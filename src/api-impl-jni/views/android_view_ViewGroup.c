@@ -40,7 +40,14 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1addView(JNIEnv *env, 
 			break;
 	}
 
-	gtk_widget_insert_before(gtk_widget_get_parent(GTK_WIDGET(_PTR(child))), parent, iter);
+	GtkWidget *child_wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(child)));
+	gtk_widget_insert_before(child_wrapper, parent, iter);
+	/* GTK only adds the parent's INSENSITIVE state on reparenting, it never clears it. A view moved
+	 * out of an insensitive (INVISIBLE) container would stay untouchable, so recompute the state. */
+	if (gtk_widget_get_sensitive(child_wrapper) && gtk_widget_is_sensitive(parent) && !gtk_widget_is_sensitive(child_wrapper)) {
+		gtk_widget_set_sensitive(child_wrapper, FALSE);
+		gtk_widget_set_sensitive(child_wrapper, TRUE);
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1removeView(JNIEnv *env, jobject this, jlong widget, jlong child)
