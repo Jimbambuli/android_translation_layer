@@ -92,6 +92,21 @@ public class ImageView extends View {
 
 	public void setImageMatrix(Matrix matrix) {}
 
+	public void setImageURI(android.net.Uri uri) {
+		if (uri == null) {
+			setImageDrawable(null);
+			return;
+		}
+		try {
+			java.io.InputStream in = getContext().getContentResolver().openInputStream(uri);
+			Bitmap bitmap = android.graphics.BitmapFactory.decodeStream(in);
+			in.close();
+			setImageBitmap(bitmap);
+		} catch (Exception e) {
+			System.err.println("ImageView.setImageURI(" + uri + "): " + e);
+		}
+	}
+
 	public void setImageBitmap(Bitmap bitmap) {
 		native_setDrawable(widget, bitmap != null ? bitmap.getTexture() : 0);
 	}
