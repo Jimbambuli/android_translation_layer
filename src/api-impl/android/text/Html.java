@@ -13,11 +13,108 @@ public class Html {
 		return Html.fromHtml(source, 0);
 	}
 
+	/* Minimal HTML-to-Spanned conversion (AOSP uses TagSoup, which we don't have): tags are stripped,
+	 * block elements become line breaks, b/strong and i/em become StyleSpans, common entities are decoded. */
 	public static Spanned fromHtml(String source, int flags) {
-		return new SpannableString(source.replace("<br/>", "\n")
-		                               .replace("<br>", "\n")
-		                               .replace("&nbsp;", " "));
-		// TODO when JTidy is in use: s/<br \/>//g
+		SpannableStringBuilder out = new SpannableStringBuilder();
+		int boldStart = -1, italicStart = -1;
+		int i = 0, n = source.length();
+		boolean pendingSpace = false;
+		while (i < n) {
+			char c = source.charAt(i);
+			if (c == '<') {
+				int end = source.indexOf('>', i);
+				if (end < 0)
+					break;
+				String tag = source.substring(i + 1, end).trim();
+				i = end + 1;
+				if (tag.startsWith("!--")) {
+					int ce = source.indexOf("-->", i);
+					i = ce < 0 ? n : ce + 3;
+					continue;
+				}
+				boolean closing = tag.startsWith("/");
+				String name = (closing ? tag.substring(1) : tag).split("[\\s/]")[0].toLowerCase();
+				if (name.equals("br")) {
+					out.append('\n');
+					pendingSpace = false;
+				} else if (name.equals("p") || name.equals("div") || name.equals("li") || name.equals("tr") || name.equals("header") ||
+				           name.equals("section") || name.equals("article") || name.equals("blockquote") ||
+				           (name.length() == 2 && name.charAt(0) == 'h' && Character.isDigit(name.charAt(1)))) {
+					if (out.length() > 0 && out.charAt(out.length() - 1) != '\n')
+						out.append('\n');
+					if (!closing && name.equals("li"))
+						out.append("• ");
+					pendingSpace = false;
+				} else if (name.equals("b") || name.equals("strong")) {
+					if (!closing) {
+						boldStart = out.length();
+					} else if (boldStart >= 0 && boldStart < out.length()) {
+						out.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), boldStart, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+						boldStart = -1;
+					}
+				} else if (name.equals("i") || name.equals("em")) {
+					if (!closing) {
+						italicStart = out.length();
+					} else if (italicStart >= 0 && italicStart < out.length()) {
+						out.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.ITALIC), italicStart, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+						italicStart = -1;
+					}
+				}
+				continue;
+			}
+			if (c == '&') {
+				int end = source.indexOf(';', i);
+				if (end > i && end - i <= 8) {
+					String rep = decodeEntity(source.substring(i + 1, end));
+					if (rep != null) {
+						if (pendingSpace && out.length() > 0)
+							out.append(' ');
+						pendingSpace = false;
+						out.append(rep);
+						i = end + 1;
+						continue;
+					}
+				}
+			}
+			if (Character.isWhitespace(c)) {
+				pendingSpace = true;
+			} else {
+				if (pendingSpace && out.length() > 0 && out.charAt(out.length() - 1) != '\n')
+					out.append(' ');
+				pendingSpace = false;
+				out.append(c);
+			}
+			i++;
+		}
+		while (out.length() > 0 && out.charAt(out.length() - 1) == '\n')
+			out.delete(out.length() - 1, out.length());
+		return out;
+	}
+
+	private static String decodeEntity(String entity) {
+		switch (entity) {
+			case "amp":
+				return "&";
+			case "lt":
+				return "<";
+			case "gt":
+				return ">";
+			case "quot":
+				return "\"";
+			case "apos":
+				return "'";
+			case "nbsp":
+				return "\u00a0";
+		}
+		try {
+			if (entity.startsWith("#x") || entity.startsWith("#X"))
+				return new String(Character.toChars(Integer.parseInt(entity.substring(2), 16)));
+			else if (entity.startsWith("#"))
+				return new String(Character.toChars(Integer.parseInt(entity.substring(1))));
+		} catch (IllegalArgumentException e) {
+		}
+		return null;
 	}
 
 	public static Spanned fromHtml(String source, ImageGetter imageGetter, TagHandler tagHandler) {
