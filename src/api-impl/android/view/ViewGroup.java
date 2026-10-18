@@ -124,6 +124,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 		native_addView(widget, child.widget, sortedIndex, params);
 		requestLayout();
+		if (child.isDuplicateParentStateEnabled())
+			child.refreshDrawableState();
 		if (callOnViewAdded) {
 			onViewAdded(child);
 			if (onHierarchyChangeListener != null)
@@ -453,6 +455,30 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void setAddStatesFromChildren(boolean addsStates) {}
+
+	/* addStatesFromChildren is not supported, so a child's state never changes ours */
+	public void childDrawableStateChanged(View child) {}
+
+	@Override
+	protected void drawableStateChanged() {
+		super.drawableStateChanged();
+		for (View child : new ArrayList<>(children)) {
+			if (child.isDuplicateParentStateEnabled())
+				child.refreshDrawableState();
+		}
+	}
+
+	@Override
+	protected void dispatchSetSelected(boolean selected) {
+		for (View child : new ArrayList<>(children))
+			child.setSelected(selected);
+	}
+
+	@Override
+	protected void dispatchSetActivated(boolean activated) {
+		for (View child : new ArrayList<>(children))
+			child.setActivated(activated);
+	}
 
 	public View getFocusedChild() { return null; }
 

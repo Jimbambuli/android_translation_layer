@@ -50,6 +50,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -961,6 +962,10 @@ public class View implements Drawable.Callback {
 	private int visibility = View.VISIBLE;
 	private float alpha = 1.0f;
 	private boolean pressed = false;
+	private boolean selected = false;
+	private boolean activated = false;
+	private boolean duplicate_parent_state = false;
+	private int[] drawable_state = null; // cached result of onCreateDrawableState(), null when dirty
 	private Drawable background;
 	private int backgroundTint = 0;
 	private int mForegroundGravity = Gravity.START | Gravity.TOP;
@@ -1135,16 +1140,36 @@ public class View implements Drawable.Callback {
 			int resId = a.getResourceId(com.android.internal.R.styleable.View_stateListAnimator, 0);
 			setStateListAnimator(AnimatorInflater.loadStateListAnimator(context, resId));
 		}
+		duplicate_parent_state = a.getBoolean(com.android.internal.R.styleable.View_duplicateParentState, false);
 		a.recycle();
 		onCreateDrawableState(0);
 	}
 
 	protected int[] onCreateDrawableState(int extraSpace) {
-		return new int[0];
+		if (duplicate_parent_state && parent instanceof View)
+			return ((View)parent).onCreateDrawableState(extraSpace);
+		int[] state = new int[4];
+		int count = 0;
+		if (isEnabled())
+			state[count++] = R.attr.state_enabled;
+		if (pressed)
+			state[count++] = R.attr.state_pressed;
+		if (selected)
+			state[count++] = R.attr.state_selected;
+		if (activated)
+			state[count++] = R.attr.state_activated;
+		return Arrays.copyOf(state, count + extraSpace);
 	}
 
-	protected static int[] mergeDrawableStates(int[] curState, int[] newState) {
-		return new int[0];
+	/* Copyright (C) 2006 The Android Open Source Project */
+	protected static int[] mergeDrawableStates(int[] baseState, int[] additionalState) {
+		final int N = baseState.length;
+		int i = N - 1;
+		while (i >= 0 && baseState[i] == 0) {
+			i--;
+		}
+		System.arraycopy(additionalState, 0, baseState, i + 1, additionalState.length);
+		return baseState;
 	}
 
 	public View findViewById(int id) {
@@ -1401,12 +1426,19 @@ public class View implements Drawable.Callback {
 		Slog.w(TAG, "calling setPressed on " + this + " with value: " + pressed);
 		if (this.pressed != pressed) {
 			this.pressed = pressed;
-			if (background != null && background.isStateful())
-				background.setState(getDrawableState());
+			refreshDrawableState();
 		}
 	}
 
-	public void setSelected(boolean selected) {}
+	public void setSelected(boolean selected) {
+		if (this.selected != selected) {
+			this.selected = selected;
+			refreshDrawableState();
+			dispatchSetSelected(selected);
+		}
+	}
+
+	protected void dispatchSetSelected(boolean selected) {}
 
 	public native Window native_get_window(long widget);
 	public ViewTreeObserver getViewTreeObserver() {
@@ -1608,6 +1640,15 @@ public class View implements Drawable.Callback {
 	}
 
 	public void refreshDrawableState() {
+		drawable_state = null;
+		drawableStateChanged();
+		if (parent instanceof ViewGroup)
+			((ViewGroup)parent).childDrawableStateChanged(this);
+	}
+
+	protected void drawableStateChanged() {
+		if (background != null && background.isStateful())
+			background.setState(getDrawableState());
 	}
 
 	public void setDescendantFocusability(int value) {}
@@ -1627,8 +1668,11 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setEnabled(boolean enabled) {
+		boolean changed = atl_enabled != enabled;
 		atl_enabled = enabled;
 		native_setVisibility(widget, visibility, alpha, atl_enabled);
+		if (changed)
+			refreshDrawableState();
 	}
 
 	public CharSequence getContentDescription() {
@@ -1946,7 +1990,7 @@ public class View implements Drawable.Callback {
 			on_layout_change_listeners.remove(listener);
 	}
 
-	public boolean isSelected() { return false; }
+	public boolean isSelected() { return selected; }
 
 	public void sendAccessibilityEvent(int eventType) {}
 
@@ -1957,9 +2001,17 @@ public class View implements Drawable.Callback {
 		this.minWidth = minWidth;
 	}
 
-	public void setActivated(boolean activated) {}
+	public void setActivated(boolean activated) {
+		if (this.activated != activated) {
+			this.activated = activated;
+			refreshDrawableState();
+			dispatchSetActivated(activated);
+		}
+	}
 
-	public boolean isActivated() { return false; }
+	protected void dispatchSetActivated(boolean activated) {}
+
+	public boolean isActivated() { return activated; }
 
 	public int getVisibility() { return visibility; }
 
@@ -1976,12 +2028,9 @@ public class View implements Drawable.Callback {
 	}
 
 	public final int[] getDrawableState() {
-		int[] state = new int[2];
-		state[0] = R.attr.state_enabled;
-		if (pressed) {
-			state[1] = R.attr.state_pressed;
-		}
-		return state;
+		if (drawable_state == null)
+			drawable_state = onCreateDrawableState(0);
+		return drawable_state;
 	}
 
 	public float getRotation() { return 0.f; }
@@ -2100,7 +2149,9 @@ public class View implements Drawable.Callback {
 
 	public void saveHierarchyState(SparseArray<Parcelable> array) {}
 
-	public void setDuplicateParentStateEnabled(boolean enabled) {}
+	public void setDuplicateParentStateEnabled(boolean enabled) {
+		duplicate_parent_state = enabled;
+	}
 
 	@Export
 	public boolean performClick() {
@@ -2620,7 +2671,7 @@ public class View implements Drawable.Callback {
 
 	public WindowInsets computeSystemWindowInsets(WindowInsets insets, Rect contentInsets) { return insets; }
 
-	public boolean isDuplicateParentStateEnabled() { return false; }
+	public boolean isDuplicateParentStateEnabled() { return duplicate_parent_state; }
 
 	public void setBackgroundTintMode(PorterDuff.Mode tintMode) {}
 
@@ -2789,9 +2840,4 @@ public class View implements Drawable.Callback {
 	public TouchDelegate getTouchDelegate() { return null; }
 
 	public void setZ(float z) {}
-
-	public void drawableStateChanged() {
-		if (background != null && background.isStateful() && background.setState(getDrawableState()))
-			invalidate();
-	}
 }
