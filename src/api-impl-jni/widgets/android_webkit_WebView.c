@@ -80,7 +80,12 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
-	webkit_web_context_register_uri_scheme(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview)), "android-asset", asset_uri_scheme_request_cb, NULL, NULL);
+	// all WebViews share the default web context, and registering a scheme twice is an error
+	static gboolean asset_scheme_registered = FALSE;
+	if (!asset_scheme_registered) {
+		webkit_web_context_register_uri_scheme(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview)), "android-asset", asset_uri_scheme_request_cb, NULL, NULL);
+		asset_scheme_registered = TRUE;
+	}
 	g_signal_connect(G_OBJECT(webview), "load-changed", G_CALLBACK(web_view_load_changed), NULL);
 	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
