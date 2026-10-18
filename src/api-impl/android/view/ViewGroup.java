@@ -123,6 +123,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			}
 		}
 		native_addView(widget, child.widget, sortedIndex, params);
+		requestLayout();
 		if (callOnViewAdded) {
 			onViewAdded(child);
 			if (onHierarchyChangeListener != null)
@@ -229,6 +230,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		child.parent = null;
 		children.remove(child);
 		native_removeView(widget, child.widget);
+		requestLayout();
 		onViewRemoved(child);
 		if (onHierarchyChangeListener != null) {
 			onHierarchyChangeListener.onChildViewRemoved(this, child);
