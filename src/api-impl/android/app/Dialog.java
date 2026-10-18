@@ -37,6 +37,10 @@ public class Dialog implements Window.Callback, DialogInterface {
 	private OnDismissListener onDismissListener;
 	private OnShowListener onShowListener;
 	private OnCancelListener onCancelListener;
+	private OnKeyListener onKeyListener;
+	private boolean cancelable = true;
+	private boolean created;
+	private boolean started; // between onStart() and onStop()
 
 	public Dialog(Context context, int themeResId) {
 		this.context = context;
@@ -85,7 +89,9 @@ public class Dialog implements Window.Callback, DialogInterface {
 
 	public void setOwnerActivity(Activity activity) {}
 
-	public void setCancelable(boolean cancelable) {}
+	public void setCancelable(boolean cancelable) {
+		this.cancelable = cancelable;
+	}
 
 	public void setOnCancelListener(OnCancelListener onCancelListener) {
 		this.onCancelListener = onCancelListener;
@@ -104,7 +110,14 @@ public class Dialog implements Window.Callback, DialogInterface {
 		Runnable action = new Runnable() {
 			@Override
 			public void run() {
-				onCreate(null);
+				if (!created) {
+					onCreate(null);
+					created = true;
+				}
+				if (!started) {
+					onStart();
+					started = true;
+				}
 				// Read the size of the main window. Floating dialogs should be smaller as specified in the windowMinWidth* attributes.
 				// Non-floating are typically constructed with MATCH_PARENT layout params and thus get the exact size of the main window.
 				// Most non-floating dialogs are technically dialogs, but are expected to behave more like full size activities.
@@ -159,6 +172,10 @@ public class Dialog implements Window.Callback, DialogInterface {
 			@Override
 			public void run() {
 				nativeClose(nativePtr);
+				if (started) {
+					started = false;
+					onStop();
+				}
 				if (onDismissListener != null)
 					onDismissListener.onDismiss(Dialog.this);
 			}
@@ -182,44 +199,81 @@ public class Dialog implements Window.Callback, DialogInterface {
 	@Override
 	public void onContentChanged() {
 	}
+	// the Window.Callback and option menu methods with the defaults of AOSP's Dialog
+
 	@Override
 	public boolean onCreatePanelMenu(int featureId, Menu menu) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onCreatePanelMenu'");
+		if (featureId == Window.FEATURE_OPTIONS_PANEL)
+			return onCreateOptionsMenu(menu);
+		return false;
 	}
+
 	@Override
 	public View onCreatePanelView(int featureId) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onCreatePanelView'");
+		return null;
 	}
+
 	@Override
 	public boolean onPreparePanel(int featureId, View view, Menu menu) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onPreparePanel'");
+		if (featureId == Window.FEATURE_OPTIONS_PANEL && menu != null)
+			return onPrepareOptionsMenu(menu) && menu.hasVisibleItems();
+		return true;
 	}
+
 	@Override
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onMenuItemSelected'");
+		return false;
 	}
+
 	@Override
-	public void onPanelClosed(int featureId, Menu menu) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onPanelClosed'");
-	}
+	public void onPanelClosed(int featureId, Menu menu) {}
 
 	@Override
 	public boolean onMenuOpened(int featureId, Menu menu) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onMenuOpened'");
+		return true;
 	}
 
-	// input reaches the views through GTK, so there is nothing to dispatch here
+	public boolean onCreateOptionsMenu(Menu menu) {
+		return true;
+	}
+
+	public boolean onPrepareOptionsMenu(Menu menu) {
+		return true;
+	}
+
+	public boolean onOptionsItemSelected(MenuItem item) {
+		return false;
+	}
 
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
+		if (onKeyListener != null && onKeyListener.onKey(this, event.getKeyCode(), event))
+			return true;
+		if (event.getAction() == KeyEvent.ACTION_DOWN)
+			return onKeyDown(event.getKeyCode(), event);
+		if (event.getAction() == KeyEvent.ACTION_UP)
+			return onKeyUp(event.getKeyCode(), event);
 		return false;
 	}
+
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		return keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE;
+	}
+
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+			onBackPressed();
+			return true;
+		}
+		return false;
+	}
+
+	public void onBackPressed() {
+		if (cancelable)
+			cancel();
+	}
+
+	// input reaches the views through GTK, so there is nothing to dispatch here
 
 	@Override
 	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
@@ -278,6 +332,23 @@ public class Dialog implements Window.Callback, DialogInterface {
 		System.out.println("- onCreate - Dialog!");
 	}
 
+	protected void onStart() {}
+
+	protected void onStop() {}
+
+	private static final String DIALOG_SHOWING_TAG = "android:dialogShowing";
+
+	public Bundle onSaveInstanceState() {
+		Bundle bundle = new Bundle();
+		bundle.putBoolean(DIALOG_SHOWING_TAG, isShowing());
+		return bundle;
+	}
+
+	public void onRestoreInstanceState(Bundle savedInstanceState) {
+		if (savedInstanceState.getBoolean(DIALOG_SHOWING_TAG))
+			show();
+	}
+
 	public void hide() {
 		System.out.println("hiding the Dialog " + this);
 		nativeClose(nativePtr);
@@ -302,7 +373,9 @@ public class Dialog implements Window.Callback, DialogInterface {
 		return false;
 	}
 
-	public void setOnKeyListener(OnKeyListener onKeyListener) {}
+	public void setOnKeyListener(OnKeyListener onKeyListener) {
+		this.onKeyListener = onKeyListener;
+	}
 
 	public View getCurrentFocus() {
 		return null;
