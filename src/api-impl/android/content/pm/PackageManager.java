@@ -2132,7 +2132,9 @@ public class PackageManager {
 	 * @see #GET_UNINSTALLED_PACKAGES
 	 */
 	public List<ApplicationInfo> getInstalledApplications(int flags) {
-		return null;
+		List<ApplicationInfo> ret = new ArrayList<ApplicationInfo>();
+		ret.add(package_info.applicationInfo);
+		return ret;
 	}
 
 	/**
