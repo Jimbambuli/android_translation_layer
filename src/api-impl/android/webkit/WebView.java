@@ -12,6 +12,7 @@ public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
 	private String url;
+	private WebChromeClient webChromeClient;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -52,10 +53,16 @@ public class WebView extends ViewGroup {
 	void internalLoadChanged(int loadState, String url) {
 		url = internalToAppUrl(url);
 		this.url = url;
-		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0 && webViewClient != null) {
-			webViewClient.onPageStarted(this, url);
-		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3 && webViewClient != null) {
-			webViewClient.onPageFinished(this, url);
+		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0) {
+			if (webViewClient != null)
+				webViewClient.onPageStarted(this, url, null);
+			if (webChromeClient != null)
+				webChromeClient.onProgressChanged(this, 10);
+		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3) {
+			if (webChromeClient != null)
+				webChromeClient.onProgressChanged(this, 100);
+			if (webViewClient != null)
+				webViewClient.onPageFinished(this, url);
 		}
 	}
 
@@ -83,7 +90,9 @@ public class WebView extends ViewGroup {
 		}
 	}
 
-	public void setWebChromeClient(WebChromeClient dummy) {}
+	public void setWebChromeClient(WebChromeClient webChromeClient) {
+		this.webChromeClient = webChromeClient;
+	}
 
 	public void removeAllViews() {}
 
