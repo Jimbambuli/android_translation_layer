@@ -262,3 +262,15 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JN
 	data->callback = callback ? (*env)->NewGlobalRef(env, callback) : NULL;
 	webkit_web_view_evaluate_javascript(webview, _CSTRING(script), -1, NULL, NULL, NULL, evaluate_js_cb, data);
 }
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBackgroundColor(JNIEnv *env, jobject this, jlong widget_ptr, jint color)
+{
+	WebKitWebView *webview = _PTR(widget_ptr);
+	GdkRGBA rgba = {
+		.red = ((color >> 16) & 0xFF) / 255.f,
+		.green = ((color >> 8) & 0xFF) / 255.f,
+		.blue = (color & 0xFF) / 255.f,
+		.alpha = ((color >> 24) & 0xFF) / 255.f,
+	};
+	webkit_web_view_set_background_color(webview, &rgba);
+}

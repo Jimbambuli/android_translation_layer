@@ -311,4 +311,7 @@ public class WebView extends ViewGroup {
 	private native void native_reload(long widget);
 	private native void native_addJavascriptInterface(long widget, String name, String methodNames);
 	private native void native_evaluateJavascript(long widget, String script, ValueCallback<String> callback);
+	/* the page is drawn by WebKit, a CSS background of the widget would stay hidden behind it */
+	@Override
+	protected native void native_setBackgroundColor(long widget, int color);
 }

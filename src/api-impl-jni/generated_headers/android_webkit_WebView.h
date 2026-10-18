@@ -289,6 +289,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1addJavascriptInterfac
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript
   (JNIEnv *, jobject, jlong, jstring, jobject);
 
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setBackgroundColor
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBackgroundColor
+  (JNIEnv *, jobject, jlong, jint);
+
 #ifdef __cplusplus
 }
 #endif
