@@ -27,6 +27,14 @@ static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointe
 	jobject asset_manager_obj = J__WebView__internalGetAssetManager(env, wrapper->jobj);
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(asset_manager_obj, "mObject"));
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, path, ACCESS_STREAMING);
+	if (asset == NULL) {
+		// like the Android WebView: a missing asset is a failed load, not a crash
+		android_log_printf(ANDROID_LOG_WARN, "WebView", "asset not found: %s\n", path);
+		GError *error = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "asset not found: %s", path);
+		webkit_uri_scheme_request_finish_error(request, error);
+		g_error_free(error);
+		return;
+	}
 	GInputStream *stream = asset_input_stream_new(asset);
 	webkit_uri_scheme_request_finish(request, stream, Asset_getLength(asset), NULL);
 	g_object_unref(stream);

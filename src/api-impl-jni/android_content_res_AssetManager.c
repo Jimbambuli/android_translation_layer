@@ -63,6 +63,8 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_openAssetFd(JNIEnv 
 	AM_SCOPEDLOCK(asset_manager)
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, file_name, mode);
 	android_log_printf(ANDROID_LOG_VERBOSE, "[" __FILE__ "]", "AssetManager_openAssetFd(%p, %s, %d, ...)\n", asset_manager, file_name, mode);
+	if (asset == NULL)
+		return -ENOENT; // AssetManager.java throws FileNotFoundException
 
 	if (asset == NULL) {
 		(*env)->ThrowNew(env, (*env)->FindClass(env, "java/io/FileNotFoundException"), file_name);
@@ -668,6 +670,8 @@ JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_openXmlAssetNative
 	const char *file_name = (*env)->GetStringUTFChars(env, _file_name, NULL);
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, file_name, ACCESS_BUFFER);
 	(*env)->ReleaseStringUTFChars(env, _file_name, file_name);
+	if (asset == NULL)
+		return 0; // AssetManager.java throws FileNotFoundException
 
 	struct ResXMLTree *res_xml = ResXMLTree_new();
 	ResXMLTree_setTo(res_xml, Asset_getBuffer(asset, true), Asset_getLength(asset), true);
