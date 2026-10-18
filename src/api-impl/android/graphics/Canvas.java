@@ -550,7 +550,7 @@ public class Canvas {
 	}
 
 	public void drawARGB(int a, int r, int g, int b) {
-		Log.w("Canvas", "STUB: drawARGB(" + a + ", " + r + ", " + g + ", " + b + ")");
+		drawColor(Color.argb(a, r, g, b));
 	}
 
 	public int saveLayer(RectF bounds, Paint paint, int flags) {
@@ -570,7 +570,10 @@ public class Canvas {
 	}
 
 	public void drawColor(int color, PorterDuff.Mode mode) {
-		Log.w("Canvas", "STUB: drawColor(" + String.format("0x%08x", color) + ", " + mode + ")");
+		Paint paint = new Paint();
+		paint.setColor(color);
+		paint.setXfermode(new PorterDuffXfermode(mode));
+		drawPaint(paint);
 	}
 
 	public boolean clipRect(int left, int top, int right, int bottom) {
@@ -642,8 +645,13 @@ public class Canvas {
 		Log.w("Canvas", "STUB: drawPicture");
 	}
 
+	/* a point is a square of the stroke width (at least one pixel) around x, y; round caps are
+	 * not drawn round */
 	public void drawPoint(float x, float y, Paint paint) {
-		Log.w("Canvas", "STUB: drawPoint");
+		float half = Math.max(paint.getStrokeWidth(), 1) / 2;
+		Paint fill = new Paint(paint);
+		fill.setStyle(Paint.Style.FILL);
+		drawRect(x - half, y - half, x + half, y + half, fill);
 	}
 
 	public void drawPoints(float[] pts, Paint paint) {
