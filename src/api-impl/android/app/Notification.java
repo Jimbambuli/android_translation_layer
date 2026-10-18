@@ -197,6 +197,20 @@ public class Notification implements Parcelable {
 
 		public Builder addExtras(Bundle bundle) { return this; }
 
+		public Builder setColorized(boolean colorize) { return this; }
+
+		public Builder setCustomContentView(RemoteViews contentView) { return this; }
+
+		public Builder setCustomBigContentView(RemoteViews contentView) { return this; }
+
+		public Builder setCustomHeadsUpContentView(RemoteViews contentView) { return this; }
+
+		public Builder addPerson(String uri) { return this; }
+
+		public Builder setAllowSystemGeneratedContextualActions(boolean allowed) { return this; }
+
+		public Builder setForegroundServiceBehavior(int behavior) { return this; }
+
 		public Notification build() {
 			return notification;
 		}
@@ -231,6 +245,12 @@ public class Notification implements Parcelable {
 			public Builder addRemoteInput(RemoteInput remoteInput) { return this; }
 
 			public Builder setAllowGeneratedReplies(boolean allowGeneratedReplies) { return this; }
+
+			public Builder setSemanticAction(int semanticAction) { return this; }
+
+			public Builder setContextual(boolean isContextual) { return this; }
+
+			public Builder setAuthenticationRequired(boolean authenticationRequired) { return this; }
 
 			public Action build() {
 				return action;
