@@ -1263,6 +1263,7 @@ public class Resources {
 			}
 
 			mAssets.applyThemeStyle(theme, resid, force);
+			mKey.append(resid, force);
 		}
 
 		/**
@@ -1276,6 +1277,7 @@ public class Resources {
 		 */
 		public void setTo(Theme other) {
 			getAssets().copyTheme(this.theme, other.theme);
+			mKey.setTo(other.getKey());
 		}
 
 		/**
@@ -1558,6 +1560,7 @@ public class Resources {
 			mResId = other.mResId == null ? null : other.mResId.clone();
 			mForce = other.mForce == null ? null : other.mForce.clone();
 			mCount = other.mCount;
+			mHashCode = other.mHashCode;
 		}
 
 		@Override
