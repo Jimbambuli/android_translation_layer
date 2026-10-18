@@ -704,6 +704,7 @@ srcs = [
 	'android/view/inputmethod/InputMethodSubtype.java',
 	'android/view/textservice/TextServicesManager.java',
 	'android/view/translation/ViewTranslationCallback.java',
+	'android/webkit/ConsoleMessage.java',
 	'android/webkit/CookieManager.java',
 	'android/webkit/CookieSyncManager.java',
 	'android/webkit/DownloadListener.java',
