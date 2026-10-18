@@ -258,7 +258,16 @@ public abstract class Context {
 	}
 
 	public File getExternalFilesDir(String type) {
-		return getFilesDir();
+		/* like on Android, keep this apart from getFilesDir() and honour the type subdirectory;
+		 * apps that clean up their external directories would otherwise delete internal data */
+		File dir = new File(getDataDirFile(), "Android/data/" + getPackageName() + "/files");
+		if (type != null)
+			dir = new File(dir, type);
+		if (!dir.exists() && !dir.mkdirs() && !dir.exists()) {
+			Slog.w(TAG, "Unable to create external files directory " + dir.getPath());
+			return null;
+		}
+		return dir;
 	}
 
 	public File[] getExternalFilesDirs(String type) {
