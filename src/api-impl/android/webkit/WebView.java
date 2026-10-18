@@ -42,9 +42,15 @@ public class WebView extends ViewGroup {
 		this.webViewClient = webViewClient;
 	}
 
+	// undo the android-asset:// rewrite (see loadUrl()), apps expect the URL they loaded
+	private static String internalToAppUrl(String url) {
+		return url != null ? url.replace("android-asset:///assets/", "file:///android_asset/") : null;
+	}
+
 	// to be used by native code
 	@Export
 	void internalLoadChanged(int loadState, String url) {
+		url = internalToAppUrl(url);
 		this.url = url;
 		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0 && webViewClient != null) {
 			webViewClient.onPageStarted(this, url);
@@ -55,6 +61,7 @@ public class WebView extends ViewGroup {
 
 	@Export
 	boolean internalShouldOverrideUrlLoading(String url) {
+		url = internalToAppUrl(url);
 		if (webViewClient != null)
 			return webViewClient.shouldOverrideUrlLoading(this, url);
 		else
@@ -91,6 +98,9 @@ public class WebView extends ViewGroup {
 		}
 		// webkit doesn't allow overwriting the file:// uri scheme. So we replace it with the android-asset:// scheme
 		data = data.replace("file:///android_asset/", "android-asset:///assets/");
+		// relative URLs in the document are resolved against the base URL, so it needs the same treatment
+		if (baseUrl != null)
+			baseUrl = baseUrl.replace("file:///android_asset/", "android-asset:///assets/");
 		native_loadDataWithBaseURL(widget, baseUrl, data, mimeType, encoding);
 	}
 
