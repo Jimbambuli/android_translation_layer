@@ -80,5 +80,50 @@ public class Spinner extends AbsSpinner {
 
 	public int getDropDownWidth() { return 100; }
 
-	public void setDropDownHorizontalOffset(int offset){};
+	/* the GTK drop-down places and sizes its popup itself; the values are only kept for the getters */
+	private int dropDownHorizontalOffset;
+	private int dropDownVerticalOffset;
+	private CharSequence prompt;
+
+	public void setDropDownWidth(int pixels) {}
+
+	public void setDropDownHorizontalOffset(int pixels) {
+		dropDownHorizontalOffset = pixels;
+	}
+
+	public int getDropDownHorizontalOffset() {
+		return dropDownHorizontalOffset;
+	}
+
+	public void setDropDownVerticalOffset(int pixels) {
+		dropDownVerticalOffset = pixels;
+	}
+
+	public int getDropDownVerticalOffset() {
+		return dropDownVerticalOffset;
+	}
+
+	public void setPopupBackgroundDrawable(Drawable background) {
+		popupBackground = background;
+	}
+
+	public void setPopupBackgroundResource(int resId) {
+		setPopupBackgroundDrawable(getContext().getDrawable(resId));
+	}
+
+	public Drawable getPopupBackground() {
+		return popupBackground;
+	}
+
+	public void setPrompt(CharSequence prompt) {
+		this.prompt = prompt;
+	}
+
+	public void setPromptId(int promptId) {
+		setPrompt(getContext().getText(promptId));
+	}
+
+	public CharSequence getPrompt() {
+		return prompt;
+	}
 }
