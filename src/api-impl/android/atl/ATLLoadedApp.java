@@ -222,7 +222,12 @@ public final class ATLLoadedApp {
 		intent.setComponent(new ComponentName(pkg.packageName, className));
 		activity.intent = intent;
 		Resources r = this.createDefaultResources();
-		activity.atl_attach_base_context(new ContextImpl(r, this, theme_res));
+		// Like ActivityThread.performLaunchActivity(): the base context only carries the default
+		// theme, the activity theme is applied after attachBaseContext(). An activity may replace
+		// its resources there (AppCompat does so for night mode), and the theme has to be resolved
+		// against those resources, not against the ones of the base context.
+		activity.atl_attach_base_context(new ContextImpl(r, this, Resources.selectDefaultTheme(0, this.effective_sdk_compat)));
+		activity.setTheme(theme_res);
 		if (label_res != 0) {
 			activity.setTitle(r.getText(label_res));
 		} else if (pkg.applicationInfo.labelRes != 0) {
