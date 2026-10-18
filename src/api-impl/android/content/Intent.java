@@ -500,6 +500,7 @@ public class Intent implements Parcelable {
 		this.data = o.data;
 		this.extras = o.extras;
 		this.component = o.component;
+		this.clipData = o.clipData;
 	}
 	public Intent(String action) {
 		this.action = action;
@@ -824,7 +825,7 @@ public class Intent implements Parcelable {
 	}
 
 	public ClipData getClipData() {
-		return null;
+		return clipData;
 	}
 
 	public static class ShortcutIconResource {
@@ -901,7 +902,11 @@ public class Intent implements Parcelable {
 		this.selector = selector;
 	}
 
-	public void setClipData(ClipData clip) {}
+	private ClipData clipData;
+
+	public void setClipData(ClipData clip) {
+		clipData = clip;
+	}
 
 	public String resolveType(Context context) {
 		return type;

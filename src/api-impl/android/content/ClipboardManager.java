@@ -78,7 +78,7 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 */
 	public void setPrimaryClip(ClipData clip) {
 		// this is not the primary clipboard in UNIX sense (not middle click paste)
-		native_set_clipboard(clip.text);
+		native_set_clipboard(clip.getItemCount() > 0 ? String.valueOf(clip.getItemAt(0).coerceToText(null)) : "");
 	}
 	/**
 	 * Returns the current primary clip on the clipboard.
@@ -116,6 +116,7 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * primary clip.  It has no label or icon.
 	 */
 	public void setText(CharSequence text) {
+		setPrimaryClip(ClipData.newPlainText(null, text));
 	}
 	/**
 	 * @deprecated Use {@link #hasPrimaryClip()} instead.

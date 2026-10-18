@@ -19,13 +19,57 @@ public class ClipDescription /*implements Parcelable*/ {
 	public static final int CLASSIFICATION_NOT_PERFORMED = 2;
 	public static final int CLASSIFICATION_COMPLETE = 3;
 
-	public ClipDescription(CharSequence label, String[] mimeTypes) {}
+	private final CharSequence label;
+	private final String[] mimeTypes;
+
+	public ClipDescription(CharSequence label, String[] mimeTypes) {
+		if (mimeTypes == null)
+			throw new NullPointerException("mimeTypes is null");
+		this.label = label;
+		this.mimeTypes = mimeTypes;
+	}
+
+	public ClipDescription(ClipDescription o) {
+		this(o.label, o.mimeTypes);
+	}
+
+	/**
+	 * Compares a MIME type with a filter that may contain wildcards ("text/*", "*&#47;*").
+	 */
+	public static boolean compareMimeTypes(String concreteType, String desiredType) {
+		if (desiredType.equals("*/*") || desiredType.equals(concreteType))
+			return true;
+		if (desiredType.endsWith("/*")) {
+			String prefix = desiredType.substring(0, desiredType.length() - 1);
+			return concreteType.startsWith(prefix);
+		}
+		return false;
+	}
+
+	public CharSequence getLabel() {
+		return label;
+	}
+
+	public boolean hasMimeType(String mimeType) {
+		for (String type : mimeTypes)
+			if (compareMimeTypes(type, mimeType))
+				return true;
+		return false;
+	}
+
+	public String[] filterMimeTypes(String mimeType) {
+		java.util.ArrayList<String> result = new java.util.ArrayList<>();
+		for (String type : mimeTypes)
+			if (compareMimeTypes(type, mimeType))
+				result.add(type);
+		return result.isEmpty() ? null : result.toArray(new String[0]);
+	}
 
 	public int getMimeTypeCount() {
-		return 0;
+		return mimeTypes.length;
 	}
 
 	public String getMimeType(int index) {
-		return "FIXME";
+		return mimeTypes[index];
 	}
 }
