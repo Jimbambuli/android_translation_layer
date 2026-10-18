@@ -1,6 +1,7 @@
 package android.view;
 
 import android.content.Context;
+import android.util.DisplayMetrics;
 
 /**
  * default values are mainly based on AOSPs defaults. Does not account for scaling yet.
@@ -55,12 +56,13 @@ public class ViewConfiguration {
 		return 8;
 	}
 
+	// AOSP's config_scrollFactor: 64dp per mouse wheel notch
 	public float getScaledHorizontalScrollFactor() {
-		return 1;
+		return 64 * DisplayMetrics.DENSITY_DEVICE / (float)DisplayMetrics.DENSITY_DEFAULT;
 	}
 
 	public float getScaledVerticalScrollFactor() {
-		return 1;
+		return 64 * DisplayMetrics.DENSITY_DEVICE / (float)DisplayMetrics.DENSITY_DEFAULT;
 	}
 
 	public static int getScrollBarFadeDuration() {
