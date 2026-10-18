@@ -9,6 +9,11 @@ import java.util.Map;
 public class MediaMetadataRetriever {
 
 	private MediaPlayer mediaPlayer;
+	/* the data source for frame extraction: a path, or a region of a file descriptor */
+	private String path;
+	private FileDescriptor fd;
+	private long fdOffset;
+	private long fdLength;
 
 	public void release() {
 		if (mediaPlayer != null)
@@ -16,11 +21,11 @@ public class MediaMetadataRetriever {
 	}
 
 	public void setDataSource(Context context, Uri uri) {
-		mediaPlayer = new MediaPlayer();
-		mediaPlayer.setDataSource(uri.getPath());
+		setDataSource(uri.getPath());
 	}
 
 	public void setDataSource(String path) {
+		this.path = path;
 		mediaPlayer = new MediaPlayer();
 		mediaPlayer.setDataSource(path);
 	}
@@ -31,6 +36,9 @@ public class MediaMetadataRetriever {
 	}
 
 	public void setDataSource(FileDescriptor fd, long offset, long length) {
+		this.fd = fd;
+		fdOffset = offset;
+		fdLength = length;
 		mediaPlayer = new MediaPlayer();
 		mediaPlayer.setDataSource(fd, offset, length);
 	}
@@ -52,11 +60,8 @@ public class MediaMetadataRetriever {
 		}
 	}
 
-	/* Frames are not extracted: null means "no frame", which AOSP returns as well when it cannot
-	 * decode one, and callers (e.g. Glide) then show their placeholder. */
-
 	public Bitmap getFrameAtTime(long timeUs, int option) {
-		return null;
+		return getScaledFrameAtTime(timeUs, option, 0, 0);
 	}
 
 	public Bitmap getFrameAtTime(long timeUs) {
@@ -67,9 +72,20 @@ public class MediaMetadataRetriever {
 		return getFrameAtTime(-1, OPTION_CLOSEST_SYNC);
 	}
 
+	/* null if there is no video frame, as in AOSP; callers (e.g. Glide) then show their placeholder */
 	public Bitmap getScaledFrameAtTime(long timeUs, int option, int dstWidth, int dstHeight) {
-		return null;
+		if (path == null && fd == null)
+			throw new IllegalStateException("no data source");
+		int[] size = new int[2];
+		int[] pixels = native_getFrameAtTime(path, fd != null ? fd.getInt$() : -1, fdOffset, fdLength,
+		                                     timeUs, option, dstWidth, dstHeight, size);
+		if (pixels == null)
+			return null;
+		return Bitmap.createBitmap(pixels, size[0], size[1], Bitmap.Config.ARGB_8888);
 	}
+
+	private static native int[] native_getFrameAtTime(String path, int fd, long offset, long length, long timeUs,
+	                                                  int option, int dstWidth, int dstHeight, int[] size);
 
 	public static final int OPTION_PREVIOUS_SYNC = 0x00;
 	public static final int OPTION_NEXT_SYNC = 0x01;
