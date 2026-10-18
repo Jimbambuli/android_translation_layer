@@ -80,13 +80,20 @@ public class AudioTrack {
 		native_play();
 	}
 
+	/* like AOSP for streaming tracks: what was written before is still played out */
 	public void stop() {
-		System.out.println("STUB: AudioTrack.stop()\n");
 		playbackState = PLAYSTATE_STOPPED;
 	}
 
+	/**
+	 * Discards the data that was written but not played yet. Only when stopped or paused, like
+	 * AOSP; the playback head position starts again at 0.
+	 */
 	public void flush() {
-		System.out.println("STUB: AudioTrack.flush()\n");
+		if (playbackState == PLAYSTATE_PLAYING)
+			return;
+		native_flush();
+		playbackHeadPosition = 0;
 	}
 
 	public void release() {
@@ -177,6 +184,7 @@ public class AudioTrack {
 	private native int native_getPlaybackHeadPosition();
 	public native void native_play();
 	public native void native_pause();
+	private native void native_flush();
 	private native int native_write(byte[] audioData, int offsetInBytes, int framesToWrite, float volume);
 	private native int native_write(short[] audioData, int offsetInShorts, int framesToWrite, float volume);
 	public native void native_release();
