@@ -34,6 +34,7 @@ public class Dialog implements Window.Callback, DialogInterface {
 	private Window window;
 	private OnDismissListener onDismissListener;
 	private OnShowListener onShowListener;
+	private OnCancelListener onCancelListener;
 
 	public Dialog(Context context, int themeResId) {
 		this.context = context;
@@ -84,7 +85,9 @@ public class Dialog implements Window.Callback, DialogInterface {
 
 	public void setCancelable(boolean cancelable) {}
 
-	public void setOnCancelListener(OnCancelListener onCancelListener) {}
+	public void setOnCancelListener(OnCancelListener onCancelListener) {
+		this.onCancelListener = onCancelListener;
+	}
 
 	public void setOnDismissListener(OnDismissListener onDismissListener) {
 		this.onDismissListener = onDismissListener;
@@ -220,6 +223,8 @@ public class Dialog implements Window.Callback, DialogInterface {
 
 	@Override
 	public void cancel() {
+		if (onCancelListener != null)
+			onCancelListener.onCancel(this);
 		dismiss();
 	}
 
