@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <gio/gunixinputstream.h>
 #include <gtk/gtk.h>
 #include <libportal/portal.h>
 #include <string.h>
@@ -121,6 +122,31 @@ char *fd_get_path(int fd)
 
 extern GtkWindow *window;
 
+static void share_save_callback(GObject *dialog, GAsyncResult *result, gpointer user_data)
+{
+	int fd = GPOINTER_TO_INT(user_data);
+	GFile *file = gtk_file_dialog_save_finish(GTK_FILE_DIALOG(dialog), result, NULL);
+	if (file) {
+		GError *error = NULL;
+		lseek(fd, 0, SEEK_SET);
+		GInputStream *in = g_unix_input_stream_new(fd, TRUE);
+		GFileOutputStream *out = g_file_replace(file, NULL, FALSE, G_FILE_CREATE_NONE, NULL, &error);
+		if (out) {
+			g_output_stream_splice(G_OUTPUT_STREAM(out), in, G_OUTPUT_STREAM_SPLICE_CLOSE_TARGET, NULL, &error);
+			g_object_unref(out);
+		}
+		if (error) {
+			fprintf(stderr, "share: saving the file failed: %s\n", error->message);
+			g_error_free(error);
+		}
+		g_object_unref(in);
+		g_object_unref(file);
+	} else {
+		close(fd);
+	}
+	g_object_unref(dialog);
+}
+
 static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointer text_jstr)
 {
 	JNIEnv *env = get_jni_env();
@@ -170,6 +196,16 @@ static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointe
 		g_object_unref(fd_list);
 		g_object_unref(email);
 		g_object_unref(connection);
+	} else if (button_id == 3) {
+		GtkFileDialog *save_dialog = gtk_file_dialog_new();
+		char *path = fd_get_path(fd);
+		if (path) {
+			char *name = g_path_get_basename(path);
+			gtk_file_dialog_set_initial_name(save_dialog, name);
+			g_free(name);
+			g_free(path);
+		}
+		gtk_file_dialog_save(save_dialog, window, NULL, share_save_callback, GINT_TO_POINTER(dup(fd)));
 	}
 	if (text_jstr) {
 		(*env)->ReleaseStringUTFChars(env, text_jstr, text);
@@ -180,7 +216,8 @@ static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointe
 }
 
 /* The XDG specification does not provide anything comparable to the Android share API yet. Therefore, we provide
- * a custom dialog allowing the user to copy to clipboard or send per mail using the composeEmail portal.
+ * a custom dialog allowing the user to copy to clipboard, send per mail using the composeEmail portal, or save
+ * a shared file.
  */
 JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd)
 {
@@ -195,7 +232,10 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 		gtk_alert_dialog_set_detail(dialog, text);
 		(*env)->ReleaseStringUTFChars(env, text_jstr, text);
 	}
-	gtk_alert_dialog_set_buttons(dialog, (const char *[]){"Cancel", "Copy", "Email", NULL});
+	if (fd != -1)
+		gtk_alert_dialog_set_buttons(dialog, (const char *[]){"Cancel", "Copy", "Email", "Save", NULL});
+	else
+		gtk_alert_dialog_set_buttons(dialog, (const char *[]){"Cancel", "Copy", "Email", NULL});
 	gtk_alert_dialog_set_cancel_button(dialog, 0);
 	gtk_alert_dialog_set_default_button(dialog, 1);
 	gtk_alert_dialog_choose(dialog, window, NULL, share_dialog_callback, _REF(text_jstr));
