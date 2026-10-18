@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -30,6 +31,7 @@ import android.view.ActionMode;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import java.util.Locale;
 
 public class TextView extends View {
 	private ColorStateList colors = new ColorStateList(new int[][] {new int[0]}, new int[1]);
@@ -240,8 +242,17 @@ public class TextView extends View {
 		return null;
 	}
 
-	public void setHintTextColor(ColorStateList colorStateList) {}
-	public void setHintTextColor(int i) {}
+	// the hint is not shown, but the colors are kept for getHintTextColors()
+	private ColorStateList hint_colors = null;
+	public void setHintTextColor(ColorStateList colorStateList) {
+		hint_colors = colorStateList;
+	}
+	public void setHintTextColor(int i) {
+		hint_colors = ColorStateList.valueOf(i);
+	}
+	public final ColorStateList getHintTextColors() {
+		return hint_colors;
+	}
 	public void setLinkTextColor(ColorStateList colorStateList) {}
 
 	public void setSingleLine() {
@@ -283,6 +294,21 @@ public class TextView extends View {
 	private native void native_setLines(int lines, int ellipsize_mode);
 
 	public void setMinWidth(int minWidth) {}
+
+	public void setMinEms(int minEms) {}
+
+	public void setMaxEms(int maxEms) {}
+
+	public Locale getTextLocale() {
+		return Locale.getDefault();
+	}
+
+	// there is no input method connection to batch or configure
+	public void beginBatchEdit() {}
+
+	public void endBatchEdit() {}
+
+	public void setPrivateImeOptions(String type) {}
 	public void setMaxWidth(int maxWidth) {}
 
 	public Typeface getTypeface() { return null; }
@@ -541,6 +567,8 @@ public class TextView extends View {
 	public void setAutoSizeTextTypeUniformWithPresetSizes(int[] presetSizes, int unit) {}
 
 	public void setCompoundDrawableTintList(ColorStateList tint) {}
+
+	public void setCompoundDrawableTintMode(PorterDuff.Mode tintMode) {}
 
 	public int getHyphenationFrequency() {
 		return hyphenation_frequency;
