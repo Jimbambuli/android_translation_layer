@@ -21,7 +21,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager.LayoutParams;
 
-public class Dialog implements Window.Callback, DialogInterface {
+public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callback {
 	protected long nativePtr;
 
 	protected native long nativeInit(long decor_view);
@@ -265,6 +265,14 @@ public class Dialog implements Window.Callback, DialogInterface {
 			onBackPressed();
 			return true;
 		}
+		return false;
+	}
+
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
 		return false;
 	}
 

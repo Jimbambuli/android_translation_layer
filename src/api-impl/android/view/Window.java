@@ -111,6 +111,12 @@ public class Window {
 		return decorView;
 	}
 
+	/* like PhoneWindow: the decor view gets the key first; AppCompat's KeyEventDispatcher calls this
+	 * before it hands the key to the Window.Callback (a dialog's Back, for instance) */
+	public boolean superDispatchKeyEvent(KeyEvent event) {
+		return decorView.dispatchKeyEvent(event);
+	}
+
 	public void takeInputQueue(InputQueue.Callback callback) {
 		take_input_queue(native_window, callback, new InputQueue());
 	}

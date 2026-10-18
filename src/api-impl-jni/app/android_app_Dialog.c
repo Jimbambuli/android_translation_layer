@@ -16,6 +16,39 @@ static gboolean on_close_request(GtkWidget *dialog, jobject jobj)
 	return FALSE;
 }
 
+#define KEYCODE_BACK 4
+#define ACTION_DOWN 0
+#define ACTION_UP 1
+
+/* Key events that no view consumed go to the dialog, like Window.Callback.dispatchKeyEvent() on
+ * Android. Only Escape is forwarded, as Back, which is what the fallback in AOSP's Generic.kcm
+ * turns an unhandled Escape into: a cancelable dialog closes, Compose's dialogs call their
+ * onDismissRequest. */
+static gboolean dispatch_back_key(jobject jobj, guint keyval, int action)
+{
+	if (keyval != GDK_KEY_Escape)
+		return FALSE;
+
+	JNIEnv *env = get_jni_env();
+	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, action, KEYCODE_BACK, 0, 0);
+	jmethodID dispatch = _METHOD(_CLASS(jobj), "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
+	gboolean ret = (*env)->CallBooleanMethod(env, jobj, dispatch, key_event);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, key_event);
+	return ret;
+}
+
+static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, jobject jobj)
+{
+	return dispatch_back_key(jobj, keyval, ACTION_DOWN);
+}
+
+static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, jobject jobj)
+{
+	return dispatch_back_key(jobj, keyval, ACTION_UP);
+}
+
 /* state for Dialog.setCanceledOnTouchOutside() */
 struct touch_outside {
 	GtkWindow *dialog;
@@ -62,7 +95,12 @@ JNIEXPORT jlong JNICALL Java_android_app_Dialog_nativeInit(JNIEnv *env, jobject 
 	gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
 	gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
 	gtk_window_set_child(GTK_WINDOW(dialog), gtk_widget_get_parent(decor_view));
-	g_signal_connect(GTK_WINDOW(dialog), "close-request", G_CALLBACK(on_close_request), _REF(this));
+	jobject ref = _REF(this);
+	g_signal_connect(GTK_WINDOW(dialog), "close-request", G_CALLBACK(on_close_request), ref);
+	GtkEventController *controller = gtk_event_controller_key_new();
+	g_signal_connect(controller, "key-pressed", G_CALLBACK(on_key_pressed), ref);
+	g_signal_connect(controller, "key-released", G_CALLBACK(on_key_released), ref);
+	gtk_widget_add_controller(dialog, controller);
 	return _INTPTR(g_object_ref(dialog));
 }
 
