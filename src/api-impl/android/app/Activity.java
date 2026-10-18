@@ -21,10 +21,12 @@ import android.util.Slog;
 import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.KeyEvent;
+import android.view.ActionMode;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -656,6 +658,54 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		return false;
 	}
+
+	/* the remaining Window.Callback methods; input reaches the views through GTK, so there is
+	 * nothing to dispatch here, and there is no action bar to start an action mode in */
+
+	@Override
+	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
+		return false;
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent event) {
+		return false;
+	}
+
+	@Override
+	public boolean dispatchTrackballEvent(MotionEvent event) {
+		return false;
+	}
+
+	@Override
+	public boolean dispatchGenericMotionEvent(MotionEvent event) {
+		return false;
+	}
+
+	@Override
+	public void onWindowAttributesChanged(WindowManager.LayoutParams params) {}
+
+	@Override
+	public void onAttachedToWindow() {}
+
+	@Override
+	public void onDetachedFromWindow() {}
+
+	@Override
+	public ActionMode onWindowStartingActionMode(ActionMode.Callback callback) {
+		return null;
+	}
+
+	@Override
+	public ActionMode onWindowStartingActionMode(ActionMode.Callback callback, int type) {
+		return null;
+	}
+
+	@Override
+	public void onActionModeStarted(ActionMode mode) {}
+
+	@Override
+	public void onActionModeFinished(ActionMode mode) {}
 
 	public void requestPermissions(String[] permissions, int requestCode) {
 		Slog.w(TAG, "requestPermissions(" + Arrays.toString(permissions) + "): not handled");

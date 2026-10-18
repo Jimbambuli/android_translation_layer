@@ -29,6 +29,38 @@ public class Window {
 		public void onPanelClosed(int featureId, Menu menu);
 
 		public boolean onMenuOpened(int featureId, Menu menu);
+
+		public boolean dispatchKeyEvent(KeyEvent event);
+
+		public boolean dispatchKeyShortcutEvent(KeyEvent event);
+
+		public boolean dispatchTouchEvent(MotionEvent event);
+
+		public boolean dispatchTrackballEvent(MotionEvent event);
+
+		public boolean dispatchGenericMotionEvent(MotionEvent event);
+
+		public void onWindowAttributesChanged(WindowManager.LayoutParams attrs);
+
+		public void onWindowFocusChanged(boolean hasFocus);
+
+		public void onAttachedToWindow();
+
+		public void onDetachedFromWindow();
+
+		public boolean onSearchRequested();
+
+		public ActionMode onWindowStartingActionMode(ActionMode.Callback callback);
+
+		public ActionMode onWindowStartingActionMode(ActionMode.Callback callback, int type);
+
+		public void onActionModeStarted(ActionMode mode);
+
+		public void onActionModeFinished(ActionMode mode);
+
+		default public void onProvideKeyboardShortcuts(java.util.List<?> data, Menu menu, int deviceId) {}
+
+		default public void onPointerCaptureChanged(boolean hasCapture) {}
 	}
 
 	public static interface OnFrameMetricsAvailableListener {}

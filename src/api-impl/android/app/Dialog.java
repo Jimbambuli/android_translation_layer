@@ -10,6 +10,8 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.view.ActionMode;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -211,6 +213,66 @@ public class Dialog implements Window.Callback, DialogInterface {
 		// TODO Auto-generated method stub
 		throw new UnsupportedOperationException("Unimplemented method 'onMenuOpened'");
 	}
+
+	// input reaches the views through GTK, so there is nothing to dispatch here
+
+	@Override
+	public boolean dispatchKeyEvent(KeyEvent event) {
+		return false;
+	}
+
+	@Override
+	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
+		return false;
+	}
+
+	@Override
+	public boolean dispatchTouchEvent(MotionEvent event) {
+		return onTouchEvent(event);
+	}
+
+	@Override
+	public boolean dispatchTrackballEvent(MotionEvent event) {
+		return false;
+	}
+
+	@Override
+	public boolean dispatchGenericMotionEvent(MotionEvent event) {
+		return false;
+	}
+
+	@Override
+	public void onWindowAttributesChanged(LayoutParams params) {}
+
+	@Override
+	public void onWindowFocusChanged(boolean hasFocus) {}
+
+	@Override
+	public void onAttachedToWindow() {}
+
+	@Override
+	public void onDetachedFromWindow() {}
+
+	@Override
+	public boolean onSearchRequested() {
+		return false;
+	}
+
+	@Override
+	public ActionMode onWindowStartingActionMode(ActionMode.Callback callback) {
+		return null;
+	}
+
+	@Override
+	public ActionMode onWindowStartingActionMode(ActionMode.Callback callback, int type) {
+		return null;
+	}
+
+	@Override
+	public void onActionModeStarted(ActionMode mode) {}
+
+	@Override
+	public void onActionModeFinished(ActionMode mode) {}
 
 	protected void onCreate(Bundle savedInstanceState) {
 		System.out.println("- onCreate - Dialog!");
