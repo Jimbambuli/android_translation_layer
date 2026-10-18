@@ -14,9 +14,12 @@ import android.graphics.BlendModeColorFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.Outline;
+import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
+import android.graphics.Region;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.LayoutDirection;
@@ -99,6 +102,10 @@ public class Drawable {
 		}
 
 		public abstract int getChangingConfigurations();
+
+		public boolean canApplyTheme() {
+			return false;
+		}
 	}
 
 	@Export
@@ -371,6 +378,50 @@ public class Drawable {
 
 	public void setAlpha(int alpha) {}
 
+	public int getAlpha() {
+		return 0xFF;
+	}
+
+	/* AOSP has no default; subclasses that know better override it */
+	public int getOpacity() {
+		return PixelFormat.TRANSLUCENT;
+	}
+
+	public Region getTransparentRegion() {
+		return null;
+	}
+
+	public void getOutline(Outline outline) {
+		outline.setRect(getBounds());
+		outline.setAlpha(0);
+	}
+
+	protected boolean onLevelChange(int level) {
+		return false;
+	}
+
+	public boolean onLayoutDirectionChanged(int layoutDirection) {
+		return false;
+	}
+
+	/* themes are applied at inflation, never afterwards */
+	public boolean canApplyTheme() {
+		return false;
+	}
+
+	public void applyTheme(Theme t) {}
+
+	public void inflate(Resources r, XmlPullParser parser, AttributeSet attrs) throws XmlPullParserException, IOException {
+		inflate(r, parser, attrs, null);
+	}
+
+	public void inflate(Resources r, XmlPullParser parser, AttributeSet attrs, Theme theme) throws XmlPullParserException, IOException {}
+
+	public static Drawable createFromStream(InputStream is, String srcName) {
+		final Bitmap bm = BitmapFactory.decodeStream(is);
+		return bm != null ? new BitmapDrawable(bm) : null;
+	}
+
 	public boolean getPadding(Rect padding) {
 		return false;
 	}
@@ -391,6 +442,10 @@ public class Drawable {
 	public void setDither(boolean dither) {}
 
 	public void setAutoMirrored(boolean mirrored) {}
+
+	public boolean isAutoMirrored() {
+		return false;
+	}
 
 	public void jumpToCurrentState() {}
 
