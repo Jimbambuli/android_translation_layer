@@ -51,6 +51,47 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRect(JNIEnv *env, 
 		gtk_snapshot_pop(snapshot);
 }
 
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLinearGradient(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat x0, jfloat y0, jfloat x1, jfloat y1, jintArray colors_arr, jfloatArray positions_arr, jboolean repeat, jlong paint_ptr)
+{
+	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	graphene_rect_t bounds = GRAPHENE_RECT_INIT(left, top, right - left, bottom - top);
+	jsize n_stops = (*env)->GetArrayLength(env, colors_arr);
+	jint *colors = (*env)->GetIntArrayElements(env, colors_arr, NULL);
+	jfloat *positions = positions_arr ? (*env)->GetFloatArrayElements(env, positions_arr, NULL) : NULL;
+	GskColorStop *stops = g_new(GskColorStop, n_stops);
+	for (int i = 0; i < n_stops; i++) {
+		float offset = positions ? positions[i] : i / (float)(n_stops - 1);
+		/* GSK requires increasing offsets in [0, 1] */
+		offset = CLAMP(offset, i > 0 ? stops[i - 1].offset : 0.f, 1.f);
+		stops[i].offset = offset;
+		stops[i].color = (GdkRGBA){
+			.red = ((colors[i] >> 16) & 0xFF) / 255.f,
+			.green = ((colors[i] >> 8) & 0xFF) / 255.f,
+			.blue = (colors[i] & 0xFF) / 255.f,
+			.alpha = ((colors[i] >> 24) & 0xFF) / 255.f,
+		};
+	}
+	(*env)->ReleaseIntArrayElements(env, colors_arr, colors, JNI_ABORT);
+	if (positions)
+		(*env)->ReleaseFloatArrayElements(env, positions_arr, positions, JNI_ABORT);
+
+	if (paint->use_color_filter)
+		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	/* the shader output is modulated by the paint's alpha */
+	gtk_snapshot_push_opacity(snapshot, paint->color.alpha);
+	if (x0 == x1 && y0 == y1) /* degenerate gradient: use the last color, like Skia does for CLAMP */
+		gtk_snapshot_append_color(snapshot, &stops[n_stops - 1].color, &bounds);
+	else if (repeat)
+		gtk_snapshot_append_repeating_linear_gradient(snapshot, &bounds, &GRAPHENE_POINT_INIT(x0, y0), &GRAPHENE_POINT_INIT(x1, y1), stops, n_stops);
+	else
+		gtk_snapshot_append_linear_gradient(snapshot, &bounds, &GRAPHENE_POINT_INIT(x0, y0), &GRAPHENE_POINT_INIT(x1, y1), stops, n_stops);
+	gtk_snapshot_pop(snapshot);
+	if (paint->use_color_filter)
+		gtk_snapshot_pop(snapshot);
+	g_free(stops);
+}
+
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong path_ptr, jint fill_rule, jlong paint_ptr)
 {
 	GtkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));

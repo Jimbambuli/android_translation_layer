@@ -114,8 +114,32 @@ public class GskCanvas extends DisplayListCanvas {
 			native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), src.left, src.top, src.width(), src.height(), paint != null ? paint.paint : default_paint.paint);
 	}
 
+	/**
+	 * Fills the given area with the paint's shader. Returns false if the paint
+	 * has no shader or the shader is not supported.
+	 */
+	private boolean fillWithShader(float left, float top, float right, float bottom, Paint paint) {
+		if (paint == null || paint.getStyle() != Paint.Style.FILL || !(paint.getShader() instanceof LinearGradient))
+			return false;
+		LinearGradient gradient = (LinearGradient)paint.getShader();
+		// TileMode.MIRROR is not supported by GSK and falls back to CLAMP
+		native_drawLinearGradient(snapshot, left, top, right, bottom, gradient.x0, gradient.y0, gradient.x1, gradient.y1,
+		                          gradient.colors, gradient.positions, gradient.tileMode == Shader.TileMode.REPEAT, paint.paint);
+		return true;
+	}
+
 	@Override
 	public void drawPath(Path path, Paint paint) {
+		if (path != null && paint != null && paint.getShader() != null) {
+			RectF bounds = new RectF();
+			path.computeBounds(bounds, true);
+			save();
+			clipPath(path);
+			boolean drawn = fillWithShader(bounds.left, bounds.top, bounds.right, bounds.bottom, paint);
+			restore();
+			if (drawn)
+				return;
+		}
 		if (path != null)
 			native_drawPath(snapshot, path.getGskPath(), path.getFillType().fill_rule, paint != null ? paint.paint : default_paint.paint);
 	}
@@ -124,6 +148,8 @@ public class GskCanvas extends DisplayListCanvas {
 	public void drawRect(float left, float top, float right, float bottom, Paint paint) {
 		// TODO: implement xfermode using gtk_snapshot_push_composite in GTK >= 4.22
 		if (paint != null && paint.getXfermode() != null)
+			return;
+		if (fillWithShader(left, top, right, bottom, paint))
 			return;
 		native_drawRect(snapshot, left, top, right, bottom, paint != null ? paint.paint : default_paint.paint);
 	}
@@ -151,6 +177,12 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, Paint paint) {
+		if (paint != null && paint.getShader() != null) {
+			Path path = new Path();
+			path.addRoundRect(left, top, right, bottom, rx, ry, Path.Direction.CW);
+			drawPath(path, paint);
+			return;
+		}
 		native_drawRoundRect(snapshot, left, top, right, bottom, rx, ry, paint != null ? paint.paint : default_paint.paint);
 	}
 
@@ -173,6 +205,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_drawBitmap(long snapshot, long texture, int x, int y, int width, int height, int src_x, int src_y, int src_width, int src_height, long paint);
 	protected native void native_drawRect(long snapshot, float left, float top, float right, float bottom, long paint);
 	protected native void native_drawPath(long snapshot, long path, int fill_rule, long paint);
+	protected native void native_drawLinearGradient(long snapshot, float left, float top, float right, float bottom, float x0, float y0, float x1, float y1, int[] colors, float[] positions, boolean repeat, long paint);
 	protected native void native_translate(long snapshot, float dx, float dy);
 	protected native void native_rotate(long snapshot, float degrees);
 	protected native void native_save(long snapshot);
