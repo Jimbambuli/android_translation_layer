@@ -104,6 +104,8 @@ public class PopupMenu {
 		mGravity = gravity;
 		menu = new MenuImpl();
 		popover = native_buildPopover(menu.menu);
+		int[] colors = PopupWindow.themeColors(context);
+		native_setColors(popover, colors[0], colors[1]);
 	}
 
 	/**
@@ -161,6 +163,7 @@ public class PopupMenu {
 	protected native void native_insertSubmenu(long menu, int position, String item, long submenu);
 	protected native void native_removeItem(long menu, int position);
 	protected native long native_buildPopover(long menu);
+	protected native void native_setColors(long popover, int background, int foreground);
 	protected native void native_show(long popover, long anchor, int anchorWidth, int anchorHeight, int gravity);
 
 	// callback from native code

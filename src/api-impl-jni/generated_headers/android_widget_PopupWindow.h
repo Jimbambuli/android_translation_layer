@@ -19,6 +19,14 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor
 
 /*
  * Class:     android_widget_PopupWindow
+ * Method:    native_setColors
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setColors
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     android_widget_PopupWindow
  * Method:    native_setContentView
  * Signature: (JJ)V
  */

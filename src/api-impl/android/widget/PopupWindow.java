@@ -2,6 +2,7 @@ package android.widget;
 
 import android.atl.annotation.Export;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
@@ -22,6 +23,19 @@ public class PopupWindow {
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.PopupWindow, defStyleAttr, defStyleRes);
 		overlap_anchor = a.getBoolean(com.android.internal.R.styleable.PopupWindow_overlapAnchor, false);
 		a.recycle();
+		int[] colors = themeColors(context);
+		native_setColors(popover, colors[0], colors[1]);
+	}
+
+	/* background and text color of Material popups: colorBackgroundFloating and textColorPrimary */
+	static int[] themeColors(Context context) {
+		/* sorted by id, as obtainStyledAttributes() expects */
+		TypedArray a = context.obtainStyledAttributes(new int[] {com.android.internal.R.attr.textColorPrimary,
+		                                                         com.android.internal.R.attr.colorBackgroundFloating});
+		ColorStateList text = a.getColorStateList(0);
+		int[] colors = {a.getColor(1, 0xffffffff), text != null ? text.getDefaultColor() : 0xff000000};
+		a.recycle();
+		return colors;
 	}
 
 	public PopupWindow(Context context) {
@@ -216,6 +230,7 @@ public class PopupWindow {
 	public void setSoftInputMode(int mode) {}
 
 	protected native long native_constructor();
+	protected native void native_setColors(long widget, int background, int foreground);
 	protected native void native_setContentView(long widget, long contentView);
 	protected native void native_showAsDropDown(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int gravity, boolean overlapAnchor);
 	protected native void native_showAtLocation(long widget, long parent, int gravity, int x, int y);

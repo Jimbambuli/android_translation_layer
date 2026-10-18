@@ -11,5 +11,7 @@ void atl_popover_place_as_dropdown(GtkPopover *popover, GtkWidget *anchor, int a
 /* place an already parented popover like AOSP's PopupWindow.showAtLocation(): at (x, y) in the
  * window, measured from the edges selected by the absolute gravity */
 void atl_popover_place_at_location(GtkPopover *popover, int gravity, int x, int y);
+/* draw the popover's background and text in the given ARGB colors instead of the GTK theme's */
+void atl_popover_set_colors(GtkPopover *popover, int background, int foreground);
 
 #endif

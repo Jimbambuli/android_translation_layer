@@ -58,6 +58,11 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1buildPopover(JNIEn
 	return _INTPTR(popover);
 }
 
+JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1setColors(JNIEnv *env, jobject this, jlong popover_ptr, jint background, jint foreground)
+{
+	atl_popover_set_colors(GTK_POPOVER(_PTR(popover_ptr)), background, foreground);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1show(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint gravity)
 {
 	GtkWidget *anchor = gtk_widget_get_parent(GTK_WIDGET(_PTR(anchor_ptr)));

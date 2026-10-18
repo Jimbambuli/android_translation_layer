@@ -49,6 +49,14 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1buildPopover
 
 /*
  * Class:     android_widget_PopupMenu
+ * Method:    native_setColors
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1setColors
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     android_widget_PopupMenu
  * Method:    native_show
  * Signature: (JJIII)V
  */

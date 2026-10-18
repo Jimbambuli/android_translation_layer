@@ -136,6 +136,39 @@ void atl_popover_place_at_location(GtkPopover *popover, int gravity, int x, int 
 	place_popover(popover, frame, x, y);
 }
 
+#define CSS_RGBA(color) ((color) >> 16) & 0xFF, ((color) >> 8) & 0xFF, (color) & 0xFF, (((color) >> 24) & 0xFF) / 255.0
+
+/* The contents node is internal to the popover, which a provider on the popover's own style context
+ * does not reach, so the rules go to the display, once per pair of colors, selected by a CSS class. */
+void atl_popover_set_colors(GtkPopover *popover, int background, int foreground)
+{
+	static GHashTable *classes = NULL;
+	char *css_class = g_strdup_printf("atl-popup-%08x-%08x", background, foreground);
+
+	if (!classes)
+		classes = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	if (!g_hash_table_contains(classes, css_class)) {
+		GtkCssProvider *css_provider = gtk_css_provider_new();
+		/* menu items are highlighted like Android's colorControlHighlight, the text color at 12 % */
+		char *css = g_strdup_printf(
+		    "popover.%1$s > contents { background-color: rgba(%2$d,%3$d,%4$d,%5$.3f); color: rgba(%6$d,%7$d,%8$d,%9$.3f); }\n"
+		    "popover.%1$s modelbutton:hover, popover.%1$s modelbutton:selected { background-color: rgba(%6$d,%7$d,%8$d,0.12); }\n",
+		    css_class, CSS_RGBA(background), CSS_RGBA(foreground));
+		gtk_css_provider_load_from_string(css_provider, css);
+		g_free(css);
+		gtk_style_context_add_provider_for_display(gtk_widget_get_display(GTK_WIDGET(popover)), GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+		g_object_unref(css_provider);
+		g_hash_table_add(classes, g_strdup(css_class));
+	}
+	gtk_widget_add_css_class(GTK_WIDGET(popover), css_class);
+	g_free(css_class);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setColors(JNIEnv *env, jobject this, jlong popover_ptr, jint background, jint foreground)
+{
+	atl_popover_set_colors(GTK_POPOVER(_PTR(popover_ptr)), background, foreground);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint x, jint y, jint gravity, jboolean overlap_anchor)
 {
 	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
