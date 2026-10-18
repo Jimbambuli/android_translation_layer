@@ -1,11 +1,15 @@
 package android.graphics.drawable;
 
+import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.ColorFilter;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
@@ -18,20 +22,20 @@ import org.xmlpull.v1.XmlPullParserException;
 public class BitmapDrawable extends Drawable {
 
 	private Bitmap bitmap;
+	private ColorStateList tint;
+	private PorterDuff.Mode tint_mode = DEFAULT_TINT_MODE;
+	private ColorFilter color_filter;
+	private final Paint paint = new Paint();
 
 	public BitmapDrawable() {
 	}
 
 	public BitmapDrawable(Resources res, Bitmap bitmap) {
 		this.bitmap = bitmap;
-		if (bitmap != null)
-			setPaintable(bitmap.getTexture());
 	}
 
 	public BitmapDrawable(Bitmap bitmap) {
 		this.bitmap = bitmap;
-		if (bitmap != null)
-			setPaintable(bitmap.getTexture());
 	}
 
 	public Bitmap getBitmap() {
@@ -56,7 +60,6 @@ public class BitmapDrawable extends Drawable {
 		a.recycle();
 		if (bitmap == null)
 			throw new XmlPullParserException("<bitmap> needs a valid `src' attribute");
-		setPaintable(bitmap.getTexture());
 	}
 
 	@Override
@@ -71,6 +74,55 @@ public class BitmapDrawable extends Drawable {
 		if (bitmap == null)
 			return 0;
 		return bitmap.getHeight();
+	}
+
+	/* overriding draw() makes Drawable use a paintable that calls it, so tint and
+	 * color filter changes are picked up by every widget showing this drawable */
+	@Override
+	public void draw(Canvas canvas) {
+		if (bitmap == null)
+			return;
+		ColorFilter filter = color_filter;
+		if (filter == null && tint != null)
+			filter = new PorterDuffColorFilter(tint.getColorForState(getState(), tint.getDefaultColor()), tint_mode);
+		paint.setColorFilter(filter);
+		canvas.drawBitmap(bitmap, null, getBounds(), paint);
+	}
+
+	@Override
+	public void setTintList(ColorStateList tint) {
+		this.tint = tint;
+		invalidateSelf();
+	}
+
+	@Override
+	public void setTintMode(PorterDuff.Mode tintMode) {
+		tint_mode = tintMode != null ? tintMode : DEFAULT_TINT_MODE;
+		invalidateSelf();
+	}
+
+	@Override
+	public void setColorFilter(ColorFilter colorFilter) {
+		color_filter = colorFilter;
+		invalidateSelf();
+	}
+
+	@Override
+	public ColorFilter getColorFilter() {
+		return color_filter;
+	}
+
+	@Override
+	public boolean isStateful() {
+		return tint != null && tint.isStateful();
+	}
+
+	@Override
+	protected boolean onStateChange(int[] stateSet) {
+		if (!isStateful())
+			return false;
+		invalidateSelf();
+		return true;
 	}
 
 	public void setTileModeX(Shader.TileMode mode) {}
