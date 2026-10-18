@@ -17,6 +17,10 @@ public class InsetDrawable extends DrawableWrapper {
 		super(new InsetState(null, null), null);
 	}
 
+	private InsetDrawable(InsetState state, Resources res) {
+		super(state, res);
+	}
+
 	public boolean getPadding(Rect padding) { return false; }
 
 	static final class InsetState extends DrawableWrapper.DrawableWrapperState {
@@ -27,8 +31,7 @@ public class InsetDrawable extends DrawableWrapper {
 
 		@Override
 		public Drawable newDrawable(Resources res) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'newDrawable'");
+			return new InsetDrawable(this, res);
 		}
 	}
 }
