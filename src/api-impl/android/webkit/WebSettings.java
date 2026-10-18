@@ -83,4 +83,38 @@ public class WebSettings {
 	public void setAllowContentAccess(boolean allow) {}
 
 	public void setAllowFileAccessFromFileURLs(boolean allow) {}
+
+	public void setStandardFontFamily(String font) {}
+
+	public void setSerifFontFamily(String font) {}
+
+	public void setSansSerifFontFamily(String font) {}
+
+	public void setFixedFontFamily(String font) {}
+
+	public void setCursiveFontFamily(String font) {}
+
+	public void setFantasyFontFamily(String font) {}
+
+	public void setDefaultFontSize(int size) {}
+
+	public void setDefaultFixedFontSize(int size) {}
+
+	public void setMinimumFontSize(int size) {}
+
+	public void setOffscreenPreRaster(boolean enabled) {}
+
+	public void setSafeBrowsingEnabled(boolean enabled) {}
+
+	public void setForceDark(int forceDark) {}
+
+	public void setAlgorithmicDarkeningAllowed(boolean allow) {}
+
+	public int getTextZoom() {
+		return 100;
+	}
+
+	public boolean getJavaScriptEnabled() {
+		return true; // JavaScript is always enabled in our WebKitWebView
+	}
 }

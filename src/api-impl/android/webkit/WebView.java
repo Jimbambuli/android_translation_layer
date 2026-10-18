@@ -295,6 +295,15 @@ public class WebView extends ViewGroup {
 		javascriptInterfaces.remove(name);
 	}
 
+	// TODO: return the height of the web content
+	public int getContentHeight() {
+		return getHeight();
+	}
+
+	public float getScale() {
+		return 1.0f;
+	}
+
 	@Override
 	protected native long native_constructor(Context context, AttributeSet attrs);
 	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);

@@ -2640,6 +2640,8 @@ public class View implements Drawable.Callback {
 
 	public void setDrawingCacheEnabled(boolean enabled) {}
 
+	public void setDrawingCacheQuality(int quality) {}
+
 	public void buildDrawingCache(boolean autoScale) {}
 
 	public Bitmap getDrawingCache() { return null; }

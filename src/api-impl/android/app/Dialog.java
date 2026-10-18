@@ -51,6 +51,10 @@ public class Dialog implements Window.Callback, DialogInterface {
 		return false;
 	}
 
+	public LayoutInflater getLayoutInflater() {
+		return LayoutInflater.from(context);
+	}
+
 	public Context getContext() {
 		return context;
 	}

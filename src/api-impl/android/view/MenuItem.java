@@ -79,6 +79,8 @@ public interface MenuItem {
 
 	public boolean expandActionView();
 
+	public boolean collapseActionView();
+
 	public boolean isActionViewExpanded();
 
 	public MenuItem setIntent(Intent intent);
