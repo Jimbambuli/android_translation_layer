@@ -213,6 +213,14 @@ extern "C" {
 #define android_widget_CompoundButton_TEXT_DIRECTION_RTL 4L
 /*
  * Class:     android_widget_CompoundButton
+ * Method:    native_setSwitchColors
+ * Signature: (JIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setSwitchColors
+  (JNIEnv *, jobject, jlong, jint, jint, jint, jint);
+
+/*
+ * Class:     android_widget_CompoundButton
  * Method:    native_constructor
  * Signature: (Landroid/content/Context;Landroid/util/AttributeSet;)J
  */

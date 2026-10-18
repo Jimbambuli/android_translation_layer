@@ -56,3 +56,34 @@ JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setText(JNIEnv
 	gtk_label_set_text(label, nativeText);
 	(*env)->ReleaseStringUTFChars(env, text, nativeText);
 }
+
+#define CSS_RGBA(color) ((color) >> 16) & 0xFF, ((color) >> 8) & 0xFF, (color) & 0xFF, (((color) >> 24) & 0xFF) / 255.0
+
+/* The switch takes the colors of Android's Material switch from the theme. The slider is a child
+ * node of the switch, which a provider on the switch's own style context does not reach, so the
+ * rules go to the display, once per set of colors, selected by a CSS class. */
+JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setSwitchColors(JNIEnv *env, jobject this, jlong widget_ptr, jint thumb, jint thumb_checked, jint track, jint track_checked)
+{
+	static GHashTable *classes = NULL;
+	GtkWidget *switcher = gtk_widget_get_last_child(GTK_WIDGET(_PTR(widget_ptr)));
+	char *css_class = g_strdup_printf("atl-switch-%08x-%08x-%08x-%08x", thumb, thumb_checked, track, track_checked);
+
+	if (!classes)
+		classes = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	if (!g_hash_table_contains(classes, css_class)) {
+		GtkCssProvider *css_provider = gtk_css_provider_new();
+		char *css = g_strdup_printf(
+		    "switch.%1$s { background-color: rgba(%2$d,%3$d,%4$d,%5$.3f); }\n"
+		    "switch.%1$s:checked { background-color: rgba(%6$d,%7$d,%8$d,%9$.3f); }\n"
+		    "switch.%1$s > slider { background-color: rgba(%10$d,%11$d,%12$d,%13$.3f); }\n"
+		    "switch.%1$s:checked > slider { background-color: rgba(%14$d,%15$d,%16$d,%17$.3f); }\n",
+		    css_class, CSS_RGBA(track), CSS_RGBA(track_checked), CSS_RGBA(thumb), CSS_RGBA(thumb_checked));
+		gtk_css_provider_load_from_string(css_provider, css);
+		g_free(css);
+		gtk_style_context_add_provider_for_display(gtk_widget_get_display(switcher), GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+		g_object_unref(css_provider);
+		g_hash_table_add(classes, g_strdup(css_class));
+	}
+	gtk_widget_add_css_class(switcher, css_class);
+	g_free(css_class);
+}

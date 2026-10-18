@@ -4,6 +4,7 @@ import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
@@ -33,7 +34,29 @@ public abstract class CompoundButton extends Button implements Checkable {
 			this.setChecked(typedArray.getBoolean(R.styleable.CompoundButton_checked, false));
 		}
 		typedArray.recycle();
+		setSwitchColorsFromTheme(context);
 	}
+
+	/* like Material's switch_thumb_material and switch_track_material: the thumb is
+	 * colorSwitchThumbNormal (colorControlActivated when checked), the track colorForeground
+	 * (colorControlActivated) at disabledAlpha */
+	private void setSwitchColorsFromTheme(Context context) {
+		/* sorted by id, as obtainStyledAttributes() expects */
+		TypedArray a = context.obtainStyledAttributes(new int[] {R.attr.colorForeground, R.attr.disabledAlpha,
+		                                                         R.attr.colorControlActivated, R.attr.colorSwitchThumbNormal});
+		int foreground = a.getColor(0, 0xff000000);
+		float alpha = a.getFloat(1, 0.3f);
+		int activated = a.getColor(2, 0xff009688);
+		int thumb = a.getColor(3, 0xfff1f1f1);
+		a.recycle();
+		native_setSwitchColors(widget, thumb, activated, withAlpha(foreground, alpha), withAlpha(activated, alpha));
+	}
+
+	private static int withAlpha(int color, float alpha) {
+		return (Math.round(Color.alpha(color) * alpha) << 24) | (color & 0xffffff);
+	}
+
+	private native void native_setSwitchColors(long widget, int thumb, int thumbChecked, int track, int trackChecked);
 
 	@Override
 	protected native long native_constructor(Context context, AttributeSet attrs);
