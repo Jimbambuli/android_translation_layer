@@ -1370,7 +1370,12 @@ public class View implements Drawable.Callback {
 
 	// --- stubs
 
-	public void setContentDescription(CharSequence contentDescription) {}
+	/* kept for getContentDescription() (e.g. Toolbar and tooltips); there are no accessibility services */
+	private CharSequence contentDescription;
+
+	public void setContentDescription(CharSequence contentDescription) {
+		this.contentDescription = contentDescription;
+	}
 
 	public void setId(int id) {
 		this.id = id;
@@ -1743,7 +1748,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public CharSequence getContentDescription() {
-		return null;
+		return contentDescription;
 	}
 
 	private OnLongClickListener on_long_click_listener = null;
