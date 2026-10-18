@@ -1101,7 +1101,7 @@ public final class Configuration implements Comparable<Configuration> {
 	public void setToDefaults() {
 		fontScale = 1;
 		mcc = mnc = 0;
-		locale = new Locale("en", "US");
+		locale = Locale.getDefault();
 		userSetLocale = false;
 		touchscreen = TOUCHSCREEN_UNDEFINED;
 		keyboard = KEYBOARD_UNDEFINED;
