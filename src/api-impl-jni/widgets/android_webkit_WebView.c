@@ -21,6 +21,21 @@ static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointe
 	const gchar *path = webkit_uri_scheme_request_get_path(request);
 	if (path == NULL)
 		return;
+	/* android-asset:/// stands in for file:/// (see WebView.loadUrl()). Only file:///android_asset/
+	 * is backed by the APK. Anything else, e.g. an absolute path resolved against an asset base URL,
+	 * is a local file, as on Android. */
+	if (!g_str_has_prefix(path, "/assets/")) {
+		g_autofree gchar *file_uri = g_strconcat("file://", path, NULL);
+		g_autoptr(GFile) file = g_file_new_for_uri(file_uri);
+		g_autoptr(GError) error = NULL;
+		g_autoptr(GFileInputStream) stream = g_file_read(file, NULL, &error);
+		g_autoptr(GFileInfo) info = stream ? g_file_input_stream_query_info(stream, G_FILE_ATTRIBUTE_STANDARD_SIZE, NULL, &error) : NULL;
+		if (info)
+			webkit_uri_scheme_request_finish(request, G_INPUT_STREAM(stream), g_file_info_get_size(info), NULL);
+		else
+			webkit_uri_scheme_request_finish_error(request, error);
+		return;
+	}
 	path += 1; // remove the leading '/'
 	JNIEnv *env = get_jni_env();
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(webkit_uri_scheme_request_get_web_view(request))));
