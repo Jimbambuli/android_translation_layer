@@ -38,7 +38,7 @@ public class TextView extends View {
 	private boolean include_padding = false;
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
-	private int gravity = Gravity.CENTER;
+	private int gravity = Gravity.TOP | Gravity.START;
 	private int max_lines = Integer.MAX_VALUE;
 	private TextUtils.TruncateAt ellipsize = null;
 
@@ -88,6 +88,9 @@ public class TextView extends View {
 				int textStyle = a.getInt(com.android.internal.R.styleable.TextView_textStyle, 0);
 				setTypeface(getTypeface(), textStyle);
 			}
+
+			if (a.hasValue(com.android.internal.R.styleable.TextView_gravity))
+				setGravity(a.getInt(com.android.internal.R.styleable.TextView_gravity, Gravity.TOP | Gravity.START));
 
 			int ellipsize_attr = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, -1);
 			if (ellipsize_attr >= 1 && ellipsize_attr <= 4)
@@ -257,6 +260,27 @@ public class TextView extends View {
 	public Typeface getTypeface() { return null; }
 
 	public float getTextSize() { return 10; }
+
+	/* GtkLabel mirrors the alignment in right-to-left layouts, so LEFT and RIGHT are
+	 * treated like START and END */
+	@Override
+	public void setGravity(int gravity) {
+		this.gravity = gravity;
+		float xalign = 0.f;
+		int horizontal = gravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK;
+		if (horizontal == Gravity.CENTER_HORIZONTAL)
+			xalign = 0.5f;
+		else if (horizontal == Gravity.RIGHT || horizontal == Gravity.END)
+			xalign = 1.f;
+		float yalign = 0.f;
+		int vertical = gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (vertical == Gravity.CENTER_VERTICAL)
+			yalign = 0.5f;
+		else if (vertical == Gravity.BOTTOM)
+			yalign = 1.f;
+		native_setAlignment(xalign, yalign);
+	}
+	private native void native_setAlignment(float xalign, float yalign);
 
 	public int getGravity() {
 		return gravity;

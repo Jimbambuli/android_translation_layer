@@ -99,6 +99,16 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLines(JNIEnv *env
 	gtk_label_set_ellipsize(label, ellipsize_mode);
 }
 
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setAlignment(JNIEnv *env, jobject this, jfloat xalign, jfloat yalign)
+{
+	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
+	if (!label)
+		return;
+	gtk_label_set_xalign(label, xalign);
+	gtk_label_set_yalign(label, yalign);
+	gtk_label_set_justify(label, xalign == 0.5f ? GTK_JUSTIFY_CENTER : xalign == 1.f ? GTK_JUSTIFY_RIGHT : GTK_JUSTIFY_LEFT);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1set_1markup(JNIEnv *env, jobject this, jint value)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
