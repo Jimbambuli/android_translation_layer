@@ -276,6 +276,11 @@ public class Drawable {
 				drawable.inflate(resources, parser, attrs, theme);
 				return drawable;
 			}
+			case "animated-selector": {
+				AnimatedStateListDrawable drawable = new AnimatedStateListDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
 			case "shape": {
 				GradientDrawable drawable = new GradientDrawable();
 				drawable.inflate(resources, parser, attrs, theme);

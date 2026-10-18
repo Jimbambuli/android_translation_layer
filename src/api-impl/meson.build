@@ -284,6 +284,7 @@ srcs = [
 	'android/graphics/drawable/AdaptiveIconDrawable.java',
 	'android/graphics/drawable/Animatable.java',
 	'android/graphics/drawable/Animatable2.java',
+	'android/graphics/drawable/AnimatedStateListDrawable.java',
 	'android/graphics/drawable/AnimatedVectorDrawable.java',
 	'android/graphics/drawable/AnimationDrawable.java',
 	'android/graphics/drawable/BitmapDrawable.java',
