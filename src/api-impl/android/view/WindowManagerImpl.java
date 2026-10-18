@@ -7,6 +7,9 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 
 	private static final String TAG = "WindowManagerImpl";
 
+	/* The parent of a view added with addView(): the root of a window, like AOSP's ViewRootImpl.
+	 * GTK lays out and invalidates the window itself, and there is nothing above to intercept
+	 * touch events or to take part in nested scrolling. */
 	private static class WindowViewParent implements ViewParent {
 
 		@Override
@@ -16,69 +19,44 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 
 		@Override
 		public boolean isLayoutRequested() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'isLayoutRequested'");
+			return false;
 		}
 
 		@Override
-		public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'requestDisallowInterceptTouchEvent'");
-		}
+		public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {}
 
 		@Override
 		public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onStartNestedScroll'");
+			return false;
 		}
 
 		@Override
 		public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onNestedPreFling'");
+			return false;
 		}
 
 		@Override
 		public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onNestedFling'");
+			return false;
 		}
 
 		@Override
-		public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onNestedScrollAccepted'");
-		}
+		public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {}
 
 		@Override
-		public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onNestedPreScroll'");
-		}
+		public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {}
 
 		@Override
-		public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onNestedScroll'");
-		}
+		public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {}
 
 		@Override
-		public void onStopNestedScroll(View target) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onStopNestedScroll'");
-		}
+		public void onStopNestedScroll(View target) {}
 
 		@Override
-		public void onDescendantInvalidated(View child, View target) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'onDescendantInvalidated'");
-		}
+		public void onDescendantInvalidated(View child, View target) {}
 
 		@Override
-		public void requestLayout() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'requestLayout'");
-		}
+		public void requestLayout() {}
 	}
 
 	public android.view.Display getDefaultDisplay() {

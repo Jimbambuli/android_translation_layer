@@ -794,29 +794,20 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		public void onChildViewRemoved(View parent, View child);
 	}
 
-	@Override
-	public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onNestedScrollAccepted'");
-	}
+	/* onStartNestedScroll() never accepts, so like in AOSP there is nothing to do for the
+	 * other NestedScrollingParent callbacks; subclasses that take part override them */
 
 	@Override
-	public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onNestedPreScroll'");
-	}
+	public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {}
 
 	@Override
-	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onNestedScroll'");
-	}
+	public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {}
 
 	@Override
-	public void onStopNestedScroll(View target) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'onStopNestedScroll'");
-	}
+	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {}
+
+	@Override
+	public void onStopNestedScroll(View target) {}
 
 	public void requestChildFocus(View child, View focused) {}
 
