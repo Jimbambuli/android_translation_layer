@@ -83,7 +83,7 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_setTextSize(JNIEnv *env, job
 	else
 		attrs = pango_attr_list_new();
 
-	PangoAttribute *size_attr = pango_attr_size_new(size * PANGO_SCALE);
+	PangoAttribute *size_attr = pango_attr_size_new_absolute(size * PANGO_SCALE);
 	pango_attr_list_change(attrs, size_attr);
 	gtk_label_set_attributes(label, attrs);
 
