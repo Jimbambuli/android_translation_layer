@@ -4,6 +4,7 @@
 #include "../util.h"
 
 #include "WrapperWidget.h"
+#include "android_widget_PopupWindow.h"
 
 #include "../generated_headers/android_widget_PopupWindow.h"
 
@@ -22,20 +23,137 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setContentView(JN
 	gtk_popover_set_child(GTK_POPOVER(_PTR(popover_ptr)), GTK_WIDGET(content));
 }
 
-static inline void set_offset(GtkPopover *popover, GtkWidget *anchor, int x, int y)
+/* android.view.Gravity */
+#define GRAVITY_CENTER_HORIZONTAL 0x01
+#define GRAVITY_RIGHT 0x05
+#define GRAVITY_HORIZONTAL_MASK 0x07
+#define GRAVITY_CENTER_VERTICAL 0x10
+#define GRAVITY_BOTTOM 0x50
+#define GRAVITY_VERTICAL_MASK 0x70
+
+/* the widget that corresponds to the Android window (the decor view's container) */
+static GtkWidget *window_frame(GtkWidget *widget)
 {
-	/* FIXME: assumes GTK_POS_BOTTOM */
-	gtk_popover_set_offset(popover, x - gtk_widget_get_width(anchor) / 2, y - gtk_widget_get_height(anchor));
-	gtk_popover_set_pointing_to(popover, &(GdkRectangle){.x = 0, .y = 0, .width = gtk_widget_get_width(anchor), .height = gtk_widget_get_height(anchor)});
+	GtkRoot *root = gtk_widget_get_root(widget);
+	GtkWidget *child = GTK_IS_WINDOW(root) ? gtk_window_get_child(GTK_WINDOW(root)) : NULL;
+	return child ? child : GTK_WIDGET(root);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint x, jint y, jint gravity)
+/* a hidden popover measures as 0x0 (GTK skips invisible widgets), so measure its first child, the
+ * box that holds the content and draws the background; its size is the visible size of the popup */
+static void measure_popover(GtkPopover *popover, int *width, int *height)
+{
+	GtkWidget *contents = gtk_widget_get_first_child(GTK_WIDGET(popover));
+	int request_width, request_height;
+
+	*width = *height = 0;
+	gtk_widget_get_size_request(GTK_WIDGET(popover), &request_width, &request_height);
+	if (contents) {
+		gtk_widget_measure(contents, GTK_ORIENTATION_HORIZONTAL, -1, NULL, width, NULL, NULL);
+		gtk_widget_measure(contents, GTK_ORIENTATION_VERTICAL, MAX(*width, request_width), NULL, height, NULL, NULL);
+	}
+	/* PopupWindow.setWidth()/setHeight() are size requests on the popover itself */
+	*width = MAX(*width, request_width);
+	*height = MAX(*height, request_height);
+}
+
+/* Show the popover with its top left corner at (x, y) in frame coordinates. We compute the final
+ * position ourselves, like Android does, and point GTK at a 1x1 rectangle there: on Wayland the
+ * rectangle becomes the xdg_positioner anchor rectangle, which is relative to the parent surface
+ * and must not be empty, so pointing at an anchor with an empty allocation put the popup at the
+ * window's origin. */
+static void place_popover(GtkPopover *popover, GtkWidget *frame, int x, int y)
+{
+	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(popover));
+	graphene_point_t p;
+
+	if (!gtk_widget_compute_point(frame, parent, &GRAPHENE_POINT_INIT(x, y), &p))
+		p = GRAPHENE_POINT_INIT(x, y);
+	gtk_popover_set_has_arrow(popover, FALSE);
+	gtk_popover_set_position(popover, GTK_POS_BOTTOM);
+	gtk_widget_set_halign(GTK_WIDGET(popover), GTK_ALIGN_START);
+	gtk_popover_set_offset(popover, 0, 0);
+	gtk_popover_set_pointing_to(popover, &(GdkRectangle){.x = p.x, .y = p.y - 1, .width = 1, .height = 1});
+}
+
+static int clamp_to_frame(int pos, int size, int frame_size)
+{
+	return MAX(0, MIN(pos, frame_size - size));
+}
+
+void atl_popover_place_as_dropdown(GtkPopover *popover, GtkWidget *anchor, int anchor_width, int anchor_height, int xoff, int yoff, int gravity, gboolean overlap_anchor)
+{
+	GtkWidget *frame = window_frame(anchor);
+	int frame_width = gtk_widget_get_width(frame);
+	int frame_height = gtk_widget_get_height(frame);
+	graphene_point_t a;
+	int width, height, x, y;
+
+	if (!gtk_widget_compute_point(anchor, frame, &GRAPHENE_POINT_INIT(0, 0), &a))
+		a = GRAPHENE_POINT_INIT(0, 0);
+	measure_popover(popover, &width, &height);
+
+	x = a.x + xoff;
+	if ((gravity & GRAVITY_HORIZONTAL_MASK) == GRAVITY_RIGHT)
+		x -= width - anchor_width;
+	/* like PopupWindow.findDropDownPosition()/tryFitVertical(): below the anchor (or over it),
+	 * moved above it if it only fits there */
+	y = a.y + (overlap_anchor ? 0 : anchor_height) + yoff;
+	if (y + height > frame_height) {
+		int above = a.y + (overlap_anchor ? anchor_height : 0) - height + yoff;
+		if (above >= 0)
+			y = above;
+	}
+
+	place_popover(popover, frame, clamp_to_frame(x, width, frame_width), clamp_to_frame(y, height, frame_height));
+}
+
+void atl_popover_place_at_location(GtkPopover *popover, int gravity, int x, int y)
+{
+	GtkWidget *frame = window_frame(GTK_WIDGET(popover));
+	int frame_width = gtk_widget_get_width(frame);
+	int frame_height = gtk_widget_get_height(frame);
+	int width, height;
+
+	measure_popover(popover, &width, &height);
+	/* like Gravity.apply() */
+	switch (gravity & GRAVITY_HORIZONTAL_MASK) {
+		case GRAVITY_CENTER_HORIZONTAL:
+			x += (frame_width - width) / 2;
+			break;
+		case GRAVITY_RIGHT:
+			x = frame_width - width - x;
+			break;
+	}
+	switch (gravity & GRAVITY_VERTICAL_MASK) {
+		case GRAVITY_CENTER_VERTICAL:
+			y += (frame_height - height) / 2;
+			break;
+		case GRAVITY_BOTTOM:
+			y = frame_height - height - y;
+			break;
+	}
+	place_popover(popover, frame, x, y);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint x, jint y, jint gravity, jboolean overlap_anchor)
 {
 	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
 	WrapperWidget *anchor = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(anchor_ptr))));
 
 	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(anchor), NULL);
-	set_offset(popover, GTK_WIDGET(anchor), x, y);
+	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
+	gtk_popover_present(GTK_POPOVER(popover));
+	gtk_popover_popup(popover);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAtLocation(JNIEnv *env, jobject this, jlong popover_ptr, jlong parent_ptr, jint gravity, jint x, jint y)
+{
+	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
+	WrapperWidget *parent = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(parent_ptr))));
+
+	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(parent), NULL);
+	atl_popover_place_at_location(popover, gravity, x, y);
 	gtk_popover_present(GTK_POPOVER(popover));
 	gtk_popover_popup(popover);
 }
@@ -116,13 +234,13 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss(JNIEnv *e
 	gtk_popover_popdown(GTK_POPOVER(_PTR(popover_ptr)));
 }
 
-JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint x, jint y, jint width, jint height)
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint x, jint y, jint width, jint height, jint gravity, jboolean overlap_anchor)
 {
 	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
 	WrapperWidget *anchor = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(anchor_ptr))));
 	gtk_widget_set_size_request(GTK_WIDGET(popover), width, height);
-	set_offset(popover, GTK_WIDGET(anchor), x, y);
 	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(anchor), NULL);
+	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
 	gtk_popover_present(GTK_POPOVER(popover));
 	gtk_popover_popup(popover);
 }

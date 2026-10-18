@@ -50,10 +50,10 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1buildPopover
 /*
  * Class:     android_widget_PopupMenu
  * Method:    native_show
- * Signature: (JJ)V
+ * Signature: (JJIII)V
  */
 JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1show
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jlong, jint, jint, jint);
 
 #ifdef __cplusplus
 }

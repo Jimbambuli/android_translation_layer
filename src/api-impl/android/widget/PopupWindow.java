@@ -2,6 +2,7 @@ package android.widget;
 
 import android.atl.annotation.Export;
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.transition.Transition;
@@ -18,6 +19,9 @@ public class PopupWindow {
 
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		popover = native_constructor();
+		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.PopupWindow, defStyleAttr, defStyleRes);
+		overlap_anchor = a.getBoolean(com.android.internal.R.styleable.PopupWindow_overlapAnchor, false);
+		a.recycle();
 	}
 
 	public PopupWindow(Context context) {
@@ -43,6 +47,10 @@ public class PopupWindow {
 	private View contentView;
 	private Drawable background;
 	private long popover; // native pointer to GtkPopover
+	private int anchored_gravity = DEFAULT_ANCHORED_GRAVITY;
+	private boolean overlap_anchor;
+
+	private static final int DEFAULT_ANCHORED_GRAVITY = Gravity.TOP | Gravity.START;
 
 	public interface OnDismissListener {
 		@Export
@@ -97,7 +105,9 @@ public class PopupWindow {
 	public void setTouchInterceptor(View.OnTouchListener listener) {}
 
 	public void showAsDropDown(View anchor, int xoff, int yoff, int gravity) {
-		native_showAsDropDown(popover, anchor.widget, xoff, yoff, gravity);
+		anchored_gravity = gravity;
+		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
+		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
 	}
 
 	public View getContentView() {
@@ -113,11 +123,13 @@ public class PopupWindow {
 			Log.e("PopupWindow", "anchor is not attached to window");
 			return;
 		}
-		native_showAsDropDown(popover, anchor.widget, xoff, yoff, Gravity.NO_GRAVITY);
+		showAsDropDown(anchor, xoff, yoff, DEFAULT_ANCHORED_GRAVITY);
 	}
 
 	public void showAtLocation(View parent, int gravity, int x, int y) {
-		native_showAsDropDown(popover, parent.widget, x, y, gravity);
+		if (gravity == Gravity.NO_GRAVITY)
+			gravity = Gravity.TOP | Gravity.START;
+		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
 	}
 
 	public void dismiss() {
@@ -133,7 +145,8 @@ public class PopupWindow {
 	public void setElevation(float elevation) {}
 
 	public void update(View anchor, int xoff, int yoff, int width, int height) {
-		native_update(popover, anchor.widget, xoff, yoff, width, height);
+		native_update(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff, width, height,
+		              Gravity.getAbsoluteGravity(anchored_gravity, anchor.getLayoutDirection()), overlap_anchor);
 	}
 
 	public void setWindowLayoutType(int type) {}
@@ -193,18 +206,24 @@ public class PopupWindow {
 	}
 
 	public void setOverlapAnchor(boolean overlap) {
+		overlap_anchor = overlap;
+	}
+
+	public boolean getOverlapAnchor() {
+		return overlap_anchor;
 	}
 
 	public void setSoftInputMode(int mode) {}
 
 	protected native long native_constructor();
 	protected native void native_setContentView(long widget, long contentView);
-	protected native void native_showAsDropDown(long widget, long anchor, int xoff, int yoff, int gravity);
+	protected native void native_showAsDropDown(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int gravity, boolean overlapAnchor);
+	protected native void native_showAtLocation(long widget, long parent, int gravity, int x, int y);
 	protected native boolean native_isShowing(long widget);
 	protected native void native_setTouchable(long widget, boolean touchable);
 	protected native void native_setTouchModal(long widget, boolean touchable);
 	protected native void native_dismiss(long widget);
-	protected native void native_update(long widget, long anchor, int xoff, int yoff, int width, int height);
+	protected native void native_update(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int width, int height, int gravity, boolean overlapAnchor);
 	public native void setOnDismissListener(OnDismissListener listener);
 	public native void native_setWidth(long widget, int width);
 	public native void native_setHeight(long widget, int height);

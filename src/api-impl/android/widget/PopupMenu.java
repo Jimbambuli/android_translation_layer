@@ -51,6 +51,7 @@ public class PopupMenu {
 	private OnMenuItemClickListener mMenuItemClickListener;
 	private OnDismissListener mOnDismissListener;
 	private OnTouchListener mDragListener;
+	private int mGravity;
 	private long popover;
 	private MenuImpl menu;
 
@@ -100,6 +101,7 @@ public class PopupMenu {
 	                 int popupStyleRes) {
 		mContext = context;
 		mAnchor = anchor;
+		mGravity = gravity;
 		menu = new MenuImpl();
 		popover = native_buildPopover(menu.menu);
 	}
@@ -159,7 +161,7 @@ public class PopupMenu {
 	protected native void native_insertSubmenu(long menu, int position, String item, long submenu);
 	protected native void native_removeItem(long menu, int position);
 	protected native long native_buildPopover(long menu);
-	protected native void native_show(long popover, long anchor);
+	protected native void native_show(long popover, long anchor, int anchorWidth, int anchorHeight, int gravity);
 
 	// callback from native code
 	@Export
@@ -185,11 +187,30 @@ public class PopupMenu {
 	*/
 	public void show() {
 		System.out.println("PopupMenu.show() called");
-		native_show(popover, mAnchor.widget);
+		/* like MenuPopupHelper: below the anchor, aligned to its start unless END is requested */
+		int gravity = Gravity.getAbsoluteGravity(mGravity == Gravity.NO_GRAVITY ? Gravity.START : mGravity,
+		                                         mAnchor.getLayoutDirection());
+		native_show(popover, mAnchor.widget, mAnchor.getWidth(), mAnchor.getHeight(), gravity);
 	}
 
 	public Menu getMenu() {
 		return menu;
+	}
+
+	/**
+	 * Sets the gravity used to align the popup menu to its anchor view.
+	 *
+	 * @param gravity the gravity used to align the popup window
+	 */
+	public void setGravity(int gravity) {
+		mGravity = gravity;
+	}
+
+	/**
+	 * @return the gravity used to align the popup window to its anchor view
+	 */
+	public int getGravity() {
+		return mGravity;
 	}
 
 	public void dismiss() {

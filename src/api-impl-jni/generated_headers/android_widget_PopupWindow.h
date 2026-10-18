@@ -7,6 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY
+#define android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY 8388659L
 /*
  * Class:     android_widget_PopupWindow
  * Method:    native_constructor
@@ -26,9 +28,17 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setContentView
 /*
  * Class:     android_widget_PopupWindow
  * Method:    native_showAsDropDown
- * Signature: (JJIII)V
+ * Signature: (JJIIIIIZ)V
  */
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown
+  (JNIEnv *, jobject, jlong, jlong, jint, jint, jint, jint, jint, jboolean);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_showAtLocation
+ * Signature: (JJIII)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAtLocation
   (JNIEnv *, jobject, jlong, jlong, jint, jint, jint);
 
 /*
@@ -66,10 +76,10 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss
 /*
  * Class:     android_widget_PopupWindow
  * Method:    native_update
- * Signature: (JJIIII)V
+ * Signature: (JJIIIIIIIZ)V
  */
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update
-  (JNIEnv *, jobject, jlong, jlong, jint, jint, jint, jint);
+  (JNIEnv *, jobject, jlong, jlong, jint, jint, jint, jint, jint, jint, jint, jboolean);
 
 /*
  * Class:     android_widget_PopupWindow

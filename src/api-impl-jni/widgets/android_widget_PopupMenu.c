@@ -4,6 +4,7 @@
 #include "../util.h"
 
 #include "../generated_headers/android_widget_PopupMenu.h"
+#include "android_widget_PopupWindow.h"
 
 JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1init(JNIEnv *env, jobject this)
 {
@@ -57,11 +58,12 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1buildPopover(JNIEn
 	return _INTPTR(popover);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1show(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr)
+JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1show(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint gravity)
 {
 	GtkWidget *anchor = gtk_widget_get_parent(GTK_WIDGET(_PTR(anchor_ptr)));
 	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
 	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(anchor), NULL);
+	atl_popover_place_as_dropdown(popover, anchor, anchor_width, anchor_height, 0, 0, gravity, FALSE);
 	gtk_popover_present(popover);
 	gtk_popover_popup(popover);
 }
