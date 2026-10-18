@@ -21,8 +21,11 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
+import android.view.ContextMenu;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -345,6 +348,37 @@ public class PopupMenu {
 			// TODO Auto-generated method stub
 			throw new UnsupportedOperationException("Unimplemented method 'close'");
 		}
+
+		@Override
+		public SubMenu addSubMenu(CharSequence title) {
+			return addSubMenu(NONE, NONE, NONE, title);
+		}
+
+		// the GMenu based popup has no keyboard shortcuts and no item groups
+
+		@Override
+		public boolean isShortcutKey(int keyCode, KeyEvent event) {
+			return false;
+		}
+
+		@Override
+		public boolean performShortcut(int keyCode, KeyEvent event, int flags) {
+			return false;
+		}
+
+		@Override
+		public void setQwertyMode(boolean isQwerty) {}
+
+		@Override
+		public void setGroupEnabled(int group, boolean enabled) {}
+
+		@Override
+		public boolean performIdentifierAction(int id, int flags) {
+			MenuItemImpl item = (MenuItemImpl)findItem(id);
+			if (item == null || item.subMenu != null)
+				return false;
+			return mMenuItemClickListener != null && mMenuItemClickListener.onMenuItemClick(item);
+		}
 	}
 
 	private class SubMenuImpl extends MenuImpl implements SubMenu {
@@ -378,6 +412,9 @@ public class PopupMenu {
 		private String title;
 		SubMenuImpl subMenu;
 		int position; // position in list of visible items, or -1 if not visible
+		private Intent intent;
+		private char alphabeticShortcut;
+		private char numericShortcut;
 
 		private MenuItemImpl(int id, MenuImpl parent, String title, SubMenuImpl subMenu) {
 			this.id = id;
@@ -554,8 +591,7 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setAlphabeticShortcut(char alphaChar) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setAlphabeticShortcut'");
+			return setAlphabeticShortcut(alphaChar, KeyEvent.META_CTRL_ON);
 		}
 
 		@Override
@@ -587,8 +623,7 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setNumericShortcut(char numericChar) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setNumericShortcut'");
+			return setNumericShortcut(numericChar, KeyEvent.META_CTRL_ON);
 		}
 
 		@Override
@@ -610,14 +645,62 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setIntent(Intent intent) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setIntent'");
+			this.intent = intent;
+			return this;
 		}
 
 		@Override
+		public Intent getIntent() {
+			return intent;
+		}
+
+		// the GMenu based popup shows neither icons, content descriptions nor tooltips
+
+		@Override
 		public MenuItem setIconTintList(ColorStateList tint) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setIconTintList'");
+			return this;
+		}
+
+		@Override
+		public MenuItem setIconTintMode(PorterDuff.Mode tintMode) {
+			return this;
+		}
+
+		@Override
+		public MenuItem setContentDescription(CharSequence contentDescription) {
+			return this;
+		}
+
+		@Override
+		public MenuItem setTooltipText(CharSequence tooltipText) {
+			return this;
+		}
+
+		@Override
+		public ContextMenu.ContextMenuInfo getMenuInfo() {
+			return null;
+		}
+
+		@Override
+		public char getAlphabeticShortcut() {
+			return alphabeticShortcut;
+		}
+
+		@Override
+		public char getNumericShortcut() {
+			return numericShortcut;
+		}
+
+		@Override
+		public MenuItem setAlphabeticShortcut(char alphaChar, int alphaModifiers) {
+			alphabeticShortcut = alphaChar;
+			return this;
+		}
+
+		@Override
+		public MenuItem setNumericShortcut(char numericChar, int numericModifiers) {
+			numericShortcut = numericChar;
+			return this;
 		}
 	}
 }

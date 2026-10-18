@@ -2,6 +2,7 @@ package android.view;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.view.KeyEvent;
 import android.view.MenuItem;
 
 public interface Menu {
@@ -43,4 +44,16 @@ public interface Menu {
 	public int addIntentOptions(int groupId, int itemId, int order, ComponentName caller, Intent[] specifics, Intent intent, int flags, MenuItem[] outSpecificItems);
 
 	public void close();
+
+	public SubMenu addSubMenu(CharSequence title);
+
+	public boolean isShortcutKey(int keyCode, KeyEvent event);
+
+	public boolean performIdentifierAction(int id, int flags);
+
+	public boolean performShortcut(int keyCode, KeyEvent event, int flags);
+
+	public void setGroupEnabled(int group, boolean enabled);
+
+	public void setQwertyMode(boolean isQwerty);
 }

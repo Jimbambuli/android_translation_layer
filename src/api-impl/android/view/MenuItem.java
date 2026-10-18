@@ -2,6 +2,7 @@ package android.view;
 
 import android.content.Intent;
 import android.content.res.ColorStateList;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 
 public interface MenuItem {
@@ -86,4 +87,22 @@ public interface MenuItem {
 	public MenuItem setIntent(Intent intent);
 
 	public MenuItem setIconTintList(ColorStateList tint);
+
+	public MenuItem setIconTintMode(PorterDuff.Mode tintMode);
+
+	public Intent getIntent();
+
+	public ContextMenu.ContextMenuInfo getMenuInfo();
+
+	public char getAlphabeticShortcut();
+
+	public char getNumericShortcut();
+
+	public MenuItem setAlphabeticShortcut(char alphaChar, int alphaModifiers);
+
+	public MenuItem setNumericShortcut(char numericChar, int numericModifiers);
+
+	public MenuItem setContentDescription(CharSequence contentDescription);
+
+	public MenuItem setTooltipText(CharSequence tooltipText);
 }
