@@ -594,7 +594,7 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setConfiguration(
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
-	const struct ResTable_config config = {
+	struct ResTable_config config = {
 		.mcc = mcc,
 		.mnc = mnc,
 		.orientation = orientation,
@@ -611,6 +611,19 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setConfiguration(
 		.uiMode = uiMode,
 		.sdkVersion = majorVersion
 	};
+	if (locale) {
+		/* "<language>-<region>" as built by Resources.updateConfiguration(); the ResTable_config
+		 * fields hold two letter codes directly (three letter codes would need packing) */
+		const char *locale_str = (*env)->GetStringUTFChars(env, locale, NULL);
+		const char *region = strchr(locale_str, '-');
+		size_t language_len = region ? (size_t)(region - locale_str) : strlen(locale_str);
+		if (language_len == 2) {
+			memcpy(config.language, locale_str, 2);
+			if (region && strlen(region + 1) == 2)
+				memcpy(config.country, region + 1, 2);
+		}
+		(*env)->ReleaseStringUTFChars(env, locale, locale_str);
+	}
 	AssetManager_setConfiguration(asset_manager, &config);
 }
 
