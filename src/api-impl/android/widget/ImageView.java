@@ -101,6 +101,11 @@ public class ImageView extends View {
 
 	public void setImageMatrix(Matrix matrix) {}
 
+	public void setImageLevel(int level) {
+		if (drawable != null)
+			drawable.setLevel(level);
+	}
+
 	public void setImageURI(android.net.Uri uri) {
 		if (uri == null) {
 			setImageDrawable(null);

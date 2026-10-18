@@ -1382,7 +1382,15 @@ public class View implements Drawable.Callback {
 		atl_focusable = focusable;
 	}
 	public void setFocusable(int focusable) {}
-	public void setFocusableInTouchMode(boolean focusableInTouchMode) {}
+	private boolean focusable_in_touch_mode = false;
+
+	public void setFocusableInTouchMode(boolean focusableInTouchMode) {
+		focusable_in_touch_mode = focusableInTouchMode;
+	}
+
+	public final boolean isFocusableInTouchMode() {
+		return focusable_in_touch_mode;
+	}
 	public final boolean requestFocus() {
 		return requestFocus(View.FOCUS_DOWN);
 	}
@@ -1551,6 +1559,65 @@ public class View implements Drawable.Callback {
 	protected int computeVerticalScrollOffset() {
 		return -1;
 	}
+
+	protected int computeHorizontalScrollOffset() {
+		return getScrollX();
+	}
+
+	/* Copyright (C) 2006 The Android Open Source Project */
+	protected boolean overScrollBy(int deltaX, int deltaY,
+	                               int scrollX, int scrollY,
+	                               int scrollRangeX, int scrollRangeY,
+	                               int maxOverScrollX, int maxOverScrollY,
+	                               boolean isTouchEvent) {
+		final int overScrollMode = getOverScrollMode();
+		final boolean canScrollHorizontal = computeHorizontalScrollRange() > computeHorizontalScrollExtent();
+		final boolean canScrollVertical = computeVerticalScrollRange() > computeVerticalScrollExtent();
+		final boolean overScrollHorizontal = overScrollMode == OVER_SCROLL_ALWAYS ||
+		                                     (overScrollMode == OVER_SCROLL_IF_CONTENT_SCROLLS && canScrollHorizontal);
+		final boolean overScrollVertical = overScrollMode == OVER_SCROLL_ALWAYS ||
+		                                   (overScrollMode == OVER_SCROLL_IF_CONTENT_SCROLLS && canScrollVertical);
+
+		int newScrollX = scrollX + deltaX;
+		if (!overScrollHorizontal) {
+			maxOverScrollX = 0;
+		}
+
+		int newScrollY = scrollY + deltaY;
+		if (!overScrollVertical) {
+			maxOverScrollY = 0;
+		}
+
+		// Clamp values if at the limits and record
+		final int left = -maxOverScrollX;
+		final int right = maxOverScrollX + scrollRangeX;
+		final int top = -maxOverScrollY;
+		final int bottom = maxOverScrollY + scrollRangeY;
+
+		boolean clampedX = false;
+		if (newScrollX > right) {
+			newScrollX = right;
+			clampedX = true;
+		} else if (newScrollX < left) {
+			newScrollX = left;
+			clampedX = true;
+		}
+
+		boolean clampedY = false;
+		if (newScrollY > bottom) {
+			newScrollY = bottom;
+			clampedY = true;
+		} else if (newScrollY < top) {
+			newScrollY = top;
+			clampedY = true;
+		}
+
+		onOverScrolled(newScrollX, newScrollY, clampedX, clampedY);
+
+		return clampedX || clampedY;
+	}
+
+	protected void onOverScrolled(int scrollX, int scrollY, boolean clampedX, boolean clampedY) {}
 
 	protected void onScrollChanged(int l, int t, int oldl, int oldt) {}
 
@@ -1775,6 +1842,10 @@ public class View implements Drawable.Callback {
 	@Export
 	public final int getMeasuredWidth() {
 		return this.measuredWidth & MEASURED_SIZE_MASK;
+	}
+
+	public final int getMeasuredHeightAndState() {
+		return measuredHeight;
 	}
 
 	@Export
@@ -2377,6 +2448,31 @@ public class View implements Drawable.Callback {
 	}
 
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {}
+
+	protected boolean verifyDrawable(Drawable who) {
+		return who == background;
+	}
+
+	public void drawableHotspotChanged(float x, float y) {}
+
+	/* the view's own opacity isn't tracked, so never claim to be opaque */
+	public boolean isOpaque() {
+		return false;
+	}
+
+	public boolean hasOverlappingRendering() {
+		return true;
+	}
+
+	/* there is no key dispatcher state, KeyEvent.dispatch() accepts null */
+	public KeyEvent.DispatcherState getKeyDispatcherState() {
+		return null;
+	}
+
+	/* setClipBounds() is not supported, so there are never clip bounds */
+	public Rect getClipBounds() {
+		return null;
+	}
 
 	public void setBackgroundTintList(ColorStateList tint) {}
 
