@@ -164,9 +164,7 @@ public class PopupMenu {
 	// callback from native code
 	@Export
 	protected void menuItemClickCallback(final int id) {
-		if (mMenuItemClickListener != null) {
-			mMenuItemClickListener.onMenuItemClick(getMenu().findItem(id));
-		}
+		menu.performIdentifierAction(id, 0);
 	}
 
 	/**
@@ -232,18 +230,25 @@ public class PopupMenu {
 		List<MenuItemImpl> items = new ArrayList<>();
 		int numVisibleItems = 0;
 
+		/* keeps the items sorted by order, items with the same order in the order they were added */
+		private void insert(MenuItemImpl item) {
+			int index = items.size();
+			while (index > 0 && items.get(index - 1).order > item.order)
+				index--;
+			items.add(index, item);
+			item.setVisible(true);
+		}
+
 		@Override
 		public MenuItem add(int groupId, int itemId, int order, CharSequence title) {
-			MenuItemImpl item = new MenuItemImpl(itemId, this, String.valueOf(title), null);
-			items.add(item);
-			item.setVisible(true);
+			MenuItemImpl item = new MenuItemImpl(itemId, groupId, order, this, String.valueOf(title), null);
+			insert(item);
 			return item;
 		}
 
 		@Override
 		public MenuItem add(int groupId, int itemId, int order, int titleRes) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'add'");
+			return add(groupId, itemId, order, mContext.getText(titleRes));
 		}
 
 		@Override
@@ -265,60 +270,68 @@ public class PopupMenu {
 			return items.get(index);
 		}
 
+		private void remove(MenuItemImpl item) {
+			item.setVisible(false);
+			items.remove(item);
+		}
+
 		@Override
 		public void clear() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'clear'");
+			for (int i = items.size() - 1; i >= 0; i--)
+				remove(items.get(i));
 		}
 
 		@Override
 		public void removeGroup(int groupId) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'removeGroup'");
+			for (int i = items.size() - 1; i >= 0; i--)
+				if (items.get(i).groupId == groupId)
+					remove(items.get(i));
 		}
 
 		@Override
-		public SubMenu addSubMenu(int id) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'addSubMenu'");
+		public SubMenu addSubMenu(int titleRes) {
+			return addSubMenu(NONE, NONE, NONE, mContext.getText(titleRes));
 		}
 
 		@Override
-		public MenuItem add(int id) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'add'");
+		public MenuItem add(int titleRes) {
+			return add(NONE, NONE, NONE, mContext.getText(titleRes));
 		}
 
 		@Override
-		public MenuItem add(CharSequence text) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'add'");
+		public MenuItem add(CharSequence title) {
+			return add(NONE, NONE, NONE, title);
 		}
 
 		@Override
 		public void setGroupCheckable(int group, boolean checkable, boolean exclusive) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setGroupCheckable'");
+			for (MenuItemImpl item : items)
+				if (item.groupId == group)
+					item.setCheckable(checkable);
 		}
 
 		@Override
 		public SubMenu addSubMenu(int groupId, int itemId, int order, CharSequence title) {
-			SubMenuImpl submenu = new SubMenuImpl(itemId, this, String.valueOf(title));
-			items.add(submenu.item);
-			submenu.item.setVisible(true);
+			SubMenuImpl submenu = new SubMenuImpl(itemId, groupId, order, this, String.valueOf(title));
+			insert(submenu.item);
 			return submenu;
 		}
 
 		@Override
 		public void setGroupVisible(int group, boolean visible) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setGroupVisible'");
+			for (MenuItemImpl item : items)
+				if (item.groupId == group)
+					item.setVisible(visible);
 		}
 
 		@Override
 		public void removeItem(int id) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'removeItem'");
+			for (MenuItemImpl item : items) {
+				if (item.id == id) {
+					remove(item);
+					return;
+				}
+			}
 		}
 
 		@Override
@@ -328,14 +341,15 @@ public class PopupMenu {
 
 		@Override
 		public boolean hasVisibleItems() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'hasVisibleItems'");
+			for (MenuItemImpl item : items)
+				if (item.isVisible())
+					return true;
+			return false;
 		}
 
 		@Override
 		public SubMenu addSubMenu(int groupId, int itemId, int order, int titleRes) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'addSubMenu'");
+			return addSubMenu(groupId, itemId, order, mContext.getText(titleRes));
 		}
 
 		@Override
@@ -345,8 +359,7 @@ public class PopupMenu {
 
 		@Override
 		public void close() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'close'");
+			dismiss();
 		}
 
 		@Override
@@ -354,7 +367,7 @@ public class PopupMenu {
 			return addSubMenu(NONE, NONE, NONE, title);
 		}
 
-		// the GMenu based popup has no keyboard shortcuts and no item groups
+		// the GMenu based popup has no keyboard shortcuts and shows no disabled items
 
 		@Override
 		public boolean isShortcutKey(int keyCode, KeyEvent event) {
@@ -370,13 +383,20 @@ public class PopupMenu {
 		public void setQwertyMode(boolean isQwerty) {}
 
 		@Override
-		public void setGroupEnabled(int group, boolean enabled) {}
+		public void setGroupEnabled(int group, boolean enabled) {
+			for (MenuItemImpl item : items)
+				if (item.groupId == group)
+					item.setEnabled(enabled);
+		}
 
 		@Override
 		public boolean performIdentifierAction(int id, int flags) {
 			MenuItemImpl item = (MenuItemImpl)findItem(id);
-			if (item == null || item.subMenu != null)
+			if (item == null || item.subMenu != null || !item.enabled)
 				return false;
+			// like AOSP's MenuItemImpl.invoke(): the item's own listener first, then the menu's
+			if (item.clickListener != null && item.clickListener.onMenuItemClick(item))
+				return true;
 			return mMenuItemClickListener != null && mMenuItemClickListener.onMenuItemClick(item);
 		}
 	}
@@ -384,8 +404,8 @@ public class PopupMenu {
 	private class SubMenuImpl extends MenuImpl implements SubMenu {
 		private MenuItemImpl item;
 
-		public SubMenuImpl(int id, MenuImpl parent, String title) {
-			item = new MenuItemImpl(id, parent, title, this);
+		public SubMenuImpl(int id, int groupId, int order, MenuImpl parent, String title) {
+			item = new MenuItemImpl(id, groupId, order, parent, title, this);
 		}
 
 		@Override
@@ -393,31 +413,41 @@ public class PopupMenu {
 			return item;
 		}
 
+		// the GMenu based popup shows neither headers nor icons
+
 		@Override
-		public void clearHeader() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'clearHeader'");
-		}
+		public void clearHeader() {}
 
 		@Override
 		public SubMenu setIcon(Drawable icon) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setIcon'");
+			return this;
 		}
 	}
 
 	private class MenuItemImpl implements MenuItem {
 		private int id;
+		private final int groupId;
+		private final int order;
 		private MenuImpl parent;
 		private String title;
+		private CharSequence titleCondensed;
 		SubMenuImpl subMenu;
 		int position; // position in list of visible items, or -1 if not visible
 		private Intent intent;
 		private char alphabeticShortcut;
 		private char numericShortcut;
+		private boolean checkable;
+		private boolean checked;
+		boolean enabled = true;
+		private View actionView;
+		private boolean actionViewExpanded;
+		OnMenuItemClickListener clickListener;
+		private OnActionExpandListener actionExpandListener;
 
-		private MenuItemImpl(int id, MenuImpl parent, String title, SubMenuImpl subMenu) {
+		private MenuItemImpl(int id, int groupId, int order, MenuImpl parent, String title, SubMenuImpl subMenu) {
 			this.id = id;
+			this.groupId = groupId;
+			this.order = order;
 			this.parent = parent;
 			this.position = -1;
 			this.title = title;
@@ -465,28 +495,34 @@ public class PopupMenu {
 			return this;
 		}
 
+		// the GMenu based popup shows plain items: check marks and the disabled state are kept, but not shown
+
 		@Override
 		public MenuItem setChecked(boolean checked) {
+			this.checked = checked;
 			return this;
 		}
 
 		@Override
 		public MenuItem setEnabled(boolean enabled) {
+			this.enabled = enabled;
 			return this;
 		}
 
 		@Override
 		public MenuItem setCheckable(boolean checkable) {
+			this.checkable = checkable;
 			return this;
 		}
 
 		@Override
 		public boolean isCheckable() {
-			return false;
+			return checkable;
 		}
 
 		@Override
 		public MenuItem setTitleCondensed(CharSequence titleCondensed) {
+			this.titleCondensed = titleCondensed;
 			return this;
 		}
 
@@ -504,17 +540,16 @@ public class PopupMenu {
 			return this;
 		}
 
+		// a popup menu has no action bar: action views are kept, but the item stays a plain item
+
 		@Override
 		public MenuItem setActionView(View actionView) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setActionView'");
+			this.actionView = actionView;
+			return this;
 		}
 
 		@Override
-		public void setShowAsAction(int action) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setShowAsAction'");
-		}
+		public void setShowAsAction(int action) {}
 
 		@Override
 		public int getItemId() {
@@ -523,14 +558,13 @@ public class PopupMenu {
 
 		@Override
 		public int getGroupId() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getGroupId'");
+			return groupId;
 		}
 
 		@Override
 		public MenuItem setOnMenuItemClickListener(OnMenuItemClickListener listener) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setOnMenuItemClickListener'");
+			clickListener = listener;
+			return this;
 		}
 
 		@Override
@@ -555,38 +589,33 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setActionView(int resId) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setActionView'");
+			return setActionView(android.view.LayoutInflater.from(mContext).inflate(resId, null, false));
 		}
 
 		@Override
 		public View getActionView() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getActionView'");
+			return actionView;
 		}
 
 		@Override
 		public boolean hasSubMenu() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'hasSubMenu'");
+			return subMenu != null;
 		}
 
 		@Override
 		public MenuItem setOnActionExpandListener(OnActionExpandListener listener) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setOnActionExpandListener'");
+			actionExpandListener = listener;
+			return this;
 		}
 
 		@Override
 		public boolean isChecked() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'isChecked'");
+			return checked;
 		}
 
 		@Override
 		public MenuItem setShowAsActionFlags(int action) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setShowAsActionFlags'");
+			return this;
 		}
 
 		@Override
@@ -599,26 +628,22 @@ public class PopupMenu {
 
 		@Override
 		public int getOrder() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getOrder'");
+			return order;
 		}
 
 		@Override
 		public boolean isEnabled() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'isEnabled'");
+			return enabled;
 		}
 
 		@Override
 		public CharSequence getTitleCondensed() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getTitleCondensed'");
+			return titleCondensed != null ? titleCondensed : title;
 		}
 
 		@Override
 		public CharSequence getTitle() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'getTitle'");
+			return title;
 		}
 
 		@Override
@@ -628,19 +653,27 @@ public class PopupMenu {
 
 		@Override
 		public boolean expandActionView() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'expandActionView'");
+			if (actionView == null || actionViewExpanded)
+				return false;
+			if (actionExpandListener != null && !actionExpandListener.onMenuItemActionExpand(this))
+				return false;
+			actionViewExpanded = true;
+			return true;
 		}
 
 		@Override
 		public boolean collapseActionView() {
-			return false;
+			if (!actionViewExpanded)
+				return false;
+			if (actionExpandListener != null && !actionExpandListener.onMenuItemActionCollapse(this))
+				return false;
+			actionViewExpanded = false;
+			return true;
 		}
 
 		@Override
 		public boolean isActionViewExpanded() {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'isActionViewExpanded'");
+			return actionViewExpanded;
 		}
 
 		@Override
