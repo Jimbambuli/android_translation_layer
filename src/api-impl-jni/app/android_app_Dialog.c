@@ -56,6 +56,11 @@ JNIEXPORT jlong JNICALL Java_android_app_Dialog_nativeInit(JNIEnv *env, jobject 
 	GtkWidget *decor_view = GTK_WIDGET(_PTR(decor_view_ptr));
 	GtkWidget *dialog = gtk_window_new();
 	gtk_window_set_transient_for(GTK_WINDOW(dialog), window);
+	/* an Android dialog is part of the app's window: modal, without decorations of its own (the
+	 * content draws its title), so the compositor keeps it centred on the app window instead of
+	 * showing a separate "android-translation-layer" window */
+	gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+	gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
 	gtk_window_set_child(GTK_WINDOW(dialog), gtk_widget_get_parent(decor_view));
 	g_signal_connect(GTK_WINDOW(dialog), "close-request", G_CALLBACK(on_close_request), _REF(this));
 	return _INTPTR(g_object_ref(dialog));
