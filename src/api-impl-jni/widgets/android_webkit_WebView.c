@@ -138,6 +138,17 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, console_script);
 	webkit_user_script_unref(console_script);
+	/* ATL presents pointer input to apps as a touchscreen (MotionEvents use SOURCE_TOUCHSCREEN), but WebKit
+	 * reports mouse input as pointerType "mouse" to web content. Web apps written for Android WebView then
+	 * take their desktop code paths, which don't cooperate with the surrounding Android views (e.g. no
+	 * long press, or a horizontal text selection drag is taken over by a ViewPager). Report "touch". */
+	WebKitUserScript *pointer_script = webkit_user_script_new(
+	    "(function(){var d=window.PointerEvent&&Object.getOwnPropertyDescriptor(PointerEvent.prototype,'pointerType');"
+	    "if(!d||!d.get)return;Object.defineProperty(PointerEvent.prototype,'pointerType',{configurable:true,enumerable:true,"
+	    "get:function(){var t=d.get.call(this);return t==='mouse'?'touch':t;}});})();",
+	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+	webkit_user_content_manager_add_script(content_manager, pointer_script);
+	webkit_user_script_unref(pointer_script);
 	g_signal_connect(G_OBJECT(webview), "load-changed", G_CALLBACK(web_view_load_changed), NULL);
 	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
