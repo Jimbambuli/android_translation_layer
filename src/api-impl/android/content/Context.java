@@ -358,6 +358,10 @@ public abstract class Context {
 		return makeFilename(getFilesDir(), name);
 	}
 
+	public boolean deleteFile(String name) {
+		return getFileStreamPath(name).delete();
+	}
+
 	public File getSharedPrefsFile(String name) {
 		return makeFilename(getPreferencesDir(), name + ".xml");
 	}
@@ -564,6 +568,15 @@ public abstract class Context {
 
 	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, Handler scheduler) {
 		return registerReceiver(receiver, filter);
+	}
+
+	/* there is only one app, so the export flags (RECEIVER_EXPORTED etc.) make no difference */
+	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, int flags) {
+		return registerReceiver(receiver, filter);
+	}
+
+	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, Handler scheduler, int flags) {
+		return registerReceiver(receiver, filter, broadcastPermission, scheduler);
 	}
 
 	public String[] fileList() {
