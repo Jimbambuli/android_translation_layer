@@ -193,8 +193,24 @@ public class Drawable {
 
 	public void clearColorFilter() {}
 
-	public final int getLevel() { return 0; }
-	public final boolean setLevel(int level) { return false; }
+	private int level = 0;
+
+	public final int getLevel() {
+		return level;
+	}
+
+	/**
+	 * Sets the level (0..10000) and calls onLevelChange() if it changed, like AOSP.
+	 *
+	 * @return the result of onLevelChange(), i.e. whether the drawable needs to be redrawn
+	 */
+	public final boolean setLevel(int level) {
+		if (this.level != level) {
+			this.level = level;
+			return onLevelChange(level);
+		}
+		return false;
+	}
 
 	public void setColorFilter(int color, PorterDuff.Mode mode) {
 		setColorFilter(new PorterDuffColorFilter(color, mode));
