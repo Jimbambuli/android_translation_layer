@@ -709,6 +709,7 @@ srcs = [
 	'android/webkit/CookieSyncManager.java',
 	'android/webkit/DownloadListener.java',
 	'android/webkit/GeolocationPermissions.java',
+	'android/webkit/JavascriptInterface.java',
 	'android/webkit/JsPromptResult.java',
 	'android/webkit/JsResult.java',
 	'android/webkit/MimeTypeMap.java',

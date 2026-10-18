@@ -273,6 +273,22 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload
   (JNIEnv *, jobject, jlong);
 
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_addJavascriptInterface
+ * Signature: (JLjava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1addJavascriptInterface
+  (JNIEnv *, jobject, jlong, jstring, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_evaluateJavascript
+ * Signature: (JLjava/lang/String;Landroid/webkit/ValueCallback;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript
+  (JNIEnv *, jobject, jlong, jstring, jobject);
+
 #ifdef __cplusplus
 }
 #endif
