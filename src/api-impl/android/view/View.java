@@ -1754,6 +1754,28 @@ public class View implements Drawable.Callback {
 			native_queueAllocate(widget); // GTK is not re-entrant-safe. Queue allocation
 		else
 			native_layout(widget, l, t, r, b);
+		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
+		notifyLayoutChange();
+	}
+
+	private int reportedLeft, reportedTop, reportedRight, reportedBottom;
+
+	/* call the OnLayoutChangeListeners once per change of the view's bounds, from layout() or layoutInternal() */
+	private void notifyLayoutChange() {
+		if (on_layout_change_listeners == null)
+			return;
+		if (left == reportedLeft && top == reportedTop && right == reportedRight && bottom == reportedBottom)
+			return;
+		int oldLeft = reportedLeft;
+		int oldTop = reportedTop;
+		int oldRight = reportedRight;
+		int oldBottom = reportedBottom;
+		reportedLeft = left;
+		reportedTop = top;
+		reportedRight = right;
+		reportedBottom = bottom;
+		for (OnLayoutChangeListener on_layout_change_listener : on_layout_change_listeners)
+			on_layout_change_listener.onLayoutChange(this, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom);
 	}
 
 	/** Helper function to be called from GTKs LayoutManager via JNI */
@@ -1783,10 +1805,7 @@ public class View implements Drawable.Callback {
 					child.layout(child.left, child.top, child.right, child.bottom);
 			}
 		}
-		if (on_layout_change_listeners != null) {
-			for (OnLayoutChangeListener on_layout_change_listener : on_layout_change_listeners)
-				on_layout_change_listener.onLayoutChange(this, left, top, right, bottom, left, top, left + oldWidth, top + oldHeight);
-		}
+		notifyLayoutChange();
 		oldWidth = width;
 		oldHeight = height;
 		in_layout = false;
