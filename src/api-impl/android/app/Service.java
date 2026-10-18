@@ -33,6 +33,10 @@ public abstract class Service extends ContextWrapper {
 		this.notification_id = id;
 	}
 
+	public void startForeground(int id, Notification notification, int foregroundServiceType) {
+		startForeground(id, notification);
+	}
+
 	public void stopForeground(boolean remove) {
 		System.out.println("stopForeground(" + remove + ") called");
 		if (remove)

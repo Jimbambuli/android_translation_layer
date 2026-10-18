@@ -383,6 +383,11 @@ public abstract class Context {
 	@Export
 	public abstract ComponentName startService(Intent intent);
 
+	/* there are no background execution limits, so this is the same as startService() */
+	public ComponentName startForegroundService(Intent service) {
+		return startService(service);
+	}
+
 	// TODO: do these both work? make them look more alike
 	public FileInputStream openFileInput(String name) throws FileNotFoundException {
 		if (Log.isLoggable(TAG, Log.VERBOSE))
