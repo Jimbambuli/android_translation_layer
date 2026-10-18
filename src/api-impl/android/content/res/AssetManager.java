@@ -93,6 +93,9 @@ public final class AssetManager {
 
 	// For communication with native code.
 	private long mObject;
+
+	/* the Resources whose configuration is currently set, see Resources.assets() */
+	/*package*/ Resources mConfigOwner;
 	private int mNObject; // used by the NDK
 
 	private StringBlock mStringBlocks[] = null;

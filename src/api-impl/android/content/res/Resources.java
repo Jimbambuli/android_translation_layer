@@ -265,7 +265,7 @@ public class Resources {
 	 *         possibly styled text information.
 	 */
 	public CharSequence getText(int id) throws NotFoundException {
-		CharSequence res = mAssets.getResourceText(id);
+		CharSequence res = assets().getResourceText(id);
 		if (res != null) {
 			return res;
 		}
@@ -294,12 +294,12 @@ public class Resources {
 	 */
 	public CharSequence getQuantityText(int id, int quantity) throws NotFoundException {
 		PluralRules rule = getPluralRule();
-		CharSequence res = mAssets.getResourceBagText(id,
+		CharSequence res = assets().getResourceBagText(id,
 		                                              attrForQuantityCode(rule.select(quantity)));
 		if (res != null) {
 			return res;
 		}
-		res = mAssets.getResourceBagText(id, ID_OTHER);
+		res = assets().getResourceBagText(id, ID_OTHER);
 		if (res != null) {
 			return res;
 		}
@@ -464,7 +464,7 @@ public class Resources {
 	 *         possibly styled text information, or def if id is 0 or not found.
 	 */
 	public CharSequence getText(int id, CharSequence def) {
-		CharSequence res = id != 0 ? mAssets.getResourceText(id) : null;
+		CharSequence res = id != 0 ? assets().getResourceText(id) : null;
 		return res != null ? res : def;
 	}
 
@@ -480,7 +480,7 @@ public class Resources {
 	 * @return The styled text array associated with the resource.
 	 */
 	public CharSequence[] getTextArray(int id) throws NotFoundException {
-		CharSequence[] res = mAssets.getResourceTextArray(id);
+		CharSequence[] res = assets().getResourceTextArray(id);
 		if (res != null) {
 			return res;
 		}
@@ -499,7 +499,7 @@ public class Resources {
 	 * @return The string array associated with the resource.
 	 */
 	public String[] getStringArray(int id) throws NotFoundException {
-		String[] res = mAssets.getResourceStringArray(id);
+		String[] res = assets().getResourceStringArray(id);
 		if (res != null) {
 			return res;
 		}
@@ -518,7 +518,7 @@ public class Resources {
 	 * @return The int array associated with the resource.
 	 */
 	public int[] getIntArray(int id) throws NotFoundException {
-		int[] res = mAssets.getArrayIntResource(id);
+		int[] res = assets().getArrayIntResource(id);
 		if (res != null) {
 			return res;
 		}
@@ -539,13 +539,13 @@ public class Resources {
 	 * when done with it.
 	 */
 	public TypedArray obtainTypedArray(int id) throws NotFoundException {
-		int len = mAssets.getArraySize(id);
+		int len = assets().getArraySize(id);
 		if (len < 0) {
 			throw new NotFoundException("Array resource ID #0x" + Integer.toHexString(id));
 		}
 
 		TypedArray array = TypedArray.obtain(this, len);
-		array.mLength = mAssets.retrieveArray(id, array.mData);
+		array.mLength = assets().retrieveArray(id, array.mData);
 		array.mIndices[0] = 0;
 
 		return array;
@@ -1154,7 +1154,7 @@ public class Resources {
 	 */
 	public void getValue(int id, TypedValue outValue, boolean resolveRefs)
 	    throws NotFoundException {
-		boolean found = mAssets.getResourceValue(id, mCompatibilityInfo.applicationDensity, outValue, resolveRefs);
+		boolean found = assets().getResourceValue(id, mCompatibilityInfo.applicationDensity, outValue, resolveRefs);
 		if (found) {
 			return;
 		}
@@ -1178,7 +1178,7 @@ public class Resources {
 	 */
 	public void getValueForDensity(int id, int density, TypedValue outValue, boolean resolveRefs)
 	    throws NotFoundException {
-		boolean found = mAssets.getResourceValue(id, density, outValue, resolveRefs);
+		boolean found = assets().getResourceValue(id, density, outValue, resolveRefs);
 		if (found) {
 			return;
 		}
@@ -1262,7 +1262,7 @@ public class Resources {
 				}
 			}
 
-			mAssets.applyThemeStyle(theme, resid, force);
+			assets().applyThemeStyle(theme, resid, force);
 			mKey.append(resid, force);
 		}
 
@@ -1386,7 +1386,7 @@ public class Resources {
 			// out the attributes from the XML file (applying type information
 			// contained in the resources and such).
 			XmlResourceParser parser = (XmlResourceParser)set;
-			getAssets().applyStyle(theme, set != null ? ((XmlBlock.Parser)set).mParseState : 0,
+			assets().applyStyle(theme, set != null ? ((XmlBlock.Parser)set).mParseState : 0,
 			                       defStyleAttr, defStyleRes,
 			                       attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
 			array.mRsrcs = attrs;
@@ -1454,7 +1454,7 @@ public class Resources {
 			}
 
 			final TypedArray array = TypedArray.obtain(Resources.this, len);
-			getAssets().resolveAttrs(theme, 0, 0, values, attrs, array.mData, array.mIndices);
+			assets().resolveAttrs(theme, 0, 0, values, attrs, array.mData, array.mIndices);
 			array.mTheme = this;
 			array.mXml = null;
 
@@ -1480,7 +1480,7 @@ public class Resources {
 		 */
 		public boolean resolveAttribute(int resid, TypedValue outValue,
 		                                boolean resolveRefs) {
-			boolean got = mAssets.getThemeValue(theme, resid, outValue, resolveRefs);
+			boolean got = assets().getThemeValue(theme, resid, outValue, resolveRefs);
 			if (debug) {
 				System.out.println(
 				    "resolveAttribute #" + Integer.toHexString(resid) + " got=" + got + ", type=0x" + Integer.toHexString(outValue.type) + ", data=0x" + Integer.toHexString(outValue.data));
@@ -1638,7 +1638,7 @@ public class Resources {
 		// out the attributes from the XML file (applying type information
 		// contained in the resources and such).
 		XmlBlock.Parser parser = (XmlBlock.Parser)set;
-		getAssets().retrieveAttributes(parser.mParseState, attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
+		assets().retrieveAttributes(parser.mParseState, attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
 
 		array.mXml = parser;
 
@@ -1707,36 +1707,7 @@ public class Resources {
 			}
 			mMetrics.scaledDensity = mMetrics.density * mConfiguration.fontScale;
 
-			String locale = null;
-			if (mConfiguration.locale != null) {
-				locale = mConfiguration.locale.getLanguage();
-				if (mConfiguration.locale.getCountry() != null) {
-					locale += "-" + mConfiguration.locale.getCountry();
-				}
-			}
-			int width, height;
-			if (mMetrics.widthPixels >= mMetrics.heightPixels) {
-				width = mMetrics.widthPixels;
-				height = mMetrics.heightPixels;
-			} else {
-				// noinspection SuspiciousNameCombination
-				width = mMetrics.heightPixels;
-				// noinspection SuspiciousNameCombination
-				height = mMetrics.widthPixels;
-			}
-			int keyboardHidden = mConfiguration.keyboardHidden;
-			if (keyboardHidden == Configuration.KEYBOARDHIDDEN_NO && mConfiguration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_YES) {
-				keyboardHidden = Configuration.KEYBOARDHIDDEN_SOFT;
-			}
-			mAssets.setConfiguration(mConfiguration.mcc, mConfiguration.mnc,
-			                         locale, mConfiguration.orientation,
-			                         mConfiguration.touchscreen,
-			                         mConfiguration.densityDpi, mConfiguration.keyboard,
-			                         keyboardHidden, mConfiguration.navigation, width, height,
-			                         mConfiguration.smallestScreenWidthDp,
-			                         mConfiguration.screenWidthDp, mConfiguration.screenHeightDp,
-			                         mConfiguration.screenLayout, mConfiguration.uiMode,
-			                         Build.VERSION.RESOURCES_SDK_INT);
+			applyAssetConfiguration();
 
 			if (DEBUG_CONFIG) {
 				Slog.i(TAG, "**** Updating config of " + this + ": final config is " + mConfiguration + " final compat is " + mCompatibilityInfo);
@@ -1754,6 +1725,86 @@ public class Resources {
 				mPluralRule = PluralRules.forLocale(config.locale);
 			}
 		}
+	}
+
+	/* All Resources of an app share one AssetManager, whose native configuration is the one of the
+	 * Resources that set it last. Before a configuration dependent lookup, assets() applies the
+	 * configuration of this Resources again if another one has changed it in the meantime. */
+	private void applyAssetConfiguration() {
+		String locale = null;
+		if (mConfiguration.locale != null) {
+			locale = mConfiguration.locale.getLanguage();
+			if (mConfiguration.locale.getCountry() != null) {
+				locale += "-" + mConfiguration.locale.getCountry();
+			}
+		}
+		int width, height;
+		if (mMetrics.widthPixels >= mMetrics.heightPixels) {
+			width = mMetrics.widthPixels;
+			height = mMetrics.heightPixels;
+		} else {
+			// noinspection SuspiciousNameCombination
+			width = mMetrics.heightPixels;
+			// noinspection SuspiciousNameCombination
+			height = mMetrics.widthPixels;
+		}
+		int keyboardHidden = mConfiguration.keyboardHidden;
+		if (keyboardHidden == Configuration.KEYBOARDHIDDEN_NO && mConfiguration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_YES) {
+			keyboardHidden = Configuration.KEYBOARDHIDDEN_SOFT;
+		}
+		mAssets.setConfiguration(mConfiguration.mcc, mConfiguration.mnc,
+		                         locale, mConfiguration.orientation,
+		                         mConfiguration.touchscreen,
+		                         mConfiguration.densityDpi, mConfiguration.keyboard,
+		                         keyboardHidden, mConfiguration.navigation, width, height,
+		                         mConfiguration.smallestScreenWidthDp,
+		                         mConfiguration.screenWidthDp, mConfiguration.screenHeightDp,
+		                         mConfiguration.screenLayout, mConfiguration.uiMode,
+		                         Build.VERSION.RESOURCES_SDK_INT);
+		mAssets.mConfigOwner = this;
+	}
+
+	private AssetManager assets() {
+		if (mAssets.mConfigOwner != this) {
+			synchronized (mAccessLock) {
+				applyAssetConfiguration();
+			}
+		}
+		return mAssets;
+	}
+
+	private void clearDrawableCacheLocked(
+	    LongSparseArray<WeakReference<ConstantState>> cache,
+	    int configChanges) {
+		/*int N = cache.size();
+		if (DEBUG_CONFIG) {
+			Log.d(TAG, "Cleaning up drawables config changes: 0x"
+			           + Integer.toHexString(configChanges));
+		}
+		for (int i = 0; i < N; i++) {
+			WeakReference<Drawable.ConstantState> ref = cache.valueAt(i);
+			if (ref != null) {
+				Drawable.ConstantState cs = ref.get();
+				if (cs != null) {
+					if (Configuration.needNewResources(
+						configChanges, cs.getChangingConfigurations())) {
+						if (DEBUG_CONFIG) {
+							Log.d(TAG, "FLUSHING #0x"
+							           + Long.toHexString(mDrawableCache.keyAt(i))
+							               + " / " + cs + " with changes: 0x"
+							               + Integer.toHexString(cs.getChangingConfigurations()));
+						}
+						cache.setValueAt(i, null);
+					} else if (DEBUG_CONFIG) {
+						Log.d(TAG, "(Keeping #0x"
+						           + Long.toHexString(cache.keyAt(i))
+						               + " / " + cs + " with changes: 0x"
+						               + Integer.toHexString(cs.getChangingConfigurations())
+						               + ")");
+					}
+				}
+			}
+		}*/
 	}
 
 	/**
