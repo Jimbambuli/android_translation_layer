@@ -18,10 +18,21 @@ public class DrawableContainer extends Drawable {
 	public boolean selectDrawable(int idx) {
 		if (idx >= 0 && idx < state.childCount && idx != curIndex && state.drawables[idx] != null) {
 			curIndex = idx;
-			native_selectChild(paintable, state.drawables[idx].paintable);
+			Drawable d = state.drawables[idx];
+			if (d.isStateful())
+				d.setState(getState());
+			native_selectChild(paintable, d.paintable);
 			invalidateSelf();
 			return true;
 		}
+		return false;
+	}
+
+	@Override
+	protected boolean onStateChange(int[] stateSet) {
+		// let the current child follow the state too, e.g. a tint with a selector
+		if (curIndex >= 0 && state.drawables[curIndex].isStateful())
+			return state.drawables[curIndex].setState(stateSet);
 		return false;
 	}
 
