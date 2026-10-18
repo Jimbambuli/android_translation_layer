@@ -161,13 +161,21 @@ public class TextView extends View {
 
 	public native final void native_setTextColor(int color);
 	public void setTextColor(int color) {
+		colors = ColorStateList.valueOf(color);
 		native_setTextColor(color);
 	}
 	public void setTextColor(ColorStateList colors) {
 		if (colors != null) {
 			this.colors = colors;
-			native_setTextColor(colors.getDefaultColor()); // TODO: do this properly
+			native_setTextColor(colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
 		}
+	}
+
+	@Override
+	protected void drawableStateChanged() {
+		super.drawableStateChanged();
+		if (colors.isStateful())
+			native_setTextColor(colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
 	}
 	public void setTypeface(Typeface tf, int style) {
 		String[] classesToRemove = {"ATL-font-bold", "ATL-font-italic"};

@@ -86,8 +86,17 @@ public class ImageView extends View {
 		this.drawable = drawable;
 		if (drawable != null) {
 			drawable.setCallback(this);
+			if (drawable.isStateful())
+				drawable.setState(getDrawableState());
 		}
 		native_setDrawable(widget, drawable != null ? drawable.paintable : 0);
+	}
+
+	@Override
+	protected void drawableStateChanged() {
+		super.drawableStateChanged();
+		if (drawable != null && drawable.isStateful())
+			drawable.setState(getDrawableState());
 	}
 
 	public void setImageMatrix(Matrix matrix) {}
