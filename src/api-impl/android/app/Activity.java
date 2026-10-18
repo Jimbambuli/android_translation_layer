@@ -707,6 +707,26 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	@Override
 	public void onActionModeFinished(ActionMode mode) {}
 
+	/**
+	 * Navigates up to the activity of upIntent if it is in the back stack: the activities above it
+	 * are finished and it receives upIntent in onNewIntent(). There is only one task, so
+	 * shouldUpRecreateTask() is always false.
+	 */
+	public boolean navigateUpTo(Intent upIntent) {
+		ComponentName target = upIntent.getComponent();
+		if (target == null)
+			return false;
+		try {
+			return nativeResumeActivity(getClassLoader().loadClass(target.getClassName()).asSubclass(Activity.class), upIntent);
+		} catch (ClassNotFoundException e) {
+			return false;
+		}
+	}
+
+	public boolean shouldUpRecreateTask(Intent targetIntent) {
+		return false;
+	}
+
 	public void requestPermissions(String[] permissions, int requestCode) {
 		Slog.w(TAG, "requestPermissions(" + Arrays.toString(permissions) + "): not handled");
 	}
