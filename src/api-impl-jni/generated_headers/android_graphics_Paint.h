@@ -33,6 +33,10 @@ extern "C" {
 #define android_graphics_Paint_AUTO_HINTING_TEXT_FLAG 2048L
 #undef android_graphics_Paint_VERTICAL_TEXT_FLAG
 #define android_graphics_Paint_VERTICAL_TEXT_FLAG 4096L
+#undef android_graphics_Paint_HINTING_OFF
+#define android_graphics_Paint_HINTING_OFF 0L
+#undef android_graphics_Paint_HINTING_ON
+#define android_graphics_Paint_HINTING_ON 1L
 /*
  * Class:     android_graphics_Paint
  * Method:    native_create

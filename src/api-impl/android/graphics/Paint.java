@@ -23,6 +23,15 @@ public class Paint {
 	private Shader shader;
 	private Align align = Align.CENTER;
 	private ColorFilter color_filter;
+	/* Kept for the getters only: GSK always draws antialiased and filtered, Pango hints text
+	 * itself. ATL always antialiases, so that flag is set by default, like in AOSP since API 30. */
+	private int flags = ANTI_ALIAS_FLAG;
+	private float text_scale_x = 1;
+	private float stroke_miter = 4;
+	private int hinting = HINTING_ON;
+
+	public static final int HINTING_OFF = 0;
+	public static final int HINTING_ON = 1;
 
 	public Paint() {
 		paint = native_create();
@@ -35,6 +44,18 @@ public class Paint {
 
 	public Paint(Paint paint) {
 		this.paint = native_clone(paint.paint);
+		copyJavaState(paint);
+	}
+
+	private void copyJavaState(Paint paint) {
+		flags = paint.flags;
+		text_scale_x = paint.text_scale_x;
+		stroke_miter = paint.stroke_miter;
+		hinting = paint.hinting;
+	}
+
+	private void setFlag(int flag, boolean on) {
+		flags = on ? flags | flag : flags & ~flag;
 	}
 
 	public void setColor(int color) {
@@ -59,10 +80,11 @@ public class Paint {
 	}
 
 	public void setAntiAlias(boolean aa) {
+		setFlag(ANTI_ALIAS_FLAG, aa);
 	}
 
 	public boolean isAntiAlias() {
-		return true;
+		return (flags & ANTI_ALIAS_FLAG) != 0;
 	}
 
 	public boolean setFontVariationSettings(String fvs) {
@@ -92,11 +114,12 @@ public class Paint {
 		native_get_text_bounds(paint, text.substring(start, end), bounds);
 		return bounds.width();
 	}
-	public void setFilterBitmap(boolean filter) {}
+	public void setFilterBitmap(boolean filter) {
+		setFlag(FILTER_BITMAP_FLAG, filter);
+	}
 
 	public void setFlags(int flags) {
-		if ((flags & ANTI_ALIAS_FLAG) != 0)
-			setAntiAlias(true);
+		this.flags = flags;
 	}
 
 	public void setStyle(Style style) {
@@ -199,14 +222,16 @@ public class Paint {
 		}
 	}
 
-	public /*native*/ int getFlags() { return 0; }
+	public int getFlags() { return flags; }
 
-	public /*native*/ int getHinting() { return 0; }
-	public /*native*/ void setHinting(int mode) {}
+	public int getHinting() { return hinting; }
+	public void setHinting(int mode) { hinting = mode; }
 
-	public /*native*/ void setDither(boolean dither) {}
+	public void setDither(boolean dither) {
+		setFlag(DITHER_FLAG, dither);
+	}
 	public boolean isDither() {
-		return false;
+		return (flags & DITHER_FLAG) != 0;
 	}
 
 	public /*native*/ void setLinearText(boolean linearText) {}
@@ -219,14 +244,14 @@ public class Paint {
 		return native_get_stroke_width(paint);
 	}
 
-	public /*native*/ float getStrokeMiter() { return 0; }
-	public /*native*/ void setStrokeMiter(float miter) {}
+	public float getStrokeMiter() { return stroke_miter; }
+	public void setStrokeMiter(float miter) { stroke_miter = miter; }
 	public /*native*/ float getTextSize() {
 		return native_get_text_size(paint);
 	}
 
-	public /*native*/ float getTextScaleX() { return 0; }
-	public /*native*/ void setTextScaleX(float scaleX) {}
+	public float getTextScaleX() { return text_scale_x; }
+	public void setTextScaleX(float scaleX) { text_scale_x = scaleX; }
 	public /*native*/ float getTextSkewX() { return 0; }
 	public /*native*/ void setTextSkewX(float skewX) {}
 
@@ -360,9 +385,10 @@ public class Paint {
 	public void set(Paint paint) {
 		native_recycle(this.paint);
 		this.paint = native_clone(paint.paint);
+		copyJavaState(paint);
 	}
 
-	public boolean isFilterBitmap() { return false; }
+	public boolean isFilterBitmap() { return (flags & FILTER_BITMAP_FLAG) != 0; }
 
 	public Cap getStrokeCap() {
 		return Cap.values[native_get_stroke_cap(paint)];
