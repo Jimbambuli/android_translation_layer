@@ -291,6 +291,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_firePointerCancel
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1firePointerCancel
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_setBackgroundColor
  * Signature: (JI)V
  */

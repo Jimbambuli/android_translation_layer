@@ -168,7 +168,13 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	WebKitUserScript *pointer_script = webkit_user_script_new(
 	    "(function(){var d=window.PointerEvent&&Object.getOwnPropertyDescriptor(PointerEvent.prototype,'pointerType');"
 	    "if(!d||!d.get)return;Object.defineProperty(PointerEvent.prototype,'pointerType',{configurable:true,enumerable:true,"
-	    "get:function(){var t=d.get.call(this);return t==='mouse'?'touch':t;}});})();",
+	    "get:function(){var t=d.get.call(this);return t==='mouse'?'touch':t;}});"
+	    /* see native_firePointerCancel(): fire the pointercancel that Android's WebView fires on ACTION_CANCEL */
+	    "var down=null;addEventListener('pointerdown',function(e){down=e;},true);"
+	    "addEventListener('pointerup',function(){down=null;},true);addEventListener('pointercancel',function(){down=null;},true);"
+	    "Object.defineProperty(window,'__atl_pointercancel',{value:function(){var e=down;down=null;if(e)"
+	    "e.target.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:e.pointerId,pointerType:'touch',"
+	    "isPrimary:e.isPrimary,clientX:e.clientX,clientY:e.clientY,screenX:e.screenX,screenY:e.screenY}));}});})();",
 	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, pointer_script);
 	webkit_user_script_unref(pointer_script);
@@ -296,4 +302,15 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBackgroundColor(JN
 		.alpha = ((color >> 24) & 0xFF) / 255.f,
 	};
 	webkit_web_view_set_background_color(webview, &rgba);
+}
+
+/* WebView.onTouchEvent() got ACTION_CANCEL: an ancestor ViewGroup intercepted the touch sequence. Android's
+ * WebView passes the cancel on to the page (pointercancel). WebKitGTK only knows GDK events and gets none for
+ * the rest of the sequence, so gesture code in the page would wait for a pointerup that never comes. */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1firePointerCancel(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+
+	webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(_PTR(widget_ptr)), "window.__atl_pointercancel&&__atl_pointercancel()", -1, NULL, NULL, NULL, NULL, NULL);
 }
