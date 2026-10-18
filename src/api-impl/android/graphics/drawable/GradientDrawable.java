@@ -881,6 +881,16 @@ public class GradientDrawable extends Drawable {
 			    com.android.internal.R.styleable.GradientDrawable_useLevel, true);
 		}
 
+		final int tintMode = a.getInt(com.android.internal.R.styleable.GradientDrawable_tintMode, -1);
+		if (tintMode != -1) {
+			st.mTintMode = Drawable.parseTintMode(tintMode, DEFAULT_TINT_MODE);
+		}
+		final ColorStateList tint = a.getColorStateList(com.android.internal.R.styleable.GradientDrawable_tint);
+		if (tint != null) {
+			st.mTint = tint;
+		}
+		mTintFilter = updateTintFilter(mTintFilter, st.mTint, st.mTintMode);
+
 		a.recycle();
 
 		setShape(shapeType);
