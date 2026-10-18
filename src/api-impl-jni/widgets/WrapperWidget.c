@@ -436,6 +436,23 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 
 GtkWidget *currently_unmapping = NULL;
 
+#define FOCUS_FORWARD 2
+
+/* View.onFocusChanged(): the view is focused when its wrapper or the wrapped widget has the GTK
+ * focus. Compose needs this to activate its focus tree, it rejects key events otherwise. */
+static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget *wrapper)
+{
+	gboolean focused = gtk_widget_has_focus(GTK_WIDGET(wrapper)) || (wrapper->child && gtk_widget_has_focus(wrapper->child));
+	if (focused == wrapper->has_focus)
+		return;
+	wrapper->has_focus = focused;
+
+	JNIEnv *env = get_jni_env();
+	J__View__onFocusChanged(env, wrapper->jobj, focused, FOCUS_FORWARD, NULL);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+}
+
 static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer user_data)
 {
 	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(wrapper));
@@ -499,6 +516,9 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 		gtk_widget_set_focusable(GTK_WIDGET(wrapper), TRUE);
 	}
 	g_signal_connect(wrapper, "notify::root", G_CALLBACK(root_changed_cb), NULL);
+	g_signal_connect(wrapper, "notify::has-focus", G_CALLBACK(focus_changed_cb), wrapper);
+	if (wrapper->child)
+		g_signal_connect(wrapper->child, "notify::has-focus", G_CALLBACK(focus_changed_cb), wrapper);
 }
 
 void wrapper_widget_set_layout_params(WrapperWidget *wrapper, int width, int height)

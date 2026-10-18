@@ -731,7 +731,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public interface OnFocusChangeListener {
-		// TODO
+		void onFocusChange(View v, boolean hasFocus);
 	}
 
 	public interface OnCreateContextMenuListener {
@@ -2241,7 +2241,18 @@ public class View implements Drawable.Callback {
 
 	public void jumpDrawablesToCurrentState() {}
 
-	public void setOnFocusChangeListener(View.OnFocusChangeListener l) {}
+	private OnFocusChangeListener onFocusChangeListener;
+
+	public void setOnFocusChangeListener(View.OnFocusChangeListener l) {
+		onFocusChangeListener = l;
+	}
+
+	/* called from native code when the view's widget gains or loses the GTK focus */
+	@Export
+	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+		if (onFocusChangeListener != null)
+			onFocusChangeListener.onFocusChange(this, gainFocus);
+	}
 
 	public boolean hasWindowFocus() { return true; }
 
@@ -2934,7 +2945,7 @@ public class View implements Drawable.Callback {
 
 	public float getCameraDistance() { return 0; }
 
-	public OnFocusChangeListener getOnFocusChangeListener() { return null; }
+	public OnFocusChangeListener getOnFocusChangeListener() { return onFocusChangeListener; }
 
 	public int getTextDirection() { return 0; /* TEXT_DIRECTION_INHERIT */ }
 
