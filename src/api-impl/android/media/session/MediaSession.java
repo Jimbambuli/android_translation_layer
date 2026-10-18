@@ -18,8 +18,18 @@ import java.util.List;
 public class MediaSession {
 
 	private List<QueueItem> queue;
+	private CharSequence queue_title;
+	private MediaMetadata metadata;
+	private final Token token = new Token(this);
 
-	public static final class Token {}
+	/* only used within the process, so it refers to the session directly */
+	public static final class Token {
+		final MediaSession session;
+
+		Token(MediaSession session) {
+			this.session = session;
+		}
+	}
 
 	public static class QueueItem {
 		long id;
@@ -29,12 +39,20 @@ public class MediaSession {
 			this.description = description;
 			this.id = id;
 		}
+
+		public MediaDescription getDescription() {
+			return description;
+		}
+
+		public long getQueueId() {
+			return id;
+		}
 	}
 
 	public MediaSession(Context context, String tag) {}
 
 	public Token getSessionToken() {
-		return new Token();
+		return token;
 	}
 
 	public void setFlags(int flags) {}
@@ -67,7 +85,9 @@ public class MediaSession {
 		nativeSetState(state.state, state.actions, state.position, state.updateTime, title, subTitle, artUrl);
 	}
 
-	public void setMetadata(MediaMetadata metadata) {}
+	public void setMetadata(MediaMetadata metadata) {
+		this.metadata = metadata;
+	}
 
 	public void setQueue(List<QueueItem> queue) {
 		this.queue = queue;
@@ -87,7 +107,21 @@ public class MediaSession {
 
 	public void setRatingType(int ratingType) {}
 
-	public void setQueueTitle(CharSequence title) {}
+	public void setQueueTitle(CharSequence title) {
+		queue_title = title;
+	}
+
+	List<QueueItem> getQueue() {
+		return queue;
+	}
+
+	CharSequence getQueueTitle() {
+		return queue_title;
+	}
+
+	MediaMetadata getMetadata() {
+		return metadata;
+	}
 	protected native void nativeSetState(int state, long actions, long position, long updateTime, String title, String subTitle, String artUrl);
 	protected native void nativeSetCallback(Callback callback);
 
