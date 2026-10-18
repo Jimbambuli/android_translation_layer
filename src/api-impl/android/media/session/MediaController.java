@@ -18,6 +18,10 @@ public class MediaController {
 		return session != null ? session.getMetadata() : null;
 	}
 
+	public PlaybackState getPlaybackState() {
+		return session != null ? session.getPlaybackState() : null;
+	}
+
 	public CharSequence getQueueTitle() {
 		return session != null ? session.getQueueTitle() : null;
 	}

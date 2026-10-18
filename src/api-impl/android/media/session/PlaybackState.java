@@ -1,6 +1,8 @@
 package android.media.session;
 
 import android.os.Bundle;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PlaybackState {
 
@@ -10,6 +12,50 @@ public class PlaybackState {
 	public long updateTime;
 	public long actions;
 	public long activeQueueItemId;
+	private long bufferedPosition;
+	private CharSequence errorMessage;
+	private List<CustomAction> customActions = new ArrayList<>();
+	private Bundle extras;
+
+	public int getState() {
+		return state;
+	}
+
+	public long getPosition() {
+		return position;
+	}
+
+	public long getBufferedPosition() {
+		return bufferedPosition;
+	}
+
+	public float getPlaybackSpeed() {
+		return playbackSpeed;
+	}
+
+	public long getActions() {
+		return actions;
+	}
+
+	public List<CustomAction> getCustomActions() {
+		return customActions;
+	}
+
+	public CharSequence getErrorMessage() {
+		return errorMessage;
+	}
+
+	public long getLastPositionUpdateTime() {
+		return updateTime;
+	}
+
+	public long getActiveQueueItemId() {
+		return activeQueueItemId;
+	}
+
+	public Bundle getExtras() {
+		return extras;
+	}
 
 	public static class Builder {
 
@@ -31,23 +77,35 @@ public class PlaybackState {
 			return this;
 		}
 
-		public Builder setBufferedPosition(long bufferedPosition) { return this; }
+		public Builder setBufferedPosition(long bufferedPosition) {
+			state.bufferedPosition = bufferedPosition;
+			return this;
+		}
 
 		public Builder setActions(long actions) {
 			state.actions = actions;
 			return this;
 		}
 
-		public Builder setErrorMessage(CharSequence errorMessage) { return this; }
+		public Builder setErrorMessage(CharSequence errorMessage) {
+			state.errorMessage = errorMessage;
+			return this;
+		}
 
 		public Builder setActiveQueueItemId(long activeQueueItemId) {
 			state.activeQueueItemId = activeQueueItemId;
 			return this;
 		}
 
-		public Builder addCustomAction(CustomAction action) { return this; }
+		public Builder addCustomAction(CustomAction action) {
+			state.customActions.add(action);
+			return this;
+		}
 
-		public Builder setExtras(Bundle bundle) { return this; }
+		public Builder setExtras(Bundle bundle) {
+			state.extras = bundle;
+			return this;
+		}
 
 		public PlaybackState build() {
 			return state;
@@ -55,13 +113,44 @@ public class PlaybackState {
 	}
 
 	public static class CustomAction {
+		private String action;
+		private CharSequence name;
+		private int icon;
+		private Bundle extras;
+
+		public String getAction() {
+			return action;
+		}
+
+		public CharSequence getName() {
+			return name;
+		}
+
+		public int getIcon() {
+			return icon;
+		}
+
+		public Bundle getExtras() {
+			return extras;
+		}
 
 		public static class Builder {
-			public Builder(String action, CharSequence label, int icon) {}
+			private final CustomAction customAction = new CustomAction();
 
-			public Builder setExtras(Bundle extras) { return this; }
+			public Builder(String action, CharSequence name, int icon) {
+				customAction.action = action;
+				customAction.name = name;
+				customAction.icon = icon;
+			}
 
-			public CustomAction build() { return new CustomAction(); }
+			public Builder setExtras(Bundle extras) {
+				customAction.extras = extras;
+				return this;
+			}
+
+			public CustomAction build() {
+				return customAction;
+			}
 		}
 	}
 }

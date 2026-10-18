@@ -20,6 +20,7 @@ public class MediaSession {
 	private List<QueueItem> queue;
 	private CharSequence queue_title;
 	private MediaMetadata metadata;
+	private PlaybackState playback_state;
 	private final Token token = new Token(this);
 
 	/* only used within the process, so it refers to the session directly */
@@ -70,6 +71,7 @@ public class MediaSession {
 	public void setActive(boolean active) {}
 
 	public void setPlaybackState(PlaybackState state) {
+		playback_state = state;
 		String title = null;
 		String subTitle = null;
 		String artUrl = null;
@@ -121,6 +123,10 @@ public class MediaSession {
 
 	MediaMetadata getMetadata() {
 		return metadata;
+	}
+
+	PlaybackState getPlaybackState() {
+		return playback_state;
 	}
 	protected native void nativeSetState(int state, long actions, long position, long updateTime, String title, String subTitle, String artUrl);
 	protected native void nativeSetCallback(Callback callback);
