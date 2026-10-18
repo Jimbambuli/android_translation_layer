@@ -18,6 +18,8 @@ package android.os;
 
 import android.util.ArrayMap;
 import android.util.Log;
+import android.util.Size;
+import android.util.SizeF;
 import android.util.SparseArray;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -312,17 +314,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	}
 
 	/**
-	 * Inserts a double value into the mapping of this Bundle, replacing
-	 * any existing value for the given key.
-	 *
-	 * @param key a String, or null
-	 * @param value a double
-	 */
-	public void putDouble(String key, double value) {
-		mMap.put(key, value);
-	}
-
-	/**
 	 * Inserts a CharSequence value into the mapping of this Bundle, replacing
 	 * any existing value for the given key.  Either key or value may be null.
 	 *
@@ -330,6 +321,28 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 * @param value a CharSequence, or null
 	 */
 	public void putCharSequence(String key, CharSequence value) {
+		mMap.put(key, value);
+	}
+
+	/**
+	 * Inserts a Size value into the mapping of this Bundle, replacing
+	 * any existing value for the given key.  Either key or value may be null.
+	 *
+	 * @param key a String, or null
+	 * @param value a Size object, or null
+	 */
+	public void putSize(String key, Size value) {
+		mMap.put(key, value);
+	}
+
+	/**
+	 * Inserts a SizeF value into the mapping of this Bundle, replacing
+	 * any existing value for the given key.  Either key or value may be null.
+	 *
+	 * @param key a String, or null
+	 * @param value a SizeF object, or null
+	 */
+	public void putSizeF(String key, SizeF value) {
 		mMap.put(key, value);
 	}
 
@@ -439,17 +452,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	}
 
 	/**
-	 * Inserts a boolean array value into the mapping of this Bundle, replacing
-	 * any existing value for the given key.  Either key or value may be null.
-	 *
-	 * @param key a String, or null
-	 * @param value a boolean array object, or null
-	 */
-	public void putBooleanArray(String key, boolean[] value) {
-		mMap.put(key, value);
-	}
-
-	/**
 	 * Inserts a byte array value into the mapping of this Bundle, replacing
 	 * any existing value for the given key.  Either key or value may be null.
 	 *
@@ -490,17 +492,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 * @param value a float array object, or null
 	 */
 	public void putFloatArray(String key, float[] value) {
-		mMap.put(key, value);
-	}
-
-	/**
-	 * Inserts a double array value into the mapping of this Bundle, replacing
-	 * any existing value for the given key.  Either key or value may be null.
-	 *
-	 * @param key a String, or null
-	 * @param value a double array object, or null
-	 */
-	public void putDoubleArray(String key, double[] value) {
 		mMap.put(key, value);
 	}
 
@@ -683,38 +674,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 			return (Float)o;
 		} catch (ClassCastException e) {
 			typeWarning(key, o, "Float", defaultValue, e);
-			return defaultValue;
-		}
-	}
-
-	/**
-	 * Returns the value associated with the given key, or 0.0 if
-	 * no mapping of the desired type exists for the given key.
-	 *
-	 * @param key a String
-	 * @return a double value
-	 */
-	public double getDouble(String key) {
-		return getDouble(key, 0.0);
-	}
-
-	/**
-	 * Returns the value associated with the given key, or defaultValue if
-	 * no mapping of the desired type exists for the given key.
-	 *
-	 * @param key a String
-	 * @param defaultValue Value to return if key does not exist
-	 * @return a double value
-	 */
-	public double getDouble(String key, double defaultValue) {
-		Object o = mMap.get(key);
-		if (o == null) {
-			return defaultValue;
-		}
-		try {
-			return (Double)o;
-		} catch (ClassCastException e) {
-			typeWarning(key, o, "Double", defaultValue, e);
 			return defaultValue;
 		}
 	}
@@ -947,27 +906,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 * value is explicitly associated with the key.
 	 *
 	 * @param key a String, or null
-	 * @return a boolean[] value, or null
-	 */
-	public boolean[] getBooleanArray(String key) {
-		Object o = mMap.get(key);
-		if (o == null) {
-			return null;
-		}
-		try {
-			return (boolean[])o;
-		} catch (ClassCastException e) {
-			typeWarning(key, o, "byte[]", e);
-			return null;
-		}
-	}
-
-	/**
-	 * Returns the value associated with the given key, or null if
-	 * no mapping of the desired type exists for the given key or a null
-	 * value is explicitly associated with the key.
-	 *
-	 * @param key a String, or null
 	 * @return a byte[] value, or null
 	 */
 	public byte[] getByteArray(String key) {
@@ -1042,27 +980,6 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 			return (float[])o;
 		} catch (ClassCastException e) {
 			typeWarning(key, o, "float[]", e);
-			return null;
-		}
-	}
-
-	/**
-	 * Returns the value associated with the given key, or null if
-	 * no mapping of the desired type exists for the given key or a null
-	 * value is explicitly associated with the key.
-	 *
-	 * @param key a String, or null
-	 * @return a double[] value, or null
-	 */
-	public double[] getDoubleArray(String key) {
-		Object o = mMap.get(key);
-		if (o == null) {
-			return null;
-		}
-		try {
-			return (double[])o;
-		} catch (ClassCastException e) {
-			typeWarning(key, o, "double[]", e);
 			return null;
 		}
 	}
