@@ -10,9 +10,9 @@
 static GtkLabel *box_get_label(JNIEnv *env, GtkWidget *box)
 {
 	GtkWidget *label = gtk_widget_get_last_child(GTK_WIDGET(box));
-	if (!GTK_IS_LABEL(label))
+	if (label && !GTK_IS_LABEL(label))
 		label = gtk_widget_get_prev_sibling(label);
-	return GTK_LABEL(label);
+	return GTK_IS_LABEL(label) ? GTK_LABEL(label) : NULL;
 }
 
 JNIEXPORT jlong JNICALL Java_android_widget_TextView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
@@ -88,6 +88,15 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_setTextSize(JNIEnv *env, job
 	gtk_label_set_attributes(label, attrs);
 
 	pango_attr_list_unref(attrs);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLines(JNIEnv *env, jobject this, jint lines, jint ellipsize_mode)
+{
+	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
+	if (!label)
+		return;
+	gtk_label_set_lines(label, lines);
+	gtk_label_set_ellipsize(label, ellipsize_mode);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1set_1markup(JNIEnv *env, jobject this, jint value)

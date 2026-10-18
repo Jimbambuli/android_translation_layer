@@ -39,6 +39,8 @@ public class TextView extends View {
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.CENTER;
+	private int max_lines = Integer.MAX_VALUE;
+	private TextUtils.TruncateAt ellipsize = null;
 
 	public TextView(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
@@ -86,6 +88,16 @@ public class TextView extends View {
 				int textStyle = a.getInt(com.android.internal.R.styleable.TextView_textStyle, 0);
 				setTypeface(getTypeface(), textStyle);
 			}
+
+			int ellipsize_attr = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, -1);
+			if (ellipsize_attr >= 1 && ellipsize_attr <= 4)
+				setEllipsize(TextUtils.TruncateAt.values()[ellipsize_attr - 1]);
+			if (a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false))
+				setSingleLine(true);
+			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
+				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
+				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
 
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textAllCaps)) {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
@@ -201,7 +213,9 @@ public class TextView extends View {
 	public void setHintTextColor(int i) {}
 	public void setLinkTextColor(ColorStateList colorStateList) {}
 
-	public void setSingleLine() {}
+	public void setSingleLine() {
+		setSingleLine(true);
+	}
 	public void setSelection(int i) {}
 	public void setSelection(int i, int j) {}
 
@@ -213,11 +227,29 @@ public class TextView extends View {
 		return 0;
 	}
 
-	public void setEllipsize(TextUtils.TruncateAt truncateAt) {}
+	public void setEllipsize(TextUtils.TruncateAt truncateAt) {
+		ellipsize = truncateAt;
+		updateLines();
+	}
 
 	public void setTextAppearance(Context context, int appearance) {}
 
-	public void setMaxLines(int maxLines) {}
+	public void setMaxLines(int maxLines) {
+		max_lines = maxLines > 0 ? maxLines : Integer.MAX_VALUE;
+		updateLines();
+	}
+
+	/* GtkLabel can only limit the number of lines when ellipsizing, so text cut off
+	 * after maxLines always gets an ellipsis, also when no ellipsize mode is set. */
+	private void updateLines() {
+		int mode = 3; // PANGO_ELLIPSIZE_END
+		if (ellipsize == TextUtils.TruncateAt.START)
+			mode = 1; // PANGO_ELLIPSIZE_START
+		else if (ellipsize == TextUtils.TruncateAt.MIDDLE)
+			mode = 2; // PANGO_ELLIPSIZE_MIDDLE
+		native_setLines(max_lines == Integer.MAX_VALUE ? -1 : max_lines, max_lines == Integer.MAX_VALUE ? 0 : mode);
+	}
+	private native void native_setLines(int lines, int ellipsize_mode);
 
 	public void setMinWidth(int minWidth) {}
 	public void setMaxWidth(int maxWidth) {}
@@ -282,7 +314,7 @@ public class TextView extends View {
 
 	public InputFilter[] getFilters() { return new InputFilter[0]; }
 
-	public int getMaxLines() { return -1; }
+	public int getMaxLines() { return max_lines == Integer.MAX_VALUE ? -1 : max_lines; }
 
 	public void setCompoundDrawablesRelative(Drawable start, Drawable top, Drawable end, Drawable bottom) {
 		setCompoundDrawables(start, top, end, bottom);
@@ -331,7 +363,9 @@ public class TextView extends View {
 		return Color.CYAN;
 	}
 
-	public void setSingleLine(boolean singleLine) {}
+	public void setSingleLine(boolean singleLine) {
+		setMaxLines(singleLine ? 1 : Integer.MAX_VALUE);
+	}
 
 	public int getCompoundPaddingLeft() { return 0; }
 
@@ -385,9 +419,12 @@ public class TextView extends View {
 
 	public void setRawInputType(int type) {}
 
-	public TextUtils.TruncateAt getEllipsize() { return null; }
+	public TextUtils.TruncateAt getEllipsize() { return ellipsize; }
 
-	public void setLines(int lines) {}
+	/* only the maximum is applied, the view is not made taller for shorter text */
+	public void setLines(int lines) {
+		setMaxLines(lines);
+	}
 
 	public int getMinLines() {
 		return -1;
