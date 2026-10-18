@@ -22,6 +22,7 @@ struct _WrapperWidget {
 	gboolean custom_dispatch_touch;
 	gboolean hover_exit_pending;
 	gboolean has_focus;
+	gboolean rtl_resolved;
 	int hover_x;
 	int hover_y;
 	bool have_custom_draw_method;

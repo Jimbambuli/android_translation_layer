@@ -459,6 +459,14 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 	JNIEnv *env = get_jni_env();
 
 	if (root) {
+		if (!wrapper->rtl_resolved) {
+			/* like View.resolveRtlPropertiesIfNeeded(); Compose initialises its layout direction here */
+			wrapper->rtl_resolved = TRUE;
+			jint layout_direction = J__View__getLayoutDirection(env, wrapper->jobj);
+			J__View__onRtlPropertiesChanged(env, wrapper->jobj, layout_direction);
+			if ((*env)->ExceptionCheck(env))
+				(*env)->ExceptionDescribe(env);
+		}
 		J__View__onAttachedToWindow(env, wrapper->jobj);
 	} else {
 		currently_unmapping = wrapper->child;

@@ -2301,6 +2301,7 @@ public class View implements Drawable.Callback {
 	public boolean isClickable() { return clickable; }
 	public boolean isLongClickable() { return longclickable; }
 
+	@Export
 	public int getLayoutDirection() { return LAYOUT_DIRECTION_LTR; }
 
 	public void setBackground(Drawable background) {
@@ -2436,6 +2437,10 @@ public class View implements Drawable.Callback {
 	public boolean getKeepScreenOn() {
 		return keepScreenOn;
 	}
+
+	/* called from native code once the view is attached, which is when AOSP resolves RTL properties */
+	@Export
+	public void onRtlPropertiesChanged(int layoutDirection) {}
 
 	@Export
 	protected void onAttachedToWindow() {
