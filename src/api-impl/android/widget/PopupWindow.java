@@ -4,6 +4,7 @@ import android.atl.annotation.Export;
 import android.content.Context;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.transition.Transition;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
@@ -12,6 +13,8 @@ import android.view.View;
 public class PopupWindow {
 
 	int input_method_mode = 0;
+	private Transition enter_transition;
+	private Transition exit_transition;
 
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		popover = native_constructor();
@@ -138,6 +141,23 @@ public class PopupWindow {
 	public void setIsClippedToScreen(boolean isClippedToScreen) {}
 
 	public void setEpicenterBounds(Rect bounds) {}
+
+	/* transitions are stored but not played; the popover appears without animation */
+	public void setEnterTransition(Transition enterTransition) {
+		enter_transition = enterTransition;
+	}
+
+	public Transition getEnterTransition() {
+		return enter_transition;
+	}
+
+	public void setExitTransition(Transition exitTransition) {
+		exit_transition = exitTransition;
+	}
+
+	public Transition getExitTransition() {
+		return exit_transition;
+	}
 
 	public void setClippingEnabled(boolean enabled) {}
 
