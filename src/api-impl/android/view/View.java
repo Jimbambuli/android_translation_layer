@@ -1584,8 +1584,15 @@ public class View implements Drawable.Callback {
 
 	public void setOnGenericMotionListener(View.OnGenericMotionListener l) {}
 
+	private IBinder windowToken;
+
 	public IBinder getWindowToken() {
-		return new Binder();
+		// all views of a window share one token, and it must not change between calls
+		// (AbstractComposeView compares it to decide whether to recreate its composition)
+		View root = getRootView();
+		if (root.windowToken == null)
+			root.windowToken = new Binder();
+		return root.windowToken;
 	}
 
 	public void getLocationInWindow(int[] location) {
