@@ -240,13 +240,15 @@ public final class Bitmap implements Parcelable {
 	}
 
 	public boolean compress(Bitmap.CompressFormat format, int quality, OutputStream stream) throws IOException {
-		if (format == CompressFormat.PNG) {
-			stream.write(native_save_to_png(getTexture()));
-			return true;
-		} else {
-			stream.write(("fixme Bitmap.compress " + format.name()).getBytes());
+		byte[] data;
+		if (format == CompressFormat.JPEG)
+			data = native_save_to_jpeg(getTexture(), quality);
+		else // there is no WebP encoder; PNG is lossless, and decoders detect the format from the data
+			data = native_save_to_png(getTexture());
+		if (data == null)
 			return false;
-		}
+		stream.write(data);
+		return true;
 	}
 
 	public void setPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
@@ -290,5 +292,6 @@ public final class Bitmap implements Parcelable {
 	private static native void native_get_pixels(long texture, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native void native_copy_to_buffer(long texture, Buffer buffer, int memory_format, int stride);
 	private static native byte[] native_save_to_png(long texture);
+	private static native byte[] native_save_to_jpeg(long texture, int quality);
 	private static native void native_set_pixels(long snapshot, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 }

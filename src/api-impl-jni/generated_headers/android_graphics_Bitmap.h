@@ -89,6 +89,14 @@ JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1png
 
 /*
  * Class:     android_graphics_Bitmap
+ * Method:    native_save_to_jpeg
+ * Signature: (JI)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1jpeg
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_graphics_Bitmap
  * Method:    native_set_pixels
  * Signature: (J[IIIIIII)V
  */

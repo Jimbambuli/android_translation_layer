@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include <stdio.h>
 
 #include "../defines.h"
 #include "../util.h"
@@ -138,6 +139,34 @@ JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1png(
 	gconstpointer data = g_bytes_get_data(bytes, &size);
 	(*env)->SetByteArrayRegion(env, result, 0, size, data);
 	g_bytes_unref(bytes);
+	return result;
+}
+
+JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1jpeg(JNIEnv *env, jclass class, jlong texture_ptr, jint quality)
+{
+	GdkTexture *texture = GDK_TEXTURE(_PTR(texture_ptr));
+	int width = gdk_texture_get_width(texture);
+	int height = gdk_texture_get_height(texture);
+	/* JPEG has no alpha channel */
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
+	gdk_texture_downloader_set_format(downloader, GDK_MEMORY_R8G8B8);
+	gsize stride;
+	GBytes *pixels = gdk_texture_downloader_download_bytes(downloader, &stride);
+	gdk_texture_downloader_free(downloader);
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_bytes(pixels, GDK_COLORSPACE_RGB, FALSE, 8, width, height, stride);
+	g_bytes_unref(pixels);
+
+	char quality_str[4];
+	snprintf(quality_str, sizeof(quality_str), "%d", CLAMP(quality, 0, 100));
+	gchar *buffer = NULL;
+	gsize size = 0;
+	jbyteArray result = NULL;
+	if (gdk_pixbuf_save_to_buffer(pixbuf, &buffer, &size, "jpeg", NULL, "quality", quality_str, NULL)) {
+		result = (*env)->NewByteArray(env, size);
+		(*env)->SetByteArrayRegion(env, result, 0, size, (jbyte *)buffer);
+		g_free(buffer);
+	}
+	g_object_unref(pixbuf);
 	return result;
 }
 
