@@ -14,6 +14,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_ScrollView_native_1constructor(JNIEn
 	GtkWidget *viewport = gtk_viewport_new(NULL, NULL);
 	gtk_scrollable_set_vscroll_policy(GTK_SCROLLABLE(viewport), GTK_SCROLL_NATURAL);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), scrolled_window);
+	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), viewport);
 	gtk_widget_set_name(scrolled_window, "ScrollView");
 	return _INTPTR(scrolled_window);

@@ -111,7 +111,10 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 			_SET_BOOL_FIELD(this, "disallowIntercept", false);
 		ret = false;
 	} else if (phase == GTK_PHASE_CAPTURE && !wrapper->intercepting_touch) {
-		wrapper->intercepting_touch = J__View__onInterceptTouchEvent(env, this, motion_event);
+		GdkEvent *outer = synthetic_propagation_failed;
+		synthetic_propagation_failed = NULL;
+		wrapper->intercepting_touch = J__View__onInterceptTouchEvent(env, this, motion_event) && !synthetic_propagation_failed;
+		synthetic_propagation_failed = outer;
 		if (wrapper->intercepting_touch) {
 			// store the event that was canceled and let it propagate to the child widgets
 			canceled_event = event;
@@ -123,7 +126,12 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 		}
 		ret = false;
 	} else {
-		ret = J__View__onTouchEventInternal(env, this, motion_event, (jboolean)is_synthetic);
+		/* a native GTK widget (ScrollView, Button, ...) answers native_gtkEventPropagation(): on this GTK
+		 * path that means it doesn't handle the event, GTK propagates it on */
+		GdkEvent *outer = synthetic_propagation_failed;
+		synthetic_propagation_failed = NULL;
+		ret = J__View__onTouchEventInternal(env, this, motion_event, (jboolean)is_synthetic) && !synthetic_propagation_failed;
+		synthetic_propagation_failed = outer;
 	}
 
 	if ((*env)->ExceptionCheck(env))
