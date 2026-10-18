@@ -26,6 +26,7 @@ import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.SubMenu;
 import android.view.View;
 import android.view.View.OnTouchListener;
@@ -126,6 +127,28 @@ public class PopupMenu {
 	 */
 	public void setOnDismissListener(OnDismissListener listener) {
 		mOnDismissListener = listener;
+	}
+
+	/**
+	 * Returns an {@link OnTouchListener} that can be added to the anchor view
+	 * to implement drag-to-open behavior.
+	 * <p>
+	 * Drag-to-open (pressing the anchor and sliding into the menu) is not
+	 * supported; the returned listener never consumes events, so the anchor's
+	 * regular click handling stays intact.
+	 *
+	 * @return a touch listener that controls drag-to-open behavior
+	 */
+	public OnTouchListener getDragToOpenListener() {
+		if (mDragListener == null) {
+			mDragListener = new OnTouchListener() {
+				@Override
+				public boolean onTouch(View v, MotionEvent event) {
+					return false;
+				}
+			};
+		}
+		return mDragListener;
 	}
 
 	protected native long native_init();
@@ -433,6 +456,14 @@ public class PopupMenu {
 		@Override
 		public MenuItem setTitle(CharSequence title) {
 			this.title = String.valueOf(title);
+			// GMenu items are immutable, so replace a visible item to show the new title
+			if (isVisible()) {
+				native_removeItem(parent.menu, position);
+				if (subMenu != null)
+					native_insertSubmenu(parent.menu, position, this.title, subMenu.menu);
+				else
+					native_insertItem(parent.menu, position, this.title, id);
+			}
 			return this;
 		}
 
@@ -467,8 +498,7 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setTitle(int resId) {
-			// TODO Auto-generated method stub
-			throw new UnsupportedOperationException("Unimplemented method 'setTitle'");
+			return setTitle(mContext.getText(resId));
 		}
 
 		@Override
