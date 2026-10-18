@@ -1593,7 +1593,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public void addOnAttachStateChangeListener(OnAttachStateChangeListener l) {
-		onAttachStateChangeListener = l;
+		onAttachStateChangeListeners.add(l);
 	}
 
 	public Context getContext() {
@@ -2274,9 +2274,8 @@ public class View implements Drawable.Callback {
 
 	@Export
 	protected void onAttachedToWindow() {
-		if (onAttachStateChangeListener != null) {
-			onAttachStateChangeListener.onViewAttachedToWindow(this);
-		}
+		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
+			listener.onViewAttachedToWindow(this);
 		if (keepScreenOn)
 			native_keep_screen_on(widget, true);
 		if (floating_observer != null) {
@@ -2287,9 +2286,8 @@ public class View implements Drawable.Callback {
 
 	@Export
 	protected void onDetachedFromWindow() {
-		if (onAttachStateChangeListener != null) {
-			onAttachStateChangeListener.onViewDetachedFromWindow(this);
-		}
+		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
+			listener.onViewDetachedFromWindow(this);
 		if (keepScreenOn)
 			native_keep_screen_on(widget, false);
 	}
@@ -2341,11 +2339,9 @@ public class View implements Drawable.Callback {
 		}
 	}
 
-	private OnAttachStateChangeListener onAttachStateChangeListener;
+	private final CopyOnWriteArrayList<OnAttachStateChangeListener> onAttachStateChangeListeners = new CopyOnWriteArrayList<>();
 	public void removeOnAttachStateChangeListener(OnAttachStateChangeListener listener) {
-		if (onAttachStateChangeListener == listener) {
-			onAttachStateChangeListener = null;
-		}
+		onAttachStateChangeListeners.remove(listener);
 	}
 
 	@Export
