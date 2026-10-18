@@ -116,6 +116,13 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1set_1markup(JNIEnv *
 	gtk_label_set_use_markup(label, value);
 }
 
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawablePadding(JNIEnv *env, jobject this, jlong widget_ptr, jint pad)
+{
+	GtkWidget *box = GTK_WIDGET(_PTR(widget_ptr));
+	if (GTK_IS_BOX(box)) // subclasses like Button use a different widget
+		gtk_box_set_spacing(GTK_BOX(box), pad);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables(JNIEnv *env, jobject this, jlong widget_ptr, jlong left, jlong top, jlong right, jlong bottom)
 {
 	GtkWidget *box = GTK_WIDGET(_PTR(widget_ptr));

@@ -102,6 +102,22 @@ public class TextView extends View {
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
 
+			Drawable left = a.getDrawable(com.android.internal.R.styleable.TextView_drawableLeft);
+			Drawable top = a.getDrawable(com.android.internal.R.styleable.TextView_drawableTop);
+			Drawable right = a.getDrawable(com.android.internal.R.styleable.TextView_drawableRight);
+			Drawable bottom = a.getDrawable(com.android.internal.R.styleable.TextView_drawableBottom);
+			Drawable start = a.getDrawable(com.android.internal.R.styleable.TextView_drawableStart);
+			Drawable end = a.getDrawable(com.android.internal.R.styleable.TextView_drawableEnd);
+			// layout direction is always LTR, so start/end override left/right like in AOSP
+			if (start != null)
+				left = start;
+			if (end != null)
+				right = end;
+			if (left != null || top != null || right != null || bottom != null)
+				setCompoundDrawablesWithIntrinsicBounds(left, top, right, bottom);
+			if (a.hasValue(com.android.internal.R.styleable.TextView_drawablePadding))
+				setCompoundDrawablePadding(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_drawablePadding, 0));
+
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textAllCaps)) {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
 				setAllCaps(allCaps);
@@ -176,6 +192,10 @@ public class TextView extends View {
 		super.drawableStateChanged();
 		if (colors.isStateful())
 			native_setTextColor(colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
+		for (Drawable d : new Drawable[] {drawableLeft, drawableTop, drawableRight, drawableBottom}) {
+			if (d != null && d.isStateful())
+				d.setState(getDrawableState());
+		}
 	}
 	public void setTypeface(Typeface tf, int style) {
 		String[] classesToRemove = {"ATL-font-bold", "ATL-font-italic"};
@@ -301,7 +321,14 @@ public class TextView extends View {
 		return text;
 	};
 
-	public void setCompoundDrawablePadding(int pad) {}
+	private int drawable_padding = 0;
+
+	public void setCompoundDrawablePadding(int pad) {
+		drawable_padding = pad;
+		native_setCompoundDrawablePadding(widget, pad);
+	}
+
+	private native void native_setCompoundDrawablePadding(long widget, int pad);
 
 	protected native void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom);
 
@@ -312,6 +339,13 @@ public class TextView extends View {
 	private Drawable drawableBottom = null;
 
 	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
+		for (Drawable d : new Drawable[] {left, top, right, bottom}) {
+			if (d != null) {
+				d.setCallback(this);
+				if (d.isStateful())
+					d.setState(getDrawableState());
+			}
+		}
 		native_setCompoundDrawables(widget,
 		                            left != null ? left.paintable : 0,
 		                            top != null ? top.paintable : 0,
@@ -409,23 +443,41 @@ public class TextView extends View {
 
 	public float getLetterSpacing() { return 0.f; }
 
-	public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start, int top, int end, int bottom) {}
+	public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start, int top, int end, int bottom) {
+		setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
+	}
 
-	public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start, Drawable top, Drawable end, Drawable bottom) {}
+	public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start, Drawable top, Drawable end, Drawable bottom) {
+		setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
+	}
 
 	public boolean getLinksClickable() { return true; }
 
 	public boolean isTextSelectable() { return true; }
 
-	public void setCompoundDrawablesWithIntrinsicBounds(int left, int top, int right, int bottom) {}
+	public void setCompoundDrawablesWithIntrinsicBounds(int left, int top, int right, int bottom) {
+		final Context context = getContext();
+		setCompoundDrawablesWithIntrinsicBounds(left != 0 ? context.getDrawable(left) : null,
+		                                        top != 0 ? context.getDrawable(top) : null,
+		                                        right != 0 ? context.getDrawable(right) : null,
+		                                        bottom != 0 ? context.getDrawable(bottom) : null);
+	}
 
-	public void setCompoundDrawablesWithIntrinsicBounds(Drawable left, Drawable top, Drawable right, Drawable bottom) {}
+	public void setCompoundDrawablesWithIntrinsicBounds(Drawable left, Drawable top, Drawable right, Drawable bottom) {
+		for (Drawable d : new Drawable[] {left, top, right, bottom}) {
+			if (d != null)
+				d.setBounds(0, 0, d.getIntrinsicWidth(), d.getIntrinsicHeight());
+		}
+		setCompoundDrawables(left, top, right, bottom);
+	}
 
 	public void setHint(CharSequence s) {}
 
-	public Drawable[] getCompoundDrawablesRelative() { return new Drawable[4]; }
+	public Drawable[] getCompoundDrawablesRelative() { return getCompoundDrawables(); }
 
-	public Drawable[] getCompoundDrawables() { return new Drawable[4]; }
+	public Drawable[] getCompoundDrawables() {
+		return new Drawable[] {drawableLeft, drawableTop, drawableRight, drawableBottom};
+	}
 
 	public void setTextAppearance(int dummy) {}
 
@@ -466,7 +518,7 @@ public class TextView extends View {
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
 
-	public int getCompoundDrawablePadding() { return 0; }
+	public int getCompoundDrawablePadding() { return drawable_padding; }
 
 	public int getPaintFlags() { return 0; }
 
