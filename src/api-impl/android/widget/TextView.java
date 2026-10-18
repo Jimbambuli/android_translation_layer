@@ -69,16 +69,8 @@ public class TextView extends View {
 			}
 
 			int ap = a.getResourceId(com.android.internal.R.styleable.TextView_textAppearance, -1);
-			if (ap != -1) {
-				TypedArray aa = context.obtainStyledAttributes(ap, com.android.internal.R.styleable.TextAppearance);
-				if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textColor)) {
-					setTextColor(aa.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor));
-				}
-				if (aa.hasValue(com.android.internal.R.styleable.TextAppearance_textSize)) {
-					setTextSize(aa.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
-				}
-				aa.recycle();
-			}
+			if (ap != -1)
+				setTextAppearance(context, ap);
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textColor)) {
 				setTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColor));
 			}
@@ -274,7 +266,26 @@ public class TextView extends View {
 		updateLines();
 	}
 
-	public void setTextAppearance(Context context, int appearance) {}
+	/**
+	 * Sets the text color, size, style, hint color and all caps from a TextAppearance style.
+	 */
+	public void setTextAppearance(Context context, int resId) {
+		TypedArray a = context.obtainStyledAttributes(resId, com.android.internal.R.styleable.TextAppearance);
+		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textColor)) {
+			ColorStateList textColor = a.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor);
+			if (textColor != null)
+				setTextColor(textColor);
+		}
+		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textSize))
+			setTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
+		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textColorHint))
+			setHintTextColor(a.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColorHint));
+		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textStyle))
+			setTypeface(getTypeface(), a.getInt(com.android.internal.R.styleable.TextAppearance_textStyle, 0));
+		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textAllCaps))
+			setAllCaps(a.getBoolean(com.android.internal.R.styleable.TextAppearance_textAllCaps, false));
+		a.recycle();
+	}
 
 	public void setMaxLines(int maxLines) {
 		max_lines = maxLines > 0 ? maxLines : Integer.MAX_VALUE;
@@ -505,7 +516,9 @@ public class TextView extends View {
 		return new Drawable[] {drawableLeft, drawableTop, drawableRight, drawableBottom};
 	}
 
-	public void setTextAppearance(int dummy) {}
+	public void setTextAppearance(int resId) {
+		setTextAppearance(getContext(), resId);
+	}
 
 	public int length() {
 		return getText().length();
