@@ -81,6 +81,23 @@ char *construct_classpath(char *prefix, char **cp_array, size_t len)
 #define JDWP_ARG    "-XjdwpOptions:transport=dt_socket,server=y,suspend=y,address="
 #define SDK_INT_ARG "-DBuild.VERSION.SDK_INT="
 
+/* -Duser.language= and -Duser.region= options for the user's locale, determined before LC_ALL is overridden */
+static char *locale_options[2];
+
+static void init_locale_options(void)
+{
+	// e.g. "de_CH.UTF-8" or "de_CH@euro"; the first entry is the most preferred one
+	const char *name = g_get_language_names()[0];
+	if (!strcmp(name, "C") || !strcmp(name, "POSIX") || g_str_has_prefix(name, "C."))
+		return;
+	size_t language_len = strcspn(name, "_.@");
+	locale_options[0] = g_strdup_printf("-Duser.language=%.*s", (int)language_len, name);
+	if (name[language_len] == '_') {
+		const char *region = name + language_len + 1;
+		locale_options[1] = g_strdup_printf("-Duser.region=%.*s", (int)strcspn(region, ".@"), region);
+	}
+}
+
 JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options)
 {
 	JavaVM *jvm;
@@ -102,6 +119,10 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 		args.nOptions += 2;
 	if (sdk_int)
 		args.nOptions += 1;
+	for (int i = 0; i < 2; i++) {
+		if (locale_options[i])
+			args.nOptions += 1;
+	}
 	if (extra_jvm_options)
 		args.nOptions += g_strv_length(extra_jvm_options);
 	options = malloc(sizeof(JavaVMOption) * args.nOptions);
@@ -127,6 +148,11 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	if (sdk_int) {
 		strncat(sdk_int_option_string, sdk_int, 2); // 2 chars should be enough for the foreseeable future, and won't overflow our array
 		options[option_counter++].optionString = sdk_int_option_string;
+	}
+
+	for (int i = 0; i < 2; i++) {
+		if (locale_options[i])
+			options[option_counter++].optionString = locale_options[i];
 	}
 
 	while (extra_jvm_options && *extra_jvm_options) {
@@ -827,6 +853,8 @@ int main(int argc, char **argv)
 	/* this has to be done in the main executable, so might as well do it here */
 	init__r_debug();
 
+	// the Java locale should follow the user's locale, even though the C locale is overridden below
+	init_locale_options();
 	// locale on android is always either C or C.UTF-8, and some apps might unbeknownst to them depend on that
 	// for correct functionality
 	setenv("LC_ALL", "C.UTF-8", 1);
