@@ -168,6 +168,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 					});
 				}
 
+				shown = true;
 				showPending = true;
 				presentWhenLaidOut(3);
 			}
@@ -208,6 +209,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	 * gets attached (Compose composes in the next frame) is laid out first, so that the window is
 	 * mapped, and placed by the compositor, with its final size. */
 	private boolean showPending;
+	private boolean shown; // from show() until the dialog is dismissed
 	private void presentWhenLaidOut(final int framesLeft) {
 		if (!showPending)
 			return;
@@ -241,6 +243,10 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
 			@Override
 			public void run() {
+				// like AOSP, a dialog that is not shown (any more) is not dismissed again
+				if (!shown)
+					return;
+				shown = false;
 				showPending = false;
 				nativeClose(nativePtr);
 				if (started) {
