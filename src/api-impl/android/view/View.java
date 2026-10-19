@@ -2108,7 +2108,9 @@ public class View implements Drawable.Callback {
 		return true;
 	}
 
-	public void setSaveFromParentEnabled(boolean enabled) {}
+	public void setSaveFromParentEnabled(boolean enabled) {
+		saveFromParentEnabled = enabled;
+	}
 
 	public void setTag(int key, Object tag) {
 		tags.put(key, tag);
@@ -2314,7 +2316,57 @@ public class View implements Drawable.Callback {
 		return factory.inflate(resource, root);
 	}
 
-	public void saveHierarchyState(SparseArray<Parcelable> array) {}
+	private boolean saveEnabled = true;
+	private boolean saveFromParentEnabled = true;
+	private boolean saveStateCalled;
+
+	/* view state saving as in AOSP: every view with an id that has saving enabled stores what
+	 * onSaveInstanceState() returns under its id; Activity saves the window's views this way */
+	public void saveHierarchyState(SparseArray<Parcelable> container) {
+		dispatchSaveInstanceState(container);
+	}
+
+	protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
+		if (id != NO_ID && saveEnabled) {
+			saveStateCalled = false;
+			Parcelable state = onSaveInstanceState();
+			if (!saveStateCalled)
+				throw new IllegalStateException("Derived class did not call super.onSaveInstanceState()");
+			if (state != null)
+				container.put(id, state);
+		}
+	}
+
+	protected Parcelable onSaveInstanceState() {
+		saveStateCalled = true;
+		return BaseSavedState.EMPTY_STATE;
+	}
+
+	protected void dispatchRestoreInstanceState(SparseArray<Parcelable> container) {
+		if (id != NO_ID) {
+			Parcelable state = container.get(id);
+			if (state != null) {
+				saveStateCalled = false;
+				onRestoreInstanceState(state);
+				if (!saveStateCalled)
+					throw new IllegalStateException("Derived class did not call super.onRestoreInstanceState()");
+			}
+		}
+	}
+
+	protected void onRestoreInstanceState(Parcelable state) {
+		saveStateCalled = true;
+		if (state != null && !(state instanceof AbsSavedState))
+			throw new IllegalArgumentException("Wrong state class, expecting View State but received " + state.getClass().toString() + " instead. This usually happens when two views of different type have the same id in the same hierarchy. This view's id is " + id);
+	}
+
+	public boolean isSaveEnabled() {
+		return saveEnabled;
+	}
+
+	public boolean isSaveFromParentEnabled() {
+		return saveFromParentEnabled;
+	}
 
 	public void setDuplicateParentStateEnabled(boolean enabled) {
 		duplicate_parent_state = enabled;
@@ -2361,7 +2413,9 @@ public class View implements Drawable.Callback {
 
 	public boolean hasWindowFocus() { return true; }
 
-	public void setSaveEnabled(boolean enabled) {}
+	public void setSaveEnabled(boolean enabled) {
+		saveEnabled = enabled;
+	}
 
 	public boolean willNotDraw() { return false; }
 
@@ -2973,7 +3027,9 @@ public class View implements Drawable.Callback {
 		return result;
 	}
 
-	public void restoreHierarchyState(SparseArray<Parcelable> container) {}
+	public void restoreHierarchyState(SparseArray<Parcelable> container) {
+		dispatchRestoreInstanceState(container);
+	}
 
 	public boolean isHovered() { return false; }
 

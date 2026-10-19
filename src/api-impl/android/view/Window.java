@@ -4,9 +4,12 @@ import android.R;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Parcelable;
 import android.transition.Transition;
+import android.util.SparseArray;
 import android.widget.FrameLayout;
 import android.widget.Toolbar;
 import android.window.OnBackInvokedDispatcher;
@@ -128,6 +131,23 @@ public class Window {
 	/** @hide the minimum width of a window measured AT_MOST, from windowMinWidthMajor/Minor */
 	public void setMinWidth(int minWidth) {
 		this.minWidth = minWidth;
+	}
+
+	private static final String VIEWS_TAG = "android:views";
+
+	/* the state of the window's views (see View.saveHierarchyState()), as AOSP's PhoneWindow keeps it */
+	public Bundle saveHierarchyState() {
+		Bundle outState = new Bundle();
+		SparseArray<Parcelable> states = new SparseArray<>();
+		decorView.saveHierarchyState(states);
+		outState.putSparseParcelableArray(VIEWS_TAG, states);
+		return outState;
+	}
+
+	public void restoreHierarchyState(Bundle savedInstanceState) {
+		SparseArray<Parcelable> states = savedInstanceState.getSparseParcelableArray(VIEWS_TAG);
+		if (states != null)
+			decorView.restoreHierarchyState(states);
 	}
 
 	public void set_native_window(long native_window) {

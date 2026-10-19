@@ -9,8 +9,10 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.SparseArray;
 import android.util.Slog;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -368,6 +370,35 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	 * @return a positive integer representing the number of children in
 	 *         the group
 	 */
+	@Override
+	protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
+		super.dispatchSaveInstanceState(container);
+		for (int i = 0; i < getChildCount(); i++) {
+			View child = getChildAt(i);
+			if (child.isSaveFromParentEnabled())
+				child.dispatchSaveInstanceState(container);
+		}
+	}
+
+	/* for views that save their children's state themselves (e.g. ViewPager, RecyclerView) */
+	protected void dispatchFreezeSelfOnly(SparseArray<Parcelable> container) {
+		super.dispatchSaveInstanceState(container);
+	}
+
+	@Override
+	protected void dispatchRestoreInstanceState(SparseArray<Parcelable> container) {
+		super.dispatchRestoreInstanceState(container);
+		for (int i = 0; i < getChildCount(); i++) {
+			View child = getChildAt(i);
+			if (child.isSaveFromParentEnabled())
+				child.dispatchRestoreInstanceState(container);
+		}
+	}
+
+	protected void dispatchThawSelfOnly(SparseArray<Parcelable> container) {
+		super.dispatchRestoreInstanceState(container);
+	}
+
 	public int getChildCount() {
 		return children.size();
 	}

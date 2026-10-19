@@ -245,7 +245,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return;
 	}
 
+	private static final String WINDOW_HIERARCHY_TAG = "android:viewHierarchyState";
+
 	protected void onSaveInstanceState(Bundle outState) {
+		outState.putBundle(WINDOW_HIERARCHY_TAG, getWindow().saveHierarchyState());
 		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.MAIN, outState);
 	}
 
@@ -632,7 +635,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	@Export
-	protected void onRestoreInstanceState(Bundle savedInstanceState) {}
+	protected void onRestoreInstanceState(Bundle savedInstanceState) {
+		Bundle windowState = savedInstanceState.getBundle(WINDOW_HIERARCHY_TAG);
+		if (windowState != null)
+			getWindow().restoreHierarchyState(windowState);
+	}
 
 	public String getLocalClassName() {
 		final String pkg = getPackageName();
