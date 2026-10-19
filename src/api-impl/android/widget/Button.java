@@ -30,10 +30,24 @@ public class Button extends TextView {
 			setText(a.getText(com.android.internal.R.styleable.TextView_text));
 		}
 
-		if (getBackground() != null) {
-			native_addClass(widget, "ATL-no-border");
-		}
 		a.recycle();
+	}
+
+	/* a button with a background of its own draws no GTK frame; MaterialButton, for one,
+	 * sets its background only after the constructor */
+	@Override
+	public void setBackgroundDrawable(Drawable backgroundDrawable) {
+		super.setBackgroundDrawable(backgroundDrawable);
+		if (backgroundDrawable != null)
+			native_addClass(widget, "ATL-no-border");
+		else
+			native_removeClass(widget, "ATL-no-border");
+	}
+
+	@Override
+	public void setBackgroundColor(int color) {
+		super.setBackgroundColor(color);
+		native_addClass(widget, "ATL-no-border");
 	}
 
 	@Override
