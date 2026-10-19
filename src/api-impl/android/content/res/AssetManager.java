@@ -685,6 +685,21 @@ public final class AssetManager {
 	 */
 	public native final String[] getLocales();
 
+	/* the screen sizes (screenWidthDp, screenHeightDp, smallestScreenWidthDp) of all configurations
+	 * the app has resources for; a window resize that crosses one of them relaunches the activity */
+	public Configuration[] getSizeConfigurations() {
+		int[] sizes = getSizeConfigurationsNative();
+		Configuration[] configs = new Configuration[sizes.length / 3];
+		for (int i = 0; i < configs.length; i++) {
+			configs[i] = new Configuration();
+			configs[i].screenWidthDp = sizes[3 * i];
+			configs[i].screenHeightDp = sizes[3 * i + 1];
+			configs[i].smallestScreenWidthDp = sizes[3 * i + 2];
+		}
+		return configs;
+	}
+	private native final int[] getSizeConfigurationsNative();
+
 	/**
 	 * Change the configuation used when retrieving resources.  Not for use by
 	 * applications.

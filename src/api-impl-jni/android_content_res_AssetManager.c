@@ -679,6 +679,21 @@ JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_openXmlAssetNative
 	return _INTPTR(res_xml);
 }
 
+JNIEXPORT jintArray JNICALL Java_android_content_res_AssetManager_getSizeConfigurationsNative(JNIEnv *env, jobject this)
+{
+	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
+	AM_SCOPEDLOCK(asset_manager)
+	uint16_t *sizes;
+	size_t count = AssetManager_getSizeConfigurations(asset_manager, &sizes);
+	jintArray array = (*env)->NewIntArray(env, count * 3);
+	jint *elements = (*env)->GetIntArrayElements(env, array, NULL);
+	for (size_t i = 0; i < count * 3; i++)
+		elements[i] = sizes[i];
+	(*env)->ReleaseIntArrayElements(env, array, elements, 0);
+	free(sizes);
+	return array;
+}
+
 JNIEXPORT jobjectArray JNICALL Java_android_content_res_AssetManager_getLocales(JNIEnv *env, jobject this)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));

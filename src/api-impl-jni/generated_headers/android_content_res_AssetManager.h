@@ -85,6 +85,14 @@ JNIEXPORT jobjectArray JNICALL Java_android_content_res_AssetManager_getLocales
 
 /*
  * Class:     android_content_res_AssetManager
+ * Method:    getSizeConfigurationsNative
+ * Signature: ()[I
+ */
+JNIEXPORT jintArray JNICALL Java_android_content_res_AssetManager_getSizeConfigurationsNative
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     android_content_res_AssetManager
  * Method:    setConfiguration
  * Signature: (IILjava/lang/String;IIIIIIIIIIIIII)V
  */
