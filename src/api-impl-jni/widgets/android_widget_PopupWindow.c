@@ -78,15 +78,22 @@ static void measure_popover(GtkPopover *popover, int *width, int *height)
 static void place_popover(GtkPopover *popover, GtkWidget *frame, int x, int y)
 {
 	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(popover));
-	graphene_point_t p;
+	graphene_point_t p = GRAPHENE_POINT_INIT(x, y);
+	graphene_point_t frame_origin, parent_origin;
 
-	if (!gtk_widget_compute_point(frame, parent, &GRAPHENE_POINT_INIT(x, y), &p))
-		p = GRAPHENE_POINT_INIT(x, y);
+	/* a submenu's parent is in another popup: go through the window's surface */
+	if (atl_compute_point_in_window(frame, &GRAPHENE_POINT_INIT(0, 0), &frame_origin) &&
+	    atl_compute_point_in_window(parent, &GRAPHENE_POINT_INIT(0, 0), &parent_origin))
+		p = GRAPHENE_POINT_INIT(x + frame_origin.x - parent_origin.x, y + frame_origin.y - parent_origin.y);
 	gtk_popover_set_has_arrow(popover, FALSE);
 	gtk_popover_set_position(popover, GTK_POS_BOTTOM);
 	gtk_widget_set_halign(GTK_WIDGET(popover), GTK_ALIGN_START);
-	gtk_popover_set_offset(popover, 0, 0);
-	gtk_popover_set_pointing_to(popover, &(GdkRectangle){.x = p.x, .y = p.y - 1, .width = 1, .height = 1});
+	/* GTK moves the rectangle into the parent's bounds, which a submenu next to its menu is not in:
+	 * point at the nearest point inside and move the popup the rest of the way by its offset */
+	int px = CLAMP((int)p.x, 0, MAX(gtk_widget_get_width(parent) - 1, 0));
+	int py = CLAMP((int)p.y, 1, MAX(gtk_widget_get_height(parent), 1));
+	gtk_popover_set_offset(popover, (int)p.x - px, (int)p.y - py);
+	gtk_popover_set_pointing_to(popover, &(GdkRectangle){.x = px, .y = py - 1, .width = 1, .height = 1});
 }
 
 static int clamp_to_frame(int pos, int size, int frame_size)
@@ -108,7 +115,11 @@ void atl_popover_place_as_dropdown(GtkPopover *popover, GtkWidget *anchor, int a
 	if (gtk_widget_get_visible(GTK_WIDGET(popover)) && !gtk_widget_get_mapped(anchor))
 		return;
 
-	if (!gtk_widget_compute_point(anchor, frame, &GRAPHENE_POINT_INIT(0, 0), &a))
+	graphene_point_t frame_origin;
+	if (atl_compute_point_in_window(anchor, &GRAPHENE_POINT_INIT(0, 0), &a) &&
+	    atl_compute_point_in_window(frame, &GRAPHENE_POINT_INIT(0, 0), &frame_origin))
+		a = GRAPHENE_POINT_INIT(a.x - frame_origin.x, a.y - frame_origin.y);
+	else
 		a = GRAPHENE_POINT_INIT(0, 0);
 	measure_popover(popover, &width, &height);
 
