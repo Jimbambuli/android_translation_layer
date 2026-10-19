@@ -179,10 +179,12 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw_1custom_1canvas(JNI
 	do {
 		PangoLayoutLine *pango_line = pango_layout_iter_get_line_readonly(pango_iter);
 
-		jstring text_jstr = (*env)->NewStringUTF(env, text + pango_line->start_index);
+		/* the line's length is in bytes of UTF-8, the Java string counts UTF-16 units: hand over
+		 * exactly the line's text, so lines with non-ASCII characters do not run into the next */
+		gchar *line_text = g_strndup(text + pango_line->start_index, pango_line->length);
+		jstring text_jstr = (*env)->NewStringUTF(env, line_text);
+		g_free(line_text);
 		jint end = (*env)->GetStringLength(env, text_jstr);
-		if (pango_line->length < end)
-			end = pango_line->length;
 		jfloat y = (float)pango_layout_iter_get_baseline(pango_iter) / PANGO_SCALE;
 		J__Canvas__drawText(env, canvas, text_jstr, (jint)0, end, (jfloat)0, y, paint);
 		(*env)->DeleteLocalRef(env, text_jstr);
