@@ -37,8 +37,19 @@ public class Layout {
 		this.paint = paint;
 		this.spacing_mult = spacingMult;
 		this.spacing_add = spacingAdd;
-		this.align = align;
 		layout = native_constructor(str, paint.paint, width);
+		setAlignment(align);
+	}
+
+	/* for StaticLayout.Builder, which builds the layout before its setters are called */
+	void setAlignment(Alignment align) {
+		this.align = align;
+		if (align == Alignment.ALIGN_CENTER)
+			native_set_alignment(layout, 1);
+		else if (align == Alignment.ALIGN_OPPOSITE || align == Alignment.ALIGN_RIGHT)
+			native_set_alignment(layout, 2);
+		else
+			native_set_alignment(layout, 0);
 	}
 
 	public int getLineCount() {
@@ -264,6 +275,8 @@ public class Layout {
 
 	protected static native long native_constructor(String text, long paint, int width);
 	protected native void native_set_width(long layout, int width);
+	/* 0 left, 1 center, 2 right (the layout direction is always LTR) */
+	private static native void native_set_alignment(long layout, int alignment);
 	protected native int native_get_width(long layout);
 	protected native int native_get_height(long layout);
 	protected native int native_get_line_count(long layout);
