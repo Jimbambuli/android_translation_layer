@@ -1432,8 +1432,16 @@ public class View implements Drawable.Callback {
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		if (haveCustomMeasure) // calling native_measure here would create infinite loop
 			setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
-		else
+		else {
 			native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+			// like AOSP's views, never measure below android:minWidth/minHeight (if the spec allows)
+			int width = getMeasuredWidth();
+			int height = getMeasuredHeight();
+			int minWidth = getSuggestedMinimumWidth();
+			int minHeight = getSuggestedMinimumHeight();
+			if (width < minWidth || height < minHeight)
+				setMeasuredDimension(resolveSize(Math.max(width, minWidth), widthMeasureSpec), resolveSize(Math.max(height, minHeight), heightMeasureSpec));
+		}
 	}
 
 	public void setPressed(boolean pressed) {
