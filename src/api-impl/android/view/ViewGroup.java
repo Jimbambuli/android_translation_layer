@@ -292,7 +292,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (index < 0)
 			index = children.size();
 		children.add(index, view);
-		view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha(), view.isEnabled());
+		view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha() * view.getTransitionAlpha(), view.isEnabled());
 	}
 
 	protected void removeDetachedView(View child, boolean animate) {
@@ -829,4 +829,24 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void scheduleLayoutAnimation() {}
 
 	public boolean addStatesFromChildren() { return false; }
+
+	private boolean layoutSuppressed;
+
+	/* API 29: transitions hold back layout passes while they run; layout is not
+	 * actually held back, but a layout pass follows the release as in AOSP */
+	public void suppressLayout(boolean suppress) {
+		boolean release = layoutSuppressed && !suppress;
+		layoutSuppressed = suppress;
+		if (release)
+			requestLayout();
+	}
+
+	public boolean isLayoutSuppressed() {
+		return layoutSuppressed;
+	}
+
+	/* API 29; children are drawn in the order of their index */
+	public final int getChildDrawingOrder(int drawingPosition) {
+		return drawingPosition;
+	}
 }

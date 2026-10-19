@@ -24,6 +24,15 @@ public class ViewConfiguration {
 		return 50;
 	}
 
+	/* API 34: per input device and axis; there is only the one set of values */
+	public int getScaledMaximumFlingVelocity(int inputDeviceId, int axis, int source) {
+		return getScaledMaximumFlingVelocity();
+	}
+
+	public int getScaledMinimumFlingVelocity(int inputDeviceId, int axis, int source) {
+		return getScaledMinimumFlingVelocity();
+	}
+
 	public static int getTapTimeout() {
 		return 100;
 	}

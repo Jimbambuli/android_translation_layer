@@ -961,6 +961,7 @@ public class View implements Drawable.Callback {
 
 	private int visibility = View.VISIBLE;
 	private float alpha = 1.0f;
+	private float transitionAlpha = 1.0f;
 	private boolean pressed = false;
 	private boolean selected = false;
 	private boolean activated = false;
@@ -1076,7 +1077,7 @@ public class View implements Drawable.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
-			native_setVisibility(widget, visibility, alpha, atl_enabled);
+			native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
 		}
 
 		if (a.hasValue(com.android.internal.R.styleable.View_minWidth))
@@ -1523,7 +1524,7 @@ public class View implements Drawable.Callback {
 			((ViewGroup)parent).requestLayout();
 		}
 		this.visibility = visibility;
-		native_setVisibility(widget, visibility, alpha, atl_enabled);
+		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
 		dispatchVisibilityChanged(this, visibility);
 	}
 
@@ -1742,7 +1743,7 @@ public class View implements Drawable.Callback {
 	public void setEnabled(boolean enabled) {
 		boolean changed = atl_enabled != enabled;
 		atl_enabled = enabled;
-		native_setVisibility(widget, visibility, alpha, atl_enabled);
+		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
 		if (changed)
 			refreshDrawableState();
 	}
@@ -2161,7 +2162,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setAlpha(float alpha) {
-		native_setVisibility(widget, visibility, alpha, atl_enabled);
+		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
 		this.alpha = alpha;
 	}
 
@@ -2755,7 +2756,24 @@ public class View implements Drawable.Callback {
 		return view;
 	}
 	public float getTransitionAlpha() {
-		return 1.0f;
+		return transitionAlpha;
+	}
+
+	/* API 29; transitions fade with this, on top of the view's own alpha */
+	public void setTransitionAlpha(float alpha) {
+		transitionAlpha = alpha;
+		native_setVisibility(widget, visibility, this.alpha * transitionAlpha, atl_enabled);
+	}
+
+	/* API 29; sets the visibility without the side effects of setVisibility() */
+	public void setTransitionVisibility(int visibility) {
+		this.visibility = visibility;
+		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+	}
+
+	/* API 29 */
+	public void setLeftTopRightBottom(int left, int top, int right, int bottom) {
+		layout(left, top, right, bottom);
 	}
 
 	public void onWindowFocusChanged(boolean hasFocus) {}
@@ -2787,9 +2805,9 @@ public class View implements Drawable.Callback {
 		scrollTo(scrollX + x, scrollY + y);
 	}
 
-	public void setAccessibilityPaneTitle(CharSequence paneTitle) {}
+	public void setAccessibilityPaneTitle(CharSequence paneTitle) { accessibilityPaneTitle = paneTitle; }
 
-	public void setAccessibilityHeading(boolean heading) {}
+	public void setAccessibilityHeading(boolean heading) { accessibilityHeading = heading; }
 
 	public WindowInsets computeSystemWindowInsets(WindowInsets insets, Rect contentInsets) { return insets; }
 
@@ -2916,6 +2934,49 @@ public class View implements Drawable.Callback {
 	public void setViewTranslationCallback(ViewTranslationCallback callback) {}
 	public void clearViewTranslationCallback() {}
 	public void transformMatrixToGlobal(Matrix matrix) {}
+	public void transformMatrixToLocal(Matrix matrix) {}
+	public void setAnimationMatrix(Matrix matrix) {}
+	public Matrix getAnimationMatrix() { return null; }
+
+	private static long nextUniqueDrawingId = 1;
+	private long uniqueDrawingId;
+
+	public long getUniqueDrawingId() {
+		if (uniqueDrawingId == 0)
+			uniqueDrawingId = nextUniqueDrawingId++;
+		return uniqueDrawingId;
+	}
+
+	/* no content capture service: like AOSP without one, the session is null */
+	private int importantForContentCapture = 0; // IMPORTANT_FOR_CONTENT_CAPTURE_AUTO
+	public void setImportantForContentCapture(int mode) { importantForContentCapture = mode; }
+	public int getImportantForContentCapture() { return importantForContentCapture; }
+	public boolean isImportantForContentCapture() { return false; }
+	public android.view.contentcapture.ContentCaptureSession getContentCaptureSession() { return null; }
+
+	private int outlineAmbientShadowColor = 0xff000000;
+	private int outlineSpotShadowColor = 0xff000000;
+	public void setOutlineAmbientShadowColor(int color) { outlineAmbientShadowColor = color; }
+	public int getOutlineAmbientShadowColor() { return outlineAmbientShadowColor; }
+	public void setOutlineSpotShadowColor(int color) { outlineSpotShadowColor = color; }
+	public int getOutlineSpotShadowColor() { return outlineSpotShadowColor; }
+
+	private java.util.List<Rect> systemGestureExclusionRects = java.util.Collections.emptyList();
+	public void setSystemGestureExclusionRects(java.util.List<Rect> rects) { systemGestureExclusionRects = new java.util.ArrayList<>(rects); }
+	public java.util.List<Rect> getSystemGestureExclusionRects() { return systemGestureExclusionRects; }
+
+	private boolean screenReaderFocusable;
+	private boolean accessibilityHeading;
+	private CharSequence accessibilityPaneTitle;
+	private CharSequence stateDescription;
+	public void setScreenReaderFocusable(boolean focusable) { screenReaderFocusable = focusable; }
+	public boolean isScreenReaderFocusable() { return screenReaderFocusable; }
+	public boolean isAccessibilityHeading() { return accessibilityHeading; }
+	public CharSequence getAccessibilityPaneTitle() { return accessibilityPaneTitle; }
+	public void setStateDescription(CharSequence description) { stateDescription = description; }
+	public CharSequence getStateDescription() { return stateDescription; }
+	public String[] getReceiveContentMimeTypes() { return null; }
+	public void setRenderEffect(android.graphics.RenderEffect renderEffect) {}
 	public boolean isShowingLayoutBounds() {
 		return true;
 	}
