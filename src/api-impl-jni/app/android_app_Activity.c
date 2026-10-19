@@ -36,7 +36,7 @@ static void activity_close(JNIEnv *env, jobject activity)
 	gtk_stack_remove(stack, decor_view);
 
 	/* -- run the activity's onDestroy -- */
-	J__Activity__onDestroy(env, activity);
+	J__Activity__performDestroy(env, activity);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 }
@@ -44,12 +44,12 @@ static void activity_close(JNIEnv *env, jobject activity)
 static void activity_unfocus(JNIEnv *env, jobject activity)
 {
 	if (!_GET_BOOL_FIELD(activity, "paused")) {
-		J__Activity__onPause(env, activity);
+		J__Activity__performPause(env, activity);
 		if ((*env)->ExceptionCheck(env))
 			(*env)->ExceptionDescribe(env);
 	}
 
-	J__Activity__onStop(env, activity);
+	J__Activity__performStop(env, activity);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 
@@ -63,7 +63,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
-	J__Activity__onStart(env, activity);
+	J__Activity__performStart(env, activity);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 	if (_GET_BOOL_FIELD(activity, "finishing"))
@@ -73,7 +73,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
 	gtk_stack_set_visible_child(stack, decor_view);
 
-	J__Activity__onResume(env, activity);
+	J__Activity__performResume(env, activity);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 	if (_GET_BOOL_FIELD(activity, "finishing"))
@@ -187,7 +187,7 @@ void activity_start(JNIEnv *env, jobject activity_object)
 		activity_unfocus(env, activity_current);
 	activity_current = NULL;
 	/* -- run the activity's onCreate -- */
-	J__Activity__onCreate(env, activity_object, NULL);
+	J__Activity__performCreate(env, activity_object, NULL);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 

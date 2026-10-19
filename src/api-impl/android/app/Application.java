@@ -57,13 +57,68 @@ public class Application extends ContextWrapper {
 	}
 
 	public interface ActivityLifecycleCallbacks {
+		default void onActivityPreCreated(Activity activity, Bundle savedInstanceState) {}
 		void onActivityCreated(Activity activity, Bundle savedInstanceState);
+		default void onActivityPostCreated(Activity activity, Bundle savedInstanceState) {}
+		default void onActivityPreStarted(Activity activity) {}
 		void onActivityStarted(Activity activity);
+		default void onActivityPostStarted(Activity activity) {}
+		default void onActivityPreResumed(Activity activity) {}
 		void onActivityResumed(Activity activity);
+		default void onActivityPostResumed(Activity activity) {}
+		default void onActivityPrePaused(Activity activity) {}
 		void onActivityPaused(Activity activity);
+		default void onActivityPostPaused(Activity activity) {}
+		default void onActivityPreStopped(Activity activity) {}
 		void onActivityStopped(Activity activity);
+		default void onActivityPostStopped(Activity activity) {}
+		default void onActivityPreSaveInstanceState(Activity activity, Bundle outState) {}
 		void onActivitySaveInstanceState(Activity activity, Bundle outState);
+		default void onActivityPostSaveInstanceState(Activity activity, Bundle outState) {}
+		default void onActivityPreDestroyed(Activity activity) {}
 		void onActivityDestroyed(Activity activity);
+		default void onActivityPostDestroyed(Activity activity) {}
+	}
+
+	/* lifecycle events of Activity.dispatchActivityLifecycle(): event * 3 + phase */
+	static final int CREATED = 0, STARTED = 1, RESUMED = 2, PAUSED = 3, STOPPED = 4, SAVE_INSTANCE_STATE = 5, DESTROYED = 6;
+	static final int PRE = 0, MAIN = 1, POST = 2;
+
+	static void callActivityLifecycle(ActivityLifecycleCallbacks cb, int event, int phase, Activity a, Bundle b) {
+		switch (event * 3 + phase) {
+			case CREATED * 3 + PRE: cb.onActivityPreCreated(a, b); break;
+			case CREATED * 3 + MAIN: cb.onActivityCreated(a, b); break;
+			case CREATED * 3 + POST: cb.onActivityPostCreated(a, b); break;
+			case STARTED * 3 + PRE: cb.onActivityPreStarted(a); break;
+			case STARTED * 3 + MAIN: cb.onActivityStarted(a); break;
+			case STARTED * 3 + POST: cb.onActivityPostStarted(a); break;
+			case RESUMED * 3 + PRE: cb.onActivityPreResumed(a); break;
+			case RESUMED * 3 + MAIN: cb.onActivityResumed(a); break;
+			case RESUMED * 3 + POST: cb.onActivityPostResumed(a); break;
+			case PAUSED * 3 + PRE: cb.onActivityPrePaused(a); break;
+			case PAUSED * 3 + MAIN: cb.onActivityPaused(a); break;
+			case PAUSED * 3 + POST: cb.onActivityPostPaused(a); break;
+			case STOPPED * 3 + PRE: cb.onActivityPreStopped(a); break;
+			case STOPPED * 3 + MAIN: cb.onActivityStopped(a); break;
+			case STOPPED * 3 + POST: cb.onActivityPostStopped(a); break;
+			case SAVE_INSTANCE_STATE * 3 + PRE: cb.onActivityPreSaveInstanceState(a, b); break;
+			case SAVE_INSTANCE_STATE * 3 + MAIN: cb.onActivitySaveInstanceState(a, b); break;
+			case SAVE_INSTANCE_STATE * 3 + POST: cb.onActivityPostSaveInstanceState(a, b); break;
+			case DESTROYED * 3 + PRE: cb.onActivityPreDestroyed(a); break;
+			case DESTROYED * 3 + MAIN: cb.onActivityDestroyed(a); break;
+			case DESTROYED * 3 + POST: cb.onActivityPostDestroyed(a); break;
+		}
+	}
+
+	private final java.util.ArrayList<ActivityLifecycleCallbacks> activityLifecycleCallbacks = new java.util.ArrayList<>();
+
+	void dispatchActivityLifecycle(int event, int phase, Activity activity, Bundle bundle) {
+		Object[] callbacks;
+		synchronized (activityLifecycleCallbacks) {
+			callbacks = activityLifecycleCallbacks.toArray();
+		}
+		for (Object cb : callbacks)
+			callActivityLifecycle((ActivityLifecycleCallbacks)cb, event, phase, activity, bundle);
 	}
 	/**
 	 * Callback interface for use with {@link Application#registerOnProvideAssistDataListener}
@@ -115,8 +170,14 @@ public class Application extends ContextWrapper {
 	public void unregisterComponentCallbacks(ComponentCallbacks callback) {
 	}*/
 	public void registerActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
+		synchronized (activityLifecycleCallbacks) {
+			activityLifecycleCallbacks.add(callback);
+		}
 	}
 	public void unregisterActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
+		synchronized (activityLifecycleCallbacks) {
+			activityLifecycleCallbacks.remove(callback);
+		}
 	}
 	public void registerOnProvideAssistDataListener(OnProvideAssistDataListener callback) {
 	}

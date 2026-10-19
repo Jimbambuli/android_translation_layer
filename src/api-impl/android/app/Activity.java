@@ -148,13 +148,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public final void setVolumeControlStream(int streamType) {}
 
-	@Export
 	protected void onCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onCreate - yay!");
 
 		for (Fragment fragment : fragments) {
 			fragment.onCreate(savedInstanceState);
 		}
+		dispatchActivityLifecycle(Application.CREATED, Application.MAIN, savedInstanceState);
 
 		return;
 	}
@@ -165,7 +165,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return;
 	}
 
-	@Export
 	protected void onStart() {
 		Slog.i(TAG, "- onStart - yay!");
 		window.setTitle(title);
@@ -173,6 +172,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onStart();
 		}
+		dispatchActivityLifecycle(Application.STARTED, Application.MAIN, null);
 
 		return;
 	}
@@ -183,13 +183,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return;
 	}
 
-	@Export
 	protected void onResume() {
 		Slog.i(TAG, "- onResume - yay!");
 
 		for (Fragment fragment : fragments) {
 			fragment.onResume();
 		}
+		dispatchActivityLifecycle(Application.RESUMED, Application.MAIN, null);
 
 		paused = false;
 		return;
@@ -201,36 +201,36 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return;
 	}
 
-	@Export
 	protected void onPause() {
 		Slog.i(TAG, "- onPause - yay!");
 
 		for (Fragment fragment : fragments) {
 			fragment.onPause();
 		}
+		dispatchActivityLifecycle(Application.PAUSED, Application.MAIN, null);
 
 		paused = true;
 		return;
 	}
 
-	@Export
 	protected void onStop() {
 		Slog.i(TAG, "- onStop - yay!");
 
 		for (Fragment fragment : fragments) {
 			fragment.onStop();
 		}
+		dispatchActivityLifecycle(Application.STOPPED, Application.MAIN, null);
 
 		return;
 	}
 
-	@Export
 	protected void onDestroy() {
 		Slog.i(TAG, "- onDestroy - yay!");
 
 		for (Fragment fragment : fragments) {
 			fragment.onDestroy();
 		}
+		dispatchActivityLifecycle(Application.DESTROYED, Application.MAIN, null);
 
 		destroyed = true;
 		return;
@@ -244,6 +244,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	protected void onSaveInstanceState(Bundle outState) {
+		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.MAIN, outState);
 	}
 
 	public void onConfigurationChanged(Configuration newConfig) {
@@ -614,7 +615,81 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	// we never put an activity into picture-in-picture, so this is always false
 	public boolean isInPictureInPictureMode() { return false; }
 
-	public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {}
+	private final ArrayList<Application.ActivityLifecycleCallbacks> activityLifecycleCallbacks = new ArrayList<>();
+
+	/* API 29: callbacks for this activity only, on top of those of the Application */
+	public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
+		synchronized (activityLifecycleCallbacks) {
+			activityLifecycleCallbacks.add(callback);
+		}
+	}
+
+	public void unregisterActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
+		synchronized (activityLifecycleCallbacks) {
+			activityLifecycleCallbacks.remove(callback);
+		}
+	}
+
+	/* like AOSP: while the activity comes up, the Application's callbacks go first (except for the
+	 * post events), while it goes down the activity's own go first and in reverse order */
+	private void dispatchActivityLifecycle(int event, int phase, Bundle bundle) {
+		Object[] callbacks;
+		synchronized (activityLifecycleCallbacks) {
+			callbacks = activityLifecycleCallbacks.toArray();
+		}
+		Application app = getApplication();
+		boolean down = event >= Application.PAUSED;
+		boolean appFirst = !down && phase != Application.POST;
+		if (appFirst && app != null)
+			app.dispatchActivityLifecycle(event, phase, this, bundle);
+		for (int i = 0; i < callbacks.length; i++)
+			Application.callActivityLifecycle((Application.ActivityLifecycleCallbacks)callbacks[down ? callbacks.length - 1 - i : i], event, phase, this, bundle);
+		if (!appFirst && app != null)
+			app.dispatchActivityLifecycle(event, phase, this, bundle);
+	}
+
+	/* called from native code instead of onCreate() etc., with the pre and post callbacks around them */
+	@Export
+	private void performCreate(Bundle savedInstanceState) {
+		dispatchActivityLifecycle(Application.CREATED, Application.PRE, savedInstanceState);
+		onCreate(savedInstanceState);
+		dispatchActivityLifecycle(Application.CREATED, Application.POST, savedInstanceState);
+	}
+
+	@Export
+	private void performStart() {
+		dispatchActivityLifecycle(Application.STARTED, Application.PRE, null);
+		onStart();
+		dispatchActivityLifecycle(Application.STARTED, Application.POST, null);
+	}
+
+	@Export
+	private void performResume() {
+		dispatchActivityLifecycle(Application.RESUMED, Application.PRE, null);
+		onResume();
+		dispatchActivityLifecycle(Application.RESUMED, Application.POST, null);
+	}
+
+	@Export
+	private void performPause() {
+		dispatchActivityLifecycle(Application.PAUSED, Application.PRE, null);
+		onPause();
+		dispatchActivityLifecycle(Application.PAUSED, Application.POST, null);
+	}
+
+	@Export
+	private void performStop() {
+		dispatchActivityLifecycle(Application.STOPPED, Application.PRE, null);
+		onStop();
+		dispatchActivityLifecycle(Application.STOPPED, Application.POST, null);
+	}
+
+	@Export
+	private void performDestroy() {
+		dispatchActivityLifecycle(Application.DESTROYED, Application.PRE, null);
+		onDestroy();
+		dispatchActivityLifecycle(Application.DESTROYED, Application.POST, null);
+	}
 
 	public void setDisablePreviewScreenshots(boolean disable) {}
 	public final View requireViewById(int id) {
