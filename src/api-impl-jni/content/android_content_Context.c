@@ -28,8 +28,14 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 	if (!configuration)
 		configuration = _GET_STATIC_OBJ_FIELD(_CACHED_CLASS(Context), "sys_config", "Landroid/content/res/Configuration;");
 
-	_SET_INT_FIELD(configuration, "screenWidthDp", geometry.width);
-	_SET_INT_FIELD(configuration, "screenHeightDp", geometry.height);
+	/* like Android, the screen size the app sees is the size of its window (which the window size
+	 * option sets, and which DisplayMetrics reports as well), at most the monitor's size; without
+	 * it, the w<N>dp resources of the monitor width were used in a narrow window */
+	jclass display = (*env)->FindClass(env, "android/view/Display");
+	int window_width = (*env)->GetStaticIntField(env, display, _STATIC_FIELD_ID(display, "window_width", "I"));
+	int window_height = (*env)->GetStaticIntField(env, display, _STATIC_FIELD_ID(display, "window_height", "I"));
+	_SET_INT_FIELD(configuration, "screenWidthDp", window_width > 0 ? MIN(window_width, geometry.width) : geometry.width);
+	_SET_INT_FIELD(configuration, "screenHeightDp", window_height > 0 ? MIN(window_height, geometry.height) : geometry.height);
 	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on */
 	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(geometry.width, geometry.height));
 	if (geometry.width >= 800 && geometry.height >= 800)
