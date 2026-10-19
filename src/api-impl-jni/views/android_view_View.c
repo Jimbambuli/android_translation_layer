@@ -218,7 +218,8 @@ void remove_pointer_fast(GPtrArray *pointer_indices, struct pointer *pointer)
 	pointer->id = 0;
 }
 
-static bool action_up_already_handled = false;
+/* the release event that completed a click whose gesture could not be claimed */
+static GdkEvent *action_up_already_handled = NULL;
 
 // TODO: find a way to reconcile this with libandroid/input.c?
 static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, GdkEvent *event, gpointer user_data)
@@ -226,10 +227,8 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 	double x;
 	double y;
 
-	if ((gdk_event_get_event_type(event) == GDK_TOUCH_END || gdk_event_get_event_type(event) == GDK_BUTTON_RELEASE) && action_up_already_handled) {
-		action_up_already_handled = false;
+	if (event == action_up_already_handled)
 		return true;
-	}
 
 	uintptr_t id = (uintptr_t)gdk_event_get_event_sequence(event);
 	if (id > MAX_POINTERS - 1) // sequence id is a real pointer for drag and drop events
@@ -347,7 +346,14 @@ static void on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 		// claiming fails if there is no last event, set a flag in that case
 		GdkEvent *event = gtk_gesture_get_last_event(GTK_GESTURE(gesture), gtk_gesture_get_last_updated_sequence(GTK_GESTURE(gesture)));
 		if (!event) {
-			action_up_already_handled = true;
+			/* only the click's own release must not reach the other touch listeners; a flag that
+			 * is only reset by the next release would swallow the release of the next click
+			 * whenever this release does not reach another touch listener (e.g. because the
+			 * click removed the view) */
+			g_clear_pointer(&action_up_already_handled, gdk_event_unref);
+			event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(gesture));
+			if (event)
+				action_up_already_handled = gdk_event_ref(event);
 		}
 	}
 }
