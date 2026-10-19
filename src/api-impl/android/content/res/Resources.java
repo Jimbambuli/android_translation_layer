@@ -1154,7 +1154,7 @@ public class Resources {
 	 */
 	public void getValue(int id, TypedValue outValue, boolean resolveRefs)
 	    throws NotFoundException {
-		boolean found = assets().getResourceValue(id, mCompatibilityInfo.applicationDensity, outValue, resolveRefs);
+		boolean found = assets().getResourceValue(id, 0, outValue, resolveRefs);
 		if (found) {
 			return;
 		}
@@ -1752,10 +1752,16 @@ public class Resources {
 		if (keyboardHidden == Configuration.KEYBOARDHIDDEN_NO && mConfiguration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_YES) {
 			keyboardHidden = Configuration.KEYBOARDHIDDEN_SOFT;
 		}
+		/* GTK draws the logical pixels at the monitor's scale: choose the resources for the
+		 * density of the device pixels, so bitmaps are as sharp as on such a device. Their
+		 * density keeps their size in logical pixels (see Drawable.createFromResourceStream) */
+		int density = mConfiguration.densityDpi;
+		if (density == Configuration.DENSITY_DPI_UNDEFINED || density == DisplayMetrics.DENSITY_DEVICE)
+			density = DisplayMetrics.DENSITY_DEVICE_PIXELS;
 		mAssets.setConfiguration(mConfiguration.mcc, mConfiguration.mnc,
 		                         locale, mConfiguration.orientation,
 		                         mConfiguration.touchscreen,
-		                         mConfiguration.densityDpi, mConfiguration.keyboard,
+		                         density, mConfiguration.keyboard,
 		                         keyboardHidden, mConfiguration.navigation, width, height,
 		                         mConfiguration.smallestScreenWidthDp,
 		                         mConfiguration.screenWidthDp, mConfiguration.screenHeightDp,

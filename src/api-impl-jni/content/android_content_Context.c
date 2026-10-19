@@ -91,6 +91,19 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv 
 	GdkMonitor *monitor = g_list_model_get_item(gdk_display_get_monitors(display), 0);
 	monitor_changed_cb(NULL, monitor, config);
 
+	/* the density of the device pixels, for choosing resources: the highest monitor scale,
+	 * since the window can be moved to any monitor */
+	GListModel *monitors = gdk_display_get_monitors(display);
+	double scale = 1;
+	for (guint i = 0; i < g_list_model_get_n_items(monitors); i++) {
+		GdkMonitor *m = g_list_model_get_item(monitors, i);
+		scale = MAX(scale, gdk_monitor_get_scale(m));
+		g_object_unref(m);
+	}
+	jclass metrics = (*env)->FindClass(env, "android/util/DisplayMetrics");
+	int density = (*env)->GetStaticIntField(env, metrics, _STATIC_FIELD_ID(metrics, "DENSITY_DEVICE", "I"));
+	_SET_STATIC_INT_FIELD(metrics, "DENSITY_DEVICE_PIXELS", (int)(density * scale + 0.5));
+
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
 	if (!xdp_settings) {
 		GError *error = NULL;

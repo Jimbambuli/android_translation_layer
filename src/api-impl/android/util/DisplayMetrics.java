@@ -113,6 +113,14 @@ public class DisplayMetrics {
 	public static int DENSITY_DEVICE_STABLE = getDeviceDensity();
 
 	/**
+	 * ATL: the density of the device pixels GTK draws to, DENSITY_DEVICE times the highest
+	 * scale of the monitors. Resources are chosen for it, while the app works in GTK's
+	 * logical pixels at DENSITY_DEVICE.
+	 * @hide
+	 */
+	public static int DENSITY_DEVICE_PIXELS = DENSITY_DEVICE;
+
+	/**
 	 * The absolute width of the display in pixels.
 	 */
 	public int widthPixels;

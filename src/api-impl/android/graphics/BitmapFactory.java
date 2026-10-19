@@ -429,6 +429,11 @@ public class BitmapFactory {
 		if (opts.inTargetDensity == 0 && res != null) {
 			opts.inTargetDensity = res.getDisplayMetrics().densityDpi;
 		}
+		/* like AOSP's compatibility mode, the app sees a lower density than that of the device
+		 * pixels: a bitmap for those keeps its pixels and gets drawn at its density */
+		if (opts.inScreenDensity == 0) {
+			opts.inScreenDensity = DisplayMetrics.DENSITY_DEVICE_PIXELS;
+		}
 
 		return decodeStream(is, pad, opts);
 	}
