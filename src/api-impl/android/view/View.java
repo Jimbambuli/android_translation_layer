@@ -1377,6 +1377,7 @@ public class View implements Drawable.Callback {
 	}
 
 	protected native long native_constructor(Context context, AttributeSet attrs); // will create a custom GtkWidget with a custom drawing function
+	private static native boolean native_hasAndroidLayout(long widget);
 	public native void native_setLayoutParams(long widget, int width, int height, int gravity, float weight, int leftMargin, int topMargin, int rightMargin, int bottomMargin);
 	protected native void native_destructor(long widget);
 	/**
@@ -1924,6 +1925,9 @@ public class View implements Drawable.Callback {
 
 	public void layout(int l, int t, int r, int b) {
 		boolean sizeChanged = r - l != right - left || b - t != bottom - top;
+		boolean changed = sizeChanged || l != left || t != top;
+		int oldW = right - left;
+		int oldH = bottom - top;
 		this.layouted = true;
 		this.left = l;
 		this.top = t;
@@ -1933,6 +1937,14 @@ public class View implements Drawable.Callback {
 			native_queueAllocate(widget); // GTK is not re-entrant-safe. Queue allocation
 		else
 			native_layout(widget, l, t, r, b);
+		/* GTK lays out native widgets (TextView, Button, ...) without layoutInternal(): let them
+		 * know their size and layout like AOSP's layout() does (MaterialButton places its icon in
+		 * onLayout()). Native containers (ScrollView) are left alone, GTK places their children */
+		if (!(this instanceof ViewGroup) && !native_hasAndroidLayout(widget)) {
+			if (sizeChanged)
+				onSizeChanged(r - l, b - t, oldW, oldH);
+			onLayout(changed, l, t, r, b);
+		}
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
 		notifyLayoutChange();
 		if (sizeChanged && getZ() > 0)

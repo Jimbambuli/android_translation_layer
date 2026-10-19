@@ -89,6 +89,12 @@ static void java_widget_class_init(JavaWidgetClass *class)
 }
 G_DEFINE_TYPE(JavaWidget, java_widget, GTK_TYPE_WIDGET)
 
+/* whether GTK lays the widget out through layoutInternal() (a JavaWidget), or by itself (a native widget) */
+JNIEXPORT jboolean JNICALL Java_android_view_View_native_1hasAndroidLayout(JNIEnv *env, jclass class, jlong widget_ptr)
+{
+	return ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(GTK_WIDGET(_PTR(widget_ptr))));
+}
+
 bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagationPhase phase, jobject motion_event, gpointer event, int action)
 {
 	int ret;

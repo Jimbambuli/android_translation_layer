@@ -245,6 +245,14 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor
 
 /*
  * Class:     android_view_View
+ * Method:    native_hasAndroidLayout
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_view_View_native_1hasAndroidLayout
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_view_View
  * Method:    native_setLayoutParams
  * Signature: (JIIIFIIII)V
  */
