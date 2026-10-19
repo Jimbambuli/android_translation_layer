@@ -984,6 +984,7 @@ public class View implements Drawable.Callback {
 
 	private boolean atl_enabled = true;
 	private boolean atl_focusable = true;
+	private boolean atl_focusable_set; // set with setFocusable() or android:focusable
 
 	private Handler handler;
 
@@ -1077,6 +1078,7 @@ public class View implements Drawable.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_focusable)) {
 			atl_focusable = a.getBoolean(com.android.internal.R.styleable.View_focusable, true);
+			atl_focusable_set = atl_focusable;
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
@@ -1137,6 +1139,7 @@ public class View implements Drawable.Callback {
 		}
 
 		clickable = a.getBoolean(com.android.internal.R.styleable.View_clickable, false);
+		updateKeyboardFocusable();
 
 		String handlerName = a.getString(com.android.internal.R.styleable.View_onClick);
 		if (handlerName != null)
@@ -1154,10 +1157,12 @@ public class View implements Drawable.Callback {
 	protected int[] onCreateDrawableState(int extraSpace) {
 		if (duplicate_parent_state && parent instanceof View)
 			return ((View)parent).onCreateDrawableState(extraSpace);
-		int[] state = new int[4];
+		int[] state = new int[5];
 		int count = 0;
 		if (isEnabled())
 			state[count++] = R.attr.state_enabled;
+		if (focus_shown)
+			state[count++] = R.attr.state_focused;
 		if (pressed)
 			state[count++] = R.attr.state_pressed;
 		if (selected)
@@ -1416,6 +1421,8 @@ public class View implements Drawable.Callback {
 
 	public void setFocusable(boolean focusable) {
 		atl_focusable = focusable;
+		atl_focusable_set = true;
+		updateKeyboardFocusable();
 	}
 	public void setFocusable(int focusable) {}
 	private boolean focusable_in_touch_mode = false;
@@ -1779,7 +1786,15 @@ public class View implements Drawable.Callback {
 	public void setClickable(boolean clickable) {
 		this.clickable = clickable;
 		updateTouchTarget();
+		updateKeyboardFocusable();
 	}
+
+	/* like AOSP's FOCUSABLE_AUTO: a clickable view can be focused with the keyboard (Tab), and
+	 * Enter or Space click it (View.onKeyUp()); clicking it with the pointer does not focus it */
+	private void updateKeyboardFocusable() {
+		native_setKeyboardFocusable(widget, atl_focusable && atl_focusable_set ? true : atl_focusable && clickable);
+	}
+	private native void native_setKeyboardFocusable(long widget, boolean focusable);
 
 	public void setEnabled(boolean enabled) {
 		boolean changed = atl_enabled != enabled;
@@ -2326,8 +2341,19 @@ public class View implements Drawable.Callback {
 		onFocusChangeListener = l;
 	}
 
-	/* called from native code when the view's widget gains or loses the GTK focus */
+	private boolean focus_shown;
+
+	/* called from native code when the view's widget gains or loses the GTK focus; focusVisible is
+	 * whether GTK shows the focus (keyboard navigation), which the drawable state follows */
 	@Export
+	private void dispatchFocusChanged(boolean gainFocus, boolean focusVisible) {
+		if (focus_shown != focusVisible) {
+			focus_shown = focusVisible;
+			refreshDrawableState();
+		}
+		onFocusChanged(gainFocus, FOCUS_FORWARD, null);
+	}
+
 	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
 		if (onFocusChangeListener != null)
 			onFocusChangeListener.onFocusChange(this, gainFocus);

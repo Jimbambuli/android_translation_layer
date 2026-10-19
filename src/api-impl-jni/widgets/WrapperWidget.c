@@ -469,10 +469,24 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 
 GtkWidget *currently_unmapping = NULL;
 
-#define FOCUS_FORWARD 2
-
 /* View.onFocusChanged(): the view is focused when its wrapper or the wrapped widget has the GTK
- * focus. Compose needs this to activate its focus tree, it rejects key events otherwise. */
+ * focus. Compose needs this to activate its focus tree, it rejects key events otherwise. The
+ * focus is shown (state_focused) only when GTK shows it, i.e. after keyboard navigation, like
+ * Android shows it only outside of touch mode. */
+/* GTK turns focus-visible on after it moved the focus, so the focused view learns it here */
+static void focus_visible_changed_cb(GtkWindow *window, GParamSpec *pspec, gpointer user_data)
+{
+	GtkWidget *focus = gtk_root_get_focus(GTK_ROOT(window));
+	while (focus && !WRAPPER_IS_WIDGET(focus))
+		focus = gtk_widget_get_parent(focus);
+	if (!focus || !WRAPPER_WIDGET(focus)->jobj)
+		return;
+	JNIEnv *env = get_jni_env();
+	J__View__dispatchFocusChanged(env, WRAPPER_WIDGET(focus)->jobj, TRUE, gtk_window_get_focus_visible(window));
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+}
+
 static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget *wrapper)
 {
 	gboolean focused = gtk_widget_has_focus(GTK_WIDGET(wrapper)) || (wrapper->child && gtk_widget_has_focus(wrapper->child));
@@ -481,7 +495,13 @@ static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget
 	wrapper->has_focus = focused;
 
 	JNIEnv *env = get_jni_env();
-	J__View__onFocusChanged(env, wrapper->jobj, focused, FOCUS_FORWARD, NULL);
+	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(wrapper));
+	gboolean visible = focused && GTK_IS_WINDOW(root) && gtk_window_get_focus_visible(GTK_WINDOW(root));
+	if (GTK_IS_WINDOW(root) && !g_object_get_data(G_OBJECT(root), "atl-focus-visible-handler")) {
+		g_signal_connect(root, "notify::focus-visible", G_CALLBACK(focus_visible_changed_cb), NULL);
+		g_object_set_data(G_OBJECT(root), "atl-focus-visible-handler", GINT_TO_POINTER(1));
+	}
+	J__View__dispatchFocusChanged(env, wrapper->jobj, focused, visible);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 }

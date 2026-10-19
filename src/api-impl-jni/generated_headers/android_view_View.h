@@ -421,6 +421,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setPadding
 
 /*
  * Class:     android_view_View
+ * Method:    native_setKeyboardFocusable
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setKeyboardFocusable
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_View
  * Method:    nativeSetOnLongClickListener
  * Signature: (J)V
  */
