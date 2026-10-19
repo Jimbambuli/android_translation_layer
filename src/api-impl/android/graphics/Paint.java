@@ -111,7 +111,7 @@ public class Paint {
 		int weight = typeface != null ? typeface.getWeight() : 400;
 		if (isFakeBoldText() && weight < 700)
 			weight = 700;
-		native_set_typeface(paint, weight, typeface != null && typeface.isItalic());
+		native_set_typeface(paint, typeface != null ? typeface.family : null, weight, typeface != null && typeface.isItalic());
 	}
 	public void getTextBounds(String text, int start, int end, Rect bounds) {
 		if (end > text.length())
@@ -472,7 +472,7 @@ public class Paint {
 	private static native void native_set_stroke_join(long paint, int join);
 	private static native int native_get_stroke_join(long paint);
 	private static native void native_set_text_size(long paint, float size);
-	private static native void native_set_typeface(long paint, int weight, boolean italic);
+	private static native void native_set_typeface(long paint, String family, int weight, boolean italic);
 	private static native float native_get_text_size(long paint);
 	private static native void native_set_color_filter(long paint, int mode, int color);
 	private static native void native_get_text_bounds(long paint, String text, Rect bounds);

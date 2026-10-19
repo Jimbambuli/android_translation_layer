@@ -8,17 +8,24 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-/* ATL draws text with Pango and does not load app fonts (see Typeface), so a Font only
- * keeps the attributes it was built with. */
+/* The font file is handed to fontconfig (see Typeface), which Pango then draws with; the Font
+ * keeps its family name and the attributes it was built with. */
 public final class Font {
 	private final FontStyle style;
 	private final int ttcIndex;
 	private final FontVariationAxis[] axes;
+	private final String familyName;
 
-	private Font(FontStyle style, int ttcIndex, FontVariationAxis[] axes) {
+	private Font(FontStyle style, int ttcIndex, FontVariationAxis[] axes, String familyName) {
 		this.style = style;
 		this.ttcIndex = ttcIndex;
 		this.axes = axes;
+		this.familyName = familyName;
+	}
+
+	/** @hide */
+	public String getFamilyName() {
+		return familyName;
 	}
 
 	public FontStyle getStyle() {
@@ -38,22 +45,60 @@ public final class Font {
 	}
 
 	public static final class Builder {
-		private int weight = FontStyle.FONT_WEIGHT_NORMAL;
-		private int slant = FontStyle.FONT_SLANT_UPRIGHT;
+		private int weight = -1; // from the font file unless set
+		private int slant = -1;
 		private int ttcIndex = 0;
 		private FontVariationAxis[] axes = null;
+		private File file;
+		private String familyName;
+		private IOException error;
 
-		public Builder(ByteBuffer buffer) {}
-		public Builder(File file) {}
-		public Builder(ParcelFileDescriptor fd) {}
-		public Builder(ParcelFileDescriptor fd, long offset, long size) {}
-		public Builder(AssetManager am, String path) {}
-		public Builder(Resources res, int resId) {}
+		public Builder(ByteBuffer buffer) {
+			byte[] bytes = new byte[buffer.remaining()];
+			buffer.duplicate().get(bytes);
+			copy(new java.io.ByteArrayInputStream(bytes));
+		}
+		public Builder(File file) {
+			this.file = file;
+		}
+		public Builder(ParcelFileDescriptor fd) {
+			copy(new java.io.FileInputStream(fd.getFileDescriptor()));
+		}
+		public Builder(ParcelFileDescriptor fd, long offset, long size) {
+			try {
+				java.io.FileInputStream in = new java.io.FileInputStream(fd.getFileDescriptor());
+				in.getChannel().position(offset);
+				byte[] bytes = new byte[(int)size];
+				new java.io.DataInputStream(in).readFully(bytes);
+				copy(new java.io.ByteArrayInputStream(bytes));
+			} catch (IOException e) {
+				error = e;
+			}
+		}
+		public Builder(AssetManager am, String path) {
+			try {
+				copy(am.open(path));
+			} catch (IOException e) {
+				error = e;
+			}
+		}
+		public Builder(Resources res, int resId) {
+			copy(res.openRawResource(resId));
+		}
 		public Builder(Font font) {
 			weight = font.style.getWeight();
 			slant = font.style.getSlant();
 			ttcIndex = font.ttcIndex;
 			axes = font.axes;
+			familyName = font.familyName;
+		}
+
+		private void copy(java.io.InputStream in) {
+			try {
+				file = android.graphics.Typeface.copyToFontFile(in);
+			} catch (IOException e) {
+				error = e;
+			}
 		}
 
 		public Builder setWeight(int weight) {
@@ -82,7 +127,17 @@ public final class Font {
 		}
 
 		public Font build() throws IOException {
-			return new Font(new FontStyle(weight, slant), ttcIndex, axes);
+			if (error != null)
+				throw error;
+			int[] style = {FontStyle.FONT_WEIGHT_NORMAL, 0};
+			if (file != null) {
+				familyName = android.graphics.Typeface.registerFontFamily(file, style);
+				if (familyName == null)
+					throw new IOException("Failed to read font " + file);
+			}
+			int w = weight != -1 ? weight : style[0];
+			int s = slant != -1 ? slant : (style[1] != 0 ? FontStyle.FONT_SLANT_ITALIC : FontStyle.FONT_SLANT_UPRIGHT);
+			return new Font(new FontStyle(w, s), ttcIndex, axes, familyName);
 		}
 	}
 }
