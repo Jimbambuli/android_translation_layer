@@ -667,4 +667,55 @@ public class Canvas {
 	public boolean quickReject(float left, float top, float right, float bottom, EdgeType edgeType) {
 		return false;
 	}
+
+	/* API 29/30 */
+
+	/* there are no render nodes to reorder by elevation, so Z reordering has no effect */
+	public void enableZ() {}
+
+	public void disableZ() {}
+
+	public void drawColor(long color) {
+		drawColor(Color.toArgb(color));
+	}
+
+	public void drawColor(int color, BlendMode mode) {
+		Paint paint = new Paint();
+		paint.setColor(color);
+		paint.setBlendMode(mode);
+		drawPaint(paint);
+	}
+
+	public void drawColor(long color, BlendMode mode) {
+		drawColor(Color.toArgb(color), mode);
+	}
+
+	public void drawDoubleRoundRect(RectF outer, float outerRx, float outerRy, RectF inner, float innerRx, float innerRy, Paint paint) {
+		Path path = new Path();
+		path.setFillType(Path.FillType.EVEN_ODD);
+		path.addRoundRect(outer, outerRx, outerRy, Path.Direction.CW);
+		path.addRoundRect(inner, innerRx, innerRy, Path.Direction.CW);
+		drawPath(path, paint);
+	}
+
+	public void drawDoubleRoundRect(RectF outer, float[] outerRadii, RectF inner, float[] innerRadii, Paint paint) {
+		Path path = new Path();
+		path.setFillType(Path.FillType.EVEN_ODD);
+		path.addRoundRect(outer, outerRadii, Path.Direction.CW);
+		path.addRoundRect(inner, innerRadii, Path.Direction.CW);
+		drawPath(path, paint);
+	}
+
+	/* never rejecting is always correct, it only skips an optimization */
+	public boolean quickReject(float left, float top, float right, float bottom) {
+		return false;
+	}
+
+	public boolean quickReject(RectF rect) {
+		return false;
+	}
+
+	public boolean quickReject(Path path) {
+		return false;
+	}
 }

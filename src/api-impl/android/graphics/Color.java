@@ -47,6 +47,34 @@ public class Color {
 		return color;
 	}
 
+	/* API 26 color long: sRGB colors carry the ARGB int in the upper half; other color spaces
+	 * hold half-float components, which are taken as sRGB values without conversion */
+	public static int toArgb(long color) {
+		if ((color & 0x3f) == 0)
+			return (int)(color >>> 32);
+		float r = halfToFloat((short)(color >>> 48));
+		float g = halfToFloat((short)(color >>> 32));
+		float b = halfToFloat((short)(color >>> 16));
+		float a = ((color >>> 6) & 0x3ff) / 1023.0f;
+		return argb(Math.round(a * 255), clamp(r), clamp(g), clamp(b));
+	}
+
+	private static int clamp(float c) {
+		return Math.round(Math.max(0.0f, Math.min(1.0f, c)) * 255);
+	}
+
+	private static float halfToFloat(short h) {
+		int bits = h & 0xffff;
+		int sign = (bits & 0x8000) << 16;
+		int exp = (bits >>> 10) & 0x1f;
+		int mant = bits & 0x3ff;
+		if (exp == 0) // zero or subnormal
+			return Float.intBitsToFloat(sign) + (sign != 0 ? -1 : 1) * mant * (float)Math.pow(2, -24);
+		if (exp == 0x1f)
+			return Float.intBitsToFloat(sign | 0x7f800000 | (mant << 13));
+		return Float.intBitsToFloat(sign | ((exp - 15 + 127) << 23) | (mant << 13));
+	}
+
 	public static int argb(int alpha, int red, int green, int blue) {
 		return (alpha << 24) | (red << 16) | (green << 8) | (blue << 0);
 	}

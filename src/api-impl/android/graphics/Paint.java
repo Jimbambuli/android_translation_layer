@@ -106,6 +106,10 @@ public class Paint {
 			end = text.length();
 		native_get_text_bounds(paint, text.substring(start, end), bounds);
 	}
+	public void getTextBounds(CharSequence text, int start, int end, Rect bounds) {
+		getTextBounds(text.toString(), start, end, bounds);
+	}
+
 	public void getTextBounds(char[] text, int index, int count, Rect bounds) {
 		native_get_text_bounds(paint, new String(text, index, count), bounds);
 	}
