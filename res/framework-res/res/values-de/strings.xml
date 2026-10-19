@@ -27,4 +27,7 @@
     <string name="no" msgid="5122037903299899715">"Abbrechen"</string>
     <string name="capital_on" msgid="2770685323900821829">"AN"</string>
     <string name="capital_off" msgid="7443704171014626777">"AUS"</string>
+    <string name="copy" msgid="5472512047143665218">"Kopieren"</string>
+    <string name="share" msgid="4157615043345227321">"Teilen"</string>
+    <string name="autofill_save_yes" msgid="8035743017382012850">"Speichern"</string>
 </resources>
