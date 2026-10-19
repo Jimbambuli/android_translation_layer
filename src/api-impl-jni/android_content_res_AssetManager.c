@@ -196,6 +196,8 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(J
 		_SET_INT_FIELD(outValue, "data", value.data);
 		_SET_INT_FIELD(outValue, "resourceId", resId);
 		_SET_INT_FIELD(outValue, "assetCookie", JAVA_COOKIE(cookie));
+		/* the density of the configuration the value comes from, which sizes a bitmap */
+		_SET_INT_FIELD(outValue, "density", outConfig.density);
 		if (value.dataType == TYPE_STRING) {
 			const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
 			size_t len;
@@ -316,6 +318,7 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadThemeAttributeV
 		_SET_INT_FIELD(outValue, "data", value.data);
 		_SET_INT_FIELD(outValue, "resourceId", ref);
 		_SET_INT_FIELD(outValue, "assetCookie", JAVA_COOKIE(cookie));
+		_SET_INT_FIELD(outValue, "density", outConfig.density);
 		if (value.dataType == TYPE_STRING) {
 			const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
 			size_t len;
