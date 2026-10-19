@@ -89,6 +89,23 @@ public class WindowInsets {
 		return Insets.NONE;
 	}
 
+	public Insets getSystemWindowInsets() {
+		return Insets.NONE;
+	}
+
+	public Insets getStableInsets() {
+		return Insets.NONE;
+	}
+
+	/* insetting clamps at 0, and all insets are 0 already */
+	public WindowInsets inset(int left, int top, int right, int bottom) {
+		return this;
+	}
+
+	public WindowInsets inset(Insets insets) {
+		return this;
+	}
+
 	public DisplayCutout getDisplayCutout() {
 		return null;
 	}
