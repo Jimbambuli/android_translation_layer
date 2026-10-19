@@ -14,6 +14,7 @@ public class Canvas {
 
 	private Bitmap bitmap;
 	private GskCanvas gsk_canvas;
+	private int density = Bitmap.DENSITY_NONE;
 
 	public Canvas() {
 		if (!(this instanceof GskCanvas)) {
@@ -24,6 +25,15 @@ public class Canvas {
 	public Canvas(Bitmap bmp) {
 		this.bitmap = bmp;
 		gsk_canvas = new GskCanvas(bmp.getSnapshot());
+		density = bmp.getDensity();
+	}
+
+	public int getDensity() {
+		return density;
+	}
+
+	public void setDensity(int density) {
+		this.density = density;
 	}
 
 	public int save() {
@@ -272,7 +282,7 @@ public class Canvas {
 	 * @param paint  The paint used to draw the bitmap (may be null)
 	 */
 	public void drawBitmap(Bitmap bitmap, float left, float top, Paint paint) {
-		Rect dst = new Rect((int)left, (int)top, (int)left + bitmap.getWidth(), (int)top + bitmap.getHeight());
+		Rect dst = new Rect((int)left, (int)top, (int)left + bitmap.getScaledWidth(this), (int)top + bitmap.getScaledHeight(this));
 		drawBitmap(bitmap, null, dst, paint);
 	}
 

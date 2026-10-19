@@ -16,6 +16,14 @@ static void ninepatch_paintable_snapshot(GdkPaintable *paintable, GdkSnapshot *s
 	int i, j;
 	NinePatchPaintable *ninepatch = NINEPATCH_PAINTABLE(paintable);
 	struct Res_png_9patch *chunk = ninepatch->chunk;
+	/* a 9-patch made for a higher density than the logical pixels has more texels per pixel:
+	 * lay the patches out in texels and scale them down, so the fixed parts keep their size */
+	if (ninepatch->scale != 1.f) {
+		gtk_snapshot_save(snapshot);
+		gtk_snapshot_scale(snapshot, 1.f / ninepatch->scale, 1.f / ninepatch->scale);
+		width *= ninepatch->scale;
+		height *= ninepatch->scale;
+	}
 	if (chunk) {
 		int32_t *xDivs = (void *)chunk + chunk->xDivsOffset;
 		int32_t *yDivs = (void *)chunk + chunk->yDivsOffset;
@@ -80,6 +88,8 @@ static void ninepatch_paintable_snapshot(GdkPaintable *paintable, GdkSnapshot *s
 		if (ninepatch->tint)
 			gtk_snapshot_pop(snapshot);
 	}
+	if (ninepatch->scale != 1.f)
+		gtk_snapshot_restore(snapshot);
 }
 
 static GdkPaintableFlags ninepatch_paintable_get_flags(GdkPaintable *paintable)
@@ -89,6 +99,7 @@ static GdkPaintableFlags ninepatch_paintable_get_flags(GdkPaintable *paintable)
 
 static void ninepatch_paintable_init(NinePatchPaintable *ninepatch_paintable)
 {
+	ninepatch_paintable->scale = 1.f;
 }
 
 static void ninepatch_paintable_paintable_init(GdkPaintableInterface *iface)

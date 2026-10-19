@@ -19,10 +19,24 @@ public class NinePatchDrawable extends Drawable {
 	public NinePatchDrawable(Resources res, Bitmap bitmap, byte[] data, Rect padding, String name) {
 		if (bitmap != null && data != null)
 			setPaintable(nativeCreate(data, bitmap.getTexture()));
+		if (paintable != 0 && res != null)
+			setScale(bitmap.getDensity(), res.getDisplayMetrics().densityDpi);
 	}
 
 	NinePatchDrawable(String path) {
 		setPaintable(nativeCreate(path));
+	}
+
+	/* a 9-patch made for density, shown at targetDensity */
+	NinePatchDrawable(String path, int density, int targetDensity) {
+		this(path);
+		if (paintable != 0)
+			setScale(density, targetDensity);
+	}
+
+	private void setScale(int density, int targetDensity) {
+		if (density != Bitmap.DENSITY_NONE && targetDensity != 0 && density != targetDensity)
+			nativeSetScale(paintable, density / (float)targetDensity);
 	}
 
 	@Override
@@ -77,4 +91,5 @@ public class NinePatchDrawable extends Drawable {
 	private native long nativeCreate(byte[] data, long texture);
 	private native long nativeCreate(String path);
 	private native void nativeSetTint(long paintable, int tint);
+	private native void nativeSetScale(long paintable, float scale);
 }

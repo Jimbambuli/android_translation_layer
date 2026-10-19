@@ -81,3 +81,9 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSe
 	paintable->tint = color;
 	gdk_paintable_invalidate_contents(GDK_PAINTABLE(paintable));
 }
+
+JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSetScale(JNIEnv *env, jobject this, jlong paintable_ptr, jfloat scale)
+{
+	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
+	paintable->scale = scale; // set right after creation, before the paintable is shown
+}

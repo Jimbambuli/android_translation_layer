@@ -446,7 +446,8 @@ public class BitmapFactory {
 	 *         size be returned (in opts.outWidth and opts.outHeight)
 	 */
 	public static Bitmap decodeResource(Resources res, int id, Options opts) throws NotFoundException {
-		Bitmap bitmap = decodeStreamInternal(res.openRawResource(id), null, opts);
+		TypedValue value = new TypedValue();
+		Bitmap bitmap = decodeResourceStream(res, value, res.openRawResource(id, value), null, opts);
 		if (bitmap == null && opts != null && opts.inBitmap != null) {
 			throw new IllegalArgumentException("Problem decoding into existing bitmap");
 		}
@@ -508,29 +509,22 @@ public class BitmapFactory {
 	}
 
 	/**
-	 * Set the newly decoded bitmap's density based on the Options.
+	 * Give the newly decoded bitmap the density from the Options and, as AOSP does with
+	 * inScaled, scale it to inTargetDensity.
 	 */
-	private static void setDensityFromOptions(Bitmap outputBitmap, Options opts) { /*
-	     if (outputBitmap == null || opts == null) return;
-
-	     final int density = opts.inDensity;
-	     if (density != 0) {
-		 outputBitmap.setDensity(density);
-		 final int targetDensity = opts.inTargetDensity;
-		 if (targetDensity == 0 || density == targetDensity || density == opts.inScreenDensity) {
-		     return;
-		 }
-
-		 byte[] np = outputBitmap.getNinePatchChunk();
-		 final boolean isNinePatch = np != null && NinePatch.isNinePatchChunk(np);
-		 if (opts.inScaled || isNinePatch) {
-		     outputBitmap.setDensity(targetDensity);
-		 }
-	     } else if (opts.inBitmap != null) {
-		 // bitmap was reused, ensure density is reset
-		 outputBitmap.setDensity(Bitmap.getDefaultDensity());
-	     }
-	 */
+	private static Bitmap applyDensityFromOptions(Bitmap bitmap, Options opts) {
+		if (bitmap == null || opts == null || opts.inDensity == 0)
+			return bitmap;
+		final int density = opts.inDensity;
+		final int targetDensity = opts.inTargetDensity;
+		if (opts.inScaled && opts.inBitmap == null && targetDensity != 0 && density != targetDensity && density != opts.inScreenDensity) {
+			Bitmap scaled = Bitmap.createScaledBitmap(bitmap, Bitmap.scaleFromDensity(bitmap.getWidth(), density, targetDensity),
+			                                          Bitmap.scaleFromDensity(bitmap.getHeight(), density, targetDensity), true);
+			scaled.setDensity(targetDensity);
+			return scaled;
+		}
+		bitmap.setDensity(density);
+		return bitmap;
 	}
 
 	/**
@@ -573,7 +567,7 @@ public class BitmapFactory {
 				throw new IllegalArgumentException("Problem decoding into existing bitmap");
 			}
 
-			setDensityFromOptions(bm, opts);
+			bm = applyDensityFromOptions(bm, opts);
 		} finally {
 			Trace.traceEnd(Trace.TRACE_TAG_GRAPHICS);
 		}
@@ -663,7 +657,7 @@ public class BitmapFactory {
 				throw new IllegalArgumentException("Problem decoding into existing bitmap");
 			}
 
-			setDensityFromOptions(bm, opts);
+			bm = applyDensityFromOptions(bm, opts);
 		} finally {
 			Trace.traceEnd(Trace.TRACE_TAG_GRAPHICS);
 		}

@@ -28,6 +28,7 @@ struct _NinePatchPaintable {
 	int strechy_width;
 	int strechy_height;
 	int tint;
+	float scale; // texels per logical pixel
 };
 G_DECLARE_FINAL_TYPE(NinePatchPaintable, ninepatch_paintable, NINEPATCH, PAINTABLE, GObject)
 

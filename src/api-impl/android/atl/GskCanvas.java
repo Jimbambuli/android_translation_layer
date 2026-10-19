@@ -22,6 +22,8 @@ public class GskCanvas extends DisplayListCanvas {
 	public GskCanvas(long snapshot) {
 		this.snapshot = snapshot;
 		state_stack.push(new Matrix());
+		/* the unit of a GTK snapshot is a logical pixel, which ATL gives the device density */
+		setDensity(android.util.DisplayMetrics.DENSITY_DEVICE);
 	}
 
 	@Override

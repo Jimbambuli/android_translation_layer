@@ -14,6 +14,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import com.android.internal.R;
 import java.io.IOException;
 import org.xmlpull.v1.XmlPullParser;
@@ -26,12 +27,14 @@ public class BitmapDrawable extends Drawable {
 	private PorterDuff.Mode tint_mode = DEFAULT_TINT_MODE;
 	private ColorFilter color_filter;
 	private final Paint paint = new Paint();
+	private int target_density = DisplayMetrics.DENSITY_DEFAULT;
 
 	public BitmapDrawable() {
 	}
 
 	public BitmapDrawable(Resources res, Bitmap bitmap) {
 		this.bitmap = bitmap;
+		setTargetDensity(res);
 	}
 
 	public BitmapDrawable(Bitmap bitmap) {
@@ -57,23 +60,39 @@ public class BitmapDrawable extends Drawable {
 			if (dr != null)
 				bitmap = dr.bitmap;
 		}
+		setTargetDensity(r);
 		a.recycle();
 		if (bitmap == null)
 			throw new XmlPullParserException("<bitmap> needs a valid `src' attribute");
 	}
 
+	public void setTargetDensity(Resources res) {
+		if (res != null)
+			setTargetDensity(res.getDisplayMetrics());
+	}
+
+	public void setTargetDensity(DisplayMetrics metrics) {
+		setTargetDensity(metrics.densityDpi);
+	}
+
+	public void setTargetDensity(int density) {
+		target_density = density == 0 ? DisplayMetrics.DENSITY_DEFAULT : density;
+		invalidateSelf();
+	}
+
+	/* the size at the target density, while drawing keeps all of the bitmap's pixels */
 	@Override
 	public int getIntrinsicWidth() {
 		if (bitmap == null)
 			return 0;
-		return bitmap.getWidth();
+		return bitmap.getScaledWidth(target_density);
 	}
 
 	@Override
 	public int getIntrinsicHeight() {
 		if (bitmap == null)
 			return 0;
-		return bitmap.getHeight();
+		return bitmap.getScaledHeight(target_density);
 	}
 
 	/* overriding draw() makes Drawable use a paintable that calls it, so tint and

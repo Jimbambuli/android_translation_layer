@@ -383,10 +383,19 @@ public class Drawable {
 
 	public static Drawable createFromResourceStream(Resources resources, TypedValue value, InputStream is, String file,
 	                                                Object object) {
+		/* the pixels are kept as they are, so the bitmap is as sharp as the resource on a
+		 * monitor with a higher density, and the density sets the size (as AOSP's
+		 * BitmapFactory.decodeResourceStream() does for the scaling) */
+		int density = DisplayMetrics.DENSITY_DEFAULT;
+		if (value != null && value.density == TypedValue.DENSITY_NONE)
+			density = Bitmap.DENSITY_NONE;
+		else if (value != null && value.density != TypedValue.DENSITY_DEFAULT)
+			density = value.density;
 		if (!file.endsWith(".9.png")) {
 			final Bitmap bm = BitmapFactory.decodeStream(is);
 			if (bm == null)
 				return null;
+			bm.setDensity(density);
 			return new BitmapDrawable(resources, bm);
 		}
 		Path path = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), file);
@@ -400,7 +409,7 @@ public class Drawable {
 				e.printStackTrace();
 			}
 		}
-		return new NinePatchDrawable(path.toString());
+		return new NinePatchDrawable(path.toString(), density, resources.getDisplayMetrics().densityDpi);
 	}
 
 	public static Drawable createFromPath(String path) {

@@ -13,6 +13,8 @@ import java.nio.Buffer;
  */
 public final class Bitmap implements Parcelable {
 
+	public static final int DENSITY_NONE = 0;
+
 	public enum Config {
 		RGB_565(2, -1, /*ANDROID_BITMAP_FORMAT_RGB_565*/ 4),
 		ARGB_8888(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /**ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1),
@@ -50,6 +52,7 @@ public final class Bitmap implements Parcelable {
 	long bytes = 0; // used by native function AndroidBitmap_lockPixels()
 	private boolean recycled = false;
 	boolean mutable = true;
+	private int density = DisplayMetrics.DENSITY_DEVICE;
 
 	Bitmap(long texture) {
 		this(native_get_width(texture), native_get_height(texture), Config.ARGB_8888);
@@ -184,14 +187,44 @@ public final class Bitmap implements Parcelable {
 		getTexture();
 	}
 
-	public void setDensity(int density) {}
-
-	public int getScaledWidth(int density) {
-		return width;
+	/* the density the pixels were made for; drawing scales the bitmap by it as in AOSP */
+	public int getDensity() {
+		return density;
 	}
 
-	public int getScaledHeight(int density) {
-		return height;
+	public void setDensity(int density) {
+		this.density = density;
+	}
+
+	public int getScaledWidth(int targetDensity) {
+		return scaleFromDensity(width, density, targetDensity);
+	}
+
+	public int getScaledHeight(int targetDensity) {
+		return scaleFromDensity(height, density, targetDensity);
+	}
+
+	public int getScaledWidth(DisplayMetrics metrics) {
+		return scaleFromDensity(width, density, metrics.densityDpi);
+	}
+
+	public int getScaledHeight(DisplayMetrics metrics) {
+		return scaleFromDensity(height, density, metrics.densityDpi);
+	}
+
+	public int getScaledWidth(Canvas canvas) {
+		return scaleFromDensity(width, density, canvas.getDensity());
+	}
+
+	public int getScaledHeight(Canvas canvas) {
+		return scaleFromDensity(height, density, canvas.getDensity());
+	}
+
+	public static int scaleFromDensity(int size, int sdensity, int tdensity) {
+		if (sdensity == DENSITY_NONE || tdensity == DENSITY_NONE || sdensity == tdensity)
+			return size;
+		// scale by tdensity / sdensity, rounding up
+		return ((size * tdensity) + (sdensity >> 1)) / sdensity;
 	}
 
 	public boolean isRecycled() {
@@ -266,10 +299,6 @@ public final class Bitmap implements Parcelable {
 
 	public Bitmap extractAlpha() {
 		return this.copy(config, mutable);
-	}
-
-	public int getDensity() {
-		return DisplayMetrics.DENSITY_DEFAULT;
 	}
 
 	@SuppressWarnings("deprecation")
