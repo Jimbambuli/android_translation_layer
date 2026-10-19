@@ -119,14 +119,6 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1stroke_1width
 
 /*
  * Class:     android_graphics_Paint
- * Method:    native_get_stroke_width
- * Signature: (J)F
- */
-JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1stroke_1width
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_graphics_Paint
  * Method:    native_set_stroke_cap
  * Signature: (JI)V
  */

@@ -29,6 +29,8 @@ public class Paint {
 	private float text_scale_x = 1;
 	private float stroke_miter = 4;
 	private int hinting = HINTING_ON;
+	/* as set by the app: GSK can't stroke with width 0 (hairline), so the native stroke is 1 then */
+	private float stroke_width = 0;
 
 	public static final int HINTING_OFF = 0;
 	public static final int HINTING_ON = 1;
@@ -53,6 +55,7 @@ public class Paint {
 		text_scale_x = paint.text_scale_x;
 		stroke_miter = paint.stroke_miter;
 		hinting = paint.hinting;
+		stroke_width = paint.stroke_width;
 	}
 
 	private void setFlag(int flag, boolean on) {
@@ -93,6 +96,7 @@ public class Paint {
 	}
 
 	public void setStrokeWidth(float width) {
+		stroke_width = width;
 		native_set_stroke_width(paint, width);
 	}
 	public void setTextSize(float size) {
@@ -264,7 +268,7 @@ public class Paint {
 	}
 
 	public float getStrokeWidth() {
-		return native_get_stroke_width(paint);
+		return stroke_width;
 	}
 
 	public float getStrokeMiter() { return stroke_miter; }
@@ -454,6 +458,7 @@ public class Paint {
 		shader = null;
 		align = Align.CENTER;
 		color_filter = null;
+		stroke_width = 0;
 	}
 
 	private static native long native_create();
@@ -466,7 +471,6 @@ public class Paint {
 	private static native void native_set_style(long paint, int style);
 	private static native int native_get_style(long paint);
 	private static native void native_set_stroke_width(long paint, float width);
-	private static native float native_get_stroke_width(long paint);
 	private static native void native_set_stroke_cap(long paint, int cap);
 	private static native int native_get_stroke_cap(long paint);
 	private static native void native_set_stroke_join(long paint, int join);

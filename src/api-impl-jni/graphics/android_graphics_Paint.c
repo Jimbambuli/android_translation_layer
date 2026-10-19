@@ -96,12 +96,6 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1stroke_1width(JN
 	gsk_stroke_set_line_width(paint->gsk_stroke, width);
 }
 
-JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1stroke_1width(JNIEnv *env, jclass clazz, jlong paint_ptr)
-{
-	struct AndroidPaint *paint = _PTR(paint_ptr);
-	return gsk_stroke_get_line_width(paint->gsk_stroke);
-}
-
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1stroke_1cap(JNIEnv *env, jclass clazz, jlong paint_ptr, jint cap)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
