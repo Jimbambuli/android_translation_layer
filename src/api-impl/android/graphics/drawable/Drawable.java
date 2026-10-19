@@ -351,7 +351,9 @@ public class Drawable {
 				return drawable;
 			}
 			case "nine-patch": {
-				return new NinePatchDrawable(resources, null, null, null, null);
+				NinePatchDrawable drawable = new NinePatchDrawable(resources, null, null, null, null);
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
 			}
 			case "animation-list": {
 				return new AnimationDrawable();

@@ -79,4 +79,5 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSe
 {
 	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
 	paintable->tint = color;
+	gdk_paintable_invalidate_contents(GDK_PAINTABLE(paintable));
 }
