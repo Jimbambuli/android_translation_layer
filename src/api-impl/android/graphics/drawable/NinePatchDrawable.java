@@ -5,6 +5,8 @@ import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
+import android.graphics.ColorFilter;
+import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import com.android.internal.R;
@@ -63,6 +65,13 @@ public class NinePatchDrawable extends Drawable {
 			return false;
 		nativeSetTint(paintable, tintList.getColorForState(stateSet, tintList.getDefaultColor()));
 		return true;
+	}
+
+	/* the native tint colours the picture like a PorterDuff SRC_IN filter, which is how
+	 * AppCompat tints the nine-patches of its widgets */
+	@Override
+	public void setColorFilter(ColorFilter colorFilter) {
+		nativeSetTint(paintable, colorFilter instanceof PorterDuffColorFilter ? ((PorterDuffColorFilter)colorFilter).getColor() : 0);
 	}
 
 	private native long nativeCreate(byte[] data, long texture);

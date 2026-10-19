@@ -2,6 +2,7 @@ package android.graphics.drawable;
 
 import android.content.res.Resources;
 import android.graphics.Canvas;
+import android.graphics.ColorFilter;
 import android.graphics.Rect;
 
 public class DrawableContainer extends Drawable {
@@ -36,6 +37,14 @@ public class DrawableContainer extends Drawable {
 		if (curIndex >= 0 && state.drawables[curIndex].isStateful())
 			return state.drawables[curIndex].setState(stateSet);
 		return false;
+	}
+
+	@Override
+	public void setColorFilter(ColorFilter colorFilter) {
+		for (int i = 0; i < state.childCount; i++) {
+			if (state.drawables[i] != null)
+				state.drawables[i].setColorFilter(colorFilter);
+		}
 	}
 
 	protected void setConstantState(DrawableContainerState state) {
