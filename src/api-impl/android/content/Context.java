@@ -349,8 +349,9 @@ public abstract class Context {
 		return getExternalFilesDirs("media");
 	}
 
+	/* as in AOSP: <data dir>/app_<name>, next to files/ (an app that cleans up files/ keeps it) */
 	public File getDir(String name, int mode) {
-		File dir = new File(getFilesDir(), name);
+		File dir = new File(getDataDirFile(), "app_" + name);
 		if (!dir.exists()) {
 			if (!dir.mkdirs()) {
 				if (dir.exists()) {
