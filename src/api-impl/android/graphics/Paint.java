@@ -31,6 +31,7 @@ public class Paint {
 	private int hinting = HINTING_ON;
 	/* as set by the app: GSK can't stroke with width 0 (hairline), so the native stroke is 1 then */
 	private float stroke_width = 0;
+	private PathEffect path_effect;
 
 	public static final int HINTING_OFF = 0;
 	public static final int HINTING_ON = 1;
@@ -56,6 +57,7 @@ public class Paint {
 		stroke_miter = paint.stroke_miter;
 		hinting = paint.hinting;
 		stroke_width = paint.stroke_width;
+		path_effect = paint.path_effect;
 	}
 
 	private void setFlag(int flag, boolean on) {
@@ -378,10 +380,16 @@ public class Paint {
 	}
 
 	public PathEffect getPathEffect() {
-		return new PathEffect();
+		return path_effect;
 	}
 
+	/* of the path effects, only dashes are drawn (as the dash of the GskStroke) */
 	public PathEffect setPathEffect(PathEffect effect) {
+		path_effect = effect;
+		if (effect instanceof DashPathEffect)
+			native_set_dash(paint, ((DashPathEffect)effect).intervals, ((DashPathEffect)effect).phase);
+		else
+			native_set_dash(paint, null, 0);
 		return effect;
 	}
 
@@ -459,6 +467,7 @@ public class Paint {
 		align = Align.CENTER;
 		color_filter = null;
 		stroke_width = 0;
+		path_effect = null;
 	}
 
 	private static native long native_create();
@@ -471,6 +480,7 @@ public class Paint {
 	private static native void native_set_style(long paint, int style);
 	private static native int native_get_style(long paint);
 	private static native void native_set_stroke_width(long paint, float width);
+	private static native void native_set_dash(long paint, float[] intervals, float phase);
 	private static native void native_set_stroke_cap(long paint, int cap);
 	private static native int native_get_stroke_cap(long paint);
 	private static native void native_set_stroke_join(long paint, int join);

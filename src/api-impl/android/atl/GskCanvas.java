@@ -153,6 +153,13 @@ public class GskCanvas extends DisplayListCanvas {
 			return;
 		if (fillWithShader(left, top, right, bottom, paint))
 			return;
+		/* the native rectangle is filled; an outline is a path */
+		if (paint != null && paint.getStyle() != Paint.Style.FILL) {
+			Path path = new Path();
+			path.addRect(left, top, right, bottom, Path.Direction.CW);
+			drawPath(path, paint);
+			return;
+		}
 		native_drawRect(snapshot, left, top, right, bottom, paint != null ? paint.paint : default_paint.paint);
 	}
 
@@ -179,7 +186,8 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, Paint paint) {
-		if (paint != null && paint.getShader() != null) {
+		/* the native rounded rectangle has no dashed outline */
+		if (paint != null && (paint.getShader() != null || (paint.getPathEffect() instanceof DashPathEffect && paint.getStyle() != Paint.Style.FILL))) {
 			Path path = new Path();
 			path.addRoundRect(left, top, right, bottom, rx, ry, Path.Direction.CW);
 			drawPath(path, paint);

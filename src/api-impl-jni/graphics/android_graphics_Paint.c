@@ -84,6 +84,21 @@ JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1get_1style(JNIEnv *en
 		return STYLE_STROKE;
 }
 
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1dash(JNIEnv *env, jclass clazz, jlong paint_ptr, jfloatArray intervals_arr, jfloat phase)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	if (!intervals_arr) {
+		gsk_stroke_set_dash(paint->gsk_stroke, NULL, 0);
+		return;
+	}
+	jsize n = (*env)->GetArrayLength(env, intervals_arr);
+	jfloat *intervals = (*env)->GetFloatArrayElements(env, intervals_arr, NULL);
+	/* like Skia, an odd last interval is ignored */
+	gsk_stroke_set_dash(paint->gsk_stroke, intervals, n & ~1);
+	gsk_stroke_set_dash_offset(paint->gsk_stroke, phase);
+	(*env)->ReleaseFloatArrayElements(env, intervals_arr, intervals, JNI_ABORT);
+}
+
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1stroke_1width(JNIEnv *env, jclass clazz, jlong paint_ptr, jfloat width)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
