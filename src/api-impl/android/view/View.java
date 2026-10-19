@@ -2408,7 +2408,17 @@ public class View implements Drawable.Callback {
 		return view;
 	}
 
-	public boolean isShown() { return true; }
+	/* like AOSP: this view and all its ancestors are visible, and the topmost one is in a window
+	 * (AOSP checks for the ViewRootImpl parent, the root views here have no parent) */
+	public boolean isShown() {
+		View current = this;
+		while (current.visibility == VISIBLE) {
+			if (!(current.parent instanceof View))
+				return current.parent != null || current.isAttachedToWindow();
+			current = (View)current.parent;
+		}
+		return false;
+	}
 
 	public int getWindowVisibility() { return VISIBLE; }
 
