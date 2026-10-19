@@ -15,6 +15,7 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
+import android.text.Spanned;
 import android.text.TextDirectionHeuristic;
 import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
@@ -22,16 +23,25 @@ import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.method.BaseMovementMethod;
 import android.text.method.KeyListener;
+import android.text.method.LinkMovementMethod;
 import android.text.method.MovementMethod;
 import android.text.method.TransformationMethod;
+import android.text.style.CharacterStyle;
+import android.text.style.ClickableSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StrikethroughSpan;
+import android.text.style.StyleSpan;
 import android.text.style.URLSpan;
+import android.text.style.UnderlineSpan;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.ActionMode;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import java.util.Arrays;
 import java.util.Locale;
+import java.util.TreeSet;
 
 public class TextView extends View {
 	private ColorStateList colors = new ColorStateList(new int[][] {new int[0]}, new int[1]);
@@ -139,12 +149,86 @@ public class TextView extends View {
 
 	public void setText(CharSequence text, BufferType type) {
 		this.text = text == null ? "" : text;
-		native_setText(text != null ? text.toString() : null);
-
-		if (text instanceof android.text.Spanned)
-			native_set_markup(1);
+		if (text instanceof Spanned)
+			native_setMarkup(toPangoMarkup((Spanned)text));
+		else
+			native_setText(text != null ? text.toString() : null);
 		if (!isLayoutRequested())
 			requestLayout();
+	}
+
+	private ClickableSpan[] linkSpans = new ClickableSpan[0];
+	private ColorStateList linkTextColor;
+
+	/* the character spans as Pango markup; a ClickableSpan becomes a link whose URI is its index in linkSpans */
+	private String toPangoMarkup(Spanned text) {
+		CharacterStyle[] spans = text.getSpans(0, text.length(), CharacterStyle.class);
+		linkSpans = text.getSpans(0, text.length(), ClickableSpan.class);
+		TreeSet<Integer> bounds = new TreeSet<>();
+		bounds.add(0);
+		bounds.add(text.length());
+		for (CharacterStyle span : spans) {
+			bounds.add(Math.max(0, Math.min(text.getSpanStart(span), text.length())));
+			bounds.add(Math.max(0, Math.min(text.getSpanEnd(span), text.length())));
+		}
+		int linkColor = getLinkTextColors().getColorForState(getDrawableState(), getLinkTextColors().getDefaultColor());
+		StringBuilder markup = new StringBuilder();
+		Integer start = bounds.first();
+		for (Integer end : bounds.tailSet(start, false)) {
+			StringBuilder open = new StringBuilder();
+			StringBuilder close = new StringBuilder();
+			for (CharacterStyle span : spans) {
+				if (text.getSpanStart(span) > start || text.getSpanEnd(span) < end)
+					continue;
+				String tag = null;
+				String attrs = null;
+				if (span instanceof ClickableSpan) {
+					tag = "a";
+					attrs = String.format("href=\"%d\"><span %s underline=\"single\"", Arrays.asList(linkSpans).indexOf(span), pangoColor(linkColor));
+				} else if (span instanceof StyleSpan && (((StyleSpan)span).getStyle() & Typeface.BOLD) != 0) {
+					tag = "b";
+				} else if (span instanceof StyleSpan && (((StyleSpan)span).getStyle() & Typeface.ITALIC) != 0) {
+					tag = "i";
+				} else if (span instanceof UnderlineSpan) {
+					tag = "u";
+				} else if (span instanceof StrikethroughSpan) {
+					tag = "s";
+				} else if (span instanceof ForegroundColorSpan) {
+					tag = "span";
+					attrs = pangoColor(((ForegroundColorSpan)span).getForegroundColor());
+				}
+				if (tag == null)
+					continue;
+				open.append('<').append(tag).append(attrs != null ? " " + attrs : "").append('>');
+				close.insert(0, "</" + tag + ">");
+				if (span instanceof ClickableSpan)
+					close.insert(0, "</span>");
+			}
+			markup.append(open);
+			for (int i = start; i < end; i++) {
+				char c = text.charAt(i);
+				markup.append(c == '&' ? "&amp;" : c == '<' ? "&lt;" : c == '>' ? "&gt;" : String.valueOf(c));
+			}
+			markup.append(close);
+			start = end;
+		}
+		return markup.toString();
+	}
+
+	/* with its own alpha, otherwise GTK draws the span with the alpha of the text color */
+	private static String pangoColor(int color) {
+		return String.format("foreground=\"#%06x\" fgalpha=\"%d\"", color & 0xffffff, Math.max(1, (color >>> 24) * 65535 / 255));
+	}
+
+	/* called when a link of the markup is activated; like LinkMovementMethod, only then do links react */
+	private boolean onLinkActivated(String uri) {
+		if (!(movementMethod instanceof LinkMovementMethod))
+			return true;
+		try {
+			linkSpans[Integer.parseInt(uri)].onClick(this);
+		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+		}
+		return true;
 	}
 
 	public void setText(char[] text, int start, int len) {
@@ -159,7 +243,7 @@ public class TextView extends View {
 		setText(SpannableStringBuilder.valueOf(this.text).append(text, start, end));
 	}
 
-	private native final void native_set_markup(int bool);
+	private native final void native_setMarkup(String markup);
 
 	public native final void native_setText(String text);
 
@@ -272,7 +356,22 @@ public class TextView extends View {
 	public final ColorStateList getHintTextColors() {
 		return hint_colors;
 	}
-	public void setLinkTextColor(ColorStateList colorStateList) {}
+	public void setLinkTextColor(ColorStateList colorStateList) {
+		linkTextColor = colorStateList;
+		if (text instanceof Spanned)
+			native_setMarkup(toPangoMarkup((Spanned)text));
+	}
+
+	public final ColorStateList getLinkTextColors() {
+		if (linkTextColor == null) {
+			TypedArray a = getContext().obtainStyledAttributes(new int[] {android.R.attr.textColorLink});
+			linkTextColor = a.getColorStateList(0);
+			a.recycle();
+			if (linkTextColor == null)
+				linkTextColor = ColorStateList.valueOf(0xff0000ee);
+		}
+		return linkTextColor;
+	}
 
 	public void setSingleLine() {
 		setSingleLine(true);
@@ -455,11 +554,16 @@ public class TextView extends View {
 
 	public URLSpan[] getUrls() { return new URLSpan[0]; }
 
-	public void setMovementMethod(MovementMethod method) {}
+	private MovementMethod movementMethod;
+	public void setMovementMethod(MovementMethod method) {
+		movementMethod = method;
+	}
 
 	public void setTextIsSelectable(boolean selectable) {}
 
 	public MovementMethod getMovementMethod() {
+		if (movementMethod != null)
+			return movementMethod;
 		return new BaseMovementMethod();
 	}
 
@@ -564,7 +668,9 @@ public class TextView extends View {
 
 	public void nullLayouts() {}
 
-	public void setLinkTextColor(int color) {}
+	public void setLinkTextColor(int color) {
+		setLinkTextColor(ColorStateList.valueOf(color));
+	}
 
 	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 

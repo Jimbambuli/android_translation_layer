@@ -221,11 +221,11 @@ JNIEXPORT jlong JNICALL Java_android_widget_TextView_native_1constructor
 
 /*
  * Class:     android_widget_TextView
- * Method:    native_set_markup
- * Signature: (I)V
+ * Method:    native_setMarkup
+ * Signature: (Ljava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_android_widget_TextView_native_1set_1markup
-  (JNIEnv *, jobject, jint);
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup
+  (JNIEnv *, jobject, jstring);
 
 /*
  * Class:     android_widget_TextView

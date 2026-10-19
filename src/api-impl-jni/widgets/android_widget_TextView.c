@@ -15,6 +15,18 @@ static GtkLabel *box_get_label(JNIEnv *env, GtkWidget *box)
 	return GTK_IS_LABEL(label) ? GTK_LABEL(label) : NULL;
 }
 
+/* links in the markup stand for the ClickableSpans of the text, the TextView handles them */
+static gboolean on_activate_link(GtkLabel *label, const char *uri, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(gtk_widget_get_parent(GTK_WIDGET(label))));
+	jmethodID onLinkActivated = _METHOD((*env)->FindClass(env, "android/widget/TextView"), "onLinkActivated", "(Ljava/lang/String;)Z");
+	jboolean ret = (*env)->CallBooleanMethod(env, wrapper->jobj, onLinkActivated, _JSTRING(uri));
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	return ret;
+}
+
 JNIEXPORT jlong JNICALL Java_android_widget_TextView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	const char *text = attribute_set_get_string(env, attrs, "text", NULL);
@@ -29,6 +41,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_TextView_native_1constructor(JNIEnv 
 	gtk_label_set_yalign(GTK_LABEL(label), 0.f);
 	gtk_widget_set_hexpand(label, TRUE);
 	gtk_box_append(GTK_BOX(box), label);
+	g_signal_connect(label, "activate-link", G_CALLBACK(on_activate_link), NULL);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), box);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 
@@ -140,11 +153,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setAlignment(JNIEnv 
 	gtk_label_set_justify(label, xalign == 0.5f ? GTK_JUSTIFY_CENTER : xalign == 1.f ? GTK_JUSTIFY_RIGHT : GTK_JUSTIFY_LEFT);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_TextView_native_1set_1markup(JNIEnv *env, jobject this, jint value)
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *env, jobject this, jstring markup_jstr)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
-
-	gtk_label_set_use_markup(label, value);
+	if (!label)
+		return;
+	const char *markup = (*env)->GetStringUTFChars(env, markup_jstr, NULL);
+	gtk_label_set_markup(label, markup);
+	(*env)->ReleaseStringUTFChars(env, markup_jstr, markup);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawablePadding(JNIEnv *env, jobject this, jlong widget_ptr, jint pad)
