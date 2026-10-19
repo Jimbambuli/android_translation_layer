@@ -213,6 +213,14 @@ extern "C" {
 #define android_view_View_TEXT_DIRECTION_RTL 4L
 /*
  * Class:     android_view_View
+ * Method:    native_setCanTarget
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setCanTarget
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_View
  * Method:    nativeSetOnTouchListener
  * Signature: (J)V
  */

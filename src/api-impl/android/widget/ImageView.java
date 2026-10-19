@@ -11,6 +11,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 
 public class ImageView extends View {
@@ -56,6 +57,21 @@ public class ImageView extends View {
 		if (a.hasValue(com.android.internal.R.styleable.ImageView_scaleType))
 			setScaleType(scaletype_from_int[a.getInt(com.android.internal.R.styleable.ImageView_scaleType, 3 /*CENTER*/)]);
 		a.recycle();
+		updateTouchTarget();
+	}
+
+	/* a plain ImageView consumes touches only when clickable, unlike buttons or views with their own onTouchEvent() */
+	@Override
+	protected boolean passesUnconsumedTouches() {
+		if (this instanceof ImageButton)
+			return false;
+		try {
+			Class<?> c = getClass();
+			return c.getMethod("onTouchEvent", MotionEvent.class).getDeclaringClass() == View.class
+			    && c.getMethod("dispatchTouchEvent", MotionEvent.class).getDeclaringClass() == View.class;
+		} catch (NoSuchMethodException e) {
+			return false;
+		}
 	}
 
 	public void setImageResource(final int resid) {

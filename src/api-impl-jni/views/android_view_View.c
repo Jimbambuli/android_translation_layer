@@ -499,6 +499,11 @@ void _setOnTouchListener(JNIEnv *env, jobject this, GtkWidget *widget)
 	gtk_widget_set_overflow(GTK_WIDGET(wrapper), GTK_OVERFLOW_HIDDEN);
 }
 
+JNIEXPORT void JNICALL Java_android_view_View_native_1setCanTarget(JNIEnv *env, jobject this, jlong widget_ptr, jboolean can_target)
+{
+	gtk_widget_set_can_target(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))), can_target);
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnTouchListener(JNIEnv *env, jobject this, jlong widget_ptr)
 {
 	GtkWidget *widget = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));

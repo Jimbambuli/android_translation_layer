@@ -1332,7 +1332,23 @@ public class View implements Drawable.Callback {
 	public void setOnTouchListener(OnTouchListener l) {
 		nativeSetOnTouchListener(widget);
 		on_touch_listener = l;
+		updateTouchTarget();
 	}
+
+	/* GTK gives a pointer event only to the widget under the pointer and its ancestors, while
+	 * Android passes a touch that a view does not consume on to the views below it, e.g. from an
+	 * icon to the clickable touch target behind it. A subclass returns true here if it consumes
+	 * touches only when it is clickable or has a listener; such a view is left out of GTK's
+	 * picking while it can not consume them, so the event reaches what lies below it. */
+	protected boolean passesUnconsumedTouches() {
+		return false;
+	}
+
+	protected void updateTouchTarget() {
+		if (passesUnconsumedTouches())
+			native_setCanTarget(widget, clickable || on_touch_listener != null || on_long_click_listener != null);
+	}
+	private native void native_setCanTarget(long widget, boolean can_target);
 	protected native void nativeSetOnTouchListener(long widget);
 	private OnClickListener on_click_listener = null;
 	private OnApplyWindowInsetsListener on_apply_window_insets_listener = null;
@@ -1762,6 +1778,7 @@ public class View implements Drawable.Callback {
 
 	public void setClickable(boolean clickable) {
 		this.clickable = clickable;
+		updateTouchTarget();
 	}
 
 	public void setEnabled(boolean enabled) {
@@ -1793,6 +1810,7 @@ public class View implements Drawable.Callback {
 			setLongClickable(true);
 		nativeSetOnLongClickListener(widget);
 		on_long_click_listener = listener;
+		updateTouchTarget();
 	}
 	protected native void nativeSetOnLongClickListener(long widget);
 
