@@ -55,7 +55,8 @@ public class Button extends TextView {
 	public native void native_setText(long widget, String text);
 	@Override
 	protected native void nativeSetOnClickListener(long widget);
-	protected native void native_setCompoundDrawables(long widget, long paintable);
+	/* the native side draws the drawable in its bounds at the time it is drawn */
+	protected native void native_setCompoundDrawables(long widget, Drawable drawable);
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
@@ -76,6 +77,21 @@ public class Button extends TextView {
 	@Override
 	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
 		compoundDrawableLeft = left;
-		native_setCompoundDrawables(widget, left != null ? left.paintable : 0);
+		native_setCompoundDrawables(widget, left);
 	}
+
+	@Override
+	public Drawable[] getCompoundDrawables() {
+		return new Drawable[] {compoundDrawableLeft, null, null, null};
+	}
+
+	/* the drawable is drawn in the bounds it has then: MaterialButton sets them in onLayout() */
+	@Override
+	public void layout(int l, int t, int r, int b) {
+		super.layout(l, t, r, b);
+		if (compoundDrawableLeft != null)
+			native_updateCompoundDrawable(widget);
+	}
+
+	private native void native_updateCompoundDrawable(long widget);
 }
