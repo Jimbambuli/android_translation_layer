@@ -211,6 +211,9 @@ public class Notification implements Parcelable {
 
 		public Builder setForegroundServiceBehavior(int behavior) { return this; }
 
+		/* API 29: there are no bubbles, the notification is shown as a normal one */
+		public Builder setBubbleMetadata(BubbleMetadata data) { return this; }
+
 		public Notification build() {
 			return notification;
 		}
@@ -287,5 +290,29 @@ public class Notification implements Parcelable {
 		public InboxStyle setSummaryText(CharSequence summaryText) { return this; }
 
 		public InboxStyle addLine(CharSequence line) { return this; }
+	}
+
+	/* API 29/30. Kept only so that apps can build it; ATL shows no bubbles. */
+	public static final class BubbleMetadata {
+		private BubbleMetadata() {}
+
+		public static final class Builder {
+			public Builder() {}
+			public Builder(String shortcutId) {}
+			public Builder(PendingIntent intent, android.graphics.drawable.Icon icon) {}
+
+			public Builder setIntent(PendingIntent intent) { return this; }
+			public Builder setIcon(android.graphics.drawable.Icon icon) { return this; }
+			public Builder setDesiredHeight(int height) { return this; }
+			public Builder setDesiredHeightResId(int heightResId) { return this; }
+			public Builder setAutoExpandBubble(boolean shouldExpand) { return this; }
+			public Builder setSuppressNotification(boolean shouldSuppressNotif) { return this; }
+			public Builder setSuppressableBubble(boolean suppressBubble) { return this; }
+			public Builder setDeleteIntent(PendingIntent deleteIntent) { return this; }
+
+			public BubbleMetadata build() {
+				return new BubbleMetadata();
+			}
+		}
 	}
 }
