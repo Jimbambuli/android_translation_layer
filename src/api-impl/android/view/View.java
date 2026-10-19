@@ -2789,7 +2789,10 @@ public class View implements Drawable.Callback {
 		return on_click_listener != null;
 	}
 
+	private int text_alignment = TEXT_ALIGNMENT_INHERIT;
+
 	public void setTextAlignment(int textAlignment) {
+		text_alignment = textAlignment;
 		String[] classesToRemove = {"ATL-text-align-left", "ATL-text-align-center", "ATL-text-align-right"};
 		native_removeClasses(widget, classesToRemove);
 
@@ -2895,7 +2898,12 @@ public class View implements Drawable.Callback {
 		pendingLongClick = null;
 	}
 
-	public int getTextAlignment() { return 0; }
+	/* the resolved text alignment as in AOSP: inherited from the parent, by default by the gravity */
+	public int getTextAlignment() {
+		if (text_alignment != TEXT_ALIGNMENT_INHERIT)
+			return text_alignment;
+		return getParent() instanceof View ? ((View)getParent()).getTextAlignment() : TEXT_ALIGNMENT_GRAVITY;
+	}
 
 	public View findViewWithTag(Object tag) {
 		if (Objects.equals(tag, this.tag))
