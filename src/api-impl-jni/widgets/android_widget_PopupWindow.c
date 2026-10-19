@@ -102,6 +102,12 @@ void atl_popover_place_as_dropdown(GtkPopover *popover, GtkWidget *anchor, int a
 	graphene_point_t a;
 	int width, height, x, y;
 
+	/* a hidden (GONE) anchor keeps the place of its last layout on Android, where update() puts a
+	 * showing popup again (ListPopupWindow.show() does on every change of the menu); GTK no longer
+	 * places an unmapped widget, so a popup that is showing stays where it is */
+	if (gtk_widget_get_visible(GTK_WIDGET(popover)) && !gtk_widget_get_mapped(anchor))
+		return;
+
 	if (!gtk_widget_compute_point(anchor, frame, &GRAPHENE_POINT_INIT(0, 0), &a))
 		a = GRAPHENE_POINT_INIT(0, 0);
 	measure_popover(popover, &width, &height);
@@ -182,12 +188,38 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setColors(JNIEnv 
 	atl_popover_set_colors(GTK_POPOVER(_PTR(popover_ptr)), background, foreground);
 }
 
+/* Android shows a popup in a window of its own, which stays while its anchor is hidden or
+ * recycled (video controls that hide themselves, list items). A GtkPopover is a child widget and
+ * is closed together with its parent, so it goes into the widget of the anchor's window instead,
+ * or for a popup anchored in another popup (a submenu) into the content of that popup, which
+ * keeps it a child of the outer popup for GDK. */
+static GtkWidget *popover_parent_for(GtkWidget *anchor)
+{
+	GtkWidget *outer = gtk_widget_get_ancestor(anchor, GTK_TYPE_POPOVER);
+	GtkWidget *content = outer ? gtk_popover_get_child(GTK_POPOVER(outer)) : NULL;
+	return content ? content : window_frame(anchor);
+}
+
+/* GtkPopover unrealizes, i.e. closes, itself when autohide changes, so the touch modality set with
+ * setTouchModal()/setOutsideTouchable() is applied only while the popup is hidden. A submenu
+ * never grabs: GDK hides a grabbing popup on a press in its parent popup, and the outer popup's
+ * grab already ends both on outside presses. */
+static void apply_touch_modal(GtkPopover *popover)
+{
+	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(popover));
+	gboolean touch_modal = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "touch-modal"));
+
+	if (!gtk_widget_get_visible(GTK_WIDGET(popover)))
+		gtk_popover_set_autohide(popover, touch_modal && !(parent && gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER)));
+}
+
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint x, jint y, jint gravity, jboolean overlap_anchor)
 {
 	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
 	WrapperWidget *anchor = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(anchor_ptr))));
 
-	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(anchor), NULL);
+	gtk_widget_insert_before(GTK_WIDGET(popover), popover_parent_for(GTK_WIDGET(anchor)), NULL);
+	apply_touch_modal(popover);
 	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
 	gtk_popover_present(GTK_POPOVER(popover));
 	gtk_popover_popup(popover);
@@ -199,6 +231,7 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAtLocation(JN
 	WrapperWidget *parent = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(parent_ptr))));
 
 	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(parent), NULL);
+	apply_touch_modal(popover);
 	atl_popover_place_at_location(popover, gravity, x, y);
 	gtk_popover_present(GTK_POPOVER(popover));
 	gtk_popover_popup(popover);
@@ -255,7 +288,8 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchModal(JNI
 	/* FIXME: we should only add grab (not autohide), however we need to remove it again in umap;
 	 * GtkPopover is not final, so we should subclass it and check whether it's modal in map/unmap
 	 * to add/remove grab, which is the desired part of what GtkPopover does with autohide enabled */
-	gtk_popover_set_autohide(popover, touch_modal);
+	g_object_set_data(G_OBJECT(popover), "touch-modal", GINT_TO_POINTER(touch_modal));
+	apply_touch_modal(popover);
 }
 
 static void on_closed_cb(GtkPopover *popover, jobject listener)
@@ -291,7 +325,8 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *en
 	if (height >= 0)
 		g_object_set_data(G_OBJECT(popover), "content-height", GINT_TO_POINTER(height + 1));
 	apply_content_size(GTK_WIDGET(popover));
-	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(anchor), NULL);
+	gtk_widget_insert_before(GTK_WIDGET(popover), popover_parent_for(GTK_WIDGET(anchor)), NULL);
+	apply_touch_modal(popover);
 	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
 	gtk_popover_present(GTK_POPOVER(popover));
 	gtk_popover_popup(popover);
