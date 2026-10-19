@@ -139,17 +139,27 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 				if (a.hasValue(R.styleable.Window_windowCloseOnTouchOutside))
 					setCanceledOnTouchOutside(a.getBoolean(R.styleable.Window_windowCloseOnTouchOutside, true));
 				float windowWidthFraction = 1;
+				float minWidthFraction = 0; // like AOSP, no minimum width without the attribute
 				if (a.getBoolean(R.styleable.Window_windowIsFloating, false)) {
-					if (displayFrame.width() > displayFrame.height())
-						windowWidthFraction = a.getFraction(R.styleable.Window_windowMinWidthMajor, 1, 1, 1);
-					else
-						windowWidthFraction = a.getFraction(R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
+					int minWidthAttr = displayFrame.width() > displayFrame.height() ? R.styleable.Window_windowMinWidthMajor : R.styleable.Window_windowMinWidthMinor;
+					windowWidthFraction = a.getFraction(minWidthAttr, 1, 1, 1);
+					if (a.hasValue(minWidthAttr))
+						minWidthFraction = windowWidthFraction;
 				}
 				a.recycle();
 
 				LayoutParams lp = getWindow().getAttributes();
-				int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.width >= 0 ? lp.width : (int)(displayFrame.width() * windowWidthFraction),
-				                                                        lp.width == LayoutParams.WRAP_CONTENT ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
+				int widthMeasureSpec;
+				if (lp.width == LayoutParams.WRAP_CONTENT) {
+					// like AOSP: start at the preferred dialog width (wider if the content does not
+					// fit, see fitWindowToContent), the fraction is the minimum width
+					displayWidth = displayFrame.width();
+					baseWidth = Math.min(displayWidth, context.getResources().getDimensionPixelSize(com.android.internal.R.dimen.config_prefDialogWidth));
+					widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(baseWidth, View.MeasureSpec.AT_MOST);
+					getWindow().setMinWidth((int)(displayWidth * minWidthFraction));
+				} else {
+					widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.width >= 0 ? lp.width : (int)(displayFrame.width() * windowWidthFraction), View.MeasureSpec.EXACTLY);
+				}
 
 				int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.height >= 0 ? lp.height : (int)(displayFrame.height()),
 				                                                         lp.height == LayoutParams.WRAP_CONTENT ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
@@ -181,6 +191,8 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	}
 
 	private int wrapWidthMeasureSpec;
+	private int displayWidth;
+	private int baseWidth;
 	private int wrapHeightMeasureSpec;
 	private boolean fitsWindowToContent;
 	private int fittedWidth = -1;
@@ -196,6 +208,14 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 			return;
 		View decor = getWindow().getDecorView();
 		decor.measure(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
+		/* like ViewRootImpl.measureHierarchy: wider when the content does not fit */
+		int widthSize = View.MeasureSpec.getSize(wrapWidthMeasureSpec);
+		if (lp.width == LayoutParams.WRAP_CONTENT && (decor.getMeasuredWidthAndState() & View.MEASURED_STATE_TOO_SMALL) != 0 && widthSize < displayWidth) {
+			widthSize = widthSize == baseWidth ? (baseWidth + displayWidth) / 2 : displayWidth;
+			wrapWidthMeasureSpec = View.MeasureSpec.makeMeasureSpec(widthSize, View.MeasureSpec.AT_MOST);
+			decor.internalSetDefaultMeasureSpec(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
+			decor.measure(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
+		}
 		int width = lp.width == LayoutParams.WRAP_CONTENT ? decor.getMeasuredWidth() : lp.width;
 		int height = lp.height == LayoutParams.WRAP_CONTENT ? decor.getMeasuredHeight() : lp.height;
 		if (width == fittedWidth && height == fittedHeight)

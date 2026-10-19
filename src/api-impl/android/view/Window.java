@@ -87,10 +87,26 @@ public class Window {
 			public OnBackInvokedDispatcher findOnBackInvokedDispatcher() {
 				return onBackInvokedDispatcher;
 			}
+
+			/* like AOSP's DecorView: a window that wraps its content is at least as wide as
+			 * windowMinWidthMajor/Minor of its theme say */
+			@Override
+			protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+				super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+				if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.AT_MOST && getMeasuredWidth() < minWidth)
+					super.onMeasure(MeasureSpec.makeMeasureSpec(minWidth, MeasureSpec.EXACTLY), heightMeasureSpec);
+			}
 		};
 		// DecorView grabs all touch events and propagates them in Java
 		decorView.native_registerTouchEventPropagation(decorView.widget);
 		decorView.setId(android.R.id.content);
+	}
+
+	private int minWidth;
+
+	/** @hide the minimum width of a window measured AT_MOST, from windowMinWidthMajor/Minor */
+	public void setMinWidth(int minWidth) {
+		this.minWidth = minWidth;
 	}
 
 	public void set_native_window(long native_window) {
