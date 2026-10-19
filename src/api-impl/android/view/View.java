@@ -2674,17 +2674,10 @@ public class View implements Drawable.Callback {
 		return measuredWidth;
 	}
 
+	/* like AOSP: only mark this view, so that the next layout pass measures and lays it out again;
+	 * no new layout pass is requested (ListView calls it while measuring its children) */
 	public void forceLayout() {
-		if (Looper.myLooper() == Looper.getMainLooper()) {
-			requestLayout();
-		} else {
-			getHandler().post(new Runnable() {
-				@Override
-				public void run() {
-					requestLayout();
-				}
-			});
-		}
+		layoutRequested = true;
 	}
 
 	private final CopyOnWriteArrayList<OnAttachStateChangeListener> onAttachStateChangeListeners = new CopyOnWriteArrayList<>();
