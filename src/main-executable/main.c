@@ -700,6 +700,14 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		return;
 	}
 
+	/* the name of the application for the desktop, which notifications carry as their app_name
+	 * (GLib takes the program name otherwise, android-translation-layer) */
+	jstring app_label_jstr = J__Application__get_app_label(env, application_object);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	else if (app_label_jstr)
+		g_set_application_name(_CSTRING(app_label_jstr));
+
 	if (!d->apk_instrumentation_class)
 		gtk_window_set_title(GTK_WINDOW(window), package_name);
 	gtk_window_set_default_size(GTK_WINDOW(window), d->window_width, d->window_height);
