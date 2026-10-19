@@ -318,12 +318,28 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeOpenURI(JNIEnv *env, jclass class, jstring uriString)
 {
 	static XdpPortal *portal = NULL;
-	if (!portal) {
-		portal = xdp_portal_new();
+	static gboolean have_portal = TRUE;
+	if (!portal && have_portal) {
+		/* xdp_portal_new() aborts the process when there is no session bus or portal */
+		GError *error = NULL;
+		portal = xdp_portal_initable_new(&error);
+		if (!portal) {
+			fprintf(stderr, "nativeOpenURI: no desktop portal (%s), opening links with the default application\n", error->message);
+			g_error_free(error);
+			have_portal = FALSE;
+		}
 	}
 
 	const char *uri = (*env)->GetStringUTFChars(env, uriString, NULL);
-	xdp_portal_open_uri(portal, NULL, uri, XDP_OPEN_URI_FLAG_NONE, NULL, NULL, NULL);
+	if (portal) {
+		xdp_portal_open_uri(portal, NULL, uri, XDP_OPEN_URI_FLAG_NONE, NULL, NULL, NULL);
+	} else {
+		GError *error = NULL;
+		if (!g_app_info_launch_default_for_uri(uri, NULL, &error)) {
+			fprintf(stderr, "nativeOpenURI: cannot open %s: %s\n", uri, error->message);
+			g_error_free(error);
+		}
+	}
 	(*env)->ReleaseStringUTFChars(env, uriString, uri);
 }
 
