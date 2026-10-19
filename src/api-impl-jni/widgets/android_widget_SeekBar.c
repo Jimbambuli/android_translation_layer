@@ -55,3 +55,34 @@ JNIEXPORT jint JNICALL Java_android_widget_SeekBar_native_1getProgress(JNIEnv *e
 	GtkRange *range = GTK_RANGE(_PTR(widget_ptr));
 	return gtk_range_get_value(range);
 }
+
+#define CSS_RGBA(color) ((color) >> 16) & 0xFF, ((color) >> 8) & 0xFF, (color) & 0xFF, (((color) >> 24) & 0xFF) / 255.0
+
+/* The scale takes the colors of Android's Material seekbar from the theme. Trough, highlight and
+ * slider are child nodes of the scale, which a provider on the scale's own style context does not
+ * reach, so the rules go to the display, once per pair of colors, selected by a CSS class. */
+JNIEXPORT void JNICALL Java_android_widget_SeekBar_native_1setColors(JNIEnv *env, jobject this, jlong widget_ptr, jint activated, jint track)
+{
+	static GHashTable *classes = NULL;
+	GtkWidget *scale = GTK_WIDGET(_PTR(widget_ptr));
+	char *css_class = g_strdup_printf("atl-seekbar-%08x-%08x", activated, track);
+
+	if (!classes)
+		classes = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+	if (!g_hash_table_contains(classes, css_class)) {
+		GtkCssProvider *css_provider = gtk_css_provider_new();
+		char *css = g_strdup_printf(
+		    "scale.%1$s trough { background-color: rgba(%6$d,%7$d,%8$d,%9$.3f); }\n"
+		    "scale.%1$s highlight, scale.%1$s slider { background-color: rgba(%2$d,%3$d,%4$d,%5$.3f); background-image: none; border-color: rgba(%2$d,%3$d,%4$d,%5$.3f); }\n"
+		    /* Material's thumb is a small filled dot */
+		    "scale.%1$s slider { min-width: 12px; min-height: 12px; margin: -4px; box-shadow: none; }\n",
+		    css_class, CSS_RGBA(activated), CSS_RGBA(track));
+		gtk_css_provider_load_from_string(css_provider, css);
+		g_free(css);
+		gtk_style_context_add_provider_for_display(gtk_widget_get_display(scale), GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+		g_object_unref(css_provider);
+		g_hash_table_add(classes, g_strdup(css_class));
+	}
+	gtk_widget_add_css_class(scale, css_class);
+	g_free(css_class);
+}

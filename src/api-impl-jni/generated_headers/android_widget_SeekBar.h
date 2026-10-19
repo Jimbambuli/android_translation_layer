@@ -213,6 +213,14 @@ extern "C" {
 #define android_widget_SeekBar_TEXT_DIRECTION_RTL 4L
 /*
  * Class:     android_widget_SeekBar
+ * Method:    native_setColors
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_SeekBar_native_1setColors
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     android_widget_SeekBar
  * Method:    native_constructor
  * Signature: (Landroid/content/Context;Landroid/util/AttributeSet;)J
  */
