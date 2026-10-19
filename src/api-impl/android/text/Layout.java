@@ -4,7 +4,16 @@ import android.atl.GskCanvas;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Typeface;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.BackgroundColorSpan;
+import android.text.style.CharacterStyle;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
+import android.text.style.StrikethroughSpan;
+import android.text.style.StyleSpan;
+import android.text.style.UnderlineSpan;
 
 public class Layout {
 
@@ -38,8 +47,50 @@ public class Layout {
 		this.spacing_mult = spacingMult;
 		this.spacing_add = spacingAdd;
 		layout = native_constructor(str, paint.paint, width);
+		if (text instanceof Spanned)
+			applySpans((Spanned)text);
 		setAlignment(align);
 	}
+
+	/* the character spans that change how the text looks become Pango attributes */
+	private void applySpans(Spanned text) {
+		for (CharacterStyle span : text.getSpans(0, text.length(), CharacterStyle.class)) {
+			int start = text.getSpanStart(span);
+			int end = text.getSpanEnd(span);
+			if (start < 0 || end <= start)
+				continue;
+			if (span instanceof AbsoluteSizeSpan) {
+				AbsoluteSizeSpan size = (AbsoluteSizeSpan)span;
+				float px = size.getDip() ? size.getSize() * paint.density : size.getSize();
+				native_add_attribute(layout, ATTR_SIZE, start, end, 0, px);
+			} else if (span instanceof RelativeSizeSpan) {
+				native_add_attribute(layout, ATTR_SCALE, start, end, 0, ((RelativeSizeSpan)span).getSizeChange());
+			} else if (span instanceof ForegroundColorSpan) {
+				native_add_attribute(layout, ATTR_FOREGROUND, start, end, ((ForegroundColorSpan)span).getForegroundColor(), 0);
+			} else if (span instanceof BackgroundColorSpan) {
+				native_add_attribute(layout, ATTR_BACKGROUND, start, end, ((BackgroundColorSpan)span).getBackgroundColor(), 0);
+			} else if (span instanceof StyleSpan) {
+				int style = ((StyleSpan)span).getStyle();
+				if ((style & Typeface.BOLD) != 0)
+					native_add_attribute(layout, ATTR_BOLD, start, end, 0, 0);
+				if ((style & Typeface.ITALIC) != 0)
+					native_add_attribute(layout, ATTR_ITALIC, start, end, 0, 0);
+			} else if (span instanceof UnderlineSpan) {
+				native_add_attribute(layout, ATTR_UNDERLINE, start, end, 0, 0);
+			} else if (span instanceof StrikethroughSpan) {
+				native_add_attribute(layout, ATTR_STRIKETHROUGH, start, end, 0, 0);
+			}
+		}
+	}
+
+	private static final int ATTR_SIZE = 0;
+	private static final int ATTR_SCALE = 1;
+	private static final int ATTR_FOREGROUND = 2;
+	private static final int ATTR_BACKGROUND = 3;
+	private static final int ATTR_BOLD = 4;
+	private static final int ATTR_ITALIC = 5;
+	private static final int ATTR_UNDERLINE = 6;
+	private static final int ATTR_STRIKETHROUGH = 7;
 
 	/* for StaticLayout.Builder, which builds the layout before its setters are called */
 	void setAlignment(Alignment align) {
@@ -274,6 +325,8 @@ public class Layout {
 	}
 
 	protected static native long native_constructor(String text, long paint, int width);
+	/* start and end in UTF-16 units of the text; color as ARGB, size in pixels, scale as factor */
+	private static native void native_add_attribute(long layout, int type, int start, int end, int color, float value);
 	protected native void native_set_width(long layout, int width);
 	/* 0 left, 1 center, 2 right (the layout direction is always LTR) */
 	private static native void native_set_alignment(long layout, int alignment);

@@ -7,6 +7,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_text_Layout_ATTR_SIZE
+#define android_text_Layout_ATTR_SIZE 0L
+#undef android_text_Layout_ATTR_SCALE
+#define android_text_Layout_ATTR_SCALE 1L
+#undef android_text_Layout_ATTR_FOREGROUND
+#define android_text_Layout_ATTR_FOREGROUND 2L
+#undef android_text_Layout_ATTR_BACKGROUND
+#define android_text_Layout_ATTR_BACKGROUND 3L
+#undef android_text_Layout_ATTR_BOLD
+#define android_text_Layout_ATTR_BOLD 4L
+#undef android_text_Layout_ATTR_ITALIC
+#define android_text_Layout_ATTR_ITALIC 5L
+#undef android_text_Layout_ATTR_UNDERLINE
+#define android_text_Layout_ATTR_UNDERLINE 6L
+#undef android_text_Layout_ATTR_STRIKETHROUGH
+#define android_text_Layout_ATTR_STRIKETHROUGH 7L
 /*
  * Class:     android_text_Layout
  * Method:    native_constructor
@@ -14,6 +30,14 @@ extern "C" {
  */
 JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor
   (JNIEnv *, jclass, jstring, jlong, jint);
+
+/*
+ * Class:     android_text_Layout
+ * Method:    native_add_attribute
+ * Signature: (JIIIIF)V
+ */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1attribute
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jfloat);
 
 /*
  * Class:     android_text_Layout

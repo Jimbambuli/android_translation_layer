@@ -20,6 +20,68 @@ JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env
 	return _INTPTR(layout);
 }
 
+/* the byte offset in the UTF-8 text of an offset in UTF-16 units */
+static guint utf16_to_byte_offset(const char *text, int offset)
+{
+	const char *p = text;
+	while (*p && offset > 0) {
+		offset -= g_utf8_get_char(p) > 0xFFFF ? 2 : 1;
+		p = g_utf8_next_char(p);
+	}
+	return p - text;
+}
+
+static guint16 color_channel(jint argb, int shift)
+{
+	return ((argb >> shift) & 0xFF) * 0x101;
+}
+
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1attribute(JNIEnv *env, jclass class, jlong layout, jint type, jint start, jint end, jint color, jfloat value)
+{
+	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
+	const char *text = pango_layout_get_text(pango_layout);
+	PangoAttrList *attrs = pango_layout_get_attributes(pango_layout);
+	attrs = attrs ? pango_attr_list_ref(attrs) : pango_attr_list_new();
+	PangoAttribute *attr = NULL, *alpha = NULL;
+	switch (type) {
+		case 0: // AbsoluteSizeSpan
+			attr = pango_attr_size_new_absolute(value * PANGO_SCALE);
+			break;
+		case 1: // RelativeSizeSpan
+			attr = pango_attr_scale_new(value);
+			break;
+		case 2: // ForegroundColorSpan
+			attr = pango_attr_foreground_new(color_channel(color, 16), color_channel(color, 8), color_channel(color, 0));
+			alpha = pango_attr_foreground_alpha_new(color_channel(color, 24));
+			break;
+		case 3: // BackgroundColorSpan
+			attr = pango_attr_background_new(color_channel(color, 16), color_channel(color, 8), color_channel(color, 0));
+			alpha = pango_attr_background_alpha_new(color_channel(color, 24));
+			break;
+		case 4: // StyleSpan BOLD
+			attr = pango_attr_weight_new(PANGO_WEIGHT_BOLD);
+			break;
+		case 5: // StyleSpan ITALIC
+			attr = pango_attr_style_new(PANGO_STYLE_ITALIC);
+			break;
+		case 6: // UnderlineSpan
+			attr = pango_attr_underline_new(PANGO_UNDERLINE_SINGLE);
+			break;
+		case 7: // StrikethroughSpan
+			attr = pango_attr_strikethrough_new(TRUE);
+			break;
+	}
+	guint start_index = utf16_to_byte_offset(text, start);
+	guint end_index = start_index + utf16_to_byte_offset(text + start_index, end - start);
+	for (PangoAttribute *a = attr; a; a = (a == attr ? alpha : NULL)) {
+		a->start_index = start_index;
+		a->end_index = end_index;
+		pango_attr_list_insert(attrs, a);
+	}
+	pango_layout_set_attributes(pango_layout, attrs);
+	pango_attr_list_unref(attrs);
+}
+
 JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1alignment(JNIEnv *env, jclass class, jlong layout, jint alignment)
 {
 	static const PangoAlignment pango_alignments[] = {PANGO_ALIGN_LEFT, PANGO_ALIGN_CENTER, PANGO_ALIGN_RIGHT};
