@@ -2694,7 +2694,9 @@ public class View implements Drawable.Callback {
 
 	public boolean onCheckIsTextEditor() { return false; }
 
-	public boolean hasOnClickListeners() { return false; }
+	public boolean hasOnClickListeners() {
+		return on_click_listener != null;
+	}
 
 	public void setTextAlignment(int textAlignment) {
 		String[] classesToRemove = {"ATL-text-align-left", "ATL-text-align-center", "ATL-text-align-right"};
