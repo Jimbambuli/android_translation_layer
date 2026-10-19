@@ -255,6 +255,10 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	jobject saved_state = J__Activity__performSaveInstanceState(env, old_activity);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	/* as on AOSP, the old instance is destroyed before the new one is created: apps that keep their
+	 * pages outside the activity (JW Library) tear them down in onDestroy() and set them up again in
+	 * onCreate() */
+	activity_close(env, old_activity);
 
 	J__Activity__performCreate(env, activity, saved_state);
 	if ((*env)->ExceptionCheck(env))
@@ -277,7 +281,6 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 		gtk_stack_add_child(stack, get_decor_view(env, activity));
 		l->data = _REF(activity);
 	}
-	activity_close(env, old_activity);
 	_UNREF(old_activity);
 	activity_update_current(env);
 }
