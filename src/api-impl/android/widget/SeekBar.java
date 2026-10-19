@@ -7,11 +7,16 @@ import android.util.AttributeSet;
 public class SeekBar extends AbsSeekBar {
 
 	public SeekBar(Context context) {
-		super(context);
+		this(context, null);
 	}
 
 	public SeekBar(Context context, AttributeSet attributeSet) {
-		super(context, attributeSet);
+		this(context, attributeSet, 0);
+	}
+
+	/* AppCompatSeekBar calls this one */
+	public SeekBar(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
 	}
 
 	@Override
