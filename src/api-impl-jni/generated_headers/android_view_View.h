@@ -253,6 +253,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1hasAndroidLayout
 
 /*
  * Class:     android_view_View
+ * Method:    native_drawThroughJava
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1drawThroughJava
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_view_View
  * Method:    native_setLayoutParams
  * Signature: (JIIIFIIII)V
  */

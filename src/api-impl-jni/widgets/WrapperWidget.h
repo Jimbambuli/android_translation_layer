@@ -43,6 +43,7 @@ extern GtkWidget *currently_unmapping;
 GtkWidget *wrapper_widget_new(void);
 void wrapper_widget_set_child(WrapperWidget *parent, GtkWidget *child);
 void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject jobj);
+void wrapper_widget_draw_through_java(WrapperWidget *wrapper, JNIEnv *env);
 void wrapper_widget_queue_draw(WrapperWidget *wrapper);
 void wrapper_widget_set_layout_params(WrapperWidget *wrapper, int width, int height);
 void wrapper_widget_set_background(WrapperWidget *wrapper, GdkPaintable *paintable);

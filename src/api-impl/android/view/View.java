@@ -1076,6 +1076,8 @@ public class View implements Drawable.Callback {
 				e.printStackTrace();
 			}
 		}
+		if (a.hasValue(com.android.internal.R.styleable.View_foreground))
+			setForeground(a.getDrawable(com.android.internal.R.styleable.View_foreground));
 		if (a.hasValue(com.android.internal.R.styleable.View_focusable)) {
 			atl_focusable = a.getBoolean(com.android.internal.R.styleable.View_focusable, true);
 			atl_focusable_set = atl_focusable;
@@ -1213,6 +1215,7 @@ public class View implements Drawable.Callback {
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
+		onDrawForeground(canvas);
 	}
 
 	public View(Context context) {
@@ -1378,6 +1381,7 @@ public class View implements Drawable.Callback {
 
 	protected native long native_constructor(Context context, AttributeSet attrs); // will create a custom GtkWidget with a custom drawing function
 	private static native boolean native_hasAndroidLayout(long widget);
+	private native void native_drawThroughJava(long widget);
 	public native void native_setLayoutParams(long widget, int width, int height, int gravity, float weight, int leftMargin, int topMargin, int rightMargin, int bottomMargin);
 	protected native void native_destructor(long widget);
 	/**
@@ -1768,6 +1772,8 @@ public class View implements Drawable.Callback {
 	protected void drawableStateChanged() {
 		if (background != null && background.isStateful())
 			background.setState(getDrawableState());
+		if (foreground != null && foreground.isStateful())
+			foreground.setState(getDrawableState());
 		if (state_list_animator != null)
 			state_list_animator.setState(getDrawableState());
 	}
@@ -2625,7 +2631,28 @@ public class View implements Drawable.Callback {
 
 	public boolean isPaddingRelative() { return false; }
 
-	public void setForeground(Drawable foreground) {}
+	private Drawable foreground;
+
+	public void setForeground(Drawable foreground) {
+		if (this.foreground != null)
+			this.foreground.setCallback(null);
+		this.foreground = foreground;
+		if (foreground != null) {
+			native_drawThroughJava(widget);
+			foreground.setCallback(this);
+			if (foreground.isStateful())
+				foreground.setState(getDrawableState());
+		}
+		invalidate();
+	}
+
+	/* the foreground fills the view, drawn over its content and children (foregroundGravity FILL) */
+	public void onDrawForeground(Canvas canvas) {
+		if (foreground == null)
+			return;
+		foreground.setBounds(0, 0, getWidth(), getHeight());
+		foreground.draw(canvas);
+	}
 
 	public int getForegroundGravity() { return mForegroundGravity; }
 
@@ -2883,7 +2910,7 @@ public class View implements Drawable.Callback {
 
 	public void setTextDirection(int textDirection) {}
 
-	public Drawable getForeground() { return null; }
+	public Drawable getForeground() { return foreground; }
 
 	public void setScrollbarFadingEnabled(boolean fadeEnabled) {}
 

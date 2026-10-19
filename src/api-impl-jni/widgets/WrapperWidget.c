@@ -532,6 +532,17 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 		currently_unmapping = NULL;
 }
 
+/* draw the view by calling its draw(), for views that draw something themselves (a foreground, or
+ * an overridden onDraw()/draw()/dispatchDraw()) */
+void wrapper_widget_draw_through_java(WrapperWidget *wrapper, JNIEnv *env)
+{
+	if (wrapper->have_custom_draw_method)
+		return;
+	wrapper->have_custom_draw_method = true;
+	wrapper->canvas = _REF(J_new__GskCanvas(env, 0));
+	gtk_widget_queue_draw(GTK_WIDGET(wrapper));
+}
+
 void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject jobj)
 {
 	JavaVM *jvm;
@@ -541,10 +552,8 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 	jmethodID on_draw_method = _METHOD(_CLASS(jobj), "onDraw", "(Landroid/graphics/Canvas;)V");
 	jmethodID dispatch_draw_method = _METHOD(_CLASS(jobj), "dispatchDraw", "(Landroid/graphics/Canvas;)V");
 	jmethodID draw_method = _METHOD(_CLASS(jobj), "draw", "(Landroid/graphics/Canvas;)V");
-	if (on_draw_method != _CACHED_METHOD(View__onDraw) || draw_method != _CACHED_METHOD(View__draw) || dispatch_draw_method != _CACHED_METHOD(View__dispatchDraw)) {
-		wrapper->have_custom_draw_method = true;
-		wrapper->canvas = _REF(J_new__GskCanvas(env, 0));
-	}
+	if (on_draw_method != _CACHED_METHOD(View__onDraw) || draw_method != _CACHED_METHOD(View__draw) || dispatch_draw_method != _CACHED_METHOD(View__dispatchDraw))
+		wrapper_widget_draw_through_java(wrapper, env);
 
 	jmethodID performClick_method = _METHOD(_CLASS(jobj), "performClick", "()Z");
 	if (performClick_method != _CACHED_METHOD(View__performClick)) {
