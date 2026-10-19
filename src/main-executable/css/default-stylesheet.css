@@ -3,6 +3,11 @@
 	border: unset;
 }
 
+.ATL-image-button {
+	background: none;
+	box-shadow: none;
+}
+
 /* Text styling */
 .ATL-text-uppercase > * {
 	text-transform: uppercase;

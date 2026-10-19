@@ -12,6 +12,8 @@ JNIEXPORT jlong JNICALL Java_android_widget_ImageButton_native_1constructor(JNIE
 {
 	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
 	GtkWidget *button = gtk_button_new();
+	/* the background of an ImageButton is its Android background, which may be none */
+	gtk_widget_add_css_class(button, "ATL-image-button");
 	GtkWidget *image = gtk_picture_new_for_resource("/org/gtk/libgtk/icons/16x16/status/image-missing.png"); // show "broken image" icon
 	gtk_button_set_child(GTK_BUTTON(button), image);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), button);
