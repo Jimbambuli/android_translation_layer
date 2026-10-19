@@ -10,7 +10,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.util.TypedValue;
 import android.view.ActionMode;
+import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -42,9 +44,16 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	private boolean created;
 	private boolean started; // between onStart() and onStop()
 
+	/* as in AOSP, the dialog's context carries the dialog theme (the given one, or the
+	 * dialogTheme of the context's theme) */
 	public Dialog(Context context, int themeResId) {
-		this.context = context;
-		window = new Window(context, this);
+		if (themeResId == 0) {
+			TypedValue outValue = new TypedValue();
+			context.getTheme().resolveAttribute(R.attr.dialogTheme, outValue, true);
+			themeResId = outValue.resourceId;
+		}
+		this.context = new ContextThemeWrapper(context, themeResId);
+		window = new Window(this.context, this);
 		nativePtr = nativeInit(window.getDecorView().widget);
 
 		window.set_native_window(nativePtr);
