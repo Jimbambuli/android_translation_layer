@@ -1742,6 +1742,8 @@ public class View implements Drawable.Callback {
 	protected void drawableStateChanged() {
 		if (background != null && background.isStateful())
 			background.setState(getDrawableState());
+		if (state_list_animator != null)
+			state_list_animator.setState(getDrawableState());
 	}
 
 	public void setDescendantFocusability(int value) {}
@@ -2283,7 +2285,10 @@ public class View implements Drawable.Callback {
 	@Export
 	public void computeScroll() {}
 
-	public void jumpDrawablesToCurrentState() {}
+	public void jumpDrawablesToCurrentState() {
+		if (state_list_animator != null)
+			state_list_animator.jumpToCurrentState();
+	}
 
 	private OnFocusChangeListener onFocusChangeListener;
 
@@ -2451,11 +2456,17 @@ public class View implements Drawable.Callback {
 	public void setOutlineProvider(ViewOutlineProvider provider) {}
 
 	public void setStateListAnimator(StateListAnimator stateListAnimator) {
-		if (stateListAnimator != null && stateListAnimator.enabledAnimator != null) {
-			stateListAnimator.enabledAnimator.setTarget(this);
-			stateListAnimator.enabledAnimator.start();
+		if (state_list_animator == stateListAnimator)
+			return;
+		if (state_list_animator != null)
+			state_list_animator.setTarget(null);
+		state_list_animator = stateListAnimator;
+		if (stateListAnimator != null) {
+			stateListAnimator.setTarget(this);
+			stateListAnimator.setState(getDrawableState());
 		}
 	}
+	private StateListAnimator state_list_animator;
 
 	private static final AtomicInteger nextGeneratedId = new AtomicInteger(1);
 	/**
@@ -2655,7 +2666,7 @@ public class View implements Drawable.Callback {
 
 	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {}
 
-	public StateListAnimator getStateListAnimator() { return null; }
+	public StateListAnimator getStateListAnimator() { return state_list_animator; }
 
 	public void requestFitSystemWindows() {}
 
