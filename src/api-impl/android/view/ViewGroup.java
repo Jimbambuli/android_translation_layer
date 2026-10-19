@@ -103,7 +103,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			params = generateLayoutParams(params);
 
 		child.parent = this;
-		child.setLayoutParams(params);
+		child.applyLayoutParams(params);
 		if (index < 0)
 			index = children.size();
 		children.add(index, child);
@@ -288,7 +288,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			params = generateLayoutParams(params);
 
 		view.parent = this;
-		view.setLayoutParams(params);
+		view.applyLayoutParams(params);
 		if (index < 0)
 			index = children.size();
 		children.add(index, view);

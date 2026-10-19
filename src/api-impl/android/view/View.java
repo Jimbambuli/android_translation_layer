@@ -1218,6 +1218,14 @@ public class View implements Drawable.Callback {
 
 	@Export
 	public void setLayoutParams(ViewGroup.LayoutParams params) {
+		applyLayoutParams(params);
+		requestLayout();
+	}
+
+	/* without requesting a layout: ViewGroup uses this when it adds or re-attaches a child, as AOSP
+	 * does by setting the child's params directly (RecyclerView re-attaches its children in every
+	 * layout pass) */
+	void applyLayoutParams(ViewGroup.LayoutParams params) {
 		if (params == null) {
 			throw new NullPointerException("Layout parameters cannot be null");
 		}
