@@ -233,6 +233,55 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env
 	activity_start(env, activity);
 }
 
+/* Activity.recreate(): the new instance takes the place of this one in the back stack and is
+ * created from the state this one saved after being stopped. As for activity_start(),
+ * onRestoreInstanceState() comes before onPostCreate(), the start follows when it is focused. */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, jobject this, jobject activity)
+{
+	GList *l;
+	for (l = activity_backlog; l != NULL; l = l->next) {
+		if ((*env)->IsSameObject(env, this, l->data))
+			break;
+	}
+	if (!l || _GET_BOOL_FIELD(this, "finishing"))
+		return;
+	jobject old_activity = l->data;
+
+	if (activity_current && (*env)->IsSameObject(env, activity_current, old_activity)) {
+		activity_unfocus(env, activity_current);
+		activity_current = NULL;
+	}
+
+	jobject saved_state = J__Activity__performSaveInstanceState(env, old_activity);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+
+	J__Activity__performCreate(env, activity, saved_state);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	if (!_GET_BOOL_FIELD(activity, "finishing")) {
+		if (saved_state) {
+			J__Activity__onRestoreInstanceState(env, activity, saved_state);
+			if ((*env)->ExceptionCheck(env))
+				(*env)->ExceptionDescribe(env);
+		}
+		J__Activity__onPostCreate(env, activity, saved_state);
+		if ((*env)->ExceptionCheck(env))
+			(*env)->ExceptionDescribe(env);
+	}
+
+	if (_GET_BOOL_FIELD(activity, "finishing")) { // finish() was called while it was created
+		activity_backlog = g_list_delete_link(activity_backlog, l);
+	} else {
+		GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
+		gtk_stack_add_child(stack, get_decor_view(env, activity));
+		l->data = _REF(activity);
+	}
+	activity_close(env, old_activity);
+	_UNREF(old_activity);
+	activity_update_current(env);
+}
+
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv *env, jclass class, jclass activity_class, jobject intent)
 {
 	GList *l;

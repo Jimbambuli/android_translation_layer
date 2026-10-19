@@ -535,16 +535,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return false;
 	}
 
+	/* like AOSP: the activity is stopped, saves its state and is destroyed, a new instance of
+	 * it is created from that state in its place in the back stack */
 	public void recreate() {
-		finishing = true;
 		try {
-			/* TODO: check if this is a toplevel activity */
 			Activity activity = internalCreateActivity(this.getClass().getName(), getWindow().native_window, intent);
-			new Handler().post(new Runnable() {
+			activity.resultRequestCode = resultRequestCode;
+			activity.resultActivity = resultActivity;
+			new Handler(Looper.getMainLooper()).post(new Runnable() {
 				@Override
 				public void run() {
-					nativeFinish(0);
-					nativeStartActivity(activity);
+					nativeRecreate(activity);
 				}
 			});
 		} catch (ReflectiveOperationException e) {
@@ -552,6 +553,19 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			e.printStackTrace();
 		}
 	}
+
+	/* called from native code by recreate(), after onStop() */
+	@Export
+	private Bundle performSaveInstanceState() {
+		Bundle outState = new Bundle();
+		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.PRE, outState);
+		onSaveInstanceState(outState);
+		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.POST, outState);
+		return outState;
+	}
+
+	@Export
+	protected void onRestoreInstanceState(Bundle savedInstanceState) {}
 
 	public String getLocalClassName() {
 		final String pkg = getPackageName();
@@ -602,6 +616,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	private native void nativeFinish(long native_window);
 	public static native void nativeStartActivity(Activity activity);
+	private native void nativeRecreate(Activity activity);
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
 	public static native void nativeOpenURI(String uri);
 	public native void nativeFileChooser(int action, String type, String title, int requestCode);
