@@ -19,6 +19,9 @@ public class ImageView extends View {
 	private ScaleType scaleType = ScaleType.FIT_CENTER;
 	private Drawable drawable = null;
 	private ColorFilter colorFilter = null;
+	private boolean adjustViewBounds = false;
+	private int maxWidth = Integer.MAX_VALUE;
+	private int maxHeight = Integer.MAX_VALUE;
 
 	public ImageView(Context context) {
 		this(context, null);
@@ -47,6 +50,9 @@ public class ImageView extends View {
 				drawable.setColorFilter(colorFilter);
 			native_setDrawable(widget, drawable.paintable);
 		}
+		adjustViewBounds = a.getBoolean(com.android.internal.R.styleable.ImageView_adjustViewBounds, false);
+		maxWidth = a.getDimensionPixelSize(com.android.internal.R.styleable.ImageView_maxWidth, Integer.MAX_VALUE);
+		maxHeight = a.getDimensionPixelSize(com.android.internal.R.styleable.ImageView_maxHeight, Integer.MAX_VALUE);
 		if (a.hasValue(com.android.internal.R.styleable.ImageView_scaleType))
 			setScaleType(scaletype_from_int[a.getInt(com.android.internal.R.styleable.ImageView_scaleType, 3 /*CENTER*/)]);
 		a.recycle();
@@ -60,7 +66,103 @@ public class ImageView extends View {
 		bitmap = BitmapFactory.decodeResource(this.getResources(), resid);
 		native_setDrawable(widget, bitmap != null ? bitmap.getTexture() : 0);
 	}
-	public void setAdjustViewBounds(boolean adjustViewBounds) {}
+	public void setAdjustViewBounds(boolean adjustViewBounds) {
+		this.adjustViewBounds = adjustViewBounds;
+		if (adjustViewBounds)
+			setScaleType(ScaleType.FIT_CENTER);
+		requestLayout();
+	}
+
+	public boolean getAdjustViewBounds() {
+		return adjustViewBounds;
+	}
+
+	public void setMaxWidth(int maxWidth) {
+		this.maxWidth = maxWidth;
+		requestLayout();
+	}
+
+	public int getMaxWidth() {
+		return maxWidth;
+	}
+
+	public void setMaxHeight(int maxHeight) {
+		this.maxHeight = maxHeight;
+		requestLayout();
+	}
+
+	public int getMaxHeight() {
+		return maxHeight;
+	}
+
+	/* AOSP's measurement from the drawable's intrinsic size, so that an image is not scaled up to the
+	 * height (or width) it is given; GtkPicture would keep the aspect ratio instead. Images set as a
+	 * bitmap have no Drawable here and are still measured by GTK. */
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		if (drawable == null) {
+			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+			return;
+		}
+		int w = Math.max(drawable.getIntrinsicWidth(), 1);
+		int h = Math.max(drawable.getIntrinsicHeight(), 1);
+		float desiredAspect = 0.0f;
+		boolean resizeWidth = false;
+		boolean resizeHeight = false;
+		if (adjustViewBounds) {
+			resizeWidth = MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.EXACTLY;
+			resizeHeight = MeasureSpec.getMode(heightMeasureSpec) != MeasureSpec.EXACTLY;
+			desiredAspect = (float)w / (float)h;
+		}
+		final int pleft = getPaddingLeft();
+		final int pright = getPaddingRight();
+		final int ptop = getPaddingTop();
+		final int pbottom = getPaddingBottom();
+		int widthSize;
+		int heightSize;
+		if (resizeWidth || resizeHeight) {
+			widthSize = resolveAdjustedSize(w + pleft + pright, maxWidth, widthMeasureSpec);
+			heightSize = resolveAdjustedSize(h + ptop + pbottom, maxHeight, heightMeasureSpec);
+			final float actualAspect = (float)(widthSize - pleft - pright) / (heightSize - ptop - pbottom);
+			if (Math.abs(actualAspect - desiredAspect) > 0.0000001) {
+				boolean done = false;
+				if (resizeWidth) {
+					int newWidth = (int)(desiredAspect * (heightSize - ptop - pbottom)) + pleft + pright;
+					if (!resizeHeight)
+						widthSize = resolveAdjustedSize(newWidth, maxWidth, widthMeasureSpec);
+					if (newWidth <= widthSize) {
+						widthSize = newWidth;
+						done = true;
+					}
+				}
+				if (!done && resizeHeight) {
+					int newHeight = (int)((widthSize - pleft - pright) / desiredAspect) + ptop + pbottom;
+					if (!resizeWidth)
+						heightSize = resolveAdjustedSize(newHeight, maxHeight, heightMeasureSpec);
+					if (newHeight <= heightSize)
+						heightSize = newHeight;
+				}
+			}
+		} else {
+			w = Math.max(w + pleft + pright, getSuggestedMinimumWidth());
+			h = Math.max(h + ptop + pbottom, getSuggestedMinimumHeight());
+			widthSize = resolveSizeAndState(w, widthMeasureSpec, 0);
+			heightSize = resolveSizeAndState(h, heightMeasureSpec, 0);
+		}
+		setMeasuredDimension(widthSize, heightSize);
+	}
+
+	private static int resolveAdjustedSize(int desiredSize, int maxSize, int measureSpec) {
+		final int specSize = MeasureSpec.getSize(measureSpec);
+		switch (MeasureSpec.getMode(measureSpec)) {
+			case MeasureSpec.UNSPECIFIED:
+				return Math.min(desiredSize, maxSize);
+			case MeasureSpec.AT_MOST:
+				return Math.min(Math.min(desiredSize, specSize), maxSize);
+			default: // EXACTLY
+				return specSize;
+		}
+	}
 
 	public void setScaleType(ScaleType scaleType) {
 		this.scaleType = scaleType;
@@ -206,9 +308,7 @@ public class ImageView extends View {
 
 	public void setImageAlpha(int alpha) {}
 
-	public void setMaxWidth(int width) {}
 
-	public void setMaxHeight(int height) {}
 
 	public void setImageState(int[] state, boolean merge) {}
 
