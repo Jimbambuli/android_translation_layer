@@ -283,6 +283,14 @@ JNIEXPORT jobject JNICALL Java_android_widget_EditText_native_1getHint
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setTextSize
   (JNIEnv *, jobject, jlong, jfloat);
 
+/*
+ * Class:     android_widget_EditText
+ * Method:    native_setHintColor
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setHintColor
+  (JNIEnv *, jobject, jlong, jint);
+
 #ifdef __cplusplus
 }
 #endif

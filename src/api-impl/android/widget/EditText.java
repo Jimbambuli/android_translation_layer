@@ -1,6 +1,7 @@
 package android.widget;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.SpannableStringBuilder;
@@ -55,6 +56,7 @@ public class EditText extends TextView {
 	@Override
 	public void setTextSize(float size) {
 		native_setTextSize(widget, size);
+		applyHintColor();
 	}
 	private native void native_setTextSize(long widget, float size);
 
@@ -79,7 +81,21 @@ public class EditText extends TextView {
 	@Override
 	public void setHint(CharSequence s) {
 		native_setHint(widget, s == null ? "" : s.toString());
+		applyHintColor();
 	}
+
+	@Override
+	public void setHintTextColor(ColorStateList colors) {
+		super.setHintTextColor(colors);
+		applyHintColor();
+	}
+
+	private void applyHintColor() {
+		ColorStateList colors = getHintTextColors();
+		if (colors != null)
+			native_setHintColor(widget, colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
+	}
+	private native void native_setHintColor(long widget, int color);
 
 	@Override
 	public CharSequence getHint() {

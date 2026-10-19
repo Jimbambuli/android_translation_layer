@@ -133,3 +133,20 @@ JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setTextSize(JNIEnv *
 	gtk_text_set_attributes(text, attrs);
 	pango_attr_list_unref(attrs);
 }
+
+/* the placeholder is an internal label of the GtkText, which neither a style provider nor the
+ * attributes of the entry reach, so the hint color and the text's attributes go to the label */
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setHintColor(JNIEnv *env, jobject this, jlong widget_ptr, jint color)
+{
+	for (GtkWidget *child = gtk_widget_get_first_child(GTK_WIDGET(_PTR(widget_ptr))); child; child = gtk_widget_get_next_sibling(child)) {
+		if (!GTK_IS_LABEL(child))
+			continue;
+		/* the text's attributes (its size) and the hint color */
+		PangoAttrList *text_attrs = gtk_text_get_attributes(GTK_TEXT(_PTR(widget_ptr)));
+		PangoAttrList *attrs = text_attrs ? pango_attr_list_copy(text_attrs) : pango_attr_list_new();
+		pango_attr_list_change(attrs, pango_attr_foreground_new(((color >> 16) & 0xff) * 257, ((color >> 8) & 0xff) * 257, (color & 0xff) * 257));
+		pango_attr_list_change(attrs, pango_attr_foreground_alpha_new(MAX(1, ((color >> 24) & 0xff) * 257)));
+		gtk_label_set_attributes(GTK_LABEL(child), attrs);
+		pango_attr_list_unref(attrs);
+	}
+}

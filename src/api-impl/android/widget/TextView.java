@@ -85,6 +85,8 @@ public class TextView extends View {
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textColor)) {
 				setTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColor));
 			}
+			if (a.hasValue(com.android.internal.R.styleable.TextView_textColorHint))
+				setHintTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColorHint));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textSize)) {
 				setTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10));
 			}
@@ -351,7 +353,7 @@ public class TextView extends View {
 		hint_colors = colorStateList;
 	}
 	public void setHintTextColor(int i) {
-		hint_colors = ColorStateList.valueOf(i);
+		setHintTextColor(ColorStateList.valueOf(i));
 	}
 	public final ColorStateList getHintTextColors() {
 		return hint_colors;
