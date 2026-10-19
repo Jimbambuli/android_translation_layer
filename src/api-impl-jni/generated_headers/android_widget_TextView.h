@@ -277,6 +277,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawableP
 
 /*
  * Class:     android_widget_TextView
+ * Method:    native_setTypeface
+ * Signature: (JLandroid/graphics/Typeface;)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTypeface
+  (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:     android_widget_TextView
  * Method:    native_setCompoundDrawables
  * Signature: (JJJJJ)V
  */

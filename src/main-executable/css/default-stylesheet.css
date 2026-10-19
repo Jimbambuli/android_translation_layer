@@ -3,15 +3,6 @@
 	border: unset;
 }
 
-/* Font styling */
-.ATL-font-bold > * {
-	font-weight: bold;
-}
-
-.ATL-font-italic > * {
-	font-style: italic;
-}
-
 /* Text styling */
 .ATL-text-uppercase > * {
 	text-transform: uppercase;

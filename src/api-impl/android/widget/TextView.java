@@ -37,6 +37,7 @@ public class TextView extends View {
 	private ColorStateList colors = new ColorStateList(new int[][] {new int[0]}, new int[1]);
 	private CharSequence text = "";
 	private TextPaint paint = new TextPaint();
+	private Typeface typeface;
 	private boolean include_padding = false;
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
@@ -191,26 +192,18 @@ public class TextView extends View {
 				d.setState(getDrawableState());
 		}
 	}
+	/* as in AOSP: the style is applied by deriving a typeface from tf */
 	public void setTypeface(Typeface tf, int style) {
-		String[] classesToRemove = {"ATL-font-bold", "ATL-font-italic"};
-		native_removeClasses(widget, classesToRemove);
-
-		switch (style) {
-			case Typeface.BOLD:
-				native_addClass(widget, "ATL-font-bold");
-				break;
-			case Typeface.ITALIC:
-				native_addClass(widget, "ATL-font-italic");
-				break;
-			case Typeface.BOLD_ITALIC:
-				native_addClass(widget, "ATL-font-bold");
-				native_addClass(widget, "ATL-font-italic");
-				break;
-			default:
-				break;
-		}
+		if (style > 0)
+			tf = (tf == null) ? Typeface.defaultFromStyle(style) : Typeface.create(tf, style);
+		setTypeface(tf);
 	}
-	public void setTypeface(Typeface tf) {}
+
+	public void setTypeface(Typeface tf) {
+		typeface = tf;
+		paint.setTypeface(tf);
+		native_setTypeface(widget, tf);
+	}
 	public void setLineSpacing(float add, float mult) {}
 
 	/* API 28, as in AOSP */
@@ -356,7 +349,7 @@ public class TextView extends View {
 	public void setPrivateImeOptions(String type) {}
 	public void setMaxWidth(int maxWidth) {}
 
-	public Typeface getTypeface() { return null; }
+	public Typeface getTypeface() { return typeface; }
 
 	public float getTextSize() { return 10; }
 
@@ -400,6 +393,7 @@ public class TextView extends View {
 	}
 
 	private native void native_setCompoundDrawablePadding(long widget, int pad);
+	private native void native_setTypeface(long widget, Typeface tf);
 
 	protected native void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom);
 

@@ -70,6 +70,37 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTextColor(JNIEnv 
 	gtk_style_context_add_provider(style_context, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 	g_object_set_data(G_OBJECT(widget), "color_style_provider", css_provider);
 }
+
+/* family, weight and slant of the typeface as per-widget CSS, which also reaches the
+ * label of buttons and the text of entries; the family is only known for app fonts */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTypeface(JNIEnv *env, jobject this, jlong widget_ptr, jobject typeface)
+{
+	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
+	GtkStyleContext *style_context = gtk_widget_get_style_context(widget);
+
+	GtkCssProvider *old_provider = g_object_get_data(G_OBJECT(widget), "typeface_style_provider");
+	if (old_provider)
+		gtk_style_context_remove_provider(style_context, GTK_STYLE_PROVIDER(old_provider));
+	g_object_set_data(G_OBJECT(widget), "typeface_style_provider", NULL);
+	if (!typeface)
+		return;
+
+	jstring family = _GET_OBJ_FIELD(typeface, "family", "Ljava/lang/String;");
+	const char *family_str = family ? (*env)->GetStringUTFChars(env, family, NULL) : NULL;
+	char *family_css = family_str ? g_markup_printf_escaped("font-family: \"%s\";", family_str) : g_strdup("");
+	if (family_str)
+		(*env)->ReleaseStringUTFChars(env, family, family_str);
+
+	char *css_string = g_strdup_printf("* { %s font-weight: %d; font-style: %s; }", family_css,
+	                                   _GET_INT_FIELD(typeface, "weight"), _GET_BOOL_FIELD(typeface, "italic") ? "italic" : "normal");
+	GtkCssProvider *css_provider = gtk_css_provider_new();
+	gtk_css_provider_load_from_string(css_provider, css_string);
+	g_free(css_string);
+	g_free(family_css);
+
+	gtk_style_context_add_provider(style_context, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+	g_object_set_data_full(G_OBJECT(widget), "typeface_style_provider", css_provider, g_object_unref);
+}
 #pragma GCC diagnostic pop
 
 JNIEXPORT void JNICALL Java_android_widget_TextView_setTextSize(JNIEnv *env, jobject this, jfloat size)
