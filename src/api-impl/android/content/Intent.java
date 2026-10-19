@@ -747,6 +747,23 @@ public class Intent implements Parcelable {
 		return extras.getParcelable(name);
 	}
 
+	public <T> T getSerializableExtra(String name, Class<T> clazz) {
+		Object o = extras.get(name);
+		return clazz.isInstance(o) ? clazz.cast(o) : null;
+	}
+
+	public <T> T getParcelableExtra(String name, Class<T> clazz) {
+		return extras.getParcelable(name, clazz);
+	}
+
+	public <T> T[] getParcelableArrayExtra(String name, Class<T> clazz) {
+		return extras.getParcelableArray(name, clazz);
+	}
+
+	public <T> ArrayList<T> getParcelableArrayListExtra(String name, Class<? extends T> clazz) {
+		return extras.getParcelableArrayList(name, clazz);
+	}
+
 	public String[] getStringArrayExtra(String name) {
 		return extras.getStringArray(name);
 	}

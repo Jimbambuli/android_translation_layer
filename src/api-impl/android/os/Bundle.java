@@ -753,6 +753,42 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	}
 
 	/**
+	 * Returns the value associated with the given key, or null if no mapping
+	 * of the given class exists for the key (API 33).
+	 */
+	public <T> T getParcelable(String key, Class<T> clazz) {
+		return getTyped(key, clazz);
+	}
+
+	public <T> T[] getParcelableArray(String key, Class<T> clazz) {
+		return (T[])getParcelableArray(key);
+	}
+
+	public <T> ArrayList<T> getParcelableArrayList(String key, Class<? extends T> clazz) {
+		return (ArrayList<T>)getParcelableArrayList(key);
+	}
+
+	public <T> SparseArray<T> getSparseParcelableArray(String key, Class<? extends T> clazz) {
+		return (SparseArray<T>)getSparseParcelableArray(key);
+	}
+
+	public <T extends Serializable> T getSerializable(String key, Class<T> clazz) {
+		return getTyped(key, clazz);
+	}
+
+	private <T> T getTyped(String key, Class<T> clazz) {
+		Object o = mMap.get(key);
+		if (o == null) {
+			return null;
+		}
+		if (!clazz.isInstance(o)) {
+			typeWarning(key, o, clazz.getName(), new ClassCastException(o.getClass().getName()));
+			return null;
+		}
+		return clazz.cast(o);
+	}
+
+	/**
 	 * Returns the value associated with the given key, or null if
 	 * no mapping of the desired type exists for the given key or a null
 	 * value is explicitly associated with the key.
