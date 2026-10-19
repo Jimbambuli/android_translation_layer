@@ -112,9 +112,25 @@ public class Typeface {
 
 	public static Typeface create(String family_name, int style) {
 		Typeface ret = new Typeface();
-		ret.weight = (style & BOLD) != 0 ? 700 : 400;
+		ret.weight = (style & BOLD) != 0 ? 700 : weightOfFamily(family_name);
 		ret.italic = (style & ITALIC) != 0;
 		return ret;
+	}
+
+	/* AOSP's fonts.xml names the weights of Roboto as families of their own
+	 * (android:fontFamily="sans-serif-medium" and so on) */
+	private static int weightOfFamily(String family_name) {
+		if (family_name == null)
+			return 400;
+		if (family_name.endsWith("-thin"))
+			return 100;
+		if (family_name.endsWith("-light"))
+			return 300;
+		if (family_name.endsWith("-medium"))
+			return 500;
+		if (family_name.endsWith("-black"))
+			return 900;
+		return 400;
 	}
 
 	public static Typeface create(Typeface typeface, int style) {
