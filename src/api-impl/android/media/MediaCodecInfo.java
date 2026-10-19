@@ -18,6 +18,23 @@ public class MediaCodecInfo {
 		return false;
 	}
 
+	/* API 29: the codecs are FFmpeg's software codecs */
+	public boolean isAlias() {
+		return false;
+	}
+
+	public boolean isHardwareAccelerated() {
+		return false;
+	}
+
+	public boolean isSoftwareOnly() {
+		return true;
+	}
+
+	public boolean isVendor() {
+		return false;
+	}
+
 	public String[] getSupportedTypes() {
 		return new String[] {mime};
 	}
@@ -192,6 +209,25 @@ public class MediaCodecInfo {
 
 		public boolean areSizeAndRateSupported(int width, int height, double frameRate) {
 			return width > 0 && height > 0 && frameRate > 0;
+		}
+
+		/* API 29: an empty list means the codec does not publish performance points */
+		public java.util.List<PerformancePoint> getSupportedPerformancePoints() {
+			return java.util.Collections.emptyList();
+		}
+
+		public static final class PerformancePoint {
+			private final int width, height, frameRate;
+
+			public PerformancePoint(int width, int height, int frameRate) {
+				this.width = width;
+				this.height = height;
+				this.frameRate = frameRate;
+			}
+
+			public boolean covers(PerformancePoint other) {
+				return width * height >= other.width * other.height && frameRate >= other.frameRate;
+			}
 		}
 	}
 

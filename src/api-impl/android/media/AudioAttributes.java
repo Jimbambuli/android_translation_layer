@@ -28,6 +28,15 @@ public class AudioAttributes {
 			return this;
 		}
 
+		/* API 29/32: no capture by other apps and no spatial audio to configure */
+		public Builder setAllowedCapturePolicy(int capturePolicy) {
+			return this;
+		}
+
+		public Builder setSpatializationBehavior(int sb) {
+			return this;
+		}
+
 		public AudioAttributes build() {
 			return new AudioAttributes();
 		}

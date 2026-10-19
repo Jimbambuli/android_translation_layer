@@ -199,11 +199,17 @@ public class AudioTrack {
 		private AudioFormat mFormat;
 		private int mBufferSizeInBytes;
 		private int mTransferMode;
+		private int mSessionId;
 
 		public Builder() {}
 
 		public AudioTrack build() {
-			return new AudioTrack(mAttributes, mFormat, mBufferSizeInBytes, mTransferMode, 0);
+			return new AudioTrack(mAttributes, mFormat, mBufferSizeInBytes, mTransferMode, mSessionId);
+		}
+
+		public Builder setSessionId(int sessionId) {
+			mSessionId = sessionId;
+			return this;
 		}
 
 		public Builder setAudioAttributes(AudioAttributes attributes) {
@@ -229,5 +235,31 @@ public class AudioTrack {
 		public Builder setPerformanceMode(int performanceMode) {
 			return this;
 		}
+
+		/* API 29: offload is never supported (see AudioManager), so this stays off */
+		public Builder setOffloadedPlayback(boolean offload) {
+			return this;
+		}
 	}
+
+	/* API 29/31 */
+	public static boolean isDirectPlaybackSupported(AudioFormat format, AudioAttributes attributes) {
+		return false;
+	}
+
+	public boolean isOffloadedPlayback() {
+		return false;
+	}
+
+	public void setOffloadDelayPadding(int delayInFrames, int paddingInFrames) {}
+
+	public void setOffloadEndOfStream() {}
+
+	public interface StreamEventCallback {}
+
+	public void registerStreamEventCallback(java.util.concurrent.Executor executor, StreamEventCallback eventCallback) {}
+
+	public void unregisterStreamEventCallback(StreamEventCallback eventCallback) {}
+
+	public void setLogSessionId(android.media.metrics.LogSessionId logSessionId) {}
 }

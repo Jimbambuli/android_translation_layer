@@ -52,6 +52,11 @@ public class MediaSession {
 
 	public MediaSession(Context context, String tag) {}
 
+	/* API 29 */
+	public MediaSession(Context context, String tag, android.os.Bundle sessionInfo) {
+		this(context, tag);
+	}
+
 	public Token getSessionToken() {
 		return token;
 	}

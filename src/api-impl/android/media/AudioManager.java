@@ -143,4 +143,25 @@ public class AudioManager {
 	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
 
 	public void playSoundEffect(int effectType) {}
+
+	/* API 32 */
+	public Spatializer getSpatializer() {
+		return new Spatializer();
+	}
+
+	/* API 29/31: no compressed offload, all playback is decoded */
+	public static boolean isOffloadedPlaybackSupported(AudioFormat format, AudioAttributes attributes) {
+		return false;
+	}
+
+	public static final int PLAYBACK_OFFLOAD_NOT_SUPPORTED = 0;
+
+	public static int getPlaybackOffloadSupport(AudioFormat format, AudioAttributes attributes) {
+		return PLAYBACK_OFFLOAD_NOT_SUPPORTED;
+	}
+
+	/* API 28 */
+	public int getStreamMinVolume(int streamType) {
+		return 0;
+	}
 }

@@ -43,6 +43,8 @@ extern "C" {
 #define android_media_AudioManager_GET_DEVICES_OUTPUTS 2L
 #undef android_media_AudioManager_GET_DEVICES_ALL
 #define android_media_AudioManager_GET_DEVICES_ALL 3L
+#undef android_media_AudioManager_PLAYBACK_OFFLOAD_NOT_SUPPORTED
+#define android_media_AudioManager_PLAYBACK_OFFLOAD_NOT_SUPPORTED 0L
 /*
  * Class:     android_media_AudioManager
  * Method:    nativeSetStreamVolume
