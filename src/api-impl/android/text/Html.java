@@ -14,10 +14,12 @@ public class Html {
 	}
 
 	/* Minimal HTML-to-Spanned conversion (AOSP uses TagSoup, which we don't have): tags are stripped,
-	 * block elements become line breaks, b/strong and i/em become StyleSpans, common entities are decoded. */
+	 * block elements become line breaks, b/strong and i/em become StyleSpans, a href becomes a URLSpan,
+	 * common entities are decoded. */
 	public static Spanned fromHtml(String source, int flags) {
 		SpannableStringBuilder out = new SpannableStringBuilder();
-		int boldStart = -1, italicStart = -1;
+		int boldStart = -1, italicStart = -1, linkStart = -1;
+		String href = null;
 		int i = 0, n = source.length();
 		boolean pendingSpace = false;
 		while (i < n) {
@@ -52,6 +54,20 @@ public class Html {
 					} else if (boldStart >= 0 && boldStart < out.length()) {
 						out.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), boldStart, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 						boldStart = -1;
+					}
+				} else if (name.equals("a")) {
+					if (!closing) {
+						// the space before the link belongs to the text before it
+						if (pendingSpace && out.length() > 0 && out.charAt(out.length() - 1) != '\n') {
+							out.append(' ');
+							pendingSpace = false;
+						}
+						java.util.regex.Matcher m = java.util.regex.Pattern.compile("href\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(tag);
+						href = m.find() ? (m.group(1) != null ? m.group(1) : m.group(2) != null ? m.group(2) : m.group(3)) : null;
+						linkStart = out.length();
+					} else if (linkStart >= 0 && linkStart < out.length() && href != null) {
+						out.setSpan(new android.text.style.URLSpan(href), linkStart, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+						linkStart = -1;
 					}
 				} else if (name.equals("i") || name.equals("em")) {
 					if (!closing) {
