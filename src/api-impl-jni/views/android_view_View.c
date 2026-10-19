@@ -406,12 +406,31 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	return ret;
 }
 
+/* the pointer position in surface coordinates, like gdk_event_get_position(); GTK also emits
+ * crossing signals without an event (when a widget appears under the pointer, for instance) */
+static void get_raw_position(GtkEventControllerMotion *controller, WrapperWidget *wrapper, double x, double y, double *raw_x, double *raw_y)
+{
+	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+	if (event) {
+		gdk_event_get_position(event, raw_x, raw_y);
+		return;
+	}
+	GtkNative *native = gtk_widget_get_native(GTK_WIDGET(wrapper));
+	graphene_point_t p = GRAPHENE_POINT_INIT(x, y);
+	double off_x = 0, off_y = 0;
+	if (native) {
+		gtk_widget_compute_point(GTK_WIDGET(wrapper), GTK_WIDGET(native), &GRAPHENE_POINT_INIT(x, y), &p);
+		gtk_native_get_surface_transform(native, &off_x, &off_y);
+	}
+	*raw_x = p.x + off_x;
+	*raw_y = p.y + off_y;
+}
+
 static void hover_enter_cb(GtkEventControllerMotion *controller, double x, double y, WrapperWidget *wrapper)
 {
 	double raw_x;
 	double raw_y;
-	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
-	gdk_event_get_position(event, &raw_x, &raw_y);
+	get_raw_position(controller, wrapper, x, y, &raw_x, &raw_y);
 	wrapper->hover_exit_pending = FALSE;
 	wrapper->hover_x = x;
 	wrapper->hover_y = y;
@@ -430,8 +449,7 @@ static void hover_motion_cb(GtkEventControllerMotion *controller, double x, doub
 {
 	double raw_x;
 	double raw_y;
-	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
-	gdk_event_get_position(event, &raw_x, &raw_y);
+	get_raw_position(controller, wrapper, x, y, &raw_x, &raw_y);
 	wrapper->hover_x = x;
 	wrapper->hover_y = y;
 	call_hover_callback(wrapper->jobj, ACTION_HOVER_MOVE, x, y, raw_x, raw_y);
