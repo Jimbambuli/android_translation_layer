@@ -906,6 +906,8 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetFullscreen(JNIEnv *env, j
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	GtkWindow *window = GTK_WINDOW(gtk_widget_get_native(widget));
+	if (!window) // not attached to a window
+		return;
 	if (fullscreen) {
 		if (gtk_window_is_maximized(window)) {
 			gtk_window_fullscreen(window);
@@ -1027,7 +1029,8 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsAttachedToWindow(JNIEn
 JNIEXPORT jobject JNICALL Java_android_view_View_native_1get_1window(JNIEnv *env, jobject this, jlong widget_ptr)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
-	return g_object_get_data(G_OBJECT(gtk_widget_get_root(widget)), "jobject");
+	GtkRoot *root = gtk_widget_get_root(widget);
+	return root ? g_object_get_data(G_OBJECT(root), "jobject") : NULL;
 }
 
 extern GtkWindow *window;
