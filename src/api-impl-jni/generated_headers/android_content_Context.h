@@ -29,6 +29,14 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig
 
 /*
  * Class:     android_content_Context
+ * Method:    native_updateConfigFromWindow
+ * Signature: (JLandroid/content/res/Configuration;)V
+ */
+JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfigFromWindow
+  (JNIEnv *, jclass, jlong, jobject);
+
+/*
+ * Class:     android_content_Context
  * Method:    nativeOpenFile
  * Signature: (I)V
  */

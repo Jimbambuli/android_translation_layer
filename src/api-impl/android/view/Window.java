@@ -96,6 +96,27 @@ public class Window {
 				if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.AT_MOST && getMeasuredWidth() < minWidth)
 					super.onMeasure(MeasureSpec.makeMeasureSpec(minWidth, MeasureSpec.EXACTLY), heightMeasureSpec);
 			}
+
+			private final Runnable configurationFollowsSize = new Runnable() {
+				@Override
+				public void run() {
+					((android.app.Activity)callback).internalWindowSizeChanged();
+				}
+			};
+
+			/* the window was resized (not the first layout): the configuration follows, like on Android.
+			 * GTK reports every step of an interactive resize, so it follows once the size has settled
+			 * for a moment: an activity that is relaunched for the new size is relaunched once per
+			 * resize, not at every size bucket the drag passes (apps that leak their activity, like
+			 * JW Library, would leak one each time) */
+			@Override
+			protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+				super.onSizeChanged(w, h, oldw, oldh);
+				if ((oldw != 0 || oldh != 0) && callback instanceof android.app.Activity) {
+					removeCallbacks(configurationFollowsSize);
+					postDelayed(configurationFollowsSize, 400);
+				}
+			}
 		};
 		// DecorView grabs all touch events and propagates them in Java
 		decorView.native_registerTouchEventPropagation(decorView.widget);

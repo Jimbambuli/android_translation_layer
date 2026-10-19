@@ -8,6 +8,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -17,6 +18,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.view.ContextThemeWrapper;
 import android.view.Display;
@@ -555,6 +557,50 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			Slog.i(TAG, "exception in Activity.recreate, this is kinda sus");
 			e.printStackTrace();
 		}
+	}
+
+	/* Called by the decor view when the window was resized or (un)maximized. Like Android, the screen
+	 * size of the configuration follows the window. An activity that handles the change itself (its
+	 * configChanges) gets onConfigurationChanged(); otherwise it is relaunched if the new size crosses
+	 * a size that the app has resources for (w<N>dp, h<N>dp), else only the resources follow. */
+	public void internalWindowSizeChanged() {
+		Resources resources = getResources();
+		Configuration oldConfig = new Configuration(resources.getConfiguration());
+		native_updateConfigFromWindow(getWindow().native_window, sys_config);
+		Configuration newConfig = new Configuration(oldConfig);
+		newConfig.screenWidthDp = sys_config.screenWidthDp;
+		newConfig.screenHeightDp = sys_config.screenHeightDp;
+		int diff = oldConfig.diff(newConfig);
+		if (diff == 0)
+			return;
+		DisplayMetrics metrics = resources.getDisplayMetrics();
+		getWindowManager().getDefaultDisplay().getMetrics(metrics);
+		resources.updateConfiguration(newConfig, metrics);
+		Resources appResources = getApplicationContext().getResources();
+		if (appResources != resources)
+			appResources.updateConfiguration(newConfig, metrics);
+
+		int handled = 0;
+		try {
+			handled = getPackageManager().getActivityInfo(getComponentName(), 0).getRealConfigChanged();
+		} catch (PackageManager.NameNotFoundException e) {
+		}
+		if ((diff & ~handled) == 0)
+			onConfigurationChanged(new Configuration(newConfig));
+		else if (crossesSizeThreshold(oldConfig, newConfig))
+			recreate();
+	}
+
+	private boolean crossesSizeThreshold(Configuration a, Configuration b) {
+		for (Configuration size : getAssets().getSizeConfigurations()) {
+			if (crosses(size.screenWidthDp, a.screenWidthDp, b.screenWidthDp) || crosses(size.screenHeightDp, a.screenHeightDp, b.screenHeightDp))
+				return true;
+		}
+		return false;
+	}
+
+	private static boolean crosses(int threshold, int a, int b) {
+		return threshold != Configuration.SCREEN_WIDTH_DP_UNDEFINED && (a >= threshold) != (b >= threshold);
 	}
 
 	/* called from native code by recreate(), after onStop() */

@@ -67,6 +67,24 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namestpace, gc
 static XdpSettings *xdp_settings = NULL;
 #endif
 
+/* the window was resized: take the screen size of the configuration (and the window size that
+ * DisplayMetrics reports) from its new size, like at the start from the window size option */
+JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfigFromWindow(JNIEnv *env, jclass this, jlong window_ptr, jobject config)
+{
+	GtkWidget *window = _PTR(window_ptr);
+	jclass display = (*env)->FindClass(env, "android/view/Display");
+	(*env)->SetStaticIntField(env, display, _STATIC_FIELD_ID(display, "window_width", "I"), gtk_widget_get_width(window));
+	(*env)->SetStaticIntField(env, display, _STATIC_FIELD_ID(display, "window_height", "I"), gtk_widget_get_height(window));
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	GdkMonitor *monitor = surface ? gdk_display_get_monitor_at_surface(gtk_widget_get_display(window), surface) : NULL;
+	if (!monitor)
+		monitor = g_list_model_get_item(gdk_display_get_monitors(gtk_widget_get_display(window)), 0);
+	else
+		g_object_ref(monitor);
+	monitor_changed_cb(NULL, monitor, config);
+	g_object_unref(monitor);
+}
+
 JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv *env, jclass this, jobject config)
 {
 	GdkDisplay *display = gdk_display_get_default();
