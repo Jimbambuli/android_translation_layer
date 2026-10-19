@@ -132,6 +132,13 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1size(JNIEn
 	pango_font_description_set_absolute_size(paint->font, roundf(size * PANGO_SCALE));
 }
 
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1typeface(JNIEnv *env, jclass clazz, jlong paint_ptr, jint weight, jboolean italic)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	pango_font_description_set_weight(paint->font, CLAMP(weight, 100, 1000));
+	pango_font_description_set_style(paint->font, italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
+}
+
 JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1text_1size(JNIEnv *env, jclass clazz, jlong paint_ptr)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);

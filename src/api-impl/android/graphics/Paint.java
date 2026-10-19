@@ -49,6 +49,7 @@ public class Paint {
 
 	private void copyJavaState(Paint paint) {
 		flags = paint.flags;
+		typeface = paint.typeface;
 		text_scale_x = paint.text_scale_x;
 		stroke_miter = paint.stroke_miter;
 		hinting = paint.hinting;
@@ -98,8 +99,19 @@ public class Paint {
 		native_set_text_size(paint, size);
 	}
 
+	private Typeface typeface;
+
 	public Typeface setTypeface(Typeface typeface) {
+		this.typeface = typeface;
+		applyTypeface();
 		return typeface;
+	}
+
+	private void applyTypeface() {
+		int weight = typeface != null ? typeface.getWeight() : 400;
+		if (isFakeBoldText() && weight < 700)
+			weight = 700;
+		native_set_typeface(paint, weight, typeface != null && typeface.isItalic());
 	}
 	public void getTextBounds(String text, int start, int end, Rect bounds) {
 		if (end > text.length())
@@ -123,7 +135,10 @@ public class Paint {
 	}
 
 	public void setFlags(int flags) {
+		boolean fakeBoldChanged = ((this.flags ^ flags) & FAKE_BOLD_TEXT_FLAG) != 0;
 		this.flags = flags;
+		if (fakeBoldChanged)
+			applyTypeface();
 	}
 
 	public void setStyle(Style style) {
@@ -242,7 +257,11 @@ public class Paint {
 	public /*native*/ void setSubpixelText(boolean subpixelText) {}
 	public /*native*/ void setUnderlineText(boolean underlineText) {}
 	public /*native*/ void setStrikeThruText(boolean strikeThruText) {}
-	public /*native*/ void setFakeBoldText(boolean fakeBoldText) {}
+	/* Pango has no synthetic emboldening of its own, so fake bold asks for a bold weight */
+	public void setFakeBoldText(boolean fakeBoldText) {
+		flags = fakeBoldText ? (flags | FAKE_BOLD_TEXT_FLAG) : (flags & ~FAKE_BOLD_TEXT_FLAG);
+		applyTypeface();
+	}
 
 	public float getStrokeWidth() {
 		return native_get_stroke_width(paint);
@@ -342,7 +361,7 @@ public class Paint {
 	}
 
 	public Typeface getTypeface() {
-		return new Typeface();
+		return typeface;
 	}
 
 	public void setTextAlign(Align align) {
@@ -419,7 +438,7 @@ public class Paint {
 	public MaskFilter setMaskFilter(MaskFilter filter) { return filter; }
 
 	public boolean isFakeBoldText() {
-		return false;
+		return (flags & FAKE_BOLD_TEXT_FLAG) != 0;
 	}
 
 	public void setFontFeatureSettings(String settings) {}
@@ -453,6 +472,7 @@ public class Paint {
 	private static native void native_set_stroke_join(long paint, int join);
 	private static native int native_get_stroke_join(long paint);
 	private static native void native_set_text_size(long paint, float size);
+	private static native void native_set_typeface(long paint, int weight, boolean italic);
 	private static native float native_get_text_size(long paint);
 	private static native void native_set_color_filter(long paint, int mode, int color);
 	private static native void native_get_text_bounds(long paint, String text, Rect bounds);

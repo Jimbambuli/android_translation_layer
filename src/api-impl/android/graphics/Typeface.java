@@ -14,7 +14,7 @@ public class Typeface {
 	 * bold, depending on what fonts are installed. Call getStyle() to know
 	 * for sure.
 	 */
-	public static final Typeface DEFAULT_BOLD = create((String)null, 0);
+	public static final Typeface DEFAULT_BOLD = create((String)null, 1);
 	/**
 	 * The NORMAL style of the default sans serif typeface.
 	 */
@@ -36,17 +36,25 @@ public class Typeface {
 
 	public long native_instance = 0; // directly accessed by androidx
 
+	/* the family is not kept (Pango picks the font), only weight and slant, which Paint applies */
+	private int weight = 400;
+	private boolean italic;
+
 	public static Typeface createFromAsset(AssetManager mgr, String path) {
 		return DEFAULT;
 	}
 
 	public static Typeface create(String family_name, int style) {
 		Typeface ret = new Typeface();
+		ret.weight = (style & BOLD) != 0 ? 700 : 400;
+		ret.italic = (style & ITALIC) != 0;
 		return ret;
 	}
 
 	public static Typeface create(Typeface typeface, int style) {
-		return typeface != null ? typeface : DEFAULT;
+		if (typeface != null && typeface.getStyle() == style)
+			return typeface;
+		return create((String)null, style);
 	}
 
 	public static Typeface createFromFile(String path) {
@@ -58,7 +66,15 @@ public class Typeface {
 	}
 
 	public int getStyle() {
-		return 0;
+		return (weight >= 600 ? BOLD : 0) | (italic ? ITALIC : 0);
+	}
+
+	public final boolean isBold() {
+		return (getStyle() & BOLD) != 0;
+	}
+
+	public final boolean isItalic() {
+		return italic;
 	}
 
 	public static Typeface defaultFromStyle(int style) {
@@ -74,15 +90,20 @@ public class Typeface {
 	}
 
 	public int getWeight() {
-		return (getStyle() & BOLD) != 0 ? 700 : 400;
+		return weight;
 	}
 
 	public static Typeface create(Typeface family, int weight, boolean italic) {
-		return create(family, (weight >= 600 ? BOLD : 0) | (italic ? ITALIC : 0));
+		Typeface ret = new Typeface();
+		ret.weight = weight;
+		ret.italic = italic;
+		return ret;
 	}
 
-	/* app fonts are not loaded (see Builder), so this gives the default typeface like the other factories */
+	/* app fonts are not loaded (see Builder), so this gives the default typeface in the requested style */
 	public static final class CustomFallbackBuilder {
+		private android.graphics.fonts.FontStyle style;
+
 		public CustomFallbackBuilder(android.graphics.fonts.FontFamily family) {}
 
 		public CustomFallbackBuilder setSystemFallback(String familyName) {
@@ -90,6 +111,7 @@ public class Typeface {
 		}
 
 		public CustomFallbackBuilder setStyle(android.graphics.fonts.FontStyle style) {
+			this.style = style;
 			return this;
 		}
 
@@ -98,7 +120,9 @@ public class Typeface {
 		}
 
 		public Typeface build() {
-			return DEFAULT;
+			if (style == null)
+				return DEFAULT;
+			return create(DEFAULT, style.getWeight(), style.getSlant() == android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC);
 		}
 	}
 

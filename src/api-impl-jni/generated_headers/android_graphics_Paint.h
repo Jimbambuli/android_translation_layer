@@ -167,6 +167,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1size
 
 /*
  * Class:     android_graphics_Paint
+ * Method:    native_set_typeface
+ * Signature: (JIZ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1typeface
+  (JNIEnv *, jclass, jlong, jint, jboolean);
+
+/*
+ * Class:     android_graphics_Paint
  * Method:    native_get_text_size
  * Signature: (J)F
  */
