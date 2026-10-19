@@ -21,6 +21,7 @@ import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
+import android.graphics.Outline;
 import android.graphics.PixelFormat;
 //import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -359,6 +360,20 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		final int N = mLayerState.mNum;
 		for (int i = 0; i < N; i++) {
 			array[i].mDrawable.draw(canvas);
+		}
+	}
+
+	/* like AOSP: the outline of the first layer that has one */
+	@Override
+	public void getOutline(Outline outline) {
+		final ChildDrawable[] array = mLayerState.mChildren;
+		final int N = mLayerState.mNum;
+		for (int i = 0; i < N; i++) {
+			if (array[i].mDrawable != null) {
+				array[i].mDrawable.getOutline(outline);
+				if (!outline.isEmpty())
+					return;
+			}
 		}
 	}
 

@@ -385,14 +385,14 @@ public abstract class DrawableWrapper extends Drawable implements Drawable.Callb
 		return mDrawable != null ? mDrawable.getIntrinsicHeight() : -1;
 	}
 
-	/*@Override
+	@Override
 	public void getOutline(@NonNull Outline outline) {
 		if (mDrawable != null) {
 			mDrawable.getOutline(outline);
 		} else {
 			super.getOutline(outline);
 		}
-	}*/
+	}
 
 	/*@Override
 	@Nullable

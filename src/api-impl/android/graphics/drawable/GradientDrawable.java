@@ -25,6 +25,7 @@ import android.graphics.Color;
 import android.graphics.ColorFilter;
 import android.graphics.DashPathEffect;
 import android.graphics.LinearGradient;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PixelFormat;
@@ -648,6 +649,32 @@ public class GradientDrawable extends Drawable {
 	@Override
 	public int getChangingConfigurations() {
 		return super.getChangingConfigurations() | mGradientState.mChangingConfigurations;
+	}
+
+	/* like AOSP: only an evenly opaque shape (no stroke of another opacity) reports an alpha */
+	@Override
+	public void getOutline(Outline outline) {
+		final GradientState st = mGradientState;
+		final Rect bounds = getBounds();
+		boolean useFillOpacity = st.mStrokeWidth <= 0 || mStrokePaint == null || mStrokePaint.getAlpha() == mFillPaint.getAlpha();
+		outline.setAlpha(useFillOpacity ? modulateAlpha(mFillPaint.getAlpha()) / 255.0f : 0.0f);
+		switch (st.mShape) {
+			case RECTANGLE:
+				if (st.mRadiusArray != null) {
+					Path path = new Path();
+					path.addRoundRect(new RectF(bounds), st.mRadiusArray, Path.Direction.CW);
+					outline.setConvexPath(path);
+					return;
+				}
+				float rad = 0;
+				if (st.mRadius > 0.0f)
+					rad = Math.min(st.mRadius, Math.min(bounds.width(), bounds.height()) * 0.5f);
+				outline.setRoundRect(bounds, rad);
+				return;
+			case OVAL:
+				outline.setOval(bounds);
+				return;
+		}
 	}
 
 	@Override

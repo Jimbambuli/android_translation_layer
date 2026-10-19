@@ -2452,8 +2452,12 @@ public class View implements Drawable.Callback {
 		cancelLongPress();
 	}
 
-	public ViewOutlineProvider getOutlineProvider() { return new ViewOutlineProvider(); }
-	public void setOutlineProvider(ViewOutlineProvider provider) {}
+	public ViewOutlineProvider getOutlineProvider() { return outline_provider; }
+	public void setOutlineProvider(ViewOutlineProvider provider) {
+		outline_provider = provider;
+		invalidateOutline();
+	}
+	private ViewOutlineProvider outline_provider = ViewOutlineProvider.BACKGROUND;
 
 	public void setStateListAnimator(StateListAnimator stateListAnimator) {
 		if (state_list_animator == stateListAnimator)

@@ -1,6 +1,8 @@
 package android.graphics.drawable;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Paint;
 
 public class ColorDrawable extends Drawable {
@@ -25,6 +27,12 @@ public class ColorDrawable extends Drawable {
 	@Override
 	public void draw(Canvas canvas) {
 		canvas.drawRect(getBounds(), paint);
+	}
+
+	@Override
+	public void getOutline(Outline outline) {
+		outline.setRect(getBounds());
+		outline.setAlpha(Color.alpha(color) / 255.0f);
 	}
 
 	public void setColor(int color) {

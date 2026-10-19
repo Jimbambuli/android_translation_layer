@@ -2,6 +2,7 @@ package android.graphics.drawable;
 
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
+import android.graphics.Outline;
 import com.android.internal.R;
 
 public class RippleDrawable extends LayerDrawable {
@@ -18,6 +19,20 @@ public class RippleDrawable extends LayerDrawable {
 
 	public int getRadius() {
 		return 0;
+	}
+
+	/* like AOSP: the outline of the first layer that is not the mask */
+	@Override
+	public void getOutline(Outline outline) {
+		final ChildDrawable[] array = mLayerState.mChildren;
+		final int N = mLayerState.mNum;
+		for (int i = 0; i < N; i++) {
+			if (array[i].mId != R.id.mask) {
+				array[i].mDrawable.getOutline(outline);
+				if (!outline.isEmpty())
+					return;
+			}
+		}
 	}
 
 	@Override
