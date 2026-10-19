@@ -49,10 +49,6 @@ public class Typeface {
 		return typeface != null ? typeface : DEFAULT;
 	}
 
-	public static Typeface create(Typeface typeface, int style, boolean italic) {
-		return typeface != null ? typeface : DEFAULT;
-	}
-
 	public static Typeface createFromFile(String path) {
 		return DEFAULT;
 	}
@@ -75,6 +71,35 @@ public class Typeface {
 
 	public static Typeface createFromFamiliesWithDefault(FontFamily[] families, int dummy1, int dummy2) {
 		return createFromFamiliesWithDefault(families);
+	}
+
+	public int getWeight() {
+		return (getStyle() & BOLD) != 0 ? 700 : 400;
+	}
+
+	public static Typeface create(Typeface family, int weight, boolean italic) {
+		return create(family, (weight >= 600 ? BOLD : 0) | (italic ? ITALIC : 0));
+	}
+
+	/* app fonts are not loaded (see Builder), so this gives the default typeface like the other factories */
+	public static final class CustomFallbackBuilder {
+		public CustomFallbackBuilder(android.graphics.fonts.FontFamily family) {}
+
+		public CustomFallbackBuilder setSystemFallback(String familyName) {
+			return this;
+		}
+
+		public CustomFallbackBuilder setStyle(android.graphics.fonts.FontStyle style) {
+			return this;
+		}
+
+		public CustomFallbackBuilder addCustomFallback(android.graphics.fonts.FontFamily family) {
+			return this;
+		}
+
+		public Typeface build() {
+			return DEFAULT;
+		}
 	}
 
 	public static class Builder {
