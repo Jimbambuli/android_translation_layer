@@ -74,7 +74,75 @@ public class MediaCodec {
 	public void start() {
 		System.out.println("MediaCodec.start(): codecName=" + codecName);
 		native_start(native_codec);
+		if (callback != null && !pumping) {
+			pumping = true;
+			callbackHandler.post(pump);
+		}
 	}
+
+	/* Asynchronous mode. The codec is driven synchronously underneath: a loop on the callback's
+	 * handler hands out every free input buffer and every decoded output buffer through the
+	 * callback, which then owns it, like AOSP's MediaCodec does with its own callbacks. */
+	public static abstract class Callback {
+		public abstract void onInputBufferAvailable(MediaCodec codec, int index);
+		public abstract void onOutputBufferAvailable(MediaCodec codec, int index, BufferInfo info);
+		public abstract void onError(MediaCodec codec, CodecException e);
+		public abstract void onOutputFormatChanged(MediaCodec codec, MediaFormat format);
+	}
+
+	public static final class CodecException extends IllegalStateException {
+		private final int errorCode;
+
+		public CodecException(int errorCode, String detailMessage) {
+			super(detailMessage);
+			this.errorCode = errorCode;
+		}
+
+		public int getErrorCode() { return errorCode; }
+		public boolean isTransient() { return false; }
+		public boolean isRecoverable() { return false; }
+		public String getDiagnosticInfo() { return getMessage(); }
+	}
+
+	private Callback callback;
+	private android.os.Handler callbackHandler;
+	private volatile boolean pumping;
+
+	public void setCallback(Callback cb) {
+		setCallback(cb, null);
+	}
+
+	public void setCallback(Callback cb, android.os.Handler handler) {
+		callback = cb;
+		if (handler == null) {
+			android.os.Looper looper = android.os.Looper.myLooper();
+			handler = new android.os.Handler(looper != null ? looper : android.os.Looper.getMainLooper());
+		}
+		callbackHandler = handler;
+	}
+
+	private final Runnable pump = new Runnable() {
+		@Override
+		public void run() {
+			if (!pumping)
+				return;
+			int index;
+			while (pumping && (index = dequeueInputBuffer(0)) >= 0)
+				callback.onInputBufferAvailable(MediaCodec.this, index);
+			while (pumping) {
+				BufferInfo info = new BufferInfo();
+				index = dequeueOutputBuffer(info, 0);
+				if (index == /*INFO_OUTPUT_FORMAT_CHANGED*/ -2)
+					callback.onOutputFormatChanged(MediaCodec.this, getOutputFormat());
+				else if (index >= 0)
+					callback.onOutputBufferAvailable(MediaCodec.this, index, info);
+				else
+					break;
+			}
+			if (pumping)
+				callbackHandler.postDelayed(this, 5);
+		}
+	};
 
 	public ByteBuffer[] getInputBuffers() {
 		return inputBuffers;
@@ -92,7 +160,7 @@ public class MediaCodec {
 		return outputBuffers[index];
 	}
 
-	public int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
+	public synchronized int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
 		if (!outputFormatSet) {
 			outputFormatSet = true;
 			return /*INFO_OUTPUT_FORMAT_CHANGED*/ -2;
@@ -112,13 +180,13 @@ public class MediaCodec {
 		return ret;
 	}
 
-	public void releaseOutputBuffer(int index, boolean render) {
+	public synchronized void releaseOutputBuffer(int index, boolean render) {
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], render, 0);
 		freeOutputBuffers.add(index);
 	}
 
 	// AOSP calls the parameter `presentationTimeUs`, but actually it is nanoseconds
-	public void releaseOutputBuffer(int index, long releaseTimeNs) {
+	public synchronized void releaseOutputBuffer(int index, long releaseTimeNs) {
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], true, releaseTimeNs);
 		freeOutputBuffers.add(index);
 	}
@@ -127,7 +195,9 @@ public class MediaCodec {
 		return mediaFormat;
 	}
 
-	public void flush() {
+	public synchronized void flush() {
+		// in asynchronous mode the codec waits for start() after a flush, as in AOSP
+		pumping = false;
 		native_flush(native_codec);
 		freeInputBuffers.clear();
 		for (int i = 0; i < inputBuffers.length; i++)
@@ -156,7 +226,7 @@ public class MediaCodec {
 		}
 	}
 
-	public int dequeueInputBuffer(long timeoutUs) {
+	public synchronized int dequeueInputBuffer(long timeoutUs) {
 		tryProcessInputBuffer();
 		Integer index = freeInputBuffers.poll();
 		if (index == null) {
@@ -166,7 +236,7 @@ public class MediaCodec {
 		}
 	}
 
-	public void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags) {
+	public synchronized void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags) {
 		if ((flags & BUFFER_FLAG_END_OF_STREAM) != 0) {
 			queuedInputBuffers.add(-1);
 			tryProcessInputBuffer();
@@ -181,10 +251,13 @@ public class MediaCodec {
 		System.out.println("MediaCodec.setVideoScalingMode(" + mode + "): codecName=" + codecName);
 	}
 
-	public void stop() {}
+	public void stop() {
+		pumping = false;
+	}
 
-	public void release() {
+	public synchronized void release() {
 		System.out.println("MediaCodec.release(): codecName=" + codecName);
+		pumping = false;
 		if (native_codec != 0) {
 			if (outputBuffers != null) {
 				for (int i = 0; i < outputBuffers.length; i++) {
@@ -257,6 +330,13 @@ public class MediaCodec {
 		public int flags;
 		public int offset;
 		public long presentationTimeUs;
+
+		public void set(int newOffset, int newSize, long newTimeUs, int newFlags) {
+			offset = newOffset;
+			size = newSize;
+			presentationTimeUs = newTimeUs;
+			flags = newFlags;
+		}
 	}
 
 	public static interface OnFrameRenderedListener {}
