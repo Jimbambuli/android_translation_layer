@@ -212,6 +212,40 @@ public class TextView extends View {
 	}
 	public void setTypeface(Typeface tf) {}
 	public void setLineSpacing(float add, float mult) {}
+
+	/* API 28, as in AOSP */
+	public void setLineHeight(int lineHeight) {
+		int fontHeight = getPaint().getFontMetricsInt(null);
+		if (lineHeight != fontHeight)
+			setLineSpacing(lineHeight - fontHeight, 1f);
+	}
+
+	/* API 34 */
+	public void setLineHeight(int unit, float lineHeight) {
+		setLineHeight((int)android.util.TypedValue.applyDimension(unit, lineHeight, getResources().getDisplayMetrics()));
+	}
+
+	/* API 28, as in AOSP: moves the first/last baseline by adjusting the padding */
+	public void setFirstBaselineToTopHeight(int firstBaselineToTopHeight) {
+		android.graphics.Paint.FontMetricsInt fm = getPaint().getFontMetricsInt();
+		int fontMetricsTop = getIncludeFontPadding() ? fm.top : fm.ascent;
+		if (firstBaselineToTopHeight > Math.abs(fontMetricsTop))
+			setPadding(getPaddingLeft(), firstBaselineToTopHeight - (-fontMetricsTop), getPaddingRight(), getPaddingBottom());
+	}
+
+	public void setLastBaselineToBottomHeight(int lastBaselineToBottomHeight) {
+		android.graphics.Paint.FontMetricsInt fm = getPaint().getFontMetricsInt();
+		int fontMetricsBottom = getIncludeFontPadding() ? fm.bottom : fm.descent;
+		if (lastBaselineToBottomHeight > Math.abs(fontMetricsBottom))
+			setPadding(getPaddingLeft(), getPaddingTop(), getPaddingRight(), lastBaselineToBottomHeight - fontMetricsBottom);
+	}
+
+	private boolean horizontallyScrollable;
+
+	/* API 29 */
+	public final boolean isHorizontallyScrollable() {
+		return horizontallyScrollable;
+	}
 	public final void setLinksClickable(boolean whether) {}
 
 	public void setInputType(int type) {}
@@ -442,7 +476,9 @@ public class TextView extends View {
 	public void setMinHeight(int minHeight) {}
 	public void setMaxHeight(int maxHeight) {}
 
-	public void setHorizontallyScrolling(boolean whether) {}
+	public void setHorizontallyScrolling(boolean whether) {
+		horizontallyScrollable = whether;
+	}
 	public boolean getHorizontallyScrolling() {
 		return false;
 	}

@@ -317,6 +317,7 @@ srcs = [
 	'android/graphics/fonts/FontFamily.java',
 	'android/graphics/fonts/FontStyle.java',
 	'android/graphics/fonts/FontVariationAxis.java',
+	'android/graphics/text/LineBreakConfig.java',
 	'android/hardware/Camera.java',
 	'android/hardware/ConsumerIrManager.java',
 	'android/hardware/GeomagneticField.java',

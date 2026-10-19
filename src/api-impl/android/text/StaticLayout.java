@@ -56,6 +56,15 @@ public class StaticLayout extends Layout {
 
 		public Builder setJustificationMode(int mode) { return this; }
 
+		public Builder setUseLineSpacingFromFallbacks(boolean useLineSpacingFromFallbacks) { return this; }
+
+		public Builder setLineBreakConfig(android.graphics.text.LineBreakConfig lineBreakConfig) { return this; }
+
 		public StaticLayout build() { return layout; }
+	}
+
+	/* API 33 */
+	public boolean isFallbackLineSpacingEnabled() {
+		return false;
 	}
 }
