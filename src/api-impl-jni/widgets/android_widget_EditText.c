@@ -121,3 +121,15 @@ JNIEXPORT jstring JNICALL Java_android_widget_EditText_native_1getHint(JNIEnv *e
 	const char *text = gtk_text_get_placeholder_text(gtk_text);
 	return _JSTRING(text);
 }
+
+/* like TextView, the size goes into the text's Pango attributes */
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setTextSize(JNIEnv *env, jobject this, jlong widget_ptr, jfloat size)
+{
+	GtkText *text = GTK_TEXT(_PTR(widget_ptr));
+	PangoAttrList *old_attrs = gtk_text_get_attributes(text);
+	PangoAttrList *attrs = old_attrs ? pango_attr_list_copy(old_attrs) : pango_attr_list_new();
+
+	pango_attr_list_change(attrs, pango_attr_size_new_absolute(size * PANGO_SCALE));
+	gtk_text_set_attributes(text, attrs);
+	pango_attr_list_unref(attrs);
+}
