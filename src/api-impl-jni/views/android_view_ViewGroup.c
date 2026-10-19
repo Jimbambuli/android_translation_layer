@@ -68,6 +68,7 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1drawChild(JNIEnv *env
 	GtkWidget *child = gtk_widget_get_parent(GTK_WIDGET(_PTR(child_ptr)));
 	GdkSnapshot *snapshot = GDK_SNAPSHOT(_PTR(snapshot_ptr));
 	gtk_widget_queue_draw(child); // FIXME: why didn't compose UI invalidate the child?
+	wrapper_widget_snapshot_shadow(widget, child, snapshot);
 	gtk_widget_snapshot_child(widget, child, snapshot);
 }
 

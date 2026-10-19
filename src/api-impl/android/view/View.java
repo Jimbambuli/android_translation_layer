@@ -16,10 +16,12 @@ import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
+import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Binder;
@@ -1888,6 +1890,7 @@ public class View implements Drawable.Callback {
 	private boolean in_layout = false;
 
 	public void layout(int l, int t, int r, int b) {
+		boolean sizeChanged = r - l != right - left || b - t != bottom - top;
 		this.layouted = true;
 		this.left = l;
 		this.top = t;
@@ -1899,6 +1902,8 @@ public class View implements Drawable.Callback {
 			native_layout(widget, l, t, r, b);
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
 		notifyLayoutChange();
+		if (sizeChanged && getZ() > 0)
+			invalidateOutline();
 	}
 
 	private int reportedLeft, reportedTop, reportedRight, reportedBottom;
@@ -1932,8 +1937,11 @@ public class View implements Drawable.Callback {
 			measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
 		}
 		boolean changed = oldWidth != width || oldHeight != height;
-		if (changed)
+		if (changed) {
 			onSizeChanged(width, height, oldWidth, oldHeight);
+			if (getZ() > 0)
+				invalidateOutline();
+		}
 		bottom = top + height;
 		right = left + width;
 		if (this instanceof ViewGroup) {
@@ -1986,6 +1994,8 @@ public class View implements Drawable.Callback {
 		this.background = backgroundDrawable;
 		if (backgroundDrawable instanceof ColorDrawable) {
 			native_setBackgroundColor(widget, ((ColorDrawable)backgroundDrawable).getColor());
+			if (getZ() > 0)
+				invalidateOutline();
 			return;
 		}
 		if (backgroundDrawable != null) {
@@ -1994,6 +2004,8 @@ public class View implements Drawable.Callback {
 				backgroundDrawable.setTint(backgroundTint);
 		}
 		native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0);
+		if (getZ() > 0)
+			invalidateOutline();
 	}
 
 	public int getOverScrollMode() { return 0; }
@@ -2367,8 +2379,13 @@ public class View implements Drawable.Callback {
 	}
 
 	private float elevation;
+	private float translation_z;
+	private boolean has_shadow;
 	public void setElevation(float elevation) {
-		this.elevation = elevation;
+		if (elevation != this.elevation) {
+			this.elevation = elevation;
+			invalidateOutline();
+		}
 	}
 	public float getElevation() {
 		return elevation;
@@ -2553,7 +2570,7 @@ public class View implements Drawable.Callback {
 	public void setLayerType(int layerType, Paint paint) {}
 
 	public float getZ() {
-		return elevation;
+		return elevation + translation_z;
 	}
 
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {}
@@ -2603,7 +2620,37 @@ public class View implements Drawable.Callback {
 
 	public void setAccessibilityLiveRegion(int mode) {}
 
-	public void invalidateOutline() {}
+	/* The outline is only used for the elevation shadow, which the parent draws below the view
+	 * (without AOSP's light source position: a soft ambient shadow and one offset downwards) */
+	public void invalidateOutline() {
+		float z = getZ();
+		Outline outline = null;
+		if (z > 0 && outline_provider != null && getWidth() > 0 && getHeight() > 0) {
+			if (background != null)
+				background.setBounds(0, 0, getWidth(), getHeight());
+			outline = new Outline();
+			outline.setAlpha(1.0f);
+			outline_provider.getOutline(this, outline);
+		}
+		if (outline == null || outline.isEmpty() || outline.getAlpha() <= 0) {
+			if (has_shadow)
+				native_setShadow(widget, 0, 0, 0, 0, 0, 0, 0);
+			has_shadow = false;
+			return;
+		}
+		Rect rect = new Rect();
+		float radius = 0;
+		if (outline.getRect(rect)) {
+			radius = Math.max(outline.getRadius(), 0);
+		} else if (outline.mPath != null) { // convex path: use its bounds
+			RectF bounds = new RectF();
+			outline.mPath.computeBounds(bounds, true);
+			bounds.round(rect);
+		}
+		native_setShadow(widget, rect.left, rect.top, rect.right, rect.bottom, radius, z, outline.getAlpha());
+		has_shadow = true;
+	}
+	private native void native_setShadow(long widget, int left, int top, int right, int bottom, float radius, float z, float alpha);
 
 	public int getMeasuredWidthAndState() {
 		return measuredWidth;
@@ -2697,9 +2744,14 @@ public class View implements Drawable.Callback {
 	public float getPivotX() { return 0.f; }
 	public float getPivotY() { return 0.f; }
 
-	public float getTranslationZ() { return 0.f; }
+	public float getTranslationZ() { return translation_z; }
 
-	public void setTranslationZ(float translationZ) {}
+	public void setTranslationZ(float translationZ) {
+		if (translationZ != translation_z) {
+			translation_z = translationZ;
+			invalidateOutline();
+		}
+	}
 
 	public int getWindowSystemUiVisibility() {
 		return 0;

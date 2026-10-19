@@ -179,6 +179,39 @@ void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int basel
 		gtk_widget_size_allocate(wrapper->background, &allocation, baseline);
 }
 
+/* An approximation of Material's elevation shadow: a soft ambient shadow all around and a stronger
+ * one offset downwards, both growing with the elevation (in px). Like on AOSP the parent draws it
+ * right before the child, since the child's own drawing is clipped to its bounds. */
+void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnapshot *snapshot)
+{
+	if (!WRAPPER_IS_WIDGET(child) || !gtk_widget_get_visible(child))
+		return;
+	WrapperWidget *wrapper = WRAPPER_WIDGET(child);
+	float z = wrapper->shadow_z;
+	graphene_point_t origin;
+	if (z <= 0 || !gtk_widget_compute_point(child, parent, &GRAPHENE_POINT_INIT(0, 0), &origin))
+		return;
+	GskRoundedRect outline;
+	gsk_rounded_rect_init_from_rect(&outline, &wrapper->shadow_rect, wrapper->shadow_radius);
+	gtk_snapshot_save(snapshot);
+	gtk_snapshot_translate(snapshot, &origin);
+	gtk_snapshot_push_opacity(snapshot, gtk_widget_get_opacity(child));
+	gtk_snapshot_append_outset_shadow(snapshot, &outline, &(GdkRGBA){0, 0, 0, 0.12f * wrapper->shadow_alpha}, 0, z / 6, 0, z / 2);
+	gtk_snapshot_append_outset_shadow(snapshot, &outline, &(GdkRGBA){0, 0, 0, 0.20f * wrapper->shadow_alpha}, 0, z / 2, 0, z);
+	gtk_snapshot_pop(snapshot);
+	gtk_snapshot_restore(snapshot);
+}
+
+void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, float radius, float z, float alpha)
+{
+	wrapper->shadow_rect = *rect;
+	wrapper->shadow_radius = radius;
+	wrapper->shadow_z = z;
+	wrapper->shadow_alpha = alpha;
+	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(wrapper));
+	gtk_widget_queue_draw(parent ? parent : GTK_WIDGET(wrapper));
+}
+
 /* this is used to avoid queing layout changes in the middle of snapshotting */
 int snapshot_in_progress = 0;
 static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)

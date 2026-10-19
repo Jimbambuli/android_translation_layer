@@ -73,10 +73,19 @@ static void java_widget_dispose(GObject *java_widget)
 		child = _child;
 	}
 }
+/* like GtkWidget's default, with the elevation shadow of each child below it */
+static void java_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
+{
+	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+		wrapper_widget_snapshot_shadow(widget, child, snapshot);
+		gtk_widget_snapshot_child(widget, child, snapshot);
+	}
+}
 static void java_widget_init(JavaWidget *java_widget) {}
 static void java_widget_class_init(JavaWidgetClass *class)
 {
 	G_OBJECT_CLASS(class)->dispose = java_widget_dispose;
+	GTK_WIDGET_CLASS(class)->snapshot = java_widget_snapshot;
 }
 G_DEFINE_TYPE(JavaWidget, java_widget, GTK_TYPE_WIDGET)
 
@@ -784,6 +793,12 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setBackgroundColor(JNIEnv 
 	g_object_set_data(G_OBJECT(widget), "background_style_provider", css_provider);
 	if (((color >> 24) & 0xFF) != 0)
 		widget_set_needs_allocation(widget);
+}
+
+JNIEXPORT void JNICALL Java_android_view_View_native_1setShadow(JNIEnv *env, jobject this, jlong widget_ptr, jint left, jint top, jint right, jint bottom, jfloat radius, jfloat z, jfloat alpha)
+{
+	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
+	wrapper_widget_set_shadow(WRAPPER_WIDGET(gtk_widget_get_parent(widget)), &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, z, alpha);
 }
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1setBackgroundDrawable(JNIEnv *env, jobject this, jlong widget_ptr, jlong paintable_ptr)

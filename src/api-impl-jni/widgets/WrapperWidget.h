@@ -27,6 +27,11 @@ struct _WrapperWidget {
 	int hover_y;
 	bool have_custom_draw_method;
 	bool have_custom_computeScroll;
+	/* elevation shadow around the view's outline, drawn when shadow_z > 0 */
+	graphene_rect_t shadow_rect;
+	float shadow_radius;
+	float shadow_z;
+	float shadow_alpha;
 };
 
 struct _WrapperWidgetClass {
@@ -41,6 +46,8 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 void wrapper_widget_queue_draw(WrapperWidget *wrapper);
 void wrapper_widget_set_layout_params(WrapperWidget *wrapper, int width, int height);
 void wrapper_widget_set_background(WrapperWidget *wrapper, GdkPaintable *paintable);
+void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, float radius, float z, float alpha);
+void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnapshot *snapshot);
 void wrapper_widget_consume_touch_events(WrapperWidget *wrapper);
 void wrapper_widget_register_invalidation_listener(WrapperWidget *wrapper);
 

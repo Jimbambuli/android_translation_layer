@@ -453,6 +453,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1keep_1screen_1on
 
 /*
  * Class:     android_view_View
+ * Method:    native_setShadow
+ * Signature: (JIIIIFFF)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setShadow
+  (JNIEnv *, jobject, jlong, jint, jint, jint, jint, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_view_View
  * Method:    native_getGlobalVisibleRect
  * Signature: (JLandroid/graphics/Rect;)Z
  */
