@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+/* //device/apps/common/assets/res/any/strings.xml
+**
+** Copyright 2006, The Android Open Source Project
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**     http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+ -->
+<!-- Subset of frameworks/base/core/res/res/values-de/strings.xml (AOSP android14-release):
+     only the strings that ATL's own code and the framework styles show to the user. -->
+<resources xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="ok" msgid="2646370155170753815">"OK"</string>
+    <string name="cancel" msgid="6908697720451760115">"Abbrechen"</string>
+    <string name="yes" msgid="9069828999585032361">"Ok"</string>
+    <string name="no" msgid="5122037903299899715">"Abbrechen"</string>
+    <string name="capital_on" msgid="2770685323900821829">"AN"</string>
+    <string name="capital_off" msgid="7443704171014626777">"AUS"</string>
+</resources>
