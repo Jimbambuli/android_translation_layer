@@ -3629,4 +3629,62 @@ public class PackageManager {
 	public boolean canRequestPackageInstalls() {
 		return false;
 	}
+
+	/* API 33: the flags as a long, wrapped per kind */
+	public static final class PackageInfoFlags {
+		private final long value;
+		private PackageInfoFlags(long value) { this.value = value; }
+		public static PackageInfoFlags of(long value) { return new PackageInfoFlags(value); }
+		public long getValue() { return value; }
+	}
+
+	public static final class ApplicationInfoFlags {
+		private final long value;
+		private ApplicationInfoFlags(long value) { this.value = value; }
+		public static ApplicationInfoFlags of(long value) { return new ApplicationInfoFlags(value); }
+		public long getValue() { return value; }
+	}
+
+	public static final class ResolveInfoFlags {
+		private final long value;
+		private ResolveInfoFlags(long value) { this.value = value; }
+		public static ResolveInfoFlags of(long value) { return new ResolveInfoFlags(value); }
+		public long getValue() { return value; }
+	}
+
+	public PackageInfo getPackageInfo(String packageName, PackageInfoFlags flags) throws NameNotFoundException {
+		return getPackageInfo(packageName, (int)flags.getValue());
+	}
+
+	public ApplicationInfo getApplicationInfo(String packageName, ApplicationInfoFlags flags) throws NameNotFoundException {
+		return getApplicationInfo(packageName, (int)flags.getValue());
+	}
+
+	public List<PackageInfo> getInstalledPackages(PackageInfoFlags flags) {
+		return getInstalledPackages((int)flags.getValue());
+	}
+
+	public List<ApplicationInfo> getInstalledApplications(ApplicationInfoFlags flags) {
+		return getInstalledApplications((int)flags.getValue());
+	}
+
+	public ResolveInfo resolveActivity(Intent intent, ResolveInfoFlags flags) {
+		return resolveActivity(intent, (int)flags.getValue());
+	}
+
+	public List<ResolveInfo> queryIntentActivities(Intent intent, ResolveInfoFlags flags) {
+		return queryIntentActivities(intent, (int)flags.getValue());
+	}
+
+	public ResolveInfo resolveService(Intent intent, ResolveInfoFlags flags) {
+		return resolveService(intent, (int)flags.getValue());
+	}
+
+	public List<ResolveInfo> queryIntentServices(Intent intent, ResolveInfoFlags flags) {
+		return queryIntentServices(intent, (int)flags.getValue());
+	}
+
+	public List<ResolveInfo> queryIntentContentProviders(Intent intent, ResolveInfoFlags flags) {
+		return queryIntentContentProviders(intent, (int)flags.getValue());
+	}
 }
