@@ -24,3 +24,9 @@
 	background-color: rgba(0,0,0,0);
 	background-image: none;
 }
+
+/* PopupWindow: the Android content brings its own background padding, and the width
+ * the app sets includes it already */
+popover#PopupWindow > contents {
+	padding: 0;
+}
