@@ -10,6 +10,7 @@ public class FragmentTransaction {
 
 	public FragmentTransaction add(Fragment fragment, String string) {
 		fragment.activity = activity;
+		fragment.tag = string;
 		activity.fragments.add(fragment);
 		return this;
 	}

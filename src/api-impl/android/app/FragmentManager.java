@@ -8,7 +8,14 @@ public class FragmentManager {
 		this.activity = activity;
 	}
 
+	/* transactions take effect immediately (see FragmentTransaction.add()) */
 	public Fragment findFragmentByTag(String tag) {
+		if (tag == null)
+			return null;
+		for (Fragment fragment : activity.fragments) {
+			if (tag.equals(fragment.tag))
+				return fragment;
+		}
 		return null;
 	}
 
