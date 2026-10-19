@@ -136,6 +136,12 @@ void current_activity_back_pressed(void)
 {
 	JNIEnv *env = get_jni_env();
 
+	bool handled = J__Activity__dispatchOnBackInvoked(env, activity_current);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	if (handled)
+		return;
+
 	jclass current_activity_class = (*env)->GetObjectClass(env, activity_current);
 	jmethodID current_activity_on_back_pressed_method_id = (*env)->GetMethodID(env, current_activity_class, "onBackPressed", "()V");
 	if ((*env)->ExceptionCheck(env))

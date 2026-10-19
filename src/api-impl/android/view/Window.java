@@ -7,6 +7,8 @@ import android.graphics.drawable.Drawable;
 import android.transition.Transition;
 import android.widget.FrameLayout;
 import android.widget.Toolbar;
+import android.window.OnBackInvokedDispatcher;
+import android.window.WindowOnBackInvokedDispatcher;
 
 public class Window {
 	public static final int FEATURE_OPTIONS_PANEL = 0;
@@ -70,11 +72,17 @@ public class Window {
 
 	private Window.Callback callback;
 	private Context context;
+	private final WindowOnBackInvokedDispatcher onBackInvokedDispatcher = new WindowOnBackInvokedDispatcher();
 
 	public Window(Context context, Window.Callback callback) {
 		this.callback = callback;
 		this.context = context;
-		decorView = new FrameLayout(context);
+		decorView = new FrameLayout(context) {
+			@Override
+			public OnBackInvokedDispatcher findOnBackInvokedDispatcher() {
+				return onBackInvokedDispatcher;
+			}
+		};
 		// DecorView grabs all touch events and propagates them in Java
 		decorView.native_registerTouchEventPropagation(decorView.widget);
 		decorView.setId(android.R.id.content);
@@ -105,6 +113,10 @@ public class Window {
 		}
 		decorView.removeAllViews();
 		decorView.addView(view);
+	}
+
+	public OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
+		return onBackInvokedDispatcher;
 	}
 
 	public View getDecorView() {

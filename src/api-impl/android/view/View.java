@@ -2345,6 +2345,11 @@ public class View implements Drawable.Callback {
 
 	public void requestApplyInsets() {}
 
+	/* the window's decor view overrides this and returns the window's dispatcher */
+	public android.window.OnBackInvokedDispatcher findOnBackInvokedDispatcher() {
+		return parent instanceof View ? ((View)parent).findOnBackInvokedDispatcher() : null;
+	}
+
 	public View getRootView() {
 		View view = this;
 		while (view.parent instanceof View) {

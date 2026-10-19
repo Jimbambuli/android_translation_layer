@@ -509,6 +509,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		finish();
 	}
 
+	public android.window.OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
+		return getWindow().getOnBackInvokedDispatcher();
+	}
+
+	/* called from native code for the back button before onBackPressed(): callbacks
+	 * registered with the OnBackInvokedDispatcher come first, as on Android 13+ */
+	@Export
+	private boolean dispatchOnBackInvoked() {
+		return ((android.window.WindowOnBackInvokedDispatcher)getOnBackInvokedDispatcher()).dispatchOnBackInvoked();
+	}
+
 	public void setIntent(Intent newIntent) {
 		this.intent = newIntent;
 	}

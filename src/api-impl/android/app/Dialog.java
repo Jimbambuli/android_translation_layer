@@ -262,7 +262,8 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	public boolean onKeyUp(int keyCode, KeyEvent event) {
 		if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-			onBackPressed();
+			if (!((android.window.WindowOnBackInvokedDispatcher)getOnBackInvokedDispatcher()).dispatchOnBackInvoked())
+				onBackPressed();
 			return true;
 		}
 		return false;
@@ -279,6 +280,10 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	public void onBackPressed() {
 		if (cancelable)
 			cancel();
+	}
+
+	public android.window.OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
+		return getWindow().getOnBackInvokedDispatcher();
 	}
 
 	// input reaches the views through GTK, so there is nothing to dispatch here
