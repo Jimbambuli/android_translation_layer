@@ -27,6 +27,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
 import android.os.Vibrator;
@@ -2223,6 +2224,29 @@ public class View implements Drawable.Callback {
 	}
 
 	public static class BaseSavedState extends AbsSavedState {
+		public BaseSavedState(Parcel source) {
+			super(source);
+		}
+
+		public BaseSavedState(Parcel source, ClassLoader loader) {
+			super(source, loader);
+		}
+
+		public BaseSavedState(Parcelable superState) {
+			super(superState);
+		}
+
+		public static final Parcelable.Creator<BaseSavedState> CREATOR = new Parcelable.Creator<BaseSavedState>() {
+			@Override
+			public BaseSavedState createFromParcel(Parcel in) {
+				return new BaseSavedState(in);
+			}
+
+			@Override
+			public BaseSavedState[] newArray(int size) {
+				return new BaseSavedState[size];
+			}
+		};
 	}
 
 	public void clearFocus() {}
