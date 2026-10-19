@@ -9,9 +9,21 @@ public class WindowInsets {
 
 	public static final WindowInsets CONSUMED = new WindowInsets();
 
+	/* there are no system bars on the desktop, so all insets are 0; only their visibility is tracked,
+	 * since apps hide and show the bars with WindowInsetsController and react to isVisible() */
+	private int visibleTypes = Type.defaultVisible();
+
 	public WindowInsets() {}
 
-	public WindowInsets(WindowInsets windowInsets) {}
+	public WindowInsets(WindowInsets windowInsets) {
+		if (windowInsets != null)
+			visibleTypes = windowInsets.visibleTypes;
+	}
+
+	/** @hide */
+	public WindowInsets(int visibleTypes) {
+		this.visibleTypes = visibleTypes;
+	}
 
 	public WindowInsets consumeStableInsets() {
 		return this;
@@ -73,6 +85,10 @@ public class WindowInsets {
 		return Insets.NONE;
 	}
 
+	public Insets getInsetsIgnoringVisibility(int typeMask) {
+		return Insets.NONE;
+	}
+
 	public DisplayCutout getDisplayCutout() {
 		return null;
 	}
@@ -85,8 +101,9 @@ public class WindowInsets {
 		return false;
 	}
 
+	/* true if all of the given types are visible */
 	public boolean isVisible(int typeMask) {
-		return false;
+		return (visibleTypes & typeMask) == typeMask;
 	}
 
 	public WindowInsets consumeDisplayCutout() {
@@ -95,9 +112,13 @@ public class WindowInsets {
 
 	public static final class Builder {
 
+		private int visibleTypes = Type.defaultVisible();
+
 		public Builder() {}
 
-		public Builder(WindowInsets insets) {}
+		public Builder(WindowInsets insets) {
+			visibleTypes = insets.visibleTypes;
+		}
 
 		public Builder setSystemWindowInsets(Insets systemWindowInsets) {
 			return this;
@@ -125,6 +146,7 @@ public class WindowInsets {
 		}
 
 		public Builder setVisible(int typeMask, boolean visible) {
+			visibleTypes = visible ? (visibleTypes | typeMask) : (visibleTypes & ~typeMask);
 			return this;
 		}
 
@@ -165,7 +187,7 @@ public class WindowInsets {
 		}
 
 		public WindowInsets build() {
-			return new WindowInsets();
+			return new WindowInsets(visibleTypes);
 		}
 	}
 

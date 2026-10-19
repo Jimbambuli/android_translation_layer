@@ -720,7 +720,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public interface OnApplyWindowInsetsListener {
-		// TODO
+		public WindowInsets onApplyWindowInsets(View v, WindowInsets insets);
 	}
 
 	public interface OnLayoutChangeListener {
@@ -1325,6 +1325,7 @@ public class View implements Drawable.Callback {
 	}
 	protected native void nativeSetOnTouchListener(long widget);
 	private OnClickListener on_click_listener = null;
+	private OnApplyWindowInsetsListener on_apply_window_insets_listener = null;
 	public void setOnClickListener(OnClickListener l) {
 		if (!isClickable())
 			setClickable(true);
@@ -2330,7 +2331,15 @@ public class View implements Drawable.Callback {
 
 	public boolean getFitsSystemWindows() { return true; }
 
-	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {}
+	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {
+		on_apply_window_insets_listener = l;
+	}
+
+	public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
+		if (on_apply_window_insets_listener != null)
+			return on_apply_window_insets_listener.onApplyWindowInsets(this, insets);
+		return onApplyWindowInsets(insets);
+	}
 
 	public final boolean isFocusable() { return atl_focusable; }
 	@Export
@@ -2379,7 +2388,12 @@ public class View implements Drawable.Callback {
 		return nativeIsAttachedToWindow(widget);
 	}
 
-	public void requestApplyInsets() {}
+	/* like AOSP, the whole window gets the insets dispatched again (on the next main loop iteration) */
+	public void requestApplyInsets() {
+		Window window = native_get_window(widget);
+		if (window != null)
+			window.requestApplyInsets();
+	}
 
 	/* the window's decor view overrides this and returns the window's dispatcher */
 	public android.window.OnBackInvokedDispatcher findOnBackInvokedDispatcher() {
@@ -2771,7 +2785,10 @@ public class View implements Drawable.Callback {
 			return false;
 	}
 
-	public WindowInsets getRootWindowInsets() { return new WindowInsets(); }
+	public WindowInsets getRootWindowInsets() {
+		Window window = native_get_window(widget);
+		return window != null ? window.getWindowInsets() : null;
+	}
 
 	public PointerIcon getPointerIcon() { return null; }
 

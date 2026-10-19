@@ -305,6 +305,17 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
+	/* like AOSP since API 30: every child gets what this view left over, whatever its siblings consume */
+	@Override
+	public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
+		insets = super.dispatchApplyWindowInsets(insets);
+		if (insets.isConsumed())
+			return insets;
+		for (View child : new ArrayList<View>(children))
+			child.dispatchApplyWindowInsets(insets);
+		return insets;
+	}
+
 	@Override
 	protected void dispatchVisibilityChanged(View changedView, int visibility) {
 		if (children == null) // happens if this gets called during super constructor

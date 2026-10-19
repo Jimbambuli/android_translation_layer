@@ -4,6 +4,8 @@ import android.R;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.transition.Transition;
 import android.widget.FrameLayout;
 import android.widget.Toolbar;
@@ -73,6 +75,9 @@ public class Window {
 	private Window.Callback callback;
 	private Context context;
 	private final WindowOnBackInvokedDispatcher onBackInvokedDispatcher = new WindowOnBackInvokedDispatcher();
+	private InsetsController insetsController;
+	private int visibleInsetTypes = WindowInsets.Type.defaultVisible();
+	private boolean applyInsetsPending;
 
 	public Window(Context context, Window.Callback callback) {
 		this.callback = callback;
@@ -235,7 +240,37 @@ public class Window {
 	public void setDecorFitsSystemWindows(boolean fits) {}
 
 	public WindowInsetsController getInsetsController() {
-		return new InsetsController();
+		if (insetsController == null)
+			insetsController = new InsetsController(this);
+		return insetsController;
+	}
+
+	/** @hide */
+	public WindowInsets getWindowInsets() {
+		return new WindowInsets(visibleInsetTypes);
+	}
+
+	/** @hide called by the InsetsController */
+	void setInsetsVisible(int types, boolean visible) {
+		int visibleTypes = visible ? (visibleInsetTypes | types) : (visibleInsetTypes & ~types);
+		if (visibleTypes != visibleInsetTypes) {
+			visibleInsetTypes = visibleTypes;
+			requestApplyInsets();
+		}
+	}
+
+	/** @hide dispatch the insets to the whole view hierarchy, once per main loop iteration */
+	public void requestApplyInsets() {
+		if (applyInsetsPending)
+			return;
+		applyInsetsPending = true;
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				applyInsetsPending = false;
+				decorView.dispatchApplyWindowInsets(getWindowInsets());
+			}
+		});
 	}
 
 	public void setStatusBarContrastEnforced(boolean enforced) {}
