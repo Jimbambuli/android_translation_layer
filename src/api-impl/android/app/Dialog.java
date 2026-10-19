@@ -12,6 +12,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.TypedValue;
 import android.view.ActionMode;
+import android.view.Choreographer;
 import android.view.ContextThemeWrapper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -20,6 +21,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager.LayoutParams;
 
@@ -154,9 +156,20 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 				getWindow().getDecorView().internalSetDefaultMeasureSpec(widthMeasureSpec, heightMeasureSpec);
 
-				nativeShow(nativePtr);
-				if (onShowListener != null)
-					onShowListener.onShow(Dialog.this);
+				wrapWidthMeasureSpec = widthMeasureSpec;
+				wrapHeightMeasureSpec = heightMeasureSpec;
+				if (!fitsWindowToContent) {
+					fitsWindowToContent = true;
+					getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+						@Override
+						public void onGlobalLayout() {
+							fitWindowToContent();
+						}
+					});
+				}
+
+				showPending = true;
+				presentWhenLaidOut(3);
 			}
 		};
 		if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -166,8 +179,56 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		}
 	}
 
+	private int wrapWidthMeasureSpec;
+	private int wrapHeightMeasureSpec;
+	private boolean fitsWindowToContent;
+	private int fittedWidth = -1;
+	private int fittedHeight = -1;
+
+	/* Like ViewRootImpl for a WRAP_CONTENT window: measure the content again after each layout and
+	 * resize the window when its size changed. GTK sizes the window only once, when it is shown,
+	 * and content that is created later (Compose composes when the view gets attached) stayed in a
+	 * window of the size measured before. */
+	private void fitWindowToContent() {
+		LayoutParams lp = getWindow().getAttributes();
+		if (lp.width != LayoutParams.WRAP_CONTENT && lp.height != LayoutParams.WRAP_CONTENT)
+			return;
+		View decor = getWindow().getDecorView();
+		decor.measure(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
+		int width = lp.width == LayoutParams.WRAP_CONTENT ? decor.getMeasuredWidth() : lp.width;
+		int height = lp.height == LayoutParams.WRAP_CONTENT ? decor.getMeasuredHeight() : lp.height;
+		if (width == fittedWidth && height == fittedHeight)
+			return;
+		fittedWidth = width;
+		fittedHeight = height;
+		getWindow().set_layout(getWindow().native_window, width, height);
+	}
+
+	/* Like AOSP, which shows the window after its first traversal: content that is created when it
+	 * gets attached (Compose composes in the next frame) is laid out first, so that the window is
+	 * mapped, and placed by the compositor, with its final size. */
+	private boolean showPending;
+	private void presentWhenLaidOut(final int framesLeft) {
+		if (!showPending)
+			return;
+		fitWindowToContent();
+		if ((fittedWidth <= 0 || fittedHeight <= 0) && framesLeft > 0) {
+			Choreographer.getInstance().postFrameCallback(new Choreographer.FrameCallback() {
+				@Override
+				public void doFrame(long frameTimeNanos) {
+					presentWhenLaidOut(framesLeft - 1);
+				}
+			});
+			return;
+		}
+		showPending = false;
+		nativeShow(nativePtr);
+		if (onShowListener != null)
+			onShowListener.onShow(this);
+	}
+
 	public boolean isShowing() {
-		return nativeIsShowing(nativePtr);
+		return showPending || nativeIsShowing(nativePtr);
 	}
 
 	@Export
@@ -180,6 +241,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
 			@Override
 			public void run() {
+				showPending = false;
 				nativeClose(nativePtr);
 				if (started) {
 					started = false;
@@ -373,6 +435,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	public void hide() {
 		System.out.println("hiding the Dialog " + this);
+		showPending = false;
 		nativeClose(nativePtr);
 	}
 
