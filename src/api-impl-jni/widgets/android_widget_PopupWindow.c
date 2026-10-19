@@ -17,10 +17,28 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor(JNIE
 	return _INTPTR(popover);
 }
 
+/* The size an app sets is the size of its content view (with the content's own background padding),
+ * so it is requested for the content; the popover adds the frame of the GTK theme around it. */
+static void apply_content_size(GtkWidget *popover)
+{
+	GtkWidget *child = gtk_popover_get_child(GTK_POPOVER(popover));
+	if (child)
+		gtk_widget_set_size_request(child, GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "content-width")) - 1,
+		                            GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "content-height")) - 1);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setContentView(JNIEnv *env, jobject this, jlong popover_ptr, jlong content_ptr)
 {
+	GtkWidget *old_child = gtk_popover_get_child(GTK_POPOVER(_PTR(popover_ptr)));
+	if (old_child)
+		gtk_widget_set_size_request(old_child, -1, -1);
+	if (!content_ptr) {
+		gtk_popover_set_child(GTK_POPOVER(_PTR(popover_ptr)), NULL);
+		return;
+	}
 	WrapperWidget *content = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(content_ptr))));
 	gtk_popover_set_child(GTK_POPOVER(_PTR(popover_ptr)), GTK_WIDGET(content));
+	apply_content_size(GTK_WIDGET(_PTR(popover_ptr)));
 }
 
 /* android.view.Gravity */
@@ -44,17 +62,12 @@ static GtkWidget *window_frame(GtkWidget *widget)
 static void measure_popover(GtkPopover *popover, int *width, int *height)
 {
 	GtkWidget *contents = gtk_widget_get_first_child(GTK_WIDGET(popover));
-	int request_width, request_height;
 
 	*width = *height = 0;
-	gtk_widget_get_size_request(GTK_WIDGET(popover), &request_width, &request_height);
 	if (contents) {
 		gtk_widget_measure(contents, GTK_ORIENTATION_HORIZONTAL, -1, NULL, width, NULL, NULL);
-		gtk_widget_measure(contents, GTK_ORIENTATION_VERTICAL, MAX(*width, request_width), NULL, height, NULL, NULL);
+		gtk_widget_measure(contents, GTK_ORIENTATION_VERTICAL, *width, NULL, height, NULL, NULL);
 	}
-	/* PopupWindow.setWidth()/setHeight() are size requests on the popover itself */
-	*width = MAX(*width, request_width);
-	*height = MAX(*height, request_height);
 }
 
 /* Show the popover with its top left corner at (x, y) in frame coordinates. We compute the final
@@ -193,34 +206,35 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAtLocation(JN
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setWidth(JNIEnv *env, jobject this, jlong popover_ptr, jint width)
 {
-	int height;
 	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
-	gtk_widget_get_size_request(popover, NULL, &height);
-	gtk_widget_set_size_request(popover, width, height);
+	g_object_set_data(G_OBJECT(popover), "content-width", GINT_TO_POINTER(width + 1));
+	apply_content_size(popover);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setHeight(JNIEnv *env, jobject this, jlong popover_ptr, jint height)
 {
-	int width;
 	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
-	gtk_widget_get_size_request(popover, &width, NULL);
-	gtk_widget_set_size_request(popover, width, height);
+	g_object_set_data(G_OBJECT(popover), "content-height", GINT_TO_POINTER(height + 1));
+	apply_content_size(popover);
+}
+
+/* the size of the content, like the size set with setWidth()/setHeight() */
+static GtkRequisition content_size(GtkWidget *popover)
+{
+	GtkWidget *child = gtk_popover_get_child(GTK_POPOVER(popover));
+	GtkRequisition natural_size;
+	gtk_widget_get_preferred_size(child ? child : popover, &natural_size, NULL);
+	return natural_size;
 }
 
 JNIEXPORT jint JNICALL Java_android_widget_PopupWindow_native_1getWidth(JNIEnv *env, jobject this, jlong popover_ptr)
 {
-	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
-	GtkRequisition natural_size;
-	gtk_widget_get_preferred_size(popover, &natural_size, NULL);
-	return natural_size.width;
+	return content_size(GTK_WIDGET(_PTR(popover_ptr))).width;
 }
 
 JNIEXPORT jint JNICALL Java_android_widget_PopupWindow_native_1getHeight(JNIEnv *env, jobject this, jlong popover_ptr)
 {
-	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
-	GtkRequisition natural_size;
-	gtk_widget_get_preferred_size(popover, &natural_size, NULL);
-	return natural_size.height;
+	return content_size(GTK_WIDGET(_PTR(popover_ptr))).height;
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchable(JNIEnv *env, jobject this, jlong popover_ptr, jboolean touchable)
@@ -271,7 +285,12 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *en
 {
 	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
 	WrapperWidget *anchor = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(anchor_ptr))));
-	gtk_widget_set_size_request(GTK_WIDGET(popover), width, height);
+	/* like AOSP, -1 keeps the current size */
+	if (width >= 0)
+		g_object_set_data(G_OBJECT(popover), "content-width", GINT_TO_POINTER(width + 1));
+	if (height >= 0)
+		g_object_set_data(G_OBJECT(popover), "content-height", GINT_TO_POINTER(height + 1));
+	apply_content_size(GTK_WIDGET(popover));
 	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(anchor), NULL);
 	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
 	gtk_popover_present(GTK_POPOVER(popover));
