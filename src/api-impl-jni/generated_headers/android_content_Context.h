@@ -46,10 +46,10 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeOpenFile
 /*
  * Class:     android_content_Context
  * Method:    nativeShareFile
- * Signature: (Ljava/lang/String;I)V
+ * Signature: (Ljava/lang/String;I[Ljava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile
-  (JNIEnv *, jclass, jstring, jint);
+  (JNIEnv *, jclass, jstring, jint, jobjectArray);
 
 /*
  * Class:     android_content_Context

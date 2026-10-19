@@ -186,16 +186,24 @@ static void share_save_callback(GObject *dialog, GAsyncResult *result, gpointer 
 	g_object_unref(dialog);
 }
 
-static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointer text_jstr)
+enum {
+	SHARE_CANCEL,
+	SHARE_COPY,
+	SHARE_EMAIL,
+	SHARE_SAVE,
+};
+
+/* runs the share target the user picked in the share sheet, after it was closed */
+static void share_sheet_destroyed(GtkWindow *sheet, gpointer text_jstr)
 {
 	JNIEnv *env = get_jni_env();
-	int button_id = gtk_alert_dialog_choose_finish(GTK_ALERT_DIALOG(dialog), result, NULL);
+	int button_id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(sheet), "target"));
 	const char *text = NULL;
 	if (text_jstr)
 		text = (*env)->GetStringUTFChars(env, text_jstr, NULL);
-	int fd = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(dialog), "fd"));
-	printf("share_dialog_callback: button_id=%d, text=%s, fd=%d\n", button_id, text, fd);
-	if (button_id == 1) {
+	int fd = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(sheet), "fd"));
+	printf("share_sheet_destroyed: button_id=%d, text=%s, fd=%d\n", button_id, text, fd);
+	if (button_id == SHARE_COPY) {
 		printf("Copy\n");
 		GdkClipboard *clipboard = gdk_display_get_clipboard(gtk_root_get_display(GTK_ROOT(window)));
 		if (fd) {
@@ -208,7 +216,7 @@ static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointe
 		if (text) {
 			gdk_clipboard_set_text(clipboard, text);
 		}
-	} else if (button_id == 2) {
+	} else if (button_id == SHARE_EMAIL) {
 		printf("Email\n");
 		GDBusConnection *connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
 		Email *email = email_proxy_new_sync(connection, 0, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", NULL, NULL);
@@ -235,7 +243,7 @@ static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointe
 		g_object_unref(fd_list);
 		g_object_unref(email);
 		g_object_unref(connection);
-	} else if (button_id == 3) {
+	} else if (button_id == SHARE_SAVE) {
 		GtkFileDialog *save_dialog = gtk_file_dialog_new();
 		char *path = fd_get_path(fd);
 		if (path) {
@@ -254,30 +262,146 @@ static void share_dialog_callback(GObject *dialog, GAsyncResult *result, gpointe
 		close(fd);
 }
 
-/* The XDG specification does not provide anything comparable to the Android share API yet. Therefore, we provide
- * a custom dialog allowing the user to copy to clipboard, send per mail using the composeEmail portal, or save
- * a shared file.
- */
-JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd)
+static void share_target_clicked(GtkButton *button, GtkWindow *sheet)
 {
-	GtkAlertDialog *dialog = gtk_alert_dialog_new("Share");
+	g_object_set_data(G_OBJECT(sheet), "target", g_object_get_data(G_OBJECT(button), "target"));
+	gtk_window_close(sheet);
+}
+
+static void share_sheet_add_target(GtkWidget *targets, GtkWindow *sheet, int target, GIcon *icon, const char *label)
+{
+	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+	GtkWidget *image = gtk_image_new_from_gicon(icon);
+	gtk_image_set_pixel_size(GTK_IMAGE(image), 40);
+	gtk_box_append(GTK_BOX(box), image);
+	GtkWidget *text = gtk_label_new(label);
+	gtk_label_set_wrap(GTK_LABEL(text), TRUE);
+	gtk_label_set_justify(GTK_LABEL(text), GTK_JUSTIFY_CENTER);
+	gtk_label_set_max_width_chars(GTK_LABEL(text), 12);
+	gtk_box_append(GTK_BOX(box), text);
+	GtkWidget *button = gtk_button_new();
+	gtk_button_set_child(GTK_BUTTON(button), box);
+	gtk_widget_add_css_class(button, "flat");
+	gtk_widget_set_size_request(button, 96, -1);
+	g_object_set_data(G_OBJECT(button), "target", GINT_TO_POINTER(target));
+	g_signal_connect(button, "clicked", G_CALLBACK(share_target_clicked), sheet);
+	gtk_box_append(GTK_BOX(targets), button);
+}
+
+static const char *jstring_or(JNIEnv *env, jobjectArray labels, int index, const char *fallback, char **to_free)
+{
+	jstring label = labels ? (*env)->GetObjectArrayElement(env, labels, index) : NULL;
+	if (!label)
+		return fallback;
+	const char *utf = (*env)->GetStringUTFChars(env, label, NULL);
+	*to_free = g_strdup(utf);
+	(*env)->ReleaseStringUTFChars(env, label, utf);
+	return *to_free;
+}
+
+/* The XDG specification does not provide anything comparable to the Android share API yet. Therefore, we provide
+ * a share sheet like Android's chooser allowing the user to copy to clipboard, send per mail using the
+ * composeEmail portal, or save a shared file. The labels (title, copy, save) come from the framework
+ * resources, so they are in the app's language; the mail target carries the name of the mail application.
+ */
+JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd, jobjectArray labels)
+{
+	char *title_free = NULL, *copy_free = NULL, *save_free = NULL;
+	const char *title = jstring_or(env, labels, 0, "Share", &title_free);
+	const char *copy = jstring_or(env, labels, 1, "Copy", &copy_free);
+	const char *save = jstring_or(env, labels, 2, "Save", &save_free);
+
+	GtkWidget *sheet = gtk_window_new();
+	gtk_window_set_title(GTK_WINDOW(sheet), title);
+	gtk_window_set_transient_for(GTK_WINDOW(sheet), window);
+	gtk_window_set_modal(GTK_WINDOW(sheet), TRUE);
+	gtk_window_set_resizable(GTK_WINDOW(sheet), FALSE);
+	GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+	gtk_widget_set_margin_start(content, 24);
+	gtk_widget_set_margin_end(content, 24);
+	gtk_widget_set_margin_bottom(content, 20);
+
+	/* the heading is the title bar: the sheet is a card with rounded corners and a shadow, like
+	 * Android's chooser, and can be moved by it */
+	GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_widget_set_margin_start(header, 24);
+	gtk_widget_set_margin_end(header, 12);
+	gtk_widget_set_margin_top(header, 12);
+	gtk_widget_set_margin_bottom(header, 4);
+	GtkWidget *heading = gtk_label_new(title);
+	gtk_widget_add_css_class(heading, "title-3");
+	gtk_label_set_xalign(GTK_LABEL(heading), 0);
+	gtk_widget_set_hexpand(heading, TRUE);
+	gtk_box_append(GTK_BOX(header), heading);
+	GtkWidget *close = gtk_button_new_from_icon_name("window-close-symbolic");
+	gtk_widget_add_css_class(close, "flat");
+	gtk_widget_add_css_class(close, "circular");
+	gtk_widget_set_valign(close, GTK_ALIGN_CENTER);
+	g_signal_connect_swapped(close, "clicked", G_CALLBACK(gtk_window_close), sheet);
+	gtk_box_append(GTK_BOX(header), close);
+	gtk_window_set_titlebar(GTK_WINDOW(sheet), header);
+
+	/* what is shared, like the preview at the top of Android's chooser */
+	char *preview = NULL;
 	if (fd != -1) {
 		char *path = fd_get_path(fd);
-		gtk_alert_dialog_set_detail(dialog, path);
+		preview = path ? g_path_get_basename(path) : NULL;
 		g_free(path);
-		g_object_set_data(G_OBJECT(dialog), "fd", GINT_TO_POINTER(dup(fd)));
+		g_object_set_data(G_OBJECT(sheet), "fd", GINT_TO_POINTER(dup(fd)));
 	} else if (text_jstr) {
 		const char *text = (*env)->GetStringUTFChars(env, text_jstr, NULL);
-		gtk_alert_dialog_set_detail(dialog, text);
+		preview = g_strdup(text);
 		(*env)->ReleaseStringUTFChars(env, text_jstr, text);
 	}
-	if (fd != -1)
-		gtk_alert_dialog_set_buttons(dialog, (const char *[]){"Cancel", "Copy", "Email", "Save", NULL});
-	else
-		gtk_alert_dialog_set_buttons(dialog, (const char *[]){"Cancel", "Copy", "Email", NULL});
-	gtk_alert_dialog_set_cancel_button(dialog, 0);
-	gtk_alert_dialog_set_default_button(dialog, 1);
-	gtk_alert_dialog_choose(dialog, window, NULL, share_dialog_callback, _REF(text_jstr));
+	if (preview) {
+		GtkWidget *label = gtk_label_new(preview);
+		gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+		gtk_label_set_lines(GTK_LABEL(label), 3);
+		gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+		gtk_label_set_max_width_chars(GTK_LABEL(label), 48);
+		gtk_label_set_width_chars(GTK_LABEL(label), 36);
+		gtk_label_set_xalign(GTK_LABEL(label), 0);
+		gtk_widget_set_margin_start(label, 12);
+		gtk_widget_set_margin_end(label, 12);
+		gtk_widget_set_margin_top(label, 10);
+		gtk_widget_set_margin_bottom(label, 10);
+		GtkWidget *card = gtk_frame_new(NULL);
+		gtk_widget_add_css_class(card, "view");
+		gtk_frame_set_child(GTK_FRAME(card), label);
+		gtk_box_append(GTK_BOX(content), card);
+		g_free(preview);
+	}
+
+	GtkWidget *targets = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+	GIcon *icon = g_themed_icon_new("edit-copy");
+	share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_COPY, icon, copy);
+	g_object_unref(icon);
+	GAppInfo *mail = g_app_info_get_default_for_uri_scheme("mailto");
+	if (mail) {
+		icon = g_app_info_get_icon(mail);
+		icon = icon ? g_object_ref(icon) : g_themed_icon_new("mail-send");
+		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_EMAIL, icon, g_app_info_get_display_name(mail));
+		g_object_unref(icon);
+		g_object_unref(mail);
+	}
+	if (fd != -1) {
+		icon = g_themed_icon_new("document-save");
+		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_SAVE, icon, save);
+		g_object_unref(icon);
+	}
+	gtk_box_append(GTK_BOX(content), targets);
+	gtk_window_set_child(GTK_WINDOW(sheet), content);
+
+	GtkEventController *shortcuts = gtk_shortcut_controller_new();
+	gtk_shortcut_controller_add_shortcut(GTK_SHORTCUT_CONTROLLER(shortcuts),
+	                                     gtk_shortcut_new(gtk_keyval_trigger_new(GDK_KEY_Escape, 0), gtk_named_action_new("window.close")));
+	gtk_widget_add_controller(sheet, shortcuts);
+
+	g_signal_connect(sheet, "destroy", G_CALLBACK(share_sheet_destroyed), _REF(text_jstr));
+	gtk_window_present(GTK_WINDOW(sheet));
+	g_free(title_free);
+	g_free(copy_free);
+	g_free(save_free);
 }
 
 static void on_bus_acquired(GDBusConnection *connection, const char *name, gpointer user_data)

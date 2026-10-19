@@ -311,7 +311,9 @@ public final class ContextImpl extends Context {
 	@Override
 	public void startActivity(Intent intent) {
 		Slog.i(TAG, "startActivity(" + intent + ") called");
+		CharSequence chooser_title = null;
 		if (intent.getAction() != null && intent.getAction().equals("android.intent.action.CHOOSER")) {
+			chooser_title = intent.getCharSequenceExtra(Intent.EXTRA_TITLE);
 			intent = (Intent)intent.getExtras().get("android.intent.extra.INTENT");
 		}
 
@@ -331,10 +333,13 @@ public final class ContextImpl extends Context {
 					}
 				}
 				final ParcelFileDescriptor fd_final = fd;
+				final String[] labels = {chooser_title != null ? chooser_title.toString() : getString(com.android.internal.R.string.share),
+				                         getString(com.android.internal.R.string.copy),
+				                         getString(com.android.internal.R.string.autofill_save_yes)};
 				Runnable runnable = new Runnable() {
 					@Override
 					public void run() {
-						nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1);
+						nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1, labels);
 						if (fd_final != null) {
 							try {
 								fd_final.close();
