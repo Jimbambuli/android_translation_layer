@@ -418,8 +418,22 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		});
 	}
 
+	/* like on AOSP, what the previous instance returned from onRetainNonConfigurationInstance() when it was
+	 * recreated; AndroidX keeps the ViewModels of the activity and its fragments in it */
+	private Object lastNonConfigurationInstance;
+
 	public Object getLastNonConfigurationInstance() {
+		return lastNonConfigurationInstance;
+	}
+
+	public Object onRetainNonConfigurationInstance() {
 		return null;
+	}
+
+	/* called from native code by recreate(), after the state was saved and before this instance is destroyed */
+	@Export
+	private void retainNonConfigurationInstanceFor(Activity next) {
+		next.lastNonConfigurationInstance = onRetainNonConfigurationInstance();
 	}
 
 	public FragmentManager getFragmentManager() {
@@ -430,7 +444,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return (LayoutInflater)getSystemService("layout_inflater");
 	}
 
-	public boolean isChangingConfigurations() { return false; }
+	private boolean changingConfigurations;
+
+	/* true while recreate() replaces this instance: AndroidX keeps the ViewModels then */
+	public boolean isChangingConfigurations() { return changingConfigurations; }
 
 	@Override
 	public void onContentChanged() {
@@ -543,6 +560,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	/* like AOSP: the activity is stopped, saves its state and is destroyed, a new instance of
 	 * it is created from that state in its place in the back stack */
 	public void recreate() {
+		changingConfigurations = true;
 		try {
 			Activity activity = internalCreateActivity(this.getClass().getName(), getWindow().native_window, intent);
 			activity.resultRequestCode = resultRequestCode;

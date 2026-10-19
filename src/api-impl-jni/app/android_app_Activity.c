@@ -234,7 +234,8 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env
 }
 
 /* Activity.recreate(): the new instance takes the place of this one in the back stack and is
- * created from the state this one saved after being stopped. As for activity_start(),
+ * created from the state this one saved after being stopped, and gets what it retained with
+ * onRetainNonConfigurationInstance() (AndroidX keeps its ViewModels there). As for activity_start(),
  * onRestoreInstanceState() comes before onPostCreate(), the start follows when it is focused. */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, jobject this, jobject activity)
 {
@@ -253,6 +254,9 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	}
 
 	jobject saved_state = J__Activity__performSaveInstanceState(env, old_activity);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	J__Activity__retainNonConfigurationInstanceFor(env, old_activity, activity);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 	/* as on AOSP, the old instance is destroyed before the new one is created: apps that keep their
