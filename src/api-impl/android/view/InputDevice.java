@@ -11,6 +11,7 @@ public class InputDevice {
 	public static final int SOURCE_CLASS_GAMEPAD = 0x00000400 | SOURCE_CLASS_BUTTON;
 	public static final int SOURCE_KEYBOARD = 0x00000100 | SOURCE_CLASS_BUTTON;
 	public static final int SOURCE_TOUCHSCREEN = 0x00001000 | SOURCE_CLASS_POINTER;
+	public static final int SOURCE_MOUSE = 0x00002000 | SOURCE_CLASS_POINTER;
 
 	public static int[] getDeviceIds() {
 		return new int[] {0}; // might work?

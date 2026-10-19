@@ -31,6 +31,7 @@ enum {
 
 #define SOURCE_TOUCHSCREEN   0x1002
 #define SOURCE_CLASS_POINTER 0x2
+#define SOURCE_MOUSE         0x2002
 
 #define MAX_POINTERS         50
 
@@ -173,7 +174,7 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
 static void call_hover_callback(jobject this, int action, float x, float y, float raw_x, float raw_y)
 {
 	JNIEnv *env = get_jni_env();
-	jobject motion_event = J_new__MotionEvent__single(env, SOURCE_CLASS_POINTER, action, 0, x, y, x, y);
+	jobject motion_event = J_new__MotionEvent__single(env, SOURCE_MOUSE, action, 0, x, y, x, y);
 	J__View__dispatchHoverEvent(env, this, motion_event);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
@@ -382,7 +383,7 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 		dx /= MAGIC_SCROLL_FACTOR;
 		dy /= MAGIC_SCROLL_FACTOR;
 	}
-	jobject motion_event = J_new__MotionEvent__scroll(env, SOURCE_CLASS_POINTER, ACTION_SCROLL,
+	jobject motion_event = J_new__MotionEvent__scroll(env, SOURCE_MOUSE, ACTION_SCROLL,
 	                                                  gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
 
 	gboolean ret = J__View__dispatchGenericMotionEvent(env, this, motion_event);

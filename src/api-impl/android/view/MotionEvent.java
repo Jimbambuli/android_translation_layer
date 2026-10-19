@@ -2026,8 +2026,8 @@ public final class MotionEvent extends InputEvent {
 	 * @see #TOOL_TYPE_MOUSE
 	 */
 	public final int getToolType(int pointerIndex) {
-		return 0x1; // TOOL_TYPE_FINGER
-			    //		return nativeGetToolType(mNativePtr, pointerIndex);
+		/* hover and wheel events come from the mouse; button presses are reported as touch */
+		return (source & InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE ? TOOL_TYPE_MOUSE : TOOL_TYPE_FINGER;
 	}
 
 	/**
