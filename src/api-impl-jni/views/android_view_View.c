@@ -862,24 +862,18 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1getGlobalVisibleRect(J
 	GtkWidget *widget = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
 	graphene_point_t point_in = {0, 0};
 	graphene_point_t point_out;
-	double off_x;
-	double off_y;
 	gboolean ret;
-	GtkWidget *window = GTK_WIDGET(gtk_widget_get_native(widget));
-	if (!window)
-		return false;
-	gtk_native_get_surface_transform(GTK_NATIVE(window), &off_x, &off_y);
-	ret = gtk_widget_compute_point(widget, window, &point_in, &point_out);
+	ret = atl_compute_point_in_window(widget, &point_in, &point_out);
 	if (!ret)
 		return false;
-	_SET_INT_FIELD(rect, "left", point_out.x + off_x);
-	_SET_INT_FIELD(rect, "top", point_out.y + off_y);
+	_SET_INT_FIELD(rect, "left", point_out.x);
+	_SET_INT_FIELD(rect, "top", point_out.y);
 	point_in = (graphene_point_t){Java_android_view_View_getWidth(env, this), Java_android_view_View_getHeight(env, this)};
-	ret = gtk_widget_compute_point(widget, window, &point_in, &point_out);
+	ret = atl_compute_point_in_window(widget, &point_in, &point_out);
 	if (!ret)
 		return false;
-	_SET_INT_FIELD(rect, "right", point_out.x + off_x);
-	_SET_INT_FIELD(rect, "bottom", point_out.y + off_y);
+	_SET_INT_FIELD(rect, "right", point_out.x);
+	_SET_INT_FIELD(rect, "bottom", point_out.y);
 	return true;
 }
 

@@ -366,3 +366,27 @@ const char *intent_actionname_from_type(int type)
 			return NULL;
 	}
 }
+
+/* a point of the widget in the surface of its window; a widget in a popup (a popover has a surface
+ * of its own) is placed by the popup's position on its parent's surface, like a view in a popup
+ * window on Android, whose location on screen includes the position of the popup */
+gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out)
+{
+	GtkNative *native = gtk_widget_get_native(widget);
+	double off_x, off_y;
+	if (!native || !gtk_widget_compute_point(widget, GTK_WIDGET(native), point_in, point_out))
+		return FALSE;
+	gtk_native_get_surface_transform(native, &off_x, &off_y);
+	point_out->x += off_x;
+	point_out->y += off_y;
+	while (GTK_IS_POPOVER(native)) {
+		GdkSurface *surface = gtk_native_get_surface(native);
+		GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(native));
+		native = parent ? gtk_widget_get_native(parent) : NULL;
+		if (!native || !surface || !GDK_IS_POPUP(surface))
+			return FALSE;
+		point_out->x += gdk_popup_get_position_x(GDK_POPUP(surface));
+		point_out->y += gdk_popup_get_position_y(GDK_POPUP(surface));
+	}
+	return TRUE;
+}

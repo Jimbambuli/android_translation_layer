@@ -56,6 +56,7 @@ void atl_safe_gtk_label_set_text(GtkLabel *label, const char *str);
 void atl_safe_gtk_widget_set_visible(GtkWidget *widget, gboolean visible);
 void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
+gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out);
 
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);
