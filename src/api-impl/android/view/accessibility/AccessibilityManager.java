@@ -5,6 +5,10 @@ import java.util.List;
 
 public class AccessibilityManager {
 
+	public static final int FLAG_CONTENT_ICONS = 1;
+	public static final int FLAG_CONTENT_TEXT = 2;
+	public static final int FLAG_CONTENT_CONTROLS = 4;
+
 	public interface AccessibilityStateChangeListener {}
 
 	public interface TouchExplorationStateChangeListener {}
@@ -31,5 +35,10 @@ public class AccessibilityManager {
 
 	public boolean removeTouchExplorationStateChangeListener(TouchExplorationStateChangeListener listener) {
 		return false;
+	}
+
+	/* there is no accessibility timeout preference, so like AOSP without one keep the app's timeout */
+	public int getRecommendedTimeoutMillis(int originalTimeout, int uiContentFlags) {
+		return originalTimeout;
 	}
 }
