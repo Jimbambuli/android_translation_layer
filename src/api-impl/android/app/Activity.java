@@ -321,7 +321,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 				final Activity activity = internalCreateActivity(intent.getComponent().getClassName(), getWindow().native_window, intent);
 				activity.resultRequestCode = requestCode;
 				activity.resultActivity = this;
-				runOnUiThread(new Runnable() {
+				/* like on Android (and like Context.startActivity), the new activity starts after the
+				 * caller has returned: started from onCreate(), it must come up after the caller's
+				 * onResume(), not be paused by it */
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
 					@Override
 					public void run() {
 						nativeStartActivity(activity);
