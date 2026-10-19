@@ -147,6 +147,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	static gboolean asset_scheme_registered = FALSE;
 	if (!asset_scheme_registered) {
 		webkit_web_context_register_uri_scheme(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview)), "android-asset", asset_uri_scheme_request_cb, NULL, NULL);
+		webkit_security_manager_register_uri_scheme_as_local(webkit_web_context_get_security_manager(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview))), "android-asset");
 		asset_scheme_registered = TRUE;
 	}
 	WebKitUserContentManager *content_manager = webkit_web_view_get_user_content_manager(WEBKIT_WEB_VIEW(webview));
