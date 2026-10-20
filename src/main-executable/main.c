@@ -516,6 +516,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	GtkWidget *stack = gtk_stack_new();
 	gtk_stack_set_transition_type(GTK_STACK(stack), GTK_STACK_TRANSITION_TYPE_SLIDE_LEFT_RIGHT);
 	gtk_window_set_child(GTK_WINDOW(window), stack);
+	atl_window_android_tab_focus(GTK_WINDOW(window));
 
 	const char *disable_decoration_env = getenv("ATL_DISABLE_WINDOW_DECORATIONS");
 	gboolean decorated;

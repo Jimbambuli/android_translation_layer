@@ -86,3 +86,10 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1offsetRect(JNIEnv *en
 		_SET_INT_FIELD(rect, "bottom", _GET_INT_FIELD(rect, "bottom") + point_out.y - point_in.y);
 	}
 }
+
+JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksFocus(JNIEnv *env, jobject this, jlong widget_ptr, jboolean blocks)
+{
+	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
+	if (wrapper)
+		g_object_set_data(G_OBJECT(wrapper), "atl-blocks-tab-focus", GINT_TO_POINTER(blocks));
+}

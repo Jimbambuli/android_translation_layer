@@ -436,6 +436,7 @@ static int map_key_code(int key_code)
 		case GDK_KEY_period:
 			return KEYCODE_PERIOD;
 		case GDK_KEY_Tab:
+		case GDK_KEY_ISO_Left_Tab: // Shift+Tab
 			return KEYCODE_TAB;
 		case GDK_KEY_space:
 			return KEYCODE_SPACE;

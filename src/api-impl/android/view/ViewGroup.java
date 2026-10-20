@@ -65,6 +65,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 		children = new ArrayList<View>();
 		detachedChildren = new ArrayList<View>();
+
+		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.ViewGroup, defStyleAttr, defStyleRes);
+		if (a.getBoolean(com.android.internal.R.styleable.ViewGroup_touchscreenBlocksFocus, false))
+			setTouchscreenBlocksFocus(true);
+		a.recycle();
 	}
 
 	public void addView(View child) {
@@ -616,7 +621,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
-	public void setTouchscreenBlocksFocus(boolean touchscreenBlocksFocus) {}
+	private boolean touchscreenBlocksFocus;
+
+	/* as on a device with a touchscreen, keyboard navigation (Tab) skips the descendants (AppCompat's
+	 * Toolbar sets this, so Tab goes through the content, not the toolbar) */
+	public void setTouchscreenBlocksFocus(boolean touchscreenBlocksFocus) {
+		this.touchscreenBlocksFocus = touchscreenBlocksFocus;
+		native_setTouchscreenBlocksFocus(widget, touchscreenBlocksFocus);
+	}
+	private native void native_setTouchscreenBlocksFocus(long widget, boolean blocks);
 
 	public void setClipChildren(boolean clipChildren) {}
 
@@ -860,7 +873,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	public void onDescendantInvalidated(View child, View target) {}
 
-	public boolean getTouchscreenBlocksFocus() { return false; }
+	public boolean getTouchscreenBlocksFocus() { return touchscreenBlocksFocus; }
 
 	public ViewGroupOverlay getOverlay() {
 		if (viewGroupOverlay == null)

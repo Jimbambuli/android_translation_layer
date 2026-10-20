@@ -275,6 +275,14 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1drawChild
 
 /*
  * Class:     android_view_ViewGroup
+ * Method:    native_setTouchscreenBlocksFocus
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksFocus
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_ViewGroup
  * Method:    native_offsetRect
  * Signature: (JJLandroid/graphics/Rect;)V
  */

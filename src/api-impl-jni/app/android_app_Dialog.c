@@ -94,6 +94,7 @@ JNIEXPORT jlong JNICALL Java_android_app_Dialog_nativeInit(JNIEnv *env, jobject 
 	 * showing a separate "android-translation-layer" window */
 	gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
 	gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
+	atl_window_android_tab_focus(GTK_WINDOW(dialog));
 	gtk_window_set_child(GTK_WINDOW(dialog), gtk_widget_get_parent(decor_view));
 	jobject ref = _REF(this);
 	g_signal_connect(GTK_WINDOW(dialog), "close-request", G_CALLBACK(on_close_request), ref);
