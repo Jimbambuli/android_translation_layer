@@ -469,6 +469,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1getMatrix
 
 /*
  * Class:     android_view_View
+ * Method:    native_setAnimating
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setAnimating
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_View
  * Method:    nativeIsAttachedToWindow
  * Signature: (J)Z
  */

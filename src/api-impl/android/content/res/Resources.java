@@ -187,6 +187,10 @@ public class Resources {
 		public NotFoundException(String name) {
 			super(name);
 		}
+
+		public NotFoundException(String name, Exception cause) {
+			super(name, cause);
+		}
 	}
 
 	/**

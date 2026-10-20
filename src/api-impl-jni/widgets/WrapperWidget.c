@@ -212,6 +212,10 @@ void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, fl
 	gtk_widget_queue_draw(parent ? parent : GTK_WIDGET(wrapper));
 }
 
+/* android.view.animation.Transformation.TYPE_ALPHA and TYPE_MATRIX */
+#define TRANSFORMATION_TYPE_ALPHA 0x1
+#define TRANSFORMATION_TYPE_MATRIX 0x2
+
 /* this is used to avoid queing layout changes in the middle of snapshotting */
 int snapshot_in_progress = 0;
 static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
@@ -219,6 +223,33 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 	snapshot_in_progress++;
 
 	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+	jobject transformation = NULL;
+	gboolean push_opacity = FALSE;
+	if (wrapper->animating && wrapper->jobj) {
+		/* view animation: the transformation applies to everything the view draws (AOSP: View.draw() with applyLegacyAnimation()) */
+		JNIEnv *env = get_jni_env();
+		transformation = J__View__applyLegacyAnimation(env, wrapper->jobj);
+		if ((*env)->ExceptionCheck(env))
+			(*env)->ExceptionDescribe(env);
+		if (transformation) {
+			int type = J__Transformation__getTransformationType(env, transformation);
+			gtk_snapshot_save(snapshot);
+			if (type & TRANSFORMATION_TYPE_MATRIX) {
+				jobject matrix = J__Transformation__getMatrix(env, transformation);
+				gtk_snapshot_transform_matrix(snapshot, _PTR(_GET_LONG_FIELD(matrix, "native_instance")));
+				(*env)->DeleteLocalRef(env, matrix);
+			}
+			if (type & TRANSFORMATION_TYPE_ALPHA) {
+				gtk_snapshot_push_opacity(snapshot, J__Transformation__getAlpha(env, transformation));
+				push_opacity = TRUE;
+			}
+			(*env)->DeleteLocalRef(env, transformation);
+		}
+		if (!_GET_BOOL_FIELD(wrapper->jobj, "animationMore") && wrapper->animation_tick) {
+			gtk_widget_remove_tick_callback(widget, wrapper->animation_tick);
+			wrapper->animation_tick = 0;
+		}
+	}
 	if (wrapper->real_height > 0 && wrapper->real_width > 0) {
 		gtk_snapshot_push_clip(snapshot, &GRAPHENE_RECT_INIT(0, 0, wrapper->real_width, wrapper->real_height));
 	}
@@ -239,6 +270,10 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 	if (wrapper->real_height > 0 && wrapper->real_width > 0) {
 		gtk_snapshot_pop(snapshot);
 	}
+	if (push_opacity)
+		gtk_snapshot_pop(snapshot);
+	if (transformation)
+		gtk_snapshot_restore(snapshot);
 
 	snapshot_in_progress--;
 }
@@ -283,6 +318,23 @@ static guint queue_queue_redraw(GtkWidget *widget)
 	gtk_widget_queue_draw(widget);
 	g_object_unref(widget);
 	return G_SOURCE_REMOVE;
+}
+
+static gboolean animation_tick(GtkWidget *widget, GdkFrameClock *frame_clock, gpointer user_data)
+{
+	gtk_widget_queue_draw(widget);
+	return G_SOURCE_CONTINUE;
+}
+
+void wrapper_widget_set_animating(WrapperWidget *wrapper, gboolean animating)
+{
+	wrapper->animating = animating;
+	if (animating && !wrapper->animation_tick) {
+		wrapper->animation_tick = gtk_widget_add_tick_callback(GTK_WIDGET(wrapper), animation_tick, NULL, NULL);
+	} else if (!animating && wrapper->animation_tick) {
+		gtk_widget_remove_tick_callback(GTK_WIDGET(wrapper), wrapper->animation_tick);
+		wrapper->animation_tick = 0;
+	}
 }
 
 void wrapper_widget_queue_draw(WrapperWidget *wrapper)

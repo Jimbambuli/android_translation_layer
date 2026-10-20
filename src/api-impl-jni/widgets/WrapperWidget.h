@@ -23,6 +23,8 @@ struct _WrapperWidget {
 	gboolean hover_exit_pending;
 	gboolean has_focus;
 	gboolean rtl_resolved;
+	gboolean animating; /* a view animation (android.view.animation) is set on the view */
+	guint animation_tick; /* redraws the view in every frame while the animation runs */
 	int hover_x;
 	int hover_y;
 	bool have_custom_draw_method;
@@ -51,6 +53,7 @@ void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, fl
 void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnapshot *snapshot);
 void wrapper_widget_consume_touch_events(WrapperWidget *wrapper);
 void wrapper_widget_register_invalidation_listener(WrapperWidget *wrapper);
+void wrapper_widget_set_animating(WrapperWidget *wrapper, gboolean animating);
 
 void _setOnTouchListener(JNIEnv *env, jobject this, GtkWidget *widget);
 

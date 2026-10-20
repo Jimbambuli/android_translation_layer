@@ -723,6 +723,11 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeInvalidate(JNIEnv *env, jcla
 	wrapper_widget_queue_draw(WRAPPER_WIDGET(gtk_widget_get_parent(widget)));
 }
 
+JNIEXPORT void JNICALL Java_android_view_View_native_1setAnimating(JNIEnv *env, jobject this, jlong widget_ptr, jboolean animating)
+{
+	wrapper_widget_set_animating(WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)))), animating);
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_native_1destructor(JNIEnv *env, jobject this, jlong widget_ptr)
 {
 	g_object_unref(gtk_widget_get_parent(_PTR(widget_ptr)));

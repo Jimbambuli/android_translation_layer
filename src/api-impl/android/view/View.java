@@ -3,6 +3,7 @@ package android.view;
 import android.R;
 import android.animation.AnimatorInflater;
 import android.animation.StateListAnimator;
+import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.atl.GskCanvas;
@@ -42,6 +43,8 @@ import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.WindowInsets;
 import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.view.animation.Transformation;
 import android.view.autofill.AutofillId;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
@@ -987,6 +990,9 @@ public class View implements Drawable.Callback {
 	private boolean atl_focusable_set; // set with setFocusable() or android:focusable
 
 	private Handler handler;
+	private Animation currentAnimation;
+	private Transformation animationTransformation;
+	private boolean animationMore; // read by the wrapper widget: draw the next frame
 
 	private CopyOnWriteArrayList<OnLayoutChangeListener> on_layout_change_listeners;
 
@@ -1084,7 +1090,7 @@ public class View implements Drawable.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
-			native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
 		}
 
 		if (a.hasValue(com.android.internal.R.styleable.View_minWidth))
@@ -1560,6 +1566,11 @@ public class View implements Drawable.Callback {
 
 	native void native_setVisibility(long widget, int visibility, float alpha, boolean sensitive);
 
+	/* like ViewGroup.dispatchDraw() in AOSP, an invisible view is drawn while it has an animation (fade in/out) */
+	private int getDrawnVisibility() {
+		return visibility == INVISIBLE && currentAnimation != null ? VISIBLE : visibility;
+	}
+
 	protected void onVisibilityChanged(View changedView, int visibility) {
 	}
 
@@ -1574,7 +1585,7 @@ public class View implements Drawable.Callback {
 			((ViewGroup)parent).requestLayout();
 		}
 		this.visibility = visibility;
-		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
 		dispatchVisibilityChanged(this, visibility);
 	}
 
@@ -1806,7 +1817,7 @@ public class View implements Drawable.Callback {
 	public void setEnabled(boolean enabled) {
 		boolean changed = atl_enabled != enabled;
 		atl_enabled = enabled;
-		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
 		if (changed)
 			refreshDrawableState();
 	}
@@ -2211,7 +2222,19 @@ public class View implements Drawable.Callback {
 		return nativeIsFocused(widget);
 	}
 
-	public void clearAnimation() {}
+	/**
+	 * Cancels any animations for this view.
+	 */
+	public void clearAnimation() {
+		if (currentAnimation != null) {
+			currentAnimation.detach();
+		}
+		currentAnimation = null;
+		native_setAnimating(widget, false);
+		if (visibility == INVISIBLE)
+			native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+		invalidate();
+	}
 
 	private ViewPropertyAnimator viewPropertyAnimator;
 	public ViewPropertyAnimator animate() {
@@ -2249,7 +2272,7 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setAlpha(float alpha) {
-		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
 		this.alpha = alpha;
 	}
 
@@ -2443,12 +2466,62 @@ public class View implements Drawable.Callback {
 
 	protected void onAnimationEnd() {}
 
+	/**
+	 * Start the specified animation now.
+	 */
 	public void startAnimation(Animation animation) {
-		if (animation == null)
-			return;
-		onAnimationStart();
-		animation.start();
-		onAnimationEnd();
+		animation.setStartTime(Animation.START_ON_FIRST_FRAME);
+		setAnimation(animation);
+		invalidate();
+	}
+
+	private native void native_setAnimating(long widget, boolean animating);
+
+	/*
+	 * Called by the wrapper widget while it draws this view, like View.applyLegacyAnimation() in
+	 * AOSP: returns the transformation for this frame, or null when there is none, and sets
+	 * animationMore if there are more frames. After the last frame the animation is cleared, unless
+	 * it fills after (AOSP: ViewGroup.finishAnimatingView()).
+	 */
+	@Export
+	private Transformation applyLegacyAnimation() {
+		final Animation a = currentAnimation;
+		if (a == null)
+			return null;
+		long drawingTime = AnimationUtils.currentAnimationTimeMillis();
+		if (!a.isInitialized()) {
+			View parentView = parent instanceof View ? (View)parent : this;
+			a.initialize(getWidth(), getHeight(), parentView.getWidth(), parentView.getHeight());
+			a.initializeInvalidateRegion(0, 0, getWidth(), getHeight());
+			a.setListenerHandler(getHandler());
+			onAnimationStart();
+		}
+		// animations are turned off (animator duration scale 0): show the end state at once
+		if (ValueAnimator.getDurationScale() == 0) {
+			if (a.getStartTime() == Animation.START_ON_FIRST_FRAME)
+				a.setStartTime(drawingTime);
+			drawingTime += a.computeDurationHint();
+		}
+		if (animationTransformation == null)
+			animationTransformation = new Transformation();
+		animationTransformation.clear();
+		boolean more = a.getTransformation(drawingTime, animationTransformation, 1f);
+		boolean ended = animationMore && !more && a.hasEnded();
+		animationMore = more;
+		if (ended) {
+			// not while GTK draws; after the listener of the animation (it may change the visibility)
+			getHandler().post(new Runnable() {
+				@Override
+				public void run() {
+					if (currentAnimation != a)
+						return;
+					if (!a.getFillAfter())
+						clearAnimation();
+					onAnimationEnd();
+				}
+			});
+		}
+		return animationTransformation;
 	}
 
 	public void getDrawingRect(Rect rect) {
@@ -2926,7 +2999,12 @@ public class View implements Drawable.Callback {
 
 	public void setTransitionName(String transitionName) {}
 
-	public Animation getAnimation() { return null; }
+	/**
+	 * Get the animation currently associated with this view.
+	 */
+	public Animation getAnimation() {
+		return currentAnimation;
+	}
 
 	public ViewOverlay getOverlay() {
 		return new ViewOverlay();
@@ -3039,13 +3117,13 @@ public class View implements Drawable.Callback {
 	/* API 29; transitions fade with this, on top of the view's own alpha */
 	public void setTransitionAlpha(float alpha) {
 		transitionAlpha = alpha;
-		native_setVisibility(widget, visibility, this.alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), this.alpha * transitionAlpha, atl_enabled);
 	}
 
 	/* API 29; sets the visibility without the side effects of setVisibility() */
 	public void setTransitionVisibility(int visibility) {
 		this.visibility = visibility;
-		native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
 	}
 
 	/* API 29 */
@@ -3055,7 +3133,41 @@ public class View implements Drawable.Callback {
 
 	public void onWindowFocusChanged(boolean hasFocus) {}
 
-	public void setAnimation(Animation animation) {}
+	/**
+	 * Sets the next animation to play for this view. The animation starts at the time set with
+	 * {@link Animation#setStartTime(long)}, {@link #startAnimation(Animation)} starts it right away.
+	 */
+	public void setAnimation(Animation animation) {
+		currentAnimation = animation;
+		if (animation != null) {
+			animation.reset();
+			animationMore = true;
+		}
+		native_setAnimating(widget, animation != null);
+		if (visibility == INVISIBLE)
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+		if (visibility == GONE && animation != null)
+			getHandler().post(new GoneAnimationTicker(animation));
+	}
+
+	/* AOSP draws a gone view (at its last bounds) as long as it has an animation, so the animation
+	 * runs and its listener is called. A gone GTK widget is not drawn, so advance it from here. */
+	private class GoneAnimationTicker implements Runnable {
+		private final Animation animation;
+
+		GoneAnimationTicker(Animation animation) {
+			this.animation = animation;
+		}
+
+		@Override
+		public void run() {
+			if (currentAnimation != animation || visibility != GONE)
+				return;
+			applyLegacyAnimation();
+			if (animationMore)
+				getHandler().postDelayed(this, 16);
+		}
+	}
 
 	public boolean performAccessibilityAction(int action, Bundle arguments) { return false; }
 
