@@ -19,6 +19,11 @@ public class ConnectivityManager {
 		return new NetworkInfo(nativeGetNetworkAvailable());
 	}
 
+	public NetworkInfo getNetworkInfo(Network network) {
+		// like AOSP: no network, no info
+		return network != null ? getActiveNetworkInfo() : null;
+	}
+
 	public NetworkInfo getActiveNetworkInfo() {
 		return new NetworkInfo(nativeGetNetworkAvailable());
 	}
