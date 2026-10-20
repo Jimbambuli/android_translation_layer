@@ -361,6 +361,18 @@ static gboolean install_dbus_service_file(const char *package_name, const char *
 	return TRUE;
 }
 
+static void update_animator_duration_scale(GtkSettings *settings)
+{
+	JNIEnv *env = get_jni_env();
+	gboolean enable_animations;
+	g_object_get(settings, "gtk-enable-animations", &enable_animations, NULL);
+	jclass value_animator = (*env)->FindClass(env, "android/animation/ValueAnimator");
+	(*env)->CallStaticVoidMethod(env, value_animator, _STATIC_METHOD(value_animator, "setDurationScale", "(F)V"), enable_animations ? 1.0f : 0.0f);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, value_animator);
+}
+
 static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
 {
 	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
@@ -493,6 +505,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	apk_path = strdup(apk_classpath);
 
 	(*env)->GetJavaVM(env, &jvm);
+
+	/* turning off animations on the desktop is what "Remove animations" (animator duration scale 0) is on Android */
+	g_signal_connect(gtk_settings_get_default(), "notify::gtk-enable-animations", G_CALLBACK(update_animator_duration_scale), NULL);
+	update_animator_duration_scale(gtk_settings_get_default());
 
 	/* -- misc -- */
 
