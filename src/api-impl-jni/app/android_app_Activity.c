@@ -6,6 +6,7 @@
 
 #include "../defines.h"
 #include "../util.h"
+#include "../widgets/WrapperWidget.h"
 #include "../generated_headers/android_app_Activity.h"
 #include "../../main-executable/back_button.h"
 #include "android_app_Activity.h"
@@ -68,6 +69,64 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
 		(*env)->ExceptionDescribe(env);
 }
 
+struct scrim_anim {
+	struct atl_scrim scrim;
+	GtkWidget *page;
+	float from;
+	float to;
+	gint64 start;
+	gint64 duration;
+};
+
+/* the tick callback owns the animation and holds a reference on the page; the page's "atl-scrim"
+ * points at it until it ends or the next change replaces it */
+static void scrim_anim_free(gpointer data)
+{
+	struct scrim_anim *anim = data;
+	if (g_object_get_data(G_OBJECT(anim->page), "atl-scrim") == anim)
+		g_object_set_data(G_OBJECT(anim->page), "atl-scrim", NULL);
+	g_object_unref(anim->page);
+	g_free(anim);
+}
+
+static gboolean scrim_tick(GtkWidget *stack, GdkFrameClock *clock, gpointer user_data)
+{
+	struct scrim_anim *anim = user_data;
+	if (g_object_get_data(G_OBJECT(anim->page), "atl-scrim") != anim)
+		return G_SOURCE_REMOVE; // replaced by the next change
+	gint64 now = gdk_frame_clock_get_frame_time(clock);
+	if (!anim->start)
+		anim->start = now;
+	double t = MIN(1.0, (double)(now - anim->start) / anim->duration);
+	anim->scrim.alpha = anim->from + (anim->to - anim->from) * t;
+	gtk_widget_queue_draw(anim->page);
+	if (t < 1 && gtk_stack_get_transition_running(GTK_STACK(stack)))
+		return G_SOURCE_CONTINUE;
+	gtk_widget_queue_draw(anim->page);
+	return G_SOURCE_REMOVE; // scrim_anim_free() takes the scrim off the page
+}
+
+/* The activity that does not move in a change fades over the black window (see
+ * Activity.getStackTransition). GtkStack draws the leaving page from a snapshot taken when the change
+ * starts, so the page that it shows live (the entering one) draws a black scrim of the matching alpha:
+ * over itself if it is the one that fades, else around itself, where the leaving page shows. */
+static void start_scrim(JNIEnv *env, GtkStack *stack, GtkWidget *page, int duration)
+{
+	jint scrim = (*env)->GetStaticIntField(env, _CACHED_CLASS(Activity),
+	                                       (*env)->GetStaticFieldID(env, _CACHED_CLASS(Activity), "stackScrim", "I"));
+	if (!(scrim & (1 << 17)) || duration <= 0 || !WRAPPER_IS_WIDGET(page))
+		return;
+	struct scrim_anim *anim = g_new0(struct scrim_anim, 1);
+	anim->page = g_object_ref(page);
+	anim->scrim.outside = !(scrim & (1 << 16));
+	anim->from = (scrim & 0xff) / 255.f;
+	anim->to = ((scrim >> 8) & 0xff) / 255.f;
+	anim->scrim.alpha = anim->from;
+	anim->duration = (gint64)duration * 1000;
+	g_object_set_data(G_OBJECT(page), "atl-scrim", anim);
+	gtk_widget_add_tick_callback(GTK_WIDGET(stack), scrim_tick, anim, scrim_anim_free);
+}
+
 static void activity_focus(JNIEnv *env, jobject activity)
 {
 	if (_GET_BOOL_FIELD(activity, "finishing"))
@@ -91,6 +150,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	gtk_stack_set_transition_type(stack, transition & 0xff);
 	gtk_stack_set_transition_duration(stack, transition >> 8);
 	gtk_stack_set_visible_child(stack, decor_view);
+	start_scrim(env, stack, decor_view, transition >> 8);
 
 	J__Activity__performResume(env, activity);
 	if ((*env)->ExceptionCheck(env))

@@ -755,8 +755,19 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			moving = exit;
 		}
 		long duration;
+		stackScrim = 0;
 		if (moving != null) {
 			duration = moving.computeDurationHint();
+			/* the activity that stays in place fades over the black window background (the
+			 * fade_out under a sliding-in activity, the fade_in under a sliding-out one): GtkStack
+			 * can't fade it, the native side draws the matching black scrim */
+			Animation still = moving == enter ? exit : enter;
+			if (still != null) {
+				float from = sampleWindowAnimation(still, 0)[2];
+				float to = sampleWindowAnimation(still, duration)[2];
+				if (from < 1 || to < 1)
+					stackScrim = 1 << 17 | (moving == exit ? 1 << 16 : 0) | Math.round((1 - from) * 255) | Math.round((1 - to) * 255) << 8;
+			}
 		} else {
 			// cross-fade for as long as the alpha of either animation changes
 			duration = Math.max(enter != null ? alphaDuration(enter) : 0, exit != null ? alphaDuration(exit) : 0);
@@ -766,6 +777,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		duration = (long)(duration * ValueAnimator.getDurationScale());
 		return type | (int)Math.min(duration, 5000) << 8;
 	}
+
+	/* for the native side, set by getStackTransition(): bit 17 set if there is a scrim, bit 16 if
+	 * it dims the entering activity (else the leaving one), bits 0-7/8-15 its alpha at the start/end */
+	private static int stackScrim;
 
 	private static Animation loadWindowAnimation(Context context, int id, int width, int height) {
 		if (id == 0)

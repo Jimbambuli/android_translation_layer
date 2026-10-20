@@ -275,6 +275,20 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 	if (transformation)
 		gtk_snapshot_restore(snapshot);
 
+	struct atl_scrim *scrim = g_object_get_data(G_OBJECT(widget), "atl-scrim");
+	if (scrim && scrim->alpha > 0) {
+		float w = gtk_widget_get_width(widget), h = gtk_widget_get_height(widget);
+		GdkRGBA black = {0, 0, 0, scrim->alpha};
+		if (scrim->outside) { // the parent clips this to where the other page shows
+			gtk_snapshot_append_color(snapshot, &black, &GRAPHENE_RECT_INIT(-2 * w, -2 * h, 5 * w, 2 * h));
+			gtk_snapshot_append_color(snapshot, &black, &GRAPHENE_RECT_INIT(-2 * w, h, 5 * w, 2 * h));
+			gtk_snapshot_append_color(snapshot, &black, &GRAPHENE_RECT_INIT(-2 * w, 0, 2 * w, h));
+			gtk_snapshot_append_color(snapshot, &black, &GRAPHENE_RECT_INIT(w, 0, 2 * w, h));
+		} else {
+			gtk_snapshot_append_color(snapshot, &black, &GRAPHENE_RECT_INIT(0, 0, w, h));
+		}
+	}
+
 	snapshot_in_progress--;
 }
 
