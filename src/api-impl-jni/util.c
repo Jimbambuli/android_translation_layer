@@ -353,9 +353,23 @@ static void on_move_focus(GtkWidget *widget, GtkDirectionType direction, gpointe
 	gtk_window_set_focus_visible(window, TRUE);
 }
 
+/* a press of the pointer (which ATL hands to the app as touch) enters touch mode, which hides the
+ * focus (Android: ViewRootImpl.ensureTouchMode()); Tab leaves it again (on_move_focus) */
+static gboolean on_pointer_event(GtkEventControllerLegacy *controller, GdkEvent *event, GtkWindow *window)
+{
+	GdkEventType type = gdk_event_get_event_type(event);
+	if (type == GDK_BUTTON_PRESS || type == GDK_TOUCH_BEGIN)
+		gtk_window_set_focus_visible(window, FALSE);
+	return FALSE;
+}
+
 void atl_window_android_tab_focus(GtkWindow *window)
 {
 	g_signal_connect(window, "move-focus", G_CALLBACK(on_move_focus), NULL);
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(on_pointer_event), window);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
 }
 
 GVariant *intent_serialize(JNIEnv *env, jobject intent)

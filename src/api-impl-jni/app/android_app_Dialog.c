@@ -124,6 +124,8 @@ JNIEXPORT void JNICALL Java_android_app_Dialog_nativeSetContentView(JNIEnv *env,
 JNIEXPORT void JNICALL Java_android_app_Dialog_nativeShow(JNIEnv *env, jobject this, jlong ptr)
 {
 	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
+	/* the dialog is in touch mode (no focus shown) if the app window is */
+	gtk_window_set_focus_visible(dialog, gtk_window_get_focus_visible(window));
 	gtk_window_present(dialog);
 }
 
