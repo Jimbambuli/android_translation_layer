@@ -7,6 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_widget_PopupWindow_ENTER_FADE_MS
+#define android_widget_PopupWindow_ENTER_FADE_MS 100L
+#undef android_widget_PopupWindow_EXIT_FADE_MS
+#define android_widget_PopupWindow_EXIT_FADE_MS 300L
 #undef android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY
 #define android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY 8388659L
 /*
@@ -76,10 +80,18 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchModal
 /*
  * Class:     android_widget_PopupWindow
  * Method:    native_dismiss
- * Signature: (J)V
+ * Signature: (JI)V
  */
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_fadeIn
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1fadeIn
+  (JNIEnv *, jobject, jlong, jint);
 
 /*
  * Class:     android_widget_PopupWindow

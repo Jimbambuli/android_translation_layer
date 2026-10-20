@@ -1,5 +1,6 @@
 package android.widget;
 
+import android.animation.ValueAnimator;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -17,11 +18,28 @@ public class PopupWindow {
 	int input_method_mode = 0;
 	private Transition enter_transition;
 	private Transition exit_transition;
+	/* AOSP plays the popupEnterTransition/popupExitTransition of the theme; ATL can't inflate
+	 * transitions and plays the fade of those of Android 14 (transition/popup_window_enter.xml:
+	 * fade from 0.1 in 100 ms, together with a 250 ms clip reveal that is left out;
+	 * popup_window_exit.xml: fade out in 300 ms) */
+	private static final int ENTER_FADE_MS = 100;
+	private static final int EXIT_FADE_MS = 300;
+	private boolean enter_animated;
+	private boolean exit_animated;
+	private int animation_style = -1;
+
+	private int fadeDuration(boolean enter) {
+		if (animation_style == 0 || ValueAnimator.getDurationScale() == 0 || !(enter ? enter_animated : exit_animated))
+			return 0;
+		return enter ? ENTER_FADE_MS : EXIT_FADE_MS;
+	}
 
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		popover = native_constructor();
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.PopupWindow, defStyleAttr, defStyleRes);
 		overlap_anchor = a.getBoolean(com.android.internal.R.styleable.PopupWindow_overlapAnchor, false);
+		enter_animated = a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupEnterTransition, 0) != 0;
+		exit_animated = a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupExitTransition, 0) != 0;
 		a.recycle();
 		int[] colors = themeColors(context);
 		native_setColors(popover, colors[0], colors[1]);
@@ -122,6 +140,7 @@ public class PopupWindow {
 		anchored_gravity = gravity;
 		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
 		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
+		native_fadeIn(popover, fadeDuration(true));
 	}
 
 	public View getContentView() {
@@ -144,13 +163,17 @@ public class PopupWindow {
 		if (gravity == Gravity.NO_GRAVITY)
 			gravity = Gravity.TOP | Gravity.START;
 		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
+		native_fadeIn(popover, fadeDuration(true));
 	}
 
 	public void dismiss() {
-		native_dismiss(popover);
+		native_dismiss(popover, fadeDuration(false));
 	}
 
-	public void setAnimationStyle(int animationStyle) {}
+	/* 0 turns the animations off, as on AOSP; other styles are not played */
+	public void setAnimationStyle(int animationStyle) {
+		animation_style = animationStyle;
+	}
 
 	public void setTouchModal(boolean touchModal) {
 		native_setTouchModal(popover, touchModal);
@@ -169,9 +192,10 @@ public class PopupWindow {
 
 	public void setEpicenterBounds(Rect bounds) {}
 
-	/* transitions are stored but not played; the popover appears without animation */
+	/* transitions are stored but not played; a null one turns the fade off (see fadeDuration) */
 	public void setEnterTransition(Transition enterTransition) {
 		enter_transition = enterTransition;
+		enter_animated = enterTransition != null;
 	}
 
 	public Transition getEnterTransition() {
@@ -180,6 +204,7 @@ public class PopupWindow {
 
 	public void setExitTransition(Transition exitTransition) {
 		exit_transition = exitTransition;
+		exit_animated = exitTransition != null;
 	}
 
 	public Transition getExitTransition() {
@@ -237,7 +262,8 @@ public class PopupWindow {
 	protected native boolean native_isShowing(long widget);
 	protected native void native_setTouchable(long widget, boolean touchable);
 	protected native void native_setTouchModal(long widget, boolean touchable);
-	protected native void native_dismiss(long widget);
+	protected native void native_dismiss(long widget, int fadeMs);
+	protected native void native_fadeIn(long widget, int fadeMs);
 	protected native void native_update(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int width, int height, int gravity, boolean overlapAnchor);
 	public native void setOnDismissListener(OnDismissListener listener);
 	public native void native_setWidth(long widget, int width);

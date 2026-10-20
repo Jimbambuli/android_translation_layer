@@ -316,14 +316,58 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_setOnDismissListener(JNIE
 		g_signal_connect(popover, "closed", G_CALLBACK(on_closed_cb), _REF(listener));
 }
 
-JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isShowing(JNIEnv *env, jobject this, jlong popover_ptr)
+/* a popup that fades out after dismiss() is no longer showing and takes no input */
+static gboolean is_fading_out(GtkWidget *popover)
 {
-	return gtk_widget_get_visible(GTK_WIDGET(_PTR(popover_ptr)));
+	return GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "fading-out"));
 }
 
-JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss(JNIEnv *env, jobject this, jlong popover_ptr)
+static void reset_fade(GtkWidget *popover)
 {
-	gtk_popover_popdown(GTK_POPOVER(_PTR(popover_ptr)));
+	atl_fade_widget_cancel(popover);
+	g_object_set_data(G_OBJECT(popover), "fading-out", NULL);
+	gtk_widget_set_can_target(popover, TRUE);
+	gtk_widget_set_opacity(popover, 1);
+}
+
+static void fade_out_done(GtkWidget *popover)
+{
+	g_object_set_data(G_OBJECT(popover), "fading-out", NULL);
+	gtk_popover_popdown(GTK_POPOVER(popover));
+	gtk_widget_set_can_target(popover, TRUE);
+	gtk_widget_set_opacity(popover, 1);
+}
+
+JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isShowing(JNIEnv *env, jobject this, jlong popover_ptr)
+{
+	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
+	return gtk_widget_get_visible(popover) && !is_fading_out(popover);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss(JNIEnv *env, jobject this, jlong popover_ptr, jint fade_ms)
+{
+	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
+	if (fade_ms <= 0 || !gtk_widget_get_mapped(popover)) {
+		reset_fade(popover);
+		gtk_popover_popdown(GTK_POPOVER(popover));
+		return;
+	}
+	if (is_fading_out(popover))
+		return;
+	g_object_set_data(G_OBJECT(popover), "fading-out", GINT_TO_POINTER(1));
+	gtk_widget_set_can_target(popover, FALSE);
+	atl_fade_widget(popover, 0, fade_ms, fade_out_done);
+}
+
+/* called after the popover was shown: fade in like the popupEnterTransition (from 0.1) */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1fadeIn(JNIEnv *env, jobject this, jlong popover_ptr, jint fade_ms)
+{
+	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
+	reset_fade(popover);
+	if (fade_ms <= 0)
+		return;
+	gtk_widget_set_opacity(popover, 0.1);
+	atl_fade_widget(popover, 1, fade_ms, NULL);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint x, jint y, jint width, jint height, jint gravity, jboolean overlap_anchor)
