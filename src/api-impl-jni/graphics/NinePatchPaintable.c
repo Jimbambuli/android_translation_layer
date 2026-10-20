@@ -94,7 +94,8 @@ static void ninepatch_paintable_snapshot(GdkPaintable *paintable, GdkSnapshot *s
 
 static GdkPaintableFlags ninepatch_paintable_get_flags(GdkPaintable *paintable)
 {
-	return GDK_PAINTABLE_STATIC_CONTENTS | GDK_PAINTABLE_STATIC_SIZE;
+	/* not static contents: setTint() changes them */
+	return GDK_PAINTABLE_STATIC_SIZE;
 }
 
 static void ninepatch_paintable_init(NinePatchPaintable *ninepatch_paintable)
