@@ -73,7 +73,12 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		view.getWindowVisibleDisplayFrame(displayFrame);
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
 		WindowManager.LayoutParams windowParams = (WindowManager.LayoutParams)params;
-		native_addView(view.widget, windowParams.type, windowParams.x, windowParams.y, params.width, params.height);
+		native_addView(view.widget, windowParams.type, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
+	}
+
+	/* the gravity by which x and y place the window; ATL's LayoutParams have -1 for none set */
+	private static int absoluteGravity(View view, WindowManager.LayoutParams params) {
+		return Gravity.getAbsoluteGravity(params.gravity == -1 ? Gravity.TOP | Gravity.LEFT : params.gravity, view.getLayoutDirection());
 	}
 
 	@Override
@@ -84,7 +89,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
 		WindowManager.LayoutParams windowParams = (WindowManager.LayoutParams)params;
 		view.setLayoutParams(params);
-		native_updateViewLayout(view.widget, windowParams.x, windowParams.y, params.width, params.height);
+		native_updateViewLayout(view.widget, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
 	}
 
 	@Override
@@ -98,7 +103,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		removeView(view);
 	}
 
-	private static native void native_addView(long widget, int type, int x, int y, int width, int height);
-	private static native void native_updateViewLayout(long widget, int x, int y, int width, int height);
+	private static native void native_addView(long widget, int type, int gravity, int x, int y, int width, int height);
+	private static native void native_updateViewLayout(long widget, int gravity, int x, int y, int width, int height);
 	private static native void native_removeView(long widget);
 }

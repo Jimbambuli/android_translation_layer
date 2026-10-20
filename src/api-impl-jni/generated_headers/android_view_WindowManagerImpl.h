@@ -10,18 +10,18 @@ extern "C" {
 /*
  * Class:     android_view_WindowManagerImpl
  * Method:    native_addView
- * Signature: (JIIIII)V
+ * Signature: (JIIIIII)V
  */
 JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jint);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jint, jint);
 
 /*
  * Class:     android_view_WindowManagerImpl
  * Method:    native_updateViewLayout
- * Signature: (JIIII)V
+ * Signature: (JIIIII)V
  */
 JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1updateViewLayout
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint);
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint, jint);
 
 /*
  * Class:     android_view_WindowManagerImpl
