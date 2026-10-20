@@ -23,6 +23,26 @@ extern "C" {
 #define android_app_Activity_RESULT_CANCELED 0L
 #undef android_app_Activity_RESULT_OK
 #define android_app_Activity_RESULT_OK -1L
+#undef android_app_Activity_GTK_STACK_TRANSITION_NONE
+#define android_app_Activity_GTK_STACK_TRANSITION_NONE 0L
+#undef android_app_Activity_GTK_STACK_TRANSITION_CROSSFADE
+#define android_app_Activity_GTK_STACK_TRANSITION_CROSSFADE 1L
+#undef android_app_Activity_GTK_STACK_TRANSITION_OVER_UP
+#define android_app_Activity_GTK_STACK_TRANSITION_OVER_UP 8L
+#undef android_app_Activity_GTK_STACK_TRANSITION_OVER_DOWN
+#define android_app_Activity_GTK_STACK_TRANSITION_OVER_DOWN 9L
+#undef android_app_Activity_GTK_STACK_TRANSITION_OVER_LEFT
+#define android_app_Activity_GTK_STACK_TRANSITION_OVER_LEFT 10L
+#undef android_app_Activity_GTK_STACK_TRANSITION_OVER_RIGHT
+#define android_app_Activity_GTK_STACK_TRANSITION_OVER_RIGHT 11L
+#undef android_app_Activity_GTK_STACK_TRANSITION_UNDER_UP
+#define android_app_Activity_GTK_STACK_TRANSITION_UNDER_UP 12L
+#undef android_app_Activity_GTK_STACK_TRANSITION_UNDER_DOWN
+#define android_app_Activity_GTK_STACK_TRANSITION_UNDER_DOWN 13L
+#undef android_app_Activity_GTK_STACK_TRANSITION_UNDER_LEFT
+#define android_app_Activity_GTK_STACK_TRANSITION_UNDER_LEFT 14L
+#undef android_app_Activity_GTK_STACK_TRANSITION_UNDER_RIGHT
+#define android_app_Activity_GTK_STACK_TRANSITION_UNDER_RIGHT 15L
 /*
  * Class:     android_app_Activity
  * Method:    isTaskRoot

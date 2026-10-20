@@ -12,6 +12,9 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.animation.ValueAnimator;
+import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -34,6 +37,9 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowManagerImpl;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.view.animation.Transformation;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -674,7 +680,123 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		finish();
 	}
 
-	public void overridePendingTransition(int enterAnim, int exitAnim) {}
+	/* animations of the next activity change, set by overridePendingTransition() */
+	private static boolean pendingTransitionSet;
+	private static int pendingEnterAnim;
+	private static int pendingExitAnim;
+
+	public void overridePendingTransition(int enterAnim, int exitAnim) {
+		pendingTransitionSet = true;
+		pendingEnterAnim = enterAnim;
+		pendingExitAnim = exitAnim;
+	}
+
+	// GtkStackTransitionType
+	private static final int GTK_STACK_TRANSITION_NONE = 0;
+	private static final int GTK_STACK_TRANSITION_CROSSFADE = 1;
+	private static final int GTK_STACK_TRANSITION_OVER_UP = 8;
+	private static final int GTK_STACK_TRANSITION_OVER_DOWN = 9;
+	private static final int GTK_STACK_TRANSITION_OVER_LEFT = 10;
+	private static final int GTK_STACK_TRANSITION_OVER_RIGHT = 11;
+	private static final int GTK_STACK_TRANSITION_UNDER_UP = 12;
+	private static final int GTK_STACK_TRANSITION_UNDER_DOWN = 13;
+	private static final int GTK_STACK_TRANSITION_UNDER_LEFT = 14;
+	private static final int GTK_STACK_TRANSITION_UNDER_RIGHT = 15;
+
+	/*
+	 * ATL shows the activities as pages of a GtkStack. Called from native code when the stack
+	 * changes to another activity: returns the GtkStack transition (type | duration << 8) that
+	 * resembles the window animations of this change. The animations come from
+	 * overridePendingTransition() or else from the windowAnimationStyle of the theme (AOSP:
+	 * activityOpenEnterAnimation and the like). An activity sliding in or out over at least a quarter
+	 * of the window becomes a GTK slide, a change of alpha a cross-fade; smaller movements (the 96dp
+	 * of the Android 14 default) are left out.
+	 */
+	@Export
+	private static int getStackTransition(Activity entering, Activity leaving, boolean opening, int width, int height) {
+		boolean set = pendingTransitionSet;
+		pendingTransitionSet = false;
+		Activity themed = opening ? entering : leaving;
+		if (themed == null || entering == null || leaving == null || ValueAnimator.getDurationScale() == 0)
+			return GTK_STACK_TRANSITION_NONE;
+		int enterAnim = pendingEnterAnim;
+		int exitAnim = pendingExitAnim;
+		if (!set) {
+			TypedArray a = themed.getTheme().obtainStyledAttributes(com.android.internal.R.styleable.Window);
+			int style = a.getResourceId(com.android.internal.R.styleable.Window_windowAnimationStyle, 0);
+			a.recycle();
+			if (style == 0)
+				return GTK_STACK_TRANSITION_NONE;
+			a = themed.getTheme().obtainStyledAttributes(style, com.android.internal.R.styleable.WindowAnimation);
+			enterAnim = a.getResourceId(opening ? com.android.internal.R.styleable.WindowAnimation_activityOpenEnterAnimation
+			                                    : com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation, 0);
+			exitAnim = a.getResourceId(opening ? com.android.internal.R.styleable.WindowAnimation_activityOpenExitAnimation
+			                                   : com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation, 0);
+			a.recycle();
+		}
+		Animation enter = loadWindowAnimation(themed, enterAnim, width, height);
+		Animation exit = loadWindowAnimation(themed, exitAnim, width, height);
+		// {dx, dy, alpha} where the entering activity starts and where the leaving one ends
+		float[] enterFrom = enter != null ? sampleWindowAnimation(enter, 0) : null;
+		float[] exitTo = exit != null ? sampleWindowAnimation(exit, exit.computeDurationHint()) : null;
+		int type = GTK_STACK_TRANSITION_NONE;
+		Animation moving = null;
+		if (enterFrom != null && Math.abs(enterFrom[1]) >= height / 4) {
+			type = enterFrom[1] > 0 ? GTK_STACK_TRANSITION_OVER_UP : GTK_STACK_TRANSITION_OVER_DOWN;
+			moving = enter;
+		} else if (enterFrom != null && Math.abs(enterFrom[0]) >= width / 4) {
+			type = enterFrom[0] > 0 ? GTK_STACK_TRANSITION_OVER_LEFT : GTK_STACK_TRANSITION_OVER_RIGHT;
+			moving = enter;
+		} else if (exitTo != null && Math.abs(exitTo[1]) >= height / 4) {
+			type = exitTo[1] > 0 ? GTK_STACK_TRANSITION_UNDER_DOWN : GTK_STACK_TRANSITION_UNDER_UP;
+			moving = exit;
+		} else if (exitTo != null && Math.abs(exitTo[0]) >= width / 4) {
+			type = exitTo[0] > 0 ? GTK_STACK_TRANSITION_UNDER_RIGHT : GTK_STACK_TRANSITION_UNDER_LEFT;
+			moving = exit;
+		}
+		long duration;
+		if (moving != null) {
+			duration = moving.computeDurationHint();
+		} else {
+			// cross-fade for as long as the alpha of either animation changes
+			duration = Math.max(enter != null ? alphaDuration(enter) : 0, exit != null ? alphaDuration(exit) : 0);
+			if (duration > 0)
+				type = GTK_STACK_TRANSITION_CROSSFADE;
+		}
+		duration = (long)(duration * ValueAnimator.getDurationScale());
+		return type | (int)Math.min(duration, 5000) << 8;
+	}
+
+	private static Animation loadWindowAnimation(Context context, int id, int width, int height) {
+		if (id == 0)
+			return null;
+		try {
+			Animation animation = AnimationUtils.loadAnimation(context, id);
+			animation.initialize(width, height, width, height);
+			return animation;
+		} catch (RuntimeException e) {
+			Slog.w(TAG, "cannot load window animation 0x" + Integer.toHexString(id) + ": " + e);
+			return null;
+		}
+	}
+
+	private static float[] sampleWindowAnimation(Animation animation, long time) {
+		Transformation t = new Transformation();
+		animation.setStartTime(0);
+		animation.getTransformation(time, t);
+		float[] values = new float[9];
+		t.getMatrix().getValues(values);
+		return new float[] {values[Matrix.MTRANS_X], values[Matrix.MTRANS_Y], t.getAlpha()};
+	}
+
+	private static long alphaDuration(Animation animation) {
+		long end = animation.computeDurationHint();
+		float last = sampleWindowAnimation(animation, end)[2];
+		long time = end;
+		while (time > 0 && Math.abs(sampleWindowAnimation(animation, time - 10)[2] - last) < 0.01f)
+			time -= 10;
+		return sampleWindowAnimation(animation, 0)[2] == last && time == 0 ? 0 : time;
+	}
 
 	public native boolean isTaskRoot();
 

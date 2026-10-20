@@ -15,6 +15,16 @@ extern GtkWindow *window;
 static GList *activity_backlog = NULL;
 static jobject activity_current = NULL;
 
+/* the activity change for which the GtkStack shows a transition: from which activity, and whether the
+ * new one opens (otherwise one is closed, or it is recreated if transition_from is NULL) */
+static jobject transition_from = NULL;
+static gboolean transition_opening = FALSE;
+
+static GtkStack *get_stack(void)
+{
+	return GTK_STACK(gtk_window_get_child(window));
+}
+
 static GtkWidget *get_decor_view(JNIEnv *env, jobject activity)
 {
 	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
@@ -71,6 +81,15 @@ static void activity_focus(JNIEnv *env, jobject activity)
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
 	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
+	jint transition = J__Activity__getStackTransition(env, transition_opening ? activity : transition_from, transition_opening ? transition_from : activity,
+	                                                  transition_opening, gtk_widget_get_width(GTK_WIDGET(stack)), gtk_widget_get_height(GTK_WIDGET(stack)));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		transition = GTK_STACK_TRANSITION_TYPE_NONE;
+	}
+	transition_from = NULL;
+	gtk_stack_set_transition_type(stack, transition & 0xff);
+	gtk_stack_set_transition_duration(stack, transition >> 8);
 	gtk_stack_set_visible_child(stack, decor_view);
 
 	J__Activity__performResume(env, activity);
@@ -183,6 +202,8 @@ static gboolean delayed_close_window(gpointer window)
 
 void activity_start(JNIEnv *env, jobject activity_object)
 {
+	transition_from = activity_current;
+	transition_opening = TRUE;
 	if (activity_current)
 		activity_unfocus(env, activity_current);
 	activity_current = NULL;
@@ -192,6 +213,7 @@ void activity_start(JNIEnv *env, jobject activity_object)
 		(*env)->ExceptionDescribe(env);
 
 	if (_GET_BOOL_FIELD(activity_object, "finishing")) { // finish() was called before the activity was created
+		transition_from = NULL;
 		return;
 	}
 
@@ -206,6 +228,17 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	gtk_stack_add_child(stack, decor_view);
 
 	activity_update_current(env);
+	transition_from = NULL;
+}
+
+static void close_after_transition(GtkStack *stack, GParamSpec *pspec, jobject activity)
+{
+	if (gtk_stack_get_transition_running(stack))
+		return;
+	g_signal_handlers_disconnect_by_func(stack, close_after_transition, activity);
+	JNIEnv *env = get_jni_env();
+	activity_close(env, activity);
+	_UNREF(activity);
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobject this, jlong window)
@@ -219,10 +252,19 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 			break;
 		}
 	}
+	transition_from = removed_activity;
+	transition_opening = FALSE;
 	activity_update_current(env);
+	transition_from = NULL;
 	if (removed_activity) {
-		activity_close(env, removed_activity);
-		_UNREF(removed_activity);
+		GtkStack *stack = get_stack();
+		if (gtk_stack_get_transition_running(stack)) {
+			/* as on AOSP, the activity is destroyed after the transition, which still shows it */
+			g_signal_connect(stack, "notify::transition-running", G_CALLBACK(close_after_transition), removed_activity);
+		} else {
+			activity_close(env, removed_activity);
+			_UNREF(removed_activity);
+		}
 	}
 	if (activity_backlog == NULL && window)
 		g_idle_add(delayed_close_window, _PTR(window));
@@ -311,7 +353,10 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
 			break;
 		}
 	}
+	transition_from = activity_current;
+	transition_opening = FALSE;
 	activity_update_current(env);
+	transition_from = NULL;
 
 	for (l = activities_to_close; l != NULL; l = l->next) {
 		activity_close(env, l->data);
