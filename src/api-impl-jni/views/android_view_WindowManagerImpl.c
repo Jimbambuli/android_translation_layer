@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 
 #include "../defines.h"
+#include "../util.h"
 #include "../generated_headers/android_view_WindowManagerImpl.h"
 #include "../widgets/android_widget_PopupWindow.h"
 #include "gdk/gdk.h"
@@ -10,6 +11,47 @@
 #define LAST_SUB_WINDOW  1999
 
 extern GtkWindow *window;
+
+static jclass window_manager_class;
+
+/* touch-modal windows that are added, and whether the rest of a press is swallowed */
+static int touch_modal_windows = 0;
+static gboolean swallowing_press = FALSE;
+
+/* GTK closed a touch-modal window (press outside of it, Escape): tell the view, as AOSP would by
+ * giving it the press, so that the app removes the window */
+static void on_closed(GtkPopover *popover, jobject view)
+{
+	/* the compositor takes the press that closed it and passes on only the rest */
+	swallowing_press = TRUE;
+	JNIEnv *env = get_jni_env();
+	(*env)->CallStaticVoidMethod(env, window_manager_class, _STATIC_METHOD(window_manager_class, "dispatchOutsideTouch", "(Landroid/view/View;)V"), view);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+}
+
+static void release_view(gpointer view, GClosure *closure)
+{
+	JNIEnv *env = get_jni_env();
+	_UNREF(view);
+}
+
+/* A touch-modal window takes the presses outside of it, so the app's window must not see them
+ * (on AOSP, tapping another button while a menu is open only closes the menu): neither the rest
+ * of the press that made GTK close the popover nor one while the popover is still shown. */
+static gboolean on_window_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
+{
+	GdkEventType type = gdk_event_get_event_type(event);
+	if (type == GDK_BUTTON_PRESS || type == GDK_TOUCH_BEGIN) {
+		swallowing_press = touch_modal_windows > 0 && gdk_event_get_surface(event) == gtk_native_get_surface(GTK_NATIVE(window));
+		return swallowing_press;
+	}
+	if (!swallowing_press)
+		return FALSE;
+	if (type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL)
+		swallowing_press = FALSE;
+	return type == GDK_MOTION_NOTIFY || type == GDK_TOUCH_UPDATE || type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL;
+}
 
 /* the window shows only its view, which draws its own background and shadow (Compose's menus),
  * without the frame and padding of the GTK theme's popover */
@@ -29,18 +71,34 @@ static void add_window_style(GtkPopover *popover)
 /* An added window is a popover in the widget of the app's window, like the popups of
  * PopupWindow: not in the current activity's page, which removes it while its views are detached
  * from the window (Compose removes its popups then), and with its top left corner at (x, y) as the
- * gravity measures them. */
-JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEnv *env, jclass clazz, jlong widget_ptr, jint type, jint gravity, jint x, jint y, jint width, jint height)
+ * gravity measures them. A touch-modal window closes on a press outside of it or Escape (GTK's
+ * autohide), which the view learns as an outside touch. */
+JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEnv *env, jclass clazz, jlong widget_ptr, jobject view, jint type, jboolean touch_modal, jint gravity, jint x, jint y, jint width, jint height)
 {
 	GtkWidget *widget = _PTR(widget_ptr);
 	if (type < FIRST_SUB_WINDOW || type > LAST_SUB_WINDOW) {
 		// TODO: handle toplevel windows properly
 		printf("WARNING: non subwindow types not implemented properly in WindowManagerImpl\n");
 	}
+	if (!window_manager_class)
+		window_manager_class = _REF(clazz);
 	GtkPopover *popover = GTK_POPOVER(g_object_ref(gtk_popover_new()));
 	gtk_popover_set_child(popover, gtk_widget_get_parent(widget));
 	add_window_style(popover);
-	gtk_popover_set_autohide(popover, FALSE);
+	gtk_popover_set_autohide(popover, touch_modal);
+	if (touch_modal) {
+		static gboolean controller_added = FALSE;
+		if (!controller_added) {
+			GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_legacy_new());
+			g_signal_connect(controller, "event", G_CALLBACK(on_window_event), NULL);
+			gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+			gtk_widget_add_controller(GTK_WIDGET(window), controller);
+			controller_added = TRUE;
+		}
+		touch_modal_windows++;
+		g_object_set_data(G_OBJECT(popover), "touch-modal", GINT_TO_POINTER(1));
+		g_signal_connect_data(popover, "closed", G_CALLBACK(on_closed), _REF(view), release_view, 0);
+	}
 	gtk_widget_insert_before(GTK_WIDGET(popover), gtk_window_get_child(window), NULL);
 	atl_popover_place_at_location(popover, gravity, x, y);
 	gtk_popover_present(popover);
@@ -57,6 +115,9 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1updateViewLay
 JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1removeView(JNIEnv *env, jclass clazz, jlong widget_ptr)
 {
 	GtkPopover *popover = GTK_POPOVER(gtk_widget_get_parent(gtk_widget_get_parent(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))))));
+	if (g_object_get_data(G_OBJECT(popover), "touch-modal"))
+		touch_modal_windows--;
+	g_signal_handlers_disconnect_matched(popover, G_SIGNAL_MATCH_FUNC, 0, 0, NULL, on_closed, NULL);
 	gtk_popover_popdown(popover);
 	gtk_widget_unparent(GTK_WIDGET(popover));
 	gtk_popover_set_child(popover, NULL);

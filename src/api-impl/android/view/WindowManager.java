@@ -17,6 +17,7 @@ public interface WindowManager {
 		public static final int FLAG_KEEP_SCREEN_ON = 0;
 		public static final int FLAG_DIM_BEHIND = 2;
 		public static final int FLAG_NOT_FOCUSABLE = 8;
+		public static final int FLAG_NOT_TOUCH_MODAL = 32;
 
 		public float screenBrightness = -1;
 		public int softInputMode;

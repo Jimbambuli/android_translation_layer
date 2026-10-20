@@ -1,6 +1,7 @@
 package android.view;
 
 import android.graphics.Rect;
+import android.os.SystemClock;
 import android.util.Slog;
 
 public class WindowManagerImpl implements WindowManager, ViewManager {
@@ -73,12 +74,25 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		view.getWindowVisibleDisplayFrame(displayFrame);
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
 		WindowManager.LayoutParams windowParams = (WindowManager.LayoutParams)params;
-		native_addView(view.widget, windowParams.type, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
+		/* as on AOSP, a focusable window that is not FLAG_NOT_TOUCH_MODAL takes all touches, also
+		 * those outside of it (Compose's popups dismiss themselves on these) */
+		boolean touchModal = (windowParams.flags & (WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)) == 0;
+		native_addView(view.widget, view, windowParams.type, touchModal, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
 	}
 
 	/* the gravity by which x and y place the window; ATL's LayoutParams have -1 for none set */
 	private static int absoluteGravity(View view, WindowManager.LayoutParams params) {
 		return Gravity.getAbsoluteGravity(params.gravity == -1 ? Gravity.TOP | Gravity.LEFT : params.gravity, view.getLayoutDirection());
+	}
+
+	/* called when GTK closed a touch-modal window on a press outside of it (or Escape): on
+	 * AOSP the window gets such presses, here it gets ACTION_OUTSIDE, on which Compose's popups
+	 * dismiss themselves alike */
+	private static void dispatchOutsideTouch(View view) {
+		long now = SystemClock.uptimeMillis();
+		MotionEvent event = MotionEvent.obtain(now, now, MotionEvent.ACTION_OUTSIDE, 0, 0, 0);
+		view.onTouchEvent(event);
+		event.recycle();
 	}
 
 	@Override
@@ -103,7 +117,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		removeView(view);
 	}
 
-	private static native void native_addView(long widget, int type, int gravity, int x, int y, int width, int height);
+	private static native void native_addView(long widget, View view, int type, boolean touchModal, int gravity, int x, int y, int width, int height);
 	private static native void native_updateViewLayout(long widget, int gravity, int x, int y, int width, int height);
 	private static native void native_removeView(long widget);
 }
