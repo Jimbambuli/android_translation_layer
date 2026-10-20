@@ -3371,8 +3371,25 @@ public class View implements Drawable.Callback {
 	public void setWindowInsetsAnimationCallback(WindowInsetsAnimation.Callback callback) {}
 	public void setViewTranslationCallback(ViewTranslationCallback callback) {}
 	public void clearViewTranslationCallback() {}
-	public void transformMatrixToGlobal(Matrix matrix) {}
-	public void transformMatrixToLocal(Matrix matrix) {}
+	/* as AOSP: from the view's coordinates to those of its window (Compose positions its popups by
+	 * this on API 29+); the view's own matrix is only its translation, see getMatrix() */
+	public void transformMatrixToGlobal(Matrix matrix) {
+		if (parent instanceof View) {
+			View vp = (View)parent;
+			vp.transformMatrixToGlobal(matrix);
+			matrix.preTranslate(-vp.scrollX, -vp.scrollY);
+		}
+		matrix.preTranslate(left + translationX, top + translationY);
+	}
+
+	public void transformMatrixToLocal(Matrix matrix) {
+		if (parent instanceof View) {
+			View vp = (View)parent;
+			vp.transformMatrixToLocal(matrix);
+			matrix.postTranslate(vp.scrollX, vp.scrollY);
+		}
+		matrix.postTranslate(-(left + translationX), -(top + translationY));
+	}
 	public void setAnimationMatrix(Matrix matrix) {}
 	public Matrix getAnimationMatrix() { return null; }
 
