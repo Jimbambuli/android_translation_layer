@@ -523,8 +523,11 @@ public class BitmapFactory {
 		final int density = opts.inDensity;
 		final int targetDensity = opts.inTargetDensity;
 		if (opts.inScaled && opts.inBitmap == null && targetDensity != 0 && density != targetDensity && density != opts.inScreenDensity) {
-			Bitmap scaled = Bitmap.createScaledBitmap(bitmap, Bitmap.scaleFromDensity(bitmap.getWidth(), density, targetDensity),
-			                                          Bitmap.scaleFromDensity(bitmap.getHeight(), density, targetDensity), true);
+			/* as AOSP's decoder, scale by a float factor: image loaders (Coil, Glide) pass densities
+			 * near Integer.MAX_VALUE to express arbitrary factors, which overflow integer arithmetic */
+			final float scale = (float)targetDensity / density;
+			Bitmap scaled = Bitmap.createScaledBitmap(bitmap, (int)(bitmap.getWidth() * scale + 0.5f),
+			                                          (int)(bitmap.getHeight() * scale + 0.5f), true);
 			scaled.setDensity(targetDensity);
 			return scaled;
 		}
