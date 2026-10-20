@@ -1221,7 +1221,47 @@ public class View implements Drawable.Callback {
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
+		if (defaultFocusHighlight != null && focus_shown) {
+			defaultFocusHighlight.setBounds(0, 0, getWidth(), getHeight());
+			defaultFocusHighlight.draw(canvas);
+		}
 		onDrawForeground(canvas);
+	}
+
+	/* Like AOSP (android:defaultFocusHighlightEnabled): a focused view whose background and
+	 * foreground don't show focus gets the selectableItemBackground of the theme, which shows
+	 * state_focused, drawn over its content while it shows the focus (AOSP: while focused, outside
+	 * of touch mode). */
+	private Drawable defaultFocusHighlight;
+	private boolean defaultFocusHighlightEnabled = true;
+
+	public void setDefaultFocusHighlightEnabled(boolean enabled) {
+		defaultFocusHighlightEnabled = enabled;
+	}
+
+	public final boolean getDefaultFocusHighlightEnabled() {
+		return defaultFocusHighlightEnabled;
+	}
+
+	private void switchDefaultFocusHighlight() {
+		boolean needed = defaultFocusHighlightEnabled && (background == null || !background.isStateful() || !background.hasFocusStateSpecified()) && (foreground == null || !foreground.isStateful() || !foreground.hasFocusStateSpecified());
+		if (needed == (defaultFocusHighlight != null))
+			return;
+		if (needed) {
+			TypedArray a = getContext().obtainStyledAttributes(new int[] {R.attr.selectableItemBackground});
+			defaultFocusHighlight = a.getDrawable(0);
+			a.recycle();
+			if (defaultFocusHighlight == null)
+				return;
+			native_drawThroughJava(widget);
+			defaultFocusHighlight.setCallback(this);
+			if (defaultFocusHighlight.isStateful())
+				defaultFocusHighlight.setState(getDrawableState());
+		} else {
+			defaultFocusHighlight.setCallback(null);
+			defaultFocusHighlight = null;
+		}
+		invalidate();
 	}
 
 	public View(Context context) {
@@ -1785,6 +1825,8 @@ public class View implements Drawable.Callback {
 			background.setState(getDrawableState());
 		if (foreground != null && foreground.isStateful())
 			foreground.setState(getDrawableState());
+		if (defaultFocusHighlight != null && defaultFocusHighlight.isStateful())
+			defaultFocusHighlight.setState(getDrawableState());
 		if (state_list_animator != null)
 			state_list_animator.setState(getDrawableState());
 	}
@@ -2440,6 +2482,8 @@ public class View implements Drawable.Callback {
 	 * whether GTK shows the focus (keyboard navigation), which the drawable state follows */
 	@Export
 	private void dispatchFocusChanged(boolean gainFocus, boolean focusVisible) {
+		if (gainFocus)
+			switchDefaultFocusHighlight();
 		if (focus_shown != focusVisible) {
 			focus_shown = focusVisible;
 			refreshDrawableState();
@@ -3035,7 +3079,6 @@ public class View implements Drawable.Callback {
 
 	public void setImportantForAutofill(int flag) {}
 
-	public void setDefaultFocusHighlightEnabled(boolean enabled) {}
 
 	public void setHorizontalFadingEdgeEnabled(boolean horizontalFadingEdgeEnabled) {}
 

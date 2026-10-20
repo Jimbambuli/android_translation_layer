@@ -247,6 +247,16 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 	 * Returns the number of layers contained within this.
 	 * @return The number of layers.
 	 */
+	@Override
+	public boolean hasFocusStateSpecified() {
+		for (int i = 0; i < getNumberOfLayers(); i++) {
+			Drawable dr = getDrawable(i);
+			if (dr != null && dr.hasFocusStateSpecified())
+				return true;
+		}
+		return false;
+	}
+
 	public int getNumberOfLayers() {
 		return mLayerState.mNum;
 	}

@@ -288,6 +288,10 @@ public class Drawable {
 		return false;
 	}
 
+	public boolean hasFocusStateSpecified() {
+		return false;
+	}
+
 	public void setTintMode(PorterDuff.Mode tintMode) {}
 
 	public boolean isProjected() { return false; }

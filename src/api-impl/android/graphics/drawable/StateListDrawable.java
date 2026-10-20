@@ -227,6 +227,18 @@ public class StateListDrawable extends DrawableContainer {
 		return this;
 	}
 
+	@Override
+	public boolean hasFocusStateSpecified() {
+		int[][] sets = mStateListState.mStateSets;
+		for (int i = 0; sets != null && i < sets.length; i++) {
+			for (int j = 0; sets[i] != null && j < sets[i].length; j++) {
+				if (sets[i][j] == android.R.attr.state_focused)
+					return true;
+			}
+		}
+		return false;
+	}
+
 	static class StateListState extends DrawableContainerState {
 		int[] mThemeAttrs;
 		int[][] mStateSets;

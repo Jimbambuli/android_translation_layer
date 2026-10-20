@@ -100,4 +100,10 @@ public class RippleDrawable extends LayerDrawable {
 				canvas.drawRect(bounds, paint);
 		}
 	}
+
+	/* the ripple shows focus (state_focused) itself */
+	@Override
+	public boolean hasFocusStateSpecified() {
+		return true;
+	}
 }
