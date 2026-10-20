@@ -17,8 +17,12 @@
 package android.view.animation;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
 import android.util.AttributeSet;
+
+import com.android.internal.R;
 
 /**
  * An interpolator where the rate of change starts out slowly and
@@ -48,12 +52,21 @@ public class AccelerateInterpolator extends BaseInterpolator {
 	}
 
 	public AccelerateInterpolator(Context context, AttributeSet attrs) {
-		TypedArray a =
-		    context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.AccelerateInterpolator);
+		this(context.getResources(), context.getTheme(), attrs);
+	}
 
-		mFactor = a.getFloat(com.android.internal.R.styleable.AccelerateInterpolator_factor, 1.0f);
+	/** @hide */
+	public AccelerateInterpolator(Resources res, Theme theme, AttributeSet attrs) {
+		TypedArray a;
+		if (theme != null) {
+			a = theme.obtainStyledAttributes(attrs, R.styleable.AccelerateInterpolator, 0, 0);
+		} else {
+			a = res.obtainAttributes(attrs, R.styleable.AccelerateInterpolator);
+		}
+
+		mFactor = a.getFloat(R.styleable.AccelerateInterpolator_factor, 1.0f);
 		mDoubleFactor = 2 * mFactor;
-
+		setChangingConfiguration(a.getChangingConfigurations());
 		a.recycle();
 	}
 
@@ -64,4 +77,5 @@ public class AccelerateInterpolator extends BaseInterpolator {
 			return (float)Math.pow(input, mDoubleFactor);
 		}
 	}
+
 }
