@@ -1087,6 +1087,8 @@ public class View implements Drawable.Callback {
 		if (a.hasValue(com.android.internal.R.styleable.View_focusable)) {
 			atl_focusable = a.getBoolean(com.android.internal.R.styleable.View_focusable, true);
 			atl_focusable_set = atl_focusable;
+			if (!atl_focusable)
+				native_setNativeFocusable(widget, false);
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
@@ -1473,6 +1475,7 @@ public class View implements Drawable.Callback {
 	public void setFocusable(boolean focusable) {
 		atl_focusable = focusable;
 		atl_focusable_set = true;
+		native_setNativeFocusable(widget, focusable);
 		updateKeyboardFocusable();
 	}
 	public void setFocusable(int focusable) {}
@@ -1855,6 +1858,7 @@ public class View implements Drawable.Callback {
 		native_setKeyboardFocusable(widget, atl_focusable && atl_focusable_set ? true : atl_focusable && clickable);
 	}
 	private native void native_setKeyboardFocusable(long widget, boolean focusable);
+	private native void native_setNativeFocusable(long widget, boolean focusable);
 
 	public void setEnabled(boolean enabled) {
 		boolean changed = atl_enabled != enabled;

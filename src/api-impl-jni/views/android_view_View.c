@@ -1062,6 +1062,23 @@ static gboolean on_activate_key_released(GtkEventControllerKey *controller, guin
 
 /* Widgets that take the focus themselves (buttons, entries) are left alone, and so is a wrapper
  * that is focusable because the view handles keys itself. */
+/* A view the app makes not focusable (android:focusable="false", like the switch in a preference
+ * row, whose row takes the focus) is skipped by Tab also when GTK's widget takes the focus itself. */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setNativeFocusable(JNIEnv *env, jobject this, jlong widget_ptr, jboolean focusable)
+{
+	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
+	gboolean ours = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "atl-not-focusable"));
+
+	/* can-focus covers the widget and its descendants (GtkSwitch inside the box of a Switch) */
+	if (!focusable && !ours && gtk_widget_get_can_focus(widget)) {
+		gtk_widget_set_can_focus(widget, FALSE);
+		g_object_set_data(G_OBJECT(widget), "atl-not-focusable", GINT_TO_POINTER(1));
+	} else if (focusable && ours) {
+		gtk_widget_set_can_focus(widget, TRUE);
+		g_object_set_data(G_OBJECT(widget), "atl-not-focusable", NULL);
+	}
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_native_1setKeyboardFocusable(JNIEnv *env, jobject this, jlong widget_ptr, jboolean focusable)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));

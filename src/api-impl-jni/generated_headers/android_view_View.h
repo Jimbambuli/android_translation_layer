@@ -445,6 +445,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setKeyboardFocusable
 
 /*
  * Class:     android_view_View
+ * Method:    native_setNativeFocusable
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setNativeFocusable
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_View
  * Method:    nativeSetOnLongClickListener
  * Signature: (J)V
  */
