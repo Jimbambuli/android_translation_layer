@@ -900,6 +900,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		dispatchActivityLifecycle(Application.DESTROYED, Application.PRE, null);
 		onDestroy();
 		dispatchActivityLifecycle(Application.DESTROYED, Application.POST, null);
+		Dialog.closeWindowsOf(this);
 	}
 
 	public void setDisablePreviewScreenshots(boolean disable) {}

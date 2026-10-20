@@ -155,9 +155,37 @@ public class Window {
 		set_jobject(native_window, this);
 	}
 
-	public void addFlags(int flags) {}
-	public void setFlags(int flags, int mask) {}
-	public void clearFlags(int flags) {}
+	public void addFlags(int flags) {
+		setFlags(flags, flags);
+	}
+
+	public void setFlags(int flags, int mask) {
+		forcedWindowFlags |= mask;
+		params.flags = (params.flags & ~mask) | (flags & mask);
+	}
+
+	public void clearFlags(int flags) {
+		setFlags(0, flags);
+	}
+
+	private int forcedWindowFlags;
+	private boolean haveDimAmount;
+
+	/** @hide Like PhoneWindow.generateLayout(): the window attributes that come from the theme,
+	 * unless the app has set them (dim behind a floating window, the window animations). */
+	public void applyThemeAttributes() {
+		TypedArray a = context.obtainStyledAttributes(com.android.internal.R.styleable.Window);
+		boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
+		if (a.getBoolean(com.android.internal.R.styleable.Window_backgroundDimEnabled, floating)) {
+			if ((forcedWindowFlags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) == 0)
+				params.flags |= WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+			if (!haveDimAmount)
+				params.dimAmount = a.getFloat(com.android.internal.R.styleable.Window_backgroundDimAmount, 0.5f);
+		}
+		if (params.windowAnimations == 0)
+			params.windowAnimations = a.getResourceId(com.android.internal.R.styleable.Window_windowAnimationStyle, 0);
+		a.recycle();
+	}
 
 	public final Callback getCallback() {
 		return this.callback;
@@ -340,9 +368,14 @@ public class Window {
 		return null;
 	}
 
-	public void setWindowAnimations(int resId) {}
+	public void setWindowAnimations(int resId) {
+		params.windowAnimations = resId;
+	}
 
-	public void setDimAmount(float dimAmount) {}
+	public void setDimAmount(float dimAmount) {
+		params.dimAmount = dimAmount;
+		haveDimAmount = true;
+	}
 
 	private native void set_title(long native_window, String title);
 	public native void take_input_queue(long native_window, InputQueue.Callback callback, InputQueue queue);

@@ -1,3 +1,4 @@
+#include <math.h>
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -241,6 +242,72 @@ void atl_safe_gtk_widget_queue_resize(GtkWidget *widget)
 	} else {
 		gtk_widget_add_tick_callback(widget, queue_queue_resize, NULL, NULL);
 	}
+}
+
+/* Fades the opacity of a widget from its current opacity to `to`, with the default interpolator of
+ * Android's animators (AccelerateDecelerate), then calls done (unless cancelled or replaced). Used for
+ * what Android animates as a whole window: popups, and the dim behind dialogs. */
+struct fade {
+	double from;
+	double to;
+	gint64 start;
+	gint64 duration;
+	AtlFadeDone done;
+	guint tick_id;
+};
+
+static gboolean fade_tick(GtkWidget *widget, GdkFrameClock *clock, gpointer user_data)
+{
+	struct fade *fade = user_data;
+	gint64 now = gdk_frame_clock_get_frame_time(clock);
+	if (!fade->start)
+		fade->start = now;
+	double t = fade->duration > 0 ? (double)(now - fade->start) / fade->duration : 1;
+	if (t > 1)
+		t = 1;
+	double v = cos((t + 1) * G_PI) / 2 + 0.5;
+	gtk_widget_set_opacity(widget, fade->from + (fade->to - fade->from) * v);
+	if (t < 1)
+		return G_SOURCE_CONTINUE;
+	AtlFadeDone done = fade->done;
+	fade->tick_id = 0;
+	g_object_set_data(G_OBJECT(widget), "atl-fade", NULL);
+	if (done)
+		done(widget);
+	return G_SOURCE_REMOVE;
+}
+
+static void fade_free(gpointer data)
+{
+	g_free(data);
+}
+
+void atl_fade_widget_cancel(GtkWidget *widget)
+{
+	struct fade *fade = g_object_get_data(G_OBJECT(widget), "atl-fade");
+	if (!fade)
+		return;
+	if (fade->tick_id)
+		gtk_widget_remove_tick_callback(widget, fade->tick_id);
+	g_object_set_data(G_OBJECT(widget), "atl-fade", NULL);
+}
+
+void atl_fade_widget(GtkWidget *widget, double to, int duration_ms, AtlFadeDone done)
+{
+	atl_fade_widget_cancel(widget);
+	if (duration_ms <= 0) {
+		gtk_widget_set_opacity(widget, to);
+		if (done)
+			done(widget);
+		return;
+	}
+	struct fade *fade = g_new0(struct fade, 1);
+	fade->from = gtk_widget_get_opacity(widget);
+	fade->to = to;
+	fade->duration = (gint64)duration_ms * 1000;
+	fade->done = done;
+	g_object_set_data_full(G_OBJECT(widget), "atl-fade", fade, fade_free);
+	fade->tick_id = gtk_widget_add_tick_callback(widget, fade_tick, fade, NULL);
 }
 
 GVariant *intent_serialize(JNIEnv *env, jobject intent)

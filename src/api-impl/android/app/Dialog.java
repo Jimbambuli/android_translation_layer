@@ -1,8 +1,10 @@
 package android.app;
 
 import android.R;
+import android.animation.ValueAnimator;
 import android.atl.annotation.Export;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.DialogInterface;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
@@ -24,6 +26,9 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager.LayoutParams;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import java.util.ArrayList;
 
 public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callback {
 	protected long nativePtr;
@@ -35,6 +40,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	private native void nativeClose(long ptr);
 	private native boolean nativeIsShowing(long ptr);
 	private native void nativeSetCanceledOnTouchOutside(long ptr, boolean cancel);
+	private static native void nativeDimBehind(float amount, int duration);
 
 	private Context context;
 	private Window window;
@@ -53,6 +59,13 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 			TypedValue outValue = new TypedValue();
 			context.getTheme().resolveAttribute(R.attr.dialogTheme, outValue, true);
 			themeResId = outValue.resourceId;
+		}
+		// like AOSP, the dialog's window belongs to the activity of the context
+		for (Context c = context; c instanceof ContextWrapper; c = ((ContextWrapper)c).getBaseContext()) {
+			if (c instanceof Activity) {
+				ownerActivity = (Activity)c;
+				break;
+			}
 		}
 		this.context = new ContextThemeWrapper(context, themeResId);
 		window = new Window(this.context, this);
@@ -98,7 +111,9 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		nativeSetTitle(nativePtr, context.getString(titleId));
 	}
 
-	public void setOwnerActivity(Activity activity) {}
+	public void setOwnerActivity(Activity activity) {
+		ownerActivity = activity;
+	}
 
 	public void setCancelable(boolean cancelable) {
 		this.cancelable = cancelable;
@@ -122,6 +137,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 			@Override
 			public void run() {
 				if (!created) {
+					window.applyThemeAttributes();
 					onCreate(null);
 					created = true;
 				}
@@ -245,6 +261,9 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		}
 		showPending = false;
 		nativeShow(nativePtr);
+		if (!openWindows.contains(this))
+			openWindows.add(this);
+		animateWindow(true);
 		if (onShowListener != null)
 			onShowListener.onShow(this);
 	}
@@ -268,7 +287,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 					return;
 				shown = false;
 				showPending = false;
-				nativeClose(nativePtr);
+				animateWindow(false);
 				if (started) {
 					started = false;
 					onStop();
@@ -281,6 +300,95 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	public Window getWindow() {
 		return window;
+	}
+
+	private static int dimmingDialogs;
+	private boolean dimming;
+	private Activity ownerActivity;
+	private static final ArrayList<Dialog> openWindows = new ArrayList<>(); // dialogs whose window is shown
+
+	/* The dim (FLAG_DIM_BEHIND) belongs to the dialog's window, as on AOSP: it comes with the window
+	 * and goes with it, whichever way the window goes (dismiss(), hide(), the activity destroyed). */
+	private void setDimmed(float amount, int duration) {
+		boolean dim = amount > 0;
+		if (dim == dimming)
+			return;
+		dimming = dim;
+		dimmingDialogs += dim ? 1 : -1;
+		if (dim)
+			nativeDimBehind(amount, duration);
+		else if (dimmingDialogs == 0)
+			nativeDimBehind(0, duration);
+	}
+
+	private void closeWindow() {
+		openWindows.remove(this);
+		nativeClose(nativePtr);
+	}
+
+	/* like WindowManagerGlobal.closeAll() after an activity was destroyed: the windows of its dialogs
+	 * that are still shown (leaked) are removed at once, and their dim with them */
+	static void closeWindowsOf(Activity activity) {
+		for (Dialog dialog : new ArrayList<>(openWindows)) {
+			if (dialog.ownerActivity != activity)
+				continue;
+			dialog.showPending = false;
+			dialog.window.getDecorView().clearAnimation();
+			dialog.setDimmed(0, 0);
+			dialog.closeWindow();
+		}
+	}
+
+	/* Like WindowManager: the window enter/exit animation of the window's windowAnimations style
+	 * (Animation.Material.Dialog and the like) runs on the content, the dim behind it (FLAG_DIM_BEHIND)
+	 * fades in and out alongside, and a dismissed window goes away when its exit animation ends. */
+	private void animateWindow(final boolean enter) {
+		View decor = window.getDecorView();
+		LayoutParams lp = window.getAttributes();
+		Animation animation = null;
+		if (ValueAnimator.getDurationScale() != 0 && lp.windowAnimations != 0) {
+			TypedArray a = context.obtainStyledAttributes(lp.windowAnimations, com.android.internal.R.styleable.WindowAnimation);
+			int id = a.getResourceId(enter ? com.android.internal.R.styleable.WindowAnimation_windowEnterAnimation
+			                               : com.android.internal.R.styleable.WindowAnimation_windowExitAnimation, 0);
+			a.recycle();
+			if (id != 0) {
+				try {
+					animation = AnimationUtils.loadAnimation(context, id);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		// AOSP's dim layer follows the window's animation, 200 ms without one
+		int duration = ValueAnimator.getDurationScale() == 0 ? 0 : animation != null ? (int)animation.computeDurationHint() : 200;
+		setDimmed(enter && (lp.flags & LayoutParams.FLAG_DIM_BEHIND) != 0 ? lp.dimAmount : 0, duration);
+		if (enter) {
+			if (animation != null)
+				decor.startAnimation(animation);
+			else
+				decor.clearAnimation();
+			return;
+		}
+		if (animation == null) {
+			decor.clearAnimation();
+			closeWindow();
+			return;
+		}
+		animation.setFillAfter(true); // stays hidden until the window is gone
+		animation.setAnimationListener(new Animation.AnimationListener() {
+			@Override
+			public void onAnimationStart(Animation animation) {}
+
+			@Override
+			public void onAnimationRepeat(Animation animation) {}
+
+			@Override
+			public void onAnimationEnd(Animation animation) {
+				if (!shown && !showPending)
+					closeWindow();
+			}
+		});
+		decor.startAnimation(animation);
 	}
 
 	public void setCanceledOnTouchOutside(boolean cancel) {
@@ -462,7 +570,9 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	public void hide() {
 		System.out.println("hiding the Dialog " + this);
 		showPending = false;
-		nativeClose(nativePtr);
+		window.getDecorView().clearAnimation();
+		setDimmed(0, 0); // the window goes at once, its dim with it; show() brings both back
+		closeWindow();
 	}
 
 	@Override

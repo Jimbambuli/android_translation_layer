@@ -58,6 +58,10 @@ void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
 gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out);
 
+typedef void (*AtlFadeDone)(GtkWidget *widget);
+void atl_fade_widget(GtkWidget *widget, double to, int duration_ms, AtlFadeDone done);
+void atl_fade_widget_cancel(GtkWidget *widget);
+
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);
 jobject intent_deserialize(JNIEnv *env, GVariant *variant);

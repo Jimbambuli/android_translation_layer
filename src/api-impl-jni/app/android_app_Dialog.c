@@ -140,6 +140,26 @@ JNIEXPORT jboolean JNICALL Java_android_app_Dialog_nativeIsShowing(JNIEnv *env, 
 	return gtk_widget_is_visible(GTK_WIDGET(dialog));
 }
 
+static void undim_done(GtkWidget *content)
+{
+	gtk_widget_remove_css_class(GTK_WIDGET(window), "ATL-dim-behind");
+}
+
+/* FLAG_DIM_BEHIND: Android puts a black layer of alpha dimAmount behind the dialog window. The app's
+ * window gets a black background and its content fades to 1 - dimAmount, which looks the same. */
+JNIEXPORT void JNICALL Java_android_app_Dialog_nativeDimBehind(JNIEnv *env, jclass this, jfloat amount, jint duration)
+{
+	GtkWidget *content = gtk_window_get_child(window);
+	if (!content)
+		return;
+	if (amount > 0) {
+		gtk_widget_add_css_class(GTK_WIDGET(window), "ATL-dim-behind");
+		atl_fade_widget(content, 1 - amount, duration, NULL);
+	} else {
+		atl_fade_widget(content, 1, duration, undim_done);
+	}
+}
+
 JNIEXPORT void JNICALL Java_android_app_Dialog_nativeSetCanceledOnTouchOutside(JNIEnv *env, jobject this, jlong ptr, jboolean cancel)
 {
 	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
