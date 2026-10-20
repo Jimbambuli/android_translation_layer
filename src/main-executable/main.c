@@ -47,6 +47,17 @@ char *apk_path;
 gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 {
 	activity_close_all();
+	/* popups (PopupWindow, WindowManager windows) are popovers in the GtkStack next to the
+	 * activities' pages; GtkStack's dispose removes only pages and loops forever on any other
+	 * child, so they go first, as AOSP removes the remaining windows of a closed app */
+	GtkWidget *stack = gtk_window_get_child(self);
+	GtkWidget *child = stack ? gtk_widget_get_first_child(stack) : NULL;
+	while (child) {
+		GtkWidget *next = gtk_widget_get_next_sibling(child);
+		if (GTK_IS_POPOVER(child))
+			gtk_widget_unparent(child);
+		child = next;
+	}
 	return false;
 }
 
