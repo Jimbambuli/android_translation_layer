@@ -53,6 +53,15 @@ static gboolean on_window_event(GtkEventControllerLegacy *controller, GdkEvent *
 	return type == GDK_MOTION_NOTIFY || type == GDK_TOUCH_UPDATE || type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL;
 }
 
+/* Android's overflow/popup menus stay open on Escape (only Back dismisses them, and ATL maps
+ * Escape to Escape, not Back) while an outside press still closes them. GTK's popover autohide
+ * would pop the menu down on Escape too, so swallow Escape here, in the capture phase, before the
+ * autohide binding sees it; the outside-press grab is untouched. */
+static gboolean on_popover_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	return keyval == GDK_KEY_Escape;
+}
+
 /* the window shows only its view, which draws its own background and shadow (Compose's menus),
  * without the frame and padding of the GTK theme's popover */
 static void add_window_style(GtkPopover *popover)
@@ -98,6 +107,10 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEn
 		touch_modal_windows++;
 		g_object_set_data(G_OBJECT(popover), "touch-modal", GINT_TO_POINTER(1));
 		g_signal_connect_data(popover, "closed", G_CALLBACK(on_closed), _REF(view), release_view, 0);
+		GtkEventController *key_controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
+		gtk_event_controller_set_propagation_phase(key_controller, GTK_PHASE_CAPTURE);
+		g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_popover_key_pressed), NULL);
+		gtk_widget_add_controller(GTK_WIDGET(popover), key_controller);
 	}
 	gtk_widget_insert_before(GTK_WIDGET(popover), gtk_window_get_child(window), NULL);
 	atl_popover_place_at_location(popover, gravity, x, y);
