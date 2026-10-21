@@ -60,6 +60,28 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_stream(stream, NULL, NULL);
 	g_object_unref(stream);
+
+	/* honour Options.inSampleSize like AOSP: subsample the image by a power of two so an image
+	 * loader (Coil/Glide) gets the smaller bitmap it asked for and does not keep the full-size one.
+	 * inJustDecodeBounds only wants the full dimensions, so it is left unscaled. */
+	if (pixbuf && opts) {
+		jclass opts_class = (*env)->GetObjectClass(env, opts);
+		int sample = (*env)->GetIntField(env, opts, (*env)->GetFieldID(env, opts_class, "inSampleSize", "I"));
+		jboolean bounds_only = (*env)->GetBooleanField(env, opts, (*env)->GetFieldID(env, opts_class, "inJustDecodeBounds", "Z"));
+		if (!bounds_only && sample > 1) {
+			int factor = 1;
+			while (factor * 2 <= sample) // round down to the nearest power of two, as AOSP's decoder does
+				factor *= 2;
+			int width = gdk_pixbuf_get_width(pixbuf) / factor;
+			int height = gdk_pixbuf_get_height(pixbuf) / factor;
+			GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf, width < 1 ? 1 : width, height < 1 ? 1 : height, GDK_INTERP_BILINEAR);
+			if (scaled) {
+				g_object_unref(pixbuf);
+				pixbuf = scaled;
+			}
+		}
+	}
+
 	GdkTexture *texture = gdk_texture_new_for_pixbuf(pixbuf);
 	g_object_unref(pixbuf);
 	return _INTPTR(texture);
