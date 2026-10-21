@@ -443,6 +443,7 @@ srcs = [
 	'android/os/Message.java',
 	'android/os/MessageQueue.java',
 	'android/os/Messenger.java',
+	'android/os/NetworkOnMainThreadException.java',
 	'android/os/OperationCanceledException.java',
 	'android/os/Parcel.java',
 	'android/os/Parcelable.java',
