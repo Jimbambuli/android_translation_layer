@@ -13,6 +13,9 @@ public class AudioTrack {
 
 	public static final int ERROR_BAD_VALUE = -2; // basically EINVAL
 
+	public static final int STATE_UNINITIALIZED = 0;
+	public static final int STATE_INITIALIZED = 1;
+
 	public static final int PLAYSTATE_STOPPED = 1;
 	public static final int PLAYSTATE_PAUSED = 2;
 	public static final int PLAYSTATE_PLAYING = 3;
@@ -102,7 +105,8 @@ public class AudioTrack {
 	}
 
 	public int getState() {
-		return 1; // TODO: fix up the native part and make this work properly
+		// the native constructor leaves pcm_handle at 0 when no PCM device could be opened
+		return pcm_handle != 0 ? STATE_INITIALIZED : STATE_UNINITIALIZED;
 	}
 
 	public int write(byte[] audioData, int offsetInBytes, int sizeInBytes) {
