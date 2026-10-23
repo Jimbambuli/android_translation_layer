@@ -217,16 +217,46 @@ static GtkWidget *popover_parent_for(GtkWidget *anchor)
 /* the grabbing (autohide) popovers that are mapped */
 static int grabbing_popovers = 0;
 
-static void on_map_count_grab(GtkWidget *popover)
+static void free_weak_ref(gpointer ref)
 {
-	if (gtk_popover_get_autohide(GTK_POPOVER(popover)))
-		grabbing_popovers++;
+	g_weak_ref_clear(ref);
+	g_free(ref);
 }
 
+static void on_map_count_grab(GtkWidget *popover)
+{
+	if (!gtk_popover_get_autohide(GTK_POPOVER(popover)))
+		return;
+	grabbing_popovers++;
+	/* the widget that has the focus before GtkPopover moves it into the popup */
+	GtkRoot *root = gtk_widget_get_root(popover);
+	GWeakRef *focus = g_new0(GWeakRef, 1);
+	g_weak_ref_init(focus, root ? gtk_root_get_focus(root) : NULL);
+	g_object_set_data_full(G_OBJECT(popover), "focus-before", focus, free_weak_ref);
+}
+
+/* GtkPopover moves the keyboard focus into a grabbing popup, but does not give it back when the popup
+ * closes: GtkWindow then focuses the first widget it finds from the top, a button in the header bar,
+ * where the keys no longer reach the app (Tab, Escape). Like on Android, where the app's window gets
+ * the focus back with the view that had it, the focus goes back to that widget, or else into the
+ * content of the window. */
 static void on_unmap_count_grab(GtkWidget *popover)
 {
-	if (gtk_popover_get_autohide(GTK_POPOVER(popover)))
-		grabbing_popovers--;
+	if (!gtk_popover_get_autohide(GTK_POPOVER(popover)))
+		return;
+	grabbing_popovers--;
+	GtkRoot *root = gtk_widget_get_root(popover);
+	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
+	if (!GTK_IS_WINDOW(root) || (focus && !gtk_widget_is_ancestor(focus, popover)))
+		return;
+	GWeakRef *focus_before = g_object_get_data(G_OBJECT(popover), "focus-before");
+	GtkWidget *before = focus_before ? g_weak_ref_get(focus_before) : NULL;
+	if (!(before && gtk_widget_get_mapped(before) && !gtk_widget_is_ancestor(before, popover) && gtk_widget_grab_focus(before))) {
+		GtkWidget *content = gtk_window_get_child(GTK_WINDOW(root));
+		if (content)
+			gtk_widget_child_focus(content, GTK_DIR_TAB_FORWARD);
+	}
+	g_clear_object(&before);
 }
 
 void atl_popover_count_grab(GtkPopover *popover)
