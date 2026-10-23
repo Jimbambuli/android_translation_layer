@@ -403,7 +403,7 @@ static GHashTable *vk_surface_native_windows;
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
 	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
-	VkResult res;
+	VkResult ret;
 
 	if (GDK_IS_WAYLAND_DISPLAY(display)) {
 		VkWaylandSurfaceCreateInfoKHR wayland_create_info = {
@@ -412,7 +412,7 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 			.surface = pCreateInfo->window->wayland_surface,
 		};
 
-		res = vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
+		ret = vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
 	} else if (GDK_IS_X11_DISPLAY(display)) {
 		VkXlibSurfaceCreateInfoKHR x11_create_info = {
 			.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
@@ -420,17 +420,17 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 			.window = pCreateInfo->window->egl_window,
 		};
 
-		res = vkCreateXlibSurfaceKHR(instance, &x11_create_info, pAllocator, pSurface);
+		ret = vkCreateXlibSurfaceKHR(instance, &x11_create_info, pAllocator, pSurface);
 	} else {
 		fprintf(stderr, "bionic_vkCreateAndroidSurfaceKHR: the GDK backend is neither Wayland nor X11, no SurfaceView for you");
-		res = VK_ERROR_UNKNOWN;
+		ret = VK_ERROR_UNKNOWN;
 	}
-	if (res == VK_SUCCESS) {
+	if (ret == VK_SUCCESS) {
 		if (!vk_surface_native_windows)
 			vk_surface_native_windows = g_hash_table_new(NULL, NULL);
 		g_hash_table_insert(vk_surface_native_windows, *pSurface, pCreateInfo->window);
 	}
-	return res;
+	return ret;
 }
 
 void bionic_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *pAllocator)
@@ -448,17 +448,13 @@ VkResult bionic_vkCreateInstance(VkInstanceCreateInfo *pCreateInfo, const VkAllo
 	memcpy(enabled_exts, pCreateInfo->ppEnabledExtensionNames, original_extension_count * sizeof(char *));
 	enabled_exts[original_extension_count] = "VK_KHR_wayland_surface";
 	enabled_exts[original_extension_count + 1] = "VK_KHR_xlib_surface";
-	enabled_exts[original_extension_count + 2] = VK_KHR_SURFACE_EXTENSION_NAME;
+	enabled_exts[original_extension_count + 2] = "VK_KHR_surface";
 
 	pCreateInfo->enabledExtensionCount = new_extension_count;
 	pCreateInfo->ppEnabledExtensionNames = enabled_exts;
 	return vkCreateInstance(pCreateInfo, pAllocator, pInstance);
 }
 
-/*
- * MapLibre library uses this method to query the size of the ANativeWindow. It also checks
- * supportedTransforms != VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR and otherwise ignores the size
- */
 VkResult bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities)
 {
 	VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, pSurfaceCapabilities);
@@ -467,6 +463,9 @@ VkResult bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physi
 		if (native_window) {
 			pSurfaceCapabilities->currentExtent.width = ANativeWindow_getWidth(native_window);
 			pSurfaceCapabilities->currentExtent.height = ANativeWindow_getHeight(native_window);
+			/* MapLibre checks `supportedTransforms != VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR` and otherwise treats
+			 * the surface as uninitialized. Vulkan controlled surface transforms are not directly supported in
+			 * Wayland and we would need to emulated them with wl_surface::set_buffer_transform if ever needed. */
 			pSurfaceCapabilities->supportedTransforms |= VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_180_BIT_KHR | VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR;
 		}
 	}
