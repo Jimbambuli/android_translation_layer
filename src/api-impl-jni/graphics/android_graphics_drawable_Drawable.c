@@ -107,7 +107,8 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_Drawable_native_1ref(JNIEn
 	g_object_ref(G_OBJECT(_PTR(paintable_ptr)));
 }
 
+/* also called from Drawable.finalize(), on the FinalizerDaemon thread */
 JNIEXPORT void JNICALL Java_android_graphics_drawable_Drawable_native_1unref(JNIEnv *env, jobject this, jlong paintable_ptr)
 {
-	g_object_unref(G_OBJECT(_PTR(paintable_ptr)));
+	atl_unref_on_main_thread(_PTR(paintable_ptr));
 }

@@ -244,6 +244,19 @@ void atl_safe_gtk_widget_queue_resize(GtkWidget *widget)
 	}
 }
 
+static gboolean unref_idle(gpointer object)
+{
+	g_object_unref(object);
+	return G_SOURCE_REMOVE;
+}
+
+/* For finalizers, which run on the FinalizerDaemon thread: GTK objects may only be disposed of on the
+ * main thread, so the last reference is dropped from the main loop. */
+void atl_unref_on_main_thread(gpointer object)
+{
+	g_idle_add(unref_idle, object);
+}
+
 /* Fades the opacity of a widget from its current opacity to `to`, with the default interpolator of
  * Android's animators (AccelerateDecelerate), then calls done (unless cancelled or replaced). Used for
  * what Android animates as a whole window: popups, and the dim behind dialogs. */

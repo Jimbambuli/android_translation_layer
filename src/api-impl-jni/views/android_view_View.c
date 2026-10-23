@@ -728,9 +728,10 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setAnimating(JNIEnv *env, 
 	wrapper_widget_set_animating(WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)))), animating);
 }
 
+/* called from View.finalize(), on the FinalizerDaemon thread */
 JNIEXPORT void JNICALL Java_android_view_View_native_1destructor(JNIEnv *env, jobject this, jlong widget_ptr)
 {
-	g_object_unref(gtk_widget_get_parent(_PTR(widget_ptr)));
+	atl_unref_on_main_thread(gtk_widget_get_parent(_PTR(widget_ptr)));
 }
 
 #define MEASURE_SPEC_UNSPECIFIED (0 << 30)

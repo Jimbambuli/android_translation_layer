@@ -56,6 +56,7 @@ void atl_safe_gtk_label_set_text(GtkLabel *label, const char *str);
 void atl_safe_gtk_widget_set_visible(GtkWidget *widget, gboolean visible);
 void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
+void atl_unref_on_main_thread(gpointer object);
 gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out);
 
 typedef void (*AtlFadeDone)(GtkWidget *widget);
