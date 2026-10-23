@@ -395,13 +395,16 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchModal(JNI
  * at dismiss() and not again when the popover closes at the end of the fade */
 static void notify_dismissed(GtkWidget *popover)
 {
-	jobject listener = g_object_get_data(G_OBJECT(popover), "dismiss-listener");
-	if (!listener)
-		return;
 	JNIEnv *env = get_jni_env();
-	J__PopupWindow__OnDismissListener__onDismiss(env, listener);
+	/* like AOSP, the PopupWindow keeps its listener; a global reference to it from the popover
+	 * would keep the listener's views (and their activity) alive for good */
+	jobject this = (*env)->NewLocalRef(env, g_object_get_data(G_OBJECT(popover), "popup-window"));
+	if (!this)
+		return;
+	J__PopupWindow__dispatchDismiss(env, this);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, this);
 }
 
 static void on_closed_cb(GtkPopover *popover, gpointer user_data)
@@ -413,21 +416,11 @@ static void on_closed_cb(GtkPopover *popover, gpointer user_data)
 	notify_dismissed(GTK_WIDGET(popover));
 }
 
-static void release_listener(gpointer listener)
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setOnDismissListener(JNIEnv *env, jobject this, jlong popover_ptr)
 {
-	JNIEnv *env = get_jni_env();
-	_UNREF(listener);
-}
-
-/* like AOSP, a new listener replaces the old one */
-JNIEXPORT void JNICALL Java_android_widget_PopupWindow_setOnDismissListener(JNIEnv *env, jobject this, jobject listener)
-{
-	GtkWidget *popover = GTK_WIDGET(_PTR(_GET_LONG_FIELD(this, "popover")));
-	if (!g_object_get_data(G_OBJECT(popover), "dismiss-listener-connected")) {
+	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
+	if (!g_signal_handler_find(popover, G_SIGNAL_MATCH_FUNC, 0, 0, NULL, on_closed_cb, NULL))
 		g_signal_connect(popover, "closed", G_CALLBACK(on_closed_cb), NULL);
-		g_object_set_data(G_OBJECT(popover), "dismiss-listener-connected", GINT_TO_POINTER(1));
-	}
-	g_object_set_data_full(G_OBJECT(popover), "dismiss-listener", listener ? _REF(listener) : NULL, listener ? release_listener : NULL);
 }
 
 /* a popup that fades out after dismiss() is no longer showing and takes no input */

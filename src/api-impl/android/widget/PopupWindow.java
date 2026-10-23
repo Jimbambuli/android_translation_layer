@@ -85,7 +85,6 @@ public class PopupWindow {
 	private static final int DEFAULT_ANCHORED_GRAVITY = Gravity.TOP | Gravity.START;
 
 	public interface OnDismissListener {
-		@Export
 		public void onDismiss();
 	}
 
@@ -265,7 +264,22 @@ public class PopupWindow {
 	protected native void native_dismiss(long widget, int fadeMs);
 	protected native void native_fadeIn(long widget, int fadeMs);
 	protected native void native_update(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int width, int height, int gravity, boolean overlapAnchor);
-	public native void setOnDismissListener(OnDismissListener listener);
+	private native void native_setOnDismissListener(long popover);
+
+	private OnDismissListener on_dismiss_listener;
+
+	/* like AOSP, a new listener replaces the old one */
+	public void setOnDismissListener(OnDismissListener listener) {
+		on_dismiss_listener = listener;
+		native_setOnDismissListener(popover);
+	}
+
+	/* called from native code when the popup is dismissed */
+	@Export
+	private void dispatchDismiss() {
+		if (on_dismiss_listener != null)
+			on_dismiss_listener.onDismiss();
+	}
 	public native void native_setWidth(long widget, int width);
 	public native void native_setHeight(long widget, int height);
 	public native int native_getWidth(long widget);
