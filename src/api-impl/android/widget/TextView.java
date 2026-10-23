@@ -1,7 +1,6 @@
 package android.widget;
 
 import android.annotation.UnsupportedAppUsage;
-import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
@@ -584,7 +583,6 @@ public class TextView extends View {
 	}
 
 	public static interface OnEditorActionListener {
-		@Export
 		public abstract boolean onEditorAction(TextView v, int actionId, KeyEvent event);
 	}
 

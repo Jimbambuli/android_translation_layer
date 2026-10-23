@@ -1,5 +1,6 @@
 package android.widget;
 
+import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
@@ -7,7 +8,9 @@ import android.text.Editable;
 import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
+import java.util.ArrayList;
 
 public class EditText extends TextView {
 	public EditText(Context context) {
@@ -30,7 +33,6 @@ public class EditText extends TextView {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 	protected native String native_getText(long widget);
 	protected native void native_addTextChangedListener(long widget, TextWatcher watcher);
-	protected native void native_removeTextChangedListener(long widget, TextWatcher watcher);
 	protected native void native_setOnEditorActionListener(long widget, OnEditorActionListener l);
 	protected native void native_setText(long widget, String text);
 	protected native void native_setHint(long widget, CharSequence s);
@@ -60,19 +62,47 @@ public class EditText extends TextView {
 	}
 	private native void native_setTextSize(long widget, float size);
 
+	/* like on AOSP, the view keeps its listeners, the GtkText calls back the view (see native code) */
+	private ArrayList<TextWatcher> listeners;
+	private OnEditorActionListener editor_action_listener;
+
 	@Override
 	public void removeTextChangedListener(TextWatcher watcher) {
-		native_removeTextChangedListener(widget, watcher);
+		if (listeners != null)
+			listeners.remove(watcher);
 	}
 
 	@Override
 	public void addTextChangedListener(TextWatcher watcher) {
+		if (listeners == null)
+			listeners = new ArrayList<TextWatcher>();
+		listeners.add(watcher);
 		native_addTextChangedListener(widget, watcher);
 	}
 
 	@Override
 	public void setOnEditorActionListener(OnEditorActionListener l) {
+		editor_action_listener = l;
 		native_setOnEditorActionListener(widget, l);
+	}
+
+	/* called from native code when the text changed */
+	@Export
+	private void sendTextChanged(String text) {
+		if (listeners == null)
+			return;
+		SpannableStringBuilder s = new SpannableStringBuilder(text);
+		for (TextWatcher watcher : new ArrayList<TextWatcher>(listeners)) {
+			watcher.onTextChanged(s, 0, 0, s.length());
+			watcher.afterTextChanged(s);
+		}
+	}
+
+	/* called from native code when Enter was pressed */
+	@Export
+	private void sendEditorAction(KeyEvent event) {
+		if (editor_action_listener != null)
+			editor_action_listener.onEditorAction(this, 0, event);
 	}
 
 	@Override
