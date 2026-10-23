@@ -14,6 +14,8 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor(JNIE
 	gtk_widget_set_name(popover, "PopupWindow");
 	/* autohiding works by the widget grabbing events, which is not something apps expect */
 	gtk_popover_set_autohide(GTK_POPOVER(popover), false);
+	/* to dismiss it on a press outside of it, as AOSP's PopupDecorView does on ACTION_OUTSIDE */
+	g_object_set_data(G_OBJECT(popover), "popup-window", _WEAK_REF(this));
 	return _INTPTR(popover);
 }
 
@@ -214,7 +216,8 @@ static GtkWidget *popover_parent_for(GtkWidget *anchor)
 /* GtkPopover unrealizes, i.e. closes, itself when autohide changes, so the touch modality set with
  * setTouchModal()/setOutsideTouchable() is applied only while the popup is hidden. A submenu
  * never grabs: GDK hides a grabbing popup on a press in its parent popup, and the outer popup's
- * grab already ends both on outside presses. */
+ * grab already ends both on outside presses. A press in the outer popup dismisses it instead
+ * (see on_outer_popup_event). */
 static void apply_touch_modal(GtkPopover *popover)
 {
 	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(popover));
@@ -222,6 +225,62 @@ static void apply_touch_modal(GtkPopover *popover)
 
 	if (!gtk_widget_get_visible(GTK_WIDGET(popover)))
 		gtk_popover_set_autohide(popover, touch_modal && !(parent && gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER)));
+}
+
+static gboolean is_fading_out(GtkWidget *popover);
+
+/* AOSP gives a press outside of an outside-touchable popup to the popup as ACTION_OUTSIDE, and
+ * the popup dismisses itself; a submenu (which CascadingMenuPopup makes not touch-modal) also
+ * lets the press through to the menu behind it. A submenu here is a popover in the content of
+ * its menu, so presses in the menu pass this menu's capture phase: dismiss its submenus that the
+ * press is not in, before the menu sees the press. Otherwise the press on another submenu item
+ * opens that submenu while the first is still showing, as if it were a submenu of the first. */
+static gboolean on_outer_popup_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
+{
+	GdkEventType type = gdk_event_get_event_type(event);
+	if (type != GDK_BUTTON_PRESS && type != GDK_TOUCH_BEGIN)
+		return FALSE;
+	GtkWidget *content = gtk_popover_get_child(GTK_POPOVER(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller))));
+	GtkNative *pressed = gtk_native_get_for_surface(gdk_event_get_surface(event));
+	GtkWidget *child = content ? gtk_widget_get_first_child(content) : NULL;
+	while (child) {
+		GtkWidget *next = gtk_widget_get_next_sibling(child);
+		jobject weak = g_object_get_data(G_OBJECT(child), "popup-window");
+		if (GTK_IS_POPOVER(child) && weak && gtk_widget_get_visible(child) && !is_fading_out(child) &&
+		    GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "touch-modal")) &&
+		    !(pressed && (GTK_WIDGET(pressed) == child || gtk_widget_is_ancestor(GTK_WIDGET(pressed), child)))) {
+			JNIEnv *env = get_jni_env();
+			jobject popup_window = (*env)->NewLocalRef(env, weak);
+			if (popup_window) {
+				(*env)->CallVoidMethod(env, popup_window, _METHOD(_CLASS(popup_window), "dismiss", "()V"));
+				if ((*env)->ExceptionCheck(env))
+					(*env)->ExceptionDescribe(env);
+				(*env)->DeleteLocalRef(env, popup_window);
+			}
+		}
+		child = next;
+	}
+	return FALSE;
+}
+
+static void watch_outer_popup(GtkPopover *popover)
+{
+	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(popover));
+	GtkWidget *outer = parent ? gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER) : NULL;
+	if (!outer || g_object_get_data(G_OBJECT(outer), "watches-submenus"))
+		return;
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(on_outer_popup_event), NULL);
+	gtk_widget_add_controller(outer, controller);
+	g_object_set_data(G_OBJECT(outer), "watches-submenus", GINT_TO_POINTER(1));
+}
+
+static void popup(GtkPopover *popover)
+{
+	watch_outer_popup(popover);
+	gtk_popover_present(popover);
+	gtk_popover_popup(popover);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown(JNIEnv *env, jobject this, jlong popover_ptr, jlong anchor_ptr, jint anchor_width, jint anchor_height, jint x, jint y, jint gravity, jboolean overlap_anchor)
@@ -232,8 +291,7 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAsDropDown(JN
 	gtk_widget_insert_before(GTK_WIDGET(popover), popover_parent_for(GTK_WIDGET(anchor)), NULL);
 	apply_touch_modal(popover);
 	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
-	gtk_popover_present(GTK_POPOVER(popover));
-	gtk_popover_popup(popover);
+	popup(popover);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAtLocation(JNIEnv *env, jobject this, jlong popover_ptr, jlong parent_ptr, jint gravity, jint x, jint y)
@@ -244,8 +302,7 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1showAtLocation(JN
 	gtk_widget_insert_before(GTK_WIDGET(popover), GTK_WIDGET(parent), NULL);
 	apply_touch_modal(popover);
 	atl_popover_place_at_location(popover, gravity, x, y);
-	gtk_popover_present(GTK_POPOVER(popover));
-	gtk_popover_popup(popover);
+	popup(popover);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setWidth(JNIEnv *env, jobject this, jlong popover_ptr, jint width)
@@ -303,17 +360,44 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchModal(JNI
 	apply_touch_modal(popover);
 }
 
-static void on_closed_cb(GtkPopover *popover, jobject listener)
+/* AOSP calls the OnDismissListener from dismiss(), before the exit transition has played (a
+ * CascadingMenuPopup learns from it which submenu is gone), so a popup that fades out is reported
+ * at dismiss() and not again when the popover closes at the end of the fade */
+static void notify_dismissed(GtkWidget *popover)
 {
+	jobject listener = g_object_get_data(G_OBJECT(popover), "dismiss-listener");
+	if (!listener)
+		return;
 	JNIEnv *env = get_jni_env();
 	J__PopupWindow__OnDismissListener__onDismiss(env, listener);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
 }
 
+static void on_closed_cb(GtkPopover *popover, gpointer user_data)
+{
+	if (g_object_get_data(G_OBJECT(popover), "dismiss-notified")) {
+		g_object_set_data(G_OBJECT(popover), "dismiss-notified", NULL);
+		return;
+	}
+	notify_dismissed(GTK_WIDGET(popover));
+}
+
+static void release_listener(gpointer listener)
+{
+	JNIEnv *env = get_jni_env();
+	_UNREF(listener);
+}
+
+/* like AOSP, a new listener replaces the old one */
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_setOnDismissListener(JNIEnv *env, jobject this, jobject listener)
 {
 	GtkWidget *popover = GTK_WIDGET(_PTR(_GET_LONG_FIELD(this, "popover")));
-	if (listener)
-		g_signal_connect(popover, "closed", G_CALLBACK(on_closed_cb), _REF(listener));
+	if (!g_object_get_data(G_OBJECT(popover), "dismiss-listener-connected")) {
+		g_signal_connect(popover, "closed", G_CALLBACK(on_closed_cb), NULL);
+		g_object_set_data(G_OBJECT(popover), "dismiss-listener-connected", GINT_TO_POINTER(1));
+	}
+	g_object_set_data_full(G_OBJECT(popover), "dismiss-listener", listener ? _REF(listener) : NULL, listener ? release_listener : NULL);
 }
 
 /* a popup that fades out after dismiss() is no longer showing and takes no input */
@@ -326,6 +410,7 @@ static void reset_fade(GtkWidget *popover)
 {
 	atl_fade_widget_cancel(popover);
 	g_object_set_data(G_OBJECT(popover), "fading-out", NULL);
+	g_object_set_data(G_OBJECT(popover), "dismiss-notified", NULL);
 	gtk_widget_set_can_target(popover, TRUE);
 	gtk_widget_set_opacity(popover, 1);
 }
@@ -356,7 +441,9 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss(JNIEnv *e
 		return;
 	g_object_set_data(G_OBJECT(popover), "fading-out", GINT_TO_POINTER(1));
 	gtk_widget_set_can_target(popover, FALSE);
+	g_object_set_data(G_OBJECT(popover), "dismiss-notified", GINT_TO_POINTER(1));
 	atl_fade_widget(popover, 0, fade_ms, fade_out_done);
+	notify_dismissed(popover);
 }
 
 /* called after the popover was shown: fade in like the popupEnterTransition (from 0.1) */
@@ -383,6 +470,5 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *en
 	gtk_widget_insert_before(GTK_WIDGET(popover), popover_parent_for(GTK_WIDGET(anchor)), NULL);
 	apply_touch_modal(popover);
 	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
-	gtk_popover_present(GTK_POPOVER(popover));
-	gtk_popover_popup(popover);
+	popup(popover);
 }
