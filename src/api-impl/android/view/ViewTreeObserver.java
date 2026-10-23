@@ -768,7 +768,7 @@ public final class ViewTreeObserver {
 	 *
 	 * @hide
 	 */
-	private void kill() {
+	void kill() {
 		/* clear any callbacks */
 		if (mOnGlobalLayoutListeners != null && mOnGlobalLayoutListeners.size() > 0)
 			native_set_have_global_layout_listeners(false);

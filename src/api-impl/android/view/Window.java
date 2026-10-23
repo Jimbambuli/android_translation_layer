@@ -150,6 +150,16 @@ public class Window {
 			decorView.restoreHierarchyState(states);
 	}
 
+	/* called when the activity is destroyed: like the observer of a window removed on AOSP, the
+	 * observer dies, which disconnects it from the frame clock of the GtkWindow (that outlives the
+	 * activity) and lets its listeners, and the views they hold, go */
+	public void killViewTreeObserver() {
+		if (view_tree_observer != null) {
+			view_tree_observer.kill();
+			view_tree_observer = null;
+		}
+	}
+
 	public void set_native_window(long native_window) {
 		this.native_window = native_window;
 		set_jobject(native_window, this);
