@@ -139,7 +139,18 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 		return Java_android_view_View_native_1constructor(env, this, context, attrs);
 
 	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
-	GtkWidget *webview = webkit_web_view_new();
+	/* Like Android, which renders the WebViews of an app in one renderer process, the WebViews share
+	 * one web process (as related views); WebKitGTK would start one per view (~150 MB each), and those
+	 * of an activity that the app leaks would stay. Each view keeps its own user content manager: the
+	 * atlbridge handler below belongs to the view. */
+	static GWeakRef related_view;
+	WebKitWebView *related = g_weak_ref_get(&related_view);
+	WebKitUserContentManager *own_content_manager = webkit_user_content_manager_new();
+	GtkWidget *webview = g_object_new(WEBKIT_TYPE_WEB_VIEW, "related-view", related, "user-content-manager", own_content_manager, NULL);
+	g_object_unref(own_content_manager);
+	if (related)
+		g_object_unref(related);
+	g_weak_ref_set(&related_view, webview);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
