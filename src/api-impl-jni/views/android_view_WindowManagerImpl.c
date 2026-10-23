@@ -95,6 +95,7 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEn
 	gtk_popover_set_child(popover, gtk_widget_get_parent(widget));
 	add_window_style(popover);
 	gtk_popover_set_autohide(popover, touch_modal);
+	atl_popover_count_grab(popover);
 	if (touch_modal) {
 		static gboolean controller_added = FALSE;
 		if (!controller_added) {

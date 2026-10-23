@@ -14,6 +14,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor(JNIE
 	gtk_widget_set_name(popover, "PopupWindow");
 	/* autohiding works by the widget grabbing events, which is not something apps expect */
 	gtk_popover_set_autohide(GTK_POPOVER(popover), false);
+	atl_popover_count_grab(GTK_POPOVER(popover));
 	/* to dismiss it on a press outside of it, as AOSP's PopupDecorView does on ACTION_OUTSIDE */
 	g_object_set_data(G_OBJECT(popover), "popup-window", _WEAK_REF(this));
 	return _INTPTR(popover);
@@ -213,6 +214,35 @@ static GtkWidget *popover_parent_for(GtkWidget *anchor)
 	return content ? content : window_frame(anchor);
 }
 
+/* the grabbing (autohide) popovers that are mapped */
+static int grabbing_popovers = 0;
+
+static void on_map_count_grab(GtkWidget *popover)
+{
+	if (gtk_popover_get_autohide(GTK_POPOVER(popover)))
+		grabbing_popovers++;
+}
+
+static void on_unmap_count_grab(GtkWidget *popover)
+{
+	if (gtk_popover_get_autohide(GTK_POPOVER(popover)))
+		grabbing_popovers--;
+}
+
+void atl_popover_count_grab(GtkPopover *popover)
+{
+	g_signal_connect(popover, "map", G_CALLBACK(on_map_count_grab), NULL);
+	g_signal_connect(popover, "unmap", G_CALLBACK(on_unmap_count_grab), NULL);
+}
+
+/* GDK maps a grabbing popup only as the child of the topmost grabbing popup. Any other one it
+ * refuses to map, but it keeps the seat grabbed for it (GTK 4 has no way to end that grab), and
+ * the app takes no more input. So a popup that is shown while another popup grabs does not grab. */
+static gboolean may_grab(void)
+{
+	return grabbing_popovers == 0;
+}
+
 /* GtkPopover unrealizes, i.e. closes, itself when autohide changes, so the touch modality set with
  * setTouchModal()/setOutsideTouchable() is applied only while the popup is hidden. A submenu
  * never grabs: GDK hides a grabbing popup on a press in its parent popup, and the outer popup's
@@ -224,7 +254,7 @@ static void apply_touch_modal(GtkPopover *popover)
 	gboolean touch_modal = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "touch-modal"));
 
 	if (!gtk_widget_get_visible(GTK_WIDGET(popover)))
-		gtk_popover_set_autohide(popover, touch_modal && !(parent && gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER)));
+		gtk_popover_set_autohide(popover, touch_modal && !(parent && gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER)) && may_grab());
 }
 
 static gboolean is_fading_out(GtkWidget *popover);

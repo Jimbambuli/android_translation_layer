@@ -13,5 +13,7 @@ void atl_popover_place_as_dropdown(GtkPopover *popover, GtkWidget *anchor, int a
 void atl_popover_place_at_location(GtkPopover *popover, int gravity, int x, int y);
 /* draw the popover's background and text in the given ARGB colors instead of the GTK theme's */
 void atl_popover_set_colors(GtkPopover *popover, int background, int foreground);
+/* count the popover while it is mapped and grabs, so that no other popup grabs then */
+void atl_popover_count_grab(GtkPopover *popover);
 
 #endif
