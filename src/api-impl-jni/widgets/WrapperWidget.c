@@ -549,9 +549,13 @@ static void focus_visible_changed_cb(GtkWindow *window, GParamSpec *pspec, gpoin
 	if (!focus || !WRAPPER_WIDGET(focus)->jobj)
 		return;
 	JNIEnv *env = get_jni_env();
-	J__View__dispatchFocusChanged(env, WRAPPER_WIDGET(focus)->jobj, TRUE, gtk_window_get_focus_visible(window));
+	jobject view = (*env)->NewLocalRef(env, WRAPPER_WIDGET(focus)->jobj);
+	if (!view) // garbage collected
+		return;
+	J__View__dispatchFocusChanged(env, view, TRUE, gtk_window_get_focus_visible(window));
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, view);
 }
 
 static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget *wrapper)
@@ -568,9 +572,15 @@ static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget
 		g_signal_connect(root, "notify::focus-visible", G_CALLBACK(focus_visible_changed_cb), NULL);
 		g_object_set_data(G_OBJECT(root), "atl-focus-visible-handler", GINT_TO_POINTER(1));
 	}
-	J__View__dispatchFocusChanged(env, wrapper->jobj, focused, visible);
+	/* GTK moves the focus away from a removed widget only later, and its view may have been
+	 * garbage collected by then (the wrapper holds a weak reference) */
+	jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
+	if (!view)
+		return;
+	J__View__dispatchFocusChanged(env, view, focused, visible);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, view);
 }
 
 static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer user_data)
