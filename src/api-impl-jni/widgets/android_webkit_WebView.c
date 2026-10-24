@@ -253,19 +253,13 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, console_script);
 	webkit_user_script_unref(console_script);
-	/* ATL presents pointer input to apps as a touchscreen (MotionEvents use SOURCE_TOUCHSCREEN), but WebKit
-	 * reports mouse input as pointerType "mouse" to web content. Web apps written for Android WebView then
-	 * take their desktop code paths, which don't cooperate with the surrounding Android views (e.g. no
-	 * long press, or a horizontal text selection drag is taken over by a ViewPager). Report "touch". */
+	/* see native_firePointerCancel(): fire the pointercancel that Android's WebView fires on ACTION_CANCEL. Mouse input
+	 * keeps its pointerType "mouse", as on Android with a mouse: the MotionEvents are mouse events too. */
 	WebKitUserScript *pointer_script = webkit_user_script_new(
-	    "(function(){var d=window.PointerEvent&&Object.getOwnPropertyDescriptor(PointerEvent.prototype,'pointerType');"
-	    "if(!d||!d.get)return;Object.defineProperty(PointerEvent.prototype,'pointerType',{configurable:true,enumerable:true,"
-	    "get:function(){var t=d.get.call(this);return t==='mouse'?'touch':t;}});"
-	    /* see native_firePointerCancel(): fire the pointercancel that Android's WebView fires on ACTION_CANCEL */
-	    "var down=null;addEventListener('pointerdown',function(e){down=e;},true);"
+	    "(function(){var down=null;addEventListener('pointerdown',function(e){down=e;},true);"
 	    "addEventListener('pointerup',function(){down=null;},true);addEventListener('pointercancel',function(){down=null;},true);"
 	    "Object.defineProperty(window,'__atl_pointercancel',{value:function(){var e=down;down=null;if(e)"
-	    "e.target.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:e.pointerId,pointerType:'touch',"
+	    "e.target.dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:e.pointerId,pointerType:e.pointerType,"
 	    "isPrimary:e.isPrimary,clientX:e.clientX,clientY:e.clientY,screenX:e.screenX,screenY:e.screenY}));}});})();",
 	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, pointer_script);
