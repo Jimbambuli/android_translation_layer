@@ -39,7 +39,6 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	private native void nativeShow(long ptr);
 	private native void nativeClose(long ptr);
 	private native boolean nativeIsShowing(long ptr);
-	private native void nativeSetCanceledOnTouchOutside(long ptr, boolean cancel);
 	private static native void nativeDimBehind(float amount, int duration);
 
 	private Context context;
@@ -49,6 +48,8 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	private OnCancelListener onCancelListener;
 	private OnKeyListener onKeyListener;
 	private boolean cancelable = true;
+	private boolean closeOnTouchOutside;
+	private boolean closeOnTouchOutsideSet;
 	private boolean created;
 	private boolean started; // between onStart() and onStop()
 
@@ -152,8 +153,9 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 				getWindow().getDecorView().getWindowVisibleDisplayFrame(displayFrame);
 
 				TypedArray a = context.obtainStyledAttributes(R.styleable.Window);
-				if (a.hasValue(R.styleable.Window_windowCloseOnTouchOutside))
-					setCanceledOnTouchOutside(a.getBoolean(R.styleable.Window_windowCloseOnTouchOutside, true));
+				// like PhoneWindow.setCloseOnTouchOutsideIfNotSet()
+				if (!closeOnTouchOutsideSet)
+					closeOnTouchOutside = a.getBoolean(R.styleable.Window_windowCloseOnTouchOutside, false);
 				float windowWidthFraction = 1;
 				float minWidthFraction = 0; // like AOSP, no minimum width without the attribute
 				if (a.getBoolean(R.styleable.Window_windowIsFloating, false)) {
@@ -392,7 +394,16 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	}
 
 	public void setCanceledOnTouchOutside(boolean cancel) {
-		nativeSetCanceledOnTouchOutside(nativePtr, cancel);
+		if (cancel && !cancelable)
+			cancelable = true;
+		closeOnTouchOutside = cancel;
+		closeOnTouchOutsideSet = true;
+	}
+
+	/* a press outside of the shown dialog, see Dialog.onTouchEvent() and Window.shouldCloseOnTouch() */
+	private void onTouchOutside() {
+		if (cancelable && closeOnTouchOutside && isShowing())
+			cancel();
 	}
 
 	public class Builder {

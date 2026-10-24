@@ -4,6 +4,7 @@
 #include "../defines.h"
 #include "../util.h"
 #include "../generated_headers/android_app_Dialog.h"
+#include "../widgets/android_widget_PopupWindow.h"
 
 /* main app window */
 extern GtkWindow *window;
@@ -49,7 +50,9 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 	return dispatch_back_key(jobj, keyval, ACTION_UP);
 }
 
-/* state for Dialog.setCanceledOnTouchOutside() */
+/* While a dialog is shown, a press in the app's window is a touch outside of the dialog. On AOSP
+ * the dialog's window takes it (it is touch-modal): the activity below sees nothing of it, and the
+ * dialog cancels itself if it closes on a touch outside (Dialog.onTouchEvent()). */
 struct touch_outside {
 	GtkWindow *dialog;
 	GtkEventController *controller;
@@ -59,16 +62,33 @@ struct touch_outside {
 static gboolean on_touch_outside(GtkEventControllerLegacy *controller, GdkEvent *event, struct touch_outside *outside)
 {
 	GdkEventType event_type = gdk_event_get_event_type(event);
-	if ((event_type == GDK_BUTTON_PRESS || event_type == GDK_TOUCH_BEGIN) && gtk_widget_get_visible(GTK_WIDGET(outside->dialog))) {
-		JNIEnv *env = get_jni_env();
-		jmethodID dismiss = _METHOD(_CLASS(outside->jobj), "dismiss", "()V");
-		(*env)->CallVoidMethod(env, outside->jobj, dismiss);
-		if ((*env)->ExceptionCheck(env))
-			(*env)->ExceptionDescribe(env);
-		return TRUE;
-	} else {
+	if (event_type != GDK_BUTTON_PRESS && event_type != GDK_TOUCH_BEGIN)
 		return FALSE;
-	}
+	atl_swallow_rest_of_press(GTK_WIDGET(window));
+	/* the press activated the app's window: the keyboard focus stays in the dialog, as on AOSP */
+	gtk_window_present(outside->dialog);
+	JNIEnv *env = get_jni_env();
+	(*env)->CallVoidMethod(env, outside->jobj, _METHOD(_CLASS(outside->jobj), "onTouchOutside", "()V"));
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	return TRUE;
+}
+
+static void add_touch_outside(GtkWindow *dialog, jobject jobj)
+{
+	JNIEnv *env = get_jni_env();
+	if (g_object_get_data(G_OBJECT(dialog), "touch-outside"))
+		return;
+	struct touch_outside *outside = g_new0(struct touch_outside, 1);
+	outside->dialog = dialog;
+	outside->jobj = _REF(jobj);
+	GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_legacy_new());
+	/* capture phase on the toplevel runs before the view tree's own touch controllers */
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(on_touch_outside), outside);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+	outside->controller = controller;
+	g_object_set_data(G_OBJECT(dialog), "touch-outside", outside);
 }
 
 static void remove_touch_outside(GtkWindow *dialog)
@@ -89,10 +109,10 @@ JNIEXPORT jlong JNICALL Java_android_app_Dialog_nativeInit(JNIEnv *env, jobject 
 	GtkWidget *decor_view = GTK_WIDGET(_PTR(decor_view_ptr));
 	GtkWidget *dialog = gtk_window_new();
 	gtk_window_set_transient_for(GTK_WINDOW(dialog), window);
-	/* an Android dialog is part of the app's window: modal, without decorations of its own (the
-	 * content draws its title), so the compositor keeps it centred on the app window instead of
-	 * showing a separate "android-translation-layer" window */
-	gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+	/* an Android dialog is part of the app's window: without decorations of its own (the content
+	 * draws its title), so the compositor keeps it centred on the app window instead of showing a
+	 * separate "android-translation-layer" window. It is not modal for the compositor, which would
+	 * keep the presses outside of it from the app; the dialog takes them (see on_touch_outside). */
 	gtk_window_set_decorated(GTK_WINDOW(dialog), FALSE);
 	atl_window_android_tab_focus(GTK_WINDOW(dialog));
 	atl_window_android_wheel_acceleration(GTK_WINDOW(dialog));
@@ -128,6 +148,7 @@ JNIEXPORT void JNICALL Java_android_app_Dialog_nativeShow(JNIEnv *env, jobject t
 	/* the dialog is in touch mode (no focus shown) if the app window is */
 	gtk_window_set_focus_visible(dialog, gtk_window_get_focus_visible(window));
 	gtk_window_present(dialog);
+	add_touch_outside(dialog, this);
 }
 
 JNIEXPORT void JNICALL Java_android_app_Dialog_nativeClose(JNIEnv *env, jobject this, jlong ptr)
@@ -162,25 +183,4 @@ JNIEXPORT void JNICALL Java_android_app_Dialog_nativeDimBehind(JNIEnv *env, jcla
 	} else {
 		atl_fade_widget(content, 1, duration, undim_done);
 	}
-}
-
-JNIEXPORT void JNICALL Java_android_app_Dialog_nativeSetCanceledOnTouchOutside(JNIEnv *env, jobject this, jlong ptr, jboolean cancel)
-{
-	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
-	remove_touch_outside(dialog);
-	if (!cancel)
-		return;
-
-	struct touch_outside *outside = g_new0(struct touch_outside, 1);
-	outside->dialog = dialog;
-	outside->jobj = _REF(this);
-
-	GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_legacy_new());
-	/* capture phase on the toplevel runs before the view tree's own touch controllers */
-	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
-	g_signal_connect(controller, "event", G_CALLBACK(on_touch_outside), outside);
-	gtk_widget_add_controller(GTK_WIDGET(window), controller);
-	outside->controller = controller;
-
-	g_object_set_data(G_OBJECT(dialog), "touch-outside", outside);
 }
