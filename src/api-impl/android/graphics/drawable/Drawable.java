@@ -378,6 +378,11 @@ public class Drawable {
 				drawable.inflate(resources, parser, attrs, theme);
 				return drawable;
 			}
+			case "color": {
+				ColorDrawable drawable = new ColorDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
 			case "animated-vector": {
 				return new AnimatedVectorDrawable();
 			}
