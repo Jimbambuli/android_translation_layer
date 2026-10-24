@@ -3,7 +3,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <glib.h>
 
@@ -29,8 +31,21 @@ static gboolean dispatch_func(GSource *source, GSourceFunc callback, gpointer us
 	(*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
 	g_source_set_ready_time(source, -1); // clear previous timeout
 	J__Looper__loop(env);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
+		/* On Android, an exception that leaves the main looper ends the app: the main thread dies,
+		 * its uncaught exception handler runs and the process is killed. Do the same here. Left
+		 * pending (ART's ExceptionDescribe keeps it), the next JNI call made CheckJNI abort the
+		 * runtime, and dumping all threads froze the window for the better part of a minute. */
+		fprintf(stderr, "FATAL EXCEPTION: main\n");
 		(*env)->ExceptionDescribe(env);
+		jthrowable exception = (*env)->ExceptionOccurred(env);
+		(*env)->ExceptionClear(env);
+		jclass thread_class = (*env)->FindClass(env, "java/lang/Thread");
+		jobject thread = (*env)->CallStaticObjectMethod(env, thread_class, _STATIC_METHOD(thread_class, "currentThread", "()Ljava/lang/Thread;"));
+		(*env)->CallVoidMethod(env, thread, _METHOD(thread_class, "dispatchUncaughtException", "(Ljava/lang/Throwable;)V"), exception);
+		fflush(NULL);
+		_exit(10);
+	}
 
 	return G_SOURCE_CONTINUE;
 }
