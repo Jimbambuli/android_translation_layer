@@ -37,6 +37,8 @@ public class WebView extends ViewGroup {
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
+		// like Chromium's AwContents: the page shows the focus itself (focus rings, the caret)
+		setDefaultFocusHighlightEnabled(false);
 	}
 
 	@Override
