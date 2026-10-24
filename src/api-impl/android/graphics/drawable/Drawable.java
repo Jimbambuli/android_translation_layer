@@ -14,6 +14,7 @@ import android.graphics.BlendModeColorFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.Insets;
 import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
@@ -478,6 +479,10 @@ public class Drawable {
 
 	public boolean getPadding(Rect padding) {
 		return false;
+	}
+
+	public Insets getOpticalInsets() {
+		return Insets.NONE;
 	}
 
 	public void copyBounds(Rect bounds) {

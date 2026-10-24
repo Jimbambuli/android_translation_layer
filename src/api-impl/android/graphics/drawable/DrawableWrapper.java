@@ -27,7 +27,7 @@ import android.content.res.TypedArray;
 //import android.graphics.BlendMode;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
-//import android.graphics.Insets;
+import android.graphics.Insets;
 import android.graphics.Outline;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -247,10 +247,10 @@ public abstract class DrawableWrapper extends Drawable implements Drawable.Callb
 		return mDrawable != null && mDrawable.getPadding(padding);
 	}
 
-	/*@Override
+	@Override
 	public Insets getOpticalInsets() {
 		return mDrawable != null ? mDrawable.getOpticalInsets() : Insets.NONE;
-	}*/
+	}
 
 	@Override
 	public void setHotspot(float x, float y) {

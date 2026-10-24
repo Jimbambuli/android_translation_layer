@@ -3,6 +3,7 @@ package android.graphics.drawable;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
+import android.graphics.Insets;
 import android.graphics.Rect;
 
 public class DrawableContainer extends Drawable {
@@ -45,6 +46,13 @@ public class DrawableContainer extends Drawable {
 			if (state.drawables[i] != null)
 				state.drawables[i].setColorFilter(colorFilter);
 		}
+	}
+
+	@Override
+	public Insets getOpticalInsets() {
+		if (curIndex >= 0 && state.drawables[curIndex] != null)
+			return state.drawables[curIndex].getOpticalInsets();
+		return Insets.NONE;
 	}
 
 	protected void setConstantState(DrawableContainerState state) {
