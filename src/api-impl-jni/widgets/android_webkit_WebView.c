@@ -16,6 +16,14 @@
 
 extern GThread *main_thread_id;
 
+/* A local reference to the Java WebView, or NULL if it has been garbage collected: the WrapperWidget only
+ * holds a weak reference, and WebKit can still deliver events for the page until the wrapper is released
+ * on the main thread after View.finalize(). */
+static jobject webview_jobject(JNIEnv *env, WrapperWidget *wrapper)
+{
+	return (*env)->NewLocalRef(env, wrapper->jobj);
+}
+
 static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
 {
 	const gchar *path = webkit_uri_scheme_request_get_path(request);
@@ -45,8 +53,15 @@ static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointe
 		return;
 	}
 	JNIEnv *env = get_jni_env();
-	WrapperWidget *wrapper = WRAPPER_WIDGET(parent);
-	jobject asset_manager_obj = J__WebView__internalGetAssetManager(env, wrapper->jobj);
+	jobject this = webview_jobject(env, WRAPPER_WIDGET(parent));
+	if (!this) {
+		GError *error = g_error_new(G_IO_ERROR, G_IO_ERROR_CANCELLED, "WebView garbage collected");
+		webkit_uri_scheme_request_finish_error(request, error);
+		g_error_free(error);
+		return;
+	}
+	jobject asset_manager_obj = J__WebView__internalGetAssetManager(env, this);
+	(*env)->DeleteLocalRef(env, this);
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(asset_manager_obj, "mObject"));
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, path, ACCESS_STREAMING);
 	if (asset == NULL) {
@@ -66,7 +81,11 @@ static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
 	JNIEnv *env = get_jni_env();
-	J__WebView__internalLoadChanged(env, wrapper->jobj, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
+	jobject this = webview_jobject(env, wrapper);
+	if (!this)
+		return;
+	J__WebView__internalLoadChanged(env, this, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
+	(*env)->DeleteLocalRef(env, this);
 }
 
 /* same-document navigations (e.g. only the fragment changed) don't emit load-changed, but Android still calls onPageFinished */
@@ -85,7 +104,11 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 		const gchar *uri = webkit_uri_request_get_uri(request);
 
 		JNIEnv *env = get_jni_env();
-		jboolean result = J__WebView__internalShouldOverrideUrlLoading(env, wrapper->jobj, _JSTRING(uri));
+		jobject this = webview_jobject(env, wrapper);
+		// a page without its WebView doesn't navigate anywhere
+		jboolean result = this ? J__WebView__internalShouldOverrideUrlLoading(env, this, _JSTRING(uri)) : JNI_TRUE;
+		if (this)
+			(*env)->DeleteLocalRef(env, this);
 		if (result)
 			webkit_policy_decision_ignore(decision);
 		else
@@ -98,11 +121,15 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 /* messages from the JavaScript side of addJavascriptInterface() and from the console forwarding script */
 static void script_message_cb(WebKitUserContentManager *manager, JSCValue *value, WrapperWidget *wrapper)
 {
-	char *message = jsc_value_to_string(value);
 	JNIEnv *env = get_jni_env();
-	J__WebView__internalJsMessage(env, wrapper->jobj, _JSTRING(message));
+	jobject this = webview_jobject(env, wrapper);
+	if (!this)
+		return;
+	char *message = jsc_value_to_string(value);
+	J__WebView__internalJsMessage(env, this, _JSTRING(message));
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, this);
 	g_free(message);
 }
 
@@ -127,11 +154,14 @@ static void evaluate_js_cb(GObject *source, GAsyncResult *result, gpointer user_
 	if (data->callback) {
 		JNIEnv *env = get_jni_env();
 		// the WebView was destroyed meanwhile: like on Android, the callback is dropped
-		if (gtk_widget_get_parent(GTK_WIDGET(source)) == GTK_WIDGET(data->wrapper)) {
-			J__WebView__internalJsResult(env, data->wrapper->jobj, data->callback, _JSTRING(json ? json : "null"));
+		jobject this = webview_jobject(env, data->wrapper);
+		if (this && gtk_widget_get_parent(GTK_WIDGET(source)) == GTK_WIDGET(data->wrapper)) {
+			J__WebView__internalJsResult(env, this, data->callback, _JSTRING(json ? json : "null"));
 			if ((*env)->ExceptionCheck(env))
 				(*env)->ExceptionDescribe(env);
 		}
+		if (this)
+			(*env)->DeleteLocalRef(env, this);
 		(*env)->DeleteGlobalRef(env, data->callback);
 	}
 	g_free(json);
