@@ -48,6 +48,8 @@ struct _WrapperWidgetClass {
 };
 
 extern GtkWidget *currently_unmapping;
+/* the window that currently_unmapping was attached to */
+extern GtkRoot *currently_unmapping_root;
 
 GtkWidget *wrapper_widget_new(void);
 void wrapper_widget_set_child(WrapperWidget *parent, GtkWidget *child);

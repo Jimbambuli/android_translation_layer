@@ -1142,6 +1142,8 @@ JNIEXPORT jobject JNICALL Java_android_view_View_native_1get_1window(JNIEnv *env
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	GtkRoot *root = gtk_widget_get_root(widget);
+	if (!root && widget == currently_unmapping) // in onDetachedFromWindow()
+		root = currently_unmapping_root;
 	return root ? g_object_get_data(G_OBJECT(root), "jobject") : NULL;
 }
 

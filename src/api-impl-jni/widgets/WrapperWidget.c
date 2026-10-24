@@ -535,6 +535,7 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 }
 
 GtkWidget *currently_unmapping = NULL;
+GtkRoot *currently_unmapping_root = NULL;
 
 /* View.onFocusChanged(): the view is focused when its wrapper or the wrapped widget has the GTK
  * focus. Compose needs this to activate its focus tree, it rejects key events otherwise. The
@@ -588,7 +589,11 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(wrapper));
 	JNIEnv *env = get_jni_env();
 
+	/* like AOSP, onDetachedFromWindow() still sees the window (getViewTreeObserver() must return the
+	 * window's observer, so that listeners added in onAttachedToWindow() can be removed). The old root
+	 * is still alive here: it is either being destroyed or has just lost this widget. */
 	if (root) {
+		g_object_set_data(G_OBJECT(wrapper), "atl-root", root);
 		if (!wrapper->rtl_resolved) {
 			/* like View.resolveRtlPropertiesIfNeeded(); Compose initialises its layout direction here */
 			wrapper->rtl_resolved = TRUE;
@@ -600,13 +605,17 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 		J__View__onAttachedToWindow(env, wrapper->jobj);
 	} else {
 		currently_unmapping = wrapper->child;
+		currently_unmapping_root = g_object_get_data(G_OBJECT(wrapper), "atl-root");
 		J__View__onDetachedFromWindow(env, wrapper->jobj);
 	}
 
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
-	if (!root)
+	if (!root) {
 		currently_unmapping = NULL;
+		currently_unmapping_root = NULL;
+		g_object_set_data(G_OBJECT(wrapper), "atl-root", NULL);
+	}
 }
 
 /* draw the view by calling its draw(), for views that draw something themselves (a foreground, or
