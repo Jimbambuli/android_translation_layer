@@ -301,6 +301,32 @@ public final class MotionEvent extends InputEvent {
 	public static final int ACTION_HOVER_EXIT = 10;
 
 	/**
+	 * Constant for {@link #getActionMasked}: A button has been pressed.
+	 *
+	 * <p>
+	 * Use {@link #getActionButton()} to get which button was pressed.
+	 * </p><p>
+	 * This action is not a touch event so it is delivered to
+	 * {@link View#onGenericMotionEvent(MotionEvent)} rather than
+	 * {@link View#onTouchEvent(MotionEvent)}.
+	 * </p>
+	 */
+	public static final int ACTION_BUTTON_PRESS = 11;
+
+	/**
+	 * Constant for {@link #getActionMasked}: A button has been released.
+	 *
+	 * <p>
+	 * Use {@link #getActionButton()} to get which button was released.
+	 * </p><p>
+	 * This action is not a touch event so it is delivered to
+	 * {@link View#onGenericMotionEvent(MotionEvent)} rather than
+	 * {@link View#onTouchEvent(MotionEvent)}.
+	 * </p>
+	 */
+	public static final int ACTION_BUTTON_RELEASE = 12;
+
+	/**
 	 * Bits in the action code that represent a pointer index, used with
 	 * {@link #ACTION_POINTER_DOWN} and {@link #ACTION_POINTER_UP}.  Shifting
 	 * down by {@link #ACTION_POINTER_INDEX_SHIFT} provides the actual pointer
@@ -1374,6 +1400,9 @@ public final class MotionEvent extends InputEvent {
 	int source;
 	int action;
 	long eventTime;
+	/* only kept for mouse events, see getButtonState() */
+	int buttonState;
+	int actionButton;
 	int[] ids;
 	float[] coords;
 
@@ -1430,6 +1459,8 @@ public final class MotionEvent extends InputEvent {
 		}
 		ev.mNext = null;
 		ev.prepareForReuse();
+		ev.buttonState = 0;
+		ev.actionButton = 0;
 		return ev;
 	}
 
@@ -1476,6 +1507,7 @@ public final class MotionEvent extends InputEvent {
 		ev.source = source;
 		ev.action = action;
 		ev.eventTime = eventTime;
+		ev.buttonState = buttonState;
 		ev.ids = new int[pointerCount];
 		ev.coords = new float[pointerCount * 4];
 		for (int i = 0; i < pointerCount; i++) {
@@ -1667,6 +1699,8 @@ public final class MotionEvent extends InputEvent {
 		MotionEvent ev = obtain();
 		ev.source = other.source;
 		ev.action = other.action;
+		ev.buttonState = other.buttonState;
+		ev.actionButton = other.actionButton;
 		ev.ids = other.ids.clone();
 		ev.coords = other.coords.clone();
 		ev.eventTime = other.eventTime;
@@ -2276,10 +2310,24 @@ public final class MotionEvent extends InputEvent {
 	 */
 	public final int getButtonState() {
 		// return nativeGetButtonState(mNativePtr);
+		if (getToolType(0) == TOOL_TYPE_MOUSE)
+			return buttonState;
 		if (getAction() == ACTION_DOWN || getAction() == ACTION_MOVE)
 			return BUTTON_PRIMARY;
 		else
 			return 0;
+	}
+
+	/**
+	 * Gets which button has been modified during a press or release action.
+	 *
+	 * For actions other than {@link #ACTION_BUTTON_PRESS} and {@link #ACTION_BUTTON_RELEASE}
+	 * the returned value is undefined.
+	 *
+	 * @see #getButtonState()
+	 */
+	public final int getActionButton() {
+		return actionButton;
 	}
 
 	/**
@@ -3136,6 +3184,10 @@ public final class MotionEvent extends InputEvent {
 				return "ACTION_HOVER_ENTER";
 			case ACTION_HOVER_EXIT:
 				return "ACTION_HOVER_EXIT";
+			case ACTION_BUTTON_PRESS:
+				return "ACTION_BUTTON_PRESS";
+			case ACTION_BUTTON_RELEASE:
+				return "ACTION_BUTTON_RELEASE";
 		}
 		int index = (action & ACTION_POINTER_INDEX_MASK) >> ACTION_POINTER_INDEX_SHIFT;
 		switch (action & ACTION_MASK) {

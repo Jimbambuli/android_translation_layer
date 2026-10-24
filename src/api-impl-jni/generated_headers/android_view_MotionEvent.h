@@ -41,6 +41,10 @@ extern "C" {
 #define android_view_MotionEvent_ACTION_HOVER_ENTER 9L
 #undef android_view_MotionEvent_ACTION_HOVER_EXIT
 #define android_view_MotionEvent_ACTION_HOVER_EXIT 10L
+#undef android_view_MotionEvent_ACTION_BUTTON_PRESS
+#define android_view_MotionEvent_ACTION_BUTTON_PRESS 11L
+#undef android_view_MotionEvent_ACTION_BUTTON_RELEASE
+#define android_view_MotionEvent_ACTION_BUTTON_RELEASE 12L
 #undef android_view_MotionEvent_ACTION_POINTER_INDEX_MASK
 #define android_view_MotionEvent_ACTION_POINTER_INDEX_MASK 65280L
 #undef android_view_MotionEvent_ACTION_POINTER_INDEX_SHIFT
