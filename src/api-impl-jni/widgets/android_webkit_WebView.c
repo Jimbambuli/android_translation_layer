@@ -95,6 +95,13 @@ static void web_view_uri_changed(WebKitWebView *web_view, GParamSpec *pspec, gpo
 		web_view_load_changed(web_view, WEBKIT_LOAD_FINISHED, user_data);
 }
 
+/* Android's WebView has no context menu of its own: a right click only reaches the page (contextmenu
+ * event). Keep WebKit's menu where Android shows its text actions instead (editable text, a selection). */
+static gboolean context_menu_cb(WebKitWebView *web_view, WebKitContextMenu *context_menu, WebKitHitTestResult *hit_test_result, gpointer user_data)
+{
+	return !webkit_hit_test_result_context_is_editable(hit_test_result) && !webkit_hit_test_result_context_is_selection(hit_test_result);
+}
+
 static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *decision, WebKitPolicyDecisionType type, WrapperWidget *wrapper)
 {
 	if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
@@ -267,6 +274,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	g_signal_connect(G_OBJECT(webview), "load-changed", G_CALLBACK(web_view_load_changed), NULL);
 	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
+	g_signal_connect(webview, "context-menu", G_CALLBACK(context_menu_cb), NULL);
 	return _INTPTR(webview);
 }
 
