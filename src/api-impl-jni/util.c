@@ -2,6 +2,7 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <gtk/gtk.h>
 
@@ -382,6 +383,100 @@ void atl_window_android_tab_focus(GtkWindow *window)
 	GtkEventController *controller = gtk_event_controller_legacy_new();
 	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
 	g_signal_connect(controller, "event", G_CALLBACK(on_pointer_event), window);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+}
+
+/* Mouse wheel acceleration as in AOSP's InputReader: CursorInputMapper runs the wheel deltas through
+ * a VelocityControl with wheelVelocityControlParameters (scale 1, low 15, high 50, acceleration 4),
+ * so a wheel spun faster than 15 notches/s scrolls up to 4 times as far per notch (full at 50/s).
+ * The speed comes from VelocityTracker's default LSQ2 estimator: the last 20 positions within
+ * 100 ms, history cleared after 40 ms without movement. GTK delivers the notches unaccelerated,
+ * and a GdkEvent cannot be built with other deltas, so the event is delivered once more for
+ * every whole notch the acceleration adds. This happens before any widget sees the event, so
+ * views (ACTION_SCROLL) and WebViews (WebKit scrolls on its own) are accelerated alike. */
+#define WHEEL_HISTORY 20
+static struct {
+	guint32 time[WHEEL_HISTORY];
+	float position[WHEEL_HISTORY];
+	int32_t count;
+	float raw_position;
+	float pending; // accelerated notches not yet delivered (fraction of an event)
+	gboolean redelivering;
+} wheel;
+
+static float wheel_velocity(void)
+{
+	// times in seconds relative to the newest sample, as in LeastSquaresVelocityTrackerStrategy
+	guint32 newest = wheel.time[wheel.count - 1];
+	float sx = 0, sx2 = 0, sx3 = 0, sx4 = 0, sy = 0, sxy = 0, sx2y = 0;
+	int32_t m = 0;
+	for (int32_t i = wheel.count - 1; i >= 0 && newest - wheel.time[i] <= 100; i--, m++) {
+		float x = -(float)(newest - wheel.time[i]) / 1000, y = wheel.position[i];
+		sx += x, sx2 += x * x, sx3 += x * x * x, sx4 += x * x * x * x;
+		sy += y, sxy += x * y, sx2y += x * x * y;
+	}
+	if (m < 2)
+		return 0;
+	float sxx = sx2 - sx * sx / m, sxy_ = sxy - sx * sy / m;
+	if (m == 2) // degree reduced to m - 1
+		return sxx ? sxy_ / sxx : 0;
+	float sxx2 = sx3 - sx * sx2 / m, sx2y_ = sx2y - sx2 * sy / m, sx2x2 = sx4 - sx2 * sx2 / m;
+	float denominator = sxx * sx2x2 - sxx2 * sxx2;
+	return denominator ? (sxy_ * sx2x2 - sx2y_ * sxx2) / denominator : 0;
+}
+
+static gboolean on_wheel_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
+{
+	if (wheel.redelivering || gdk_event_get_event_type(event) != GDK_SCROLL || gdk_scroll_event_get_unit(event) != GDK_SCROLL_UNIT_WHEEL)
+		return FALSE;
+	double dx, dy;
+	gdk_scroll_event_get_deltas(event, &dx, &dy);
+	if (!dx && !dy) {
+		GdkScrollDirection direction = gdk_scroll_event_get_direction(event);
+		dy = direction == GDK_SCROLL_DOWN ? 1 : direction == GDK_SCROLL_UP ? -1 : 0;
+	}
+	float delta = dy ? dy : dx;
+	if (!delta)
+		return FALSE;
+
+	guint32 time = gdk_event_get_time(event);
+	if (wheel.count && time - wheel.time[wheel.count - 1] > 40) // pointer stopped
+		wheel.count = 0;
+	if (!wheel.count)
+		wheel.pending = 0;
+	if (wheel.count == WHEEL_HISTORY) {
+		memmove(wheel.time, wheel.time + 1, sizeof(wheel.time[0]) * (WHEEL_HISTORY - 1));
+		memmove(wheel.position, wheel.position + 1, sizeof(wheel.position[0]) * (WHEEL_HISTORY - 1));
+		wheel.count--;
+	}
+	wheel.raw_position += delta;
+	wheel.time[wheel.count] = time;
+	wheel.position[wheel.count] = wheel.raw_position;
+	wheel.count++;
+
+	float speed = fabsf(wheel_velocity()), scale = 1;
+	if (speed >= 50)
+		scale = 4;
+	else if (speed > 15)
+		scale = 1 + (speed - 15) / (50 - 15) * (4 - 1);
+
+	// the event itself is one delivery; deliver it again for each further whole multiple
+	wheel.pending += scale - 1;
+	GdkSurface *surface = gdk_event_get_surface(event);
+	wheel.redelivering = TRUE;
+	for (; wheel.pending >= 1; wheel.pending -= 1) {
+		gboolean handled;
+		g_signal_emit_by_name(surface, "event", event, &handled);
+	}
+	wheel.redelivering = FALSE;
+	return FALSE;
+}
+
+void atl_window_android_wheel_acceleration(GtkWindow *window)
+{
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(on_wheel_event), NULL);
 	gtk_widget_add_controller(GTK_WIDGET(window), controller);
 }
 

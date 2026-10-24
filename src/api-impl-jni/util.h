@@ -63,6 +63,7 @@ typedef void (*AtlFadeDone)(GtkWidget *widget);
 void atl_fade_widget(GtkWidget *widget, double to, int duration_ms, AtlFadeDone done);
 void atl_fade_widget_cancel(GtkWidget *widget);
 void atl_window_android_tab_focus(GtkWindow *window);
+void atl_window_android_wheel_acceleration(GtkWindow *window);
 
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);
