@@ -48,9 +48,38 @@ static gboolean on_window_event(GtkEventControllerLegacy *controller, GdkEvent *
 	}
 	if (!swallowing_press)
 		return FALSE;
+	/* no button is held (anymore), so there is no rest of a press to swallow */
+	if (type == GDK_MOTION_NOTIFY && !(gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK)) {
+		swallowing_press = FALSE;
+		return FALSE;
+	}
 	if (type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL)
 		swallowing_press = FALSE;
 	return type == GDK_MOTION_NOTIFY || type == GDK_TOUCH_UPDATE || type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL;
+}
+
+/* watch the presses in a window of the app, in the capture phase, before its views see them */
+static void watch_window(GtkWidget *window_widget)
+{
+	if (g_object_get_data(G_OBJECT(window_widget), "watches-presses"))
+		return;
+	GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_legacy_new());
+	g_signal_connect(controller, "event", G_CALLBACK(on_window_event), NULL);
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	gtk_widget_add_controller(window_widget, controller);
+	g_object_set_data(G_OBJECT(window_widget), "watches-presses", GINT_TO_POINTER(1));
+}
+
+/* A grabbing popup that closes on a press outside of it takes the press like AOSP's touch-modal
+ * popups, but the compositor passes the rest of it (motion, release) on to the window below,
+ * whose views would take it for a swipe from where their last press was. */
+void atl_swallow_rest_of_press(GtkWidget *widget)
+{
+	GtkRoot *root = gtk_widget_get_root(widget);
+	if (!root)
+		return;
+	watch_window(GTK_WIDGET(root));
+	swallowing_press = TRUE;
 }
 
 /* Android's overflow/popup menus stay open on Escape (only Back dismisses them, and ATL maps
@@ -97,14 +126,7 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEn
 	gtk_popover_set_autohide(popover, touch_modal);
 	atl_popover_count_grab(popover);
 	if (touch_modal) {
-		static gboolean controller_added = FALSE;
-		if (!controller_added) {
-			GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_legacy_new());
-			g_signal_connect(controller, "event", G_CALLBACK(on_window_event), NULL);
-			gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
-			gtk_widget_add_controller(GTK_WIDGET(window), controller);
-			controller_added = TRUE;
-		}
+		watch_window(GTK_WIDGET(window));
 		touch_modal_windows++;
 		g_object_set_data(G_OBJECT(popover), "touch-modal", GINT_TO_POINTER(1));
 		g_signal_connect_data(popover, "closed", G_CALLBACK(on_closed), _REF(view), release_view, 0);

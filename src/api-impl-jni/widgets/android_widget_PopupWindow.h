@@ -15,5 +15,8 @@ void atl_popover_place_at_location(GtkPopover *popover, int gravity, int x, int 
 void atl_popover_set_colors(GtkPopover *popover, int background, int foreground);
 /* count the popover while it is mapped and grabs, so that no other popup grabs then */
 void atl_popover_count_grab(GtkPopover *popover);
+/* keep the rest of the current press (motion, release) from the views of the widget's window,
+ * e.g. of the press that closed a grabbing popover (in android_view_WindowManagerImpl.c) */
+void atl_swallow_rest_of_press(GtkWidget *widget);
 
 #endif
