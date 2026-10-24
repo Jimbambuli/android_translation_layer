@@ -151,6 +151,10 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	if (related)
 		g_object_unref(related);
 	g_weak_ref_set(&related_view, webview);
+	/* Android's WebView applies a mouse wheel step at once (one frame per notch, the size already
+	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
+	 * starts over at every further step, so a spinning wheel scrolls in lurches. */
+	webkit_settings_set_enable_smooth_scrolling(webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webview)), FALSE);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
