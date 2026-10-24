@@ -26,6 +26,12 @@ enum {
 	JAVA_ENUM(ACTION_SCROLL),
 	JAVA_ENUM(ACTION_HOVER_ENTER),
 	JAVA_ENUM(ACTION_HOVER_EXIT),
+	JAVA_ENUM(ACTION_BUTTON_PRESS),
+	JAVA_ENUM(ACTION_BUTTON_RELEASE),
+
+	JAVA_ENUM(BUTTON_PRIMARY),
+	JAVA_ENUM(BUTTON_SECONDARY),
+	JAVA_ENUM(BUTTON_TERTIARY),
 };
 #undef JAVA_ENUM_CLASS
 
@@ -169,7 +175,7 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 	return ret;
 }
 
-static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct pointer pointers[MAX_POINTERS], GPtrArray *pointer_indices, GtkPropagationPhase phase, guint32 timestamp, GdkEvent *event)
+static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct pointer pointers[MAX_POINTERS], GPtrArray *pointer_indices, GtkPropagationPhase phase, guint32 timestamp, GdkEvent *event, int32_t source, int32_t button_state)
 {
 	bool ret;
 	JNIEnv *env = get_jni_env();
@@ -184,7 +190,8 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
 		(*env)->SetFloatArrayRegion(env, coords, 4 * i, 4, &pointer->coord_x);
 	}
 
-	jobject motion_event = J_new__MotionEvent(env, SOURCE_TOUCHSCREEN, action, timestamp, ids, coords);
+	jobject motion_event = J_new__MotionEvent(env, source, action, timestamp, ids, coords);
+	_SET_INT_FIELD(motion_event, "buttonState", button_state);
 
 	ret = view_dispatch_motionevent(env, wrapper, phase, motion_event, event, action);
 
@@ -196,7 +203,13 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
 static void call_hover_callback(jobject this, int action, float x, float y, float raw_x, float raw_y)
 {
 	JNIEnv *env = get_jni_env();
-	jobject motion_event = J_new__MotionEvent__single(env, SOURCE_MOUSE, action, 0, x, y, x, y);
+	/* the pointer id of the mouse's presses (see on_pointer_event()): hover and press are one pointer, as on
+	 * Android, so that the hovering pointer turns into the pressed one instead of staying behind */
+	jintArray ids = (*env)->NewIntArray(env, 1);
+	(*env)->SetIntArrayRegion(env, ids, 0, 1, &(jint){1});
+	jfloatArray coords = (*env)->NewFloatArray(env, 4);
+	(*env)->SetFloatArrayRegion(env, coords, 0, 4, (jfloat[]){x, y, raw_x, raw_y});
+	jobject motion_event = J_new__MotionEvent(env, SOURCE_MOUSE, action, (jlong)0, ids, coords);
 	J__View__dispatchHoverEvent(env, this, motion_event);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
@@ -234,6 +247,47 @@ void remove_pointer_fast(GPtrArray *pointer_indices, struct pointer *pointer)
 /* the release event that completed a click whose gesture could not be claimed */
 static GdkEvent *action_up_already_handled = NULL;
 
+/* the MotionEvent.BUTTON_* bit of a GDK button number */
+static int32_t mouse_button(guint button)
+{
+	switch (button) {
+		case GDK_BUTTON_PRIMARY:
+			return BUTTON_PRIMARY;
+		case GDK_BUTTON_SECONDARY:
+			return BUTTON_SECONDARY;
+		case GDK_BUTTON_MIDDLE:
+			return BUTTON_TERTIARY;
+		default:
+			return 0;
+	}
+}
+
+/* the buttons held before the event, as MotionEvent.getButtonState() reports them */
+static int32_t mouse_button_state(GdkEvent *event)
+{
+	GdkModifierType state = gdk_event_get_modifier_state(event);
+	return (state & GDK_BUTTON1_MASK ? BUTTON_PRIMARY : 0) | (state & GDK_BUTTON3_MASK ? BUTTON_SECONDARY : 0) |
+	       (state & GDK_BUTTON2_MASK ? BUTTON_TERTIARY : 0);
+}
+
+/* Android sends ACTION_BUTTON_PRESS after ACTION_DOWN and ACTION_BUTTON_RELEASE before ACTION_UP, and only
+ * these when another button is pressed or released while one is held. They go through
+ * dispatchGenericMotionEvent() like the wheel, so only to views that handle generic motion themselves. */
+static gboolean call_button_callback(WrapperWidget *wrapper, int action, int32_t action_button, int32_t button_state, struct pointer *pointer, guint32 timestamp)
+{
+	if (!wrapper->custom_generic_motion)
+		return false;
+	JNIEnv *env = get_jni_env();
+	jobject motion_event = J_new__MotionEvent__single(env, SOURCE_MOUSE, action, (jlong)timestamp, pointer->coord_x, pointer->coord_y, pointer->raw_x, pointer->raw_y);
+	_SET_INT_FIELD(motion_event, "buttonState", button_state);
+	_SET_INT_FIELD(motion_event, "actionButton", action_button);
+	gboolean ret = J__View__dispatchGenericMotionEvent(env, wrapper->jobj, motion_event);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, motion_event);
+	return ret;
+}
+
 // TODO: find a way to reconcile this with libandroid/input.c?
 static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, GdkEvent *event, gpointer user_data)
 {
@@ -262,17 +316,45 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 
 	int action;
 	GdkEventType event_type = gdk_event_get_event_type(event);
+	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(event_controller));
+	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+	GtkPropagationPhase phase = gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(event_controller));
+	guint32 timestamp = gdk_event_get_time(event);
+	/* A mouse is a mouse on Android too (SOURCE_MOUSE, TOOL_TYPE_MOUSE, getButtonState()): apps and web
+	 * content treat it differently from a finger, e.g. a drag selects text instead of turning the page.
+	 * Touchscreens send GDK_TOUCH_* events; pens stay touch events as before. */
+	GdkInputSource input_source = gdk_device_get_source(gdk_event_get_device(event));
+	bool is_mouse = event_type != GDK_TOUCH_BEGIN && event_type != GDK_TOUCH_UPDATE && event_type != GDK_TOUCH_END &&
+	                input_source != GDK_SOURCE_PEN && input_source != GDK_SOURCE_TOUCHSCREEN;
+	int32_t button_state = is_mouse ? mouse_button_state(event) : 0;
+	int32_t action_button = 0;
 	switch (event_type) {
 		case GDK_BUTTON_PRESS:
+			if (is_mouse) {
+				action_button = mouse_button(gdk_button_event_get_button(event));
+				if (!action_button)
+					return false;
+				if (button_state) // another button is held
+					return phase == GTK_PHASE_BUBBLE && call_button_callback(wrapper, ACTION_BUTTON_PRESS, action_button, button_state | action_button, &pointers[id], timestamp);
+				button_state |= action_button;
+			}
 		case GDK_TOUCH_BEGIN:
 			action = pointer_index > 0 ? (ACTION_POINTER_DOWN | (pointer_index << 8)) : ACTION_DOWN;
 			break;
 		case GDK_BUTTON_RELEASE:
+			if (is_mouse) {
+				action_button = mouse_button(gdk_button_event_get_button(event));
+				button_state &= ~action_button;
+				if (!action_button)
+					return false;
+				if (button_state) // another button is still held
+					return phase == GTK_PHASE_BUBBLE && call_button_callback(wrapper, ACTION_BUTTON_RELEASE, action_button, button_state, &pointers[id], timestamp);
+			}
 		case GDK_TOUCH_END:
 			action = pointer_index > 0 ? (ACTION_POINTER_UP | (pointer_index << 8)) : ACTION_UP;
 			break;
 		case GDK_MOTION_NOTIFY:
-			if (!(gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK))
+			if (!(gdk_event_get_modifier_state(event) & (is_mouse ? GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK : GDK_BUTTON1_MASK)))
 				return false;
 		case GDK_TOUCH_UPDATE:
 			action = ACTION_MOVE;
@@ -280,11 +362,6 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 		default: // not a touch or mouse event, nothing to do here
 			return false;
 	}
-
-	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(event_controller));
-	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
-	GtkPropagationPhase phase = gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(event_controller));
-	guint32 timestamp = gdk_event_get_time(event);
 
 	if (id >= MAX_POINTERS) {
 		fprintf(stderr, "exiting - event sequence %w64d larger than %d, did Gtk implementation change?", id, MAX_POINTERS);
@@ -314,7 +391,12 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 		action = ACTION_CANCEL;
 	}
 
-	gboolean ret = call_ontouch_callback(wrapper, action, pointers, pointer_indices, phase, timestamp, event);
+	gboolean ret;
+	if (is_mouse && action == ACTION_UP && phase == GTK_PHASE_BUBBLE)
+		call_button_callback(wrapper, ACTION_BUTTON_RELEASE, action_button, button_state, &pointers[id], timestamp);
+	ret = call_ontouch_callback(wrapper, action, pointers, pointer_indices, phase, timestamp, event, is_mouse ? SOURCE_MOUSE : SOURCE_TOUCHSCREEN, button_state);
+	if (is_mouse && action == ACTION_DOWN && phase == GTK_PHASE_BUBBLE)
+		call_button_callback(wrapper, ACTION_BUTTON_PRESS, action_button, button_state, &pointers[id], timestamp);
 	if (event_type == GDK_BUTTON_RELEASE || event_type == GDK_TOUCH_END) {
 		remove_pointer_fast(pointer_indices, &pointers[id]);
 	}
@@ -453,11 +535,17 @@ static void hover_enter_cb(GtkEventControllerMotion *controller, double x, doubl
 	wrapper->hover_exit_pending = FALSE;
 	wrapper->hover_x = x;
 	wrapper->hover_y = y;
-	call_hover_callback(wrapper->jobj, ACTION_HOVER_ENTER, x, y, raw_x, raw_y);
+	/* like Android's InputDispatcher, enter on the first motion: GTK also sends crossings without one, e.g.
+	 * when a popup closes on a press outside of it, and with that hover Compose lost the next mouse press */
+	wrapper->hover_enter_pending = TRUE;
 }
 
 static void hover_leave_cb(GtkEventControllerMotion *controller, WrapperWidget *wrapper)
 {
+	if (wrapper->hover_enter_pending) { // it never entered
+		wrapper->hover_enter_pending = FALSE;
+		return;
+	}
 	if (pointer_indices->len) // composeUI apps don't like ACTION_HOVER_EXIT events while a pointer is down
 		wrapper->hover_exit_pending = TRUE;
 	else
@@ -468,9 +556,15 @@ static void hover_motion_cb(GtkEventControllerMotion *controller, double x, doub
 {
 	double raw_x;
 	double raw_y;
+	if (pointer_indices && pointer_indices->len) // like Android: the pointer is down, it doesn't hover
+		return;
 	get_raw_position(controller, wrapper, x, y, &raw_x, &raw_y);
 	wrapper->hover_x = x;
 	wrapper->hover_y = y;
+	if (wrapper->hover_enter_pending) {
+		wrapper->hover_enter_pending = FALSE;
+		call_hover_callback(wrapper->jobj, ACTION_HOVER_ENTER, x, y, raw_x, raw_y);
+	}
 	call_hover_callback(wrapper->jobj, ACTION_HOVER_MOVE, x, y, raw_x, raw_y);
 }
 
@@ -703,6 +797,7 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, 
 
 		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), wrapper->jobj);
 		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
+		wrapper->custom_generic_motion = TRUE;
 	}
 	if (_METHOD(class, "dispatchHoverEvent", "(Landroid/view/MotionEvent;)Z") != _CACHED_METHOD(View__dispatchHoverEvent)) {
 		GtkEventController *controller = gtk_event_controller_motion_new();

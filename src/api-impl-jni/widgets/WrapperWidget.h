@@ -20,7 +20,9 @@ struct _WrapperWidget {
 	gboolean needs_allocation;
 	gboolean intercepting_touch;
 	gboolean custom_dispatch_touch;
+	gboolean custom_generic_motion;
 	gboolean hover_exit_pending;
+	gboolean hover_enter_pending;
 	gboolean has_focus;
 	gboolean rtl_resolved;
 	gboolean animating; /* a view animation (android.view.animation) is set on the view */
