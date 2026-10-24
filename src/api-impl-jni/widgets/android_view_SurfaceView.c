@@ -112,21 +112,29 @@ void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, Gdk
 
 // ---
 
+/* The callbacks reach the SurfaceView through the weak reference of its wrapper: a global reference
+ * here would keep the view, and with it its activity, alive forever (the widget only goes away
+ * when the view is garbage collected). The idle sources hold a reference on the widget. */
 struct jni_callback_data {
-	JavaVM *jvm;
-	jobject this;
 	gint resize_width;
 	gint resize_height;
 };
 
-static gboolean on_resize_delayed(struct jni_callback_data *d)
+static jobject surface_view_get_view(JNIEnv *env, GtkWidget *dummy)
 {
-	JNIEnv *env;
-	(*d->jvm)->GetEnv(d->jvm, (void **)&env, JNI_VERSION_1_6);
+	GtkWidget *wrapper = gtk_widget_get_parent(gtk_widget_get_parent(dummy)); // dummy -> graphics offload -> wrapper
+	return WRAPPER_IS_WIDGET(wrapper) ? (*env)->NewLocalRef(env, WRAPPER_WIDGET(wrapper)->jobj) : NULL;
+}
 
-	// TODO: are there cases where returning RGBA_8888 is a bad idea?
-	// NOTE: we want to call the private method of android.view.SurfaceView, not the related method with this name in the API
-	J__SurfaceView__surfaceChanged(env, d->this, 1 /*RGBA_8888*/, d->resize_width, d->resize_height);
+static gboolean on_resize_delayed(GtkWidget *dummy)
+{
+	JNIEnv *env = get_jni_env();
+	struct jni_callback_data *d = g_object_get_data(G_OBJECT(dummy), "atl-callback-data");
+	jobject view = surface_view_get_view(env, dummy);
+	if (view) {
+		J__SurfaceView__surfaceChanged(env, view, 1 /*RGBA_8888*/, d->resize_width, d->resize_height);
+		(*env)->DeleteLocalRef(env, view);
+	}
 
 	return G_SOURCE_REMOVE;
 }
@@ -136,23 +144,24 @@ static void on_resize(GtkWidget *self, gint width, gint height, struct jni_callb
 	d->resize_width = width;
 	d->resize_height = height;
 
-	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_resize_delayed), d, NULL);
+	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_resize_delayed), g_object_ref(self), g_object_unref);
 }
 
-static gboolean on_realize_delayed(struct jni_callback_data *d)
+static gboolean on_realize_delayed(GtkWidget *dummy)
 {
-	JNIEnv *env;
-	(*d->jvm)->GetEnv(d->jvm, (void **)&env, JNI_VERSION_1_6);
-
-	// NOTE: we want to call the private method of android.view.SurfaceView, not the related method with this name in the API
-	J__SurfaceView__surfaceCreated(env, d->this);
+	JNIEnv *env = get_jni_env();
+	jobject view = surface_view_get_view(env, dummy);
+	if (view) {
+		J__SurfaceView__surfaceCreated(env, view);
+		(*env)->DeleteLocalRef(env, view);
+	}
 
 	return G_SOURCE_REMOVE;
 }
 
 static void on_realize(GtkWidget *self, struct jni_callback_data *d)
 {
-	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_realize_delayed), d, NULL);
+	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_realize_delayed), g_object_ref(self), g_object_unref);
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
@@ -163,16 +172,11 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv
 	GtkWidget *graphics_offload = gtk_graphics_offload_new(dummy);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), graphics_offload);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
-	// TODO: is this correct for all usecases? how do we know when it's not?
 	gtk_widget_set_hexpand(wrapper, true);
 	gtk_widget_set_vexpand(wrapper, true);
 
-	JavaVM *jvm;
-	(*env)->GetJavaVM(env, &jvm);
-
-	struct jni_callback_data *callback_data = malloc(sizeof(struct jni_callback_data));
-	callback_data->jvm = jvm;
-	callback_data->this = _REF(this);
+	struct jni_callback_data *callback_data = g_new0(struct jni_callback_data, 1);
+	g_object_set_data_full(G_OBJECT(dummy), "atl-callback-data", callback_data, g_free);
 
 	g_signal_connect(dummy, "resize", G_CALLBACK(on_resize), callback_data);
 	g_signal_connect(dummy, "realize", G_CALLBACK(on_realize), callback_data);
