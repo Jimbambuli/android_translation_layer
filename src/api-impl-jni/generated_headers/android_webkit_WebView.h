@@ -299,6 +299,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1firePointerCancel
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_destroy
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1destroy
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_setBackgroundColor
  * Signature: (JI)V
  */

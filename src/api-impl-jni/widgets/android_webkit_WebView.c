@@ -37,8 +37,15 @@ static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointe
 		return;
 	}
 	path += 1; // remove the leading '/'
+	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(webkit_uri_scheme_request_get_web_view(request)));
+	if (!WRAPPER_IS_WIDGET(parent)) { // the WebView was destroyed
+		GError *error = g_error_new(G_IO_ERROR, G_IO_ERROR_CANCELLED, "WebView destroyed");
+		webkit_uri_scheme_request_finish_error(request, error);
+		g_error_free(error);
+		return;
+	}
 	JNIEnv *env = get_jni_env();
-	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(webkit_uri_scheme_request_get_web_view(request))));
+	WrapperWidget *wrapper = WRAPPER_WIDGET(parent);
 	jobject asset_manager_obj = J__WebView__internalGetAssetManager(env, wrapper->jobj);
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(asset_manager_obj, "mObject"));
 	struct Asset *asset = AssetManager_openNonAsset(asset_manager, path, ACCESS_STREAMING);
@@ -119,13 +126,49 @@ static void evaluate_js_cb(GObject *source, GAsyncResult *result, gpointer user_
 	}
 	if (data->callback) {
 		JNIEnv *env = get_jni_env();
-		J__WebView__internalJsResult(env, data->wrapper->jobj, data->callback, _JSTRING(json ? json : "null"));
-		if ((*env)->ExceptionCheck(env))
-			(*env)->ExceptionDescribe(env);
+		// the WebView was destroyed meanwhile: like on Android, the callback is dropped
+		if (gtk_widget_get_parent(GTK_WIDGET(source)) == GTK_WIDGET(data->wrapper)) {
+			J__WebView__internalJsResult(env, data->wrapper->jobj, data->callback, _JSTRING(json ? json : "null"));
+			if ((*env)->ExceptionCheck(env))
+				(*env)->ExceptionDescribe(env);
+		}
 		(*env)->DeleteGlobalRef(env, data->callback);
 	}
 	g_free(json);
+	g_object_unref(data->wrapper);
 	g_free(data);
+}
+
+/* A WebView that is destroyed or garbage collected gives up its page, but WebKit does not close it: WebKitGTK
+ * 2.54 aborts the web process when it closes a page whose compositing thread stops before it has dropped its
+ * buffer release timer (AcceleratedSurface::willDestroyCompositingRunLoop(), fixed in WebKit main), and with
+ * it every page of the app goes blank. So the WebKitWebView stays alive, here, and its page is emptied: the
+ * document, its style rules and scripts go, which is what made every page an app has shown cost time and
+ * memory. Nothing calls back into the View any more. */
+static void park_web_view(WebKitWebView *webview, gpointer wrapper)
+{
+	if (g_object_get_data(G_OBJECT(webview), "atl-parked"))
+		return;
+	g_object_set_data(G_OBJECT(webview), "atl-parked", GINT_TO_POINTER(1));
+	webkit_web_view_stop_loading(webview);
+	WebKitUserContentManager *content_manager = webkit_web_view_get_user_content_manager(webview);
+	g_signal_handlers_disconnect_by_data(content_manager, wrapper);
+	webkit_user_content_manager_unregister_script_message_handler(content_manager, "atlbridge", NULL);
+	webkit_user_content_manager_remove_all_scripts(content_manager);
+	g_signal_handlers_disconnect_by_func(webview, web_view_load_changed, NULL);
+	g_signal_handlers_disconnect_by_data(webview, wrapper);
+	// own settings without the page cache, which would keep the old document
+	WebKitSettings *settings = webkit_settings_new();
+	webkit_settings_set_enable_page_cache(settings, FALSE);
+	webkit_web_view_set_settings(webview, settings);
+	g_object_unref(settings);
+	webkit_web_view_load_uri(webview, "about:blank");
+}
+
+// the wrapper goes when the WebView is garbage collected
+static void wrapper_finalized(gpointer webview, GObject *wrapper)
+{
+	park_web_view(webview, wrapper);
 }
 
 JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
@@ -151,6 +194,9 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	if (related)
 		g_object_unref(related);
 	g_weak_ref_set(&related_view, webview);
+	// never finalized, see park_web_view()
+	g_object_ref(webview);
+	g_object_weak_ref(G_OBJECT(wrapper), wrapper_finalized, webview);
 	/* Android's WebView applies a mouse wheel step at once (one frame per notch, the size already
 	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
 	 * starts over at every further step, so a spinning wheel scrolls in lurches. */
@@ -303,7 +349,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JN
 
 	WebKitWebView *webview = _PTR(widget_ptr);
 	struct evaluate_js_data *data = g_new(struct evaluate_js_data, 1);
-	data->wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(webview)));
+	data->wrapper = g_object_ref(WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(webview))));
 	data->callback = callback ? (*env)->NewGlobalRef(env, callback) : NULL;
 	webkit_web_view_evaluate_javascript(webview, _CSTRING(script), -1, NULL, NULL, NULL, evaluate_js_cb, data);
 }
@@ -311,6 +357,8 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JN
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBackgroundColor(JNIEnv *env, jobject this, jlong widget_ptr, jint color)
 {
 	WebKitWebView *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // destroyed, or WebViews are disabled
+		return;
 	GdkRGBA rgba = {
 		.red = ((color >> 16) & 0xFF) / 255.f,
 		.green = ((color >> 8) & 0xFF) / 255.f,
@@ -325,8 +373,28 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBackgroundColor(JN
  * the rest of the sequence, so gesture code in the page would wait for a pointerup that never comes. */
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1firePointerCancel(JNIEnv *env, jobject this, jlong widget_ptr)
 {
-	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // destroyed, or WebViews are disabled
 		return;
 
-	webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(_PTR(widget_ptr)), "window.__atl_pointercancel&&__atl_pointercancel()", -1, NULL, NULL, NULL, NULL, NULL);
+	webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(webview), "window.__atl_pointercancel&&__atl_pointercancel()", -1, NULL, NULL, NULL, NULL, NULL);
+}
+
+/* WebView.destroy(): release the page in the (shared) web process (see park_web_view()). Until then every page an
+ * app has shown stays loaded and keeps working (styles, scripts, timers). The Java object stays a View that the
+ * app may still remove from its parent, so an empty widget takes the WebKitWebView's place in the wrapper; the
+ * WebView methods ignore further calls, like on Android. */
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1destroy(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // WebViews are disabled, this is a plain View
+		return widget_ptr;
+
+	GtkWidget *wrapper = gtk_widget_get_parent(webview);
+	park_web_view(WEBKIT_WEB_VIEW(webview), wrapper);
+	gtk_widget_unparent(webview);
+
+	GtkWidget *placeholder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), placeholder);
+	return _INTPTR(placeholder);
 }

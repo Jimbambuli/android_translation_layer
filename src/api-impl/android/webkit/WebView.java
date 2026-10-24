@@ -25,6 +25,7 @@ public class WebView extends ViewGroup {
 	private WebViewClient webViewClient;
 	private String url;
 	private WebChromeClient webChromeClient;
+	private boolean destroyed;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -104,6 +105,8 @@ public class WebView extends ViewGroup {
 	/* The object becomes available to JavaScript as window.<name> on the next page load. Calls are
 	 * asynchronous (WebKitGTK script message handlers), so return values are not passed back. */
 	public void addJavascriptInterface(Object object, String name) {
+		if (isDestroyed())
+			return;
 		javascriptInterfaces.put(name, object);
 		Set<String> methodNames = new LinkedHashSet<>();
 		for (Method method : getJavascriptInterfaceMethods(object))
@@ -218,9 +221,25 @@ public class WebView extends ViewGroup {
 
 	public void removeAllViews() {}
 
-	public void destroy() {}
+	/* Like Android: frees the page and the web content's resources, the WebView must not be used
+	 * afterwards; calls to it are logged and ignored. */
+	public void destroy() {
+		if (destroyed)
+			return;
+		destroyed = true;
+		javascriptInterfaces.clear();
+		widget = native_destroy(widget);
+	}
+
+	private boolean isDestroyed() {
+		if (destroyed)
+			Log.w(TAG, "Application attempted to call on a destroyed WebView");
+		return destroyed;
+	}
 
 	public void loadDataWithBaseURL(String baseUrl, String data, String mimeType, String encoding, String historyUrl) {
+		if (isDestroyed())
+			return;
 		if ("base64".equals(encoding)) {
 			data = new String(Base64.decode(data, 0));
 		}
@@ -236,6 +255,8 @@ public class WebView extends ViewGroup {
 	}
 
 	public void loadUrl(String url) {
+		if (isDestroyed())
+			return;
 		if (url.startsWith("javascript:")) {
 			native_evaluateJavascript(widget, url.substring("javascript:".length()), null);
 			return;
@@ -276,6 +297,8 @@ public class WebView extends ViewGroup {
 	}
 
 	public void evaluateJavascript(String script, ValueCallback<String> resultCallback) {
+		if (isDestroyed())
+			return;
 		native_evaluateJavascript(widget, script, resultCallback);
 	}
 
@@ -318,6 +341,7 @@ public class WebView extends ViewGroup {
 	private native void native_addJavascriptInterface(long widget, String name, String methodNames);
 	private native void native_evaluateJavascript(long widget, String script, ValueCallback<String> callback);
 	private native void native_firePointerCancel(long widget);
+	private native long native_destroy(long widget);
 	/* the page is drawn by WebKit, a CSS background of the widget would stay hidden behind it */
 	@Override
 	protected native void native_setBackgroundColor(long widget, int color);
