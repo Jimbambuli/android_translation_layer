@@ -59,7 +59,13 @@ public class SeekBar extends AbsSeekBar {
 		native_setProgress(widget, progress);
 	}
 
-	public native void setOnSeekBarChangeListener(final OnSeekBarChangeListener l);
+	/* kept here as on AOSP; the native side holds no reference to it, a global reference there
+	 * would keep the listener, and with it usually this view, alive forever */
+	private OnSeekBarChangeListener mOnSeekBarChangeListener;
+
+	public void setOnSeekBarChangeListener(OnSeekBarChangeListener l) {
+		mOnSeekBarChangeListener = l;
+	}
 
 	@Override
 	public int getProgress() {

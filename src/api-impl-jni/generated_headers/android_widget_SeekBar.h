@@ -251,14 +251,6 @@ JNIEXPORT jint JNICALL Java_android_widget_SeekBar_native_1getProgress
 JNIEXPORT void JNICALL Java_android_widget_SeekBar_native_1setMax
   (JNIEnv *, jobject, jlong, jint);
 
-/*
- * Class:     android_widget_SeekBar
- * Method:    setOnSeekBarChangeListener
- * Signature: (Landroid/widget/SeekBar/OnSeekBarChangeListener;)V
- */
-JNIEXPORT void JNICALL Java_android_widget_SeekBar_setOnSeekBarChangeListener
-  (JNIEnv *, jobject, jobject);
-
 #ifdef __cplusplus
 }
 #endif

@@ -9,6 +9,8 @@
 #include "../generated_headers/android_widget_SeekBar.h"
 #include "jni.h"
 
+static void on_change_value(GtkRange *self, GtkScrollType *scroll, gdouble value, gpointer user_data);
+
 JNIEXPORT jlong JNICALL Java_android_widget_SeekBar_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
@@ -17,6 +19,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_SeekBar_native_1constructor(JNIEnv *
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), scale);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	gtk_widget_set_name(scale, "SeekBar");
+	g_signal_connect(scale, "change_value", G_CALLBACK(on_change_value), NULL);
 	return _INTPTR(scale);
 }
 
@@ -32,22 +35,23 @@ JNIEXPORT void JNICALL Java_android_widget_SeekBar_native_1setProgress(JNIEnv *e
 	gtk_range_set_value(range, progress);
 }
 
-static void on_change_value(GtkRange *self, GtkScrollType *scroll, gdouble value, jobject listener)
+static void on_change_value(GtkRange *self, GtkScrollType *scroll, gdouble value, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(self)));
-	J__SeekBar__OnSeekBarChangeListener__onStartTrackingTouch(env, listener, wrapper->jobj);
-	J__SeekBar__OnSeekBarChangeListener__onProgressChanged(env, listener, wrapper->jobj, (int)value, TRUE);
-	J__SeekBar__OnSeekBarChangeListener__onStopTrackingTouch(env, listener, wrapper->jobj);
-}
-
-JNIEXPORT void JNICALL Java_android_widget_SeekBar_setOnSeekBarChangeListener(JNIEnv *env, jobject this, jobject listener)
-{
-	GtkRange *range = GTK_RANGE(_PTR(_GET_LONG_FIELD(this, "widget")));
-	g_signal_handlers_disconnect_matched(range, G_SIGNAL_MATCH_FUNC, 0, 0, NULL, on_change_value, NULL);
-	if (listener) {
-		g_signal_connect(range, "change_value", G_CALLBACK(on_change_value), _REF(listener));
+	jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
+	if (!view) // garbage collected
+		return;
+	jobject listener = _GET_OBJ_FIELD(view, "mOnSeekBarChangeListener", "Landroid/widget/SeekBar$OnSeekBarChangeListener;");
+	if (!listener) {
+		(*env)->DeleteLocalRef(env, view);
+		return;
 	}
+	J__SeekBar__OnSeekBarChangeListener__onStartTrackingTouch(env, listener, view);
+	J__SeekBar__OnSeekBarChangeListener__onProgressChanged(env, listener, view, (int)value, TRUE);
+	J__SeekBar__OnSeekBarChangeListener__onStopTrackingTouch(env, listener, view);
+	(*env)->DeleteLocalRef(env, listener);
+	(*env)->DeleteLocalRef(env, view);
 }
 
 JNIEXPORT jint JNICALL Java_android_widget_SeekBar_native_1getProgress(JNIEnv *env, jobject this, jlong widget_ptr)
