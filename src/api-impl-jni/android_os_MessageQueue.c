@@ -54,8 +54,36 @@ static GSourceFuncs source_funcs = {
 };
 static GSource *source = NULL;
 
+/* GTK calls into Java from the main loop, outside of any native method: the local references made
+ * there are never freed (the thread never returns to Java), and they keep what they point to (old
+ * activities, their windows and views) alive. So the main loop gets a local frame per iteration, like
+ * a native method has one per call: it's dropped and pushed again before polling, when no callback
+ * runs (depth 0; a loop nested in a callback must not drop the callback's references). */
+static GPollFunc default_poll_func;
+static gint local_frame_poll(GPollFD *fds, guint nfds, gint timeout)
+{
+	static gboolean frame_pushed = FALSE;
+	if (g_main_depth() == 0) {
+		JNIEnv *env = get_jni_env();
+		if (frame_pushed)
+			(*env)->PopLocalFrame(env, NULL);
+		frame_pushed = (*env)->PushLocalFrame(env, 16) == 0;
+	}
+	return default_poll_func(fds, nfds, timeout);
+}
+
+/* from the main loop, so that the startup code (in GApplication's activate, which runs before the
+ * loop) keeps its references */
+static gboolean install_local_frame_poll(gpointer data)
+{
+	default_poll_func = g_main_context_get_poll_func(NULL);
+	g_main_context_set_poll_func(NULL, local_frame_poll);
+	return G_SOURCE_REMOVE;
+}
+
 void prepare_main_looper(JNIEnv *env)
 {
+	g_idle_add(install_local_frame_poll, NULL);
 	main_thread_id = g_thread_self();
 	main_thread_looper = ALooper_prepare(0);
 
