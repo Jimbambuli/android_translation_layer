@@ -218,7 +218,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
 		return Java_android_view_View_native_1constructor(env, this, context, attrs);
 
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	/* Like Android, which renders the WebViews of an app in one renderer process, the WebViews share
 	 * one web process (as related views); WebKitGTK would start one per view (~150 MB each), and those
 	 * of an activity that the app leaks would stay. Each view keeps its own user content manager: the

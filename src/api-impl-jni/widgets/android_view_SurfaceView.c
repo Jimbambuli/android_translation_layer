@@ -157,7 +157,7 @@ static void on_realize(GtkWidget *self, struct jni_callback_data *d)
 
 JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *dummy = surface_view_widget_new();
 	gtk_widget_set_name(dummy, "dummy widget for SurfaceView");
 	GtkWidget *graphics_offload = gtk_graphics_offload_new(dummy);

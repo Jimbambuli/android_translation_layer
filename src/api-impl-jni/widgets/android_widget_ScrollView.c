@@ -9,7 +9,7 @@
 
 JNIEXPORT jlong JNICALL Java_android_widget_ScrollView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *scrolled_window = gtk_scrolled_window_new();
 	GtkWidget *viewport = gtk_viewport_new(NULL, NULL);
 	gtk_scrollable_set_vscroll_policy(GTK_SCROLLABLE(viewport), GTK_SCROLL_NATURAL);

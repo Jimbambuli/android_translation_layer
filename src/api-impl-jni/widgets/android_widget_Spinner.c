@@ -62,7 +62,7 @@ static void bind_listitem_cb(GtkListItemFactory *factory, GtkListItem *list_item
 
 JNIEXPORT jlong JNICALL Java_android_widget_Spinner_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	WrapperWidget *wrapper = g_object_ref(WRAPPER_WIDGET(wrapper_widget_new()));
+	WrapperWidget *wrapper = g_object_ref_sink(WRAPPER_WIDGET(wrapper_widget_new()));
 	wrapper_widget_set_jobject(wrapper, env, this);
 	GtkListItemFactory *factory = gtk_signal_list_item_factory_new();
 	g_signal_connect(factory, "bind", G_CALLBACK(bind_listitem_cb), wrapper->jobj);

@@ -18,7 +18,7 @@
 
 JNIEXPORT jlong JNICALL Java_android_widget_ImageView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *image = gtk_picture_new();
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), image);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);

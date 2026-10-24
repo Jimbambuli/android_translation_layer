@@ -17,7 +17,7 @@ static gboolean transform_spin_txt_cb(GtkSpinButton *widget, gpointer user_data 
 
 JNIEXPORT jlong JNICALL Java_android_widget_TimePicker_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
 	gtk_widget_set_margin_start(vbox, 10);
 	gtk_widget_set_margin_top(vbox, 10);

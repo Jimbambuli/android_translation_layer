@@ -10,7 +10,7 @@
 
 JNIEXPORT jlong JNICALL Java_android_widget_ImageButton_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *button = gtk_button_new();
 	/* the background of an ImageButton is its Android background, which may be none */
 	gtk_widget_add_css_class(button, "ATL-image-button");

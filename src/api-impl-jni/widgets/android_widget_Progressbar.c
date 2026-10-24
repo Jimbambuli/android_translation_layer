@@ -10,7 +10,7 @@
 
 JNIEXPORT jlong JNICALL Java_android_widget_ProgressBar_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	GtkWidget *wrapper = g_object_ref(wrapper_widget_new());
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	GtkWidget *progress_bar = gtk_progress_bar_new();
 	GtkWidget *spinner = gtk_spinner_new();

@@ -779,7 +779,7 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setVisibility(JNIEnv *env,
 
 JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
-	WrapperWidget *wrapper = g_object_ref(WRAPPER_WIDGET(wrapper_widget_new()));
+	WrapperWidget *wrapper = g_object_ref_sink(WRAPPER_WIDGET(wrapper_widget_new()));
 	GtkWidget *widget = g_object_new(java_widget_get_type(), NULL);
 	gtk_widget_set_layout_manager(widget, android_layout_new(this));
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), widget);
