@@ -115,7 +115,7 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	JNIEnv *env;
 	JavaVMInitArgs args = {
 		.version = JNI_VERSION_1_6,
-		.nOptions = 5,
+		.nOptions = 7,
 	};
 	JavaVMOption *options;
 
@@ -150,6 +150,10 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	options[2].optionString = construct_classpath("-Datl.app.class.path=", (char *[]){apk_classpath}, 1);
 	options[3].optionString = construct_classpath("-Datl.app.library.path=", (char *[]){api_impl_natives_dir, app_lib_dir}, 2);
 	options[4].optionString = "-Xcheck:jni";
+	// like the zygote's dalvik.vm.heapsize / dalvik.vm.heapgrowthlimit: apps get 256 MB as before,
+	// apps with android:largeHeap lift the growth limit (Context) and get up to 512 MB
+	options[5].optionString = "-Xmx512m";
+	options[6].optionString = "-XX:HeapGrowthLimit=256m";
 	if (jdwp_port) {
 		strncat(jdwp_option_string, jdwp_port, 5); // 5 chars is enough for a port number, and won't overflow our array
 		options[option_counter++].optionString = "-XjdwpProvider:internal";
