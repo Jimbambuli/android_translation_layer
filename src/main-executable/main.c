@@ -525,6 +525,18 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	g_signal_connect(gtk_settings_get_default(), "notify::gtk-enable-animations", G_CALLBACK(update_animator_duration_scale), NULL);
 	update_animator_duration_scale(gtk_settings_get_default());
 
+	/* Android's default font (sans-serif) is Roboto; where it is not installed, fontconfig picks
+	 * its sans-serif font as before */
+	char *font_name;
+	g_object_get(gtk_settings_get_default(), "gtk-font-name", &font_name, NULL);
+	PangoFontDescription *font = pango_font_description_from_string(font_name ? font_name : "");
+	pango_font_description_set_family(font, "Roboto,sans-serif");
+	char *android_font_name = pango_font_description_to_string(font);
+	g_object_set(gtk_settings_get_default(), "gtk-font-name", android_font_name, NULL);
+	g_free(android_font_name);
+	pango_font_description_free(font);
+	g_free(font_name);
+
 	/* -- misc -- */
 
 	window = gtk_application_window_new(app);
