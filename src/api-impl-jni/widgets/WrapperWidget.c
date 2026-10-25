@@ -602,11 +602,11 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 			if ((*env)->ExceptionCheck(env))
 				(*env)->ExceptionDescribe(env);
 		}
-		J__View__onAttachedToWindow(env, wrapper->jobj);
+		J__View__dispatchAttachedToWindow(env, wrapper->jobj);
 	} else {
 		currently_unmapping = wrapper->child;
 		currently_unmapping_root = g_object_get_data(G_OBJECT(wrapper), "atl-root");
-		J__View__onDetachedFromWindow(env, wrapper->jobj);
+		J__View__dispatchDetachedFromWindow(env, wrapper->jobj);
 	}
 
 	if ((*env)->ExceptionCheck(env))

@@ -69,7 +69,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		Slog.v(TAG, "addView(" + view + ", " + params + ") called");
 		view.setLayoutParams(params);
 		view.parent = new WindowViewParent();
-		view.onAttachedToWindow();
+		view.dispatchAttachedToWindow();
 		Rect displayFrame = new Rect();
 		view.getWindowVisibleDisplayFrame(displayFrame);
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
@@ -108,6 +108,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 
 	@Override
 	public void removeView(View view) {
+		view.dispatchDetachedFromWindow();
 		native_removeView(view.widget);
 		view.parent = null;
 	}

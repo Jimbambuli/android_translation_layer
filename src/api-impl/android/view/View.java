@@ -2805,7 +2805,26 @@ public class View implements Drawable.Callback {
 	@Export
 	public void onRtlPropertiesChanged(int layoutDirection) {}
 
+	private boolean attachedToWindow;
+
+	/* like AOSP: onAttachedToWindow() and onDetachedFromWindow() alternate, each exactly once; called
+	 * when GTK roots/unroots the widget, and for detaching also from ViewGroup and Window like AOSP */
 	@Export
+	void dispatchAttachedToWindow() {
+		if (attachedToWindow)
+			return;
+		attachedToWindow = true;
+		onAttachedToWindow();
+	}
+
+	@Export
+	void dispatchDetachedFromWindow() {
+		if (!attachedToWindow)
+			return;
+		onDetachedFromWindow();
+		attachedToWindow = false;
+	}
+
 	protected void onAttachedToWindow() {
 		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
 			listener.onViewAttachedToWindow(this);
@@ -2817,7 +2836,6 @@ public class View implements Drawable.Callback {
 		}
 	}
 
-	@Export
 	protected void onDetachedFromWindow() {
 		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
 			listener.onViewDetachedFromWindow(this);

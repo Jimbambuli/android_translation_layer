@@ -100,6 +100,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		requestLayout();
 	}
 
+	/* like AOSP: the children first */
+	@Override
+	void dispatchDetachedFromWindow() {
+		for (int i = 0; i < children.size(); i++)
+			children.get(i).dispatchDetachedFromWindow();
+		super.dispatchDetachedFromWindow();
+	}
+
 	public void onViewAdded(View view) {}
 	public void onViewRemoved(View view) {}
 
@@ -236,6 +244,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	protected void removeViewInternal(View child) {
 		if (child == null || child.parent != this)
 			return;
+		child.dispatchDetachedFromWindow();
 		child.parent = null;
 		children.remove(child);
 		native_removeView(widget, child.widget);
@@ -272,6 +281,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void removeAllViews() {
 		for (Iterator<View> it = children.iterator(); it.hasNext();) {
 			View child = it.next();
+			child.dispatchDetachedFromWindow();
 			child.parent = null;
 			it.remove();
 			native_removeView(widget, child.widget);
@@ -305,6 +315,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	protected void removeDetachedView(View child, boolean animate) {
 		if (!detachedChildren.remove(child))
 			return;
+		child.dispatchDetachedFromWindow();
 		child.parent = null;
 		native_removeView(widget, child.widget);
 		if (onHierarchyChangeListener != null) {
