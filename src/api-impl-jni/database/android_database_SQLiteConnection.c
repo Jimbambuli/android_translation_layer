@@ -275,7 +275,7 @@ JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegis
 
 	if (err != SQLITE_OK) {
 		fprintf(stderr, "sqlite3_create_function returned %d", err);
-		(*env)->DeleteGlobalRef(env, functionObjGlobal);
+		/* SQLite has called the destructor already, which deleted functionObjGlobal */
 		throw_sqlite3_exception_handle(env, connection->db);
 		return;
 	}
