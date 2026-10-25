@@ -480,6 +480,32 @@ void atl_window_android_wheel_acceleration(GtkWindow *window)
 	gtk_widget_add_controller(GTK_WIDGET(window), controller);
 }
 
+/* The back and forward buttons of a mouse (BTN_SIDE/BTN_EXTRA, GDK buttons 8 and 9) are keys on
+ * Android, not presses: InputReader turns them into KEYCODE_BACK and KEYCODE_FORWARD
+ * (synthesizeButtonKeys). So no view or WebView gets the press, the release of back goes back like
+ * the back key, and forward has no default action. */
+static gboolean on_mouse_back_event(GtkEventControllerLegacy *controller, GdkEvent *event, GCallback back)
+{
+	GdkEventType type = gdk_event_get_event_type(event);
+	if (type != GDK_BUTTON_PRESS && type != GDK_BUTTON_RELEASE)
+		return FALSE;
+	guint button = gdk_button_event_get_button(event);
+	if (button != 8 && button != 9)
+		return FALSE;
+	if (type == GDK_BUTTON_RELEASE && button == 8)
+		((void (*)(gpointer))back)(g_object_get_data(G_OBJECT(controller), "back-data"));
+	return TRUE;
+}
+
+void atl_window_android_mouse_back(GtkWindow *window, GCallback back, gpointer data)
+{
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_object_set_data(G_OBJECT(controller), "back-data", data);
+	g_signal_connect(controller, "event", G_CALLBACK(on_mouse_back_event), back);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+}
+
 GVariant *intent_serialize(JNIEnv *env, jobject intent)
 {
 	if (!intent)

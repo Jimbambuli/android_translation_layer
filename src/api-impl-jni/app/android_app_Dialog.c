@@ -50,6 +50,13 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 	return dispatch_back_key(jobj, keyval, ACTION_UP);
 }
 
+/* the back button of a mouse is the back key (see atl_window_android_mouse_back()) */
+static void on_mouse_back(jobject jobj)
+{
+	dispatch_back_key(jobj, GDK_KEY_Escape, ACTION_DOWN);
+	dispatch_back_key(jobj, GDK_KEY_Escape, ACTION_UP);
+}
+
 /* While a dialog is shown, a press in the app's window is a touch outside of the dialog. On AOSP
  * the dialog's window takes it (it is touch-modal): the activity below sees nothing of it, and the
  * dialog cancels itself if it closes on a touch outside (Dialog.onTouchEvent()). */
@@ -118,6 +125,7 @@ JNIEXPORT jlong JNICALL Java_android_app_Dialog_nativeInit(JNIEnv *env, jobject 
 	atl_window_android_wheel_acceleration(GTK_WINDOW(dialog));
 	gtk_window_set_child(GTK_WINDOW(dialog), gtk_widget_get_parent(decor_view));
 	jobject ref = _REF(this);
+	atl_window_android_mouse_back(GTK_WINDOW(dialog), G_CALLBACK(on_mouse_back), ref);
 	g_signal_connect(GTK_WINDOW(dialog), "close-request", G_CALLBACK(on_close_request), ref);
 	GtkEventController *controller = gtk_event_controller_key_new();
 	g_signal_connect(controller, "key-pressed", G_CALLBACK(on_key_pressed), ref);
