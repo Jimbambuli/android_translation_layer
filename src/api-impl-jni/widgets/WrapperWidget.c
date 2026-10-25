@@ -595,6 +595,8 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 {
 	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(wrapper));
 	JNIEnv *env = get_jni_env();
+	if (!wrapper->jobj) // the view was finalized
+		return;
 
 	/* like AOSP, onDetachedFromWindow() still sees the window (getViewTreeObserver() must return the
 	 * window's observer, so that listeners added in onAttachedToWindow() can be removed). The old root

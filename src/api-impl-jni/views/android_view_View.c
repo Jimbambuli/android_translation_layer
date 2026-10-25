@@ -830,9 +830,22 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setAnimating(JNIEnv *env, 
 }
 
 /* called from View.finalize(), on the FinalizerDaemon thread */
+static gboolean release_wrapper(gpointer data)
+{
+	WrapperWidget *wrapper = data;
+	JNIEnv *env = get_jni_env();
+	if (wrapper->jobj)
+		_WEAK_UNREF(wrapper->jobj);
+	wrapper->jobj = NULL;
+	g_object_unref(wrapper);
+	return G_SOURCE_REMOVE;
+}
+
+/* called from the finalizer: the view is gone, so drop its weak reference on the main thread along
+ * with the unref, instead of only once GTK lets go of the widget (a parent may keep it for long) */
 JNIEXPORT void JNICALL Java_android_view_View_native_1destructor(JNIEnv *env, jobject this, jlong widget_ptr)
 {
-	atl_unref_on_main_thread(gtk_widget_get_parent(_PTR(widget_ptr)));
+	g_idle_add(release_wrapper, WRAPPER_WIDGET(gtk_widget_get_parent(_PTR(widget_ptr))));
 }
 
 #define MEASURE_SPEC_UNSPECIFIED (0 << 30)

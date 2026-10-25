@@ -125,7 +125,24 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_Drawable_native_1ref(JNIEn
 }
 
 /* also called from Drawable.finalize(), on the FinalizerDaemon thread */
+static gboolean release_paintable(gpointer data)
+{
+	JavaPaintable *paintable = data;
+	JNIEnv *env = get_jni_env();
+	if (paintable->drawable)
+		_WEAK_UNREF(paintable->drawable);
+	paintable->drawable = NULL;
+	g_object_unref(paintable);
+	return G_SOURCE_REMOVE;
+}
+
 JNIEXPORT void JNICALL Java_android_graphics_drawable_Drawable_native_1unref(JNIEnv *env, jobject this, jlong paintable_ptr)
 {
-	atl_unref_on_main_thread(_PTR(paintable_ptr));
+	GdkPaintable *paintable = _PTR(paintable_ptr);
+	/* the drawable lets go of its own paintable (it is finalized or replaced it): drop the weak
+	 * reference to it as well, on the main thread like the unref, instead of only once GTK lets go */
+	if (JAVA_IS_PAINTABLE(paintable) && (*env)->IsSameObject(env, JAVA_PAINTABLE(paintable)->drawable, this))
+		g_idle_add(release_paintable, paintable);
+	else
+		atl_unref_on_main_thread(paintable);
 }
