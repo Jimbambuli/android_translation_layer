@@ -16,7 +16,6 @@ G_DECLARE_FINAL_TYPE(AndroidLayout, android_layout, ATL, ANDROID_LAYOUT, GtkLayo
 
 struct _AndroidLayout {
 	GtkLayoutManager parent_instance;
-	jobject view;
 	int width;
 	int height;
 	int real_width;
@@ -24,7 +23,7 @@ struct _AndroidLayout {
 	gboolean needs_allocation;
 };
 
-GtkLayoutManager *android_layout_new(jobject view);
+GtkLayoutManager *android_layout_new(void);
 void android_layout_set_params(AndroidLayout *layout, int width, int height);
 
 void widget_set_needs_allocation(GtkWidget *widget);
