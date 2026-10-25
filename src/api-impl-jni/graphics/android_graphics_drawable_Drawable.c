@@ -17,23 +17,36 @@ struct _JavaPaintable {
 	jobject drawable;
 };
 G_DECLARE_FINAL_TYPE(JavaPaintable, java_paintable, JAVA, PAINTABLE, GObject)
+static void java_paintable_paintable_init(GdkPaintableInterface *iface);
+G_DEFINE_TYPE_WITH_CODE(JavaPaintable, java_paintable, G_TYPE_OBJECT,
+                        G_IMPLEMENT_INTERFACE(GDK_TYPE_PAINTABLE, java_paintable_paintable_init))
 
 static void java_paintable_snapshot(GdkPaintable *gdk_paintable, GdkSnapshot *snapshot, double width, double height)
 {
 	JNIEnv *env = get_jni_env();
 	JavaPaintable *paintable = JAVA_PAINTABLE(gdk_paintable);
+	/* the drawable may be gone already (finalized or disposed), the paintable then draws nothing */
+	jobject drawable = (*env)->NewLocalRef(env, paintable->drawable);
+	if (!drawable)
+		return;
 	jobject canvas = J_new__GskCanvas(env, _INTPTR(snapshot));
-	J__Drawable__setBounds(env, paintable->drawable, 0, 0, (int)width, (int)height);
-	J__Drawable__draw(env, paintable->drawable, canvas);
+	J__Drawable__setBounds(env, drawable, 0, 0, (int)width, (int)height);
+	J__Drawable__draw(env, drawable, canvas);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
+	(*env)->DeleteLocalRef(env, canvas);
+	(*env)->DeleteLocalRef(env, drawable);
 }
 
 static int java_paintable_get_intrinsic_width(GdkPaintable *gdk_paintable)
 {
 	JNIEnv *env = get_jni_env();
 	JavaPaintable *paintable = JAVA_PAINTABLE(gdk_paintable);
-	int width = J__Drawable__getIntrinsicWidth(env, paintable->drawable);
+	jobject drawable = (*env)->NewLocalRef(env, paintable->drawable);
+	if (!drawable)
+		return 0;
+	int width = J__Drawable__getIntrinsicWidth(env, drawable);
+	(*env)->DeleteLocalRef(env, drawable);
 	return width > 0 ? width : 0;
 }
 
@@ -41,7 +54,11 @@ static int java_paintable_get_intrinsic_height(GdkPaintable *gdk_paintable)
 {
 	JNIEnv *env = get_jni_env();
 	JavaPaintable *paintable = JAVA_PAINTABLE(gdk_paintable);
-	int height = J__Drawable__getIntrinsicHeight(env, paintable->drawable);
+	jobject drawable = (*env)->NewLocalRef(env, paintable->drawable);
+	if (!drawable)
+		return 0;
+	int height = J__Drawable__getIntrinsicHeight(env, drawable);
+	(*env)->DeleteLocalRef(env, drawable);
 	return height > 0 ? height : 0;
 }
 
@@ -60,16 +77,16 @@ static void java_paintable_dispose(GObject *object)
 {
 	JavaPaintable *java_paintable = JAVA_PAINTABLE(object);
 	JNIEnv *env = get_jni_env();
-	_WEAK_UNREF(java_paintable->drawable);
+	if (java_paintable->drawable)
+		_WEAK_UNREF(java_paintable->drawable);
+	java_paintable->drawable = NULL;
+	G_OBJECT_CLASS(java_paintable_parent_class)->dispose(object);
 }
 
 static void java_paintable_class_init(JavaPaintableClass *class)
 {
 	G_OBJECT_CLASS(class)->dispose = java_paintable_dispose;
 }
-
-G_DEFINE_TYPE_WITH_CODE(JavaPaintable, java_paintable, G_TYPE_OBJECT,
-                        G_IMPLEMENT_INTERFACE(GDK_TYPE_PAINTABLE, java_paintable_paintable_init))
 
 JNIEXPORT jlong JNICALL Java_android_graphics_drawable_Drawable_native_1constructor(JNIEnv *env, jobject this)
 {

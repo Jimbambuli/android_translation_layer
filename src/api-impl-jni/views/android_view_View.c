@@ -473,7 +473,7 @@ gboolean hacky_get_cursor_position(GtkWidget *widget, double *x, double *y)
 	                                       x, y, NULL);
 }
 
-static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdouble dy, jobject this)
+static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdouble dy, WrapperWidget *wrapper)
 {
 	double x;
 	double y;
@@ -484,7 +484,9 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	GdkScrollUnit scroll_unit = gtk_event_controller_scroll_get_unit(controller);
 	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
 	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
-	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+	jobject this = (*env)->NewLocalRef(env, wrapper->jobj);
+	if (!this)
+		return FALSE;
 	hacky_get_cursor_position(widget, &raw_x, &raw_y);
 	x = raw_x, y = raw_y;
 	transform_coords_to_widget_relative(widget, &x, &y);
@@ -504,6 +506,8 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	if (wrapper->hover_x && wrapper->hover_y)
 		call_hover_callback(this, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y);
 
+	(*env)->DeleteLocalRef(env, motion_event);
+	(*env)->DeleteLocalRef(env, this);
 	return ret;
 }
 
@@ -795,7 +799,7 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, 
 	    || _METHOD(class, "dispatchGenericMotionEvent", "(Landroid/view/MotionEvent;)Z") != _CACHED_METHOD(View__dispatchGenericMotionEvent)) {
 		GtkEventController *controller = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
 
-		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), wrapper->jobj);
+		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), wrapper);
 		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
 		wrapper->custom_generic_motion = TRUE;
 	}

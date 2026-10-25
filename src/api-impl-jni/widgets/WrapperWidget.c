@@ -107,10 +107,13 @@ static void wrapper_widget_dispose(GObject *wrapper_widget)
 	if (wrapper->jvm) {
 		JNIEnv *env;
 		(*wrapper->jvm)->GetEnv(wrapper->jvm, (void **)&env, JNI_VERSION_1_6);
+		/* dispose may run more than once, and GTK may still call in afterwards */
 		if (wrapper->jobj)
 			_WEAK_UNREF(wrapper->jobj);
+		wrapper->jobj = NULL;
 		if (wrapper->canvas)
 			_UNREF(wrapper->canvas);
+		wrapper->canvas = NULL;
 	}
 	G_OBJECT_CLASS(wrapper_widget_parent_class)->dispose(wrapper_widget);
 }
@@ -366,14 +369,18 @@ void wrapper_widget_queue_draw(WrapperWidget *wrapper)
 	}
 }
 
-static bool on_click(GtkGestureClick *gesture, int n_press, double x, double y, jobject this)
+static bool on_click(GtkGestureClick *gesture, int n_press, double x, double y, WrapperWidget *wrapper)
 {
 	JNIEnv *env = get_jni_env();
+	jobject this = (*env)->NewLocalRef(env, wrapper->jobj);
+	if (!this)
+		return false;
 
 	bool ret = J__View__performClick(env, this);
 	if ((*env)->ExceptionCheck(env))
 		(*env)->ExceptionDescribe(env);
 
+	(*env)->DeleteLocalRef(env, this);
 	return ret;
 }
 
@@ -645,7 +652,7 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 	if (performClick_method != _CACHED_METHOD(View__performClick)) {
 		GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_gesture_click_new());
 
-		g_signal_connect(controller, "released", G_CALLBACK(on_click), wrapper->jobj);
+		g_signal_connect(controller, "released", G_CALLBACK(on_click), wrapper);
 		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
 		widget_set_needs_allocation(wrapper->child);
 	}
