@@ -4,10 +4,10 @@
 #include <gtk/gtk.h>
 #include <jni.h>
 
-#define MEASURE_SPEC_UNSPECIFIED (0 << 30)
-#define MEASURE_SPEC_EXACTLY     (1 << 30)
-#define MEASURE_SPEC_AT_MOST     (2 << 30)
-#define MEASURE_SPEC_MASK        (0x3 << 30)
+#define MEASURE_SPEC_UNSPECIFIED ((int)(0u << 30))
+#define MEASURE_SPEC_EXACTLY     ((int)(1u << 30))
+#define MEASURE_SPEC_AT_MOST     ((int)(2u << 30)) /* unsigned: no shift into the sign bit */
+#define MEASURE_SPEC_MASK        ((int)(0x3u << 30))
 
 #define MATCH_PARENT             (-1)
 #define WRAP_CONTENT             (-2)

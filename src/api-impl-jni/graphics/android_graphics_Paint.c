@@ -47,7 +47,8 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1color(JNIEnv *en
 JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1get_1color(JNIEnv *env, jclass clazz, jlong paint_ptr)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
-	return ((int)(paint->color.red * 0xFF) << 16) + ((int)(paint->color.green * 0xFF) << 8) + ((int)(paint->color.blue * 0xFF) << 0) + ((int)(paint->color.alpha * 0xFF) << 24);
+	// unsigned, so that the alpha does not shift into the sign bit
+	return (jint)(((uint32_t)(paint->color.red * 0xFF) << 16) + ((uint32_t)(paint->color.green * 0xFF) << 8) + ((uint32_t)(paint->color.blue * 0xFF) << 0) + ((uint32_t)(paint->color.alpha * 0xFF) << 24));
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1alpha(JNIEnv *env, jclass clazz, jlong paint_ptr, jint alpha)

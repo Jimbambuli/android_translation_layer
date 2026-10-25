@@ -848,10 +848,10 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1destructor(JNIEnv *env, jo
 	g_idle_add(release_wrapper, WRAPPER_WIDGET(gtk_widget_get_parent(_PTR(widget_ptr))));
 }
 
-#define MEASURE_SPEC_UNSPECIFIED (0 << 30)
-#define MEASURE_SPEC_EXACTLY     (1 << 30)
-#define MEASURE_SPEC_AT_MOST     (2 << 30)
-#define MEASURE_SPEC_MASK        (0x3 << 30)
+#define MEASURE_SPEC_UNSPECIFIED ((int)(0u << 30))
+#define MEASURE_SPEC_EXACTLY     ((int)(1u << 30))
+#define MEASURE_SPEC_AT_MOST     ((int)(2u << 30)) /* unsigned: no shift into the sign bit */
+#define MEASURE_SPEC_MASK        ((int)(0x3u << 30))
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1measure(JNIEnv *env, jobject this, jlong widget_ptr, jint width_spec, jint height_spec)
 {
