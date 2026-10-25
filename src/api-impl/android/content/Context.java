@@ -119,6 +119,9 @@ public abstract class Context {
 		ApplicationInfo application_info = primary_application.pkg.applicationInfo;
 		application_info.dataDir = Environment.getExternalStorageDirectory().getAbsolutePath();
 		application_info.nativeLibraryDir = (new File(Environment.getExternalStorageDirectory(), "lib")).getAbsolutePath();
+		// like ActivityThread.handleBindApplication
+		if ((application_info.flags & ApplicationInfo.FLAG_LARGE_HEAP) != 0)
+			dalvik.system.VMRuntime.getRuntime().clearGrowthLimit();
 		package_manager = new PackageManager();
 
 		Provider provider = new Provider("AndroidKeyStore", 1.0, "Android KeyStore provider") {};
