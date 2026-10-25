@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include <hb.h>
 
 #include "../defines.h"
 #include "../util.h"
@@ -151,6 +152,55 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setAlignment(JNIEnv 
 	gtk_label_set_xalign(label, xalign);
 	gtk_label_set_yalign(label, yalign);
 	gtk_label_set_justify(label, xalign == 0.5f ? GTK_JUSTIFY_CENTER : xalign == 1.f ? GTK_JUSTIFY_RIGHT : GTK_JUSTIFY_LEFT);
+}
+
+/* AOSP's TextView includes the font padding by default (includeFontPadding): its first line starts
+ * at the top of the font's bounding box (yMax of the head table, Skia's FontMetrics.top) instead of
+ * its ascent, and its last line ends at the bottom (yMin) instead of the descent. The difference
+ * goes to the label as a margin. */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setFontPadding(JNIEnv *env, jobject this, jlong widget_ptr, jboolean include)
+{
+	GtkLabel *label = box_get_label(env, _PTR(widget_ptr));
+	if (!label)
+		return;
+	int top = 0, bottom = 0;
+	PangoLayoutLine *line = include ? pango_layout_get_line_readonly(gtk_label_get_layout(label), 0) : NULL;
+	if (line && line->runs) {
+		PangoFont *font = ((PangoGlyphItem *)line->runs->data)->item->analysis.font;
+		hb_blob_t *head = hb_face_reference_table(hb_font_get_face(pango_font_get_hb_font(font)), HB_TAG('h', 'e', 'a', 'd'));
+		unsigned int length;
+		const uint8_t *data = (const uint8_t *)hb_blob_get_data(head, &length);
+		if (length >= 44) {
+			int units_per_em = data[18] << 8 | data[19];
+			int y_min = (int16_t)(data[38] << 8 | data[39]);
+			int y_max = (int16_t)(data[42] << 8 | data[43]);
+			PangoFontDescription *description = pango_font_describe_with_absolute_size(font);
+			float size = (float)pango_font_description_get_size(description) / PANGO_SCALE;
+			pango_font_description_free(description);
+			PangoFontMetrics *metrics = pango_font_get_metrics(font, NULL);
+			top = MAX(0, (int)roundf(y_max * size / units_per_em - (float)pango_font_metrics_get_ascent(metrics) / PANGO_SCALE));
+			bottom = MAX(0, (int)roundf(-y_min * size / units_per_em - (float)pango_font_metrics_get_descent(metrics) / PANGO_SCALE));
+			pango_font_metrics_unref(metrics);
+		}
+		hb_blob_destroy(head);
+	}
+	int padding = top << 16 | bottom;
+	if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(label), "font_padding")) == padding)
+		return;
+	g_object_set_data(G_OBJECT(label), "font_padding", GINT_TO_POINTER(padding));
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+	GtkStyleContext *style_context = gtk_widget_get_style_context(GTK_WIDGET(label));
+	GtkCssProvider *old_provider = g_object_get_data(G_OBJECT(label), "font_padding_style_provider");
+	if (old_provider)
+		gtk_style_context_remove_provider(style_context, GTK_STYLE_PROVIDER(old_provider));
+	GtkCssProvider *css_provider = gtk_css_provider_new();
+	char *css_string = g_strdup_printf("* { margin-top: %dpx; margin-bottom: %dpx; }", top, bottom);
+	gtk_css_provider_load_from_string(css_provider, css_string);
+	g_free(css_string);
+	gtk_style_context_add_provider(style_context, GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+#pragma GCC diagnostic pop
+	g_object_set_data_full(G_OBJECT(label), "font_padding_style_provider", css_provider, g_object_unref);
 }
 
 /* the baseline of the first line of the label at the given width, moved by the label's vertical

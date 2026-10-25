@@ -47,7 +47,7 @@ public class TextView extends View {
 	private CharSequence text = "";
 	private TextPaint paint = new TextPaint();
 	private Typeface typeface;
-	private boolean include_padding = false;
+	private boolean include_padding = true; // AOSP's default
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.TOP | Gravity.START;
@@ -94,6 +94,8 @@ public class TextView extends View {
 				int textStyle = a.getInt(com.android.internal.R.styleable.TextView_textStyle, 0);
 				setTypeface(getTypeface(), textStyle);
 			}
+
+			include_padding = a.getBoolean(com.android.internal.R.styleable.TextView_includeFontPadding, true);
 
 			if (a.hasValue(com.android.internal.R.styleable.TextView_gravity))
 				setGravity(a.getInt(com.android.internal.R.styleable.TextView_gravity, Gravity.TOP | Gravity.START));
@@ -742,7 +744,16 @@ public class TextView extends View {
 
 	public void setIncludeFontPadding(boolean includePadding) {
 		include_padding = includePadding;
+		requestLayout();
 	}
+
+	/* the font padding depends on the font, which may have changed since the last measure */
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		native_setFontPadding(widget, include_padding);
+		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+	}
+	private native void native_setFontPadding(long widget, boolean include);
 
 	public float getLineSpacingExtra() { return 0.f; }
 

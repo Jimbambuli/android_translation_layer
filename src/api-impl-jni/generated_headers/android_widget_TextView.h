@@ -299,6 +299,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTypeface
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables
   (JNIEnv *, jobject, jlong, jlong, jlong, jlong, jlong);
 
+/*
+ * Class:     android_widget_TextView
+ * Method:    native_setFontPadding
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setFontPadding
+  (JNIEnv *, jobject, jlong, jboolean);
+
 #ifdef __cplusplus
 }
 #endif
