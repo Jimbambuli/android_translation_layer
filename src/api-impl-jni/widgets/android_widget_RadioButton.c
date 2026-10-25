@@ -37,9 +37,9 @@ static gboolean on_toggled(GtkCheckButton *self, gpointer user_data)
 	return FALSE;
 }
 
-JNIEXPORT void JNICALL Java_android_widget_RadioButton_setText(JNIEnv *env, jobject this, jstring text)
+JNIEXPORT void JNICALL Java_android_widget_RadioButton_native_1setText(JNIEnv *env, jobject this, jlong widget_ptr, jstring text)
 {
-	GtkCheckButton *button = GTK_CHECK_BUTTON(_PTR(_GET_LONG_FIELD(this, "widget")));
+	GtkCheckButton *button = GTK_CHECK_BUTTON(_PTR(widget_ptr));
 	const char *text_str = text ? (*env)->GetStringUTFChars(env, text, NULL) : NULL;
 	gtk_check_button_set_label(button, text_str);
 	if (text)

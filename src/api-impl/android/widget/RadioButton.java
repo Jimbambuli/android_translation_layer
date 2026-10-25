@@ -23,7 +23,7 @@ public class RadioButton extends CompoundButton {
 	public native boolean isChecked();
 
 	@Override
-	public native void setText(CharSequence text);
+	public native void native_setText(long widget, String text);
 
 	// following methods are overridden to prevent calling incompatible methods from superclasses
 	@Override

@@ -237,11 +237,11 @@ JNIEXPORT jboolean JNICALL Java_android_widget_RadioButton_isChecked
 
 /*
  * Class:     android_widget_RadioButton
- * Method:    setText
- * Signature: (Ljava/lang/CharSequence;)V
+ * Method:    native_setText
+ * Signature: (JLjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_android_widget_RadioButton_setText
-  (JNIEnv *, jobject, jobject);
+JNIEXPORT void JNICALL Java_android_widget_RadioButton_native_1setText
+  (JNIEnv *, jobject, jlong, jstring);
 
 #ifdef __cplusplus
 }

@@ -93,9 +93,19 @@ public abstract class CompoundButton extends Button implements Checkable {
 	public void setTextColor(int color) {}
 	@Override
 	public void setTextSize(float size) {}
+	/* the text as set, like AOSP's TextView.mText; no initializer, as Button's constructor sets the
+	 * text from the attributes before the fields of this class are initialized */
+	private CharSequence mText;
+
+	@Override
+	public void setText(CharSequence text) {
+		mText = text == null ? "" : text;
+		native_setText(widget, mText.toString());
+	}
+
 	@Override
 	public CharSequence getText() {
-		return "FIXME CompoundButton.getText()";
+		return mText == null ? "" : mText;
 	}
 
 	public void setButtonTintList(ColorStateList list) {
