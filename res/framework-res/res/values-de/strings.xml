@@ -30,4 +30,5 @@
     <string name="copy" msgid="5472512047143665218">"Kopieren"</string>
     <string name="share" msgid="4157615043345227321">"Teilen"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Speichern"</string>
+    <string name="action_menu_overflow_description" msgid="4579536843510088170">"Weitere Optionen"</string>
 </resources>
