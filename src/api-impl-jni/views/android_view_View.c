@@ -69,6 +69,7 @@ struct _JavaWidget {
 	GtkWidget parent_instance;
 };
 G_DECLARE_FINAL_TYPE(JavaWidget, java_widget, JAVA, WIDGET, GtkWidget)
+G_DEFINE_TYPE(JavaWidget, java_widget, GTK_TYPE_WIDGET)
 static void java_widget_dispose(GObject *java_widget)
 {
 	GtkWidget *widget = GTK_WIDGET(java_widget);
@@ -78,6 +79,8 @@ static void java_widget_dispose(GObject *java_widget)
 		gtk_widget_unparent(child);
 		child = _child;
 	}
+	/* GtkWidget's dispose releases the layout manager (with the view's weak reference) and the controllers */
+	G_OBJECT_CLASS(java_widget_parent_class)->dispose(java_widget);
 }
 /* like GtkWidget's default, with the elevation shadow of each child below it */
 static void java_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
@@ -93,7 +96,6 @@ static void java_widget_class_init(JavaWidgetClass *class)
 	G_OBJECT_CLASS(class)->dispose = java_widget_dispose;
 	GTK_WIDGET_CLASS(class)->snapshot = java_widget_snapshot;
 }
-G_DEFINE_TYPE(JavaWidget, java_widget, GTK_TYPE_WIDGET)
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1drawThroughJava(JNIEnv *env, jobject this, jlong widget_ptr)
 {
