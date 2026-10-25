@@ -1629,6 +1629,9 @@ public class View implements Drawable.Callback {
 		}
 		this.visibility = visibility;
 		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+		/* a view that goes while it animates: the animation runs on as on AOSP (see GoneAnimationTicker) */
+		if (visibility == GONE && currentAnimation != null && animationMore)
+			getHandler().post(new GoneAnimationTicker(currentAnimation));
 		dispatchVisibilityChanged(this, visibility);
 	}
 
