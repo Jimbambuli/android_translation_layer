@@ -221,14 +221,6 @@ JNIEXPORT jlong JNICALL Java_android_widget_RadioButton_native_1constructor
 
 /*
  * Class:     android_widget_RadioButton
- * Method:    setOnCheckedChangeListener
- * Signature: (Landroid/widget/CompoundButton/OnCheckedChangeListener;)V
- */
-JNIEXPORT void JNICALL Java_android_widget_RadioButton_setOnCheckedChangeListener
-  (JNIEnv *, jobject, jobject);
-
-/*
- * Class:     android_widget_RadioButton
  * Method:    setChecked
  * Signature: (Z)V
  */

@@ -19,9 +19,6 @@ public class CheckBox extends CompoundButton {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 
 	@Override
-	public native void setOnCheckedChangeListener(OnCheckedChangeListener listener);
-
-	@Override
 	public native void setChecked(boolean checked);
 
 	@Override

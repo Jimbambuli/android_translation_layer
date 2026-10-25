@@ -221,14 +221,6 @@ JNIEXPORT jlong JNICALL Java_android_widget_CheckBox_native_1constructor
 
 /*
  * Class:     android_widget_CheckBox
- * Method:    setOnCheckedChangeListener
- * Signature: (Landroid/widget/CompoundButton/OnCheckedChangeListener;)V
- */
-JNIEXPORT void JNICALL Java_android_widget_CheckBox_setOnCheckedChangeListener
-  (JNIEnv *, jobject, jobject);
-
-/*
- * Class:     android_widget_CheckBox
  * Method:    setChecked
  * Signature: (Z)V
  */

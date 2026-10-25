@@ -68,7 +68,13 @@ public abstract class CompoundButton extends Button implements Checkable {
 		public void onCheckedChanged(CompoundButton buttonView, boolean isChecked);
 	}
 
-	public native void setOnCheckedChangeListener(OnCheckedChangeListener listener);
+	/* kept here as on AOSP; the native side holds no reference to it, a global reference there
+	 * would keep the listener, and with it usually this view, alive forever */
+	private OnCheckedChangeListener mOnCheckedChangeListener;
+
+	public void setOnCheckedChangeListener(OnCheckedChangeListener listener) {
+		mOnCheckedChangeListener = listener;
+	}
 
 	@Override
 	public native void setChecked(boolean checked);

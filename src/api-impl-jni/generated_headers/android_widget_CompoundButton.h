@@ -237,14 +237,6 @@ JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setText
 
 /*
  * Class:     android_widget_CompoundButton
- * Method:    setOnCheckedChangeListener
- * Signature: (Landroid/widget/CompoundButton/OnCheckedChangeListener;)V
- */
-JNIEXPORT void JNICALL Java_android_widget_CompoundButton_setOnCheckedChangeListener
-  (JNIEnv *, jobject, jobject);
-
-/*
- * Class:     android_widget_CompoundButton
  * Method:    setChecked
  * Signature: (Z)V
  */
