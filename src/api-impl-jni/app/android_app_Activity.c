@@ -31,6 +31,9 @@ static GtkWidget *get_decor_view(JNIEnv *env, jobject activity)
 	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
 	jobject decor_view_jobj = _GET_OBJ_FIELD(window_jobj, "decorView", "Landroid/view/ViewGroup;");
 	GtkWidget *decor_view = GTK_WIDGET(_PTR(_GET_LONG_FIELD(decor_view_jobj, "widget")));
+	/* called from signal handlers and idles, outside of a native method: these would stay */
+	(*env)->DeleteLocalRef(env, decor_view_jobj);
+	(*env)->DeleteLocalRef(env, window_jobj);
 	return gtk_widget_get_parent(decor_view);
 }
 
