@@ -5,6 +5,25 @@ import java.io.File;
 
 public class Typeface {
 
+	/* like AOSP's typeface caches: one instance per family and style instead of one per TextView
+	 * (declared first, the constants below already use it) */
+	private static final java.util.HashMap<String, Typeface> cache = new java.util.HashMap<>();
+
+	private static Typeface cached(String family, int weight, boolean italic) {
+		String key = family + "/" + weight + "/" + italic;
+		synchronized (cache) {
+			Typeface ret = cache.get(key);
+			if (ret == null) {
+				ret = new Typeface();
+				ret.family = family;
+				ret.weight = weight;
+				ret.italic = italic;
+				cache.put(key, ret);
+			}
+			return ret;
+		}
+	}
+
 	/**
 	 * The default NORMAL typeface object
 	 */
@@ -18,15 +37,15 @@ public class Typeface {
 	/**
 	 * The NORMAL style of the default sans serif typeface.
 	 */
-	public static final Typeface SANS_SERIF = create((String)null, 0);
+	public static final Typeface SANS_SERIF = new Typeface(); // an instance of its own, as on AOSP
 	/**
 	 * The NORMAL style of the default serif typeface.
 	 */
-	public static final Typeface SERIF = create((String)null, 0);
+	public static final Typeface SERIF = new Typeface(); // an instance of its own, as on AOSP
 	/**
 	 * The NORMAL style of the default monospace typeface.
 	 */
-	public static final Typeface MONOSPACE = create((String)null, 0);
+	public static final Typeface MONOSPACE = new Typeface(); // an instance of its own, as on AOSP
 
 	// Style
 	public static final int NORMAL = 0;
@@ -111,10 +130,7 @@ public class Typeface {
 	}
 
 	public static Typeface create(String family_name, int style) {
-		Typeface ret = new Typeface();
-		ret.weight = (style & BOLD) != 0 ? 700 : weightOfFamily(family_name);
-		ret.italic = (style & ITALIC) != 0;
-		return ret;
+		return cached(null, (style & BOLD) != 0 ? 700 : weightOfFamily(family_name), (style & ITALIC) != 0);
 	}
 
 	/* AOSP's fonts.xml names the weights of Roboto as families of their own
@@ -136,10 +152,7 @@ public class Typeface {
 	public static Typeface create(Typeface typeface, int style) {
 		if (typeface != null && typeface.getStyle() == style)
 			return typeface;
-		Typeface ret = create((String)null, style);
-		if (typeface != null)
-			ret.family = typeface.family;
-		return ret;
+		return cached(typeface != null ? typeface.family : null, (style & BOLD) != 0 ? 700 : 400, (style & ITALIC) != 0);
 	}
 
 	public static Typeface createFromFile(String path) {
@@ -181,11 +194,7 @@ public class Typeface {
 	}
 
 	public static Typeface create(Typeface family, int weight, boolean italic) {
-		Typeface ret = new Typeface();
-		ret.family = family != null ? family.family : null;
-		ret.weight = weight;
-		ret.italic = italic;
-		return ret;
+		return cached(family != null ? family.family : null, weight, italic);
 	}
 
 	/* the typeface uses the family of the first font; Pango does the fallback for missing glyphs */
@@ -214,9 +223,7 @@ public class Typeface {
 			android.graphics.fonts.FontStyle s = style;
 			if (s == null)
 				s = fontFamily.getFont(0).getStyle();
-			Typeface ret = create(DEFAULT, s.getWeight(), s.getSlant() == android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC);
-			ret.family = fontFamily.getFont(0).getFamilyName();
-			return ret;
+			return cached(fontFamily.getFont(0).getFamilyName(), s.getWeight(), s.getSlant() == android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC);
 		}
 	}
 
