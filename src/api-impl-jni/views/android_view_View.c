@@ -1107,6 +1107,15 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetFullscreen(JNIEnv *env, j
 	}
 }
 
+JNIEXPORT void JNICALL Java_android_view_View_native_1setTooltipText(JNIEnv *env, jobject this, jlong widget_ptr, jstring tooltip_jstr)
+{
+	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
+	const char *tooltip = tooltip_jstr ? (*env)->GetStringUTFChars(env, tooltip_jstr, NULL) : NULL;
+	gtk_widget_set_tooltip_text(widget, tooltip);
+	if (tooltip_jstr)
+		(*env)->ReleaseStringUTFChars(env, tooltip_jstr, tooltip);
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_native_1addClass(JNIEnv *env, jobject this, jlong widget_ptr, jstring class_name_jstr)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));

@@ -523,6 +523,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1getGlobalVisibleRect
 JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame
   (JNIEnv *, jobject, jobject);
 
+/*
+ * Class:     android_view_View
+ * Method:    native_setTooltipText
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setTooltipText
+  (JNIEnv *, jobject, jlong, jstring);
+
 #ifdef __cplusplus
 }
 #endif

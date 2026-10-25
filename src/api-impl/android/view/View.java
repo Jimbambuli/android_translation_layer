@@ -1143,6 +1143,11 @@ public class View implements Drawable.Callback {
 		if (a.hasValue(com.android.internal.R.styleable.View_tag))
 			tag = a.getText(com.android.internal.R.styleable.View_tag);
 
+		if (a.hasValue(com.android.internal.R.styleable.View_contentDescription))
+			setContentDescription(a.getString(com.android.internal.R.styleable.View_contentDescription));
+		if (a.hasValue(com.android.internal.R.styleable.View_tooltipText))
+			setTooltipText(a.getText(com.android.internal.R.styleable.View_tooltipText));
+
 		if (a.hasValue(com.android.internal.R.styleable.View_textAlignment)) {
 			int textAlignment = a.getInt(com.android.internal.R.styleable.View_textAlignment, 0);
 			setTextAlignment(textAlignment);
@@ -3098,7 +3103,19 @@ public class View implements Drawable.Callback {
 			return null;
 	}
 
-	public void setTooltipText(CharSequence tooltip) {}
+	/* like AOSP, shown when the mouse rests on the view; GTK's tooltip does the showing and hiding */
+	private CharSequence tooltipText;
+
+	public void setTooltipText(CharSequence tooltip) {
+		tooltipText = (tooltip == null || tooltip.length() == 0) ? null : tooltip;
+		native_setTooltipText(widget, tooltipText == null ? null : tooltipText.toString());
+	}
+
+	public CharSequence getTooltipText() {
+		return tooltipText;
+	}
+
+	private native void native_setTooltipText(long widget, String tooltip);
 
 	public int getImportantForAutofill() { return 0; }
 
