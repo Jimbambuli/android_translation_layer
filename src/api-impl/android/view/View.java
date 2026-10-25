@@ -1914,6 +1914,7 @@ public class View implements Drawable.Callback {
 			oldWidthMeasureSpec = widthMeasureSpec;
 			oldHeightMeasureSpec = heightMeasureSpec;
 			onMeasure(widthMeasureSpec, heightMeasureSpec);
+			layoutRequired = true;
 		}
 	}
 
@@ -2023,12 +2024,17 @@ public class View implements Drawable.Callback {
 	}
 
 	private int reportedLeft, reportedTop, reportedRight, reportedBottom;
+	/* like AOSP's PFLAG_LAYOUT_REQUIRED: the view was measured and is laid out next */
+	private boolean layoutRequired;
 
-	/* call the OnLayoutChangeListeners once per change of the view's bounds, from layout() or layoutInternal() */
+	/* call the OnLayoutChangeListeners from layout() or layoutInternal() like AOSP's layout() does: once
+	 * per change of the view's bounds, and once per layout after a measure even if they stay the same */
 	private void notifyLayoutChange() {
+		boolean required = layoutRequired;
+		layoutRequired = false;
 		if (on_layout_change_listeners == null)
 			return;
-		if (left == reportedLeft && top == reportedTop && right == reportedRight && bottom == reportedBottom)
+		if (!required && left == reportedLeft && top == reportedTop && right == reportedRight && bottom == reportedBottom)
 			return;
 		int oldLeft = reportedLeft;
 		int oldTop = reportedTop;
