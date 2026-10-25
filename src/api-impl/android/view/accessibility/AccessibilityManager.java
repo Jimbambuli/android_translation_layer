@@ -5,6 +5,15 @@ import java.util.List;
 
 public class AccessibilityManager {
 
+	private static AccessibilityManager instance;
+
+	/* one per process, as on AOSP (it was made anew on every getSystemService()) */
+	public static synchronized AccessibilityManager getInstance(android.content.Context context) {
+		if (instance == null)
+			instance = new AccessibilityManager();
+		return instance;
+	}
+
 	public static final int FLAG_CONTENT_ICONS = 1;
 	public static final int FLAG_CONTENT_TEXT = 2;
 	public static final int FLAG_CONTENT_CONTROLS = 4;
