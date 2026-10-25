@@ -475,6 +475,16 @@ public class TextView extends View {
 	}
 	private native void native_setAlignment(float xalign, float yalign);
 
+	/* like AOSP: the baseline of the first line, below the top padding and moved by the vertical
+	 * gravity (BaselineLayout, baseline-aligned LinearLayouts and others place the text by it) */
+	@Override
+	public int getBaseline() {
+		int baseline = native_getBaseline(widget, getMeasuredWidth() - getPaddingLeft() - getPaddingRight(),
+		                                  getMeasuredHeight() - getPaddingTop() - getPaddingBottom());
+		return baseline < 0 ? super.getBaseline() : getPaddingTop() + baseline;
+	}
+	private native int native_getBaseline(long widget, int width, int height);
+
 	public int getGravity() {
 		return gravity;
 	}

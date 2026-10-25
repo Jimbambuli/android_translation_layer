@@ -269,6 +269,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setAlignment
 
 /*
  * Class:     android_widget_TextView
+ * Method:    native_getBaseline
+ * Signature: (JII)I
+ */
+JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline
+  (JNIEnv *, jobject, jlong, jint, jint);
+
+/*
+ * Class:     android_widget_TextView
  * Method:    native_setCompoundDrawablePadding
  * Signature: (JI)V
  */

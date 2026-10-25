@@ -153,6 +153,20 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setAlignment(JNIEnv 
 	gtk_label_set_justify(label, xalign == 0.5f ? GTK_JUSTIFY_CENTER : xalign == 1.f ? GTK_JUSTIFY_RIGHT : GTK_JUSTIFY_LEFT);
 }
 
+/* the baseline of the first line of the label at the given width, moved by the label's vertical
+ * alignment within the given height */
+JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline(JNIEnv *env, jobject this, jlong widget_ptr, jint width, jint height)
+{
+	GtkLabel *label = box_get_label(env, _PTR(widget_ptr));
+	if (!label)
+		return -1;
+	int natural, baseline;
+	gtk_widget_measure(GTK_WIDGET(label), GTK_ORIENTATION_VERTICAL, width > 0 ? width : -1, NULL, &natural, NULL, &baseline);
+	if (baseline < 0)
+		return -1;
+	return baseline + MAX(height - natural, 0) * gtk_label_get_yalign(label);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *env, jobject this, jstring markup_jstr)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
