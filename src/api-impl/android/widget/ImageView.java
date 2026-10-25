@@ -301,7 +301,7 @@ public class ImageView extends View {
 		}
 		final int nativeInt;
 	}
-	private final ScaleType[] scaletype_from_int = {
+	private static final ScaleType[] scaletype_from_int = {
 		ScaleType.MATRIX,
 		ScaleType.FIT_XY,
 		ScaleType.FIT_START,

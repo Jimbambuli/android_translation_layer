@@ -158,7 +158,8 @@ public class TextView extends View {
 			requestLayout();
 	}
 
-	private ClickableSpan[] linkSpans = new ClickableSpan[0];
+	private static final ClickableSpan[] NO_LINKS = new ClickableSpan[0];
+	private ClickableSpan[] linkSpans = NO_LINKS;
 	private ColorStateList linkTextColor;
 
 	/* the character spans as Pango markup; a ClickableSpan becomes a link whose URI is its index in linkSpans */
