@@ -1099,6 +1099,12 @@ public class View implements Drawable.Callback {
 
 		widget = native_constructor(context, attrs);
 
+		if (!sCompatibilityDone && context != null) {
+			sUseDefaultFocusHighlight = context.getResources().getBoolean(
+					com.android.internal.R.bool.config_useDefaultFocusHighlight);
+			sCompatibilityDone = true;
+		}
+
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.View, defStyle, defStyleRes);
 		this.id = a.getResourceId(com.android.internal.R.styleable.View_id, View.NO_ID);
 		if (a.hasValue(com.android.internal.R.styleable.View_backgroundTint))
@@ -1116,6 +1122,7 @@ public class View implements Drawable.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_foreground))
 			setForeground(a.getDrawable(com.android.internal.R.styleable.View_foreground));
+		mDefaultFocusHighlightEnabled = a.getBoolean(com.android.internal.R.styleable.View_defaultFocusHighlightEnabled, true);
 		if (a.hasValue(com.android.internal.R.styleable.View_focusable)) {
 			atl_focusable = a.getBoolean(com.android.internal.R.styleable.View_focusable, true);
 			atl_focusable_set = atl_focusable;
@@ -1288,47 +1295,82 @@ public class View implements Drawable.Callback {
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
-		if (defaultFocusHighlight != null && focus_shown) {
-			defaultFocusHighlight.setBounds(0, 0, getWidth(), getHeight());
-			defaultFocusHighlight.draw(canvas);
-		}
 		onDrawForeground(canvas);
+		drawDefaultFocusHighlight(canvas);
 	}
 
-	/* Like AOSP (android:defaultFocusHighlightEnabled): a focused view whose background and
-	 * foreground don't show focus gets the selectableItemBackground of the theme, which shows
-	 * state_focused, drawn over its content while it shows the focus (AOSP: while focused, outside
-	 * of touch mode). */
-	private Drawable defaultFocusHighlight;
-	private boolean defaultFocusHighlightEnabled = true;
+	/* AOSP's default focus highlight (android-14 View.java) */
+	private Drawable mDefaultFocusHighlight;
+	private Drawable mDefaultFocusHighlightCache;
+	boolean mDefaultFocusHighlightEnabled = true;
+	private static boolean sUseDefaultFocusHighlight;
 
-	public void setDefaultFocusHighlightEnabled(boolean enabled) {
-		defaultFocusHighlightEnabled = enabled;
+	public void setDefaultFocusHighlightEnabled(boolean defaultFocusHighlightEnabled) {
+		mDefaultFocusHighlightEnabled = defaultFocusHighlightEnabled;
 	}
 
 	public final boolean getDefaultFocusHighlightEnabled() {
-		return defaultFocusHighlightEnabled;
+		return mDefaultFocusHighlightEnabled;
+	}
+
+	private Drawable getDefaultFocusHighlightDrawable() {
+		if (mDefaultFocusHighlightCache == null) {
+			if (context != null) {
+				final int[] attrs = new int[] { android.R.attr.selectableItemBackground };
+				final TypedArray ta = context.obtainStyledAttributes(attrs);
+				mDefaultFocusHighlightCache = ta.getDrawable(0);
+				ta.recycle();
+			}
+		}
+		return mDefaultFocusHighlightCache;
+	}
+
+	/* ATL: the wrapper widget draws through Java instead of AOSP's PFLAG_SKIP_DRAW, and the bounds
+	 * are set on each draw (there is no setFrame() to tell about a size change) */
+	private void setDefaultFocusHighlight(Drawable highlight) {
+		mDefaultFocusHighlight = highlight;
+		if (highlight != null) {
+			native_drawThroughJava(widget);
+			if (highlight.isStateful()) {
+				highlight.setState(getDrawableState());
+			}
+			if (isAttachedToWindow()) {
+				highlight.setVisible(getWindowVisibility() == VISIBLE && isShown(), false);
+			}
+			// Set callback last, since the view may still be initializing.
+			highlight.setCallback(this);
+		}
+		invalidate();
+	}
+
+	public boolean isDefaultFocusHighlightNeeded(Drawable background, Drawable foreground) {
+		final boolean lackFocusState = (background == null || !background.isStateful()
+				|| !background.hasFocusStateSpecified())
+				&& (foreground == null || !foreground.isStateful()
+				|| !foreground.hasFocusStateSpecified());
+		return !isInTouchMode() && getDefaultFocusHighlightEnabled() && lackFocusState
+				&& isAttachedToWindow() && sUseDefaultFocusHighlight;
 	}
 
 	private void switchDefaultFocusHighlight() {
-		boolean needed = defaultFocusHighlightEnabled && (background == null || !background.isStateful() || !background.hasFocusStateSpecified()) && (foreground == null || !foreground.isStateful() || !foreground.hasFocusStateSpecified());
-		if (needed == (defaultFocusHighlight != null))
-			return;
-		if (needed) {
-			TypedArray a = getContext().obtainStyledAttributes(new int[] {R.attr.selectableItemBackground});
-			defaultFocusHighlight = a.getDrawable(0);
-			a.recycle();
-			if (defaultFocusHighlight == null)
-				return;
-			native_drawThroughJava(widget);
-			defaultFocusHighlight.setCallback(this);
-			if (defaultFocusHighlight.isStateful())
-				defaultFocusHighlight.setState(getDrawableState());
-		} else {
-			defaultFocusHighlight.setCallback(null);
-			defaultFocusHighlight = null;
+		if (isFocused()) {
+			final boolean needed = isDefaultFocusHighlightNeeded(background, foreground);
+			final boolean active = mDefaultFocusHighlight != null;
+			if (needed && !active) {
+				setDefaultFocusHighlight(getDefaultFocusHighlightDrawable());
+			} else if (!needed && active) {
+				// The highlight is no longer needed, so tear it down.
+				setDefaultFocusHighlight(null);
+			}
 		}
-		invalidate();
+	}
+
+	/* ATL: drawn while GTK shows the focus (AOSP: while focused, which outside of touch mode is the same) */
+	private void drawDefaultFocusHighlight(Canvas canvas) {
+		if (mDefaultFocusHighlight != null && focus_shown) {
+			mDefaultFocusHighlight.setBounds(0, 0, getWidth(), getHeight());
+			mDefaultFocusHighlight.draw(canvas);
+		}
 	}
 
 	public View(Context context) {
@@ -1936,7 +1978,7 @@ public class View implements Drawable.Callback {
 			changed |= bg.setState(state);
 		}
 
-		final Drawable hl = defaultFocusHighlight;
+		final Drawable hl = mDefaultFocusHighlight;
 		if (hl != null && hl.isStateful()) {
 			changed |= hl.setState(state);
 		}
@@ -2664,8 +2706,6 @@ public class View implements Drawable.Callback {
 	 * whether GTK shows the focus (keyboard navigation), which the drawable state follows */
 	@Export
 	private void dispatchFocusChanged(boolean gainFocus, boolean focusVisible) {
-		if (gainFocus)
-			switchDefaultFocusHighlight();
 		if (focus_shown != focusVisible) {
 			focus_shown = focusVisible;
 			refreshDrawableState();
@@ -2674,6 +2714,9 @@ public class View implements Drawable.Callback {
 	}
 
 	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+		// Here we check whether we still need the default focus highlight, and switch it on/off.
+		switchDefaultFocusHighlight();
+
 		if (onFocusChangeListener != null)
 			onFocusChangeListener.onFocusChange(this, gainFocus);
 	}
