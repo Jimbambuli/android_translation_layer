@@ -1685,7 +1685,7 @@ public class View implements Drawable.Callback {
 	}
 
 	protected int computeVerticalScrollOffset() {
-		return -1;
+		return getScrollY();
 	}
 
 	protected int computeHorizontalScrollOffset() {
@@ -1872,8 +1872,12 @@ public class View implements Drawable.Callback {
 
 	/* like AOSP's FOCUSABLE_AUTO: a clickable view can be focused with the keyboard (Tab), and
 	 * Enter or Space click it (View.onKeyUp()); clicking it with the pointer does not focus it */
+	/* AOSP's focusable: android:focusable/setFocusable(), or FOCUSABLE_AUTO, which follows clickable */
+	private boolean isFocusableResolved() {
+		return atl_focusable && (atl_focusable_set || clickable);
+	}
 	private void updateKeyboardFocusable() {
-		native_setKeyboardFocusable(widget, atl_focusable && atl_focusable_set ? true : atl_focusable && clickable);
+		native_setKeyboardFocusable(widget, isFocusableResolved());
 	}
 	private native void native_setKeyboardFocusable(long widget, boolean focusable);
 	private native void native_setNativeFocusable(long widget, boolean focusable);
@@ -2282,10 +2286,15 @@ public class View implements Drawable.Callback {
 	public void bringToFront() {}
 
 	public boolean isEnabled() { return atl_enabled; }
-	public boolean hasFocus() { return false; }
+	/* the GTK focus is in this view's widgets (ViewGroup refines this to AOSP's invariant) */
+	public boolean hasFocus() { return nativeHasFocus(widget); }
+	private static native boolean nativeHasFocus(long widget);
 	public boolean isLayoutRequested() { return layoutRequested; }
 	public int getBaseline() { return -1; }
-	public boolean hasFocusable() { return false; }
+	/* as AOSP for API >= 26: visible, enabled and focusable (FOCUSABLE_AUTO counts) */
+	public boolean hasFocusable() {
+		return visibility == VISIBLE && atl_enabled && isFocusableResolved();
+	}
 	private static native boolean nativeIsFocused(long widget);
 	public boolean isFocused() {
 		return nativeIsFocused(widget);
@@ -2392,6 +2401,8 @@ public class View implements Drawable.Callback {
 	protected static final int[] PRESSED_ENABLED_STATE_SET = new int[] {R.attr.state_pressed, R.attr.state_enabled};
 
 	protected static final int[] SELECTED_STATE_SET = new int[] {R.attr.state_selected};
+
+	protected static final int[] FOCUSED_STATE_SET = new int[] {R.attr.state_focused};
 
 	/**
 	 * Utility to return a default size. Uses the supplied size if the
@@ -2834,7 +2845,16 @@ public class View implements Drawable.Callback {
 
 	public void setForegroundGravity(int gravity) { mForegroundGravity = gravity; }
 
-	public boolean canScrollVertically(int value) { return false; }
+	/* as AOSP: from the scroll offset, range and extent the view computes */
+	public boolean canScrollVertically(int direction) {
+		final int offset = computeVerticalScrollOffset();
+		final int range = computeVerticalScrollRange() - computeVerticalScrollExtent();
+		if (range == 0)
+			return false;
+		if (direction < 0)
+			return offset > 0;
+		return offset < range - 1;
+	}
 
 	public boolean isInTouchMode() { return false; }
 
@@ -3023,7 +3043,15 @@ public class View implements Drawable.Callback {
 		return onTouchEvent(event);
 	}
 
-	public boolean canScrollHorizontally(int direction) { return false; }
+	public boolean canScrollHorizontally(int direction) {
+		final int offset = computeHorizontalScrollOffset();
+		final int range = computeHorizontalScrollRange() - computeHorizontalScrollExtent();
+		if (range == 0)
+			return false;
+		if (direction < 0)
+			return offset > 0;
+		return offset < range - 1;
+	}
 
 	protected native boolean native_getGlobalVisibleRect(long widget, Rect visibleRect);
 

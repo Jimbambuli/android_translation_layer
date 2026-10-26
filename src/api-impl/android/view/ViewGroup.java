@@ -549,7 +549,38 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			child.setActivated(activated);
 	}
 
-	public View getFocusedChild() { return null; }
+	/* as AOSP: this group is focused or a descendant is (then getFocusedChild() is that branch) */
+	@Override
+	public boolean hasFocus() {
+		return isFocused() || getFocusedChild() != null;
+	}
+
+	/* as AOSP: the direct child that has or contains the focus */
+	public View getFocusedChild() {
+		if (!super.hasFocus()) // nothing in this tree is focused
+			return null;
+		for (View child : children) {
+			if (child.hasFocus())
+				return child;
+		}
+		return null;
+	}
+
+	/* as AOSP: this group or, unless it blocks them, one of its descendants is focusable */
+	@Override
+	public boolean hasFocusable() {
+		if (getVisibility() != VISIBLE)
+			return false;
+		if (super.hasFocusable())
+			return true;
+		if (getDescendantFocusability() != FOCUS_BLOCK_DESCENDANTS) {
+			for (View child : children) {
+				if (child.hasFocusable())
+					return true;
+			}
+		}
+		return false;
+	}
 
 	public int getDescendantFocusability() { return 0; }
 

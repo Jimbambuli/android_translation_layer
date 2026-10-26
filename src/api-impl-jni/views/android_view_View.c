@@ -1265,6 +1265,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsFocused(JNIEnv *env, j
 	return gtk_widget_has_focus(widget) || gtk_widget_has_focus(wrapper);
 }
 
+/* the GTK focus is in the view's widget tree: the view itself, an internal GTK child or (for a
+ * ViewGroup) a descendant view */
+JNIEXPORT jboolean JNICALL Java_android_view_View_nativeHasFocus(JNIEnv *env, jclass class, jlong widget_ptr)
+{
+	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
+	return wrapper && (gtk_widget_get_state_flags(wrapper) & (GTK_STATE_FLAG_FOCUSED | GTK_STATE_FLAG_FOCUS_WITHIN));
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_native_1keep_1screen_1on(JNIEnv *env, jobject this, jlong widget_ptr, jboolean enable)
 {
 	GtkApplication *application = GTK_APPLICATION(g_application_get_default());
