@@ -1,6 +1,7 @@
 package android.view;
 
 import android.R;
+import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
@@ -91,6 +92,29 @@ public class Window {
 				return onBackInvokedDispatcher;
 			}
 
+			/* like AOSP's DecorView: the window's Window.Callback hears when the window gains or loses
+			 * the focus and when it is attached or detached */
+			@Override
+			public void onWindowFocusChanged(boolean hasWindowFocus) {
+				super.onWindowFocusChanged(hasWindowFocus);
+				if (Window.this.callback != null)
+					Window.this.callback.onWindowFocusChanged(hasWindowFocus);
+			}
+
+			@Override
+			protected void onAttachedToWindow() {
+				super.onAttachedToWindow();
+				if (Window.this.callback != null)
+					Window.this.callback.onAttachedToWindow();
+			}
+
+			@Override
+			protected void onDetachedFromWindow() {
+				super.onDetachedFromWindow();
+				if (Window.this.callback != null)
+					Window.this.callback.onDetachedFromWindow();
+			}
+
 			/* like AOSP's DecorView: a window that wraps its content is at least as wide as
 			 * windowMinWidthMajor/Minor of its theme say */
 			@Override
@@ -172,6 +196,20 @@ public class Window {
 	public void setFlags(int flags, int mask) {
 		forcedWindowFlags |= mask;
 		params.flags = (params.flags & ~mask) | (flags & mask);
+		dispatchWindowAttributesChanged(params);
+	}
+
+	/* like AOSP: the Window.Callback hears about every change of the window attributes */
+	protected void dispatchWindowAttributesChanged(WindowManager.LayoutParams attrs) {
+		if (callback != null)
+			callback.onWindowAttributesChanged(attrs);
+	}
+
+	/** @hide called from native code when the window gains or loses the focus: like ViewRootImpl,
+	 * the decor view gets it, which hands it to the Window.Callback */
+	@Export
+	public void dispatchWindowFocusChanged(boolean hasFocus) {
+		decorView.onWindowFocusChanged(hasFocus);
 	}
 
 	public void clearFlags(int flags) {
@@ -263,7 +301,8 @@ public class Window {
 		if (params.screenBrightness != -1)
 			set_screen_brightness(params.screenBrightness);
 		this.params = params;
-		setLayout(params.width, params.height);
+		set_layout(native_window, params.width, params.height);
+		dispatchWindowAttributesChanged(params);
 	}
 
 	public void takeSurface(SurfaceHolder.Callback2 callback) {}
@@ -278,6 +317,7 @@ public class Window {
 		params.width = width;
 		params.height = height;
 		set_layout(native_window, width, height);
+		dispatchWindowAttributesChanged(params);
 	}
 
 	public WindowManager getWindowManager() {
@@ -380,11 +420,13 @@ public class Window {
 
 	public void setWindowAnimations(int resId) {
 		params.windowAnimations = resId;
+		dispatchWindowAttributesChanged(params);
 	}
 
 	public void setDimAmount(float dimAmount) {
 		params.dimAmount = dimAmount;
 		haveDimAmount = true;
+		dispatchWindowAttributesChanged(params);
 	}
 
 	private native void set_title(long native_window, String title);

@@ -37,6 +37,19 @@ static GtkWidget *get_decor_view(JNIEnv *env, jobject activity)
 	return gtk_widget_get_parent(decor_view);
 }
 
+/* like ViewRootImpl: the window's views get the focus change, its decor view hands it to the
+ * Window.Callback (AppCompat wraps the activity in its own) */
+static void window_focus_changed(JNIEnv *env, jobject activity, jboolean has_focus)
+{
+	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
+	J__Window__dispatchWindowFocusChanged(env, window_jobj, has_focus);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, window_jobj);
+}
+
 static void activity_close(JNIEnv *env, jobject activity)
 {
 	// in case some exception was left unhandled in native code, print it here so we don't confuse it with an exception thrown by onDestroy
@@ -74,11 +87,7 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
 		(*env)->ExceptionClear(env);
 	}
 
-	J__Activity__onWindowFocusChanged(env, activity, false);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
+	window_focus_changed(env, activity, false);
 }
 
 struct scrim_anim {
@@ -183,11 +192,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
-	J__Activity__onWindowFocusChanged(env, activity, true);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
+	window_focus_changed(env, activity, true);
 }
 
 static void activity_update_current(JNIEnv *env)
@@ -227,13 +232,8 @@ void activity_window_ready(void)
 {
 	JNIEnv *env = get_jni_env();
 
-	for (GList *l = activity_backlog; l != NULL; l = l->next) {
-		J__Activity__onWindowFocusChanged(env, l->data, true);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-	}
+	for (GList *l = activity_backlog; l != NULL; l = l->next)
+		window_focus_changed(env, l->data, true);
 }
 
 void current_activity_back_pressed(void)

@@ -244,7 +244,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return;
 	}
 
-	@Export
 	public void onWindowFocusChanged(boolean hasFocus) {
 		Slog.i(TAG, "- onWindowFocusChanged - yay! (hasFocus: " + hasFocus + ")");
 
