@@ -308,8 +308,10 @@ static void dismiss_popup_window(GtkWidget *popover)
 	jobject popup_window = (*env)->NewLocalRef(env, g_object_get_data(G_OBJECT(popover), "popup-window"));
 	if (popup_window) {
 		(*env)->CallVoidMethod(env, popup_window, _METHOD(_CLASS(popup_window), "dismiss", "()V"));
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		(*env)->DeleteLocalRef(env, popup_window);
 	}
 }
@@ -496,8 +498,10 @@ static void notify_dismissed(GtkWidget *popover)
 	if (!this)
 		return;
 	J__PopupWindow__dispatchDismiss(env, this);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, this);
 }
 

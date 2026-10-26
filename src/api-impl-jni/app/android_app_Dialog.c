@@ -34,8 +34,10 @@ static gboolean dispatch_back_key(jobject jobj, guint keyval, int action)
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, action, KEYCODE_BACK, 0, 0);
 	jmethodID dispatch = _METHOD(_CLASS(jobj), "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
 	gboolean ret = (*env)->CallBooleanMethod(env, jobj, dispatch, key_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, key_event);
 	return ret;
 }
@@ -76,8 +78,10 @@ static gboolean on_touch_outside(GtkEventControllerLegacy *controller, GdkEvent 
 	gtk_window_present(outside->dialog);
 	JNIEnv *env = get_jni_env();
 	(*env)->CallVoidMethod(env, outside->jobj, _METHOD(_CLASS(outside->jobj), "onTouchOutside", "()V"));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	return TRUE;
 }
 

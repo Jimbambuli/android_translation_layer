@@ -40,8 +40,10 @@ static void wrapper_widget_get_property(GObject *object, guint property_id, GVal
 	switch ((WrapperWidgetProperty)property_id) {
 		case ATL_ID: {
 			jint id_jint = J__View__getId(env, jobj);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 
 			const char *id = g_markup_printf_escaped("0x%08x", id_jint);
 			g_value_set_string(value, id);
@@ -50,8 +52,10 @@ static void wrapper_widget_get_property(GObject *object, guint property_id, GVal
 
 		case ATL_ID_NAME: {
 			jstring id_name_jstring = J__View__getIdName(env, jobj);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 
 			const char *id_name = (*env)->GetStringUTFChars(env, id_name_jstring, NULL);
 			g_value_set_string(value, id_name);
@@ -62,8 +66,10 @@ static void wrapper_widget_get_property(GObject *object, guint property_id, GVal
 
 		case ATL_CLASS_NAME: {
 			jstring class_name_jstring = J__Class__getName(env, class);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 
 			const char *class_name = (*env)->GetStringUTFChars(env, class_name_jstring, NULL);
 			g_value_set_string(value, class_name);
@@ -74,8 +80,10 @@ static void wrapper_widget_get_property(GObject *object, guint property_id, GVal
 
 		case ATL_SUPER_CLASS_NAMES: {
 			jstring super_classes_names_obj = J__View__getAllSuperClasses(env, jobj);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 
 			const char *super_classes_names = (*env)->GetStringUTFChars(env, super_classes_names_obj, NULL);
 			g_value_set_string(value, super_classes_names);
@@ -159,8 +167,10 @@ void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int basel
 		JNIEnv *env;
 		(*wrapper->jvm)->GetEnv(wrapper->jvm, (void **)&env, JNI_VERSION_1_6);
 		J__View__computeScroll(env, wrapper->jobj);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		allocation.x = -J__View__getScrollX(env, wrapper->jobj);
 		allocation.y = -J__View__getScrollY(env, wrapper->jobj);
 	}
@@ -253,8 +263,10 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		/* view animation: the transformation applies to everything the view draws (AOSP: View.draw() with applyLegacyAnimation()) */
 		JNIEnv *env = get_jni_env();
 		transformation = J__View__applyLegacyAnimation(env, wrapper->jobj);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		if (transformation) {
 			int type = J__Transformation__getTransformationType(env, transformation);
 			gtk_snapshot_save(snapshot);
@@ -295,8 +307,10 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		JNIEnv *env = get_jni_env();
 		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(snapshot));
 		J__View__draw(env, wrapper->jobj, wrapper->canvas);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	} else {
 		GtkWidget *widget = &wrapper->parent_instance;
 		GtkWidget *child = gtk_widget_get_first_child(widget);
@@ -411,8 +425,10 @@ static bool on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 		return false;
 
 	bool ret = J__View__performClick(env, this);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	(*env)->DeleteLocalRef(env, this);
 	return ret;
@@ -558,8 +574,10 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_DOWN, map_key_code(keyval), 0, map_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	return ret;
 }
 
@@ -570,8 +588,10 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, map_key_code(keyval), 0, map_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	return ret;
 }
 
@@ -595,8 +615,10 @@ static void focus_visible_changed_cb(GtkWindow *window, GParamSpec *pspec, gpoin
 	if (!view) // garbage collected
 		return;
 	J__View__dispatchFocusChanged(env, view, TRUE, gtk_window_get_focus_visible(window));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, view);
 }
 
@@ -620,8 +642,10 @@ static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget
 	if (!view)
 		return;
 	J__View__dispatchFocusChanged(env, view, focused, visible);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, view);
 }
 
@@ -642,8 +666,10 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 			wrapper->rtl_resolved = TRUE;
 			jint layout_direction = J__View__getLayoutDirection(env, wrapper->jobj);
 			J__View__onRtlPropertiesChanged(env, wrapper->jobj, layout_direction);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 		}
 		J__View__dispatchAttachedToWindow(env, wrapper->jobj);
 	} else {
@@ -652,8 +678,10 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 		J__View__dispatchDetachedFromWindow(env, wrapper->jobj);
 	}
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (!root) {
 		currently_unmapping = NULL;
 		currently_unmapping_root = NULL;

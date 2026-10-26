@@ -43,6 +43,7 @@ static void activity_close(JNIEnv *env, jobject activity)
 	if ((*env)->ExceptionCheck(env)) {
 		fprintf(stderr, "activity.onDestroy: seems there was a pending exception... :");
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
@@ -51,25 +52,33 @@ static void activity_close(JNIEnv *env, jobject activity)
 
 	/* -- run the activity's onDestroy -- */
 	J__Activity__performDestroy(env, activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void activity_unfocus(JNIEnv *env, jobject activity)
 {
 	if (!_GET_BOOL_FIELD(activity, "paused")) {
 		J__Activity__performPause(env, activity);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	J__Activity__performStop(env, activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	J__Activity__onWindowFocusChanged(env, activity, false);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 struct scrim_anim {
@@ -136,8 +145,10 @@ static void activity_focus(JNIEnv *env, jobject activity)
 		return;
 
 	J__Activity__performStart(env, activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
@@ -147,6 +158,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	                                                  transition_opening, gtk_widget_get_width(GTK_WIDGET(stack)), gtk_widget_get_height(GTK_WIDGET(stack)));
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 		transition = GTK_STACK_TRANSITION_TYPE_NONE;
 	}
 	transition_from = NULL;
@@ -156,20 +168,26 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	start_scrim(env, stack, decor_view, transition >> 8);
 
 	J__Activity__performResume(env, activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
 	J__Activity__onPostResume(env, activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
 	J__Activity__onWindowFocusChanged(env, activity, true);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void activity_update_current(JNIEnv *env)
@@ -192,8 +210,10 @@ static void activity_update_current(JNIEnv *env)
 	if (activity_current != NULL) {
 		jclass current_activity_class = (*env)->GetObjectClass(env, activity_current);
 		jmethodID current_activity_on_back_pressed_method_id = (*env)->GetMethodID(env, current_activity_class, "onBackPressed", "()V");
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 
 		if (g_list_length(activity_backlog) > 1 || _CACHED_METHOD(Activity__onBackPressed) != current_activity_on_back_pressed_method_id) {
 			back_button_set_sensitive(true);
@@ -209,8 +229,10 @@ void activity_window_ready(void)
 
 	for (GList *l = activity_backlog; l != NULL; l = l->next) {
 		J__Activity__onWindowFocusChanged(env, l->data, true);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 }
 
@@ -219,21 +241,27 @@ void current_activity_back_pressed(void)
 	JNIEnv *env = get_jni_env();
 
 	bool handled = J__Activity__dispatchOnBackInvoked(env, activity_current);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (handled)
 		return;
 
 	jclass current_activity_class = (*env)->GetObjectClass(env, activity_current);
 	jmethodID current_activity_on_back_pressed_method_id = (*env)->GetMethodID(env, current_activity_class, "onBackPressed", "()V");
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	// Either a new activity was added to the backlog or the current activity's onBackPressed method was changed
 	if (g_list_length(activity_backlog) > 1 || _CACHED_METHOD(Activity__onBackPressed) != current_activity_on_back_pressed_method_id) {
 		J__Activity__onBackPressed(env, activity_current);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	} else {
 		back_button_set_sensitive(false);
 	}
@@ -272,8 +300,10 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	activity_current = NULL;
 	/* -- run the activity's onCreate -- */
 	J__Activity__performCreate(env, activity_object, NULL);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (_GET_BOOL_FIELD(activity_object, "finishing")) { // finish() was called before the activity was created
 		transition_from = NULL;
@@ -281,8 +311,10 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	}
 
 	J__Activity__onPostCreate(env, activity_object, NULL);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
 
@@ -359,28 +391,38 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	}
 
 	jobject saved_state = J__Activity__performSaveInstanceState(env, old_activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	J__Activity__retainNonConfigurationInstanceFor(env, old_activity, activity);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	/* as on AOSP, the old instance is destroyed before the new one is created: apps that keep their
 	 * pages outside the activity (JW Library) tear them down in onDestroy() and set them up again in
 	 * onCreate() */
 	activity_close(env, old_activity);
 
 	J__Activity__performCreate(env, activity, saved_state);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (!_GET_BOOL_FIELD(activity, "finishing")) {
 		if (saved_state) {
 			J__Activity__onRestoreInstanceState(env, activity, saved_state);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 		}
 		J__Activity__onPostCreate(env, activity, saved_state);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 
 	if (_GET_BOOL_FIELD(activity, "finishing")) { // finish() was called while it was created
@@ -410,8 +452,10 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
 
 			/* -- run the activity's onNewIntent -- */
 			J__Activity__onNewIntent(env, l->data, intent);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 			found = JNI_TRUE;
 			break;
 		}
@@ -486,8 +530,10 @@ static void file_dialog_callback(GObject *source_object, GAsyncResult *res, gpoi
 		char *uri = g_file_get_uri(file);
 
 		J__Activity__fileChooserResultCallback(env, d->activity, d->request_code, RESULT_OK, d->action, _JSTRING(uri));
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 
 		g_free(uri);
 		g_object_unref(file);

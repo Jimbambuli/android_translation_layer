@@ -40,8 +40,10 @@ static void changed_cb(GtkEditable *self, gpointer user_data)
 	if (!this)
 		return;
 	J__EditText__sendTextChanged(env, this, _JSTRING(gtk_editable_get_text(self)));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, this);
 }
 
@@ -64,8 +66,10 @@ static void insert_text_cb(GtkEditable *editable, const char *text, int length, 
 	jstring source_jstr = _JSTRING(source);
 	g_free(source);
 	jstring filtered = J__EditText__filterInsertion(env, this, source_jstr, *position);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	if (filtered) {
 		const char *str = (*env)->GetStringUTFChars(env, filtered, NULL);
 		g_signal_handlers_block_by_func(editable, insert_text_cb, user_data);
@@ -100,8 +104,10 @@ static void on_activate(GtkText *gtk_text, gpointer user_data)
 		return;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, IME_ACTION_SEARCH, KEYCODE_ENTER, 0, 0);
 	J__EditText__sendEditorAction(env, this, key_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, this);
 }
 

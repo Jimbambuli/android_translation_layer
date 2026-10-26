@@ -128,8 +128,10 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 		if (synthetic_propagation_failed != event) { // New event. Try to handle again.
 			synthetic_propagation_failed = NULL;
 			ret = J__View__dispatchTouchEvent(env, this, motion_event);
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 		}
 		if (synthetic_propagation_failed) {
 			// The app tried to synthetically propagate the event to a GTK widget, but that is not possible in GTK4,
@@ -165,8 +167,10 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 		synthetic_propagation_failed = outer;
 	}
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (action == ACTION_UP || action == ACTION_CANCEL)
 		wrapper->intercepting_touch = false;
@@ -213,8 +217,10 @@ static void call_hover_callback(jobject this, int action, float x, float y, floa
 	(*env)->SetFloatArrayRegion(env, coords, 0, 4, (jfloat[]){x, y, raw_x, raw_y});
 	jobject motion_event = J_new__MotionEvent(env, SOURCE_MOUSE, action, (jlong)0, ids, coords);
 	J__View__dispatchHoverEvent(env, this, motion_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void transform_coords_to_widget_relative(GtkWidget *widget, double *x, double *y)
@@ -284,8 +290,10 @@ static gboolean call_button_callback(WrapperWidget *wrapper, int action, int32_t
 	_SET_INT_FIELD(motion_event, "buttonState", button_state);
 	_SET_INT_FIELD(motion_event, "actionButton", action_button);
 	gboolean ret = J__View__dispatchGenericMotionEvent(env, wrapper->jobj, motion_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, motion_event);
 	return ret;
 }
@@ -435,8 +443,10 @@ static void on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 		return;
 	jboolean handled = J__View__performClick(env, wrapper->jobj);
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (handled) {
 		gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
@@ -501,8 +511,10 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	                                                  gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
 
 	gboolean ret = J__View__dispatchGenericMotionEvent(env, this, motion_event);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	// HACK: replay last hover event to work around scrolling issues in composeUI apps
 	if (wrapper->hover_x && wrapper->hover_y)
@@ -991,8 +1003,10 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setOutlineClip(JNIEnv *env
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1setBackgroundDrawable(JNIEnv *env, jobject this, jlong widget_ptr, jlong paintable_ptr)
 {
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	GdkPaintable *paintable = GDK_PAINTABLE(_PTR(paintable_ptr));
@@ -1044,8 +1058,10 @@ static void on_long_click(GtkGestureLongPress *gesture, double x, double y, gpoi
 
 	bool ret = J__View__performLongClick(env, wrapper->jobj, x, y);
 
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 
 	if (ret)
 		gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
@@ -1205,8 +1221,10 @@ static gboolean on_activate_key_released(GtkEventControllerKey *controller, guin
 	if (!gtk_widget_has_focus(GTK_WIDGET(wrapper)) || !J__View__isClickable(env, wrapper->jobj))
 		return FALSE;
 	J__View__performClick(env, wrapper->jobj);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	return TRUE;
 }
 

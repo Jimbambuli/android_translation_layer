@@ -45,8 +45,10 @@ void compound_button_checked_changed(WrapperWidget *wrapper, gboolean checked)
 	jobject listener = _GET_OBJ_FIELD(view, "mOnCheckedChangeListener", "Landroid/widget/CompoundButton$OnCheckedChangeListener;");
 	if (listener) {
 		J__CompoundButton__OnCheckedChangeListener__onCheckedChanged(env, listener, view, checked);
-		if ((*env)->ExceptionCheck(env))
+		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		(*env)->DeleteLocalRef(env, listener);
 	}
 	(*env)->DeleteLocalRef(env, view);

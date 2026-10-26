@@ -26,8 +26,10 @@ static void on_closed(GtkPopover *popover, jobject view)
 	swallowing_press = TRUE;
 	JNIEnv *env = get_jni_env();
 	(*env)->CallStaticVoidMethod(env, window_manager_class, _STATIC_METHOD(window_manager_class, "dispatchOutsideTouch", "(Landroid/view/View;)V"), view);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 }
 
 static void release_view(gpointer view, GClosure *closure)

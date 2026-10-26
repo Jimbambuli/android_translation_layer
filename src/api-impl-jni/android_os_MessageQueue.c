@@ -88,8 +88,10 @@ void prepare_main_looper(JNIEnv *env)
 	main_thread_looper = ALooper_prepare(0);
 
 	J__Looper__prepareMainLooper(env);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	source = g_source_new(&source_funcs, sizeof(GSource));
 	JavaVM *jvm;
 	(*env)->GetJavaVM(env, &jvm);

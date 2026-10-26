@@ -430,6 +430,7 @@ static gboolean on_new_endpoint(Connector1 *connector, GDBusMethodInvocation *in
 	J__Context__sendBroadcast(env, context, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 	return TRUE;
 }
@@ -455,6 +456,7 @@ static gboolean on_message(Connector1 *connector, GDBusMethodInvocation *invocat
 	J__Context__sendBroadcast(env, context, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
 	return TRUE;
 }

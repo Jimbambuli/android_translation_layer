@@ -134,8 +134,10 @@ static void script_message_cb(WebKitUserContentManager *manager, JSCValue *value
 		return;
 	char *message = jsc_value_to_string(value);
 	J__WebView__internalJsMessage(env, this, _JSTRING(message));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, this);
 	g_free(message);
 }
@@ -164,8 +166,10 @@ static void evaluate_js_cb(GObject *source, GAsyncResult *result, gpointer user_
 		jobject this = webview_jobject(env, data->wrapper);
 		if (this && gtk_widget_get_parent(GTK_WIDGET(source)) == GTK_WIDGET(data->wrapper)) {
 			J__WebView__internalJsResult(env, this, data->callback, _JSTRING(json ? json : "null"));
-			if ((*env)->ExceptionCheck(env))
+			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
 		}
 		if (this)
 			(*env)->DeleteLocalRef(env, this);

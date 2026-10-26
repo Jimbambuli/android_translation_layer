@@ -23,8 +23,10 @@ static gboolean on_activate_link(GtkLabel *label, const char *uri, gpointer user
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(gtk_widget_get_parent(GTK_WIDGET(label))));
 	jmethodID onLinkActivated = _METHOD((*env)->FindClass(env, "android/widget/TextView"), "onLinkActivated", "(Ljava/lang/String;)Z");
 	jboolean ret = (*env)->CallBooleanMethod(env, wrapper->jobj, onLinkActivated, _JSTRING(uri));
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	return ret;
 }
 

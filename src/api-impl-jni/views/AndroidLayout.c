@@ -99,8 +99,10 @@ static void android_layout_allocate(GtkLayoutManager *layout_manager, GtkWidget 
 	if (!view)
 		return;
 	J__View__layoutInternal(env, view, width, height);
-	if ((*env)->ExceptionCheck(env))
+	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, view);
 }
 
