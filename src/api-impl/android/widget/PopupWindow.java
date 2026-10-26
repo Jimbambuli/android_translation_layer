@@ -7,6 +7,8 @@ import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.os.Handler;
+import android.os.Looper;
 import android.transition.Transition;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -150,6 +152,40 @@ public class PopupWindow {
 		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
 		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
 		native_fadeIn(popover, fadeDuration(true));
+		takeWindowFocus(anchor);
+	}
+
+	/* the root view of the window whose focus this popup has taken */
+	private View focusTakenFrom;
+
+	/* like AOSP: a focusable popup is a window of its own that gets the window focus, which the
+	 * window it is shown over loses (a popup that is not focusable leaves the focus there) */
+	private void takeWindowFocus(View anchor) {
+		if (!focusable || contentView == null || !isShowing())
+			return;
+		if (focusTakenFrom == null) {
+			focusTakenFrom = anchor.getRootView();
+			native_setOnDismissListener(popover); // to give the focus back on every dismissal
+			focusTakenFrom.dispatchWindowFocusChanged(false);
+		}
+		contentView.dispatchWindowFocusChanged(true);
+	}
+
+	/* the window below gets the focus back once the popup is gone; like the window manager, after
+	 * the popup's window is removed, so a popup that is shown again right away keeps it */
+	private void returnWindowFocus() {
+		if (focusTakenFrom == null)
+			return;
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				if (focusTakenFrom == null || isShowing())
+					return;
+				View root = focusTakenFrom;
+				focusTakenFrom = null;
+				root.dispatchWindowFocusChanged(true);
+			}
+		});
 	}
 
 	public View getContentView() {
@@ -173,6 +209,7 @@ public class PopupWindow {
 			gravity = Gravity.TOP | Gravity.START;
 		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
 		native_fadeIn(popover, fadeDuration(true));
+		takeWindowFocus(parent);
 	}
 
 	public void dismiss() {
@@ -290,6 +327,7 @@ public class PopupWindow {
 	private void dispatchDismiss() {
 		if (on_dismiss_listener != null)
 			on_dismiss_listener.onDismiss();
+		returnWindowFocus();
 	}
 	public native void native_setWidth(long widget, int width);
 	public native void native_setHeight(long widget, int height);
