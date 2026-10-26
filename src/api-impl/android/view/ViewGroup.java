@@ -44,6 +44,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	protected int mGroupFlags;
 
+	private static final int[] DESCENDANT_FOCUSABILITY_FLAGS =
+			{FOCUS_BEFORE_DESCENDANTS, FOCUS_AFTER_DESCENDANTS,
+					FOCUS_BLOCK_DESCENDANTS};
+
 	public ArrayList<View> children;
 	private ArrayList<View> detachedChildren;
 	private boolean pendingHideDetachedChildren = false;
@@ -69,7 +73,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		children = new ArrayList<View>();
 		detachedChildren = new ArrayList<View>();
 
+		setDescendantFocusability(FOCUS_BEFORE_DESCENDANTS);
+
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.ViewGroup, defStyleAttr, defStyleRes);
+		if (a.hasValue(com.android.internal.R.styleable.ViewGroup_descendantFocusability))
+			setDescendantFocusability(DESCENDANT_FOCUSABILITY_FLAGS[a.getInt(com.android.internal.R.styleable.ViewGroup_descendantFocusability, 0)]);
 		if (a.getBoolean(com.android.internal.R.styleable.ViewGroup_touchscreenBlocksFocus, false))
 			setTouchscreenBlocksFocus(true);
 		setClipChildren(a.getBoolean(com.android.internal.R.styleable.ViewGroup_clipChildren, true));
@@ -696,7 +704,83 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
-	public int getDescendantFocusability() { return 0; }
+	public int getDescendantFocusability() {
+		return mGroupFlags & FLAG_MASK_FOCUSABILITY;
+	}
+
+	/* AOSP; ATL: GTK does not let the focus into the children of a group that blocks them */
+	public void setDescendantFocusability(int focusability) {
+		switch (focusability) {
+			case FOCUS_BEFORE_DESCENDANTS:
+			case FOCUS_AFTER_DESCENDANTS:
+			case FOCUS_BLOCK_DESCENDANTS:
+				break;
+			default:
+				throw new IllegalArgumentException("must be one of FOCUS_BEFORE_DESCENDANTS, "
+						+ "FOCUS_AFTER_DESCENDANTS, FOCUS_BLOCK_DESCENDANTS");
+		}
+		mGroupFlags &= ~FLAG_MASK_FOCUSABILITY;
+		mGroupFlags |= (focusability & FLAG_MASK_FOCUSABILITY);
+		native_setBlockDescendantsFocus(widget, focusability == FOCUS_BLOCK_DESCENDANTS);
+	}
+	private native void native_setBlockDescendantsFocus(long widget, boolean block);
+
+	/* AOSP, without PFLAG_WANTS_FOCUS (GTK keeps the focus of a view that is not laid out yet) */
+	@Override
+	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
+		int descendantFocusability = getDescendantFocusability();
+
+		boolean result;
+		switch (descendantFocusability) {
+			case FOCUS_BLOCK_DESCENDANTS:
+				result = super.requestFocus(direction, previouslyFocusedRect);
+				break;
+			case FOCUS_BEFORE_DESCENDANTS: {
+				final boolean took = super.requestFocus(direction, previouslyFocusedRect);
+				result = took ? took : onRequestFocusInDescendants(direction,
+						previouslyFocusedRect);
+				break;
+			}
+			case FOCUS_AFTER_DESCENDANTS: {
+				final boolean took = onRequestFocusInDescendants(direction, previouslyFocusedRect);
+				result = took ? took : super.requestFocus(direction, previouslyFocusedRect);
+				break;
+			}
+			default:
+				throw new IllegalStateException("descendant focusability must be "
+						+ "one of FOCUS_BEFORE_DESCENDANTS, FOCUS_AFTER_DESCENDANTS, FOCUS_BLOCK_DESCENDANTS "
+						+ "but is " + descendantFocusability);
+		}
+		return result;
+	}
+
+	@SuppressWarnings({"ConstantConditions"})
+	protected boolean onRequestFocusInDescendants(int direction,
+			Rect previouslyFocusedRect) {
+		int index;
+		int increment;
+		int end;
+		int count = getChildCount();
+		if ((direction & FOCUS_FORWARD) != 0) {
+			index = 0;
+			increment = 1;
+			end = count;
+		} else {
+			index = count - 1;
+			increment = -1;
+			end = -1;
+		}
+		final View[] children = this.children.toArray(new View[0]);
+		for (int i = index; i != end; i += increment) {
+			View child = children[i];
+			if (child.getVisibility() == VISIBLE) {
+				if (child.requestFocus(direction, previouslyFocusedRect)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
 
 	public void startViewTransition(View view) {}
 	public void endViewTransition(View view) {}

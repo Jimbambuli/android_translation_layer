@@ -94,6 +94,17 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksF
 		g_object_set_data(G_OBJECT(wrapper), "atl-blocks-tab-focus", GINT_TO_POINTER(blocks));
 }
 
+/* FOCUS_BLOCK_DESCENDANTS: can-focus of the group's widget covers its descendants, while the group itself
+ * takes the focus through its wrapper */
+JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setBlockDescendantsFocus(JNIEnv *env, jobject this, jlong widget_ptr, jboolean block)
+{
+	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
+	if (block == GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "atl-block-descendants")))
+		return;
+	g_object_set_data(G_OBJECT(widget), "atl-block-descendants", GINT_TO_POINTER(block));
+	gtk_widget_set_can_focus(widget, !block && !g_object_get_data(G_OBJECT(widget), "atl-not-focusable"));
+}
+
 JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setClipChildren(JNIEnv *env, jobject this, jlong widget_ptr, jboolean clip_children)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));

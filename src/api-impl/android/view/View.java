@@ -1621,10 +1621,10 @@ public class View implements Drawable.Callback {
 	public final boolean requestFocus(int direction) {
 		return requestFocus(direction, null);
 	}
+	/* AOSP: whether the view took the focus; ATL: whether GTK gave it to the view's widget */
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
 		if (atl_enabled && atl_focusable && visibility == VISIBLE) {
-			nativeRequestFocus(widget, direction);
-			return true;
+			return nativeRequestFocus(widget, direction);
 		}
 		return false;
 	}
@@ -1632,7 +1632,7 @@ public class View implements Drawable.Callback {
 		// TODO: if (isInTouchMode()) leave touch mode
 		return requestFocus(View.FOCUS_DOWN);
 	}
-	private native void nativeRequestFocus(long widget, int direction);
+	private native boolean nativeRequestFocus(long widget, int direction);
 
 	private native void nativeSetFullscreen(long widget, boolean fullscreen);
 
@@ -2013,8 +2013,6 @@ public class View implements Drawable.Callback {
 			invalidate();
 		}
 	}
-
-	public void setDescendantFocusability(int value) {}
 
 	public void setAccessibilityDelegate(AccessibilityDelegate delegate) {}
 

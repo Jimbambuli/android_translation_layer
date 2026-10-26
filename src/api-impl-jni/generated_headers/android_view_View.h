@@ -394,9 +394,9 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1registerTouchEventPropagat
 /*
  * Class:     android_view_View
  * Method:    nativeRequestFocus
- * Signature: (JI)V
+ * Signature: (JI)Z
  */
-JNIEXPORT void JNICALL Java_android_view_View_nativeRequestFocus
+JNIEXPORT jboolean JNICALL Java_android_view_View_nativeRequestFocus
   (JNIEnv *, jobject, jlong, jint);
 
 /*

@@ -1254,7 +1254,7 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setNativeFocusable(JNIEnv 
 		gtk_widget_set_can_focus(widget, FALSE);
 		g_object_set_data(G_OBJECT(widget), "atl-not-focusable", GINT_TO_POINTER(1));
 	} else if (focusable && ours) {
-		gtk_widget_set_can_focus(widget, TRUE);
+		gtk_widget_set_can_focus(widget, !g_object_get_data(G_OBJECT(widget), "atl-block-descendants"));
 		g_object_set_data(G_OBJECT(widget), "atl-not-focusable", NULL);
 	}
 }
@@ -1278,14 +1278,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setKeyboardFocusable(JNIEn
 	g_object_set_data(G_OBJECT(wrapper), "keyboard-focusable", GINT_TO_POINTER(focusable));
 }
 
-JNIEXPORT void JNICALL Java_android_view_View_nativeRequestFocus(JNIEnv *env, jobject this, jlong widget_ptr, jint direction)
+JNIEXPORT jboolean JNICALL Java_android_view_View_nativeRequestFocus(JNIEnv *env, jobject this, jlong widget_ptr, jint direction)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	GtkWidget *wrapper = gtk_widget_get_parent(widget);
 	if (gtk_widget_get_focusable(widget))
-		gtk_widget_grab_focus(widget);
+		return gtk_widget_grab_focus(widget);
 	else
-		gtk_widget_grab_focus(wrapper);
+		return gtk_widget_grab_focus(wrapper);
 }
 
 JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsFocused(JNIEnv *env, jobject this, jlong widget_ptr)
