@@ -354,11 +354,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	protected void native_drawContent(long widget, long snapshot) {}
 
 	public View getChildAt(int index) {
-		try {
-			return children.get(index);
-		} catch (IndexOutOfBoundsException e) {
+		if (index < 0 || index >= children.size())
 			return null;
-		}
+		return children.get(index);
 	}
 
 	public int indexOfChild(View child) {
