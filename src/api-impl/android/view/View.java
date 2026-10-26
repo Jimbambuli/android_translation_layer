@@ -2029,7 +2029,7 @@ public class View implements Drawable.Callback {
 		}
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
 		notifyLayoutChange();
-		if (sizeChanged && getZ() > 0)
+		if (sizeChanged && needsOutline())
 			invalidateOutline();
 	}
 
@@ -2071,7 +2071,7 @@ public class View implements Drawable.Callback {
 		boolean changed = oldWidth != width || oldHeight != height;
 		if (changed) {
 			onSizeChanged(width, height, oldWidth, oldHeight);
-			if (getZ() > 0)
+			if (needsOutline())
 				invalidateOutline();
 		}
 		bottom = top + height;
@@ -2126,7 +2126,7 @@ public class View implements Drawable.Callback {
 		this.background = backgroundDrawable;
 		if (backgroundDrawable instanceof ColorDrawable) {
 			native_setBackgroundColor(widget, ((ColorDrawable)backgroundDrawable).getColor());
-			if (getZ() > 0)
+			if (needsOutline())
 				invalidateOutline();
 			return;
 		}
@@ -2136,7 +2136,7 @@ public class View implements Drawable.Callback {
 				backgroundDrawable.setTint(backgroundTint);
 		}
 		native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0);
-		if (getZ() > 0)
+		if (needsOutline())
 			invalidateOutline();
 	}
 
@@ -2746,7 +2746,14 @@ public class View implements Drawable.Callback {
 
 	public boolean isNestedScrollingEnabled() { return false; }
 
-	public void setClipToOutline(boolean clipToOutline) {}
+	private boolean clipToOutline;
+	private boolean has_outline_clip;
+	public void setClipToOutline(boolean clipToOutline) {
+		if (this.clipToOutline == clipToOutline)
+			return;
+		this.clipToOutline = clipToOutline;
+		invalidateOutline();
+	}
 
 	public boolean hasTransientState() { return false; }
 
@@ -2919,9 +2926,8 @@ public class View implements Drawable.Callback {
 		return null;
 	}
 
-	/* setClipBounds() is not supported, so there are never clip bounds */
 	public Rect getClipBounds() {
-		return null;
+		return clipBounds != null ? new Rect(clipBounds) : null;
 	}
 
 	public void setBackgroundTintList(ColorStateList tint) {}
@@ -2944,19 +2950,34 @@ public class View implements Drawable.Callback {
 
 	public void setAccessibilityLiveRegion(int mode) {}
 
-	/* The outline is only used for the elevation shadow, which the parent draws below the view
-	 * (without AOSP's light source position: a soft ambient shadow and one offset downwards) */
+	/* the outline is needed for the elevation shadow and for setClipToOutline() */
+	private boolean needsOutline() {
+		return getZ() > 0 || clipToOutline;
+	}
+
+	/* The outline gives the elevation shadow, which the parent draws below the view (without AOSP's
+	 * light source position: a soft ambient shadow and one offset downwards), and the clip of
+	 * setClipToOutline() (rect, round rect or, as AOSP since API 33, path) */
 	public void invalidateOutline() {
 		float z = getZ();
 		Outline outline = null;
-		if (z > 0 && outline_provider != null && getWidth() > 0 && getHeight() > 0) {
+		if (needsOutline() && outline_provider != null && getWidth() > 0 && getHeight() > 0) {
 			if (background != null)
 				background.setBounds(0, 0, getWidth(), getHeight());
 			outline = new Outline();
 			outline.setAlpha(1.0f);
 			outline_provider.getOutline(this, outline);
 		}
-		if (outline == null || outline.isEmpty() || outline.getAlpha() <= 0) {
+		if (clipToOutline && outline != null && !outline.isEmpty()) {
+			Rect rect = outline.mRect;
+			long path = outline.mMode == Outline.MODE_PATH ? outline.mPath.getGskPath() : 0;
+			native_setOutlineClip(widget, true, rect.left, rect.top, rect.right, rect.bottom, Math.max(outline.mRadius, 0), path);
+			has_outline_clip = true;
+		} else if (has_outline_clip) {
+			native_setOutlineClip(widget, false, 0, 0, 0, 0, 0, 0);
+			has_outline_clip = false;
+		}
+		if (z <= 0 || outline == null || outline.isEmpty() || outline.getAlpha() <= 0) {
 			if (has_shadow)
 				native_setShadow(widget, 0, 0, 0, 0, 0, 0, 0);
 			has_shadow = false;
@@ -2975,6 +2996,7 @@ public class View implements Drawable.Callback {
 		has_shadow = true;
 	}
 	private native void native_setShadow(long widget, int left, int top, int right, int bottom, float radius, float z, float alpha);
+	private native void native_setOutlineClip(long widget, boolean enabled, int left, int top, int right, int bottom, float radius, long path);
 
 	public int getMeasuredWidthAndState() {
 		return measuredWidth;
@@ -3217,9 +3239,19 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
-	public void setClipBounds(Rect clipBounds) {}
+	private Rect clipBounds;
+	public void setClipBounds(Rect clipBounds) {
+		if (clipBounds == null ? this.clipBounds == null : clipBounds.equals(this.clipBounds))
+			return;
+		this.clipBounds = clipBounds != null ? new Rect(clipBounds) : null;
+		if (clipBounds != null)
+			native_setClipBounds(widget, true, clipBounds.left, clipBounds.top, clipBounds.right, clipBounds.bottom);
+		else
+			native_setClipBounds(widget, false, 0, 0, 0, 0);
+	}
+	private native void native_setClipBounds(long widget, boolean enabled, int left, int top, int right, int bottom);
 
-	public boolean getClipToOutline() { return false; }
+	public boolean getClipToOutline() { return clipToOutline; }
 
 	public void setLeft(int left) {
 		layout(left, top, right, bottom);

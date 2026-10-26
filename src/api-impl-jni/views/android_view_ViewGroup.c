@@ -93,3 +93,10 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksF
 	if (wrapper)
 		g_object_set_data(G_OBJECT(wrapper), "atl-blocks-tab-focus", GINT_TO_POINTER(blocks));
 }
+
+JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setClipChildren(JNIEnv *env, jobject this, jlong widget_ptr, jboolean clip_children)
+{
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
+	wrapper->clip_children = clip_children;
+	gtk_widget_queue_draw(GTK_WIDGET(wrapper));
+}

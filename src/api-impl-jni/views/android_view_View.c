@@ -975,6 +975,20 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setShadow(JNIEnv *env, job
 	wrapper_widget_set_shadow(WRAPPER_WIDGET(gtk_widget_get_parent(widget)), &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, z, alpha);
 }
 
+JNIEXPORT void JNICALL Java_android_view_View_native_1setClipBounds(JNIEnv *env, jobject this, jlong widget_ptr, jboolean enabled, jint left, jint top, jint right, jint bottom)
+{
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
+	wrapper->has_clip_bounds = enabled;
+	wrapper->clip_bounds = GRAPHENE_RECT_INIT(left, top, right - left, bottom - top);
+	gtk_widget_queue_draw(GTK_WIDGET(wrapper));
+}
+
+JNIEXPORT void JNICALL Java_android_view_View_native_1setOutlineClip(JNIEnv *env, jobject this, jlong widget_ptr, jboolean enabled, jint left, jint top, jint right, jint bottom, jfloat radius, jlong path_ptr)
+{
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
+	wrapper_widget_set_outline_clip(wrapper, enabled, &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, _PTR(path_ptr));
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_native_1setBackgroundDrawable(JNIEnv *env, jobject this, jlong widget_ptr, jlong paintable_ptr)
 {
 	if ((*env)->ExceptionCheck(env))

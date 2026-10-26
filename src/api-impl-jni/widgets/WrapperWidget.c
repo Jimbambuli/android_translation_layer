@@ -92,11 +92,13 @@ static void wrapper_widget_get_property(GObject *object, guint property_id, GVal
 
 static void wrapper_widget_init(WrapperWidget *wrapper_widget)
 {
+	wrapper_widget->clip_children = TRUE;
 }
 
 static void wrapper_widget_dispose(GObject *wrapper_widget)
 {
 	GtkWidget *widget = GTK_WIDGET(wrapper_widget);
+	g_clear_pointer(&WRAPPER_WIDGET(wrapper_widget)->outline_clip_path, gsk_path_unref);
 	GtkWidget *child = gtk_widget_get_first_child(widget);
 	while (child) {
 		GtkWidget *_child = gtk_widget_get_next_sibling(child);
@@ -215,6 +217,25 @@ void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, fl
 	gtk_widget_queue_draw(parent ? parent : GTK_WIDGET(wrapper));
 }
 
+void wrapper_widget_set_outline_clip(WrapperWidget *wrapper, gboolean enabled, graphene_rect_t *rect, float radius, GskPath *path)
+{
+	wrapper->has_outline_clip = enabled;
+	gsk_rounded_rect_init_from_rect(&wrapper->outline_clip, rect, radius);
+	g_clear_pointer(&wrapper->outline_clip_path, gsk_path_unref);
+	if (path)
+		wrapper->outline_clip_path = gsk_path_ref(path);
+	gtk_widget_queue_draw(GTK_WIDGET(wrapper));
+}
+
+/* does the parent view clip its children (ViewGroup.setClipChildren)? The parent of a WrapperWidget
+ * is the parent view's widget, whose parent is that view's WrapperWidget */
+static gboolean parent_clips_children(GtkWidget *wrapper)
+{
+	GtkWidget *parent = gtk_widget_get_parent(wrapper);
+	parent = parent ? gtk_widget_get_parent(parent) : NULL;
+	return !parent || !WRAPPER_IS_WIDGET(parent) || WRAPPER_WIDGET(parent)->clip_children;
+}
+
 /* android.view.animation.Transformation.TYPE_ALPHA and TYPE_MATRIX */
 #define TRANSFORMATION_TYPE_ALPHA 0x1
 #define TRANSFORMATION_TYPE_MATRIX 0x2
@@ -253,8 +274,22 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 			wrapper->animation_tick = 0;
 		}
 	}
-	if (wrapper->real_height > 0 && wrapper->real_width > 0) {
+	/* AOSP order: the bounds (if the parent clips its children), the clip bounds, the outline */
+	int clips = 0;
+	if (wrapper->real_height > 0 && wrapper->real_width > 0 && parent_clips_children(widget)) {
 		gtk_snapshot_push_clip(snapshot, &GRAPHENE_RECT_INIT(0, 0, wrapper->real_width, wrapper->real_height));
+		clips++;
+	}
+	if (wrapper->has_clip_bounds) {
+		gtk_snapshot_push_clip(snapshot, &wrapper->clip_bounds);
+		clips++;
+	}
+	if (wrapper->has_outline_clip) {
+		if (wrapper->outline_clip_path)
+			gtk_snapshot_push_fill(snapshot, wrapper->outline_clip_path, GSK_FILL_RULE_WINDING);
+		else
+			gtk_snapshot_push_rounded_clip(snapshot, &wrapper->outline_clip);
+		clips++;
 	}
 	if (wrapper->have_custom_draw_method) {
 		JNIEnv *env = get_jni_env();
@@ -270,9 +305,8 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 			child = gtk_widget_get_next_sibling(child);
 		}
 	}
-	if (wrapper->real_height > 0 && wrapper->real_width > 0) {
+	while (clips--)
 		gtk_snapshot_pop(snapshot);
-	}
 	if (push_opacity)
 		gtk_snapshot_pop(snapshot);
 	if (transformation)

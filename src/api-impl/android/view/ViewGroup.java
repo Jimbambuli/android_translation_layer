@@ -69,6 +69,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.ViewGroup, defStyleAttr, defStyleRes);
 		if (a.getBoolean(com.android.internal.R.styleable.ViewGroup_touchscreenBlocksFocus, false))
 			setTouchscreenBlocksFocus(true);
+		setClipChildren(a.getBoolean(com.android.internal.R.styleable.ViewGroup_clipChildren, true));
 		a.recycle();
 	}
 
@@ -642,7 +643,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 	private native void native_setTouchscreenBlocksFocus(long widget, boolean blocks);
 
-	public void setClipChildren(boolean clipChildren) {}
+	/* as AOSP: by default each child is clipped to its bounds */
+	private boolean clipChildren = true;
+	public void setClipChildren(boolean clipChildren) {
+		if (this.clipChildren == clipChildren)
+			return;
+		this.clipChildren = clipChildren;
+		native_setClipChildren(widget, clipChildren);
+	}
+	private native void native_setClipChildren(long widget, boolean clipChildren);
 
 	protected void dispatchSetPressed(boolean pressed) {}
 
@@ -878,7 +887,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void requestChildFocus(View child, View focused) {}
 
 	public boolean getClipChildren() {
-		return false;
+		return clipChildren;
 	}
 
 	@Override

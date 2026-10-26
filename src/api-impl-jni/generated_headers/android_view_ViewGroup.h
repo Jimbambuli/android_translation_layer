@@ -283,6 +283,14 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksF
 
 /*
  * Class:     android_view_ViewGroup
+ * Method:    native_setClipChildren
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setClipChildren
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_view_ViewGroup
  * Method:    native_offsetRect
  * Signature: (JJLandroid/graphics/Rect;)V
  */

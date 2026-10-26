@@ -509,6 +509,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setShadow
 
 /*
  * Class:     android_view_View
+ * Method:    native_setOutlineClip
+ * Signature: (JZIIIIFJ)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setOutlineClip
+  (JNIEnv *, jobject, jlong, jboolean, jint, jint, jint, jint, jfloat, jlong);
+
+/*
+ * Class:     android_view_View
  * Method:    native_getGlobalVisibleRect
  * Signature: (JLandroid/graphics/Rect;)Z
  */
@@ -530,6 +538,14 @@ JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame
  */
 JNIEXPORT void JNICALL Java_android_view_View_native_1setTooltipText
   (JNIEnv *, jobject, jlong, jstring);
+
+/*
+ * Class:     android_view_View
+ * Method:    native_setClipBounds
+ * Signature: (JZIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_native_1setClipBounds
+  (JNIEnv *, jobject, jlong, jboolean, jint, jint, jint, jint);
 
 #ifdef __cplusplus
 }
