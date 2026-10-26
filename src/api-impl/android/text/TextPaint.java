@@ -81,8 +81,4 @@ public class TextPaint extends Paint {
 		underlineColor = color;
 		underlineThickness = thickness;
 	}
-
-	public float getLetterSpacing() {
-		return 1.0f;
-	}
 }

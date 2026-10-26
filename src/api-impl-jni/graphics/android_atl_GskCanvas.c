@@ -170,6 +170,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawText(JNIEnv *env, 
 	struct AndroidPaint *paint = _PTR(paint_ptr);
 	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
 	pango_layout_set_font_description(layout, paint->font);
+	android_paint_apply_letter_spacing(layout, paint);
 	const char *str = (*env)->GetStringUTFChars(env, text, NULL);
 	pango_layout_set_text(layout, str, -1);
 	(*env)->ReleaseStringUTFChars(env, text, str);

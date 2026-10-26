@@ -183,6 +183,22 @@ JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1text_1size
 
 /*
  * Class:     android_graphics_Paint
+ * Method:    native_set_letter_spacing
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1letter_1spacing
+  (JNIEnv *, jclass, jlong, jfloat);
+
+/*
+ * Class:     android_graphics_Paint
+ * Method:    native_get_letter_spacing
+ * Signature: (J)F
+ */
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1letter_1spacing
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Paint
  * Method:    native_set_color_filter
  * Signature: (JII)V
  */

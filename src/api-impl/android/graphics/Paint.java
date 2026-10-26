@@ -314,7 +314,9 @@ public class Paint {
 		return null;
 	}
 
-	public void setLetterSpacing(float spacing) {}
+	public void setLetterSpacing(float spacing) {
+		native_set_letter_spacing(paint, spacing);
+	}
 
 	public enum Cap {
 		/**
@@ -435,7 +437,9 @@ public class Paint {
 
 	public Locale getTextLocale() { return Locale.getDefault(); }
 
-	public float getLetterSpacing() { return 1.0f; }
+	public float getLetterSpacing() {
+		return native_get_letter_spacing(paint);
+	}
 
 	public Style getStyle() {
 		return Style.values[native_get_style(paint)];
@@ -488,6 +492,8 @@ public class Paint {
 	private static native void native_set_text_size(long paint, float size);
 	private static native void native_set_typeface(long paint, String family, int weight, boolean italic);
 	private static native float native_get_text_size(long paint);
+	private static native void native_set_letter_spacing(long paint, float spacing);
+	private static native float native_get_letter_spacing(long paint);
 	private static native void native_set_color_filter(long paint, int mode, int color);
 	private static native void native_get_text_bounds(long paint, String text, Rect bounds);
 	private static native void native_set_text_align(long paint, int align);

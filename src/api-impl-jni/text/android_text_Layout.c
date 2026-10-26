@@ -13,6 +13,7 @@ JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env
 	struct AndroidPaint *android_paint = _PTR(paint);
 	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
 	pango_layout_set_font_description(layout, android_paint->font);
+	android_paint_apply_letter_spacing(layout, android_paint);
 	const char *str = (*env)->GetStringUTFChars(env, text, NULL);
 	pango_layout_set_text(layout, str, -1);
 	(*env)->ReleaseStringUTFChars(env, text, str);

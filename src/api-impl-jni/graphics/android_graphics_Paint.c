@@ -162,6 +162,18 @@ JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1text_1size(JNI
 	return (jfloat)pango_font_description_get_size(paint->font) / PANGO_SCALE;
 }
 
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1letter_1spacing(JNIEnv *env, jclass clazz, jlong paint_ptr, jfloat spacing)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	paint->letter_spacing = spacing;
+}
+
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1letter_1spacing(JNIEnv *env, jclass clazz, jlong paint_ptr)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	return paint->letter_spacing;
+}
+
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1color_1filter(JNIEnv *env, jclass clazz, jlong paint_ptr, jint mode, jint color)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
@@ -184,6 +196,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1text_1bounds(JNI
 	struct AndroidPaint *paint = _PTR(paint_ptr);
 	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
 	pango_layout_set_font_description(layout, paint->font);
+	android_paint_apply_letter_spacing(layout, paint);
 	const char *str = (*env)->GetStringUTFChars(env, text_ptr, NULL);
 	pango_layout_set_text(layout, str, -1);
 	(*env)->ReleaseStringUTFChars(env, text_ptr, str);
