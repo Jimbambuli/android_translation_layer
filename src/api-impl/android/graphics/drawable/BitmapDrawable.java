@@ -151,4 +151,46 @@ public class BitmapDrawable extends Drawable {
 	}
 
 	public void setGravity(int g) {}
+
+	/* like AOSP's BitmapState: what a new BitmapDrawable needs, taken when asked for */
+	@Override
+	public ConstantState getConstantState() {
+		return new BitmapState(this);
+	}
+
+	final static class BitmapState extends ConstantState {
+		Bitmap mBitmap;
+		ColorStateList mTint;
+		PorterDuff.Mode mTintMode;
+		int mTargetDensity;
+
+		BitmapState(BitmapDrawable drawable) {
+			mBitmap = drawable.bitmap;
+			mTint = drawable.tint;
+			mTintMode = drawable.tint_mode;
+			mTargetDensity = drawable.target_density;
+		}
+
+		@Override
+		public Drawable newDrawable() {
+			return new BitmapDrawable(this);
+		}
+
+		@Override
+		public Drawable newDrawable(Resources res) {
+			return new BitmapDrawable(this);
+		}
+
+		@Override
+		public int getChangingConfigurations() {
+			return 0;
+		}
+	}
+
+	private BitmapDrawable(BitmapState state) {
+		bitmap = state.mBitmap;
+		tint = state.mTint;
+		tint_mode = state.mTintMode;
+		target_density = state.mTargetDensity;
+	}
 }

@@ -73,23 +73,9 @@ public class Drawable {
 
 	public void setChangingConfigurations(int bitmap) {}
 
+	/* like AOSP: a drawable that cannot make copies of itself has no constant state */
 	public ConstantState getConstantState() {
-		return new ConstantState() {
-			@Override
-			public Drawable newDrawable(Resources res) {
-				return Drawable.this;
-			}
-
-			@Override
-			public Drawable newDrawable() {
-				return Drawable.this;
-			}
-
-			@Override
-			public int getChangingConfigurations() {
-				return Drawable.this.getChangingConfigurations();
-			}
-		};
+		return null;
 	}
 
 	public static abstract class ConstantState {

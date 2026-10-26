@@ -54,4 +54,33 @@ public class ColorDrawable extends Drawable {
 		this.color = color;
 		paint.setColor(color);
 	}
+
+	/* like AOSP's ColorState: what a new ColorDrawable needs, taken when asked for */
+	@Override
+	public ConstantState getConstantState() {
+		return new ColorState(color);
+	}
+
+	final static class ColorState extends ConstantState {
+		int mBaseColor;
+
+		ColorState(int color) {
+			mBaseColor = color;
+		}
+
+		@Override
+		public Drawable newDrawable() {
+			return new ColorDrawable(mBaseColor);
+		}
+
+		@Override
+		public Drawable newDrawable(Resources res) {
+			return new ColorDrawable(mBaseColor);
+		}
+
+		@Override
+		public int getChangingConfigurations() {
+			return 0;
+		}
+	}
 }

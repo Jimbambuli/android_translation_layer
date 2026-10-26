@@ -2289,11 +2289,6 @@ public class Resources {
 		if (dr != null) {
 			dr.setChangingConfigurations(value.changingConfigurations);
 			Drawable.ConstantState cs = dr.getConstantState();
-			/* Several drawables (Drawable's default, DrawableContainer, LayerDrawable and its
-			 * subclasses) return a ConstantState whose newDrawable() hands out the drawable itself.
-			 * Caching those would make every view share one instance, with one state and bounds. */
-			if (cs != null && cs.newDrawable(this) == dr)
-				cs = null;
 			if (cs != null) {
 				/*if (mPreloading) {
 					final int changingConfigs = cs.getChangingConfigurations();
