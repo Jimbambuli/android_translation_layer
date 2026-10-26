@@ -920,7 +920,19 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1layout(JNIEnv *env, jobjec
 		allocation.y += _GET_FLOAT_FIELD(wrapper->jobj, "translationY");
 	}
 
-	gtk_widget_size_allocate(widget, &allocation, -1);
+	/* scale and rotation about the pivot like AOSP's RenderNode (View.getMatrix()); GTK draws and
+	 * picks the widget through this transform */
+	GskTransform *transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(allocation.x, allocation.y));
+	if (wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform")) {
+		graphene_point_t pivot = GRAPHENE_POINT_INIT(width / 2.f, height / 2.f);
+		if (_GET_BOOL_FIELD(wrapper->jobj, "pivotExplicit"))
+			pivot = GRAPHENE_POINT_INIT(_GET_FLOAT_FIELD(wrapper->jobj, "pivotX"), _GET_FLOAT_FIELD(wrapper->jobj, "pivotY"));
+		transform = gsk_transform_translate(transform, &pivot);
+		transform = gsk_transform_rotate(transform, _GET_FLOAT_FIELD(wrapper->jobj, "rotation"));
+		transform = gsk_transform_scale(transform, _GET_FLOAT_FIELD(wrapper->jobj, "scaleX"), _GET_FLOAT_FIELD(wrapper->jobj, "scaleY"));
+		transform = gsk_transform_translate(transform, &GRAPHENE_POINT_INIT(-pivot.x, -pivot.y));
+	}
+	gtk_widget_allocate(widget, allocation.width, allocation.height, -1, transform);
 }
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1requestLayout(JNIEnv *env, jobject this, jlong widget_ptr)

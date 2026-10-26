@@ -949,6 +949,16 @@ public class View implements Drawable.Callback {
 
 	private float translationX = 0;
 	private float translationY = 0;
+	/* AOSP RenderNode properties; native_layout() reads them when hasTransform is set */
+	private float scaleX = 1;
+	private float scaleY = 1;
+	private float rotation = 0;
+	private float pivotX = 0;
+	private float pivotY = 0;
+	private boolean pivotExplicit = false;
+	private boolean hasTransform = false;
+	private Matrix matrix;
+	private Matrix inverseMatrix;
 
 	private int scrollX = 0;
 	private int scrollY = 0;
@@ -2268,7 +2278,6 @@ public class View implements Drawable.Callback {
 		return drawable_state;
 	}
 
-	public float getRotation() { return 0.f; }
 
 	public void bringToFront() {}
 
@@ -2347,8 +2356,33 @@ public class View implements Drawable.Callback {
 	protected boolean awakenScrollBars() { return false; }
 
 	protected native boolean native_getMatrix(long widget, long matrix);
+	/* as AOSP's RenderProperties: translation, then rotation and scale about the pivot */
 	public Matrix getMatrix() {
-		return Matrix.IDENTITY_MATRIX;
+		if (matrix == null)
+			matrix = new Matrix();
+		matrix.setTranslate(translationX, translationY);
+		matrix.preRotate(rotation, getPivotX(), getPivotY());
+		matrix.preScale(scaleX, scaleY, getPivotX(), getPivotY());
+		return matrix;
+	}
+
+	final Matrix getInverseMatrix() {
+		if (inverseMatrix == null)
+			inverseMatrix = new Matrix();
+		getMatrix().invert(inverseMatrix);
+		return inverseMatrix;
+	}
+
+	public boolean hasIdentityMatrix() {
+		return translationX == 0 && translationY == 0 && !hasTransform;
+	}
+
+	/* GTK applies the transform when the parent allocates this view, see native_layout() */
+	private void transformChanged() {
+		boolean had = hasTransform;
+		hasTransform = scaleX != 1 || scaleY != 1 || rotation != 0;
+		if ((had || hasTransform) && parent instanceof View)
+			((View)parent).native_queueAllocate(((View)parent).widget);
 	}
 
 	protected static final int[] EMPTY_STATE_SET = new int[0];
@@ -3013,24 +3047,67 @@ public class View implements Drawable.Callback {
 
 	public native void getWindowVisibleDisplayFrame(Rect rect);
 
-	public void setRotation(float rotation) {}
+	public void setRotation(float rotation) {
+		if (this.rotation == rotation)
+			return;
+		this.rotation = rotation;
+		transformChanged();
+	}
+
+	public float getRotation() { return rotation; }
 	public void setRotationX(float deg) {}
 	public void setRotationY(float deg) {}
 
 	public float getRotationX() { return 0.f; }
 	public float getRotationY() { return 0.f; }
 
-	public void setScaleX(float scaleX) {}
-	public void setScaleY(float scaleY) {}
+	public void setScaleX(float scaleX) {
+		if (this.scaleX == scaleX)
+			return;
+		this.scaleX = scaleX;
+		transformChanged();
+	}
 
-	public float getScaleX() { return 1.f; }
-	public float getScaleY() { return 1.f; }
+	public void setScaleY(float scaleY) {
+		if (this.scaleY == scaleY)
+			return;
+		this.scaleY = scaleY;
+		transformChanged();
+	}
 
-	public void setPivotX(float pivot_x) {}
-	public void setPivotY(float pivot_y) {}
+	public float getScaleX() { return scaleX; }
+	public float getScaleY() { return scaleY; }
 
-	public float getPivotX() { return 0.f; }
-	public float getPivotY() { return 0.f; }
+	/* as AOSP: once one pivot is set, both are explicit; until then the pivot is the center */
+	public void setPivotX(float pivot_x) {
+		if (pivotExplicit && pivotX == pivot_x)
+			return;
+		if (!pivotExplicit)
+			pivotY = getHeight() / 2f;
+		pivotExplicit = true;
+		pivotX = pivot_x;
+		transformChanged();
+	}
+
+	public void setPivotY(float pivot_y) {
+		if (pivotExplicit && pivotY == pivot_y)
+			return;
+		if (!pivotExplicit)
+			pivotX = getWidth() / 2f;
+		pivotExplicit = true;
+		pivotY = pivot_y;
+		transformChanged();
+	}
+
+	public float getPivotX() { return pivotExplicit ? pivotX : getWidth() / 2f; }
+	public float getPivotY() { return pivotExplicit ? pivotY : getHeight() / 2f; }
+
+	public boolean isPivotSet() { return pivotExplicit; }
+
+	public void resetPivot() {
+		pivotExplicit = false;
+		transformChanged();
+	}
 
 	public float getTranslationZ() { return translation_z; }
 
@@ -3416,14 +3493,16 @@ public class View implements Drawable.Callback {
 	public void setViewTranslationCallback(ViewTranslationCallback callback) {}
 	public void clearViewTranslationCallback() {}
 	/* as AOSP: from the view's coordinates to those of its window (Compose positions its popups by
-	 * this on API 29+); the view's own matrix is only its translation, see getMatrix() */
+	 * this on API 29+) */
 	public void transformMatrixToGlobal(Matrix matrix) {
 		if (parent instanceof View) {
 			View vp = (View)parent;
 			vp.transformMatrixToGlobal(matrix);
 			matrix.preTranslate(-vp.scrollX, -vp.scrollY);
 		}
-		matrix.preTranslate(left + translationX, top + translationY);
+		matrix.preTranslate(left, top);
+		if (!hasIdentityMatrix())
+			matrix.preConcat(getMatrix());
 	}
 
 	public void transformMatrixToLocal(Matrix matrix) {
@@ -3432,7 +3511,9 @@ public class View implements Drawable.Callback {
 			vp.transformMatrixToLocal(matrix);
 			matrix.postTranslate(vp.scrollX, vp.scrollY);
 		}
-		matrix.postTranslate(-(left + translationX), -(top + translationY));
+		matrix.postTranslate(-left, -top);
+		if (!hasIdentityMatrix())
+			matrix.postConcat(getInverseMatrix());
 	}
 	public void setAnimationMatrix(Matrix matrix) {}
 	public Matrix getAnimationMatrix() { return null; }
