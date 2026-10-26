@@ -157,6 +157,15 @@ public class AudioTrack {
 		return sampleRateInHz;
 	}
 
+	/* hidden in AOSP, looked up by ExoPlayer via reflection: estimated latency in ms, including the
+	 * buffer. The ALSA delay is already subtracted in getPlaybackHeadPosition, so only the buffer
+	 * (PCM16, as used by native_constructor) is reported here. */
+	public int getLatency() {
+		if (channels <= 0 || sampleRateInHz <= 0)
+			return 0;
+		return (int)((long)bufferSizeInBytes / (channels * 2) * 1000 / sampleRateInHz);
+	}
+
 	public int setStereoVolume(float leftVolume, float rightVolume) {
 		this.volume = (leftVolume + rightVolume) / 2;
 		return 0;
