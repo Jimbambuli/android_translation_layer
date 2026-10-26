@@ -362,14 +362,35 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
-	/* like AOSP since API 30: every child gets what this view left over, whatever its siblings consume */
 	@Override
 	public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
 		insets = super.dispatchApplyWindowInsets(insets);
-		if (insets.isConsumed())
+		if (insets.isConsumed()) {
 			return insets;
-		for (View child : new ArrayList<View>(children))
-			child.dispatchApplyWindowInsets(insets);
+		}
+		if (View.sBrokenInsetsDispatch) {
+			return brokenDispatchApplyWindowInsets(insets);
+		} else {
+			return newDispatchApplyWindowInsets(insets);
+		}
+	}
+
+	private WindowInsets brokenDispatchApplyWindowInsets(WindowInsets insets) {
+		final int count = getChildCount();
+		for (int i = 0; i < count; i++) {
+			insets = getChildAt(i).dispatchApplyWindowInsets(insets);
+			if (insets.isConsumed()) {
+				break;
+			}
+		}
+		return insets;
+	}
+
+	private WindowInsets newDispatchApplyWindowInsets(WindowInsets insets) {
+		final int count = getChildCount();
+		for (int i = 0; i < count; i++) {
+			getChildAt(i).dispatchApplyWindowInsets(insets);
+		}
 		return insets;
 	}
 

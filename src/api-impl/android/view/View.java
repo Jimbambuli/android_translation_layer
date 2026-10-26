@@ -27,6 +27,7 @@ import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -1099,8 +1100,12 @@ public class View implements Drawable.Callback {
 		widget = native_constructor(context, attrs);
 
 		if (!sCompatibilityDone && context != null) {
+			final int targetSdkVersion = context.getApplicationInfo().targetSdkVersion;
+
 			sUseDefaultFocusHighlight = context.getResources().getBoolean(
 					com.android.internal.R.bool.config_useDefaultFocusHighlight);
+
+			sBrokenInsetsDispatch = targetSdkVersion < Build.VERSION_CODES.R;
 			sCompatibilityDone = true;
 		}
 
@@ -1312,6 +1317,9 @@ public class View implements Drawable.Callback {
 	private Drawable mDefaultFocusHighlightCache;
 	boolean mDefaultFocusHighlightEnabled = true;
 	private static boolean sUseDefaultFocusHighlight;
+
+	/* before API 30, a view group stops handing out the insets once a child consumed them */
+	static boolean sBrokenInsetsDispatch;
 
 	public void setDefaultFocusHighlightEnabled(boolean defaultFocusHighlightEnabled) {
 		mDefaultFocusHighlightEnabled = defaultFocusHighlightEnabled;
@@ -2826,10 +2834,13 @@ public class View implements Drawable.Callback {
 		on_apply_window_insets_listener = l;
 	}
 
+	/* AOSP, without PFLAG3_APPLYING_INSETS (ATL has no fitSystemWindows() to tell it to) */
 	public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
-		if (on_apply_window_insets_listener != null)
+		if (on_apply_window_insets_listener != null) {
 			return on_apply_window_insets_listener.onApplyWindowInsets(this, insets);
-		return onApplyWindowInsets(insets);
+		} else {
+			return onApplyWindowInsets(insets);
+		}
 	}
 
 	public final boolean isFocusable() { return atl_focusable; }
