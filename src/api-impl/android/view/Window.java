@@ -255,7 +255,7 @@ public class Window {
 	 * the views of the window get it, the decor view hands it to the Window.Callback */
 	@Export
 	public void dispatchWindowFocusChanged(boolean hasFocus) {
-		decorView.dispatchWindowFocusChanged(hasFocus);
+		decorView.dispatchRootWindowFocusChanged(hasFocus);
 	}
 
 	public void clearFlags(int flags) {

@@ -167,9 +167,9 @@ public class PopupWindow {
 		if (focusTakenFrom == null) {
 			focusTakenFrom = anchor.getRootView();
 			native_setOnDismissListener(popover); // to give the focus back on every dismissal
-			focusTakenFrom.dispatchWindowFocusChanged(false);
+			focusTakenFrom.dispatchRootWindowFocusChanged(false);
 		}
-		contentView.dispatchWindowFocusChanged(true);
+		contentView.dispatchRootWindowFocusChanged(true);
 	}
 
 	/* the window below gets the focus back once the popup is gone; like the window manager, after
@@ -184,7 +184,7 @@ public class PopupWindow {
 					return;
 				View root = focusTakenFrom;
 				focusTakenFrom = null;
-				root.dispatchWindowFocusChanged(true);
+				root.dispatchRootWindowFocusChanged(true);
 			}
 		});
 	}

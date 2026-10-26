@@ -2730,7 +2730,6 @@ public class View implements Drawable.Callback {
 			onFocusChangeListener.onFocusChange(this, gainFocus);
 	}
 
-	public boolean hasWindowFocus() { return true; }
 
 	public void setSaveEnabled(boolean enabled) {
 		saveEnabled = enabled;
@@ -3766,7 +3765,35 @@ public class View implements Drawable.Callback {
 		onWindowFocusChanged(hasFocus);
 	}
 
-	public void onWindowFocusChanged(boolean hasFocus) {}
+	public void onWindowFocusChanged(boolean hasWindowFocus) {
+		if (!hasWindowFocus) {
+			if (isPressed()) {
+				setPressed(false);
+			}
+			onFocusLost();
+		}
+
+		refreshDrawableState();
+	}
+
+	/* AOSP's AttachInfo.mHasWindowFocus, kept by the root view of a window: -1 for a window ATL
+	 * doesn't tell about its focus (a dialog), which counts as focused */
+	private int rootHasWindowFocus = -1;
+
+	/** @hide ATL: what ViewRootImpl.handleWindowFocusChanged() does with the root view of a window */
+	public void dispatchRootWindowFocusChanged(boolean hasWindowFocus) {
+		rootHasWindowFocus = hasWindowFocus ? 1 : 0;
+		dispatchWindowFocusChanged(hasWindowFocus);
+	}
+
+	public boolean hasWindowFocus() {
+		return isAttachedToWindow() && getRootView().rootHasWindowFocus != 0;
+	}
+
+	/** @hide */
+	protected void onFocusLost() {
+		resetPressedState();
+	}
 
 	/**
 	 * Sets the next animation to play for this view. The animation starts at the time set with
