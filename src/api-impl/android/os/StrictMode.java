@@ -92,6 +92,7 @@ public final class StrictMode {
 			public Builder permitUnbufferedIo() {
 				return this;
 			}
+			public Builder penaltyListener(Executor executor, OnThreadViolationListener listener) { return this; }
 		}
 		static {
 			LAX = (new Builder()).build();
