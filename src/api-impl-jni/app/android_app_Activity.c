@@ -50,6 +50,68 @@ static void window_focus_changed(JNIEnv *env, jobject activity, jboolean has_foc
 	(*env)->DeleteLocalRef(env, window_jobj);
 }
 
+/* fields of android.app.Activity itself, which an app's subclass may hide with fields of the same name */
+static jboolean activity_get_bool(JNIEnv *env, jobject activity, const char *name)
+{
+	return (*env)->GetBooleanField(env, activity, _FIELD_ID(_CACHED_CLASS(Activity), name, "Z"));
+}
+
+/* like AOSP, the activity that is left is paused (and loses the focus) before the next one comes up,
+ * and stopped only once that one is resumed (see stop_when_idle) */
+static void activity_pause(JNIEnv *env, jobject activity, bool user_leaving)
+{
+	if (!_GET_BOOL_FIELD(activity, "paused")) {
+		J__Activity__onTopResumedActivityChanged(env, activity, false);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		if (user_leaving) {
+			J__Activity__performUserLeaving(env, activity);
+			if ((*env)->ExceptionCheck(env)) {
+				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
+		}
+		J__Activity__performPause(env, activity);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+	}
+
+	window_focus_changed(env, activity, false);
+}
+
+/* onStop(), then (unless it is finishing or save_state is false) onSaveInstanceState() */
+static void activity_stop(JNIEnv *env, jobject activity, bool save_state)
+{
+	if (!activity_get_bool(env, activity, "started"))
+		return;
+	J__Activity__performStop(env, activity, save_state);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
+/* AOSP stops the activity that was left once the next one is idle, not while the app is still in the
+ * call that started or finished an activity: that call may still change the fragments of the activity
+ * it left, which must not have saved its state yet */
+static gboolean stop_when_idle(gpointer activity)
+{
+	JNIEnv *env = get_jni_env();
+	if (_GET_BOOL_FIELD(activity, "paused")) // unless it came back meanwhile
+		activity_stop(env, activity, true);
+	_UNREF(activity);
+	return G_SOURCE_REMOVE;
+}
+
+static void stop_later(JNIEnv *env, jobject activity)
+{
+	g_idle_add(stop_when_idle, _REF(activity));
+}
+
 static void activity_close(JNIEnv *env, jobject activity)
 {
 	// in case some exception was left unhandled in native code, print it here so we don't confuse it with an exception thrown by onDestroy
@@ -58,6 +120,8 @@ static void activity_close(JNIEnv *env, jobject activity)
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
+
+	activity_stop(env, activity, false);
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
 	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
@@ -69,25 +133,6 @@ static void activity_close(JNIEnv *env, jobject activity)
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
-}
-
-static void activity_unfocus(JNIEnv *env, jobject activity)
-{
-	if (!_GET_BOOL_FIELD(activity, "paused")) {
-		J__Activity__performPause(env, activity);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-	}
-
-	J__Activity__performStop(env, activity);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-
-	window_focus_changed(env, activity, false);
 }
 
 struct scrim_anim {
@@ -153,13 +198,18 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
-	J__Activity__performStart(env, activity);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
+	if (!activity_get_bool(env, activity, "started")) { // (one that was only paused is just resumed)
+		if (activity_get_bool(env, activity, "stopped"))
+			J__Activity__performRestart(env, activity);
+		else
+			J__Activity__performStart(env, activity);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		if (_GET_BOOL_FIELD(activity, "finishing"))
+			return;
 	}
-	if (_GET_BOOL_FIELD(activity, "finishing"))
-		return;
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
 	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
@@ -192,6 +242,12 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
+	J__Activity__onTopResumedActivityChanged(env, activity, true);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+
 	window_focus_changed(env, activity, true);
 }
 
@@ -200,12 +256,15 @@ static void activity_update_current(JNIEnv *env)
 	jobject activity_new = activity_backlog ? g_list_first(activity_backlog)->data : NULL;
 
 	if (activity_current != activity_new) {
-		if (activity_current)
-			activity_unfocus(env, activity_current);
+		jobject activity_old = activity_current;
+		if (activity_old)
+			activity_pause(env, activity_old, false);
 		activity_current = NULL;
 
 		if (activity_new)
 			activity_focus(env, activity_new);
+		if (activity_old)
+			stop_later(env, activity_old);
 		if (activity_new && _GET_BOOL_FIELD(activity_new, "finishing"))
 			return;
 
@@ -275,7 +334,10 @@ void activity_close_all(void)
 	activities = activity_backlog;
 	// deactivate all activities
 	activity_backlog = NULL;
-	activity_update_current(env);
+	if (activity_current) {
+		activity_pause(env, activity_current, false);
+		activity_current = NULL;
+	}
 	// destroy all activities
 	for (l = activities; l != NULL; l = l->next) {
 		activity_close(env, l->data);
@@ -291,12 +353,19 @@ static gboolean delayed_close_window(gpointer window)
 	return G_SOURCE_REMOVE;
 }
 
+#define FLAG_ACTIVITY_NO_USER_ACTION 0x00040000
+
 void activity_start(JNIEnv *env, jobject activity_object)
 {
+	jobject activity_old = activity_current;
 	transition_from = activity_current;
 	transition_opening = TRUE;
-	if (activity_current)
-		activity_unfocus(env, activity_current);
+	if (activity_old) {
+		jobject intent = _GET_OBJ_FIELD(activity_object, "intent", "Landroid/content/Intent;");
+		bool user_leaving = !intent || !((*env)->CallIntMethod(env, intent, _METHOD(_CLASS(intent), "getFlags", "()I")) & FLAG_ACTIVITY_NO_USER_ACTION);
+		activity_pause(env, activity_old, user_leaving);
+		stop_later(env, activity_old);
+	}
 	activity_current = NULL;
 	/* -- run the activity's onCreate -- */
 	J__Activity__performCreate(env, activity_object, NULL);
@@ -386,15 +455,12 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	jobject old_activity = l->data;
 
 	if (activity_current && (*env)->IsSameObject(env, activity_current, old_activity)) {
-		activity_unfocus(env, activity_current);
+		activity_pause(env, activity_current, false);
 		activity_current = NULL;
 	}
+	activity_stop(env, old_activity, true);
 
-	jobject saved_state = J__Activity__performSaveInstanceState(env, old_activity);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
+	jobject saved_state = (*env)->GetObjectField(env, old_activity, _FIELD_ID(_CACHED_CLASS(Activity), "savedState", "Landroid/os/Bundle;"));
 	J__Activity__retainNonConfigurationInstanceFor(env, old_activity, activity);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);

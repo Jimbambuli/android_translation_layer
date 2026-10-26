@@ -61,6 +61,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	private Activity resultActivity;
 	private int resultRequestCode;
 	private boolean paused = false;
+	private boolean started = false; // between performStart() and performStop()
+	private boolean stopped = false; // stopped and not started again: the next start is a restart
+	private Bundle savedState; // what it saved when it was last stopped, recreate() creates the new instance from it
 	private CharSequence title = null;
 	List<Fragment> fragments = new ArrayList<>();
 	boolean destroyed = false;
@@ -249,6 +252,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 		return;
 	}
+
+	@Export
+	public void onTopResumedActivityChanged(boolean isTopResumedActivity) {}
+
+	public void onUserInteraction() {}
+
+	protected void onUserLeaveHint() {}
 
 	private static final String WINDOW_HIERARCHY_TAG = "android:viewHierarchyState";
 
@@ -629,8 +639,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return threshold != Configuration.SCREEN_WIDTH_DP_UNDEFINED && (a >= threshold) != (b >= threshold);
 	}
 
-	/* called from native code by recreate(), after onStop() */
-	@Export
 	private Bundle performSaveInstanceState() {
 		Bundle outState = new Bundle();
 		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.PRE, outState);
@@ -886,6 +894,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		dispatchActivityLifecycle(Application.STARTED, Application.PRE, null);
 		onStart();
 		dispatchActivityLifecycle(Application.STARTED, Application.POST, null);
+		started = true;
+	}
+
+	/* like AOSP: a stopped activity that comes back gets onRestart() before onStart() */
+	@Export
+	private void performRestart() {
+		stopped = false;
+		onRestart();
+		performStart();
 	}
 
 	@Export
@@ -902,11 +919,28 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		dispatchActivityLifecycle(Application.PAUSED, Application.POST, null);
 	}
 
+	/* like AOSP's callActivityOnStop(): unless it is finishing, the activity saves its state when it is
+	 * stopped, after onStop() for apps targeting API 28 and later, before it for older ones */
 	@Export
-	private void performStop() {
+	private void performStop(boolean saveState) {
+		saveState = saveState && !finishing;
+		boolean preP = getApplicationInfo().targetSdkVersion < 28;
+		if (saveState && preP)
+			savedState = performSaveInstanceState();
 		dispatchActivityLifecycle(Application.STOPPED, Application.PRE, null);
 		onStop();
 		dispatchActivityLifecycle(Application.STOPPED, Application.POST, null);
+		started = false;
+		stopped = true;
+		if (saveState && !preP)
+			savedState = performSaveInstanceState();
+	}
+
+	/* like AOSP: when another activity is started by the user, the one it covers is told before it is paused */
+	@Export
+	private void performUserLeaving() {
+		onUserInteraction();
+		onUserLeaveHint();
 	}
 
 	@Export
