@@ -993,7 +993,6 @@ public class View implements Drawable.Callback {
 	private int[] mDrawableState = null;
 	private Drawable background;
 	private int backgroundTint = 0;
-	private int mForegroundGravity = Gravity.START | Gravity.TOP;
 
 	private int minWidth = 0;
 	private int minHeight = 0;
@@ -1122,6 +1121,15 @@ public class View implements Drawable.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_foreground))
 			setForeground(a.getDrawable(com.android.internal.R.styleable.View_foreground));
+		if (a.hasValue(com.android.internal.R.styleable.View_foregroundGravity))
+			setForegroundGravity(a.getInt(com.android.internal.R.styleable.View_foregroundGravity, Gravity.NO_GRAVITY));
+		if (a.hasValue(com.android.internal.R.styleable.View_foregroundInsidePadding)) {
+			if (mForegroundInfo == null) {
+				mForegroundInfo = new ForegroundInfo();
+			}
+			mForegroundInfo.mInsidePadding = a.getBoolean(com.android.internal.R.styleable.View_foregroundInsidePadding,
+					mForegroundInfo.mInsidePadding);
+		}
 		mDefaultFocusHighlightEnabled = a.getBoolean(com.android.internal.R.styleable.View_defaultFocusHighlightEnabled, true);
 		if (a.hasValue(com.android.internal.R.styleable.View_focusable)) {
 			atl_focusable = a.getBoolean(com.android.internal.R.styleable.View_focusable, true);
@@ -1354,7 +1362,8 @@ public class View implements Drawable.Callback {
 
 	private void switchDefaultFocusHighlight() {
 		if (isFocused()) {
-			final boolean needed = isDefaultFocusHighlightNeeded(background, foreground);
+			final boolean needed = isDefaultFocusHighlightNeeded(background,
+					mForegroundInfo == null ? null : mForegroundInfo.mDrawable);
 			final boolean active = mDefaultFocusHighlight != null;
 			if (needed && !active) {
 				setDefaultFocusHighlight(getDefaultFocusHighlightDrawable());
@@ -1983,7 +1992,7 @@ public class View implements Drawable.Callback {
 			changed |= hl.setState(state);
 		}
 
-		final Drawable fg = foreground;
+		final Drawable fg = mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
 		if (fg != null && fg.isStateful()) {
 			changed |= fg.setState(state);
 		}
@@ -3109,32 +3118,108 @@ public class View implements Drawable.Callback {
 		return userPaddingStart != UNDEFINED_PADDING || userPaddingEnd != UNDEFINED_PADDING;
 	}
 
-	private Drawable foreground;
+	/* AOSP's ForegroundInfo, without the tint */
+	private static class ForegroundInfo {
+		private Drawable mDrawable;
+		private int mGravity = Gravity.FILL;
+		private boolean mInsidePadding = true;
+		private final Rect mSelfBounds = new Rect();
+		private final Rect mOverlayBounds = new Rect();
+	}
 
+	private ForegroundInfo mForegroundInfo;
+
+	/* AOSP; ATL: the wrapper widget is told to draw through Java instead of clearing PFLAG_SKIP_DRAW */
 	public void setForeground(Drawable foreground) {
-		if (this.foreground != null)
-			this.foreground.setCallback(null);
-		this.foreground = foreground;
+		if (mForegroundInfo == null) {
+			if (foreground == null) {
+				// Nothing to do.
+				return;
+			}
+			mForegroundInfo = new ForegroundInfo();
+		}
+
+		if (foreground == mForegroundInfo.mDrawable) {
+			// Nothing to do
+			return;
+		}
+
+		if (mForegroundInfo.mDrawable != null) {
+			if (isAttachedToWindow()) {
+				mForegroundInfo.mDrawable.setVisible(false, false);
+			}
+			mForegroundInfo.mDrawable.setCallback(null);
+			unscheduleDrawable(mForegroundInfo.mDrawable);
+		}
+
+		mForegroundInfo.mDrawable = foreground;
 		if (foreground != null) {
 			native_drawThroughJava(widget);
-			foreground.setCallback(this);
-			if (foreground.isStateful())
+			foreground.setLayoutDirection(getLayoutDirection());
+			if (foreground.isStateful()) {
 				foreground.setState(getDrawableState());
+			}
+			if (isAttachedToWindow()) {
+				foreground.setVisible(getWindowVisibility() == VISIBLE && isShown(), false);
+			}
+			// Set callback last, since the view may still be initializing.
+			foreground.setCallback(this);
 		}
+		requestLayout();
 		invalidate();
 	}
 
-	/* the foreground fills the view, drawn over its content and children (foregroundGravity FILL) */
-	public void onDrawForeground(Canvas canvas) {
-		if (foreground == null)
-			return;
-		foreground.setBounds(0, 0, getWidth(), getHeight());
-		foreground.draw(canvas);
+	public boolean isForegroundInsidePadding() {
+		return mForegroundInfo != null ? mForegroundInfo.mInsidePadding : true;
 	}
 
-	public int getForegroundGravity() { return mForegroundGravity; }
+	public int getForegroundGravity() {
+		return mForegroundInfo != null ? mForegroundInfo.mGravity
+				: Gravity.START | Gravity.TOP;
+	}
 
-	public void setForegroundGravity(int gravity) { mForegroundGravity = gravity; }
+	public void setForegroundGravity(int gravity) {
+		if (mForegroundInfo == null) {
+			mForegroundInfo = new ForegroundInfo();
+		}
+
+		if (mForegroundInfo.mGravity != gravity) {
+			if ((gravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK) == 0) {
+				gravity |= Gravity.START;
+			}
+
+			if ((gravity & Gravity.VERTICAL_GRAVITY_MASK) == 0) {
+				gravity |= Gravity.TOP;
+			}
+
+			mForegroundInfo.mGravity = gravity;
+			requestLayout();
+		}
+	}
+
+	/* AOSP, without scroll indicators and bars; ATL: the bounds are computed on each draw, there is
+	 * no setFrame() to tell about a size change */
+	public void onDrawForeground(Canvas canvas) {
+		final Drawable foreground = mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
+		if (foreground != null) {
+			final Rect selfBounds = mForegroundInfo.mSelfBounds;
+			final Rect overlayBounds = mForegroundInfo.mOverlayBounds;
+
+			if (mForegroundInfo.mInsidePadding) {
+				selfBounds.set(0, 0, getWidth(), getHeight());
+			} else {
+				selfBounds.set(getPaddingLeft(), getPaddingTop(),
+						getWidth() - getPaddingRight(), getHeight() - getPaddingBottom());
+			}
+
+			final int ld = getLayoutDirection();
+			Gravity.apply(mForegroundInfo.mGravity, foreground.getIntrinsicWidth(),
+					foreground.getIntrinsicHeight(), selfBounds, overlayBounds, ld);
+			foreground.setBounds(overlayBounds);
+
+			foreground.draw(canvas);
+		}
+	}
 
 	/* as AOSP: from the scroll offset, range and extent the view computes */
 	public boolean canScrollVertically(int direction) {
@@ -3218,8 +3303,13 @@ public class View implements Drawable.Callback {
 
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {}
 
+	/* AOSP, without the scroll bar */
 	protected boolean verifyDrawable(Drawable who) {
-		return who == background;
+		// Avoid verifying the scroll bar drawable so that we don't end up in
+		// an invalidation loop. This effectively prevents the scroll bar
+		// drawable from triggering invalidations and scheduling runnables.
+		return who == background || (mForegroundInfo != null && mForegroundInfo.mDrawable == who)
+				|| (mDefaultFocusHighlight == who);
 	}
 
 	public void drawableHotspotChanged(float x, float y) {}
@@ -3495,7 +3585,9 @@ public class View implements Drawable.Callback {
 
 	public void setTextDirection(int textDirection) {}
 
-	public Drawable getForeground() { return foreground; }
+	public Drawable getForeground() {
+		return mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
+	}
 
 	public void setScrollbarFadingEnabled(boolean fadeEnabled) {}
 
