@@ -211,6 +211,14 @@ extern "C" {
 #define android_widget_Spinner_TEXT_DIRECTION_LTR 3L
 #undef android_widget_Spinner_TEXT_DIRECTION_RTL
 #define android_widget_Spinner_TEXT_DIRECTION_RTL 4L
+#undef android_widget_Spinner_PFLAG_SELECTED
+#define android_widget_Spinner_PFLAG_SELECTED 4L
+#undef android_widget_Spinner_PFLAG_DRAWABLE_STATE_DIRTY
+#define android_widget_Spinner_PFLAG_DRAWABLE_STATE_DIRTY 1024L
+#undef android_widget_Spinner_PFLAG_PRESSED
+#define android_widget_Spinner_PFLAG_PRESSED 16384L
+#undef android_widget_Spinner_PFLAG_ACTIVATED
+#define android_widget_Spinner_PFLAG_ACTIVATED 1073741824L
 #undef android_widget_Spinner_UNDEFINED_PADDING
 #define android_widget_Spinner_UNDEFINED_PADDING -2147483648L
 #undef android_widget_Spinner_FLAG_CLIP_CHILDREN
@@ -227,6 +235,8 @@ extern "C" {
 #define android_widget_Spinner_FLAG_USE_CHILD_DRAWING_ORDER 1024L
 #undef android_widget_Spinner_FLAG_SUPPORT_STATIC_TRANSFORMATIONS
 #define android_widget_Spinner_FLAG_SUPPORT_STATIC_TRANSFORMATIONS 2048L
+#undef android_widget_Spinner_FLAG_ADD_STATES_FROM_CHILDREN
+#define android_widget_Spinner_FLAG_ADD_STATES_FROM_CHILDREN 8192L
 #undef android_widget_Spinner_FLAG_MASK_FOCUSABILITY
 #define android_widget_Spinner_FLAG_MASK_FOCUSABILITY 393216L
 #undef android_widget_Spinner_FOCUS_BEFORE_DESCENDANTS

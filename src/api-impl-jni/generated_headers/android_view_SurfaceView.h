@@ -211,6 +211,14 @@ extern "C" {
 #define android_view_SurfaceView_TEXT_DIRECTION_LTR 3L
 #undef android_view_SurfaceView_TEXT_DIRECTION_RTL
 #define android_view_SurfaceView_TEXT_DIRECTION_RTL 4L
+#undef android_view_SurfaceView_PFLAG_SELECTED
+#define android_view_SurfaceView_PFLAG_SELECTED 4L
+#undef android_view_SurfaceView_PFLAG_DRAWABLE_STATE_DIRTY
+#define android_view_SurfaceView_PFLAG_DRAWABLE_STATE_DIRTY 1024L
+#undef android_view_SurfaceView_PFLAG_PRESSED
+#define android_view_SurfaceView_PFLAG_PRESSED 16384L
+#undef android_view_SurfaceView_PFLAG_ACTIVATED
+#define android_view_SurfaceView_PFLAG_ACTIVATED 1073741824L
 #undef android_view_SurfaceView_UNDEFINED_PADDING
 #define android_view_SurfaceView_UNDEFINED_PADDING -2147483648L
 /*

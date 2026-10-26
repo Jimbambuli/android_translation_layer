@@ -42,6 +42,7 @@ import android.util.LayoutDirection;
 import android.util.Property;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.StateSet;
 import android.util.TypedValue;
 import android.view.WindowInsets;
 import android.view.animation.Animation;
@@ -58,7 +59,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -981,11 +981,16 @@ public class View implements Drawable.Callback {
 	private int visibility = View.VISIBLE;
 	private float alpha = 1.0f;
 	private float transitionAlpha = 1.0f;
-	private boolean pressed = false;
-	private boolean selected = false;
-	private boolean activated = false;
 	private boolean duplicate_parent_state = false;
-	private int[] drawable_state = null; // cached result of onCreateDrawableState(), null when dirty
+
+	/* the bits of AOSP's mPrivateFlags that ATL keeps in Java */
+	int mPrivateFlags;
+	static final int PFLAG_SELECTED                    = 0x00000004;
+	static final int PFLAG_DRAWABLE_STATE_DIRTY        = 0x00000400;
+	private static final int PFLAG_PRESSED             = 0x00004000;
+	static final int PFLAG_ACTIVATED                   = 0x40000000;
+
+	private int[] mDrawableState = null;
 	private Drawable background;
 	private int backgroundTint = 0;
 	private int mForegroundGravity = Gravity.START | Gravity.TOP;
@@ -1205,22 +1210,40 @@ public class View implements Drawable.Callback {
 		onCreateDrawableState(0);
 	}
 
+	/* AOSP View.onCreateDrawableState(); ATL: state_focused follows whether GTK shows the focus
+	 * (AOSP: focused, which outside of touch mode is the same), no accelerated/hovered/drag states */
 	protected int[] onCreateDrawableState(int extraSpace) {
-		if (duplicate_parent_state && parent instanceof View)
-			return ((View)parent).onCreateDrawableState(extraSpace);
-		int[] state = new int[5];
-		int count = 0;
-		if (isEnabled())
-			state[count++] = R.attr.state_enabled;
-		if (focus_shown)
-			state[count++] = R.attr.state_focused;
-		if (pressed)
-			state[count++] = R.attr.state_pressed;
-		if (selected)
-			state[count++] = R.attr.state_selected;
-		if (activated)
-			state[count++] = R.attr.state_activated;
-		return Arrays.copyOf(state, count + extraSpace);
+		if (duplicate_parent_state && parent instanceof View) {
+			return ((View) parent).onCreateDrawableState(extraSpace);
+		}
+
+		int[] drawableState;
+
+		int privateFlags = mPrivateFlags;
+
+		int viewStateIndex = 0;
+		if ((privateFlags & PFLAG_PRESSED) != 0) viewStateIndex |= StateSet.VIEW_STATE_PRESSED;
+		if (isEnabled()) viewStateIndex |= StateSet.VIEW_STATE_ENABLED;
+		if (focus_shown) viewStateIndex |= StateSet.VIEW_STATE_FOCUSED;
+		if ((privateFlags & PFLAG_SELECTED) != 0) viewStateIndex |= StateSet.VIEW_STATE_SELECTED;
+		if (hasWindowFocus()) viewStateIndex |= StateSet.VIEW_STATE_WINDOW_FOCUSED;
+		if ((privateFlags & PFLAG_ACTIVATED) != 0) viewStateIndex |= StateSet.VIEW_STATE_ACTIVATED;
+
+		drawableState = StateSet.get(viewStateIndex);
+
+		if (extraSpace == 0) {
+			return drawableState;
+		}
+
+		final int[] fullState;
+		if (drawableState != null) {
+			fullState = new int[drawableState.length + extraSpace];
+			System.arraycopy(drawableState, 0, fullState, 0, drawableState.length);
+		} else {
+			fullState = new int[extraSpace];
+		}
+
+		return fullState;
 	}
 
 	/* Copyright (C) 2006 The Android Open Source Project */
@@ -1580,22 +1603,47 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setPressed(boolean pressed) {
-		Slog.w(TAG, "calling setPressed on " + this + " with value: " + pressed);
-		if (this.pressed != pressed) {
-			this.pressed = pressed;
+		final boolean needsRefresh = pressed != ((mPrivateFlags & PFLAG_PRESSED) == PFLAG_PRESSED);
+
+		if (pressed) {
+			mPrivateFlags |= PFLAG_PRESSED;
+		} else {
+			mPrivateFlags &= ~PFLAG_PRESSED;
+		}
+
+		if (needsRefresh) {
 			refreshDrawableState();
+		}
+		dispatchSetPressed(pressed);
+	}
+
+	protected void dispatchSetPressed(boolean pressed) {
+	}
+
+	/* AOSP; the long press is GTK's, so there is no callback to remove */
+	private void resetPressedState() {
+		if (!isEnabled()) {
+			return;
+		}
+
+		if (isPressed()) {
+			setPressed(false);
 		}
 	}
 
 	public void setSelected(boolean selected) {
-		if (this.selected != selected) {
-			this.selected = selected;
+		//noinspection DoubleNegation
+		if (((mPrivateFlags & PFLAG_SELECTED) != 0) != selected) {
+			mPrivateFlags = (mPrivateFlags & ~PFLAG_SELECTED) | (selected ? PFLAG_SELECTED : 0);
+			if (!selected) resetPressedState();
+			invalidate();
 			refreshDrawableState();
 			dispatchSetSelected(selected);
 		}
 	}
 
-	protected void dispatchSetSelected(boolean selected) {}
+	protected void dispatchSetSelected(boolean selected) {
+	}
 
 	public native Window native_get_window(long widget);
 	public ViewTreeObserver getViewTreeObserver() {
@@ -1868,21 +1916,42 @@ public class View implements Drawable.Callback {
 	}
 
 	public void refreshDrawableState() {
-		drawable_state = null;
+		mPrivateFlags |= PFLAG_DRAWABLE_STATE_DIRTY;
 		drawableStateChanged();
-		if (parent instanceof ViewGroup)
-			((ViewGroup)parent).childDrawableStateChanged(this);
+
+		ViewParent parent = this.parent;
+		if (parent instanceof ViewGroup) {
+			((ViewGroup) parent).childDrawableStateChanged(this);
+		}
 	}
 
+	/* AOSP View.drawableStateChanged(), without the scroll bar */
 	protected void drawableStateChanged() {
-		if (background != null && background.isStateful())
-			background.setState(getDrawableState());
-		if (foreground != null && foreground.isStateful())
-			foreground.setState(getDrawableState());
-		if (defaultFocusHighlight != null && defaultFocusHighlight.isStateful())
-			defaultFocusHighlight.setState(getDrawableState());
-		if (state_list_animator != null)
-			state_list_animator.setState(getDrawableState());
+		final int[] state = getDrawableState();
+		boolean changed = false;
+
+		final Drawable bg = background;
+		if (bg != null && bg.isStateful()) {
+			changed |= bg.setState(state);
+		}
+
+		final Drawable hl = defaultFocusHighlight;
+		if (hl != null && hl.isStateful()) {
+			changed |= hl.setState(state);
+		}
+
+		final Drawable fg = foreground;
+		if (fg != null && fg.isStateful()) {
+			changed |= fg.setState(state);
+		}
+
+		if (state_list_animator != null) {
+			state_list_animator.setState(state);
+		}
+
+		if (changed) {
+			invalidate();
+		}
 	}
 
 	public void setDescendantFocusability(int value) {}
@@ -2277,7 +2346,9 @@ public class View implements Drawable.Callback {
 			on_layout_change_listeners.remove(listener);
 	}
 
-	public boolean isSelected() { return selected; }
+	public boolean isSelected() {
+		return (mPrivateFlags & PFLAG_SELECTED) != 0;
+	}
 
 	public void sendAccessibilityEvent(int eventType) {}
 
@@ -2289,16 +2360,21 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setActivated(boolean activated) {
-		if (this.activated != activated) {
-			this.activated = activated;
+		//noinspection DoubleNegation
+		if (((mPrivateFlags & PFLAG_ACTIVATED) != 0) != activated) {
+			mPrivateFlags = (mPrivateFlags & ~PFLAG_ACTIVATED) | (activated ? PFLAG_ACTIVATED : 0);
+			invalidate();
 			refreshDrawableState();
 			dispatchSetActivated(activated);
 		}
 	}
 
-	protected void dispatchSetActivated(boolean activated) {}
+	protected void dispatchSetActivated(boolean activated) {
+	}
 
-	public boolean isActivated() { return activated; }
+	public boolean isActivated() {
+		return (mPrivateFlags & PFLAG_ACTIVATED) != 0;
+	}
 
 	public int getVisibility() { return visibility; }
 
@@ -2315,9 +2391,13 @@ public class View implements Drawable.Callback {
 	}
 
 	public final int[] getDrawableState() {
-		if (drawable_state == null)
-			drawable_state = onCreateDrawableState(0);
-		return drawable_state;
+		if ((mDrawableState != null) && ((mPrivateFlags & PFLAG_DRAWABLE_STATE_DIRTY) == 0)) {
+			return mDrawableState;
+		} else {
+			mDrawableState = onCreateDrawableState(0);
+			mPrivateFlags &= ~PFLAG_DRAWABLE_STATE_DIRTY;
+			return mDrawableState;
+		}
 	}
 
 
@@ -3273,7 +3353,9 @@ public class View implements Drawable.Callback {
 
 	public void requestFitSystemWindows() {}
 
-	public boolean isPressed() { return pressed; }
+	public boolean isPressed() {
+		return (mPrivateFlags & PFLAG_PRESSED) == PFLAG_PRESSED;
+	}
 
 	public native void getWindowVisibleDisplayFrame(Rect rect);
 

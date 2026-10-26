@@ -30,6 +30,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	protected static final int FLAG_USE_CHILD_DRAWING_ORDER = (1 << 10);
 	@UnsupportedAppUsage
 	protected static final int FLAG_SUPPORT_STATIC_TRANSFORMATIONS = (1 << 11);
+	private static final int FLAG_ADD_STATES_FROM_CHILDREN = 0x2000;
 	private static final int FLAG_MASK_FOCUSABILITY  = (3 << 17);
 	public static final int FOCUS_BEFORE_DESCENDANTS = (1 << 17);
 	public static final int FOCUS_AFTER_DESCENDANTS  = (2 << 17);
@@ -40,6 +41,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	static final int FLAG_IS_TRANSITION_GROUP_SET      = (1 << 25);
 	static final int FLAG_TOUCHSCREEN_BLOCKS_FOCUS     = (1 << 26);
 	/* clang-format on */
+
+	protected int mGroupFlags;
 
 	public ArrayList<View> children;
 	private ArrayList<View> detachedChildren;
@@ -556,10 +559,56 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
-	public void setAddStatesFromChildren(boolean addsStates) {}
+	/* AOSP ViewGroup.onCreateDrawableState(), setAddStatesFromChildren(), addStatesFromChildren()
+	 * and childDrawableStateChanged() */
+	@Override
+	protected int[] onCreateDrawableState(int extraSpace) {
+		if ((mGroupFlags & FLAG_ADD_STATES_FROM_CHILDREN) == 0) {
+			return super.onCreateDrawableState(extraSpace);
+		}
 
-	/* addStatesFromChildren is not supported, so a child's state never changes ours */
-	public void childDrawableStateChanged(View child) {}
+		int need = 0;
+		int n = getChildCount();
+		for (int i = 0; i < n; i++) {
+			int[] childState = getChildAt(i).getDrawableState();
+
+			if (childState != null) {
+				need += childState.length;
+			}
+		}
+
+		int[] state = super.onCreateDrawableState(extraSpace + need);
+
+		for (int i = 0; i < n; i++) {
+			int[] childState = getChildAt(i).getDrawableState();
+
+			if (childState != null) {
+				state = mergeDrawableStates(state, childState);
+			}
+		}
+
+		return state;
+	}
+
+	public void setAddStatesFromChildren(boolean addsStates) {
+		if (addsStates) {
+			mGroupFlags |= FLAG_ADD_STATES_FROM_CHILDREN;
+		} else {
+			mGroupFlags &= ~FLAG_ADD_STATES_FROM_CHILDREN;
+		}
+
+		refreshDrawableState();
+	}
+
+	public boolean addStatesFromChildren() {
+		return (mGroupFlags & FLAG_ADD_STATES_FROM_CHILDREN) != 0;
+	}
+
+	public void childDrawableStateChanged(View child) {
+		if ((mGroupFlags & FLAG_ADD_STATES_FROM_CHILDREN) != 0) {
+			refreshDrawableState();
+		}
+	}
 
 	@Override
 	protected void drawableStateChanged() {
@@ -571,15 +620,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	@Override
-	protected void dispatchSetSelected(boolean selected) {
-		for (View child : new ArrayList<>(children))
-			child.setSelected(selected);
+	public void dispatchSetSelected(boolean selected) {
+		final View[] children = this.children.toArray(new View[0]);
+		final int count = children.length;
+		for (int i = 0; i < count; i++) {
+			children[i].setSelected(selected);
+		}
 	}
 
 	@Override
-	protected void dispatchSetActivated(boolean activated) {
-		for (View child : new ArrayList<>(children))
-			child.setActivated(activated);
+	public void dispatchSetActivated(boolean activated) {
+		final View[] children = this.children.toArray(new View[0]);
+		final int count = children.length;
+		for (int i = 0; i < count; i++) {
+			children[i].setActivated(activated);
+		}
 	}
 
 	/* as AOSP: this group is focused or a descendant is (then getFocusedChild() is that branch) */
@@ -717,7 +772,20 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 	private native void native_setClipChildren(long widget, boolean clipChildren);
 
-	protected void dispatchSetPressed(boolean pressed) {}
+	@Override
+	protected void dispatchSetPressed(boolean pressed) {
+		final View[] children = this.children.toArray(new View[0]);
+		final int count = children.length;
+		for (int i = 0; i < count; i++) {
+			final View child = children[i];
+			// Children that are clickable on their own should not
+			// show a pressed state when their parent view does.
+			// Clearing a pressed state always propagates.
+			if (!pressed || (!child.isClickable() && !child.isLongClickable())) {
+				child.setPressed(pressed);
+			}
+		}
+	}
 
 	@Override
 	public View findViewWithTag(Object tag) {
@@ -1029,8 +1097,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void scheduleLayoutAnimation() {}
-
-	public boolean addStatesFromChildren() { return false; }
 
 	private boolean layoutSuppressed;
 
