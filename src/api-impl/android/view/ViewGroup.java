@@ -101,6 +101,30 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		requestLayout();
 	}
 
+	/* like AOSP: the children that inherit the layout direction follow this view group */
+	@Override
+	public boolean resolveRtlPropertiesIfNeeded() {
+		final boolean result = super.resolveRtlPropertiesIfNeeded();
+		if (result) {
+			for (int i = 0; i < children.size(); i++) {
+				View child = children.get(i);
+				if (child.isLayoutDirectionInherited())
+					child.resolveRtlPropertiesIfNeeded();
+			}
+		}
+		return result;
+	}
+
+	@Override
+	public void resetRtlProperties() {
+		super.resetRtlProperties();
+		for (int i = 0; i < children.size(); i++) {
+			View child = children.get(i);
+			if (child.isLayoutDirectionInherited())
+				child.resetRtlProperties();
+		}
+	}
+
 	/* like AOSP: the children first */
 	@Override
 	void dispatchDetachedFromWindow() {
@@ -127,6 +151,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			params = generateLayoutParams(params);
 
 		child.parent = this;
+		/* like AOSP: an inherited layout direction is resolved again in the new parent */
+		if (child.isLayoutDirectionInherited())
+			child.resetRtlProperties();
 		child.applyLayoutParams(params);
 		if (index < 0)
 			index = children.size();
@@ -822,8 +849,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			int marginVertical = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginVertical, -1);
 			int marginHorizontal = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginHorizontal, -1);
 
-			int marginStart = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginStart, -1);
-			int marginEnd = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginEnd, -1);
+			/* like AOSP, relative margins may be negative (AppCompat's menu item icon) */
+			int marginStart = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginStart, DEFAULT_MARGIN_RELATIVE);
+			int marginEnd = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginEnd, DEFAULT_MARGIN_RELATIVE);
 
 			leftMargin = 0;
 			topMargin = 0;
@@ -851,15 +879,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 					leftMargin = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginLeft, 0);
 					rightMargin = a.getDimensionPixelSize(com.android.internal.R.styleable.ViewGroup_MarginLayout_layout_marginRight, 0);
 
-					if (marginStart >= 0) {
-						leftMargin = marginStart;
-					}
-
-					if (marginEnd >= 0) {
-						rightMargin = marginEnd;
-					}
+					/* like AOSP, start/end override left/right once resolved */
+					startMargin = marginStart;
+					endMargin = marginEnd;
 				}
 			}
+			needResolution = isMarginRelative();
 
 			a.recycle();
 		}
@@ -872,33 +897,98 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			topMargin = source.topMargin;
 			rightMargin = source.rightMargin;
 			bottomMargin = source.bottomMargin;
+			startMargin = source.startMargin;
+			endMargin = source.endMargin;
+			layoutDirection = source.layoutDirection;
+			needResolution = source.needResolution;
 		}
+
+		/* like AOSP: the relative margins are kept apart and, if one is set, resolved into
+		 * leftMargin/rightMargin with the layout direction of the view (an unset one gives 0) */
+		private static final int DEFAULT_MARGIN_RELATIVE = Integer.MIN_VALUE;
+		private int startMargin = DEFAULT_MARGIN_RELATIVE;
+		private int endMargin = DEFAULT_MARGIN_RELATIVE;
+		private int layoutDirection = LAYOUT_DIRECTION_LTR;
+		private boolean needResolution;
 
 		public void setMargins(int left, int top, int right, int bottom) {
 			leftMargin = left;
 			topMargin = top;
 			rightMargin = right;
 			bottomMargin = bottom;
+			needResolution = isMarginRelative();
+		}
+
+		/** @hide */
+		public void setMarginsRelative(int start, int top, int end, int bottom) {
+			startMargin = start;
+			topMargin = top;
+			endMargin = end;
+			bottomMargin = bottom;
+			needResolution = true;
 		}
 
 		public int getMarginStart() {
-			return leftMargin;
+			if (startMargin != DEFAULT_MARGIN_RELATIVE)
+				return startMargin;
+			if (needResolution)
+				doResolveMargins();
+			return isLayoutRtl() ? rightMargin : leftMargin;
 		}
 
 		public int getMarginEnd() {
-			return rightMargin;
+			if (endMargin != DEFAULT_MARGIN_RELATIVE)
+				return endMargin;
+			if (needResolution)
+				doResolveMargins();
+			return isLayoutRtl() ? leftMargin : rightMargin;
 		}
 
 		public void setMarginStart(int marginStart) {
-			leftMargin = marginStart;
+			startMargin = marginStart;
+			needResolution = true;
 		}
 		public void setMarginEnd(int marginEnd) {
-			rightMargin = marginEnd;
+			endMargin = marginEnd;
+			needResolution = true;
 		}
 
-		public int getLayoutDirection() { return LAYOUT_DIRECTION_LTR; }
+		public void setLayoutDirection(int layoutDirection) {
+			if (layoutDirection != LAYOUT_DIRECTION_LTR && layoutDirection != LAYOUT_DIRECTION_RTL)
+				return;
+			if (layoutDirection != this.layoutDirection) {
+				this.layoutDirection = layoutDirection;
+				needResolution = isMarginRelative();
+			}
+		}
 
-		public boolean isMarginRelative() { return false; }
+		public int getLayoutDirection() { return layoutDirection; }
+
+		/** @hide */
+		public boolean isLayoutRtl() { return layoutDirection == LAYOUT_DIRECTION_RTL; }
+
+		public boolean isMarginRelative() {
+			return startMargin != DEFAULT_MARGIN_RELATIVE || endMargin != DEFAULT_MARGIN_RELATIVE;
+		}
+
+		@Override
+		public void resolveLayoutDirection(int layoutDirection) {
+			setLayoutDirection(layoutDirection);
+			if (!isMarginRelative() || !needResolution)
+				return;
+			doResolveMargins();
+		}
+
+		private void doResolveMargins() {
+			if (isLayoutRtl()) {
+				leftMargin = (endMargin > DEFAULT_MARGIN_RELATIVE) ? endMargin : 0;
+				rightMargin = (startMargin > DEFAULT_MARGIN_RELATIVE) ? startMargin : 0;
+			} else {
+				leftMargin = (startMargin > DEFAULT_MARGIN_RELATIVE) ? startMargin : 0;
+				rightMargin = (endMargin > DEFAULT_MARGIN_RELATIVE) ? endMargin : 0;
+			}
+			needResolution = false;
+		}
 	}
 
 	public interface OnHierarchyChangeListener {

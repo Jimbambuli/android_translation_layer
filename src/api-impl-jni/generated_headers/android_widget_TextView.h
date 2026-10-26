@@ -211,6 +211,8 @@ extern "C" {
 #define android_widget_TextView_TEXT_DIRECTION_LTR 3L
 #undef android_widget_TextView_TEXT_DIRECTION_RTL
 #define android_widget_TextView_TEXT_DIRECTION_RTL 4L
+#undef android_widget_TextView_UNDEFINED_PADDING
+#define android_widget_TextView_UNDEFINED_PADDING -2147483648L
 /*
  * Class:     android_widget_TextView
  * Method:    native_constructor

@@ -38,10 +38,12 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 	_SET_INT_FIELD(configuration, "screenHeightDp", window_height > 0 ? MIN(window_height, geometry.height) : geometry.height);
 	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on */
 	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(geometry.width, geometry.height));
+	/* the layout direction bits come from the locale (Configuration.setLayoutDirection()) */
+	jint layout_dir = _GET_INT_FIELD(configuration, "screenLayout") & /*SCREENLAYOUT_LAYOUTDIR_MASK*/ 0xC0;
 	if (geometry.width >= 800 && geometry.height >= 800)
-		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_LARGE*/ 0x03);
+		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_LARGE*/ 0x03 | layout_dir);
 	else
-		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02);
+		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02 | layout_dir);
 }
 
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8

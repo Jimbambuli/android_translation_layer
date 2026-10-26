@@ -581,7 +581,7 @@ public class Gallery extends AbsSpinner implements GestureDetector.OnGestureList
 	@Override
 	void layout(int delta, boolean animate) {
 
-		mIsRtl = false; // isLayoutRtl();
+		mIsRtl = isLayoutRtl();
 
 		int childrenLeft = mSpinnerPadding.left;
 		int childrenWidth = getRight() - getLeft() - mSpinnerPadding.left - mSpinnerPadding.right;

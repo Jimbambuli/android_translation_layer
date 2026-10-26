@@ -354,7 +354,7 @@ public class ExpandableListView extends ListView {
 	 * indicator when defined.
 	 */
 	private void resolveIndicator() {
-		final boolean isLayoutRtl = false /*isLayoutRtl()*/;
+		final boolean isLayoutRtl = isLayoutRtl();
 		if (isLayoutRtl) {
 			if (mIndicatorStart >= 0) {
 				mIndicatorRight = mIndicatorStart;
@@ -380,7 +380,7 @@ public class ExpandableListView extends ListView {
 	 * left/right child indicator when defined.
 	 */
 	private void resolveChildIndicator() {
-		final boolean isLayoutRtl = false /*isLayoutRtl()*/;
+		final boolean isLayoutRtl = isLayoutRtl();
 		if (isLayoutRtl) {
 			if (mChildIndicatorStart >= CHILD_INDICATOR_INHERIT) {
 				mChildIndicatorRight = mChildIndicatorStart;
@@ -461,7 +461,7 @@ public class ExpandableListView extends ListView {
 			// Get more expandable list-related info for this item
 			pos = mConnector.getUnflattenedPos(childFlPos);
 
-			final boolean isLayoutRtl = false /*isLayoutRtl()*/;
+			final boolean isLayoutRtl = isLayoutRtl();
 			final int width = getWidth();
 
 			// If this item type and the previous item type are different, then we need to change

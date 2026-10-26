@@ -17,7 +17,7 @@
 package android.content.res;
 
 import android.content.pm.ActivityInfo;
-// import android.text.TextUtils;
+import android.text.TextUtils;
 import android.os.LocaleList;
 import android.view.View;
 import java.util.Locale;
@@ -1579,7 +1579,7 @@ public final class Configuration implements Comparable<Configuration> {
 	public void setLayoutDirection(Locale locale) {
 		// There is a "1" difference between the configuration values for
 		// layout direction and View constants for layout direction, just add "1".
-		final int layoutDirection = 1 /*+ TextUtils.getLayoutDirectionFromLocale(locale)*/;
+		final int layoutDirection = 1 + TextUtils.getLayoutDirectionFromLocale(locale);
 		screenLayout = (screenLayout & ~SCREENLAYOUT_LAYOUTDIR_MASK) | (layoutDirection << SCREENLAYOUT_LAYOUTDIR_SHIFT);
 	}
 

@@ -125,7 +125,7 @@ public class CheckedTextView extends TextView implements Checkable {
 		long left = paintable(d[0]);
 		long right = paintable(d[2]);
 		if (mCheckMarkDrawable != null) {
-			int gravity = Gravity.getAbsoluteGravity(mCheckMarkGravity, LAYOUT_DIRECTION_LTR);
+			int gravity = Gravity.getAbsoluteGravity(mCheckMarkGravity, getLayoutDirection());
 			if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.LEFT)
 				left = mCheckMarkDrawable.paintable;
 			else

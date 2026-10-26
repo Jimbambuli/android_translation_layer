@@ -18,14 +18,19 @@
 
 package android.text;
 
+import android.icu.util.ULocale;
+import android.view.View;
 import com.android.internal.util.ArrayUtils;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
 public class TextUtils {
+	/* like AOSP: RTL for the locales whose script is written right to left */
 	public static int getLayoutDirectionFromLocale(Locale locale) {
-		return 0 /*LTR*/; // FIXME
+		return (locale != null && !locale.equals(Locale.ROOT) && ULocale.forLocale(locale).isRightToLeft())
+		           ? View.LAYOUT_DIRECTION_RTL
+		           : View.LAYOUT_DIRECTION_LTR;
 	}
 
 	/* split */

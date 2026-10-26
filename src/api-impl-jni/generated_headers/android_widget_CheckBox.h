@@ -211,6 +211,8 @@ extern "C" {
 #define android_widget_CheckBox_TEXT_DIRECTION_LTR 3L
 #undef android_widget_CheckBox_TEXT_DIRECTION_RTL
 #define android_widget_CheckBox_TEXT_DIRECTION_RTL 4L
+#undef android_widget_CheckBox_UNDEFINED_PADDING
+#define android_widget_CheckBox_UNDEFINED_PADDING -2147483648L
 /*
  * Class:     android_widget_CheckBox
  * Method:    native_constructor

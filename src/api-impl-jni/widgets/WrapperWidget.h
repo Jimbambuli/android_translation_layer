@@ -24,7 +24,6 @@ struct _WrapperWidget {
 	gboolean hover_exit_pending;
 	gboolean hover_enter_pending;
 	gboolean has_focus;
-	gboolean rtl_resolved;
 	gboolean animating; /* a view animation (android.view.animation) is set on the view */
 	guint animation_tick; /* redraws the view in every frame while the animation runs */
 	int hover_x;

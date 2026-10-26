@@ -661,16 +661,6 @@ static void root_changed_cb(WrapperWidget *wrapper, GParamSpec *pspec, gpointer 
 	 * is still alive here: it is either being destroyed or has just lost this widget. */
 	if (root) {
 		g_object_set_data(G_OBJECT(wrapper), "atl-root", root);
-		if (!wrapper->rtl_resolved) {
-			/* like View.resolveRtlPropertiesIfNeeded(); Compose initialises its layout direction here */
-			wrapper->rtl_resolved = TRUE;
-			jint layout_direction = J__View__getLayoutDirection(env, wrapper->jobj);
-			J__View__onRtlPropertiesChanged(env, wrapper->jobj, layout_direction);
-			if ((*env)->ExceptionCheck(env)) {
-				(*env)->ExceptionDescribe(env);
-				(*env)->ExceptionClear(env);
-			}
-		}
 		J__View__dispatchAttachedToWindow(env, wrapper->jobj);
 	} else {
 		currently_unmapping = wrapper->child;

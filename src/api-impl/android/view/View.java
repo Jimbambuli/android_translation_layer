@@ -10,6 +10,7 @@ import android.atl.GskCanvas;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.pm.ApplicationInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -34,6 +35,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
 import android.os.Vibrator;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.FloatProperty;
 import android.util.LayoutDirection;
@@ -58,6 +60,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -995,6 +998,20 @@ public class View implements Drawable.Callback {
 	protected int paddingRight = 0;
 	protected int paddingBottom = 0;
 
+	/* like AOSP's mUserPadding*: paddingLeft/paddingRight are resolved from the relative padding
+	 * (start/end, which win if set) and the absolute one with the resolved layout direction */
+	private static final int UNDEFINED_PADDING = Integer.MIN_VALUE;
+	private int userPaddingStart = UNDEFINED_PADDING;
+	private int userPaddingEnd = UNDEFINED_PADDING;
+	private int userPaddingLeftInitial = 0;
+	private int userPaddingRightInitial = 0;
+
+	/* android:layoutDirection as set, and what it resolves to (AOSP's PFLAG2_LAYOUT_DIRECTION_*) */
+	private int rawLayoutDirection = LAYOUT_DIRECTION_INHERIT;
+	private boolean layoutDirectionResolved = false;
+	private boolean layoutRtl = false;
+	private boolean layoutParamsRtl = false; // the direction the layout params were resolved with
+
 	private boolean atl_enabled = true;
 	private boolean atl_focusable = true;
 	private boolean atl_focusable_set; // set with setFocusable() or android:focusable
@@ -1140,15 +1157,24 @@ public class View implements Drawable.Callback {
 				paddingLeft = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingLeft, 0);
 				paddingRight = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingRight, 0);
 
+				/* like AOSP, start/end override left/right once resolved */
 				if (paddingStart >= 0)
-					paddingLeft = paddingStart;
+					userPaddingStart = paddingStart;
 
 				if (paddingEnd >= 0)
-					paddingRight = paddingEnd;
+					userPaddingEnd = paddingEnd;
 			}
 		}
+		userPaddingLeftInitial = paddingLeft;
+		userPaddingRightInitial = paddingRight;
+		resolvePaddingValues();
 
 		native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+
+		if (a.hasValue(com.android.internal.R.styleable.View_layoutDirection)) {
+			/* the attribute's values are ltr, rtl, inherit and locale, in the order of the constants */
+			rawLayoutDirection = a.getInt(com.android.internal.R.styleable.View_layoutDirection, LAYOUT_DIRECTION_INHERIT);
+		}
 
 		if (a.hasValue(com.android.internal.R.styleable.View_tag))
 			tag = a.getText(com.android.internal.R.styleable.View_tag);
@@ -1302,11 +1328,14 @@ public class View implements Drawable.Callback {
 		if (params == null) {
 			throw new NullPointerException("Layout parameters cannot be null");
 		}
+		layoutParamsRtl = isLayoutRtl();
 		params.resolveLayoutDirection(getLayoutDirection());
 
 		int gravity = params.gravity;
 		if (gravity == -1 && parent instanceof View)
 			gravity = ((View)parent).gravity;
+		if (gravity != -1)
+			gravity = Gravity.getAbsoluteGravity(gravity, getLayoutDirection());
 
 		int leftMargin = 0;
 		int topMargin = 0;
@@ -1651,6 +1680,10 @@ public class View implements Drawable.Callback {
 	}
 
 	public void setPadding(int left, int top, int right, int bottom) {
+		userPaddingStart = UNDEFINED_PADDING;
+		userPaddingEnd = UNDEFINED_PADDING;
+		userPaddingLeftInitial = left;
+		userPaddingRightInitial = right;
 		paddingLeft = left;
 		paddingTop = top;
 		paddingRight = right;
@@ -1784,11 +1817,11 @@ public class View implements Drawable.Callback {
 	}
 
 	public int getPaddingStart() {
-		return paddingLeft;
+		return isLayoutRtl() ? paddingRight : paddingLeft;
 	}
 
 	public int getPaddingEnd() {
-		return paddingRight;
+		return isLayoutRtl() ? paddingLeft : paddingRight;
 	}
 
 	public void postInvalidate() {
@@ -1925,6 +1958,7 @@ public class View implements Drawable.Callback {
 	public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
 		if (layoutRequested || widthMeasureSpec != oldWidthMeasureSpec || heightMeasureSpec != oldHeightMeasureSpec) {
 			layoutRequested = false;
+			resolveRtlPropertiesIfNeeded();
 			oldWidthMeasureSpec = widthMeasureSpec;
 			oldHeightMeasureSpec = heightMeasureSpec;
 			onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -2671,8 +2705,112 @@ public class View implements Drawable.Callback {
 	public boolean isClickable() { return clickable; }
 	public boolean isLongClickable() { return longclickable; }
 
-	@Export
-	public int getLayoutDirection() { return LAYOUT_DIRECTION_LTR; }
+	/* like AOSP: LTR until the direction is resolved */
+	public int getLayoutDirection() { return layoutRtl ? LAYOUT_DIRECTION_RTL : LAYOUT_DIRECTION_LTR; }
+
+	/** @hide */
+	public boolean isLayoutRtl() { return layoutRtl; }
+
+	/** @hide the direction as set, not resolved */
+	public int getRawLayoutDirection() { return rawLayoutDirection; }
+
+	/** @hide */
+	public boolean isLayoutDirectionInherited() { return rawLayoutDirection == LAYOUT_DIRECTION_INHERIT; }
+
+	public void setLayoutDirection(int layoutDirection) {
+		if (rawLayoutDirection == layoutDirection)
+			return;
+		rawLayoutDirection = layoutDirection;
+		resetRtlProperties();
+		resolveRtlPropertiesIfNeeded();
+		requestLayout();
+		invalidate();
+	}
+
+	/* AOSP's isRtlCompatibilityMode(): apps without android:supportsRtl stay LTR */
+	private boolean hasRtlSupport() {
+		ApplicationInfo info = getContext().getApplicationInfo();
+		return info != null && info.hasRtlSupport() && info.targetSdkVersion >= 17 /* JELLY_BEAN_MR1 */;
+	}
+
+	/** @hide like AOSP: inherit from the parent once that is resolved; the root view of a window
+	 * gets the configuration's direction there (as ViewRootImpl sets it on its view) */
+	public boolean resolveLayoutDirection() {
+		boolean rtl = false;
+		if (hasRtlSupport()) {
+			switch (rawLayoutDirection) {
+				case LAYOUT_DIRECTION_INHERIT:
+					if (!canResolveLayoutDirection())
+						return false;
+					if (parent instanceof View) {
+						View p = (View)parent;
+						if (!p.isLayoutDirectionResolved())
+							return false;
+						rtl = p.getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+					} else {
+						rtl = getResources().getConfiguration().getLayoutDirection() == LAYOUT_DIRECTION_RTL;
+					}
+					break;
+				case LAYOUT_DIRECTION_RTL:
+					rtl = true;
+					break;
+				case LAYOUT_DIRECTION_LOCALE:
+					rtl = TextUtils.getLayoutDirectionFromLocale(Locale.getDefault()) == LAYOUT_DIRECTION_RTL;
+					break;
+			}
+		}
+		layoutRtl = rtl;
+		layoutDirectionResolved = true;
+		return true;
+	}
+
+	/** @hide like AOSP: the layout direction first, then what depends on it (layout params,
+	 * padding), and onRtlPropertiesChanged(); returns whether anything was resolved */
+	public boolean resolveRtlPropertiesIfNeeded() {
+		if (layoutDirectionResolved || !resolveLayoutDirection())
+			return false;
+		if (layout_params != null && layoutParamsRtl != layoutRtl)
+			applyLayoutParams(layout_params);
+		resolvePadding();
+		onRtlPropertiesChanged(getLayoutDirection());
+		return true;
+	}
+
+	/** @hide */
+	public void resetRtlProperties() {
+		layoutDirectionResolved = false;
+		layoutRtl = false;
+	}
+
+	/* paddingLeft/paddingRight from the relative and the absolute padding (AOSP's resolvePadding()) */
+	private void resolvePaddingValues() {
+		int left = userPaddingLeftInitial;
+		int right = userPaddingRightInitial;
+		if (layoutRtl) {
+			if (userPaddingStart != UNDEFINED_PADDING)
+				right = userPaddingStart;
+			if (userPaddingEnd != UNDEFINED_PADDING)
+				left = userPaddingEnd;
+		} else {
+			if (userPaddingStart != UNDEFINED_PADDING)
+				left = userPaddingStart;
+			if (userPaddingEnd != UNDEFINED_PADDING)
+				right = userPaddingEnd;
+		}
+		paddingLeft = left;
+		paddingRight = right;
+	}
+
+	/** @hide */
+	public void resolvePadding() {
+		int left = paddingLeft;
+		int right = paddingRight;
+		resolvePaddingValues();
+		if (left != paddingLeft || right != paddingRight) {
+			native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+			requestLayout();
+		}
+	}
 
 	public void setBackground(Drawable background) {
 		setBackgroundDrawable(background);
@@ -2711,7 +2849,22 @@ public class View implements Drawable.Callback {
 		postInvalidate();
 	}
 
-	public void setPaddingRelative(int start, int top, int end, int bottom) {}
+	public void setPaddingRelative(int start, int top, int end, int bottom) {
+		userPaddingStart = start;
+		userPaddingEnd = end;
+		if (isLayoutRtl()) {
+			userPaddingLeftInitial = end;
+			userPaddingRightInitial = start;
+		} else {
+			userPaddingLeftInitial = start;
+			userPaddingRightInitial = end;
+		}
+		paddingLeft = userPaddingLeftInitial;
+		paddingTop = top;
+		paddingRight = userPaddingRightInitial;
+		paddingBottom = bottom;
+		native_setPadding(widget, paddingLeft, top, paddingRight, bottom);
+	}
 
 	private native boolean nativeIsAttachedToWindow(long widget);
 	public boolean isAttachedToWindow() {
@@ -2816,11 +2969,21 @@ public class View implements Drawable.Callback {
 		}
 	}
 
-	public boolean isLayoutDirectionResolved() { return true; }
+	public boolean isLayoutDirectionResolved() { return layoutDirectionResolved; }
 
-	public boolean canResolveLayoutDirection() { return true; }
+	/* like AOSP: an inherited direction needs a parent that can resolve it; a view without a parent
+	 * can when it is the root of a window */
+	public boolean canResolveLayoutDirection() {
+		if (rawLayoutDirection != LAYOUT_DIRECTION_INHERIT)
+			return true;
+		if (parent instanceof View)
+			return ((View)parent).canResolveLayoutDirection();
+		return attachedToWindow;
+	}
 
-	public boolean isPaddingRelative() { return false; }
+	public boolean isPaddingRelative() {
+		return userPaddingStart != UNDEFINED_PADDING || userPaddingEnd != UNDEFINED_PADDING;
+	}
 
 	private Drawable foreground;
 
@@ -2880,8 +3043,6 @@ public class View implements Drawable.Callback {
 		return keepScreenOn;
 	}
 
-	/* called from native code once the view is attached, which is when AOSP resolves RTL properties */
-	@Export
 	public void onRtlPropertiesChanged(int layoutDirection) {}
 
 	private boolean attachedToWindow;
@@ -2893,6 +3054,9 @@ public class View implements Drawable.Callback {
 		if (attachedToWindow)
 			return;
 		attachedToWindow = true;
+		/* AOSP resolves the RTL properties when the view is measured after it was attached (the
+		 * window's root view before); Compose initialises its layout direction there */
+		resolveRtlPropertiesIfNeeded();
 		onAttachedToWindow();
 	}
 
@@ -3178,7 +3342,6 @@ public class View implements Drawable.Callback {
 
 	public void setScrollIndicators(int indicators, int mask) {}
 
-	public void setLayoutDirection(int layoutDirection) {}
 
 	public ColorStateList getBackgroundTintList() { return null; }
 

@@ -211,6 +211,8 @@ extern "C" {
 #define android_webkit_WebView_TEXT_DIRECTION_LTR 3L
 #undef android_webkit_WebView_TEXT_DIRECTION_RTL
 #define android_webkit_WebView_TEXT_DIRECTION_RTL 4L
+#undef android_webkit_WebView_UNDEFINED_PADDING
+#define android_webkit_WebView_UNDEFINED_PADDING -2147483648L
 #undef android_webkit_WebView_FLAG_CLIP_CHILDREN
 #define android_webkit_WebView_FLAG_CLIP_CHILDREN 1L
 #undef android_webkit_WebView_FLAG_INVALIDATE_REQUIRED
