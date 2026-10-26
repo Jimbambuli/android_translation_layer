@@ -366,6 +366,11 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 		case GDK_MOTION_NOTIFY:
 			if (!(gdk_event_get_modifier_state(event) & (is_mouse ? GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK : GDK_BUTTON1_MASK)))
 				return false;
+			/* GTK synthesizes a motion event (time GDK_CURRENT_TIME) when the layout under the pointer changes,
+			 * e.g. while a list scrolls along with the drag. Android only delivers what the input device
+			 * reports; as an ACTION_MOVE at time 0 it made a VelocityTracker take the pointer for stopped. */
+			if (timestamp == GDK_CURRENT_TIME)
+				return false;
 		case GDK_TOUCH_UPDATE:
 			action = ACTION_MOVE;
 			break;
