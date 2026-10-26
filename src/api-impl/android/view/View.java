@@ -3065,7 +3065,7 @@ public class View implements Drawable.Callback {
 
 	public void requestFitSystemWindows() {}
 
-	public boolean isPressed() { return false; }
+	public boolean isPressed() { return pressed; }
 
 	public native void getWindowVisibleDisplayFrame(Rect rect);
 
@@ -3277,6 +3277,11 @@ public class View implements Drawable.Callback {
 
 	@Export
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	/* like AOSP; ATL calls it only where a view drives a drop-down (AutoCompleteTextView) */
+	public boolean onKeyPreIme(int keyCode, KeyEvent event) {
 		return false;
 	}
 

@@ -108,7 +108,17 @@ public class PopupWindow {
 		return native_isShowing(popover);
 	}
 
-	public void setFocusable(boolean focusable) {}
+	private boolean focusable;
+
+	/* like AOSP, takes effect when the popup is shown (or updated) next */
+	public void setFocusable(boolean focusable) {
+		this.focusable = focusable;
+		native_setFocusable(popover, focusable);
+	}
+
+	public boolean isFocusable() {
+		return focusable;
+	}
 
 	public Drawable getBackground() {
 		return background;
@@ -261,6 +271,7 @@ public class PopupWindow {
 	protected native boolean native_isShowing(long widget);
 	protected native void native_setTouchable(long widget, boolean touchable);
 	protected native void native_setTouchModal(long widget, boolean touchable);
+	protected native void native_setFocusable(long widget, boolean focusable);
 	protected native void native_dismiss(long widget, int fadeMs);
 	protected native void native_fadeIn(long widget, int fadeMs);
 	protected native void native_update(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int width, int height, int gravity, boolean overlapAnchor);

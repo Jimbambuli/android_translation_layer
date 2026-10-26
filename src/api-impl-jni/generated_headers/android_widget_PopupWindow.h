@@ -79,6 +79,14 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchModal
 
 /*
  * Class:     android_widget_PopupWindow
+ * Method:    native_setFocusable
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setFocusable
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_widget_PopupWindow
  * Method:    native_dismiss
  * Signature: (JI)V
  */

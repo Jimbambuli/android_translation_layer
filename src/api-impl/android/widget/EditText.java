@@ -131,6 +131,10 @@ public class EditText extends TextView {
 	/* called from native code when Enter was pressed */
 	@Export
 	private void sendEditorAction(KeyEvent event) {
+		/* like AOSP, where the editor action comes from TextView.onKeyDown(): a subclass's onKeyDown()
+		 * sees Enter first (AutoCompleteTextView completes the item selected in its drop-down) */
+		if (onKeyDown(KeyEvent.KEYCODE_ENTER, new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)))
+			return;
 		if (editor_action_listener != null)
 			editor_action_listener.onEditorAction(this, 0, event);
 	}

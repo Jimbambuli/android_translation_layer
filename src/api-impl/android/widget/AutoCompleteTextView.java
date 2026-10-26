@@ -787,13 +787,26 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
 				// if (state != null) {
 				// 	state.handleUpEvent(event);
 				// }
-				if (event.isTracking() && !event.isCanceled()) {
+				/* ATL: no key dispatcher state that tracks the down event */
+				if (/*event.isTracking() &&*/ !event.isCanceled()) {
 					dismissDropDown();
 					return true;
 				}
 			}
 		}
-		return false; // super.onKeyPreIme(keyCode, event);
+		return super.onKeyPreIme(keyCode, event);
+	}
+
+	/* ATL: the drop-down is driven by the keys of this view, as on AOSP, where onKeyPreIme() sees them
+	 * first (Back/Escape closes the drop-down) and View.dispatchKeyEvent() also calls onKeyUp() (Enter
+	 * completes the selected item); ATL's View.dispatchKeyEvent() calls neither */
+	@Override
+	public boolean dispatchKeyEvent(KeyEvent event) {
+		if (onKeyPreIme(event.getKeyCode(), event))
+			return true;
+		if (event.getAction() == KeyEvent.ACTION_UP)
+			return onKeyUp(event.getKeyCode(), event);
+		return super.dispatchKeyEvent(event);
 	}
 
 	public boolean onKeyUp(int keyCode, KeyEvent event) {

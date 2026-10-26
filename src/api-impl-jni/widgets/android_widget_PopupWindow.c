@@ -223,8 +223,12 @@ static void free_weak_ref(gpointer ref)
 	g_free(ref);
 }
 
+/* the popovers that are mapped, see on_window_press() */
+static GList *mapped_popovers = NULL;
+
 static void on_map_count_grab(GtkWidget *popover)
 {
+	mapped_popovers = g_list_prepend(mapped_popovers, popover);
 	if (!gtk_popover_get_autohide(GTK_POPOVER(popover)))
 		return;
 	grabbing_popovers++;
@@ -242,6 +246,7 @@ static void on_map_count_grab(GtkWidget *popover)
  * content of the window. */
 static void on_unmap_count_grab(GtkWidget *popover)
 {
+	mapped_popovers = g_list_remove(mapped_popovers, popover);
 	if (!gtk_popover_get_autohide(GTK_POPOVER(popover)))
 		return;
 	grabbing_popovers--;
@@ -283,12 +288,31 @@ static void apply_touch_modal(GtkPopover *popover)
 {
 	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(popover));
 	gboolean touch_modal = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "touch-modal"));
+	gboolean focusable = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "focusable"));
 
-	if (!gtk_widget_get_visible(GTK_WIDGET(popover)))
-		gtk_popover_set_autohide(popover, touch_modal && !(parent && gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER)) && may_grab());
+	if (!gtk_widget_get_visible(GTK_WIDGET(popover))) {
+		/* AOSP's popup window that is not focusable (FLAG_NOT_FOCUSABLE) is never touch-modal and
+		 * leaves the keyboard focus in the app's window, e.g. with the view that types into a
+		 * drop-down (AutoCompleteTextView); GtkPopover moves the focus into a grabbing popup, and
+		 * the focus must not get into the popup's widgets on a click either */
+		gtk_popover_set_autohide(popover, touch_modal && focusable && !(parent && gtk_widget_get_ancestor(parent, GTK_TYPE_POPOVER)) && may_grab());
+		gtk_widget_set_can_focus(GTK_WIDGET(popover), focusable);
+	}
 }
 
 static gboolean is_fading_out(GtkWidget *popover);
+
+static void dismiss_popup_window(GtkWidget *popover)
+{
+	JNIEnv *env = get_jni_env();
+	jobject popup_window = (*env)->NewLocalRef(env, g_object_get_data(G_OBJECT(popover), "popup-window"));
+	if (popup_window) {
+		(*env)->CallVoidMethod(env, popup_window, _METHOD(_CLASS(popup_window), "dismiss", "()V"));
+		if ((*env)->ExceptionCheck(env))
+			(*env)->ExceptionDescribe(env);
+		(*env)->DeleteLocalRef(env, popup_window);
+	}
+}
 
 /* AOSP gives a press outside of an outside-touchable popup to the popup as ACTION_OUTSIDE, and
  * the popup dismisses itself; a submenu (which CascadingMenuPopup makes not touch-modal) also
@@ -309,16 +333,8 @@ static gboolean on_outer_popup_event(GtkEventControllerLegacy *controller, GdkEv
 		jobject weak = g_object_get_data(G_OBJECT(child), "popup-window");
 		if (GTK_IS_POPOVER(child) && weak && gtk_widget_get_visible(child) && !is_fading_out(child) &&
 		    GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "touch-modal")) &&
-		    !(pressed && (GTK_WIDGET(pressed) == child || gtk_widget_is_ancestor(GTK_WIDGET(pressed), child)))) {
-			JNIEnv *env = get_jni_env();
-			jobject popup_window = (*env)->NewLocalRef(env, weak);
-			if (popup_window) {
-				(*env)->CallVoidMethod(env, popup_window, _METHOD(_CLASS(popup_window), "dismiss", "()V"));
-				if ((*env)->ExceptionCheck(env))
-					(*env)->ExceptionDescribe(env);
-				(*env)->DeleteLocalRef(env, popup_window);
-			}
-		}
+		    !(pressed && (GTK_WIDGET(pressed) == child || gtk_widget_is_ancestor(GTK_WIDGET(pressed), child))))
+			dismiss_popup_window(child);
 		child = next;
 	}
 	return FALSE;
@@ -337,9 +353,49 @@ static void watch_outer_popup(GtkPopover *popover)
 	g_object_set_data(G_OBJECT(outer), "watches-submenus", GINT_TO_POINTER(1));
 }
 
+/* A popup that does not grab (not focusable) and is outside-touchable gets a press outside of it
+ * as ACTION_OUTSIDE on AOSP and dismisses itself, while the press also goes to the window below.
+ * The window sees the presses in its popovers too, so the press is outside of the popups whose
+ * surface it is not on. */
+static gboolean on_window_press(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
+{
+	GdkEventType type = gdk_event_get_event_type(event);
+	if (type != GDK_BUTTON_PRESS && type != GDK_TOUCH_BEGIN)
+		return FALSE;
+	GtkWidget *window = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+	GtkNative *pressed = gtk_native_get_for_surface(gdk_event_get_surface(event));
+	GPtrArray *outside = g_ptr_array_new_with_free_func(g_object_unref);
+	for (GList *l = mapped_popovers; l; l = l->next) {
+		GtkWidget *popover = l->data;
+		if (g_object_get_data(G_OBJECT(popover), "popup-window") && GTK_WIDGET(gtk_widget_get_root(popover)) == window &&
+		    !gtk_popover_get_autohide(GTK_POPOVER(popover)) &&
+		    !GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "focusable")) &&
+		    GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "touch-modal")) && !is_fading_out(popover) &&
+		    !(pressed && (GTK_WIDGET(pressed) == popover || gtk_widget_is_ancestor(GTK_WIDGET(pressed), popover))))
+			g_ptr_array_add(outside, g_object_ref(popover));
+	}
+	for (guint i = 0; i < outside->len; i++)
+		dismiss_popup_window(g_ptr_array_index(outside, i));
+	g_ptr_array_unref(outside);
+	return FALSE;
+}
+
+static void watch_window(GtkPopover *popover)
+{
+	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(popover));
+	if (!root || g_object_get_data(G_OBJECT(root), "watches-popups"))
+		return;
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(on_window_press), NULL);
+	gtk_widget_add_controller(GTK_WIDGET(root), controller);
+	g_object_set_data(G_OBJECT(root), "watches-popups", GINT_TO_POINTER(1));
+}
+
 static void popup(GtkPopover *popover)
 {
 	watch_outer_popup(popover);
+	watch_window(popover);
 	gtk_popover_present(popover);
 	gtk_popover_popup(popover);
 }
@@ -409,6 +465,13 @@ JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isTouchable(J
 {
 	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
 	return gtk_widget_is_sensitive(popover);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setFocusable(JNIEnv *env, jobject this, jlong popover_ptr, jboolean focusable)
+{
+	GtkPopover *popover = GTK_POPOVER(_PTR(popover_ptr));
+	g_object_set_data(G_OBJECT(popover), "focusable", GINT_TO_POINTER(focusable));
+	apply_touch_modal(popover);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTouchModal(JNIEnv *env, jobject this, jlong popover_ptr, jboolean touch_modal)

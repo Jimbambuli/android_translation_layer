@@ -66,7 +66,7 @@ public class ListPopupWindow {
 
 	private Context mContext;
 	private ListAdapter mAdapter;
-	private /*DropDown*/ ListView mDropDownList;
+	private DropDownListView mDropDownList;
 
 	private int mDropDownHeight = ViewGroup.LayoutParams.WRAP_CONTENT;
 	private int mDropDownWidth = ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -790,9 +790,9 @@ public class ListPopupWindow {
 	 * @param position List position to set as selected.
 	 */
 	public void setSelection(int position) {
-		/*DropDown*/ ListView list = mDropDownList;
+		DropDownListView list = mDropDownList;
 		if (isShowing() && list != null) {
-			// list.setListSelectionHidden(false);
+			list.setListSelectionHidden(false);
 			list.setSelection(position);
 			if (list.getChoiceMode() != ListView.CHOICE_MODE_NONE) {
 				list.setItemChecked(position, true);
@@ -805,10 +805,10 @@ public class ListPopupWindow {
 	 * Only valid when {@link #isShowing()} == {@code true}.
 	 */
 	public void clearListSelection() {
-		final /*DropDown*/ ListView list = mDropDownList;
+		final DropDownListView list = mDropDownList;
 		if (list != null) {
 			// WARNING: Please read the comment where mListSelectionHidden is declared
-			// list.setListSelectionHidden(true);
+			list.setListSelectionHidden(true);
 			list.hideSelector();
 			list.requestLayout();
 		}
@@ -839,7 +839,7 @@ public class ListPopupWindow {
 	public boolean performItemClick(int position) {
 		if (isShowing()) {
 			if (mItemClickListener != null) {
-				final /*DropDown*/ ListView list = mDropDownList;
+				final DropDownListView list = mDropDownList;
 				final View child = list.getChildAt(position - list.getFirstVisiblePosition());
 				final ListAdapter adapter = list.getAdapter();
 				mItemClickListener.onItemClick(list, child, position, adapter.getItemId(position));
@@ -907,8 +907,48 @@ public class ListPopupWindow {
 	}
 
 	@NonNull
-	/*DropDown*/ ListView createDropDownListView(Context context, boolean hijackFocus) {
-		return new /*DropDown*/ ListView(context /*, hijackFocus*/);
+	DropDownListView createDropDownListView(Context context, boolean hijackFocus) {
+		return new DropDownListView(context, hijackFocus);
+	}
+
+	/* ATL: the part of AOSP's DropDownListView that lets the list of a drop-down that is not modal
+	 * (the focus stays in the text view) act as focused, so that the selector shows the item selected
+	 * with the keys, and keeps the list in touch mode (no selection) until a key selects an item */
+	static class DropDownListView extends ListView {
+		private final boolean mHijackFocus;
+		private boolean mListSelectionHidden;
+
+		DropDownListView(Context context, boolean hijackFocus) {
+			super(context);
+			mHijackFocus = hijackFocus;
+		}
+
+		void setListSelectionHidden(boolean hideListSelection) {
+			mListSelectionHidden = hideListSelection;
+		}
+
+		@Override
+		public boolean isInTouchMode() {
+			return (mHijackFocus && mListSelectionHidden) || super.isInTouchMode();
+		}
+
+		@Override
+		public boolean isFocused() {
+			return mHijackFocus || super.isFocused();
+		}
+
+		@Override
+		public boolean hasFocus() {
+			return mHijackFocus || super.hasFocus();
+		}
+
+		/* ATL's View builds the focused state from the GTK focus, not from isFocused() */
+		@Override
+		protected int[] onCreateDrawableState(int extraSpace) {
+			if (!mHijackFocus)
+				return super.onCreateDrawableState(extraSpace);
+			return mergeDrawableStates(super.onCreateDrawableState(extraSpace + 1), new int[] {android.R.attr.state_focused});
+		}
 	}
 
 	/**
@@ -971,7 +1011,7 @@ public class ListPopupWindow {
 				} else {
 					// WARNING: Please read the comment where mListSelectionHidden
 					//          is declared
-					// mDropDownList.setListSelectionHidden(false);
+					mDropDownList.setListSelectionHidden(false);
 				}
 
 				consumed = mDropDownList.onKeyDown(keyCode, event);
@@ -1149,13 +1189,13 @@ public class ListPopupWindow {
 				public void onItemSelected(AdapterView<?> parent, View view,
 				                           int position, long id) {
 
-					// if (position != -1) {
-					// 	DropDownListView dropDownList = mDropDownList;
+					if (position != -1) {
+						DropDownListView dropDownList = mDropDownList;
 
-					// 	if (dropDownList != null) {
-					// 		dropDownList.setListSelectionHidden(false);
-					// 	}
-					// }
+						if (dropDownList != null) {
+							dropDownList.setListSelectionHidden(false);
+						}
+					}
 				}
 
 				public void onNothingSelected(AdapterView<?> parent) {
