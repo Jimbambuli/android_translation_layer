@@ -185,7 +185,7 @@ static void evaluate_js_cb(GObject *source, GAsyncResult *result, gpointer user_
  * buffer release timer (AcceleratedSurface::willDestroyCompositingRunLoop(), fixed in WebKit main), and with
  * it every page of the app goes blank. So the WebKitWebView stays alive, here, and its page is emptied: the
  * document, its style rules and scripts go, which is what made every page an app has shown cost time and
- * memory. Nothing calls back into the View any more. */
+ * memory. Nothing calls back into the View any more, and a new WebView takes it over. */
 static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 {
 	if (g_object_get_data(G_OBJECT(webview), "atl-parked"))
@@ -197,6 +197,7 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	webkit_user_content_manager_unregister_script_message_handler(content_manager, "atlbridge", NULL);
 	webkit_user_content_manager_remove_all_scripts(content_manager);
 	g_signal_handlers_disconnect_by_func(webview, web_view_load_changed, NULL);
+	g_signal_handlers_disconnect_by_func(webview, context_menu_cb, NULL);
 	g_signal_handlers_disconnect_by_data(webview, wrapper);
 	// own settings without the page cache, which would keep the old document
 	WebKitSettings *settings = webkit_settings_new();
@@ -206,10 +207,30 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	webkit_web_view_load_uri(webview, "about:blank");
 }
 
-// the wrapper goes when the WebView is garbage collected
+/* Parked WebKitWebViews, for the next WebViews of the app: a new WebKitWebView makes the web process create a
+ * page, and that rebuilds the style of every page the process shows (WebPage::WebPage() sets the accent color,
+ * see web_view_css_changed()), which got slower with each page the app keeps. */
+static GQueue parked_web_views = G_QUEUE_INIT;
+
+// the wrapper goes when the WebView is garbage collected, and has let go of the WebKitWebView by now
 static void wrapper_finalized(gpointer webview, GObject *wrapper)
 {
 	park_web_view(webview, wrapper);
+	g_queue_push_tail(&parked_web_views, webview);
+}
+
+// a parked WebKitWebView that is done loading about:blank, or NULL
+static WebKitWebView *take_parked_web_view(void)
+{
+	for (GList *l = parked_web_views.head; l; l = l->next) {
+		WebKitWebView *webview = l->data;
+		if (!webkit_web_view_is_loading(webview) && !gtk_widget_get_parent(GTK_WIDGET(webview))) {
+			g_queue_delete_link(&parked_web_views, l);
+			g_object_set_data(G_OBJECT(webview), "atl-parked", NULL);
+			return webview;
+		}
+	}
+	return NULL;
 }
 
 /* the theme's accent color, looked up like WebKitGTK does (PageClientImpl::accentColor()) */
@@ -266,18 +287,27 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	 * of an activity that the app leaks would stay. Each view keeps its own user content manager: the
 	 * atlbridge handler below belongs to the view. */
 	static GWeakRef related_view;
-	WebKitWebView *related = g_weak_ref_get(&related_view);
-	WebKitUserContentManager *own_content_manager = webkit_user_content_manager_new();
-	GtkWidget *webview = g_object_new(WEBKIT_TYPE_WEB_VIEW, "related-view", related, "user-content-manager", own_content_manager, NULL);
-	g_object_unref(own_content_manager);
-	if (related)
-		g_object_unref(related);
-	g_weak_ref_set(&related_view, webview);
-	// the page gets this color when it is created, see web_view_css_changed()
-	GdkRGBA accent_color = web_view_accent_color(webview);
-	g_object_set_data_full(G_OBJECT(webview), "atl-accent-color", gdk_rgba_copy(&accent_color), (GDestroyNotify)gdk_rgba_free);
-	// never finalized, see park_web_view()
-	g_object_ref(webview);
+	GtkWidget *webview = GTK_WIDGET(take_parked_web_view());
+	if (webview) {
+		// what a new WebKitWebView has: default settings and background
+		WebKitSettings *settings = webkit_settings_new();
+		webkit_web_view_set_settings(WEBKIT_WEB_VIEW(webview), settings);
+		g_object_unref(settings);
+		webkit_web_view_set_background_color(WEBKIT_WEB_VIEW(webview), &(GdkRGBA){1.f, 1.f, 1.f, 1.f});
+	} else {
+		WebKitWebView *related = g_weak_ref_get(&related_view);
+		WebKitUserContentManager *own_content_manager = webkit_user_content_manager_new();
+		webview = g_object_new(WEBKIT_TYPE_WEB_VIEW, "related-view", related, "user-content-manager", own_content_manager, NULL);
+		g_object_unref(own_content_manager);
+		if (related)
+			g_object_unref(related);
+		g_weak_ref_set(&related_view, webview);
+		// the page gets this color when it is created, see web_view_css_changed()
+		GdkRGBA accent_color = web_view_accent_color(webview);
+		g_object_set_data_full(G_OBJECT(webview), "atl-accent-color", gdk_rgba_copy(&accent_color), (GDestroyNotify)gdk_rgba_free);
+		// never finalized, see park_web_view()
+		g_object_ref(webview);
+	}
 	g_object_weak_ref(G_OBJECT(wrapper), wrapper_finalized, webview);
 	/* Android's WebView applies a mouse wheel step at once (one frame per notch, the size already
 	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
@@ -470,6 +500,8 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1destroy(JNIEnv *env,
 	GtkWidget *wrapper = gtk_widget_get_parent(webview);
 	park_web_view(WEBKIT_WEB_VIEW(webview), wrapper);
 	gtk_widget_unparent(webview);
+	g_object_weak_unref(G_OBJECT(wrapper), wrapper_finalized, webview);
+	g_queue_push_tail(&parked_web_views, webview);
 
 	GtkWidget *placeholder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), placeholder);
