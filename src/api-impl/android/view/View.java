@@ -1195,6 +1195,7 @@ public class View implements Drawable.Callback {
 		}
 
 		clickable = a.getBoolean(com.android.internal.R.styleable.View_clickable, false);
+		longclickable = a.getBoolean(com.android.internal.R.styleable.View_longClickable, false);
 		updateKeyboardFocusable();
 
 		String handlerName = a.getString(com.android.internal.R.styleable.View_onClick);
