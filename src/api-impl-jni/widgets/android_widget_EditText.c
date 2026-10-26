@@ -52,6 +52,43 @@ JNIEXPORT void JNICALL Java_android_widget_EditText_native_1addTextChangedListen
 		g_signal_connect(GTK_EDITABLE(gtk_text), "changed", G_CALLBACK(changed_cb), NULL);
 }
 
+/* InputFilters: the EditText filters what is about to be inserted; if that changes the text, insert
+ * the filtered text instead (the pattern from the GtkEditable documentation) */
+static void insert_text_cb(GtkEditable *editable, const char *text, int length, int *position, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = get_edit_text(env, GTK_WIDGET(editable));
+	if (!this)
+		return;
+	char *source = length < 0 ? g_strdup(text) : g_strndup(text, length);
+	jstring source_jstr = _JSTRING(source);
+	g_free(source);
+	jstring filtered = J__EditText__filterInsertion(env, this, source_jstr, *position);
+	if ((*env)->ExceptionCheck(env))
+		(*env)->ExceptionDescribe(env);
+	if (filtered) {
+		const char *str = (*env)->GetStringUTFChars(env, filtered, NULL);
+		g_signal_handlers_block_by_func(editable, insert_text_cb, user_data);
+		gtk_editable_insert_text(editable, str, -1, position);
+		g_signal_handlers_unblock_by_func(editable, insert_text_cb, user_data);
+		g_signal_stop_emission_by_name(editable, "insert-text");
+		(*env)->ReleaseStringUTFChars(env, filtered, str);
+		(*env)->DeleteLocalRef(env, filtered);
+	}
+	(*env)->DeleteLocalRef(env, source_jstr);
+	(*env)->DeleteLocalRef(env, this);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setFiltered(JNIEnv *env, jobject this, jlong widget_ptr, jboolean filtered)
+{
+	GtkEditable *editable = GTK_EDITABLE(_PTR(widget_ptr));
+	gboolean connected = g_signal_handler_find(editable, G_SIGNAL_MATCH_FUNC, 0, 0, NULL, insert_text_cb, NULL);
+	if (filtered && !connected)
+		g_signal_connect(editable, "insert-text", G_CALLBACK(insert_text_cb), NULL);
+	else if (!filtered && connected)
+		g_signal_handlers_disconnect_by_func(editable, insert_text_cb, NULL);
+}
+
 #define IME_ACTION_SEARCH 3
 #define KEYCODE_ENTER     66
 

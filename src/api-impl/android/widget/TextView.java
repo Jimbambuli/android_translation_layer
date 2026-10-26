@@ -15,6 +15,7 @@ import android.text.InputFilter;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.SpannedString;
 import android.text.TextDirectionHeuristic;
 import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
@@ -109,6 +110,9 @@ public class TextView extends View {
 				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
+			int max_length = a.getInt(com.android.internal.R.styleable.TextView_maxLength, -1);
+			if (max_length >= 0)
+				setFilters(new InputFilter[] {new InputFilter.LengthFilter(max_length)});
 
 			Drawable left = a.getDrawable(com.android.internal.R.styleable.TextView_drawableLeft);
 			Drawable top = a.getDrawable(com.android.internal.R.styleable.TextView_drawableTop);
@@ -151,6 +155,7 @@ public class TextView extends View {
 	}
 
 	public void setText(CharSequence text, BufferType type) {
+		text = applyFilters(text);
 		this.text = text == null ? "" : text;
 		if (text instanceof Spanned)
 			native_setMarkup(toPangoMarkup((Spanned)text));
@@ -330,7 +335,25 @@ public class TextView extends View {
 	public final void setLinksClickable(boolean whether) {}
 
 	public void setInputType(int type) {}
-	public void setFilters(InputFilter[] filters) {}
+	private static final InputFilter[] NO_FILTERS = new InputFilter[0];
+	private InputFilter[] filters = NO_FILTERS;
+	public void setFilters(InputFilter[] filters) {
+		if (filters == null)
+			throw new IllegalArgumentException();
+		this.filters = filters;
+	}
+
+	/* as AOSP's setText(): the whole new text goes through the filters, replacing an empty text */
+	protected CharSequence applyFilters(CharSequence text) {
+		if (text == null)
+			return null;
+		for (InputFilter filter : filters) {
+			CharSequence out = filter.filter(text, 0, text.length(), new SpannedString(""), 0, 0);
+			if (out != null)
+				text = out;
+		}
+		return text;
+	}
 	public void setCursorVisible(boolean visible) {}
 	public void setImeOptions(int imeOptions) {}
 
@@ -556,7 +579,7 @@ public class TextView extends View {
 
 	public final void setTransformationMethod(TransformationMethod method) {}
 
-	public InputFilter[] getFilters() { return new InputFilter[0]; }
+	public InputFilter[] getFilters() { return filters; }
 
 	public int getMaxLines() { return max_lines == Integer.MAX_VALUE ? -1 : max_lines; }
 

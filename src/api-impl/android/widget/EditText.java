@@ -5,7 +5,9 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.text.Editable;
+import android.text.InputFilter;
 import android.text.SpannableStringBuilder;
+import android.text.SpannedString;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
@@ -53,7 +55,35 @@ public class EditText extends TextView {
 
 	@Override
 	public void setText(CharSequence text) {
+		text = applyFilters(text);
 		native_setText(widget, text == null ? "" : text.toString());
+	}
+
+	/* as AOSP's Editor: typed or pasted text goes through the filters before it is inserted */
+	@Override
+	public void setFilters(InputFilter[] filters) {
+		super.setFilters(filters);
+		native_setFiltered(widget, filters.length > 0);
+	}
+	private native void native_setFiltered(long widget, boolean filtered);
+
+	/* called from native code before source is inserted at position (in characters): the filtered
+	 * text, or null to insert it unchanged */
+	@Export
+	private String filterInsertion(String source, int position) {
+		String text = native_getText(widget);
+		int offset = text.offsetByCodePoints(0, Math.min(position, text.codePointCount(0, text.length())));
+		SpannedString dest = new SpannedString(text);
+		CharSequence result = source;
+		boolean filtered = false;
+		for (InputFilter filter : getFilters()) {
+			CharSequence out = filter.filter(result, 0, result.length(), dest, offset, offset);
+			if (out != null) {
+				result = out;
+				filtered = true;
+			}
+		}
+		return filtered ? result.toString() : null;
 	}
 	@Override
 	public void setTextSize(float size) {

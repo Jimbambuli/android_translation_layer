@@ -269,6 +269,14 @@ JNIEXPORT jobject JNICALL Java_android_widget_EditText_native_1getHint
 
 /*
  * Class:     android_widget_EditText
+ * Method:    native_setFiltered
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setFiltered
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_widget_EditText
  * Method:    native_setTextSize
  * Signature: (JF)V
  */
