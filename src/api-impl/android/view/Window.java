@@ -206,10 +206,10 @@ public class Window {
 	}
 
 	/** @hide called from native code when the window gains or loses the focus: like ViewRootImpl,
-	 * the decor view gets it, which hands it to the Window.Callback */
+	 * the views of the window get it, the decor view hands it to the Window.Callback */
 	@Export
 	public void dispatchWindowFocusChanged(boolean hasFocus) {
-		decorView.onWindowFocusChanged(hasFocus);
+		decorView.dispatchWindowFocusChanged(hasFocus);
 	}
 
 	public void clearFlags(int flags) {

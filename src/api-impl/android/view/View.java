@@ -3368,6 +3368,11 @@ public class View implements Drawable.Callback {
 		layout(left, top, right, bottom);
 	}
 
+	/* like AOSP: the window focus change reaches every view of the window */
+	public void dispatchWindowFocusChanged(boolean hasFocus) {
+		onWindowFocusChanged(hasFocus);
+	}
+
 	public void onWindowFocusChanged(boolean hasFocus) {}
 
 	/**

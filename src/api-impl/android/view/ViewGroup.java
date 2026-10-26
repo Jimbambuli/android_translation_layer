@@ -109,6 +109,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		super.dispatchDetachedFromWindow();
 	}
 
+	/* like AOSP: this view group first, then its children */
+	@Override
+	public void dispatchWindowFocusChanged(boolean hasFocus) {
+		super.dispatchWindowFocusChanged(hasFocus);
+		for (int i = 0; i < children.size(); i++)
+			children.get(i).dispatchWindowFocusChanged(hasFocus);
+	}
+
 	public void onViewAdded(View view) {}
 	public void onViewRemoved(View view) {}
 
