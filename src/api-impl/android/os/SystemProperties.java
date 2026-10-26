@@ -37,7 +37,7 @@ public class SystemProperties {
 		return properties.getProperty(prop, def);
 	}
 
-	public boolean getBoolean(String prop, boolean def) {
+	public static boolean getBoolean(String prop, boolean def) {
 		android.util.Log.i("SystemProperties", "Grabbing boolean prop " + prop + ", default " + def);
 		String val = properties.getProperty(prop);
 		return val == null ? def : Boolean.parseBoolean(val);
