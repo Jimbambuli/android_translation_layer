@@ -212,6 +212,38 @@ static void wrapper_finalized(gpointer webview, GObject *wrapper)
 	park_web_view(webview, wrapper);
 }
 
+/* the theme's accent color, looked up like WebKitGTK does (PageClientImpl::accentColor()) */
+static GdkRGBA web_view_accent_color(GtkWidget *webview)
+{
+	static const char *const names[] = {"accent_bg_color", "accent_color", "accentColor", "theme_selected_bg_color"};
+	GdkRGBA color = {52 / 255.f, 132 / 255.f, 228 / 255.f, 1.f};
+	G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+	GtkStyleContext *context = gtk_widget_get_style_context(webview);
+	for (int i = 0; i < G_N_ELEMENTS(names); i++)
+		if (gtk_style_context_lookup_color(context, names[i], &color))
+			break;
+	G_GNUC_END_IGNORE_DEPRECATIONS
+	return color;
+}
+
+static void (*webkit_css_changed)(GtkWidget *widget, GtkCssStyleChange *change);
+
+/* WebKitGTK hands the accent color to the web process whenever the CSS of a WebKitWebView changes, e.g. when the
+ * view is added to or removed from a window, and the web process then rebuilds the style of every page it shows
+ * (RenderThemeAdwaita::setAccentColor() does not check whether the color changed). With the WebViews an app keeps,
+ * that made each new page cost more. Only pass real changes on. */
+static void web_view_css_changed(GtkWidget *webview, GtkCssStyleChange *change)
+{
+	GdkRGBA color = web_view_accent_color(webview);
+	GdkRGBA *sent = g_object_get_data(G_OBJECT(webview), "atl-accent-color");
+	if (sent && gdk_rgba_equal(sent, &color)) {
+		GTK_WIDGET_CLASS(g_type_class_peek(GTK_TYPE_WIDGET))->css_changed(webview, change);
+		return;
+	}
+	g_object_set_data_full(G_OBJECT(webview), "atl-accent-color", gdk_rgba_copy(&color), (GDestroyNotify)gdk_rgba_free);
+	webkit_css_changed(webview, change);
+}
+
 JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	/*
@@ -221,6 +253,12 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	 */
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
 		return Java_android_view_View_native_1constructor(env, this, context, attrs);
+
+	if (!webkit_css_changed) {
+		GtkWidgetClass *web_view_class = g_type_class_ref(WEBKIT_TYPE_WEB_VIEW);
+		webkit_css_changed = web_view_class->css_changed;
+		web_view_class->css_changed = web_view_css_changed;
+	}
 
 	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	/* Like Android, which renders the WebViews of an app in one renderer process, the WebViews share
@@ -235,6 +273,9 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	if (related)
 		g_object_unref(related);
 	g_weak_ref_set(&related_view, webview);
+	// the page gets this color when it is created, see web_view_css_changed()
+	GdkRGBA accent_color = web_view_accent_color(webview);
+	g_object_set_data_full(G_OBJECT(webview), "atl-accent-color", gdk_rgba_copy(&accent_color), (GDestroyNotify)gdk_rgba_free);
 	// never finalized, see park_web_view()
 	g_object_ref(webview);
 	g_object_weak_ref(G_OBJECT(wrapper), wrapper_finalized, webview);
