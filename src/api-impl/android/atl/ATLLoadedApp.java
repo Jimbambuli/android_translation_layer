@@ -206,8 +206,10 @@ public final class ATLLoadedApp {
 	    throws ReflectiveOperationException {
 		int theme_res = 0;
 		int label_res = 0;
+		int soft_input_mode = 0;
 		for (PackageParser.Activity activity : pkg.activities) {
 			if (className.equals(activity.className)) {
+				soft_input_mode = activity.info.softInputMode;
 				label_res = activity.info.labelRes;
 				theme_res = activity.info.getThemeResource();
 				break;
@@ -227,6 +229,13 @@ public final class ATLLoadedApp {
 		// its resources there (AppCompat does so for night mode), and the theme has to be resolved
 		// against those resources, not against the ones of the base context.
 		activity.atl_attach_base_context(new ContextImpl(r, this, Resources.selectDefaultTheme(0, this.effective_sdk_compat)));
+		// like Activity.attach(), with the activity as the Window.Callback: the window takes the
+		// manifest's soft input mode, the color mode and the post-processing preference (ATL reads
+		// neither android:colorMode nor android:preferMinimalPostProcessing, so these are the defaults)
+		if (soft_input_mode != 0)
+			activity.getWindow().setSoftInputMode(soft_input_mode);
+		activity.getWindow().setColorMode(0 /* ActivityInfo.COLOR_MODE_DEFAULT */);
+		activity.getWindow().setPreferMinimalPostProcessing(false);
 		activity.setTheme(theme_res);
 		if (label_res != 0) {
 			activity.setTitle(r.getText(label_res));

@@ -242,7 +242,42 @@ public class Window {
 		this.callback = callback;
 	}
 
+	private boolean decorInstalled;
+	private boolean hasSoftInputMode;
+
+	/* like PhoneWindow.installDecor()/generateLayout(), once, when the decor view is first asked
+	 * for: the window flags from the theme, each set with setFlags(), so the Window.Callback hears
+	 * of every one; the attributes ATL implements are applied elsewhere (applyThemeAttributes()) */
+	private void installDecor() {
+		if (decorInstalled)
+			return;
+		decorInstalled = true;
+		TypedArray a = context.obtainStyledAttributes(com.android.internal.R.styleable.Window);
+		final boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
+		final int flagsToUpdate = (WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR) & ~forcedWindowFlags;
+		if (floating)
+			setFlags(0, flagsToUpdate); // AOSP sets the size to WRAP_CONTENT as well; ATL's dialogs size themselves
+		else
+			setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR, flagsToUpdate);
+		setThemeFlag(a, com.android.internal.R.styleable.Window_windowFullscreen, false, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+		setThemeFlag(a, com.android.internal.R.styleable.Window_windowTranslucentStatus, false, WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+		setThemeFlag(a, com.android.internal.R.styleable.Window_windowTranslucentNavigation, false, WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+		setThemeFlag(a, com.android.internal.R.styleable.Window_windowShowWallpaper, false, WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER);
+		setThemeFlag(a, com.android.internal.R.styleable.Window_windowEnableSplitTouch, context.getApplicationInfo().targetSdkVersion >= 11 /* HONEYCOMB */, WindowManager.LayoutParams.FLAG_SPLIT_TOUCH);
+		if (!floating)
+			setThemeFlag(a, com.android.internal.R.styleable.Window_windowDrawsSystemBarBackgrounds, false, WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+		if (!hasSoftInputMode)
+			params.softInputMode = a.getInt(com.android.internal.R.styleable.Window_windowSoftInputMode, params.softInputMode);
+		a.recycle();
+	}
+
+	private void setThemeFlag(TypedArray a, int attr, boolean defValue, int flag) {
+		if (a.getBoolean(attr, defValue))
+			setFlags(flag, flag & ~forcedWindowFlags);
+	}
+
 	public void setContentView(View view) {
+		installDecor();
 		if (decorView.getBackground() == null) {
 			TypedArray ta = context.obtainStyledAttributes(new int[] {R.attr.windowBackground});
 			if (ta.hasValue(0))
@@ -258,6 +293,7 @@ public class Window {
 	}
 
 	public View getDecorView() {
+		installDecor();
 		return decorView;
 	}
 
@@ -311,7 +347,25 @@ public class Window {
 
 	public void setNavigationBarColor(int color) {}
 
-	public void setFormat(int format) {}
+	public void setFormat(int format) {
+		params.format = format;
+		dispatchWindowAttributesChanged(params);
+	}
+
+	public void setType(int type) {
+		params.type = type;
+		dispatchWindowAttributesChanged(params);
+	}
+
+	public void setColorMode(int colorMode) {
+		params.setColorMode(colorMode);
+		dispatchWindowAttributesChanged(params);
+	}
+
+	public void setPreferMinimalPostProcessing(boolean isPreferred) {
+		params.preferMinimalPostProcessing = isPreferred;
+		dispatchWindowAttributesChanged(params);
+	}
 
 	public void setLayout(int width, int height) {
 		params.width = width;
@@ -324,7 +378,15 @@ public class Window {
 		return new WindowManagerImpl();
 	}
 
-	public void setSoftInputMode(int dummy) {}
+	public void setSoftInputMode(int mode) {
+		if (mode != WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED) {
+			params.softInputMode = mode;
+			hasSoftInputMode = true;
+		} else {
+			hasSoftInputMode = false;
+		}
+		dispatchWindowAttributesChanged(params);
+	}
 
 	public int getNavigationBarColor() {
 		return 0xFF888888; // gray
@@ -370,7 +432,10 @@ public class Window {
 
 	public void setEnterTransition(Transition transition) {}
 
-	public void setGravity(int gravity) {}
+	public void setGravity(int gravity) {
+		params.gravity = gravity;
+		dispatchWindowAttributesChanged(params);
+	}
 
 	public void setDecorFitsSystemWindows(boolean fits) {}
 
