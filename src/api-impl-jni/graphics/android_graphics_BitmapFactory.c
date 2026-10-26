@@ -57,28 +57,49 @@ static GInputStream *java_input_stream_new(JNIEnv *env, jobject is, jbyteArray s
 JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(JNIEnv *env, jclass, jobject is, jbyteArray storage, jobject outPadding, jobject opts)
 {
 	GInputStream *stream = java_input_stream_new(env, is, storage);
-
-	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_stream(stream, NULL, NULL);
+	GOutputStream *memory = g_memory_output_stream_new_resizable();
+	g_output_stream_splice(memory, stream, G_OUTPUT_STREAM_SPLICE_CLOSE_SOURCE | G_OUTPUT_STREAM_SPLICE_CLOSE_TARGET, NULL, NULL);
 	g_object_unref(stream);
+	GBytes *bytes = g_memory_output_stream_steal_as_bytes(G_MEMORY_OUTPUT_STREAM(memory));
+	g_object_unref(memory);
 
 	/* honour Options.inSampleSize like AOSP: subsample the image by a power of two so an image
 	 * loader (Coil/Glide) gets the smaller bitmap it asked for and does not keep the full-size one.
 	 * inJustDecodeBounds only wants the full dimensions, so it is left unscaled. */
-	if (pixbuf && opts) {
+	int sample = 1;
+	if (opts) {
 		jclass opts_class = (*env)->GetObjectClass(env, opts);
-		int sample = (*env)->GetIntField(env, opts, (*env)->GetFieldID(env, opts_class, "inSampleSize", "I"));
 		jboolean bounds_only = (*env)->GetBooleanField(env, opts, (*env)->GetFieldID(env, opts_class, "inJustDecodeBounds", "Z"));
-		if (!bounds_only && sample > 1) {
-			int factor = 1;
-			while (factor * 2 <= sample) // round down to the nearest power of two, as AOSP's decoder does
-				factor *= 2;
-			int width = gdk_pixbuf_get_width(pixbuf) / factor;
-			int height = gdk_pixbuf_get_height(pixbuf) / factor;
-			GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf, width < 1 ? 1 : width, height < 1 ? 1 : height, GDK_INTERP_BILINEAR);
-			if (scaled) {
-				g_object_unref(pixbuf);
-				pixbuf = scaled;
-			}
+		if (!bounds_only)
+			sample = (*env)->GetIntField(env, opts, (*env)->GetFieldID(env, opts_class, "inSampleSize", "I"));
+	}
+
+	/* GTK decodes PNG, JPEG and TIFF itself, in process. gdk-pixbuf may hand every image to a sandboxed
+	 * loader process (glycin), which costs about a millisecond even for a small icon, and apps decode
+	 * many of those while they inflate a layout. */
+	if (sample <= 1) {
+		GdkTexture *texture = gdk_texture_new_from_bytes(bytes, NULL);
+		if (texture) {
+			g_bytes_unref(bytes);
+			return _INTPTR(texture);
+		}
+	}
+
+	GInputStream *memory_stream = g_memory_input_stream_new_from_bytes(bytes);
+	g_bytes_unref(bytes);
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_stream(memory_stream, NULL, NULL);
+	g_object_unref(memory_stream);
+
+	if (pixbuf && sample > 1) {
+		int factor = 1;
+		while (factor * 2 <= sample) // round down to the nearest power of two, as AOSP's decoder does
+			factor *= 2;
+		int width = gdk_pixbuf_get_width(pixbuf) / factor;
+		int height = gdk_pixbuf_get_height(pixbuf) / factor;
+		GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf, width < 1 ? 1 : width, height < 1 ? 1 : height, GDK_INTERP_BILINEAR);
+		if (scaled) {
+			g_object_unref(pixbuf);
+			pixbuf = scaled;
 		}
 	}
 
