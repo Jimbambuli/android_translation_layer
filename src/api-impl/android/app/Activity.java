@@ -174,7 +174,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return;
 	}
 
-	@Export
 	protected void onPostCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onPostCreate - yay!");
 		return;
@@ -666,7 +665,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return outState;
 	}
 
-	@Export
 	protected void onRestoreInstanceState(Bundle savedInstanceState) {
 		Bundle windowState = savedInstanceState.getBundle(WINDOW_HIERARCHY_TAG);
 		if (windowState != null)
@@ -1120,6 +1118,26 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		dispatchActivityPreCreated(savedInstanceState);
 		onCreate(savedInstanceState);
 		dispatchActivityPostCreated(savedInstanceState);
+		postCreatePending = true;
+		createdFromState = savedInstanceState;
+	}
+
+	/* like AOSP's ActivityThread.handleStartActivity(): after its first onStart(), a new instance
+	 * restores the state it was created from and gets onPostCreate() */
+	private boolean postCreatePending;
+	private Bundle createdFromState;
+
+	private void performPostStart() {
+		if (!postCreatePending)
+			return;
+		postCreatePending = false;
+		Bundle state = createdFromState;
+		createdFromState = null;
+		if (finishing)
+			return;
+		if (state != null)
+			onRestoreInstanceState(state);
+		onPostCreate(state);
 	}
 
 	@Export
@@ -1128,6 +1146,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		onStart();
 		dispatchActivityPostStarted();
 		started = true;
+		performPostStart();
 	}
 
 	/* like AOSP: a stopped activity that comes back gets onRestart() before onStart() */

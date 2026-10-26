@@ -440,12 +440,6 @@ void activity_start(JNIEnv *env, jobject activity_object)
 		return;
 	}
 
-	J__Activity__onPostCreate(env, activity_object, NULL);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-
 	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
 
 	GtkWidget *decor_view = get_decor_view(env, activity_object);
@@ -502,8 +496,8 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env
 
 /* Activity.recreate(): the new instance takes the place of this one in the back stack and is
  * created from the state this one saved after being stopped, and gets what it retained with
- * onRetainNonConfigurationInstance() (AndroidX keeps its ViewModels there). As for activity_start(),
- * onRestoreInstanceState() comes before onPostCreate(), the start follows when it is focused. */
+ * onRetainNonConfigurationInstance() (AndroidX keeps its ViewModels there). The start follows when it
+ * is focused, then onRestoreInstanceState() and onPostCreate() (see Activity.performStart()). */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, jobject this, jobject activity)
 {
 	GList *l;
@@ -537,21 +531,6 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
-	if (!_GET_BOOL_FIELD(activity, "finishing")) {
-		if (saved_state) {
-			J__Activity__onRestoreInstanceState(env, activity, saved_state);
-			if ((*env)->ExceptionCheck(env)) {
-				(*env)->ExceptionDescribe(env);
-				(*env)->ExceptionClear(env);
-			}
-		}
-		J__Activity__onPostCreate(env, activity, saved_state);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-	}
-
 	if (_GET_BOOL_FIELD(activity, "finishing")) { // finish() was called while it was created
 		activity_backlog = g_list_delete_link(activity_backlog, l);
 	} else {
