@@ -521,6 +521,9 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	/* this method is private, but it seems we get away with calling it from C */
 	J__Runtime__loadLibrary(env, java_runtime, _JSTRING("translation_layer_main"), class_loader);
 
+	/* like Android's RuntimeInit.commonInit(): process-wide setup before any app code runs */
+	J__RuntimeInit__commonInit(env);
+
 	// some apps need the apk path since they directly read their apk
 	apk_path = strdup(apk_classpath);
 

@@ -1,6 +1,11 @@
 package android.os;
 
+import android.system.ErrnoException;
+import android.system.Os;
+import java.io.File;
+import java.io.IOException;
 import java.util.Properties;
+import libcore.io.IoUtils;
 
 public class SystemProperties {
 	private static final Properties properties = new Properties();
@@ -25,6 +30,49 @@ public class SystemProperties {
 			properties.put("ro.product.cpu.abilist", "arm64-v8a");
 			properties.put("ro.product.cpu.abilist64", "arm64-v8a");
 		}
+		// on Android the time zone service keeps persist.sys.timezone; here it follows the host
+		String timezone = hostTimeZoneId();
+		if (timezone != null)
+			properties.put("persist.sys.timezone", timezone);
+	}
+
+	private static String hostTimeZoneId() {
+		String etcTimezone = null;
+		try {
+			etcTimezone = IoUtils.readFileAsString("/etc/timezone");
+		} catch (IOException e) {
+		}
+		String localtimeLink = null;
+		try {
+			localtimeLink = Os.readlink("/etc/localtime");
+		} catch (ErrnoException e) { // missing, or a copy instead of a symlink: leave it to libcore
+		}
+		return hostTimeZoneId(System.getenv("TZ"), etcTimezone, localtimeLink);
+	}
+
+	/* the host's zone id, found like glibc does: TZ when it names a zone file (":Area/City", "Area/City"
+	 * or a zoneinfo path; POSIX rules such as "CET-1CEST" name no zone), else /etc/timezone (Debian),
+	 * else the zoneinfo/Area/City target of the /etc/localtime symlink; null leaves it to libcore */
+	static String hostTimeZoneId(String tz, String etcTimezone, String localtimeLink) {
+		String id = zoneIdOf(tz);
+		if (id != null && new File(ZONEINFO_DIR, id).isFile())
+			return id;
+		if (etcTimezone != null && !etcTimezone.trim().isEmpty())
+			return etcTimezone.trim();
+		return zoneIdOf(localtimeLink);
+	}
+
+	private static final String ZONEINFO_DIR = "/usr/share/zoneinfo";
+
+	private static String zoneIdOf(String path) {
+		if (path == null)
+			return null;
+		if (path.startsWith(":"))
+			path = path.substring(1);
+		int i = path.indexOf("zoneinfo/");
+		if (i >= 0)
+			path = path.substring(i + "zoneinfo/".length());
+		return path.isEmpty() ? null : path;
 	}
 
 	public static String get(String prop) {
