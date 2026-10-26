@@ -150,6 +150,9 @@ public class Window {
 		decorView.setId(android.R.id.content);
 	}
 
+	/** @hide like View.AttachInfo.mKeyDispatchState, one for the views of a window */
+	public final KeyEvent.DispatcherState mKeyDispatchState = new KeyEvent.DispatcherState();
+
 	private int minWidth;
 
 	/** @hide the minimum width of a window measured AT_MOST, from windowMinWidthMajor/Minor */

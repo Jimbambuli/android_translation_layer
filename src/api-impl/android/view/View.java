@@ -3109,9 +3109,10 @@ public class View implements Drawable.Callback {
 		return true;
 	}
 
-	/* there is no key dispatcher state, KeyEvent.dispatch() accepts null */
+	/* AOSP keeps the state in the AttachInfo of the window's ViewRootImpl, ATL in the Window */
 	public KeyEvent.DispatcherState getKeyDispatcherState() {
-		return null;
+		Window window = native_get_window(widget);
+		return window != null ? window.mKeyDispatchState : null;
 	}
 
 	public Rect getClipBounds() {

@@ -8,6 +8,43 @@
 
 #include "../generated_headers/android_widget_PopupWindow.h"
 
+#define KEYCODE_ESCAPE 111
+#define ACTION_DOWN 0
+#define ACTION_UP 1
+
+/* On AOSP the popup's decor view gets the keys first (PopupWindow.PopupDecorView.dispatchKeyEvent())
+ * and dismisses the popup on Back or Escape: here in the capture phase, before the content and
+ * before GtkPopover's own key handler, which would pop the popup down on Escape by itself. */
+static gboolean dispatch_decor_key(GtkEventControllerKey *controller, guint keyval, int action)
+{
+	if (keyval != GDK_KEY_Escape)
+		return FALSE;
+	GtkWidget *popover = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+	JNIEnv *env = get_jni_env();
+	jobject popup_window = (*env)->NewLocalRef(env, g_object_get_data(G_OBJECT(popover), "popup-window"));
+	if (!popup_window)
+		return FALSE;
+	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, action, KEYCODE_ESCAPE, 0, 0);
+	gboolean ret = J__PopupWindow__dispatchDecorKeyEvent(env, popup_window, key_event);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, key_event);
+	(*env)->DeleteLocalRef(env, popup_window);
+	return ret;
+}
+
+static gboolean on_decor_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	return dispatch_decor_key(controller, keyval, ACTION_DOWN);
+}
+
+static gboolean on_decor_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	return dispatch_decor_key(controller, keyval, ACTION_UP);
+}
+
 JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor(JNIEnv *env, jobject this)
 {
 	GtkWidget *popover = gtk_popover_new();
@@ -17,6 +54,11 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor(JNIE
 	atl_popover_count_grab(GTK_POPOVER(popover));
 	/* to dismiss it on a press outside of it, as AOSP's PopupDecorView does on ACTION_OUTSIDE */
 	g_object_set_data(G_OBJECT(popover), "popup-window", _WEAK_REF(this));
+	GtkEventController *key_controller = gtk_event_controller_key_new();
+	gtk_event_controller_set_propagation_phase(key_controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_decor_key_pressed), NULL);
+	g_signal_connect(key_controller, "key-released", G_CALLBACK(on_decor_key_released), NULL);
+	gtk_widget_add_controller(popover, key_controller);
 	return _INTPTR(popover);
 }
 

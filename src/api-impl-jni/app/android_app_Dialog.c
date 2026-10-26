@@ -18,20 +18,17 @@ static gboolean on_close_request(GtkWidget *dialog, jobject jobj)
 }
 
 #define KEYCODE_BACK 4
+#define KEYCODE_ESCAPE 111
 #define ACTION_DOWN 0
 #define ACTION_UP 1
 
 /* Key events that no view consumed go to the dialog, like Window.Callback.dispatchKeyEvent() on
- * Android. Only Escape is forwarded, as Back, which is what the fallback in AOSP's Generic.kcm
- * turns an unhandled Escape into: a cancelable dialog closes, Compose's dialogs call their
- * onDismissRequest. */
-static gboolean dispatch_back_key(jobject jobj, guint keyval, int action)
+ * Android (the other keys reach the views through GTK): Escape as KEYCODE_ESCAPE, which
+ * Dialog.onKeyUp() closes a cancelable dialog on, as on AOSP since P. */
+static gboolean dispatch_key(jobject jobj, int key_code, int action)
 {
-	if (keyval != GDK_KEY_Escape)
-		return FALSE;
-
 	JNIEnv *env = get_jni_env();
-	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, action, KEYCODE_BACK, 0, 0);
+	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, action, key_code, 0, 0);
 	jmethodID dispatch = _METHOD(_CLASS(jobj), "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
 	gboolean ret = (*env)->CallBooleanMethod(env, jobj, dispatch, key_event);
 	if ((*env)->ExceptionCheck(env)) {
@@ -44,19 +41,19 @@ static gboolean dispatch_back_key(jobject jobj, guint keyval, int action)
 
 static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, jobject jobj)
 {
-	return dispatch_back_key(jobj, keyval, ACTION_DOWN);
+	return keyval == GDK_KEY_Escape && dispatch_key(jobj, KEYCODE_ESCAPE, ACTION_DOWN);
 }
 
 static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, jobject jobj)
 {
-	return dispatch_back_key(jobj, keyval, ACTION_UP);
+	return keyval == GDK_KEY_Escape && dispatch_key(jobj, KEYCODE_ESCAPE, ACTION_UP);
 }
 
 /* the back button of a mouse is the back key (see atl_window_android_mouse_back()) */
 static void on_mouse_back(jobject jobj)
 {
-	dispatch_back_key(jobj, GDK_KEY_Escape, ACTION_DOWN);
-	dispatch_back_key(jobj, GDK_KEY_Escape, ACTION_UP);
+	dispatch_key(jobj, KEYCODE_BACK, ACTION_DOWN);
+	dispatch_key(jobj, KEYCODE_BACK, ACTION_UP);
 }
 
 /* While a dialog is shown, a press in the app's window is a touch outside of the dialog. On AOSP

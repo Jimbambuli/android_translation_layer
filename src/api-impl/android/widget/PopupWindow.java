@@ -13,6 +13,7 @@ import android.transition.Transition;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 
 public class PopupWindow {
@@ -320,6 +321,30 @@ public class PopupWindow {
 	public void setOnDismissListener(OnDismissListener listener) {
 		on_dismiss_listener = listener;
 		native_setOnDismissListener(popover);
+	}
+
+	/* AOSP's PopupWindow.PopupDecorView.dispatchKeyEvent(): Back and Escape dismiss the popup. ATL
+	 * has no decor view; the popup hands this the keys that reach it before its content gets them,
+	 * and false is super.dispatchKeyEvent(), the content then gets the key. */
+	@Export
+	private boolean dispatchDecorKeyEvent(KeyEvent event) {
+		if (event.getKeyCode() == KeyEvent.KEYCODE_BACK || event.getKeyCode() == KeyEvent.KEYCODE_ESCAPE) {
+			final KeyEvent.DispatcherState state = contentView != null ? contentView.getKeyDispatcherState() : null;
+			if (state == null) {
+				return false;
+			}
+
+			if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+				state.startTracking(event, this);
+				return true;
+			} else if (event.getAction() == KeyEvent.ACTION_UP) {
+				if (state.isTracking(event) && !event.isCanceled()) {
+					dismiss();
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/* called from native code when the popup is dismissed */

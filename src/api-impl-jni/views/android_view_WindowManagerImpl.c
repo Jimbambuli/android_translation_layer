@@ -84,11 +84,11 @@ void atl_swallow_rest_of_press(GtkWidget *widget)
 	swallowing_press = TRUE;
 }
 
-/* Android's overflow/popup menus stay open on Escape (only Back dismisses them, and ATL maps
- * Escape to Escape, not Back) while an outside press still closes them. GTK's popover autohide
- * would pop the menu down on Escape too, so swallow Escape here, in the capture phase, before the
- * autohide binding sees it; the outside-press grab is untouched. */
-static gboolean on_popover_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+/* A window added with WindowManager.addView() gets Escape as KEYCODE_ESCAPE through its views,
+ * which decide what it does (Compose's popups close on Back only); unlike a GtkPopover, an Android
+ * window has no default action for it. So an Escape that the views did not consume stops here,
+ * after them and before GtkPopover's key handler, which would pop the window down. */
+static gboolean on_window_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
 {
 	return keyval == GDK_KEY_Escape;
 }
@@ -111,8 +111,8 @@ static void add_window_style(GtkPopover *popover)
 /* An added window is a popover in the widget of the app's window, like the popups of
  * PopupWindow: not in the current activity's page, which removes it while its views are detached
  * from the window (Compose removes its popups then), and with its top left corner at (x, y) as the
- * gravity measures them. A touch-modal window closes on a press outside of it or Escape (GTK's
- * autohide), which the view learns as an outside touch. */
+ * gravity measures them. A touch-modal window closes on a press outside of it (GTK's autohide),
+ * which the view learns as an outside touch. */
 JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEnv *env, jclass clazz, jlong widget_ptr, jobject view, jint type, jboolean touch_modal, jint gravity, jint x, jint y, jint width, jint height)
 {
 	GtkWidget *widget = _PTR(widget_ptr);
@@ -132,11 +132,10 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEn
 		touch_modal_windows++;
 		g_object_set_data(G_OBJECT(popover), "touch-modal", GINT_TO_POINTER(1));
 		g_signal_connect_data(popover, "closed", G_CALLBACK(on_closed), _REF(view), release_view, 0);
-		GtkEventController *key_controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
-		gtk_event_controller_set_propagation_phase(key_controller, GTK_PHASE_CAPTURE);
-		g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_popover_key_pressed), NULL);
-		gtk_widget_add_controller(GTK_WIDGET(popover), key_controller);
 	}
+	GtkEventController *key_controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
+	g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_window_key_pressed), NULL);
+	gtk_widget_add_controller(gtk_widget_get_parent(widget), key_controller);
 	gtk_widget_insert_before(GTK_WIDGET(popover), gtk_window_get_child(window), NULL);
 	atl_popover_place_at_location(popover, gravity, x, y);
 	gtk_popover_present(popover);

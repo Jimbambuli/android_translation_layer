@@ -461,23 +461,37 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		return false;
 	}
 
+	/* AOSP's Dialog.dispatchKeyEvent() */
 	@Override
 	public boolean dispatchKeyEvent(KeyEvent event) {
-		if (onKeyListener != null && onKeyListener.onKey(this, event.getKeyCode(), event))
+		if ((onKeyListener != null) && (onKeyListener.onKey(this, event.getKeyCode(), event))) {
 			return true;
-		if (event.getAction() == KeyEvent.ACTION_DOWN)
-			return onKeyDown(event.getKeyCode(), event);
-		if (event.getAction() == KeyEvent.ACTION_UP)
-			return onKeyUp(event.getKeyCode(), event);
+		}
+		if (window.superDispatchKeyEvent(event)) {
+			return true;
+		}
+		View decor = window.getDecorView();
+		return event.dispatch(this, decor != null
+		    ? decor.getKeyDispatcherState() : null, this);
+	}
+
+	/* AOSP's Dialog.onKeyDown() */
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+			event.startTracking();
+			return true;
+		}
+
 		return false;
 	}
 
-	public boolean onKeyDown(int keyCode, KeyEvent event) {
-		return keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE;
-	}
-
+	/* AOSP's Dialog.onKeyUp(). ATL has no ViewRootImpl that hands Back to the window's
+	 * OnBackInvokedDispatcher, so the dialog does it here and calls onBackPressed() only when no
+	 * callback is registered. */
 	public boolean onKeyUp(int keyCode, KeyEvent event) {
-		if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
+		if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE)
+		    && event.isTracking()
+		    && !event.isCanceled()) {
 			if (!((android.window.WindowOnBackInvokedDispatcher)getOnBackInvokedDispatcher()).dispatchOnBackInvoked())
 				onBackPressed();
 			return true;
