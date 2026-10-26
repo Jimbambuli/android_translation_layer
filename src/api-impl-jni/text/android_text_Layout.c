@@ -99,6 +99,39 @@ static void line_extents(PangoLayout *pango_layout, int line, PangoRectangle *lo
 	pango_layout_iter_free(pango_iter);
 }
 
+/* AOSP adds (mult - 1) * line height + add between lines, not after the last one; Pango's spacing
+ * does the same (with one line height for the whole layout). Indents: Pango knows a first-line
+ * indent and a hanging indent of all other lines, not both at once. */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1paragraph_1style(JNIEnv *env, jclass class, jlong layout, jfloat spacing_mult, jfloat spacing_add, jboolean justify, jint first_indent, jint rest_indent)
+{
+	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
+	float spacing = spacing_add * PANGO_SCALE;
+	if (spacing_mult != 1.0f) {
+		PangoRectangle logical_rect;
+		line_extents(pango_layout, 0, &logical_rect);
+		spacing += logical_rect.height * (spacing_mult - 1.0f);
+	}
+	pango_layout_set_spacing(pango_layout, spacing);
+	pango_layout_set_justify(pango_layout, justify);
+	if (rest_indent == 0)
+		pango_layout_set_indent(pango_layout, first_indent * PANGO_SCALE);
+	else if (first_indent == 0)
+		pango_layout_set_indent(pango_layout, -rest_indent * PANGO_SCALE);
+}
+
+/* AOSP's StaticLayout stops after max_lines lines and ellipsizes the last; a positive height makes
+ * Pango do the same (a negative one would count lines per paragraph) */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1max_1lines(JNIEnv *env, jclass class, jlong layout, jint max_lines, jint ellipsize_mode)
+{
+	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
+	if (max_lines < 1 || pango_layout_get_line_count(pango_layout) <= max_lines)
+		return;
+	PangoRectangle logical_rect;
+	line_extents(pango_layout, max_lines - 1, &logical_rect);
+	pango_layout_set_ellipsize(pango_layout, (PangoEllipsizeMode)ellipsize_mode);
+	pango_layout_set_height(pango_layout, logical_rect.y + logical_rect.height);
+}
+
 JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1width(JNIEnv *env, jobject object, jlong layout, jint width)
 {
 	PangoLayout *pango_layout = _PTR(layout);

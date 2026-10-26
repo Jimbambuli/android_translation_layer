@@ -57,6 +57,22 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1alignment
 
 /*
  * Class:     android_text_Layout
+ * Method:    native_set_paragraph_style
+ * Signature: (JFFZII)V
+ */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1paragraph_1style
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jboolean, jint, jint);
+
+/*
+ * Class:     android_text_Layout
+ * Method:    native_set_max_lines
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1max_1lines
+  (JNIEnv *, jclass, jlong, jint, jint);
+
+/*
+ * Class:     android_text_Layout
  * Method:    native_get_width
  * Signature: (J)I
  */

@@ -33,6 +33,7 @@ public class Layout {
 	private float spacing_mult;
 	private float spacing_add;
 	private Alignment align;
+	private int maxLines = Integer.MAX_VALUE;
 
 	protected Layout(CharSequence text, TextPaint paint, int width, Layout.Alignment align, float spacingMult, float spacingAdd) {
 		if (text instanceof Spanned) {
@@ -103,8 +104,24 @@ public class Layout {
 			native_set_alignment(layout, 0);
 	}
 
+	/* StaticLayout.Builder: line spacing as AOSP (extra space between lines, not after the last),
+	 * JUSTIFICATION_MODE_INTER_WORD, first-line or hanging indent */
+	void setParagraphStyle(float spacingMult, float spacingAdd, boolean justify, int firstIndent, int restIndent) {
+		spacing_mult = spacingMult;
+		spacing_add = spacingAdd;
+		native_set_paragraph_style(layout, spacingMult, spacingAdd, justify, firstIndent, restIndent);
+	}
+
+	/* StaticLayout.Builder: like AOSP only the first maxLines lines exist; with ellipsize the last of
+	 * them ends in an ellipsis (Pango does that natively), without it the rest is cut off */
+	void setMaxLines(int maxLines, TextUtils.TruncateAt ellipsize) {
+		this.maxLines = maxLines;
+		if (ellipsize != null && ellipsize != TextUtils.TruncateAt.MARQUEE)
+			native_set_max_lines(layout, maxLines, ellipsize.ordinal() + 1);
+	}
+
 	public int getLineCount() {
-		return native_get_line_count(layout);
+		return Math.min(native_get_line_count(layout), maxLines);
 	}
 
 	public float getLineWidth(int line) {
@@ -130,10 +147,23 @@ public class Layout {
 	}
 
 	public int getHeight() {
+		if (native_get_line_count(layout) > maxLines)
+			return getLineBottom(maxLines - 1);
 		return native_get_height(layout);
 	}
 
 	public void draw(Canvas canvas) {
+		if (native_get_line_count(layout) > maxLines) {
+			canvas.save();
+			canvas.clipRect(-1e6f, 0, 1e6f, getHeight()); // only the lines below the last are cut
+			drawLayout(canvas);
+			canvas.restore();
+		} else {
+			drawLayout(canvas);
+		}
+	}
+
+	private void drawLayout(Canvas canvas) {
 		if (canvas instanceof GskCanvas)
 			native_draw(layout, ((GskCanvas)canvas).snapshot, paint.paint);
 		else
@@ -330,6 +360,9 @@ public class Layout {
 	protected native void native_set_width(long layout, int width);
 	/* 0 left, 1 center, 2 right (the layout direction is always LTR) */
 	private static native void native_set_alignment(long layout, int alignment);
+	private static native void native_set_paragraph_style(long layout, float spacing_mult, float spacing_add, boolean justify, int first_indent, int rest_indent);
+	/* ellipsize_mode as PangoEllipsizeMode */
+	private static native void native_set_max_lines(long layout, int max_lines, int ellipsize_mode);
 	protected native int native_get_width(long layout);
 	protected native int native_get_height(long layout);
 	protected native int native_get_line_count(long layout);
