@@ -53,6 +53,7 @@ public class WebSettings {
 
 	public void setLoadWithOverviewMode(boolean overview) {}
 
+	public void setNeedInitialFocus(boolean flag) {}
 	public void setRenderPriority(RenderPriority priority) {}
 
 	public void setBlockNetworkLoads(boolean block) {}
