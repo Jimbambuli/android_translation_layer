@@ -340,22 +340,27 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
 		Slog.i(TAG, "startActivityForResult(" + intent + ", " + requestCode + "," + options + ") called");
 		if (intent.getComponent() != null) {
-			try {
-				final Activity activity = internalCreateActivity(intent.getComponent().getClassName(), getWindow().native_window, intent);
-				activity.resultRequestCode = requestCode;
-				activity.resultActivity = this;
-				/* like on Android (and like Context.startActivity), the new activity starts after the
-				 * caller has returned: started from onCreate(), it must come up after the caller's
-				 * onResume(), not be paused by it */
-				new Handler(Looper.getMainLooper()).post(new Runnable() {
-					@Override
-					public void run() {
-						nativeStartActivity(activity);
+			/* like on Android (and like Context.startActivity), the new activity starts after the
+			 * caller has returned: started from onCreate(), it must come up after the caller's
+			 * onResume(), not be paused by it; and like AOSP, the caller is paused before the new
+			 * activity is created */
+			new Handler(Looper.getMainLooper()).post(new Runnable() {
+				@Override
+				public void run() {
+					nativePauseCurrentActivity(intent);
+					final Activity activity;
+					try {
+						activity = internalCreateActivity(intent.getComponent().getClassName(), getWindow().native_window, intent);
+					} catch (ReflectiveOperationException e) {
+						nativeResumeCurrentActivity();
+						onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
+						return;
 					}
-				});
-			} catch (ReflectiveOperationException e) {
-				onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
-			}
+					activity.resultRequestCode = requestCode;
+					activity.resultActivity = Activity.this;
+					nativeStartActivity(activity);
+				}
+			});
 		} else if (FILE_CHOOSER_ACTIONS.contains(intent.getAction())) {
 			nativeFileChooser(FILE_CHOOSER_ACTIONS.indexOf(intent.getAction()), intent.getType(), intent.getStringExtra("android.intent.extra.TITLE"), requestCode);
 		} else if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())) {
@@ -447,14 +452,27 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return lastNonConfigurationInstance;
 	}
 
+	@Export
 	public Object onRetainNonConfigurationInstance() {
 		return null;
 	}
 
-	/* called from native code by recreate(), after the state was saved and before this instance is destroyed */
+	/* called from native code by recreate() once this instance is destroyed: like AOSP's
+	 * handleRelaunchActivity(), the new instance is created after the old one is gone, and gets what
+	 * the old one retained (onRetainNonConfigurationInstance(), before it was destroyed) */
 	@Export
-	private void retainNonConfigurationInstanceFor(Activity next) {
-		next.lastNonConfigurationInstance = onRetainNonConfigurationInstance();
+	private Activity createRelaunched(Object lastNonConfigurationInstance) {
+		try {
+			Activity activity = internalCreateActivity(this.getClass().getName(), getWindow().native_window, intent);
+			activity.resultRequestCode = resultRequestCode;
+			activity.resultActivity = resultActivity;
+			activity.lastNonConfigurationInstance = lastNonConfigurationInstance;
+			return activity;
+		} catch (ReflectiveOperationException e) {
+			Slog.i(TAG, "exception in Activity.recreate, this is kinda sus");
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	public FragmentManager getFragmentManager() {
@@ -582,20 +600,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	 * it is created from that state in its place in the back stack */
 	public void recreate() {
 		changingConfigurations = true;
-		try {
-			Activity activity = internalCreateActivity(this.getClass().getName(), getWindow().native_window, intent);
-			activity.resultRequestCode = resultRequestCode;
-			activity.resultActivity = resultActivity;
-			new Handler(Looper.getMainLooper()).post(new Runnable() {
-				@Override
-				public void run() {
-					nativeRecreate(activity);
-				}
-			});
-		} catch (ReflectiveOperationException e) {
-			Slog.i(TAG, "exception in Activity.recreate, this is kinda sus");
-			e.printStackTrace();
-		}
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				nativeRecreate();
+			}
+		});
 	}
 
 	/* Called by the decor view when the window was resized or (un)maximized. Like Android, the screen
@@ -851,7 +861,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	private native void nativeFinish(long native_window);
 	public static native void nativeStartActivity(Activity activity);
-	private native void nativeRecreate(Activity activity);
+	private native void nativeRecreate();
+	static native void nativePauseCurrentActivity(Intent intent);
+	static native void nativeResumeCurrentActivity();
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
 	public static native void nativeOpenURI(String uri);
 	public native void nativeFileChooser(int action, String type, String title, int requestCode);

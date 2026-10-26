@@ -436,15 +436,19 @@ static gboolean delayed_close_window(gpointer window)
 
 #define FLAG_ACTIVITY_NO_USER_ACTION 0x00040000
 
+static bool is_user_leaving(JNIEnv *env, jobject intent)
+{
+	return !intent || !((*env)->CallIntMethod(env, intent, _METHOD(_CLASS(intent), "getFlags", "()I")) & FLAG_ACTIVITY_NO_USER_ACTION);
+}
+
 void activity_start(JNIEnv *env, jobject activity_object)
 {
 	jobject activity_old = activity_current;
 	transition_from = activity_current;
 	transition_opening = TRUE;
-	if (activity_old) {
+	if (activity_old) { // (unless it was paused before the new activity was created)
 		jobject intent = _GET_OBJ_FIELD(activity_object, "intent", "Landroid/content/Intent;");
-		bool user_leaving = !intent || !((*env)->CallIntMethod(env, intent, _METHOD(_CLASS(intent), "getFlags", "()I")) & FLAG_ACTIVITY_NO_USER_ACTION);
-		activity_pause(env, activity_old, user_leaving);
+		activity_pause(env, activity_old, is_user_leaving(env, intent));
 		stop_later(env, activity_old);
 	}
 	activity_current = NULL;
@@ -514,11 +518,25 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity(JNIEnv *env
 	activity_start(env, activity);
 }
 
+/* like AOSP, the activity that is left is paused before the next one is created */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativePauseCurrentActivity(JNIEnv *env, jclass class, jobject intent)
+{
+	if (activity_current)
+		activity_pause(env, activity_current, is_user_leaving(env, intent));
+}
+
+/* the next activity could not be created: the one that was paused for it comes back */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeResumeCurrentActivity(JNIEnv *env, jclass class)
+{
+	if (activity_current && _GET_BOOL_FIELD(activity_current, "paused"))
+		activity_focus(env, activity_current);
+}
+
 /* Activity.recreate(): the new instance takes the place of this one in the back stack and is
  * created from the state this one saved after being stopped, and gets what it retained with
  * onRetainNonConfigurationInstance() (AndroidX keeps its ViewModels there). The start follows when it
  * is focused, then onRestoreInstanceState() and onPostCreate() (see Activity.performStart()). */
-JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, jobject this, jobject activity)
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, jobject this)
 {
 	GList *l;
 	for (l = activity_backlog; l != NULL; l = l->next) {
@@ -536,15 +554,29 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	activity_stop(env, old_activity, true);
 
 	jobject saved_state = (*env)->GetObjectField(env, old_activity, _FIELD_ID(_CACHED_CLASS(Activity), "savedState", "Landroid/os/Bundle;"));
-	J__Activity__retainNonConfigurationInstanceFor(env, old_activity, activity);
+	jobject retained = J__Activity__onRetainNonConfigurationInstance(env, old_activity);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
+		retained = NULL;
 	}
 	/* as on AOSP, the old instance is destroyed before the new one is created: apps that keep their
 	 * pages outside the activity (JW Library) tear them down in onDestroy() and set them up again in
 	 * onCreate() */
 	activity_close(env, old_activity);
+
+	jobject activity = J__Activity__createRelaunched(env, old_activity, retained);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		activity = NULL;
+	}
+	if (!activity) {
+		activity_backlog = g_list_delete_link(activity_backlog, l);
+		_UNREF(old_activity);
+		activity_update_current(env);
+		return;
+	}
 
 	J__Activity__performCreate(env, activity, saved_state);
 	if ((*env)->ExceptionCheck(env)) {

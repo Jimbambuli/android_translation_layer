@@ -70,10 +70,26 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity
 /*
  * Class:     android_app_Activity
  * Method:    nativeRecreate
- * Signature: (Landroid/app/Activity;)V
+ * Signature: ()V
  */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate
-  (JNIEnv *, jobject, jobject);
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativePauseCurrentActivity
+ * Signature: (Landroid/content/Intent;)V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativePauseCurrentActivity
+  (JNIEnv *, jclass, jobject);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeResumeCurrentActivity
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeResumeCurrentActivity
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_app_Activity

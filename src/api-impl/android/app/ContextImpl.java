@@ -397,11 +397,14 @@ public final class ContextImpl extends Context {
 						if (found)
 							return;
 					}
+					/* like AOSP, the activity that is left is paused before the new one is created */
+					Activity.nativePauseCurrentActivity(intent_);
 					Activity activity = Activity.internalCreateActivity(
 					    className_, ContextImpl.this.atl_loaded_app.getNativeWindow(), intent_);
 					Activity.nativeStartActivity(activity);
 				} catch (Exception e) {
 					e.printStackTrace();
+					Activity.nativeResumeCurrentActivity();
 				}
 			}
 		});
