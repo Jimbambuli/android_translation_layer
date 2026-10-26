@@ -193,6 +193,67 @@ static void start_scrim(JNIEnv *env, GtkStack *stack, GtkWidget *page, int durat
 	gtk_widget_add_tick_callback(GTK_WIDGET(stack), scrim_tick, anim, scrim_anim_free);
 }
 
+static void weak_ref_free(gpointer ref)
+{
+	g_weak_ref_clear(ref);
+	g_free(ref);
+}
+
+/* gives the focus back to a widget without the viewports around it scrolling to it */
+static void grab_focus_in_place(GtkWidget *widget)
+{
+	GSList *viewports = NULL;
+	for (GtkWidget *w = widget; w; w = gtk_widget_get_parent(w)) {
+		if (GTK_IS_VIEWPORT(w) && gtk_viewport_get_scroll_to_focus(GTK_VIEWPORT(w))) {
+			gtk_viewport_set_scroll_to_focus(GTK_VIEWPORT(w), FALSE);
+			viewports = g_slist_prepend(viewports, w);
+		}
+	}
+	gtk_widget_grab_focus(widget);
+	for (GSList *l = viewports; l; l = l->next)
+		gtk_viewport_set_scroll_to_focus(GTK_VIEWPORT(l->data), TRUE);
+	g_slist_free(viewports);
+}
+
+/* On Android every activity has a window of its own, which keeps its focused view while another
+ * activity is in front; a window that gets the focus back assigns no new focus and does not scroll.
+ * Here all activities are pages of one GtkStack, which would move the focus to the widget focused
+ * in the page before, or else to the first focusable one, and the viewports of the scroll views
+ * would then scroll to it (e.g. back to the top of a page that the user had scrolled down). So
+ * remember the focus of the page that is left, and only give it back, in place, when the page is
+ * shown again; a page shown for the first time gets the first focusable widget, as from GtkStack. */
+static void stack_show_page(GtkStack *stack, GtkWidget *page)
+{
+	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(stack));
+	GtkWidget *old_page = gtk_stack_get_visible_child(stack);
+	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
+	gboolean had_focus = old_page && focus && gtk_widget_is_ancestor(focus, old_page);
+
+	if (old_page && old_page != page) {
+		GWeakRef *ref = g_new(GWeakRef, 1);
+		g_weak_ref_init(ref, had_focus ? focus : NULL);
+		g_object_set_data_full(G_OBJECT(old_page), "atl-last-focus", ref, weak_ref_free);
+		if (had_focus)
+			gtk_root_set_focus(root, NULL);
+	}
+
+	gtk_stack_set_visible_child(stack, page);
+
+	if (!had_focus || old_page == page)
+		return;
+	GWeakRef *ref = g_object_get_data(G_OBJECT(page), "atl-last-focus");
+	if (!ref) {
+		gtk_widget_child_focus(page, GTK_DIR_TAB_FORWARD);
+		return;
+	}
+	GtkWidget *last_focus = g_weak_ref_get(ref);
+	if (last_focus) {
+		if (gtk_widget_is_ancestor(last_focus, page))
+			grab_focus_in_place(last_focus);
+		g_object_unref(last_focus);
+	}
+}
+
 static void activity_focus(JNIEnv *env, jobject activity)
 {
 	if (_GET_BOOL_FIELD(activity, "finishing"))
@@ -223,7 +284,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	transition_from = NULL;
 	gtk_stack_set_transition_type(stack, transition & 0xff);
 	gtk_stack_set_transition_duration(stack, transition >> 8);
-	gtk_stack_set_visible_child(stack, decor_view);
+	stack_show_page(stack, decor_view);
 	start_scrim(env, stack, decor_view, transition >> 8);
 
 	J__Activity__performResume(env, activity);
