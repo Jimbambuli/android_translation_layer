@@ -11,6 +11,7 @@ import android.view.ViewGroup;
 public class WebView extends ViewGroup {
 
 	private WebViewClient webViewClient;
+	private String url;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -44,6 +45,7 @@ public class WebView extends ViewGroup {
 	// to be used by native code
 	@Export
 	void internalLoadChanged(int loadState, String url) {
+		this.url = url;
 		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0 && webViewClient != null) {
 			webViewClient.onPageStarted(this, url);
 		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3 && webViewClient != null) {
@@ -102,7 +104,15 @@ public class WebView extends ViewGroup {
 		native_loadUrl(widget, url);
 	}
 
+	public String getUrl() {
+		return url;
+	}
+
 	public void stopLoading() {}
+
+	public void reload() {
+		native_reload(widget);
+	}
 
 	// to be used by native code
 	@Export
@@ -149,4 +159,5 @@ public class WebView extends ViewGroup {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);
 	private native void native_loadUrl(long widget, String url);
+	private native void native_reload(long widget);
 }
