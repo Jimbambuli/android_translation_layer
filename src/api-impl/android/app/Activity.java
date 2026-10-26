@@ -40,6 +40,7 @@ import android.view.WindowManagerImpl;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
+import android.window.SizeConfigurationBuckets;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -68,6 +69,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	List<Fragment> fragments = new ArrayList<>();
 	boolean destroyed = false;
 	private boolean finishing = false;
+	private SizeConfigurationBuckets mSizeConfigurations;
 
 	public static Activity internalCreateActivity(String className, long native_window, Intent intent) throws ReflectiveOperationException {
 		Activity activity = ATLLoadedApp.getPrimaryApplication().createActivity(className, intent);
@@ -596,9 +598,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	/* Called by the decor view when the window was resized or (un)maximized. Like Android, the screen
-	 * size of the configuration follows the window. An activity that handles the change itself (its
-	 * configChanges) gets onConfigurationChanged(); otherwise it is relaunched if the new size crosses
-	 * a size that the app has resources for (w<N>dp, h<N>dp), else only the resources follow. */
+	 * size of the configuration follows the window. As in ActivityRecord.getConfigurationChanges() and
+	 * shouldRelaunchLocked(), the activity is relaunched if the change minus the size changes that cross
+	 * no size bucket of the app (SizeConfigurationBuckets) is not handled by its configChanges; otherwise
+	 * the resources follow and ActivityThread.shouldReportChange() decides on onConfigurationChanged(). */
 	public void internalWindowSizeChanged() {
 		Resources resources = getResources();
 		Configuration oldConfig = new Configuration(resources.getConfiguration());
@@ -621,22 +624,36 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			handled = getPackageManager().getActivityInfo(getComponentName(), 0).getRealConfigChanged();
 		} catch (PackageManager.NameNotFoundException e) {
 		}
-		if ((diff & ~handled) == 0)
-			onConfigurationChanged(new Configuration(newConfig));
-		else if (crossesSizeThreshold(oldConfig, newConfig))
+		/* ActivityThread.reportSizeConfigurations() */
+		if (mSizeConfigurations == null)
+			mSizeConfigurations = new SizeConfigurationBuckets(resources.getSizeConfigurations());
+		int changes = SizeConfigurationBuckets.filterDiff(diff, oldConfig, newConfig, mSizeConfigurations);
+		if ((changes & ~handled) != 0)
 			recreate();
+		else if (shouldReportChange(oldConfig, newConfig, mSizeConfigurations, handled))
+			onConfigurationChanged(new Configuration(newConfig));
 	}
 
-	private boolean crossesSizeThreshold(Configuration a, Configuration b) {
-		for (Configuration size : getAssets().getSizeConfigurations()) {
-			if (crosses(size.screenWidthDp, a.screenWidthDp, b.screenWidthDp) || crosses(size.screenHeightDp, a.screenHeightDp, b.screenHeightDp))
-				return true;
+	/* ActivityThread.shouldReportChange(), without the window bounds and alwaysReportChange */
+	private static boolean shouldReportChange(Configuration currentConfig, Configuration newConfig,
+						  SizeConfigurationBuckets sizeBuckets, int handledConfigChanges) {
+		final int publicDiff = currentConfig.diff(newConfig);
+		// Don't report the change if there's no public diff between current and new config.
+		if (publicDiff == 0) {
+			return false;
 		}
-		return false;
-	}
 
-	private static boolean crosses(int threshold, int a, int b) {
-		return threshold != Configuration.SCREEN_WIDTH_DP_UNDEFINED && (a >= threshold) != (b >= threshold);
+		final int diffWithBucket = SizeConfigurationBuckets.filterDiff(publicDiff, currentConfig,
+				newConfig, sizeBuckets);
+		// Compare to the diff which filter the change without crossing size buckets with
+		// {@code handledConfigChanges}. The small changes should not block Activity to receive
+		// its handled config updates. Also, if Activity handles all small changes, we should
+		// dispatch the updated config to it.
+		final int diff = diffWithBucket != 0 ? diffWithBucket : publicDiff;
+		// If this activity doesn't handle any of the config changes, then don't bother
+		// calling onConfigurationChanged. Otherwise, report to the activity for the
+		// changes.
+		return (~handledConfigChanges & diff) == 0;
 	}
 
 	private Bundle performSaveInstanceState() {

@@ -236,6 +236,30 @@ public final class Configuration implements Comparable<Configuration> {
 	 */
 	public static final int SCREENLAYOUT_LAYOUTDIR_RTL = 0x02 << SCREENLAYOUT_LAYOUTDIR_SHIFT;
 
+	/** Constant for {@link #screenLayout}: bits that encode roundness of the screen. */
+	public static final int SCREENLAYOUT_ROUND_MASK = 0x300;
+	/** @hide Constant for {@link #screenLayout}: bit shift to get to screen roundness bits */
+	public static final int SCREENLAYOUT_ROUND_SHIFT = 8;
+	/**
+	 * Constant for {@link #screenLayout}: a {@link #SCREENLAYOUT_ROUND_MASK} value indicating
+	 * that it is unknown whether or not the screen has a round shape.
+	 */
+	public static final int SCREENLAYOUT_ROUND_UNDEFINED = 0x00;
+	/**
+	 * Constant for {@link #screenLayout}: a {@link #SCREENLAYOUT_ROUND_MASK} value indicating
+	 * that the screen does not have a rounded shape.
+	 */
+	public static final int SCREENLAYOUT_ROUND_NO = 0x1 << SCREENLAYOUT_ROUND_SHIFT;
+	/**
+	 * Constant for {@link #screenLayout}: a {@link #SCREENLAYOUT_ROUND_MASK} value indicating
+	 * that the screen has a rounded shape. Corners may not be visible to the user;
+	 * developers should pay special attention to the {@link android.view.WindowInsets} delivered
+	 * to views for more information about ensuring content is not obscured.
+	 *
+	 * <p>Corresponds to the <code>-round</code> resource qualifier.</p>
+	 */
+	public static final int SCREENLAYOUT_ROUND_YES = 0x2 << SCREENLAYOUT_ROUND_SHIFT;
+
 	/**
 	 * Constant for {@link #screenLayout}: a value indicating that screenLayout is undefined
 	 */

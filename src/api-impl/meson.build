@@ -828,6 +828,7 @@ srcs = [
 	'android/window/OnBackAnimationCallback.java',
 	'android/window/OnBackInvokedCallback.java',
 	'android/window/OnBackInvokedDispatcher.java',
+	'android/window/SizeConfigurationBuckets.java',
 	'android/window/WindowOnBackInvokedDispatcher.java',
 	'com/android/internal/Manifest.java',
 	'com/android/internal/R.java',

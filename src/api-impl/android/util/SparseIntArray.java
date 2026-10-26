@@ -17,6 +17,7 @@
 package android.util;
 
 import com.android.internal.util.ArrayUtils;
+import java.util.Arrays;
 
 /**
  * SparseIntArrays map integers to integers.  Unlike a normal array of integers,
@@ -261,6 +262,18 @@ public class SparseIntArray implements Cloneable {
 		mKeys[pos] = key;
 		mValues[pos] = value;
 		mSize = pos + 1;
+	}
+
+	/**
+	 * Provides a copy of keys.
+	 *
+	 * @hide
+	 * */
+	public int[] copyKeys() {
+		if (size() == 0) {
+			return null;
+		}
+		return Arrays.copyOf(mKeys, size());
 	}
 
 	/**
