@@ -589,6 +589,10 @@ public abstract class Context {
 
 	public abstract Context createDeviceProtectedStorageContext();
 
+	public AttributionSource getAttributionSource() {
+		return null;
+	}
+
 	public boolean moveSharedPreferencesFrom(Context sourceContext, String name) {
 		File sourceFile = sourceContext.getSharedPrefsFile(name);
 		if (!sourceFile.exists()) {
