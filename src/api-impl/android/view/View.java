@@ -2642,46 +2642,64 @@ public class View implements Drawable.Callback {
 
 	private boolean saveEnabled = true;
 	private boolean saveFromParentEnabled = true;
-	private boolean saveStateCalled;
+	private static final int PFLAG_SAVE_STATE_CALLED   = 0x00020000;
 
-	/* view state saving as in AOSP: every view with an id that has saving enabled stores what
-	 * onSaveInstanceState() returns under its id; Activity saves the window's views this way */
+	/* AOSP's view state saving (android-14 View.java), without the autofill state; ATL keeps
+	 * SAVE_DISABLED and PARENT_SAVE_DISABLED as saveEnabled and saveFromParentEnabled */
 	public void saveHierarchyState(SparseArray<Parcelable> container) {
 		dispatchSaveInstanceState(container);
 	}
 
 	protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
 		if (id != NO_ID && saveEnabled) {
-			saveStateCalled = false;
+			mPrivateFlags &= ~PFLAG_SAVE_STATE_CALLED;
 			Parcelable state = onSaveInstanceState();
-			if (!saveStateCalled)
-				throw new IllegalStateException("Derived class did not call super.onSaveInstanceState()");
-			if (state != null)
+			if ((mPrivateFlags & PFLAG_SAVE_STATE_CALLED) == 0) {
+				throw new IllegalStateException(
+						"Derived class did not call super.onSaveInstanceState()");
+			}
+			if (state != null) {
+				// Log.i("View", "Freezing #" + Integer.toHexString(mID)
+				// + ": " + state);
 				container.put(id, state);
+			}
 		}
 	}
 
 	protected Parcelable onSaveInstanceState() {
-		saveStateCalled = true;
+		mPrivateFlags |= PFLAG_SAVE_STATE_CALLED;
 		return BaseSavedState.EMPTY_STATE;
+	}
+
+	public void restoreHierarchyState(SparseArray<Parcelable> container) {
+		dispatchRestoreInstanceState(container);
 	}
 
 	protected void dispatchRestoreInstanceState(SparseArray<Parcelable> container) {
 		if (id != NO_ID) {
 			Parcelable state = container.get(id);
 			if (state != null) {
-				saveStateCalled = false;
+				// Log.i("View", "Restoreing #" + Integer.toHexString(mID)
+				// + ": " + state);
+				mPrivateFlags &= ~PFLAG_SAVE_STATE_CALLED;
 				onRestoreInstanceState(state);
-				if (!saveStateCalled)
-					throw new IllegalStateException("Derived class did not call super.onRestoreInstanceState()");
+				if ((mPrivateFlags & PFLAG_SAVE_STATE_CALLED) == 0) {
+					throw new IllegalStateException(
+							"Derived class did not call super.onRestoreInstanceState()");
+				}
 			}
 		}
 	}
 
 	protected void onRestoreInstanceState(Parcelable state) {
-		saveStateCalled = true;
-		if (state != null && !(state instanceof AbsSavedState))
-			throw new IllegalArgumentException("Wrong state class, expecting View State but received " + state.getClass().toString() + " instead. This usually happens when two views of different type have the same id in the same hierarchy. This view's id is " + id);
+		mPrivateFlags |= PFLAG_SAVE_STATE_CALLED;
+		if (state != null && !(state instanceof AbsSavedState)) {
+			throw new IllegalArgumentException("Wrong state class, expecting View State but "
+					+ "received " + state.getClass().toString() + " instead. This usually happens "
+					+ "when two views of different type have the same id in the same hierarchy. "
+					+ "This view's id is " + getId() + ". Make sure "
+					+ "other views do not use the same id.");
+		}
 	}
 
 	public boolean isSaveEnabled() {
@@ -3857,10 +3875,6 @@ public class View implements Drawable.Callback {
 		boolean result = native_getGlobalVisibleRect(widget, visibleRect);
 		globalOffset.set(visibleRect.left, visibleRect.top);
 		return result;
-	}
-
-	public void restoreHierarchyState(SparseArray<Parcelable> container) {
-		dispatchRestoreInstanceState(container);
 	}
 
 	public boolean isHovered() { return false; }

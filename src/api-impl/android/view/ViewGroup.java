@@ -447,14 +447,16 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
 		super.dispatchSaveInstanceState(container);
-		for (int i = 0; i < getChildCount(); i++) {
-			View child = getChildAt(i);
-			if (child.isSaveFromParentEnabled())
-				child.dispatchSaveInstanceState(container);
+		final View[] children = this.children.toArray(new View[0]);
+		final int count = children.length;
+		for (int i = 0; i < count; i++) {
+			View c = children[i];
+			if (c.isSaveFromParentEnabled()) {
+				c.dispatchSaveInstanceState(container);
+			}
 		}
 	}
 
-	/* for views that save their children's state themselves (e.g. ViewPager, RecyclerView) */
 	protected void dispatchFreezeSelfOnly(SparseArray<Parcelable> container) {
 		super.dispatchSaveInstanceState(container);
 	}
@@ -462,10 +464,13 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	protected void dispatchRestoreInstanceState(SparseArray<Parcelable> container) {
 		super.dispatchRestoreInstanceState(container);
-		for (int i = 0; i < getChildCount(); i++) {
-			View child = getChildAt(i);
-			if (child.isSaveFromParentEnabled())
-				child.dispatchRestoreInstanceState(container);
+		final View[] children = this.children.toArray(new View[0]);
+		final int count = children.length;
+		for (int i = 0; i < count; i++) {
+			View c = children[i];
+			if (c.isSaveFromParentEnabled()) {
+				c.dispatchRestoreInstanceState(container);
+			}
 		}
 	}
 

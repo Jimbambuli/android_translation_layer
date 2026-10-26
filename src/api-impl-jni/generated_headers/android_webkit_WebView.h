@@ -221,6 +221,8 @@ extern "C" {
 #define android_webkit_WebView_PFLAG_ACTIVATED 1073741824L
 #undef android_webkit_WebView_UNDEFINED_PADDING
 #define android_webkit_WebView_UNDEFINED_PADDING -2147483648L
+#undef android_webkit_WebView_PFLAG_SAVE_STATE_CALLED
+#define android_webkit_WebView_PFLAG_SAVE_STATE_CALLED 131072L
 #undef android_webkit_WebView_FLAG_CLIP_CHILDREN
 #define android_webkit_WebView_FLAG_CLIP_CHILDREN 1L
 #undef android_webkit_WebView_FLAG_INVALIDATE_REQUIRED

@@ -221,6 +221,8 @@ extern "C" {
 #define android_widget_Spinner_PFLAG_ACTIVATED 1073741824L
 #undef android_widget_Spinner_UNDEFINED_PADDING
 #define android_widget_Spinner_UNDEFINED_PADDING -2147483648L
+#undef android_widget_Spinner_PFLAG_SAVE_STATE_CALLED
+#define android_widget_Spinner_PFLAG_SAVE_STATE_CALLED 131072L
 #undef android_widget_Spinner_FLAG_CLIP_CHILDREN
 #define android_widget_Spinner_FLAG_CLIP_CHILDREN 1L
 #undef android_widget_Spinner_FLAG_INVALIDATE_REQUIRED

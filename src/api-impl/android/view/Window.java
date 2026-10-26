@@ -205,19 +205,31 @@ public class Window {
 
 	private static final String VIEWS_TAG = "android:views";
 
-	/* the state of the window's views (see View.saveHierarchyState()), as AOSP's PhoneWindow keeps it */
+	/* AOSP PhoneWindow.saveHierarchyState()/restoreHierarchyState() with the decor view as the content
+	 * parent; ATL: no panels, no action bar views, and the focused view is not saved (findFocus() is a stub) */
 	public Bundle saveHierarchyState() {
 		Bundle outState = new Bundle();
-		SparseArray<Parcelable> states = new SparseArray<>();
+		if (decorView == null) {
+			return outState;
+		}
+
+		SparseArray<Parcelable> states = new SparseArray<Parcelable>();
 		decorView.saveHierarchyState(states);
 		outState.putSparseParcelableArray(VIEWS_TAG, states);
+
 		return outState;
 	}
 
 	public void restoreHierarchyState(Bundle savedInstanceState) {
-		SparseArray<Parcelable> states = savedInstanceState.getSparseParcelableArray(VIEWS_TAG);
-		if (states != null)
-			decorView.restoreHierarchyState(states);
+		if (decorView == null) {
+			return;
+		}
+
+		SparseArray<Parcelable> savedStates
+				= savedInstanceState.getSparseParcelableArray(VIEWS_TAG);
+		if (savedStates != null) {
+			decorView.restoreHierarchyState(savedStates);
+		}
 	}
 
 	/* called when the activity is destroyed: like the observer of a window removed on AOSP, the

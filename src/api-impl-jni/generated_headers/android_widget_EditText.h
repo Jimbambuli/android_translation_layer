@@ -221,6 +221,8 @@ extern "C" {
 #define android_widget_EditText_PFLAG_ACTIVATED 1073741824L
 #undef android_widget_EditText_UNDEFINED_PADDING
 #define android_widget_EditText_UNDEFINED_PADDING -2147483648L
+#undef android_widget_EditText_PFLAG_SAVE_STATE_CALLED
+#define android_widget_EditText_PFLAG_SAVE_STATE_CALLED 131072L
 /*
  * Class:     android_widget_EditText
  * Method:    native_constructor
