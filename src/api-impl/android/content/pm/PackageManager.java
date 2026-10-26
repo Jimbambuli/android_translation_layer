@@ -2388,7 +2388,7 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentActivityOptions(
 	    ComponentName caller, Intent[] specifics, Intent intent, int flags) {
-		return null;
+		return Collections.emptyList();
 	}
 
 	/**
@@ -2434,7 +2434,7 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryBroadcastReceivers(Intent intent,
 	                                                 int flags, int userId) {
-		return null;
+		return queryBroadcastReceivers(intent, flags);
 	}
 
 	/**
@@ -2513,7 +2513,7 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentServicesAsUser(Intent intent,
 	                                                   int flags, int userId) {
-		return null;
+		return queryIntentServices(intent, flags);
 	}
 
 	/**
@@ -2521,7 +2521,7 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentContentProvidersAsUser(
 	    Intent intent, int flags, int userId) {
-		return null;
+		return Collections.emptyList();
 	}
 
 	/**
@@ -2537,7 +2537,7 @@ public class PackageManager {
 	 * @see #GET_RESOLVED_FILTER
 	 */
 	public List<ResolveInfo> queryIntentContentProviders(Intent intent, int flags) {
-		return null;
+		return queryIntentContentProvidersAsUser(intent, flags, UserHandle.myUserId());
 	}
 
 	/**
