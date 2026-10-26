@@ -2,10 +2,21 @@ package android.text.style;
 
 import android.text.Layout;
 
-public interface AlignmentSpan {
+public interface AlignmentSpan extends ParagraphStyle {
 
-	public static class Standard {
+	Layout.Alignment getAlignment();
 
-		public Standard(Layout.Alignment alignment) {}
+	public static class Standard implements AlignmentSpan {
+
+		private final Layout.Alignment mAlignment;
+
+		public Standard(Layout.Alignment alignment) {
+			mAlignment = alignment;
+		}
+
+		@Override
+		public Layout.Alignment getAlignment() {
+			return mAlignment;
+		}
 	}
 }

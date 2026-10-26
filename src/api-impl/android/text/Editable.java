@@ -1,6 +1,6 @@
 package android.text;
 
-public interface Editable extends CharSequence {
+public interface Editable extends CharSequence, GetChars, Spannable, Appendable {
 
 	public class Factory {
 		public static Factory getInstance() {

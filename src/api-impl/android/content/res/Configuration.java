@@ -1611,6 +1611,11 @@ public final class Configuration implements Comparable<Configuration> {
 		return screenLayout & ~SCREENLAYOUT_LAYOUTDIR_MASK;
 	}
 
+	/**
+	 * An undefined fontWeightAdjustment.
+	 */
+	public static final int FONT_WEIGHT_ADJUSTMENT_UNDEFINED = Integer.MAX_VALUE;
+
 	public int fontWeightAdjustment;
 
 	public boolean isScreenRound() {

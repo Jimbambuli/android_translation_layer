@@ -14,8 +14,15 @@ public class ImageSpan extends DynamicDrawableSpan {
 		drawable = d;
 	}
 
+	private String mSource;
+
 	public ImageSpan(Drawable d, String source) {
 		drawable = d;
+		mSource = source;
+	}
+
+	public String getSource() {
+		return mSource;
 	}
 
 	public ImageSpan(Drawable d, int verticalAlignment) {
