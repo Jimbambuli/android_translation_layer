@@ -11,7 +11,10 @@
 #include "WrapperWidget.h"
 
 #include "../generated_headers/android_view_View.h"
+#include "../generated_headers/android_webkit_CookieManager.h"
 #include "../generated_headers/android_webkit_WebView.h"
+
+extern GThread *main_thread_id;
 
 static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
 {
@@ -112,4 +115,50 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(J
 	char *data = malloc(data_len + 1); // + 1 for NUL
 	(*env)->GetStringUTFRegion(env, data_jstr, 0, data_jlen, data);
 	webkit_web_view_load_bytes(webview, g_bytes_new(data, data_len), mime_type ? _CSTRING(mime_type) : "text/html", encoding ? _CSTRING(encoding) : NULL, base_url ? _CSTRING(base_url) : NULL);
+}
+
+struct get_cookies_data {
+	gboolean done;
+	GList *cookies;
+};
+
+static void get_cookies_cb(GObject *cookie_manager, GAsyncResult *res, gpointer user_data)
+{
+	struct get_cookies_data *data = user_data;
+	data->cookies = webkit_cookie_manager_get_cookies_finish(WEBKIT_COOKIE_MANAGER(cookie_manager), res, NULL);
+	data->done = TRUE;
+}
+
+JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_native_1getCookie(JNIEnv *env, jobject this, jstring url)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return _JSTRING("");
+
+	// Android's getCookie is synchronous, so we need to iterate the main loop until WebKit replies
+	if (g_thread_self() != main_thread_id) {
+		fprintf(stderr, "CookieManager.getCookie: not supported off the main thread\n");
+		return _JSTRING("");
+	}
+
+	struct get_cookies_data data = {0};
+	const char *uri = _CSTRING(url);
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_get_cookies(cookie_manager, uri, NULL, get_cookies_cb, &data);
+	(*env)->ReleaseStringUTFChars(env, url, uri);
+	while (!data.done)
+		g_main_context_iteration(g_main_context_default(), TRUE);
+
+	if (!data.cookies)
+		return NULL;
+
+	GString *cookie_string = g_string_new(NULL);
+	for (GList *l = data.cookies; l; l = l->next) {
+		SoupCookie *cookie = l->data;
+		g_string_append_printf(cookie_string, "%s%s=%s", l == data.cookies ? "" : "; ", soup_cookie_get_name(cookie), soup_cookie_get_value(cookie));
+	}
+	g_list_free_full(data.cookies, (GDestroyNotify)soup_cookie_free);
+
+	jstring ret = _JSTRING(cookie_string->str);
+	g_string_free(cookie_string, TRUE);
+	return ret;
 }
