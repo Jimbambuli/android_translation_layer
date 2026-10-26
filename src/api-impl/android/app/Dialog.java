@@ -6,12 +6,14 @@ import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.DialogInterface;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.ActionMode;
 import android.view.Choreographer;
@@ -146,59 +148,35 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 					onStart();
 					started = true;
 				}
-				// Read the size of the main window. Floating dialogs should be smaller as specified in the windowMinWidth* attributes.
-				// Non-floating are typically constructed with MATCH_PARENT layout params and thus get the exact size of the main window.
-				// Most non-floating dialogs are technically dialogs, but are expected to behave more like full size activities.
-				Rect displayFrame = new Rect();
-				getWindow().getDecorView().getWindowVisibleDisplayFrame(displayFrame);
-
 				TypedArray a = context.obtainStyledAttributes(R.styleable.Window);
 				// like PhoneWindow.setCloseOnTouchOutsideIfNotSet()
 				if (!closeOnTouchOutsideSet)
 					closeOnTouchOutside = a.getBoolean(R.styleable.Window_windowCloseOnTouchOutside, false);
-				float windowWidthFraction = 1;
-				float minWidthFraction = 0; // like AOSP, no minimum width without the attribute
+				// Floating dialogs whose window does not wrap its width get the fraction of the main
+				// window that the windowMinWidth* attributes say. Non-floating are typically constructed
+				// with MATCH_PARENT layout params and thus get the exact size of the main window.
+				windowWidthFraction = 1;
 				if (a.getBoolean(R.styleable.Window_windowIsFloating, false)) {
-					int minWidthAttr = displayFrame.width() > displayFrame.height() ? R.styleable.Window_windowMinWidthMajor : R.styleable.Window_windowMinWidthMinor;
-					windowWidthFraction = a.getFraction(minWidthAttr, 1, 1, 1);
-					if (a.hasValue(minWidthAttr))
-						minWidthFraction = windowWidthFraction;
+					Rect displayFrame = new Rect();
+					getWindow().getDecorView().getWindowVisibleDisplayFrame(displayFrame);
+					windowWidthFraction = a.getFraction(displayFrame.width() > displayFrame.height() ? R.styleable.Window_windowMinWidthMajor : R.styleable.Window_windowMinWidthMinor, 1, 1, 1);
 				}
 				a.recycle();
 
-				LayoutParams lp = getWindow().getAttributes();
-				int widthMeasureSpec;
-				if (lp.width == LayoutParams.WRAP_CONTENT) {
-					// like AOSP: start at the preferred dialog width (wider if the content does not
-					// fit, see fitWindowToContent), the fraction is the minimum width
-					displayWidth = displayFrame.width();
-					baseWidth = Math.min(displayWidth, context.getResources().getDimensionPixelSize(com.android.internal.R.dimen.config_prefDialogWidth));
-					widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(baseWidth, View.MeasureSpec.AT_MOST);
-					getWindow().setMinWidth((int)(displayWidth * minWidthFraction));
-				} else {
-					widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.width >= 0 ? lp.width : (int)(displayFrame.width() * windowWidthFraction), View.MeasureSpec.EXACTLY);
-				}
-
-				int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(lp.height >= 0 ? lp.height : (int)(displayFrame.height()),
-				                                                         lp.height == LayoutParams.WRAP_CONTENT ? View.MeasureSpec.AT_MOST : View.MeasureSpec.EXACTLY);
-
-				getWindow().getDecorView().internalSetDefaultMeasureSpec(widthMeasureSpec, heightMeasureSpec);
-
-				wrapWidthMeasureSpec = widthMeasureSpec;
-				wrapHeightMeasureSpec = heightMeasureSpec;
 				if (!fitsWindowToContent) {
 					fitsWindowToContent = true;
 					getWindow().getDecorView().getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
 						@Override
 						public void onGlobalLayout() {
-							fitWindowToContent();
+							if (!showPending)
+								performTraversals();
 						}
 					});
 				}
 
 				shown = true;
 				showPending = true;
-				presentWhenLaidOut(3);
+				scheduleTraversals();
 			}
 		};
 		if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -208,66 +186,152 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		}
 	}
 
-	private int wrapWidthMeasureSpec;
-	private int displayWidth;
-	private int baseWidth;
-	private int wrapHeightMeasureSpec;
+	private float windowWidthFraction = 1;
 	private boolean fitsWindowToContent;
-	private int fittedWidth = -1;
-	private int fittedHeight = -1;
+	private int mWidth = -1;
+	private int mHeight = -1;
 
-	/* Like ViewRootImpl for a WRAP_CONTENT window: measure the content again after each layout and
-	 * resize the window when its size changed. GTK sizes the window only once, when it is shown,
-	 * and content that is created later (Compose composes when the view gets attached) stayed in a
-	 * window of the size measured before. */
-	private void fitWindowToContent() {
+	/* Like ViewRootImpl.scheduleTraversals() after WindowManager.addView(): the window's first
+	 * traversal runs in the next frame, when the content has been attached (Compose composes then),
+	 * measures it and shows the window with that size, so the compositor places it centred with its
+	 * final size. isShowing() is true from show() on, as on AOSP. */
+	private boolean showPending;
+	private boolean shown; // from show() until the dialog is dismissed
+	private void scheduleTraversals() {
+		Choreographer.getInstance().postFrameCallback(new Choreographer.FrameCallback() {
+			@Override
+			public void doFrame(long frameTimeNanos) {
+				if (!showPending)
+					return;
+				performTraversals();
+				showPending = false;
+				nativeShow(nativePtr);
+				if (!openWindows.contains(Dialog.this))
+					openWindows.add(Dialog.this);
+				animateWindow(true);
+				if (onShowListener != null)
+					onShowListener.onShow(Dialog.this);
+			}
+		});
+	}
+
+	/* The measuring part of ViewRootImpl.performTraversals(), for the first traversal and after each
+	 * layout (GTK sizes a window only when it is shown, content that changes later would stay in a
+	 * window of the size measured before): a window that wraps its content gets the size of it.
+	 * desiredWindowWidth/Height are the app's window (getWindowBoundsInsetSystemBars()); ATL keeps
+	 * its own width for a window that does not wrap its width (windowWidthFraction). */
+	private void performTraversals() {
 		LayoutParams lp = getWindow().getAttributes();
-		if (lp.width != LayoutParams.WRAP_CONTENT && lp.height != LayoutParams.WRAP_CONTENT)
-			return;
-		View decor = getWindow().getDecorView();
-		decor.measure(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
-		/* like ViewRootImpl.measureHierarchy: wider when the content does not fit */
-		int widthSize = View.MeasureSpec.getSize(wrapWidthMeasureSpec);
-		if (lp.width == LayoutParams.WRAP_CONTENT && (decor.getMeasuredWidthAndState() & View.MEASURED_STATE_TOO_SMALL) != 0 && widthSize < displayWidth) {
-			widthSize = widthSize == baseWidth ? (baseWidth + displayWidth) / 2 : displayWidth;
-			wrapWidthMeasureSpec = View.MeasureSpec.makeMeasureSpec(widthSize, View.MeasureSpec.AT_MOST);
-			decor.internalSetDefaultMeasureSpec(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
-			decor.measure(wrapWidthMeasureSpec, wrapHeightMeasureSpec);
+		View host = getWindow().getDecorView();
+		Rect frame = new Rect();
+		host.getWindowVisibleDisplayFrame(frame);
+		final int desiredWindowWidth = frame.width();
+		final int desiredWindowHeight = frame.height();
+		if (lp.width == LayoutParams.WRAP_CONTENT) {
+			measureHierarchy(host, lp, host.getContext().getResources(), desiredWindowWidth, desiredWindowHeight);
+		} else {
+			performMeasure(host, View.MeasureSpec.makeMeasureSpec(lp.width >= 0 ? lp.width : (int)(desiredWindowWidth * windowWidthFraction), View.MeasureSpec.EXACTLY),
+			               getRootMeasureSpec(desiredWindowHeight, lp.height));
 		}
-		int width = lp.width == LayoutParams.WRAP_CONTENT ? decor.getMeasuredWidth() : lp.width;
-		int height = lp.height == LayoutParams.WRAP_CONTENT ? decor.getMeasuredHeight() : lp.height;
-		if (width == fittedWidth && height == fittedHeight)
+		/* GTK measures the decor view again when it lays out the window, with the default measure
+		 * spec: that is the one the window was measured with (setting it requests a layout) */
+		if (measuredWidthSpec != defaultWidthSpec || measuredHeightSpec != defaultHeightSpec) {
+			defaultWidthSpec = measuredWidthSpec;
+			defaultHeightSpec = measuredHeightSpec;
+			host.internalSetDefaultMeasureSpec(measuredWidthSpec, measuredHeightSpec);
+		}
+		if (lp.width != LayoutParams.WRAP_CONTENT && lp.height != LayoutParams.WRAP_CONTENT)
+			return; // GTK gives the window its size
+		int width = lp.width == LayoutParams.WRAP_CONTENT ? host.getMeasuredWidth() : lp.width;
+		int height = lp.height == LayoutParams.WRAP_CONTENT ? host.getMeasuredHeight() : lp.height;
+		if (width == mWidth && height == mHeight)
 			return;
-		fittedWidth = width;
-		fittedHeight = height;
+		mWidth = width;
+		mHeight = height;
 		getWindow().set_layout(getWindow().native_window, width, height);
 	}
 
-	/* Like AOSP, which shows the window after its first traversal: content that is created when it
-	 * gets attached (Compose composes in the next frame) is laid out first, so that the window is
-	 * mapped, and placed by the compositor, with its final size. */
-	private boolean showPending;
-	private boolean shown; // from show() until the dialog is dismissed
-	private void presentWhenLaidOut(final int framesLeft) {
-		if (!showPending)
-			return;
-		fitWindowToContent();
-		if ((fittedWidth <= 0 || fittedHeight <= 0) && framesLeft > 0) {
-			Choreographer.getInstance().postFrameCallback(new Choreographer.FrameCallback() {
-				@Override
-				public void doFrame(long frameTimeNanos) {
-					presentWhenLaidOut(framesLeft - 1);
+	private int measuredWidthSpec;
+	private int measuredHeightSpec;
+	private int defaultWidthSpec;
+	private int defaultHeightSpec;
+
+	/* ViewRootImpl.performMeasure() */
+	private void performMeasure(View host, int childWidthMeasureSpec, int childHeightMeasureSpec) {
+		host.measure(childWidthMeasureSpec, childHeightMeasureSpec);
+		measuredWidthSpec = childWidthMeasureSpec;
+		measuredHeightSpec = childHeightMeasureSpec;
+	}
+
+	private final TypedValue mTmpValue = new TypedValue();
+
+	/* ViewRootImpl.measureHierarchy() of android14, without forRootSizeOnly and the debug output */
+	private boolean measureHierarchy(final View host, final LayoutParams lp,
+	                                 final Resources res, final int desiredWindowWidth, final int desiredWindowHeight) {
+		int childWidthMeasureSpec;
+		int childHeightMeasureSpec;
+		boolean windowSizeMayChange = false;
+
+		boolean goodMeasure = false;
+		if (lp.width == ViewGroup.LayoutParams.WRAP_CONTENT) {
+			// On large screens, we don't want to allow dialogs to just
+			// stretch to fill the entire width of the screen to display
+			// one line of text.  First try doing the layout at a smaller
+			// size to see if it will fit.
+			final DisplayMetrics packageMetrics = res.getDisplayMetrics();
+			res.getValue(com.android.internal.R.dimen.config_prefDialogWidth, mTmpValue, true);
+			int baseSize = 0;
+			if (mTmpValue.type == TypedValue.TYPE_DIMENSION) {
+				baseSize = (int)mTmpValue.getDimension(packageMetrics);
+			}
+			if (baseSize != 0 && desiredWindowWidth > baseSize) {
+				childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);
+				childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);
+				performMeasure(host, childWidthMeasureSpec, childHeightMeasureSpec);
+				if ((host.getMeasuredWidthAndState() & View.MEASURED_STATE_TOO_SMALL) == 0) {
+					goodMeasure = true;
+				} else {
+					// Didn't fit in that size... try expanding a bit.
+					baseSize = (baseSize + desiredWindowWidth) / 2;
+					childWidthMeasureSpec = getRootMeasureSpec(baseSize, lp.width);
+					performMeasure(host, childWidthMeasureSpec, childHeightMeasureSpec);
+					if ((host.getMeasuredWidthAndState() & View.MEASURED_STATE_TOO_SMALL) == 0) {
+						goodMeasure = true;
+					}
 				}
-			});
-			return;
+			}
 		}
-		showPending = false;
-		nativeShow(nativePtr);
-		if (!openWindows.contains(this))
-			openWindows.add(this);
-		animateWindow(true);
-		if (onShowListener != null)
-			onShowListener.onShow(this);
+
+		if (!goodMeasure) {
+			childWidthMeasureSpec = getRootMeasureSpec(desiredWindowWidth, lp.width);
+			childHeightMeasureSpec = getRootMeasureSpec(desiredWindowHeight, lp.height);
+			performMeasure(host, childWidthMeasureSpec, childHeightMeasureSpec);
+			if (mWidth != host.getMeasuredWidth() || mHeight != host.getMeasuredHeight()) {
+				windowSizeMayChange = true;
+			}
+		}
+
+		return windowSizeMayChange;
+	}
+
+	/* ViewRootImpl.getRootMeasureSpec(), without PRIVATE_FLAG_LAYOUT_SIZE_EXTENDED_BY_CUTOUT */
+	private static int getRootMeasureSpec(int windowSize, int rootDimension) {
+		int measureSpec;
+		switch (rootDimension) {
+			case ViewGroup.LayoutParams.MATCH_PARENT:
+				// Window can't resize. Force root view to be windowSize.
+				measureSpec = View.MeasureSpec.makeMeasureSpec(windowSize, View.MeasureSpec.EXACTLY);
+				break;
+			case ViewGroup.LayoutParams.WRAP_CONTENT:
+				// Window can resize. Set max size for root view.
+				measureSpec = View.MeasureSpec.makeMeasureSpec(windowSize, View.MeasureSpec.AT_MOST);
+				break;
+			default:
+				// Window wants to be an exact size. Force root view to be that size.
+				measureSpec = View.MeasureSpec.makeMeasureSpec(rootDimension, View.MeasureSpec.EXACTLY);
+				break;
+		}
+		return measureSpec;
 	}
 
 	public boolean isShowing() {

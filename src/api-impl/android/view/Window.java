@@ -3,14 +3,18 @@ package android.view;
 import android.R;
 import android.atl.annotation.Export;
 import android.content.Context;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Parcelable;
 import android.transition.Transition;
+import android.util.DisplayMetrics;
 import android.util.SparseArray;
+import android.util.TypedValue;
 import android.widget.FrameLayout;
 import android.widget.Toolbar;
 import android.window.OnBackInvokedDispatcher;
@@ -115,13 +119,55 @@ public class Window {
 					Window.this.callback.onDetachedFromWindow();
 			}
 
-			/* like AOSP's DecorView: a window that wraps its content is at least as wide as
-			 * windowMinWidthMajor/Minor of its theme say */
+			/* AOSP's DecorView.onMeasure(), the minimum width of a window that wraps its content
+			 * (windowMinWidthMajor/Minor); ATL has no fixed sizes (windowFixedWidth*) and no floating
+			 * insets. ATL does not set Configuration.orientation and screenWidthDp keeps the start
+			 * size, so the orientation and the available width come from the app's window, the
+			 * frame ViewRootImpl measures a dialog in. */
 			@Override
 			protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+				final Resources res = getContext().getResources();
+				final DisplayMetrics metrics = res.getDisplayMetrics();
+				final Rect frame = new Rect();
+				getWindowVisibleDisplayFrame(frame);
+				final boolean isPortrait = frame.width() <= frame.height();
+
+				final int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+
+				boolean fixedWidth = false;
+
 				super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-				if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.AT_MOST && getMeasuredWidth() < minWidth)
-					super.onMeasure(MeasureSpec.makeMeasureSpec(minWidth, MeasureSpec.EXACTLY), heightMeasureSpec);
+
+				int width = getMeasuredWidth();
+				boolean measure = false;
+
+				widthMeasureSpec = MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY);
+
+				if (!fixedWidth && widthMode == MeasureSpec.AT_MOST) {
+					final TypedValue tv = isPortrait ? mMinWidthMinor : mMinWidthMajor;
+					final float availableWidth = frame.width();
+					if (tv.type != TypedValue.TYPE_NULL) {
+						final int min;
+						if (tv.type == TypedValue.TYPE_DIMENSION) {
+							min = (int) tv.getDimension(metrics);
+						} else if (tv.type == TypedValue.TYPE_FRACTION) {
+							min = (int) tv.getFraction(availableWidth, availableWidth);
+						} else {
+							min = 0;
+						}
+
+						if (width < min) {
+							widthMeasureSpec = MeasureSpec.makeMeasureSpec(min, MeasureSpec.EXACTLY);
+							measure = true;
+						}
+					}
+				}
+
+				// TODO: Support height?
+
+				if (measure) {
+					super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+				}
 			}
 
 			private final Runnable configurationFollowsSize = new Runnable() {
@@ -153,12 +199,9 @@ public class Window {
 	/** @hide like View.AttachInfo.mKeyDispatchState, one for the views of a window */
 	public final KeyEvent.DispatcherState mKeyDispatchState = new KeyEvent.DispatcherState();
 
-	private int minWidth;
-
-	/** @hide the minimum width of a window measured AT_MOST, from windowMinWidthMajor/Minor */
-	public void setMinWidth(int minWidth) {
-		this.minWidth = minWidth;
-	}
+	// like PhoneWindow, read in installDecor() (PhoneWindow.generateLayout())
+	private final TypedValue mMinWidthMajor = new TypedValue();
+	private final TypedValue mMinWidthMinor = new TypedValue();
 
 	private static final String VIEWS_TAG = "android:views";
 
@@ -271,6 +314,8 @@ public class Window {
 			setThemeFlag(a, com.android.internal.R.styleable.Window_windowDrawsSystemBarBackgrounds, false, WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
 		if (!hasSoftInputMode)
 			params.softInputMode = a.getInt(com.android.internal.R.styleable.Window_windowSoftInputMode, params.softInputMode);
+		a.getValue(com.android.internal.R.styleable.Window_windowMinWidthMajor, mMinWidthMajor);
+		a.getValue(com.android.internal.R.styleable.Window_windowMinWidthMinor, mMinWidthMinor);
 		a.recycle();
 	}
 
