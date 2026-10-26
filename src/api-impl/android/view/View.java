@@ -2148,6 +2148,10 @@ public class View implements Drawable.Callback {
 
 	public void setFitsSystemWindows(boolean fitsSystemWindows) {}
 
+	/* hidden in AOSP, looked up by AppCompat via reflection; like setFitsSystemWindows,
+	 * the system window flags have no effect here */
+	public void makeOptionalFitsSystemWindows() {}
+
 	public void setWillNotDraw(boolean value) {}
 
 	public void setScrollContainer(boolean isScrollContainer) {}
