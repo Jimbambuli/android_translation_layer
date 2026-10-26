@@ -36,6 +36,13 @@ static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_
 	J__WebView__internalLoadChanged(env, wrapper->jobj, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
 }
 
+/* same-document navigations (e.g. only the fragment changed) don't emit load-changed, but Android still calls onPageFinished */
+static void web_view_uri_changed(WebKitWebView *web_view, GParamSpec *pspec, gpointer user_data)
+{
+	if (!webkit_web_view_is_loading(web_view))
+		web_view_load_changed(web_view, WEBKIT_LOAD_FINISHED, user_data);
+}
+
 static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *decision, WebKitPolicyDecisionType type, WrapperWidget *wrapper)
 {
 	if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
@@ -72,6 +79,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
 	webkit_web_context_register_uri_scheme(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview)), "android-asset", asset_uri_scheme_request_cb, NULL, NULL);
 	g_signal_connect(G_OBJECT(webview), "load-changed", G_CALLBACK(web_view_load_changed), NULL);
+	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
 	return _INTPTR(webview);
 }
@@ -83,6 +91,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl(JNIEnv *env, 
 
 	WebKitWebView *webview = _PTR(widget_ptr);
 	webkit_web_view_load_uri(webview, _CSTRING(url));
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+	WebKitWebView *webview = _PTR(widget_ptr);
+	webkit_web_view_reload(webview);
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(JNIEnv *env, jobject this, jlong widget_ptr, jstring base_url, jstring data_jstr, jstring mime_type, jstring encoding)

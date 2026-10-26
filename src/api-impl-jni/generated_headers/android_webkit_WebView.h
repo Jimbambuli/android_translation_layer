@@ -265,6 +265,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl
   (JNIEnv *, jobject, jlong, jstring);
 
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_reload
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload
+  (JNIEnv *, jobject, jlong);
+
 #ifdef __cplusplus
 }
 #endif
