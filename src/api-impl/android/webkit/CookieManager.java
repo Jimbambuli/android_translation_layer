@@ -20,9 +20,15 @@ public class CookieManager {
 		return new CookieManager();
 	}
 
-	public void removeAllCookies(ValueCallback callback) {}
+	public void removeAllCookies(ValueCallback<Boolean> callback) {
+		if (callback != null)
+			callback.onReceiveValue(true);
+	}
 
-	public void removeSessionCookies(ValueCallback callback) {}
+	public void removeSessionCookies(ValueCallback<Boolean> callback) {
+		if (callback != null)
+			callback.onReceiveValue(true);
+	}
 
 	public void removeExpiredCookie() {}
 
@@ -33,7 +39,7 @@ public class CookieManager {
 	public void flush() {}
 
 	public String getCookie(String url) {
-		return "";
+		return native_getCookie(url);
 	}
 
 	public void setCookie(String url, String value) {}
@@ -47,4 +53,6 @@ public class CookieManager {
 	public void setAcceptThirdPartyCookies(WebView webView, boolean accept) {}
 
 	public static void setAcceptFileSchemeCookies(boolean accept) {}
+
+	private native String native_getCookie(String url);
 }
