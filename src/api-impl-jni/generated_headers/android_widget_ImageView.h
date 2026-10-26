@@ -219,6 +219,8 @@ extern "C" {
 #define android_widget_ImageView_PFLAG_PRESSED 16384L
 #undef android_widget_ImageView_PFLAG_ACTIVATED
 #define android_widget_ImageView_PFLAG_ACTIVATED 1073741824L
+#undef android_widget_ImageView_PFLAG3_IS_LAID_OUT
+#define android_widget_ImageView_PFLAG3_IS_LAID_OUT 4L
 #undef android_widget_ImageView_UNDEFINED_PADDING
 #define android_widget_ImageView_UNDEFINED_PADDING -2147483648L
 #undef android_widget_ImageView_PFLAG_SAVE_STATE_CALLED

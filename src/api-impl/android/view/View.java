@@ -992,6 +992,10 @@ public class View implements Drawable.Callback {
 	static final int PFLAG_ACTIVATED                   = 0x40000000;
 
 	private int[] mDrawableState = null;
+
+	/* the bits of AOSP's mPrivateFlags3 that ATL keeps */
+	int mPrivateFlags3;
+	static final int PFLAG3_IS_LAID_OUT = 0x4;
 	private Drawable background;
 	private int backgroundTint = 0;
 
@@ -2094,7 +2098,9 @@ public class View implements Drawable.Callback {
 	}
 
 	public final int getMeasuredState() {
-		return 0;
+		return (measuredWidth&MEASURED_STATE_MASK)
+				| ((measuredHeight>>MEASURED_HEIGHT_STATE_SHIFT)
+						& (MEASURED_STATE_MASK>>MEASURED_HEIGHT_STATE_SHIFT));
 	}
 
 	public static int combineMeasuredStates(int curState, int newState) {
@@ -2194,6 +2200,7 @@ public class View implements Drawable.Callback {
 		}
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
 		notifyLayoutChange();
+		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
 		if (sizeChanged && needsOutline())
 			invalidateOutline();
 	}
@@ -2254,6 +2261,7 @@ public class View implements Drawable.Callback {
 			}
 		}
 		notifyLayoutChange();
+		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
 		oldWidth = width;
 		oldHeight = height;
 		in_layout = false;
@@ -2988,7 +2996,9 @@ public class View implements Drawable.Callback {
 		return elevation;
 	}
 
-	public boolean isLaidOut() { return true; }
+	public boolean isLaidOut() {
+		return (mPrivateFlags3 & PFLAG3_IS_LAID_OUT) == PFLAG3_IS_LAID_OUT;
+	}
 
 	public void postOnAnimation(Runnable action) {
 		postDelayed(action, 1000 / 60);
@@ -3300,10 +3310,13 @@ public class View implements Drawable.Callback {
 		if (!attachedToWindow)
 			return;
 		onDetachedFromWindow();
+		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT; // AOSP's onDetachedFromWindowInternal()
 		attachedToWindow = false;
 	}
 
 	protected void onAttachedToWindow() {
+		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT;
+
 		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
 			listener.onViewAttachedToWindow(this);
 		if (keepScreenOn)
