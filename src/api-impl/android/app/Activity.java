@@ -1,5 +1,7 @@
 package android.app;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.ActionBar;
 import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
@@ -167,7 +169,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onCreate(savedInstanceState);
 		}
-		dispatchActivityLifecycle(Application.CREATED, Application.MAIN, savedInstanceState);
+		dispatchActivityCreated(savedInstanceState);
 
 		return;
 	}
@@ -185,7 +187,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onStart();
 		}
-		dispatchActivityLifecycle(Application.STARTED, Application.MAIN, null);
+		dispatchActivityStarted();
 
 		return;
 	}
@@ -202,7 +204,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onResume();
 		}
-		dispatchActivityLifecycle(Application.RESUMED, Application.MAIN, null);
+		dispatchActivityResumed();
 
 		paused = false;
 		return;
@@ -220,7 +222,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onPause();
 		}
-		dispatchActivityLifecycle(Application.PAUSED, Application.MAIN, null);
+		dispatchActivityPaused();
 
 		paused = true;
 		return;
@@ -232,7 +234,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onStop();
 		}
-		dispatchActivityLifecycle(Application.STOPPED, Application.MAIN, null);
+		dispatchActivityStopped();
 
 		return;
 	}
@@ -243,7 +245,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		for (Fragment fragment : fragments) {
 			fragment.onDestroy();
 		}
-		dispatchActivityLifecycle(Application.DESTROYED, Application.MAIN, null);
+		dispatchActivityDestroyed();
 
 		destroyed = true;
 		return;
@@ -266,7 +268,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	protected void onSaveInstanceState(Bundle outState) {
 		outState.putBundle(WINDOW_HIERARCHY_TAG, getWindow().saveHierarchyState());
-		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.MAIN, outState);
+		dispatchActivitySaveInstanceState(outState);
 	}
 
 	public void onConfigurationChanged(Configuration newConfig) {
@@ -658,9 +660,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	private Bundle performSaveInstanceState() {
 		Bundle outState = new Bundle();
-		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.PRE, outState);
+		dispatchActivityPreSaveInstanceState(outState);
 		onSaveInstanceState(outState);
-		dispatchActivityLifecycle(Application.SAVE_INSTANCE_STATE, Application.POST, outState);
+		dispatchActivityPostSaveInstanceState(outState);
 		return outState;
 	}
 
@@ -865,52 +867,266 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	// we never put an activity into picture-in-picture, so this is always false
 	public boolean isInPictureInPictureMode() { return false; }
 
-	private final ArrayList<Application.ActivityLifecycleCallbacks> activityLifecycleCallbacks = new ArrayList<>();
+	private final ArrayList<Application.ActivityLifecycleCallbacks> mActivityLifecycleCallbacks =
+			new ArrayList<Application.ActivityLifecycleCallbacks>();
 
-	/* API 29: callbacks for this activity only, on top of those of the Application */
-	public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
-		synchronized (activityLifecycleCallbacks) {
-			activityLifecycleCallbacks.add(callback);
+	public void registerActivityLifecycleCallbacks(
+			@NonNull Application.ActivityLifecycleCallbacks callback) {
+		synchronized (mActivityLifecycleCallbacks) {
+			mActivityLifecycleCallbacks.add(callback);
 		}
 	}
 
-	public void unregisterActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
-		synchronized (activityLifecycleCallbacks) {
-			activityLifecycleCallbacks.remove(callback);
+	public void unregisterActivityLifecycleCallbacks(
+			@NonNull Application.ActivityLifecycleCallbacks callback) {
+		synchronized (mActivityLifecycleCallbacks) {
+			mActivityLifecycleCallbacks.remove(callback);
 		}
 	}
 
-	/* like AOSP: while the activity comes up, the Application's callbacks go first (except for the
-	 * post events), while it goes down the activity's own go first and in reverse order */
-	private void dispatchActivityLifecycle(int event, int phase, Bundle bundle) {
-		Object[] callbacks;
-		synchronized (activityLifecycleCallbacks) {
-			callbacks = activityLifecycleCallbacks.toArray();
+	private void dispatchActivityPreCreated(@Nullable Bundle savedInstanceState) {
+		getApplication().dispatchActivityPreCreated(this, savedInstanceState);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreCreated(this,
+						savedInstanceState);
+			}
 		}
-		Application app = getApplication();
-		boolean down = event >= Application.PAUSED;
-		boolean appFirst = !down && phase != Application.POST;
-		if (appFirst && app != null)
-			app.dispatchActivityLifecycle(event, phase, this, bundle);
-		for (int i = 0; i < callbacks.length; i++)
-			Application.callActivityLifecycle((Application.ActivityLifecycleCallbacks)callbacks[down ? callbacks.length - 1 - i : i], event, phase, this, bundle);
-		if (!appFirst && app != null)
-			app.dispatchActivityLifecycle(event, phase, this, bundle);
+	}
+
+	private void dispatchActivityCreated(@Nullable Bundle savedInstanceState) {
+		getApplication().dispatchActivityCreated(this, savedInstanceState);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityCreated(this,
+						savedInstanceState);
+			}
+		}
+	}
+
+	private void dispatchActivityPostCreated(@Nullable Bundle savedInstanceState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPostCreated(this,
+						savedInstanceState);
+			}
+		}
+		getApplication().dispatchActivityPostCreated(this, savedInstanceState);
+	}
+
+	private void dispatchActivityPreStarted() {
+		getApplication().dispatchActivityPreStarted(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreStarted(this);
+			}
+		}
+	}
+
+	private void dispatchActivityStarted() {
+		getApplication().dispatchActivityStarted(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityStarted(this);
+			}
+		}
+	}
+
+	private void dispatchActivityPostStarted() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivityPostStarted(this);
+			}
+		}
+		getApplication().dispatchActivityPostStarted(this);
+	}
+
+	private void dispatchActivityPreResumed() {
+		getApplication().dispatchActivityPreResumed(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreResumed(this);
+			}
+		}
+	}
+
+	private void dispatchActivityResumed() {
+		getApplication().dispatchActivityResumed(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityResumed(this);
+			}
+		}
+	}
+
+	private void dispatchActivityPostResumed() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPostResumed(this);
+			}
+		}
+		getApplication().dispatchActivityPostResumed(this);
+	}
+
+	private void dispatchActivityPrePaused() {
+		getApplication().dispatchActivityPrePaused(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPrePaused(this);
+			}
+		}
+	}
+
+	private void dispatchActivityPaused() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPaused(this);
+			}
+		}
+		getApplication().dispatchActivityPaused(this);
+	}
+
+	private void dispatchActivityPostPaused() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPostPaused(this);
+			}
+		}
+		getApplication().dispatchActivityPostPaused(this);
+	}
+
+	private void dispatchActivityPreStopped() {
+		getApplication().dispatchActivityPreStopped(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityPreStopped(this);
+			}
+		}
+	}
+
+	private void dispatchActivityStopped() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityStopped(this);
+			}
+		}
+		getApplication().dispatchActivityStopped(this);
+	}
+
+	private void dispatchActivityPostStopped() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivityPostStopped(this);
+			}
+		}
+		getApplication().dispatchActivityPostStopped(this);
+	}
+
+	private void dispatchActivityPreSaveInstanceState(@NonNull Bundle outState) {
+		getApplication().dispatchActivityPreSaveInstanceState(this, outState);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivityPreSaveInstanceState(this, outState);
+			}
+		}
+	}
+
+	private void dispatchActivitySaveInstanceState(@NonNull Bundle outState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivitySaveInstanceState(this, outState);
+			}
+		}
+		getApplication().dispatchActivitySaveInstanceState(this, outState);
+	}
+
+	private void dispatchActivityPostSaveInstanceState(@NonNull Bundle outState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivityPostSaveInstanceState(this, outState);
+			}
+		}
+		getApplication().dispatchActivityPostSaveInstanceState(this, outState);
+	}
+
+	private void dispatchActivityPreDestroyed() {
+		getApplication().dispatchActivityPreDestroyed(this);
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivityPreDestroyed(this);
+			}
+		}
+	}
+
+	private void dispatchActivityDestroyed() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i]).onActivityDestroyed(this);
+			}
+		}
+		getApplication().dispatchActivityDestroyed(this);
+	}
+
+	private void dispatchActivityPostDestroyed() {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = callbacks.length - 1; i >= 0; i--) {
+				((Application.ActivityLifecycleCallbacks) callbacks[i])
+						.onActivityPostDestroyed(this);
+			}
+		}
+		getApplication().dispatchActivityPostDestroyed(this);
+	}
+
+	private Object[] collectActivityLifecycleCallbacks() {
+		Object[] callbacks = null;
+		synchronized (mActivityLifecycleCallbacks) {
+			if (mActivityLifecycleCallbacks.size() > 0) {
+				callbacks = mActivityLifecycleCallbacks.toArray();
+			}
+		}
+		return callbacks;
 	}
 
 	/* called from native code instead of onCreate() etc., with the pre and post callbacks around them */
 	@Export
 	private void performCreate(Bundle savedInstanceState) {
-		dispatchActivityLifecycle(Application.CREATED, Application.PRE, savedInstanceState);
+		dispatchActivityPreCreated(savedInstanceState);
 		onCreate(savedInstanceState);
-		dispatchActivityLifecycle(Application.CREATED, Application.POST, savedInstanceState);
+		dispatchActivityPostCreated(savedInstanceState);
 	}
 
 	@Export
 	private void performStart() {
-		dispatchActivityLifecycle(Application.STARTED, Application.PRE, null);
+		dispatchActivityPreStarted();
 		onStart();
-		dispatchActivityLifecycle(Application.STARTED, Application.POST, null);
+		dispatchActivityPostStarted();
 		started = true;
 	}
 
@@ -924,16 +1140,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	@Export
 	private void performResume() {
-		dispatchActivityLifecycle(Application.RESUMED, Application.PRE, null);
+		dispatchActivityPreResumed();
 		onResume();
-		dispatchActivityLifecycle(Application.RESUMED, Application.POST, null);
+		dispatchActivityPostResumed();
 	}
 
 	@Export
 	private void performPause() {
-		dispatchActivityLifecycle(Application.PAUSED, Application.PRE, null);
+		dispatchActivityPrePaused();
 		onPause();
-		dispatchActivityLifecycle(Application.PAUSED, Application.POST, null);
+		dispatchActivityPostPaused();
 	}
 
 	/* like AOSP's callActivityOnStop(): unless it is finishing, the activity saves its state when it is
@@ -944,9 +1160,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		boolean preP = getApplicationInfo().targetSdkVersion < 28;
 		if (saveState && preP)
 			savedState = performSaveInstanceState();
-		dispatchActivityLifecycle(Application.STOPPED, Application.PRE, null);
+		dispatchActivityPreStopped();
 		onStop();
-		dispatchActivityLifecycle(Application.STOPPED, Application.POST, null);
+		dispatchActivityPostStopped();
 		started = false;
 		stopped = true;
 		if (saveState && !preP)
@@ -962,9 +1178,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	@Export
 	private void performDestroy() {
-		dispatchActivityLifecycle(Application.DESTROYED, Application.PRE, null);
+		dispatchActivityPreDestroyed();
 		onDestroy();
-		dispatchActivityLifecycle(Application.DESTROYED, Application.POST, null);
+		dispatchActivityPostDestroyed();
 		Dialog.closeWindowsOf(this);
 		if (window != null)
 			window.killViewTreeObserver();

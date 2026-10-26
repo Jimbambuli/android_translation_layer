@@ -1,6 +1,8 @@
 package android.app;
 
 import android.R;
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
 import android.content.Context;
@@ -8,6 +10,7 @@ import android.content.ContextWrapper;
 import android.content.pm.PackageParser;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import java.util.ArrayList;
 
 public class Application extends ContextWrapper {
 	public long native_window;
@@ -56,6 +59,9 @@ public class Application extends ContextWrapper {
 		return (mimeTypes.length() == 0) ? null : mimeTypes.toString();
 	}
 
+	private ArrayList<ActivityLifecycleCallbacks> mActivityLifecycleCallbacks =
+			new ArrayList<ActivityLifecycleCallbacks>();
+
 	public interface ActivityLifecycleCallbacks {
 		default void onActivityPreCreated(Activity activity, Bundle savedInstanceState) {}
 		void onActivityCreated(Activity activity, Bundle savedInstanceState);
@@ -80,46 +86,6 @@ public class Application extends ContextWrapper {
 		default void onActivityPostDestroyed(Activity activity) {}
 	}
 
-	/* lifecycle events of Activity.dispatchActivityLifecycle(): event * 3 + phase */
-	static final int CREATED = 0, STARTED = 1, RESUMED = 2, PAUSED = 3, STOPPED = 4, SAVE_INSTANCE_STATE = 5, DESTROYED = 6;
-	static final int PRE = 0, MAIN = 1, POST = 2;
-
-	static void callActivityLifecycle(ActivityLifecycleCallbacks cb, int event, int phase, Activity a, Bundle b) {
-		switch (event * 3 + phase) {
-			case CREATED * 3 + PRE: cb.onActivityPreCreated(a, b); break;
-			case CREATED * 3 + MAIN: cb.onActivityCreated(a, b); break;
-			case CREATED * 3 + POST: cb.onActivityPostCreated(a, b); break;
-			case STARTED * 3 + PRE: cb.onActivityPreStarted(a); break;
-			case STARTED * 3 + MAIN: cb.onActivityStarted(a); break;
-			case STARTED * 3 + POST: cb.onActivityPostStarted(a); break;
-			case RESUMED * 3 + PRE: cb.onActivityPreResumed(a); break;
-			case RESUMED * 3 + MAIN: cb.onActivityResumed(a); break;
-			case RESUMED * 3 + POST: cb.onActivityPostResumed(a); break;
-			case PAUSED * 3 + PRE: cb.onActivityPrePaused(a); break;
-			case PAUSED * 3 + MAIN: cb.onActivityPaused(a); break;
-			case PAUSED * 3 + POST: cb.onActivityPostPaused(a); break;
-			case STOPPED * 3 + PRE: cb.onActivityPreStopped(a); break;
-			case STOPPED * 3 + MAIN: cb.onActivityStopped(a); break;
-			case STOPPED * 3 + POST: cb.onActivityPostStopped(a); break;
-			case SAVE_INSTANCE_STATE * 3 + PRE: cb.onActivityPreSaveInstanceState(a, b); break;
-			case SAVE_INSTANCE_STATE * 3 + MAIN: cb.onActivitySaveInstanceState(a, b); break;
-			case SAVE_INSTANCE_STATE * 3 + POST: cb.onActivityPostSaveInstanceState(a, b); break;
-			case DESTROYED * 3 + PRE: cb.onActivityPreDestroyed(a); break;
-			case DESTROYED * 3 + MAIN: cb.onActivityDestroyed(a); break;
-			case DESTROYED * 3 + POST: cb.onActivityPostDestroyed(a); break;
-		}
-	}
-
-	private final java.util.ArrayList<ActivityLifecycleCallbacks> activityLifecycleCallbacks = new java.util.ArrayList<>();
-
-	void dispatchActivityLifecycle(int event, int phase, Activity activity, Bundle bundle) {
-		Object[] callbacks;
-		synchronized (activityLifecycleCallbacks) {
-			callbacks = activityLifecycleCallbacks.toArray();
-		}
-		for (Object cb : callbacks)
-			callActivityLifecycle((ActivityLifecycleCallbacks)cb, event, phase, activity, bundle);
-	}
 	/**
 	 * Callback interface for use with {@link Application#registerOnProvideAssistDataListener}
 	 * and {@link Application#unregisterOnProvideAssistDataListener}.
@@ -170,15 +136,227 @@ public class Application extends ContextWrapper {
 	public void unregisterComponentCallbacks(ComponentCallbacks callback) {
 	}*/
 	public void registerActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
-		synchronized (activityLifecycleCallbacks) {
-			activityLifecycleCallbacks.add(callback);
+		synchronized (mActivityLifecycleCallbacks) {
+			mActivityLifecycleCallbacks.add(callback);
 		}
 	}
 	public void unregisterActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
-		synchronized (activityLifecycleCallbacks) {
-			activityLifecycleCallbacks.remove(callback);
+		synchronized (mActivityLifecycleCallbacks) {
+			mActivityLifecycleCallbacks.remove(callback);
 		}
 	}
+
+	/* package */ void dispatchActivityPreCreated(@NonNull Activity activity,
+			@Nullable Bundle savedInstanceState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPreCreated(activity,
+						savedInstanceState);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityCreated(@NonNull Activity activity,
+			@Nullable Bundle savedInstanceState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivityCreated(activity,
+						savedInstanceState);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostCreated(@NonNull Activity activity,
+			@Nullable Bundle savedInstanceState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostCreated(activity,
+						savedInstanceState);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPreStarted(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPreStarted(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityStarted(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivityStarted(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostStarted(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostStarted(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPreResumed(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPreResumed(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityResumed(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivityResumed(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostResumed(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostResumed(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPrePaused(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPrePaused(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPaused(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivityPaused(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostPaused(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostPaused(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPreStopped(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPreStopped(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityStopped(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivityStopped(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostStopped(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostStopped(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPreSaveInstanceState(@NonNull Activity activity,
+			@NonNull Bundle outState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPreSaveInstanceState(
+						activity, outState);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivitySaveInstanceState(@NonNull Activity activity,
+			@NonNull Bundle outState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivitySaveInstanceState(activity,
+						outState);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostSaveInstanceState(@NonNull Activity activity,
+			@NonNull Bundle outState) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostSaveInstanceState(
+						activity, outState);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPreDestroyed(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPreDestroyed(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityDestroyed(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i=0; i<callbacks.length; i++) {
+				((ActivityLifecycleCallbacks)callbacks[i]).onActivityDestroyed(activity);
+			}
+		}
+	}
+
+	/* package */ void dispatchActivityPostDestroyed(@NonNull Activity activity) {
+		Object[] callbacks = collectActivityLifecycleCallbacks();
+		if (callbacks != null) {
+			for (int i = 0; i < callbacks.length; i++) {
+				((ActivityLifecycleCallbacks) callbacks[i]).onActivityPostDestroyed(activity);
+			}
+		}
+	}
+
+	private Object[] collectActivityLifecycleCallbacks() {
+		Object[] callbacks = null;
+		synchronized (mActivityLifecycleCallbacks) {
+			if (mActivityLifecycleCallbacks.size() > 0) {
+				callbacks = mActivityLifecycleCallbacks.toArray();
+			}
+		}
+		return callbacks;
+	}
+
 	public void registerOnProvideAssistDataListener(OnProvideAssistDataListener callback) {
 	}
 	public void unregisterOnProvideAssistDataListener(OnProvideAssistDataListener callback) {
