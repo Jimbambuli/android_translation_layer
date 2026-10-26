@@ -50,14 +50,31 @@ static void window_focus_changed(JNIEnv *env, jobject activity, jboolean has_foc
 	(*env)->DeleteLocalRef(env, window_jobj);
 }
 
+/* the activity whose window has the focus, like the focused window of the window manager */
+static jobject focused_activity = NULL;
+
+/* like the input dispatcher, the window that had the focus loses it before the next one gains it; an
+ * activity that is paused keeps the focus until the next one is resumed, and one that is destroyed
+ * meanwhile (finished or recreated) is not told, its window is gone */
+static void activity_take_focus(JNIEnv *env, jobject activity)
+{
+	if (focused_activity) {
+		if (!(*env)->IsSameObject(env, focused_activity, activity))
+			window_focus_changed(env, focused_activity, false);
+		_UNREF(focused_activity);
+	}
+	focused_activity = _REF(activity);
+	window_focus_changed(env, activity, true);
+}
+
 /* fields of android.app.Activity itself, which an app's subclass may hide with fields of the same name */
 static jboolean activity_get_bool(JNIEnv *env, jobject activity, const char *name)
 {
 	return (*env)->GetBooleanField(env, activity, _FIELD_ID(_CACHED_CLASS(Activity), name, "Z"));
 }
 
-/* like AOSP, the activity that is left is paused (and loses the focus) before the next one comes up,
- * and stopped only once that one is resumed (see stop_when_idle) */
+/* like AOSP, the activity that is left is paused before the next one comes up, loses the focus when that
+ * one is resumed (see activity_take_focus) and is stopped only once it is idle (see stop_when_idle) */
 static void activity_pause(JNIEnv *env, jobject activity, bool user_leaving)
 {
 	if (!_GET_BOOL_FIELD(activity, "paused")) {
@@ -79,8 +96,6 @@ static void activity_pause(JNIEnv *env, jobject activity, bool user_leaving)
 			(*env)->ExceptionClear(env);
 		}
 	}
-
-	window_focus_changed(env, activity, false);
 }
 
 /* onStop(), then (unless it is finishing or save_state is false) onSaveInstanceState() */
@@ -122,6 +137,11 @@ static void activity_close(JNIEnv *env, jobject activity)
 	}
 
 	activity_stop(env, activity, false);
+
+	if (focused_activity && (*env)->IsSameObject(env, focused_activity, activity)) {
+		_UNREF(focused_activity);
+		focused_activity = NULL;
+	}
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
 	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
@@ -309,7 +329,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 		(*env)->ExceptionClear(env);
 	}
 
-	window_focus_changed(env, activity, true);
+	activity_take_focus(env, activity);
 }
 
 static void activity_update_current(JNIEnv *env)
