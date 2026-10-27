@@ -165,7 +165,7 @@ public class PathInterpolator extends BaseInterpolator {
 		}
 	}
 
-	/* pathData with absolute M, L, Q and C commands, as used by the framework interpolators */
+	/* pathData with M, L, Q and C commands, absolute or (lower case) relative, as used by the framework interpolators */
 	private boolean initPathData(String pathData) {
 		String[] tokens = pathData.trim().replaceAll("([MLQCmlqc])", " $1 ").split("[\\s,]+");
 		ArrayList<float[]> points = new ArrayList<>();
@@ -185,27 +185,31 @@ public class PathInterpolator extends BaseInterpolator {
 					i++;
 					continue;
 				}
-				switch (command) {
+				/* a lower case command takes its coordinates relative to the current point */
+				float ox = Character.isLowerCase(command) ? x : 0, oy = Character.isLowerCase(command) ? y : 0;
+				switch (Character.toUpperCase(command)) {
 					case 'M':
 					case 'L':
-						x = Float.parseFloat(tokens[i++]);
-						y = Float.parseFloat(tokens[i++]);
+						x = ox + Float.parseFloat(tokens[i++]);
+						y = oy + Float.parseFloat(tokens[i++]);
 						points.add(new float[] {x, y});
 						if (command == 'M')
 							command = 'L';
+						else if (command == 'm')
+							command = 'l';
 						break;
 					case 'Q': {
-						float cx = Float.parseFloat(tokens[i++]), cy = Float.parseFloat(tokens[i++]);
-						float ex = Float.parseFloat(tokens[i++]), ey = Float.parseFloat(tokens[i++]);
+						float cx = ox + Float.parseFloat(tokens[i++]), cy = oy + Float.parseFloat(tokens[i++]);
+						float ex = ox + Float.parseFloat(tokens[i++]), ey = oy + Float.parseFloat(tokens[i++]);
 						addQuad(points, x, y, cx, cy, ex, ey);
 						x = ex;
 						y = ey;
 						break;
 					}
 					case 'C': {
-						float x1 = Float.parseFloat(tokens[i++]), y1 = Float.parseFloat(tokens[i++]);
-						float x2 = Float.parseFloat(tokens[i++]), y2 = Float.parseFloat(tokens[i++]);
-						float ex = Float.parseFloat(tokens[i++]), ey = Float.parseFloat(tokens[i++]);
+						float x1 = ox + Float.parseFloat(tokens[i++]), y1 = oy + Float.parseFloat(tokens[i++]);
+						float x2 = ox + Float.parseFloat(tokens[i++]), y2 = oy + Float.parseFloat(tokens[i++]);
+						float ex = ox + Float.parseFloat(tokens[i++]), ey = oy + Float.parseFloat(tokens[i++]);
 						addCubic(points, x, y, x1, y1, x2, y2, ex, ey);
 						x = ex;
 						y = ey;
