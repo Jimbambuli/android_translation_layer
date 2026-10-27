@@ -2689,6 +2689,26 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			backgroundDrawable.setCallback(this);
 			if (backgroundTint != 0)
 				backgroundDrawable.setTint(backgroundTint);
+			/* View.setBackgroundDrawable() of android-14: the padding of the background (the insets of an
+			 * InsetDrawable, a nine-patch's padding) becomes the view's padding, so that a window or view
+			 * with such a background is measured and laid out with room for it */
+			Rect bgPadding = new Rect();
+			if (backgroundDrawable.getPadding(bgPadding)) {
+				userPaddingStart = UNDEFINED_PADDING;
+				userPaddingEnd = UNDEFINED_PADDING;
+				if (layoutRtl) {
+					userPaddingLeftInitial = bgPadding.right;
+					userPaddingRightInitial = bgPadding.left;
+				} else {
+					userPaddingLeftInitial = bgPadding.left;
+					userPaddingRightInitial = bgPadding.right;
+				}
+				paddingLeft = userPaddingLeftInitial;
+				paddingRight = userPaddingRightInitial;
+				paddingTop = bgPadding.top;
+				paddingBottom = bgPadding.bottom;
+				native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+			}
 		}
 		native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0);
 		if (needsOutline())
