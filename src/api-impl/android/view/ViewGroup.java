@@ -14,6 +14,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
 import android.util.Slog;
+import android.content.pm.PackageManager;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -704,6 +705,163 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
+	/* AOSP ViewGroup.findFocus(), focusSearch(), addFocusables(), shouldBlockFocusForTouchscreen() */
+	@Override
+	public View findFocus() {
+		if (isFocused())
+			return this;
+		View child = getFocusedChild();
+		return child != null ? child.findFocus() : null;
+	}
+
+	/* the root of a window (the decor view, which has no parent view) searches; the others ask it */
+	public View focusSearch(View focused, int direction) {
+		if (!(parent instanceof ViewGroup))
+			return FocusFinder.getInstance().findNextFocus(this, focused, direction);
+		return ((ViewGroup)parent).focusSearch(focused, direction);
+	}
+
+	boolean shouldBlockFocusForTouchscreen() {
+		return getTouchscreenBlocksFocus() && getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN);
+	}
+
+	@Override
+	public void addFocusables(ArrayList<View> views, int direction, int focusableMode) {
+		final int focusableCount = views.size();
+
+		final int descendantFocusability = getDescendantFocusability();
+		final boolean blockFocusForTouchscreen = shouldBlockFocusForTouchscreen();
+		final boolean focusSelf = (isFocusableInTouchMode() || !blockFocusForTouchscreen);
+
+		if (descendantFocusability == FOCUS_BLOCK_DESCENDANTS) {
+			if (focusSelf) {
+				super.addFocusables(views, direction, focusableMode);
+			}
+			return;
+		}
+
+		if (blockFocusForTouchscreen) {
+			focusableMode |= FOCUSABLES_TOUCH_MODE;
+		}
+
+		if ((descendantFocusability == FOCUS_BEFORE_DESCENDANTS) && focusSelf) {
+			super.addFocusables(views, direction, focusableMode);
+		}
+
+		int count = 0;
+		final View[] visibleChildren = new View[children.size()];
+		for (View child : children) {
+			if (child.getVisibility() == VISIBLE) {
+				visibleChildren[count++] = child;
+			}
+		}
+
+		FocusFinder.sort(visibleChildren, 0, count, this, isLayoutRtl());
+
+		for (int i = 0; i < count; i++) {
+			visibleChildren[i].addFocusables(views, direction, focusableMode);
+		}
+
+		// When set to FOCUS_AFTER_DESCENDANTS, we only add ourselves if
+		// there aren't any focusable descendants.  this is
+		// to avoid the focus search finding layouts when a more precise search
+		// among the focusable children would be more interesting.
+		if ((descendantFocusability == FOCUS_AFTER_DESCENDANTS) && focusSelf) {
+			if (focusableCount == views.size()) {
+				super.addFocusables(views, direction, focusableMode);
+			}
+		}
+	}
+
+	@Override
+	public void addKeyboardNavigationClusters(java.util.Collection<View> views, int direction) {
+		final int focusableCount = views.size();
+
+		super.addKeyboardNavigationClusters(views, direction);
+
+		if (focusableCount != views.size()) {
+			// No need to look for clusters inside a cluster.
+			return;
+		}
+
+		if (getDescendantFocusability() == FOCUS_BLOCK_DESCENDANTS) {
+			return;
+		}
+
+		int count = 0;
+		final View[] visibleChildren = new View[children.size()];
+		for (View child : children) {
+			if (child.getVisibility() == VISIBLE) {
+				visibleChildren[count++] = child;
+			}
+		}
+
+		FocusFinder.sort(visibleChildren, 0, count, this, isLayoutRtl());
+
+		for (int i = 0; i < count; i++) {
+			visibleChildren[i].addKeyboardNavigationClusters(views, direction);
+		}
+	}
+
+	@Override
+	public void addTouchables(ArrayList<View> views) {
+		super.addTouchables(views);
+
+		for (View child : children) {
+			if (child.getVisibility() == VISIBLE) {
+				child.addTouchables(views);
+			}
+		}
+	}
+
+	/* AOSP ViewGroup.offsetRectBetweenParentAndChild() */
+	void offsetRectBetweenParentAndChild(View descendant, Rect rect, boolean offsetFromChildToParent, boolean clipToBounds) {
+		// already in the same coord system :)
+		if (descendant == this) {
+			return;
+		}
+
+		ViewParent theParent = descendant.getParent();
+
+		// search and offset up to the parent
+		while ((theParent != null) && (theParent instanceof View) && (theParent != this)) {
+			if (offsetFromChildToParent) {
+				rect.offset(descendant.getLeft() - descendant.getScrollX(), descendant.getTop() - descendant.getScrollY());
+				if (clipToBounds) {
+					View p = (View)theParent;
+					boolean intersected = rect.intersect(0, 0, p.getWidth(), p.getHeight());
+					if (!intersected) {
+						rect.setEmpty();
+					}
+				}
+			} else {
+				if (clipToBounds) {
+					View p = (View)theParent;
+					boolean intersected = rect.intersect(0, 0, p.getWidth(), p.getHeight());
+					if (!intersected) {
+						rect.setEmpty();
+					}
+				}
+				rect.offset(descendant.getScrollX() - descendant.getLeft(), descendant.getScrollY() - descendant.getTop());
+			}
+
+			descendant = (View)theParent;
+			theParent = descendant.getParent();
+		}
+
+		// now that we are up to this view, need to offset one more time
+		// to get into our coordinate space
+		if (theParent == this) {
+			if (offsetFromChildToParent) {
+				rect.offset(descendant.getLeft() - descendant.getScrollX(), descendant.getTop() - descendant.getScrollY());
+			} else {
+				rect.offset(descendant.getScrollX() - descendant.getLeft(), descendant.getScrollY() - descendant.getTop());
+			}
+		} else {
+			throw new IllegalArgumentException("parameter must be a descendant of this view");
+		}
+	}
+
 	public int getDescendantFocusability() {
 		return mGroupFlags & FLAG_MASK_FOCUSABILITY;
 	}
@@ -864,13 +1022,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	private boolean touchscreenBlocksFocus;
 
-	/* as on a device with a touchscreen, keyboard navigation (Tab) skips the descendants (AppCompat's
-	 * Toolbar sets this, so Tab goes through the content, not the toolbar) */
+	/* AOSP: on a device with a touchscreen, the focus search (Tab) skips the descendants that are not
+	 * focusable in touch mode (AppCompat's Toolbar sets this, so Tab goes through the content) */
 	public void setTouchscreenBlocksFocus(boolean touchscreenBlocksFocus) {
 		this.touchscreenBlocksFocus = touchscreenBlocksFocus;
-		native_setTouchscreenBlocksFocus(widget, touchscreenBlocksFocus);
 	}
-	private native void native_setTouchscreenBlocksFocus(long widget, boolean blocks);
 
 	/* as AOSP: by default each child is clipped to its bounds */
 	private boolean clipChildren = true;

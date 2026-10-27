@@ -266,6 +266,29 @@ public class Window {
 
 	/** @hide called from native code when the window gains or loses the focus: like ViewRootImpl,
 	 * the views of the window get it, the decor view hands it to the Window.Callback */
+	/*
+	 * Tab and Shift+Tab that no focused widget used, as ViewRootImpl.ViewPostImeInputStage.processKeyEvent()
+	 * handles KEYCODE_TAB: the focus search of the focused view, or of the root if nothing is focused,
+	 * with FocusFinder, and the found view takes the focus. root is the decor view of the window.
+	 */
+	@Export
+	static boolean moveFocusOnTab(View root, boolean forward) {
+		int direction = forward ? View.FOCUS_FORWARD : View.FOCUS_BACKWARD;
+		View focused = root.findFocus();
+		if (focused != null) {
+			View v = focused.focusSearch(direction);
+			if (v != null && v != focused) {
+				Rect rect = new Rect();
+				focused.getFocusedRect(rect);
+				return v.requestFocus(direction, rect);
+			}
+			return false;
+		}
+		// no view has the focus: the best view to start with
+		View v = root instanceof ViewGroup ? ((ViewGroup)root).focusSearch(null, direction) : null;
+		return v != null && v.requestFocus(direction);
+	}
+
 	@Export
 	public void dispatchWindowFocusChanged(boolean hasFocus) {
 		decorView.dispatchRootWindowFocusChanged(hasFocus);

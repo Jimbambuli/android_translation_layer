@@ -8,6 +8,8 @@
 
 #include "src/api-impl-jni/defines.h"
 #include "util.h"
+#include "app/android_app_Activity.h"
+#include "widgets/WrapperWidget.h"
 
 const char *attribute_set_get_string(JNIEnv *env, jobject attrs, char *attribute, char *schema)
 {
@@ -324,46 +326,29 @@ void atl_fade_widget(GtkWidget *widget, double to, int duration_ms, AtlFadeDone 
 	fade->tick_id = gtk_widget_add_tick_callback(widget, fade_tick, fade, NULL);
 }
 
-/* where Tab may put the focus: in the window's content (not the title bar, which is not part of
- * the Android window) and not inside a ViewGroup with touchscreenBlocksFocus */
-static gboolean tab_focus_allowed(GtkWindow *window, GtkWidget *focus)
-{
-	GtkWidget *content = gtk_window_get_child(window);
-	if (!focus || !content || !gtk_widget_is_ancestor(focus, content))
-		return FALSE;
-	for (GtkWidget *w = focus; w && w != content; w = gtk_widget_get_parent(w)) {
-		if (g_object_get_data(G_OBJECT(w), "atl-blocks-tab-focus"))
-			return FALSE;
-	}
-	return TRUE;
-}
-
-/* GtkWindow's move-focus (Tab, Shift+Tab, when the focused widget did not use the key): move like
- * GTK does, but on to the next widget as long as the focus lands where Android's focus search
- * would not go. Like Android, the focus wraps around at the end. */
+/* GtkWindow's move-focus (Tab, Shift+Tab, when the focused widget did not use the key): the focus
+ * moves as Android's ViewRootImpl moves it, by the focus search of the window's views
+ * (Window.moveFocusOnTab(), FocusFinder), not in the order of the GTK widgets; the title bar is not
+ * part of the Android window. The root of the views is the window's content, or the activity's page
+ * that is shown in the main window. */
 static void on_move_focus(GtkWidget *widget, GtkDirectionType direction, gpointer user_data)
 {
 	GtkWindow *window = GTK_WINDOW(widget);
 	if (direction != GTK_DIR_TAB_FORWARD && direction != GTK_DIR_TAB_BACKWARD)
 		return;
 	g_signal_stop_emission_by_name(widget, "move-focus");
-	GtkWidget *start = gtk_root_get_focus(GTK_ROOT(window));
-	if (start)
-		g_object_ref(start);
-	for (int i = 0; i < 1000; i++) {
-		if (!gtk_widget_child_focus(widget, direction)) {
-			gtk_window_set_focus(window, NULL);
-			if (!gtk_widget_child_focus(widget, direction))
-				break;
+	GtkWidget *root = gtk_window_get_child(window);
+	GtkWidget *stack = activity_pages_stack();
+	if (stack && gtk_widget_get_root(stack) == GTK_ROOT(window))
+		root = gtk_stack_get_visible_child(GTK_STACK(stack));
+	if (root && WRAPPER_IS_WIDGET(root) && WRAPPER_WIDGET(root)->jobj) {
+		JNIEnv *env = get_jni_env();
+		J__Window__moveFocusOnTab(env, WRAPPER_WIDGET(root)->jobj, direction == GTK_DIR_TAB_FORWARD);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
 		}
-		GtkWidget *focus = gtk_root_get_focus(GTK_ROOT(window));
-		if (tab_focus_allowed(window, focus))
-			break;
-		if (focus == start) // went all the way round
-			break;
 	}
-	if (start)
-		g_object_unref(start);
 	gtk_window_set_focus_visible(window, TRUE);
 }
 

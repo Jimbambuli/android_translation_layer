@@ -299,14 +299,6 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setBlockDescendantsFo
 
 /*
  * Class:     android_view_ViewGroup
- * Method:    native_setTouchscreenBlocksFocus
- * Signature: (JZ)V
- */
-JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksFocus
-  (JNIEnv *, jobject, jlong, jboolean);
-
-/*
- * Class:     android_view_ViewGroup
  * Method:    native_setClipChildren
  * Signature: (JZ)V
  */

@@ -87,13 +87,6 @@ JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1offsetRect(JNIEnv *en
 	}
 }
 
-JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setTouchscreenBlocksFocus(JNIEnv *env, jobject this, jlong widget_ptr, jboolean blocks)
-{
-	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
-	if (wrapper)
-		g_object_set_data(G_OBJECT(wrapper), "atl-blocks-tab-focus", GINT_TO_POINTER(blocks));
-}
-
 /* FOCUS_BLOCK_DESCENDANTS: can-focus of the group's widget covers its descendants, while the group itself
  * takes the focus through its wrapper */
 JNIEXPORT void JNICALL Java_android_view_ViewGroup_native_1setBlockDescendantsFocus(JNIEnv *env, jobject this, jlong widget_ptr, jboolean block)

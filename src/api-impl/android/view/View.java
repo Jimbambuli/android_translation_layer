@@ -1115,6 +1115,12 @@ public class View implements Drawable.Callback {
 
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.View, defStyle, defStyleRes);
 		this.id = a.getResourceId(com.android.internal.R.styleable.View_id, View.NO_ID);
+		mNextFocusLeftId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusLeft, View.NO_ID);
+		mNextFocusRightId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusRight, View.NO_ID);
+		mNextFocusUpId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusUp, View.NO_ID);
+		mNextFocusDownId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusDown, View.NO_ID);
+		mNextFocusForwardId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusForward, View.NO_ID);
+		mNextClusterForwardId = a.getResourceId(com.android.internal.R.styleable.View_nextClusterForward, View.NO_ID);
 		if (a.hasValue(com.android.internal.R.styleable.View_backgroundTint))
 			backgroundTint = a.getColor(com.android.internal.R.styleable.View_backgroundTint, 0);
 		if (a.hasValue(com.android.internal.R.styleable.View_background)) {
@@ -3160,7 +3166,8 @@ public class View implements Drawable.Callback {
 
 	public float getAlpha() { return alpha; }
 
-	public View findFocus() { return this; }
+	/* AOSP: the view if it has the focus */
+	public View findFocus() { return isFocused() ? this : null; }
 
 	public int getMinimumHeight() { return minHeight; }
 	public int getMinimumWidth() { return minWidth; }
@@ -3999,13 +4006,115 @@ public class View implements Drawable.Callback {
 
 	public void setBackgroundTintMode(PorterDuff.Mode tintMode) {}
 
-	public void setNextFocusLeftId(int id) {}
+	int mNextFocusLeftId = NO_ID;
+	int mNextFocusRightId = NO_ID;
+	int mNextFocusUpId = NO_ID;
+	int mNextFocusDownId = NO_ID;
+	int mNextFocusForwardId = NO_ID;
+	int mNextClusterForwardId = NO_ID;
 
-	public void setNextFocusRightId(int id) {}
+	public int getNextFocusLeftId() { return mNextFocusLeftId; }
+	public void setNextFocusLeftId(int id) { mNextFocusLeftId = id; }
+	public int getNextFocusRightId() { return mNextFocusRightId; }
+	public void setNextFocusRightId(int id) { mNextFocusRightId = id; }
+	public int getNextFocusUpId() { return mNextFocusUpId; }
+	public void setNextFocusUpId(int id) { mNextFocusUpId = id; }
+	public int getNextFocusDownId() { return mNextFocusDownId; }
+	public void setNextFocusDownId(int id) { mNextFocusDownId = id; }
+	public int getNextFocusForwardId() { return mNextFocusForwardId; }
+	public void setNextFocusForwardId(int id) { mNextFocusForwardId = id; }
+	public int getNextClusterForwardId() { return mNextClusterForwardId; }
+	public void setNextClusterForwardId(int id) { mNextClusterForwardId = id; }
 
-	public void setNextFocusDownId(int id) {}
+	/* AOSP View.findUserSetNextFocus() and findUserSetNextKeyboardNavigationCluster(), with
+	 * findViewById() for findViewInsideOutShouldExist() */
+	View findUserSetNextFocus(View root, int direction) {
+		switch (direction) {
+			case FOCUS_LEFT:
+				return mNextFocusLeftId == NO_ID ? null : root.findViewById(mNextFocusLeftId);
+			case FOCUS_RIGHT:
+				return mNextFocusRightId == NO_ID ? null : root.findViewById(mNextFocusRightId);
+			case FOCUS_UP:
+				return mNextFocusUpId == NO_ID ? null : root.findViewById(mNextFocusUpId);
+			case FOCUS_DOWN:
+				return mNextFocusDownId == NO_ID ? null : root.findViewById(mNextFocusDownId);
+			case FOCUS_FORWARD:
+				return mNextFocusForwardId == NO_ID ? null : root.findViewById(mNextFocusForwardId);
+			case FOCUS_BACKWARD:
+				return id == NO_ID ? null : findViewWithNextFocusForwardId(root, id, false);
+		}
+		return null;
+	}
 
-	public void setNextFocusUpId(int id) {}
+	View findUserSetNextKeyboardNavigationCluster(View root, int direction) {
+		switch (direction) {
+			case FOCUS_FORWARD:
+				return mNextClusterForwardId == NO_ID ? null : root.findViewById(mNextClusterForwardId);
+			case FOCUS_BACKWARD:
+				return id == NO_ID ? null : findViewWithNextFocusForwardId(root, id, true);
+		}
+		return null;
+	}
+
+	private static View findViewWithNextFocusForwardId(View v, int forwardTo, boolean cluster) {
+		if ((cluster ? v.mNextClusterForwardId : v.mNextFocusForwardId) == forwardTo)
+			return v;
+		if (v instanceof ViewGroup) {
+			ViewGroup group = (ViewGroup)v;
+			for (int i = 0; i < group.getChildCount(); i++) {
+				View found = findViewWithNextFocusForwardId(group.getChildAt(i), forwardTo, cluster);
+				if (found != null)
+					return found;
+			}
+		}
+		return null;
+	}
+
+	/* AOSP View.addFocusables(), canTakeFocus(): the views that a focus search can end in */
+	public void addFocusables(ArrayList<View> views, int direction) {
+		addFocusables(views, direction, isInTouchMode() ? FOCUSABLES_TOUCH_MODE : FOCUSABLES_ALL);
+	}
+
+	public void addFocusables(ArrayList<View> views, int direction, int focusableMode) {
+		if (views == null)
+			return;
+		if (!canTakeFocus())
+			return;
+		if ((focusableMode & FOCUSABLES_TOUCH_MODE) == FOCUSABLES_TOUCH_MODE && !isFocusableInTouchMode())
+			return;
+		views.add(this);
+	}
+
+	private boolean canTakeFocus() {
+		return visibility == VISIBLE && isFocusableResolved() && atl_enabled && getWidth() > 0 && getHeight() > 0;
+	}
+
+	/* AOSP View.addKeyboardNavigationClusters(), getTouchables(), addTouchables() */
+	public void addKeyboardNavigationClusters(java.util.Collection<View> views, int direction) {
+		if (!isKeyboardNavigationCluster())
+			return;
+		if (!hasFocusable())
+			return;
+		views.add(this);
+	}
+
+	public ArrayList<View> getTouchables() {
+		ArrayList<View> result = new ArrayList<View>();
+		addTouchables(result);
+		return result;
+	}
+
+	public void addTouchables(ArrayList<View> views) {
+		if ((isClickable() || isLongClickable()) && atl_enabled)
+			views.add(this);
+	}
+
+	/* AOSP View.focusSearch() */
+	public View focusSearch(int direction) {
+		if (parent instanceof ViewGroup)
+			return ((ViewGroup)parent).focusSearch(this, direction);
+		return null;
+	}
 
 	public void setHasTransientState(boolean hasTransientState) {}
 
@@ -4051,7 +4160,8 @@ public class View implements Drawable.Callback {
 
 	public ActionMode startActionMode(ActionMode.Callback callback) { return null; }
 
-	public void getFocusedRect(Rect r) {}
+	/* AOSP: the whole view; a text view gives the cursor */
+	public void getFocusedRect(Rect r) { getDrawingRect(r); }
 
 	/**
 	* An implementation of OnClickListener that attempts to lazily load a

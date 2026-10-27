@@ -2184,6 +2184,7 @@ public class PackageManager {
 	 */
 	public boolean hasSystemFeature(String name) {
 		switch (name) {
+			case FEATURE_TOUCHSCREEN:
 			case "android.hardware.touchscreen.multitouch.distinct":
 				return true;
 			case FEATURE_AUTOMOTIVE:
