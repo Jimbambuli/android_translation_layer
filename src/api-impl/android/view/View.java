@@ -1816,27 +1816,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setOnTouchListener(OnTouchListener l) {
 		nativeSetOnTouchListener(widget);
 		on_touch_listener = l;
-		updateTouchTarget();
 	}
 
-	/* GTK gives a pointer event only to the widget under the pointer and its ancestors, while
-	 * Android passes a touch that a view does not consume on to the views below it, e.g. from an
-	 * icon to the clickable touch target behind it. In the Java dispatch (ViewGroup.dispatchTouchEvent)
-	 * this is AOSP's own rule and needs nothing here; it is only the GTK path (native GTK widgets
-	 * such as a ScrollView and its content, popups) that still lets GTK's picking decide, and AOSP
-	 * has no counterpart for that.
-	 * A subclass returns true here if it consumes touches only by AOSP's View.onTouchEvent() rule
-	 * (clickable or long clickable) or by an OnTouchListener; such a view is left out of GTK's
-	 * picking while none of these applies, so the event reaches what lies below it. */
-	protected boolean passesUnconsumedTouches() {
-		return false;
-	}
-
-	protected void updateTouchTarget() {
-		if (passesUnconsumedTouches())
-			native_setCanTarget(widget, isClickable() || isLongClickable() || on_touch_listener != null);
-	}
-	private native void native_setCanTarget(long widget, boolean can_target);
 	protected native void nativeSetOnTouchListener(long widget);
 	private OnApplyWindowInsetsListener on_apply_window_insets_listener = null;
 	public void setOnClickListener(OnClickListener l) {
@@ -1978,10 +1959,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 				if (isFocused()) clearFocus();
 			}
 			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
-		}
-
-		if ((changed & (CLICKABLE | LONG_CLICKABLE)) != 0) {
-			updateTouchTarget();
 		}
 	}
 	/**
@@ -2471,7 +2448,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			setLongClickable(true);
 		nativeSetOnLongClickListener(widget);
 		on_long_click_listener = listener;
-		updateTouchTarget();
 	}
 	protected native void nativeSetOnLongClickListener(long widget);
 

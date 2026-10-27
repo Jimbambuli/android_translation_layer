@@ -227,14 +227,6 @@ extern "C" {
 #define android_view_View_PFLAG_SAVE_STATE_CALLED 131072L
 /*
  * Class:     android_view_View
- * Method:    native_setCanTarget
- * Signature: (JZ)V
- */
-JNIEXPORT void JNICALL Java_android_view_View_native_1setCanTarget
-  (JNIEnv *, jobject, jlong, jboolean);
-
-/*
- * Class:     android_view_View
  * Method:    nativeSetOnTouchListener
  * Signature: (J)V
  */
