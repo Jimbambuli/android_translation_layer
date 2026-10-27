@@ -8,6 +8,7 @@ java/lang/CharSequence.toString()Ljava/lang/String;
 java/lang/Class.getClassLoader()Ljava/lang/ClassLoader;
 java/lang/Class.getName()Ljava/lang/String;
 java/lang/Exception
+java/lang/IllegalArgumentException
 java/lang/IndexOutOfBoundsException
 java/lang/Runtime.getRuntime()Ljava/lang/Runtime;
 java/lang/Runtime.loadLibrary(Ljava/lang/String;Ljava/lang/ClassLoader;)V

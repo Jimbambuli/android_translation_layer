@@ -235,12 +235,18 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(J
 	return JAVA_COOKIE(cookie);
 }
 
+/* like AOSP's NativeGetResourceStringArray() (android_util_AssetManager.cpp): null if the bag cannot be
+ * found or an entry cannot be resolved */
 JNIEXPORT jobjectArray JNICALL Java_android_content_res_AssetManager_getArrayStringResource(JNIEnv *env, jobject this, jint ident)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
 	const struct ResolvedBag *bag = AssetManager_getBag(asset_manager, ident);
+	if (!bag)
+		return NULL;
 	jobjectArray array = (*env)->NewObjectArray(env, bag->entry_count, _CACHED_CLASS(String), NULL);
+	if (array == NULL)
+		return NULL;
 	for (int i = 0; i < bag->entry_count; i++) {
 		const struct ResolvedBag_Entry entry = bag->entries[i];
 		struct Res_value value = entry.value;
@@ -250,13 +256,22 @@ JNIEXPORT jobjectArray JNICALL Java_android_content_res_AssetManager_getArrayStr
 		ApkAssetsCookie cookie = AssetManager_resolveReference(asset_manager, entry.cookie,
 		                                                       &value, &outConfig,
 		                                                       &outSpecFlags, &ref);
+		if (cookie < 0)
+			return NULL;
 		if (value.dataType == TYPE_STRING) {
 			const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
 			if (string_pool == NULL)
-				continue;
+				return NULL;
 			size_t len;
 			const char16_t *string = ResStringPool_stringAt(string_pool, value.data, &len);
-			(*env)->SetObjectArrayElement(env, array, i, (*env)->NewString(env, string, len));
+			if (string == NULL)
+				return NULL;
+			jstring java_string = (*env)->NewString(env, string, len);
+			if ((*env)->ExceptionCheck(env))
+				return NULL;
+			(*env)->SetObjectArrayElement(env, array, i, java_string);
+			/* a large array of strings could overflow the local reference table */
+			(*env)->DeleteLocalRef(env, java_string);
 		}
 	}
 
@@ -467,21 +482,40 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_applyStyle(JNIEnv *
 	(*env)->ReleaseIntArrayElements(env, java_attrs, attrs, JNI_ABORT);
 }
 
+/* like AOSP's NativeGetResourceArraySize(): -1 if the bag cannot be found */
 JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_getArraySize(JNIEnv *env, jobject this, jint ident)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
 	const struct ResolvedBag *bag = AssetManager_getBag(asset_manager, ident);
+	if (!bag)
+		return -1;
 	return bag->entry_count;
 }
 
+/* like AOSP's NativeGetResourceArray(): -1 if the bag cannot be found or an entry cannot be resolved,
+ * IllegalArgumentException if the output array is too small */
 JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_retrieveArray(JNIEnv *env, jobject this, jint ident, jintArray outArray)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
 
-	jint *array = (*env)->GetIntArrayElements(env, outArray, NULL);
 	const struct ResolvedBag *bag = AssetManager_getBag(asset_manager, ident);
+	if (!bag)
+		return -1;
+
+	const jsize out_data_length = (*env)->GetArrayLength(env, outArray);
+	if ((*env)->ExceptionCheck(env))
+		return -1;
+
+	if ((jsize)bag->entry_count > out_data_length * STYLE_NUM_ENTRIES) {
+		(*env)->ThrowNew(env, _CACHED_CLASS(IllegalArgumentException), "Input array is not large enough");
+		return -1;
+	}
+
+	jint *array = (*env)->GetIntArrayElements(env, outArray, NULL);
+	if (array == NULL)
+		return -1;
 	for (int i = 0; i < bag->entry_count; i++) {
 		const struct ResolvedBag_Entry entry = bag->entries[i];
 		struct Res_value value = entry.value;
@@ -491,6 +525,10 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_retrieveArray(JNIEn
 		ApkAssetsCookie cookie = AssetManager_resolveReference(asset_manager, entry.cookie,
 		                                                       &value, &outConfig,
 		                                                       &outSpecFlags, &ref);
+		if (cookie < 0) {
+			(*env)->ReleaseIntArrayElements(env, outArray, array, JNI_ABORT);
+			return -1;
+		}
 
 		array[i * STYLE_NUM_ENTRIES + STYLE_TYPE] = value.dataType;
 		array[i * STYLE_NUM_ENTRIES + STYLE_DATA] = value.data;
