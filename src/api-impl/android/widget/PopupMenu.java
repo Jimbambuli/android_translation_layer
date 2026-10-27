@@ -164,6 +164,7 @@ public class PopupMenu {
 	protected native void native_removeItem(long menu, int position);
 	protected native long native_buildPopover(long menu);
 	protected native void native_setColors(long popover, int background, int foreground);
+	protected native void native_dismiss(long popover);
 	protected native void native_show(long popover, long anchor, int anchorWidth, int anchorHeight, int gravity);
 
 	// callback from native code
@@ -216,8 +217,18 @@ public class PopupMenu {
 		return mGravity;
 	}
 
+	/* AOSP's PopupMenu.dismiss(): dismisses the menu if it is showing */
 	public void dismiss() {
-		System.out.println("PopupMenu.dismiss() called");
+		native_dismiss(popover);
+	}
+
+	/* AOSP's PopupMenu: MenuPopupHelper's OnDismissListener tells the PopupMenu's listener;
+	 * called from native code when the popover is closed */
+	@Export
+	protected void dispatchDismiss() {
+		if (mOnDismissListener != null) {
+			mOnDismissListener.onDismiss(this);
+		}
 	}
 
 	/**

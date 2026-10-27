@@ -49,6 +49,16 @@ static void popupmenu_activated(GSimpleAction *action, GVariant *parameter, gpoi
 	}
 }
 
+static void popupmenu_closed(GtkPopover *popover, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	J__PopupMenu__dispatchDismiss(env, (jobject)user_data);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
 static const GActionEntry action_entry = {"clicked", popupmenu_activated, "i", NULL, NULL};
 
 JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1buildPopover(JNIEnv *env, jobject this, jlong menu_ptr)
@@ -57,6 +67,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_PopupMenu_native_1buildPopover(JNIEn
 	GSimpleActionGroup *group = g_simple_action_group_new();
 	g_action_map_add_action_entries(G_ACTION_MAP(group), &action_entry, 1, _REF(this));
 	gtk_widget_insert_action_group(popover, "popupmenu", G_ACTION_GROUP(group));
+	g_signal_connect(popover, "closed", G_CALLBACK(popupmenu_closed), _REF(this));
 	return _INTPTR(popover);
 }
 
@@ -73,4 +84,9 @@ JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1show(JNIEnv *env, j
 	atl_popover_place_as_dropdown(popover, anchor, anchor_width, anchor_height, 0, 0, gravity, FALSE);
 	gtk_popover_present(popover);
 	gtk_popover_popup(popover);
+}
+
+JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1dismiss(JNIEnv *env, jobject this, jlong popover_ptr)
+{
+	gtk_popover_popdown(GTK_POPOVER(_PTR(popover_ptr)));
 }
