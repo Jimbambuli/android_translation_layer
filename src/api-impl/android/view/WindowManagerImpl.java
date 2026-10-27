@@ -24,6 +24,9 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		}
 
 		@Override
+		public void childHasTransientStateChanged(View child, boolean hasTransientState) {}
+
+		@Override
 		public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {}
 
 		@Override

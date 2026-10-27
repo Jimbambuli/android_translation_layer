@@ -227,6 +227,7 @@ public class LinearLayout extends ViewGroup {
 		requestLayout();
 	}
 
+	@Override
 	public boolean shouldDelayChildPressedState() {
 		return false;
 	}

@@ -1247,6 +1247,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			rawLayoutDirection = a.getInt(com.android.internal.R.styleable.View_layoutDirection, LAYOUT_DIRECTION_INHERIT);
 		}
 
+		/* AOSP View(): the overScrollMode and soundEffectsEnabled attributes */
+		if (a.hasValue(com.android.internal.R.styleable.View_overScrollMode))
+			setOverScrollMode(a.getInt(com.android.internal.R.styleable.View_overScrollMode, OVER_SCROLL_IF_CONTENT_SCROLLS));
+		if (a.hasValue(com.android.internal.R.styleable.View_soundEffectsEnabled))
+			setSoundEffectsEnabled(a.getBoolean(com.android.internal.R.styleable.View_soundEffectsEnabled, true));
+
 		if (a.hasValue(com.android.internal.R.styleable.View_tag))
 			tag = a.getText(com.android.internal.R.styleable.View_tag);
 
@@ -2379,7 +2385,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	}
 
-	public void setAccessibilityDelegate(AccessibilityDelegate delegate) {}
+	/* AOSP View.setAccessibilityDelegate(): kept for getAccessibilityDelegate(); ATL has no accessibility service
+	 * that would call it */
+	private AccessibilityDelegate mAccessibilityDelegate;
+
+	public void setAccessibilityDelegate(AccessibilityDelegate delegate) {
+		mAccessibilityDelegate = delegate;
+	}
 
 	public static class AccessibilityDelegate {
 		public void sendAccessibilityEvent(View view, int eventType) {}
@@ -2715,7 +2727,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			invalidateOutline();
 	}
 
-	public int getOverScrollMode() { return 0; }
+	/* AOSP View.mOverScrollMode, set by the overScrollMode attribute */
+	private int mOverScrollMode = OVER_SCROLL_IF_CONTENT_SCROLLS;
+
+	public int getOverScrollMode() { return mOverScrollMode; }
 
 	public void setFitsSystemWindows(boolean fitsSystemWindows) {}
 
@@ -2744,7 +2759,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	};
 
-	public void setOverScrollMode(int mode) {}
+	public void setOverScrollMode(int mode) {
+		if (mode != OVER_SCROLL_ALWAYS && mode != OVER_SCROLL_IF_CONTENT_SCROLLS && mode != OVER_SCROLL_NEVER) {
+			throw new IllegalArgumentException("Invalid overscroll mode " + mode);
+		}
+		mOverScrollMode = mode;
+	}
 
 	@Export
 	public int getId() { return id; }
@@ -3187,7 +3207,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return result;
 	}
 
-	public void playSoundEffect(int soundConstant) {}
+	/* AOSP View.setSoundEffectsEnabled / isSoundEffectsEnabled (SOUND_EFFECTS_ENABLED, on by default) */
+	private boolean mSoundEffectsEnabled = true;
+
+	public void setSoundEffectsEnabled(boolean soundEffectsEnabled) {
+		mSoundEffectsEnabled = soundEffectsEnabled;
+	}
+
+	public boolean isSoundEffectsEnabled() {
+		return mSoundEffectsEnabled;
+	}
+
+	/* AOSP View.playSoundEffect(), which hands the effect to the root (ViewRootImpl.playSoundEffect()) and from
+	 * there to the AudioManager; a view that is not attached to a window plays nothing. ATL's AudioManager has
+	 * no sound effect samples, so nothing is heard on the desktop. */
+	public void playSoundEffect(int soundConstant) {
+		if (!isSoundEffectsEnabled() || !isAttachedToWindow()) {
+			return;
+		}
+		final android.media.AudioManager audioManager = (android.media.AudioManager)getContext().getSystemService(Context.AUDIO_SERVICE);
+		if (audioManager != null && soundConstant == SoundEffectConstants.CLICK) {
+			audioManager.playSoundEffect(android.media.AudioManager.FX_KEY_CLICK);
+		}
+	}
 
 	@Export
 	public void computeScroll() {}
@@ -3568,7 +3610,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		invalidateOutline();
 	}
 
-	public boolean hasTransientState() { return false; }
+	/* AOSP View.hasTransientState() / setHasTransientState(): nested calls are counted, the parent is told when
+	 * the state turns on or off (PFLAG2_HAS_TRANSIENT_STATE, mTransientStateCount) */
+	private boolean mHasTransientState;
+	private int mTransientStateCount = 0;
+
+	public boolean hasTransientState() {
+		return mHasTransientState;
+	}
 
 	public final void cancelPendingInputEvents() {
 		cancelLongPress();
@@ -4706,7 +4755,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return null;
 	}
 
-	public void setHasTransientState(boolean hasTransientState) {}
+	public void setHasTransientState(boolean hasTransientState) {
+		final boolean oldHasTransientState = hasTransientState();
+		mTransientStateCount = hasTransientState ? mTransientStateCount + 1 : mTransientStateCount - 1;
+		if (mTransientStateCount < 0) {
+			mTransientStateCount = 0;
+			android.util.Log.e("View", "hasTransientState decremented below 0: unmatched pair of setHasTransientState calls");
+		} else if ((hasTransientState && mTransientStateCount == 1) || (!hasTransientState && mTransientStateCount == 0)) {
+			// update flag if we've just incremented up from 0 or decremented down to 0
+			mHasTransientState = hasTransientState;
+			final boolean newHasTransientState = hasTransientState();
+			if (parent != null && newHasTransientState != oldHasTransientState) {
+				parent.childHasTransientStateChanged(this, newHasTransientState);
+			}
+		}
+	}
 
 	protected void onConfigurationChanged(Configuration newConfig) {}
 
@@ -4732,7 +4795,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public AutofillId getAutofillId() { return new AutofillId(); }
 
-	public AccessibilityDelegate getAccessibilityDelegate() { return null; }
+	public AccessibilityDelegate getAccessibilityDelegate() {
+		return mAccessibilityDelegate;
+	}
 
 	public void setScrollX(int value) {
 		this.scrollX = value;

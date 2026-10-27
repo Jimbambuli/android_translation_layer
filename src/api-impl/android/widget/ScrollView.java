@@ -53,4 +53,10 @@ public class ScrollView extends FrameLayout {
 	public boolean fullScroll(int direction) {
 		return true;
 	}
+
+	/* AOSP: a child's pressed state is delayed, as the touch may start a scroll */
+	@Override
+	public boolean shouldDelayChildPressedState() {
+		return true;
+	}
 }

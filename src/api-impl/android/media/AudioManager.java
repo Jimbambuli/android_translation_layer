@@ -142,6 +142,9 @@ public class AudioManager {
 
 	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
 
+	/* AOSP AudioManager.FX_KEY_CLICK: the standard key click sound */
+	public static final int FX_KEY_CLICK = 0;
+
 	public void playSoundEffect(int effectType) {}
 
 	/* API 32 */

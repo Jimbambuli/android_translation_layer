@@ -240,6 +240,7 @@ public class RelativeLayout extends ViewGroup {
 		mMeasureVerticalWithPaddingMargin = version >= Build.VERSION_CODES.JELLY_BEAN_MR2;
 	}
 
+	@Override
 	public boolean shouldDelayChildPressedState() {
 		return false;
 	}

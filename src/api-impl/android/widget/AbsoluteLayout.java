@@ -137,7 +137,7 @@ public class AbsoluteLayout extends ViewGroup {
 		return p;
 	}
 
-	//@Override
+	@Override
 	public boolean shouldDelayChildPressedState() {
 		return false;
 	}

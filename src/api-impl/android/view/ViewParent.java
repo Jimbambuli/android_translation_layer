@@ -24,4 +24,7 @@ public interface ViewParent {
 	public void onDescendantInvalidated(View child, View target);
 
 	public void requestLayout();
+
+	/** AOSP ViewParent.childHasTransientStateChanged(): a child's setHasTransientState() changed its state */
+	public void childHasTransientStateChanged(View child, boolean hasTransientState);
 }

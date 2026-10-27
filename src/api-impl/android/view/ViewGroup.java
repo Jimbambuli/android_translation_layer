@@ -174,6 +174,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			params = generateLayoutParams(params);
 
 		child.parent = this;
+		if (child.hasTransientState()) {
+			childHasTransientStateChanged(child, true);
+		}
 		/* like AOSP: an inherited layout direction is resolved again in the new parent */
 		if (child.isLayoutDirectionInherited())
 			child.resetRtlProperties();
@@ -332,6 +335,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	/* AOSP removeFromArray(); ATL also takes the child's widget out of the GTK parent */
 	private void removeFromArray(int index) {
 		View child = children.get(index);
+		if (child.hasTransientState()) {
+			childHasTransientStateChanged(child, false);
+		}
 		child.parent = null;
 		children.remove(index);
 		native_removeView(widget, child.widget);
@@ -433,7 +439,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void attachViewToParent(View view, int index, LayoutParams params) {
-		if (!detachedChildren.remove(view)) {
+		final boolean wasDetached = detachedChildren.remove(view);
+		if (!wasDetached) {
 			addViewInternal(view, index, params, false);
 		}
 		if (!checkLayoutParams(params))
@@ -444,6 +451,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (index < 0)
 			index = children.size();
 		children.add(index, view);
+		if (wasDetached && view.hasTransientState()) {
+			childHasTransientStateChanged(view, true);
+		}
 		view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha() * view.getTransitionAlpha(), view.isEnabled());
 	}
 
@@ -1094,7 +1104,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void detachViewFromParent(View view) {
-		children.remove(view);
+		if (children.remove(view) && view.hasTransientState()) {
+			childHasTransientStateChanged(view, false);
+		}
 		view.parent = null;
 		detachedChildren.add(view);
 		if (!pendingHideDetachedChildren) {
@@ -1167,7 +1179,37 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	protected void cleanupLayoutState(View child) {}
 
-	public boolean shouldDelayChildPressedState() { return false; }
+	/**
+	 * AOSP ViewGroup.shouldDelayChildPressedState(): true unless the container never scrolls
+	 * (FrameLayout, LinearLayout, RelativeLayout and AbsoluteLayout say so), so that a pressed
+	 * child inside a scrolling container shows its pressed state only after the tap timeout.
+	 */
+	public boolean shouldDelayChildPressedState() {
+		return true;
+	}
+
+	/* AOSP ViewGroup.mChildCountWithTransientState, childHasTransientStateChanged() and hasTransientState() */
+	private int mChildCountWithTransientState = 0;
+
+	@Override
+	public void childHasTransientStateChanged(View child, boolean childHasTransientState) {
+		final boolean oldHasTransientState = hasTransientState();
+		if (childHasTransientState) {
+			mChildCountWithTransientState++;
+		} else {
+			mChildCountWithTransientState--;
+		}
+
+		final boolean newHasTransientState = hasTransientState();
+		if (parent != null && oldHasTransientState != newHasTransientState) {
+			parent.childHasTransientStateChanged(this, newHasTransientState);
+		}
+	}
+
+	@Override
+	public boolean hasTransientState() {
+		return mChildCountWithTransientState > 0 || super.hasTransientState();
+	}
 
 	public void offsetChildrenTopAndBottom(int offset) {
 		// FIXME

@@ -379,4 +379,10 @@ public class FrameLayout extends ViewGroup {
 			this.gravity = source.gravity;
 		}
 	}
+
+	/* AOSP FrameLayout */
+	@Override
+	public boolean shouldDelayChildPressedState() {
+		return false;
+	}
 }
