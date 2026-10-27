@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2006 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,348 +16,455 @@
 
 package android.view;
 
+import android.annotation.IntDef;
+import android.annotation.UnsupportedAppUsage;
+import android.os.SystemProperties;
+import android.util.ArrayMap;
 import android.util.Pools.SynchronizedPool;
-import android.util.SparseArray;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.Map;
 
 /**
- * Helper for tracking the velocity of touch events, for implementing
+ * Helper for tracking the velocity of motion events, for implementing
  * flinging and other such gestures.
  *
- * The API is AOSP's (frameworks/base core/java/android/view/VelocityTracker.java). The native part,
- * frameworks/native libs/input/VelocityTracker.cpp, is ported to Java for the default strategy of the
- * X and Y axes: LSQ2, an unweighted second degree least squares fit of the last 20 positions within
- * 100 ms, history dropped when the pointer did not move for 40 ms. AXIS_SCROLL (IMPULSE) is not ported.
+ * Use {@link #obtain} to retrieve a new instance of the class when you are going
+ * to begin tracking.  Put the motion events you receive into it with
+ * {@link #addMovement(MotionEvent)}.  When you want to determine the velocity, call
+ * {@link #computeCurrentVelocity(int)} and then call the velocity-getter methods like
+ * {@link #getXVelocity(int)}, {@link #getYVelocity(int)}, or {@link #getAxisVelocity(int, int)}
+ * to retrieve velocity for different axes and/or pointer IDs.
  */
 public final class VelocityTracker {
-	private static final SynchronizedPool<VelocityTracker> sPool =
-	    new SynchronizedPool<VelocityTracker>(2);
+    private static final SynchronizedPool<VelocityTracker> sPool =
+            new SynchronizedPool<VelocityTracker>(2);
 
-	private static final int ACTIVE_POINTER_ID = -1;
+    private static final int ACTIVE_POINTER_ID = -1;
 
-	public static final int VELOCITY_TRACKER_STRATEGY_DEFAULT = -1;
-	public static final int VELOCITY_TRACKER_STRATEGY_LSQ2 = 2;
+    /** @hide */
+    @IntDef(value = {
+            MotionEvent.AXIS_X,
+            MotionEvent.AXIS_Y,
+            MotionEvent.AXIS_SCROLL
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface VelocityTrackableMotionEventAxis {}
 
-	// VelocityTracker.cpp
-	private static final long ASSUME_POINTER_STOPPED_TIME = 40; // ms
-	// LeastSquaresVelocityTrackerStrategy (VelocityTracker.h)
-	private static final long HORIZON = 100; // ms
-	private static final int HISTORY_SIZE = 20;
+    /**
+     * Velocity Tracker Strategy: Invalid.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_DEFAULT = -1;
 
-	/* movements of one pointer on one axis, a circular buffer as in LeastSquaresVelocityTrackerStrategy */
-	private static final class Movements {
-		final long[] eventTime = new long[HISTORY_SIZE];
-		final float[] position = new float[HISTORY_SIZE];
-		int index = 0;
-		boolean empty = true;
-	}
+    /**
+     * Velocity Tracker Strategy: Impulse.
+     * Physical model of pushing an object.  Quality: VERY GOOD.
+     * Works with duplicate coordinates, unclean finger liftoff.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_IMPULSE = 0;
 
-	// per axis (X, Y): pointer id -> movements; dropped as a whole like mConfiguredStrategies
-	private final SparseArray<Movements>[] mMovements = new SparseArray[] {new SparseArray<Movements>(), new SparseArray<Movements>()};
-	// per axis: pointer id -> velocity of the last computeCurrentVelocity()
-	private final SparseArray<Float>[] mComputedVelocity = new SparseArray[] {new SparseArray<Float>(), new SparseArray<Float>()};
-	private int mCurrentPointerIdBits;
-	private int mActivePointerId = -1;
-	private long mLastEventTime;
+    /**
+     * Velocity Tracker Strategy: LSQ1.
+     * 1st order least squares.  Quality: POOR.
+     * Frequently underfits the touch data especially when the finger accelerates
+     * or changes direction.  Often underestimates velocity.  The direction
+     * is overly influenced by historical touch points.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_LSQ1 = 1;
 
-	/**
-	 * Retrieve a new VelocityTracker object to watch the velocity of a
-	 * motion.  Be sure to call {@link #recycle} when done.  You should
-	 * generally only maintain an active object while tracking a movement,
-	 * so that the VelocityTracker can be re-used elsewhere.
-	 *
-	 * @return Returns a new VelocityTracker.
-	 */
-	static public VelocityTracker obtain() {
-		VelocityTracker instance = sPool.acquire();
-		return (instance != null) ? instance : new VelocityTracker();
-	}
+    /**
+     * Velocity Tracker Strategy: LSQ2.
+     * 2nd order least squares.  Quality: VERY GOOD.
+     * Pretty much ideal, but can be confused by certain kinds of touch data,
+     * particularly if the panel has a tendency to generate delayed,
+     * duplicate or jittery touch coordinates when the finger is released.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_LSQ2 = 2;
 
-	public static VelocityTracker obtain(String strategy) {
-		return obtain();
-	}
+    /**
+     * Velocity Tracker Strategy: LSQ3.
+     * 3rd order least squares.  Quality: UNUSABLE.
+     * Frequently overfits the touch data yielding wildly divergent estimates
+     * of the velocity when the finger is released.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_LSQ3 = 3;
 
-	public static VelocityTracker obtain(int strategy) {
-		return new VelocityTracker();
-	}
+    /**
+     * Velocity Tracker Strategy: WLSQ2_DELTA.
+     * 2nd order weighted least squares, delta weighting.  Quality: EXPERIMENTAL
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_WLSQ2_DELTA = 4;
 
-	/**
-	 * Return a VelocityTracker object back to be re-used by others.  You must
-	 * not touch the object after calling this function.
-	 */
-	public void recycle() {
-		clear();
-		sPool.release(this);
-	}
+    /**
+     * Velocity Tracker Strategy: WLSQ2_CENTRAL.
+     * 2nd order weighted least squares, central weighting.  Quality: EXPERIMENTAL
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_WLSQ2_CENTRAL = 5;
 
-	public int getStrategyId() {
-		return VELOCITY_TRACKER_STRATEGY_DEFAULT;
-	}
+    /**
+     * Velocity Tracker Strategy: WLSQ2_RECENT.
+     * 2nd order weighted least squares, recent weighting.  Quality: EXPERIMENTAL
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_WLSQ2_RECENT = 6;
 
-	private VelocityTracker() {}
+    /**
+     * Velocity Tracker Strategy: INT1.
+     * 1st order integrating filter.  Quality: GOOD.
+     * Not as good as 'lsq2' because it cannot estimate acceleration but it is
+     * more tolerant of errors.  Like 'lsq1', this strategy tends to underestimate
+     * the velocity of a fling but this strategy tends to respond to changes in
+     * direction more quickly and accurately.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_INT1 = 7;
 
-	public boolean isAxisSupported(int axis) {
-		return axis == MotionEvent.AXIS_X || axis == MotionEvent.AXIS_Y;
-	}
+    /**
+     * Velocity Tracker Strategy: INT2.
+     * 2nd order integrating filter.  Quality: EXPERIMENTAL.
+     * For comparison purposes only.  Unlike 'int1' this strategy can compensate
+     * for acceleration but it typically overestimates the effect.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_INT2 = 8;
 
-	/**
-	 * Reset the velocity tracker back to its initial state.
-	 */
-	public void clear() {
-		mCurrentPointerIdBits = 0;
-		mActivePointerId = -1;
-		clearMovements();
-	}
+    /**
+     * Velocity Tracker Strategy: Legacy.
+     * Legacy velocity tracker algorithm.  Quality: POOR.
+     * For comparison purposes only.  This algorithm is strongly influenced by
+     * old data points, consistently underestimates velocity and takes a very long
+     * time to adjust to changes in direction.
+     *
+     * @hide
+     */
+    public static final int VELOCITY_TRACKER_STRATEGY_LEGACY = 9;
 
-	private void clearMovements() {
-		mMovements[0].clear();
-		mMovements[1].clear();
-	}
 
-	private void clearPointer(int pointerId) {
-		mCurrentPointerIdBits &= ~(1 << pointerId);
-		if (mActivePointerId == pointerId) {
-			// The active pointer id is being removed. Mark it invalid and try to find a new one
-			// from the remaining pointers.
-			mActivePointerId = mCurrentPointerIdBits != 0 ? Integer.numberOfTrailingZeros(mCurrentPointerIdBits) : -1;
-		}
-		mMovements[0].remove(pointerId);
-		mMovements[1].remove(pointerId);
-	}
+    /**
+     * Velocity Tracker Strategy look up table.
+     */
+    private static final Map<String, Integer> STRATEGIES = new ArrayMap<>();
 
-	private void addMovement(long eventTime, int pointerId, int axis, float position) {
-		if ((mCurrentPointerIdBits & (1 << pointerId)) != 0 && eventTime - mLastEventTime > ASSUME_POINTER_STOPPED_TIME) {
-			// We have not received any movements for too long.  Assume that all pointers
-			// have stopped.
-			clearMovements();
-		}
-		mLastEventTime = eventTime;
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"VELOCITY_TRACKER_STRATEGY_"}, value = {
+            VELOCITY_TRACKER_STRATEGY_DEFAULT,
+            VELOCITY_TRACKER_STRATEGY_IMPULSE,
+            VELOCITY_TRACKER_STRATEGY_LSQ1,
+            VELOCITY_TRACKER_STRATEGY_LSQ2,
+            VELOCITY_TRACKER_STRATEGY_LSQ3,
+            VELOCITY_TRACKER_STRATEGY_WLSQ2_DELTA,
+            VELOCITY_TRACKER_STRATEGY_WLSQ2_CENTRAL,
+            VELOCITY_TRACKER_STRATEGY_WLSQ2_RECENT,
+            VELOCITY_TRACKER_STRATEGY_INT1,
+            VELOCITY_TRACKER_STRATEGY_INT2,
+            VELOCITY_TRACKER_STRATEGY_LEGACY
+    })
+    public @interface VelocityTrackerStrategy {}
 
-		mCurrentPointerIdBits |= 1 << pointerId;
-		if (mActivePointerId == -1) {
-			// Let this be the new active pointer if no active pointer is currently set
-			mActivePointerId = pointerId;
-		}
+    private long mPtr;
+    @VelocityTrackerStrategy
+    private final int mStrategy;
 
-		Movements movements = mMovements[axis].get(pointerId);
-		if (movements == null) {
-			movements = new Movements();
-			mMovements[axis].put(pointerId, movements);
-		}
-		if (!movements.empty && movements.eventTime[movements.index] != eventTime) {
-			// When ACTION_POINTER_DOWN happens, we will first receive ACTION_MOVE with the coordinates
-			// of the existing pointers, and then ACTION_POINTER_DOWN with the coordinates that include
-			// the new pointer. If the eventtimes for both events are identical, just update the data
-			// for this time.
-			movements.index++;
-		}
-		if (movements.index == HISTORY_SIZE)
-			movements.index = 0;
-		movements.empty = false;
-		movements.eventTime[movements.index] = eventTime;
-		movements.position[movements.index] = position;
-	}
+    private static native long nativeInitialize(int strategy);
+    private static native void nativeDispose(long ptr);
+    private static native void nativeClear(long ptr);
+    private static native void nativeAddMovement(long ptr, MotionEvent event);
+    private static native void nativeComputeCurrentVelocity(long ptr, int units, float maxVelocity);
+    private static native float nativeGetVelocity(long ptr, int axis, int id);
+    private static native boolean nativeIsAxisSupported(int axis);
 
-	/**
-	 * Add a user's movement to the tracker.  You should call this for the
-	 * initial {@link MotionEvent#ACTION_DOWN}, the following
-	 * {@link MotionEvent#ACTION_MOVE} events that you receive, and the
-	 * final {@link MotionEvent#ACTION_UP}.  You can, however, call this
-	 * for whichever events you desire.
-	 *
-	 * @param event The MotionEvent you received and would like to track.
-	 */
-	public void addMovement(MotionEvent event) {
-		if (event == null) {
-			throw new IllegalArgumentException("event must not be null");
-		}
-		switch (event.getActionMasked()) {
-			case MotionEvent.ACTION_DOWN:
-			case MotionEvent.ACTION_HOVER_ENTER:
-				// Clear all pointers on down before adding the new movement.
-				clear();
-				break;
-			case MotionEvent.ACTION_POINTER_DOWN:
-				// Start a new movement trace for a pointer that just went down.
-				// We do this on down instead of on up because the client may want to query the
-				// final velocity for a pointer that just went up.
-				clearPointer(event.getPointerId(event.getActionIndex()));
-				break;
-			case MotionEvent.ACTION_MOVE:
-			case MotionEvent.ACTION_HOVER_MOVE:
-				break;
-			case MotionEvent.ACTION_POINTER_UP:
-			case MotionEvent.ACTION_UP:
-				if (event.getEventTime() - mLastEventTime > ASSUME_POINTER_STOPPED_TIME) {
-					// We have not received any movements for too long.  Assume that all pointers
-					// have stopped.
-					clearMovements();
-				}
-				// These actions because they do not convey any new information about
-				// pointer movement.  We also want to preserve the last known velocity of the pointers.
-				return;
-			default:
-				// Ignore all other actions.
-				return;
-		}
+    static {
+        // Strategy string and IDs mapping lookup.
+        STRATEGIES.put("impulse", VELOCITY_TRACKER_STRATEGY_IMPULSE);
+        STRATEGIES.put("lsq1", VELOCITY_TRACKER_STRATEGY_LSQ1);
+        STRATEGIES.put("lsq2", VELOCITY_TRACKER_STRATEGY_LSQ2);
+        STRATEGIES.put("lsq3", VELOCITY_TRACKER_STRATEGY_LSQ3);
+        STRATEGIES.put("wlsq2-delta", VELOCITY_TRACKER_STRATEGY_WLSQ2_DELTA);
+        STRATEGIES.put("wlsq2-central", VELOCITY_TRACKER_STRATEGY_WLSQ2_CENTRAL);
+        STRATEGIES.put("wlsq2-recent", VELOCITY_TRACKER_STRATEGY_WLSQ2_RECENT);
+        STRATEGIES.put("int1", VELOCITY_TRACKER_STRATEGY_INT1);
+        STRATEGIES.put("int2", VELOCITY_TRACKER_STRATEGY_INT2);
+        STRATEGIES.put("legacy", VELOCITY_TRACKER_STRATEGY_LEGACY);
+    }
 
-		long eventTime = event.getEventTime();
-		for (int i = 0; i < event.getPointerCount(); i++) {
-			int pointerId = event.getPointerId(i);
-			addMovement(eventTime, pointerId, MotionEvent.AXIS_X, event.getX(i));
-			addMovement(eventTime, pointerId, MotionEvent.AXIS_Y, event.getY(i));
-		}
-	}
+    /**
+     * Return a strategy ID from string.
+     */
+    private static int toStrategyId(String strStrategy) {
+        if (STRATEGIES.containsKey(strStrategy)) {
+            return STRATEGIES.get(strStrategy);
+        }
+        return VELOCITY_TRACKER_STRATEGY_DEFAULT;
+    }
 
-	/* LeastSquaresVelocityTrackerStrategy::getEstimator() for degree 2 without weighting: coeff[1], or null */
-	private static Float getVelocity(Movements movements) {
-		if (movements == null || movements.empty)
-			return null;
-		// Iterate over movement samples in reverse time order and collect samples.
-		float[] time = new float[HISTORY_SIZE];
-		float[] position = new float[HISTORY_SIZE];
-		int m = 0;
-		int index = movements.index;
-		long newest = movements.eventTime[index];
-		do {
-			long age = newest - movements.eventTime[index];
-			if (age > HORIZON)
-				break;
-			if (movements.eventTime[index] == 0 && index != 0)
-				break;
-			position[m] = movements.position[index];
-			time[m] = -age * 0.001f;
-			m++;
-			index = (index == 0 ? HISTORY_SIZE : index) - 1;
-		} while (m < HISTORY_SIZE);
+    /**
+     * Retrieve a new VelocityTracker object to watch the velocity of a
+     * motion.  Be sure to call {@link #recycle} when done.  You should
+     * generally only maintain an active object while tracking a movement,
+     * so that the VelocityTracker can be re-used elsewhere.
+     *
+     * @return Returns a new VelocityTracker.
+     */
+    static public VelocityTracker obtain() {
+        VelocityTracker instance = sPool.acquire();
+        return (instance != null) ? instance
+                : new VelocityTracker(VELOCITY_TRACKER_STRATEGY_DEFAULT);
+    }
 
-		if (m >= 3)
-			return solveUnweightedLeastSquaresDeg2(time, position, m);
-		if (m == 2) // degree reduced to m - 1: the straight line through both
-			return time[0] != time[1] ? (position[0] - position[1]) / (time[0] - time[1]) : null;
-		return null; // degree 0, no velocity
-	}
+    /**
+     * Obtains a velocity tracker with the specified strategy as string.
+     * For testing and comparison purposes only.
+     * @deprecated Use {@link obtain(int strategy)} instead.
+     *
+     * @param strategy The strategy, or null to use the default.
+     * @return The velocity tracker.
+     *
+     * @hide
+     */
+    @UnsupportedAppUsage
+    @Deprecated
+    public static VelocityTracker obtain(String strategy) {
+        if (strategy == null) {
+            return obtain();
+        }
+        return new VelocityTracker(toStrategyId(strategy));
+    }
 
-	/* solveUnweightedLeastSquaresDeg2(): y = a*x^2 + b*x + c, returns b */
-	private static Float solveUnweightedLeastSquaresDeg2(float[] x, float[] y, int count) {
-		float sxi = 0, sxiyi = 0, syi = 0, sxi2 = 0, sxi3 = 0, sxi2yi = 0, sxi4 = 0;
-		for (int i = 0; i < count; i++) {
-			float xi = x[i];
-			float yi = y[i];
-			float xi2 = xi * xi;
-			float xi3 = xi2 * xi;
-			float xi4 = xi3 * xi;
-			float xiyi = xi * yi;
-			float xi2yi = xi2 * yi;
+    /**
+     * Obtains a velocity tracker with the specified strategy.
+     * For testing and comparison purposes only.
+     *
+     * @param strategy The strategy Id, VELOCITY_TRACKER_STRATEGY_DEFAULT to use the default.
+     * @return The velocity tracker.
+     *
+     * @hide
+     */
+    public static VelocityTracker obtain(int strategy) {
+        return new VelocityTracker(strategy);
+    }
 
-			sxi += xi;
-			sxi2 += xi2;
-			sxiyi += xiyi;
-			sxi2yi += xi2yi;
-			syi += yi;
-			sxi3 += xi3;
-			sxi4 += xi4;
-		}
+    /**
+     * Return a VelocityTracker object back to be re-used by others.  You must
+     * not touch the object after calling this function.
+     */
+    public void recycle() {
+        if (mStrategy == VELOCITY_TRACKER_STRATEGY_DEFAULT) {
+            clear();
+            sPool.release(this);
+        }
+    }
 
-		float Sxx = sxi2 - sxi * sxi / count;
-		float Sxy = sxiyi - sxi * syi / count;
-		float Sxx2 = sxi3 - sxi * sxi2 / count;
-		float Sx2y = sxi2yi - sxi2 * syi / count;
-		float Sx2x2 = sxi4 - sxi2 * sxi2 / count;
+    /**
+     * Return strategy Id of VelocityTracker object.
+     * @return The velocity tracker strategy Id.
+     *
+     * @hide
+     */
+    public int getStrategyId() {
+        return mStrategy;
+    }
 
-		float denominator = Sxx * Sx2x2 - Sxx2 * Sxx2;
-		if (denominator == 0)
-			return null;
-		return (Sxy * Sx2x2 - Sx2y * Sxx2) / denominator;
-	}
+    private VelocityTracker(@VelocityTrackerStrategy int strategy) {
+        // If user has not selected a specific strategy
+        if (strategy == VELOCITY_TRACKER_STRATEGY_DEFAULT) {
+            // ATL: InputManagerService.getVelocityTrackerStrategy() reads this system property.
+            final String strategyProperty =
+                    SystemProperties.get("persist.input.velocitytracker.strategy");
+            // Check if user specified strategy by overriding system property.
+            if (strategyProperty == null || strategyProperty.isEmpty()) {
+                mStrategy = strategy;
+            } else {
+                mStrategy = toStrategyId(strategyProperty);
+            }
+        } else {
+            // User specified strategy
+            mStrategy = strategy;
+        }
+        mPtr = nativeInitialize(mStrategy);
+    }
 
-	/**
-	 * Equivalent to invoking {@link #computeCurrentVelocity(int, float)} with a maximum
-	 * velocity of Float.MAX_VALUE.
-	 *
-	 * @see #computeCurrentVelocity(int, float)
-	 */
-	public void computeCurrentVelocity(int units) {
-		computeCurrentVelocity(units, Float.MAX_VALUE);
-	}
+    @Override
+    protected void finalize() throws Throwable {
+        try {
+            if (mPtr != 0) {
+                nativeDispose(mPtr);
+                mPtr = 0;
+            }
+        } finally {
+            super.finalize();
+        }
+    }
 
-	/**
-	 * Compute the current velocity based on the points that have been
-	 * collected.  Only call this when you actually want to retrieve velocity
-	 * information, as it is relatively expensive.  You can then retrieve
-	 * the velocity with {@link #getXVelocity()} and
-	 * {@link #getYVelocity()}.
-	 *
-	 * @param units The units you would like the velocity in.  A value of 1
-	 * provides pixels per millisecond, 1000 provides pixels per second, etc.
-	 * @param maxVelocity The maximum velocity that can be computed by this method.
-	 * This value must be declared in the same unit as the units parameter. This value
-	 * must be positive.
-	 */
-	public void computeCurrentVelocity(int units, float maxVelocity) {
-		for (int axis = 0; axis < 2; axis++) {
-			mComputedVelocity[axis].clear();
-			for (int bits = mCurrentPointerIdBits; bits != 0; bits &= bits - 1) {
-				int id = Integer.numberOfTrailingZeros(bits);
-				Float velocity = getVelocity(mMovements[axis].get(id));
-				if (velocity != null)
-					mComputedVelocity[axis].put(id, Math.max(-maxVelocity, Math.min(velocity * units / 1000, maxVelocity)));
-			}
-		}
-	}
+    /**
+     * Checks whether a given velocity-trackable {@link MotionEvent} axis is supported for velocity
+     * tracking by this {@link VelocityTracker} instance (refer to
+     * {@link #getAxisVelocity(int, int)} for a list of potentially velocity-trackable axes).
+     *
+     * <p>Note that the value returned from this method will stay the same for a given instance, so
+     * a single check for axis support is enough per a {@link VelocityTracker} instance.
+     *
+     * @param axis The axis to check for velocity support.
+     * @return {@code true} if {@code axis} is supported for velocity tracking, or {@code false}
+     * otherwise.
+     * @see #getAxisVelocity(int, int)
+     * @see #getAxisVelocity(int)
+     */
+    public boolean isAxisSupported(@VelocityTrackableMotionEventAxis int axis) {
+        return nativeIsAxisSupported(axis);
+    }
 
-	/**
-	 * Retrieve the last computed X velocity.  You must first call
-	 * {@link #computeCurrentVelocity(int)} before calling this function.
-	 *
-	 * @return The previously computed X velocity.
-	 */
-	public float getXVelocity() {
-		return getXVelocity(ACTIVE_POINTER_ID);
-	}
+    /**
+     * Reset the velocity tracker back to its initial state.
+     */
+    public void clear() {
+        nativeClear(mPtr);
+    }
 
-	/**
-	 * Retrieve the last computed Y velocity.  You must first call
-	 * {@link #computeCurrentVelocity(int)} before calling this function.
-	 *
-	 * @return The previously computed Y velocity.
-	 */
-	public float getYVelocity() {
-		return getYVelocity(ACTIVE_POINTER_ID);
-	}
+    /**
+     * Add a user's movement to the tracker.  You should call this for the
+     * initial {@link MotionEvent#ACTION_DOWN}, the following
+     * {@link MotionEvent#ACTION_MOVE} events that you receive, and the
+     * final {@link MotionEvent#ACTION_UP}.  You can, however, call this
+     * for whichever events you desire.
+     *
+     * @param event The MotionEvent you received and would like to track.
+     */
+    public void addMovement(MotionEvent event) {
+        if (event == null) {
+            throw new IllegalArgumentException("event must not be null");
+        }
+        nativeAddMovement(mPtr, event);
+    }
 
-	/**
-	 * Retrieve the last computed X velocity.  You must first call
-	 * {@link #computeCurrentVelocity(int)} before calling this function.
-	 *
-	 * @param id Which pointer's velocity to return.
-	 * @return The previously computed X velocity.
-	 */
-	public float getXVelocity(int id) {
-		return getAxisVelocity(MotionEvent.AXIS_X, id);
-	}
+    /**
+     * Equivalent to invoking {@link #computeCurrentVelocity(int, float)} with a maximum
+     * velocity of Float.MAX_VALUE.
+     *
+     * @see #computeCurrentVelocity(int, float)
+     */
+    public void computeCurrentVelocity(int units) {
+        nativeComputeCurrentVelocity(mPtr, units, Float.MAX_VALUE);
+    }
 
-	/**
-	 * Retrieve the last computed Y velocity.  You must first call
-	 * {@link #computeCurrentVelocity(int)} before calling this function.
-	 *
-	 * @param id Which pointer's velocity to return.
-	 * @return The previously computed Y velocity.
-	 */
-	public float getYVelocity(int id) {
-		return getAxisVelocity(MotionEvent.AXIS_Y, id);
-	}
+    /**
+     * Compute the current velocity based on the points that have been
+     * collected.  Only call this when you actually want to retrieve velocity
+     * information, as it is relatively expensive.  You can then retrieve
+     * the velocity with {@link #getXVelocity()} and
+     * {@link #getYVelocity()}.
+     *
+     * @param units The units you would like the velocity in.  A value of 1
+     * provides units per millisecond, 1000 provides units per second, etc.
+     * Note that the units referred to here are the same units with which motion is reported. For
+     * axes X and Y, the units are pixels.
+     * @param maxVelocity The maximum velocity that can be computed by this method.
+     * This value must be declared in the same unit as the units parameter. This value
+     * must be positive.
+     */
+    public void computeCurrentVelocity(int units, float maxVelocity) {
+        nativeComputeCurrentVelocity(mPtr, units, maxVelocity);
+    }
 
-	/* android_view_VelocityTracker.cpp: VelocityTrackerState::getVelocity() */
-	public float getAxisVelocity(int axis, int id) {
-		if (!isAxisSupported(axis))
-			return 0;
-		if (id == ACTIVE_POINTER_ID)
-			id = mActivePointerId;
-		Float velocity = mComputedVelocity[axis].get(id);
-		return velocity != null ? velocity : 0;
-	}
+    /**
+     * Retrieve the last computed X velocity.  You must first call
+     * {@link #computeCurrentVelocity(int)} before calling this function.
+     *
+     * @return The previously computed X velocity.
+     */
+    public float getXVelocity() {
+        return getXVelocity(ACTIVE_POINTER_ID);
+    }
 
-	public float getAxisVelocity(int axis) {
-		return getAxisVelocity(axis, ACTIVE_POINTER_ID);
-	}
+    /**
+     * Retrieve the last computed Y velocity.  You must first call
+     * {@link #computeCurrentVelocity(int)} before calling this function.
+     *
+     * @return The previously computed Y velocity.
+     */
+    public float getYVelocity() {
+        return getYVelocity(ACTIVE_POINTER_ID);
+    }
+
+    /**
+     * Retrieve the last computed X velocity.  You must first call
+     * {@link #computeCurrentVelocity(int)} before calling this function.
+     *
+     * @param id Which pointer's velocity to return.
+     * @return The previously computed X velocity.
+     */
+    public float getXVelocity(int id) {
+        return nativeGetVelocity(mPtr, MotionEvent.AXIS_X, id);
+    }
+
+    /**
+     * Retrieve the last computed Y velocity.  You must first call
+     * {@link #computeCurrentVelocity(int)} before calling this function.
+     *
+     * @param id Which pointer's velocity to return.
+     * @return The previously computed Y velocity.
+     */
+    public float getYVelocity(int id) {
+        return nativeGetVelocity(mPtr, MotionEvent.AXIS_Y, id);
+    }
+
+    /**
+     * Retrieve the last computed velocity for a given motion axis. You must first call
+     * {@link #computeCurrentVelocity(int)} or {@link #computeCurrentVelocity(int, float)} before
+     * calling this function.
+     *
+     * <p>In addition to {@link MotionEvent#AXIS_X} and {@link MotionEvent#AXIS_Y} which have been
+     * supported since the introduction of this class, the following axes can be candidates for this
+     * method:
+     * <ul>
+     *   <li> {@link MotionEvent#AXIS_SCROLL}: supported starting
+     *        {@link android.os.Build.VERSION_CODES#UPSIDE_DOWN_CAKE}
+     * </ul>
+     *
+     * <p>Before accessing velocities of an axis using this method, check that your
+     * {@link VelocityTracker} instance supports the axis by using {@link #isAxisSupported(int)}.
+     *
+     * @param axis Which axis' velocity to return.
+     * @param id Which pointer's velocity to return.
+     * @return The previously computed velocity for {@code axis} for pointer ID of {@code id} if
+     * {@code axis} is supported for velocity tracking, or 0 if velocity tracking is not supported
+     * for the axis.
+     * @see #isAxisSupported(int)
+     */
+    public float getAxisVelocity(@VelocityTrackableMotionEventAxis int axis, int id) {
+        return nativeGetVelocity(mPtr, axis, id);
+    }
+
+    /**
+     * Equivalent to calling {@link #getAxisVelocity(int, int)} for {@code axis} and the active
+     * pointer.
+     *
+     * @param axis Which axis' velocity to return.
+     * @return The previously computed velocity for {@code axis} for the active pointer if
+     * {@code axis} is supported for velocity tracking, or 0 if velocity tracking is not supported
+     * for the axis.
+     * @see #isAxisSupported(int)
+     * @see #getAxisVelocity(int, int)
+     */
+    public float getAxisVelocity(@VelocityTrackableMotionEventAxis int axis) {
+        return nativeGetVelocity(mPtr, axis, ACTIVE_POINTER_ID);
+    }
 }

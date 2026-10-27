@@ -943,6 +943,21 @@ public final class MotionEvent extends InputEvent {
 	public static final int AXIS_TILT = 25;
 
 	/**
+	 * Axis constant: Generic scroll axis of a motion event.
+	 * <p>
+	 * <ul>
+	 * <li>Reports the relative movement of the generic scrolling device.
+	 * </ul>
+	 * </p><p>
+	 * This axis should be used for scroll events that are neither strictly vertical nor horizontal.
+	 * A good example would be the rotation of a rotary encoder input device.
+	 * </p>
+	 *
+	 * @see #getAxisValue(int, int)
+	 */
+	public static final int AXIS_SCROLL = 26;
+
+	/**
 	 * Axis constant: Generic 1 axis of a motion event.
 	 * The interpretation of a generic axis is device-specific.
 	 *
@@ -1152,6 +1167,7 @@ public final class MotionEvent extends InputEvent {
 		names.append(AXIS_BRAKE, "AXIS_BRAKE");
 		names.append(AXIS_DISTANCE, "AXIS_DISTANCE");
 		names.append(AXIS_TILT, "AXIS_TILT");
+		names.append(AXIS_SCROLL, "AXIS_SCROLL");
 		names.append(AXIS_GENERIC_1, "AXIS_GENERIC_1");
 		names.append(AXIS_GENERIC_2, "AXIS_GENERIC_2");
 		names.append(AXIS_GENERIC_3, "AXIS_GENERIC_3");
@@ -1807,6 +1823,7 @@ public final class MotionEvent extends InputEvent {
 	 * Use {@link #getActionIndex} to return the index associated with pointer actions.
 	 * @return The action, such as {@link #ACTION_DOWN} or {@link #ACTION_POINTER_DOWN}.
 	 */
+	@Export
 	public final int getActionMasked() {
 		return action & ACTION_MASK;
 	}
@@ -1821,6 +1838,7 @@ public final class MotionEvent extends InputEvent {
 	 * gone down or up.
 	 * @return The index associated with the action.
 	 */
+	@Export
 	public final int getActionIndex() {
 		return (action & ACTION_POINTER_INDEX_MASK) >> ACTION_POINTER_INDEX_SHIFT;
 	}
@@ -1894,6 +1912,7 @@ public final class MotionEvent extends InputEvent {
 	 * in the {@link android.os.SystemClock#uptimeMillis} time base.
 	 */
 	@Override
+	@Export
 	public final long getEventTime() {
 		return eventTime;
 	}
@@ -2029,6 +2048,7 @@ public final class MotionEvent extends InputEvent {
 	 * The number of pointers of data contained in this event.  Always
 	 * >= 1.
 	 */
+	@Export
 	public final int getPointerCount() {
 		return ids.length;
 	}
@@ -2041,6 +2061,7 @@ public final class MotionEvent extends InputEvent {
 	 * @param pointerIndex Raw index of pointer to retrieve.  Value may be from 0
 	 * (the first pointer that is down) to {@link #getPointerCount()}-1.
 	 */
+	@Export
 	public final int getPointerId(int pointerIndex) {
 		return ids[pointerIndex];
 	}
@@ -2087,6 +2108,7 @@ public final class MotionEvent extends InputEvent {
 	 *
 	 * @see #AXIS_X
 	 */
+	@Export("getXAt")
 	public final float getX(int pointerIndex) {
 		return coords[4 * pointerIndex + X_OFFSET];
 	}
@@ -2102,6 +2124,7 @@ public final class MotionEvent extends InputEvent {
 	 *
 	 * @see #AXIS_Y
 	 */
+	@Export("getYAt")
 	public final float getY(int pointerIndex) {
 		return coords[4 * pointerIndex + Y_OFFSET];
 	}
@@ -2245,6 +2268,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see #AXIS_X
 	 * @see #AXIS_Y
 	 */
+	@Export("getAxisValueAt")
 	public final float getAxisValue(int axis, int pointerIndex) {
 		return nativeGetAxisValue(mNativePtr, axis, pointerIndex, HISTORY_CURRENT);
 	}
