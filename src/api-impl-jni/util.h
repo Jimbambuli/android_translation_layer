@@ -58,6 +58,7 @@ void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
 void atl_unref_on_main_thread(gpointer object);
 gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out);
+void atl_snapshot_concat_matrix(GtkSnapshot *snapshot, const graphene_matrix_t *matrix);
 
 typedef void (*AtlFadeDone)(GtkWidget *widget);
 void atl_fade_widget(GtkWidget *widget, double to, int duration_ms, AtlFadeDone done);

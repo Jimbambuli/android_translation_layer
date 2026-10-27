@@ -3,6 +3,7 @@
 #include <pango/pango.h>
 
 #include "../defines.h"
+#include "../util.h"
 #include "AndroidPaint.h"
 
 #include "../generated_headers/android_atl_GskCanvas.h"
@@ -232,7 +233,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1concat(JNIEnv *env, jc
 {
 	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
 	graphene_matrix_t *matrix = (graphene_matrix_t *)_PTR(matrix_ptr);
-	gtk_snapshot_transform_matrix(snapshot, matrix);
+	atl_snapshot_concat_matrix(snapshot, matrix);
 }
 
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipRect(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom)

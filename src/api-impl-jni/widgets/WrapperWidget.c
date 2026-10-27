@@ -361,7 +361,7 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 			gtk_snapshot_save(snapshot);
 			if (type & TRANSFORMATION_TYPE_MATRIX) {
 				jobject matrix = J__Transformation__getMatrix(env, transformation);
-				gtk_snapshot_transform_matrix(snapshot, _PTR(_GET_LONG_FIELD(matrix, "native_instance")));
+				atl_snapshot_concat_matrix(snapshot, _PTR(_GET_LONG_FIELD(matrix, "native_instance")));
 				(*env)->DeleteLocalRef(env, matrix);
 			}
 			if (type & TRANSFORMATION_TYPE_ALPHA) {

@@ -653,3 +653,24 @@ gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *
 	}
 	return TRUE;
 }
+
+/*
+ * Concatenate an android.graphics.Matrix to the snapshot like Skia's SkCanvas::concat(const SkMatrix&):
+ * an identity matrix changes nothing, and translate/scale matrices (SkMatrix::getType() without
+ * kAffine/kPerspective) stay translate/scale transforms. GSK can't classify a raw matrix, so every
+ * gtk_snapshot_transform_matrix() is an "unknown" transform for it and goes through its generic
+ * offscreen path, which breaks below views that are scaled almost to zero (e.g. the SwipeRefreshLayout
+ * spinner at the end of its scale-down animation, ImageView's identity draw matrix inside it): the
+ * stroke mask comes out NaN-sized and the renderer crashes.
+ */
+void atl_snapshot_concat_matrix(GtkSnapshot *snapshot, const graphene_matrix_t *matrix)
+{
+	if (graphene_matrix_is_identity(matrix))
+		return;
+	if (graphene_matrix_is_2d(matrix) && graphene_matrix_get_value(matrix, 0, 1) == 0.f && graphene_matrix_get_value(matrix, 1, 0) == 0.f) {
+		gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(graphene_matrix_get_value(matrix, 3, 0), graphene_matrix_get_value(matrix, 3, 1)));
+		gtk_snapshot_scale(snapshot, graphene_matrix_get_value(matrix, 0, 0), graphene_matrix_get_value(matrix, 1, 1));
+		return;
+	}
+	gtk_snapshot_transform_matrix(snapshot, matrix);
+}
