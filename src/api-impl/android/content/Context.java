@@ -227,7 +227,7 @@ public abstract class Context {
 	}
 
 	public ContentResolver getContentResolver() {
-		return new ContentResolver();
+		return new ContentResolver(this);
 	}
 
 	public abstract Object getSystemService(String name);

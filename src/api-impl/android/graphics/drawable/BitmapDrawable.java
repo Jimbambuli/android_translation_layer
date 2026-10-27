@@ -81,6 +81,14 @@ public class BitmapDrawable extends Drawable {
 	}
 
 	/* the size at the target density, while drawing keeps all of the bitmap's pixels */
+	/* AOSP BitmapDrawable.setBitmap() (@hide) */
+	public void setBitmap(Bitmap bitmap) {
+		if (this.bitmap != bitmap) {
+			this.bitmap = bitmap;
+			invalidateSelf();
+		}
+	}
+
 	@Override
 	public int getIntrinsicWidth() {
 		if (bitmap == null)

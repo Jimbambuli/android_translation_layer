@@ -1,7 +1,9 @@
 package android.content;
 
 import android.accounts.Account;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.AssetFileDescriptor;
+import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.MatrixCursor;
@@ -9,6 +11,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
+import android.text.TextUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
@@ -18,6 +21,14 @@ import java.util.List;
 
 public class ContentResolver {
 	public static final String SCHEME_CONTENT = "content";
+	public static final String SCHEME_ANDROID_RESOURCE = "android.resource";
+	public static final String SCHEME_FILE = "file";
+
+	private final Context mContext;
+
+	public ContentResolver(Context context) {
+		mContext = context;
+	}
 
 	public static final String SYNC_EXTRAS_IGNORE_SETTINGS = "ignore_settings";
 
@@ -184,4 +195,56 @@ public class ContentResolver {
 	}
 
 	private static native void native_query_file_info(String path, String[] attributes, Object[] result);
+
+	/* AOSP ContentResolver.OpenResourceIdResult and getResourceId() (@hide): a resource identified by the {@link Resources} that contains it, and a resource id.
+	 *
+	 * @hide
+	 */
+	public class OpenResourceIdResult {
+		public Resources r;
+		public int id;
+	}
+
+	/**
+	 * Resolves an android.resource URI to a {@link Resources} and a resource id.
+	 *
+	 * @hide
+	 */
+	public OpenResourceIdResult getResourceId(Uri uri) throws FileNotFoundException {
+		String authority = uri.getAuthority();
+		Resources r;
+		if (TextUtils.isEmpty(authority)) {
+			throw new FileNotFoundException("No authority: " + uri);
+		} else {
+			try {
+				r = mContext.getPackageManager().getResourcesForApplication(authority);
+			} catch (NameNotFoundException ex) {
+				throw new FileNotFoundException("No package found for authority: " + uri);
+			}
+		}
+		List<String> path = uri.getPathSegments();
+		if (path == null) {
+			throw new FileNotFoundException("No path: " + uri);
+		}
+		int len = path.size();
+		int id;
+		if (len == 1) {
+			try {
+				id = Integer.parseInt(path.get(0));
+			} catch (NumberFormatException e) {
+				throw new FileNotFoundException("Single path segment is not a resource ID: " + uri);
+			}
+		} else if (len == 2) {
+			id = r.getIdentifier(path.get(1), path.get(0), authority);
+		} else {
+			throw new FileNotFoundException("More than two path segments: " + uri);
+		}
+		if (id == 0) {
+			throw new FileNotFoundException("No resource found for: " + uri);
+		}
+		OpenResourceIdResult res = new OpenResourceIdResult();
+		res.r = r;
+		res.id = id;
+		return res;
+	}
 }
