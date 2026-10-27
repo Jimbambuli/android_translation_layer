@@ -53,7 +53,7 @@ public class Path {
 		this.path = native_ref_path(path.getGskPath());
 	}
 
-	private long getBuilder() {
+	long getBuilder() {
 		if (builder == 0 || path != 0) {
 			builder = native_create_builder(path, builder);
 			path = 0;
