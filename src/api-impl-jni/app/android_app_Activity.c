@@ -343,6 +343,16 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
+	/* like ActivityThread.handleSendResult(): the results of the activities that finished come before it
+	 * is restarted or resumed */
+	J__Activity__performDeliverResults(env, activity);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	if (_GET_BOOL_FIELD(activity, "finishing"))
+		return;
+
 	if (!activity_get_bool(env, activity, "started")) { // (one that was only paused is just resumed)
 		if (activity_get_bool(env, activity, "stopped"))
 			J__Activity__performRestart(env, activity);

@@ -60,8 +60,25 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	Window window;
 	int requested_orientation = -1 /*ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED*/; // dummy
 	public Intent intent;
-	private Activity resultActivity;
+	private Activity resultActivity; // the activity that started this one with startActivityForResult()
 	private int resultRequestCode;
+	/* like AOSP: what setResult() set, handed over by finish() */
+	private int mResultCode = RESULT_CANCELED;
+	private Intent mResultData;
+	/* the results of the activities this one started that finished, delivered before it comes back
+	 * (AOSP: ActivityResultItem, ActivityThread.handleSendResult()) */
+	private ArrayList<ResultInfo> mPendingResults;
+
+	private static final class ResultInfo {
+		final int requestCode;
+		final int resultCode;
+		final Intent data;
+		ResultInfo(int requestCode, int resultCode, Intent data) {
+			this.requestCode = requestCode;
+			this.resultCode = resultCode;
+			this.data = data;
+		}
+	}
 	private boolean paused = false;
 	private boolean started = false; // between performStart() and performStop()
 	private boolean stopped = false; // stopped and not started again: the next start is a restart
@@ -323,6 +340,43 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {}
 
+	/* Activity.dispatchActivityResult(). ATL: only the results of activities (who == null); there are no
+	 * results for fragments, permission requests, views or autofill */
+	void dispatchActivityResult(String who, int requestCode, int resultCode, Intent data, String reason) {
+		onActivityResult(requestCode, resultCode, data);
+	}
+
+	/* what finish() of the started activity does in ActivityRecord.finishIfPossible(): queue the result for
+	 * the activity that started it */
+	private void addPendingResult(int requestCode, int resultCode, Intent data) {
+		synchronized (this) {
+			if (mPendingResults == null)
+				mPendingResults = new ArrayList<ResultInfo>();
+			mPendingResults.add(new ResultInfo(requestCode, resultCode, data));
+		}
+	}
+
+	/* called from native code when this activity comes back (before onRestart()/onStart()/onResume()):
+	 * ActivityThread.deliverResults() */
+	@Export
+	private void performDeliverResults() {
+		ArrayList<ResultInfo> results;
+		synchronized (this) {
+			results = mPendingResults;
+			mPendingResults = null;
+		}
+		if (results == null)
+			return;
+		for (ResultInfo ri : results) {
+			try {
+				dispatchActivityResult(null, ri.requestCode, ri.resultCode, ri.data, "ACTIVITY_RESULT");
+			} catch (Exception e) {
+				throw new RuntimeException("Failure delivering result " + ri.resultCode + " (request " + ri.requestCode
+				                           + ") to activity " + getComponentName().toShortString() + ": " + e.toString(), e);
+			}
+		}
+	}
+
 	// the order must match GtkFileChooserAction enum
 	private static final List<String> FILE_CHOOSER_ACTIONS = Arrays.asList(
 	    "android.intent.action.OPEN_DOCUMENT",     // (0) GTK_FILE_CHOOSER_ACTION_OPEN
@@ -333,7 +387,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	// callback from native code
 	@Export
 	protected void fileChooserResultCallback(int requestCode, int resultCode, int action, String uri) {
-		onActivityResult(requestCode, resultCode, new Intent(FILE_CHOOSER_ACTIONS.get(action), uri != null ? Uri.parse(uri) : null));
+		dispatchActivityResult(null, requestCode, resultCode, new Intent(FILE_CHOOSER_ACTIONS.get(action), uri != null ? Uri.parse(uri) : null), "fileChooserResult");
 	}
 
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
@@ -355,8 +409,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 						onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 						return;
 					}
-					activity.resultRequestCode = requestCode;
-					activity.resultActivity = Activity.this;
+					/* like AOSP, a negative request code asks for no result */
+					if (requestCode >= 0) {
+						activity.resultRequestCode = requestCode;
+						activity.resultActivity = Activity.this;
+					}
 					nativeStartActivity(activity);
 				}
 			});
@@ -386,14 +443,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		startActivityForResult(intent, requestCode, null);
 	}
 
-	public void setResult(int resultCode, Intent data) {
-		if (resultActivity != null) {
-			resultActivity.onActivityResult(resultRequestCode, resultCode, data);
+	public final void setResult(int resultCode) {
+		synchronized (this) {
+			mResultCode = resultCode;
+			mResultData = null;
 		}
 	}
 
-	public void setResult(int resultCode) {
-		setResult(resultCode, null);
+	public final void setResult(int resultCode, Intent data) {
+		synchronized (this) {
+			mResultCode = resultCode;
+			mResultData = data;
+		}
 	}
 
 	protected Dialog onCreateDialog(int id) {
@@ -430,8 +491,20 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			dialog.dismiss();
 	}
 
+	/* Activity.finish(): the result of setResult() goes to the activity that started this one, which gets it
+	 * in onActivityResult() when it comes back (ActivityClient.finishActivity()); a second finish() changes
+	 * nothing */
 	public void finish() {
+		int resultCode;
+		Intent resultData;
+		synchronized (this) {
+			resultCode = mResultCode;
+			resultData = mResultData;
+		}
+		final boolean wasFinishing = finishing;
 		finishing = true;
+		if (!wasFinishing && resultActivity != null)
+			resultActivity.addPendingResult(resultRequestCode, resultCode, resultData);
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
