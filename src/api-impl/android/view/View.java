@@ -497,6 +497,17 @@ public class View implements Drawable.Callback {
 	 * Cleared when the drag operation concludes.
 	 * @hide
 	 */
+	/* the bits of AOSP's mPrivateFlags2 that ATL keeps in Java: the raw and the resolved text alignment */
+	static final int PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT = 13;
+	static final int PFLAG2_TEXT_ALIGNMENT_MASK = 0x00000007 << PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT;
+	static final int PFLAG2_TEXT_ALIGNMENT_RESOLVED = 0x00000008 << PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT;
+	static final int PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT = 17;
+	static final int PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK = 0x00000007 << PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT;
+	private static final int TEXT_ALIGNMENT_DEFAULT = 1 /* TEXT_ALIGNMENT_GRAVITY */;
+	static final int TEXT_ALIGNMENT_RESOLVED_DEFAULT = 1 /* TEXT_ALIGNMENT_GRAVITY */;
+	private static final int PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT = TEXT_ALIGNMENT_RESOLVED_DEFAULT << PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT;
+	int mPrivateFlags2 = (TEXT_ALIGNMENT_DEFAULT << PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT) | PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+
 	static final int PFLAG2_DRAG_CAN_ACCEPT = 0x00000001;
 
 	/**
@@ -2291,6 +2302,10 @@ public class View implements Drawable.Callback {
 	public void layout(int l, int t, int r, int b) {
 		boolean sizeChanged = r - l != right - left || b - t != bottom - top;
 		boolean changed = sizeChanged || l != left || t != top;
+		int oldL = left;
+		int oldT = top;
+		int oldR = right;
+		int oldB = bottom;
 		int oldW = right - left;
 		int oldH = bottom - top;
 		this.layouted = true;
@@ -2303,10 +2318,8 @@ public class View implements Drawable.Callback {
 		else {
 			layoutCall = true; // layoutInternal() leaves the layout change listeners to this method
 			native_layout(widget, l, t, r, b);
-		int oldL = left;
-		int oldT = top;
-		int oldR = right;
-		int oldB = bottom;
+			layoutCall = false;
+		}
 		/* GTK lays out native widgets (TextView, Button, ...) without layoutInternal(): let them
 		 * know their size and layout like AOSP's layout() does (MaterialButton places its icon in
 		 * onLayout()). Native containers (ScrollView) are left alone, GTK places their children */
@@ -2318,8 +2331,6 @@ public class View implements Drawable.Callback {
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
 		dispatchLayoutChange(changed, l, t, r, b, oldL, oldT, oldR, oldB);
 		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
-			layoutCall = false;
-		}
 		if (sizeChanged && needsOutline())
 			invalidateOutline();
 	}
@@ -2355,6 +2366,10 @@ public class View implements Drawable.Callback {
 			measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
 		}
 		boolean changed = oldWidth != width || oldHeight != height;
+		int oldL = left;
+		int oldT = top;
+		int oldR = left + oldWidth;
+		int oldB = top + oldHeight;
 		if (changed) {
 			onSizeChanged(width, height, oldWidth, oldHeight);
 			if (needsOutline())
@@ -2366,10 +2381,6 @@ public class View implements Drawable.Callback {
 			for (View child : ((ViewGroup)this).children)
 				child.layouted = false;
 		}
-		int oldL = left;
-		int oldT = top;
-		int oldR = left + oldWidth;
-		int oldB = top + oldHeight;
 		onLayout(changed, 0, 0, width, height);
 		// ReactViewGroup has onLayout implemented as no-op, so we need to walk children ourself in such cases
 		if (this instanceof ViewGroup) {
@@ -3076,6 +3087,7 @@ public class View implements Drawable.Callback {
 			return false;
 		if (layout_params != null && layoutParamsRtl != layoutRtl)
 			applyLayoutParams(layout_params);
+		resolveTextAlignment();
 		resolvePadding();
 		onRtlPropertiesChanged(getLayoutDirection());
 		return true;
@@ -3085,6 +3097,7 @@ public class View implements Drawable.Callback {
 	public void resetRtlProperties() {
 		layoutDirectionResolved = false;
 		layoutRtl = false;
+		resetResolvedTextAlignment();
 	}
 
 	/* paddingLeft/paddingRight from the relative and the absolute padding (AOSP's resolvePadding()) */
@@ -3671,10 +3684,26 @@ public class View implements Drawable.Callback {
 		return (li != null && li.mOnClickListener != null);
 	}
 
-	private int text_alignment = TEXT_ALIGNMENT_INHERIT;
+	/* AOSP View.getRawTextAlignment() / setTextAlignment() (the GTK style classes follow the raw value) */
+	public int getRawTextAlignment() {
+		return (mPrivateFlags2 & PFLAG2_TEXT_ALIGNMENT_MASK) >> PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT;
+	}
 
 	public void setTextAlignment(int textAlignment) {
-		text_alignment = textAlignment;
+		if (textAlignment != getRawTextAlignment()) {
+			// Reset the current and resolved text alignment
+			mPrivateFlags2 &= ~PFLAG2_TEXT_ALIGNMENT_MASK;
+			resetResolvedTextAlignment();
+			// Set the new text alignment
+			mPrivateFlags2 |= ((textAlignment << PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT) & PFLAG2_TEXT_ALIGNMENT_MASK);
+			// Do resolution
+			resolveTextAlignment();
+			// Notify change
+			onRtlPropertiesChanged(getLayoutDirection());
+			// Refresh
+			requestLayout();
+			invalidate();
+		}
 		String[] classesToRemove = {"ATL-text-align-left", "ATL-text-align-center", "ATL-text-align-right"};
 		native_removeClasses(widget, classesToRemove);
 
@@ -3831,11 +3860,106 @@ public class View implements Drawable.Callback {
 		pendingLongClick = null;
 	}
 
-	/* the resolved text alignment as in AOSP: inherited from the parent, by default by the gravity */
+	/* AOSP View.getTextAlignment(): the resolved text alignment */
 	public int getTextAlignment() {
-		if (text_alignment != TEXT_ALIGNMENT_INHERIT)
-			return text_alignment;
-		return getParent() instanceof View ? ((View)getParent()).getTextAlignment() : TEXT_ALIGNMENT_GRAVITY;
+		return (mPrivateFlags2 & PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK) >> PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT;
+	}
+
+	/* AOSP View.resolveTextAlignment(); ATL's parents are Views or the window's root (AOSP's ViewRootImpl:
+	 * can resolve, is resolved, TEXT_ALIGNMENT_GRAVITY) */
+	public boolean resolveTextAlignment() {
+		// Reset any previous text alignment resolution
+		mPrivateFlags2 &= ~(PFLAG2_TEXT_ALIGNMENT_RESOLVED | PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK);
+
+		if (hasRtlSupport()) {
+			// Set resolved text alignment flag depending on text alignment flag
+			final int textAlignment = getRawTextAlignment();
+			switch (textAlignment) {
+				case TEXT_ALIGNMENT_INHERIT:
+					// Check if we can resolve the text alignment
+					if (!canResolveTextAlignment()) {
+						// We cannot do the resolution if there is no parent so use the default
+						mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+						// Resolution will need to happen again later
+						return false;
+					}
+
+					// Parent has not yet resolved, so we still return the default
+					if (parent instanceof View && !((View)parent).isTextAlignmentResolved()) {
+						mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+						// Resolution will need to happen again later
+						return false;
+					}
+
+					int parentResolvedTextAlignment = parent instanceof View ? ((View)parent).getTextAlignment() : TEXT_ALIGNMENT_GRAVITY;
+
+					switch (parentResolvedTextAlignment) {
+						case TEXT_ALIGNMENT_GRAVITY:
+						case TEXT_ALIGNMENT_TEXT_START:
+						case TEXT_ALIGNMENT_TEXT_END:
+						case TEXT_ALIGNMENT_CENTER:
+						case TEXT_ALIGNMENT_VIEW_START:
+						case TEXT_ALIGNMENT_VIEW_END:
+							// Resolved text alignment is the same as the parent resolved
+							// text alignment
+							mPrivateFlags2 |= (parentResolvedTextAlignment << PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT);
+							break;
+						default:
+							// Use default resolved text alignment
+							mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+					}
+					break;
+				case TEXT_ALIGNMENT_GRAVITY:
+				case TEXT_ALIGNMENT_TEXT_START:
+				case TEXT_ALIGNMENT_TEXT_END:
+				case TEXT_ALIGNMENT_CENTER:
+				case TEXT_ALIGNMENT_VIEW_START:
+				case TEXT_ALIGNMENT_VIEW_END:
+					// Resolved text alignment is the same as text alignment
+					mPrivateFlags2 |= (textAlignment << PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT);
+					break;
+				default:
+					// Use default resolved text alignment
+					mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+			}
+		} else {
+			// Use default resolved text alignment
+			mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+		}
+
+		// Set the resolved
+		mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED;
+		return true;
+	}
+
+	/* AOSP View.canResolveTextAlignment() */
+	public boolean canResolveTextAlignment() {
+		switch (getRawTextAlignment()) {
+			case TEXT_DIRECTION_INHERIT:
+				if (parent instanceof View) {
+					return ((View)parent).canResolveTextAlignment();
+				}
+				return parent != null;
+			default:
+				return true;
+		}
+	}
+
+	/* AOSP View.resetResolvedTextAlignment() */
+	public void resetResolvedTextAlignment() {
+		// Reset any previous text alignment resolution
+		mPrivateFlags2 &= ~(PFLAG2_TEXT_ALIGNMENT_RESOLVED | PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK);
+		// Set to default
+		mPrivateFlags2 |= PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT;
+	}
+
+	/* AOSP View.isTextAlignmentInherited() / isTextAlignmentResolved() */
+	public boolean isTextAlignmentInherited() {
+		return (getRawTextAlignment() == TEXT_ALIGNMENT_INHERIT);
+	}
+
+	public boolean isTextAlignmentResolved() {
+		return (mPrivateFlags2 & PFLAG2_TEXT_ALIGNMENT_RESOLVED) == PFLAG2_TEXT_ALIGNMENT_RESOLVED;
 	}
 
 	public View findViewWithTag(Object tag) {
