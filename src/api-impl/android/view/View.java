@@ -1689,6 +1689,13 @@ public class View implements Drawable.Callback {
 	public final boolean isFocusableInTouchMode() {
 		return focusable_in_touch_mode;
 	}
+	/**
+	 * Gives focus to this view or the descendant the layout asked for with <requestFocus/> (AOSP View.restoreDefaultFocus()).
+	 */
+	public boolean restoreDefaultFocus() {
+		return requestFocus(View.FOCUS_DOWN);
+	}
+
 	public final boolean requestFocus() {
 		return requestFocus(View.FOCUS_DOWN);
 	}

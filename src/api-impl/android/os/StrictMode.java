@@ -3,6 +3,8 @@ package android.os;
 import java.util.concurrent.Executor;
 
 public final class StrictMode {
+	/** ATL: StrictMode is a stub, nothing to report. */
+	public static void assertConfigurationContext(android.content.Context context, String methodName) {}
 	public static void setThreadPolicy(final ThreadPolicy policy) {}
 	public static void setVmPolicy(final VmPolicy policy) {}
 	public static VmPolicy getVmPolicy() { return new VmPolicy.Builder().build(); }

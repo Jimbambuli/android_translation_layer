@@ -36,6 +36,7 @@ import android.view.WindowManagerImpl;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.CaptioningManager;
 import android.view.inputmethod.InputMethodManager;
+import com.android.internal.policy.PhoneLayoutInflater;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -58,7 +59,7 @@ public final class ContextImpl extends Context {
 	@UnsupportedAppUsage
 	private int mThemeResource;
 
-	private final LayoutInflater layout_inflater = new LayoutInflater(this);
+	private final LayoutInflater layout_inflater = new PhoneLayoutInflater(this);
 	private final JobScheduler job_scheduler = new JobScheduler(this);
 
 	private final int atl_flags;

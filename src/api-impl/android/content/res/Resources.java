@@ -237,6 +237,16 @@ public class Resources {
 	 * the current screen (can not use dimension units, does not change based
 	 * on orientation, etc).
 	 */
+	public static final int ID_NULL = 0;
+
+	/**
+	 * ATL: the layout parsers do not record the resource they were opened from, so there is never a source id
+	 * (AOSP: Resources.getAttributeSetSourceResId(), only used for the position in InflateException messages).
+	 */
+	public static int getAttributeSetSourceResId(AttributeSet set) {
+		return ID_NULL;
+	}
+
 	public static Resources getSystem() {
 		Resources ret = mSystem;
 		if (ret != null) {

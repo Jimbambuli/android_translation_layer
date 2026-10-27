@@ -1229,6 +1229,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return null;
 	}
 
+	public View onCreateView(String name, Context context, AttributeSet attrs) {
+		return null;
+	}
+
 	public boolean onSearchRequested() {
 		return false;
 	}
@@ -1355,6 +1359,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void atl_attach_base_context(Context baseContext) {
 		super.atl_attach_base_context(baseContext);
 		this.window = new Window(this, this);
+		getLayoutInflater().setPrivateFactory(this); /* Activity.attach() */
 	}
 
 	public void applyOverrideConfiguration(Configuration overrideConfiguration) {}
