@@ -973,7 +973,6 @@ public class View implements Drawable.Callback {
 
 	private int oldWidthMeasureSpec = -1;
 	private int oldHeightMeasureSpec = -1;
-	private boolean layoutRequested = true;
 	private int oldWidth;
 	private int oldHeight;
 	protected boolean haveCustomMeasure = true;
@@ -985,7 +984,10 @@ public class View implements Drawable.Callback {
 	private boolean duplicate_parent_state = false;
 
 	/* the bits of AOSP's mPrivateFlags that ATL keeps in Java */
-	int mPrivateFlags;
+	int mPrivateFlags = PFLAG_FORCE_LAYOUT;
+	/* ATL clears PFLAG_FORCE_LAYOUT when the view is measured (GTK measures and allocates separately), AOSP in layout() */
+	static final int PFLAG_FORCE_LAYOUT                = 0x00001000;
+	static final int PFLAG_LAYOUT_REQUIRED             = 0x00002000;
 	static final int PFLAG_SELECTED                    = 0x00000004;
 	static final int PFLAG_DRAWABLE_STATE_DIRTY        = 0x00000400;
 	private static final int PFLAG_PRESSED             = 0x00004000;
@@ -2197,13 +2199,13 @@ public class View implements Drawable.Callback {
 
 	@Export
 	public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
-		if (layoutRequested || widthMeasureSpec != oldWidthMeasureSpec || heightMeasureSpec != oldHeightMeasureSpec) {
-			layoutRequested = false;
+		if ((mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT || widthMeasureSpec != oldWidthMeasureSpec || heightMeasureSpec != oldHeightMeasureSpec) {
+			mPrivateFlags &= ~PFLAG_FORCE_LAYOUT;
 			resolveRtlPropertiesIfNeeded();
 			oldWidthMeasureSpec = widthMeasureSpec;
 			oldHeightMeasureSpec = heightMeasureSpec;
 			onMeasure(widthMeasureSpec, heightMeasureSpec);
-			layoutRequired = true;
+			mPrivateFlags |= PFLAG_LAYOUT_REQUIRED;
 		}
 	}
 
@@ -2298,8 +2300,13 @@ public class View implements Drawable.Callback {
 		this.bottom = b;
 		if (this.in_layout)                   // check re-entrancy
 			native_queueAllocate(widget); // GTK is not re-entrant-safe. Queue allocation
-		else
+		else {
+			layoutCall = true; // layoutInternal() leaves the layout change listeners to this method
 			native_layout(widget, l, t, r, b);
+		int oldL = left;
+		int oldT = top;
+		int oldR = right;
+		int oldB = bottom;
 		/* GTK lays out native widgets (TextView, Button, ...) without layoutInternal(): let them
 		 * know their size and layout like AOSP's layout() does (MaterialButton places its icon in
 		 * onLayout()). Native containers (ScrollView) are left alone, GTK places their children */
@@ -2309,38 +2316,31 @@ public class View implements Drawable.Callback {
 			onLayout(changed, l, t, r, b);
 		}
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
-		notifyLayoutChange();
+		dispatchLayoutChange(changed, l, t, r, b, oldL, oldT, oldR, oldB);
 		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
+			layoutCall = false;
+		}
 		if (sizeChanged && needsOutline())
 			invalidateOutline();
 	}
 
-	private int reportedLeft, reportedTop, reportedRight, reportedBottom;
-	/* like AOSP's PFLAG_LAYOUT_REQUIRED: the view was measured and is laid out next */
-	private boolean layoutRequired;
+	/* layout() is on the stack: it calls the OnLayoutChangeListeners itself, with the bounds from before */
+	private boolean layoutCall;
 
-	/* call the OnLayoutChangeListeners from layout() or layoutInternal() like AOSP's layout() does: once
-	 * per change of the view's bounds, and once per layout after a measure even if they stay the same */
-	private void notifyLayoutChange() {
-		boolean required = layoutRequired;
-		layoutRequired = false;
-		ListenerInfo li = mListenerInfo;
-		if (li == null || li.mOnLayoutChangeListeners == null || li.mOnLayoutChangeListeners.size() == 0)
-			return;
-		if (!required && left == reportedLeft && top == reportedTop && right == reportedRight && bottom == reportedBottom)
-			return;
-		int oldLeft = reportedLeft;
-		int oldTop = reportedTop;
-		int oldRight = reportedRight;
-		int oldBottom = reportedBottom;
-		reportedLeft = left;
-		reportedTop = top;
-		reportedRight = right;
-		reportedBottom = bottom;
-		ArrayList<OnLayoutChangeListener> listenersCopy = (ArrayList<OnLayoutChangeListener>)li.mOnLayoutChangeListeners.clone();
-		int numListeners = listenersCopy.size();
-		for (int i = 0; i < numListeners; ++i) {
-			listenersCopy.get(i).onLayoutChange(this, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom);
+	/* the end of AOSP's View.layout(): the OnLayoutChangeListeners are called once per change of the
+	 * view's bounds, and once per layout after a measure (PFLAG_LAYOUT_REQUIRED) even if they stay the same */
+	private void dispatchLayoutChange(boolean changed, int l, int t, int r, int b, int oldL, int oldT, int oldR, int oldB) {
+		if (changed || (mPrivateFlags & PFLAG_LAYOUT_REQUIRED) == PFLAG_LAYOUT_REQUIRED) {
+			mPrivateFlags &= ~PFLAG_LAYOUT_REQUIRED;
+
+			ListenerInfo li = mListenerInfo;
+			if (li != null && li.mOnLayoutChangeListeners != null) {
+				ArrayList<OnLayoutChangeListener> listenersCopy = (ArrayList<OnLayoutChangeListener>)li.mOnLayoutChangeListeners.clone();
+				int numListeners = listenersCopy.size();
+				for (int i = 0; i < numListeners; ++i) {
+					listenersCopy.get(i).onLayoutChange(this, l, t, r, b, oldL, oldT, oldR, oldB);
+				}
+			}
 		}
 	}
 
@@ -2350,7 +2350,7 @@ public class View implements Drawable.Callback {
 		in_layout = true;
 		// if the layout is triggered from a native widget, we might not have measured yet
 		// also measure again if a descendant requested a layout without our size changing
-		if (!(parent instanceof ViewGroup) && (layoutRequested || width != getMeasuredWidth() || height != getMeasuredHeight())) {
+		if (!(parent instanceof ViewGroup) && ((mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT || width != getMeasuredWidth() || height != getMeasuredHeight())) {
 			requestLayout();
 			measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
 		}
@@ -2366,6 +2366,10 @@ public class View implements Drawable.Callback {
 			for (View child : ((ViewGroup)this).children)
 				child.layouted = false;
 		}
+		int oldL = left;
+		int oldT = top;
+		int oldR = left + oldWidth;
+		int oldB = top + oldHeight;
 		onLayout(changed, 0, 0, width, height);
 		// ReactViewGroup has onLayout implemented as no-op, so we need to walk children ourself in such cases
 		if (this instanceof ViewGroup) {
@@ -2374,7 +2378,8 @@ public class View implements Drawable.Callback {
 					child.layout(child.left, child.top, child.right, child.bottom);
 			}
 		}
-		notifyLayoutChange();
+		if (!layoutCall)
+			dispatchLayoutChange(changed, left, top, right, bottom, oldL, oldT, oldR, oldB);
 		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
 		oldWidth = width;
 		oldHeight = height;
@@ -2447,8 +2452,8 @@ public class View implements Drawable.Callback {
 	public void requestLayout() {
 		native_requestLayout(widget);
 		View view = this;
-		while (!view.layoutRequested) {
-			view.layoutRequested = true;
+		while ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0) {
+			view.mPrivateFlags |= PFLAG_FORCE_LAYOUT;
 			if (view.parent instanceof View)
 				view = (View)view.parent;
 			else
@@ -2596,7 +2601,7 @@ public class View implements Drawable.Callback {
 	/* the GTK focus is in this view's widgets (ViewGroup refines this to AOSP's invariant) */
 	public boolean hasFocus() { return nativeHasFocus(widget); }
 	private static native boolean nativeHasFocus(long widget);
-	public boolean isLayoutRequested() { return layoutRequested; }
+	public boolean isLayoutRequested() { return (mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT; }
 	public int getBaseline() { return -1; }
 	/* as AOSP for API >= 26: visible, enabled and focusable (FOCUSABLE_AUTO counts) */
 	public boolean hasFocusable() {
@@ -3620,7 +3625,7 @@ public class View implements Drawable.Callback {
 	/* like AOSP: only mark this view, so that the next layout pass measures and lays it out again;
 	 * no new layout pass is requested (ListView calls it while measuring its children) */
 	public void forceLayout() {
-		layoutRequested = true;
+		mPrivateFlags |= PFLAG_FORCE_LAYOUT;
 	}
 
 	/* AOSP View.removeOnAttachStateChangeListener() */
