@@ -594,10 +594,13 @@ public class BitmapFactory {
 			tempStorage = opts.inTempStorage;
 		if (tempStorage == null)
 			tempStorage = new byte[DECODE_BUFFER_SIZE];
-		final long texture = nativeDecodeStream(is, tempStorage, outPadding, opts);
+		/* the 9-patch chunk of a PNG goes with the Bitmap, as AOSP's decoder does (getNinePatchChunk()) */
+		final byte[][] ninePatchChunk = new byte[1][];
+		final long texture = nativeDecodeStream(is, tempStorage, outPadding, opts, ninePatchChunk);
 		if (texture == 0)
 			return null;
 		Bitmap decoded = new Bitmap(texture);
+		decoded.setNinePatchChunk(ninePatchChunk[0]);
 		if (opts != null) {
 			opts.outWidth = decoded.getWidth();
 			opts.outHeight = decoded.getHeight();
@@ -685,7 +688,7 @@ public class BitmapFactory {
 	}
 
 	private static native long nativeDecodeStream(InputStream is, byte[] storage,
-	                                              Rect padding, Options opts);
+	                                              Rect padding, Options opts, byte[][] outNinePatchChunk);
 	private static native Bitmap nativeDecodeFileDescriptor(FileDescriptor fd,
 	                                                        Rect padding, Options opts);
 	private static native Bitmap nativeDecodeAsset(int asset, Rect padding, Options opts);

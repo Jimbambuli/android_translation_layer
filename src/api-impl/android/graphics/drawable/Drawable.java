@@ -28,9 +28,6 @@ import android.util.LayoutDirection;
 import android.util.TypedValue;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -497,25 +494,16 @@ public class Drawable {
 			density = Bitmap.DENSITY_NONE;
 		else if (value != null && value.density != TypedValue.DENSITY_DEFAULT)
 			density = value.density;
-		if (!file.endsWith(".9.png")) {
-			final Bitmap bm = BitmapFactory.decodeStream(is);
-			if (bm == null)
-				return null;
-			bm.setDensity(density);
-			return new BitmapDrawable(resources, bm);
-		}
-		Path path = Paths.get(android.os.Environment.getExternalStorageDirectory().getPath(), file);
-		if (!Files.exists(path)) {
-			try (InputStream inputStream = resources.getAssets().openNonAsset(file)) {
-				if (inputStream != null) {
-					Files.createDirectories(path.getParent());
-					Files.copy(inputStream, path);
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		return new NinePatchDrawable(path.toString(), density, resources.getDisplayMetrics().densityDpi);
+		/* like AOSP's createFromResourceStream(): decode the stream, and when the bitmap carries a 9-patch
+		 * chunk (BitmapFactory takes it from the PNG) make a NinePatchDrawable of it; nothing is written */
+		final Bitmap bm = BitmapFactory.decodeStream(is);
+		if (bm == null)
+			return null;
+		bm.setDensity(density);
+		final byte[] np = bm.getNinePatchChunk();
+		if (np != null)
+			return new NinePatchDrawable(resources, bm, np, null, file);
+		return new BitmapDrawable(resources, bm);
 	}
 
 	public static Drawable createFromPath(String path) {

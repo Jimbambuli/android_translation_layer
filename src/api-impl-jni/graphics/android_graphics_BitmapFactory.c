@@ -54,7 +54,41 @@ static GInputStream *java_input_stream_new(JNIEnv *env, jobject is, jbyteArray s
 	return &stream->parent_instance;
 }
 
-JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(JNIEnv *env, jclass, jobject is, jbyteArray storage, jobject outPadding, jobject opts)
+/* Like AOSP's decoder (which hands the "npTc" chunk to the Bitmap, frameworks/base/libs/hwui/jni/
+ * BitmapFactory.cpp), find the 9-patch chunk of a PNG. It comes before the image data, so the scan
+ * stops at IDAT. The bytes can come from untrusted sources: every length is checked against the
+ * data, and the chunk is limited to 1 MB. Returns a byte[] without the CRC, or NULL. */
+static jbyteArray find_ninepatch_chunk(JNIEnv *env, GBytes *bytes)
+{
+	gsize size;
+	const guint8 *data = g_bytes_get_data(bytes, &size);
+	static const guint8 signature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
+	gsize pos = 8;
+
+	if (size < 8 || memcmp(data, signature, 8))
+		return NULL;
+	while (size - pos >= 12) { // length, type, (data), crc
+		guint32 length = ((guint32)data[pos] << 24) | ((guint32)data[pos + 1] << 16) | ((guint32)data[pos + 2] << 8) | data[pos + 3];
+		const guint8 *type = data + pos + 4;
+
+		if (!memcmp(type, "IDAT", 4) || !memcmp(type, "IEND", 4))
+			return NULL;
+		if (length > size - pos - 12)
+			return NULL;
+		if (!memcmp(type, "npTc", 4)) {
+			if (length > 1024 * 1024)
+				return NULL;
+			jbyteArray chunk = (*env)->NewByteArray(env, length);
+			if (chunk)
+				(*env)->SetByteArrayRegion(env, chunk, 0, length, (const jbyte *)(data + pos + 8));
+			return chunk;
+		}
+		pos += 12 + (gsize)length;
+	}
+	return NULL;
+}
+
+JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(JNIEnv *env, jclass, jobject is, jbyteArray storage, jobject outPadding, jobject opts, jobjectArray outNinePatchChunk)
 {
 	GInputStream *stream = java_input_stream_new(env, is, storage);
 	GOutputStream *memory = g_memory_output_stream_new_resizable();
@@ -62,6 +96,12 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 	g_object_unref(stream);
 	GBytes *bytes = g_memory_output_stream_steal_as_bytes(G_MEMORY_OUTPUT_STREAM(memory));
 	g_object_unref(memory);
+
+	if (outNinePatchChunk) {
+		jbyteArray chunk = find_ninepatch_chunk(env, bytes);
+		if (chunk)
+			(*env)->SetObjectArrayElement(env, outNinePatchChunk, 0, chunk);
+	}
 
 	/* honour Options.inSampleSize like AOSP: subsample the image by a power of two so an image
 	 * loader (Coil/Glide) gets the smaller bitmap it asked for and does not keep the full-size one.

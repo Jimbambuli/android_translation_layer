@@ -94,6 +94,19 @@ public final class Bitmap implements Parcelable {
 	private boolean recycled = false;
 	boolean mutable = true;
 	private int density = DisplayMetrics.DENSITY_DEVICE;
+	private byte[] mNinePatchChunk; // the "npTc" chunk of a 9-patch PNG, set by BitmapFactory
+
+	/**
+	 * Returns an optional array of private data, used by the UI system for
+	 * some bitmaps. Not intended to be called by applications.
+	 */
+	public byte[] getNinePatchChunk() {
+		return mNinePatchChunk;
+	}
+
+	void setNinePatchChunk(byte[] chunk) {
+		mNinePatchChunk = chunk;
+	}
 
 	Bitmap(long texture) {
 		this(native_get_width(texture), native_get_height(texture), Config.ARGB_8888);
