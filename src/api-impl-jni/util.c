@@ -10,6 +10,7 @@
 #include "util.h"
 #include "app/android_app_Activity.h"
 #include "widgets/WrapperWidget.h"
+#include "input/VelocityControl.h"
 
 const char *attribute_set_get_string(JNIEnv *env, jobject attrs, char *attribute, char *schema)
 {
@@ -372,43 +373,20 @@ void atl_window_android_tab_focus(GtkWindow *window)
 }
 
 /* Mouse wheel acceleration as in AOSP's InputReader: CursorInputMapper runs the wheel deltas through
- * a VelocityControl with wheelVelocityControlParameters (scale 1, low 15, high 50, acceleration 4),
- * so a wheel spun faster than 15 notches/s scrolls up to 4 times as far per notch (full at 50/s).
- * The speed comes from VelocityTracker's default LSQ2 estimator: the last 20 positions within
- * 100 ms, history cleared after 40 ms without movement. GTK delivers the notches unaccelerated,
- * and a GdkEvent cannot be built with other deltas, so the event is delivered once more for
- * every whole notch the acceleration adds. This happens before any widget sees the event, so
- * views (ACTION_SCROLL) and WebViews (WebKit scrolls on its own) are accelerated alike. */
-#define WHEEL_HISTORY 20
+ * a VelocityControl per axis (input/VelocityControl.c, a port of libs/input/VelocityControl.cpp), with
+ * InputReaderConfiguration's wheelVelocityControlParameters (scale 1, low threshold 15, high threshold 50,
+ * acceleration 4): a wheel spun faster than 15 notches/s scrolls up to 4 times as far per notch (full at
+ * 50/s). GTK delivers the notches unaccelerated, and a GdkEvent cannot be built with other deltas, so the
+ * event is delivered once more for every whole notch the acceleration adds (the remainder is carried to
+ * the next event). This happens before any widget sees the event, so views (ACTION_SCROLL) and WebViews
+ * (WebKit scrolls on its own) are accelerated alike. */
 static struct {
-	guint32 time[WHEEL_HISTORY];
-	float position[WHEEL_HISTORY];
-	int32_t count;
-	float raw_position;
+	struct velocity_control x, y; // mWheelXVelocityControl, mWheelYVelocityControl
+	gboolean initialized;
+	nsecs_t last_event_time;
 	float pending; // accelerated notches not yet delivered (fraction of an event)
 	gboolean redelivering;
 } wheel;
-
-static float wheel_velocity(void)
-{
-	// times in seconds relative to the newest sample, as in LeastSquaresVelocityTrackerStrategy
-	guint32 newest = wheel.time[wheel.count - 1];
-	float sx = 0, sx2 = 0, sx3 = 0, sx4 = 0, sy = 0, sxy = 0, sx2y = 0;
-	int32_t m = 0;
-	for (int32_t i = wheel.count - 1; i >= 0 && newest - wheel.time[i] <= 100; i--, m++) {
-		float x = -(float)(newest - wheel.time[i]) / 1000, y = wheel.position[i];
-		sx += x, sx2 += x * x, sx3 += x * x * x, sx4 += x * x * x * x;
-		sy += y, sxy += x * y, sx2y += x * x * y;
-	}
-	if (m < 2)
-		return 0;
-	float sxx = sx2 - sx * sx / m, sxy_ = sxy - sx * sy / m;
-	if (m == 2) // degree reduced to m - 1
-		return sxx ? sxy_ / sxx : 0;
-	float sxx2 = sx3 - sx * sx2 / m, sx2y_ = sx2y - sx2 * sy / m, sx2x2 = sx4 - sx2 * sx2 / m;
-	float denominator = sxx * sx2x2 - sxx2 * sxx2;
-	return denominator ? (sxy_ * sx2x2 - sx2y_ * sxx2) / denominator : 0;
-}
 
 static gboolean on_wheel_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
 {
@@ -420,30 +398,27 @@ static gboolean on_wheel_event(GtkEventControllerLegacy *controller, GdkEvent *e
 		GdkScrollDirection direction = gdk_scroll_event_get_direction(event);
 		dy = direction == GDK_SCROLL_DOWN ? 1 : direction == GDK_SCROLL_UP ? -1 : 0;
 	}
-	float delta = dy ? dy : dx;
-	if (!delta)
+	if (!dx && !dy)
 		return FALSE;
 
-	guint32 time = gdk_event_get_time(event);
-	if (wheel.count && time - wheel.time[wheel.count - 1] > 40) // pointer stopped
-		wheel.count = 0;
-	if (!wheel.count)
-		wheel.pending = 0;
-	if (wheel.count == WHEEL_HISTORY) {
-		memmove(wheel.time, wheel.time + 1, sizeof(wheel.time[0]) * (WHEEL_HISTORY - 1));
-		memmove(wheel.position, wheel.position + 1, sizeof(wheel.position[0]) * (WHEEL_HISTORY - 1));
-		wheel.count--;
+	if (!wheel.initialized) {
+		struct velocity_control_parameters parameters = {1.0f, 15.0f, 50.0f, 4.0f};
+		velocity_control_init(&wheel.x);
+		velocity_control_init(&wheel.y);
+		velocity_control_set_parameters(&wheel.x, &parameters);
+		velocity_control_set_parameters(&wheel.y, &parameters);
+		wheel.initialized = TRUE;
 	}
-	wheel.raw_position += delta;
-	wheel.time[wheel.count] = time;
-	wheel.position[wheel.count] = wheel.raw_position;
-	wheel.count++;
 
-	float speed = fabsf(wheel_velocity()), scale = 1;
-	if (speed >= 50)
-		scale = 4;
-	else if (speed > 15)
-		scale = 1 + (speed - 15) / (50 - 15) * (4 - 1);
+	nsecs_t when = (nsecs_t)gdk_event_get_time(event) * 1000000;
+	if (wheel.last_event_time && when - wheel.last_event_time >= 500 * 1000000) // VelocityControl::STOP_TIME: the controls reset themselves
+		wheel.pending = 0;
+	wheel.last_event_time = when;
+
+	float hscroll = dx, vscroll = dy;
+	velocity_control_move(&wheel.y, when, NULL, &vscroll);
+	velocity_control_move(&wheel.x, when, &hscroll, NULL);
+	float scale = dy ? vscroll / dy : hscroll / dx;
 
 	// the event itself is one delivery; deliver it again for each further whole multiple
 	wheel.pending += scale - 1;
