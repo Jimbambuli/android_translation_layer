@@ -4364,8 +4364,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
-	/* AOSP View.dispatchKeyEvent(), without the key dispatch state (long press tracking) and the input
-	 * consistency verifier */
+	/* AOSP View.dispatchKeyEvent(), without the input consistency verifier; the dispatcher state (tracking for
+	 * startTracking() and long presses) is the window's, see getKeyDispatcherState(). AOSP's ViewGroup.dispatchKeyEvent()
+	 * hands the key down to mFocused; here GTK delivers it to the focused widget's key controller (WrapperWidget.c). */
 	@Export
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		// Give any attached key listener a first crack at the event.
@@ -4374,7 +4375,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			return true;
 		}
 
-		if (event.dispatch(this, null, this)) {
+		if (event.dispatch(this, getKeyDispatcherState(), this)) {
 			return true;
 		}
 
