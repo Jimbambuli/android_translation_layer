@@ -59,8 +59,13 @@ public final class ContextImpl extends Context {
 	@UnsupportedAppUsage
 	private int mThemeResource;
 
-	private final LayoutInflater layout_inflater = new PhoneLayoutInflater(this);
-	private final JobScheduler job_scheduler = new JobScheduler(this);
+	/* like AOSP: the services of this context that SystemServiceRegistry's CachedServiceFetcher keeps */
+	static final int STATE_UNINITIALIZED = 0;
+	static final int STATE_INITIALIZING = 1;
+	static final int STATE_READY = 2;
+	static final int STATE_NOT_FOUND = 3;
+	final Object[] mServiceCache = SystemServiceRegistry.createServiceCache();
+	final int[] mServiceInitializationStateArray = new int[mServiceCache.length];
 
 	private final int atl_flags;
 
@@ -141,90 +146,12 @@ public final class ContextImpl extends Context {
 
 	@Override
 	public Object getSystemService(String name) {
-		switch (name) {
-			case "window":
-				return new WindowManagerImpl();
-			case "clipboard":
-				return new ClipboardManager();
-			case "sensor":
-				return new SensorManager();
-			case "connectivity":
-				return new ConnectivityManager();
-			case "keyguard":
-				return new KeyguardManager();
-			case "phone":
-				return new TelephonyManager();
-			case "audio":
-				return new AudioManager();
-			case "activity":
-				return new ActivityManager();
-			case "usb":
-				return new UsbManager();
-			case "vibrator":
-				return (vibrator != null) ? vibrator : (vibrator = new Vibrator());
-			case "power":
-				return new PowerManager();
-			case "display":
-				return new DisplayManager();
-			case "media_router":
-				return new MediaRouter();
-			case "notification":
-				return new NotificationManager();
-			case "alarm":
-				return new AlarmManager();
-			case "input":
-				return new InputManager();
-			case "location":
-				return new LocationManager();
-			case "uimode":
-				return new UiModeManager();
-			case "input_method":
-				return new InputMethodManager();
-			case "accessibility":
-				return AccessibilityManager.getInstance(this);
-			case "layout_inflater":
-				return layout_inflater;
-			case "wifi":
-				return new WifiManager();
-			case "bluetooth":
-				return new BluetoothManager();
-			case "jobscheduler":
-				return job_scheduler;
-			case "appops":
-				return new AppOpsManager();
-			case "user":
-				return new UserManager();
-			case "captioning":
-				return new CaptioningManager();
-			case "statusbar":
-				return new StatusBarManager();
-			case "camera":
-				return new CameraManager();
-			case "color_display":
-				return new ColorDisplayManager();
-			case "search":
-				return new SearchManager();
-			case "storage":
-				return new StorageManager();
-			case "batterymanager":
-				return new BatteryManager();
-			case "download":
-				return new DownloadManager();
-			default:
-				Slog.e(TAG, "!!!!!!! getSystemService: case >" + name + "< is not implemented yet");
-				return null;
-		}
+		return SystemServiceRegistry.getSystemService(this, name);
 	}
 
 	@Override
-	public Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException {
-		if (serviceClass == LayoutInflater.class)
-			return layout_inflater;
-		if (serviceClass == JobScheduler.class)
-			return job_scheduler;
-		if (serviceClass == WindowManager.class)
-			return new WindowManagerImpl();
-		return serviceClass.getConstructors()[0].newInstance();
+	public String getSystemServiceName(Class<?> serviceClass) {
+		return SystemServiceRegistry.getSystemServiceName(serviceClass);
 	}
 
 	@Override

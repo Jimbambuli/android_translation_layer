@@ -47,8 +47,8 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
-	public Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException {
-		return this.baseContext.getSystemService(serviceClass);
+	public String getSystemServiceName(Class<?> serviceClass) {
+		return this.baseContext.getSystemServiceName(serviceClass);
 	}
 
 	@Override

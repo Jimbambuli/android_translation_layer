@@ -189,18 +189,6 @@ public class ContextThemeWrapper extends ContextWrapper {
     }
 
     /**
-     * ATL: Context.getSystemService(Class) is abstract here (checked exceptions, no
-     * getSystemServiceName() mapping), so the layout inflater is returned for its class directly.
-     */
-    @Override
-    public Object getSystemService(Class<?> serviceClass) throws InstantiationException, IllegalAccessException, InvocationTargetException {
-        if (serviceClass == LayoutInflater.class) {
-            return getSystemService(LAYOUT_INFLATER_SERVICE);
-        }
-        return super.getSystemService(serviceClass);
-    }
-
-    /**
      * Called by {@link #setTheme} and {@link #getTheme} to apply a theme
      * resource to the current Theme object. May be overridden to change the
      * default (simple) behavior. This method will not be called in multiple
