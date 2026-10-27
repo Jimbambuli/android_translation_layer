@@ -5,6 +5,7 @@ import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
+import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -507,7 +508,16 @@ public class Window {
 
 	/** @hide */
 	public WindowInsets getWindowInsets() {
-		return new WindowInsets(visibleInsetTypes);
+		/* like InsetsState.calculateInsets() for a window without any insets source: a desktop window has no
+		 * system bars, cutout or rounded corners, so every inset is empty; only the visibility of the bars,
+		 * set by WindowInsetsController, is kept */
+		boolean[] typeVisibilityMap = new boolean[WindowInsets.Type.SIZE];
+		for (int type = WindowInsets.Type.FIRST; type <= WindowInsets.Type.LAST; type <<= 1)
+			typeVisibilityMap[WindowInsets.Type.indexOf(type)] = (visibleInsetTypes & type) != 0;
+		return new WindowInsets(new Insets[WindowInsets.Type.SIZE], new Insets[WindowInsets.Type.SIZE], typeVisibilityMap,
+		                        false, false, 0, DisplayCutout.NO_CUTOUT, RoundedCorners.NO_ROUNDED_CORNERS,
+		                        new PrivacyIndicatorBounds(), DisplayShape.NONE,
+		                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout(), false);
 	}
 
 	/** @hide called by the InsetsController */
