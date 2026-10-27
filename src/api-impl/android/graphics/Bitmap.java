@@ -280,6 +280,17 @@ public final class Bitmap implements Parcelable {
 		return hasAlpha;
 	}
 
+	/* AOSP keeps the flag in the native bitmap; nothing here uses mip maps, but BitmapDrawable reads and sets it */
+	private boolean hasMipMap;
+
+	public final boolean hasMipMap() {
+		return hasMipMap;
+	}
+
+	public final void setHasMipMap(boolean hasMipMap) {
+		this.hasMipMap = hasMipMap;
+	}
+
 	public Bitmap copy(Bitmap.Config config, boolean isMutable) {
 		Bitmap bitmap = new Bitmap(width, height, config);
 		bitmap.texture = native_ref_texture(getTexture());

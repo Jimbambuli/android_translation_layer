@@ -668,12 +668,19 @@ public class Drawable {
 		throw e;
 	}
 
+	/* AOSP Drawable.mSrcDensityOverride: the density BitmapDrawable.inflate() asks the resource for */
+	protected int mSrcDensityOverride = 0;
+
 	static int resolveDensity(Resources r, int parentDensity) {
 		final int densityDpi = r == null ? parentDensity : r.getDisplayMetrics().densityDpi;
 		return densityDpi == 0 ? DisplayMetrics.DENSITY_DEFAULT : densityDpi;
 	}
 
 	public void setFilterBitmap(boolean filter) {}
+
+	public boolean isFilterBitmap() {
+		return false;
+	}
 
 	public void setHotspotBounds(int left, int top, int right, int bottom) {}
 
