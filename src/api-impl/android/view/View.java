@@ -2033,11 +2033,13 @@ public class View implements Drawable.Callback {
 
 	public void setOnGenericMotionListener(View.OnGenericMotionListener l) {}
 
+	/* AOSP's AttachInfo.mWindowToken (ViewRootImpl's IWindow binder): one per view hierarchy, kept by the
+	 * root view of a window as for rootHasWindowFocus; null while the view is not attached */
 	private IBinder windowToken;
 
 	public IBinder getWindowToken() {
-		// all views of a window share one token, and it must not change between calls
-		// (AbstractComposeView compares it to decide whether to recreate its composition)
+		if (!isAttachedToWindow())
+			return null;
 		View root = getRootView();
 		if (root.windowToken == null)
 			root.windowToken = new Binder();
