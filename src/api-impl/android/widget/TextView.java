@@ -10,8 +10,10 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.fonts.FontStyle;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
+import android.os.LocaleList;
 import android.text.BoringLayout;
 import android.text.Editable;
 import android.text.InputFilter;
@@ -443,25 +445,241 @@ public class TextView extends View {
 		updateLines();
 	}
 
-	/**
-	 * Sets the text color, size, style, hint color and all caps from a TextAppearance style.
-	 */
-	public void setTextAppearance(Context context, int resId) {
-		TypedArray a = context.obtainStyledAttributes(resId, com.android.internal.R.styleable.TextAppearance);
-		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textColor)) {
-			ColorStateList textColor = a.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColor);
-			if (textColor != null)
-				setTextColor(textColor);
+	/* AOSP: values of the typeface attribute */
+	private static final int SANS = 1;
+	private static final int SERIF = 2;
+	private static final int MONOSPACE = 3;
+	private static final int DEFAULT_TYPEFACE = -1;
+
+
+	private static class TextAppearanceAttributes {
+		int mTextColorHighlight = 0;
+		int mSearchResultHighlightColor = 0;
+		int mFocusedSearchResultHighlightColor = 0;
+		ColorStateList mTextColor = null;
+		ColorStateList mTextColorHint = null;
+		ColorStateList mTextColorLink = null;
+		int mTextSize = -1;
+		int mTextSizeUnit = -1;
+		LocaleList mTextLocales = null;
+		String mFontFamily = null;
+		Typeface mFontTypeface = null;
+		boolean mFontFamilyExplicit = false;
+		int mTypefaceIndex = -1;
+		int mTextStyle = 0;
+		int mFontWeight = FontStyle.FONT_WEIGHT_UNSPECIFIED;
+		boolean mAllCaps = false;
+		int mShadowColor = 0;
+		float mShadowDx = 0, mShadowDy = 0, mShadowRadius = 0;
+		boolean mHasElegant = false;
+		boolean mElegant = false;
+		boolean mHasFallbackLineSpacing = false;
+		boolean mFallbackLineSpacing = false;
+		boolean mHasLetterSpacing = false;
+		float mLetterSpacing = 0;
+		String mFontFeatureSettings = null;
+		String mFontVariationSettings = null;
+
+	}
+
+	private void readTextAppearance(Context context, TypedArray appearance,
+			TextAppearanceAttributes attributes) {
+		final int n = appearance.getIndexCount();
+		for (int i = 0; i < n; i++) {
+			final int attr = appearance.getIndex(i);
+			int index = attr;
+			switch (index) {
+				case com.android.internal.R.styleable.TextAppearance_textColorHighlight:
+					attributes.mTextColorHighlight =
+							appearance.getColor(attr, attributes.mTextColorHighlight);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_searchResultHighlightColor:
+					attributes.mSearchResultHighlightColor =
+							appearance.getColor(attr, attributes.mSearchResultHighlightColor);
+					break;
+				case com.android.internal.R.styleable
+						.TextAppearance_focusedSearchResultHighlightColor:
+					attributes.mFocusedSearchResultHighlightColor =
+							appearance.getColor(attr,
+									attributes.mFocusedSearchResultHighlightColor);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textColor:
+					attributes.mTextColor = appearance.getColorStateList(attr);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textColorHint:
+					attributes.mTextColorHint = appearance.getColorStateList(attr);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textColorLink:
+					attributes.mTextColorLink = appearance.getColorStateList(attr);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textSize:
+					attributes.mTextSize =
+							appearance.getDimensionPixelSize(attr, attributes.mTextSize);
+					attributes.mTextSizeUnit = appearance.peekValue(attr).getComplexUnit();
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textLocale:
+					final String localeString = appearance.getString(attr);
+					if (localeString != null) {
+						final LocaleList localeList = LocaleList.forLanguageTags(localeString);
+						if (!localeList.isEmpty()) {
+							attributes.mTextLocales = localeList;
+						}
+					}
+					break;
+				case com.android.internal.R.styleable.TextAppearance_typeface:
+					attributes.mTypefaceIndex = appearance.getInt(attr, attributes.mTypefaceIndex);
+					if (attributes.mTypefaceIndex != -1 && !attributes.mFontFamilyExplicit) {
+						attributes.mFontFamily = null;
+					}
+					break;
+				case com.android.internal.R.styleable.TextAppearance_fontFamily:
+					if (attributes.mFontTypeface == null) {
+						attributes.mFontFamily = appearance.getString(attr);
+					}
+					attributes.mFontFamilyExplicit = true;
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textStyle:
+					attributes.mTextStyle = appearance.getInt(attr, attributes.mTextStyle);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textFontWeight:
+					attributes.mFontWeight = appearance.getInt(attr, attributes.mFontWeight);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_textAllCaps:
+					attributes.mAllCaps = appearance.getBoolean(attr, attributes.mAllCaps);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_shadowColor:
+					attributes.mShadowColor = appearance.getInt(attr, attributes.mShadowColor);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_shadowDx:
+					attributes.mShadowDx = appearance.getFloat(attr, attributes.mShadowDx);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_shadowDy:
+					attributes.mShadowDy = appearance.getFloat(attr, attributes.mShadowDy);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_shadowRadius:
+					attributes.mShadowRadius = appearance.getFloat(attr, attributes.mShadowRadius);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_elegantTextHeight:
+					attributes.mHasElegant = true;
+					attributes.mElegant = appearance.getBoolean(attr, attributes.mElegant);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_fallbackLineSpacing:
+					attributes.mHasFallbackLineSpacing = true;
+					attributes.mFallbackLineSpacing = appearance.getBoolean(attr,
+							attributes.mFallbackLineSpacing);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_letterSpacing:
+					attributes.mHasLetterSpacing = true;
+					attributes.mLetterSpacing =
+							appearance.getFloat(attr, attributes.mLetterSpacing);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_fontFeatureSettings:
+					attributes.mFontFeatureSettings = appearance.getString(attr);
+					break;
+				case com.android.internal.R.styleable.TextAppearance_fontVariationSettings:
+					attributes.mFontVariationSettings = appearance.getString(attr);
+					break;
+				default:
+			}
 		}
-		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textSize))
-			setTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextAppearance_textSize, 10));
-		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textColorHint))
-			setHintTextColor(a.getColorStateList(com.android.internal.R.styleable.TextAppearance_textColorHint));
-		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textStyle))
-			setTypeface(getTypeface(), a.getInt(com.android.internal.R.styleable.TextAppearance_textStyle, 0));
-		if (a.hasValue(com.android.internal.R.styleable.TextAppearance_textAllCaps))
-			setAllCaps(a.getBoolean(com.android.internal.R.styleable.TextAppearance_textAllCaps, false));
-		a.recycle();
+	}
+
+	private void applyTextAppearance(TextAppearanceAttributes attributes) {
+		if (attributes.mTextColor != null) {
+			setTextColor(attributes.mTextColor);
+		}
+
+		if (attributes.mTextColorHint != null) {
+			setHintTextColor(attributes.mTextColorHint);
+		}
+
+		if (attributes.mTextColorLink != null) {
+			setLinkTextColor(attributes.mTextColorLink);
+		}
+
+		if (attributes.mTextColorHighlight != 0) {
+			setHighlightColor(attributes.mTextColorHighlight);
+		}
+
+		if (attributes.mTextSize != -1) {
+			setTextSize(attributes.mTextSize); // in pixels, see setTextSize(float)
+		}
+
+		if (attributes.mTypefaceIndex != -1 && !attributes.mFontFamilyExplicit) {
+			attributes.mFontFamily = null;
+		}
+		// AOSP always calls this; with nothing specified it sets the default typeface again, which here
+		// would only cost a native call for every styled TextView
+		if (attributes.mFontTypeface != null || attributes.mFontFamily != null || attributes.mTypefaceIndex != -1
+				|| attributes.mTextStyle != 0 || attributes.mFontWeight != FontStyle.FONT_WEIGHT_UNSPECIFIED) {
+			setTypefaceFromAttrs(attributes.mFontTypeface, attributes.mFontFamily,
+					attributes.mTypefaceIndex, attributes.mTextStyle, attributes.mFontWeight);
+		}
+
+		if (attributes.mShadowColor != 0) {
+			setShadowLayer(attributes.mShadowRadius, attributes.mShadowDx, attributes.mShadowDy,
+					attributes.mShadowColor);
+		}
+
+		if (attributes.mAllCaps) {
+			setAllCaps(true); // a CSS class of the label instead of AOSP's AllCapsTransformationMethod
+		}
+
+
+
+		if (attributes.mHasLetterSpacing) {
+			setLetterSpacing(attributes.mLetterSpacing);
+		}
+
+
+
+	}
+
+	private void setTypefaceFromAttrs(Typeface typeface, String familyName,
+			int typefaceIndex, int style,
+					int weight) {
+		if (typeface == null && familyName != null) {
+			// Lookup normal Typeface from system font map.
+			final Typeface normalTypeface = Typeface.create(familyName, Typeface.NORMAL);
+			resolveStyleAndSetTypeface(normalTypeface, style, weight);
+		} else if (typeface != null) {
+			resolveStyleAndSetTypeface(typeface, style, weight);
+		} else {  // both typeface and familyName is null.
+			switch (typefaceIndex) {
+				case SANS:
+					resolveStyleAndSetTypeface(Typeface.SANS_SERIF, style, weight);
+					break;
+				case SERIF:
+					resolveStyleAndSetTypeface(Typeface.SERIF, style, weight);
+					break;
+				case MONOSPACE:
+					resolveStyleAndSetTypeface(Typeface.MONOSPACE, style, weight);
+					break;
+				case DEFAULT_TYPEFACE:
+				default:
+					resolveStyleAndSetTypeface(null, style, weight);
+					break;
+			}
+		}
+	}
+
+	private void resolveStyleAndSetTypeface(Typeface typeface, int style,
+					int weight) {
+		if (weight >= 0) {
+			weight = Math.min(FontStyle.FONT_WEIGHT_MAX, weight);
+			final boolean italic = (style & Typeface.ITALIC) != 0;
+			setTypeface(Typeface.create(typeface, weight, italic));
+		} else {
+			setTypeface(typeface, style);
+		}
+	}
+
+	public void setTextAppearance(Context context, int resId) {
+		final TypedArray ta = context.obtainStyledAttributes(resId, com.android.internal.R.styleable.TextAppearance);
+		final TextAppearanceAttributes attributes = new TextAppearanceAttributes();
+		readTextAppearance(context, ta, attributes);
+		ta.recycle();
+		applyTextAppearance(attributes);
 	}
 
 	public void setMaxLines(int maxLines) {
