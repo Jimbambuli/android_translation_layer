@@ -1594,16 +1594,20 @@ public class View implements Drawable.Callback {
 
 	/* GTK gives a pointer event only to the widget under the pointer and its ancestors, while
 	 * Android passes a touch that a view does not consume on to the views below it, e.g. from an
-	 * icon to the clickable touch target behind it. A subclass returns true here if it consumes
-	 * touches only when it is clickable or has a listener; such a view is left out of GTK's
-	 * picking while it can not consume them, so the event reaches what lies below it. */
+	 * icon to the clickable touch target behind it. In the Java dispatch (ViewGroup.dispatchTouchEvent)
+	 * this is AOSP's own rule and needs nothing here; it is only the GTK path (native GTK widgets
+	 * such as a ScrollView and its content, popups) that still lets GTK's picking decide, and AOSP
+	 * has no counterpart for that.
+	 * A subclass returns true here if it consumes touches only by AOSP's View.onTouchEvent() rule
+	 * (clickable or long clickable) or by an OnTouchListener; such a view is left out of GTK's
+	 * picking while none of these applies, so the event reaches what lies below it. */
 	protected boolean passesUnconsumedTouches() {
 		return false;
 	}
 
 	protected void updateTouchTarget() {
 		if (passesUnconsumedTouches())
-			native_setCanTarget(widget, clickable || on_touch_listener != null || on_long_click_listener != null);
+			native_setCanTarget(widget, isClickable() || isLongClickable() || on_touch_listener != null);
 	}
 	private native void native_setCanTarget(long widget, boolean can_target);
 	protected native void nativeSetOnTouchListener(long widget);
@@ -2160,6 +2164,7 @@ public class View implements Drawable.Callback {
 
 	public void setLongClickable(boolean longClickable) {
 		this.longclickable = longClickable;
+		updateTouchTarget();
 	}
 
 	public void setOnHoverListener(OnHoverListener listener) {}
