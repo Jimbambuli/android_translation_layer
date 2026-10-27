@@ -267,6 +267,7 @@ executable('android-translation-layer', [
                                         ],
                                         include_directories: shared_includes_dir,
                                         install: true,
+                                        pie: true,
                                         dependencies: [
                                         	dependency('gtk4'), dependency('jni'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'), upcalls_header
                                         ],
