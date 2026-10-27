@@ -846,9 +846,9 @@ public class GridLayout extends ViewGroup {
 	/**
 	 * @hide
 	 */
-	//@Override
+	@Override
 	protected void onSetLayoutParams(View child, ViewGroup.LayoutParams layoutParams) {
-		//super.onSetLayoutParams(child, layoutParams);
+		super.onSetLayoutParams(child, layoutParams);
 
 		if (!checkLayoutParams(layoutParams)) {
 			handleInvalidParams("supplied LayoutParams are of the wrong type");

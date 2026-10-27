@@ -497,6 +497,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		this.onHierarchyChangeListener = listener;
 	}
 
+	/** @hide AOSP ViewGroup.onSetLayoutParams(): a child's layout parameters were set */
+	protected void onSetLayoutParams(View child, LayoutParams layoutParams) {
+		requestLayout();
+	}
+
 	protected boolean checkLayoutParams(LayoutParams params) {
 		return true;
 	}

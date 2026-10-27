@@ -1441,6 +1441,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	@Export
 	public void setLayoutParams(ViewGroup.LayoutParams params) {
 		applyLayoutParams(params);
+		if (parent instanceof ViewGroup) {
+			((ViewGroup)parent).onSetLayoutParams(this, params);
+		}
 		requestLayout();
 	}
 
