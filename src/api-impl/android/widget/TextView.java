@@ -418,6 +418,7 @@ public class TextView extends View {
 	public final void setLinksClickable(boolean whether) {}
 
 	public void setInputType(int type) {}
+	private static final Spanned EMPTY_SPANNED = new SpannedString("");
 	private static final InputFilter[] NO_FILTERS = new InputFilter[0];
 	private InputFilter[] filters = NO_FILTERS;
 	public void setFilters(InputFilter[] filters) {
@@ -431,7 +432,7 @@ public class TextView extends View {
 		if (text == null)
 			return null;
 		for (InputFilter filter : filters) {
-			CharSequence out = filter.filter(text, 0, text.length(), new SpannedString(""), 0, 0);
+			CharSequence out = filter.filter(text, 0, text.length(), EMPTY_SPANNED, 0, 0);
 			if (out != null)
 				text = out;
 		}
