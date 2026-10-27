@@ -9,7 +9,14 @@ import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.animation.Animator;
+import android.transition.Fade;
 import android.transition.Transition;
+import android.transition.TransitionInflater;
+import android.transition.TransitionSet;
+import android.transition.Visibility;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
@@ -21,28 +28,143 @@ public class PopupWindow {
 	int input_method_mode = 0;
 	private Transition enter_transition;
 	private Transition exit_transition;
-	/* AOSP plays the popupEnterTransition/popupExitTransition of the theme; ATL can't inflate
-	 * transitions and plays the fade of those of Android 14 (transition/popup_window_enter.xml:
-	 * fade from 0.1 in 100 ms, together with a 250 ms clip reveal that is left out;
-	 * popup_window_exit.xml: fade out in 300 ms) */
-	private static final int ENTER_FADE_MS = 100;
-	private static final int EXIT_FADE_MS = 300;
-	private boolean enter_animated;
-	private boolean exit_animated;
-	private int animation_style = -1;
+	private static final int ANIMATION_STYLE_DEFAULT = -1;
+	private int animation_style = ANIMATION_STYLE_DEFAULT;
+	private ValueAnimator fade;
+	private boolean fading_out;
 
-	private int fadeDuration(boolean enter) {
-		if (animation_style == 0 || ValueAnimator.getDurationScale() == 0 || !(enter ? enter_animated : exit_animated))
-			return 0;
-		return enter ? ENTER_FADE_MS : EXIT_FADE_MS;
+	/*
+	 * AOSP plays the popupEnterTransition and popupExitTransition of the theme (inflated as in
+	 * PopupWindow.getTransition()) on the popup's window, and the windowEnterAnimation and
+	 * windowExitAnimation of an animation style that the app set. ATL has no transition framework
+	 * (TransitionManager): the Fade of a transition runs as it does in AOSP's Fade (from alpha 0 to 1
+	 * when it appears, from 1 to 0 when it disappears) with its duration, start delay and interpolator,
+	 * on the popover; the clip reveal of Android 14's popup_window_enter.xml is left out.
+	 */
+	private Transition getTransition(Context context, int resId) {
+		if (resId != 0 && resId != com.android.internal.R.transition.no_transition) {
+			try {
+				final Transition transition = TransitionInflater.from(context).inflateTransition(resId);
+				if (transition != null) {
+					final boolean isEmpty = transition instanceof TransitionSet && ((TransitionSet)transition).getTransitionCount() == 0;
+					if (!isEmpty)
+						return transition;
+				}
+			} catch (RuntimeException e) {
+				Log.w("PopupWindow", "cannot inflate transition 0x" + Integer.toHexString(resId) + ": " + e);
+			}
+		}
+		return null;
+	}
+
+	/* the first Fade of the transition that fades in (Visibility.MODE_IN) or out (MODE_OUT) */
+	private static Fade findFade(Transition transition, int mode) {
+		if (transition instanceof Fade)
+			return (((Fade)transition).getMode() & mode) != 0 ? (Fade)transition : null;
+		if (transition instanceof TransitionSet) {
+			TransitionSet set = (TransitionSet)transition;
+			for (int i = 0; i < set.getTransitionCount(); i++) {
+				Fade fade = findFade(set.getTransitionAt(i), mode);
+				if (fade != null)
+					return fade;
+			}
+		}
+		return null;
+	}
+
+	/* the windowEnterAnimation/windowExitAnimation of an animation style that was set (the default
+	 * style, and Animation.PopupWindow, which the transitions replace, have none here) */
+	private Animation styleAnimation(boolean enter) {
+		if (animation_style == ANIMATION_STYLE_DEFAULT || animation_style == 0 || contentView == null)
+			return null;
+		TypedArray a = contentView.getContext().obtainStyledAttributes(animation_style, com.android.internal.R.styleable.WindowAnimation);
+		int id = a.getResourceId(enter ? com.android.internal.R.styleable.WindowAnimation_windowEnterAnimation
+		                               : com.android.internal.R.styleable.WindowAnimation_windowExitAnimation, 0);
+		a.recycle();
+		if (id == 0)
+			return null;
+		try {
+			return AnimationUtils.loadAnimation(contentView.getContext(), id);
+		} catch (RuntimeException e) {
+			Log.w("PopupWindow", "cannot load animation 0x" + Integer.toHexString(id) + ": " + e);
+			return null;
+		}
+	}
+
+	private void resetFade() {
+		if (fade != null) {
+			fade.cancel();
+			fade = null;
+		}
+		if (contentView != null)
+			contentView.clearAnimation();
+		fading_out = false;
+		native_resetFade(popover);
+	}
+
+	private void playFade(final Fade fadeTransition, final boolean appear, final Runnable done) {
+		fade = ValueAnimator.ofFloat(0, 1);
+		fade.setDuration(fadeTransition.getDuration() >= 0 ? fadeTransition.getDuration() : 300);
+		if (fadeTransition.getStartDelay() > 0)
+			fade.setStartDelay(fadeTransition.getStartDelay());
+		if (fadeTransition.getInterpolator() != null)
+			fade.setInterpolator(fadeTransition.getInterpolator());
+		native_setOpacity(popover, appear ? 0 : 1);
+		fade.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+			@Override
+			public void onAnimationUpdate(ValueAnimator animation) {
+				float f = (Float)animation.getAnimatedValue();
+						native_setOpacity(popover, appear ? f : 1 - f);
+			}
+		});
+		fade.addListener(new android.animation.AnimatorListenerAdapter() {
+			private boolean canceled;
+
+			@Override
+			public void onAnimationCancel(Animator animation) {
+				canceled = true;
+			}
+
+			@Override
+			public void onAnimationEnd(Animator animation) {
+				if (!canceled && done != null)
+					done.run();
+			}
+		});
+		fade.start();
+	}
+
+	/* after the popover was shown */
+	private void startEnterAnimation() {
+		resetFade();
+		if (ValueAnimator.getDurationScale() == 0)
+			return;
+		Animation animation = styleAnimation(true);
+		if (animation != null)
+			contentView.startAnimation(animation);
+		Fade enterFade = findFade(enter_transition, Visibility.MODE_IN);
+		if (enterFade != null)
+			playFade(enterFade, true, null);
+	}
+
+	private void finishDismiss() {
+		resetFade();
+		native_dismiss(popover);
 	}
 
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		popover = native_constructor();
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.PopupWindow, defStyleAttr, defStyleRes);
 		overlap_anchor = a.getBoolean(com.android.internal.R.styleable.PopupWindow_overlapAnchor, false);
-		enter_animated = a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupEnterTransition, 0) != 0;
-		exit_animated = a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupExitTransition, 0) != 0;
+		if (a.hasValueOrEmpty(com.android.internal.R.styleable.PopupWindow_popupAnimationStyle)) {
+			int animStyle = a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupAnimationStyle, 0);
+			animation_style = animStyle == com.android.internal.R.style.Animation_PopupWindow ? ANIMATION_STYLE_DEFAULT : animStyle;
+		}
+		enter_transition = getTransition(context, a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupEnterTransition, 0));
+		if (a.hasValueOrEmpty(com.android.internal.R.styleable.PopupWindow_popupExitTransition))
+			exit_transition = getTransition(context, a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupExitTransition, 0));
+		else
+			exit_transition = enter_transition == null ? null : enter_transition.clone();
 		a.recycle();
 		int[] colors = themeColors(context);
 		native_setColors(popover, colors[0], colors[1]);
@@ -152,7 +274,7 @@ public class PopupWindow {
 		anchored_gravity = gravity;
 		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
 		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
-		native_fadeIn(popover, fadeDuration(true));
+		startEnterAnimation();
 		takeWindowFocus(anchor);
 	}
 
@@ -209,17 +331,64 @@ public class PopupWindow {
 		if (gravity == Gravity.NO_GRAVITY)
 			gravity = Gravity.TOP | Gravity.START;
 		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
-		native_fadeIn(popover, fadeDuration(true));
+		startEnterAnimation();
 		takeWindowFocus(parent);
 	}
 
 	public void dismiss() {
-		native_dismiss(popover, fadeDuration(false));
+		if (fading_out)
+			return;
+		resetFade();
+		Fade exitFade = ValueAnimator.getDurationScale() == 0 ? null : findFade(exit_transition, Visibility.MODE_OUT);
+		Animation animation = ValueAnimator.getDurationScale() == 0 ? null : styleAnimation(false);
+		if ((exitFade == null && animation == null) || !native_isMapped(popover)) {
+			native_dismiss(popover);
+			return;
+		}
+		/* as on AOSP, the dismiss listener is called at once, the popup is no longer showing and takes no
+		 * input; it is popped down when the animations end */
+		fading_out = true;
+		native_startFadeOut(popover);
+		final int[] running = {0};
+		final Runnable onEnd = new Runnable() {
+			@Override
+			public void run() {
+				if (--running[0] == 0 && fading_out)
+					finishDismiss();
+			}
+		};
+		if (animation != null) {
+			running[0]++;
+			animation.setFillAfter(true);
+			animation.setAnimationListener(new Animation.AnimationListener() {
+				@Override
+				public void onAnimationStart(Animation animation) {}
+
+				@Override
+				public void onAnimationRepeat(Animation animation) {}
+
+				@Override
+				public void onAnimationEnd(Animation animation) {
+					onEnd.run();
+				}
+			});
+		}
+		if (exitFade != null)
+			running[0]++;
+		if (animation != null)
+			contentView.startAnimation(animation);
+		if (exitFade != null)
+			playFade(exitFade, false, onEnd);
 	}
 
-	/* 0 turns the animations off, as on AOSP; other styles are not played */
+	/* as on AOSP, 0 means no window animation (the transitions are set apart); the style's window enter
+	 * and exit animation are played on the content */
 	public void setAnimationStyle(int animationStyle) {
 		animation_style = animationStyle;
+	}
+
+	public int getAnimationStyle() {
+		return animation_style;
 	}
 
 	public void setTouchModal(boolean touchModal) {
@@ -239,10 +408,9 @@ public class PopupWindow {
 
 	public void setEpicenterBounds(Rect bounds) {}
 
-	/* transitions are stored but not played; a null one turns the fade off (see fadeDuration) */
+	/* a null transition turns the animation off, as on AOSP */
 	public void setEnterTransition(Transition enterTransition) {
 		enter_transition = enterTransition;
-		enter_animated = enterTransition != null;
 	}
 
 	public Transition getEnterTransition() {
@@ -251,7 +419,6 @@ public class PopupWindow {
 
 	public void setExitTransition(Transition exitTransition) {
 		exit_transition = exitTransition;
-		exit_animated = exitTransition != null;
 	}
 
 	public Transition getExitTransition() {
@@ -310,8 +477,12 @@ public class PopupWindow {
 	protected native void native_setTouchable(long widget, boolean touchable);
 	protected native void native_setTouchModal(long widget, boolean touchable);
 	protected native void native_setFocusable(long widget, boolean focusable);
-	protected native void native_dismiss(long widget, int fadeMs);
-	protected native void native_fadeIn(long widget, int fadeMs);
+	protected native void native_dismiss(long widget);
+	protected native boolean native_isMapped(long widget);
+	protected native void native_startFadeOut(long widget);
+	protected native void native_fadeOutDone(long widget);
+	protected native void native_resetFade(long widget);
+	protected native void native_setOpacity(long widget, float opacity);
 	protected native void native_update(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int width, int height, int gravity, boolean overlapAnchor);
 	private native void native_setOnDismissListener(long popover);
 

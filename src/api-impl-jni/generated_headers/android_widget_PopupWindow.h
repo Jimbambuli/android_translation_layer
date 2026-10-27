@@ -7,10 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#undef android_widget_PopupWindow_ENTER_FADE_MS
-#define android_widget_PopupWindow_ENTER_FADE_MS 100L
-#undef android_widget_PopupWindow_EXIT_FADE_MS
-#define android_widget_PopupWindow_EXIT_FADE_MS 300L
+#undef android_widget_PopupWindow_ANIMATION_STYLE_DEFAULT
+#define android_widget_PopupWindow_ANIMATION_STYLE_DEFAULT -1L
 #undef android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY
 #define android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY 8388659L
 /*
@@ -88,18 +86,50 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setFocusable
 /*
  * Class:     android_widget_PopupWindow
  * Method:    native_dismiss
- * Signature: (JI)V
+ * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1dismiss
-  (JNIEnv *, jobject, jlong, jint);
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     android_widget_PopupWindow
- * Method:    native_fadeIn
- * Signature: (JI)V
+ * Method:    native_isMapped
+ * Signature: (J)Z
  */
-JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1fadeIn
-  (JNIEnv *, jobject, jlong, jint);
+JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isMapped
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_startFadeOut
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1startFadeOut
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_fadeOutDone
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1fadeOutDone
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_resetFade
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1resetFade
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_setOpacity
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setOpacity
+  (JNIEnv *, jobject, jlong, jfloat);
 
 /*
  * Class:     android_widget_PopupWindow

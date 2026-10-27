@@ -860,6 +860,7 @@ srcs = [
 	'com/android/internal/graphics/cam/Frame.java',
 	'com/android/internal/graphics/cam/HctSolver.java',
 	'com/android/internal/os/RuntimeInit.java',
+	'com/android/internal/transition/EpicenterTranslateClipReveal.java',
 	'com/android/internal/util/ArrayUtils.java',
 	'com/android/internal/util/FastXmlSerializer.java',
 	'com/android/internal/util/GrowingArrayUtils.java',
