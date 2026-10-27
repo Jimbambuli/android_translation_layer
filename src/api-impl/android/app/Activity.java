@@ -120,7 +120,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	public Activity() {
-		super(null);
+		super();
 	}
 
 	public View root_view;
