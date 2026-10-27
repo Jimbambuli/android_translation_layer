@@ -441,7 +441,7 @@ public class Window {
 	}
 
 	public View peekDecorView() {
-		return null;
+		return decorView;
 	}
 
 	public WindowManager.LayoutParams getAttributes() {
