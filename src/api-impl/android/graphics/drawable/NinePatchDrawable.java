@@ -5,7 +5,9 @@ import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.util.AttributeSet;
@@ -39,12 +41,22 @@ public class NinePatchDrawable extends Drawable {
 			nativeSetScale(paintable, density / (float)targetDensity);
 	}
 
-	@Override
-	public void setTint(int tint) {
-		nativeSetTint(paintable, tint);
-	}
-
 	private ColorStateList tintList;
+	private PorterDuff.Mode tintMode = DEFAULT_TINT_MODE;
+	private ColorFilter colorFilter;
+
+	/* Like AOSP's draw(), a colour filter set with setColorFilter() overrides the filter made from the
+	 * tint (updateTintFilter(), with the default mode SRC_IN). The native paintable can only colour the
+	 * picture the way a PorterDuff SRC_IN filter does; other colour filters are not drawn. */
+	private void updateNativeTint() {
+		ColorFilter filter = colorFilter;
+		if (filter == null && tintList != null && tintMode != null)
+			filter = new PorterDuffColorFilter(tintList.getColorForState(getState(), Color.TRANSPARENT), tintMode);
+		int color = 0;
+		if (filter instanceof PorterDuffColorFilter && ((PorterDuffColorFilter)filter).getMode() == PorterDuff.Mode.SRC_IN)
+			color = ((PorterDuffColorFilter)filter).getColor();
+		nativeSetTint(paintable, color);
+	}
 
 	/* <nine-patch android:src="..." android:tint="..."/> */
 	@Override
@@ -65,7 +77,15 @@ public class NinePatchDrawable extends Drawable {
 	@Override
 	public void setTintList(ColorStateList tint) {
 		tintList = tint;
-		nativeSetTint(paintable, tint != null ? tint.getColorForState(getState(), tint.getDefaultColor()) : 0);
+		updateNativeTint();
+		invalidateSelf();
+	}
+
+	@Override
+	public void setTintMode(PorterDuff.Mode tintMode) {
+		this.tintMode = tintMode;
+		updateNativeTint();
+		invalidateSelf();
 	}
 
 	@Override
@@ -75,17 +95,23 @@ public class NinePatchDrawable extends Drawable {
 
 	@Override
 	protected boolean onStateChange(int[] stateSet) {
-		if (tintList == null || !tintList.isStateful())
-			return false;
-		nativeSetTint(paintable, tintList.getColorForState(stateSet, tintList.getDefaultColor()));
-		return true;
+		if (tintList != null && tintMode != null) {
+			updateNativeTint();
+			return true;
+		}
+		return false;
 	}
 
-	/* the native tint colours the picture like a PorterDuff SRC_IN filter, which is how
-	 * AppCompat tints the nine-patches of its widgets */
 	@Override
 	public void setColorFilter(ColorFilter colorFilter) {
-		nativeSetTint(paintable, colorFilter instanceof PorterDuffColorFilter ? ((PorterDuffColorFilter)colorFilter).getColor() : 0);
+		this.colorFilter = colorFilter;
+		updateNativeTint();
+		invalidateSelf();
+	}
+
+	@Override
+	public ColorFilter getColorFilter() {
+		return colorFilter;
 	}
 
 	private native long nativeCreate(byte[] data, long texture);

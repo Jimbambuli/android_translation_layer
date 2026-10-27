@@ -1,9 +1,11 @@
 package android.graphics.drawable;
 
+import android.content.res.ColorStateList;
 import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Insets;
+import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.util.DisplayMetrics;
 import android.util.SparseArray;
@@ -26,9 +28,7 @@ public class DrawableContainer extends Drawable {
 		if (idx >= 0 && idx < state.childCount && idx != curIndex && state.getChild(idx) != null) {
 			curIndex = idx;
 			Drawable d = state.getChild(idx);
-			if (d.isStateful())
-				d.setState(getState());
-			d.setBounds(getBounds());
+			initializeDrawableForDisplay(d);
 			native_selectChild(paintable, d.paintable);
 			invalidateSelf();
 			return true;
@@ -135,11 +135,69 @@ public class DrawableContainer extends Drawable {
 		return false;
 	}
 
+	/**
+	 * Initializes a drawable for display in this container, like AOSP (without the alpha of the
+	 * fade, the hotspot and the block of the invalidation callback, which ATL does not have).
+	 *
+	 * @param d The drawable to initialize.
+	 */
+	private void initializeDrawableForDisplay(Drawable d) {
+		if (state.mHasColorFilter) {
+			// Color filter always overrides tint.
+			d.setColorFilter(state.mColorFilter);
+		} else {
+			if (state.mHasTintList) {
+				d.setTintList(state.mTintList);
+			}
+			if (state.mHasTintMode) {
+				d.setTintMode(state.mTintMode);
+			}
+		}
+		d.setVisible(isVisible(), true);
+		d.setDither(state.mDither);
+		d.setState(getState());
+		d.setLevel(getLevel());
+		d.setBounds(getBounds());
+		d.setLayoutDirection(getLayoutDirection());
+		d.setAutoMirrored(state.mAutoMirrored);
+	}
+
 	@Override
 	public void setColorFilter(ColorFilter colorFilter) {
-		for (int i = 0; i < state.childCount; i++) {
-			if (state.getChild(i) != null)
-				state.getChild(i).setColorFilter(colorFilter);
+		state.mHasColorFilter = true;
+
+		if (state.mColorFilter != colorFilter) {
+			state.mColorFilter = colorFilter;
+
+			if (getCurrent() != null) {
+				getCurrent().setColorFilter(colorFilter);
+			}
+		}
+	}
+
+	@Override
+	public void setTintList(ColorStateList tint) {
+		state.mHasTintList = true;
+
+		if (state.mTintList != tint) {
+			state.mTintList = tint;
+
+			if (getCurrent() != null) {
+				getCurrent().setTintList(tint);
+			}
+		}
+	}
+
+	@Override
+	public void setTintMode(PorterDuff.Mode tintMode) {
+		state.mHasTintMode = true;
+
+		if (state.mTintMode != tintMode) {
+			state.mTintMode = tintMode;
+
+			if (getCurrent() != null) {
+				getCurrent().setTintMode(tintMode);
+			}
 		}
 	}
 
@@ -193,6 +251,14 @@ public class DrawableContainer extends Drawable {
 		int mEnterFadeDuration = 0;
 		int mExitFadeDuration = 0;
 
+		ColorFilter mColorFilter;
+		boolean mHasColorFilter;
+
+		ColorStateList mTintList;
+		PorterDuff.Mode mTintMode;
+		boolean mHasTintList;
+		boolean mHasTintMode;
+
 		/* like AOSP: a copy gets new instances of the children, made from their constant states
 		 * when they are first used */
 		protected DrawableContainerState(DrawableContainerState orig, DrawableContainer owner, Resources res) {
@@ -211,6 +277,12 @@ public class DrawableContainer extends Drawable {
 				mAutoMirrored = orig.mAutoMirrored;
 				mEnterFadeDuration = orig.mEnterFadeDuration;
 				mExitFadeDuration = orig.mExitFadeDuration;
+				mColorFilter = orig.mColorFilter;
+				mHasColorFilter = orig.mHasColorFilter;
+				mTintList = orig.mTintList;
+				mTintMode = orig.mTintMode;
+				mHasTintList = orig.mHasTintList;
+				mHasTintMode = orig.mHasTintMode;
 
 				mCheckedConstantState = true;
 				mCanConstantState = true;
