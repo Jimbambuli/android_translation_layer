@@ -1505,6 +1505,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	private OnTouchListener on_touch_listener = null;
+	private TouchDelegate mTouchDelegate = null;
 
 	@Export
 	public boolean onTouchEventInternal(MotionEvent event, boolean handle_gestures) {
@@ -1540,9 +1541,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private float mLongClickX = Float.NaN;
 	private float mLongClickY = Float.NaN;
 
-	/* AOSP View.onTouchEvent() (android-14) without what ATL has no counterpart for: the touch
-	 * delegate, tooltips on touch, mouse button actions (performButtonActionOnTouchDown) and the touch
-	 * classification (ATL's events are always CLASSIFICATION_NONE) */
+	/* AOSP View.onTouchEvent() (android-14) without what ATL has no counterpart for: tooltips on touch
+	 * (GTK shows the tooltip, see setTooltipText()), mouse button actions (performButtonActionOnTouchDown,
+	 * the buttons are the native input stack's) and the touch classification (ATL's events are always
+	 * CLASSIFICATION_NONE) */
 	@Export
 	public boolean onTouchEvent(MotionEvent event) {
 		final float x = event.getX();
@@ -1550,6 +1552,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		final int action = event.getAction();
 
 		final boolean clickable = isClickable() || isLongClickable();
+
+		if (mTouchDelegate != null) {
+			if (mTouchDelegate.onTouchEvent(event)) {
+				return true;
+			}
+		}
 
 		if (!isEnabled()) {
 			// A disabled view that is clickable still consumes the touch events, it just doesn't respond to them.
@@ -4111,7 +4119,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setNestedScrollingEnabled(boolean enabled) {}
 
-	public void setTouchDelegate(TouchDelegate touchDelegate) {}
+	/* AOSP View.setTouchDelegate(). The delegate is asked in onTouchEvent(), which GTK calls for a view with a touch
+	 * or click listener or an onTouchEvent() override; it does not add the touch controller itself, because that
+	 * reallocates the wrapper (a SearchView sets its delegate from onLayout() and ended up laid out differently) */
+	public void setTouchDelegate(TouchDelegate touchDelegate) {
+		mTouchDelegate = touchDelegate;
+	}
 
 	public void setOnDragListener(OnDragListener onDragListener) {}
 
@@ -4866,7 +4879,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public int getTextDirection() { return 0; /* TEXT_DIRECTION_INHERIT */ }
 
-	public TouchDelegate getTouchDelegate() { return null; }
+	public TouchDelegate getTouchDelegate() {
+		return mTouchDelegate;
+	}
 
 	public void setZ(float z) {}
 }
