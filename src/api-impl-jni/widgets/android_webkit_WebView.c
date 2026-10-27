@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 #include <gio/gunixinputstream.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
@@ -76,6 +77,77 @@ static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointe
 	GInputStream *stream = asset_input_stream_new(asset);
 	webkit_uri_scheme_request_finish(request, stream, Asset_getLength(asset), NULL);
 	g_object_unref(stream);
+}
+
+/* The Java bridge (addJavascriptInterface()): a call from the page is a synchronous XMLHttpRequest to this
+ * scheme, which is how a page can wait for a native answer in WebKitGTK (script message handlers only
+ * reply with a promise). The WebView calls the Java method on a background thread (Chromium's bridge does
+ * as well) and hands the answer back through native_finishJavaBridgeCall(), so the main loop keeps running
+ * while the page waits. */
+#define JAVA_BRIDGE_SCHEME "atl-javabridge"
+
+static void java_bridge_reply(WebKitURISchemeRequest *request, const char *answer)
+{
+	gsize length = strlen(answer);
+	GInputStream *stream = g_memory_input_stream_new_from_data(g_strdup(answer), length, g_free);
+	WebKitURISchemeResponse *response = webkit_uri_scheme_response_new(stream, length);
+	SoupMessageHeaders *headers = soup_message_headers_new(SOUP_MESSAGE_HEADERS_RESPONSE);
+	soup_message_headers_append(headers, "Access-Control-Allow-Origin", "*");
+	webkit_uri_scheme_response_set_content_type(response, "text/plain; charset=utf-8");
+	webkit_uri_scheme_response_set_http_headers(response, headers);
+	webkit_uri_scheme_request_finish_with_response(request, response);
+	g_object_unref(response);
+	g_object_unref(stream);
+}
+
+static void java_bridge_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
+{
+	WebKitWebView *web_view = webkit_uri_scheme_request_get_web_view(request);
+	GtkWidget *parent = web_view ? gtk_widget_get_parent(GTK_WIDGET(web_view)) : NULL;
+	JNIEnv *env = get_jni_env();
+	jobject this = WRAPPER_IS_WIDGET(parent) ? webview_jobject(env, WRAPPER_WIDGET(parent)) : NULL;
+	GInputStream *body = webkit_uri_scheme_request_get_http_body(request);
+	if (!this || !body) {
+		java_bridge_reply(request, "eJava object is gone");
+		return;
+	}
+	GString *message = g_string_new(NULL);
+	char buffer[4096];
+	gssize count;
+	while ((count = g_input_stream_read(body, buffer, sizeof(buffer), NULL, NULL)) > 0)
+		g_string_append_len(message, buffer, count);
+	J__WebView__internalJavaBridgeCall(env, this, _INTPTR(g_object_ref(request)), _JSTRING(message->str));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, this);
+	g_string_free(message, TRUE);
+}
+
+struct java_bridge_answer {
+	WebKitURISchemeRequest *request;
+	char *answer;
+};
+
+static gboolean java_bridge_answer_cb(gpointer user_data)
+{
+	struct java_bridge_answer *answer = user_data;
+	java_bridge_reply(answer->request, answer->answer);
+	g_object_unref(answer->request);
+	g_free(answer->answer);
+	g_free(answer);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishJavaBridgeCall(JNIEnv *env, jobject this, jlong request, jstring answer)
+{
+	struct java_bridge_answer *data = g_new(struct java_bridge_answer, 1);
+	const char *text = _CSTRING(answer);
+	data->request = _PTR(request);
+	data->answer = g_strdup(text);
+	(*env)->ReleaseStringUTFChars(env, answer, text);
+	g_idle_add(java_bridge_answer_cb, data); // the answer is given on the main thread
 }
 
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
@@ -338,6 +410,10 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	if (!asset_scheme_registered) {
 		webkit_web_context_register_uri_scheme(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview)), "android-asset", asset_uri_scheme_request_cb, NULL, NULL);
 		webkit_security_manager_register_uri_scheme_as_local(webkit_web_context_get_security_manager(webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview))), "android-asset");
+		WebKitWebContext *web_context = webkit_web_view_get_context(WEBKIT_WEB_VIEW(webview));
+		webkit_web_context_register_uri_scheme(web_context, JAVA_BRIDGE_SCHEME, java_bridge_request_cb, NULL, NULL);
+		webkit_security_manager_register_uri_scheme_as_cors_enabled(webkit_web_context_get_security_manager(web_context), JAVA_BRIDGE_SCHEME);
+		webkit_security_manager_register_uri_scheme_as_secure(webkit_web_context_get_security_manager(web_context), JAVA_BRIDGE_SCHEME);
 		asset_scheme_registered = TRUE;
 	}
 	WebKitUserContentManager *content_manager = webkit_web_view_get_user_content_manager(WEBKIT_WEB_VIEW(webview));
@@ -452,12 +528,17 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1addJavascriptInterfac
 		return;
 
 	WebKitWebView *webview = _PTR(widget_ptr);
-	/* window.<name>.<method>(args...) posts "<name>\1<method>\1<type>:<value>..." to script_message_cb;
-	 * the call is asynchronous, so methods can't return values to JavaScript */
+	/* window.<name>.<method>(args...) asks the Java bridge (see java_bridge_request_cb()) with a synchronous request:
+	 * "<name>\1<method>\1<typeof>:<value>..." (null as "null:"), answered by "u" (undefined), "n" (null), "b<bool>",
+	 * "d<number>", "s<string>" or "e<error>", which throws like Chromium's bridge does. */
 	char *source = g_strdup_printf(
 	    "(function(){var o={};'%s'.split(',').forEach(function(m){o[m]=function(){"
-	    "var a=Array.prototype.map.call(arguments,function(x){return (typeof x)+':'+String(x);});"
-	    "window.webkit.messageHandlers.atlbridge.postMessage(['%s',m].concat(a).join('\\u0001'));};});"
+	    "var a=['%s',m];for(var i=0;i<arguments.length;i++){var x=arguments[i],t=typeof x;"
+	    "a.push(x===null?'null:':t+':'+(t==='number'||t==='boolean'||t==='string'?String(x):''));}"
+	    "var r=new XMLHttpRequest();r.open('POST','" JAVA_BRIDGE_SCHEME "://call',false);r.send(a.join('\\u0001'));"
+	    "var t=r.responseText,v=t.substring(1);"
+	    "switch(t.charAt(0)){case 'e':throw new Error('Error invoking '+m+': '+v);case 'b':return v==='true';"
+	    "case 'd':return Number(v);case 's':return v;case 'n':return null;}};});"
 	    "window['%s']=o;})();",
 	    _CSTRING(method_names), _CSTRING(name), _CSTRING(name));
 	WebKitUserScript *script = webkit_user_script_new(source, WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);

@@ -9,6 +9,8 @@ import android.view.MotionEvent;
 import android.util.Log;
 import android.view.ViewGroup;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -104,8 +106,8 @@ public class WebView extends ViewGroup {
 	// like on Android, interface methods are called on a background thread
 	private static ExecutorService javaBridgeExecutor;
 
-	/* The object becomes available to JavaScript as window.<name> on the next page load. Calls are
-	 * asynchronous (WebKitGTK script message handlers), so return values are not passed back. */
+	/* The object becomes available to JavaScript as window.<name> on the next page load. Its methods return
+	 * their values to the page, which waits for them, as in Chromium. */
 	public void addJavascriptInterface(Object object, String name) {
 		if (isDestroyed())
 			return;
@@ -130,65 +132,120 @@ public class WebView extends ViewGroup {
 		return methods;
 	}
 
-	// to be used by native code; message is "<interface>\u0001<method>\u0001<type>:<value>..."
-	// or "\u0001console\u0001<level>\u0001<message>"
+	// to be used by native code; message is "\u0001console\u0001<level>\u0001<message>"
 	@Export
 	void internalJsMessage(String message) {
 		final String[] parts = message.split("\u0001", -1);
-		if (parts.length < 2)
-			return;
-		if (parts[0].isEmpty() && parts[1].equals("console")) {
+		if (parts.length >= 2 && parts[0].isEmpty() && parts[1].equals("console"))
 			internalConsoleMessage(parts.length > 2 ? parts[2] : "log", parts.length > 3 ? parts[3] : "");
-			return;
-		}
-		final Object object = javascriptInterfaces.get(parts[0]);
-		if (object == null)
-			return;
+	}
+
+	/* A call of an interface method from the page: the page waits for the answer (a synchronous
+	 * XMLHttpRequest, see native_addJavascriptInterface()), the method runs on a background thread as in
+	 * Chromium's Java bridge, and native_finishJavaBridgeCall() hands the answer to the page.
+	 * message is "<interface>\u0001<method>\u0001<type>:<value>..." */
+	@Export
+	void internalJavaBridgeCall(final long request, String message) {
+		final String[] parts = message.split("\u0001", -1);
 		if (javaBridgeExecutor == null)
 			javaBridgeExecutor = Executors.newSingleThreadExecutor();
 		javaBridgeExecutor.execute(new Runnable() {
 			@Override
 			public void run() {
-				invokeJavascriptInterface(object, parts[1], Arrays.copyOfRange(parts, 2, parts.length));
+				native_finishJavaBridgeCall(request, invokeJavascriptInterface(parts));
 			}
 		});
 	}
 
-	private void invokeJavascriptInterface(Object object, String methodName, String[] jsArgs) {
+	/* GinJavaMethodInvocationHelper::Invoke(): the first method with this name and number of parameters,
+	 * the arguments coerced to the parameter types, the result (or the error) as the answer for the
+	 * page: "u" undefined, "n" null, "b<true|false>", "d<number>", "s<string>" or "e<error message>" */
+	private String invokeJavascriptInterface(String[] parts) {
+		Object object = javascriptInterfaces.get(parts[0]);
+		if (object == null)
+			return "eJava object is gone";
 		for (Method method : getJavascriptInterfaceMethods(object)) {
 			Class<?>[] types = method.getParameterTypes();
-			if (!method.getName().equals(methodName) || types.length != jsArgs.length)
+			if (!method.getName().equals(parts[1]) || types.length != parts.length - 2)
 				continue;
-			Object[] args = new Object[jsArgs.length];
-			for (int i = 0; i < jsArgs.length; i++)
-				args[i] = convertJavascriptArgument(jsArgs[i], types[i]);
+			Object[] args = new Object[types.length];
+			for (int i = 0; i < types.length; i++)
+				args[i] = coerceJavascriptArgument(parts[i + 2], types[i]);
 			try {
-				method.invoke(object, args);
+				return javascriptResult(method.getReturnType(), method.invoke(object, args));
 			} catch (ReflectiveOperationException e) {
 				e.printStackTrace();
+				return "eJava exception was raised during method invocation";
 			}
-			return;
 		}
-		Log.w(TAG, "no JavaScript interface method " + methodName + " with " + jsArgs.length + " arguments");
+		return "eMethod not found";
 	}
 
-	private static Object convertJavascriptArgument(String typedValue, Class<?> type) {
+	private static String javascriptResult(Class<?> type, Object result) {
+		if (type == void.class || type.isArray())
+			return "u";
+		if (type == boolean.class)
+			return "b" + result;
+		if (type == char.class)
+			return "d" + (int)(Character)result;
+		if (type == long.class)
+			return "d" + (double)(Long)result;
+		if (type.isPrimitive())
+			return "d" + result;
+		if (type == String.class)
+			return result == null ? "u" : "s" + result;
+		/* LIVECONNECT_COMPLIANCE as in Chromium's bridge: an object that is not null would be exposed
+		 * to the page with its own interface methods; here it is undefined */
+		return result == null ? "n" : "u";
+	}
+
+	/* CoerceJavaScriptValueToJavaValue() of Chromium's gin_java_script_to_java_types_coercion.cc, with the
+	 * value as "<typeof>:<value>" ("null:" for null): numbers are truncated to the parameter's type,
+	 * everything that does not fit becomes 0, false or null; String parameters get numbers and booleans as
+	 * text and undefined (or an object) as "undefined"; wrapper and other object types get null. */
+	private static Object coerceJavascriptArgument(String typedValue, Class<?> type) {
 		int colon = typedValue.indexOf(':');
 		String jsType = typedValue.substring(0, colon);
 		String value = typedValue.substring(colon + 1);
-		if (jsType.equals("undefined") || (jsType.equals("object") && value.equals("null")))
-			return type.isPrimitive() ? convertJavascriptArgument("number:0", type) : null;
-		if (type == int.class || type == Integer.class)
-			return (int)Double.parseDouble(value);
-		if (type == long.class || type == Long.class)
-			return (long)Double.parseDouble(value);
-		if (type == float.class || type == Float.class)
-			return (float)Double.parseDouble(value);
-		if (type == double.class || type == Double.class)
-			return Double.parseDouble(value);
-		if (type == boolean.class || type == Boolean.class)
-			return Boolean.parseBoolean(value);
-		return value;
+		boolean isNumber = jsType.equals("number");
+		double number = isNumber ? Double.parseDouble(value) : 0;
+		if (type == String.class) {
+			if (jsType.equals("string"))
+				return value;
+			if (isNumber)
+				return number == (int)number ? Integer.toString((int)number) : javascriptNumberToString(number);
+			if (jsType.equals("boolean"))
+				return value;
+			return jsType.equals("null") ? null : "undefined";
+		}
+		if (type == boolean.class)
+			return jsType.equals("boolean") && value.equals("true");
+		if (type == char.class)
+			return isNumber && number == (int)number ? (char)(int)number : (char)0;
+		if (type == byte.class)
+			return (byte)(int)number;
+		if (type == short.class)
+			return (short)(int)number;
+		if (type == int.class)
+			return (int)number;
+		if (type == long.class)
+			return (long)number;
+		if (type == float.class)
+			return (float)number;
+		if (type == double.class)
+			return number;
+		return null;
+	}
+
+	// printf's "%.6lg", as Chromium formats a number for a String parameter
+	private static String javascriptNumberToString(double number) {
+		if (Double.isNaN(number) || Double.isInfinite(number))
+			return Double.isNaN(number) ? "nan" : number > 0 ? "inf" : "-inf";
+		BigDecimal rounded = new BigDecimal(number).round(new MathContext(6)).stripTrailingZeros();
+		int exponent = rounded.precision() - rounded.scale() - 1;
+		if (rounded.signum() == 0 || (exponent >= -4 && exponent < 6))
+			return rounded.toPlainString();
+		return rounded.unscaledValue() + "e" + (exponent < 0 ? "-" : "+") + (Math.abs(exponent) < 10 ? "0" : "") + Math.abs(exponent);
 	}
 
 	private void internalConsoleMessage(String level, String message) {
@@ -342,6 +399,7 @@ public class WebView extends ViewGroup {
 	private native void native_reload(long widget);
 	private native void native_addJavascriptInterface(long widget, String name, String methodNames);
 	private native void native_evaluateJavascript(long widget, String script, ValueCallback<String> callback);
+	private native void native_finishJavaBridgeCall(long request, String response);
 	private native void native_firePointerCancel(long widget);
 	private native long native_destroy(long widget);
 	/* the page is drawn by WebKit, a CSS background of the widget would stay hidden behind it */
