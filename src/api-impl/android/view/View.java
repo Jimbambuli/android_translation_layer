@@ -121,7 +121,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/**
 	 * Mask for use with setFlags indicating bits used for focus.
 	 */
-	private static final int FOCUSABLE_MASK = 0x00000001;
+	private static final int FOCUSABLE_MASK = 0x00000011;
+
+	/**
+	 * This view determines focusability automatically. This is the default.
+	 */
+	static final int FOCUSABLE_AUTO = 0x00000010;
 
 	/**
 	 * This view will adjust its padding to fit sytem windows (e.g. status bar)
@@ -1034,9 +1039,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private boolean layoutRtl = false;
 	private boolean layoutParamsRtl = false; // the direction the layout params were resolved with
 
-	private boolean atl_enabled = true;
-	private boolean atl_focusable = true;
-	private boolean atl_focusable_set; // set with setFocusable() or android:focusable
+	/* AOSP's mViewFlags for the flags ATL has: ENABLED_MASK, FOCUSABLE_MASK, FOCUSABLE_IN_TOUCH_MODE, CLICKABLE and
+	 * LONG_CLICKABLE (the visibility stays in the visibility field). Unlike AOSP the view starts out FOCUSABLE as well as
+	 * FOCUSABLE_AUTO: GTK decides what a native widget can focus, so isFocusable() stays true until the app says otherwise. */
+	int mViewFlags = ENABLED | FOCUSABLE | FOCUSABLE_AUTO;
 
 	private Handler handler;
 	private Animation currentAnimation;
@@ -1061,9 +1067,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mListenerInfo = new ListenerInfo();
 		return mListenerInfo;
 	}
-
-	private boolean clickable = false;
-	private boolean longclickable = false;
 
 	public static final Property<View, Float> TRANSLATION_X = new Property<View, Float>(Float.class, "translationX") {
 		@Override
@@ -1177,14 +1180,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		mDefaultFocusHighlightEnabled = a.getBoolean(com.android.internal.R.styleable.View_defaultFocusHighlightEnabled, true);
 		if (a.hasValue(com.android.internal.R.styleable.View_focusable)) {
-			atl_focusable = a.getBoolean(com.android.internal.R.styleable.View_focusable, true);
-			atl_focusable_set = atl_focusable;
-			if (!atl_focusable)
-				native_setNativeFocusable(widget, false);
+			if (a.getBoolean(com.android.internal.R.styleable.View_focusable, true)) {
+				setFlags(FOCUSABLE, FOCUSABLE_MASK); // GTK's default for the widget stays
+			} else {
+				setFocusable(false);
+			}
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 		}
 
 		if (a.hasValue(com.android.internal.R.styleable.View_minWidth))
@@ -1254,9 +1258,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			setTextAlignment(textAlignment);
 		}
 
-		clickable = a.getBoolean(com.android.internal.R.styleable.View_clickable, false);
-		longclickable = a.getBoolean(com.android.internal.R.styleable.View_longClickable, false);
-		updateKeyboardFocusable();
+		if (a.hasValue(com.android.internal.R.styleable.View_clickable)) {
+			setClickable(a.getBoolean(com.android.internal.R.styleable.View_clickable, false));
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_longClickable)) {
+			setLongClickable(a.getBoolean(com.android.internal.R.styleable.View_longClickable, false));
+		}
 
 		String handlerName = a.getString(com.android.internal.R.styleable.View_onClick);
 		if (handlerName != null)
@@ -1892,21 +1899,80 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 	private native void nativeSetOnKeyListener(long widget);
 
+	/* AOSP View.setFocusable(), setFocusableInTouchMode(), isFocusable(), isFocusableInTouchMode() */
 	public void setFocusable(boolean focusable) {
-		atl_focusable = focusable;
-		atl_focusable_set = true;
-		native_setNativeFocusable(widget, focusable);
-		updateKeyboardFocusable();
+		setFocusable(focusable ? FOCUSABLE : NOT_FOCUSABLE);
 	}
-	public void setFocusable(int focusable) {}
-	private boolean focusable_in_touch_mode = false;
+
+	public void setFocusable(int focusable) {
+		if ((focusable & (FOCUSABLE_AUTO | FOCUSABLE)) == 0) {
+			setFlags(0, FOCUSABLE_IN_TOUCH_MODE);
+		}
+		setFlags(focusable, FOCUSABLE_MASK);
+		/* ATL: what GTK's widget can focus follows an explicit setFocusable(), not FOCUSABLE_AUTO or touch mode */
+		if ((focusable & FOCUSABLE_AUTO) == 0) {
+			native_setNativeFocusable(widget, (focusable & FOCUSABLE) != 0);
+		}
+	}
 
 	public void setFocusableInTouchMode(boolean focusableInTouchMode) {
-		focusable_in_touch_mode = focusableInTouchMode;
+		setFlags(focusableInTouchMode ? FOCUSABLE_IN_TOUCH_MODE : 0, FOCUSABLE_IN_TOUCH_MODE);
+
+		if (focusableInTouchMode) {
+			setFlags(FOCUSABLE, FOCUSABLE_MASK);
+		}
 	}
 
 	public final boolean isFocusableInTouchMode() {
-		return focusable_in_touch_mode;
+		return FOCUSABLE_IN_TOUCH_MODE == (mViewFlags & FOCUSABLE_IN_TOUCH_MODE);
+	}
+
+	/**
+	 * AOSP View.setFlags() for the flags ATL keeps in mViewFlags; the parts for visibility, drawing and
+	 * accessibility have no ATL counterpart, ATL tells GTK instead.
+	 */
+	void setFlags(int flags, int mask) {
+		int old = mViewFlags;
+		mViewFlags = (mViewFlags & ~mask) | (flags & mask);
+
+		int changed = mViewFlags ^ old;
+		if (changed == 0) {
+			return;
+		}
+
+		int focusableChangedByAuto = 0;
+		if (((mViewFlags & FOCUSABLE_AUTO) != 0) && (changed & (FOCUSABLE_MASK | CLICKABLE)) != 0) {
+			final int newFocus;
+			if ((mViewFlags & CLICKABLE) != 0) {
+				newFocus = FOCUSABLE;
+			} else {
+				newFocus = NOT_FOCUSABLE;
+			}
+			mViewFlags = (mViewFlags & ~FOCUSABLE) | newFocus;
+			focusableChangedByAuto = (old & FOCUSABLE) ^ (newFocus & FOCUSABLE);
+			changed = (changed & ~FOCUSABLE) | focusableChangedByAuto;
+		}
+
+		if ((changed & FOCUSABLE) != 0) {
+			if (((old & FOCUSABLE) == FOCUSABLE) && isFocused()) {
+				clearFocus();
+			}
+		}
+
+		if ((changed & (FOCUSABLE | FOCUSABLE_AUTO | CLICKABLE)) != 0) {
+			updateKeyboardFocusable();
+		}
+
+		if ((changed & ENABLED_MASK) != 0) {
+			if ((mViewFlags & ENABLED_MASK) != ENABLED) {
+				if (isFocused()) clearFocus();
+			}
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+		}
+
+		if ((changed & (CLICKABLE | LONG_CLICKABLE)) != 0) {
+			updateTouchTarget();
+		}
 	}
 	/**
 	 * Gives focus to this view or the descendant the layout asked for with <requestFocus/> (AOSP View.restoreDefaultFocus()).
@@ -1923,7 +1989,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 	/* AOSP: whether the view took the focus; ATL: whether GTK gave it to the view's widget */
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
-		if (atl_enabled && atl_focusable && visibility == VISIBLE) {
+		if (isEnabled() && isFocusable() && visibility == VISIBLE) {
 			return nativeRequestFocus(widget, direction);
 		}
 		return false;
@@ -2080,7 +2146,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			((ViewGroup)parent).requestLayout();
 		}
 		this.visibility = visibility;
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 		/* a view that goes while it animates: the animation runs on as on AOSP (see GoneAnimationTicker) */
 		if (visibility == GONE && currentAnimation != null && animationMore)
 			getHandler().post(new GoneAnimationTicker(currentAnimation));
@@ -2332,16 +2398,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setClickable(boolean clickable) {
-		this.clickable = clickable;
-		updateTouchTarget();
-		updateKeyboardFocusable();
+		setFlags(clickable ? CLICKABLE : 0, CLICKABLE);
 	}
 
 	/* like AOSP's FOCUSABLE_AUTO: a clickable view can be focused with the keyboard (Tab), and
 	 * Enter or Space click it (View.onKeyUp()); clicking it with the pointer does not focus it */
 	/* AOSP's focusable: android:focusable/setFocusable(), or FOCUSABLE_AUTO, which follows clickable */
 	private boolean isFocusableResolved() {
-		return atl_focusable && (atl_focusable_set || clickable);
+		return isFocusable() && ((mViewFlags & FOCUSABLE_AUTO) == 0 || isClickable());
 	}
 	private void updateKeyboardFocusable() {
 		native_setKeyboardFocusable(widget, isFocusableResolved());
@@ -2350,11 +2414,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private native void native_setNativeFocusable(long widget, boolean focusable);
 
 	public void setEnabled(boolean enabled) {
-		boolean changed = atl_enabled != enabled;
-		atl_enabled = enabled;
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
-		if (changed)
-			refreshDrawableState();
+		if (enabled == isEnabled()) return;
+
+		setFlags(enabled ? ENABLED : DISABLED, ENABLED_MASK);
+
+		refreshDrawableState();
+
+		if (!enabled) {
+			cancelPendingInputEvents();
+		}
 	}
 
 	public CharSequence getContentDescription() {
@@ -2396,8 +2464,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected native void nativeSetOnLongClickListener(long widget);
 
 	public void setLongClickable(boolean longClickable) {
-		this.longclickable = longClickable;
-		updateTouchTarget();
+		setFlags(longClickable ? LONG_CLICKABLE : 0, LONG_CLICKABLE);
 	}
 
 	public void setOnHoverListener(OnHoverListener listener) {}
@@ -2802,7 +2869,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void bringToFront() {}
 
-	public boolean isEnabled() { return atl_enabled; }
+	public boolean isEnabled() {
+		return (mViewFlags & ENABLED_MASK) == ENABLED;
+	}
 	/* the GTK focus is in this view's widgets (ViewGroup refines this to AOSP's invariant) */
 	public boolean hasFocus() { return nativeHasFocus(widget); }
 	private static native boolean nativeHasFocus(long widget);
@@ -2810,7 +2879,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public int getBaseline() { return -1; }
 	/* as AOSP for API >= 26: visible, enabled and focusable (FOCUSABLE_AUTO counts) */
 	public boolean hasFocusable() {
-		return visibility == VISIBLE && atl_enabled && isFocusableResolved();
+		return visibility == VISIBLE && isEnabled() && isFocusableResolved();
 	}
 	private static native boolean nativeIsFocused(long widget);
 	public boolean isFocused() {
@@ -2827,7 +2896,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		currentAnimation = null;
 		native_setAnimating(widget, false);
 		if (visibility == INVISIBLE)
-			native_setVisibility(widget, visibility, alpha * transitionAlpha, atl_enabled);
+			native_setVisibility(widget, visibility, alpha * transitionAlpha, isEnabled());
 		invalidate();
 	}
 
@@ -2867,7 +2936,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setAlpha(float alpha) {
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 		this.alpha = alpha;
 	}
 
@@ -3210,10 +3279,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	}
 
-	public final boolean isFocusable() { return atl_focusable; }
+	public final boolean isFocusable() {
+		return FOCUSABLE == (mViewFlags & FOCUSABLE);
+	}
 	@Export
-	public boolean isClickable() { return clickable; }
-	public boolean isLongClickable() { return longclickable; }
+	public boolean isClickable() {
+		return (mViewFlags & CLICKABLE) == CLICKABLE;
+	}
+	public boolean isLongClickable() {
+		return (mViewFlags & LONG_CLICKABLE) == LONG_CLICKABLE;
+	}
 
 	/* like AOSP: LTR until the direction is resolved */
 	public int getLayoutDirection() { return layoutRtl ? LAYOUT_DIRECTION_RTL : LAYOUT_DIRECTION_LTR; }
@@ -4335,13 +4410,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* API 29; transitions fade with this, on top of the view's own alpha */
 	public void setTransitionAlpha(float alpha) {
 		transitionAlpha = alpha;
-		native_setVisibility(widget, getDrawnVisibility(), this.alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), this.alpha * transitionAlpha, isEnabled());
 	}
 
 	/* API 29; sets the visibility without the side effects of setVisibility() */
 	public void setTransitionVisibility(int visibility) {
 		this.visibility = visibility;
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 	}
 
 	/* API 29 */
@@ -4403,7 +4478,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		native_setAnimating(widget, animation != null);
 		if (visibility == INVISIBLE)
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, atl_enabled);
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 		if (visibility == GONE && animation != null)
 			getHandler().post(new GoneAnimationTicker(animation));
 	}
@@ -4540,7 +4615,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	private boolean canTakeFocus() {
-		return visibility == VISIBLE && isFocusableResolved() && atl_enabled && getWidth() > 0 && getHeight() > 0;
+		return visibility == VISIBLE && isFocusableResolved() && isEnabled() && getWidth() > 0 && getHeight() > 0;
 	}
 
 	/* AOSP View.addKeyboardNavigationClusters(), getTouchables(), addTouchables() */
@@ -4559,7 +4634,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void addTouchables(ArrayList<View> views) {
-		if ((isClickable() || isLongClickable()) && atl_enabled)
+		if ((isClickable() || isLongClickable()) && isEnabled())
 			views.add(this);
 	}
 
