@@ -1,4 +1,7 @@
+#include <ctype.h>
 #include <errno.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -620,6 +623,168 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_copyTheme(JNIEnv *e
 	}
 }
 
+/* ResTable_config::setBcp47Locale() and what it uses, from frameworks/base/libs/androidfw/ResourceTypes.cpp
+ * (android-14), in C: libandroidfw's C API only exposes the struct, not the C++ methods. Not taken: computeScript()
+ * (it needs the locale data table of LocaleData.cpp), so localeScriptWasComputed stays set without a script. */
+static void pack_language_or_region(const char *in, const char base, char out[2])
+{
+	if (in[2] == 0 || in[2] == '-') {
+		out[0] = in[0];
+		out[1] = in[1];
+	} else {
+		uint8_t first = (in[0] - base) & 0x007f;
+		uint8_t second = (in[1] - base) & 0x007f;
+		uint8_t third = (in[2] - base) & 0x007f;
+
+		out[0] = (0x80 | (third << 2) | (second >> 3));
+		out[1] = ((second << 5) | first);
+	}
+}
+
+enum locale_parser_kind {
+	LPS_BASE,
+	LPS_UNICODE_EXTENSION,
+	LPS_IGNORE_THE_REST
+};
+
+enum locale_unicode_kind {
+	LUS_NO_KEY,
+	LUS_EXPECT_KEY,
+	LUS_IGNORE_KEY,
+	LUS_NUMBERING_SYSTEM
+};
+
+struct locale_parser_state {
+	enum locale_parser_kind parser_state;
+	enum locale_unicode_kind unicode_state;
+};
+
+static struct locale_parser_state assign_locale_component(struct ResTable_config *config, const char *start, size_t size, struct locale_parser_state state)
+{
+	/* It is assumed that this function is not invoked with state.parser_state set to LPS_IGNORE_THE_REST. */
+	if (state.parser_state == LPS_UNICODE_EXTENSION) {
+		switch (size) {
+			case 1:
+				/* Other BCP 47 extensions are not supported at the moment */
+				state.parser_state = LPS_IGNORE_THE_REST;
+				break;
+			case 2:
+				if (state.unicode_state == LUS_NO_KEY || state.unicode_state == LUS_EXPECT_KEY) {
+					/* Analyze Unicode extension key. Currently only 'nu' (numbering system) is supported. */
+					if ((start[0] == 'n' || start[0] == 'N') && (start[1] == 'u' || start[1] == 'U'))
+						state.unicode_state = LUS_NUMBERING_SYSTEM;
+					else
+						state.unicode_state = LUS_IGNORE_KEY;
+				} else {
+					/* Keys are not allowed in other state allowed, ignore the rest. */
+					state.parser_state = LPS_IGNORE_THE_REST;
+				}
+				break;
+			case 3:
+			case 4:
+			case 5:
+			case 6:
+			case 7:
+			case 8:
+				switch (state.unicode_state) {
+					case LUS_NUMBERING_SYSTEM:
+						/* Accept only the first occurrence of the numbering system. */
+						if (config->localeNumberingSystem[0] == '\0') {
+							for (size_t i = 0; i < size; ++i)
+								config->localeNumberingSystem[i] = tolower(start[i]);
+							state.unicode_state = LUS_EXPECT_KEY;
+						} else {
+							state.parser_state = LPS_IGNORE_THE_REST;
+						}
+						break;
+					case LUS_IGNORE_KEY:
+						/* Unsupported Unicode keyword. Ignore. */
+						state.unicode_state = LUS_EXPECT_KEY;
+						break;
+					case LUS_EXPECT_KEY:
+						/* A keyword followed by an attribute is not allowed. */
+						state.parser_state = LPS_IGNORE_THE_REST;
+						break;
+					case LUS_NO_KEY:
+						/* Extension attribute. Do nothing. */
+						break;
+				}
+				break;
+			default:
+				/* Unexpected field length - ignore the rest and treat as an error */
+				state.parser_state = LPS_IGNORE_THE_REST;
+		}
+		return state;
+	}
+
+	switch (size) {
+		case 0:
+			state.parser_state = LPS_IGNORE_THE_REST;
+			break;
+		case 1:
+			state.parser_state = (start[0] == 'u' || start[0] == 'U') ? LPS_UNICODE_EXTENSION : LPS_IGNORE_THE_REST;
+			break;
+		case 2:
+		case 3:
+			if (config->language[0])
+				pack_language_or_region(start, '0', config->country);
+			else
+				pack_language_or_region(start, 'a', config->language);
+			break;
+		case 4:
+			if ('0' <= start[0] && start[0] <= '9') {
+				/* this is a variant, so fall through */
+			} else {
+				config->localeScript[0] = toupper(start[0]);
+				for (size_t i = 1; i < 4; ++i)
+					config->localeScript[i] = tolower(start[i]);
+				break;
+			}
+			/* fall through */
+		case 5:
+		case 6:
+		case 7:
+		case 8:
+			for (size_t i = 0; i < size; ++i)
+				config->localeVariant[i] = tolower(start[i]);
+			break;
+		default:
+			state.parser_state = LPS_IGNORE_THE_REST;
+	}
+
+	return state;
+}
+
+static void res_table_config_set_bcp47_locale(struct ResTable_config *config, const char *in)
+{
+	/* clearLocale() */
+	memset(config->language, 0, sizeof(config->language));
+	memset(config->country, 0, sizeof(config->country));
+	memset(config->localeScript, 0, sizeof(config->localeScript));
+	memset(config->localeVariant, 0, sizeof(config->localeVariant));
+	memset(config->localeNumberingSystem, 0, sizeof(config->localeNumberingSystem));
+
+	const char *start = in;
+	const char *separator;
+	struct locale_parser_state state = {LPS_BASE, LUS_NO_KEY};
+	while ((separator = strchr(start, '-'))) {
+		const size_t size = separator - start;
+		state = assign_locale_component(config, start, size, state);
+		if (state.parser_state == LPS_IGNORE_THE_REST) {
+			fprintf(stderr, "Invalid BCP-47 locale string: %s\n", in);
+			break;
+		}
+		start = (separator + 1);
+	}
+
+	if (state.parser_state != LPS_IGNORE_THE_REST) {
+		const size_t size = strlen(start);
+		assign_locale_component(config, start, size, state);
+	}
+
+	config->localeScriptWasComputed = (config->localeScript[0] == '\0');
+}
+
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setConfiguration(
     JNIEnv *env, jobject this, jint mcc, jint mnc, jstring locale,
     jint orientation, jint touchscreen, jint density, jint keyboard,
@@ -647,16 +812,9 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setConfiguration(
 		.sdkVersion = majorVersion
 	};
 	if (locale) {
-		/* "<language>-<region>" as built by Resources.updateConfiguration(); the ResTable_config
-		 * fields hold two letter codes directly (three letter codes would need packing) */
+		/* as android_util_AssetManager.cpp NativeSetConfiguration(): ResTable_config::setBcp47Locale() */
 		const char *locale_str = (*env)->GetStringUTFChars(env, locale, NULL);
-		const char *region = strchr(locale_str, '-');
-		size_t language_len = region ? (size_t)(region - locale_str) : strlen(locale_str);
-		if (language_len == 2) {
-			memcpy(config.language, locale_str, 2);
-			if (region && strlen(region + 1) == 2)
-				memcpy(config.country, region + 1, 2);
-		}
+		res_table_config_set_bcp47_locale(&config, locale_str);
 		(*env)->ReleaseStringUTFChars(env, locale, locale_str);
 	}
 	AssetManager_setConfiguration(asset_manager, &config);

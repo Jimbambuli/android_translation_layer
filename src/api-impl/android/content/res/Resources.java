@@ -1743,13 +1743,31 @@ public class Resources {
 
 	/* ResourcesImpl.updateConfiguration(): the AssetManager belongs to the Resources of one override
 	 * configuration (see ATLLoadedApp.createResources), like the one of a ResourcesImpl */
+	/**
+	 * ResourcesImpl.adjustLanguageTag(): the old ISO 639 code of the language (he -> iw), as the resource
+	 * qualifiers still use it, followed by the rest of the tag.
+	 */
+	static String adjustLanguageTag(String languageTag) {
+		final int separator = languageTag.indexOf('-');
+		final String language;
+		final String remainder;
+
+		if (separator == -1) {
+			language = languageTag;
+			remainder = "";
+		} else {
+			language = languageTag.substring(0, separator);
+			remainder = languageTag.substring(separator);
+		}
+
+		return Locale.adjustLanguageCode(language) + remainder;
+	}
+
 	private void applyAssetConfiguration() {
 		String locale = null;
 		if (mConfiguration.locale != null) {
-			locale = mConfiguration.locale.getLanguage();
-			if (mConfiguration.locale.getCountry() != null) {
-				locale += "-" + mConfiguration.locale.getCountry();
-			}
+			/* ResourcesImpl.updateConfigurationLocked(): adjustLanguageTag(locale.toLanguageTag()) */
+			locale = adjustLanguageTag(mConfiguration.locale.toLanguageTag());
 		}
 		int width, height;
 		if (mMetrics.widthPixels >= mMetrics.heightPixels) {
