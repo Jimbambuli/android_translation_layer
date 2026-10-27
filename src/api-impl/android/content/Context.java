@@ -114,6 +114,9 @@ public abstract class Context {
 	static {
 		sys_config = new Configuration();
 		native_updateConfig(sys_config);
+		/* GTK draws the logical pixels at the monitor's scale: resources are chosen for the density
+		 * of the device pixels (see Resources.updateConfiguration), the app works at DENSITY_DEVICE */
+		DisplayMetrics.DENSITY_DEVICE_PIXELS = (int)(DisplayMetrics.DENSITY_DEVICE * native_getMonitorScale() + 0.5);
 		sys_config.setLayoutDirection(sys_config.locale); // like AOSP, from the locale
 		ATLLoadedApp primary_application = ATLLoadedApp.getPrimaryApplication();
 
@@ -144,6 +147,7 @@ public abstract class Context {
 	}
 
 	protected static native void native_updateConfig(Configuration config);
+	private static native double native_getMonitorScale();
 	protected static native void native_updateConfigFromWindow(long window, Configuration config);
 	protected static native void nativeOpenFile(int fd);
 	protected static native void nativeShareFile(String text, int fd, String[] labels);

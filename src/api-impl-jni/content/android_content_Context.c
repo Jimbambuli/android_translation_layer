@@ -87,24 +87,24 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfigFromWind
 	g_object_unref(monitor);
 }
 
-JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv *env, jclass this, jobject config)
+/* the highest scale of the monitors, since the window can be moved to any of them */
+JNIEXPORT jdouble JNICALL Java_android_content_Context_native_1getMonitorScale(JNIEnv *env, jclass this)
 {
-	GdkDisplay *display = gdk_display_get_default();
-	GdkMonitor *monitor = g_list_model_get_item(gdk_display_get_monitors(display), 0);
-	monitor_changed_cb(NULL, monitor, config);
-
-	/* the density of the device pixels, for choosing resources: the highest monitor scale,
-	 * since the window can be moved to any monitor */
-	GListModel *monitors = gdk_display_get_monitors(display);
+	GListModel *monitors = gdk_display_get_monitors(gdk_display_get_default());
 	double scale = 1;
 	for (guint i = 0; i < g_list_model_get_n_items(monitors); i++) {
 		GdkMonitor *m = g_list_model_get_item(monitors, i);
 		scale = MAX(scale, gdk_monitor_get_scale(m));
 		g_object_unref(m);
 	}
-	jclass metrics = (*env)->FindClass(env, "android/util/DisplayMetrics");
-	int density = (*env)->GetStaticIntField(env, metrics, _STATIC_FIELD_ID(metrics, "DENSITY_DEVICE", "I"));
-	_SET_STATIC_INT_FIELD(metrics, "DENSITY_DEVICE_PIXELS", (int)(density * scale + 0.5));
+	return scale;
+}
+
+JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv *env, jclass this, jobject config)
+{
+	GdkDisplay *display = gdk_display_get_default();
+	GdkMonitor *monitor = g_list_model_get_item(gdk_display_get_monitors(display), 0);
+	monitor_changed_cb(NULL, monitor, config);
 
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
 	if (!xdp_settings) {

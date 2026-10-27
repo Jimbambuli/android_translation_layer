@@ -29,6 +29,14 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig
 
 /*
  * Class:     android_content_Context
+ * Method:    native_getMonitorScale
+ * Signature: ()D
+ */
+JNIEXPORT jdouble JNICALL Java_android_content_Context_native_1getMonitorScale
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_content_Context
  * Method:    native_updateConfigFromWindow
  * Signature: (JLandroid/content/res/Configuration;)V
  */
