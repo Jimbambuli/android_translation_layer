@@ -348,6 +348,8 @@ public class Window {
 		setThemeFlag(a, com.android.internal.R.styleable.Window_windowEnableSplitTouch, context.getApplicationInfo().targetSdkVersion >= 11 /* HONEYCOMB */, WindowManager.LayoutParams.FLAG_SPLIT_TOUCH);
 		if (!floating)
 			setThemeFlag(a, com.android.internal.R.styleable.Window_windowDrawsSystemBarBackgrounds, false, WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+		if (a.getBoolean(com.android.internal.R.styleable.Window_windowCloseOnTouchOutside, false))
+			setCloseOnTouchOutsideIfNotSet(true);
 		if (!hasSoftInputMode)
 			params.softInputMode = a.getInt(com.android.internal.R.styleable.Window_windowSoftInputMode, params.softInputMode);
 		a.getValue(com.android.internal.R.styleable.Window_windowMinWidthMajor, mMinWidthMajor);
@@ -385,6 +387,43 @@ public class Window {
 	 * before it hands the key to the Window.Callback (a dialog's Back, for instance) */
 	public boolean superDispatchKeyEvent(KeyEvent event) {
 		return decorView.dispatchKeyEvent(event);
+	}
+
+	private boolean mCloseOnTouchOutside = false;
+	private boolean mSetCloseOnTouchOutside = false;
+
+	/* AOSP's Window.setCloseOnTouchOutside() and setCloseOnTouchOutsideIfNotSet() */
+	public void setCloseOnTouchOutside(boolean close) {
+		mCloseOnTouchOutside = close;
+		mSetCloseOnTouchOutside = true;
+	}
+
+	public void setCloseOnTouchOutsideIfNotSet(boolean close) {
+		if (!mSetCloseOnTouchOutside) {
+			mCloseOnTouchOutside = close;
+			mSetCloseOnTouchOutside = true;
+		}
+	}
+
+	/* AOSP's Window.shouldCloseOnTouch() and isOutOfBounds() (android-14) */
+	public boolean shouldCloseOnTouch(Context context, MotionEvent event) {
+		final boolean isOutside =
+		    event.getAction() == MotionEvent.ACTION_UP && isOutOfBounds(context, event)
+		    || event.getAction() == MotionEvent.ACTION_OUTSIDE;
+		if (mCloseOnTouchOutside && peekDecorView() != null && isOutside) {
+			return true;
+		}
+		return false;
+	}
+
+	private boolean isOutOfBounds(Context context, MotionEvent event) {
+		final int x = (int)event.getX();
+		final int y = (int)event.getY();
+		final int slop = ViewConfiguration.get(context).getScaledWindowTouchSlop();
+		final View decorView = getDecorView();
+		return (x < -slop) || (y < -slop)
+		    || (x > (decorView.getWidth() + slop))
+		    || (y > (decorView.getHeight() + slop));
 	}
 
 	public void takeInputQueue(InputQueue.Callback callback) {

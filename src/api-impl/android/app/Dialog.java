@@ -50,8 +50,6 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	private OnCancelListener onCancelListener;
 	private OnKeyListener onKeyListener;
 	private boolean cancelable = true;
-	private boolean closeOnTouchOutside;
-	private boolean closeOnTouchOutsideSet;
 	private boolean created;
 	private boolean started; // between onStart() and onStop()
 
@@ -149,9 +147,6 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 					started = true;
 				}
 				TypedArray a = context.obtainStyledAttributes(R.styleable.Window);
-				// like PhoneWindow.setCloseOnTouchOutsideIfNotSet()
-				if (!closeOnTouchOutsideSet)
-					closeOnTouchOutside = a.getBoolean(R.styleable.Window_windowCloseOnTouchOutside, false);
 				// Floating dialogs whose window does not wrap its width get the fraction of the main
 				// window that the windowMinWidth* attributes say. Non-floating are typically constructed
 				// with MATCH_PARENT layout params and thus get the exact size of the main window.
@@ -458,16 +453,21 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	}
 
 	public void setCanceledOnTouchOutside(boolean cancel) {
-		if (cancel && !cancelable)
+		if (cancel && !cancelable) {
 			cancelable = true;
-		closeOnTouchOutside = cancel;
-		closeOnTouchOutsideSet = true;
+		}
+
+		window.setCloseOnTouchOutside(cancel);
 	}
 
-	/* a press outside of the shown dialog, see Dialog.onTouchEvent() and Window.shouldCloseOnTouch() */
+	/* A press outside of the shown dialog (GTK reports it as a click on the app's window): the window
+	 * manager's MotionEvent.ACTION_OUTSIDE for the window, which Dialog.onTouchEvent() and
+	 * Window.shouldCloseOnTouch() act on as in AOSP. Called from native code. */
 	private void onTouchOutside() {
-		if (cancelable && closeOnTouchOutside && isShowing())
-			cancel();
+		final long now = android.os.SystemClock.uptimeMillis();
+		MotionEvent event = MotionEvent.obtain(now, now, MotionEvent.ACTION_OUTSIDE, 0, 0, 0);
+		dispatchTouchEvent(event);
+		event.recycle();
 	}
 
 	public class Builder {
@@ -679,7 +679,13 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	public void setDismissMessage(Message msg) {}
 
+	/* AOSP's Dialog.onTouchEvent(): a press outside of the dialog cancels it when the window says so */
 	public boolean onTouchEvent(MotionEvent event) {
+		if (cancelable && shown && window.shouldCloseOnTouch(context, event)) {
+			cancel();
+			return true;
+		}
+
 		return false;
 	}
 
