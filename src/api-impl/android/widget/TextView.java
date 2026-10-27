@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.BlendMode;
-import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.Typeface;
@@ -50,7 +49,9 @@ import java.util.Locale;
 import java.util.TreeSet;
 
 public class TextView extends View {
-	private ColorStateList colors = new ColorStateList(new int[][] {new int[0]}, new int[1]);
+	/* AOSP: opaque black until a color is set; the color for the current drawable state is mCurTextColor */
+	private ColorStateList colors = ColorStateList.valueOf(0xFF000000);
+	private int mCurTextColor = 0xFF000000;
 	private CharSequence text = "";
 	private TextPaint paint = new TextPaint();
 	private Typeface typeface;
@@ -354,13 +355,12 @@ public class TextView extends View {
 
 	public native final void native_setTextColor(int color);
 	public void setTextColor(int color) {
-		colors = ColorStateList.valueOf(color);
-		native_setTextColor(color);
+		setTextColor(ColorStateList.valueOf(color));
 	}
 	public void setTextColor(ColorStateList colors) {
 		if (colors != null) {
 			this.colors = colors;
-			native_setTextColor(colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
+			updateTextColors();
 		}
 	}
 
@@ -368,7 +368,7 @@ public class TextView extends View {
 	protected void drawableStateChanged() {
 		super.drawableStateChanged();
 		if (colors.isStateful())
-			native_setTextColor(colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
+			updateTextColors();
 
 		/* AOSP TextView.drawableStateChanged() */
 		if (mDrawables != null) {
@@ -405,6 +405,12 @@ public class TextView extends View {
 	public void setLineHeight(int unit, float lineHeight) {
 		setLineHeight((int)android.util.TypedValue.applyDimension(unit, lineHeight, getResources().getDisplayMetrics()));
 	}
+	/* AOSP updateTextColors(): the color for the current drawable state, which the label is given as well */
+	private void updateTextColors() {
+		mCurTextColor = colors.getColorForState(getDrawableState(), colors.getDefaultColor());
+		native_setTextColor(mCurTextColor);
+	}
+
 
 	/* API 28, as in AOSP: moves the first/last baseline by adjusting the padding */
 	public void setFirstBaselineToTopHeight(int firstBaselineToTopHeight) {
@@ -871,7 +877,6 @@ public class TextView extends View {
 		return mMovement;
 	}
 
-	public CharSequence getHint() { return "HINT"; }
 
 	public int getMinHeight() { return 0; }
 	public int getMinWidth() { return 0; }
@@ -894,7 +899,7 @@ public class TextView extends View {
 	}
 
 	public int getCurrentTextColor() {
-		return Color.CYAN;
+		return mCurTextColor;
 	}
 
 	public void setHint(int resId) {
@@ -906,7 +911,6 @@ public class TextView extends View {
 
 	public boolean isTextSelectable() { return true; }
 
-	public void setHint(CharSequence s) {}
 
 	public void setTextAppearance(int resId) {
 		setTextAppearance(getContext(), resId);
@@ -2096,3 +2100,15 @@ public class TextView extends View {
 		return mAutoLinkMask;
 	}
 }
+
+	/* as AOSP: the hint is kept for getHint(); a GtkLabel has no place to show it while the text is empty
+	 * (EditText overrides this with the placeholder of its GtkText) */
+	private CharSequence mHint;
+
+	public void setHint(CharSequence hint) {
+		mHint = TextUtils.stringOrSpannedString(hint);
+	}
+
+	public CharSequence getHint() {
+		return mHint;
+	}
