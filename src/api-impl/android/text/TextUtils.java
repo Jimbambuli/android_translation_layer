@@ -20,7 +20,28 @@ package android.text;
 
 import android.icu.text.CaseMap;
 import android.icu.text.Edits;
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.icu.util.ULocale;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.BackgroundColorSpan;
+import android.text.style.CharacterStyle;
+import android.text.style.LeadingMarginSpan;
+import android.text.style.QuoteSpan;
+import android.text.style.SuggestionSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.ScaleXSpan;
+import android.text.style.StrikethroughSpan;
+import android.text.style.StyleSpan;
+import android.text.style.SubscriptSpan;
+import android.text.style.SuperscriptSpan;
+import android.text.style.TypefaceSpan;
+import android.text.style.URLSpan;
+import android.text.style.UnderlineSpan;
+import android.util.Log;
 import android.view.View;
 import com.android.internal.util.ArrayUtils;
 import java.util.Iterator;
@@ -531,4 +552,232 @@ public class TextUtils {
 
 		return source.toString();
 	}
+
+    private static final String TAG = "TextUtils";
+
+    /** @hide */
+    public static final int ALIGNMENT_SPAN = 1;
+    /** @hide */
+    public static final int FIRST_SPAN = ALIGNMENT_SPAN;
+    /** @hide */
+    public static final int FOREGROUND_COLOR_SPAN = 2;
+    /** @hide */
+    public static final int RELATIVE_SIZE_SPAN = 3;
+    /** @hide */
+    public static final int SCALE_X_SPAN = 4;
+    /** @hide */
+    public static final int STRIKETHROUGH_SPAN = 5;
+    /** @hide */
+    public static final int UNDERLINE_SPAN = 6;
+    /** @hide */
+    public static final int STYLE_SPAN = 7;
+    /** @hide */
+    public static final int BULLET_SPAN = 8;
+    /** @hide */
+    public static final int QUOTE_SPAN = 9;
+    /** @hide */
+    public static final int LEADING_MARGIN_SPAN = 10;
+    /** @hide */
+    public static final int URL_SPAN = 11;
+    /** @hide */
+    public static final int BACKGROUND_COLOR_SPAN = 12;
+    /** @hide */
+    public static final int TYPEFACE_SPAN = 13;
+    /** @hide */
+    public static final int SUPERSCRIPT_SPAN = 14;
+    /** @hide */
+    public static final int SUBSCRIPT_SPAN = 15;
+    /** @hide */
+    public static final int ABSOLUTE_SIZE_SPAN = 16;
+    /** @hide */
+    public static final int TEXT_APPEARANCE_SPAN = 17;
+    /** @hide */
+    public static final int ANNOTATION = 18;
+    /** @hide */
+    public static final int SUGGESTION_SPAN = 19;
+    /** @hide */
+    public static final int SPELL_CHECK_SPAN = 20;
+    /** @hide */
+    public static final int SUGGESTION_RANGE_SPAN = 21;
+    /** @hide */
+    public static final int EASY_EDIT_SPAN = 22;
+    /** @hide */
+    public static final int LOCALE_SPAN = 23;
+    /** @hide */
+    public static final int TTS_SPAN = 24;
+    /** @hide */
+    public static final int ACCESSIBILITY_CLICKABLE_SPAN = 25;
+    /** @hide */
+    public static final int ACCESSIBILITY_URL_SPAN = 26;
+    /** @hide */
+    public static final int LINE_BACKGROUND_SPAN = 27;
+    /** @hide */
+    public static final int LINE_HEIGHT_SPAN = 28;
+    /** @hide */
+    public static final int ACCESSIBILITY_REPLACEMENT_SPAN = 29;
+    /** @hide */
+    public static final int LAST_SPAN = ACCESSIBILITY_REPLACEMENT_SPAN;
+
+    /**
+     * Flatten a CharSequence and whatever styles can be copied across processes
+     * into the parcel.
+     */
+    public static void writeToParcel(@Nullable CharSequence cs, @NonNull Parcel p,
+            int parcelableFlags) {
+        if (cs instanceof Spanned) {
+            p.writeInt(0);
+            p.writeString8(cs.toString());
+
+            Spanned sp = (Spanned) cs;
+            Object[] os = sp.getSpans(0, cs.length(), Object.class);
+
+            // note to people adding to this: check more specific types
+            // before more generic types.  also notice that it uses
+            // "if" instead of "else if" where there are interfaces
+            // so one object can be several.
+
+            for (int i = 0; i < os.length; i++) {
+                Object o = os[i];
+                Object prop = os[i];
+
+                if (prop instanceof CharacterStyle) {
+                    prop = ((CharacterStyle) prop).getUnderlying();
+                }
+
+                if (prop instanceof ParcelableSpan) {
+                    final ParcelableSpan ps = (ParcelableSpan) prop;
+                    final int spanTypeId = ps.getSpanTypeIdInternal();
+                    if (spanTypeId < FIRST_SPAN || spanTypeId > LAST_SPAN) {
+                        Log.e(TAG, "External class \"" + ps.getClass().getSimpleName()
+                                + "\" is attempting to use the frameworks-only ParcelableSpan"
+                                + " interface");
+                    } else {
+                        p.writeInt(spanTypeId);
+                        ps.writeToParcelInternal(p, parcelableFlags);
+                        writeWhere(p, sp, o);
+                    }
+                }
+            }
+
+            p.writeInt(0);
+        } else {
+            p.writeInt(1);
+            if (cs != null) {
+                p.writeString8(cs.toString());
+            } else {
+                p.writeString8(null);
+            }
+        }
+    }
+
+    private static void writeWhere(Parcel p, Spanned sp, Object o) {
+        p.writeInt(sp.getSpanStart(o));
+        p.writeInt(sp.getSpanEnd(o));
+        p.writeInt(sp.getSpanFlags(o));
+    }
+
+    public static final Parcelable.Creator<CharSequence> CHAR_SEQUENCE_CREATOR
+            = new Parcelable.Creator<CharSequence>() {
+        /**
+         * Read and return a new CharSequence, possibly with styles,
+         * from the parcel.
+         */
+        public CharSequence createFromParcel(Parcel p) {
+            int kind = p.readInt();
+
+            String string = p.readString8();
+            if (string == null) {
+                return null;
+            }
+
+            if (kind == 1) {
+                return string;
+            }
+
+            SpannableString sp = new SpannableString(string);
+
+            while (true) {
+                kind = p.readInt();
+
+                if (kind == 0)
+                    break;
+
+                switch (kind) {
+                case FOREGROUND_COLOR_SPAN:
+                    readSpan(p, sp, new ForegroundColorSpan(p));
+                    break;
+
+                case RELATIVE_SIZE_SPAN:
+                    readSpan(p, sp, new RelativeSizeSpan(p));
+                    break;
+
+                case SCALE_X_SPAN:
+                    readSpan(p, sp, new ScaleXSpan(p));
+                    break;
+
+                case STRIKETHROUGH_SPAN:
+                    readSpan(p, sp, new StrikethroughSpan(p));
+                    break;
+
+                case UNDERLINE_SPAN:
+                    readSpan(p, sp, new UnderlineSpan(p));
+                    break;
+
+                case STYLE_SPAN:
+                    readSpan(p, sp, new StyleSpan(p));
+                    break;
+
+                case QUOTE_SPAN:
+                    readSpan(p, sp, new QuoteSpan(p));
+                    break;
+
+                case LEADING_MARGIN_SPAN:
+                    readSpan(p, sp, new LeadingMarginSpan.Standard(p));
+                    break;
+
+                case SUGGESTION_SPAN:
+                    readSpan(p, sp, new SuggestionSpan(p));
+                    break;
+
+                case URL_SPAN:
+                    readSpan(p, sp, new URLSpan(p));
+                    break;
+
+                case BACKGROUND_COLOR_SPAN:
+                    readSpan(p, sp, new BackgroundColorSpan(p));
+                    break;
+
+                case TYPEFACE_SPAN:
+                    readSpan(p, sp, new TypefaceSpan(p));
+                    break;
+
+                case SUPERSCRIPT_SPAN:
+                    readSpan(p, sp, new SuperscriptSpan(p));
+                    break;
+
+                case SUBSCRIPT_SPAN:
+                    readSpan(p, sp, new SubscriptSpan(p));
+                    break;
+
+                case ABSOLUTE_SIZE_SPAN:
+                    readSpan(p, sp, new AbsoluteSizeSpan(p));
+                    break;
+
+                default:
+                    throw new RuntimeException("bogus span encoding " + kind);
+                }
+            }
+
+            return sp;
+        }
+
+        public CharSequence[] newArray(int size)
+        {
+            return new CharSequence[size];
+        }
+    };
+
+    private static void readSpan(Parcel p, Spannable sp, Object o) {
+        sp.setSpan(o, p.readInt(), p.readInt(), p.readInt());
+    }
 }
