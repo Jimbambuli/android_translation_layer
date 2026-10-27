@@ -279,11 +279,13 @@ static int32_t mouse_button_state(GdkEvent *event)
 }
 
 /* Android sends ACTION_BUTTON_PRESS after ACTION_DOWN and ACTION_BUTTON_RELEASE before ACTION_UP, and only
- * these when another button is pressed or released while one is held. They go through
- * dispatchGenericMotionEvent() like the wheel, so only to views that handle generic motion themselves. */
+ * these when another button is pressed or released while one is held. They are not touch events:
+ * like ViewRootImpl (View.dispatchPointerEvent()) the root view gets them through
+ * dispatchGenericMotionEvent(), which passes them on to the child under the pointer. The root
+ * is the DecorView that dispatches the touches in Java too. */
 static gboolean call_button_callback(WrapperWidget *wrapper, int action, int32_t action_button, int32_t button_state, struct pointer *pointer, guint32 timestamp)
 {
-	if (!wrapper->custom_generic_motion)
+	if (!wrapper->touch_root)
 		return false;
 	JNIEnv *env = get_jni_env();
 	jobject motion_event = J_new__MotionEvent__single(env, SOURCE_MOUSE, action, (jlong)timestamp, pointer->coord_x, pointer->coord_y, pointer->raw_x, pointer->raw_y);
@@ -345,7 +347,7 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 				if (!action_button)
 					return false;
 				if (button_state) // another button is held
-					return phase == GTK_PHASE_BUBBLE && call_button_callback(wrapper, ACTION_BUTTON_PRESS, action_button, button_state | action_button, &pointers[id], timestamp);
+					return phase == GTK_PHASE_CAPTURE && call_button_callback(wrapper, ACTION_BUTTON_PRESS, action_button, button_state | action_button, &pointers[id], timestamp);
 				button_state |= action_button;
 			}
 		case GDK_TOUCH_BEGIN:
@@ -358,7 +360,7 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 				if (!action_button)
 					return false;
 				if (button_state) // another button is still held
-					return phase == GTK_PHASE_BUBBLE && call_button_callback(wrapper, ACTION_BUTTON_RELEASE, action_button, button_state, &pointers[id], timestamp);
+					return phase == GTK_PHASE_CAPTURE && call_button_callback(wrapper, ACTION_BUTTON_RELEASE, action_button, button_state, &pointers[id], timestamp);
 			}
 		case GDK_TOUCH_END:
 			action = pointer_index > 0 ? (ACTION_POINTER_UP | (pointer_index << 8)) : ACTION_UP;
@@ -407,10 +409,10 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 	}
 
 	gboolean ret;
-	if (is_mouse && action == ACTION_UP && phase == GTK_PHASE_BUBBLE)
+	if (is_mouse && action == ACTION_UP && phase == GTK_PHASE_CAPTURE)
 		call_button_callback(wrapper, ACTION_BUTTON_RELEASE, action_button, button_state, &pointers[id], timestamp);
 	ret = call_ontouch_callback(wrapper, action, pointers, pointer_indices, phase, timestamp, event, is_mouse ? SOURCE_MOUSE : SOURCE_TOUCHSCREEN, button_state);
-	if (is_mouse && action == ACTION_DOWN && phase == GTK_PHASE_BUBBLE)
+	if (is_mouse && action == ACTION_DOWN && phase == GTK_PHASE_CAPTURE)
 		call_button_callback(wrapper, ACTION_BUTTON_PRESS, action_button, button_state, &pointers[id], timestamp);
 	if (event_type == GDK_BUTTON_RELEASE || event_type == GDK_TOUCH_END) {
 		remove_pointer_fast(pointer_indices, &pointers[id]);
@@ -820,7 +822,6 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, 
 
 		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), wrapper);
 		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
-		wrapper->custom_generic_motion = TRUE;
 	}
 	if (_METHOD(class, "dispatchHoverEvent", "(Landroid/view/MotionEvent;)Z") != _CACHED_METHOD(View__dispatchHoverEvent)) {
 		GtkEventController *controller = gtk_event_controller_motion_new();
@@ -1343,5 +1344,6 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1registerTouchEventPropagat
 {
 	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
 	WRAPPER_WIDGET(wrapper)->custom_dispatch_touch = TRUE;
+	WRAPPER_WIDGET(wrapper)->touch_root = TRUE;
 	_setOnTouchListener(env, this, wrapper);
 }

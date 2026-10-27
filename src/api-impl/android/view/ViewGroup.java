@@ -223,6 +223,31 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return handled;
 	}
 
+	/* AOSP's ViewGroup.dispatchGenericPointerEvent(): the child under the pointer, front to back */
+	@Override
+	protected boolean dispatchGenericPointerEvent(MotionEvent event) {
+		for (int i = children.size() - 1; i >= 0; i--) {
+			View child = children.get(i);
+			if (!isTouchPointInView(event.getX(), event.getY(), child))
+				continue;
+			if (dispatchTransformedGenericPointerEvent(event, child))
+				return true;
+		}
+		// No child handled the event.  Send it to this view group.
+		return super.dispatchGenericPointerEvent(event);
+	}
+
+	/* AOSP's ViewGroup.dispatchTransformedGenericPointerEvent(), in the child's coordinates as
+	 * dispatchTransformedTouchEvent() */
+	private boolean dispatchTransformedGenericPointerEvent(MotionEvent event, View child) {
+		float offsetX = getScrollX() - child.getLeft() - child.getTranslationX();
+		float offsetY = getScrollY() - child.getTop() - child.getTranslationY();
+		event.offsetLocation(offsetX, offsetY);
+		boolean handled = child.dispatchGenericMotionEvent(event);
+		event.offsetLocation(-offsetX, -offsetY);
+		return handled;
+	}
+
 	@Export
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {

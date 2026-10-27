@@ -20,7 +20,8 @@ struct _WrapperWidget {
 	gboolean needs_allocation;
 	gboolean intercepting_touch;
 	gboolean custom_dispatch_touch;
-	gboolean custom_generic_motion;
+	/* the DecorView, where the Java dispatch of the pointer events starts (like ViewRootImpl's root view) */
+	gboolean touch_root;
 	gboolean hover_exit_pending;
 	gboolean hover_enter_pending;
 	gboolean has_focus;

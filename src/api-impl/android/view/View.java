@@ -724,8 +724,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		public void onViewDetachedFromWindow(View v);
 	}
 
+	/* AOSP's View.OnGenericMotionListener */
 	public interface OnGenericMotionListener {
-		// TODO
+		boolean onGenericMotion(View v, MotionEvent event);
 	}
 
 	public interface OnSystemUiVisibilityChangeListener {
@@ -1054,6 +1055,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	static class ListenerInfo {
 		OnClickListener mOnClickListener;
 		OnKeyListener mOnKeyListener;
+		OnGenericMotionListener mOnGenericMotionListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -2324,7 +2326,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		});
 	}
 
-	public void setOnGenericMotionListener(View.OnGenericMotionListener l) {}
+	public void setOnGenericMotionListener(View.OnGenericMotionListener l) {
+		getListenerInfo().mOnGenericMotionListener = l;
+	}
 
 	/* AOSP's AttachInfo.mWindowToken (ViewRootImpl's IWindow binder): one per view hierarchy, kept by the
 	 * root view of a window as for rootHasWindowFocus; null while the view is not attached */
@@ -2951,9 +2955,48 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	@Export
 	public boolean onGenericMotionEvent(MotionEvent event) { return false; }
 
+	/* AOSP's View.dispatchGenericMotionEvent(): the pointer events that are not touches (the mouse
+	 * buttons, the wheel, hovering) go to the child under the pointer first. The hover events keep
+	 * their GTK path (dispatchHoverEvent() is called from the hover controllers). */
 	@Export
 	public boolean dispatchGenericMotionEvent(MotionEvent event) {
+		final int source = event.getSource();
+		if ((source & InputDevice.SOURCE_CLASS_POINTER) != 0) {
+			final int action = event.getAction();
+			if (action == MotionEvent.ACTION_HOVER_ENTER
+					|| action == MotionEvent.ACTION_HOVER_MOVE
+					|| action == MotionEvent.ACTION_HOVER_EXIT) {
+				if (dispatchHoverEvent(event)) {
+					return true;
+				}
+			} else if (dispatchGenericPointerEvent(event)) {
+				return true;
+			}
+		} else if (dispatchGenericFocusedEvent(event)) {
+			return true;
+		}
+
+		return dispatchGenericMotionEventInternal(event);
+	}
+
+	/* AOSP's View.dispatchGenericMotionEventInternal(), without the context click (not implemented) */
+	private boolean dispatchGenericMotionEventInternal(MotionEvent event) {
+		ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnGenericMotionListener != null
+				&& isEnabled()
+				&& li.mOnGenericMotionListener.onGenericMotion(this, event)) {
+			return true;
+		}
+
 		return onGenericMotionEvent(event);
+	}
+
+	protected boolean dispatchGenericPointerEvent(MotionEvent event) {
+		return false;
+	}
+
+	protected boolean dispatchGenericFocusedEvent(MotionEvent event) {
+		return false;
 	}
 
 	protected boolean awakenScrollBars() { return false; }
