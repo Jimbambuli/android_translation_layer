@@ -74,15 +74,14 @@ public class Button extends TextView {
 	@Override
 	public void setTextSize(float size) {}
 
+	/* the native Button draws only the left drawable (TextView keeps all of them) */
 	@Override
-	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
+	protected void updateNativeCompoundDrawables() {
+		Drawable left = getCompoundDrawables()[0];
+		if (left == null && compoundDrawableLeft == null)
+			return;
 		compoundDrawableLeft = left;
-		native_setCompoundDrawables(widget, left);
-	}
-
-	@Override
-	public Drawable[] getCompoundDrawables() {
-		return new Drawable[] {compoundDrawableLeft, null, null, null};
+		native_setCompoundDrawables(widget, compoundDrawableLeft);
 	}
 
 	/* the drawable is drawn in the bounds it has then: MaterialButton sets them in onLayout() */

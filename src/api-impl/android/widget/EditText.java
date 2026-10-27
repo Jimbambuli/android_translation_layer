@@ -139,8 +139,10 @@ public class EditText extends TextView {
 			editor_action_listener.onEditorAction(this, 0, event);
 	}
 
+	/* the GtkText has no room for compound drawables: they are kept (getCompoundDrawablesRelative() is how
+	 * TextInputLayout finds its icons) but not drawn */
 	@Override
-	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {}
+	protected void updateNativeCompoundDrawables() {}
 
 	@Override
 	public void setHint(CharSequence s) {

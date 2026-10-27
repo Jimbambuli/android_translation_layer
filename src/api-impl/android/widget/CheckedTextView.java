@@ -115,8 +115,7 @@ public class CheckedTextView extends TextView implements Checkable {
 	}
 
 	@Override
-	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
-		super.setCompoundDrawables(left, top, right, bottom);
+	protected void updateNativeCompoundDrawables() {
 		updateCheckMark();
 	}
 

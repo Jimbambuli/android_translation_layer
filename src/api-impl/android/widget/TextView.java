@@ -4,10 +4,13 @@ import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
+import android.graphics.BlendMode;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.text.BoringLayout;
 import android.text.Editable;
@@ -114,21 +117,36 @@ public class TextView extends View {
 			if (max_length >= 0)
 				setFilters(new InputFilter[] {new InputFilter.LengthFilter(max_length)});
 
-			Drawable left = a.getDrawable(com.android.internal.R.styleable.TextView_drawableLeft);
-			Drawable top = a.getDrawable(com.android.internal.R.styleable.TextView_drawableTop);
-			Drawable right = a.getDrawable(com.android.internal.R.styleable.TextView_drawableRight);
-			Drawable bottom = a.getDrawable(com.android.internal.R.styleable.TextView_drawableBottom);
-			Drawable start = a.getDrawable(com.android.internal.R.styleable.TextView_drawableStart);
-			Drawable end = a.getDrawable(com.android.internal.R.styleable.TextView_drawableEnd);
-			// layout direction is always LTR, so start/end override left/right like in AOSP
-			if (start != null)
-				left = start;
-			if (end != null)
-				right = end;
-			if (left != null || top != null || right != null || bottom != null)
-				setCompoundDrawablesWithIntrinsicBounds(left, top, right, bottom);
-			if (a.hasValue(com.android.internal.R.styleable.TextView_drawablePadding))
-				setCompoundDrawablePadding(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_drawablePadding, 0));
+			Drawable drawableLeft = a.getDrawable(com.android.internal.R.styleable.TextView_drawableLeft);
+			Drawable drawableTop = a.getDrawable(com.android.internal.R.styleable.TextView_drawableTop);
+			Drawable drawableRight = a.getDrawable(com.android.internal.R.styleable.TextView_drawableRight);
+			Drawable drawableBottom = a.getDrawable(com.android.internal.R.styleable.TextView_drawableBottom);
+			Drawable drawableStart = a.getDrawable(com.android.internal.R.styleable.TextView_drawableStart);
+			Drawable drawableEnd = a.getDrawable(com.android.internal.R.styleable.TextView_drawableEnd);
+			ColorStateList drawableTint = a.getColorStateList(com.android.internal.R.styleable.TextView_drawableTint);
+			BlendMode drawableTintMode = Drawable.parseBlendMode(a.getInt(com.android.internal.R.styleable.TextView_drawableTintMode, -1), null);
+			int drawablePadding = a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_drawablePadding, 0);
+
+			// Set up the tint (if needed) before setting the drawables so that it
+			// gets applied correctly.
+			if (drawableTint != null || drawableTintMode != null) {
+				if (mDrawables == null) {
+					mDrawables = new Drawables(context);
+				}
+				if (drawableTint != null) {
+					mDrawables.mTintList = drawableTint;
+					mDrawables.mHasTint = true;
+				}
+				if (drawableTintMode != null) {
+					mDrawables.mBlendMode = drawableTintMode;
+					mDrawables.mHasTintMode = true;
+				}
+			}
+
+			// This call will save the initial left/right drawables
+			setCompoundDrawablesWithIntrinsicBounds(drawableLeft, drawableTop, drawableRight, drawableBottom);
+			setRelativeDrawablesIfNeeded(drawableStart, drawableEnd);
+			setCompoundDrawablePadding(drawablePadding);
 
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textAllCaps)) {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
@@ -280,9 +298,15 @@ public class TextView extends View {
 		super.drawableStateChanged();
 		if (colors.isStateful())
 			native_setTextColor(colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
-		for (Drawable d : new Drawable[] {drawableLeft, drawableTop, drawableRight, drawableBottom}) {
-			if (d != null && d.isStateful())
-				d.setState(getDrawableState());
+
+		/* AOSP TextView.drawableStateChanged() */
+		if (mDrawables != null) {
+			final int[] state = getDrawableState();
+			for (Drawable dr : mDrawables.mShowing) {
+				if (dr != null && dr.isStateful() && dr.setState(state)) {
+					invalidateDrawable(dr);
+				}
+			}
 		}
 	}
 	/* as in AOSP: the style is applied by deriving a typeface from tf */
@@ -514,49 +538,14 @@ public class TextView extends View {
 		return gravity;
 	}
 
-	public int getCompoundPaddingTop() { return 0; }
-	public int getCompoundPaddingBottom() { return 0; }
-
 	public CharSequence getText() {
 		return text;
 	};
-
-	private int drawable_padding = 0;
-
-	public void setCompoundDrawablePadding(int pad) {
-		drawable_padding = pad;
-		native_setCompoundDrawablePadding(widget, pad);
-	}
 
 	private native void native_setCompoundDrawablePadding(long widget, int pad);
 	private native void native_setTypeface(long widget, Typeface tf);
 
 	protected native void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom);
-
-	// just to prevent garbage collection while native side uses it
-	private Drawable drawableLeft = null;
-	private Drawable drawableTop = null;
-	private Drawable drawableRight = null;
-	private Drawable drawableBottom = null;
-
-	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {
-		for (Drawable d : new Drawable[] {left, top, right, bottom}) {
-			if (d != null) {
-				d.setCallback(this);
-				if (d.isStateful())
-					d.setState(getDrawableState());
-			}
-		}
-		native_setCompoundDrawables(widget,
-		                            left != null ? left.paintable : 0,
-		                            top != null ? top.paintable : 0,
-		                            right != null ? right.paintable : 0,
-		                            bottom != null ? bottom.paintable : 0);
-		drawableLeft = left;
-		drawableTop = top;
-		drawableRight = right;
-		drawableBottom = bottom;
-	}
 
 	public void setAllCaps(boolean allCaps) {
 		String[] classesToRemove = {"ATL-text-uppercase"};
@@ -582,10 +571,6 @@ public class TextView extends View {
 	public InputFilter[] getFilters() { return filters; }
 
 	public int getMaxLines() { return max_lines == Integer.MAX_VALUE ? -1 : max_lines; }
-
-	public void setCompoundDrawablesRelative(Drawable start, Drawable top, Drawable end, Drawable bottom) {
-		setCompoundDrawables(start, top, end, bottom);
-	}
 
 	public int getLineCount() { return 1; }
 
@@ -640,51 +625,17 @@ public class TextView extends View {
 		setMaxLines(singleLine ? 1 : Integer.MAX_VALUE);
 	}
 
-	public int getCompoundPaddingLeft() { return 0; }
-
-	public int getCompoundPaddingRight() { return 0; }
-
 	public void setHint(int resId) {
 		setHint(getContext().getResources().getText(resId));
 	}
 
 	public float getLetterSpacing() { return 0.f; }
 
-	public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start, int top, int end, int bottom) {
-		setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
-	}
-
-	public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start, Drawable top, Drawable end, Drawable bottom) {
-		setCompoundDrawablesWithIntrinsicBounds(start, top, end, bottom);
-	}
-
 	public boolean getLinksClickable() { return true; }
 
 	public boolean isTextSelectable() { return true; }
 
-	public void setCompoundDrawablesWithIntrinsicBounds(int left, int top, int right, int bottom) {
-		final Context context = getContext();
-		setCompoundDrawablesWithIntrinsicBounds(left != 0 ? context.getDrawable(left) : null,
-		                                        top != 0 ? context.getDrawable(top) : null,
-		                                        right != 0 ? context.getDrawable(right) : null,
-		                                        bottom != 0 ? context.getDrawable(bottom) : null);
-	}
-
-	public void setCompoundDrawablesWithIntrinsicBounds(Drawable left, Drawable top, Drawable right, Drawable bottom) {
-		for (Drawable d : new Drawable[] {left, top, right, bottom}) {
-			if (d != null)
-				d.setBounds(0, 0, d.getIntrinsicWidth(), d.getIntrinsicHeight());
-		}
-		setCompoundDrawables(left, top, right, bottom);
-	}
-
 	public void setHint(CharSequence s) {}
-
-	public Drawable[] getCompoundDrawablesRelative() { return getCompoundDrawables(); }
-
-	public Drawable[] getCompoundDrawables() {
-		return new Drawable[] {drawableLeft, drawableTop, drawableRight, drawableBottom};
-	}
 
 	public void setTextAppearance(int resId) {
 		setTextAppearance(getContext(), resId);
@@ -710,8 +661,6 @@ public class TextView extends View {
 
 	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
-	public int getExtendedPaddingTop() { return 0; }
-
 	public void setRawInputType(int type) {}
 
 	public TextUtils.TruncateAt getEllipsize() { return ellipsize; }
@@ -728,8 +677,6 @@ public class TextView extends View {
 	public void setMinLines(int lines) {}
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
-
-	public int getCompoundDrawablePadding() { return drawable_padding; }
 
 	public int getPaintFlags() { return 0; }
 
@@ -750,10 +697,6 @@ public class TextView extends View {
 	}
 
 	public void setAutoSizeTextTypeUniformWithPresetSizes(int[] presetSizes, int unit) {}
-
-	public void setCompoundDrawableTintList(ColorStateList tint) {}
-
-	public void setCompoundDrawableTintMode(PorterDuff.Mode tintMode) {}
 
 	public int getHyphenationFrequency() {
 		return hyphenation_frequency;
@@ -794,14 +737,6 @@ public class TextView extends View {
 		System.out.println("ERROR: " + error);
 	}
 
-	public int getTotalPaddingLeft() { return 0; }
-
-	public int getTotalPaddingTop() { return 0; }
-
-	public int getTotalPaddingRight() { return 0; }
-
-	public int getTotalPaddingBottom() { return 0; }
-
 	public int getImeOptions() { return 0; }
 
 	public void setShadowLayer(float radius, float dx, float dy, int color) {}
@@ -838,8 +773,6 @@ public class TextView extends View {
 	}
 
 	public void setImeActionLabel(CharSequence label, int actionId) {}
-
-	public int getExtendedPaddingBottom() { return 0; }
 
 	public boolean hasSelection() { return false; }
 
@@ -893,5 +826,814 @@ public class TextView extends View {
 				break;
 		}
 		return alignment;
+	}
+
+
+	/* ATL: AOSP's onDraw() paints the compound drawables itself; here the GtkBox of the label does, so every
+	 * change of the drawables that are shown (mShowing, already resolved for the layout direction) is passed
+	 * to it. Subclasses whose native widget is no GtkBox (Button, EditText) or that add a drawable
+	 * (CheckedTextView) override this. */
+	protected void updateNativeCompoundDrawables() {
+		final Drawable[] d = getCompoundDrawables();
+		boolean any = d[Drawables.LEFT] != null || d[Drawables.TOP] != null || d[Drawables.RIGHT] != null || d[Drawables.BOTTOM] != null;
+		if (!any && !nativeHasDrawables)
+			return; // the constructor sets "no drawables": nothing to tell the native side
+		nativeHasDrawables = any;
+		native_setCompoundDrawables(widget, d[Drawables.LEFT] != null ? d[Drawables.LEFT].paintable : 0,
+				d[Drawables.TOP] != null ? d[Drawables.TOP].paintable : 0,
+				d[Drawables.RIGHT] != null ? d[Drawables.RIGHT].paintable : 0,
+				d[Drawables.BOTTOM] != null ? d[Drawables.BOTTOM].paintable : 0);
+	}
+
+	private void resolveDrawables() {
+		onResolveDrawables(getLayoutDirection());
+	}
+
+	/* AOSP View.resetRtlProperties() calls resetResolvedDrawables(), then resolves again */
+	@Override
+	public void onRtlPropertiesChanged(int layoutDirection) {
+		super.onRtlPropertiesChanged(layoutDirection);
+		resetResolvedDrawables();
+		onResolveDrawables(layoutDirection);
+	}
+
+	/* no text layout here (GtkLabel), so the text never needs the scrolling space of the extended padding
+	 * and has no vertical offset: the AOSP values for a text that fits */
+	public int getExtendedPaddingTop() {
+		return getCompoundPaddingTop();
+	}
+
+	public int getExtendedPaddingBottom() {
+		return getCompoundPaddingBottom();
+	}
+
+	public int getTotalPaddingTop() {
+		return getExtendedPaddingTop();
+	}
+
+	public int getTotalPaddingBottom() {
+		return getExtendedPaddingBottom();
+	}
+
+	Drawables mDrawables;
+	private boolean nativeHasDrawables;
+	private int mLastLayoutDirection = -1;
+
+	static class Drawables {
+		static final int LEFT = 0;
+		static final int TOP = 1;
+		static final int RIGHT = 2;
+		static final int BOTTOM = 3;
+
+		static final int DRAWABLE_NONE = -1;
+		static final int DRAWABLE_RIGHT = 0;
+		static final int DRAWABLE_LEFT = 1;
+
+		final Rect mCompoundRect = new Rect();
+
+		final Drawable[] mShowing = new Drawable[4];
+
+		ColorStateList mTintList;
+		BlendMode mBlendMode;
+		boolean mHasTint;
+		boolean mHasTintMode;
+
+		Drawable mDrawableStart, mDrawableEnd, mDrawableError, mDrawableTemp;
+		Drawable mDrawableLeftInitial, mDrawableRightInitial;
+
+		boolean mIsRtlCompatibilityMode;
+		boolean mOverride;
+
+		int mDrawableSizeTop, mDrawableSizeBottom, mDrawableSizeLeft, mDrawableSizeRight,
+				mDrawableSizeStart, mDrawableSizeEnd, mDrawableSizeError, mDrawableSizeTemp;
+
+		int mDrawableWidthTop, mDrawableWidthBottom, mDrawableHeightLeft, mDrawableHeightRight,
+				mDrawableHeightStart, mDrawableHeightEnd, mDrawableHeightError, mDrawableHeightTemp;
+
+		int mDrawablePadding;
+
+		int mDrawableSaved = DRAWABLE_NONE;
+
+		public Drawables(Context context) {
+			final int targetSdkVersion = context.getApplicationInfo().targetSdkVersion;
+			mIsRtlCompatibilityMode = targetSdkVersion < VERSION_CODES.JELLY_BEAN_MR1
+					|| !context.getApplicationInfo().hasRtlSupport();
+			mOverride = false;
+		}
+
+		/**
+		 * @return {@code true} if this object contains metadata that needs to
+		 *         be retained, {@code false} otherwise
+		 */
+		public boolean hasMetadata() {
+			return mDrawablePadding != 0 || mHasTintMode || mHasTint;
+		}
+
+		/**
+		 * Updates the list of displayed drawables to account for the current
+		 * layout direction.
+		 *
+		 * @param layoutDirection the current layout direction
+		 * @return {@code true} if the displayed drawables changed
+		 */
+		public boolean resolveWithLayoutDirection(int layoutDirection) {
+			final Drawable previousLeft = mShowing[Drawables.LEFT];
+			final Drawable previousRight = mShowing[Drawables.RIGHT];
+
+			// First reset "left" and "right" drawables to their initial values
+			mShowing[Drawables.LEFT] = mDrawableLeftInitial;
+			mShowing[Drawables.RIGHT] = mDrawableRightInitial;
+
+			if (mIsRtlCompatibilityMode) {
+				// Use "start" drawable as "left" drawable if the "left" drawable was not defined
+				if (mDrawableStart != null && mShowing[Drawables.LEFT] == null) {
+					mShowing[Drawables.LEFT] = mDrawableStart;
+					mDrawableSizeLeft = mDrawableSizeStart;
+					mDrawableHeightLeft = mDrawableHeightStart;
+				}
+				// Use "end" drawable as "right" drawable if the "right" drawable was not defined
+				if (mDrawableEnd != null && mShowing[Drawables.RIGHT] == null) {
+					mShowing[Drawables.RIGHT] = mDrawableEnd;
+					mDrawableSizeRight = mDrawableSizeEnd;
+					mDrawableHeightRight = mDrawableHeightEnd;
+				}
+			} else {
+				// JB-MR1+ normal case: "start" / "end" drawables are overriding "left" / "right"
+				// drawable if and only if they have been defined
+				switch(layoutDirection) {
+					case LAYOUT_DIRECTION_RTL:
+						if (mOverride) {
+							mShowing[Drawables.RIGHT] = mDrawableStart;
+							mDrawableSizeRight = mDrawableSizeStart;
+							mDrawableHeightRight = mDrawableHeightStart;
+
+							mShowing[Drawables.LEFT] = mDrawableEnd;
+							mDrawableSizeLeft = mDrawableSizeEnd;
+							mDrawableHeightLeft = mDrawableHeightEnd;
+						}
+						break;
+
+					case LAYOUT_DIRECTION_LTR:
+					default:
+						if (mOverride) {
+							mShowing[Drawables.LEFT] = mDrawableStart;
+							mDrawableSizeLeft = mDrawableSizeStart;
+							mDrawableHeightLeft = mDrawableHeightStart;
+
+							mShowing[Drawables.RIGHT] = mDrawableEnd;
+							mDrawableSizeRight = mDrawableSizeEnd;
+							mDrawableHeightRight = mDrawableHeightEnd;
+						}
+						break;
+				}
+			}
+
+			applyErrorDrawableIfNeeded(layoutDirection);
+
+			return mShowing[Drawables.LEFT] != previousLeft
+					|| mShowing[Drawables.RIGHT] != previousRight;
+		}
+
+		public void setErrorDrawable(Drawable dr, TextView tv) {
+			if (mDrawableError != dr && mDrawableError != null) {
+				mDrawableError.setCallback(null);
+			}
+			mDrawableError = dr;
+
+			if (mDrawableError != null) {
+				final Rect compoundRect = mCompoundRect;
+				final int[] state = tv.getDrawableState();
+
+				mDrawableError.setState(state);
+				mDrawableError.copyBounds(compoundRect);
+				mDrawableError.setCallback(tv);
+				mDrawableSizeError = compoundRect.width();
+				mDrawableHeightError = compoundRect.height();
+			} else {
+				mDrawableSizeError = mDrawableHeightError = 0;
+			}
+		}
+
+		private void applyErrorDrawableIfNeeded(int layoutDirection) {
+			// first restore the initial state if needed
+			switch (mDrawableSaved) {
+				case DRAWABLE_LEFT:
+					mShowing[Drawables.LEFT] = mDrawableTemp;
+					mDrawableSizeLeft = mDrawableSizeTemp;
+					mDrawableHeightLeft = mDrawableHeightTemp;
+					break;
+				case DRAWABLE_RIGHT:
+					mShowing[Drawables.RIGHT] = mDrawableTemp;
+					mDrawableSizeRight = mDrawableSizeTemp;
+					mDrawableHeightRight = mDrawableHeightTemp;
+					break;
+				case DRAWABLE_NONE:
+				default:
+			}
+			// then, if needed, assign the Error drawable to the correct location
+			if (mDrawableError != null) {
+				switch(layoutDirection) {
+					case LAYOUT_DIRECTION_RTL:
+						mDrawableSaved = DRAWABLE_LEFT;
+
+						mDrawableTemp = mShowing[Drawables.LEFT];
+						mDrawableSizeTemp = mDrawableSizeLeft;
+						mDrawableHeightTemp = mDrawableHeightLeft;
+
+						mShowing[Drawables.LEFT] = mDrawableError;
+						mDrawableSizeLeft = mDrawableSizeError;
+						mDrawableHeightLeft = mDrawableHeightError;
+						break;
+					case LAYOUT_DIRECTION_LTR:
+					default:
+						mDrawableSaved = DRAWABLE_RIGHT;
+
+						mDrawableTemp = mShowing[Drawables.RIGHT];
+						mDrawableSizeTemp = mDrawableSizeRight;
+						mDrawableHeightTemp = mDrawableHeightRight;
+
+						mShowing[Drawables.RIGHT] = mDrawableError;
+						mDrawableSizeRight = mDrawableSizeError;
+						mDrawableHeightRight = mDrawableHeightError;
+						break;
+				}
+			}
+		}
+	}
+
+	public void setCompoundDrawables(Drawable left, Drawable top,
+			Drawable right, Drawable bottom) {
+		Drawables dr = mDrawables;
+
+		// We're switching to absolute, discard relative.
+		if (dr != null) {
+			if (dr.mDrawableStart != null) dr.mDrawableStart.setCallback(null);
+			dr.mDrawableStart = null;
+			if (dr.mDrawableEnd != null) dr.mDrawableEnd.setCallback(null);
+			dr.mDrawableEnd = null;
+			dr.mDrawableSizeStart = dr.mDrawableHeightStart = 0;
+			dr.mDrawableSizeEnd = dr.mDrawableHeightEnd = 0;
+		}
+
+		final boolean drawables = left != null || top != null || right != null || bottom != null;
+		if (!drawables) {
+			// Clearing drawables...  can we free the data structure?
+			if (dr != null) {
+				if (!dr.hasMetadata()) {
+					mDrawables = null;
+				} else {
+					// We need to retain the last set padding, so just clear
+					// out all of the fields in the existing structure.
+					for (int i = dr.mShowing.length - 1; i >= 0; i--) {
+						if (dr.mShowing[i] != null) {
+							dr.mShowing[i].setCallback(null);
+						}
+						dr.mShowing[i] = null;
+					}
+					dr.mDrawableSizeLeft = dr.mDrawableHeightLeft = 0;
+					dr.mDrawableSizeRight = dr.mDrawableHeightRight = 0;
+					dr.mDrawableSizeTop = dr.mDrawableWidthTop = 0;
+					dr.mDrawableSizeBottom = dr.mDrawableWidthBottom = 0;
+				}
+			}
+		} else {
+			if (dr == null) {
+				mDrawables = dr = new Drawables(getContext());
+			}
+
+			mDrawables.mOverride = false;
+
+			if (dr.mShowing[Drawables.LEFT] != left && dr.mShowing[Drawables.LEFT] != null) {
+				dr.mShowing[Drawables.LEFT].setCallback(null);
+			}
+			dr.mShowing[Drawables.LEFT] = left;
+
+			if (dr.mShowing[Drawables.TOP] != top && dr.mShowing[Drawables.TOP] != null) {
+				dr.mShowing[Drawables.TOP].setCallback(null);
+			}
+			dr.mShowing[Drawables.TOP] = top;
+
+			if (dr.mShowing[Drawables.RIGHT] != right && dr.mShowing[Drawables.RIGHT] != null) {
+				dr.mShowing[Drawables.RIGHT].setCallback(null);
+			}
+			dr.mShowing[Drawables.RIGHT] = right;
+
+			if (dr.mShowing[Drawables.BOTTOM] != bottom && dr.mShowing[Drawables.BOTTOM] != null) {
+				dr.mShowing[Drawables.BOTTOM].setCallback(null);
+			}
+			dr.mShowing[Drawables.BOTTOM] = bottom;
+
+			final Rect compoundRect = dr.mCompoundRect;
+			int[] state;
+
+			state = getDrawableState();
+
+			if (left != null) {
+				left.setState(state);
+				left.copyBounds(compoundRect);
+				left.setCallback(this);
+				dr.mDrawableSizeLeft = compoundRect.width();
+				dr.mDrawableHeightLeft = compoundRect.height();
+			} else {
+				dr.mDrawableSizeLeft = dr.mDrawableHeightLeft = 0;
+			}
+
+			if (right != null) {
+				right.setState(state);
+				right.copyBounds(compoundRect);
+				right.setCallback(this);
+				dr.mDrawableSizeRight = compoundRect.width();
+				dr.mDrawableHeightRight = compoundRect.height();
+			} else {
+				dr.mDrawableSizeRight = dr.mDrawableHeightRight = 0;
+			}
+
+			if (top != null) {
+				top.setState(state);
+				top.copyBounds(compoundRect);
+				top.setCallback(this);
+				dr.mDrawableSizeTop = compoundRect.height();
+				dr.mDrawableWidthTop = compoundRect.width();
+			} else {
+				dr.mDrawableSizeTop = dr.mDrawableWidthTop = 0;
+			}
+
+			if (bottom != null) {
+				bottom.setState(state);
+				bottom.copyBounds(compoundRect);
+				bottom.setCallback(this);
+				dr.mDrawableSizeBottom = compoundRect.height();
+				dr.mDrawableWidthBottom = compoundRect.width();
+			} else {
+				dr.mDrawableSizeBottom = dr.mDrawableWidthBottom = 0;
+			}
+		}
+
+		// Save initial left/right drawables
+		if (dr != null) {
+			dr.mDrawableLeftInitial = left;
+			dr.mDrawableRightInitial = right;
+		}
+
+		resetResolvedDrawables();
+		resolveDrawables();
+		applyCompoundDrawableTint();
+		updateNativeCompoundDrawables();
+		invalidate();
+		requestLayout();
+	}
+
+	public void setCompoundDrawablesWithIntrinsicBounds(int left,
+			int top, int right, int bottom) {
+		final Context context = getContext();
+		setCompoundDrawablesWithIntrinsicBounds(left != 0 ? context.getDrawable(left) : null,
+				top != 0 ? context.getDrawable(top) : null,
+				right != 0 ? context.getDrawable(right) : null,
+				bottom != 0 ? context.getDrawable(bottom) : null);
+	}
+
+	public void setCompoundDrawablesWithIntrinsicBounds(Drawable left,
+			Drawable top, Drawable right, Drawable bottom) {
+
+		if (left != null) {
+			left.setBounds(0, 0, left.getIntrinsicWidth(), left.getIntrinsicHeight());
+		}
+		if (right != null) {
+			right.setBounds(0, 0, right.getIntrinsicWidth(), right.getIntrinsicHeight());
+		}
+		if (top != null) {
+			top.setBounds(0, 0, top.getIntrinsicWidth(), top.getIntrinsicHeight());
+		}
+		if (bottom != null) {
+			bottom.setBounds(0, 0, bottom.getIntrinsicWidth(), bottom.getIntrinsicHeight());
+		}
+		setCompoundDrawables(left, top, right, bottom);
+	}
+
+	public void setCompoundDrawablesRelative(Drawable start, Drawable top,
+			Drawable end, Drawable bottom) {
+		Drawables dr = mDrawables;
+
+		// We're switching to relative, discard absolute.
+		if (dr != null) {
+			if (dr.mShowing[Drawables.LEFT] != null) {
+				dr.mShowing[Drawables.LEFT].setCallback(null);
+			}
+			dr.mShowing[Drawables.LEFT] = dr.mDrawableLeftInitial = null;
+			if (dr.mShowing[Drawables.RIGHT] != null) {
+				dr.mShowing[Drawables.RIGHT].setCallback(null);
+			}
+			dr.mShowing[Drawables.RIGHT] = dr.mDrawableRightInitial = null;
+			dr.mDrawableSizeLeft = dr.mDrawableHeightLeft = 0;
+			dr.mDrawableSizeRight = dr.mDrawableHeightRight = 0;
+		}
+
+		final boolean drawables = start != null || top != null
+				|| end != null || bottom != null;
+
+		if (!drawables) {
+			// Clearing drawables...  can we free the data structure?
+			if (dr != null) {
+				if (!dr.hasMetadata()) {
+					mDrawables = null;
+				} else {
+					// We need to retain the last set padding, so just clear
+					// out all of the fields in the existing structure.
+					if (dr.mDrawableStart != null) dr.mDrawableStart.setCallback(null);
+					dr.mDrawableStart = null;
+					if (dr.mShowing[Drawables.TOP] != null) {
+						dr.mShowing[Drawables.TOP].setCallback(null);
+					}
+					dr.mShowing[Drawables.TOP] = null;
+					if (dr.mDrawableEnd != null) {
+						dr.mDrawableEnd.setCallback(null);
+					}
+					dr.mDrawableEnd = null;
+					if (dr.mShowing[Drawables.BOTTOM] != null) {
+						dr.mShowing[Drawables.BOTTOM].setCallback(null);
+					}
+					dr.mShowing[Drawables.BOTTOM] = null;
+					dr.mDrawableSizeStart = dr.mDrawableHeightStart = 0;
+					dr.mDrawableSizeEnd = dr.mDrawableHeightEnd = 0;
+					dr.mDrawableSizeTop = dr.mDrawableWidthTop = 0;
+					dr.mDrawableSizeBottom = dr.mDrawableWidthBottom = 0;
+				}
+			}
+		} else {
+			if (dr == null) {
+				mDrawables = dr = new Drawables(getContext());
+			}
+
+			mDrawables.mOverride = true;
+
+			if (dr.mDrawableStart != start && dr.mDrawableStart != null) {
+				dr.mDrawableStart.setCallback(null);
+			}
+			dr.mDrawableStart = start;
+
+			if (dr.mShowing[Drawables.TOP] != top && dr.mShowing[Drawables.TOP] != null) {
+				dr.mShowing[Drawables.TOP].setCallback(null);
+			}
+			dr.mShowing[Drawables.TOP] = top;
+
+			if (dr.mDrawableEnd != end && dr.mDrawableEnd != null) {
+				dr.mDrawableEnd.setCallback(null);
+			}
+			dr.mDrawableEnd = end;
+
+			if (dr.mShowing[Drawables.BOTTOM] != bottom && dr.mShowing[Drawables.BOTTOM] != null) {
+				dr.mShowing[Drawables.BOTTOM].setCallback(null);
+			}
+			dr.mShowing[Drawables.BOTTOM] = bottom;
+
+			final Rect compoundRect = dr.mCompoundRect;
+			int[] state;
+
+			state = getDrawableState();
+
+			if (start != null) {
+				start.setState(state);
+				start.copyBounds(compoundRect);
+				start.setCallback(this);
+				dr.mDrawableSizeStart = compoundRect.width();
+				dr.mDrawableHeightStart = compoundRect.height();
+			} else {
+				dr.mDrawableSizeStart = dr.mDrawableHeightStart = 0;
+			}
+
+			if (end != null) {
+				end.setState(state);
+				end.copyBounds(compoundRect);
+				end.setCallback(this);
+				dr.mDrawableSizeEnd = compoundRect.width();
+				dr.mDrawableHeightEnd = compoundRect.height();
+			} else {
+				dr.mDrawableSizeEnd = dr.mDrawableHeightEnd = 0;
+			}
+
+			if (top != null) {
+				top.setState(state);
+				top.copyBounds(compoundRect);
+				top.setCallback(this);
+				dr.mDrawableSizeTop = compoundRect.height();
+				dr.mDrawableWidthTop = compoundRect.width();
+			} else {
+				dr.mDrawableSizeTop = dr.mDrawableWidthTop = 0;
+			}
+
+			if (bottom != null) {
+				bottom.setState(state);
+				bottom.copyBounds(compoundRect);
+				bottom.setCallback(this);
+				dr.mDrawableSizeBottom = compoundRect.height();
+				dr.mDrawableWidthBottom = compoundRect.width();
+			} else {
+				dr.mDrawableSizeBottom = dr.mDrawableWidthBottom = 0;
+			}
+		}
+
+		resetResolvedDrawables();
+		resolveDrawables();
+		updateNativeCompoundDrawables();
+		invalidate();
+		requestLayout();
+	}
+
+	public void setCompoundDrawablesRelativeWithIntrinsicBounds(int start,
+			int top, int end, int bottom) {
+		final Context context = getContext();
+		setCompoundDrawablesRelativeWithIntrinsicBounds(
+				start != 0 ? context.getDrawable(start) : null,
+				top != 0 ? context.getDrawable(top) : null,
+				end != 0 ? context.getDrawable(end) : null,
+				bottom != 0 ? context.getDrawable(bottom) : null);
+	}
+
+	public void setCompoundDrawablesRelativeWithIntrinsicBounds(Drawable start,
+			Drawable top, Drawable end, Drawable bottom) {
+
+		if (start != null) {
+			start.setBounds(0, 0, start.getIntrinsicWidth(), start.getIntrinsicHeight());
+		}
+		if (end != null) {
+			end.setBounds(0, 0, end.getIntrinsicWidth(), end.getIntrinsicHeight());
+		}
+		if (top != null) {
+			top.setBounds(0, 0, top.getIntrinsicWidth(), top.getIntrinsicHeight());
+		}
+		if (bottom != null) {
+			bottom.setBounds(0, 0, bottom.getIntrinsicWidth(), bottom.getIntrinsicHeight());
+		}
+		setCompoundDrawablesRelative(start, top, end, bottom);
+	}
+
+	public Drawable[] getCompoundDrawables() {
+		final Drawables dr = mDrawables;
+		if (dr != null) {
+			return dr.mShowing.clone();
+		} else {
+			return new Drawable[] { null, null, null, null };
+		}
+	}
+
+	public Drawable[] getCompoundDrawablesRelative() {
+		final Drawables dr = mDrawables;
+		if (dr != null) {
+			return new Drawable[] {
+				dr.mDrawableStart, dr.mShowing[Drawables.TOP],
+				dr.mDrawableEnd, dr.mShowing[Drawables.BOTTOM]
+			};
+		} else {
+			return new Drawable[] { null, null, null, null };
+		}
+	}
+
+	public void setCompoundDrawablePadding(int pad) {
+		Drawables dr = mDrawables;
+		if (pad == 0) {
+			if (dr != null) {
+				dr.mDrawablePadding = pad;
+			}
+		} else {
+			if (dr == null) {
+				mDrawables = dr = new Drawables(getContext());
+			}
+			dr.mDrawablePadding = pad;
+		}
+
+		native_setCompoundDrawablePadding(widget, pad);
+		invalidate();
+		requestLayout();
+	}
+
+	public int getCompoundDrawablePadding() {
+		final Drawables dr = mDrawables;
+		return dr != null ? dr.mDrawablePadding : 0;
+	}
+
+	public void setCompoundDrawableTintList(ColorStateList tint) {
+		if (mDrawables == null) {
+			mDrawables = new Drawables(getContext());
+		}
+		mDrawables.mTintList = tint;
+		mDrawables.mHasTint = true;
+
+		applyCompoundDrawableTint();
+	}
+
+	public ColorStateList getCompoundDrawableTintList() {
+		return mDrawables != null ? mDrawables.mTintList : null;
+	}
+
+	public void setCompoundDrawableTintMode(PorterDuff.Mode tintMode) {
+		setCompoundDrawableTintBlendMode(tintMode != null
+				? BlendMode.fromValue(tintMode.nativeInt) : null);
+	}
+
+	public void setCompoundDrawableTintBlendMode(BlendMode blendMode) {
+		if (mDrawables == null) {
+			mDrawables = new Drawables(getContext());
+		}
+		mDrawables.mBlendMode = blendMode;
+		mDrawables.mHasTintMode = true;
+
+		applyCompoundDrawableTint();
+	}
+
+	public PorterDuff.Mode getCompoundDrawableTintMode() {
+		BlendMode mode = getCompoundDrawableTintBlendMode();
+		return mode != null ? BlendMode.blendModeToPorterDuffMode(mode) : null;
+	}
+
+	public BlendMode getCompoundDrawableTintBlendMode() {
+		return mDrawables != null ? mDrawables.mBlendMode : null;
+	}
+
+	private void applyCompoundDrawableTint() {
+		if (mDrawables == null) {
+			return;
+		}
+
+		if (mDrawables.mHasTint || mDrawables.mHasTintMode) {
+			final ColorStateList tintList = mDrawables.mTintList;
+			final BlendMode blendMode = mDrawables.mBlendMode;
+			final boolean hasTint = mDrawables.mHasTint;
+			final boolean hasTintMode = mDrawables.mHasTintMode;
+			final int[] state = getDrawableState();
+
+			for (Drawable dr : mDrawables.mShowing) {
+				if (dr == null) {
+					continue;
+				}
+
+				if (dr == mDrawables.mDrawableError) {
+					// From a developer's perspective, the error drawable isn't
+					// a compound drawable. Don't apply the generic compound
+					// drawable tint to it.
+					continue;
+				}
+
+				dr.mutate();
+
+				if (hasTint) {
+					dr.setTintList(tintList);
+				}
+
+				if (hasTintMode) {
+					dr.setTintBlendMode(blendMode);
+				}
+
+				// The drawable (or one of its children) may not have been
+				// stateful before applying the tint, so let's try again.
+				if (dr.isStateful()) {
+					dr.setState(state);
+				}
+			}
+		}
+	}
+
+	private void setRelativeDrawablesIfNeeded(Drawable start, Drawable end) {
+		boolean hasRelativeDrawables = (start != null) || (end != null);
+		if (hasRelativeDrawables) {
+			Drawables dr = mDrawables;
+			if (dr == null) {
+				mDrawables = dr = new Drawables(getContext());
+			}
+			mDrawables.mOverride = true;
+			final Rect compoundRect = dr.mCompoundRect;
+			int[] state = getDrawableState();
+			if (start != null) {
+				start.setBounds(0, 0, start.getIntrinsicWidth(), start.getIntrinsicHeight());
+				start.setState(state);
+				start.copyBounds(compoundRect);
+				start.setCallback(this);
+
+				dr.mDrawableStart = start;
+				dr.mDrawableSizeStart = compoundRect.width();
+				dr.mDrawableHeightStart = compoundRect.height();
+			} else {
+				dr.mDrawableSizeStart = dr.mDrawableHeightStart = 0;
+			}
+			if (end != null) {
+				end.setBounds(0, 0, end.getIntrinsicWidth(), end.getIntrinsicHeight());
+				end.setState(state);
+				end.copyBounds(compoundRect);
+				end.setCallback(this);
+
+				dr.mDrawableEnd = end;
+				dr.mDrawableSizeEnd = compoundRect.width();
+				dr.mDrawableHeightEnd = compoundRect.height();
+			} else {
+				dr.mDrawableSizeEnd = dr.mDrawableHeightEnd = 0;
+			}
+			resetResolvedDrawables();
+			resolveDrawables();
+			applyCompoundDrawableTint();
+			updateNativeCompoundDrawables();
+		}
+	}
+
+	public int getCompoundPaddingTop() {
+		final Drawables dr = mDrawables;
+		if (dr == null || dr.mShowing[Drawables.TOP] == null) {
+			return getPaddingTop();
+		} else {
+			return getPaddingTop() + dr.mDrawablePadding + dr.mDrawableSizeTop;
+		}
+	}
+
+	public int getCompoundPaddingBottom() {
+		final Drawables dr = mDrawables;
+		if (dr == null || dr.mShowing[Drawables.BOTTOM] == null) {
+			return getPaddingBottom();
+		} else {
+			return getPaddingBottom() + dr.mDrawablePadding + dr.mDrawableSizeBottom;
+		}
+	}
+
+	public int getCompoundPaddingLeft() {
+		final Drawables dr = mDrawables;
+		if (dr == null || dr.mShowing[Drawables.LEFT] == null) {
+			return getPaddingLeft();
+		} else {
+			return getPaddingLeft() + dr.mDrawablePadding + dr.mDrawableSizeLeft;
+		}
+	}
+
+	public int getCompoundPaddingRight() {
+		final Drawables dr = mDrawables;
+		if (dr == null || dr.mShowing[Drawables.RIGHT] == null) {
+			return getPaddingRight();
+		} else {
+			return getPaddingRight() + dr.mDrawablePadding + dr.mDrawableSizeRight;
+		}
+	}
+
+	public int getTotalPaddingLeft() {
+		return getCompoundPaddingLeft();
+	}
+
+	public int getTotalPaddingRight() {
+		return getCompoundPaddingRight();
+	}
+
+	@Override
+	protected boolean verifyDrawable(Drawable who) {
+		final boolean verified = super.verifyDrawable(who);
+		if (!verified && mDrawables != null) {
+			for (Drawable dr : mDrawables.mShowing) {
+				if (who == dr) {
+					return true;
+				}
+			}
+		}
+		return verified;
+	}
+
+	@Override
+	public void jumpDrawablesToCurrentState() {
+		super.jumpDrawablesToCurrentState();
+		if (mDrawables != null) {
+			for (Drawable dr : mDrawables.mShowing) {
+				if (dr != null) {
+					dr.jumpToCurrentState();
+				}
+			}
+		}
+	}
+
+	private void onResolveDrawables(int layoutDirection) {
+		// No need to resolve twice
+		if (mLastLayoutDirection == layoutDirection) {
+			return;
+		}
+		mLastLayoutDirection = layoutDirection;
+
+		// Resolve drawables
+		if (mDrawables != null) {
+			if (mDrawables.resolveWithLayoutDirection(layoutDirection)) {
+				prepareDrawableForDisplay(mDrawables.mShowing[Drawables.LEFT]);
+				prepareDrawableForDisplay(mDrawables.mShowing[Drawables.RIGHT]);
+				applyCompoundDrawableTint();
+				updateNativeCompoundDrawables();
+			}
+		}
+	}
+
+	private void prepareDrawableForDisplay(Drawable dr) {
+		if (dr == null) {
+			return;
+		}
+
+		dr.setLayoutDirection(getLayoutDirection());
+
+		if (dr.isStateful()) {
+			dr.setState(getDrawableState());
+			dr.jumpToCurrentState();
+		}
+	}
+
+	private void resetResolvedDrawables() {
+		mLastLayoutDirection = -1;
 	}
 }
