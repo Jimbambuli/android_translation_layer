@@ -157,9 +157,10 @@ public class AudioTrack {
 		return sampleRateInHz;
 	}
 
-	/* hidden in AOSP, looked up by ExoPlayer via reflection: estimated latency in ms, including the
-	 * buffer. The ALSA delay is already subtracted in getPlaybackHeadPosition, so only the buffer
-	 * (PCM16, as used by native_constructor) is reported here. */
+	/** @hide AOSP: native_get_latency(), i.e. AudioTrack::mLatency = afLatency + 1000 * mFrameCount / mSampleRate.
+	 * ExoPlayer looks it up via reflection. ATL has no AudioFlinger: the output (afLatency) part is
+	 * already accounted for by the ALSA delay in getPlaybackHeadPosition(), so only the buffer term
+	 * (PCM16, as used by native_constructor) is reported. */
 	public int getLatency() {
 		if (channels <= 0 || sampleRateInHz <= 0)
 			return 0;
