@@ -1,85 +1,130 @@
+/*
+ * Copyright (C) 2006 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package android.widget;
 
-import android.atl.annotation.Export;
+import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
-import android.content.res.TypedArray;
-import android.graphics.Color;
+import android.os.Build;
 import android.util.AttributeSet;
-import com.android.internal.R;
 
+
+/**
+ * A SeekBar is an extension of ProgressBar that adds a draggable thumb. The user can touch
+ * the thumb and drag left or right to set the current progress level or use the arrow keys.
+ * Placing focusable widgets to the left or right of a SeekBar is discouraged.
+ * <p>
+ * Clients of the SeekBar can attach a {@link SeekBar.OnSeekBarChangeListener} to
+ * be notified of the user's actions.
+ *
+ * @attr ref android.R.styleable#SeekBar_thumb
+ */
 public class SeekBar extends AbsSeekBar {
 
-	public SeekBar(Context context) {
-		this(context, null);
-	}
+    /**
+     * A callback that notifies clients when the progress level has been
+     * changed. This includes changes that were initiated by the user through a
+     * touch gesture or arrow key/trackball as well as changes that were initiated
+     * programmatically.
+     */
+    public interface OnSeekBarChangeListener {
 
-	public SeekBar(Context context, AttributeSet attributeSet) {
-		this(context, attributeSet, 0);
-	}
+        /**
+         * Notification that the progress level has changed. Clients can use the fromUser parameter
+         * to distinguish user-initiated changes from those that occurred programmatically.
+         *
+         * @param seekBar The SeekBar whose progress has changed
+         * @param progress The current progress level. This will be in the range min..max where min
+         *                 and max were set by {@link ProgressBar#setMin(int)} and
+         *                 {@link ProgressBar#setMax(int)}, respectively. (The default values for
+         *                 min is 0 and max is 100.)
+         * @param fromUser True if the progress change was initiated by the user.
+         */
+        void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser);
 
-	/* AppCompatSeekBar calls this one */
-	public SeekBar(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
-		setColorsFromTheme(context);
-	}
+        /**
+         * Notification that the user has started a touch gesture. Clients may want to use this
+         * to disable advancing the seekbar.
+         * @param seekBar The SeekBar in which the touch gesture began
+         */
+        void onStartTrackingTouch(SeekBar seekBar);
 
-	/* like Material's seekbar: thumb and progress colorControlActivated, the rest of the
-	 * track colorControlNormal at disabledAlpha */
-	private void setColorsFromTheme(Context context) {
-		/* sorted by id, as obtainStyledAttributes() expects */
-		TypedArray a = context.obtainStyledAttributes(new int[] {R.attr.disabledAlpha, R.attr.colorControlNormal,
-		                                                         R.attr.colorControlActivated});
-		float alpha = a.getFloat(0, 0.3f);
-		int normal = a.getColor(1, 0xff757575);
-		int activated = a.getColor(2, 0xff009688);
-		a.recycle();
-		int track = (Math.round(Color.alpha(normal) * alpha) << 24) | (normal & 0xffffff);
-		native_setColors(widget, activated, track);
-	}
+        /**
+         * Notification that the user has finished a touch gesture. Clients may want to use this
+         * to re-enable advancing the seekbar.
+         * @param seekBar The SeekBar in which the touch gesture began
+         */
+        void onStopTrackingTouch(SeekBar seekBar);
+    }
 
-	private native void native_setColors(long widget, int activated, int track);
+    @UnsupportedAppUsage
+    private OnSeekBarChangeListener mOnSeekBarChangeListener;
 
-	@Override
-	protected native long native_constructor(Context context, AttributeSet attrs);
-	@Override
-	protected native void native_setProgress(long widget, float fraction);
-	protected native int native_getProgress(long widget);
-	protected native void native_setMax(long widget, int max);
-	@Override
-	public void native_setIndeterminate(boolean indeterminate) {}
+    public SeekBar(Context context) {
+        this(context, null);
+    }
 
-	@Override
-	public void setMax(int max) {
-		this.max = max;
-		native_setMax(widget, max);
-	}
-	@Override
-	public void setProgress(int progress) {
-		this.progress = progress;
-		native_setProgress(widget, progress);
-	}
+    public SeekBar(Context context, AttributeSet attrs) {
+        this(context, attrs, com.android.internal.R.attr.seekBarStyle);
+    }
 
-	/* kept here as on AOSP; the native side holds no reference to it, a global reference there
-	 * would keep the listener, and with it usually this view, alive forever */
-	private OnSeekBarChangeListener mOnSeekBarChangeListener;
+    public SeekBar(Context context, AttributeSet attrs, int defStyleAttr) {
+        this(context, attrs, defStyleAttr, 0);
+    }
 
-	public void setOnSeekBarChangeListener(OnSeekBarChangeListener l) {
-		mOnSeekBarChangeListener = l;
-	}
+    public SeekBar(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        super(context, attrs, defStyleAttr, defStyleRes);
+    }
 
-	@Override
-	public int getProgress() {
-		return native_getProgress(widget);
-	}
+    @Override
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
+    void onProgressRefresh(float scale, boolean fromUser, int progress) {
+        super.onProgressRefresh(scale, fromUser, progress);
 
-	public static interface OnSeekBarChangeListener {
-		@Export
-		public void onStartTrackingTouch(SeekBar seekBar);
+        if (mOnSeekBarChangeListener != null) {
+            mOnSeekBarChangeListener.onProgressChanged(this, progress, fromUser);
+        }
+    }
 
-		@Export
-		public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser);
+    /**
+     * Sets a listener to receive notifications of changes to the SeekBar's progress level. Also
+     * provides notifications of when the user starts and stops a touch gesture within the SeekBar.
+     *
+     * @param l The seek bar notification listener
+     *
+     * @see SeekBar.OnSeekBarChangeListener
+     */
+    public void setOnSeekBarChangeListener(OnSeekBarChangeListener l) {
+        mOnSeekBarChangeListener = l;
+    }
 
-		@Export
-		public void onStopTrackingTouch(SeekBar seekBar);
-	}
+    @Override
+    void onStartTrackingTouch() {
+        super.onStartTrackingTouch();
+        if (mOnSeekBarChangeListener != null) {
+            mOnSeekBarChangeListener.onStartTrackingTouch(this);
+        }
+    }
+
+    @Override
+    void onStopTrackingTouch() {
+        super.onStopTrackingTouch();
+        if (mOnSeekBarChangeListener != null) {
+            mOnSeekBarChangeListener.onStopTrackingTouch(this);
+        }
+    }
+
 }

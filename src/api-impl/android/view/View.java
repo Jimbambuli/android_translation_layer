@@ -3385,9 +3385,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			applyLayoutParams(layout_params);
 		resolveTextAlignment();
 		resolvePadding();
+		/* AOSP's resolveDrawables(), without the background and foreground, which take the direction elsewhere here */
+		onResolveDrawables(getLayoutDirection());
 		onRtlPropertiesChanged(getLayoutDirection());
 		return true;
 	}
+
+	/** @hide AOSP: called when the layout direction is resolved, to pass it on to the drawables the view owns */
+	public void onResolveDrawables(int layoutDirection) {}
 
 	/** @hide */
 	public void resetRtlProperties() {

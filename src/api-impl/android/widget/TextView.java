@@ -1907,7 +1907,8 @@ public class TextView extends View {
 		}
 	}
 
-	private void onResolveDrawables(int layoutDirection) {
+	@Override
+	public void onResolveDrawables(int layoutDirection) {
 		// No need to resolve twice
 		if (mLastLayoutDirection == layoutDirection) {
 			return;
