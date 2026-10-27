@@ -30,6 +30,7 @@ import android.text.method.BaseMovementMethod;
 import android.text.method.KeyListener;
 import android.text.method.LinkMovementMethod;
 import android.text.method.MovementMethod;
+import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TransformationMethod;
 import android.text.style.CharacterStyle;
 import android.text.style.ClickableSpan;
@@ -57,8 +58,28 @@ public class TextView extends View {
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.TOP | Gravity.START;
-	private int max_lines = Integer.MAX_VALUE;
-	private TextUtils.TruncateAt ellipsize = null;
+	/* AOSP: the height limits in lines (the pixel and ems modes are not applied here) */
+	private static final int LINES = 1;
+	private static final int EMS = LINES;
+	private static final int PIXELS = 2;
+	private int mMaximum = Integer.MAX_VALUE;
+	private int mMaxMode = LINES;
+	private int mMinimum = 0;
+	private int mMinMode = LINES;
+	private boolean mSingleLine;
+	private boolean mHorizontallyScrolling;
+	private TextUtils.TruncateAt mEllipsize;
+	private InputFilter.LengthFilter mSingleLineLengthFilter = null;
+	private static final int MAX_LENGTH_FOR_SINGLE_LINE_EDIT_TEXT = 5000;
+	private TransformationMethod mTransformation;
+	private CharSequence mTransformed = "";
+	private BufferType mBufferType = BufferType.NORMAL;
+	private static final int ELLIPSIZE_NOT_SET = -1;
+	private static final int ELLIPSIZE_NONE = 0;
+	private static final int ELLIPSIZE_START = 1;
+	private static final int ELLIPSIZE_MIDDLE = 2;
+	private static final int ELLIPSIZE_END = 3;
+	private static final int ELLIPSIZE_MARQUEE = 4;
 
 	public TextView(Context context, AttributeSet attrs) {
 		this(context, attrs, 0);
@@ -106,13 +127,12 @@ public class TextView extends View {
 			if (a.hasValue(com.android.internal.R.styleable.TextView_gravity))
 				setGravity(a.getInt(com.android.internal.R.styleable.TextView_gravity, Gravity.TOP | Gravity.START));
 
-			int ellipsize_attr = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, -1);
-			if (ellipsize_attr >= 1 && ellipsize_attr <= 4)
-				setEllipsize(TextUtils.TruncateAt.values()[ellipsize_attr - 1]);
-			if (a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false))
-				setSingleLine(true);
+			int ellipsize = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, ELLIPSIZE_NOT_SET);
+			boolean singleLine = a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false);
 			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
 				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minLines))
+				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
 			int max_length = a.getInt(com.android.internal.R.styleable.TextView_maxLength, -1);
@@ -150,6 +170,37 @@ public class TextView extends View {
 			setRelativeDrawablesIfNeeded(drawableStart, drawableEnd);
 			setCompoundDrawablePadding(drawablePadding);
 
+			// Same as setSingleLine(), but make sure the transformation method and the maximum number
+			// of lines of height are unchanged for multi-line TextViews.
+			setInputTypeSingleLine(singleLine);
+			applySingleLine(singleLine, singleLine, singleLine,
+			                // Does not apply automated max length filter since length filter will be resolved
+			                // later in this function.
+			                false);
+
+			if (singleLine && getKeyListener() == null && ellipsize == ELLIPSIZE_NOT_SET) {
+				ellipsize = ELLIPSIZE_END;
+			}
+
+			switch (ellipsize) {
+				case ELLIPSIZE_START:
+					setEllipsize(TextUtils.TruncateAt.START);
+					break;
+				case ELLIPSIZE_MIDDLE:
+					setEllipsize(TextUtils.TruncateAt.MIDDLE);
+					break;
+				case ELLIPSIZE_END:
+					setEllipsize(TextUtils.TruncateAt.END);
+					break;
+				case ELLIPSIZE_MARQUEE:
+					// AOSP also fades the edge (setHorizontalFadingEdgeEnabled()); there is no scrolling text
+					setEllipsize(TextUtils.TruncateAt.MARQUEE);
+					break;
+				case ELLIPSIZE_NONE:
+				default:
+					break;
+			}
+
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textAllCaps)) {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
 				setAllCaps(allCaps);
@@ -171,18 +222,25 @@ public class TextView extends View {
 	}
 
 	public void setText(CharSequence text) {
-		setText(text, BufferType.NORMAL);
+		setText(text, mBufferType);
 	}
 
 	public void setText(CharSequence text, BufferType type) {
+		mBufferType = type;
 		text = applyFilters(text);
 		this.text = text == null ? "" : text;
-		if (text instanceof Spanned)
-			native_setMarkup(toPangoMarkup((Spanned)text));
-		else
-			native_setText(text != null ? text.toString() : null);
+		/* as AOSP's setText(): the transformation decides what is shown (getText() stays the text that was set) */
+		mTransformed = mTransformation == null ? this.text : mTransformation.getTransformation(this.text, this);
+		updateNativeText();
 		if (!isLayoutRequested())
 			requestLayout();
+	}
+
+	private void updateNativeText() {
+		if (mTransformed instanceof Spanned)
+			native_setMarkup(toPangoMarkup((Spanned)mTransformed));
+		else
+			native_setText(mTransformed.toString());
 	}
 
 	private static final ClickableSpan[] NO_LINKS = new ClickableSpan[0];
@@ -352,11 +410,10 @@ public class TextView extends View {
 			setPadding(getPaddingLeft(), getPaddingTop(), getPaddingRight(), lastBaselineToBottomHeight - fontMetricsBottom);
 	}
 
-	private boolean horizontallyScrollable;
 
 	/* API 29 */
 	public final boolean isHorizontallyScrollable() {
-		return horizontallyScrollable;
+		return mHorizontallyScrolling;
 	}
 	public final void setLinksClickable(boolean whether) {}
 
@@ -394,10 +451,6 @@ public class TextView extends View {
 	public void removeTextChangedListener(TextWatcher watcher) {}
 	public void setOnEditorActionListener(TextView.OnEditorActionListener l) {}
 
-	public TransformationMethod getTransformationMethod() {
-		return null;
-	}
-
 	// the hint is not shown, but the colors are kept for getHintTextColors()
 	private ColorStateList hint_colors = null;
 	public void setHintTextColor(ColorStateList colorStateList) {
@@ -411,8 +464,8 @@ public class TextView extends View {
 	}
 	public void setLinkTextColor(ColorStateList colorStateList) {
 		linkTextColor = colorStateList;
-		if (text instanceof Spanned)
-			native_setMarkup(toPangoMarkup((Spanned)text));
+		if (mTransformed instanceof Spanned)
+			native_setMarkup(toPangoMarkup((Spanned)mTransformed));
 	}
 
 	public final ColorStateList getLinkTextColors() {
@@ -438,11 +491,6 @@ public class TextView extends View {
 
 	public int getSelectionEnd() {
 		return 0;
-	}
-
-	public void setEllipsize(TextUtils.TruncateAt truncateAt) {
-		ellipsize = truncateAt;
-		updateLines();
 	}
 
 	/* AOSP: values of the typeface attribute */
@@ -682,20 +730,17 @@ public class TextView extends View {
 		applyTextAppearance(attributes);
 	}
 
-	public void setMaxLines(int maxLines) {
-		max_lines = maxLines > 0 ? maxLines : Integer.MAX_VALUE;
-		updateLines();
-	}
-
 	/* GtkLabel can only limit the number of lines when ellipsizing, so text cut off
-	 * after maxLines always gets an ellipsis, also when no ellipsize mode is set. */
+	 * after maxLines always gets an ellipsis, also when no ellipsize mode is set.
+	 * There is no minimum number of lines (minLines/lines only set the AOSP state). */
 	private void updateLines() {
 		int mode = 3; // PANGO_ELLIPSIZE_END
-		if (ellipsize == TextUtils.TruncateAt.START)
+		if (mEllipsize == TextUtils.TruncateAt.START)
 			mode = 1; // PANGO_ELLIPSIZE_START
-		else if (ellipsize == TextUtils.TruncateAt.MIDDLE)
+		else if (mEllipsize == TextUtils.TruncateAt.MIDDLE)
 			mode = 2; // PANGO_ELLIPSIZE_MIDDLE
-		native_setLines(max_lines == Integer.MAX_VALUE ? -1 : max_lines, max_lines == Integer.MAX_VALUE ? 0 : mode);
+		boolean limited = mMaxMode == LINES && mMaximum > 0 && mMaximum != Integer.MAX_VALUE;
+		native_setLines(limited ? mMaximum : -1, limited ? mode : 0);
 	}
 	private native void native_setLines(int lines, int ellipsize_mode);
 
@@ -784,11 +829,7 @@ public class TextView extends View {
 
 	public int getInputType() { return 0; }
 
-	public final void setTransformationMethod(TransformationMethod method) {}
-
 	public InputFilter[] getFilters() { return filters; }
-
-	public int getMaxLines() { return max_lines == Integer.MAX_VALUE ? -1 : max_lines; }
 
 	public int getLineCount() { return 1; }
 
@@ -814,12 +855,6 @@ public class TextView extends View {
 	public void setMinHeight(int minHeight) {}
 	public void setMaxHeight(int maxHeight) {}
 
-	public void setHorizontallyScrolling(boolean whether) {
-		horizontallyScrollable = whether;
-	}
-	public boolean getHorizontallyScrolling() {
-		return false;
-	}
 
 	public static interface OnEditorActionListener {
 		public abstract boolean onEditorAction(TextView v, int actionId, KeyEvent event);
@@ -837,10 +872,6 @@ public class TextView extends View {
 
 	public int getCurrentTextColor() {
 		return Color.CYAN;
-	}
-
-	public void setSingleLine(boolean singleLine) {
-		setMaxLines(singleLine ? 1 : Integer.MAX_VALUE);
 	}
 
 	public void setHint(int resId) {
@@ -880,19 +911,6 @@ public class TextView extends View {
 	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
 	public void setRawInputType(int type) {}
-
-	public TextUtils.TruncateAt getEllipsize() { return ellipsize; }
-
-	/* only the maximum is applied, the view is not made taller for shorter text */
-	public void setLines(int lines) {
-		setMaxLines(lines);
-	}
-
-	public int getMinLines() {
-		return -1;
-	}
-
-	public void setMinLines(int lines) {}
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
 
@@ -1854,4 +1872,187 @@ public class TextView extends View {
 	private void resetResolvedDrawables() {
 		mLastLayoutDirection = -1;
 	}
+
+	public void setMinLines(int minLines) {
+		mMinimum = minLines;
+		mMinMode = LINES;
+
+		requestLayout();
+		invalidate();
+	}
+
+	public void setMaxLines(int maxLines) {
+		mMaximum = maxLines;
+		mMaxMode = LINES;
+
+		updateLines();
+		requestLayout();
+		invalidate();
+	}
+
+	public void setLines(int lines) {
+		mMaximum = mMinimum = lines;
+		mMaxMode = mMinMode = LINES;
+
+		updateLines();
+		requestLayout();
+		invalidate();
+	}
+
+	public int getMaxLines() {
+		return mMaxMode == LINES ? mMaximum : -1;
+	}
+
+	public int getMinLines() {
+		return mMinMode == LINES ? mMinimum : -1;
+	}
+
+	public void setHorizontallyScrolling(boolean whether) {
+		if (mHorizontallyScrolling != whether) {
+			mHorizontallyScrolling = whether;
+
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	public boolean getHorizontallyScrolling() {
+		return mHorizontallyScrolling;
+	}
+
+	public void setEllipsize(TextUtils.TruncateAt where) {
+		// TruncateAt is an enum. != comparison is ok between these singleton objects.
+		if (mEllipsize != where) {
+			mEllipsize = where;
+
+			updateLines();
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	public TextUtils.TruncateAt getEllipsize() {
+		return mEllipsize;
+	}
+
+	public void setSingleLine(boolean singleLine) {
+		// Could be used, but may break backward compatibility.
+		// if (mSingleLine == singleLine) return;
+		setInputTypeSingleLine(singleLine);
+		applySingleLine(singleLine, true, true, true);
+	}
+
+	private void applySingleLine(boolean singleLine, boolean applyTransformation,
+			boolean changeMaxLines, boolean changeMaxLength) {
+		mSingleLine = singleLine;
+
+		if (singleLine) {
+			setLines(1);
+			setHorizontallyScrolling(true);
+			if (applyTransformation) {
+				setTransformationMethod(SingleLineTransformationMethod.getInstance());
+			}
+
+			if (!changeMaxLength) return;
+
+			// Single line length filter is only applicable editable text.
+			if (mBufferType != BufferType.EDITABLE) return;
+
+			final InputFilter[] prevFilters = getFilters();
+			for (InputFilter filter: getFilters()) {
+				// We don't add LengthFilter if already there.
+				if (filter instanceof InputFilter.LengthFilter) return;
+			}
+
+			if (mSingleLineLengthFilter == null) {
+				mSingleLineLengthFilter = new InputFilter.LengthFilter(
+					MAX_LENGTH_FOR_SINGLE_LINE_EDIT_TEXT);
+			}
+
+			final InputFilter[] newFilters = new InputFilter[prevFilters.length + 1];
+			System.arraycopy(prevFilters, 0, newFilters, 0, prevFilters.length);
+			newFilters[prevFilters.length] = mSingleLineLengthFilter;
+
+			setFilters(newFilters);
+
+			// Since filter doesn't apply to existing text, trigger filter by setting text.
+			setText(getText());
+		} else {
+			if (changeMaxLines) {
+				setMaxLines(Integer.MAX_VALUE);
+			}
+			setHorizontallyScrolling(false);
+			if (applyTransformation) {
+				setTransformationMethod(null);
+			}
+
+			if (!changeMaxLength) return;
+
+			// Single line length filter is only applicable editable text.
+			if (mBufferType != BufferType.EDITABLE) return;
+
+			final InputFilter[] prevFilters = getFilters();
+			if (prevFilters.length == 0) return;
+
+			// Short Circuit: if mSingleLineLengthFilter is not allocated, nobody sets automated
+			// single line char limit filter.
+			if (mSingleLineLengthFilter == null) return;
+
+			// If we need to remove mSingleLineLengthFilter, we need to allocate another array.
+			// Since filter list is expected to be small and want to avoid unnecessary array
+			// allocation, check if there is mSingleLengthFilter first.
+			int targetIndex = -1;
+			for (int i = 0; i < prevFilters.length; ++i) {
+				if (prevFilters[i] == mSingleLineLengthFilter) {
+					targetIndex = i;
+					break;
+				}
+			}
+			if (targetIndex == -1) return;  // not found. Do nothing.
+
+			if (prevFilters.length == 1) {
+				setFilters(NO_FILTERS);
+				return;
+			}
+
+			// Create new array which doesn't include mSingleLengthFilter.
+			final InputFilter[] newFilters = new InputFilter[prevFilters.length - 1];
+			System.arraycopy(prevFilters, 0, newFilters, 0, targetIndex);
+			System.arraycopy(
+					prevFilters,
+					targetIndex + 1,
+					newFilters,
+					targetIndex,
+					prevFilters.length - targetIndex - 1);
+			setFilters(newFilters);
+			mSingleLineLengthFilter = null;
+		}
+	}
+
+	private void setInputTypeSingleLine(boolean singleLine) {
+		// no Editor: the input type of the GtkText is not kept by the TextView
+	}
+
+	public final TransformationMethod getTransformationMethod() {
+		return mTransformation;
+	}
+
+	public final void setTransformationMethod(TransformationMethod method) {
+		setTransformationMethodInternal(method);
+	}
+
+	void setTransformationMethodInternal(TransformationMethod method) {
+		if (method == mTransformation) {
+			// Avoid the setText() below if the transformation is
+			// the same.
+			return;
+		}
+
+		mTransformation = method;
+
+		// (AOSP also tells a TransformationMethod2 whether the length may change and keeps the method as a
+		// span of a Spannable text: neither is needed here, the text is transformed on every setText())
+		setText(getText()); // not the field: Button keeps its text in the native widget
+	}
+
 }
