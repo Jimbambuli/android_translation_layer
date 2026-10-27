@@ -1486,6 +1486,47 @@ public class View implements Drawable.Callback {
 
 	private LongClickRunnable pendingLongClick = null;
 
+	/* AOSP View.CheckForTap, UnsetPressedState and isInScrollingContainer: a view inside a scrolling
+	 * container shows the pressed state (and the ripple) only after the tap timeout, so that a scroll
+	 * gesture doesn't flash it */
+	private class CheckForTap implements Runnable {
+		float x, y;
+
+		@Override
+		public void run() {
+			pendingCheckForTap = null;
+			drawableHotspotChanged(x, y);
+			setPressed(true);
+		}
+	}
+
+	private CheckForTap pendingCheckForTap = null;
+
+	private final Runnable mUnsetPressedState = new Runnable() {
+		@Override
+		public void run() {
+			setPressed(false);
+		}
+	};
+
+	private boolean isInScrollingContainer() {
+		ViewParent p = getParent();
+		while (p != null && p instanceof ViewGroup) {
+			if (((ViewGroup)p).shouldDelayChildPressedState()) {
+				return true;
+			}
+			p = p.getParent();
+		}
+		return false;
+	}
+
+	private void removeTapCallback() {
+		if (pendingCheckForTap != null) {
+			removeCallbacks(pendingCheckForTap);
+			pendingCheckForTap = null;
+		}
+	}
+
 	@Export
 	public boolean onTouchEvent(MotionEvent event) {
 		if (isClickable() || isLongClickable()) {
@@ -1496,19 +1537,48 @@ public class View implements Drawable.Callback {
 						pendingLongClick = new LongClickRunnable();
 						postDelayed(pendingLongClick, ViewConfiguration.getLongPressTimeout());
 					}
+					if (isInScrollingContainer()) {
+						removeTapCallback();
+						pendingCheckForTap = new CheckForTap();
+						pendingCheckForTap.x = event.getX();
+						pendingCheckForTap.y = event.getY();
+						postDelayed(pendingCheckForTap, ViewConfiguration.getTapTimeout());
+					} else {
+						drawableHotspotChanged(event.getX(), event.getY());
+						setPressed(true);
+					}
 					return true;
 				case MotionEvent.ACTION_MOVE:
-					if (event.getX() < 0 || event.getY() < 0 || event.getX() > getWidth() || event.getY() > getHeight())
+					drawableHotspotChanged(event.getX(), event.getY());
+					if (event.getX() < 0 || event.getY() < 0 || event.getX() > getWidth() || event.getY() > getHeight()) {
 						cancelLongPress();
+						removeTapCallback();
+						if (isPressed()) {
+							setPressed(false);
+						}
+					}
 					return true;
-				case MotionEvent.ACTION_UP:
+				case MotionEvent.ACTION_UP: {
 					boolean long_click_done = pendingLongClick != null && pendingLongClick.long_click_done;
 					cancelLongPress();
+					if (pendingCheckForTap != null) {
+						// pressed only now, so that the tap shows
+						removeTapCallback();
+						drawableHotspotChanged(event.getX(), event.getY());
+						setPressed(true);
+					}
+					boolean handled = true;
 					if (isClickable() && !long_click_done && event.getX() >= 0 && event.getY() >= 0 && event.getX() <= getWidth() && event.getY() <= getHeight())
-						return performClick();
-					return true;
+						handled = performClick();
+					if (isPressed() && !post(mUnsetPressedState)) {
+						mUnsetPressedState.run();
+					}
+					return handled;
+				}
 				case MotionEvent.ACTION_CANCEL:
 					cancelLongPress();
+					removeTapCallback();
+					setPressed(false);
 					return true;
 			}
 		}
@@ -3351,7 +3421,18 @@ public class View implements Drawable.Callback {
 				|| (mDefaultFocusHighlight == who);
 	}
 
-	public void drawableHotspotChanged(float x, float y) {}
+	/* AOSP View.drawableHotspotChanged */
+	public void drawableHotspotChanged(float x, float y) {
+		if (background != null) {
+			background.setHotspot(x, y);
+		}
+		if (mDefaultFocusHighlight != null) {
+			mDefaultFocusHighlight.setHotspot(x, y);
+		}
+		if (mForegroundInfo != null && mForegroundInfo.mDrawable != null) {
+			mForegroundInfo.mDrawable.setHotspot(x, y);
+		}
+	}
 
 	/* the view's own opacity isn't tracked, so never claim to be opaque */
 	public boolean isOpaque() {
