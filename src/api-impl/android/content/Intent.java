@@ -1,6 +1,7 @@
 package android.content;
 
 import android.atl.annotation.Export;
+import android.content.pm.ResolveInfo;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
@@ -905,8 +906,29 @@ public class Intent implements Parcelable {
 		return intent;
 	}
 
+	/* AOSP Intent.makeMainActivity() */
+	public static Intent makeMainActivity(ComponentName mainActivity) {
+		Intent intent = new Intent(ACTION_MAIN);
+		intent.setComponent(mainActivity);
+		intent.addCategory(CATEGORY_LAUNCHER);
+		return intent;
+	}
+
+	/* AOSP Intent.resolveActivity() */
 	public ComponentName resolveActivity(PackageManager pm) {
-		return component;
+		if (component != null) {
+			return component;
+		}
+
+		ResolveInfo info = pm.resolveActivity(
+		    this, PackageManager.MATCH_DEFAULT_ONLY);
+		if (info != null) {
+			return new ComponentName(
+			    info.activityInfo.applicationInfo.packageName,
+			    info.activityInfo.name);
+		}
+
+		return null;
 	}
 
 	public void setSourceBounds(Rect sourceBounds) {}

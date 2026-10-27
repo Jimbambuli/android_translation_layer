@@ -10,6 +10,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.res.Configuration;
@@ -23,6 +24,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.text.TextUtils;
+import android.util.Log;
 import android.util.Slog;
 import android.view.ContextThemeWrapper;
 import android.view.Display;
@@ -691,10 +694,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	public void setIntent(Intent newIntent) {
 		this.intent = newIntent;
-	}
-
-	public Intent getParentActivityIntent() {
-		return null;
 	}
 
 	@Override
@@ -1397,18 +1396,62 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void onActionModeFinished(ActionMode mode) {}
 
 	/**
-	 * Navigates up to the activity of upIntent if it is in the back stack: the activities above it
-	 * are finished and it receives upIntent in onNewIntent(). There is only one task, so
-	 * shouldUpRecreateTask() is always false.
+	 * Activity.navigateUpTo(). If the activity of upIntent is in the back stack, the activities above it
+	 * are finished and it receives upIntent in onNewIntent(); if not, this activity is finished and the
+	 * activity is started from upIntent (ActivityTaskManager's navigateUpTo(), which is not available
+	 * here: there is only one task, so shouldUpRecreateTask() is always false).
 	 */
 	public boolean navigateUpTo(Intent upIntent) {
-		ComponentName target = upIntent.getComponent();
-		if (target == null)
-			return false;
+		ComponentName destInfo = upIntent.getComponent();
+		if (destInfo == null) {
+			destInfo = upIntent.resolveActivity(getPackageManager());
+			if (destInfo == null) {
+				return false;
+			}
+			upIntent = new Intent(upIntent);
+			upIntent.setComponent(destInfo);
+		}
 		try {
-			return nativeResumeActivity(getClassLoader().loadClass(target.getClassName()).asSubclass(Activity.class), upIntent);
+			if (nativeResumeActivity(getClassLoader().loadClass(destInfo.getClassName()).asSubclass(Activity.class), upIntent))
+				return true;
 		} catch (ClassNotFoundException e) {
 			return false;
+		}
+		startActivity(upIntent);
+		finish();
+		return true;
+	}
+
+	/* Activity.getParentActivityIntent() */
+	public Intent getParentActivityIntent() {
+		final ActivityInfo info = getActivityInfo();
+		final String parentName = info != null ? info.parentActivityName : null;
+		if (TextUtils.isEmpty(parentName)) {
+			return null;
+		}
+
+		// If the parent itself has no parent, generate a main activity intent.
+		final ComponentName target = new ComponentName(this, parentName);
+		try {
+			final ActivityInfo parentInfo = getPackageManager().getActivityInfo(target, 0);
+			final String parentActivity = parentInfo.parentActivityName;
+			final Intent parentIntent = parentActivity == null
+			    ? Intent.makeMainActivity(target)
+			    : new Intent().setComponent(target);
+			return parentIntent;
+		} catch (PackageManager.NameNotFoundException e) {
+			Log.e(TAG, "getParentActivityIntent: bad parentActivityName '" + parentName +
+			               "' in manifest");
+			return null;
+		}
+	}
+
+	/* AOSP's mActivityInfo, from the manifest */
+	private ActivityInfo getActivityInfo() {
+		try {
+			return getPackageManager().getActivityInfo(getComponentName(), 0);
+		} catch (PackageManager.NameNotFoundException e) {
+			return null;
 		}
 	}
 
@@ -1441,8 +1484,29 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return resultActivity == null ? null : resultActivity.getComponentName();
 	}
 
+	/* Activity.onNavigateUp(), without the task stack that shouldUpRecreateTask() would need */
 	public boolean onNavigateUp() {
+		// Automatically handle hierarchical Up navigation if the proper
+		// metadata is available.
+		Intent upIntent = getParentActivityIntent();
+		if (upIntent != null) {
+			final ActivityInfo info = getActivityInfo();
+			if (info != null && info.taskAffinity == null) {
+				// Activities with a null affinity are special; they really shouldn't
+				// specify a parent activity intent in the first place. Just finish
+				// the current activity and call it a day.
+				finish();
+			} else {
+				navigateUpTo(upIntent);
+			}
+			return true;
+		}
 		return false;
+	}
+
+	@Deprecated
+	public boolean onNavigateUpFromChild(Activity child) {
+		return onNavigateUp();
 	}
 
 	public void setExitSharedElementCallback(SharedElementCallback callback) {}
