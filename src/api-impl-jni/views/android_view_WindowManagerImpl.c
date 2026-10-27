@@ -15,16 +15,13 @@ extern GtkWindow *window;
 
 static jclass window_manager_class;
 
-/* touch-modal windows that are added, and whether the rest of a press is swallowed */
+/* touch-modal windows that are added */
 static int touch_modal_windows = 0;
-static gboolean swallowing_press = FALSE;
 
 /* GTK closed a touch-modal window (press outside of it, Escape): tell the view, as AOSP would by
  * giving it the press, so that the app removes the window */
 static void on_closed(GtkPopover *popover, jobject view)
 {
-	/* the compositor takes the press that closed it and passes on only the rest */
-	swallowing_press = TRUE;
 	JNIEnv *env = get_jni_env();
 	(*env)->CallStaticVoidMethod(env, window_manager_class, _STATIC_METHOD(window_manager_class, "dispatchOutsideTouch", "(Landroid/view/View;)V"), view);
 	if ((*env)->ExceptionCheck(env)) {
@@ -40,25 +37,16 @@ static void release_view(gpointer view, GClosure *closure)
 }
 
 /* A touch-modal window takes the presses outside of it, so the app's window must not see them
- * (on AOSP, tapping another button while a menu is open only closes the menu): neither the rest
- * of the press that made GTK close the popover nor one while the popover is still shown. */
+ * (on AOSP, tapping another button while a menu is open only closes the menu). The press that made
+ * GTK close the popover never reaches the window, and the window drops the rest of it (see
+ * atl_window_android_touch_targets()). */
 static gboolean on_window_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
 {
 	GdkEventType type = gdk_event_get_event_type(event);
-	if (type == GDK_BUTTON_PRESS || type == GDK_TOUCH_BEGIN) {
-		swallowing_press = touch_modal_windows > 0 && gdk_event_get_surface(event) == gtk_native_get_surface(GTK_NATIVE(window));
-		return swallowing_press;
-	}
-	if (!swallowing_press)
+	if ((type != GDK_BUTTON_PRESS && type != GDK_TOUCH_BEGIN) || touch_modal_windows == 0 || gdk_event_get_surface(event) != gtk_native_get_surface(GTK_NATIVE(window)))
 		return FALSE;
-	/* no button is held (anymore), so there is no rest of a press to swallow */
-	if (type == GDK_MOTION_NOTIFY && !(gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK)) {
-		swallowing_press = FALSE;
-		return FALSE;
-	}
-	if (type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL)
-		swallowing_press = FALSE;
-	return type == GDK_MOTION_NOTIFY || type == GDK_TOUCH_UPDATE || type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END || type == GDK_TOUCH_CANCEL;
+	atl_window_press_taken(GTK_WIDGET(window), event);
+	return TRUE;
 }
 
 /* watch the presses in a window of the app, in the capture phase, before its views see them */
@@ -71,18 +59,6 @@ static void watch_window(GtkWidget *window_widget)
 	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
 	gtk_widget_add_controller(window_widget, controller);
 	g_object_set_data(G_OBJECT(window_widget), "watches-presses", GINT_TO_POINTER(1));
-}
-
-/* A grabbing popup that closes on a press outside of it takes the press like AOSP's touch-modal
- * popups, but the compositor passes the rest of it (motion, release) on to the window below,
- * whose views would take it for a swipe from where their last press was. */
-void atl_swallow_rest_of_press(GtkWidget *widget)
-{
-	GtkRoot *root = gtk_widget_get_root(widget);
-	if (!root)
-		return;
-	watch_window(GTK_WIDGET(root));
-	swallowing_press = TRUE;
 }
 
 /* A window added with WindowManager.addView() gets Escape as KEYCODE_ESCAPE through its views,

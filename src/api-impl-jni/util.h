@@ -66,6 +66,10 @@ void atl_fade_widget_cancel(GtkWidget *widget);
 void atl_window_android_tab_focus(GtkWindow *window);
 void atl_window_android_wheel_acceleration(GtkWindow *window);
 void atl_window_android_mouse_back(GtkWindow *window, GCallback back, gpointer data);
+/* the window gets the moves and the release of a gesture only if it got its press (InputDispatcher touch targets) */
+void atl_window_android_touch_targets(GtkWindow *window);
+/* another window took the press that this one has seen: the rest of the gesture is not for this window */
+void atl_window_press_taken(GtkWidget *widget, GdkEvent *event);
 
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);

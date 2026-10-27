@@ -70,7 +70,7 @@ static gboolean on_touch_outside(GtkEventControllerLegacy *controller, GdkEvent 
 	GdkEventType event_type = gdk_event_get_event_type(event);
 	if (event_type != GDK_BUTTON_PRESS && event_type != GDK_TOUCH_BEGIN)
 		return FALSE;
-	atl_swallow_rest_of_press(GTK_WIDGET(window));
+	atl_window_press_taken(GTK_WIDGET(window), event);
 	/* the press activated the app's window: the keyboard focus stays in the dialog, as on AOSP */
 	gtk_window_present(outside->dialog);
 	JNIEnv *env = get_jni_env();
@@ -127,6 +127,7 @@ JNIEXPORT jlong JNICALL Java_android_app_Dialog_nativeInit(JNIEnv *env, jobject 
 	gtk_window_set_child(GTK_WINDOW(dialog), gtk_widget_get_parent(decor_view));
 	jobject ref = _REF(this);
 	atl_window_android_mouse_back(GTK_WINDOW(dialog), G_CALLBACK(on_mouse_back), ref);
+	atl_window_android_touch_targets(GTK_WINDOW(dialog));
 	g_signal_connect(GTK_WINDOW(dialog), "close-request", G_CALLBACK(on_close_request), ref);
 	GtkEventController *controller = gtk_event_controller_key_new();
 	g_signal_connect(controller, "key-pressed", G_CALLBACK(on_key_pressed), ref);

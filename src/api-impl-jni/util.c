@@ -659,3 +659,69 @@ void atl_snapshot_concat_matrix(GtkSnapshot *snapshot, const graphene_matrix_t *
 	}
 	gtk_snapshot_transform_matrix(snapshot, matrix);
 }
+
+/* Touch targets per window, as AOSP's InputDispatcher keeps them: a pointer's gesture belongs to the
+ * window that got its ACTION_DOWN, and a window gets the moves and the up of a gesture only if it got
+ * the down (InputDispatcher::findTouchedWindowTargetsLocked(); the same holds for the next ViewGroup in
+ * ViewGroup.dispatchTouchEvent(), which drops them without a touch target). GTK passes the rest of a
+ * press on to the window below once the popup that took the press (a closing grabbing popover, a
+ * touch-modal window, a dialog) is gone, so the window drops the moves and the release it got no
+ * press for. The pointer moving without a button is a hover and always passes. */
+#define BUTTONS_MASK (GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK | GDK_BUTTON4_MASK | GDK_BUTTON5_MASK)
+
+static gpointer press_key(GtkWidget *window, GdkEvent *event)
+{
+	GdkEventSequence *sequence = gdk_event_get_event_sequence(event);
+	return sequence ? (gpointer)sequence : (gpointer)window; /* the mouse has no sequence */
+}
+
+static gboolean on_gesture_event(GtkEventControllerLegacy *controller, GdkEvent *event, GHashTable *pressed)
+{
+	GtkWidget *window = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+	GdkEventType type = gdk_event_get_event_type(event);
+	gpointer key = press_key(window, event);
+	GdkModifierType buttons = gdk_event_get_modifier_state(event) & BUTTONS_MASK;
+	switch (type) {
+	case GDK_BUTTON_PRESS:
+	case GDK_TOUCH_BEGIN:
+		g_hash_table_add(pressed, key);
+		return FALSE;
+	case GDK_MOTION_NOTIFY:
+		if (!buttons) { /* a hover; a gesture whose release this window never got is over, too */
+			g_hash_table_remove(pressed, key);
+			return FALSE;
+		}
+		return !g_hash_table_contains(pressed, key);
+	case GDK_TOUCH_UPDATE:
+		return !g_hash_table_contains(pressed, key);
+	case GDK_BUTTON_RELEASE: {
+		gboolean got_press = g_hash_table_contains(pressed, key);
+		if (!(buttons & ~(GDK_BUTTON1_MASK << (gdk_button_event_get_button(event) - 1))))
+			g_hash_table_remove(pressed, key);
+		return !got_press;
+	}
+	case GDK_TOUCH_END:
+	case GDK_TOUCH_CANCEL:
+		return !g_hash_table_remove(pressed, key);
+	default:
+		return FALSE;
+	}
+}
+
+void atl_window_android_touch_targets(GtkWindow *window)
+{
+	GHashTable *pressed = g_hash_table_new(g_direct_hash, g_direct_equal);
+	g_object_set_data_full(G_OBJECT(window), "touch-targets", pressed, (GDestroyNotify)g_hash_table_unref);
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(on_gesture_event), pressed);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+}
+
+void atl_window_press_taken(GtkWidget *widget, GdkEvent *event)
+{
+	GtkRoot *root = gtk_widget_get_root(widget);
+	GHashTable *pressed = root ? g_object_get_data(G_OBJECT(root), "touch-targets") : NULL;
+	if (pressed)
+		g_hash_table_remove(pressed, press_key(GTK_WIDGET(root), event));
+}

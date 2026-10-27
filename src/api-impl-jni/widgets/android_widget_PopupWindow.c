@@ -292,7 +292,6 @@ static void on_unmap_count_grab(GtkWidget *popover)
 	if (!gtk_popover_get_autohide(GTK_POPOVER(popover)))
 		return;
 	grabbing_popovers--;
-	atl_swallow_rest_of_press(popover);
 	GtkRoot *root = gtk_widget_get_root(popover);
 	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
 	if (!GTK_IS_WINDOW(root) || (focus && !gtk_widget_is_ancestor(focus, popover)))

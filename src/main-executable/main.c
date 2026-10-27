@@ -552,6 +552,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	atl_window_android_tab_focus(GTK_WINDOW(window));
 	atl_window_android_wheel_acceleration(GTK_WINDOW(window));
 	atl_window_android_mouse_back(GTK_WINDOW(window), G_CALLBACK(current_activity_back_pressed), NULL);
+	atl_window_android_touch_targets(GTK_WINDOW(window));
 
 	const char *disable_decoration_env = getenv("ATL_DISABLE_WINDOW_DECORATIONS");
 	gboolean decorated;
