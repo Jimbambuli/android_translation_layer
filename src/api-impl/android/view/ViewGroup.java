@@ -286,59 +286,110 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return true;
 	}
 
-	// This internal method is used to share code between removeView and removeViewInLayout.
-	// Reusing removeView in removeViewInLayout is not possible, because e.g.
-	// ViewPager overrides removeView to call removeViewInLayout
-	protected void removeViewInternal(View child) {
-		if (child == null || child.parent != this)
-			return;
-		child.dispatchDetachedFromWindow();
-		child.parent = null;
-		children.remove(child);
-		native_removeView(widget, child.widget);
-		requestLayout();
+	void dispatchViewRemoved(View child) {
 		onViewRemoved(child);
 		if (onHierarchyChangeListener != null) {
 			onHierarchyChangeListener.onChildViewRemoved(this, child);
 		}
 	}
 
-	public void removeView(View child) {
-		removeViewInternal(child);
-		requestLayout();
+	/* AOSP removeFromArray(); ATL also takes the child's widget out of the GTK parent */
+	private void removeFromArray(int index) {
+		View child = children.get(index);
+		child.parent = null;
+		children.remove(index);
+		native_removeView(widget, child.widget);
 	}
 
-	public void removeViewInLayout(View child) {
-		removeViewInternal(child);
+	/* AOSP ViewGroup.removeView() ... removeAllViewsInLayout(); without what ATL has no counterpart for (the
+	 * LayoutTransition, the focus bookkeeping of mFocused/mDefaultFocus, touch and hover targets, disappearing
+	 * views and transient state, accessibility) */
+	public void removeView(View view) {
+		if (removeViewInternal(view)) {
+			requestLayout();
+			invalidate();
+		}
 	}
 
-	public void removeViews(int start, int count) {
-		removeViewsInLayout(start, count);
-		requestLayout();
+	public void removeViewInLayout(View view) {
+		removeViewInternal(view);
 	}
 
 	public void removeViewsInLayout(int start, int count) {
-		for (View child : new ArrayList<>(children.subList(start, start + count)))
-			removeViewInternal(child);
+		removeViewsInternal(start, count);
 	}
 
 	public void removeViewAt(int index) {
-		removeView(children.get(index));
+		removeViewInternal(index, getChildAt(index));
+		requestLayout();
+		invalidate();
+	}
+
+	public void removeViews(int start, int count) {
+		removeViewsInternal(start, count);
+		requestLayout();
+		invalidate();
+	}
+
+	private boolean removeViewInternal(View view) {
+		final int index = indexOfChild(view);
+		if (index >= 0) {
+			removeViewInternal(index, view);
+			return true;
+		}
+		return false;
+	}
+
+	private void removeViewInternal(int index, View view) {
+		// like AOSP's mAttachInfo != null: dispatchDetachedFromWindow() does nothing for a detached view
+		view.dispatchDetachedFromWindow();
+
+		removeFromArray(index);
+
+		dispatchViewRemoved(view);
+	}
+
+	private void removeViewsInternal(int start, int count) {
+		final int end = start + count;
+
+		if (start < 0 || count < 0 || end > children.size()) {
+			throw new IndexOutOfBoundsException();
+		}
+
+		for (int i = start; i < end; i++) {
+			final View view = children.get(i);
+
+			view.dispatchDetachedFromWindow();
+
+			dispatchViewRemoved(view);
+		}
+
+		for (int i = end - 1; i >= start; i--) {
+			removeFromArray(i);
+		}
 	}
 
 	public void removeAllViews() {
-		for (Iterator<View> it = children.iterator(); it.hasNext();) {
-			View child = it.next();
-			child.dispatchDetachedFromWindow();
-			child.parent = null;
-			it.remove();
-			native_removeView(widget, child.widget);
-			onViewRemoved(child);
-			if (onHierarchyChangeListener != null) {
-				onHierarchyChangeListener.onChildViewRemoved(this, child);
-			}
-		}
+		removeAllViewsInLayout();
 		requestLayout();
+		invalidate();
+	}
+
+	public void removeAllViewsInLayout() {
+		final int count = children.size();
+		if (count <= 0) {
+			return;
+		}
+
+		for (int i = count - 1; i >= 0; i--) {
+			final View view = children.get(i);
+
+			view.dispatchDetachedFromWindow();
+
+			dispatchViewRemoved(view);
+
+			removeFromArray(i);
+		}
 	}
 
 	public void detachViewFromParent(int index) {
@@ -366,9 +417,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		child.dispatchDetachedFromWindow();
 		child.parent = null;
 		native_removeView(widget, child.widget);
-		if (onHierarchyChangeListener != null) {
-			onHierarchyChangeListener.onChildViewRemoved(this, child);
-		}
+		dispatchViewRemoved(child);
 	}
 
 	@Override
@@ -1083,12 +1132,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	protected void cleanupLayoutState(View child) {}
 
 	public boolean shouldDelayChildPressedState() { return false; }
-
-	public void removeAllViewsInLayout() {
-		for (int i = getChildCount() - 1; i >= 0; i--) {
-			removeViewInLayout(getChildAt(i));
-		}
-	}
 
 	public void offsetChildrenTopAndBottom(int offset) {
 		// FIXME
