@@ -5,12 +5,15 @@ import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Insets;
 import android.graphics.Rect;
+import android.util.DisplayMetrics;
 import android.util.SparseArray;
 
 public class DrawableContainer extends Drawable {
 
+	private static final boolean DEFAULT_DITHER = true;
 	private DrawableContainerState state;
 	private int curIndex = -1;
+	private boolean mMutated;
 
 	protected native long native_constructor();
 	protected native void native_selectChild(long container, long child);
@@ -31,6 +34,97 @@ public class DrawableContainer extends Drawable {
 			return true;
 		}
 		return false;
+	}
+
+	@Override
+	public Drawable getCurrent() {
+		return curIndex >= 0 ? state.getChild(curIndex) : null;
+	}
+
+	/** @hide */
+	public int getCurrentIndex() {
+		return curIndex;
+	}
+
+	/* the parts of AOSP's DrawableContainer that are not about drawing (ATL draws the selected
+	 * child with a native paintable and has no fade animations, the durations are only kept) */
+	@Override
+	public void setDither(boolean dither) {
+		if (state.mDither != dither) {
+			state.mDither = dither;
+			if (curIndex >= 0 && state.getChild(curIndex) != null) {
+				state.getChild(curIndex).setDither(state.mDither);
+			}
+		}
+	}
+
+	@Override
+	public void setAutoMirrored(boolean mirrored) {
+		if (state.mAutoMirrored != mirrored) {
+			state.mAutoMirrored = mirrored;
+			if (curIndex >= 0 && state.getChild(curIndex) != null) {
+				state.getChild(curIndex).setAutoMirrored(state.mAutoMirrored);
+			}
+		}
+	}
+
+	@Override
+	public boolean isAutoMirrored() {
+		return state.mAutoMirrored;
+	}
+
+	@Override
+	public void jumpToCurrentState() {
+		if (curIndex >= 0 && state.getChild(curIndex) != null) {
+			state.getChild(curIndex).jumpToCurrentState();
+		}
+	}
+
+	@Override
+	public boolean setVisible(boolean visible, boolean restart) {
+		boolean changed = super.setVisible(visible, restart);
+		if (curIndex >= 0 && state.getChild(curIndex) != null) {
+			state.getChild(curIndex).setVisible(visible, restart);
+		}
+		return changed;
+	}
+
+	/**
+	 * @param res the resources used to inflate density-dependent values
+	 * @hide
+	 */
+	protected final void updateDensity(Resources res) {
+		state.updateDensity(res);
+	}
+
+	/**
+	 * @hide
+	 */
+	public void clearMutated() {
+		super.clearMutated();
+		state.clearMutated();
+		mMutated = false;
+	}
+
+	@Override
+	public Drawable mutate() {
+		if (!mMutated && super.mutate() == this) {
+			final DrawableContainerState clone = cloneConstantState();
+			clone.mutate();
+			setConstantState(clone);
+			mMutated = true;
+		}
+		return this;
+	}
+
+	/**
+	 * Returns a shallow copy of the container's constant state to be used as
+	 * the base state for {@link #mutate()}.
+	 *
+	 * @return a shallow copy of the constant state
+	 */
+	DrawableContainerState cloneConstantState() {
+		return state;
 	}
 
 	@Override
@@ -58,6 +152,15 @@ public class DrawableContainer extends Drawable {
 
 	protected void setConstantState(DrawableContainerState state) {
 		this.state = state;
+
+		// The locally cached drawables may have changed.
+		if (curIndex >= 0) {
+			Drawable d = state.getChild(curIndex);
+			if (d != null) {
+				initializeDrawableForDisplay(d);
+				native_selectChild(paintable, d.paintable);
+			}
+		}
 	}
 
 	@Override
@@ -76,10 +179,19 @@ public class DrawableContainer extends Drawable {
 		private DrawableContainer owner;
 		private Resources mSourceRes;
 		private SparseArray<ConstantState> mDrawableFutures;
+		int mDensity = DisplayMetrics.DENSITY_DEFAULT;
 		int mChangingConfigurations;
 		int mChildrenChangingConfigurations;
 		private boolean mCheckedConstantState;
 		private boolean mCanConstantState;
+		boolean mMutated;
+
+		boolean mVariablePadding = false;
+		boolean mConstantSize = false;
+		boolean mDither = DEFAULT_DITHER;
+		boolean mAutoMirrored;
+		int mEnterFadeDuration = 0;
+		int mExitFadeDuration = 0;
 
 		/* like AOSP: a copy gets new instances of the children, made from their constant states
 		 * when they are first used */
@@ -87,9 +199,18 @@ public class DrawableContainer extends Drawable {
 			this.owner = owner;
 			mSourceRes = res != null ? res : (orig != null ? orig.mSourceRes : null);
 
+			mDensity = Drawable.resolveDensity(res, orig != null ? orig.mDensity : 0);
+
 			if (orig != null) {
 				mChangingConfigurations = orig.mChangingConfigurations;
 				mChildrenChangingConfigurations = orig.mChildrenChangingConfigurations;
+
+				mVariablePadding = orig.mVariablePadding;
+				mConstantSize = orig.mConstantSize;
+				mDither = orig.mDither;
+				mAutoMirrored = orig.mAutoMirrored;
+				mEnterFadeDuration = orig.mEnterFadeDuration;
+				mExitFadeDuration = orig.mExitFadeDuration;
 
 				mCheckedConstantState = true;
 				mCanConstantState = true;
@@ -201,6 +322,82 @@ public class DrawableContainer extends Drawable {
 			return childCount++;
 		}
 
+		/**
+		 * Updates the source density based on the resources used to inflate
+		 * density-dependent values.
+		 *
+		 * @param res the resources used to inflate density-dependent values
+		 */
+		final void updateDensity(Resources res) {
+			if (res != null) {
+				mSourceRes = res;
+
+				// The density may have changed since the last update (if any). Any
+				// dimension-type attributes will need their default values scaled.
+				final int targetDensity = Drawable.resolveDensity(res, mDensity);
+				mDensity = targetDensity;
+			}
+		}
+
+		private void mutate() {
+			// No need to call createAllFutures, since future drawables will
+			// mutate when they are prepared.
+			final int N = childCount;
+			final Drawable[] drawables = this.drawables;
+			for (int i = 0; i < N; i++) {
+				if (drawables[i] != null) {
+					drawables[i].mutate();
+				}
+			}
+
+			mMutated = true;
+		}
+
+		final void clearMutated() {
+			final int N = childCount;
+			final Drawable[] drawables = this.drawables;
+			for (int i = 0; i < N; i++) {
+				if (drawables[i] != null) {
+					drawables[i].clearMutated();
+				}
+			}
+
+			mMutated = false;
+		}
+
+		/**
+		 * A boolean value indicating whether to use the maximum padding value
+		 * of all frames in the set (false), or to use the padding value of the
+		 * frame being shown (true). Default value is false.
+		 */
+		public final void setVariablePadding(boolean variable) {
+			mVariablePadding = variable;
+		}
+
+		public final void setConstantSize(boolean constant) {
+			mConstantSize = constant;
+		}
+
+		public final boolean isConstantSize() {
+			return mConstantSize;
+		}
+
+		public final void setEnterFadeDuration(int duration) {
+			mEnterFadeDuration = duration;
+		}
+
+		public final int getEnterFadeDuration() {
+			return mEnterFadeDuration;
+		}
+
+		public final void setExitFadeDuration(int duration) {
+			mExitFadeDuration = duration;
+		}
+
+		public final int getExitFadeDuration() {
+			return mExitFadeDuration;
+		}
+
 		public void growArray(int oldSize, int newSize) {
 			Drawable[] newDrawables = new Drawable[newSize];
 			System.arraycopy(drawables, 0, newDrawables, 0, oldSize);
@@ -253,7 +450,23 @@ public class DrawableContainer extends Drawable {
 			state.getChild(curIndex).setBounds(bounds);
 	}
 
-	public void setEnterFadeDuration(int duration) {}
+	/**
+	 * Change the global fade duration when a new drawable is entering
+	 * the scene.
+	 *
+	 * @param ms The amount of time to fade in milliseconds.
+	 */
+	public void setEnterFadeDuration(int ms) {
+		state.mEnterFadeDuration = ms;
+	}
 
-	public void setExitFadeDuration(int duration) {}
+	/**
+	 * Change the global fade duration when a new drawable is leaving
+	 * the scene.
+	 *
+	 * @param ms The amount of time to fade in milliseconds.
+	 */
+	public void setExitFadeDuration(int ms) {
+		state.mExitFadeDuration = ms;
+	}
 }

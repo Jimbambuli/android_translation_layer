@@ -11,4 +11,20 @@ public class AnimatedVectorDrawable extends Drawable implements Animatable2 {
 	public void start() {}
 
 	public void stop() {}
+
+	/**
+	 * Reverses ongoing animations or starts pending animations in reverse.
+	 * <p>
+	 * NOTE: Only works if all animations support reverse. Otherwise, this will
+	 * do nothing.
+	 * @hide
+	 */
+	public void reverse() {}
+
+	/**
+	 * @hide
+	 */
+	public boolean canReverse() {
+		return false;
+	}
 }

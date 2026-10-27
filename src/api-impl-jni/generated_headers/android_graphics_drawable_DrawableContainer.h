@@ -7,6 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_graphics_drawable_DrawableContainer_DEFAULT_DITHER
+#define android_graphics_drawable_DrawableContainer_DEFAULT_DITHER 1L
 /*
  * Class:     android_graphics_drawable_DrawableContainer
  * Method:    native_constructor

@@ -228,6 +228,19 @@ public class StateListDrawable extends DrawableContainer {
 	}
 
 	@Override
+	StateListState cloneConstantState() {
+		return new StateListState(mStateListState, this, null);
+	}
+
+	/**
+	 * @hide
+	 */
+	public void clearMutated() {
+		super.clearMutated();
+		mMutated = false;
+	}
+
+	@Override
 	public boolean hasFocusStateSpecified() {
 		int[][] sets = mStateListState.mStateSets;
 		for (int i = 0; sets != null && i < sets.length; i++) {

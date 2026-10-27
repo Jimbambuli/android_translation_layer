@@ -163,12 +163,57 @@ public class Drawable {
 		}
 	}
 
-	public boolean isVisible() {
-		return true;
+	private boolean mVisible = true;
+
+	public final boolean isVisible() {
+		return mVisible;
 	}
 
+	/**
+	 * Set whether this Drawable is visible.  This generally does not impact
+	 * the Drawable's behavior, but is a hint that can be used by some
+	 * Drawables, for example, to decide whether run animations.
+	 *
+	 * @param visible Set to true if visible, false if not.
+	 * @param restart You can supply true here to force the drawable to behave
+	 *                as if it has just become visible, even if it had last
+	 *                been set visible.  Used for example to force animations
+	 *                to restart.
+	 *
+	 * @return boolean Returns true if the new visibility is different than
+	 *         its previous state.
+	 */
 	public boolean setVisible(boolean visible, boolean restart) {
-		return false;
+		boolean changed = mVisible != visible;
+		if (changed) {
+			mVisible = visible;
+			invalidateSelf();
+		}
+		return changed;
+	}
+
+	/**
+	 * Clears the mutated state, allowing this drawable to be cached and
+	 * mutated again.
+	 * <p>
+	 * This is hidden because only framework drawables can be cached, so
+	 * custom drawables don't need to support constant state, mutate(), or
+	 * clearMutated().
+	 *
+	 * @hide
+	 */
+	public void clearMutated() {
+		// Default implementation is no-op.
+	}
+
+	/**
+	 * Inflate a Drawable from an XML resource.
+	 *
+	 * @hide
+	 */
+	void inflateWithAttributes(Resources r, XmlPullParser parser, TypedArray attrs, int visibleAttr)
+	    throws XmlPullParserException, IOException {
+		mVisible = attrs.getBoolean(visibleAttr, mVisible);
 	}
 
 	protected static TypedArray obtainAttributes(Resources r, Theme theme, AttributeSet set, int[] attrs) {
