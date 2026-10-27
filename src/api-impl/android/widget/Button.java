@@ -72,7 +72,7 @@ public class Button extends TextView {
 	public native CharSequence getText();
 
 	@Override
-	public void setTextSize(float size) {}
+	protected void applyNativeTextSize(float size) {}
 
 	/* the native Button draws only the left drawable (TextView keeps all of them) */
 	@Override

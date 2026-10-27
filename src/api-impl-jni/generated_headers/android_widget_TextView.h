@@ -251,10 +251,10 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setText
 
 /*
  * Class:     android_widget_TextView
- * Method:    setTextSize
+ * Method:    native_setTextSize
  * Signature: (F)V
  */
-JNIEXPORT void JNICALL Java_android_widget_TextView_setTextSize
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTextSize
   (JNIEnv *, jobject, jfloat);
 
 /*

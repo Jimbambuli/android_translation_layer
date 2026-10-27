@@ -92,7 +92,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 	@Override
 	public void setTextColor(int color) {}
 	@Override
-	public void setTextSize(float size) {}
+	protected void applyNativeTextSize(float size) {}
 	/* the text as set, like AOSP's TextView.mText; no initializer, as Button's constructor sets the
 	 * text from the attributes before the fields of this class are initialized */
 	private CharSequence mText;

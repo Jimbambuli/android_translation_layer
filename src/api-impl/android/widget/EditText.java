@@ -86,7 +86,7 @@ public class EditText extends TextView {
 		return filtered ? result.toString() : null;
 	}
 	@Override
-	public void setTextSize(float size) {
+	protected void applyNativeTextSize(float size) {
 		native_setTextSize(widget, size);
 		applyHintColor();
 	}

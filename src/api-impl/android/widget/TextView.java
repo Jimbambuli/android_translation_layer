@@ -3,6 +3,7 @@ package android.widget;
 import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.BlendMode;
 import android.graphics.PorterDuff;
@@ -115,7 +116,9 @@ public class TextView extends View {
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textColorHint))
 				setHintTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColorHint));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textSize)) {
-				setTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10));
+				// as AOSP: the pixel size and its unit are kept, the size is set with the layout request
+				mTextSizeUnit = a.peekValue(com.android.internal.R.styleable.TextView_textSize).getComplexUnit();
+				setRawTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10), true);
 			}
 
 			if (a.hasValue(com.android.internal.R.styleable.TextView_textStyle)) {
@@ -346,12 +349,50 @@ public class TextView extends View {
 
 	public native final void native_setText(String text);
 
-	public void setTextSize(int unit, float size) {
-		if (unit != TypedValue.COMPLEX_UNIT_SP)
-			System.out.println("setTextSize called with non-SP unit (" + unit + "), we don't currently handle that");
-		setTextSize(size);
+	/* android-14 TextView.setTextSize(), setTextSizeInternal(), setRawTextSize() and getTextSize(): the size is
+	 * converted to pixels with the display metrics, the paint keeps it (getTextSize(), getPaint().getTextSize()) */
+	public void setTextSize(float size) {
+		setTextSize(TypedValue.COMPLEX_UNIT_SP, size);
 	}
-	public native void setTextSize(float size);
+
+	public void setTextSize(int unit, float size) {
+		setTextSizeInternal(unit, size, true);
+	}
+
+	private void setTextSizeInternal(int unit, float size, boolean shouldRequestLayout) {
+		mTextSizeUnit = unit;
+		Context c = getContext();
+		Resources r;
+
+		if (c == null) {
+			r = Resources.getSystem();
+		} else {
+			r = c.getResources();
+		}
+
+		setRawTextSize(TypedValue.applyDimension(unit, size, r.getDisplayMetrics()), shouldRequestLayout);
+	}
+
+	/* AOSP skips this when the paint already has the size; here the label's size is independent of the
+	 * paint's initial one, so it is always passed on */
+	private void setRawTextSize(float size, boolean shouldRequestLayout) {
+		getPaint().setTextSize(size);
+		applyNativeTextSize(size);
+
+		if (shouldRequestLayout) {
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	private int mTextSizeUnit = -1;
+
+	/* the GtkLabel takes the size as an absolute Pango size in pixels; Button, CheckBox, CompoundButton and
+	 * RadioButton (native widgets with their own text size) ignore it, EditText sets it on its GtkText */
+	protected void applyNativeTextSize(float size) {
+		native_setTextSize(size);
+	}
+	private native void native_setTextSize(float size);
 
 	public native final void native_setTextColor(int color);
 	public void setTextColor(int color) {
@@ -362,6 +403,12 @@ public class TextView extends View {
 			this.colors = colors;
 			updateTextColors();
 		}
+	}
+
+	/* AOSP updateTextColors(): the color for the current drawable state, which the label is given as well */
+	private void updateTextColors() {
+		mCurTextColor = colors.getColorForState(getDrawableState(), colors.getDefaultColor());
+		native_setTextColor(mCurTextColor);
 	}
 
 	@Override
@@ -405,12 +452,6 @@ public class TextView extends View {
 	public void setLineHeight(int unit, float lineHeight) {
 		setLineHeight((int)android.util.TypedValue.applyDimension(unit, lineHeight, getResources().getDisplayMetrics()));
 	}
-	/* AOSP updateTextColors(): the color for the current drawable state, which the label is given as well */
-	private void updateTextColors() {
-		mCurTextColor = colors.getColorForState(getDrawableState(), colors.getDefaultColor());
-		native_setTextColor(mCurTextColor);
-	}
-
 
 	/* API 28, as in AOSP: moves the first/last baseline by adjusting the padding */
 	public void setFirstBaselineToTopHeight(int firstBaselineToTopHeight) {
@@ -667,7 +708,8 @@ public class TextView extends View {
 		}
 
 		if (attributes.mTextSize != -1) {
-			setTextSize(attributes.mTextSize); // in pixels, see setTextSize(float)
+			mTextSizeUnit = attributes.mTextSizeUnit;
+			setRawTextSize(attributes.mTextSize, true /* shouldRequestLayout */);
 		}
 
 		if (attributes.mTypefaceIndex != -1 && !attributes.mFontFamilyExplicit) {
@@ -781,7 +823,9 @@ public class TextView extends View {
 
 	public Typeface getTypeface() { return typeface; }
 
-	public float getTextSize() { return 10; }
+	public float getTextSize() {
+		return getPaint().getTextSize();
+	}
 
 	/* GtkLabel mirrors the alignment in right-to-left layouts, so LEFT and RIGHT are
 	 * treated like START and END */
@@ -2099,7 +2143,6 @@ public class TextView extends View {
 	public final int getAutoLinkMask() {
 		return mAutoLinkMask;
 	}
-}
 
 	/* as AOSP: the hint is kept for getHint(); a GtkLabel has no place to show it while the text is empty
 	 * (EditText overrides this with the placeholder of its GtkText) */
@@ -2112,3 +2155,4 @@ public class TextView extends View {
 	public CharSequence getHint() {
 		return mHint;
 	}
+}

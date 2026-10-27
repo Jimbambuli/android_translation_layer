@@ -119,7 +119,7 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTypeface(JNIEnv *
 }
 #pragma GCC diagnostic pop
 
-JNIEXPORT void JNICALL Java_android_widget_TextView_setTextSize(JNIEnv *env, jobject this, jfloat size)
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTextSize(JNIEnv *env, jobject this, jfloat size)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
 	PangoAttrList *attrs;
