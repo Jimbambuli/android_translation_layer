@@ -187,7 +187,7 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 	 * @param right The right padding of the new layer.
 	 * @param bottom The bottom padding of the new layer.
 	 */
-	private void addLayer(Drawable layer, int id, int left, int top, int right, int bottom) {
+	void addLayer(Drawable layer, int id, int left, int top, int right, int bottom) {
 		final LayerState st = mLayerState;
 		int N = st.mChildren != null ? st.mChildren.length : 0;
 		int i = st.mNum;
@@ -616,7 +616,16 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 		return false;
 	}
 
-	private void ensurePadding() {
+	/* AOSP LayerDrawable.refreshPadding */
+	void refreshPadding() {
+		final int N = mLayerState.mNum;
+		final ChildDrawable[] array = mLayerState.mChildren;
+		for (int i = 0; i < N; i++) {
+			reapplyPadding(i, array[i]);
+		}
+	}
+
+	void ensurePadding() {
 		final int N = mLayerState.mNum;
 		if (mPaddingL != null && mPaddingL.length >= N) {
 			return;
@@ -671,6 +680,9 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 
 	public void setPaddingMode(int paddingMode) {}
 
+	public static final int PADDING_MODE_NEST = 0;
+	public static final int PADDING_MODE_STACK = 1;
+
 	static class ChildDrawable {
 		public Drawable mDrawable;
 		public int mInsetL, mInsetT, mInsetR, mInsetB;
@@ -695,7 +707,11 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 
 		private boolean mAutoMirrored;
 
+		/* AOSP LayerState density handling */
+		int mDensity;
+
 		LayerState(LayerState orig, LayerDrawable owner, Resources res) {
+			mDensity = Drawable.resolveDensity(res, orig != null ? orig.mDensity : 0);
 			if (orig != null) {
 				final ChildDrawable[] origChildDrawable = orig.mChildren;
 				final int N = orig.mNum;
@@ -732,9 +748,27 @@ public class LayerDrawable extends Drawable implements Drawable.Callback {
 				mStateful = orig.mStateful;
 				mCheckedConstantState = mCanConstantState = true;
 				mAutoMirrored = orig.mAutoMirrored;
+
+				if (orig.mDensity != mDensity) {
+					applyDensityScaling(orig.mDensity, mDensity);
+				}
 			} else {
 				mNum = 0;
 				mChildren = null;
+			}
+		}
+
+		void onDensityChanged(int sourceDensity, int targetDensity) {
+			applyDensityScaling(sourceDensity, targetDensity);
+		}
+
+		private void applyDensityScaling(int sourceDensity, int targetDensity) {
+			for (int i = 0; i < mNum; i++) {
+				final ChildDrawable child = mChildren[i];
+				child.mInsetL = Drawable.scaleFromDensity(child.mInsetL, sourceDensity, targetDensity, false);
+				child.mInsetT = Drawable.scaleFromDensity(child.mInsetT, sourceDensity, targetDensity, false);
+				child.mInsetR = Drawable.scaleFromDensity(child.mInsetR, sourceDensity, targetDensity, false);
+				child.mInsetB = Drawable.scaleFromDensity(child.mInsetB, sourceDensity, targetDensity, false);
 			}
 		}
 

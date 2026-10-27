@@ -11,6 +11,7 @@ public class Canvas {
 		BW;
 	}
 	public static final int HAS_ALPHA_LAYER_SAVE_FLAG = (1 << 2);
+	public static final int CLIP_SAVE_FLAG = 0x02;
 
 	private Bitmap bitmap;
 	private GskCanvas gsk_canvas;
@@ -34,6 +35,11 @@ public class Canvas {
 
 	public void setDensity(int density) {
 		this.density = density;
+	}
+
+	/* AOSP's deprecated save(int); the GSK canvas always saves the matrix together with the clip */
+	public int save(int saveFlags) {
+		return save();
 	}
 
 	public int save() {

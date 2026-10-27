@@ -26,6 +26,10 @@ import android.util.Printer;
  * &lt;receiver&gt; tags.
  */
 public class ActivityInfo extends ComponentInfo {
+	/** Marks an int as a CONFIG_* bit mask (annotation only, as in AOSP's ActivityInfo). */
+	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+	public @interface Config {}
+
 	/**
 	 * A style resource identifier (in the package's resources) of this
 	 * activity's theme.  From the "theme" attribute or, if not set, 0.

@@ -21,6 +21,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.graphics.Xfermode;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.LayoutDirection;
@@ -326,6 +327,33 @@ public class Drawable {
 
 	public void setTintMode(PorterDuff.Mode tintMode) {}
 
+	/* AOSP Drawable.setTintBlendMode */
+	private boolean mSetBlendModeInvoked;
+
+	public void setTintBlendMode(BlendMode blendMode) {
+		if (!mSetBlendModeInvoked) {
+			mSetBlendModeInvoked = true;
+			PorterDuff.Mode mode = BlendMode.blendModeToPorterDuffMode(blendMode);
+			setTintMode(mode != null ? mode : Drawable.DEFAULT_TINT_MODE);
+			mSetBlendModeInvoked = false;
+		}
+	}
+
+	/* AOSP Drawable.getDirtyBounds */
+	public Rect getDirtyBounds() {
+		return getBounds();
+	}
+
+	/* AOSP Drawable.setXfermode */
+	public void setXfermode(Xfermode mode) {
+		// Base implementation drops it on the floor for compatibility. Whee!
+	}
+
+	/* AOSP Drawable.getHotspotBounds */
+	public void getHotspotBounds(Rect outRect) {
+		outRect.set(getBounds());
+	}
+
 	public boolean isProjected() { return false; }
 
 	public static Drawable createFromXml(Resources resources, XmlResourceParser parser) throws XmlPullParserException, IOException {
@@ -552,6 +580,38 @@ public class Drawable {
 
 	public int getLayoutDirection() {
 		return LayoutDirection.LTR;
+	}
+
+	/* AOSP Drawable.scaleFromDensity */
+	static float scaleFromDensity(float pixels, int sourceDensity, int targetDensity) {
+		return pixels * targetDensity / sourceDensity;
+	}
+
+	static int scaleFromDensity(int pixels, int sourceDensity, int targetDensity, boolean isSize) {
+		if (pixels == 0 || sourceDensity == targetDensity) {
+			return pixels;
+		}
+
+		final float result = pixels * targetDensity / (float)sourceDensity;
+		if (!isSize) {
+			return (int)result;
+		}
+
+		final int rounded = Math.round(result);
+		if (rounded != 0) {
+			return rounded;
+		} else if (pixels > 0) {
+			return 1;
+		} else {
+			return -1;
+		}
+	}
+
+	/* AOSP Drawable.rethrowAsRuntimeException */
+	static void rethrowAsRuntimeException(Exception cause) throws RuntimeException {
+		final RuntimeException e = new RuntimeException(cause);
+		e.setStackTrace(new StackTraceElement[0]);
+		throw e;
 	}
 
 	static int resolveDensity(Resources r, int parentDensity) {
