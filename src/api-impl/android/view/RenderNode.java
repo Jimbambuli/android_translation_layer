@@ -33,12 +33,16 @@ public class RenderNode {
 	private boolean clipToOutline = false;
 	private float alpha = 1.0f;
 	private Outline outline = null;
+	/* AOSP: the StretchEffect an EdgeEffect gave this node while it was recorded (RenderNode.stretch()) */
+	private float stretchX = 0.0f;
+	private float stretchY = 0.0f;
 
 	private native long nativeCreateSnapshot();
 	private native long nativeCreateNode(long snapshot);
 	private native long nativePatchNode(long node, long old_child, long new_child);
 	private native long nativeTransform(long node, float scaleX, float scaleY, float translationX, float translationY, float rotation, float pivotX, float pivotY);
 	private native long nativeClip(long node, float left, float top, float right, float bottom);
+	private native long nativeStretch(long node, float width, float height, float stretchX, float stretchY);
 	private native void nativeUnref(long node);
 	private native long nativeAddStubNode(long snapshot);
 	private native long nativeCreateEmpyNode();
@@ -287,7 +291,11 @@ public class RenderNode {
 		}
 		if (transformed_node == 0 || old_render_node != render_node) {
 			nativeUnref(transformed_node);
-			transformed_node = nativeTransform(render_node, scaleX, scaleY, translationX, translationY, rotation, pivotX, pivotY);
+			/* hwui RenderNode::applyViewPropertyTransforms(): the stretch applies inside the property transforms */
+			long node = (stretchX != 0 || stretchY != 0) ? nativeStretch(render_node, width, height, stretchX, stretchY) : render_node;
+			transformed_node = nativeTransform(node, scaleX, scaleY, translationX, translationY, rotation, pivotX, pivotY);
+			if (node != render_node)
+				nativeUnref(node);
 			if (clipToOutline) {
 				Rect bounds = new Rect();
 				outline.getRect(bounds);
@@ -317,6 +325,9 @@ public class RenderNode {
 	public void end(DisplayListCanvas canvas) {
 		nativeUnref(render_node);
 		render_node = nativeCreateNode(((GskCanvas)canvas).snapshot);
+		/* the canvas started without a stretch (AOSP: View clears it before recording) */
+		stretchX = ((GskCanvas)canvas).stretch_x;
+		stretchY = ((GskCanvas)canvas).stretch_y;
 		((GskCanvas)canvas).snapshot = 0;
 		if (transformed_node != 0) {
 			nativeUnref(transformed_node);

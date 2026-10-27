@@ -211,6 +211,55 @@ public class GskCanvas extends DisplayListCanvas {
 		native_drawRenderNode(snapshot, node.getGskNode());
 	}
 
+	/* Stretch of the view this canvas records, set by EdgeEffect.draw(). In AOSP this is the
+	 * StretchEffect of the view's RenderNode (RenderNode.stretch(), hwui StretchEffect::mergeWith());
+	 * the WrapperWidget clears it before View.draw() and applies it to what the view drew. */
+	public float stretch_x;
+	public float stretch_y;
+	private float max_stretch_x;
+	private float max_stretch_y;
+
+	/* hwui StretchEffect::NON_ZERO_EPSILON */
+	private static boolean isZero(float value) {
+		return Math.abs(value) <= 0.00004f;
+	}
+
+	/* AOSP RenderNode.stretch() with hwui StretchEffect::mergeWith() */
+	public boolean stretch(float vecX, float vecY, float maxStretchAmountX, float maxStretchAmountY) {
+		if (Float.isInfinite(vecX) || Float.isNaN(vecX)) {
+			throw new IllegalArgumentException("vecX must be a finite, non-NaN value " + vecX);
+		}
+		if (Float.isInfinite(vecY) || Float.isNaN(vecY)) {
+			throw new IllegalArgumentException("vecY must be a finite, non-NaN value " + vecY);
+		}
+		if (maxStretchAmountX <= 0.0f) {
+			throw new IllegalArgumentException(
+					"The max horizontal stretch amount must be >0, got " + maxStretchAmountX);
+		}
+		if (maxStretchAmountY <= 0.0f) {
+			throw new IllegalArgumentException(
+					"The max vertical stretch amount must be >0, got " + maxStretchAmountY);
+		}
+		if (isZero(vecX) && isZero(vecY))
+			return true;
+		if (isZero(stretch_x) && isZero(stretch_y)) {
+			stretch_x = vecX;
+			stretch_y = vecY;
+			max_stretch_x = maxStretchAmountX;
+			max_stretch_y = maxStretchAmountY;
+			return true;
+		}
+		stretch_x += vecX;
+		stretch_y += vecY;
+		if (isZero(stretch_x) && isZero(stretch_y)) {
+			stretch_x = stretch_y = max_stretch_x = max_stretch_y = 0;
+			return true;
+		}
+		max_stretch_x = Math.max(max_stretch_x, maxStretchAmountX);
+		max_stretch_y = Math.max(max_stretch_y, maxStretchAmountY);
+		return true;
+	}
+
 	protected native void native_drawBitmap(long snapshot, long texture, int x, int y, int width, int height, long paint);
 	protected native void native_drawBitmap(long snapshot, long texture, int x, int y, int width, int height, int src_x, int src_y, int src_width, int src_height, long paint);
 	protected native void native_drawRect(long snapshot, float left, float top, float right, float bottom, long paint);

@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 
 #include "../defines.h"
+#include "../widgets/WrapperWidget.h"
 
 #include "../generated_headers/android_view_RenderNode.h"
 
@@ -97,6 +98,11 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeClip(JNIEnv *env, job
 	GskRenderNode *clipped_node = gsk_clip_node_new(node, &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top));
 	gsk_render_node_unref(node);
 	return _INTPTR(clipped_node);
+}
+
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeStretch(JNIEnv *env, jobject this, jlong node_ptr, jfloat width, jfloat height, jfloat stretch_x, jfloat stretch_y)
+{
+	return _INTPTR(atl_stretch_node(_PTR(node_ptr), width, height, stretch_x, stretch_y));
 }
 
 JNIEXPORT void JNICALL Java_android_view_RenderNode_nativeUnref(JNIEnv *env, jobject this, jlong node_ptr)

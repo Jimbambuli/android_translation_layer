@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include <math.h>
 
 #include "../defines.h"
 #include "../util.h"
@@ -322,6 +323,22 @@ static gboolean parent_clips_children(GtkWidget *wrapper)
 #define TRANSFORMATION_TYPE_ALPHA 0x1
 #define TRANSFORMATION_TYPE_MATRIX 0x2
 
+/* hwui StretchEffectBehavior::UniformScale (StretchEffect::makeLinearStretch(), libs/hwui/effects/StretchEffect.h):
+ * scale by 1 + |stretch| about the pulled edge (stretch > 0: left/top edge). hwui's default stretch shader keeps the
+ * content inside the node's bounds, so clip to them. GSK has no runtime shader for hwui's non-linear StretchShader. */
+GskRenderNode *atl_stretch_node(GskRenderNode *node, float width, float height, float stretch_x, float stretch_y)
+{
+	graphene_point_t pivot = GRAPHENE_POINT_INIT(stretch_x > 0 ? 0 : width, stretch_y > 0 ? 0 : height);
+	GskTransform *transform = gsk_transform_translate(NULL, &pivot);
+	transform = gsk_transform_scale(transform, 1 + fabsf(stretch_x), 1 + fabsf(stretch_y));
+	transform = gsk_transform_translate(transform, &GRAPHENE_POINT_INIT(-pivot.x, -pivot.y));
+	GskRenderNode *stretched = gsk_transform_node_new(node, transform);
+	gsk_transform_unref(transform);
+	GskRenderNode *clipped = gsk_clip_node_new(stretched, &GRAPHENE_RECT_INIT(0, 0, width, height));
+	gsk_render_node_unref(stretched);
+	return clipped;
+}
+
 /* this is used to avoid queing layout changes in the middle of snapshotting */
 int snapshot_in_progress = 0;
 static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
@@ -377,11 +394,37 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 	}
 	if (wrapper->have_custom_draw_method) {
 		JNIEnv *env = get_jni_env();
-		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(snapshot));
+		/* AOSP: EdgeEffect.draw() stretches the RenderNode of the view it draws into; View clears the
+		 * stretch before each draw and hwui applies it when it draws the node. A view that stretched
+		 * before draws into its own snapshot here, so the stretch can be applied to all it drew. */
+		GdkSnapshot *content = wrapper->may_stretch ? gtk_snapshot_new() : snapshot;
+		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_x", 0);
+		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_y", 0);
+		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(content));
 		J__View__draw(env, wrapper->jobj, wrapper->canvas);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
+		}
+		float stretch_x = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_x");
+		float stretch_y = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_y");
+		if (content != snapshot) {
+			GskRenderNode *node = gtk_snapshot_free_to_node(content);
+			if (node && (stretch_x != 0 || stretch_y != 0)) {
+				float w = wrapper->real_width > 0 ? wrapper->real_width : gtk_widget_get_width(widget);
+				float h = wrapper->real_height > 0 ? wrapper->real_height : gtk_widget_get_height(widget);
+				GskRenderNode *stretched = atl_stretch_node(node, w, h, stretch_x, stretch_y);
+				gtk_snapshot_append_node(snapshot, stretched);
+				gsk_render_node_unref(stretched);
+			} else if (node) {
+				gtk_snapshot_append_node(snapshot, node);
+			}
+			if (node)
+				gsk_render_node_unref(node);
+		} else if (stretch_x != 0 || stretch_y != 0) {
+			/* the first stretch of this view shows from the next frame on */
+			wrapper->may_stretch = TRUE;
+			gtk_widget_queue_draw(widget);
 		}
 	} else {
 		GtkWidget *widget = &wrapper->parent_instance;

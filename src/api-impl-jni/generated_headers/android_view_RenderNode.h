@@ -49,6 +49,14 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeClip
 
 /*
  * Class:     android_view_RenderNode
+ * Method:    nativeStretch
+ * Signature: (JFFFF)J
+ */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeStretch
+  (JNIEnv *, jobject, jlong, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_view_RenderNode
  * Method:    nativeUnref
  * Signature: (J)V
  */

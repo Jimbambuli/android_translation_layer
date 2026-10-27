@@ -34,6 +34,7 @@ import android.graphics.Paint;
 //import android.graphics.RecordingCanvas;
 import android.graphics.Rect;
 //import android.graphics.RenderNode;
+import android.atl.GskCanvas;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.animation.AnimationUtils;
@@ -605,15 +606,12 @@ public class EdgeEffect {
 			mPaint.setAlpha((int) (0xff * mGlowAlpha));
 			canvas.drawCircle(centerX, centerY, mRadius, mPaint);
 			canvas.restoreToCount(count);
-		}
-		// ATL: there is no RecordingCanvas/RenderNode (the canvas is GSK backed),
-		// so like a software canvas in AOSP the stretch branch is never taken.
-		/* else if (edgeEffectBehavior == TYPE_STRETCH && canvas instanceof RecordingCanvas) {
+		} else if (edgeEffectBehavior == TYPE_STRETCH && canvas instanceof GskCanvas) {
 			if (mState == STATE_RECEDE) {
 				updateSpring();
 			}
 			if (mDistance != 0f) {
-				RecordingCanvas recordingCanvas = (RecordingCanvas) canvas;
+				GskCanvas recordingCanvas = (GskCanvas) canvas;
 				if (mTmpMatrix == null) {
 					mTmpMatrix = new Matrix();
 					mTmpPoints = new float[12];
@@ -635,15 +633,17 @@ public class EdgeEffect {
 				mTmpPoints[11] = mHeight * mDistance; // drag point
 				mTmpMatrix.mapPoints(mTmpPoints);
 
-				RenderNode renderNode = recordingCanvas.mNode;
+				// ATL: the GskCanvas records the view itself (in AOSP its RenderNode), in
+				// the view's coordinates, so the node's left/top offset is 0 here.
+				final float renderNodeLeft = 0, renderNodeTop = 0;
 
-				float left = renderNode.getLeft()
+				float left = renderNodeLeft
 					+ min(mTmpPoints[0], mTmpPoints[2], mTmpPoints[4], mTmpPoints[6]);
-				float top = renderNode.getTop()
+				float top = renderNodeTop
 					+ min(mTmpPoints[1], mTmpPoints[3], mTmpPoints[5], mTmpPoints[7]);
-				float right = renderNode.getLeft()
+				float right = renderNodeLeft
 					+ max(mTmpPoints[0], mTmpPoints[2], mTmpPoints[4], mTmpPoints[6]);
-				float bottom = renderNode.getTop()
+				float bottom = renderNodeTop
 					+ max(mTmpPoints[1], mTmpPoints[3], mTmpPoints[5], mTmpPoints[7]);
 				// assume rotations of increments of 90 degrees
 				float x = mTmpPoints[10] - mTmpPoints[8];
@@ -656,7 +656,7 @@ public class EdgeEffect {
 
 				boolean hasValidVectors = Float.isFinite(vecX) && Float.isFinite(vecY);
 				if (right > left && bottom > top && mWidth > 0 && mHeight > 0 && hasValidVectors) {
-					renderNode.stretch(
+					recordingCanvas.stretch(
 						vecX, // horizontal stretch intensity
 						vecY, // vertical stretch intensity
 						mWidth, // max horizontal stretch in pixels
@@ -664,7 +664,7 @@ public class EdgeEffect {
 					);
 				}
 			}
-		} */ else {
+		} else {
 			// Animations have been disabled or this is TYPE_STRETCH and drawing into a Canvas
 			// that isn't a Recording Canvas, so no effect can be shown. Just end the effect.
 			mState = STATE_IDLE;

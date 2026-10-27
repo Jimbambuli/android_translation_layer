@@ -49,6 +49,8 @@ struct _WrapperWidget {
 	gboolean has_outline_clip;
 	GskRoundedRect outline_clip; /* used when outline_clip_path is NULL */
 	GskPath *outline_clip_path;
+	/* an EdgeEffect stretched this view once: it draws into its own snapshot from then on (see snapshot) */
+	gboolean may_stretch;
 };
 
 /* object data "atl-scrim" of a WrapperWidget: a black layer drawn over the widget (or around it,
@@ -79,6 +81,7 @@ void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnap
 void wrapper_widget_consume_touch_events(WrapperWidget *wrapper);
 void wrapper_widget_register_invalidation_listener(WrapperWidget *wrapper);
 void wrapper_widget_set_animating(WrapperWidget *wrapper, gboolean animating);
+GskRenderNode *atl_stretch_node(GskRenderNode *node, float width, float height, float stretch_x, float stretch_y);
 
 void _setOnTouchListener(JNIEnv *env, jobject this, GtkWidget *widget);
 
