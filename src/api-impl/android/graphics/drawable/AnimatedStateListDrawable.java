@@ -219,10 +219,10 @@ public class AnimatedStateListDrawable extends StateListDrawable {
 			transition = new AnimationDrawableTransition((AnimationDrawable) d,
 					reversed, hasReversibleFlag);
 		} else if (d instanceof AnimatedVectorDrawable) {
-			// ATL: AnimatedVectorDrawable is a stub that draws nothing, so go to
-			// the keyframe right away instead of showing the transition (AOSP:
-			// new AnimatedVectorDrawableTransition(avd, reversed, hasReversibleFlag)).
-			return false;
+			final boolean reversed = state.isTransitionReversed(fromId, toId);
+
+			transition = new AnimatedVectorDrawableTransition((AnimatedVectorDrawable) d,
+					reversed, hasReversibleFlag);
 		} else if (d instanceof Animatable) {
 			transition = new AnimatableTransition((Animatable) d);
 		} else {
