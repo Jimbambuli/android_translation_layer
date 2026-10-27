@@ -5,6 +5,7 @@ import java.util.List;
 
 public class InputDevice {
 
+	public static final int SOURCE_CLASS_NONE = 0x00000000;
 	public static final int SOURCE_CLASS_BUTTON = 0x00000001;
 	public static final int SOURCE_CLASS_POINTER = 0x00000002;
 	public static final int SOURCE_CLASS_JOYSTICK = 0x00000010;
@@ -12,6 +13,7 @@ public class InputDevice {
 	public static final int SOURCE_KEYBOARD = 0x00000100 | SOURCE_CLASS_BUTTON;
 	public static final int SOURCE_TOUCHSCREEN = 0x00001000 | SOURCE_CLASS_POINTER;
 	public static final int SOURCE_MOUSE = 0x00002000 | SOURCE_CLASS_POINTER;
+	public static final int SOURCE_ROTARY_ENCODER = 0x00400000 | SOURCE_CLASS_NONE;
 
 	public static int[] getDeviceIds() {
 		return new int[] {0}; // might work?
