@@ -33,6 +33,7 @@ public class MediaSession {
 	}
 
 	public static class QueueItem {
+		public static final int UNKNOWN_ID = -1;
 		long id;
 		MediaDescription description;
 
@@ -82,14 +83,16 @@ public class MediaSession {
 		String artUrl = null;
 		if (queue != null)
 			for (QueueItem item : queue) {
-				if (item.id == state.activeQueueItemId) {
-					title = item.description.title.toString();
-					subTitle = item.description.subtitle.toString();
-					artUrl = item.description.iconUri == null ? null : item.description.iconUri.toString();
+				if (item.id == state.getActiveQueueItemId()) {
+					CharSequence t = item.description.getTitle();
+					title = t == null ? null : t.toString();
+					CharSequence st = item.description.getSubtitle();
+					subTitle = st == null ? null : st.toString();
+					artUrl = item.description.getIconUri() == null ? null : item.description.getIconUri().toString();
 					break;
 				}
 			}
-		nativeSetState(state.state, state.actions, state.position, state.updateTime, title, subTitle, artUrl);
+		nativeSetState(state.getState(), state.getActions(), state.getPosition(), state.getLastPositionUpdateTime(), title, subTitle, artUrl);
 	}
 
 	public void setMetadata(MediaMetadata metadata) {
