@@ -1,3 +1,4 @@
+#include <math.h>
 #include <gio/gunixinputstream.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
@@ -265,6 +266,20 @@ static void web_view_css_changed(GtkWidget *webview, GtkCssStyleChange *change)
 	webkit_css_changed(webview, change);
 }
 
+/* An Android WebView scales its content by the display density alone: a CSS px is a dp. ATL's dp is GTK's
+ * logical pixel, which GTK already draws at the monitor scale. WebKitGTK additionally zooms every page by
+ * the font resolution, gtk-xft-dpi / 96 (refreshInternalScaling() in WebKitWebViewBase.cpp, which leaves
+ * out changes of up to 2 %), so a desktop text scaling such as 144 dpi with a 150 % monitor would scale
+ * web content twice. Undo that zoom; this follows WebKit when gtk-xft-dpi changes, whichever handler runs
+ * first. Without gtk-xft-dpi WebKit takes the monitor's physical resolution, which GTK does not tell. */
+static void undo_font_dpi_zoom(GtkSettings *settings, GParamSpec *pspec, WebKitWebView *webview)
+{
+	int xft_dpi;
+	g_object_get(settings, "gtk-xft-dpi", &xft_dpi, NULL);
+	double page_scale = xft_dpi > 0 ? xft_dpi / (96 * 1024.0) : 1;
+	webkit_web_view_set_zoom_level(webview, fabs(page_scale - 1) > 0.02 ? 1 / page_scale : 1);
+}
+
 JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	/*
@@ -313,6 +328,8 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
 	 * starts over at every further step, so a spinning wheel scrolls in lurches. */
 	webkit_settings_set_enable_smooth_scrolling(webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webview)), FALSE);
+	undo_font_dpi_zoom(gtk_settings_get_default(), NULL, WEBKIT_WEB_VIEW(webview));
+	g_signal_connect_object(gtk_settings_get_default(), "notify::gtk-xft-dpi", G_CALLBACK(undo_font_dpi_zoom), webview, 0);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
