@@ -1030,7 +1030,23 @@ public class View implements Drawable.Callback {
 	private Transformation animationTransformation;
 	private boolean animationMore; // read by the wrapper widget: draw the next frame
 
-	private CopyOnWriteArrayList<OnLayoutChangeListener> on_layout_change_listeners;
+	/* AOSP's View.ListenerInfo, with the listeners ATL keeps in Java: the click listener and the
+	 * lists of layout change and attach state change listeners */
+	static class ListenerInfo {
+		OnClickListener mOnClickListener;
+		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
+		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
+	}
+
+	ListenerInfo mListenerInfo;
+
+	ListenerInfo getListenerInfo() {
+		if (mListenerInfo != null) {
+			return mListenerInfo;
+		}
+		mListenerInfo = new ListenerInfo();
+		return mListenerInfo;
+	}
 
 	private boolean clickable = false;
 	private boolean longclickable = false;
@@ -1617,13 +1633,12 @@ public class View implements Drawable.Callback {
 	}
 	private native void native_setCanTarget(long widget, boolean can_target);
 	protected native void nativeSetOnTouchListener(long widget);
-	private OnClickListener on_click_listener = null;
 	private OnApplyWindowInsetsListener on_apply_window_insets_listener = null;
 	public void setOnClickListener(OnClickListener l) {
 		if (!isClickable())
 			setClickable(true);
 		nativeSetOnClickListener(widget);
-		on_click_listener = l;
+		getListenerInfo().mOnClickListener = l;
 	}
 	protected native void nativeSetOnClickListener(long widget);
 
@@ -2060,8 +2075,13 @@ public class View implements Drawable.Callback {
 		getLocationOnScreen(location);
 	}
 
-	public void addOnAttachStateChangeListener(OnAttachStateChangeListener l) {
-		onAttachStateChangeListeners.add(l);
+	/* AOSP View.addOnAttachStateChangeListener() */
+	public void addOnAttachStateChangeListener(OnAttachStateChangeListener listener) {
+		ListenerInfo li = getListenerInfo();
+		if (li.mOnAttachStateChangeListeners == null) {
+			li.mOnAttachStateChangeListeners = new CopyOnWriteArrayList<OnAttachStateChangeListener>();
+		}
+		li.mOnAttachStateChangeListeners.add(listener);
 	}
 
 	public Context getContext() {
@@ -2304,7 +2324,8 @@ public class View implements Drawable.Callback {
 	private void notifyLayoutChange() {
 		boolean required = layoutRequired;
 		layoutRequired = false;
-		if (on_layout_change_listeners == null)
+		ListenerInfo li = mListenerInfo;
+		if (li == null || li.mOnLayoutChangeListeners == null || li.mOnLayoutChangeListeners.size() == 0)
 			return;
 		if (!required && left == reportedLeft && top == reportedTop && right == reportedRight && bottom == reportedBottom)
 			return;
@@ -2316,8 +2337,11 @@ public class View implements Drawable.Callback {
 		reportedTop = top;
 		reportedRight = right;
 		reportedBottom = bottom;
-		for (OnLayoutChangeListener on_layout_change_listener : on_layout_change_listeners)
-			on_layout_change_listener.onLayoutChange(this, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom);
+		ArrayList<OnLayoutChangeListener> listenersCopy = (ArrayList<OnLayoutChangeListener>)li.mOnLayoutChangeListeners.clone();
+		int numListeners = listenersCopy.size();
+		for (int i = 0; i < numListeners; ++i) {
+			listenersCopy.get(i).onLayoutChange(this, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom);
+		}
 	}
 
 	/** Helper function to be called from GTKs LayoutManager via JNI */
@@ -2492,14 +2516,23 @@ public class View implements Drawable.Callback {
 		return tag;
 	}
 
+	/* AOSP View.addOnLayoutChangeListener() / removeOnLayoutChangeListener() */
 	public void addOnLayoutChangeListener(OnLayoutChangeListener listener) {
-		if (on_layout_change_listeners == null)
-			on_layout_change_listeners = new CopyOnWriteArrayList<OnLayoutChangeListener>();
-		on_layout_change_listeners.add(listener);
+		ListenerInfo li = getListenerInfo();
+		if (li.mOnLayoutChangeListeners == null) {
+			li.mOnLayoutChangeListeners = new ArrayList<OnLayoutChangeListener>();
+		}
+		if (!li.mOnLayoutChangeListeners.contains(listener)) {
+			li.mOnLayoutChangeListeners.add(listener);
+		}
 	}
+
 	public void removeOnLayoutChangeListener(OnLayoutChangeListener listener) {
-		if (on_layout_change_listeners != null)
-			on_layout_change_listeners.remove(listener);
+		ListenerInfo li = mListenerInfo;
+		if (li == null || li.mOnLayoutChangeListeners == null) {
+			return;
+		}
+		li.mOnLayoutChangeListeners.remove(listener);
 	}
 
 	public boolean isSelected() {
@@ -2811,8 +2844,18 @@ public class View implements Drawable.Callback {
 	}
 
 	@Export
+	/* AOSP View.performClick() (no autofill, no accessibility events) */
 	public boolean performClick() {
-		return callOnClick();
+		final boolean result;
+		final ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnClickListener != null) {
+			playSoundEffect(SoundEffectConstants.CLICK);
+			li.mOnClickListener.onClick(this);
+			result = true;
+		} else {
+			result = false;
+		}
+		return result;
 	}
 
 	public void playSoundEffect(int soundConstant) {}
@@ -3394,6 +3437,18 @@ public class View implements Drawable.Callback {
 		 * window's root view before); Compose initialises its layout direction there */
 		resolveRtlPropertiesIfNeeded();
 		onAttachedToWindow();
+
+		ListenerInfo li = mListenerInfo;
+		final CopyOnWriteArrayList<OnAttachStateChangeListener> listeners = li != null ? li.mOnAttachStateChangeListeners : null;
+		if (listeners != null && listeners.size() > 0) {
+			// NOTE: because of the use of CopyOnWriteArrayList, we *must* use an iterator to
+			// perform the dispatching. The iterator is a safe guard against listeners that
+			// could mutate the list by calling the various add/remove methods. This prevents
+			// the array from being modified while we iterate it.
+			for (OnAttachStateChangeListener listener : listeners) {
+				listener.onViewAttachedToWindow(this);
+			}
+		}
 	}
 
 	@Export
@@ -3402,14 +3457,21 @@ public class View implements Drawable.Callback {
 			return;
 		onDetachedFromWindow();
 		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT; // AOSP's onDetachedFromWindowInternal()
+
+		ListenerInfo li = mListenerInfo;
+		final CopyOnWriteArrayList<OnAttachStateChangeListener> listeners = li != null ? li.mOnAttachStateChangeListeners : null;
+		if (listeners != null && listeners.size() > 0) {
+			// see dispatchAttachedToWindow(): iterate, the list is a CopyOnWriteArrayList
+			for (OnAttachStateChangeListener listener : listeners) {
+				listener.onViewDetachedFromWindow(this);
+			}
+		}
 		attachedToWindow = false;
 	}
 
 	protected void onAttachedToWindow() {
 		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT;
 
-		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
-			listener.onViewAttachedToWindow(this);
 		if (keepScreenOn)
 			native_keep_screen_on(widget, true);
 		if (floating_observer != null) {
@@ -3419,8 +3481,6 @@ public class View implements Drawable.Callback {
 	}
 
 	protected void onDetachedFromWindow() {
-		for (OnAttachStateChangeListener listener : onAttachStateChangeListeners)
-			listener.onViewDetachedFromWindow(this);
 		if (keepScreenOn)
 			native_keep_screen_on(widget, false);
 	}
@@ -3563,9 +3623,13 @@ public class View implements Drawable.Callback {
 		layoutRequested = true;
 	}
 
-	private final CopyOnWriteArrayList<OnAttachStateChangeListener> onAttachStateChangeListeners = new CopyOnWriteArrayList<>();
+	/* AOSP View.removeOnAttachStateChangeListener() */
 	public void removeOnAttachStateChangeListener(OnAttachStateChangeListener listener) {
-		onAttachStateChangeListeners.remove(listener);
+		ListenerInfo li = mListenerInfo;
+		if (li == null || li.mOnAttachStateChangeListeners == null) {
+			return;
+		}
+		li.mOnAttachStateChangeListeners.remove(listener);
 	}
 
 	@Export
@@ -3596,8 +3660,10 @@ public class View implements Drawable.Callback {
 
 	public boolean onCheckIsTextEditor() { return false; }
 
+	/* AOSP View.hasOnClickListeners() */
 	public boolean hasOnClickListeners() {
-		return on_click_listener != null;
+		ListenerInfo li = mListenerInfo;
+		return (li != null && li.mOnClickListener != null);
 	}
 
 	private int text_alignment = TEXT_ALIGNMENT_INHERIT;
@@ -4296,13 +4362,14 @@ public class View implements Drawable.Callback {
 		return true;
 	}
 
+	/* AOSP View.callOnClick() */
 	public boolean callOnClick() {
-		if (on_click_listener != null) {
-			on_click_listener.onClick(this);
+		ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnClickListener != null) {
+			li.mOnClickListener.onClick(this);
 			return true;
-		} else {
-			return false;
 		}
+		return false;
 	}
 
 	public void destroyDrawingCache() {}
