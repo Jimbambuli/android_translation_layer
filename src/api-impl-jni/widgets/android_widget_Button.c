@@ -42,6 +42,18 @@ JNIEXPORT void JNICALL Java_android_widget_Button_native_1setText(JNIEnv *env, j
 	((*env)->ReleaseStringUTFChars(env, text, nativeText));
 }
 
+JNIEXPORT void JNICALL Java_android_widget_Button_native_1setTextSize(JNIEnv *env, jobject this, jlong widget_ptr, jfloat size)
+{
+	GtkButton *button = GTK_BUTTON(_PTR(widget_ptr));
+	GtkLabel *label = box_get_label(env, gtk_button_get_child(button));
+	PangoAttrList *old_attrs = gtk_label_get_attributes(label);
+	PangoAttrList *attrs = old_attrs ? pango_attr_list_copy(old_attrs) : pango_attr_list_new();
+
+	pango_attr_list_change(attrs, pango_attr_size_new_absolute(size * PANGO_SCALE));
+	gtk_label_set_attributes(label, attrs);
+	pango_attr_list_unref(attrs);
+}
+
 static void clicked_cb(GtkWidget *button, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();

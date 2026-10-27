@@ -71,8 +71,14 @@ public class Button extends TextView {
 	@Override
 	public native CharSequence getText();
 
+	/* the label of the GtkButton takes the size as an absolute Pango size in pixels; without it GTK's default font
+	 * (in points) follows gtk-xft-dpi, which Android's sp do not */
 	@Override
-	protected void applyNativeTextSize(float size) {}
+	protected void applyNativeTextSize(float size) {
+		native_setTextSize(widget, size);
+	}
+
+	private native void native_setTextSize(long widget, float size);
 
 	/* the native Button draws only the left drawable (TextView keeps all of them) */
 	@Override

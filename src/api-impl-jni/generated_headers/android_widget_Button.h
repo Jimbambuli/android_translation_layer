@@ -273,6 +273,14 @@ JNIEXPORT jobject JNICALL Java_android_widget_Button_getText
 JNIEXPORT void JNICALL Java_android_widget_Button_native_1updateCompoundDrawable
   (JNIEnv *, jobject, jlong);
 
+/*
+ * Class:     android_widget_Button
+ * Method:    native_setTextSize
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_Button_native_1setTextSize
+  (JNIEnv *, jobject, jlong, jfloat);
+
 #ifdef __cplusplus
 }
 #endif
