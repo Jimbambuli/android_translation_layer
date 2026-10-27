@@ -270,6 +270,7 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	webkit_user_content_manager_unregister_script_message_handler(content_manager, "atlbridge", NULL);
 	webkit_user_content_manager_remove_all_scripts(content_manager);
 	g_signal_handlers_disconnect_by_func(webview, web_view_load_changed, NULL);
+	g_signal_handlers_disconnect_by_func(webview, web_view_uri_changed, NULL);
 	g_signal_handlers_disconnect_by_func(webview, context_menu_cb, NULL);
 	g_signal_handlers_disconnect_by_data(webview, wrapper);
 	// own settings without the page cache, which would keep the old document
