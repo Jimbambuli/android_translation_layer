@@ -1134,6 +1134,8 @@ public class View implements Drawable.Callback {
 			setTextAlignment(textAlignment);
 		}
 
+		clickable = a.getBoolean(com.android.internal.R.styleable.View_clickable, false);
+
 		String handlerName = a.getString(com.android.internal.R.styleable.View_onClick);
 		if (handlerName != null)
 			setOnClickListener(new DeclaredOnClickListener(this, handlerName));
@@ -2331,6 +2333,7 @@ public class View implements Drawable.Callback {
 	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {}
 
 	public final boolean isFocusable() { return atl_focusable; }
+	@Export
 	public boolean isClickable() { return clickable; }
 	public boolean isLongClickable() { return longclickable; }
 

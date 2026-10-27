@@ -325,6 +325,8 @@ static void on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(widget));
 
+	if (!J__View__isClickable(env, wrapper->jobj))
+		return;
 	jboolean handled = J__View__performClick(env, wrapper->jobj);
 
 	if ((*env)->ExceptionCheck(env))
