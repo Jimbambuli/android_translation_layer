@@ -90,9 +90,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public void addView(View child, int index) {
+		if (child == null) {
+			throw new IllegalArgumentException("Cannot add a null child view to a ViewGroup");
+		}
 		LayoutParams params = child.getLayoutParams();
 		if (params == null) {
 			params = generateDefaultLayoutParams();
+			if (params == null) {
+				throw new IllegalArgumentException("generateDefaultLayoutParams() cannot return null");
+			}
 		}
 		addView(child, index, params);
 	}
@@ -105,12 +111,17 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		final LayoutParams params = generateDefaultLayoutParams();
 		params.width = width;
 		params.height = height;
-		addView(child, params);
+		addView(child, -1, params);
 	}
 
+	/* AOSP's ViewGroup.addView(): the layout is requested before the child is added (invalidate(true)
+	 * has no counterpart, GTK redraws what it lays out) */
 	public void addView(View child, int index, LayoutParams params) {
-		addViewInternal(child, index, params, true);
+		if (child == null) {
+			throw new IllegalArgumentException("Cannot add a null child view to a ViewGroup");
+		}
 		requestLayout();
+		addViewInternal(child, index, params, true);
 	}
 
 	/* like AOSP: the children that inherit the layout direction follow this view group */
