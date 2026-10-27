@@ -1150,17 +1150,7 @@ public class TextView extends View {
 				d[Drawables.BOTTOM] != null ? d[Drawables.BOTTOM].paintable : 0);
 	}
 
-	private void resolveDrawables() {
-		onResolveDrawables(getLayoutDirection());
-	}
-
-	/* AOSP View.resetRtlProperties() calls resetResolvedDrawables(), then resolves again */
-	@Override
-	public void onRtlPropertiesChanged(int layoutDirection) {
-		super.onRtlPropertiesChanged(layoutDirection);
-		resetResolvedDrawables();
-		onResolveDrawables(layoutDirection);
-	}
+	/* resolveDrawables() and the reset on a direction change are View's, as in AOSP */
 
 	/* no text layout here (GtkLabel), so the text never needs the scrolling space of the extended padding
 	 * and has no vertical offset: the AOSP values for a text that fits */
@@ -1939,7 +1929,9 @@ public class TextView extends View {
 		}
 	}
 
-	private void resetResolvedDrawables() {
+	@Override
+	protected void resetResolvedDrawables() {
+		super.resetResolvedDrawables();
 		mLastLayoutDirection = -1;
 	}
 

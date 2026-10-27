@@ -1361,8 +1361,7 @@ public class VectorDrawable extends Drawable {
 	}
 
 	private boolean needMirroring() {
-		// return isAutoMirrored() && getLayoutDirection() == LayoutDirection.RTL;
-		return false;
+		return isAutoMirrored() && getLayoutDirection() == LayoutDirection.RTL;
 	}
 
 	@Override

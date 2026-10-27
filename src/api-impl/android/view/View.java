@@ -2691,6 +2691,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setBackgroundDrawable(Drawable backgroundDrawable) {
 		this.background = backgroundDrawable;
+		if (backgroundDrawable != null) {
+			/* AOSP View.setBackgroundDrawable() */
+			resetResolvedDrawablesInternal();
+			backgroundDrawable.setLayoutDirection(getLayoutDirection());
+		}
 		if (backgroundDrawable instanceof ColorDrawable) {
 			native_setBackgroundColor(widget, ((ColorDrawable)backgroundDrawable).getColor());
 			if (needsOutline())
@@ -3449,20 +3454,65 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (layout_params != null && layoutParamsRtl != layoutRtl)
 			applyLayoutParams(layout_params);
 		resolveTextAlignment();
+		/* AOSP: the drawables before the padding, as the padding may depend on their direction */
+		if (!areDrawablesResolved())
+			resolveDrawables();
 		resolvePadding();
-		/* AOSP's resolveDrawables(), without the background and foreground, which take the direction elsewhere here */
-		onResolveDrawables(getLayoutDirection());
 		onRtlPropertiesChanged(getLayoutDirection());
 		return true;
 	}
 
-	/** @hide AOSP: called when the layout direction is resolved, to pass it on to the drawables the view owns */
+	/* AOSP View.PFLAG2_DRAWABLE_RESOLVED */
+	private boolean drawablesResolved = false;
+
+	boolean areDrawablesResolved() { return drawablesResolved; }
+
+	/** AOSP View.resolveDrawables(): hand the layout direction on to the background, the foreground
+	 * and the default focus highlight, then onResolveDrawables() @hide */
+	protected void resolveDrawables() {
+		// Drawables resolution may need to happen before resolving the layout direction (which is
+		// done only during the measure() call).
+		// If the layout direction is not resolved yet, we cannot resolve the Drawables except in
+		// one case: when the raw layout direction has not been defined as LAYOUT_DIRECTION_INHERIT.
+		// So, if the raw layout direction is LAYOUT_DIRECTION_LTR or LAYOUT_DIRECTION_RTL or
+		// LAYOUT_DIRECTION_LOCALE, we can "cheat" and we don't need to wait for the layout
+		// direction to be resolved as its resolved value will be the same as its raw value.
+		if (!isLayoutDirectionResolved() && getRawLayoutDirection() == View.LAYOUT_DIRECTION_INHERIT) {
+			return;
+		}
+
+		final int layoutDirection = isLayoutDirectionResolved() ? getLayoutDirection() : getRawLayoutDirection();
+
+		if (background != null) {
+			background.setLayoutDirection(layoutDirection);
+		}
+		if (mForegroundInfo != null && mForegroundInfo.mDrawable != null) {
+			mForegroundInfo.mDrawable.setLayoutDirection(layoutDirection);
+		}
+		if (mDefaultFocusHighlight != null) {
+			mDefaultFocusHighlight.setLayoutDirection(layoutDirection);
+		}
+		drawablesResolved = true;
+		onResolveDrawables(layoutDirection);
+	}
+
+	/** AOSP View.onResolveDrawables(): called when the layout direction has been resolved, does nothing @hide */
 	public void onResolveDrawables(int layoutDirection) {}
+
+	/** AOSP View.resetResolvedDrawables() @hide */
+	protected void resetResolvedDrawables() {
+		resetResolvedDrawablesInternal();
+	}
+
+	void resetResolvedDrawablesInternal() {
+		drawablesResolved = false;
+	}
 
 	/** @hide */
 	public void resetRtlProperties() {
 		layoutDirectionResolved = false;
 		layoutRtl = false;
+		resetResolvedDrawables();
 		resetResolvedTextAlignment();
 	}
 

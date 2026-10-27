@@ -65,11 +65,19 @@ public class Drawable {
 		this.paintable = paintable;
 	}
 
+	/* AOSP Drawable.setChangingConfigurations / getChangingConfigurations */
+	private int mChangingConfigurations = 0;
+
+	/* AOSP Drawable.mLayoutDirection (View.LAYOUT_DIRECTION_LTR until set) */
+	private int mLayoutDirection;
+
 	public int getChangingConfigurations() {
-		return 0;
+		return mChangingConfigurations;
 	}
 
-	public void setChangingConfigurations(int bitmap) {}
+	public void setChangingConfigurations(int configs) {
+		mChangingConfigurations = configs;
+	}
 
 	/* like AOSP: a drawable that cannot make copies of itself has no constant state */
 	public ConstantState getConstantState() {
@@ -221,7 +229,9 @@ public class Drawable {
 			return r.obtainAttributes(set, attrs);
 	}
 
-	public void clearColorFilter() {}
+	public void clearColorFilter() {
+		setColorFilter(null);
+	}
 
 	private int level = 0;
 
@@ -595,11 +605,15 @@ public class Drawable {
 		bounds.set(mBounds);
 	}
 
+	/* AOSP Drawable.getMinimumWidth / getMinimumHeight */
 	public int getMinimumWidth() {
-		return 10; // FIXME
+		final int intrinsicWidth = getIntrinsicWidth();
+		return intrinsicWidth > 0 ? intrinsicWidth : 0;
 	}
+
 	public int getMinimumHeight() {
-		return 10; // FIXME
+		final int intrinsicHeight = getIntrinsicHeight();
+		return intrinsicHeight > 0 ? intrinsicHeight : 0;
 	}
 
 	protected void onBoundsChange(Rect bounds) {}
@@ -614,14 +628,20 @@ public class Drawable {
 
 	public void jumpToCurrentState() {}
 
-	public boolean setLayoutDirection(int layoutDirection) {
+	/* AOSP Drawable.setLayoutDirection */
+	public final boolean setLayoutDirection(int layoutDirection) {
+		if (mLayoutDirection != layoutDirection) {
+			mLayoutDirection = layoutDirection;
+			return onLayoutDirectionChanged(layoutDirection);
+		}
 		return false;
 	}
 
 	public void setHotspot(float x, float y) {}
 
+	/* AOSP Drawable.getLayoutDirection */
 	public int getLayoutDirection() {
-		return LayoutDirection.LTR;
+		return mLayoutDirection;
 	}
 
 	/* AOSP Drawable.scaleFromDensity */
