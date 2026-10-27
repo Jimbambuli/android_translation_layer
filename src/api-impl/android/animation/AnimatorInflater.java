@@ -569,8 +569,8 @@ public class AnimatorInflater {
 	 * @param hasTo True if "valueTo" exists.
 	 * @param toType The type of "valueTo".
 	 */
-	/*private static void setupValues(ValueAnimator anim, TypedArray arrayAnimator,
-					boolean getFloats, boolean hasFrom, int fromType, boolean hasTo, int toType) {
+	private static void setupValues(ValueAnimator anim, TypedArray arrayAnimator,
+	                                boolean getFloats, boolean hasFrom, int fromType, boolean hasTo, int toType) {
 		int valueFromIndex = R.styleable.Animator_valueFrom;
 		int valueToIndex = R.styleable.Animator_valueTo;
 		if (getFloats) {
@@ -636,7 +636,7 @@ public class AnimatorInflater {
 				}
 			}
 		}
-	}*/
+	}
 
 	private static Animator createAnimatorFromXml(Resources res, Theme theme, XmlPullParser parser,
 	                                              float pixelSize)
@@ -740,18 +740,18 @@ public class AnimatorInflater {
 				int valueType = a.getInt(R.styleable.PropertyValuesHolder_valueType,
 				                         VALUE_TYPE_UNDEFINED);
 
-				/*PropertyValuesHolder pvh = loadPvh(res, theme, parser, propertyName, valueType);
+				PropertyValuesHolder pvh = loadPvh(res, theme, parser, propertyName, valueType);
 				if (pvh == null) {
 					pvh = getPVH(a, valueType,
-						     R.styleable.PropertyValuesHolder_valueFrom,
-						     R.styleable.PropertyValuesHolder_valueTo, propertyName);
+					             R.styleable.PropertyValuesHolder_valueFrom,
+					             R.styleable.PropertyValuesHolder_valueTo, propertyName);
 				}
 				if (pvh != null) {
 					if (values == null) {
 						values = new ArrayList<PropertyValuesHolder>();
 					}
 					values.add(pvh);
-				}*/
+				}
 				a.recycle();
 			}
 
@@ -813,7 +813,7 @@ public class AnimatorInflater {
 		return valueType;
 	}
 
-	/*private static void dumpKeyframes(Object[] keyframes, String header) {
+	private static void dumpKeyframes(Object[] keyframes, String header) {
 		if (keyframes == null || keyframes.length == 0) {
 			return;
 		}
@@ -821,16 +821,14 @@ public class AnimatorInflater {
 		int count = keyframes.length;
 		for (int i = 0; i < count; ++i) {
 			Keyframe keyframe = (Keyframe)keyframes[i];
-			Log.d(TAG, "Keyframe " + i + ": fraction " +
-				       (keyframe.getFraction() < 0 ? "null" : keyframe.getFraction()) + ", "
-				       +
-				       ", value : " + ((keyframe.hasValue()) ? keyframe.getValue() : "null"));
+			Log.d(TAG, "Keyframe " + i + ": fraction " + (keyframe.getFraction() < 0 ? "null" : keyframe.getFraction()) + ", "
+			           + ", value : " + ((keyframe.hasValue()) ? keyframe.getValue() : "null"));
 		}
-	}*/
+	}
 
 	// Load property values holder if there are keyframes defined in it. Otherwise return null.
-	/*private static PropertyValuesHolder loadPvh(Resources res, Theme theme, XmlPullParser parser,
-						    String propertyName, int valueType)
+	private static PropertyValuesHolder loadPvh(Resources res, Theme theme, XmlPullParser parser,
+	                                            String propertyName, int valueType)
 	    throws XmlPullParserException, IOException {
 
 		PropertyValuesHolder value = null;
@@ -902,8 +900,7 @@ public class AnimatorInflater {
 							}
 							endIndex = j;
 						}
-						float gap = keyframeArray[endIndex + 1].getFraction() -
-							    keyframeArray[startIndex - 1].getFraction();
+						float gap = keyframeArray[endIndex + 1].getFraction() - keyframeArray[startIndex - 1].getFraction();
 						distributeKeyframes(keyframeArray, gap, startIndex, endIndex);
 					}
 				}
@@ -915,12 +912,12 @@ public class AnimatorInflater {
 		}
 
 		return value;
-	}*/
+	}
 
-	/*private static Keyframe createNewKeyframe(Keyframe sampleKeyframe, float fraction) {
+	private static Keyframe createNewKeyframe(Keyframe sampleKeyframe, float fraction) {
 		return sampleKeyframe.getType() == float.class ? Keyframe.ofFloat(fraction) : (sampleKeyframe.getType() == int.class) ? Keyframe.ofInt(fraction)
-																      : Keyframe.ofObject(fraction);
-	}*/
+		                                                                                                                      : Keyframe.ofObject(fraction);
+	}
 
 	/**
 	 * Utility function to set fractions on keyframes to cover a gap in which the
@@ -940,17 +937,17 @@ public class AnimatorInflater {
 	 * @param startIndex The index of the first keyframe whose fraction must be set
 	 * @param endIndex The index of the last keyframe whose fraction must be set
 	 */
-	/*private static void distributeKeyframes(Keyframe[] keyframes, float gap,
-						int startIndex, int endIndex) {
+	private static void distributeKeyframes(Keyframe[] keyframes, float gap,
+	                                        int startIndex, int endIndex) {
 		int count = endIndex - startIndex + 2;
 		float increment = gap / count;
 		for (int i = startIndex; i <= endIndex; ++i) {
 			keyframes[i].setFraction(keyframes[i - 1].getFraction() + increment);
 		}
-	}*/
+	}
 
-	/*private static Keyframe loadKeyframe(Resources res, Theme theme, AttributeSet attrs,
-					     int valueType)
+	private static Keyframe loadKeyframe(Resources res, Theme theme, AttributeSet attrs,
+	                                     int valueType)
 	    throws XmlPullParserException, IOException {
 
 		TypedArray a;
@@ -1000,7 +997,7 @@ public class AnimatorInflater {
 		a.recycle();
 
 		return keyframe;
-	}*/
+	}
 
 	private static ObjectAnimator loadObjectAnimator(Resources res, Theme theme, AttributeSet attrs,
 	                                                 float pathErrorScale) throws NotFoundException {
@@ -1051,14 +1048,14 @@ public class AnimatorInflater {
 		parseAnimatorFromTypeArray(anim, arrayAnimator, arrayObjectAnimator, pathErrorScale);
 
 		final int resID = arrayAnimator.getResourceId(R.styleable.Animator_interpolator, 0);
-		/*if (resID > 0) {
+		if (resID > 0) {
 			final Interpolator interpolator = AnimationUtils.loadInterpolator(res, theme, resID);
 			if (interpolator instanceof BaseInterpolator) {
 				anim.appendChangingConfigurations(
 				    ((BaseInterpolator)interpolator).getChangingConfiguration());
 			}
 			anim.setInterpolator(interpolator);
-		}*/
+		}
 
 		arrayAnimator.recycle();
 		if (arrayObjectAnimator != null) {

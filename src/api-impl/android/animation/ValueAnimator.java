@@ -604,7 +604,7 @@ public class ValueAnimator extends Animator implements AnimationHandler.Animatio
 		mValuesMap = new HashMap<>(numValues);
 		for (int i = 0; i < numValues; ++i) {
 			PropertyValuesHolder valuesHolder = values[i];
-			mValuesMap.put(valuesHolder.getProperty_name(), valuesHolder);
+			mValuesMap.put(valuesHolder.getPropertyName(), valuesHolder);
 		}
 		// New property/values/target should cause re-initialization prior to starting
 		mInitialized = false;
@@ -1614,7 +1614,7 @@ public class ValueAnimator extends Animator implements AnimationHandler.Animatio
 			for (int i = 0; i < numValues; ++i) {
 				PropertyValuesHolder newValuesHolder = oldValues[i].clone();
 				anim.mValues[i] = newValuesHolder;
-				anim.mValuesMap.put(newValuesHolder.getProperty_name(), newValuesHolder);
+				anim.mValuesMap.put(newValuesHolder.getPropertyName(), newValuesHolder);
 			}
 		}
 		return anim;
