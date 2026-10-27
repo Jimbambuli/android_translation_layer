@@ -43,6 +43,8 @@ public final class ATLLoadedApp {
 	private final HashMap<String, Service> running_services;
 	private Application application;
 	private Resources.Theme default_theme;
+	/* the AssetManagers for the override configurations, see createResources() */
+	private final HashMap<Configuration, AssetManager> override_assets = new HashMap<>();
 
 	ATLLoadedApp(Resources resources, ClassLoader classLoader,
 	             PackageParser.Package pkg) {
@@ -130,24 +132,40 @@ public final class ATLLoadedApp {
 	}
 
 	public Resources createDefaultResources() {
-		return this.createResources(this.default_resources.getDisplayMetrics(), Context.sys_config);
+		return this.createResources(this.default_resources.getDisplayMetrics(), null);
 	}
 
-	public Resources createResources(DisplayMetrics displayMetrics, Configuration configuration) {
+	/* Like ResourcesManager.getResources(): Resources with the same override configuration share the
+	 * AssetManager (in AOSP the one of their ResourcesImpl), whose native configuration is theirs; those
+	 * of another override configuration get an AssetManager of their own with the same ApkAssets. */
+	public Resources createResources(DisplayMetrics displayMetrics, Configuration overrideConfiguration) {
 		if (displayMetrics == null)
 			displayMetrics = this.default_resources.getDisplayMetrics();
-		if (configuration == null)
-			configuration = Context.sys_config;
-		Resources resources = new Resources(this.default_resources.getAssets(), displayMetrics, configuration);
-		return resources;
+		AssetManager assets = this.default_resources.getAssets();
+		Configuration config = Context.sys_config;
+		/* ResourcesKey.hasOverrideConfiguration() */
+		if (overrideConfiguration != null && !Configuration.EMPTY.equals(overrideConfiguration)) {
+			/* ResourcesManager.findOrCreateResourcesImplForKeyLocked(), createAssetManager() */
+			synchronized (this.override_assets) {
+				assets = this.override_assets.get(overrideConfiguration);
+				if (assets == null) {
+					assets = new AssetManager(this.default_resources.getAssets());
+					this.override_assets.put(new Configuration(overrideConfiguration), assets);
+				}
+			}
+			/* ResourcesManager.generateConfig() */
+			config = new Configuration(Context.sys_config);
+			config.updateFrom(overrideConfiguration);
+		}
+		return new Resources(assets, displayMetrics, config);
 	}
 
-	public ContextImpl createContext(DisplayMetrics displayMetrics, Configuration configuration, int theme) {
-		return new ContextImpl(this.createResources(displayMetrics, configuration), this, theme);
+	public ContextImpl createContext(DisplayMetrics displayMetrics, Configuration overrideConfiguration, int theme) {
+		return new ContextImpl(this.createResources(displayMetrics, overrideConfiguration), this, theme);
 	}
 
-	public ContextImpl createContext(DisplayMetrics displayMetrics, Configuration configuration, Resources.Theme theme) {
-		return new ContextImpl(this.createResources(displayMetrics, configuration), this, theme);
+	public ContextImpl createContext(DisplayMetrics displayMetrics, Configuration overrideConfiguration, Resources.Theme theme) {
+		return new ContextImpl(this.createResources(displayMetrics, overrideConfiguration), this, theme);
 	}
 
 	public Resources.Theme getDefaultTheme() {

@@ -94,8 +94,6 @@ public final class AssetManager {
 	// For communication with native code.
 	private long mObject;
 
-	/* the Resources whose configuration is currently set, see Resources.assets() */
-	/*package*/ Resources mConfigOwner;
 	private int mNObject; // used by the NDK
 
 	private StringBlock mStringBlocks[] = null;
@@ -140,6 +138,20 @@ public final class AssetManager {
 			for (int i = paths.length - 1; i >= 0; i--)
 				asset_paths.add(paths[i]);
 			asset_paths.add(android.os.Environment.getExternalStorageDirectory().getAbsolutePath() + "/");
+			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
+			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
+		}
+	}
+
+	/**
+	 * Create an AssetManager with the assets of another one, like ResourcesManager.createAssetManager()
+	 * does with the cached ApkAssets for a ResourcesImpl of its own.
+	 * {@hide}
+	 */
+	public AssetManager(AssetManager base) {
+		synchronized (this) {
+			init(android.os.Build.VERSION.RESOURCES_SDK_INT);
+			asset_paths.addAll(base.asset_paths);
 			/*String*/ Object[] asset_paths_arr = asset_paths.toArray();
 			native_setApkAssets(asset_paths_arr, asset_paths_arr.length);
 		}
@@ -794,7 +806,7 @@ public final class AssetManager {
 	private native final long newTheme();
 	private native final void deleteTheme(long theme);
 	/*package*/ native final void applyThemeStyle(long theme, int styleRes, boolean force);
-	/*package*/ native final void copyTheme(long dest, long source);
+	/*package*/ native final void copyTheme(long dest, AssetManager sourceAssets, long source);
 	/*package*/ native final int loadThemeAttributeValue(long theme, int ident,
 	                                                     TypedValue outValue,
 	                                                     boolean resolve);

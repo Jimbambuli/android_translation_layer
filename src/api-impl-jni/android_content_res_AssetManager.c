@@ -149,6 +149,34 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_init(JNIEnv *env, j
 	_SET_LONG_FIELD(this, "mObject", _INTPTR(asset_manager));
 }
 
+/* Like ResourcesManager.loadApkAssets(), reuse the ApkAssets of a path in every AssetManager: the
+ * Resources of each override configuration have an AssetManager of their own, and Theme::SetTo()
+ * between two AssetManagers only copies the values of ApkAssets they share. ATL never frees
+ * ApkAssets, so the cache holds them for good. */
+static const struct ApkAssets *load_apk_assets(const char *path)
+{
+	static GMutex lock;
+	static GHashTable *cache;
+	const struct ApkAssets *a;
+
+	g_mutex_lock(&lock);
+	if (!cache)
+		cache = g_hash_table_new(g_str_hash, g_str_equal);
+	a = g_hash_table_lookup(cache, path);
+	if (!a) {
+		if (path[strlen(path) - 1] == '/')
+			a = ApkAssets_loadDir(strdup(path));
+		else
+			a = ApkAssets_load(strdup(path), false);
+		if (a == NULL)
+			android_log_printf(ANDROID_LOG_WARN, "[" __FILE__ "]", "failed to load ApkAssets from %s\n", path);
+		else
+			g_hash_table_insert(cache, g_strdup(path), (gpointer)a);
+	}
+	g_mutex_unlock(&lock);
+	return a;
+}
+
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_native_1setApkAssets(JNIEnv *env, jobject this, jobjectArray paths, int num_assets)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
@@ -160,13 +188,7 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_native_1setApkAsset
 		if (path_jstr == NULL)
 			continue;
 		const char *path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
-		const struct ApkAssets *a;
-		if (path[strlen(path) - 1] == '/')
-			a = ApkAssets_loadDir(strdup(path));
-		else
-			a = ApkAssets_load(strdup(path), false);
-		if (a == NULL)
-			android_log_printf(ANDROID_LOG_WARN, "[" __FILE__ "]", "failed to load ApkAssets from %s\n", path);
+		const struct ApkAssets *a = load_apk_assets(path);
 		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
 		if (a != NULL)
 			apk_assets[actual_count++] = a;
@@ -582,12 +604,20 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceBagValu
 	return JAVA_COOKIE(cookie);
 }
 
-JNIEXPORT void JNICALL Java_android_content_res_AssetManager_copyTheme(JNIEnv *env, jobject this, jlong dest, jlong src)
+/* like AOSP's NativeThemeCopy(): lock both AssetManagers, the themes may belong to different ones */
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_copyTheme(JNIEnv *env, jobject this, jlong dest, jobject src_assets, jlong src)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
+	struct AssetManager *src_asset_manager = _PTR(_GET_LONG_FIELD(src_assets, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
 
-	Theme_setTo(_PTR(dest), _PTR(src));
+	if (src_asset_manager != asset_manager) {
+		AssetManager_lock(src_asset_manager);
+		Theme_setTo(_PTR(dest), _PTR(src));
+		AssetManager_unlock(src_asset_manager);
+	} else {
+		Theme_setTo(_PTR(dest), _PTR(src));
+	}
 }
 
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setConfiguration(

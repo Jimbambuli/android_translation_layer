@@ -441,12 +441,11 @@ public final class ContextImpl extends Context {
 	}
 
 	@Override
-	public Context createConfigurationContext(Configuration config_override) {
-		Configuration config = new Configuration();
-		config.setTo(getResources().getConfiguration());
-		if (config_override != null)
-			config.updateFrom(config_override);
-		return this.atl_loaded_app.createContext(null, config, getTheme());
+	public Context createConfigurationContext(Configuration overrideConfiguration) {
+		if (overrideConfiguration == null) {
+			throw new IllegalArgumentException("overrideConfiguration must not be null");
+		}
+		return this.atl_loaded_app.createContext(null, overrideConfiguration, getTheme());
 	}
 
 	@Override

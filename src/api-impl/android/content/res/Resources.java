@@ -269,7 +269,7 @@ public class Resources {
 	 *         possibly styled text information.
 	 */
 	public CharSequence getText(int id) throws NotFoundException {
-		CharSequence res = assets().getResourceText(id);
+		CharSequence res = mAssets.getResourceText(id);
 		if (res != null) {
 			return res;
 		}
@@ -298,12 +298,12 @@ public class Resources {
 	 */
 	public CharSequence getQuantityText(int id, int quantity) throws NotFoundException {
 		PluralRules rule = getPluralRule();
-		CharSequence res = assets().getResourceBagText(id,
+		CharSequence res = mAssets.getResourceBagText(id,
 		                                              attrForQuantityCode(rule.select(quantity)));
 		if (res != null) {
 			return res;
 		}
-		res = assets().getResourceBagText(id, ID_OTHER);
+		res = mAssets.getResourceBagText(id, ID_OTHER);
 		if (res != null) {
 			return res;
 		}
@@ -468,7 +468,7 @@ public class Resources {
 	 *         possibly styled text information, or def if id is 0 or not found.
 	 */
 	public CharSequence getText(int id, CharSequence def) {
-		CharSequence res = id != 0 ? assets().getResourceText(id) : null;
+		CharSequence res = id != 0 ? mAssets.getResourceText(id) : null;
 		return res != null ? res : def;
 	}
 
@@ -484,7 +484,7 @@ public class Resources {
 	 * @return The styled text array associated with the resource.
 	 */
 	public CharSequence[] getTextArray(int id) throws NotFoundException {
-		CharSequence[] res = assets().getResourceTextArray(id);
+		CharSequence[] res = mAssets.getResourceTextArray(id);
 		if (res != null) {
 			return res;
 		}
@@ -503,7 +503,7 @@ public class Resources {
 	 * @return The string array associated with the resource.
 	 */
 	public String[] getStringArray(int id) throws NotFoundException {
-		String[] res = assets().getResourceStringArray(id);
+		String[] res = mAssets.getResourceStringArray(id);
 		if (res != null) {
 			return res;
 		}
@@ -522,7 +522,7 @@ public class Resources {
 	 * @return The int array associated with the resource.
 	 */
 	public int[] getIntArray(int id) throws NotFoundException {
-		int[] res = assets().getArrayIntResource(id);
+		int[] res = mAssets.getArrayIntResource(id);
 		if (res != null) {
 			return res;
 		}
@@ -543,13 +543,13 @@ public class Resources {
 	 * when done with it.
 	 */
 	public TypedArray obtainTypedArray(int id) throws NotFoundException {
-		int len = assets().getArraySize(id);
+		int len = mAssets.getArraySize(id);
 		if (len < 0) {
 			throw new NotFoundException("Array resource ID #0x" + Integer.toHexString(id));
 		}
 
 		TypedArray array = TypedArray.obtain(this, len);
-		array.mLength = assets().retrieveArray(id, array.mData);
+		array.mLength = mAssets.retrieveArray(id, array.mData);
 		array.mIndices[0] = 0;
 
 		return array;
@@ -1158,7 +1158,7 @@ public class Resources {
 	 */
 	public void getValue(int id, TypedValue outValue, boolean resolveRefs)
 	    throws NotFoundException {
-		boolean found = assets().getResourceValue(id, 0, outValue, resolveRefs);
+		boolean found = mAssets.getResourceValue(id, 0, outValue, resolveRefs);
 		if (found) {
 			return;
 		}
@@ -1182,7 +1182,7 @@ public class Resources {
 	 */
 	public void getValueForDensity(int id, int density, TypedValue outValue, boolean resolveRefs)
 	    throws NotFoundException {
-		boolean found = assets().getResourceValue(id, density, outValue, resolveRefs);
+		boolean found = mAssets.getResourceValue(id, density, outValue, resolveRefs);
 		if (found) {
 			return;
 		}
@@ -1266,7 +1266,7 @@ public class Resources {
 				}
 			}
 
-			assets().applyThemeStyle(theme, resid, force);
+			mAssets.applyThemeStyle(theme, resid, force);
 			mKey.append(resid, force);
 		}
 
@@ -1280,7 +1280,7 @@ public class Resources {
 		 * @param other The existing Theme to copy from.
 		 */
 		public void setTo(Theme other) {
-			getAssets().copyTheme(this.theme, other.theme);
+			mAssets.copyTheme(this.theme, other.mAssets, other.theme);
 			mKey.setTo(other.getKey());
 		}
 
@@ -1390,7 +1390,7 @@ public class Resources {
 			// out the attributes from the XML file (applying type information
 			// contained in the resources and such).
 			XmlResourceParser parser = (XmlResourceParser)set;
-			assets().applyStyle(theme, set != null ? ((XmlBlock.Parser)set).mParseState : 0,
+			mAssets.applyStyle(theme, set != null ? ((XmlBlock.Parser)set).mParseState : 0,
 			                       defStyleAttr, defStyleRes,
 			                       attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
 			array.mRsrcs = attrs;
@@ -1458,7 +1458,7 @@ public class Resources {
 			}
 
 			final TypedArray array = TypedArray.obtain(Resources.this, len);
-			assets().resolveAttrs(theme, 0, 0, values, attrs, array.mData, array.mIndices);
+			mAssets.resolveAttrs(theme, 0, 0, values, attrs, array.mData, array.mIndices);
 			array.mTheme = this;
 			array.mXml = null;
 
@@ -1484,7 +1484,7 @@ public class Resources {
 		 */
 		public boolean resolveAttribute(int resid, TypedValue outValue,
 		                                boolean resolveRefs) {
-			boolean got = assets().getThemeValue(theme, resid, outValue, resolveRefs);
+			boolean got = mAssets.getThemeValue(theme, resid, outValue, resolveRefs);
 			if (debug) {
 				System.out.println(
 				    "resolveAttribute #" + Integer.toHexString(resid) + " got=" + got + ", type=0x" + Integer.toHexString(outValue.type) + ", data=0x" + Integer.toHexString(outValue.data));
@@ -1642,7 +1642,7 @@ public class Resources {
 		// out the attributes from the XML file (applying type information
 		// contained in the resources and such).
 		XmlBlock.Parser parser = (XmlBlock.Parser)set;
-		assets().retrieveAttributes(parser.mParseState, attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
+		mAssets.retrieveAttributes(parser.mParseState, attrs, attrs.length, array.mDataAddress, array.mIndicesAddress);
 
 		array.mXml = parser;
 
@@ -1731,9 +1731,8 @@ public class Resources {
 		}
 	}
 
-	/* All Resources of an app share one AssetManager, whose native configuration is the one of the
-	 * Resources that set it last. Before a configuration dependent lookup, assets() applies the
-	 * configuration of this Resources again if another one has changed it in the meantime. */
+	/* ResourcesImpl.updateConfiguration(): the AssetManager belongs to the Resources of one override
+	 * configuration (see ATLLoadedApp.createResources), like the one of a ResourcesImpl */
 	private void applyAssetConfiguration() {
 		String locale = null;
 		if (mConfiguration.locale != null) {
@@ -1771,16 +1770,6 @@ public class Resources {
 		                         mConfiguration.screenWidthDp, mConfiguration.screenHeightDp,
 		                         mConfiguration.screenLayout, mConfiguration.uiMode,
 		                         Build.VERSION.RESOURCES_SDK_INT);
-		mAssets.mConfigOwner = this;
-	}
-
-	private AssetManager assets() {
-		if (mAssets.mConfigOwner != this) {
-			synchronized (mAccessLock) {
-				applyAssetConfiguration();
-			}
-		}
-		return mAssets;
 	}
 
 	private void clearDrawableCacheLocked(

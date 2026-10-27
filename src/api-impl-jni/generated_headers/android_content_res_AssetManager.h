@@ -334,10 +334,10 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_applyThemeStyle
 /*
  * Class:     android_content_res_AssetManager
  * Method:    copyTheme
- * Signature: (JJ)V
+ * Signature: (JLandroid/content/res/AssetManager;J)V
  */
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_copyTheme
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jobject, jlong);
 
 /*
  * Class:     android_content_res_AssetManager
