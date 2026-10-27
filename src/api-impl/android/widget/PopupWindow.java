@@ -257,20 +257,90 @@ public class PopupWindow {
 		native_setContentView(popover, view == null ? 0 : view.widget);
 	}
 
-	public int getMaxAvailableHeight(View anchor, int yOffset) { return 500; }
+	private final int[] mTmpDrawingLocation = new int[2];
+	private final Rect mTempRect = new Rect();
 
-	public int getMaxAvailableHeight(View anchor, int yOffset, boolean ignoreKeyboard) { return 500; }
+	/* AOSP's PopupWindow.getMaxAvailableHeight() (android-14). getAppRootView() is the anchor's root
+	 * view (ATL has no WindowManagerGlobal); ATL has no system bars to ignore, so the display frame
+	 * for ignoreBottomDecorations is the visible one. */
+	public int getMaxAvailableHeight(View anchor) {
+		return getMaxAvailableHeight(anchor, 0);
+	}
+
+	public int getMaxAvailableHeight(View anchor, int yOffset) {
+		return getMaxAvailableHeight(anchor, yOffset, false);
+	}
+
+	public int getMaxAvailableHeight(View anchor, int yOffset, boolean ignoreBottomDecorations) {
+		final Rect displayFrame = new Rect();
+
+		final View appView = anchor.getRootView();
+		appView.getWindowVisibleDisplayFrame(displayFrame);
+
+		final int[] anchorPos = mTmpDrawingLocation;
+		anchor.getLocationOnScreen(anchorPos);
+
+		final int bottomEdge = displayFrame.bottom;
+
+		final int distanceToBottom;
+		if (overlap_anchor) {
+			distanceToBottom = bottomEdge - anchorPos[1] - yOffset;
+		} else {
+			distanceToBottom = bottomEdge - (anchorPos[1] + anchor.getHeight()) - yOffset;
+		}
+		final int distanceToTop = anchorPos[1] - displayFrame.top + yOffset;
+
+		// anchorPos[1] is distance from anchor to top of screen
+		int returnedHeight = Math.max(distanceToBottom, distanceToTop);
+		if (background != null) {
+			background.getPadding(mTempRect);
+			returnedHeight -= mTempRect.top + mTempRect.bottom;
+		}
+
+		return returnedHeight;
+	}
+
+	private boolean mOutsideTouchable = false;
+
+	public boolean isOutsideTouchable() {
+		return mOutsideTouchable;
+	}
 
 	public void setOutsideTouchable(boolean touchable) {
+		mOutsideTouchable = touchable;
 		/* FIXME: the semantics are different, this seems to specifically exist for cases
 		 * where the popup is *not* modal, so that in addition to the window behind getting
 		 * the real event, the popup gets a special MotionEvent.ACTION_OUTSIDE event */
 		native_setTouchModal(popover, touchable);
 	}
 
-	public void setTouchInterceptor(View.OnTouchListener listener) {}
+	/* the state AOSP's PopupWindow keeps for the window it would add; ATL's popover does not use it */
+	private View.OnTouchListener mTouchInterceptor;
+	private boolean mClippingEnabled = true;
+	private boolean mClipToScreen;
+	private boolean mAllowScrollingAnchorParent = true;
+	private boolean mLayoutInsetDecor = false;
+	private boolean mAttachedInDecor = true;
+	private boolean mAttachedInDecorSet = false;
+	private int mWindowLayoutType = 1000; // WindowManager.LayoutParams.TYPE_APPLICATION_PANEL (FIRST_SUB_WINDOW), not declared in ATL
+	private int mSoftInputMode = 1; // SOFT_INPUT_STATE_UNCHANGED, not declared in ATL
+	private float mElevation;
+	private Rect mEpicenterBounds;
+
+	public void setTouchInterceptor(View.OnTouchListener l) {
+		mTouchInterceptor = l;
+	}
+
+	/* AOSP's PopupWindow.hasContentView() */
+	protected final boolean hasContentView() {
+		return contentView != null;
+	}
 
 	public void showAsDropDown(View anchor, int xoff, int yoff, int gravity) {
+		if (isShowing() || !hasContentView()) {
+			return;
+		}
+
 		anchored_gravity = gravity;
 		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
 		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
@@ -328,6 +398,10 @@ public class PopupWindow {
 	}
 
 	public void showAtLocation(View parent, int gravity, int x, int y) {
+		if (isShowing() || !hasContentView()) {
+			return;
+		}
+
 		if (gravity == Gravity.NO_GRAVITY)
 			gravity = Gravity.TOP | Gravity.START;
 		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
@@ -395,18 +469,63 @@ public class PopupWindow {
 		native_setTouchModal(popover, touchModal);
 	}
 
-	public void setElevation(float elevation) {}
+	public float getElevation() {
+		return mElevation;
+	}
+
+	public void setElevation(float elevation) {
+		mElevation = elevation;
+	}
 
 	public void update(View anchor, int xoff, int yoff, int width, int height) {
 		native_update(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff, width, height,
 		              Gravity.getAbsoluteGravity(anchored_gravity, anchor.getLayoutDirection()), overlap_anchor);
 	}
 
-	public void setWindowLayoutType(int type) {}
+	public void setWindowLayoutType(int layoutType) {
+		mWindowLayoutType = layoutType;
+	}
 
-	public void setIsClippedToScreen(boolean isClippedToScreen) {}
+	public int getWindowLayoutType() {
+		return mWindowLayoutType;
+	}
 
-	public void setEpicenterBounds(Rect bounds) {}
+	public void setIsClippedToScreen(boolean enabled) {
+		mClipToScreen = enabled;
+	}
+
+	public boolean isClippedToScreen() {
+		return mClipToScreen;
+	}
+
+	public void setEpicenterBounds(Rect bounds) {
+		mEpicenterBounds = bounds != null ? new Rect(bounds) : null;
+	}
+
+	public Rect getEpicenterBounds() {
+		return mEpicenterBounds != null ? new Rect(mEpicenterBounds) : null;
+	}
+
+	public void setAttachedInDecor(boolean enabled) {
+		mAttachedInDecor = enabled;
+		mAttachedInDecorSet = true;
+	}
+
+	public boolean isAttachedInDecor() {
+		return mAttachedInDecor;
+	}
+
+	protected final void setLayoutInsetDecor(boolean enabled) {
+		mLayoutInsetDecor = enabled;
+	}
+
+	protected final boolean isLayoutInsetDecor() {
+		return mLayoutInsetDecor;
+	}
+
+	public boolean isClippingEnabled() {
+		return mClippingEnabled;
+	}
 
 	/* a null transition turns the animation off, as on AOSP */
 	public void setEnterTransition(Transition enterTransition) {
@@ -425,7 +544,9 @@ public class PopupWindow {
 		return exit_transition;
 	}
 
-	public void setClippingEnabled(boolean enabled) {}
+	public void setClippingEnabled(boolean enabled) {
+		mClippingEnabled = enabled;
+	}
 
 	/* TODO: handle LayoutParams.WRAP_CONTENT and LayoutParams.MATCH_PARENT */
 	public void setWidth(int width) {
@@ -466,7 +587,13 @@ public class PopupWindow {
 		return overlap_anchor;
 	}
 
-	public void setSoftInputMode(int mode) {}
+	public void setSoftInputMode(int mode) {
+		mSoftInputMode = mode;
+	}
+
+	public int getSoftInputMode() {
+		return mSoftInputMode;
+	}
 
 	protected native long native_constructor();
 	protected native void native_setColors(long widget, int background, int foreground);

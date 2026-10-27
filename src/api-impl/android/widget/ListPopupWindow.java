@@ -1289,9 +1289,8 @@ public class ListPopupWindow {
 		// Max height available on the screen for a popup.
 		final boolean ignoreBottomDecorations =
 		    mPopup.getInputMethodMode() == INPUT_METHOD_NOT_NEEDED;
-		final int maxHeight = 500 /*mPopup.getMaxAvailableHeight(
-				getAnchorView(), mDropDownVerticalOffset, ignoreBottomDecorations)*/
-		    ;
+		final int maxHeight = mPopup.getMaxAvailableHeight(
+		    getAnchorView(), mDropDownVerticalOffset, ignoreBottomDecorations);
 		if (mDropDownAlwaysVisible || mDropDownHeight == ViewGroup.LayoutParams.MATCH_PARENT) {
 			return maxHeight + padding;
 		}
