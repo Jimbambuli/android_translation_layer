@@ -22,6 +22,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 
 public class PopupWindow {
 
@@ -215,10 +216,34 @@ public class PopupWindow {
 
 	public void setBackgroundDrawable(Drawable background) {
 		this.background = background;
-		/* FIXME: use a decorview? */
 		if (contentView != null) {
-			contentView.setBackgroundDrawable(background);
+			updateBackgroundView();
 		}
+	}
+
+	/* the view that is handed to the popover: the content view, or - with a background - a FrameLayout
+	 * around it that carries the background, as AOSP's PopupWindow.createBackgroundView() does, so that
+	 * the padding of the background (a nine-patch, an InsetDrawable) is not applied to the content view
+	 * itself, where ListPopupWindow would count it a second time */
+	private void updateBackgroundView() {
+		if (contentView == null) {
+			native_setContentView(popover, 0);
+			return;
+		}
+		if (contentView.getParent() instanceof ViewGroup)
+			((ViewGroup)contentView.getParent()).removeView(contentView);
+		View backgroundView = contentView;
+		if (background != null) {
+			final ViewGroup.LayoutParams layoutParams = contentView.getLayoutParams();
+			final int height = layoutParams != null && layoutParams.height == ViewGroup.LayoutParams.WRAP_CONTENT
+			                       ? ViewGroup.LayoutParams.WRAP_CONTENT
+			                       : ViewGroup.LayoutParams.MATCH_PARENT;
+			final FrameLayout wrapper = new FrameLayout(contentView.getContext());
+			wrapper.addView(contentView, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
+			wrapper.setBackgroundDrawable(background);
+			backgroundView = wrapper;
+		}
+		native_setContentView(popover, backgroundView.widget);
 	}
 
 	public void setInputMethodMode(int mode) {
@@ -251,10 +276,7 @@ public class PopupWindow {
 
 	public void setContentView(View view) {
 		contentView = view;
-		if (contentView != null) {
-			contentView.setBackground(getBackground());
-		}
-		native_setContentView(popover, view == null ? 0 : view.widget);
+		updateBackgroundView();
 	}
 
 	private final int[] mTmpDrawingLocation = new int[2];
