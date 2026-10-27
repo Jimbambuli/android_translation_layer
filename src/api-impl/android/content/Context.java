@@ -81,6 +81,7 @@ public abstract class Context {
 	private final static String TAG = "Context";
 
 	public static final int MODE_PRIVATE = 0;
+	public static final int MODE_APPEND = 0x8000;
 	public static final String LAYOUT_INFLATER_SERVICE = "layout_inflater";
 	public static final String ACTIVITY_SERVICE = "activity";
 	public static final String AUDIO_SERVICE = "audio";
@@ -152,6 +153,7 @@ public abstract class Context {
 	File obb_dir = null;
 	File cache_dir = null;
 	File nobackup_dir = null;
+	File code_cache_dir = null;
 
 	private static Map<IntentFilter, BroadcastReceiver> receiverMap = new ConcurrentHashMap<>();
 
@@ -282,6 +284,7 @@ public abstract class Context {
 		return getResources().getAssets();
 	}
 
+	/* ContextImpl.makeFilename(), without BlockGuard */
 	private File makeFilename(File base, String name) {
 		if (name.indexOf(File.separatorChar) < 0) {
 			return new File(base, name);
@@ -289,6 +292,19 @@ public abstract class Context {
 		throw new IllegalArgumentException(
 		    "File " + name + " contains a path separator");
 	}
+
+	/* ContextImpl.ensurePrivateDirExists(). ATL: mkdirs() instead of Os.mkdir() with mode 0771, since
+	 * the parents of some of the directories (cache, external) do not exist yet */
+	private static File ensurePrivateDirExists(File file) {
+		if (!file.exists()) {
+			if (!file.mkdirs() && !file.exists())
+				Slog.w(TAG, "Failed to ensure " + file);
+			// (if it exists now, we raced with someone; that's okay)
+		}
+		return file;
+	}
+
+	private final Object mSync = new Object();
 
 	private File getDataDirFile() {
 		if (data_dir == null) {
@@ -302,127 +318,139 @@ public abstract class Context {
 	}
 
 	public File getFilesDir() {
-		if (files_dir == null) {
-			files_dir = new File(getDataDirFile(), "files");
-		}
-		if (!files_dir.exists()) {
-			if (!files_dir.mkdirs()) {
-				if (files_dir.exists()) {
-					// spurious failure; probably racing with another process for this app
-					return files_dir;
-				}
-				Slog.w(TAG, "Unable to create files directory " + files_dir.getPath());
-				return null;
+		synchronized (mSync) {
+			if (files_dir == null) {
+				files_dir = new File(getDataDirFile(), "files");
 			}
+			return ensurePrivateDirExists(files_dir);
 		}
-		return files_dir;
+	}
+
+	/* ContextImpl.getCodeCacheDir(); ATL has no code cache of its own, it is only a directory */
+	public File getCodeCacheDir() {
+		synchronized (mSync) {
+			if (code_cache_dir == null) {
+				code_cache_dir = new File(getDataDirFile(), "code_cache");
+			}
+			return ensurePrivateDirExists(code_cache_dir);
+		}
 	}
 
 	public File getExternalFilesDir(String type) {
-		/* like on Android, keep this apart from getFilesDir() and honour the type subdirectory;
-		 * apps that clean up their external directories would otherwise delete internal data */
-		File dir = new File(getDataDirFile(), "Android/data/" + getPackageName() + "/files");
-		if (type != null)
-			dir = new File(dir, type);
-		if (!dir.exists() && !dir.mkdirs() && !dir.exists()) {
-			Slog.w(TAG, "Unable to create external files directory " + dir.getPath());
-			return null;
-		}
-		return dir;
+		// Operates on primary external storage
+		final File[] dirs = getExternalFilesDirs(type);
+		return (dirs != null && dirs.length > 0) ? dirs[0] : null;
 	}
 
 	public File[] getExternalFilesDirs(String type) {
-		return new File[] {getExternalFilesDir(type)};
+		synchronized (mSync) {
+			/* Environment.buildExternalStorageAppFilesDirs() and buildPaths() */
+			File[] dirs = {new File(getDataDirFile(), "Android/data/" + getPackageName() + "/files")};
+			if (type != null) {
+				dirs = new File[] {new File(dirs[0], type)};
+			}
+			return ensureExternalDirsExistOrFilter(dirs);
+		}
+	}
+
+	/* ContextImpl.ensureExternalDirsExistOrFilter(), without asking StorageManager (vold) to create what
+	 * this process cannot */
+	private File[] ensureExternalDirsExistOrFilter(File[] dirs) {
+		final File[] result = new File[dirs.length];
+		for (int i = 0; i < dirs.length; i++) {
+			File dir = dirs[i];
+			if (!dir.exists()) {
+				try {
+					dir.mkdirs();
+				} catch (Exception e) {
+					Slog.w(TAG, "Failed to ensure " + dir + ": " + e);
+					dir = null;
+				}
+			}
+			if (dir != null && !dir.exists()) {
+				Slog.w(TAG, "Failed to ensure " + dir);
+				dir = null;
+			}
+			result[i] = dir;
+		}
+		return result;
 	}
 
 	public File getObbDir() {
-		if (obb_dir == null) {
-			obb_dir = new File(getDataDirFile(), "Android/obb/" + getPackageName());
-		}
-		if (!obb_dir.exists()) {
-			if (!obb_dir.mkdirs()) {
-				if (obb_dir.exists()) {
-					// spurious failure; probably racing with another process for this app
-					return obb_dir;
-				}
-				Slog.w(TAG, "Unable to create obb directory >" + obb_dir.getPath() + "<");
-				return null;
-			}
-		}
-		return obb_dir;
+		// Operates on primary external storage
+		final File[] dirs = getObbDirs();
+		return (dirs != null && dirs.length > 0) ? dirs[0] : null;
 	}
 
 	public File[] getObbDirs() {
-		return new File[] {getObbDir()};
+		synchronized (mSync) {
+			if (obb_dir == null) {
+				obb_dir = new File(getDataDirFile(), "Android/obb/" + getPackageName());
+			}
+			return ensureExternalDirsExistOrFilter(new File[] {obb_dir});
+		}
 	}
 
+	/* ATL: in /tmp/atl_cache (AOSP: <data dir>/cache), what the system may clear at any time */
 	public File getCacheDir() {
-		if (cache_dir == null) {
-			cache_dir = new File("/tmp/atl_cache/" + getPackageName());
-		}
-		if (!cache_dir.exists()) {
-			if (!cache_dir.mkdirs()) {
-				if (cache_dir.exists()) {
-					// spurious failure; probably racing with another process for this app
-					return cache_dir;
-				}
-				Slog.w(TAG, "Unable to create cache directory >" + cache_dir.getPath() + "<");
-				return null;
+		synchronized (mSync) {
+			if (cache_dir == null) {
+				cache_dir = new File("/tmp/atl_cache/" + getPackageName());
 			}
+			return ensurePrivateDirExists(cache_dir);
 		}
-		return cache_dir;
 	}
 
 	public File getExternalCacheDir() {
-		return getCacheDir();
+		// Operates on primary external storage
+		final File[] dirs = getExternalCacheDirs();
+		return (dirs != null && dirs.length > 0) ? dirs[0] : null;
 	}
 
 	public File[] getExternalCacheDirs() {
-		return new File[] {getCacheDir()};
+		synchronized (mSync) {
+			/* Environment.buildExternalStorageAppCacheDirs() */
+			return ensureExternalDirsExistOrFilter(
+			    new File[] {new File(getDataDirFile(), "Android/data/" + getPackageName() + "/cache")});
+		}
 	}
 
+	/* the directory is <data dir>/no_backup/<package> here, not <data dir>/no_backup as in AOSP: an
+	 * app (WorkManager) that kept its database there would not find it again */
 	public File getNoBackupFilesDir() {
-		if (nobackup_dir == null) {
-			nobackup_dir = new File(getDataDirFile(), "no_backup/" + getPackageName());
-		}
-		if (!nobackup_dir.exists()) {
-			if (!nobackup_dir.mkdirs()) {
-				if (nobackup_dir.exists()) {
-					// spurious failure; probably racing with another process for this app
-					return nobackup_dir;
-				}
-				Slog.w(TAG, "Unable to create no_backup directory >" + nobackup_dir.getPath() + "<");
-				return null;
+		synchronized (mSync) {
+			if (nobackup_dir == null) {
+				nobackup_dir = new File(getDataDirFile(), "no_backup/" + getPackageName());
 			}
+			return ensurePrivateDirExists(nobackup_dir);
 		}
-		return nobackup_dir;
 	}
 
 	private File getPreferencesDir() {
-		if (prefs_dir == null) {
-			prefs_dir = new File(getDataDirFile(), "shared_prefs");
+		synchronized (mSync) {
+			if (prefs_dir == null) {
+				prefs_dir = new File(getDataDirFile(), "shared_prefs");
+			}
+			return ensurePrivateDirExists(prefs_dir);
 		}
-		return prefs_dir;
 	}
 
 	public File[] getExternalMediaDirs() {
-		return getExternalFilesDirs("media");
+		synchronized (mSync) {
+			/* Environment.buildExternalStorageAppMediaDirs() */
+			return ensureExternalDirsExistOrFilter(
+			    new File[] {new File(getDataDirFile(), "Android/media/" + getPackageName())});
+		}
 	}
 
-	/* as in AOSP: <data dir>/app_<name>, next to files/ (an app that cleans up files/ keeps it) */
+	/* ContextImpl.getDir(): <data dir>/app_<name>, without the file mode (there is one user) */
 	public File getDir(String name, int mode) {
-		File dir = new File(getDataDirFile(), "app_" + name);
-		if (!dir.exists()) {
-			if (!dir.mkdirs()) {
-				if (dir.exists()) {
-					// spurious failure; probably racing with another process for this app
-					return dir;
-				}
-				Slog.w(TAG, "Unable to create directory >" + dir.getPath() + "<");
-				return null;
-			}
+		name = "app_" + name;
+		File file = makeFilename(getDataDirFile(), name);
+		if (!file.exists()) {
+			file.mkdir();
 		}
-		return dir;
+		return file;
 	}
 
 	public File getFileStreamPath(String name) {
@@ -430,11 +458,16 @@ public abstract class Context {
 	}
 
 	public boolean deleteFile(String name) {
-		return getFileStreamPath(name).delete();
+		File f = makeFilename(getFilesDir(), name);
+		return f.delete();
+	}
+
+	public File getSharedPreferencesPath(String name) {
+		return makeFilename(getPreferencesDir(), name + ".xml");
 	}
 
 	public File getSharedPrefsFile(String name) {
-		return makeFilename(getPreferencesDir(), name + ".xml");
+		return getSharedPreferencesPath(name);
 	}
 
 	private static Map<String, SharedPreferences> sharedPrefs = new HashMap<String, SharedPreferences>();
@@ -463,19 +496,23 @@ public abstract class Context {
 		return startService(service);
 	}
 
-	// TODO: do these both work? make them look more alike
 	public FileInputStream openFileInput(String name) throws FileNotFoundException {
-		if (Log.isLoggable(TAG, Log.VERBOSE))
-			Slog.v(TAG, "openFileInput called for: '" + name + "'");
-		File file = new File(getFilesDir(), name);
-
-		return new FileInputStream(file);
+		File f = makeFilename(getFilesDir(), name);
+		return new FileInputStream(f);
 	}
 
-	public FileOutputStream openFileOutput(String name, int mode) throws java.io.FileNotFoundException {
-		if (Log.isLoggable(TAG, Log.VERBOSE))
-			Slog.v(TAG, "openFileOutput called for: '" + name + "'");
-		return new FileOutputStream(android.os.Environment.getExternalStorageDirectory().getPath() + "/files/" + name);
+	/* ContextImpl.openFileOutput(), without the file mode */
+	public FileOutputStream openFileOutput(String name, int mode) throws FileNotFoundException {
+		final boolean append = (mode & MODE_APPEND) != 0;
+		File f = makeFilename(getFilesDir(), name);
+		try {
+			return new FileOutputStream(f, append);
+		} catch (FileNotFoundException e) {
+		}
+
+		File parent = f.getParentFile();
+		parent.mkdir();
+		return new FileOutputStream(f, append);
 	}
 
 	public int checkCallingOrSelfPermission(String permission) {
@@ -554,19 +591,31 @@ public abstract class Context {
 
 	public abstract boolean isRestricted();
 
-	public File getDatabasePath(String dbName) {
-		File databaseFile;
-		File databaseDir;
-		if (dbName.startsWith("/")) {
-			databaseFile = new File(dbName);
-			databaseDir = databaseFile.getParentFile();
+	/* ContextImpl.getDatabasePath() */
+	public File getDatabasePath(String name) {
+		File dir;
+		File f;
+
+		if (name.charAt(0) == File.separatorChar) {
+			String dirPath = name.substring(0, name.lastIndexOf(File.separatorChar));
+			dir = new File(dirPath);
+			name = name.substring(name.lastIndexOf(File.separatorChar));
+			f = new File(dir, name);
+
+			if (!dir.isDirectory())
+				dir.mkdir();
 		} else {
-			databaseDir = new File(getDataDirFile(), "databases");
-			databaseFile = new File(databaseDir, dbName);
+			dir = getDatabasesDir();
+			f = makeFilename(dir, name);
 		}
-		if (!databaseDir.exists())
-			databaseDir.mkdirs();
-		return databaseFile;
+
+		return f;
+	}
+
+	private File getDatabasesDir() {
+		synchronized (mSync) {
+			return ensurePrivateDirExists(new File(getDataDirFile(), "databases"));
+		}
 	}
 
 	@Export
@@ -624,9 +673,14 @@ public abstract class Context {
 		return db;
 	}
 
+	/* ContextImpl.deleteDatabase(): the journal and the other files of the database go with it */
 	public boolean deleteDatabase(String name) {
-		File dbFile = getDatabasePath(name);
-		return dbFile.delete();
+		try {
+			File f = getDatabasePath(name);
+			return SQLiteDatabase.deleteDatabase(f);
+		} catch (Exception e) {
+		}
+		return false;
 	}
 
 	public abstract Context createConfigurationContext(Configuration configuration);
@@ -651,7 +705,13 @@ public abstract class Context {
 	}
 
 	public String[] fileList() {
-		return new String[0];
+		return listOrEmpty(getFilesDir());
+	}
+
+	/* FileUtils.listOrEmpty() */
+	private static String[] listOrEmpty(File dir) {
+		String[] list = dir != null ? dir.list() : null;
+		return list != null ? list : new String[0];
 	}
 
 	public void revokeUriPermission(Uri uri, int mode) {
@@ -668,12 +728,7 @@ public abstract class Context {
 	}
 
 	public String[] databaseList() {
-		File databaseDir = new File(getDataDirFile(), "databases");
-		if (databaseDir.exists()) {
-			return databaseDir.list();
-		} else {
-			return new String[0];
-		}
+		return listOrEmpty(getDatabasesDir());
 	}
 
 	public abstract Context createDeviceProtectedStorageContext();
