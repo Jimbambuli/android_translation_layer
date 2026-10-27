@@ -154,6 +154,13 @@ public class BitmapDrawable extends Drawable {
 
 	public void setTileModeX(Shader.TileMode mode) {}
 
+	/* ATL draws the bitmap through its own filter */
+	public void setAntiAlias(boolean aa) {}
+
+	/* ATL draws a bitmap once, stretched to the bounds: tiling is not implemented (ProgressBar's tileify()
+	 * asks for it on the bitmaps of old progress drawables) */
+	public void setTileModeXY(Shader.TileMode xmode, Shader.TileMode ymode) {}
+
 	public Paint getPaint() {
 		return new Paint();
 	}

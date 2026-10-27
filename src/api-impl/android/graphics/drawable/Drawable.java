@@ -442,8 +442,43 @@ public class Drawable {
 				drawable.inflate(resources, parser, attrs, theme);
 				return drawable;
 			}
+			case "level-list": {
+				LevelListDrawable drawable = new LevelListDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
+			case "scale": {
+				ScaleDrawable drawable = new ScaleDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
+			case "clip": {
+				ClipDrawable drawable = new ClipDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
+			case "animated-rotate": {
+				AnimatedRotateDrawable drawable = new AnimatedRotateDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
 			case "animated-vector": {
-				return new AnimatedVectorDrawable();
+				AnimatedVectorDrawable drawable = new AnimatedVectorDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			}
+		}
+
+		/* like AOSP's DrawableInflater.inflateFromClass(): a tag with dots names a Drawable class
+		 * (AnimationScaleListDrawable in the framework's progress drawables) */
+		String name = parser.getName();
+		if (name.indexOf('.') > 0) {
+			try {
+				Drawable drawable = (Drawable)Class.forName(name).getConstructor().newInstance();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
+			} catch (ReflectiveOperationException e) {
+				throw new XmlPullParserException("Error inflating class " + name + ": " + e, parser, e);
 			}
 		}
 
@@ -504,6 +539,23 @@ public class Drawable {
 	/* AOSP has no default; subclasses that know better override it */
 	public int getOpacity() {
 		return PixelFormat.TRANSLUCENT;
+	}
+
+	/* AOSP Drawable.resolveOpacity */
+	public static int resolveOpacity(int op1, int op2) {
+		if (op1 == op2) {
+			return op1;
+		}
+		if (op1 == PixelFormat.UNKNOWN || op2 == PixelFormat.UNKNOWN) {
+			return PixelFormat.UNKNOWN;
+		}
+		if (op1 == PixelFormat.TRANSLUCENT || op2 == PixelFormat.TRANSLUCENT) {
+			return PixelFormat.TRANSLUCENT;
+		}
+		if (op1 == PixelFormat.TRANSPARENT || op2 == PixelFormat.TRANSPARENT) {
+			return PixelFormat.TRANSPARENT;
+		}
+		return PixelFormat.OPAQUE;
 	}
 
 	public Region getTransparentRegion() {

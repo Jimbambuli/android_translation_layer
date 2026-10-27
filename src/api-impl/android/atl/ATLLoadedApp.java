@@ -8,6 +8,7 @@ import android.app.Service;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
+import android.graphics.Compatibility;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.content.res.Resources;
@@ -52,6 +53,8 @@ public final class ATLLoadedApp {
 		this.class_loader = classLoader;
 		this.pkg = pkg;
 		this.effective_sdk_compat = Math.min(pkg.applicationInfo.targetSdkVersion, Build.VERSION.SDK_INT);
+		/* AOSP sets it in ActivityThread.handleBindApplication(); AnimatedVectorDrawable reads it */
+		Compatibility.setTargetSdkVersion(pkg.applicationInfo.targetSdkVersion);
 		this.init_lock = new Object();
 		this.running_services = new HashMap<>();
 	}

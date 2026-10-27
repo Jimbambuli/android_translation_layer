@@ -42,6 +42,9 @@ import android.util.LayoutDirection;
 import android.util.Log;
 import android.util.MathUtils;
 // import android.util.PathParser;
+import android.util.FloatProperty;
+import android.util.IntProperty;
+import android.util.Property;
 import android.util.Xml;
 import com.android.internal.R;
 import java.io.IOException;
@@ -1374,7 +1377,12 @@ public class VectorDrawable extends Drawable {
 		return mVectorState.mAutoMirrored;
 	}
 
-	private static class VectorDrawableState extends ConstantState {
+	static class VectorDrawableState extends ConstantState {
+		/* AOSP gives out the "alpha" property of the root here; ATL animates the renderer (see getTargetByName()) */
+		Property getProperty(String propertyName) {
+			return null;
+		}
+
 		int[] mThemeAttrs;
 		int mChangingConfigurations;
 		VPathRenderer mVPathRenderer;
@@ -1796,7 +1804,56 @@ public class VectorDrawable extends Drawable {
 		}
 	}
 
-	private static class VGroup {
+	/* AOSP's VObject: what AnimatedVectorDrawable animates. AOSP's VObjects hold the native tree and give out
+	 * Property objects that set the native property; these set the Java field the draw reads. */
+	static abstract class VObject {
+		abstract Property getProperty(String propertyName);
+	}
+
+	private static class VGroup extends VObject {
+		private static final Property<VGroup, Float> ROTATION = new FloatProperty<VGroup>("rotation") {
+			@Override public void setValue(VGroup o, float v) { o.setRotation(v); }
+			@Override public Float get(VGroup o) { return o.getRotation(); }
+		};
+		private static final Property<VGroup, Float> PIVOT_X = new FloatProperty<VGroup>("pivotX") {
+			@Override public void setValue(VGroup o, float v) { o.setPivotX(v); }
+			@Override public Float get(VGroup o) { return o.getPivotX(); }
+		};
+		private static final Property<VGroup, Float> PIVOT_Y = new FloatProperty<VGroup>("pivotY") {
+			@Override public void setValue(VGroup o, float v) { o.setPivotY(v); }
+			@Override public Float get(VGroup o) { return o.getPivotY(); }
+		};
+		private static final Property<VGroup, Float> SCALE_X = new FloatProperty<VGroup>("scaleX") {
+			@Override public void setValue(VGroup o, float v) { o.setScaleX(v); }
+			@Override public Float get(VGroup o) { return o.getScaleX(); }
+		};
+		private static final Property<VGroup, Float> SCALE_Y = new FloatProperty<VGroup>("scaleY") {
+			@Override public void setValue(VGroup o, float v) { o.setScaleY(v); }
+			@Override public Float get(VGroup o) { return o.getScaleY(); }
+		};
+		private static final Property<VGroup, Float> TRANSLATE_X = new FloatProperty<VGroup>("translateX") {
+			@Override public void setValue(VGroup o, float v) { o.setTranslateX(v); }
+			@Override public Float get(VGroup o) { return o.getTranslateX(); }
+		};
+		private static final Property<VGroup, Float> TRANSLATE_Y = new FloatProperty<VGroup>("translateY") {
+			@Override public void setValue(VGroup o, float v) { o.setTranslateY(v); }
+			@Override public Float get(VGroup o) { return o.getTranslateY(); }
+		};
+
+		@Override
+		Property getProperty(String propertyName) {
+			switch (propertyName) {
+				case "rotation": return ROTATION;
+				case "pivotX": return PIVOT_X;
+				case "pivotY": return PIVOT_Y;
+				case "scaleX": return SCALE_X;
+				case "scaleY": return SCALE_Y;
+				case "translateX": return TRANSLATE_X;
+				case "translateY": return TRANSLATE_Y;
+			}
+			return null;
+		}
+
 		// mStackedMatrix is only used temporarily when drawing, it combines all
 		// the parents' local matrices with the current one.
 		private final Matrix mStackedMatrix = new Matrix();
@@ -2021,7 +2078,13 @@ public class VectorDrawable extends Drawable {
 	/**
 	 * Common Path information for clip path and normal path.
 	 */
-	private static class VPath {
+	private static class VPath extends VObject {
+		/* AOSP animates "pathData" through a PathParser.PathData; the reflection on setPathData() remains for it */
+		@Override
+		Property getProperty(String propertyName) {
+			return null;
+		}
+
 		protected PathParser.PathDataNode[] mNodes = null;
 		String mPathName;
 		int mChangingConfigurations;
@@ -2119,6 +2182,54 @@ public class VectorDrawable extends Drawable {
 	 * Normal path, which contains all the fill / paint information.
 	 */
 	private static class VFullPath extends VPath {
+		private static final Property<VFullPath, Float> STROKE_WIDTH = new FloatProperty<VFullPath>("strokeWidth") {
+			@Override public void setValue(VFullPath o, float v) { o.setStrokeWidth(v); }
+			@Override public Float get(VFullPath o) { return o.getStrokeWidth(); }
+		};
+		private static final Property<VFullPath, Integer> STROKE_COLOR = new IntProperty<VFullPath>("strokeColor") {
+			@Override public void setValue(VFullPath o, int v) { o.setStrokeColor(v); }
+			@Override public Integer get(VFullPath o) { return o.getStrokeColor(); }
+		};
+		private static final Property<VFullPath, Float> STROKE_ALPHA = new FloatProperty<VFullPath>("strokeAlpha") {
+			@Override public void setValue(VFullPath o, float v) { o.setStrokeAlpha(v); }
+			@Override public Float get(VFullPath o) { return o.getStrokeAlpha(); }
+		};
+		private static final Property<VFullPath, Integer> FILL_COLOR = new IntProperty<VFullPath>("fillColor") {
+			@Override public void setValue(VFullPath o, int v) { o.setFillColor(v); }
+			@Override public Integer get(VFullPath o) { return o.getFillColor(); }
+		};
+		private static final Property<VFullPath, Float> FILL_ALPHA = new FloatProperty<VFullPath>("fillAlpha") {
+			@Override public void setValue(VFullPath o, float v) { o.setFillAlpha(v); }
+			@Override public Float get(VFullPath o) { return o.getFillAlpha(); }
+		};
+		private static final Property<VFullPath, Float> TRIM_PATH_START = new FloatProperty<VFullPath>("trimPathStart") {
+			@Override public void setValue(VFullPath o, float v) { o.setTrimPathStart(v); }
+			@Override public Float get(VFullPath o) { return o.getTrimPathStart(); }
+		};
+		private static final Property<VFullPath, Float> TRIM_PATH_END = new FloatProperty<VFullPath>("trimPathEnd") {
+			@Override public void setValue(VFullPath o, float v) { o.setTrimPathEnd(v); }
+			@Override public Float get(VFullPath o) { return o.getTrimPathEnd(); }
+		};
+		private static final Property<VFullPath, Float> TRIM_PATH_OFFSET = new FloatProperty<VFullPath>("trimPathOffset") {
+			@Override public void setValue(VFullPath o, float v) { o.setTrimPathOffset(v); }
+			@Override public Float get(VFullPath o) { return o.getTrimPathOffset(); }
+		};
+
+		@Override
+		Property getProperty(String propertyName) {
+			switch (propertyName) {
+				case "strokeWidth": return STROKE_WIDTH;
+				case "strokeColor": return STROKE_COLOR;
+				case "strokeAlpha": return STROKE_ALPHA;
+				case "fillColor": return FILL_COLOR;
+				case "fillAlpha": return FILL_ALPHA;
+				case "trimPathStart": return TRIM_PATH_START;
+				case "trimPathEnd": return TRIM_PATH_END;
+				case "trimPathOffset": return TRIM_PATH_OFFSET;
+			}
+			return super.getProperty(propertyName);
+		}
+
 		/////////////////////////////////////////////////////
 		// Variables below need to be copied (deep copy if applicable) for mutation.
 		private int[] mThemeAttrs;

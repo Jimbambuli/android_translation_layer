@@ -195,6 +195,29 @@ public class StateListDrawable extends DrawableContainer {
 	}
 
 	/**
+	 * Gets the number of states contained in this drawable.
+	 *
+	 * @return The number of states contained in this drawable.
+	 * @see #getStateSet(int)
+	 * @see #getStateDrawable(int)
+	 */
+	public int getStateCount() {
+		return mStateListState.getChildCount();
+	}
+
+	/**
+	 * Gets the drawable at an index.
+	 *
+	 * @param index The index of the drawable.
+	 * @return The drawable at the index.
+	 * @see #getStateCount()
+	 * @see #getStateSet(int)
+	 */
+	public Drawable getStateDrawable(int index) {
+		return mStateListState.getChild(index);
+	}
+
+	/**
 	 * Gets the state set at an index.
 	 *
 	 * @param index The index of the state set.

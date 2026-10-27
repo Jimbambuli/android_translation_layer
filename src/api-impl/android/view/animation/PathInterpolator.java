@@ -171,6 +171,8 @@ public class PathInterpolator extends BaseInterpolator {
 		ArrayList<float[]> points = new ArrayList<>();
 		float x = 0, y = 0;
 		char command = 0;
+		/* a Path starts at (0,0) without a moveTo, so the framework's "L0.5,0 C ..." (trim_start_interpolator) is valid */
+		points.add(new float[] {0, 0});
 		try {
 			for (int i = 0; i < tokens.length;) {
 				if (tokens[i].isEmpty()) {
