@@ -6,7 +6,6 @@
 
 #include "../defines.h"
 #include "../util.h"
-#include "../widgets/WrapperWidget.h"
 #include "../generated_headers/android_app_Activity.h"
 #include "../../main-executable/back_button.h"
 #include "android_app_Activity.h"
@@ -16,14 +15,137 @@ extern GtkWindow *window;
 static GList *activity_backlog = NULL;
 static jobject activity_current = NULL;
 
-/* the activity change for which the GtkStack shows a transition: from which activity, and whether the
- * new one opens (otherwise one is closed, or it is recreated if transition_from is NULL) */
+/* the activity change that plays window animations: from which activity, and whether the new one
+ * opens (otherwise one is closed, or it is recreated if transition_from is NULL) */
 static jobject transition_from = NULL;
 static gboolean transition_opening = FALSE;
 
+/* The window's child is a GtkOverlay: the activities are the pages of its GtkStack, and the window
+ * that an activity change animates out is shown by a snapshot (AtlWindowGhost) in one of the two
+ * layers around the stack - below it for an opening change (the new window slides in over the old
+ * one), above it for a closing one (the old window slides away over the revealed one). The stack
+ * itself switches pages at once. */
+static GtkWidget *pages_stack;
+static GtkWidget *pages_below;
+static GtkWidget *pages_above;
+
+GtkWidget *activity_pages_new(void)
+{
+	GtkWidget *overlay = gtk_overlay_new();
+	pages_below = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	pages_stack = gtk_stack_new();
+	pages_above = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	gtk_stack_set_transition_type(GTK_STACK(pages_stack), GTK_STACK_TRANSITION_TYPE_NONE);
+	gtk_widget_set_can_target(pages_above, FALSE);
+	gtk_overlay_set_child(GTK_OVERLAY(overlay), pages_below);
+	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_stack);
+	gtk_overlay_set_measure_overlay(GTK_OVERLAY(overlay), pages_stack, TRUE);
+	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_above);
+	return overlay;
+}
+
+GtkWidget *activity_pages_stack(void)
+{
+	return pages_stack;
+}
+
 static GtkStack *get_stack(void)
 {
-	return GTK_STACK(gtk_window_get_child(window));
+	return GTK_STACK(pages_stack);
+}
+
+/* ---- AtlWindowGhost: the snapshot of a window that an activity change animates out ---- */
+
+#define ATL_TYPE_WINDOW_GHOST (atl_window_ghost_get_type())
+G_DECLARE_FINAL_TYPE(AtlWindowGhost, atl_window_ghost, ATL, WINDOW_GHOST, GtkWidget)
+
+struct _AtlWindowGhost {
+	GtkWidget parent_instance;
+	GskRenderNode *image; /* what the window showed, as it was when the change started */
+	float alpha;
+	float matrix[9]; /* android.graphics.Matrix values of the window animation */
+	gint64 start;
+	gint64 duration; /* ms */
+};
+
+G_DEFINE_FINAL_TYPE(AtlWindowGhost, atl_window_ghost, GTK_TYPE_WIDGET)
+
+static void atl_window_ghost_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
+{
+	AtlWindowGhost *ghost = ATL_WINDOW_GHOST(widget);
+	graphene_matrix_t matrix;
+	/* a 2D affine transformation: x' = xx * x + xy * y + x_0, y' = yx * x + yy * y + y_0 */
+	graphene_matrix_init_from_2d(&matrix, ghost->matrix[0], ghost->matrix[3], ghost->matrix[1], ghost->matrix[4], ghost->matrix[2], ghost->matrix[5]);
+	GskTransform *transform = gsk_transform_matrix(NULL, &matrix);
+	gtk_snapshot_save(snapshot);
+	gtk_snapshot_transform(snapshot, transform);
+	gtk_snapshot_push_opacity(snapshot, ghost->alpha);
+	if (ghost->image)
+		gtk_snapshot_append_node(snapshot, ghost->image);
+	gtk_snapshot_pop(snapshot);
+	gtk_snapshot_restore(snapshot);
+	gsk_transform_unref(transform);
+}
+
+static void atl_window_ghost_dispose(GObject *object)
+{
+	g_clear_pointer(&ATL_WINDOW_GHOST(object)->image, gsk_render_node_unref);
+	G_OBJECT_CLASS(atl_window_ghost_parent_class)->dispose(object);
+}
+
+static void atl_window_ghost_class_init(AtlWindowGhostClass *class)
+{
+	G_OBJECT_CLASS(class)->dispose = atl_window_ghost_dispose;
+	GTK_WIDGET_CLASS(class)->snapshot = atl_window_ghost_snapshot;
+}
+
+static void atl_window_ghost_init(AtlWindowGhost *ghost)
+{
+	ghost->alpha = 1;
+	ghost->matrix[0] = ghost->matrix[4] = ghost->matrix[8] = 1;
+	gtk_widget_set_can_target(GTK_WIDGET(ghost), FALSE);
+	gtk_widget_set_overflow(GTK_WIDGET(ghost), GTK_OVERFLOW_HIDDEN);
+	gtk_widget_set_hexpand(GTK_WIDGET(ghost), TRUE);
+	gtk_widget_set_vexpand(GTK_WIDGET(ghost), TRUE);
+}
+
+/* each frame: Activity.sampleWindowTransition() gives the transformation of the window animation */
+static gboolean ghost_tick(GtkWidget *widget, GdkFrameClock *clock, gpointer user_data)
+{
+	AtlWindowGhost *ghost = ATL_WINDOW_GHOST(widget);
+	gint64 now = gdk_frame_clock_get_frame_time(clock);
+	if (!ghost->start)
+		ghost->start = now;
+	JNIEnv *env = get_jni_env();
+	jfloatArray values = (*env)->NewFloatArray(env, 10);
+	jboolean more = J__Activity__sampleWindowTransition(env, (now - ghost->start) / 1000, values);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		more = FALSE;
+	}
+	if (more) {
+		float out[10];
+		(*env)->GetFloatArrayRegion(env, values, 0, 10, out);
+		ghost->alpha = out[0];
+		memcpy(ghost->matrix, out + 1, sizeof(ghost->matrix));
+		gtk_widget_queue_draw(widget);
+	}
+	(*env)->DeleteLocalRef(env, values);
+	if (!more)
+		gtk_box_remove(GTK_BOX(gtk_widget_get_parent(widget)), widget);
+	return more ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
+}
+
+/* shows a snapshot of the page that is about to be left, for the time the window animations need */
+static void ghost_start(GtkWidget *page, gboolean below)
+{
+	AtlWindowGhost *ghost = g_object_new(ATL_TYPE_WINDOW_GHOST, NULL);
+	GtkSnapshot *snapshot = gtk_snapshot_new();
+	gtk_widget_snapshot_child(gtk_widget_get_parent(page), page, snapshot); /* as GtkStack does for its transitions */
+	ghost->image = gtk_snapshot_free_to_node(snapshot);
+	gtk_box_append(GTK_BOX(below ? pages_below : pages_above), GTK_WIDGET(ghost));
+	gtk_widget_add_tick_callback(GTK_WIDGET(ghost), ghost_tick, NULL, NULL);
 }
 
 static GtkWidget *get_decor_view(JNIEnv *env, jobject activity)
@@ -144,7 +266,7 @@ static void activity_close(JNIEnv *env, jobject activity)
 	}
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
-	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
+	GtkStack *stack = get_stack();
 	gtk_stack_remove(stack, decor_view);
 
 	/* -- run the activity's onDestroy -- */
@@ -153,64 +275,6 @@ static void activity_close(JNIEnv *env, jobject activity)
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
-}
-
-struct scrim_anim {
-	struct atl_scrim scrim;
-	GtkWidget *page;
-	float from;
-	float to;
-	gint64 start;
-	gint64 duration;
-};
-
-/* the tick callback owns the animation and holds a reference on the page; the page's "atl-scrim"
- * points at it until it ends or the next change replaces it */
-static void scrim_anim_free(gpointer data)
-{
-	struct scrim_anim *anim = data;
-	if (g_object_get_data(G_OBJECT(anim->page), "atl-scrim") == anim)
-		g_object_set_data(G_OBJECT(anim->page), "atl-scrim", NULL);
-	g_object_unref(anim->page);
-	g_free(anim);
-}
-
-static gboolean scrim_tick(GtkWidget *stack, GdkFrameClock *clock, gpointer user_data)
-{
-	struct scrim_anim *anim = user_data;
-	if (g_object_get_data(G_OBJECT(anim->page), "atl-scrim") != anim)
-		return G_SOURCE_REMOVE; // replaced by the next change
-	gint64 now = gdk_frame_clock_get_frame_time(clock);
-	if (!anim->start)
-		anim->start = now;
-	double t = MIN(1.0, (double)(now - anim->start) / anim->duration);
-	anim->scrim.alpha = anim->from + (anim->to - anim->from) * t;
-	gtk_widget_queue_draw(anim->page);
-	if (t < 1 && gtk_stack_get_transition_running(GTK_STACK(stack)))
-		return G_SOURCE_CONTINUE;
-	gtk_widget_queue_draw(anim->page);
-	return G_SOURCE_REMOVE; // scrim_anim_free() takes the scrim off the page
-}
-
-/* The activity that does not move in a change fades over the black window (see
- * Activity.getStackTransition). GtkStack draws the leaving page from a snapshot taken when the change
- * starts, so the page that it shows live (the entering one) draws a black scrim of the matching alpha:
- * over itself if it is the one that fades, else around itself, where the leaving page shows. */
-static void start_scrim(JNIEnv *env, GtkStack *stack, GtkWidget *page, int duration)
-{
-	jint scrim = (*env)->GetStaticIntField(env, _CACHED_CLASS(Activity),
-	                                       (*env)->GetStaticFieldID(env, _CACHED_CLASS(Activity), "stackScrim", "I"));
-	if (!(scrim & (1 << 17)) || duration <= 0 || !WRAPPER_IS_WIDGET(page))
-		return;
-	struct scrim_anim *anim = g_new0(struct scrim_anim, 1);
-	anim->page = g_object_ref(page);
-	anim->scrim.outside = !(scrim & (1 << 16));
-	anim->from = (scrim & 0xff) / 255.f;
-	anim->to = ((scrim >> 8) & 0xff) / 255.f;
-	anim->scrim.alpha = anim->from;
-	anim->duration = (gint64)duration * 1000;
-	g_object_set_data(G_OBJECT(page), "atl-scrim", anim);
-	gtk_widget_add_tick_callback(GTK_WIDGET(stack), scrim_tick, anim, scrim_anim_free);
 }
 
 static void weak_ref_free(gpointer ref)
@@ -293,19 +357,21 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	}
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
-	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
-	jint transition = J__Activity__getStackTransition(env, transition_opening ? activity : transition_from, transition_opening ? transition_from : activity,
-	                                                  transition_opening, gtk_widget_get_width(GTK_WIDGET(stack)), gtk_widget_get_height(GTK_WIDGET(stack)));
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-		transition = GTK_STACK_TRANSITION_TYPE_NONE;
+	GtkStack *stack = get_stack();
+	GtkWidget *old_page = gtk_stack_get_visible_child(stack);
+	if (old_page && old_page != decor_view && transition_from) {
+		jint duration = J__Activity__startWindowTransition(env, activity, transition_from, transition_opening,
+		                                                   gtk_widget_get_width(GTK_WIDGET(stack)), gtk_widget_get_height(GTK_WIDGET(stack)));
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			duration = 0;
+		}
+		if (duration > 0)
+			ghost_start(old_page, transition_opening);
 	}
 	transition_from = NULL;
-	gtk_stack_set_transition_type(stack, transition & 0xff);
-	gtk_stack_set_transition_duration(stack, transition >> 8);
 	stack_show_page(stack, decor_view);
-	start_scrim(env, stack, decor_view, transition >> 8);
 
 	J__Activity__performResume(env, activity);
 	if ((*env)->ExceptionCheck(env)) {
@@ -467,21 +533,11 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
 
 	GtkWidget *decor_view = get_decor_view(env, activity_object);
-	GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
+	GtkStack *stack = get_stack();
 	gtk_stack_add_child(stack, decor_view);
 
 	activity_update_current(env);
 	transition_from = NULL;
-}
-
-static void close_after_transition(GtkStack *stack, GParamSpec *pspec, jobject activity)
-{
-	if (gtk_stack_get_transition_running(stack))
-		return;
-	g_signal_handlers_disconnect_by_func(stack, close_after_transition, activity);
-	JNIEnv *env = get_jni_env();
-	activity_close(env, activity);
-	_UNREF(activity);
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobject this, jlong window)
@@ -500,14 +556,8 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 	activity_update_current(env);
 	transition_from = NULL;
 	if (removed_activity) {
-		GtkStack *stack = get_stack();
-		if (gtk_stack_get_transition_running(stack)) {
-			/* as on AOSP, the activity is destroyed after the transition, which still shows it */
-			g_signal_connect(stack, "notify::transition-running", G_CALLBACK(close_after_transition), removed_activity);
-		} else {
-			activity_close(env, removed_activity);
-			_UNREF(removed_activity);
-		}
+		activity_close(env, removed_activity);
+		_UNREF(removed_activity);
 	}
 	if (activity_backlog == NULL && window)
 		g_idle_add(delayed_close_window, _PTR(window));
@@ -586,7 +636,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	if (_GET_BOOL_FIELD(activity, "finishing")) { // finish() was called while it was created
 		activity_backlog = g_list_delete_link(activity_backlog, l);
 	} else {
-		GtkStack *stack = GTK_STACK(gtk_window_get_child(window));
+		GtkStack *stack = get_stack();
 		gtk_stack_add_child(stack, get_decor_view(env, activity));
 		l->data = _REF(activity);
 	}

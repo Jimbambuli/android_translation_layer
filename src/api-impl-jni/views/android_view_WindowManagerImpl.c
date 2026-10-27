@@ -4,6 +4,7 @@
 #include "../util.h"
 #include "../generated_headers/android_view_WindowManagerImpl.h"
 #include "../widgets/android_widget_PopupWindow.h"
+#include "../app/android_app_Activity.h"
 #include "gdk/gdk.h"
 #include "glib-object.h"
 
@@ -136,7 +137,7 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEn
 	GtkEventController *key_controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
 	g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_window_key_pressed), NULL);
 	gtk_widget_add_controller(gtk_widget_get_parent(widget), key_controller);
-	gtk_widget_insert_before(GTK_WIDGET(popover), gtk_window_get_child(window), NULL);
+	gtk_widget_insert_before(GTK_WIDGET(popover), activity_pages_stack(), NULL);
 	atl_popover_place_at_location(popover, gravity, x, y);
 	gtk_popover_present(popover);
 	gtk_popover_popup(popover);

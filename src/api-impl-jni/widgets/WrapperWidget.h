@@ -53,13 +53,6 @@ struct _WrapperWidget {
 	gboolean may_stretch;
 };
 
-/* object data "atl-scrim" of a WrapperWidget: a black layer drawn over the widget (or around it,
- * outside its bounds) with the given alpha, for the fade of an activity change */
-struct atl_scrim {
-	float alpha;
-	gboolean outside;
-};
-
 struct _WrapperWidgetClass {
 	GtkWidgetClass parent_class;
 };

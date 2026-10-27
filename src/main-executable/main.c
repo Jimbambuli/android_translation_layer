@@ -50,7 +50,7 @@ gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 	/* popups (PopupWindow, WindowManager windows) are popovers in the GtkStack next to the
 	 * activities' pages; GtkStack's dispose removes only pages and loops forever on any other
 	 * child, so they go first, as AOSP removes the remaining windows of a closed app */
-	GtkWidget *stack = gtk_window_get_child(self);
+	GtkWidget *stack = activity_pages_stack();
 	GtkWidget *child = stack ? gtk_widget_get_first_child(stack) : NULL;
 	while (child) {
 		GtkWidget *next = gtk_widget_get_next_sibling(child);
@@ -548,9 +548,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	/* -- misc -- */
 
 	window = gtk_application_window_new(app);
-	GtkWidget *stack = gtk_stack_new();
-	gtk_stack_set_transition_type(GTK_STACK(stack), GTK_STACK_TRANSITION_TYPE_SLIDE_LEFT_RIGHT);
-	gtk_window_set_child(GTK_WINDOW(window), stack);
+	gtk_window_set_child(GTK_WINDOW(window), activity_pages_new());
 	atl_window_android_tab_focus(GTK_WINDOW(window));
 	atl_window_android_wheel_acceleration(GTK_WINDOW(window));
 	atl_window_android_mouse_back(GTK_WINDOW(window), G_CALLBACK(current_activity_back_pressed), NULL);
