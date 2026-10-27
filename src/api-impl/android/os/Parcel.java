@@ -395,8 +395,13 @@ public class Parcel {
 		return bundle;
 	}
 
-	public Bundle readBundle() throws ReflectiveOperationException {
-		return readBundle(getClass().getClassLoader());
+	/** As in android-14: a Bundle that cannot be read throws the unchecked BadParcelableException. */
+	public Bundle readBundle() {
+		try {
+			return readBundle(getClass().getClassLoader());
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
+		}
 	}
 
 	public void writeInterfaceToken(String value) {
@@ -428,6 +433,42 @@ public class Parcel {
 		}
 	}
 
+	/** android-14 Parcel.writeString8(): a null-safe UTF-8 string (here the same wire format as writeString()). */
+	public void writeString8(String val) {
+		writeString(val);
+	}
+
+	public String readString8() {
+		return readString();
+	}
+
+	/** android-14 Parcel.writeTypedObject(): a presence flag, then the object. */
+	public <T extends Parcelable> void writeTypedObject(T val, int parcelableFlags) {
+		if (val != null) {
+			writeInt(1);
+			val.writeToParcel(this, parcelableFlags);
+		} else {
+			writeInt(0);
+		}
+	}
+
+	public <T> T readTypedObject(Parcelable.Creator<T> c) {
+		if (readInt() != 0) {
+			return c.createFromParcel(this);
+		} else {
+			return null;
+		}
+	}
+
+	/** android-14 Parcel.readParcelable(ClassLoader, Class): the result must be of the requested type. */
+	public <T> T readParcelable(ClassLoader loader, Class<T> clazz) {
+		Parcelable p = readParcelable(loader != null ? loader : getClass().getClassLoader());
+		if (p != null && !clazz.isInstance(p)) {
+			throw new BadParcelableException("Parcelable " + p.getClass().getName() + " is not a " + clazz.getName());
+		}
+		return (T)p;
+	}
+
 	public void writeStringArray(String[] strings) {
 		int len = strings == null ? -1 : strings.length;
 		writeInt(len);
@@ -441,6 +482,11 @@ public class Parcel {
 			throw new RuntimeException("array length mismatch");
 		for (int i = 0; i < size; i++)
 			strings[i] = readString();
+	}
+
+	/** android-14 Parcel.readStringArray(): same as createStringArray(). */
+	public String[] readStringArray() {
+		return createStringArray();
 	}
 
 	public String[] createStringArray() {
@@ -609,11 +655,11 @@ public class Parcel {
 		}
 	}
 
-	public Object[] createTypedArray(Parcelable.Creator<Parcelable> creator) {
+	public <T> T[] createTypedArray(Parcelable.Creator<T> creator) {
 		int size = readInt();
 		if (size == -1)
 			return null;
-		Object[] array = creator.newArray(size);
+		T[] array = creator.newArray(size);
 		for (int i = 0; i < size; i++) {
 			if (readBoolean())
 				array[i] = creator.createFromParcel(this);
@@ -621,7 +667,7 @@ public class Parcel {
 		return array;
 	}
 
-	public void writeTypedList(List<Parcelable> list) {
+	public <T extends Parcelable> void writeTypedList(List<T> list) {
 		int len = list == null ? -1 : list.size();
 		writeInt(len);
 		for (int i = 0; i < len; i++) {
@@ -631,7 +677,7 @@ public class Parcel {
 		}
 	}
 
-	public void readTypedList(List<Parcelable> list, Parcelable.Creator<Parcelable> creator) throws ReflectiveOperationException {
+	public <T> void readTypedList(List<T> list, Parcelable.Creator<T> creator) {
 		int size = readInt();
 		list.clear();
 		for (int i = 0; i < size; i++) {
@@ -642,11 +688,11 @@ public class Parcel {
 		}
 	}
 
-	public ArrayList<Parcelable> createTypedArrayList(Parcelable.Creator<Parcelable> creator) throws ReflectiveOperationException {
+	public <T> ArrayList<T> createTypedArrayList(Parcelable.Creator<T> creator) {
 		int size = readInt();
 		if (size == -1)
 			return null;
-		ArrayList<Parcelable> list = new ArrayList<>(size);
+		ArrayList<T> list = new ArrayList<>(size);
 		for (int i = 0; i < size; i++) {
 			if (readBoolean())
 				list.add(creator.createFromParcel(this));
