@@ -420,7 +420,9 @@ public class Drawable {
 				return drawable;
 			}
 			case "animation-list": {
-				return new AnimationDrawable();
+				AnimationDrawable drawable = new AnimationDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
 			}
 			case "adaptive-icon": {
 				AdaptiveIconDrawable drawable = new AdaptiveIconDrawable();

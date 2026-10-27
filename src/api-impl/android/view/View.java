@@ -2081,8 +2081,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		postDelayed(runnable, time - SystemClock.uptimeMillis());
 	}
 
+	/* AOSP removes the callbacks posted with the drawable as token; scheduleDrawable() has none here,
+	 * so the runnable itself is removed */
 	public void unscheduleDrawable(Drawable drawable, Runnable runnable) {
-		/* TODO */
+		if (runnable != null)
+			removeCallbacks(runnable);
 	}
 
 	public void unscheduleDrawable(Drawable drawable) {}
