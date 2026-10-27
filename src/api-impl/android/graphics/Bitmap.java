@@ -34,12 +34,53 @@ public final class Bitmap implements Parcelable {
 		}
 	}
 
+	/**
+	 * Specifies the known formats a bitmap can be compressed into
+	 */
 	public enum CompressFormat {
-		JPEG,
-		PNG,
-		WEBP,
-		WEBP_LOSSY,
-		WEBP_LOSSLESS,
+		/**
+		 * Compress to the JPEG format. {@code quality} of {@code 0} means
+		 * compress for the smallest size. {@code 100} means compress for max
+		 * visual quality.
+		 */
+		JPEG          (0),
+		/**
+		 * Compress to the PNG format. PNG is lossless, so {@code quality} is
+		 * ignored.
+		 */
+		PNG           (1),
+		/**
+		 * Compress to the WEBP format. {@code quality} of {@code 0} means
+		 * compress for the smallest size. {@code 100} means compress for max
+		 * visual quality. As of {@link android.os.Build.VERSION_CODES#Q}, a
+		 * value of {@code 100} results in a file in the lossless WEBP format.
+		 * Otherwise the file will be in the lossy WEBP format.
+		 *
+		 * @deprecated in favor of the more explicit
+		 *             {@link CompressFormat#WEBP_LOSSY} and
+		 *             {@link CompressFormat#WEBP_LOSSLESS}.
+		 */
+		@Deprecated
+		WEBP          (2),
+		/**
+		 * Compress to the WEBP lossy format. {@code quality} of {@code 0} means
+		 * compress for the smallest size. {@code 100} means compress for max
+		 * visual quality.
+		 */
+		WEBP_LOSSY    (3),
+		/**
+		 * Compress to the WEBP lossless format. {@code quality} refers to how
+		 * much effort to put into compression. A value of {@code 0} means to
+		 * compress quickly, resulting in a relatively large file size.
+		 * {@code 100} means to spend more time compressing, resulting in a
+		 * smaller file.
+		 */
+		WEBP_LOSSLESS (4);
+
+		CompressFormat(int nativeInt) {
+			this.nativeInt = nativeInt;
+		}
+		final int nativeInt;
 	}
 
 	private int width;
@@ -272,15 +313,26 @@ public final class Bitmap implements Parcelable {
 		return mutable;
 	}
 
-	public boolean compress(Bitmap.CompressFormat format, int quality, OutputStream stream) throws IOException {
-		byte[] data;
-		if (format == CompressFormat.JPEG)
-			data = native_save_to_jpeg(getTexture(), quality);
-		else // there is no WebP encoder; PNG is lossless, and decoders detect the format from the data
-			data = native_save_to_png(getTexture());
+	public boolean compress(Bitmap.CompressFormat format, int quality, OutputStream stream) {
+		if (recycled) {
+			throw new IllegalStateException("Can't compress a recycled bitmap");
+		}
+		// do explicit check before calling the native method
+		if (stream == null) {
+			throw new NullPointerException();
+		}
+		if (quality < 0 || quality > 100) {
+			throw new IllegalArgumentException("quality must be 0..100");
+		}
+		/* AOSP's nativeCompress() writes to the stream and returns false when that fails */
+		byte[] data = native_compress(getTexture(), format.nativeInt, quality);
 		if (data == null)
 			return false;
-		stream.write(data);
+		try {
+			stream.write(data);
+		} catch (IOException e) {
+			return false;
+		}
 		return true;
 	}
 
@@ -320,7 +372,6 @@ public final class Bitmap implements Parcelable {
 	private static native long native_ref_texture(long texture);
 	private static native void native_get_pixels(long texture, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native void native_copy_to_buffer(long texture, Buffer buffer, int memory_format, int stride);
-	private static native byte[] native_save_to_png(long texture);
-	private static native byte[] native_save_to_jpeg(long texture, int quality);
+	private static native byte[] native_compress(long texture, int format, int quality);
 	private static native void native_set_pixels(long snapshot, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 }

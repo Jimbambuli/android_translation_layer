@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
 #include <stdio.h>
+#include <webp/encode.h>
 
 #include "../defines.h"
 #include "../util.h"
@@ -130,43 +131,101 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1to_1buffer(JNI
 	gdk_texture_downloader_free(downloader);
 }
 
-JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1png(JNIEnv *env, jclass class, jlong texture_ptr)
+static GBytes *download(GdkTexture *texture, GdkMemoryFormat format, gsize *stride)
 {
-	GdkTexture *texture = GDK_TEXTURE(_PTR(texture_ptr));
-	GBytes *bytes = gdk_texture_save_to_png_bytes(texture);
-	jbyteArray result = (*env)->NewByteArray(env, g_bytes_get_size(bytes));
-	gsize size;
-	gconstpointer data = g_bytes_get_data(bytes, &size);
-	(*env)->SetByteArrayRegion(env, result, 0, size, data);
-	g_bytes_unref(bytes);
-	return result;
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
+	gdk_texture_downloader_set_format(downloader, format);
+	GBytes *pixels = gdk_texture_downloader_download_bytes(downloader, stride);
+	gdk_texture_downloader_free(downloader);
+	return pixels;
 }
 
-JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1save_1to_1jpeg(JNIEnv *env, jclass class, jlong texture_ptr, jint quality)
+static GBytes *encode_jpeg(GdkTexture *texture, int quality)
 {
-	GdkTexture *texture = GDK_TEXTURE(_PTR(texture_ptr));
-	int width = gdk_texture_get_width(texture);
-	int height = gdk_texture_get_height(texture);
-	/* JPEG has no alpha channel */
-	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
-	gdk_texture_downloader_set_format(downloader, GDK_MEMORY_R8G8B8);
 	gsize stride;
-	GBytes *pixels = gdk_texture_downloader_download_bytes(downloader, &stride);
-	gdk_texture_downloader_free(downloader);
-	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_bytes(pixels, GDK_COLORSPACE_RGB, FALSE, 8, width, height, stride);
+	/* JPEG has no alpha channel */
+	GBytes *pixels = download(texture, GDK_MEMORY_R8G8B8, &stride);
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_bytes(pixels, GDK_COLORSPACE_RGB, FALSE, 8, gdk_texture_get_width(texture), gdk_texture_get_height(texture), stride);
 	g_bytes_unref(pixels);
 
 	char quality_str[4];
-	snprintf(quality_str, sizeof(quality_str), "%d", CLAMP(quality, 0, 100));
+	snprintf(quality_str, sizeof(quality_str), "%d", quality);
 	gchar *buffer = NULL;
 	gsize size = 0;
-	jbyteArray result = NULL;
-	if (gdk_pixbuf_save_to_buffer(pixbuf, &buffer, &size, "jpeg", NULL, "quality", quality_str, NULL)) {
-		result = (*env)->NewByteArray(env, size);
-		(*env)->SetByteArrayRegion(env, result, 0, size, (jbyte *)buffer);
-		g_free(buffer);
-	}
+	GBytes *result = NULL;
+	if (gdk_pixbuf_save_to_buffer(pixbuf, &buffer, &size, "jpeg", NULL, "quality", quality_str, NULL))
+		result = g_bytes_new_take(buffer, size);
 	g_object_unref(pixbuf);
+	return result;
+}
+
+/* like Skia's SkWebpEncoder::Encode(): unpremultiplied RGBA, method 3 */
+static GBytes *encode_webp(GdkTexture *texture, int quality, bool lossless)
+{
+	WebPConfig config;
+	WebPPicture picture;
+	WebPMemoryWriter writer;
+	GBytes *result = NULL;
+
+	if (!WebPConfigInit(&config) || !WebPPictureInit(&picture))
+		return NULL;
+	config.lossless = lossless;
+	config.quality = quality;
+	config.method = 3;
+	picture.use_argb = lossless;
+	picture.width = gdk_texture_get_width(texture);
+	picture.height = gdk_texture_get_height(texture);
+
+	gsize stride;
+	GBytes *pixels = download(texture, GDK_MEMORY_R8G8B8A8, &stride);
+	WebPMemoryWriterInit(&writer);
+	picture.writer = WebPMemoryWrite;
+	picture.custom_ptr = &writer;
+	if (WebPPictureImportRGBA(&picture, g_bytes_get_data(pixels, NULL), stride) && WebPEncode(&config, &picture))
+		result = g_bytes_new_with_free_func(writer.mem, writer.size, WebPFree, writer.mem);
+	else
+		WebPMemoryWriterClear(&writer);
+	WebPPictureFree(&picture);
+	g_bytes_unref(pixels);
+	return result;
+}
+
+/* the formats of Bitmap.CompressFormat, as in hwui's Bitmap::compress() */
+enum {
+	COMPRESS_JPEG = 0,
+	COMPRESS_PNG = 1,
+	COMPRESS_WEBP = 2,
+	COMPRESS_WEBP_LOSSY = 3,
+	COMPRESS_WEBP_LOSSLESS = 4,
+};
+
+JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1compress(JNIEnv *env, jclass class, jlong texture_ptr, jint format, jint quality)
+{
+	GdkTexture *texture = GDK_TEXTURE(_PTR(texture_ptr));
+	GBytes *bytes = NULL;
+	switch (format) {
+		case COMPRESS_JPEG:
+			bytes = encode_jpeg(texture, quality);
+			break;
+		case COMPRESS_PNG:
+			bytes = gdk_texture_save_to_png_bytes(texture);
+			break;
+		case COMPRESS_WEBP:
+			/* SkEncodeImage(): quality 100 is lossless (with quality 75), anything else lossy */
+			bytes = quality == 100 ? encode_webp(texture, 75, true) : encode_webp(texture, quality, false);
+			break;
+		case COMPRESS_WEBP_LOSSY:
+		case COMPRESS_WEBP_LOSSLESS:
+			bytes = encode_webp(texture, quality, format == COMPRESS_WEBP_LOSSLESS);
+			break;
+	}
+	if (!bytes)
+		return NULL;
+	gsize size;
+	gconstpointer data = g_bytes_get_data(bytes, &size);
+	jbyteArray result = (*env)->NewByteArray(env, size);
+	(*env)->SetByteArrayRegion(env, result, 0, size, data);
+	g_bytes_unref(bytes);
 	return result;
 }
 
