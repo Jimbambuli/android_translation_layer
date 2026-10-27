@@ -519,4 +519,16 @@ public class TextUtils {
 			return iterator.destinationIndex() + (sourceIndex - iterator.sourceIndex());
 		}
 	}
+
+	/* android-14 TextUtils.stringOrSpannedString() */
+	public static CharSequence stringOrSpannedString(CharSequence source) {
+		if (source == null)
+			return null;
+		if (source instanceof SpannedString)
+			return source;
+		if (source instanceof Spanned)
+			return new SpannedString(source);
+
+		return source.toString();
+	}
 }

@@ -19,6 +19,7 @@ import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
+import android.text.Spannable;
 import android.text.Spanned;
 import android.text.SpannedString;
 import android.text.TextDirectionHeuristic;
@@ -26,7 +27,6 @@ import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.TextWatcher;
-import android.text.method.BaseMovementMethod;
 import android.text.method.KeyListener;
 import android.text.method.LinkMovementMethod;
 import android.text.method.MovementMethod;
@@ -227,8 +227,19 @@ public class TextView extends View {
 
 	public void setText(CharSequence text, BufferType type) {
 		mBufferType = type;
+		if (text == null)
+			text = "";
 		text = applyFilters(text);
-		this.text = text == null ? "" : text;
+		/* as AOSP's setText(): the buffer type (or a movement method, which needs spans) decides what getText()
+		 * returns; the Editor, PrecomputedText and autoLink parts of AOSP do not apply here */
+		if (type == BufferType.EDITABLE) {
+			text = Editable.Factory.getInstance().newEditable(text);
+		} else if (type == BufferType.SPANNABLE || mMovement != null) {
+			text = Spannable.Factory.getInstance().newSpannable(text);
+		} else {
+			text = TextUtils.stringOrSpannedString(text);
+		}
+		this.text = text;
 		/* as AOSP's setText(): the transformation decides what is shown (getText() stays the text that was set) */
 		mTransformed = mTransformation == null ? this.text : mTransformation.getTransformation(this.text, this);
 		updateNativeText();
@@ -309,7 +320,7 @@ public class TextView extends View {
 
 	/* called when a link of the markup is activated; like LinkMovementMethod, only then do links react */
 	private boolean onLinkActivated(String uri) {
-		if (!(movementMethod instanceof LinkMovementMethod))
+		if (!(mMovement instanceof LinkMovementMethod))
 			return true;
 		try {
 			linkSpans[Integer.parseInt(uri)].onClick(this);
@@ -415,7 +426,6 @@ public class TextView extends View {
 	public final boolean isHorizontallyScrollable() {
 		return mHorizontallyScrolling;
 	}
-	public final void setLinksClickable(boolean whether) {}
 
 	public void setInputType(int type) {}
 	private static final Spanned EMPTY_SPANNED = new SpannedString("");
@@ -822,7 +832,6 @@ public class TextView extends View {
 
 	public void setSaveEnabled(boolean enabled) {}
 
-	public final void setAutoLinkMask(int mask) {}
 
 	public void setEditableFactory(Editable.Factory factory) {}
 
@@ -836,17 +845,30 @@ public class TextView extends View {
 
 	public URLSpan[] getUrls() { return new URLSpan[0]; }
 
-	private MovementMethod movementMethod;
-	public void setMovementMethod(MovementMethod method) {
-		movementMethod = method;
+	/* as AOSP: the movement method, null unless set (or the default of a subclass) */
+	private MovementMethod mMovement;
+
+	protected MovementMethod getDefaultMovementMethod() {
+		return null;
+	}
+
+	public final void setMovementMethod(MovementMethod movement) {
+		if (mMovement != movement) {
+			mMovement = movement;
+
+			if (movement != null && !(getText() instanceof Spannable)) {
+				setText(getText());
+			}
+
+			// (AOSP also makes the view focusable and clickable here and tells the Editor: not needed, the
+			// GtkLabel handles its links itself)
+		}
 	}
 
 	public void setTextIsSelectable(boolean selectable) {}
 
-	public MovementMethod getMovementMethod() {
-		if (movementMethod != null)
-			return movementMethod;
-		return new BaseMovementMethod();
+	public final MovementMethod getMovementMethod() {
+		return mMovement;
 	}
 
 	public CharSequence getHint() { return "HINT"; }
@@ -881,7 +903,6 @@ public class TextView extends View {
 
 	public float getLetterSpacing() { return 0.f; }
 
-	public boolean getLinksClickable() { return true; }
 
 	public boolean isTextSelectable() { return true; }
 
@@ -990,7 +1011,6 @@ public class TextView extends View {
 
 	public void setKeyListener(KeyListener keyListener) {}
 
-	public int getAutoLinkMask() { return 0; }
 
 	public void setWidth(int width) {}
 	public void setHeight(int height) {}
@@ -2056,4 +2076,23 @@ public class TextView extends View {
 		setText(getText()); // not the field: Button keeps its text in the native widget
 	}
 
+	/* as AOSP; Linkify is a stub here, so the mask is kept (getAutoLinkMask()) but no links are added to the text */
+	private int mAutoLinkMask;
+	private boolean mLinksClickable = true;
+
+	public final void setAutoLinkMask(int mask) {
+		mAutoLinkMask = mask;
+	}
+
+	public final void setLinksClickable(boolean whether) {
+		mLinksClickable = whether;
+	}
+
+	public final boolean getLinksClickable() {
+		return mLinksClickable;
+	}
+
+	public final int getAutoLinkMask() {
+		return mAutoLinkMask;
+	}
 }
