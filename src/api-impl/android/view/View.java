@@ -69,7 +69,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 class WindowId {}
 
-public class View implements Drawable.Callback {
+public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	// --- constants from android source
 
@@ -1047,6 +1047,7 @@ public class View implements Drawable.Callback {
 	 * lists of layout change and attach state change listeners */
 	static class ListenerInfo {
 		OnClickListener mOnClickListener;
+		OnKeyListener mOnKeyListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -1880,7 +1881,13 @@ public class View implements Drawable.Callback {
 		this.id = id;
 	}
 
-	public void setOnKeyListener(OnKeyListener l) {}
+	/* AOSP View.setOnKeyListener(); ATL passes the keys on only when the view's widget has the focus
+	 * and the key reaches its wrapper widget (nativeSetOnKeyListener() makes sure it listens) */
+	public void setOnKeyListener(OnKeyListener l) {
+		getListenerInfo().mOnKeyListener = l;
+		nativeSetOnKeyListener(widget);
+	}
+	private native void nativeSetOnKeyListener(long widget);
 
 	public void setFocusable(boolean focusable) {
 		atl_focusable = focusable;
@@ -4219,8 +4226,58 @@ public class View implements Drawable.Callback {
 
 	public boolean requestRectangleOnScreen(Rect rectangle) { return false; }
 
+	/* AOSP View.onKeyDown(): Enter and the other confirm keys press a clickable view */
 	@Export
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers()) {
+			if (!isEnabled()) {
+				return true;
+			}
+
+			if (event.getRepeatCount() == 0) {
+				// Long clickable items don't necessarily have to be clickable.
+				final boolean clickable = isClickable() || isLongClickable();
+				if (clickable) {
+					final float x = getWidth() / 2f;
+					final float y = getHeight() / 2f;
+					setPressed(true, x, y);
+					checkForLongClick(ViewConfiguration.getLongPressTimeout(), x, y);
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/* AOSP View.onKeyLongPress() */
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	/* AOSP View.onKeyUp(): the confirm key released on a pressed clickable view clicks it */
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers()) {
+			if (!isEnabled()) {
+				return true;
+			}
+			if (isClickable() && isPressed()) {
+				setPressed(false);
+
+				if (!mHasPerformedLongPress) {
+					// This is a tap, so remove the longpress check
+					removeLongPressCallback();
+					if (!event.isCanceled()) {
+						return performClick();
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/* AOSP View.onKeyMultiple() */
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
 		return false;
 	}
 
@@ -4229,12 +4286,21 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
+	/* AOSP View.dispatchKeyEvent(), without the key dispatch state (long press tracking) and the input
+	 * consistency verifier */
 	@Export
 	public boolean dispatchKeyEvent(KeyEvent event) {
-		if (event.getAction() == KeyEvent.ACTION_DOWN)
-			return onKeyDown(event.getKeyCode(), event);
-		else
-			return false;
+		// Give any attached key listener a first crack at the event.
+		ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnKeyListener != null && isEnabled() && li.mOnKeyListener.onKey(this, event.getKeyCode(), event)) {
+			return true;
+		}
+
+		if (event.dispatch(this, null, this)) {
+			return true;
+		}
+
+		return false;
 	}
 
 	public WindowInsets getRootWindowInsets() {

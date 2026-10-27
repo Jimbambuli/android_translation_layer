@@ -672,6 +672,8 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
 {
 	JNIEnv *env = get_jni_env();
 
+	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
+		return FALSE;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_DOWN, map_key_code(keyval), 0, map_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
@@ -686,6 +688,8 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 {
 	JNIEnv *env = get_jni_env();
 
+	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
+		return FALSE;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, map_key_code(keyval), 0, map_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
@@ -694,6 +698,24 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 		(*env)->ExceptionClear(env);
 	}
 	return ret;
+}
+
+/* the keys that reach the wrapper go to View.dispatchKeyEvent() (once per wrapper). focus_only: only
+ * while the wrapper itself has the focus, not for keys that bubble up from a descendant (like AOSP's
+ * ViewGroup.dispatchKeyEvent(), which hands the key to the focused view only) */
+void wrapper_widget_add_key_controller(WrapperWidget *wrapper, gboolean focus_only)
+{
+	if (g_object_get_data(G_OBJECT(wrapper), "key-controller")) {
+		if (!focus_only)
+			g_object_set_data(G_OBJECT(wrapper), "key-focus-only", NULL);
+		return;
+	}
+	g_object_set_data(G_OBJECT(wrapper), "key-focus-only", GINT_TO_POINTER(focus_only));
+	GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
+	g_signal_connect(controller, "key-pressed", G_CALLBACK(on_key_pressed), wrapper);
+	g_signal_connect(controller, "key-released", G_CALLBACK(on_key_released), wrapper);
+	gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
+	g_object_set_data(G_OBJECT(wrapper), "key-controller", controller);
 }
 
 GtkWidget *currently_unmapping = NULL;
@@ -827,10 +849,7 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 	jmethodID dispatch_key_event_method = _METHOD(_CLASS(jobj), "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
 	jmethodID on_key_down_method = _METHOD(_CLASS(jobj), "onKeyDown", "(ILandroid/view/KeyEvent;)Z");
 	if (dispatch_key_event_method != _CACHED_METHOD(View__dispatchKeyEvent) || on_key_down_method != _CACHED_METHOD(View__onKeyDown)) {
-		GtkEventController *controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
-		g_signal_connect(controller, "key-pressed", G_CALLBACK(on_key_pressed), wrapper);
-		g_signal_connect(controller, "key-released", G_CALLBACK(on_key_released), wrapper);
-		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
+		wrapper_widget_add_key_controller(wrapper, FALSE);
 		gtk_widget_set_focusable(GTK_WIDGET(wrapper), TRUE);
 	}
 	g_signal_connect(wrapper, "notify::root", G_CALLBACK(root_changed_cb), NULL);

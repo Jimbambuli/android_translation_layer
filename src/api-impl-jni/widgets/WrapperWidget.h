@@ -67,6 +67,7 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 void wrapper_widget_draw_through_java(WrapperWidget *wrapper, JNIEnv *env);
 void wrapper_widget_queue_draw(WrapperWidget *wrapper);
 void wrapper_widget_set_layout_params(WrapperWidget *wrapper, int width, int height);
+void wrapper_widget_add_key_controller(WrapperWidget *wrapper, gboolean focus_only);
 void wrapper_widget_set_background(WrapperWidget *wrapper, GdkPaintable *paintable);
 void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, float radius, float z, float alpha);
 void wrapper_widget_set_outline_clip(WrapperWidget *wrapper, gboolean enabled, graphene_rect_t *rect, float radius, GskPath *path);

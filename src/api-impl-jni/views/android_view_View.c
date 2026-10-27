@@ -1222,24 +1222,6 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1removeClasses(JNIEnv *env,
 	}
 }
 
-/* like View.onKeyUp(): Enter and Space click a focused clickable view */
-static gboolean on_activate_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
-{
-	JNIEnv *env = get_jni_env();
-	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller)));
-
-	if (keyval != GDK_KEY_Return && keyval != GDK_KEY_KP_Enter && keyval != GDK_KEY_space)
-		return FALSE;
-	if (!gtk_widget_has_focus(GTK_WIDGET(wrapper)) || !J__View__isClickable(env, wrapper->jobj))
-		return FALSE;
-	J__View__performClick(env, wrapper->jobj);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-	return TRUE;
-}
-
 /* Widgets that take the focus themselves (buttons, entries) are left alone, and so is a wrapper
  * that is focusable because the view handles keys itself. */
 /* A view the app makes not focusable (android:focusable="false", like the switch in a preference
@@ -1267,15 +1249,19 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setKeyboardFocusable(JNIEn
 
 	if (!WRAPPER_IS_WIDGET(wrapper) || gtk_widget_get_focusable(widget) || (gtk_widget_get_focusable(wrapper) && !ours))
 		return;
-	if (focusable && !g_object_get_data(G_OBJECT(wrapper), "activate-key-controller")) {
-		GtkEventController *controller = gtk_event_controller_key_new();
-		g_signal_connect(controller, "key-released", G_CALLBACK(on_activate_key_released), NULL);
-		gtk_widget_add_controller(wrapper, controller);
-		g_object_set_data(G_OBJECT(wrapper), "activate-key-controller", controller);
-	}
+	/* the keys go to View.dispatchKeyEvent(): Enter and Space press and click a clickable view (View.onKeyDown/onKeyUp) */
+	if (focusable)
+		wrapper_widget_add_key_controller(WRAPPER_WIDGET(wrapper), TRUE);
 	gtk_widget_set_focusable(wrapper, focusable);
 	gtk_widget_set_focus_on_click(wrapper, FALSE);
 	g_object_set_data(G_OBJECT(wrapper), "keyboard-focusable", GINT_TO_POINTER(focusable));
+}
+
+JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnKeyListener(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
+	if (WRAPPER_IS_WIDGET(wrapper))
+		wrapper_widget_add_key_controller(WRAPPER_WIDGET(wrapper), FALSE);
 }
 
 JNIEXPORT jboolean JNICALL Java_android_view_View_nativeRequestFocus(JNIEnv *env, jobject this, jlong widget_ptr, jint direction)
