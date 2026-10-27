@@ -170,6 +170,10 @@ public class Paint {
 		if (colorFilter instanceof PorterDuffColorFilter) {
 			PorterDuffColorFilter porterDuff = (PorterDuffColorFilter)colorFilter;
 			native_set_color_filter(paint, porterDuff.getMode().ordinal(), porterDuff.getColor());
+		} else if (colorFilter instanceof BlendModeColorFilter && BlendMode.blendModeToPorterDuffMode(((BlendModeColorFilter)colorFilter).getMode()) != null) {
+			/* AOSP's blend-mode filter: the Porter-Duff blend modes map one to one */
+			BlendModeColorFilter blend = (BlendModeColorFilter)colorFilter;
+			native_set_color_filter(paint, BlendMode.blendModeToPorterDuffMode(blend.getMode()).ordinal(), blend.getColor());
 		} else {
 			native_set_color_filter(paint, -1, 0);
 		}
