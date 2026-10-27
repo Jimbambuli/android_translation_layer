@@ -45,21 +45,50 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	private Context context;
 	private Window window;
-	private OnDismissListener onDismissListener;
-	private OnShowListener onShowListener;
-	private OnCancelListener onCancelListener;
 	private OnKeyListener onKeyListener;
 	private boolean cancelable = true;
 	private boolean created;
 	private boolean started; // between onStart() and onStop()
 
-	/* as in AOSP, the dialog's context carries the dialog theme (the given one, or the
-	 * dialogTheme of the context's theme) */
+	/* AOSP's Dialog constructors (android-14) */
+	private static final int DISMISS = 0x43;
+	private static final int CANCEL = 0x44;
+	private static final int SHOW = 0x45;
+
+	private final Handler mListenersHandler;
+	private Message mCancelMessage;
+	private Message mDismissMessage;
+	private Message mShowMessage;
+	private boolean mCanceled = false;
+	private String mCancelAndDismissTaken;
+	private Runnable mDismissOverride;
+	private final Runnable mDismissAction = new Runnable() {
+		@Override
+		public void run() {
+			dismissDialog();
+		}
+	};
+
+	public Dialog(Context context) {
+		this(context, 0, true);
+	}
+
 	public Dialog(Context context, int themeResId) {
-		if (themeResId == 0) {
-			TypedValue outValue = new TypedValue();
-			context.getTheme().resolveAttribute(R.attr.dialogTheme, outValue, true);
-			themeResId = outValue.resourceId;
+		this(context, themeResId, true);
+	}
+
+	Dialog(Context context, int themeResId, boolean createContextThemeWrapper) {
+		/* as in AOSP, the dialog's context carries the dialog theme (the given one, or the
+		 * dialogTheme of the context's theme) */
+		if (createContextThemeWrapper) {
+			if (themeResId == Resources.ID_NULL) {
+				final TypedValue outValue = new TypedValue();
+				context.getTheme().resolveAttribute(R.attr.dialogTheme, outValue, true);
+				themeResId = outValue.resourceId;
+			}
+			this.context = new ContextThemeWrapper(context, themeResId);
+		} else {
+			this.context = context;
 		}
 		// like AOSP, the dialog's window belongs to the activity of the context
 		for (Context c = context; c instanceof ContextWrapper; c = ((ContextWrapper)c).getBaseContext()) {
@@ -68,15 +97,24 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 				break;
 			}
 		}
-		this.context = new ContextThemeWrapper(context, themeResId);
 		window = new Window(this.context, this);
 		nativePtr = nativeInit(window.getDecorView().widget);
 
 		window.set_native_window(nativePtr);
+
+		mListenersHandler = new ListenersHandler(this);
 	}
 
-	public Dialog(Context context) {
-		this(context, 0);
+	protected Dialog(Context context, boolean cancelable, OnCancelListener cancelListener) {
+		this(context);
+		this.cancelable = cancelable;
+		setOnCancelListener(cancelListener);
+	}
+
+	protected Dialog(Context context, boolean cancelable, Message cancelCallback) {
+		this(context);
+		this.cancelable = cancelable;
+		mCancelMessage = cancelCallback;
 	}
 
 	public final boolean requestWindowFeature(int featureId) {
@@ -112,20 +150,115 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		nativeSetTitle(nativePtr, context.getString(titleId));
 	}
 
-	public void setOwnerActivity(Activity activity) {
+	public final void setOwnerActivity(Activity activity) {
 		ownerActivity = activity;
 	}
 
-	public void setCancelable(boolean cancelable) {
-		this.cancelable = cancelable;
+	public final Activity getOwnerActivity() {
+		return ownerActivity;
 	}
 
-	public void setOnCancelListener(OnCancelListener onCancelListener) {
-		this.onCancelListener = onCancelListener;
+	public void setCancelable(boolean flag) {
+		cancelable = flag;
 	}
 
-	public void setOnDismissListener(OnDismissListener onDismissListener) {
-		this.onDismissListener = onDismissListener;
+	/* AOSP's Dialog.setOnCancelListener() ... takeCancelAndDismissListeners(), setDismissOverride() */
+	public void setOnCancelListener(OnCancelListener listener) {
+		if (mCancelAndDismissTaken != null) {
+			throw new IllegalStateException(
+			    "OnCancelListener is already taken by "
+			    + mCancelAndDismissTaken + " and can not be replaced.");
+		}
+		if (listener != null) {
+			mCancelMessage = mListenersHandler.obtainMessage(CANCEL, listener);
+		} else {
+			mCancelMessage = null;
+		}
+	}
+
+	public void setCancelMessage(Message msg) {
+		mCancelMessage = msg;
+	}
+
+	public void setOnDismissListener(OnDismissListener listener) {
+		if (mCancelAndDismissTaken != null) {
+			throw new IllegalStateException(
+			    "OnDismissListener is already taken by "
+			    + mCancelAndDismissTaken + " and can not be replaced.");
+		}
+		if (listener != null) {
+			mDismissMessage = mListenersHandler.obtainMessage(DISMISS, listener);
+		} else {
+			mDismissMessage = null;
+		}
+	}
+
+	public void setOnShowListener(OnShowListener listener) {
+		if (listener != null) {
+			mShowMessage = mListenersHandler.obtainMessage(SHOW, listener);
+		} else {
+			mShowMessage = null;
+		}
+	}
+
+	public void setDismissMessage(Message msg) {
+		mDismissMessage = msg;
+	}
+
+	public void setDismissOverride(Runnable override) {
+		mDismissOverride = override;
+	}
+
+	public boolean takeCancelAndDismissListeners(String msg, OnCancelListener cancel, OnDismissListener dismiss) {
+		if (mCancelAndDismissTaken != null) {
+			mCancelAndDismissTaken = null;
+		} else if (mCancelMessage != null || mDismissMessage != null) {
+			return false;
+		}
+
+		setOnCancelListener(cancel);
+		setOnDismissListener(dismiss);
+		mCancelAndDismissTaken = msg;
+
+		return true;
+	}
+
+	private void sendDismissMessage() {
+		if (mDismissMessage != null) {
+			// Obtain a new message so this dialog can be re-used
+			Message.obtain(mDismissMessage).sendToTarget();
+		}
+	}
+
+	private void sendShowMessage() {
+		if (mShowMessage != null) {
+			// Obtain a new message so this dialog can be re-used
+			Message.obtain(mShowMessage).sendToTarget();
+		}
+	}
+
+	/* AOSP's Dialog.ListenersHandler */
+	private static final class ListenersHandler extends Handler {
+		private final java.lang.ref.WeakReference<DialogInterface> mDialog;
+
+		public ListenersHandler(Dialog dialog) {
+			mDialog = new java.lang.ref.WeakReference<>(dialog);
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+				case DISMISS:
+					((OnDismissListener)msg.obj).onDismiss(mDialog.get());
+					break;
+				case CANCEL:
+					((OnCancelListener)msg.obj).onCancel(mDialog.get());
+					break;
+				case SHOW:
+					((OnShowListener)msg.obj).onShow(mDialog.get());
+					break;
+			}
+		}
 	}
 
 	public View findViewById(int id) {
@@ -137,11 +270,17 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		Runnable action = new Runnable() {
 			@Override
 			public void run() {
-				if (!created) {
-					window.applyThemeAttributes();
-					onCreate(null);
-					created = true;
+				if (shown) {
+					// AOSP: showing a dialog that is showing only makes its window visible again
+					if (!showPending && !nativeIsShowing(nativePtr)) {
+						showPending = true;
+						scheduleTraversals();
+					}
+					return;
 				}
+				mCanceled = false;
+				if (!created)
+					dispatchOnCreate(null);
 				if (!started) {
 					onStart();
 					started = true;
@@ -204,8 +343,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 				if (!openWindows.contains(Dialog.this))
 					openWindows.add(Dialog.this);
 				animateWindow(true);
-				if (onShowListener != null)
-					onShowListener.onShow(Dialog.this);
+				sendShowMessage();
 			}
 		});
 	}
@@ -340,23 +478,27 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		// and the system server. We replicate this behavior by adding 10 ms delay.
 		// This Hack is required for NewPipe RouterActivity which has a race condition. It subscribes an rxJava observable
 		// and immediately calls Dialog.dismiss(). The OnDismissListener would unsubscribes the observable again.
-		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-			@Override
-			public void run() {
-				// like AOSP, a dialog that is not shown (any more) is not dismissed again
-				if (!shown)
-					return;
-				shown = false;
-				showPending = false;
-				animateWindow(false);
-				if (started) {
-					started = false;
-					onStop();
-				}
-				if (onDismissListener != null)
-					onDismissListener.onDismiss(Dialog.this);
-			}
-		}, 10);
+		if (mDismissOverride != null) {
+			mDismissOverride.run();
+			return;
+		}
+		new Handler(Looper.getMainLooper()).postDelayed(mDismissAction, 10);
+	}
+
+	/* AOSP's Dialog.dismissDialog(): a dialog that is not shown (any more) is not dismissed again.
+	 * The window is removed by animateWindow(false), which waits for the exit animation;
+	 * AOSP's mActionMode and mWindow.closeAllPanels() have no counterpart in ATL's dialogs. */
+	void dismissDialog() {
+		if (!shown)
+			return;
+		shown = false;
+		showPending = false;
+		animateWindow(false);
+		if (started) {
+			started = false;
+			onStop();
+		}
+		sendDismissMessage();
 	}
 
 	public Window getWindow() {
@@ -635,6 +777,22 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	@Override
 	public void onActionModeFinished(ActionMode mode) {}
 
+	public void create() {
+		if (!created) {
+			dispatchOnCreate(null);
+		}
+	}
+
+	/* AOSP: makes sure `created` is set without requiring subclasses to call through to super in onCreate;
+	 * ATL also applies the theme's window attributes before the first onCreate() */
+	void dispatchOnCreate(Bundle savedInstanceState) {
+		if (!created) {
+			window.applyThemeAttributes();
+			onCreate(savedInstanceState);
+			created = true;
+		}
+	}
+
 	protected void onCreate(Bundle savedInstanceState) {
 		System.out.println("- onCreate - Dialog!");
 	}
@@ -645,15 +803,29 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	private static final String DIALOG_SHOWING_TAG = "android:dialogShowing";
 
+	private static final String DIALOG_HIERARCHY_TAG = "android:dialogHierarchy";
+
+	/* AOSP's Dialog.onSaveInstanceState() and onRestoreInstanceState() */
 	public Bundle onSaveInstanceState() {
 		Bundle bundle = new Bundle();
-		bundle.putBoolean(DIALOG_SHOWING_TAG, isShowing());
+		bundle.putBoolean(DIALOG_SHOWING_TAG, shown);
+		if (created) {
+			bundle.putBundle(DIALOG_HIERARCHY_TAG, window.saveHierarchyState());
+		}
 		return bundle;
 	}
 
 	public void onRestoreInstanceState(Bundle savedInstanceState) {
-		if (savedInstanceState.getBoolean(DIALOG_SHOWING_TAG))
+		final Bundle dialogHierarchyState = savedInstanceState.getBundle(DIALOG_HIERARCHY_TAG);
+		if (dialogHierarchyState == null) {
+			// dialog has never been shown, or onCreated, nothing to restore.
+			return;
+		}
+		dispatchOnCreate(savedInstanceState);
+		window.restoreHierarchyState(dialogHierarchyState);
+		if (savedInstanceState.getBoolean(DIALOG_SHOWING_TAG)) {
 			show();
+		}
 	}
 
 	public void hide() {
@@ -664,20 +836,16 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		closeWindow();
 	}
 
+	/* AOSP's Dialog.cancel() */
 	@Override
 	public void cancel() {
-		if (onCancelListener != null)
-			onCancelListener.onCancel(this);
+		if (!mCanceled && mCancelMessage != null) {
+			mCanceled = true;
+			// Obtain a new message so this dialog can be re-used
+			Message.obtain(mCancelMessage).sendToTarget();
+		}
 		dismiss();
 	}
-
-	public void setOnShowListener(OnShowListener onShowListener) {
-		this.onShowListener = onShowListener;
-	}
-
-	public void setCancelMessage(Message msg) {}
-
-	public void setDismissMessage(Message msg) {}
 
 	/* AOSP's Dialog.onTouchEvent(): a press outside of the dialog cancels it when the window says so */
 	public boolean onTouchEvent(MotionEvent event) {
