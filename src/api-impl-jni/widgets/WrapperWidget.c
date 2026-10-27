@@ -194,26 +194,98 @@ void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int basel
 		gtk_widget_size_allocate(wrapper->background, &allocation, baseline);
 }
 
-/* An approximation of Material's elevation shadow: a soft ambient shadow all around and a stronger
- * one offset downwards, both growing with the elevation (in px). Like on AOSP the parent draws it
- * right before the child, since the child's own drawing is clipped to its bounds. */
+/* SkDrawShadowMetrics (Skia, android-14) */
+static const float kAmbientHeightFactor = 1.0f / 128.0f;
+static const float kAmbientGeomFactor = 64.0f;
+static const float kMaxAmbientRadius = 300 * (1.0f / 128.0f) * 64.0f;
+
+static float divide_and_pin(float numer, float denom, float min, float max)
+{
+	return CLAMP(numer / denom, min, max);
+}
+
+static float ambient_blur_radius(float height)
+{
+	return MIN(height * kAmbientHeightFactor * kAmbientGeomFactor, kMaxAmbientRadius);
+}
+
+static float ambient_recip_alpha(float height)
+{
+	return 1.0f + MAX(height * kAmbientHeightFactor, 0.0f);
+}
+
+/* SkBlurMask::ConvertRadiusToSigma() */
+static float radius_to_sigma(float radius)
+{
+	return radius > 0 ? 0.57735f * radius + 0.5f : 0.0f;
+}
+
+/* a rounded rectangle filled with color and blurred with a Gaussian of sigma; GSK's blur radius is
+ * twice the standard deviation */
+static void append_blurred(GdkSnapshot *snapshot, const GskRoundedRect *rect, const GdkRGBA *color, float sigma)
+{
+	gtk_snapshot_push_blur(snapshot, 2 * sigma);
+	gtk_snapshot_push_rounded_clip(snapshot, rect);
+	gtk_snapshot_append_color(snapshot, color, &rect->bounds);
+	gtk_snapshot_pop(snapshot);
+	gtk_snapshot_pop(snapshot);
+}
+
+/* The elevation shadow of AOSP: EndReorderBarrierDrawable::drawShadow() (hwui) draws it in the parent
+ * right before the child, with SkShadowUtils::DrawShadow() for the outline at the child's Z and the
+ * light source of the window. GSK draws Skia's blur variant of it: the ambient shadow is the outline
+ * outset and blurred, the spot shadow the outline projected from the light onto the parent and
+ * blurred (SkDrawShadowMetrics::GetSpotParams()). As in LightingInfo, the light is centered over the
+ * window horizontally (ATL knows no display position) at lightY and lightZ. A translucent outline
+ * (kTransparentOccluder) is drawn like an opaque one. */
 void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnapshot *snapshot)
 {
 	if (!WRAPPER_IS_WIDGET(child) || !gtk_widget_get_visible(child))
 		return;
 	WrapperWidget *wrapper = WRAPPER_WIDGET(child);
 	float z = wrapper->shadow_z;
-	graphene_point_t origin;
-	if (z <= 0 || !gtk_widget_compute_point(child, parent, &GRAPHENE_POINT_INIT(0, 0), &origin))
+	const float caster_alpha = gtk_widget_get_opacity(child) * wrapper->shadow_alpha;
+	graphene_point_t origin, window_origin;
+	GtkWidget *root = GTK_WIDGET(gtk_widget_get_root(child));
+	if (z <= 0 || caster_alpha <= 0 || !gtk_widget_compute_point(child, parent, &GRAPHENE_POINT_INIT(0, 0), &origin) ||
+	    !gtk_widget_compute_point(child, root, &GRAPHENE_POINT_INIT(0, 0), &window_origin))
 		return;
-	GskRoundedRect outline;
-	gsk_rounded_rect_init_from_rect(&outline, &wrapper->shadow_rect, wrapper->shadow_radius);
+	const float ambient_alpha = wrapper->ambient_shadow_alpha * caster_alpha;
+	const float spot_alpha = wrapper->spot_shadow_alpha * caster_alpha;
+	/* the light relative to the child */
+	const float light_x = gtk_widget_get_width(root) / 2.0f - window_origin.x;
+	const float light_y = wrapper->light_y - window_origin.y;
+	const float light_z = wrapper->light_z;
+
 	gtk_snapshot_save(snapshot);
 	gtk_snapshot_translate(snapshot, &origin);
-	gtk_snapshot_push_opacity(snapshot, gtk_widget_get_opacity(child));
-	gtk_snapshot_append_outset_shadow(snapshot, &outline, &(GdkRGBA){0, 0, 0, 0.12f * wrapper->shadow_alpha}, 0, z / 6, 0, z / 2);
-	gtk_snapshot_append_outset_shadow(snapshot, &outline, &(GdkRGBA){0, 0, 0, 0.20f * wrapper->shadow_alpha}, 0, z / 2, 0, z);
-	gtk_snapshot_pop(snapshot);
+
+	if (ambient_alpha > 0) {
+		/* SkShadowUtils::DrawShadow(), "draw with blur" for the ambient shadow */
+		float devSpaceOutset = ambient_blur_radius(z);
+		float oneOverA = ambient_recip_alpha(z);
+		float blurRadius = 0.5f * devSpaceOutset * oneOverA;
+		float strokeWidth = 0.5f * (devSpaceOutset - blurRadius);
+		GskRoundedRect ambient;
+		gsk_rounded_rect_init_from_rect(&ambient, &wrapper->shadow_rect, wrapper->shadow_radius);
+		/* kStrokeAndFill_Style outsets the path by half the stroke width */
+		gsk_rounded_rect_shrink(&ambient, -strokeWidth / 2, -strokeWidth / 2, -strokeWidth / 2, -strokeWidth / 2);
+		append_blurred(snapshot, &ambient, &(GdkRGBA){0, 0, 0, ambient_alpha}, radius_to_sigma(blurRadius));
+	}
+
+	if (spot_alpha > 0 && light_z > z) {
+		/* SkDrawShadowMetrics::GetSpotShadowTransform() with GetSpotParams() */
+		float zRatio = divide_and_pin(z, light_z - z, 0.0f, 0.95f);
+		float radius = wrapper->light_radius * zRatio;
+		float scale = divide_and_pin(light_z, light_z - z, 1.0f, 1.95f);
+		const graphene_rect_t *r = &wrapper->shadow_rect;
+		GskRoundedRect spot;
+		gsk_rounded_rect_init_from_rect(&spot, &GRAPHENE_RECT_INIT(scale * r->origin.x - zRatio * light_x, scale * r->origin.y - zRatio * light_y,
+		                                                           scale * r->size.width, scale * r->size.height),
+		                                scale * wrapper->shadow_radius);
+		append_blurred(snapshot, &spot, &(GdkRGBA){0, 0, 0, spot_alpha}, radius_to_sigma(radius));
+	}
+
 	gtk_snapshot_restore(snapshot);
 }
 

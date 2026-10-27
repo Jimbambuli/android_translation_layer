@@ -986,10 +986,17 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setBackgroundColor(JNIEnv 
 		widget_set_needs_allocation(widget);
 }
 
-JNIEXPORT void JNICALL Java_android_view_View_native_1setShadow(JNIEnv *env, jobject this, jlong widget_ptr, jint left, jint top, jint right, jint bottom, jfloat radius, jfloat z, jfloat alpha)
+JNIEXPORT void JNICALL Java_android_view_View_native_1setShadow(JNIEnv *env, jobject this, jlong widget_ptr, jint left, jint top, jint right, jint bottom, jfloat radius, jfloat z, jfloat alpha,
+                                                               jfloat ambient_alpha, jfloat spot_alpha, jfloat light_y, jfloat light_z, jfloat light_radius)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
-	wrapper_widget_set_shadow(WRAPPER_WIDGET(gtk_widget_get_parent(widget)), &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, z, alpha);
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(widget));
+	wrapper->light_y = light_y;
+	wrapper->light_z = light_z;
+	wrapper->light_radius = light_radius;
+	wrapper->ambient_shadow_alpha = ambient_alpha;
+	wrapper->spot_shadow_alpha = spot_alpha;
+	wrapper_widget_set_shadow(wrapper, &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, z, alpha);
 }
 
 JNIEXPORT void JNICALL Java_android_view_View_native_1setClipBounds(JNIEnv *env, jobject this, jlong widget_ptr, jboolean enabled, jint left, jint top, jint right, jint bottom)

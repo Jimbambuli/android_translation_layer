@@ -3144,9 +3144,9 @@ public class View implements Drawable.Callback {
 		return getZ() > 0 || clipToOutline;
 	}
 
-	/* The outline gives the elevation shadow, which the parent draws below the view (without AOSP's
-	 * light source position: a soft ambient shadow and one offset downwards), and the clip of
-	 * setClipToOutline() (rect, round rect or, as AOSP since API 33, path) */
+	/* The outline gives the elevation shadow, which the parent draws below the view with the light
+	 * source of the theme (see wrapper_widget_snapshot_shadow()), and the clip of setClipToOutline()
+	 * (rect, round rect or, as AOSP since API 33, path) */
 	public void invalidateOutline() {
 		float z = getZ();
 		Outline outline = null;
@@ -3168,7 +3168,7 @@ public class View implements Drawable.Callback {
 		}
 		if (z <= 0 || outline == null || outline.isEmpty() || outline.getAlpha() <= 0) {
 			if (has_shadow)
-				native_setShadow(widget, 0, 0, 0, 0, 0, 0, 0);
+				native_setShadow(widget, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 			has_shadow = false;
 			return;
 		}
@@ -3181,10 +3181,21 @@ public class View implements Drawable.Callback {
 			outline.mPath.computeBounds(bounds, true);
 			bounds.round(rect);
 		}
-		native_setShadow(widget, rect.left, rect.top, rect.right, rect.bottom, radius, z, outline.getAlpha());
+		/* the light source of the window, as ThreadedRenderer reads it from the theme (Lighting) and
+		 * keeps the alphas as 0..255 for hwui's LightingInfo */
+		final TypedArray a = getContext().obtainStyledAttributes(null, com.android.internal.R.styleable.Lighting, 0, 0);
+		final float lightY = a.getDimension(com.android.internal.R.styleable.Lighting_lightY, 0);
+		final float lightZ = a.getDimension(com.android.internal.R.styleable.Lighting_lightZ, 0);
+		final float lightRadius = a.getDimension(com.android.internal.R.styleable.Lighting_lightRadius, 0);
+		final int ambientShadowAlpha = (int)(255 * a.getFloat(com.android.internal.R.styleable.Lighting_ambientShadowAlpha, 0) + 0.5f);
+		final int spotShadowAlpha = (int)(255 * a.getFloat(com.android.internal.R.styleable.Lighting_spotShadowAlpha, 0) + 0.5f);
+		a.recycle();
+		native_setShadow(widget, rect.left, rect.top, rect.right, rect.bottom, radius, z, outline.getAlpha(),
+				 ambientShadowAlpha / 255.f, spotShadowAlpha / 255.f, lightY, lightZ, lightRadius);
 		has_shadow = true;
 	}
-	private native void native_setShadow(long widget, int left, int top, int right, int bottom, float radius, float z, float alpha);
+	private native void native_setShadow(long widget, int left, int top, int right, int bottom, float radius, float z, float alpha,
+					     float ambientAlpha, float spotAlpha, float lightY, float lightZ, float lightRadius);
 	private native void native_setOutlineClip(long widget, boolean enabled, int left, int top, int right, int bottom, float radius, long path);
 
 	public int getMeasuredWidthAndState() {

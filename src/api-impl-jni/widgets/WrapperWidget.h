@@ -35,6 +35,12 @@ struct _WrapperWidget {
 	float shadow_radius;
 	float shadow_z;
 	float shadow_alpha;
+	/* the light source (hwui's LightingInfo, from the theme's Lighting attributes) */
+	float light_y;
+	float light_z;
+	float light_radius;
+	float ambient_shadow_alpha;
+	float spot_shadow_alpha;
 	/* clipping like AOSP: clipChildren of the view (as a parent, default on) clips each child to
 	 * its bounds; setClipBounds() and setClipToOutline() clip the view itself */
 	gboolean clip_children;
