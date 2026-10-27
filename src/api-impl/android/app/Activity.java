@@ -516,29 +516,59 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		});
 	}
 
-	/* like on AOSP, what the previous instance returned from onRetainNonConfigurationInstance() when it was
-	 * recreated; AndroidX keeps the ViewModels of the activity and its fragments in it */
-	private Object lastNonConfigurationInstance;
+	/* Activity.NonConfigurationInstances: what the previous instance retained when it was recreated.
+	 * ATL has no loaders and no fragment manager state to retain, and no voice interactor */
+	static final class NonConfigurationInstances {
+		Object activity;
+		HashMap<String, Object> children;
+	}
+	NonConfigurationInstances mLastNonConfigurationInstances;
 
 	public Object getLastNonConfigurationInstance() {
-		return lastNonConfigurationInstance;
+		return mLastNonConfigurationInstances != null
+		    ? mLastNonConfigurationInstances.activity : null;
 	}
 
-	@Export
 	public Object onRetainNonConfigurationInstance() {
 		return null;
 	}
 
+	HashMap<String, Object> getLastNonConfigurationChildInstances() {
+		return mLastNonConfigurationInstances != null
+		    ? mLastNonConfigurationInstances.children : null;
+	}
+
+	HashMap<String, Object> onRetainNonConfigurationChildInstances() {
+		return null;
+	}
+
+	/* called from native code by recreate() before the instance is destroyed */
+	@Export
+	NonConfigurationInstances retainNonConfigurationInstances() {
+		Object activity = onRetainNonConfigurationInstance();
+		HashMap<String, Object> children = onRetainNonConfigurationChildInstances();
+
+		if (activity == null && children == null) {
+			return null;
+		}
+
+		NonConfigurationInstances nci = new NonConfigurationInstances();
+		nci.activity = activity;
+		nci.children = children;
+		return nci;
+	}
+
 	/* called from native code by recreate() once this instance is destroyed: like AOSP's
 	 * handleRelaunchActivity(), the new instance is created after the old one is gone, and gets what
-	 * the old one retained (onRetainNonConfigurationInstance(), before it was destroyed) */
+	 * the old one retained (retainNonConfigurationInstances(), before it was destroyed): it is the
+	 * lastNonConfigurationInstances argument of Activity.attach() */
 	@Export
-	private Activity createRelaunched(Object lastNonConfigurationInstance) {
+	private Activity createRelaunched(Object lastNonConfigurationInstances) {
 		try {
 			Activity activity = internalCreateActivity(this.getClass().getName(), getWindow().native_window, intent);
 			activity.resultRequestCode = resultRequestCode;
 			activity.resultActivity = resultActivity;
-			activity.lastNonConfigurationInstance = lastNonConfigurationInstance;
+			activity.mLastNonConfigurationInstances = (NonConfigurationInstances)lastNonConfigurationInstances;
 			return activity;
 		} catch (ReflectiveOperationException e) {
 			Slog.i(TAG, "exception in Activity.recreate, this is kinda sus");
@@ -555,10 +585,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		return (LayoutInflater)getSystemService("layout_inflater");
 	}
 
-	private boolean changingConfigurations;
+	/* true if the activity is being destroyed in order to recreate it with a new configuration (AndroidX
+	 * keeps the ViewModels then) */
+	boolean mChangingConfigurations = false;
+	/* the configuration changes that made recreate() relaunch the activity */
+	int mConfigChangeFlags;
 
-	/* true while recreate() replaces this instance: AndroidX keeps the ViewModels then */
-	public boolean isChangingConfigurations() { return changingConfigurations; }
+	public boolean isChangingConfigurations() {
+		return mChangingConfigurations;
+	}
 
 	@Override
 	public void onContentChanged() {
@@ -671,7 +706,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	/* like AOSP: the activity is stopped, saves its state and is destroyed, a new instance of
 	 * it is created from that state in its place in the back stack */
 	public void recreate() {
-		changingConfigurations = true;
+		recreate(0);
+	}
+
+	/* the relaunch of the activity for a configuration change (ActivityThread.handleRelaunchActivity()
+	 * with configChanges) */
+	private void recreate(int configChanges) {
+		mConfigChangeFlags |= configChanges;
+		mChangingConfigurations = true;
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
@@ -712,7 +754,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			mSizeConfigurations = new SizeConfigurationBuckets(resources.getSizeConfigurations());
 		int changes = SizeConfigurationBuckets.filterDiff(diff, oldConfig, newConfig, mSizeConfigurations);
 		if ((changes & ~handled) != 0)
-			recreate();
+			recreate(changes & ~handled);
 		else if (shouldReportChange(oldConfig, newConfig, mSizeConfigurations, handled))
 			onConfigurationChanged(new Configuration(newConfig));
 	}
@@ -1275,7 +1317,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void setProgressBarIndeterminateVisibility(boolean indeterminate) {}
 
 	public int getChangingConfigurations() {
-		return 0;
+		return mConfigChangeFlags;
 	}
 
 	public int getTaskId() {

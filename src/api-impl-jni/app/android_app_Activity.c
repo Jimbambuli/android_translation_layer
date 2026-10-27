@@ -594,7 +594,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeResumeCurrentActivity(JNI
 
 /* Activity.recreate(): the new instance takes the place of this one in the back stack and is
  * created from the state this one saved after being stopped, and gets what it retained with
- * onRetainNonConfigurationInstance() (AndroidX keeps its ViewModels there). The start follows when it
+ * retainNonConfigurationInstances() (AndroidX keeps its ViewModels there). The start follows when it
  * is focused, then onRestoreInstanceState() and onPostCreate() (see Activity.performStart()). */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, jobject this)
 {
@@ -614,7 +614,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	activity_stop(env, old_activity, true);
 
 	jobject saved_state = (*env)->GetObjectField(env, old_activity, _FIELD_ID(_CACHED_CLASS(Activity), "savedState", "Landroid/os/Bundle;"));
-	jobject retained = J__Activity__onRetainNonConfigurationInstance(env, old_activity);
+	jobject retained = J__Activity__retainNonConfigurationInstances(env, old_activity);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
