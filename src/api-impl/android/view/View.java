@@ -1498,7 +1498,7 @@ public class View implements Drawable.Callback {
 	@Export
 	public boolean onTouchEventInternal(MotionEvent event, boolean handle_gestures) {
 		boolean handled = false;
-		if (on_touch_listener != null)
+		if (on_touch_listener != null && isEnabled())
 			handled = on_touch_listener.onTouch(this, event);
 
 		if (!handled)
@@ -1510,41 +1510,153 @@ public class View implements Drawable.Callback {
 		return handled;
 	}
 
-	private class LongClickRunnable implements Runnable {
-		private boolean long_click_done = false;
+	/* AOSP's PFLAG_PREPRESSED: a view in a scrolling container is pressed only after the tap timeout */
+	static final int PFLAG_PREPRESSED = 0x02000000;
 
-		@Override
-		public void run() {
-			long_click_done = performLongClick();
+	private CheckForLongPress mPendingCheckForLongPress;
+	private CheckForTap mPendingCheckForTap = null;
+	private PerformClick mPerformClick;
+	private UnsetPressedState mUnsetPressedState;
+	private boolean mHasPerformedLongPress;
+	private boolean mIgnoreNextUpEvent;
+	private boolean mInContextButtonPress;
+	int mWindowAttachCount;
+
+	/* AOSP View.getWindowAttachCount() */
+	protected int getWindowAttachCount() {
+		return mWindowAttachCount;
+	}
+	private float mLongClickX = Float.NaN;
+	private float mLongClickY = Float.NaN;
+
+	/* AOSP View.onTouchEvent() (android-14) without what ATL has no counterpart for: the touch
+	 * delegate, tooltips on touch, mouse button actions (performButtonActionOnTouchDown) and the touch
+	 * classification (ATL's events are always CLASSIFICATION_NONE) */
+	@Export
+	public boolean onTouchEvent(MotionEvent event) {
+		final float x = event.getX();
+		final float y = event.getY();
+		final int action = event.getAction();
+
+		final boolean clickable = isClickable() || isLongClickable();
+
+		if (!isEnabled()) {
+			// A disabled view that is clickable still consumes the touch events, it just doesn't respond to them.
+			if (action == MotionEvent.ACTION_UP && (mPrivateFlags & PFLAG_PRESSED) != 0) {
+				setPressed(false);
+			}
+			return clickable;
 		}
+
+		if (clickable) {
+			switch (action) {
+				case MotionEvent.ACTION_UP:
+					boolean prepressed = (mPrivateFlags & PFLAG_PREPRESSED) != 0;
+					if ((mPrivateFlags & PFLAG_PRESSED) != 0 || prepressed) {
+						// take focus if we don't have it already and we should in touch mode.
+						boolean focusTaken = false;
+						if (isFocusable() && isFocusableInTouchMode() && !isFocused()) {
+							focusTaken = requestFocus();
+						}
+
+						if (prepressed) {
+							// The button is being released before we actually
+							// showed it as pressed.  Make it show the pressed
+							// state now (before scheduling the click) to ensure
+							// the user sees it.
+							setPressed(true, x, y);
+						}
+
+						if (!mHasPerformedLongPress && !mIgnoreNextUpEvent) {
+							// This is a tap, so remove the longpress check
+							removeLongPressCallback();
+
+							// Only perform take click actions if we were in the pressed state
+							if (!focusTaken) {
+								// Use a Runnable and post this rather than calling
+								// performClick directly. This lets other visual state
+								// of the view update before click actions start.
+								if (mPerformClick == null) {
+									mPerformClick = new PerformClick();
+								}
+								if (!post(mPerformClick)) {
+									performClick();
+								}
+							}
+						}
+
+						if (mUnsetPressedState == null) {
+							mUnsetPressedState = new UnsetPressedState();
+						}
+
+						if (prepressed) {
+							postDelayed(mUnsetPressedState, ViewConfiguration.getPressedStateDuration());
+						} else if (!post(mUnsetPressedState)) {
+							// If the post failed, unpress right now
+							mUnsetPressedState.run();
+						}
+
+						removeTapCallback();
+					}
+					mIgnoreNextUpEvent = false;
+					break;
+
+				case MotionEvent.ACTION_DOWN:
+					mHasPerformedLongPress = false;
+
+					// Walk up the hierarchy to determine if we're inside a scrolling container.
+					boolean isInScrollingContainer = isInScrollingContainer();
+
+					// For views inside a scrolling container, delay the pressed feedback for
+					// a short period in case this is a scroll.
+					if (isInScrollingContainer) {
+						mPrivateFlags |= PFLAG_PREPRESSED;
+						if (mPendingCheckForTap == null) {
+							mPendingCheckForTap = new CheckForTap();
+						}
+						mPendingCheckForTap.x = event.getX();
+						mPendingCheckForTap.y = event.getY();
+						postDelayed(mPendingCheckForTap, ViewConfiguration.getTapTimeout());
+					} else {
+						// Not inside a scrolling container, so show the feedback right away
+						setPressed(true, x, y);
+						checkForLongClick(ViewConfiguration.getLongPressTimeout(), x, y);
+					}
+					break;
+
+				case MotionEvent.ACTION_CANCEL:
+					setPressed(false);
+					removeTapCallback();
+					removeLongPressCallback();
+					mInContextButtonPress = false;
+					mHasPerformedLongPress = false;
+					mIgnoreNextUpEvent = false;
+					break;
+
+				case MotionEvent.ACTION_MOVE:
+					drawableHotspotChanged(x, y);
+
+					// Be lenient about moving outside of buttons
+					if (!pointInView(x, y, ViewConfiguration.get(context).getScaledTouchSlop())) {
+						// Outside button
+						// Remove any future long press/tap checks
+						removeTapCallback();
+						removeLongPressCallback();
+						if ((mPrivateFlags & PFLAG_PRESSED) != 0) {
+							setPressed(false);
+						}
+					}
+					break;
+			}
+
+			return true;
+		}
+
+		return false;
 	}
 
-	private LongClickRunnable pendingLongClick = null;
-
-	/* AOSP View.CheckForTap, UnsetPressedState and isInScrollingContainer: a view inside a scrolling
-	 * container shows the pressed state (and the ripple) only after the tap timeout, so that a scroll
-	 * gesture doesn't flash it */
-	private class CheckForTap implements Runnable {
-		float x, y;
-
-		@Override
-		public void run() {
-			pendingCheckForTap = null;
-			drawableHotspotChanged(x, y);
-			setPressed(true);
-		}
-	}
-
-	private CheckForTap pendingCheckForTap = null;
-
-	private final Runnable mUnsetPressedState = new Runnable() {
-		@Override
-		public void run() {
-			setPressed(false);
-		}
-	};
-
-	private boolean isInScrollingContainer() {
+	/* AOSP View.isInScrollingContainer(), pointInView(), the remove*Callback() helpers */
+	public boolean isInScrollingContainer() {
 		ViewParent p = getParent();
 		while (p != null && p instanceof ViewGroup) {
 			if (((ViewGroup)p).shouldDelayChildPressedState()) {
@@ -1555,70 +1667,129 @@ public class View implements Drawable.Callback {
 		return false;
 	}
 
-	private void removeTapCallback() {
-		if (pendingCheckForTap != null) {
-			removeCallbacks(pendingCheckForTap);
-			pendingCheckForTap = null;
+	public boolean pointInView(float localX, float localY, float slop) {
+		return localX >= -slop && localY >= -slop && localX < ((right - left) + slop) && localY < ((bottom - top) + slop);
+	}
+
+	private void removeLongPressCallback() {
+		if (mPendingCheckForLongPress != null) {
+			removeCallbacks(mPendingCheckForLongPress);
 		}
 	}
 
-	@Export
-	public boolean onTouchEvent(MotionEvent event) {
-		if (isClickable() || isLongClickable()) {
-			switch (event.getActionMasked()) {
-				case MotionEvent.ACTION_DOWN:
-					if (isLongClickable()) {
-						cancelLongPress();
-						pendingLongClick = new LongClickRunnable();
-						postDelayed(pendingLongClick, ViewConfiguration.getLongPressTimeout());
-					}
-					if (isInScrollingContainer()) {
-						removeTapCallback();
-						pendingCheckForTap = new CheckForTap();
-						pendingCheckForTap.x = event.getX();
-						pendingCheckForTap.y = event.getY();
-						postDelayed(pendingCheckForTap, ViewConfiguration.getTapTimeout());
-					} else {
-						drawableHotspotChanged(event.getX(), event.getY());
-						setPressed(true);
-					}
-					return true;
-				case MotionEvent.ACTION_MOVE:
-					drawableHotspotChanged(event.getX(), event.getY());
-					if (event.getX() < 0 || event.getY() < 0 || event.getX() > getWidth() || event.getY() > getHeight()) {
-						cancelLongPress();
-						removeTapCallback();
-						if (isPressed()) {
-							setPressed(false);
-						}
-					}
-					return true;
-				case MotionEvent.ACTION_UP: {
-					boolean long_click_done = pendingLongClick != null && pendingLongClick.long_click_done;
-					cancelLongPress();
-					if (pendingCheckForTap != null) {
-						// pressed only now, so that the tap shows
-						removeTapCallback();
-						drawableHotspotChanged(event.getX(), event.getY());
-						setPressed(true);
-					}
-					boolean handled = true;
-					if (isClickable() && !long_click_done && event.getX() >= 0 && event.getY() >= 0 && event.getX() <= getWidth() && event.getY() <= getHeight())
-						handled = performClick();
-					if (isPressed() && !post(mUnsetPressedState)) {
-						mUnsetPressedState.run();
-					}
-					return handled;
+	private void removePerformClickCallback() {
+		if (mPerformClick != null) {
+			removeCallbacks(mPerformClick);
+		}
+	}
+
+	private void removeUnsetPressCallback() {
+		if ((mPrivateFlags & PFLAG_PRESSED) != 0 && mUnsetPressedState != null) {
+			setPressed(false);
+			removeCallbacks(mUnsetPressedState);
+		}
+	}
+
+	private void removeTapCallback() {
+		if (mPendingCheckForTap != null) {
+			mPrivateFlags &= ~PFLAG_PREPRESSED;
+			removeCallbacks(mPendingCheckForTap);
+		}
+	}
+
+	/* AOSP View.cancelLongPress() */
+	public void cancelLongPress() {
+		removeLongPressCallback();
+
+		/*
+		 * The prepressed state handled by the tap callback is a display
+		 * construct, but the tap callback will post a long press callback
+		 * less than its own timeout. Remove it here.
+		 */
+		removeTapCallback();
+	}
+
+	/* AOSP View.checkForLongClick() */
+	private void checkForLongClick(long delay, float x, float y) {
+		if (isLongClickable()) {
+			mHasPerformedLongPress = false;
+
+			if (mPendingCheckForLongPress == null) {
+				mPendingCheckForLongPress = new CheckForLongPress();
+			}
+			mPendingCheckForLongPress.setAnchor(x, y);
+			mPendingCheckForLongPress.rememberWindowAttachCount();
+			mPendingCheckForLongPress.rememberPressedState();
+			postDelayed(mPendingCheckForLongPress, delay);
+		}
+	}
+
+	private final class CheckForLongPress implements Runnable {
+		private int mOriginalWindowAttachCount;
+		private float mX;
+		private float mY;
+		private boolean mOriginalPressedState;
+
+		private CheckForLongPress() {
+		}
+
+		@Override
+		public void run() {
+			if ((mOriginalPressedState == isPressed()) && (parent != null) && mOriginalWindowAttachCount == mWindowAttachCount) {
+				if (performLongClick(mX, mY)) {
+					mHasPerformedLongPress = true;
 				}
-				case MotionEvent.ACTION_CANCEL:
-					cancelLongPress();
-					removeTapCallback();
-					setPressed(false);
-					return true;
 			}
 		}
 
-		return false;
+		public void setAnchor(float x, float y) {
+			mX = x;
+			mY = y;
+		}
+
+		public void rememberWindowAttachCount() {
+			mOriginalWindowAttachCount = mWindowAttachCount;
+		}
+
+		public void rememberPressedState() {
+			mOriginalPressedState = isPressed();
+		}
+	}
+
+	private final class CheckForTap implements Runnable {
+		public float x;
+		public float y;
+
+		@Override
+		public void run() {
+			mPrivateFlags &= ~PFLAG_PREPRESSED;
+			setPressed(true, x, y);
+			final long delay = ViewConfiguration.getLongPressTimeout() - ViewConfiguration.getTapTimeout();
+			checkForLongClick(delay, x, y);
+		}
+	}
+
+	private final class PerformClick implements Runnable {
+		@Override
+		public void run() {
+			performClick();
+		}
+	}
+
+	private final class UnsetPressedState implements Runnable {
+		@Override
+		public void run() {
+			setPressed(false);
+		}
+	}
+
+	/* AOSP View.setPressed(boolean, float, float) */
+	private void setPressed(boolean pressed, float x, float y) {
+		if (pressed) {
+			drawableHotspotChanged(x, y);
+		}
+
+		setPressed(pressed);
 	}
 
 	public void setOnTouchListener(OnTouchListener l) {
@@ -2182,15 +2353,28 @@ public class View implements Drawable.Callback {
 
 	private OnLongClickListener on_long_click_listener = null;
 
+	/* AOSP View.performLongClick() and performLongClickInternal(), without the accessibility event,
+	 * context menu, tooltip and haptic feedback ATL has no counterpart for */
+	public boolean performLongClick() {
+		return performLongClickInternal(mLongClickX, mLongClickY);
+	}
+
 	@Export
 	public boolean performLongClick(float x, float y) {
-		if (on_long_click_listener != null) {
-			return on_long_click_listener.onLongClick(this);
-		}
-		return false;
+		mLongClickX = x;
+		mLongClickY = y;
+		final boolean handled = performLongClick();
+		mLongClickX = Float.NaN;
+		mLongClickY = Float.NaN;
+		return handled;
 	}
-	public boolean performLongClick() {
-		return performLongClick(Float.NaN, Float.NaN);
+
+	private boolean performLongClickInternal(float x, float y) {
+		boolean handled = false;
+		if (on_long_click_listener != null) {
+			handled = on_long_click_listener.onLongClick(this);
+		}
+		return handled;
 	}
 	public void setOnLongClickListener(OnLongClickListener listener) {
 		if (!isLongClickable())
@@ -3451,6 +3635,7 @@ public class View implements Drawable.Callback {
 		if (attachedToWindow)
 			return;
 		attachedToWindow = true;
+		mWindowAttachCount++;
 		/* AOSP resolves the RTL properties when the view is measured after it was attached (the
 		 * window's root view before); Compose initialises its layout direction there */
 		resolveRtlPropertiesIfNeeded();
@@ -3475,6 +3660,9 @@ public class View implements Drawable.Callback {
 			return;
 		onDetachedFromWindow();
 		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT; // AOSP's onDetachedFromWindowInternal()
+		removeUnsetPressCallback();
+		removeLongPressCallback();
+		removePerformClickCallback();
 
 		ListenerInfo li = mListenerInfo;
 		final CopyOnWriteArrayList<OnAttachStateChangeListener> listeners = li != null ? li.mOnAttachStateChangeListeners : null;
@@ -3655,7 +3843,7 @@ public class View implements Drawable.Callback {
 
 	@Export
 	public boolean dispatchTouchEvent(MotionEvent event) {
-		if (on_touch_listener != null && on_touch_listener.onTouch(this, event))
+		if (on_touch_listener != null && isEnabled() && on_touch_listener.onTouch(this, event))
 			return true;
 		return onTouchEvent(event);
 	}
@@ -3853,11 +4041,6 @@ public class View implements Drawable.Callback {
 
 	public ViewOverlay getOverlay() {
 		return new ViewOverlay();
-	}
-
-	public void cancelLongPress() {
-		removeCallbacks(pendingLongClick);
-		pendingLongClick = null;
 	}
 
 	/* AOSP View.getTextAlignment(): the resolved text alignment */
@@ -4107,6 +4290,13 @@ public class View implements Drawable.Callback {
 			if (isPressed()) {
 				setPressed(false);
 			}
+			if (mPerformClick != null) {
+				removeCallbacks(mPerformClick);
+			}
+			if (mPendingCheckForLongPress != null) {
+				removeCallbacks(mPendingCheckForLongPress);
+			}
+			removeTapCallback();
 			onFocusLost();
 		}
 
