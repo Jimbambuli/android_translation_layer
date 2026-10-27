@@ -66,6 +66,7 @@ void atl_fade_widget_cancel(GtkWidget *widget);
 void atl_window_android_tab_focus(GtkWindow *window);
 void atl_window_android_wheel_acceleration(GtkWindow *window);
 void atl_window_android_mouse_back(GtkWindow *window, GCallback back, gpointer data);
+void atl_window_set_key_window(GtkWindow *window, GtkWindow *key_window);
 /* the window gets the moves and the release of a gesture only if it got its press (InputDispatcher touch targets) */
 void atl_window_android_touch_targets(GtkWindow *window);
 /* another window took the press that this one has seen: the rest of the gesture is not for this window */

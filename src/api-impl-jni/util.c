@@ -452,8 +452,15 @@ static gboolean on_mouse_back_event(GtkEventControllerLegacy *controller, GdkEve
 	guint button = gdk_button_event_get_button(event);
 	if (button != 8 && button != 9)
 		return FALSE;
-	if (type == GDK_BUTTON_RELEASE && button == 8)
-		((void (*)(gpointer))back)(g_object_get_data(G_OBJECT(controller), "back-data"));
+	if (type == GDK_BUTTON_RELEASE && button == 8) {
+		/* a key goes to the window with the input focus, not to the one under the pointer: while a dialog
+		 * is shown that is the dialog (atl_window_set_key_window()), even if the pointer is outside of it */
+		GtkWidget *window = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+		GtkWidget *key_window = g_object_get_data(G_OBJECT(window), "key-window");
+		GObject *target = key_window ? g_object_get_data(G_OBJECT(key_window), "mouse-back") : G_OBJECT(controller);
+		if (target)
+			((void (*)(gpointer))g_object_get_data(target, "back-fn"))(g_object_get_data(target, "back-data"));
+	}
 	return TRUE;
 }
 
@@ -462,8 +469,17 @@ void atl_window_android_mouse_back(GtkWindow *window, GCallback back, gpointer d
 	GtkEventController *controller = gtk_event_controller_legacy_new();
 	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
 	g_object_set_data(G_OBJECT(controller), "back-data", data);
+	g_object_set_data(G_OBJECT(controller), "back-fn", back);
+	g_object_set_data(G_OBJECT(window), "mouse-back", controller);
 	g_signal_connect(controller, "event", G_CALLBACK(on_mouse_back_event), back);
 	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+}
+
+/* The window that takes the keys of an app window, while it has the input focus above it (a dialog),
+ * or NULL again (see atl_window_android_mouse_back()). */
+void atl_window_set_key_window(GtkWindow *window, GtkWindow *key_window)
+{
+	g_object_set_data(G_OBJECT(window), "key-window", key_window);
 }
 
 GVariant *intent_serialize(JNIEnv *env, jobject intent)

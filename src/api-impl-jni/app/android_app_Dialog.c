@@ -97,6 +97,8 @@ static void add_touch_outside(GtkWindow *dialog, jobject jobj)
 	gtk_widget_add_controller(GTK_WIDGET(window), controller);
 	outside->controller = controller;
 	g_object_set_data(G_OBJECT(dialog), "touch-outside", outside);
+	/* the dialog has the input focus: the back button of a mouse is its back key wherever the pointer is */
+	atl_window_set_key_window(window, dialog);
 }
 
 static void remove_touch_outside(GtkWindow *dialog)
@@ -107,6 +109,8 @@ static void remove_touch_outside(GtkWindow *dialog)
 
 	JNIEnv *env = get_jni_env();
 	gtk_widget_remove_controller(GTK_WIDGET(window), outside->controller);
+	if (g_object_get_data(G_OBJECT(window), "key-window") == dialog)
+		atl_window_set_key_window(window, NULL);
 	_UNREF(outside->jobj);
 	g_free(outside);
 	g_object_set_data(G_OBJECT(dialog), "touch-outside", NULL);
