@@ -474,7 +474,14 @@ public class TextView extends View {
 		return mHorizontallyScrolling;
 	}
 
-	public void setInputType(int type) {}
+	/* AOSP keeps the input type in Editor.mInputType, which only exists once an input type is set (mEditor != null). ATL has no
+	 * Editor: the type is kept here, 0 (TYPE_NULL) stands for "no Editor". The key listener, IME hints and password handling
+	 * of TextView.setInputType(type, direct) are not reproduced. */
+	private int mInputType;
+
+	public void setInputType(int type) {
+		setRawInputType(type);
+	}
 	private static final Spanned EMPTY_SPANNED = new SpannedString("");
 	private static final InputFilter[] NO_FILTERS = new InputFilter[0];
 	private InputFilter[] filters = NO_FILTERS;
@@ -887,7 +894,7 @@ public class TextView extends View {
 
 	public KeyListener getKeyListener() { return null; }
 
-	public int getInputType() { return 0; }
+	public int getInputType() { return mInputType; }
 
 	public InputFilter[] getFilters() { return filters; }
 
@@ -964,7 +971,20 @@ public class TextView extends View {
 		return getText().length();
 	}
 
-	public void setHighlightColor(int color) {}
+	/* AOSP TextView.setHighlightColor / getHighlightColor (mHighlightColor, default 0x6633B5E5); the colour is kept, ATL's
+	 * text widgets draw their selection through GTK, which does not use it. */
+	private int mHighlightColor = 0x6633B5E5;
+
+	public void setHighlightColor(int color) {
+		if (mHighlightColor != color) {
+			mHighlightColor = color;
+			invalidate();
+		}
+	}
+
+	public int getHighlightColor() {
+		return mHighlightColor;
+	}
 
 	public Editable getEditableText() {
 		return new SpannableStringBuilder(getText());
@@ -980,7 +1000,9 @@ public class TextView extends View {
 
 	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
-	public void setRawInputType(int type) {}
+	public void setRawInputType(int type) {
+		mInputType = type;
+	}
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
 
@@ -2092,7 +2114,14 @@ public class TextView extends View {
 	}
 
 	private void setInputTypeSingleLine(boolean singleLine) {
-		// no Editor: the input type of the GtkText is not kept by the TextView
+		// AOSP TextView.setInputTypeSingleLine(): TYPE_MASK_CLASS 0xf, TYPE_CLASS_TEXT 0x1, TYPE_TEXT_FLAG_MULTI_LINE 0x20000
+		if (mInputType != 0 && (mInputType & 0x0000000f) == 0x00000001) {
+			if (singleLine) {
+				mInputType &= ~0x00020000;
+			} else {
+				mInputType |= 0x00020000;
+			}
+		}
 	}
 
 	public final TransformationMethod getTransformationMethod() {
