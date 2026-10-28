@@ -389,13 +389,22 @@ public class VectorDrawable extends Drawable {
 
 	@Override
 	protected boolean onStateChange(int[] stateSet) {
+		boolean changed = false;
+
+		// When the VD is stateful, we need to mutate the drawable such that we don't share the
+		// cache bitmap with others. Such that the state change only affect this new cached bitmap.
+		if (isStateful()) {
+			mutate();
+		}
 		final VectorDrawableState state = mVectorState;
 		if (state.mTint != null && state.mTintMode != null) {
 			mTintFilter = updateTintFilter(mTintFilter, state.mTint, state.mTintMode);
-			invalidateSelf();
-			return true;
+			changed = true;
 		}
-		return false;
+		if (changed) {
+			invalidateSelf();
+		}
+		return changed;
 	}
 
 	public int getOpacity() {
