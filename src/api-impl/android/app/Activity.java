@@ -1243,6 +1243,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 
 	@Export
 	private void performResume() {
+		/* the activities of an app share one GtkWindow, which knows only the Window of the activity that
+		 * registered last (weakly, and that one is gone once its activity has finished): the lookup of a
+		 * view's Window (View.getRootWindowInsets(), requestApplyInsets()) must find the one of the
+		 * activity that comes to the front. Without it the insets of the main activity were lost after
+		 * the settings had been open, and JW Library kept the old bottom margin of the content */
+		if (window != null && window.native_window != 0)
+			window.set_native_window(window.native_window);
 		dispatchActivityPreResumed();
 		onResume();
 		dispatchActivityPostResumed();
