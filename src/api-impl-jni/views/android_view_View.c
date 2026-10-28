@@ -792,6 +792,25 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setVisibility(JNIEnv *env,
 		gtk_widget_set_sensitive(wrapper, sensitive && visibility != android_view_View_INVISIBLE && alpha != 0.0f);
 }
 
+/* the motion controller that turns GTK's crossings and motion into ACTION_HOVER_* events for View.dispatchHoverEvent() */
+static void add_hover_controller(WrapperWidget *wrapper)
+{
+	if (g_object_get_data(G_OBJECT(wrapper), "hover_controller"))
+		return;
+	GtkEventController *controller = gtk_event_controller_motion_new();
+
+	g_signal_connect(controller, "enter", G_CALLBACK(hover_enter_cb), wrapper);
+	g_signal_connect(controller, "leave", G_CALLBACK(hover_leave_cb), wrapper);
+	g_signal_connect(controller, "motion", G_CALLBACK(hover_motion_cb), wrapper);
+	gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
+	g_object_set_data(G_OBJECT(wrapper), "hover_controller", controller);
+}
+
+JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnHoverListener(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	add_hover_controller(WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)))));
+}
+
 JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	WrapperWidget *wrapper = g_object_ref_sink(WRAPPER_WIDGET(wrapper_widget_new()));
@@ -813,14 +832,17 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, 
 		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), wrapper);
 		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
 	}
-	if (_METHOD(class, "dispatchHoverEvent", "(Landroid/view/MotionEvent;)Z") != _CACHED_METHOD(View__dispatchHoverEvent)) {
-		GtkEventController *controller = gtk_event_controller_motion_new();
-
-		g_signal_connect(controller, "enter", G_CALLBACK(hover_enter_cb), wrapper);
-		g_signal_connect(controller, "leave", G_CALLBACK(hover_leave_cb), wrapper);
-		g_signal_connect(controller, "motion", G_CALLBACK(hover_motion_cb), wrapper);
-		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
+	jmethodID dispatchhoverevent_method = _METHOD(class, "dispatchHoverEvent", "(Landroid/view/MotionEvent;)Z");
+	jclass viewgroup_class = (*env)->FindClass(env, "android/view/ViewGroup");
+	if (dispatchhoverevent_method != _CACHED_METHOD(View__dispatchHoverEvent) && dispatchhoverevent_method != _CACHED_METHOD(ViewGroup__dispatchHoverEvent)) {
+		add_hover_controller(wrapper);
+	} else if (_METHOD(class, "onHoverEvent", "(Landroid/view/MotionEvent;)Z") != _CACHED_METHOD(View__onHoverEvent)) {
+		add_hover_controller(wrapper);
+	} else if ((*env)->IsAssignableFrom(env, class, viewgroup_class)
+	           && _METHOD(class, "onInterceptHoverEvent", "(Landroid/view/MotionEvent;)Z") != _CACHED_METHOD(ViewGroup__onInterceptHoverEvent)) {
+		add_hover_controller(wrapper);
 	}
+	(*env)->DeleteLocalRef(env, viewgroup_class);
 
 	return _INTPTR(widget);
 }

@@ -262,6 +262,22 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return handled;
 	}
 
+	/* AOSP's ViewGroup.onInterceptHoverEvent(), without the scroll bar thumb (not implemented) */
+	@Export
+	public boolean onInterceptHoverEvent(MotionEvent event) {
+		return false;
+	}
+
+	/* AOSP's ViewGroup.dispatchHoverEvent() asks onInterceptHoverEvent() first and then hands the event to the
+	 * children. Here every view with a hover handler has its own GTK motion controller (see
+	 * View.native_constructor()), so the children get their events there and only the interception is kept. */
+	@Export
+	@Override
+	protected boolean dispatchHoverEvent(MotionEvent event) {
+		onInterceptHoverEvent(event);
+		return super.dispatchHoverEvent(event);
+	}
+
 	@Export
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {

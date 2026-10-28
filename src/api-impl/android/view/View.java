@@ -742,7 +742,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public interface OnHoverListener {
-		// TODO
+		boolean onHover(View v, MotionEvent event);
 	}
 
 	public interface OnApplyWindowInsetsListener {
@@ -1056,6 +1056,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		OnClickListener mOnClickListener;
 		OnKeyListener mOnKeyListener;
 		OnGenericMotionListener mOnGenericMotionListener;
+		OnHoverListener mOnHoverListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -2470,7 +2471,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		setFlags(longClickable ? LONG_CLICKABLE : 0, LONG_CLICKABLE);
 	}
 
-	public void setOnHoverListener(OnHoverListener listener) {}
+	/* AOSP's View.setOnHoverListener(); the hover events are delivered by a GTK motion controller, which is
+	 * installed once a view has a hover listener (or overrides one of the hover methods) */
+	public void setOnHoverListener(OnHoverListener l) {
+		getListenerInfo().mOnHoverListener = l;
+		nativeSetOnHoverListener(widget);
+	}
+
+	protected native void nativeSetOnHoverListener(long widget);
 
 	@Export
 	public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -4856,8 +4864,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		this.scrollY = value;
 	}
 
+	/* AOSP's View.dispatchHoverEvent() */
 	@Export
-	protected boolean dispatchHoverEvent(MotionEvent event) { return false; }
+	protected boolean dispatchHoverEvent(MotionEvent event) {
+		ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnHoverListener != null
+				&& isEnabled()
+				&& li.mOnHoverListener.onHover(this, event)) {
+			return true;
+		}
+
+		return onHoverEvent(event);
+	}
+
+	/* AOSP's View.onHoverEvent() without the accessibility and the hovered state (not implemented) */
+	@Export
+	public boolean onHoverEvent(MotionEvent event) { return false; }
 
 	public ActionMode startActionMode(ActionMode.Callback callback, int type) { return null; }
 
