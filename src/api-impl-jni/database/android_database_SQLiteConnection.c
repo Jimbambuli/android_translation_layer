@@ -28,6 +28,9 @@
 #include <string.h>
 
 #include <sqlite3.h>
+#include <unicode/ucol.h>
+#include <unicode/uiter.h>
+#include <unicode/utypes.h>
 
 #include "../defines.h"
 #include "../util.h"
@@ -68,28 +71,75 @@ struct SQLiteConnection {
 static const int BUSY_TIMEOUT_MS = 2500;
 
 /*
-** This function is a collation sequence callback equivalent to the built-in
-** BINARY sequence.
-**
-** Stock Android uses a modified version of sqlite3.c that calls out to a module
-** named "sqlite3_android" to add extra built-in collations and functions to
-** all database handles. Specifically, collation sequence "LOCALIZED" and "UNICODE". For now,
-** this module does not include sqlite3_android (since it is difficult to build
-** with the NDK only). Instead, this function is registered as "LOCALIZED" and "UNICODE" for all
-** new database handles.
+** Collations as in AOSP external/sqlite/android/sqlite3_android.cpp (android-14): collate8 compares with an ICU UCollator,
+** localized_collator_dtor closes it, register_localized_collators() registers "LOCALIZED" and "PHONEBOOK" for the locale
+** given by SQLiteConnection.setLocaleFromConfiguration(), register_android_functions() registers "UNICODE" for the default
+** ICU locale. Rewritten from C++ to C (the ICU C API is used as it is); the storage is UTF-8 (UTF16_STORAGE is 0 in
+** android_database_SQLiteConnection.cpp).
 */
-static int coll_localized(
-    void *not_used,
-    int nKey1, const void *pKey1,
-    int nKey2, const void *pKey2)
+static int collate8(void *p, int n1, const void *v1, int n2, const void *v2)
 {
-	int rc, n;
-	n = nKey1 < nKey2 ? nKey1 : nKey2;
-	rc = memcmp(pKey1, pKey2, n);
-	if (rc == 0) {
-		rc = nKey1 - nKey2;
+	UCollator *coll = (UCollator *)p;
+	UCharIterator i1, i2;
+	UErrorCode status = U_ZERO_ERROR;
+
+	uiter_setUTF8(&i1, (const char *)v1, n1);
+	uiter_setUTF8(&i2, (const char *)v2, n2);
+
+	UCollationResult result = ucol_strcollIter(coll, &i1, &i2, &status);
+
+	if (result == UCOL_LESS) {
+		return -1;
+	} else if (result == UCOL_GREATER) {
+		return 1;
+	} else {
+		return 0;
 	}
-	return rc;
+}
+
+static void localized_collator_dtor(void *collator)
+{
+	ucol_close((UCollator *)collator);
+}
+
+#define LOCALIZED_COLLATOR_NAME "LOCALIZED"
+#define PHONEBOOK_COLLATOR_NAME "PHONEBOOK"
+
+static int register_localized_collators(sqlite3 *handle, const char *systemLocale)
+{
+	static const char *const names[] = { LOCALIZED_COLLATOR_NAME, PHONEBOOK_COLLATOR_NAME };
+
+	for (int i = 0; i < 2; i++) {
+		UErrorCode status = U_ZERO_ERROR;
+		UCollator *collator = ucol_open(systemLocale, &status);
+		if (U_FAILURE(status)) {
+			return -1;
+		}
+
+		ucol_setAttribute(collator, UCOL_STRENGTH, UCOL_PRIMARY, &status);
+		if (U_FAILURE(status)) {
+			ucol_close(collator);
+			return -1;
+		}
+
+		int err = sqlite3_create_collation_v2(handle, names[i], SQLITE_UTF8, collator, collate8, localized_collator_dtor);
+		if (err != SQLITE_OK) {
+			return err;
+		}
+	}
+	return SQLITE_OK;
+}
+
+static int register_android_functions(sqlite3 *handle)
+{
+	UErrorCode status = U_ZERO_ERROR;
+
+	UCollator *collator = ucol_open(NULL, &status);
+	if (U_FAILURE(status)) {
+		return -1;
+	}
+
+	return sqlite3_create_collation_v2(handle, "UNICODE", SQLITE_UTF8, collator, collate8, localized_collator_dtor);
 }
 
 // Called each time a statement begins execution, when tracing is enabled.
@@ -134,15 +184,7 @@ JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeOpen
 		throw_sqlite3_exception_errcode(env, err, "Could not open database");
 		return 0;
 	}
-	err = sqlite3_create_collation(db, "localized", SQLITE_UTF8, 0, coll_localized);
-	if (err != SQLITE_OK) {
-		throw_sqlite3_exception_errcode(env, err, "Could not register collation");
-		sqlite3_close(db);
-		return 0;
-	}
-
-	err = sqlite3_create_collation(db, "UNICODE", SQLITE_UTF8, 0, coll_localized);
-
+	err = register_android_functions(db);
 	if (err != SQLITE_OK) {
 		throw_sqlite3_exception_errcode(env, err, "Could not register collation");
 		sqlite3_close(db);
@@ -283,7 +325,16 @@ JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegis
 
 JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterLocalizedCollators(JNIEnv *env, jclass clazz, jlong connectionPtr, jstring localeStr)
 {
-	/* Localized collators are not supported. */
+	/* android_database_SQLiteConnection.cpp: register_localized_collators(connection->db, locale, UTF16_STORAGE) */
+	struct SQLiteConnection *connection = _PTR(connectionPtr);
+
+	const char *locale = (*env)->GetStringUTFChars(env, localeStr, NULL);
+	int err = register_localized_collators(connection->db, locale);
+	(*env)->ReleaseStringUTFChars(env, localeStr, locale);
+
+	if (err != SQLITE_OK) {
+		throw_sqlite3_exception_handle(env, connection->db);
+	}
 }
 
 JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativePrepareStatement(JNIEnv *env, jclass clazz, jlong connectionPtr, jstring sqlString)
