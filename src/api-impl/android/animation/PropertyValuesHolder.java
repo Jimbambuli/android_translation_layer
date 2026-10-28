@@ -21,7 +21,7 @@ import android.graphics.PointF;
 import android.util.FloatProperty;
 import android.util.IntProperty;
 import android.util.Log;
-//import android.util.PathParser;
+import android.util.PathParser;
 import android.util.Property;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -1080,21 +1080,17 @@ public class PropertyValuesHolder implements Cloneable {
 		values.propertyName = mPropertyName;
 		values.type = mValueType;
 		values.startValue = mKeyframes.getValue(0);
-		/* ATL: no PathParser
         if (values.startValue instanceof PathParser.PathData) {
             // PathData evaluator returns the same mutable PathData object when query fraction,
             // so we have to make a copy here.
             values.startValue = new PathParser.PathData((PathParser.PathData) values.startValue);
         }
-        */
 		values.endValue = mKeyframes.getValue(1);
-		/* ATL: no PathParser
         if (values.endValue instanceof PathParser.PathData) {
             // PathData evaluator returns the same mutable PathData object when query fraction,
             // so we have to make a copy here.
             values.endValue = new PathParser.PathData((PathParser.PathData) values.endValue);
         }
-        */
 		// TODO: We need a better way to get data out of keyframes.
 		if (/* ATL: no PathKeyframes
                 mKeyframes instanceof PathKeyframes.FloatKeyframesBase

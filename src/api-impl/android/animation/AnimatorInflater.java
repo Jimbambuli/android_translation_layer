@@ -30,7 +30,7 @@ import android.content.res.XmlResourceParser;
 import android.graphics.Path;
 import android.util.AttributeSet;
 import android.util.Log;
-//import android.util.PathParser;
+import android.util.PathParser;
 import android.util.StateSet;
 import android.util.TypedValue;
 import android.util.Xml;
@@ -254,7 +254,7 @@ public class AnimatorInflater {
 	 * represented in the same format but different control points' values.
 	 * The path is represented as verbs and points for each of the verbs.
 	 */
-	/*private static class PathDataEvaluator implements TypeEvaluator<PathParser.PathData> {
+	private static class PathDataEvaluator implements TypeEvaluator<PathParser.PathData> {
 		private final PathParser.PathData mPathData = new PathParser.PathData();
 
 		@Override
@@ -266,7 +266,7 @@ public class AnimatorInflater {
 			}
 			return mPathData;
 		}
-	}*/
+	}
 
 	private static PropertyValuesHolder getPVH(TypedArray styledAttributes, int valueType, int valueFromId, int valueToId, String propertyName) {
 
@@ -291,7 +291,6 @@ public class AnimatorInflater {
 		PropertyValuesHolder returnValue = null;
 
 		if (valueType == VALUE_TYPE_PATH) {
-			/*
 			String fromString = styledAttributes.getString(valueFromId);
 			String toString = styledAttributes.getString(valueToId);
 			PathParser.PathData nodesFrom = fromString == null
@@ -321,7 +320,6 @@ public class AnimatorInflater {
 										    (Object)nodesTo);
 				}
 			}
-			*/
 		} else {
 			TypeEvaluator evaluator = null;
 			// Integer and float value types are handled here.
@@ -443,47 +441,6 @@ public class AnimatorInflater {
 			setupObjectAnimator(anim, arrayObjectAnimator, valueType, pixelSize);
 		}
 	}
-
-	/**
-	 * Setup the Animator to achieve path morphing.
-	 *
-	 * @param anim The target Animator which will be updated.
-	 * @param arrayAnimator TypedArray for the ValueAnimator.
-	 * @return the PathDataEvaluator.
-	 */
-	/*private static TypeEvaluator setupAnimatorForPath(ValueAnimator anim,
-							  TypedArray arrayAnimator) {
-		TypeEvaluator evaluator = null;
-		String fromString = arrayAnimator.getString(R.styleable.Animator_valueFrom);
-		String toString = arrayAnimator.getString(R.styleable.Animator_valueTo);
-		PathParser.PathData pathDataFrom = fromString == null
-						       ? null
-						       : new PathParser.PathData(fromString);
-		PathParser.PathData pathDataTo = toString == null
-						     ? null
-						     : new PathParser.PathData(toString);
-
-		if (pathDataFrom != null) {
-			if (pathDataTo != null) {
-				anim.setObjectValues(pathDataFrom, pathDataTo);
-				if (!PathParser.canMorph(pathDataFrom, pathDataTo)) {
-					throw new InflateException(arrayAnimator.getPositionDescription() + " Can't morph from " + fromString + " to " + toString);
-				}
-			} else {
-				anim.setObjectValues((Object)pathDataFrom);
-			}
-			evaluator = new PathDataEvaluator();
-		} else if (pathDataTo != null) {
-			anim.setObjectValues((Object)pathDataTo);
-			evaluator = new PathDataEvaluator();
-		}
-
-		if (DBG_ANIMATOR_INFLATER && evaluator != null) {
-			Log.v(TAG, "create a new PathDataEvaluator here");
-		}
-
-		return evaluator;
-	}*/
 
 	/**
 	 * Setup ObjectAnimator's property or values from pathData.
