@@ -411,6 +411,13 @@ static gboolean on_wheel_event(GtkEventControllerLegacy *controller, GdkEvent *e
 	}
 
 	nsecs_t when = (nsecs_t)gdk_event_get_time(event) * 1000000;
+	/* InputReader accelerates each wheel event once, when it comes from the device. A WebView gets the
+	 * events WebCore did not handle (at the end of the page) back from WebKitGTK with gdk_display_put_event(),
+	 * so they pass this window again: they are not new input, and accelerating them again would deliver
+	 * them again, back to WebKit, which hands them back once more (a loop that floods WebKit's wheel event
+	 * queue, and the wheel turned the other way then waits behind it or is coalesced with it). */
+	if (wheel.last_event_time && when <= wheel.last_event_time)
+		return FALSE;
 	if (wheel.last_event_time && when - wheel.last_event_time >= 500 * 1000000) // VelocityControl::STOP_TIME: the controls reset themselves
 		wheel.pending = 0;
 	wheel.last_event_time = when;
