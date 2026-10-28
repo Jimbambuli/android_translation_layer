@@ -740,11 +740,6 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
 	gtk_widget_set_halign(widget, halign);
 	gtk_widget_set_valign(widget, valign);
 
-	if (width > 0)
-		g_object_set(G_OBJECT(widget), "width-request", width, NULL);
-	if (height > 0)
-		g_object_set(G_OBJECT(widget), "height-request", height, NULL);
-
 	GtkWidget *parent = gtk_widget_get_parent(widget);
 	// if parent is Java widget, it will handle the margins by itself
 	if (parent && !ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(parent))) {

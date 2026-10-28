@@ -138,12 +138,26 @@ GtkSizeRequestMode wrapper_widget_get_request_mode(GtkWidget *widget)
 void wrapper_widget_measure(GtkWidget *widget, GtkOrientation orientation, int for_size, int *minimum, int *natural, int *minimum_baseline, int *natural_baseline)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+	GtkOrientation opposite = orientation == GTK_ORIENTATION_HORIZONTAL ? GTK_ORIENTATION_VERTICAL : GTK_ORIENTATION_HORIZONTAL;
+	if (for_size >= 0 && !ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(wrapper->child))) {
+		/* the size comes from the layout and may be below the child's minimum; GTK would warn and measure for the minimum */
+		int minimum_for_size;
+		gtk_widget_measure(wrapper->child, opposite, -1, &minimum_for_size, NULL, NULL, NULL);
+		for_size = MAX(for_size, minimum_for_size);
+	}
 	gtk_widget_measure(wrapper->child, orientation, for_size, minimum, natural, minimum_baseline, natural_baseline);
 	if (orientation == GTK_ORIENTATION_HORIZONTAL && (wrapper->layout_width > 0)) {
-		*minimum = *natural = wrapper->layout_width;
+		*natural = wrapper->layout_width;
 	} else if (orientation == GTK_ORIENTATION_VERTICAL && (wrapper->layout_height > 0)) {
-		*minimum = *natural = wrapper->layout_height;
+		*natural = wrapper->layout_height;
 	}
+	/* The size comes from the AOSP layout, not from GTK minimums: ViewGroup.layout() gives a child the
+	 * size the parent chose, below GTK's minimum for the child as well. Without a minimum
+	 * gtk_widget_allocate() has none to warn about. */
+	*minimum = 0;
+	/* a baseline outside of the size is none (GTK warns about it) */
+	if (*minimum_baseline > *minimum || *natural_baseline > *natural)
+		*minimum_baseline = *natural_baseline = -1;
 }
 
 void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int baseline)
@@ -189,7 +203,15 @@ void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int basel
 		else
 			gtk_widget_size_allocate(wrapper->child, &(GtkAllocation){.x = allocation.x, .y = allocation.y}, baseline);
 	} else {
-		gtk_widget_size_allocate(wrapper->child, &allocation, baseline);
+		/* AOSP gives the size; a GTK container (the box of a TextView with its padding) must not be
+		 * allocated below its minimum, or its children get negative sizes */
+		GtkAllocation child_allocation = allocation;
+		int minimum_width, minimum_height;
+		gtk_widget_measure(wrapper->child, GTK_ORIENTATION_HORIZONTAL, -1, &minimum_width, NULL, NULL, NULL);
+		child_allocation.width = MAX(width, minimum_width);
+		gtk_widget_measure(wrapper->child, GTK_ORIENTATION_VERTICAL, child_allocation.width, &minimum_height, NULL, NULL, NULL);
+		child_allocation.height = MAX(height, minimum_height);
+		gtk_widget_size_allocate(wrapper->child, &child_allocation, baseline);
 	}
 	if (wrapper->background)
 		gtk_widget_size_allocate(wrapper->background, &allocation, baseline);

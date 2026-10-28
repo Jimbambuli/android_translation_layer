@@ -212,8 +212,10 @@ JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline(JNIEnv *
 	GtkLabel *label = box_get_label(env, _PTR(widget_ptr));
 	if (!label)
 		return -1;
-	int natural, baseline;
-	gtk_widget_measure(GTK_WIDGET(label), GTK_ORIENTATION_VERTICAL, width > 0 ? width : -1, NULL, &natural, NULL, &baseline);
+	int natural, baseline, minimum_width;
+	/* the width comes from the layout and may be below the label's minimum; GTK would warn and measure for the minimum */
+	gtk_widget_measure(GTK_WIDGET(label), GTK_ORIENTATION_HORIZONTAL, -1, &minimum_width, NULL, NULL, NULL);
+	gtk_widget_measure(GTK_WIDGET(label), GTK_ORIENTATION_VERTICAL, width > 0 ? MAX(width, minimum_width) : -1, NULL, &natural, NULL, &baseline);
 	if (baseline < 0)
 		return -1;
 	return baseline + MAX(height - natural, 0) * gtk_label_get_yalign(label);
