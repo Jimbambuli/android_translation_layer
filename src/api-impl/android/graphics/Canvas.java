@@ -474,7 +474,16 @@ public class Canvas {
 		synchronized (bitmap) {
 			if (paint.getShader() instanceof BitmapShader) {
 				BitmapShader shader = (BitmapShader)paint.getShader();
-				drawBitmap(shader.bitmap, 0, 0, paint);
+				Matrix localMatrix = new Matrix();
+				if (shader.getLocalMatrix(localMatrix)) {
+					// the shader maps the bitmap with its local matrix (AOSP Shader.setLocalMatrix)
+					int saveCount = save();
+					concat(localMatrix);
+					drawBitmap(shader.bitmap, 0, 0, paint);
+					restoreToCount(saveCount);
+				} else {
+					drawBitmap(shader.bitmap, 0, 0, paint);
+				}
 			} else if (paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
 				int oldSaveCount = gsk_canvas.getSaveCount();
 				gsk_canvas.restoreToCount(1);
