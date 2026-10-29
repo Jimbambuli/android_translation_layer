@@ -107,6 +107,16 @@ public class MediaCodec {
 	private Callback callback;
 	private android.os.Handler callbackHandler;
 	private volatile boolean pumping;
+	private final Object mListenerLock = new Object();
+
+	/* AOSP MediaCodec.stop(): drop the callback messages still queued on the callback handler. */
+	private void stopPumping() {
+		synchronized (mListenerLock) {
+			pumping = false;
+			if (callbackHandler != null)
+				callbackHandler.removeCallbacks(pump);
+		}
+	}
 
 	public void setCallback(Callback cb) {
 		setCallback(cb, null);
@@ -139,8 +149,13 @@ public class MediaCodec {
 				else
 					break;
 			}
-			if (pumping)
-				callbackHandler.postDelayed(this, 5);
+			/* Like AOSP's stop(), which removes the pending callback messages under mListenerLock, so
+			 * that nothing is posted to a handler whose thread is gone once the codec is stopped.
+			 * ExoPlayer quits the callback thread before it releases the codec, hence the check of the queue. */
+			synchronized (mListenerLock) {
+				if (pumping && !callbackHandler.getLooper().getQueue().isQuitting())
+					callbackHandler.postDelayed(this, 5);
+			}
 		}
 	};
 
@@ -252,12 +267,12 @@ public class MediaCodec {
 	}
 
 	public void stop() {
-		pumping = false;
+		stopPumping();
 	}
 
 	public synchronized void release() {
 		System.out.println("MediaCodec.release(): codecName=" + codecName);
-		pumping = false;
+		stopPumping();
 		if (native_codec != 0) {
 			if (outputBuffers != null) {
 				for (int i = 0; i < outputBuffers.length; i++) {

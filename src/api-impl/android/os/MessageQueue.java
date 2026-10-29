@@ -41,6 +41,18 @@ public final class MessageQueue {
 	private IdleHandler[] mPendingIdleHandlers;
 	private boolean mQuitting;
 
+	/**
+	 * ATL addition (AOSP has no equivalent): true once quit() was called. AOSP's codec callbacks come from a
+	 * native thread that stops with the codec; ATL's MediaCodec pump runs on the handler's thread and must
+	 * not queue itself on a looper that is quitting.
+	 * @hide
+	 */
+	public boolean isQuitting() {
+		synchronized (this) {
+			return mQuitting;
+		}
+	}
+
 	// Indicates whether next() is blocked waiting in pollOnce() with a non-zero timeout.
 	private boolean mBlocked;
 
