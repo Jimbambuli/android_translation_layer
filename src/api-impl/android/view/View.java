@@ -1935,6 +1935,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/* should be called from onTouchEvent() of GtkWidget implementations */
 	protected native boolean native_gtkEventPropagation();
+	/* should be called from onGenericMotionEvent() of GtkWidget implementations that scroll by themselves:
+	 * the GTK widget gets the wheel event, even when another view lies over it */
+	protected native boolean native_gtkScrollTarget(long widget);
 	/* used by the DecorView to register a GtkEventController and wire it to dispatchTouchEvent() */
 	protected native void native_registerTouchEventPropagation(long widget);
 

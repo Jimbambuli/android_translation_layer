@@ -424,10 +424,18 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 	return ret;
 }
 
+static gboolean on_scroll_event(WrapperWidget *wrapper, GdkEvent *event);
+
 static gboolean on_event(GtkEventControllerLegacy *event_controller, GdkEvent *event, gpointer user_data)
 {
 	GdkEventType event_type = gdk_event_get_event_type(event);
 	switch (event_type) {
+		case GDK_SCROLL: {
+			WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(event_controller)));
+			if (!wrapper->touch_root || gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(event_controller)) != GTK_PHASE_CAPTURE)
+				return false;
+			return on_scroll_event(wrapper, event);
+		}
 		case GDK_BUTTON_PRESS:
 		case GDK_TOUCH_BEGIN:
 		case GDK_BUTTON_RELEASE:
@@ -492,6 +500,13 @@ gboolean hacky_get_cursor_position(GtkWidget *widget, double *x, double *y)
 	                                       x, y, NULL);
 }
 
+/* the GTK widget that consumed the ACTION_SCROLL in Java and scrolls by itself (see native_gtkScrollTarget()) */
+static GtkWidget *gtk_scroll_target = NULL;
+/* the wheel event that the root view dispatched in Java and that no view consumed */
+static GdkEvent *java_scroll_unhandled = NULL;
+/* the root view delivers a wheel event once more (see deliver_scroll_to()) */
+static gboolean scroll_redelivering = FALSE;
+
 static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdouble dy, WrapperWidget *wrapper)
 {
 	double x;
@@ -503,6 +518,8 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	GdkScrollUnit scroll_unit = gtk_event_controller_scroll_get_unit(controller);
 	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
 	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+	if (event && event == java_scroll_unhandled) // the root view already offered it to this view in Java
+		return FALSE;
 	jobject this = (*env)->NewLocalRef(env, wrapper->jobj);
 	if (!this)
 		return FALSE;
@@ -517,7 +534,12 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	jobject motion_event = J_new__MotionEvent__scroll(env, SOURCE_MOUSE, ACTION_SCROLL,
 	                                                  gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
 
-	gboolean ret = J__View__dispatchGenericMotionEvent(env, this, motion_event);
+	/* a GTK widget that scrolls by itself (ScrollView, WebView) handles the event on GTK's path */
+	GdkEvent *outer = synthetic_propagation_failed;
+	synthetic_propagation_failed = NULL;
+	gboolean ret = J__View__dispatchGenericMotionEvent(env, this, motion_event) && !synthetic_propagation_failed;
+	synthetic_propagation_failed = outer;
+	gtk_scroll_target = NULL;
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
@@ -530,6 +552,118 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 	(*env)->DeleteLocalRef(env, motion_event);
 	(*env)->DeleteLocalRef(env, this);
 	return ret;
+}
+
+/* The view that consumes ACTION_SCROLL can be a GTK widget that scrolls by itself (WebKit) and that lies
+ * below the widget GTK delivers the event to (a button drawn over the page): GTK only passes the event on
+ * to the ancestors of that widget. The widget's scroll controller is lent to the root view for one more
+ * delivery of the event, which the root view then gets first. */
+static gboolean deliver_scroll_to(WrapperWidget *root, GtkWidget *target, GdkEvent *event)
+{
+	double x, y, off_x, off_y;
+	GtkNative *native = gtk_widget_get_native(target);
+	if (!native)
+		return false;
+	hacky_get_cursor_position(target, &x, &y); // scroll events carry no position
+	gtk_native_get_surface_transform(native, &off_x, &off_y);
+	GtkWidget *picked = gtk_widget_pick(GTK_WIDGET(native), x - off_x, y - off_y, GTK_PICK_DEFAULT);
+	if (picked && (picked == target || gtk_widget_is_ancestor(picked, target)))
+		return false; // the widget is under the pointer, GTK delivers the event to it
+
+	GtkEventController *controller = NULL;
+	GListModel *controllers = gtk_widget_observe_controllers(target);
+	for (guint i = 0; !controller && i < g_list_model_get_n_items(controllers); i++) {
+		GtkEventController *item = g_list_model_get_item(controllers, i);
+		if (GTK_IS_EVENT_CONTROLLER_SCROLL(item))
+			controller = item;
+		else
+			g_object_unref(item);
+	}
+	g_object_unref(controllers);
+	if (!controller)
+		return false;
+
+	GtkPropagationPhase phase = gtk_event_controller_get_propagation_phase(controller);
+	gtk_widget_remove_controller(target, controller);
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	gtk_widget_add_controller(GTK_WIDGET(root), g_object_ref(controller));
+	gboolean handled;
+	scroll_redelivering = TRUE;
+	g_signal_emit_by_name(gdk_event_get_surface(event), "event", event, &handled);
+	scroll_redelivering = FALSE;
+	gtk_widget_remove_controller(GTK_WIDGET(root), controller);
+	gtk_event_controller_set_propagation_phase(controller, phase);
+	gtk_widget_add_controller(target, controller);
+	return true;
+}
+
+/* Like ViewRootImpl, the root view (the DecorView, which dispatches the touches in Java too) gets the wheel
+ * event as ACTION_SCROLL through dispatchGenericMotionEvent(); ViewGroup.dispatchGenericPointerEvent() offers it
+ * to the children under the pointer, front to back, until one consumes it. GTK would give it only to the
+ * widget under the pointer and its ancestors, so a view that does not scroll (a button over a WebView) kept it
+ * from the view below. An event no view consumes goes on along GTK's path, where native GTK widgets get it. */
+static gboolean on_scroll_event(WrapperWidget *wrapper, GdkEvent *event)
+{
+	if (scroll_redelivering)
+		return false;
+	g_clear_pointer(&java_scroll_unhandled, gdk_event_unref);
+
+	double dx, dy;
+	gdk_scroll_event_get_deltas(event, &dx, &dy);
+	switch (gdk_scroll_event_get_direction(event)) { // as GtkEventControllerScroll reports the discrete events
+		case GDK_SCROLL_UP: dy = -1; break;
+		case GDK_SCROLL_DOWN: dy = 1; break;
+		case GDK_SCROLL_LEFT: dx = -1; break;
+		case GDK_SCROLL_RIGHT: dx = 1; break;
+		default: break;
+	}
+	if (!dx && !dy) // the end of a touchpad scroll
+		return false;
+	if (gdk_scroll_event_get_unit(event) == GDK_SCROLL_UNIT_SURFACE) {
+		dx /= MAGIC_SCROLL_FACTOR;
+		dy /= MAGIC_SCROLL_FACTOR;
+	}
+	double raw_x, raw_y;
+	hacky_get_cursor_position(GTK_WIDGET(wrapper), &raw_x, &raw_y); // scroll events carry no position
+	double x = raw_x, y = raw_y;
+	transform_coords_to_widget_relative(GTK_WIDGET(wrapper), &x, &y);
+
+	JNIEnv *env = get_jni_env();
+	jobject motion_event = J_new__MotionEvent__scroll(env, SOURCE_MOUSE, ACTION_SCROLL, gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
+	GdkEvent *outer = synthetic_propagation_failed;
+	synthetic_propagation_failed = NULL;
+	gtk_scroll_target = NULL;
+	gboolean handled = J__View__dispatchGenericMotionEvent(env, wrapper->jobj, motion_event);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, motion_event);
+	gboolean gtk_path = synthetic_propagation_failed != NULL;
+	synthetic_propagation_failed = outer;
+	GtkWidget *target = gtk_scroll_target;
+	gtk_scroll_target = NULL;
+
+	if (!handled) {
+		java_scroll_unhandled = gdk_event_ref(event);
+		return false;
+	}
+	if (target)
+		return deliver_scroll_to(wrapper, target, event);
+	if (gtk_path)
+		return false;
+
+	// HACK (see scroll_cb()): replay the last hover event to the views that scroll themselves
+	GtkNative *native = gtk_widget_get_native(GTK_WIDGET(wrapper));
+	double off_x, off_y;
+	gtk_native_get_surface_transform(native, &off_x, &off_y);
+	for (GtkWidget *w = gtk_widget_pick(GTK_WIDGET(native), raw_x - off_x, raw_y - off_y, GTK_PICK_DEFAULT); w && w != GTK_WIDGET(native); w = gtk_widget_get_parent(w)) {
+		if (WRAPPER_IS_WIDGET(w) && g_object_get_data(G_OBJECT(w), "scroll_controller") && WRAPPER_WIDGET(w)->hover_x && WRAPPER_WIDGET(w)->hover_y)
+			call_hover_callback(WRAPPER_WIDGET(w)->jobj, ACTION_HOVER_MOVE, WRAPPER_WIDGET(w)->hover_x, WRAPPER_WIDGET(w)->hover_y, WRAPPER_WIDGET(w)->hover_x, WRAPPER_WIDGET(w)->hover_y);
+		if (w == GTK_WIDGET(wrapper))
+			break;
+	}
+	return true;
 }
 
 /* the pointer position in surface coordinates, like gdk_event_get_position(); GTK also emits
@@ -831,6 +965,7 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env, 
 
 		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), wrapper);
 		gtk_widget_add_controller(GTK_WIDGET(wrapper), controller);
+		g_object_set_data(G_OBJECT(wrapper), "scroll_controller", controller);
 	}
 	jmethodID dispatchhoverevent_method = _METHOD(class, "dispatchHoverEvent", "(Landroid/view/MotionEvent;)Z");
 	jclass viewgroup_class = (*env)->FindClass(env, "android/view/ViewGroup");
@@ -1348,6 +1483,13 @@ JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame(JNIEn
 
 JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkEventPropagation(JNIEnv *env, jobject this)
 {
+	synthetic_propagation_failed = GINT_TO_POINTER(1);
+	return true;
+}
+
+JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkScrollTarget(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	gtk_scroll_target = GTK_WIDGET(_PTR(widget_ptr));
 	synthetic_propagation_failed = GINT_TO_POINTER(1);
 	return true;
 }

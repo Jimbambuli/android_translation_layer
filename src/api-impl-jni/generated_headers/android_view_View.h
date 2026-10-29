@@ -379,6 +379,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkEventPropagation
 
 /*
  * Class:     android_view_View
+ * Method:    native_gtkScrollTarget
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkScrollTarget
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_view_View
  * Method:    native_registerTouchEventPropagation
  * Signature: (J)V
  */

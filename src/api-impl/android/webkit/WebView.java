@@ -54,6 +54,15 @@ public class WebView extends ViewGroup {
 		return native_gtkEventPropagation();
 	}
 
+	/* like Chromium's WebView (AwContents.onGenericMotionEvent()), the page consumes ACTION_SCROLL;
+	 * WebKitGTK scrolls it with the GdkEvent */
+	@Override
+	public boolean onGenericMotionEvent(MotionEvent event) {
+		if (event.getActionMasked() == MotionEvent.ACTION_SCROLL)
+			return native_gtkScrollTarget(widget);
+		return super.onGenericMotionEvent(event);
+	}
+
 	public WebSettings getSettings() {
 		return new WebSettings();
 	}

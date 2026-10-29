@@ -32,6 +32,13 @@ public class ScrollView extends FrameLayout {
 		return native_gtkEventPropagation();
 	}
 
+	/* the children's positions in Java do not follow the GTK scrolling: as with the touches
+	 * (onInterceptTouchEvent()), the wheel goes on along GTK's path to the children and the ScrollView */
+	@Override
+	protected boolean dispatchGenericPointerEvent(MotionEvent event) {
+		return native_gtkEventPropagation();
+	}
+
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		int width = 0;
