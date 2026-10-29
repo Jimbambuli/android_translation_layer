@@ -269,6 +269,7 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	g_signal_handlers_disconnect_by_data(content_manager, wrapper);
 	webkit_user_content_manager_unregister_script_message_handler(content_manager, "atlbridge", NULL);
 	webkit_user_content_manager_remove_all_scripts(content_manager);
+	webkit_user_content_manager_remove_all_style_sheets(content_manager);
 	g_signal_handlers_disconnect_by_func(webview, web_view_load_changed, NULL);
 	g_signal_handlers_disconnect_by_func(webview, web_view_uri_changed, NULL);
 	g_signal_handlers_disconnect_by_func(webview, context_menu_cb, NULL);
@@ -440,6 +441,18 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, pointer_script);
 	webkit_user_script_unref(pointer_script);
+	/* Chromium's WebView mirrors the page's scroll offset in View.getScrollX/Y() (AwScrollOffsetManager), apps
+	 * follow it with onScrollChanged() and read getContentHeight(). Report the offset and the size of the page
+	 * when it scrolls or changes its size; WebView.internalScrollChanged() takes them. */
+	WebKitUserScript *scroll_script = webkit_user_script_new(
+	    "(function(){var last='';function report(){var e=document.scrollingElement||document.documentElement;if(!e)return;"
+	    "var m='\001scroll\001'+scrollX+'\001'+scrollY+'\001'+e.scrollWidth+'\001'+e.scrollHeight;"
+	    "if(m===last)return;last=m;try{window.webkit.messageHandlers.atlbridge.postMessage(m);}catch(x){}}"
+	    "addEventListener('scroll',report,{passive:true});addEventListener('resize',report);"
+	    "addEventListener('DOMContentLoaded',function(){report();new ResizeObserver(report).observe(document.documentElement);});})();",
+	    WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+	webkit_user_content_manager_add_script(content_manager, scroll_script);
+	webkit_user_script_unref(scroll_script);
 	g_signal_connect(G_OBJECT(webview), "load-changed", G_CALLBACK(web_view_load_changed), NULL);
 	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
@@ -584,6 +597,40 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1firePointerCancel(JNI
 		return;
 
 	webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(webview), "window.__atl_pointercancel&&__atl_pointercancel()", -1, NULL, NULL, NULL, NULL, NULL);
+}
+
+/* WebView.onScrollChanged(): the app scrolled the WebView, scroll the page (AwScrollOffsetManager.scrollNativeTo()) */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1scrollTo(JNIEnv *env, jobject this, jlong widget_ptr, jfloat x, jfloat y)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // destroyed, or WebViews are disabled
+		return;
+
+	char x_str[G_ASCII_DTOSTR_BUF_SIZE], y_str[G_ASCII_DTOSTR_BUF_SIZE];
+	char *script = g_strdup_printf("scrollTo(%s,%s)", g_ascii_dtostr(x_str, sizeof(x_str), x), g_ascii_dtostr(y_str, sizeof(y_str), y));
+	webkit_web_view_evaluate_javascript(WEBKIT_WEB_VIEW(webview), script, -1, NULL, NULL, NULL, NULL, NULL);
+	g_free(script);
+}
+
+/* WebView.setVerticalScrollBarEnabled(): Android's WebView then draws no vertical scrollbar for the page.
+ * WebKitGTK has no setting for its own scrollbars, and its ::-webkit-scrollbar:vertical does not hide one axis
+ * alone (tested with 2.54), so a user style sheet hides both; pages rarely scroll sideways. The sheet belongs to
+ * this view's own user content manager, so only its page restyles, and apps turn the scrollbar off before they
+ * load the page. */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setVerticalScrollBarEnabled(JNIEnv *env, jobject this, jlong widget_ptr, jboolean enabled)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // destroyed, or WebViews are disabled
+		return;
+
+	WebKitUserContentManager *content_manager = webkit_web_view_get_user_content_manager(WEBKIT_WEB_VIEW(webview));
+	webkit_user_content_manager_remove_all_style_sheets(content_manager);
+	if (enabled)
+		return;
+	WebKitUserStyleSheet *style_sheet = webkit_user_style_sheet_new("html{scrollbar-width:none!important}",
+	    WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_STYLE_LEVEL_USER, NULL, NULL);
+	webkit_user_content_manager_add_style_sheet(content_manager, style_sheet);
+	webkit_user_style_sheet_unref(style_sheet);
 }
 
 /* WebView.destroy(): release the page in the (shared) web process (see park_web_view()). Until then every page an

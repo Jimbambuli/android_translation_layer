@@ -1898,7 +1898,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected native void nativeSetOnClickListener(long widget);
 
 	private OnScrollChangeListener on_scroll_change_listener = null;
-	public void setOnScrollChangeListener(OnScrollChangeListener l) {}
+	public void setOnScrollChangeListener(OnScrollChangeListener l) {
+		on_scroll_change_listener = l;
+	}
 
 	public /*native*/ void setOnSystemUiVisibilityChangeListener(OnSystemUiVisibilityChangeListener l) {}
 	public final int getWidth() {
@@ -2247,10 +2249,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return scrollY;
 	}
 
+	/* AOSP's View.scrollTo() */
 	public void scrollTo(int x, int y) {
-		scrollX = x;
-		scrollY = y;
-		invalidate();
+		if (scrollX != x || scrollY != y) {
+			int oldX = scrollX;
+			int oldY = scrollY;
+			scrollX = x;
+			scrollY = y;
+			onScrollChanged(scrollX, scrollY, oldX, oldY);
+			invalidate();
+		}
 	}
 
 	protected int computeVerticalScrollOffset() {
@@ -2316,7 +2324,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	protected void onOverScrolled(int scrollX, int scrollY, boolean clampedX, boolean clampedY) {}
 
-	protected void onScrollChanged(int l, int t, int oldl, int oldt) {}
+	/* AOSP's View.onScrollChanged(), the part that informs the listener */
+	protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+		if (on_scroll_change_listener != null)
+			on_scroll_change_listener.onScrollChange(this, l, t, oldl, oldt);
+	}
 
 	public void getLocationOnScreen(int[] location) {
 		Rect rect = new Rect();

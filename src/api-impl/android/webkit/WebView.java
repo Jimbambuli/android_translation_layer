@@ -28,6 +28,14 @@ public class WebView extends ViewGroup {
 	private String url;
 	private WebChromeClient webChromeClient;
 	private boolean destroyed;
+	// the page's scroll offset in View pixels as last reported or set, AwScrollOffsetManager's mNativeScroll*
+	private int nativeScrollX;
+	private int nativeScrollY;
+	// the page's size in CSS pixels, as in AwContents
+	private int contentWidthCss;
+	private int contentHeightCss;
+	private boolean verticalScrollBarEnabled = true;
+	private boolean horizontalScrollBarEnabled = true;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -107,7 +115,70 @@ public class WebView extends ViewGroup {
 			return false;
 	}
 
-	public void setVerticalScrollBarEnabled(boolean enabled) {}
+	/* Android's WebView draws no vertical scrollbar when the app turns it off; WebKit draws its own, which
+	 * native_setVerticalScrollBarEnabled() hides */
+	@Override
+	public void setVerticalScrollBarEnabled(boolean enabled) {
+		if (verticalScrollBarEnabled == enabled || isDestroyed())
+			return;
+		verticalScrollBarEnabled = enabled;
+		native_setVerticalScrollBarEnabled(widget, enabled);
+	}
+
+	// WebKit can only hide both scrollbars of a page together, so this one stays
+	@Override
+	public void setHorizontalScrollBarEnabled(boolean enabled) {
+		horizontalScrollBarEnabled = enabled;
+	}
+
+	public boolean isVerticalScrollBarEnabled() {
+		return verticalScrollBarEnabled;
+	}
+
+	public boolean isHorizontalScrollBarEnabled() {
+		return horizontalScrollBarEnabled;
+	}
+
+	/* The page scrolled (message "\u0001scroll\u0001<x>\u0001<y>\u0001<width>\u0001<height>" in CSS pixels):
+	 * like Chromium's AwScrollOffsetManager.scrollContainerViewTo(), the View's scroll offset follows the
+	 * page, so getScrollY() and onScrollChanged() tell the app where the page is. */
+	private void internalScrollChanged(String[] parts) {
+		float scale = getScale();
+		contentWidthCss = (int)Math.ceil(Double.parseDouble(parts[4]));
+		contentHeightCss = (int)Math.ceil(Double.parseDouble(parts[5]));
+		nativeScrollX = Math.round(Float.parseFloat(parts[2]) * scale);
+		nativeScrollY = Math.round(Float.parseFloat(parts[3]) * scale);
+		scrollTo(nativeScrollX, nativeScrollY);
+	}
+
+	/* like WebViewChromium.onScrollChanged() -> AwScrollOffsetManager.onContainerViewScrollChanged(): an
+	 * app's scrollTo()/scrollBy() scrolls the page */
+	@Override
+	protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+		super.onScrollChanged(l, t, oldl, oldt);
+		// the page's own offset, from internalScrollChanged()
+		if (destroyed || (l == nativeScrollX && t == nativeScrollY))
+			return;
+		// AwScrollOffsetManager.scrollNativeTo()
+		int x = Math.max(0, Math.min(l, computeHorizontalScrollRange() - getWidth()));
+		int y = Math.max(0, Math.min(t, computeVerticalScrollRange() - getHeight()));
+		if (x == nativeScrollX && y == nativeScrollY)
+			return;
+		nativeScrollX = x;
+		nativeScrollY = y;
+		native_scrollTo(widget, x / getScale(), y / getScale());
+	}
+
+	// AwScrollOffsetManager: the View's size plus the maximum scroll offset
+	@Override
+	protected int computeHorizontalScrollRange() {
+		return Math.max(getWidth(), (int)Math.ceil(contentWidthCss * getScale()));
+	}
+
+	@Override
+	protected int computeVerticalScrollRange() {
+		return Math.max(getHeight(), (int)Math.ceil(contentHeightCss * getScale()));
+	}
 	public void setVerticalScrollbarOverlay(boolean overlay) {}
 	public void setInitialScale(int scaleInPercent) {}
 
@@ -147,6 +218,8 @@ public class WebView extends ViewGroup {
 		final String[] parts = message.split("\u0001", -1);
 		if (parts.length >= 2 && parts[0].isEmpty() && parts[1].equals("console"))
 			internalConsoleMessage(parts.length > 2 ? parts[2] : "log", parts.length > 3 ? parts[3] : "");
+		else if (parts.length == 6 && parts[0].isEmpty() && parts[1].equals("scroll"))
+			internalScrollChanged(parts);
 	}
 
 	/* A call of an interface method from the page: the page waits for the answer (a synchronous
@@ -392,13 +465,15 @@ public class WebView extends ViewGroup {
 		javascriptInterfaces.remove(name);
 	}
 
-	// TODO: return the height of the web content
+	// AwContents.getContentHeightCss(): the page's height in CSS pixels
 	public int getContentHeight() {
-		return getHeight();
+		return contentHeightCss;
 	}
 
+	/* AwContents.getScale(): page scale times the display density; a CSS pixel is a dp (see
+	 * undo_font_dpi_zoom() in android_webkit_WebView.c), and the page is not zoomed */
 	public float getScale() {
-		return 1.0f;
+		return getContext().getResources().getDisplayMetrics().density;
 	}
 
 	@Override
@@ -410,6 +485,8 @@ public class WebView extends ViewGroup {
 	private native void native_evaluateJavascript(long widget, String script, ValueCallback<String> callback);
 	private native void native_finishJavaBridgeCall(long request, String response);
 	private native void native_firePointerCancel(long widget);
+	private native void native_scrollTo(long widget, float x, float y);
+	private native void native_setVerticalScrollBarEnabled(long widget, boolean enabled);
 	private native long native_destroy(long widget);
 	/* the page is drawn by WebKit, a CSS background of the widget would stay hidden behind it */
 	@Override
