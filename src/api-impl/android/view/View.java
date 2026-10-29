@@ -2986,9 +2986,28 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private static native boolean nativeHasFocus(long widget);
 	public boolean isLayoutRequested() { return (mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT; }
 	public int getBaseline() { return -1; }
-	/* as AOSP for API >= 26: visible, enabled and focusable (FOCUSABLE_AUTO counts) */
+	/* AOSP View.hasFocusable(), hasExplicitFocusable() and hasFocusable(boolean, boolean) (API >= 26: FOCUSABLE_AUTO
+	 * counts for hasFocusable() only); ATL resolves FOCUSABLE_AUTO with isFocusableResolved() */
 	public boolean hasFocusable() {
-		return visibility == VISIBLE && isEnabled() && isFocusableResolved();
+		return hasFocusable(true, false);
+	}
+
+	public boolean hasExplicitFocusable() {
+		return hasFocusable(false, true);
+	}
+
+	boolean hasFocusable(boolean allowAutoFocus, boolean dispatchExplicit) {
+		// Invisible, gone, or disabled views are never focusable.
+		if (visibility != VISIBLE || !isEnabled()) {
+			return false;
+		}
+
+		// Only use effective focusable value when allowed.
+		if (allowAutoFocus ? isFocusableResolved() : ((mViewFlags & FOCUSABLE_AUTO) == 0 && isFocusable())) {
+			return true;
+		}
+
+		return false;
 	}
 	private static native boolean nativeIsFocused(long widget);
 	public boolean isFocused() {

@@ -805,19 +805,40 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return null;
 	}
 
-	/* as AOSP: this group or, unless it blocks them, one of its descendants is focusable */
+	/* AOSP ViewGroup.hasFocusable(boolean, boolean) and hasFocusableChild(): this group or, unless it blocks them,
+	 * one of its descendants is focusable */
 	@Override
-	public boolean hasFocusable() {
-		if (getVisibility() != VISIBLE)
+	boolean hasFocusable(boolean allowAutoFocus, boolean dispatchExplicit) {
+		// Invisible and gone views are never focusable.
+		if (getVisibility() != VISIBLE) {
 			return false;
-		if (super.hasFocusable())
+		}
+
+		// Only use effective focusable value when allowed.
+		if (super.hasFocusable(allowAutoFocus, dispatchExplicit)) {
 			return true;
-		if (getDescendantFocusability() != FOCUS_BLOCK_DESCENDANTS) {
-			for (View child : children) {
-				if (child.hasFocusable())
-					return true;
+		}
+
+		// Determine whether we have a focused descendant.
+		final int descendantFocusability = getDescendantFocusability();
+		if (descendantFocusability != FOCUS_BLOCK_DESCENDANTS) {
+			return hasFocusableChild(dispatchExplicit);
+		}
+
+		return false;
+	}
+
+	boolean hasFocusableChild(boolean dispatchExplicit) {
+		// Determine whether we have a focusable descendant.
+		for (View child : children) {
+			// In case the subclass has overridden has[Explicit]Focusable, dispatch
+			// to the expected one for each child even though we share logic here.
+			if ((dispatchExplicit && child.hasExplicitFocusable())
+			    || (!dispatchExplicit && child.hasFocusable())) {
+				return true;
 			}
 		}
+
 		return false;
 	}
 
