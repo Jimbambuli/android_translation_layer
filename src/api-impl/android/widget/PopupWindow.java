@@ -23,6 +23,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import java.lang.ref.WeakReference;
 
 public class PopupWindow {
 
@@ -363,11 +364,67 @@ public class PopupWindow {
 			return;
 		}
 
+		attachToAnchor(anchor, xoff, yoff, gravity);
 		anchored_gravity = gravity;
 		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
 		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
 		startEnterAnimation();
 		takeWindowFocus(anchor);
+	}
+
+	/* AOSP's PopupWindow.attachToAnchor()/detachFromAnchor()/alignToAnchor(): the popup follows its anchor
+	 * whenever the anchor's root view is laid out, so it also lands at the anchor when that was added
+	 * right before show() and had no place yet. ATL has no decor view; isShowing() stands for
+	 * hasDecorView() and update() places the popup at the anchor (findDropDownPosition() is native). */
+	private WeakReference<View> mAnchor;
+	private WeakReference<View> mAnchorRoot;
+	private int mAnchorXoff;
+	private int mAnchorYoff;
+
+	/* posted: the root is laid out from inside GTK's allocation, where the popover cannot be placed */
+	private final Runnable mAlignToAnchor = new Runnable() {
+		@Override
+		public void run() {
+			alignToAnchor();
+		}
+	};
+
+	private final View.OnLayoutChangeListener mOnLayoutChangeListener = new View.OnLayoutChangeListener() {
+		@Override
+		public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+			v.removeCallbacks(mAlignToAnchor);
+			v.post(mAlignToAnchor);
+		}
+	};
+
+	protected void detachFromAnchor() {
+		final View anchorRoot = mAnchorRoot != null ? mAnchorRoot.get() : null;
+		if (anchorRoot != null) {
+			anchorRoot.removeOnLayoutChangeListener(mOnLayoutChangeListener);
+		}
+
+		mAnchor = null;
+		mAnchorRoot = null;
+	}
+
+	protected void attachToAnchor(View anchor, int xoff, int yoff, int gravity) {
+		detachFromAnchor();
+
+		final View anchorRoot = anchor.getRootView();
+		anchorRoot.addOnLayoutChangeListener(mOnLayoutChangeListener);
+
+		mAnchor = new WeakReference<>(anchor);
+		mAnchorRoot = new WeakReference<>(anchorRoot);
+
+		mAnchorXoff = xoff;
+		mAnchorYoff = yoff;
+	}
+
+	private void alignToAnchor() {
+		final View anchor = mAnchor != null ? mAnchor.get() : null;
+		if (anchor != null && anchor.isAttachedToWindow() && isShowing()) {
+			update(anchor, mAnchorXoff, mAnchorYoff, -1, -1);
+		}
 	}
 
 	/* the root view of the window whose focus this popup has taken */
@@ -434,6 +491,7 @@ public class PopupWindow {
 	public void dismiss() {
 		if (fading_out)
 			return;
+		detachFromAnchor();
 		resetFade();
 		Fade exitFade = ValueAnimator.getDurationScale() == 0 ? null : findFade(exit_transition, Visibility.MODE_OUT);
 		Animation animation = ValueAnimator.getDurationScale() == 0 ? null : styleAnimation(false);
