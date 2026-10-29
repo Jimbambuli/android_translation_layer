@@ -1,8 +1,10 @@
 package android.security.keystore;
 
 import java.security.InvalidAlgorithmParameterException;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.ProviderException;
 import java.security.SecureRandom;
 import java.security.spec.AlgorithmParameterSpec;
 import javax.crypto.KeyGeneratorSpi;
@@ -20,7 +22,7 @@ public abstract class KeyGenerator extends KeyGeneratorSpi {
 			try {
 				keyGenerator = javax.crypto.KeyGenerator.getInstance("AES", "BC");
 				this.params = params;
-				keyGenerator.init(random);
+				keyGenerator.init(keySize(params, 128), random);
 			} catch (NoSuchAlgorithmException | NoSuchProviderException e) {
 				e.printStackTrace();
 				throw new UnsupportedOperationException("Unimplemented method 'engineInit'");
@@ -35,7 +37,7 @@ public abstract class KeyGenerator extends KeyGeneratorSpi {
 			try {
 				keyGenerator = javax.crypto.KeyGenerator.getInstance("HmacSHA512", "BC");
 				this.params = params;
-				keyGenerator.init(random);
+				keyGenerator.init(keySize(params, 512), random);
 			} catch (NoSuchAlgorithmException | NoSuchProviderException e) {
 				e.printStackTrace();
 				throw new UnsupportedOperationException("Unimplemented method 'engineInit'");
@@ -43,12 +45,23 @@ public abstract class KeyGenerator extends KeyGeneratorSpi {
 		}
 	}
 
+	/* like AndroidKeyStoreKeyGeneratorSpi.engineInit: the spec's key size, or the algorithm's default
+	 * (AES 128 bits, HMAC the digest's output size) */
+	private static int keySize(AlgorithmParameterSpec params, int defaultKeySizeBits) {
+		int keySize = ((KeyGenParameterSpec)params).getKeySize();
+		return keySize > 0 ? keySize : defaultKeySizeBits;
+	}
+
 	@Override
 	protected SecretKey engineGenerateKey() {
 		System.out.println("generating key with alias " + ((KeyGenParameterSpec)params).getKeystoreAlias());
 		SecretKey key = keyGenerator.generateKey();
-		new AndroidKeyStore().engineSetKeyEntry(((KeyGenParameterSpec)params).getKeystoreAlias(), key, null, null);
-		return key;
+		try {
+			new AndroidKeyStore().engineSetKeyEntry(((KeyGenParameterSpec)params).getKeystoreAlias(), key, null, null);
+		} catch (KeyStoreException e) {
+			throw new ProviderException("Keystore key generation failed", e);
+		}
+		return new AndroidKeyStoreSecretKey(key.getEncoded(), key.getAlgorithm());
 	}
 
 	@Override

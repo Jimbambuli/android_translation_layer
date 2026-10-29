@@ -179,6 +179,13 @@ public abstract class Context {
 		provider.put("KeyGenerator.AES", "android.security.keystore.KeyGenerator$AES");
 		provider.put("KeyGenerator.HmacSHA512", "android.security.keystore.KeyGenerator$HmacSHA512");
 		Security.addProvider(provider);
+		// like AndroidKeyStoreProvider.install(): ciphers for AndroidKeyStore keys come from their own provider,
+		// which takes only those keys (SupportedKeyClasses). AOSP puts it after Bouncy Castle, which cannot use
+		// keystore2's key handles; ATL's keys are encodable, so it goes first to keep Bouncy Castle off them.
+		Provider workaround = new Provider("AndroidKeyStoreBCWorkaround", 1.0, "Android KeyStore security provider to work around Bouncy Castle") {};
+		workaround.put("Cipher.AES/GCM/NoPadding", "android.security.keystore.AndroidKeyStoreAuthenticatedAESCipherSpi$GCM");
+		workaround.put("Cipher.AES/GCM/NoPadding SupportedKeyClasses", "android.security.keystore.AndroidKeyStoreSecretKey");
+		Security.insertProviderAt(workaround, 1);
 
 		for (PackageParser.Activity receiver : primary_application.pkg.receivers) {
 			if (receiver.intents == null)

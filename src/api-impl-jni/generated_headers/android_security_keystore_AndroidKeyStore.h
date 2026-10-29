@@ -9,14 +9,6 @@ extern "C" {
 #endif
 /*
  * Class:     android_security_keystore_AndroidKeyStore
- * Method:    nativeSetKey
- * Signature: (Ljava/lang/String;Ljava/lang/String;[B)V
- */
-JNIEXPORT void JNICALL Java_android_security_keystore_AndroidKeyStore_nativeSetKey
-  (JNIEnv *, jclass, jstring, jstring, jbyteArray);
-
-/*
- * Class:     android_security_keystore_AndroidKeyStore
  * Method:    nativeGetKey
  * Signature: (Ljava/lang/String;Ljava/lang/String;)[B
  */

@@ -502,6 +502,8 @@ srcs = [
 	'android/provider/UserDictionary.java',
 	'android/security/NetworkSecurityPolicy.java',
 	'android/security/keystore/AndroidKeyStore.java',
+	'android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java',
+	'android/security/keystore/AndroidKeyStoreSecretKey.java',
 	'android/security/keystore/KeyGenerator.java',
 	'android/security/keystore/KeyGenParameterSpec.java',
 	'android/service/media/MediaBrowserService.java',
