@@ -496,12 +496,16 @@ public class Intent implements Parcelable {
 
 	@Export
 	public Intent() {}
+	private android.util.ArraySet<String> mCategories;
+
 	public Intent(Intent o) {
 		this.action = o.action;
 		this.data = o.data;
 		this.extras = o.extras;
 		this.component = o.component;
 		this.clipData = o.clipData;
+		if (o.mCategories != null)
+			this.mCategories = new android.util.ArraySet<String>(o.mCategories);
 	}
 	public Intent(String action) {
 		this.action = action;
@@ -777,7 +781,11 @@ public class Intent implements Parcelable {
 		return extras;
 	}
 
-	public Intent addCategory(String action) {
+	/* AOSP Intent.addCategory() */
+	public Intent addCategory(String category) {
+		if (mCategories == null)
+			mCategories = new android.util.ArraySet<String>();
+		mCategories.add(category.intern());
 		return this;
 	}
 
@@ -866,7 +874,7 @@ public class Intent implements Parcelable {
 	}
 
 	public Set<String> getCategories() {
-		return Collections.emptySet();
+		return mCategories != null ? mCategories : Collections.emptySet();
 	}
 
 	public byte[] getByteArrayExtra(String name) {
