@@ -1,8 +1,10 @@
 #include <gtk/gtk.h>
+#include <arpa/inet.h>
 #include <string.h>
 
 #include "../defines.h"
 #include "../util.h"
+#include "NinePatchPaintable.h"
 
 #include "../generated_headers/android_graphics_BitmapFactory.h"
 
@@ -88,6 +90,29 @@ static jbyteArray find_ninepatch_chunk(JNIEnv *env, GBytes *bytes)
 	return NULL;
 }
 
+/* AOSP NinePatchPeeker::getPadding(): the padding of the 9-patch chunk (paddingLeft/Right/Top/Bottom, stored big-endian
+ * in the PNG, see Res_png_9patch::fileToDevice) goes to the Rect, -1 for every side without a chunk. The chunk is not
+ * scaled here, the NinePatchDrawable scales the padding to the density it is shown at. */
+static void set_padding(JNIEnv *env, jobject rect, jbyteArray chunk)
+{
+	int32_t values[4] = { -1, -1, -1, -1 }; // left, top, right, bottom
+	jbyte raw[sizeof(struct Res_png_9patch)];
+
+	if (chunk && (*env)->GetArrayLength(env, chunk) >= (jsize)sizeof(raw)) {
+		(*env)->GetByteArrayRegion(env, chunk, 0, sizeof(raw), raw);
+		const struct Res_png_9patch *patch = (const struct Res_png_9patch *)raw;
+		values[0] = ntohl(patch->paddingLeft);
+		values[1] = ntohl(patch->paddingTop);
+		values[2] = ntohl(patch->paddingRight);
+		values[3] = ntohl(patch->paddingBottom);
+	}
+	jclass rect_class = (*env)->GetObjectClass(env, rect);
+	(*env)->SetIntField(env, rect, (*env)->GetFieldID(env, rect_class, "left", "I"), values[0]);
+	(*env)->SetIntField(env, rect, (*env)->GetFieldID(env, rect_class, "top", "I"), values[1]);
+	(*env)->SetIntField(env, rect, (*env)->GetFieldID(env, rect_class, "right", "I"), values[2]);
+	(*env)->SetIntField(env, rect, (*env)->GetFieldID(env, rect_class, "bottom", "I"), values[3]);
+}
+
 JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(JNIEnv *env, jclass, jobject is, jbyteArray storage, jobject outPadding, jobject opts, jobjectArray outNinePatchChunk)
 {
 	GInputStream *stream = java_input_stream_new(env, is, storage);
@@ -97,9 +122,10 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 	GBytes *bytes = g_memory_output_stream_steal_as_bytes(G_MEMORY_OUTPUT_STREAM(memory));
 	g_object_unref(memory);
 
-	if (outNinePatchChunk) {
-		jbyteArray chunk = find_ninepatch_chunk(env, bytes);
-		if (chunk)
+	jbyteArray chunk = NULL;
+	if (outNinePatchChunk || outPadding) {
+		chunk = find_ninepatch_chunk(env, bytes);
+		if (chunk && outNinePatchChunk)
 			(*env)->SetObjectArrayElement(env, outNinePatchChunk, 0, chunk);
 	}
 
@@ -107,12 +133,16 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 	 * loader (Coil/Glide) gets the smaller bitmap it asked for and does not keep the full-size one.
 	 * inJustDecodeBounds only wants the full dimensions, so it is left unscaled. */
 	int sample = 1;
+	jboolean bounds_only = JNI_FALSE;
 	if (opts) {
 		jclass opts_class = (*env)->GetObjectClass(env, opts);
-		jboolean bounds_only = (*env)->GetBooleanField(env, opts, (*env)->GetFieldID(env, opts_class, "inJustDecodeBounds", "Z"));
+		bounds_only = (*env)->GetBooleanField(env, opts, (*env)->GetFieldID(env, opts_class, "inJustDecodeBounds", "Z"));
 		if (!bounds_only)
 			sample = (*env)->GetIntField(env, opts, (*env)->GetFieldID(env, opts_class, "inSampleSize", "I"));
 	}
+
+	if (outPadding && !bounds_only) // like AOSP, a decode of the bounds leaves the padding alone
+		set_padding(env, outPadding, chunk);
 
 	/* GTK decodes PNG, JPEG and TIFF itself, in process. gdk-pixbuf may hand every image to a sandboxed
 	 * loader process (glycin), which costs about a millisecond even for a small icon, and apps decode

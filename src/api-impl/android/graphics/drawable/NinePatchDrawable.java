@@ -18,11 +18,20 @@ import org.xmlpull.v1.XmlPullParserException;
 
 public class NinePatchDrawable extends Drawable {
 
+	/* the padding of the chunk, as the decoder reports it for the bitmap's density (AOSP NinePatchState.mPadding) */
+	private Rect sourcePadding;
+	/* AOSP NinePatchDrawable.mPadding: sourcePadding scaled to the density it is shown at */
+	private Rect mPadding;
+
 	public NinePatchDrawable(Resources res, Bitmap bitmap, byte[] data, Rect padding, String name) {
 		if (bitmap != null && data != null)
 			setPaintable(nativeCreate(data, bitmap.getTexture()));
+		if (padding != null)
+			sourcePadding = new Rect(padding);
 		if (paintable != 0 && res != null)
 			setScale(bitmap.getDensity(), res.getDisplayMetrics().densityDpi);
+		else
+			computePadding(0, 0);
 	}
 
 	NinePatchDrawable(String path) {
@@ -39,6 +48,36 @@ public class NinePatchDrawable extends Drawable {
 	private void setScale(int density, int targetDensity) {
 		if (density != Bitmap.DENSITY_NONE && targetDensity != 0 && density != targetDensity)
 			nativeSetScale(paintable, density / (float)targetDensity);
+		computePadding(density, targetDensity);
+	}
+
+	/* AOSP NinePatchDrawable.computeBitmapSize(): the padding of the chunk, scaled from the bitmap's density to the
+	 * density of the display (the decoder of AOSP scales the pixels and the chunk, here only the paintable is scaled) */
+	private void computePadding(int sourceDensity, int targetDensity) {
+		if (sourcePadding == null) {
+			mPadding = null;
+			return;
+		}
+		if (mPadding == null)
+			mPadding = new Rect();
+		if (sourceDensity == Bitmap.DENSITY_NONE || sourceDensity == 0 || targetDensity == 0) {
+			mPadding.set(sourcePadding);
+			return;
+		}
+		mPadding.left = Drawable.scaleFromDensity(sourcePadding.left, sourceDensity, targetDensity, true);
+		mPadding.top = Drawable.scaleFromDensity(sourcePadding.top, sourceDensity, targetDensity, true);
+		mPadding.right = Drawable.scaleFromDensity(sourcePadding.right, sourceDensity, targetDensity, true);
+		mPadding.bottom = Drawable.scaleFromDensity(sourcePadding.bottom, sourceDensity, targetDensity, true);
+	}
+
+	/* AOSP NinePatchDrawable.getPadding() (without the mirroring of auto-mirrored drawables) */
+	@Override
+	public boolean getPadding(Rect padding) {
+		if (mPadding != null) {
+			padding.set(mPadding);
+			return true;
+		}
+		return false;
 	}
 
 	private ColorStateList tintList;
@@ -69,6 +108,8 @@ public class NinePatchDrawable extends Drawable {
 			throw new XmlPullParserException("<nine-patch> requires a valid 9-patch source image");
 		}
 		setPaintable(src.paintable);
+		sourcePadding = ((NinePatchDrawable)src).sourcePadding;
+		mPadding = ((NinePatchDrawable)src).mPadding;
 		if (a.hasValue(R.styleable.NinePatchDrawable_tint))
 			setTintList(a.getColorStateList(R.styleable.NinePatchDrawable_tint));
 		a.recycle();

@@ -506,13 +506,14 @@ public class Drawable {
 			density = value.density;
 		/* like AOSP's createFromResourceStream(): decode the stream, and when the bitmap carries a 9-patch
 		 * chunk (BitmapFactory takes it from the PNG) make a NinePatchDrawable of it; nothing is written */
-		final Bitmap bm = BitmapFactory.decodeStream(is);
+		final Rect pad = new Rect();
+		final Bitmap bm = BitmapFactory.decodeStream(is, pad, null);
 		if (bm == null)
 			return null;
 		bm.setDensity(density);
 		final byte[] np = bm.getNinePatchChunk();
 		if (np != null)
-			return new NinePatchDrawable(resources, bm, np, null, file);
+			return new NinePatchDrawable(resources, bm, np, pad, file);
 		return new BitmapDrawable(resources, bm);
 	}
 
