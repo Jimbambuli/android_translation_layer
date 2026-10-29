@@ -11,6 +11,7 @@
     <method name="PlayPause"/>
     <method name="Next"/>
     <method name="Previous"/>
+    <method name="Stop"/>
     <method name="Seek">
       <arg name="Offset" direction="in" type="x"/>
     </method>
@@ -26,6 +27,11 @@
     <property name="CanGoPrevious" type="b" access="read"/>
     <property name="Metadata" type="a{sv}" access="read"/>
     <property name="PlaybackStatus" type="s" access="read"/>
-    <property name="Position" type="x" access="read"/>
+    <property name="Position" type="x" access="read">
+      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
+    </property>
+    <signal name="Seeked">
+      <arg name="Position" type="x"/>
+    </signal>
   </interface>
 </node>

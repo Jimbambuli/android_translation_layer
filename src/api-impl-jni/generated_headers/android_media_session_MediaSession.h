@@ -7,18 +7,24 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_media_session_MediaSession_MPRIS_STOPPED
+#define android_media_session_MediaSession_MPRIS_STOPPED 0L
+#undef android_media_session_MediaSession_MPRIS_PAUSED
+#define android_media_session_MediaSession_MPRIS_PAUSED 1L
+#undef android_media_session_MediaSession_MPRIS_PLAYING
+#define android_media_session_MediaSession_MPRIS_PLAYING 2L
 /*
  * Class:     android_media_session_MediaSession
  * Method:    nativeSetState
- * Signature: (IJJJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+ * Signature: (IJJJFLjava/lang/String;Ljava/lang/String;Ljava/lang/String;JLjava/lang/String;)V
  */
 JNIEXPORT void JNICALL Java_android_media_session_MediaSession_nativeSetState
-  (JNIEnv *, jobject, jint, jlong, jlong, jlong, jstring, jstring, jstring);
+  (JNIEnv *, jobject, jint, jlong, jlong, jlong, jfloat, jstring, jstring, jstring, jlong, jstring);
 
 /*
  * Class:     android_media_session_MediaSession
  * Method:    nativeSetCallback
- * Signature: (Landroid/media/session/MediaSession/Callback;)V
+ * Signature: (Landroid/media/session/MediaSession;)V
  */
 JNIEXPORT void JNICALL Java_android_media_session_MediaSession_nativeSetCallback
   (JNIEnv *, jobject, jobject);
