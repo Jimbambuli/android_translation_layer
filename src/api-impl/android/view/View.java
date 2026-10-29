@@ -1283,6 +1283,68 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			setStateListAnimator(AnimatorInflater.loadStateListAnimator(context, resId));
 		}
 		duplicate_parent_state = a.getBoolean(com.android.internal.R.styleable.View_duplicateParentState, false);
+		/* the transform attributes, as AOSP's View(Context, AttributeSet, int, int) */
+		if (a.hasValue(com.android.internal.R.styleable.View_transformPivotX))
+			setPivotX(a.getDimension(com.android.internal.R.styleable.View_transformPivotX, 0));
+		if (a.hasValue(com.android.internal.R.styleable.View_transformPivotY))
+			setPivotY(a.getDimension(com.android.internal.R.styleable.View_transformPivotY, 0));
+		boolean transformSet = false;
+		float tx = 0;
+		float ty = 0;
+		float tz = 0;
+		float elevation = 0;
+		float rotation = 0;
+		float rotationX = 0;
+		float rotationY = 0;
+		float sx = 1f;
+		float sy = 1f;
+		if (a.hasValue(com.android.internal.R.styleable.View_translationX)) {
+			tx = a.getDimension(com.android.internal.R.styleable.View_translationX, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_translationY)) {
+			ty = a.getDimension(com.android.internal.R.styleable.View_translationY, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_translationZ)) {
+			tz = a.getDimension(com.android.internal.R.styleable.View_translationZ, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_elevation)) {
+			elevation = a.getDimension(com.android.internal.R.styleable.View_elevation, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_rotation)) {
+			rotation = a.getFloat(com.android.internal.R.styleable.View_rotation, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_rotationX)) {
+			rotationX = a.getFloat(com.android.internal.R.styleable.View_rotationX, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_rotationY)) {
+			rotationY = a.getFloat(com.android.internal.R.styleable.View_rotationY, 0);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_scaleX)) {
+			sx = a.getFloat(com.android.internal.R.styleable.View_scaleX, 1f);
+			transformSet = true;
+		}
+		if (a.hasValue(com.android.internal.R.styleable.View_scaleY)) {
+			sy = a.getFloat(com.android.internal.R.styleable.View_scaleY, 1f);
+			transformSet = true;
+		}
+		if (transformSet) {
+			setTranslationX(tx);
+			setTranslationY(ty);
+			setTranslationZ(tz);
+			setElevation(elevation);
+			setRotation(rotation);
+			setRotationX(rotationX);
+			setRotationY(rotationY);
+			setScaleX(sx);
+			setScaleY(sy);
+		}
 		a.recycle();
 		onCreateDrawableState(0);
 	}
