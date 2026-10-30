@@ -114,4 +114,65 @@ public class MediaStore {
 			return Uri.parse("content://media/files/" + type);
 		}
 	}
+
+	private static final int PICK_IMAGES_MAX_LIMIT = 100;
+
+	/**
+	 * Activity Action: Allow the user to select images or videos provided by
+	 * system and return it. This is different than {@link Intent#ACTION_PICK}
+	 * and {@link Intent#ACTION_GET_CONTENT} in that
+	 * <ul>
+	 * <li> the data for this action is provided by the system
+	 * <li> this action is only used for picking images and videos
+	 * <li> caller gets read access to user picked items even without storage
+	 * permissions
+	 * </ul>
+	 * <p>
+	 * Callers can optionally specify MIME type (such as {@code image/*} or
+	 * {@code video/*}), resulting in a range of content selection that the
+	 * caller is interested in. The optional MIME type can be requested with
+	 * {@link Intent#setType(String)}.
+	 * <p>
+	 * If the caller needs multiple returned items (or caller wants to allow
+	 * multiple selection), then it can specify
+	 * {@link MediaStore#EXTRA_PICK_IMAGES_MAX} to indicate this.
+	 * <p>
+	 * When the caller requests multiple selection, the value of
+	 * {@link MediaStore#EXTRA_PICK_IMAGES_MAX} must be a positive integer
+	 * greater than 1 and less than or equal to
+	 * {@link MediaStore#getPickImagesMaxLimit}, otherwise
+	 * {@link Activity#RESULT_CANCELED} is returned.
+	 * <p>
+	 * Output: MediaStore content URI(s) of the item(s) that was picked.
+	 */
+	public static final String ACTION_PICK_IMAGES = "android.provider.action.PICK_IMAGES";
+
+	/**
+	 * Activity Action: Launch settings controlling images or videos selection with
+	 * {@link #ACTION_PICK_IMAGES}.
+	 */
+	public static final String ACTION_PICK_IMAGES_SETTINGS =
+	    "android.provider.action.PICK_IMAGES_SETTINGS";
+
+	/**
+	 * The name of an optional intent-extra used to allow multiple selection of
+	 * items and constrain maximum number of items that can be returned by
+	 * {@link MediaStore#ACTION_PICK_IMAGES}, action may still return nothing
+	 * (0 items) if the user chooses to cancel.
+	 * <p>
+	 * The value of this intent-extra should be a positive integer greater
+	 * than 1 and less than or equal to
+	 * {@link MediaStore#getPickImagesMaxLimit}, otherwise
+	 * {@link Activity#RESULT_CANCELED} is returned.
+	 */
+	public final static String EXTRA_PICK_IMAGES_MAX = "android.provider.extra.PICK_IMAGES_MAX";
+
+	/**
+	 * The maximum limit for the number of items that can be selected using
+	 * {@link MediaStore#ACTION_PICK_IMAGES} when launched in multiple selection mode.
+	 * This can be used as a constant value for {@link MediaStore#EXTRA_PICK_IMAGES_MAX}.
+	 */
+	public static int getPickImagesMaxLimit() {
+		return PICK_IMAGES_MAX_LIMIT;
+	}
 }
