@@ -376,17 +376,22 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	 * of an activity that the app leaks would stay. Each view keeps its own user content manager: the
 	 * atlbridge handler below belongs to the view. */
 	static GWeakRef related_view;
+	/* Android's WebView applies a mouse wheel step at once (one frame per notch, the size already
+	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
+	 * starts over at every further step, so a spinning wheel scrolls in lurches. The setting has to be
+	 * there when the view is created: the page may set up its threaded scrolling tree right away, and
+	 * that keeps the value it saw (WebKitGTK 2.54 ThreadedScrollingTree::m_scrollAnimatorEnabled). */
+	WebKitSettings *settings = webkit_settings_new();
+	webkit_settings_set_enable_smooth_scrolling(settings, FALSE);
 	GtkWidget *webview = GTK_WIDGET(take_parked_web_view());
 	if (webview) {
 		// what a new WebKitWebView has: default settings and background
-		WebKitSettings *settings = webkit_settings_new();
 		webkit_web_view_set_settings(WEBKIT_WEB_VIEW(webview), settings);
-		g_object_unref(settings);
 		webkit_web_view_set_background_color(WEBKIT_WEB_VIEW(webview), &(GdkRGBA){1.f, 1.f, 1.f, 1.f});
 	} else {
 		WebKitWebView *related = g_weak_ref_get(&related_view);
 		WebKitUserContentManager *own_content_manager = webkit_user_content_manager_new();
-		webview = g_object_new(WEBKIT_TYPE_WEB_VIEW, "related-view", related, "user-content-manager", own_content_manager, NULL);
+		webview = g_object_new(WEBKIT_TYPE_WEB_VIEW, "related-view", related, "user-content-manager", own_content_manager, "settings", settings, NULL);
 		g_object_unref(own_content_manager);
 		if (related)
 			g_object_unref(related);
@@ -397,11 +402,8 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 		// never finalized, see park_web_view()
 		g_object_ref(webview);
 	}
+	g_object_unref(settings);
 	g_object_weak_ref(G_OBJECT(wrapper), wrapper_finalized, webview);
-	/* Android's WebView applies a mouse wheel step at once (one frame per notch, the size already
-	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
-	 * starts over at every further step, so a spinning wheel scrolls in lurches. */
-	webkit_settings_set_enable_smooth_scrolling(webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webview)), FALSE);
 	undo_font_dpi_zoom(gtk_settings_get_default(), NULL, WEBKIT_WEB_VIEW(webview));
 	g_signal_connect_object(gtk_settings_get_default(), "notify::gtk-xft-dpi", G_CALLBACK(undo_font_dpi_zoom), webview, 0);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
