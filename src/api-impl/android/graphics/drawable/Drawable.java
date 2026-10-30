@@ -293,8 +293,19 @@ public class Drawable {
 		}
 	}
 
+	/* Copyright (C) 2006 The Android Open Source Project */
 	public static BlendMode parseBlendMode(int value, BlendMode defaultMode) {
-		return defaultMode;
+		switch (value) {
+			case 3: return BlendMode.SRC_OVER;
+			case 5: return BlendMode.SRC_IN;
+			case 9: return BlendMode.SRC_ATOP;
+			// b/73224934 PorterDuff Multiply maps to Skia Modulate so actually
+			// return BlendMode.MODULATE here
+			case 14: return BlendMode.MODULATE;
+			case 15: return BlendMode.SCREEN;
+			case 16: return BlendMode.PLUS;
+			default: return defaultMode;
+		}
 	}
 
 	/* Copyright (C) 2006 The Android Open Source Project */
