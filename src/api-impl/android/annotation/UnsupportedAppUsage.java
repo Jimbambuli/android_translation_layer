@@ -119,6 +119,11 @@ public @interface UnsupportedAppUsage {
 	 * @return A dex API signature.
 	 */
 	String implicitMember() default "";
+
+	/**
+	 * Public API alternatives to this API.
+	 */
+	String publicAlternatives() default "";
 	/**
 	 * Container for {@link UnsupportedAppUsage} that allows it to be applied repeatedly to types.
 	 */

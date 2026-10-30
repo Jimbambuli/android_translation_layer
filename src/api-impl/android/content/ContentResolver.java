@@ -20,6 +20,8 @@ import java.util.Collections;
 import java.util.List;
 
 public class ContentResolver {
+	/** @hide */
+	public static final String MIME_TYPE_DEFAULT = "application/octet-stream";
 	public static final String SCHEME_CONTENT = "content";
 	public static final String SCHEME_ANDROID_RESOURCE = "android.resource";
 	public static final String SCHEME_FILE = "file";
