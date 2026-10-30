@@ -237,7 +237,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1set_1pixels(JNIEnv *
 	memcpy(data, array + offset, height * stride * 4);
 	(*env)->ReleaseIntArrayElements(env, pixels, array, 0);
 	GBytes *bytes = g_bytes_new_take(data, height * stride * 4);
-	GdkTexture *texture = gdk_memory_texture_new(width, height, GDK_MEMORY_R8G8B8A8, bytes, stride * 4);
+	GdkTexture *texture = gdk_memory_texture_new(width, height, GDK_MEMORY_B8G8R8A8, bytes, stride * 4);
 	g_bytes_unref(bytes);
 	gtk_snapshot_append_texture(snapshot, texture, &GRAPHENE_RECT_INIT(x, y, width, height));
 	g_object_unref(texture);
