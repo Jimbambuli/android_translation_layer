@@ -800,8 +800,18 @@ public class Environment {
 		return true;
 	}
 
+	/* AOSP: the state of the storage volume that holds path (StorageManager.getStorageVolume()),
+	 * MEDIA_UNKNOWN if none does; the only volume here is the external storage directory */
 	public static String getExternalStorageState(File path) {
-		return Environment.MEDIA_MOUNTED;
+		try {
+			final String volume = getExternalStorageDirectory().getCanonicalPath();
+			final String file = path.getCanonicalPath();
+			if (file.equals(volume) || file.startsWith(volume + "/"))
+				return getExternalStorageState();
+		} catch (IOException e) {
+			Log.w(TAG, "Failed to resolve target path: " + e);
+		}
+		return Environment.MEDIA_UNKNOWN;
 	}
 
 	/*

@@ -17,6 +17,7 @@
 package com.android.internal.util;
 
 import dalvik.system.VMRuntime;
+import java.io.File;
 import java.lang.reflect.Array;
 
 // XXX these should be changed to reflect the actual memory allocator we use.
@@ -29,6 +30,7 @@ import java.lang.reflect.Array;
  */
 public class ArrayUtils {
 	private static Object[] EMPTY = new Object[0];
+	public static final File[] EMPTY_FILE = new File[0];
 	private static final int CACHE_SIZE = 73;
 	private static Object[] sCache = new Object[CACHE_SIZE];
 
@@ -289,5 +291,9 @@ public class ArrayUtils {
 			}
 		}
 		return cur;
+	}
+
+	public static File[] defeatNullable(File[] val) {
+		return (val != null) ? val : EMPTY_FILE;
 	}
 }
