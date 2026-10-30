@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <inttypes.h>
 #include <unistd.h>
 
 #include <libavcodec/avcodec.h>
@@ -16,6 +17,11 @@
 #define OPTION_NEXT_SYNC 1
 #define OPTION_CLOSEST_SYNC 2
 #define OPTION_CLOSEST 3
+
+/* MediaMetadataRetriever.METADATA_KEY_* */
+#define METADATA_KEY_DURATION 9
+#define METADATA_KEY_VIDEO_WIDTH 18
+#define METADATA_KEY_VIDEO_HEIGHT 19
 
 /* a region of a file descriptor, like setDataSource(FileDescriptor, long, long) */
 struct fd_region {
@@ -95,20 +101,43 @@ static AVFrame *decode_frame(AVFormatContext *format, int stream_index, AVCodecC
 
 /* the frame as ARGB pixels (the int[] of Bitmap.createBitmap()), or NULL if there is no video or
  * it cannot be decoded; the source is the file at path, or the fd region if path is NULL */
-static uint32_t *extract_frame(const char *path, struct fd_region *region, int64_t time_us, int option, int dst_width, int dst_height, int *out_width, int *out_height)
+/* opens the file at path, or the fd region if path is NULL; *io is the region's AVIOContext */
+static AVFormatContext *open_input(const char *path, struct fd_region *region, AVIOContext **io)
 {
 	AVFormatContext *format = avformat_alloc_context();
-	AVIOContext *io = NULL;
+
+	*io = NULL;
+	if (!path) {
+		*io = avio_alloc_context(av_malloc(32768), 32768, 0, region, fd_region_read, NULL, fd_region_seek);
+		format->pb = *io;
+	}
+	/* avformat_open_input() frees the context on failure */
+	if (avformat_open_input(&format, path, NULL, NULL) < 0)
+		return NULL;
+	if (avformat_find_stream_info(format, NULL) < 0)
+		avformat_close_input(&format);
+	return format;
+}
+
+/* format may be NULL (open failed), the region's io is freed anyway */
+static void close_input(AVFormatContext *format, AVIOContext *io)
+{
+	avformat_close_input(&format);
+	if (io) {
+		av_freep(&io->buffer);
+		avio_context_free(&io);
+	}
+}
+
+static uint32_t *extract_frame(const char *path, struct fd_region *region, int64_t time_us, int option, int dst_width, int dst_height, int *out_width, int *out_height)
+{
+	AVIOContext *io;
+	AVFormatContext *format = open_input(path, region, &io);
 	AVCodecContext *codec = NULL;
 	AVFrame *frame = NULL;
 	uint32_t *pixels = NULL;
 
-	if (!path) {
-		io = avio_alloc_context(av_malloc(32768), 32768, 0, region, fd_region_read, NULL, fd_region_seek);
-		format->pb = io;
-	}
-	/* avformat_open_input() frees the context on failure */
-	if (avformat_open_input(&format, path, NULL, NULL) < 0 || avformat_find_stream_info(format, NULL) < 0)
+	if (!format)
 		goto out;
 
 	const AVCodec *decoder = NULL;
@@ -157,24 +186,29 @@ static uint32_t *extract_frame(const char *path, struct fd_region *region, int64
 out:
 	av_frame_free(&frame);
 	avcodec_free_context(&codec);
-	avformat_close_input(&format);
-	if (io) {
-		av_freep(&io->buffer);
-		avio_context_free(&io);
-	}
+	close_input(format, io);
 	return pixels;
+}
+
+/* the source of the native_* calls: the file at path, or the region of fd (to its end if length
+ * is unknown) */
+static const char *get_source(JNIEnv *env, jstring path_jstr, struct fd_region *region)
+{
+	if (path_jstr)
+		return (*env)->GetStringUTFChars(env, path_jstr, NULL);
+	if (region->length <= 0 || region->length == INT64_MAX) {
+		off_t end = lseek(region->fd, 0, SEEK_END);
+		region->length = end > region->offset ? end - region->offset : 0;
+	}
+	return NULL;
 }
 
 JNIEXPORT jintArray JNICALL Java_android_media_MediaMetadataRetriever_native_1getFrameAtTime(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length, jlong time_us, jint option, jint dst_width, jint dst_height, jintArray size)
 {
 	struct fd_region region = {.fd = fd, .offset = offset, .length = length};
-	const char *path = path_jstr ? (*env)->GetStringUTFChars(env, path_jstr, NULL) : NULL;
+	const char *path = get_source(env, path_jstr, &region);
 	int width, height;
 
-	if (!path && (region.length <= 0 || region.length == INT64_MAX)) {
-		off_t end = lseek(fd, 0, SEEK_END);
-		region.length = end > offset ? end - offset : 0;
-	}
 	uint32_t *pixels = extract_frame(path, &region, time_us, option, dst_width, dst_height, &width, &height);
 	if (path)
 		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
@@ -186,4 +220,53 @@ JNIEXPORT jintArray JNICALL Java_android_media_MediaMetadataRetriever_native_1ge
 	(*env)->SetIntArrayRegion(env, size, 0, 2, (jint[]){width, height});
 	g_free(pixels);
 	return array;
+}
+
+/* the attached picture (ID3 APIC, MP4 covr, ...) as stored in the file, like AOSP's
+ * getEmbeddedPicture(EMBEDDED_PICTURE_TYPE_ANY); NULL if there is none */
+JNIEXPORT jbyteArray JNICALL Java_android_media_MediaMetadataRetriever_native_1getEmbeddedPicture(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length)
+{
+	struct fd_region region = {.fd = fd, .offset = offset, .length = length};
+	const char *path = get_source(env, path_jstr, &region);
+	AVIOContext *io;
+	AVFormatContext *format = open_input(path, &region, &io);
+	jbyteArray array = NULL;
+
+	for (unsigned int i = 0; format && i < format->nb_streams; i++) {
+		AVPacket *pic = &format->streams[i]->attached_pic;
+		if ((format->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) && pic->size > 0) {
+			array = (*env)->NewByteArray(env, pic->size);
+			(*env)->SetByteArrayRegion(env, array, 0, pic->size, (jbyte *)pic->data);
+			break;
+		}
+	}
+	close_input(format, io);
+	if (path)
+		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
+	return array;
+}
+
+/* METADATA_KEY_DURATION (ms), METADATA_KEY_VIDEO_WIDTH/HEIGHT, read from the container like AOSP's
+ * retriever does without preparing a player; NULL if the source does not have it */
+JNIEXPORT jstring JNICALL Java_android_media_MediaMetadataRetriever_native_1extractMetadata(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length, jint key)
+{
+	struct fd_region region = {.fd = fd, .offset = offset, .length = length};
+	const char *path = get_source(env, path_jstr, &region);
+	AVIOContext *io;
+	AVFormatContext *format = open_input(path, &region, &io);
+	char value[32] = "";
+
+	if (format && key == METADATA_KEY_DURATION && format->duration != AV_NOPTS_VALUE) {
+		snprintf(value, sizeof(value), "%" PRId64, format->duration / 1000);
+	} else if (format && (key == METADATA_KEY_VIDEO_WIDTH || key == METADATA_KEY_VIDEO_HEIGHT)) {
+		int stream_index = av_find_best_stream(format, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
+		if (stream_index >= 0) {
+			AVCodecParameters *par = format->streams[stream_index]->codecpar;
+			snprintf(value, sizeof(value), "%d", key == METADATA_KEY_VIDEO_WIDTH ? par->width : par->height);
+		}
+	}
+	close_input(format, io);
+	if (path)
+		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
+	return value[0] ? _JSTRING(value) : NULL;
 }
