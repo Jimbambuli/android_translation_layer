@@ -1208,27 +1208,36 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		int paddingStart = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingStart, -1);
 		int paddingEnd = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingEnd, -1);
 
+		/* AOSP View(Context, AttributeSet, int, int): setBackground() above took the padding of the
+		 * background (the insets of an InsetDrawable, a nine-patch's padding); it stays the padding of
+		 * every side the attributes do not define */
+		boolean leftPaddingDefined = a.hasValue(com.android.internal.R.styleable.View_paddingLeft);
+		boolean rightPaddingDefined = a.hasValue(com.android.internal.R.styleable.View_paddingRight);
+		int leftPadding = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingLeft, -1);
+		int topPadding = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingTop, -1);
+		int rightPadding = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingRight, -1);
+		int bottomPadding = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingBottom, -1);
+
 		if (padding >= 0) {
-			paddingLeft = padding;
-			paddingTop = padding;
-			paddingRight = padding;
-			paddingBottom = padding;
+			leftPadding = padding;
+			topPadding = padding;
+			rightPadding = padding;
+			bottomPadding = padding;
+			leftPaddingDefined = true;
+			rightPaddingDefined = true;
 		} else {
+			if (paddingHorizontal >= 0) {
+				leftPadding = paddingHorizontal;
+				rightPadding = paddingHorizontal;
+				leftPaddingDefined = true;
+				rightPaddingDefined = true;
+			}
 			if (paddingVertical >= 0) {
-				paddingTop = paddingVertical;
-				paddingBottom = paddingVertical;
-			} else {
-				paddingTop = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingTop, 0);
-				paddingBottom = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingBottom, 0);
+				topPadding = paddingVertical;
+				bottomPadding = paddingVertical;
 			}
 
-			if (paddingHorizontal >= 0) {
-				paddingLeft = paddingHorizontal;
-				paddingRight = paddingHorizontal;
-			} else {
-				paddingLeft = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingLeft, 0);
-				paddingRight = a.getDimensionPixelSize(com.android.internal.R.styleable.View_paddingRight, 0);
-
+			if (paddingHorizontal < 0) {
 				/* like AOSP, start/end override left/right once resolved */
 				if (paddingStart >= 0)
 					userPaddingStart = paddingStart;
@@ -1237,8 +1246,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 					userPaddingEnd = paddingEnd;
 			}
 		}
-		userPaddingLeftInitial = paddingLeft;
-		userPaddingRightInitial = paddingRight;
+		if (leftPaddingDefined)
+			userPaddingLeftInitial = leftPadding;
+		if (rightPaddingDefined)
+			userPaddingRightInitial = rightPadding;
+		if (topPadding >= 0)
+			paddingTop = topPadding;
+		if (bottomPadding >= 0)
+			paddingBottom = bottomPadding;
 		resolvePaddingValues();
 
 		native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
