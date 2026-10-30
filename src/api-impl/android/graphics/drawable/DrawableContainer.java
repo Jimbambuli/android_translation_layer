@@ -8,6 +8,7 @@ import android.graphics.Insets;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.util.DisplayMetrics;
+import android.util.LayoutDirection;
 import android.util.SparseArray;
 
 public class DrawableContainer extends Drawable {
@@ -201,6 +202,35 @@ public class DrawableContainer extends Drawable {
 		}
 	}
 
+	private boolean needsMirroring() {
+		return isAutoMirrored() && getLayoutDirection() == LayoutDirection.RTL;
+	}
+
+	/* AOSP DrawableContainer.getPadding(): the largest padding of all children, or with
+	 * variablePadding the padding of the child shown */
+	@Override
+	public boolean getPadding(Rect padding) {
+		final Rect r = state.getConstantPadding();
+		boolean result;
+		if (r != null) {
+			padding.set(r);
+			result = (r.left | r.top | r.bottom | r.right) != 0;
+		} else {
+			if (getCurrent() != null) {
+				result = getCurrent().getPadding(padding);
+			} else {
+				result = super.getPadding(padding);
+			}
+		}
+		if (needsMirroring()) {
+			final int left = padding.left;
+			final int right = padding.right;
+			padding.left = right;
+			padding.right = left;
+		}
+		return result;
+	}
+
 	@Override
 	public Insets getOpticalInsets() {
 		if (curIndex >= 0 && state.getChild(curIndex) != null)
@@ -245,6 +275,8 @@ public class DrawableContainer extends Drawable {
 		boolean mMutated;
 
 		boolean mVariablePadding = false;
+		boolean mCheckedPadding;
+		Rect mConstantPadding;
 		boolean mConstantSize = false;
 		boolean mDither = DEFAULT_DITHER;
 		boolean mAutoMirrored;
@@ -283,6 +315,13 @@ public class DrawableContainer extends Drawable {
 				mTintMode = orig.mTintMode;
 				mHasTintList = orig.mHasTintList;
 				mHasTintMode = orig.mHasTintMode;
+
+				if (orig.mDensity == mDensity) {
+					if (orig.mCheckedPadding) {
+						mConstantPadding = orig.mConstantPadding != null ? new Rect(orig.mConstantPadding) : null;
+						mCheckedPadding = true;
+					}
+				}
 
 				mCheckedConstantState = true;
 				mCanConstantState = true;
@@ -390,6 +429,8 @@ public class DrawableContainer extends Drawable {
 			}
 			drawables[childCount] = dr;
 			mChildrenChangingConfigurations |= dr.getChangingConfigurations();
+			mConstantPadding = null;
+			mCheckedPadding = false;
 			mCheckedConstantState = false;
 			return childCount++;
 		}
@@ -407,7 +448,12 @@ public class DrawableContainer extends Drawable {
 				// The density may have changed since the last update (if any). Any
 				// dimension-type attributes will need their default values scaled.
 				final int targetDensity = Drawable.resolveDensity(res, mDensity);
+				final int sourceDensity = mDensity;
 				mDensity = targetDensity;
+
+				if (sourceDensity != targetDensity) {
+					mCheckedPadding = false;
+				}
 			}
 		}
 
@@ -444,6 +490,35 @@ public class DrawableContainer extends Drawable {
 		 */
 		public final void setVariablePadding(boolean variable) {
 			mVariablePadding = variable;
+		}
+
+		public final Rect getConstantPadding() {
+			if (mVariablePadding) {
+				return null;
+			}
+
+			if ((mConstantPadding != null) || mCheckedPadding) {
+				return mConstantPadding;
+			}
+
+			createAllFutures();
+
+			Rect r = null;
+			final Rect t = new Rect();
+			final int N = childCount;
+			final Drawable[] drawables = this.drawables;
+			for (int i = 0; i < N; i++) {
+				if (drawables[i].getPadding(t)) {
+					if (r == null) r = new Rect(0, 0, 0, 0);
+					if (t.left > r.left) r.left = t.left;
+					if (t.top > r.top) r.top = t.top;
+					if (t.right > r.right) r.right = t.right;
+					if (t.bottom > r.bottom) r.bottom = t.bottom;
+				}
+			}
+
+			mCheckedPadding = true;
+			return (mConstantPadding = r);
 		}
 
 		public final void setConstantSize(boolean constant) {
