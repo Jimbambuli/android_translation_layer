@@ -655,6 +655,29 @@ void atl_snapshot_concat_matrix(GtkSnapshot *snapshot, const graphene_matrix_t *
 		gtk_snapshot_scale(snapshot, graphene_matrix_get_value(matrix, 0, 0), graphene_matrix_get_value(matrix, 1, 1));
 		return;
 	}
+	/* a GskTransform made from a raw matrix has an unknown category, and GSK draws such a
+	 * transform node as a pink fallback; so build other 2D affine matrices (rotations) from
+	 * translate * rotate * skew * scale, which keeps the 2D category */
+	/* graphene_matrix_is_2d() wants exact zeros, which rotations do not leave; an android Matrix
+	 * is 2D unless it has perspective */
+	if (fabsf(graphene_matrix_get_value(matrix, 0, 3)) < 1e-6f && fabsf(graphene_matrix_get_value(matrix, 1, 3)) < 1e-6f &&
+	    fabsf(graphene_matrix_get_value(matrix, 3, 3) - 1.f) < 1e-6f) {
+		double xx = graphene_matrix_get_value(matrix, 0, 0), yx = graphene_matrix_get_value(matrix, 0, 1);
+		double xy = graphene_matrix_get_value(matrix, 1, 0), yy = graphene_matrix_get_value(matrix, 1, 1);
+		double x0 = graphene_matrix_get_value(matrix, 3, 0), y0 = graphene_matrix_get_value(matrix, 3, 1);
+		double sx = hypot(xx, yx);
+		double sy = sx ? (xx * yy - yx * xy) / sx : 0;
+		if (sx && sy) {
+			double shear = (xx * xy + yx * yy) / sx;
+			GskTransform *transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(x0, y0));
+			transform = gsk_transform_rotate(transform, atan2(yx, xx) * 180 / G_PI);
+			transform = gsk_transform_skew(transform, atan(shear / sy) * 180 / G_PI, 0);
+			transform = gsk_transform_scale(transform, sx, sy);
+			gtk_snapshot_transform(snapshot, transform);
+			gsk_transform_unref(transform);
+			return;
+		}
+	}
 	gtk_snapshot_transform_matrix(snapshot, matrix);
 }
 

@@ -141,16 +141,71 @@ public final class Bitmap implements Parcelable {
 		return dest;
 	}
 
-	public static Bitmap createBitmap(Bitmap src, int x, int y, int width, int height, Matrix matrix, boolean filter) {
-		Bitmap dest = new Bitmap(width, height, src.getConfig());
-		Canvas canvas = new Canvas(dest);
-		canvas.concat(matrix);
-		canvas.drawBitmap(src, new Rect(x, y, x + width, y + height), new Rect(0, 0, width, height), null);
-		return dest;
+	/* AOSP Bitmap.createBitmap(Bitmap, int, int, int, int, Matrix, boolean): the result has the
+	 * size of the transformed source rectangle, which is moved to the origin */
+	public static Bitmap createBitmap(Bitmap source, int x, int y, int width, int height, Matrix m, boolean filter) {
+		if (x < 0 || y < 0)
+			throw new IllegalArgumentException("x and y must be >= 0");
+		if (width <= 0 || height <= 0)
+			throw new IllegalArgumentException("width and height must be > 0");
+		if (x + width > source.getWidth()) {
+			throw new IllegalArgumentException("x + width must be <= bitmap.width()");
+		}
+		if (y + height > source.getHeight()) {
+			throw new IllegalArgumentException("y + height must be <= bitmap.height()");
+		}
+		if (source.isRecycled()) {
+			throw new IllegalArgumentException("cannot use a recycled source in createBitmap");
+		}
+
+		// check if we can just return our argument unchanged
+		if (!source.isMutable() && x == 0 && y == 0 && width == source.getWidth() &&
+		    height == source.getHeight() && (m == null || m.isIdentity())) {
+			return source;
+		}
+
+		int neww = width;
+		int newh = height;
+		Paint paint = null;
+
+		Rect srcR = new Rect(x, y, x + width, y + height);
+		RectF dstR = new RectF(0, 0, width, height);
+		RectF deviceR = new RectF();
+
+		if (m != null && !m.isIdentity()) {
+			m.mapRect(deviceR, dstR);
+
+			neww = Math.round(deviceR.width());
+			newh = Math.round(deviceR.height());
+
+			paint = new Paint();
+			paint.setFilterBitmap(filter);
+			if (!m.rectStaysRect()) {
+				paint.setAntiAlias(true);
+			}
+		}
+
+		Bitmap bitmap = new Bitmap(neww, newh, source.getConfig());
+		// The new bitmap was created from a known bitmap source so assume that
+		// they use the same density
+		bitmap.density = source.density;
+		bitmap.setHasAlpha(source.hasAlpha());
+
+		Canvas canvas = new Canvas(bitmap);
+		canvas.translate(-deviceR.left, -deviceR.top);
+		if (m != null)
+			canvas.concat(m);
+		canvas.drawBitmap(source, srcR, dstR, paint);
+		return bitmap;
 	}
 
+	/* AOSP: createBitmap(null, colors, 0, width, width, height, config) */
 	public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {
-		return createBitmap(width, height, config);
+		if ((width | height) < 0 || colors.length < width * height)
+			throw new ArrayIndexOutOfBoundsException();
+		Bitmap bm = createBitmap(width, height, config);
+		bm.setPixels(colors, 0, width, 0, 0, width, height);
+		return bm;
 	}
 
 	public static Bitmap createBitmap(Bitmap src) {
