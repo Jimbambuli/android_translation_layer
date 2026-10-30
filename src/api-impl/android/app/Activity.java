@@ -22,6 +22,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.text.TextUtils;
@@ -393,6 +394,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		dispatchActivityResult(null, requestCode, resultCode, new Intent(FILE_CHOOSER_ACTIONS.get(action), uri != null ? Uri.parse(uri) : null), "fileChooserResult");
 	}
 
+	// callback from native code; no uris: the user cancelled
+	@Export
+	protected void pickImagesResultCallback(int requestCode, int maxItems, String[] uris) {
+		if (uris == null || uris.length == 0)
+			dispatchActivityResult(null, requestCode, RESULT_CANCELED, null, "pickImagesResult");
+		else
+			dispatchActivityResult(null, requestCode, RESULT_OK, PhotoPicker.getPickerResponseIntent(maxItems, uris), "pickImagesResult");
+	}
+
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
 		Slog.i(TAG, "startActivityForResult(" + intent + ", " + requestCode + "," + options + ") called");
 		if (intent.getComponent() != null) {
@@ -422,6 +432,20 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			});
 		} else if (FILE_CHOOSER_ACTIONS.contains(intent.getAction())) {
 			nativeFileChooser(FILE_CHOOSER_ACTIONS.indexOf(intent.getAction()), intent.getType(), intent.getStringExtra("android.intent.extra.TITLE"), requestCode);
+		} else if (MediaStore.ACTION_PICK_IMAGES.equals(intent.getAction())) {
+			/* on Android, MediaProvider's photo picker (PhotoPickerActivity) answers it; ATL shows the file dialog */
+			String[] mimeTypes;
+			int maxItems;
+			try {
+				mimeTypes = PhotoPicker.getMimeTypeFilters(intent);
+				maxItems = PhotoPicker.getMaxSelectionLimit(intent);
+			} catch (IllegalArgumentException e) {
+				// PhotoPickerActivity.onCreate(): finish with RESULT_CANCELED
+				Slog.e(TAG, "Finish activity due to an exception while parsing extras: " + e);
+				dispatchActivityResult(null, requestCode, RESULT_CANCELED, null, "pickImagesResult");
+				return;
+			}
+			nativePickImages(mimeTypes, maxItems, requestCode);
 		} else if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())) {
 			nativeFileChooser(0 /*GTK_FILE_CHOOSER_ACTION_OPEN*/, intent.getType(), intent.getStringExtra(Intent.EXTRA_TITLE), requestCode);
 		} else if ("android.intent.action.INSTALL_PACKAGE".equals(intent.getAction())) {
@@ -939,6 +963,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
 	public static native void nativeOpenURI(String uri);
 	public native void nativeFileChooser(int action, String type, String title, int requestCode);
+	public native void nativePickImages(String[] mimeTypes, int maxItems, int requestCode);
 	public void reportFullyDrawn() {}
 	public void setVisible(boolean visible) {}
 	public Uri getReferrer() { return null; }

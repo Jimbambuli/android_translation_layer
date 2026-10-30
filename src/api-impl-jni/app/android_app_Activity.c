@@ -793,6 +793,88 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFileChooser(JNIEnv *env, 
 	file_dialog_functions[action](dialog, window, NULL, file_dialog_callback, callback_data);
 }
 
+/* MediaStore.ACTION_PICK_IMAGES: the GTK file dialog stands in for the photo picker of MediaProvider */
+struct pick_images_callback_data {
+	jobject activity;
+	jint request_code;
+	jint max_items;
+};
+
+static void pick_images_callback(GObject *source_object, GAsyncResult *res, gpointer data)
+{
+	struct pick_images_callback_data *d = data;
+	GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
+	JNIEnv *env = get_jni_env();
+	GListModel *files = NULL;
+	jobjectArray uris = NULL;
+
+	if (d->max_items > 1) {
+		files = gtk_file_dialog_open_multiple_finish(dialog, res, NULL);
+	} else {
+		GFile *file = gtk_file_dialog_open_finish(dialog, res, NULL);
+		if (file) {
+			GListStore *store = g_list_store_new(G_TYPE_FILE);
+			g_list_store_append(store, file);
+			g_object_unref(file);
+			files = G_LIST_MODEL(store);
+		}
+	}
+	if (files) {
+		guint n = g_list_model_get_n_items(files);
+		uris = (*env)->NewObjectArray(env, n, (*env)->FindClass(env, "java/lang/String"), NULL);
+		for (guint i = 0; i < n; i++) {
+			GFile *file = g_list_model_get_item(files, i);
+			char *uri = g_file_get_uri(file);
+			(*env)->SetObjectArrayElement(env, uris, i, _JSTRING(uri));
+			g_free(uri);
+			g_object_unref(file);
+		}
+		g_object_unref(files);
+	}
+	J__Activity__pickImagesResultCallback(env, d->activity, d->request_code, d->max_items, uris);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	_UNREF(d->activity);
+	free(d);
+}
+
+/* mime_types: null for all images and videos (MimeFilterUtils.getMimeTypeFilters()) */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativePickImages(JNIEnv *env, jobject this, jobjectArray mime_types, jint max_items, jint request_code)
+{
+	GtkFileDialog *dialog = gtk_file_dialog_new();
+	gtk_file_dialog_set_title(dialog, max_items > 1 ? "Select Photos and Videos" : "Select a Photo or Video");
+
+	GtkFileFilter *filter = gtk_file_filter_new();
+	if (mime_types) {
+		jsize n = (*env)->GetArrayLength(env, mime_types);
+		for (jsize i = 0; i < n; i++) {
+			jstring type_jstring = (*env)->GetObjectArrayElement(env, mime_types, i);
+			const char *type = (*env)->GetStringUTFChars(env, type_jstring, NULL);
+			gtk_file_filter_add_mime_type(filter, type);
+			(*env)->ReleaseStringUTFChars(env, type_jstring, type);
+			(*env)->DeleteLocalRef(env, type_jstring);
+		}
+	} else {
+		gtk_file_filter_add_mime_type(filter, "image/*");
+		gtk_file_filter_add_mime_type(filter, "video/*");
+	}
+	gtk_file_filter_set_name(filter, "Photos and videos");
+	gtk_file_dialog_set_default_filter(dialog, filter);
+	g_object_unref(filter);
+
+	struct pick_images_callback_data *callback_data = malloc(sizeof(struct pick_images_callback_data));
+	callback_data->activity = _REF(this);
+	callback_data->request_code = request_code;
+	callback_data->max_items = max_items;
+	if (max_items > 1)
+		gtk_file_dialog_open_multiple(dialog, window, NULL, pick_images_callback, callback_data);
+	else
+		gtk_file_dialog_open(dialog, window, NULL, pick_images_callback, callback_data);
+	g_object_unref(dialog);
+}
+
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_isInMultiWindowMode(JNIEnv *env, jobject this)
 {
 	return !gtk_window_is_maximized(window);

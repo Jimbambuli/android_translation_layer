@@ -97,6 +97,14 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFileChooser
 
 /*
  * Class:     android_app_Activity
+ * Method:    nativePickImages
+ * Signature: ([Ljava/lang/String;II)V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativePickImages
+  (JNIEnv *, jobject, jobjectArray, jint, jint);
+
+/*
+ * Class:     android_app_Activity
  * Method:    isInMultiWindowMode
  * Signature: ()Z
  */
