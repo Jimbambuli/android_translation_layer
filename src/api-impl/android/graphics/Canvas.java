@@ -617,7 +617,7 @@ public class Canvas {
 	}
 
 	public boolean clipRect(Rect rect, Region.Op op) {
-		return clipRect((float)rect.left, rect.top, rect.right, rect.bottom);
+		return clipRect((float)rect.left, rect.top, rect.right, rect.bottom, op);
 	}
 
 	public boolean clipPath(Path path) {
@@ -639,12 +639,41 @@ public class Canvas {
 		return clipRect(rect.left, rect.top, rect.right, rect.bottom);
 	}
 
+	/* Region.Op.DIFFERENCE (AOSP clipOutRect(), e.g. AbsSeekBar.drawTrack() with splitTrack) has no
+	 * GSK clip node: clip to an even-odd path of a very large rectangle with the rectangle cut out.
+	 * The other ops still intersect, as before (AOSP only allows INTERSECT and DIFFERENCE since P). */
+	private static final float CLIP_OUT_EXTENT = 1e6f;
+
 	public boolean clipRect(float left, float top, float right, float bottom, Region.Op op) {
+		if (op == Region.Op.DIFFERENCE) {
+			Path path = new Path();
+			path.setFillType(Path.FillType.EVEN_ODD);
+			path.addRect(-CLIP_OUT_EXTENT, -CLIP_OUT_EXTENT, CLIP_OUT_EXTENT, CLIP_OUT_EXTENT, Path.Direction.CW);
+			path.addRect(left, top, right, bottom, Path.Direction.CW);
+			clipPath(path);
+			return true;
+		}
 		return clipRect(left, top, right, bottom);
 	}
 
 	public boolean clipRect(RectF rect, Region.Op op) {
-		return clipRect(rect.left, rect.top, rect.right, rect.bottom);
+		return clipRect(rect.left, rect.top, rect.right, rect.bottom, op);
+	}
+
+	public boolean clipOutRect(RectF rect) {
+		return clipRect(rect.left, rect.top, rect.right, rect.bottom, Region.Op.DIFFERENCE);
+	}
+
+	public boolean clipOutRect(Rect rect) {
+		return clipRect((float)rect.left, rect.top, rect.right, rect.bottom, Region.Op.DIFFERENCE);
+	}
+
+	public boolean clipOutRect(float left, float top, float right, float bottom) {
+		return clipRect(left, top, right, bottom, Region.Op.DIFFERENCE);
+	}
+
+	public boolean clipOutRect(int left, int top, int right, int bottom) {
+		return clipRect((float)left, top, right, bottom, Region.Op.DIFFERENCE);
 	}
 
 	public void drawArc(float left, float top, float right, float bottom, float startAngle, float sweepAngle, boolean includeCenter, Paint paint) {
