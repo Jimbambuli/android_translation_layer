@@ -1305,7 +1305,7 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetFullscreen(JNIEnv *env, j
 		} else {
 			printf("blocking fullscreen request, because window is not maximized\n");
 		}
-	} else {
+	} else if (!getenv("ATL_FORCE_FULLSCREEN")) {
 		gtk_window_unfullscreen(window);
 	}
 }
