@@ -11,9 +11,10 @@
  *  - theme, icons, cursor and the layout of the title bar buttons come from the host's settings.ini
  *    (the font stays Roboto for the app, see main.c; the title bar gets the desktop's font)
  *  - the host's gtk.css (KDE: @import 'colors.css', the colors of the color scheme) is user CSS as in GTK
- *  - window_decorations.css (KDE: the title bar buttons of the window decoration, as KWin draws them) styles
- *    the window buttons of ATL's title bar. KDE writes it for GTK 3 (class "titlebutton", images in assets/
- *    of gtk-3.0); GTK 4's window buttons are "windowcontrols > button", so the selectors are adapted.
+ *  - the title of the title bar is in the desktop's font.
+ * The window buttons are the theme's (Breeze draws them like KWin's Breeze decoration). KDE's
+ * window_decorations.css is not used: it is written for GTK 3 (class "titlebutton", images only in gtk-3.0),
+ * GTK 4 does not load it, and GTK 4.24 draws its images (SVG from Qt) as nothing, which hid the buttons.
  *
  * A change of these files (another theme or color scheme) is applied while the app runs. Without these files
  * GTK keeps its default theme and the dark variant from the settings portal. */
@@ -101,46 +102,6 @@ static char *apply_settings(void)
 	return font_name;
 }
 
-static gboolean dir_has_files(const char *path)
-{
-	GDir *dir = g_dir_open(path, 0, NULL);
-	gboolean has_files = dir && g_dir_read_name(dir);
-	if (dir)
-		g_dir_close(dir);
-	return has_files;
-}
-
-/* window_decorations.css with GTK 4 selectors and absolute image paths (the CSS is loaded from a string);
- * NULL if there is none whose images are there (KDE leaves assets/ of gtk-4.0 empty) */
-static GString *window_decorations_css(void)
-{
-	const char *gtk_dirs[] = {"gtk-4.0", "gtk-3.0"};
-	for (int i = 0; i < G_N_ELEMENTS(gtk_dirs); i++) {
-		char *path = config_file(gtk_dirs[i], "window_decorations.css");
-		char *assets = config_file(gtk_dirs[i], "assets");
-		char *contents = NULL;
-		if (dir_has_files(assets))
-			g_file_get_contents(path, &contents, NULL, NULL);
-		g_free(path);
-		if (!contents) {
-			g_free(assets);
-			continue;
-		}
-		GString *css = g_string_new_take(contents);
-		g_string_replace(css, "button.titlebutton", "windowcontrols > button", 0);
-		char *assets_uri = g_filename_to_uri(assets, NULL, NULL);
-		char *url = g_strconcat("url(\"", assets_uri, "/", NULL);
-		g_string_replace(css, "url(\"assets/", url, 0);
-		g_free(url);
-		g_free(assets_uri);
-		g_free(assets);
-		/* the images show the symbol, GTK's symbolic icon of the button would be drawn on top */
-		g_string_append(css, "\nheaderbar windowcontrols > button > image { opacity: 0; }\n");
-		return css;
-	}
-	return NULL;
-}
-
 static void load_css(char *font_name)
 {
 	char *path = config_file("gtk-4.0", "gtk.css");
@@ -150,9 +111,7 @@ static void load_css(char *font_name)
 		gtk_css_provider_load_from_string(user_provider, "");
 	g_free(path);
 
-	GString *css = window_decorations_css();
-	if (!css)
-		css = g_string_new("");
+	GString *css = g_string_new("");
 	if (font_name) {
 		/* the title of the window in the desktop's font, as in the desktop's title bars (themes set a size of
 		 * their own for .title) */
