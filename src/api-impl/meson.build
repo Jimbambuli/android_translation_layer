@@ -107,6 +107,7 @@ srcs = [
 	'android/atl/ATLMediaContentProvider.java',
 	'android/atl/ATLPaths.java',
 	'android/atl/ATLProvider.java',
+	'android/atl/ATLStubHits.java',
 	'android/atl/ATLViewDump.java',
 	'android/atl/ATLSigHelper.java',
 	'android/atl/ATLThemeOverlay.java',

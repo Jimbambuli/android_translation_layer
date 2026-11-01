@@ -276,6 +276,7 @@ struct jni_callback_data {
 	char **extra_jvm_options;
 	char **extra_string_keys;
 	char *sdk_int;
+	char *attach_agent;
 };
 
 static char *uri_option = NULL;
@@ -584,6 +585,21 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	/* like Android's RuntimeInit.commonInit(): process-wide setup before any app code runs */
 	J__RuntimeInit__commonInit(env);
+
+	/* like Android's ActivityThread.handleBindApplication() for "am start --attach-agent": attach a JVMTI agent
+	 * once the runtime runs, before any app code. Unlike -agentpath (Agent_OnLoad) this keeps the runtime
+	 * non-debuggable, so the app runs at its normal speed. */
+	if (d->attach_agent) {
+		jclass vm_debug = (*env)->FindClass(env, "dalvik/system/VMDebug");
+		jmethodID attach = vm_debug ? (*env)->GetStaticMethodID(env, vm_debug, "attachAgent", "(Ljava/lang/String;)V") : NULL;
+		if (attach)
+			(*env)->CallStaticVoidMethod(env, vm_debug, attach, _JSTRING(d->attach_agent));
+		if ((*env)->ExceptionCheck(env)) {
+			fprintf(stderr, "error: cannot attach agent %s\n", d->attach_agent);
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+	}
 
 	// some apps need the apk path since they directly read their apk
 	apk_path = strdup(apk_classpath);
@@ -972,6 +988,7 @@ void init_cmd_parameters(GApplication *app, struct jni_callback_data *d)
 		{ "install-internal",  0 , 0, G_OPTION_ARG_NONE,         &d->install_internal,          "copy an apk to _installed_apks_ but don't create a desktop entry",                             NULL            },
 		{ "extra-jvm-option", 'X', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_jvm_options,         "pass an additional option directly to art (e.g -X \"-verbose:jni\")",                          "\"OPTION\""    },
 		{ "extra-string-key", 'e', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_string_keys,         "pass a string extra (-e key=value)",                                                           "\"KEY=VALUE\"" },
+		{ "attach-agent",      0 , 0, G_OPTION_ARG_STRING,       &d->attach_agent,              "attach a JVMTI agent before any app code runs, like \"am start --attach-agent\" (the runtime stays fast)", "\"LIBRARY[=OPTIONS]\"" },
 		{ "sdk-int",           0 , 0, G_OPTION_ARG_STRING,       &d->sdk_int,                   "shorthand for -X \"-DBuild.VERSION.SDK_INT=<version>\"",                                                           "SDK_INT" },
 		/* long_name | short_name | flags                     | arg                  | arg_data     | description                                                                              | arg_desc */
 		{ "uri",              'u', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, option_uri_cb, "open the given URI inside the application",                                               "URI"           },
@@ -1047,6 +1064,7 @@ int main(int argc, char **argv)
 	callback_data->extra_jvm_options = NULL;
 	callback_data->extra_string_keys = NULL;
 	callback_data->sdk_int = NULL;
+	callback_data->attach_agent = NULL;
 
 	app = gtk_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
 

@@ -1,7 +1,7 @@
 download_tool_deps = get_option('download_tool_deps')
 
-srcs = ['src/JNIUpcallWrapperGenerator.java']
-out = ['jni_upcall_gen', 'JNIUpcallWrapperGenerator.class']
+srcs = ['src/JNIUpcallWrapperGenerator.java', 'src/StubHitsInstrumenter.java']
+out = ['jni_upcall_gen', 'JNIUpcallWrapperGenerator.class', 'stub_hits_instr', 'StubHitsInstrumenter.class']
 cmd = ['build.py', '--outdir', meson.current_build_dir()]
 
 xmvn_resolve = find_program('xmvn5-resolve', required: not download_tool_deps)
