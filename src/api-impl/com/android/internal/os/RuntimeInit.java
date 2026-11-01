@@ -1,7 +1,7 @@
 package com.android.internal.os;
 
-import android.atl.NativeDigest;
 import android.atl.annotation.Export;
+import android.atl.crypto.OpenSSLProvider;
 import android.os.SystemProperties;
 import java.security.Security;
 import java.util.TimeZone;
@@ -28,8 +28,8 @@ public class RuntimeInit {
 		TimeZone.setDefault(null);
 
 		/*
-		 * Digests in native code first, as Conscrypt's OpenSSLProvider is the first provider on Android
+		 * Crypto in native code first, as Conscrypt's OpenSSLProvider is the first provider on Android
 		 */
-		Security.insertProviderAt(new NativeDigest.NativeDigestProvider(), 1);
+		Security.insertProviderAt(new OpenSSLProvider(), 1);
 	}
 }
