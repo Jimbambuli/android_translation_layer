@@ -139,6 +139,7 @@ public class TextView extends View {
 				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
+			mCursorDrawableRes = a.getResourceId(com.android.internal.R.styleable.TextView_textCursorDrawable, 0);
 			int max_length = a.getInt(com.android.internal.R.styleable.TextView_maxLength, -1);
 			if (max_length >= 0)
 				setFilters(new InputFilter[] {new InputFilter.LengthFilter(max_length)});
@@ -984,6 +985,26 @@ public class TextView extends View {
 
 	public int getHighlightColor() {
 		return mHighlightColor;
+	}
+
+	/* AOSP TextView.setTextCursorDrawable / getTextCursorDrawable (textCursorDrawable attribute); the drawable is
+	 * kept for the app, ATL's text widgets draw the cursor through GTK, which does not use it. */
+	private int mCursorDrawableRes;
+	private Drawable mCursorDrawable;
+
+	public void setTextCursorDrawable(Drawable textCursorDrawable) {
+		mCursorDrawable = textCursorDrawable;
+		mCursorDrawableRes = 0;
+	}
+
+	public void setTextCursorDrawable(int textCursorDrawable) {
+		setTextCursorDrawable(textCursorDrawable != 0 ? getContext().getDrawable(textCursorDrawable) : null);
+	}
+
+	public Drawable getTextCursorDrawable() {
+		if (mCursorDrawable == null && mCursorDrawableRes != 0)
+			mCursorDrawable = getContext().getDrawable(mCursorDrawableRes);
+		return mCursorDrawable;
 	}
 
 	public Editable getEditableText() {
