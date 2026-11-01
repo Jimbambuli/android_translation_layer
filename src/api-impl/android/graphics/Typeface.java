@@ -42,15 +42,16 @@ public class Typeface {
 	private static final String DEFAULT_FAMILY = "sans-serif";
 
 	/* The families and aliases of frameworks/base/data/fonts/fonts.xml (android-14) without the
-	 * fallback fonts for the scripts. ATL draws with Pango and has none of the font files: a family
-	 * is drawn with the font fontconfig chooses for the name given here (null: the default font,
-	 * Roboto as on Android if it is installed). sans-serif-condensed has no condensed width then. */
+	 * fallback fonts for the scripts. ATL draws with Pango: a family is drawn with the font
+	 * fontconfig chooses for the names given here (null: the default font, which is Roboto as on
+	 * Android, see add_android_fonts() in main.c, as is "Roboto Condensed", Roboto at wdth 75).
+	 * For the fonts ATL does not bring along, the AOSP font comes first if it is installed. */
 	private static final String[][] SYSTEM_FAMILIES = {
 		// name, Pango family
 		{"sans-serif", null},
-		{"sans-serif-condensed", null},
-		{"serif", "serif"},
-		{"monospace", "monospace"},
+		{"sans-serif-condensed", "Roboto Condensed"},
+		{"serif", "Noto Serif,serif"},
+		{"monospace", "Droid Sans Mono,Noto Sans Mono,Noto Mono,monospace"},
 		{"serif-monospace", "monospace"},
 		{"casual", "cursive"},
 		{"cursive", "cursive"},

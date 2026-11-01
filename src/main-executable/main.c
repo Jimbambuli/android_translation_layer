@@ -2,6 +2,8 @@
 #define _GNU_SOURCE
 
 #include <cairo-svg.h>
+#include <fontconfig/fontconfig.h>
+#include <pango/pangofc-fontmap.h>
 #include <gdk/wayland/gdkwayland.h>
 #include <gtk/gtk.h>
 #include <libportal/portal.h>
@@ -391,6 +393,42 @@ static void update_animator_duration_scale(GtkSettings *settings)
 	(*env)->DeleteLocalRef(env, value_animator);
 }
 
+/* The fonts of the Android families that ATL brings along: Roboto as in AOSP's external/roboto-fonts
+ * (android-14), one variable font for the families of frameworks/base/data/fonts/fonts.xml
+ * sans-serif (and its -thin/-light/-medium/-black aliases, by weight) and sans-serif-condensed (axis
+ * wdth 75). It is added to the fontconfig configuration of Pango as an application font, so it
+ * is used even where Roboto is not installed. android.graphics.Typeface names the condensed
+ * family "Roboto Condensed", the family name of the condensed Roboto fonts; the rule below makes
+ * it Roboto at width 75 (the Condensed instances of the variable font). */
+#define ROBOTO_FONT "Roboto-Regular.ttf"
+static const char *roboto_font_paths[] = {
+	INSTALL_DATADIR "/atl/fonts/" ROBOTO_FONT,
+	/* Relative path when running from ./android_translation_layer/builddir */
+	"../res/fonts/" ROBOTO_FONT,
+	NULL,
+};
+
+static void add_android_fonts(void)
+{
+	FcConfig *config = FcConfigGetCurrent();
+	for (const char **path = roboto_font_paths; *path; path++) {
+		if (FcConfigAppFontAddFile(config, (const FcChar8 *)*path))
+			break;
+		if (!path[1])
+			fprintf(stderr, "add_android_fonts: %s not found, Roboto is used only if it is installed\n", ROBOTO_FONT);
+	}
+	FcConfigParseAndLoadFromMemory(config, (const FcChar8 *)
+	    "<?xml version=\"1.0\"?><!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\"><fontconfig>"
+	    "<match target=\"pattern\"><test name=\"family\"><string>Roboto Condensed</string></test>"
+	    "<edit name=\"family\" mode=\"assign\" binding=\"same\"><string>Roboto</string></edit>"
+	    "<edit name=\"width\" mode=\"assign\"><const>condensed</const></edit></match>"
+	    "</fontconfig>",
+	    FcTrue);
+	PangoFontMap *font_map = pango_cairo_font_map_get_default();
+	if (PANGO_IS_FC_FONT_MAP(font_map))
+		pango_fc_font_map_config_changed(PANGO_FC_FONT_MAP(font_map));
+}
+
 static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
 {
 	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
@@ -533,8 +571,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	g_signal_connect(gtk_settings_get_default(), "notify::gtk-enable-animations", G_CALLBACK(update_animator_duration_scale), NULL);
 	update_animator_duration_scale(gtk_settings_get_default());
 
-	/* Android's default font (sans-serif) is Roboto; where it is not installed, fontconfig picks
-	 * its sans-serif font as before */
+	/* Android's default font (sans-serif) is Roboto; ATL brings it along, see add_android_fonts() */
+	add_android_fonts();
 	char *font_name;
 	g_object_get(gtk_settings_get_default(), "gtk-font-name", &font_name, NULL);
 	PangoFontDescription *font = pango_font_description_from_string(font_name ? font_name : "");

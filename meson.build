@@ -95,6 +95,13 @@ install_data([
              ],
              install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/etc')
 
+# Roboto (Apache-2.0, AOSP external/roboto-fonts android-14), see add_android_fonts() in main.c
+install_data([
+             	'res/fonts/Roboto-Regular.ttf',
+             	'res/fonts/Roboto-NOTICE'
+             ],
+             install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/fonts')
+
 #tools
 subdir('tools/jni_upcall_gen')
 
@@ -269,7 +276,7 @@ executable('android-translation-layer', [
                                         install: true,
                                         pie: true,
                                         dependencies: [
-                                        	dependency('gtk4'), dependency('jni'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'), upcalls_header
+                                        	dependency('gtk4'), dependency('jni'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'), dependency('pangoft2'), upcalls_header
                                         ],
                                         link_args: [
                                         	'-rdynamic'
