@@ -85,6 +85,14 @@ JNIEXPORT jobjectArray JNICALL Java_android_content_res_AssetManager_getLocales
 
 /*
  * Class:     android_content_res_AssetManager
+ * Method:    setOverlayColors
+ * Signature: ([I[I)V
+ */
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setOverlayColors
+  (JNIEnv *, jclass, jintArray, jintArray);
+
+/*
+ * Class:     android_content_res_AssetManager
  * Method:    getSizeConfigurationsNative
  * Signature: ()[I
  */

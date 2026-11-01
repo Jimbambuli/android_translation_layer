@@ -3,6 +3,7 @@
 #include <gio/gunixinputstream.h>
 #include <gtk/gtk.h>
 #include <libportal/portal.h>
+#include <math.h>
 #include <string.h>
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
 	#include <libportal/settings.h>
@@ -50,10 +51,12 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 /* The appearance of the desktop, from the XDG settings portal (namespace org.freedesktop.appearance) and
  * followed while the app runs, like the system settings on Android: color-scheme is the night mode
  * (UiModeManagerService: UI_MODE_NIGHT_YES for dark, otherwise NO), contrast the contrast level
- * (UiModeManager.getContrast(): 1 for high contrast). Without the portal, GTK's
+ * (UiModeManager.getContrast(): 1 for high contrast) and accent-color the color the Material You palettes
+ * are made from (android.atl.ATLThemeOverlay; out of range: none). Without the portal, GTK's
  * gtk-application-prefer-dark-theme decides, otherwise it is light. */
 static guint32 color_scheme = 0; // 0: no preference, 1: prefer dark, 2: prefer light
 static guint32 contrast = 0;     // 0: no preference, 1: high contrast
+static guint32 accent_color = 0; // ARGB, 0: none
 static gboolean appearance_from_portal = FALSE;
 
 static jint appearance_ui_mode_night(void)
@@ -79,6 +82,13 @@ static gboolean appearance_setting(const char *namespace, const char *key, GVari
 		g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", color_scheme == 1, NULL);
 	} else if (!strcmp(key, "contrast") && g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) {
 		contrast = g_variant_get_uint32(value);
+	} else if (!strcmp(key, "accent-color") && g_variant_is_of_type(value, G_VARIANT_TYPE("(ddd)"))) {
+		double r, g, b;
+		g_variant_get(value, "(ddd)", &r, &g, &b);
+		if (r >= 0 && r <= 1 && g >= 0 && g <= 1 && b >= 0 && b <= 1)
+			accent_color = 0xff000000 | (guint32)lround(r * 255) << 16 | (guint32)lround(g * 255) << 8 | (guint32)lround(b * 255);
+		else
+			accent_color = 0;
 	} else {
 		return FALSE;
 	}
@@ -96,6 +106,14 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gch
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
+	}
+	/* the dynamic colors depend on the contrast as well */
+	if (!strcmp(key, "accent-color") || !strcmp(key, "contrast")) {
+		J__ATLThemeOverlay__setAccentColor(env, accent_color);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	}
 	activity_ensure_configuration();
 }
@@ -165,11 +183,14 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv 
 	if (xdp_settings) {
 		appearance_read("color-scheme");
 		appearance_read("contrast");
+		appearance_read("accent-color");
 	}
 #endif
 	_SET_INT_FIELD(config, "uiMode", (_GET_INT_FIELD(config, "uiMode") & ~/*UI_MODE_NIGHT_MASK*/ 0x30) | appearance_ui_mode_night());
 	jclass ui_mode_manager = (*env)->FindClass(env, "android/app/UiModeManager");
 	(*env)->SetStaticFloatField(env, ui_mode_manager, _STATIC_FIELD_ID(ui_mode_manager, "sContrast", "F"), appearance_contrast());
+	jclass theme_overlay = (*env)->FindClass(env, "android/atl/ATLThemeOverlay");
+	_SET_STATIC_INT_FIELD(theme_overlay, "sAccentColor", accent_color);
 }
 
 void update_config_for_window(GtkWindow *window)

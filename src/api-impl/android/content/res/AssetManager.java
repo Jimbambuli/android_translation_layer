@@ -697,6 +697,13 @@ public final class AssetManager {
 	 */
 	public native final String[] getLocales();
 
+	/**
+	 * ATL: the colors of the system's theme overlay (resource ids and ARGB values, null for none), which
+	 * every AssetManager returns in place of framework-res' values (see android.atl.ATLThemeOverlay).
+	 * @hide
+	 */
+	public static native void setOverlayColors(int[] ids, int[] colors);
+
 	/* the screen sizes (screenWidthDp, screenHeightDp, smallestScreenWidthDp) of all configurations
 	 * the app has resources for; a window resize that crosses one of them relaunches the activity */
 	public Configuration[] getSizeConfigurations() {

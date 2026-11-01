@@ -42,6 +42,66 @@ void _AssetManager_unlock(struct AssetManager **asset_manager)
 	AssetManager_lock(asset_manager); \
 	__attribute__((__cleanup__(_AssetManager_unlock))) struct AssetManager *_RESERVED_am = asset_manager;
 
+/* The colors of the system's theme overlay (android.atl.ATLThemeOverlay): on Android, SystemUI's
+ * ThemeOverlayController makes fabricated overlays of the android package for them, and the
+ * AssetManager of every app finds the overlay's value for these resources (ResTable with the idmap).
+ * ATL has no overlays, so a value that resolved to one of these resources gets the overlay's color.
+ * Only resources whose value in framework-res is a color are overlaid. */
+static GRWLock overlay_lock;
+static GHashTable *overlay_colors; // resource id -> ARGB
+
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setOverlayColors(JNIEnv *env, jclass clazz, jintArray ids, jintArray colors)
+{
+	GHashTable *table = NULL;
+	if (ids && colors) {
+		jsize count = MIN((*env)->GetArrayLength(env, ids), (*env)->GetArrayLength(env, colors));
+		jint *id = (*env)->GetIntArrayElements(env, ids, NULL);
+		jint *color = (*env)->GetIntArrayElements(env, colors, NULL);
+		table = g_hash_table_new(g_direct_hash, g_direct_equal);
+		for (jsize i = 0; i < count; i++)
+			g_hash_table_insert(table, GUINT_TO_POINTER((guint32)id[i]), GUINT_TO_POINTER((guint32)color[i]));
+		(*env)->ReleaseIntArrayElements(env, colors, color, JNI_ABORT);
+		(*env)->ReleaseIntArrayElements(env, ids, id, JNI_ABORT);
+	}
+	g_rw_lock_writer_lock(&overlay_lock);
+	GHashTable *old = overlay_colors;
+	overlay_colors = table;
+	g_rw_lock_writer_unlock(&overlay_lock);
+	if (old)
+		g_hash_table_unref(old);
+}
+
+/* the value of resource resid, with the overlay applied (type and data of a Res_value) */
+static void overlay_value(uint32_t resid, uint32_t *type, uint32_t *data)
+{
+	if (resid >> 24 != 0x01 || *type < TYPE_FIRST_COLOR_INT || *type > TYPE_LAST_COLOR_INT)
+		return;
+	gpointer color;
+	g_rw_lock_reader_lock(&overlay_lock);
+	if (overlay_colors && g_hash_table_lookup_extended(overlay_colors, GUINT_TO_POINTER(resid), NULL, &color)) {
+		*type = TYPE_INT_COLOR_ARGB8;
+		*data = GPOINTER_TO_UINT(color);
+	}
+	g_rw_lock_reader_unlock(&overlay_lock);
+}
+
+static void overlay_res_value(uint32_t resid, struct Res_value *value)
+{
+	uint32_t type = value->dataType, data = value->data;
+	overlay_value(resid, &type, &data);
+	value->dataType = type;
+	value->data = data;
+}
+
+/* the STYLE_NUM_ENTRIES values per attribute of ResolveAttrs(), ApplyStyle() and RetrieveAttributes() */
+static void overlay_style_values(uint32_t *out_values, jsize count)
+{
+	for (jsize i = 0; i < count; i++) {
+		uint32_t *v = out_values + i * STYLE_NUM_ENTRIES;
+		overlay_value(v[STYLE_RESOURCE_ID], &v[STYLE_TYPE], &v[STYLE_DATA]);
+	}
+}
+
 JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_openAsset(JNIEnv *env, jobject this, jstring _file_name, jint mode)
 {
 	const char *file_name = _CSTRING(_file_name);
@@ -208,7 +268,7 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(J
 	struct Res_value value;
 	uint32_t outSpecFlags;
 	struct ResTable_config outConfig;
-	uint32_t ref;
+	uint32_t ref = 0;
 	ApkAssetsCookie cookie = AssetManager_getResource(asset_manager, resId, false, density,
 	                                                  &value, &outConfig, &outSpecFlags);
 	if (resolve) {
@@ -216,6 +276,8 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(J
 		                                       &value, &outConfig,
 		                                       &outSpecFlags, &ref);
 	}
+	if (cookie >= 0)
+		overlay_res_value(ref ? ref : resId, &value); // ref: the last reference followed, 0 for none
 	if (cookie >= 0) {
 		_SET_INT_FIELD(outValue, "type", value.dataType);
 		_SET_INT_FIELD(outValue, "data", value.data);
@@ -346,13 +408,15 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadThemeAttributeV
 	struct Res_value value;
 	uint32_t outSpecFlags;
 	struct ResTable_config outConfig;
-	uint32_t ref;
+	uint32_t ref = 0;
 	int cookie = Theme_getAttribute(theme, ident, &value, &outSpecFlags);
 	if (resolve) {
 		cookie = AssetManager_resolveReference(asset_manager, cookie,
 		                                       &value, &outConfig,
 		                                       &outSpecFlags, &ref);
 	}
+	if (cookie >= 0)
+		overlay_res_value(ref, &value);
 	if (cookie >= 0) {
 		_SET_INT_FIELD(outValue, "type", value.dataType);
 		_SET_INT_FIELD(outValue, "data", value.data);
@@ -433,6 +497,7 @@ JNIEXPORT jboolean JNICALL Java_android_content_res_AssetManager_resolveAttrs(JN
 	                        (uint32_t *)values, values_len,
 	                        (uint32_t *)attrs, attrs_len,
 	                        (uint32_t *)out_values, (uint32_t *)out_indices);
+	overlay_style_values((uint32_t *)out_values, attrs_len);
 	if (out_indices)
 		(*env)->ReleasePrimitiveArrayCritical(env, out_java_indices, out_indices, 0);
 
@@ -457,6 +522,7 @@ JNIEXPORT jboolean JNICALL Java_android_content_res_AssetManager_retrieveAttribu
 	jint *attrs = (*env)->GetIntArrayElements(env, java_attrs, 0);
 
 	jboolean ret = RetrieveAttributes(asset_manager, parser, (uint32_t *)attrs, attrs_len, (uint32_t *)_PTR(out_values), (uint32_t *)_PTR(out_indices));
+	overlay_style_values((uint32_t *)_PTR(out_values), attrs_len);
 
 	(*env)->ReleaseIntArrayElements(env, java_attrs, attrs, JNI_ABORT);
 
@@ -478,6 +544,7 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_applyStyle(JNIEnv *
 	jint *attrs = (*env)->GetIntArrayElements(env, java_attrs, 0);
 
 	ApplyStyle(theme, parser, def_style_attr, def_style_res, (uint32_t *)attrs, attrs_len, (uint32_t *)_PTR(out_values), (uint32_t *)_PTR(out_indices));
+	overlay_style_values((uint32_t *)_PTR(out_values), attrs_len);
 
 	(*env)->ReleaseIntArrayElements(env, java_attrs, attrs, JNI_ABORT);
 }
@@ -521,7 +588,7 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_retrieveArray(JNIEn
 		struct Res_value value = entry.value;
 		struct ResTable_config outConfig;
 		uint32_t outSpecFlags;
-		uint32_t ref;
+		uint32_t ref = 0;
 		ApkAssetsCookie cookie = AssetManager_resolveReference(asset_manager, entry.cookie,
 		                                                       &value, &outConfig,
 		                                                       &outSpecFlags, &ref);
@@ -529,6 +596,7 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_retrieveArray(JNIEn
 			(*env)->ReleaseIntArrayElements(env, outArray, array, JNI_ABORT);
 			return -1;
 		}
+		overlay_res_value(ref, &value);
 
 		array[i * STYLE_NUM_ENTRIES + STYLE_TYPE] = value.dataType;
 		array[i * STYLE_NUM_ENTRIES + STYLE_DATA] = value.data;
@@ -621,10 +689,11 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceBagValu
 			struct Res_value value = entry.value;
 			struct ResTable_config outConfig;
 			uint32_t outSpecFlags;
-			uint32_t ref;
+			uint32_t ref = 0;
 			cookie = AssetManager_resolveReference(asset_manager, entry.cookie,
 			                                       &value, &outConfig,
 			                                       &outSpecFlags, &ref);
+			overlay_res_value(ref, &value);
 
 			_SET_INT_FIELD(outValue, "type", value.dataType);
 			_SET_INT_FIELD(outValue, "data", value.data);

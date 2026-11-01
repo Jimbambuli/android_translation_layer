@@ -729,6 +729,21 @@ public final class Configuration implements Comparable<Configuration> {
 	public int densityDpi;
 
 	/**
+	 * Default value for {@link #assetsSeq} indicating that no asset sequence number is set.
+	 * @hide
+	 */
+	public static final int ASSETS_SEQ_UNDEFINED = 0;
+
+	/**
+	 * Internal counter that allows us to piggyback off the configuration change mechanism to
+	 * signal to apps that the the assets for an Application have changed. A difference in these
+	 * between two Configurations will yield a diff flag of
+	 * {@link ActivityInfo#CONFIG_ASSETS_PATHS}.
+	 * @hide
+	 */
+	public int assetsSeq;
+
+	/**
 	 * @hide Hack to get this information from WM to app running in compat mode.
 	 */
 	public int compatScreenWidthDp;
@@ -846,6 +861,7 @@ public final class Configuration implements Comparable<Configuration> {
 		screenHeightDp = o.screenHeightDp;
 		smallestScreenWidthDp = o.smallestScreenWidthDp;
 		densityDpi = o.densityDpi;
+		assetsSeq = o.assetsSeq;
 		compatScreenWidthDp = o.compatScreenWidthDp;
 		compatScreenHeightDp = o.compatScreenHeightDp;
 		compatSmallestScreenWidthDp = o.compatSmallestScreenWidthDp;
@@ -1141,6 +1157,7 @@ public final class Configuration implements Comparable<Configuration> {
 		screenHeightDp = compatScreenHeightDp = SCREEN_HEIGHT_DP_UNDEFINED;
 		smallestScreenWidthDp = compatSmallestScreenWidthDp = SMALLEST_SCREEN_WIDTH_DP_UNDEFINED;
 		densityDpi = DENSITY_DPI_UNDEFINED;
+		assetsSeq = ASSETS_SEQ_UNDEFINED;
 		seq = 0;
 	}
 
@@ -1266,6 +1283,10 @@ public final class Configuration implements Comparable<Configuration> {
 			changed |= ActivityInfo.CONFIG_DENSITY;
 			densityDpi = delta.densityDpi;
 		}
+		if (delta.assetsSeq != ASSETS_SEQ_UNDEFINED && delta.assetsSeq != assetsSeq) {
+			changed |= ActivityInfo.CONFIG_ASSETS_PATHS;
+			assetsSeq = delta.assetsSeq;
+		}
 		if (delta.compatScreenWidthDp != SCREEN_WIDTH_DP_UNDEFINED) {
 			compatScreenWidthDp = delta.compatScreenWidthDp;
 		}
@@ -1372,6 +1393,9 @@ public final class Configuration implements Comparable<Configuration> {
 		}
 		if (delta.densityDpi != DENSITY_DPI_UNDEFINED && densityDpi != delta.densityDpi) {
 			changed |= ActivityInfo.CONFIG_DENSITY;
+		}
+		if (delta.assetsSeq != ASSETS_SEQ_UNDEFINED && assetsSeq != delta.assetsSeq) {
+			changed |= ActivityInfo.CONFIG_ASSETS_PATHS;
 		}
 
 		return changed;
@@ -1495,7 +1519,9 @@ public final class Configuration implements Comparable<Configuration> {
 		if (n != 0)
 			return n;
 		n = this.densityDpi - that.densityDpi;
-		// if (n != 0) return n;
+		if (n != 0)
+			return n;
+		n = this.assetsSeq - that.assetsSeq;
 		return n;
 	}
 
@@ -1534,6 +1560,7 @@ public final class Configuration implements Comparable<Configuration> {
 		result = 31 * result + screenHeightDp;
 		result = 31 * result + smallestScreenWidthDp;
 		result = 31 * result + densityDpi;
+		result = 31 * result + assetsSeq;
 		return result;
 	}
 

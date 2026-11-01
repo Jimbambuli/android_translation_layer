@@ -164,6 +164,7 @@ public abstract class Context {
 		 * of the device pixels (see Resources.updateConfiguration), the app works at DENSITY_DEVICE */
 		DisplayMetrics.DENSITY_DEVICE_PIXELS = (int)(DisplayMetrics.DENSITY_DEVICE * native_getMonitorScale() + 0.5);
 		sys_config.setLayoutDirection(sys_config.locale); // like AOSP, from the locale
+		android.atl.ATLThemeOverlay.apply(); // the accent color of the desktop (Material You)
 		ATLLoadedApp primary_application = ATLLoadedApp.getPrimaryApplication();
 
 		ApplicationInfo application_info = primary_application.pkg.applicationInfo;
