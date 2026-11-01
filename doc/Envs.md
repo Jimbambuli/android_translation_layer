@@ -19,6 +19,12 @@ The following environment variables are recognized by the main executable:
 
 ---
 
+`ATL_SYSTEM_TITLEBAR=1` - if set, the window gets the desktop's title bar where the compositor draws one (e.g. KWin),
+                          without ATL's back button (back is Escape or the back button of the mouse);
+                          by default ATL draws the title bar with a back button in the desktop's GTK theme
+
+---
+
 `ATL_UGLY_ENABLE_LOCATION=` - if set, apps will be able to get location data using the relevant android APIs. (TODO: use bubblewrap)  
 
 ---

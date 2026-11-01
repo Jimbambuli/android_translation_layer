@@ -799,7 +799,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			printf("WARNING: RUN_FROM_BUILDDIR set and --install given: using current directory in desktop entry\n");
 			g_string_append_printf(exec_cmd, "-C %s ", g_get_current_dir());
 		}
-		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
+		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_SYSTEM_TITLEBAR", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
 		for (int i = 0; i < ARRAY_SIZE(envs); i++) {
 			if (getenv(envs[i])) {
 				g_string_append_printf(exec_cmd, "%s=%s ", envs[i], getenv(envs[i]));
@@ -850,15 +850,24 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	gtk_window_set_default_size(GTK_WINDOW(window), d->window_width, d->window_height);
 	g_signal_connect(window, "close-request", G_CALLBACK(app_exit), env);
 
-	/* An Android window has no title bar of its own. Where the compositor prefers to draw title bars
-	 * (server-side decorations, e.g. KWin), ATL sets none, so GTK asks for them and the window gets
-	 * the title bar of the desktop; back is the Escape key and the back button of the mouse, as on
-	 * Android with keyboard and mouse (see on_escape_released()). Where GTK draws the title bar
-	 * itself (client-side decorations, e.g. Mutter), ATL draws the header bar with its back button.
-	 * GTK decides this when the window is realized and marks client-side decorations with "csd". */
-	gtk_widget_realize(window);
-	if (gtk_widget_has_css_class(window, "csd")) {
-		gtk_widget_unrealize(window);
+	/* An Android window has no title bar of its own. ATL draws one with a back button, so that back is at
+	 * hand; the desktop's GTK theme styles it like the title bars of the other windows. With
+	 * ATL_SYSTEM_TITLEBAR=1 the window gets the desktop's title bar where the compositor draws one
+	 * (server-side decorations, e.g. KWin): GTK asks for it when the window has no title bar of its own,
+	 * and back is the Escape key and the back button of the mouse, as on Android with keyboard and mouse
+	 * (see on_escape_released()). Where GTK draws the title bar itself (client-side decorations, e.g.
+	 * Mutter), ATL's title bar is used all the same. GTK decides this when the window is realized and
+	 * marks client-side decorations with "csd". */
+	const char *system_titlebar_env = getenv("ATL_SYSTEM_TITLEBAR");
+	gboolean system_titlebar = system_titlebar_env && strcmp(system_titlebar_env, "0") && strcmp(system_titlebar_env, "false");
+	gboolean atl_titlebar = TRUE;
+	if (system_titlebar) {
+		gtk_widget_realize(window);
+		atl_titlebar = gtk_widget_has_css_class(window, "csd");
+		if (atl_titlebar)
+			gtk_widget_unrealize(window);
+	}
+	if (atl_titlebar) {
 		GtkWidget *header_bar = gtk_header_bar_new();
 		GtkWidget *back_button = back_button_new();
 
