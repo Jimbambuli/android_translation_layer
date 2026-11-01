@@ -266,6 +266,8 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	}
 
 	public void show() {
+		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
+		android.atl.ATLViewDump.addRoot(this);
 		System.out.println("showing the Dialog " + this);
 		Runnable action = new Runnable() {
 			@Override

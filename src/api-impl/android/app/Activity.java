@@ -218,6 +218,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	}
 
 	protected void onResume() {
+		android.atl.ATLViewDump.resumed(this); // debugging aid (atl-doctor)
 		Slog.i(TAG, "- onResume - yay!");
 
 		for (Fragment fragment : fragments) {
