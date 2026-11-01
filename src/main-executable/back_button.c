@@ -14,7 +14,9 @@ GtkWidget *back_button_new()
 	return back_button;
 }
 
+/* without a header bar (server-side decorations) there is no back button */
 void back_button_set_sensitive(bool sensitive)
 {
-	gtk_widget_set_sensitive(GTK_WIDGET(back_button), sensitive);
+	if (back_button)
+		gtk_widget_set_sensitive(GTK_WIDGET(back_button), sensitive);
 }

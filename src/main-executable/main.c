@@ -393,6 +393,28 @@ static void update_animator_duration_scale(GtkSettings *settings)
 	(*env)->DeleteLocalRef(env, value_animator);
 }
 
+/* An Escape that no view consumed (the views get the keys before the window) is the back key, as on
+ * Android: its Generic.kcm maps ESCAPE to "fallback BACK", so InputDispatcher sends KEYCODE_BACK when
+ * the app does not handle KEYCODE_ESCAPE. Like the back button of the mouse (atl_window_android_mouse_back())
+ * it goes back when it is released, if the window got its press. */
+static gboolean escape_pressed = FALSE;
+
+static gboolean on_escape_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	if (keyval != GDK_KEY_Escape)
+		return FALSE;
+	escape_pressed = TRUE;
+	return TRUE;
+}
+
+static void on_escape_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	if (keyval != GDK_KEY_Escape || !escape_pressed)
+		return;
+	escape_pressed = FALSE;
+	current_activity_back_pressed();
+}
+
 /* The fonts of the Android families that ATL brings along: Roboto as in AOSP's external/roboto-fonts
  * (android-14), one variable font for the families of frameworks/base/data/fonts/fonts.xml
  * sans-serif (and its -thin/-light/-medium/-black aliases, by weight) and sans-serif-condensed (axis
@@ -590,6 +612,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	atl_window_android_tab_focus(GTK_WINDOW(window));
 	atl_window_android_wheel_acceleration(GTK_WINDOW(window));
 	atl_window_android_mouse_back(GTK_WINDOW(window), G_CALLBACK(current_activity_back_pressed), NULL);
+	GtkEventController *escape_controller = gtk_event_controller_key_new();
+	g_signal_connect(escape_controller, "key-pressed", G_CALLBACK(on_escape_pressed), NULL);
+	g_signal_connect(escape_controller, "key-released", G_CALLBACK(on_escape_released), NULL);
+	gtk_widget_add_controller(window, escape_controller);
 	atl_window_android_touch_targets(GTK_WINDOW(window));
 
 	const char *disable_decoration_env = getenv("ATL_DISABLE_WINDOW_DECORATIONS");
@@ -824,11 +850,21 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	gtk_window_set_default_size(GTK_WINDOW(window), d->window_width, d->window_height);
 	g_signal_connect(window, "close-request", G_CALLBACK(app_exit), env);
 
-	GtkWidget *header_bar = gtk_header_bar_new();
-	GtkWidget *back_button = back_button_new();
+	/* An Android window has no title bar of its own. Where the compositor prefers to draw title bars
+	 * (server-side decorations, e.g. KWin), ATL sets none, so GTK asks for them and the window gets
+	 * the title bar of the desktop; back is the Escape key and the back button of the mouse, as on
+	 * Android with keyboard and mouse (see on_escape_released()). Where GTK draws the title bar
+	 * itself (client-side decorations, e.g. Mutter), ATL draws the header bar with its back button.
+	 * GTK decides this when the window is realized and marks client-side decorations with "csd". */
+	gtk_widget_realize(window);
+	if (gtk_widget_has_css_class(window, "csd")) {
+		gtk_widget_unrealize(window);
+		GtkWidget *header_bar = gtk_header_bar_new();
+		GtkWidget *back_button = back_button_new();
 
-	gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), back_button);
-	gtk_window_set_titlebar(GTK_WINDOW(window), header_bar);
+		gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), back_button);
+		gtk_window_set_titlebar(GTK_WINDOW(window), header_bar);
+	}
 	GtkDropTarget *drop_target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
 	g_signal_connect(drop_target, "drop", G_CALLBACK(on_drop), NULL);
 	gtk_widget_add_controller(window, GTK_EVENT_CONTROLLER(drop_target));
