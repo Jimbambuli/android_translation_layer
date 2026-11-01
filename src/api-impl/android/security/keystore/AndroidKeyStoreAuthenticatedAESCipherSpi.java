@@ -42,7 +42,8 @@ public class AndroidKeyStoreAuthenticatedAESCipherSpi {
 			if (key == null || key.getEncoded() == null)
 				throw new InvalidKeyException("Unsupported key: " + key);
 			try {
-				cipher = Cipher.getInstance("AES/GCM/NoPadding", "BC");
+				// the first provider that takes the plain key (not this one): AndroidOpenSSL, else Bouncy Castle
+				cipher = Cipher.getInstance("AES/GCM/NoPadding");
 			} catch (GeneralSecurityException e) {
 				throw new ProviderException(e);
 			}
