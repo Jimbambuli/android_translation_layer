@@ -1,7 +1,9 @@
 package com.android.internal.os;
 
+import android.atl.NativeDigest;
 import android.atl.annotation.Export;
 import android.os.SystemProperties;
+import java.security.Security;
 import java.util.TimeZone;
 import org.apache.harmony.luni.internal.util.TimezoneGetter;
 
@@ -24,5 +26,10 @@ public class RuntimeInit {
 			}
 		});
 		TimeZone.setDefault(null);
+
+		/*
+		 * Digests in native code first, as Conscrypt's OpenSSLProvider is the first provider on Android
+		 */
+		Security.insertProviderAt(new NativeDigest.NativeDigestProvider(), 1);
 	}
 }
