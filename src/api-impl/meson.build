@@ -113,6 +113,7 @@ srcs = [
 	'android/atl/ATLThemeOverlay.java',
 	'android/atl/ATLToggles.java',
 	'android/atl/EarlyPackageParser.java',
+	'android/atl/NativeDigest.java',
 	'android/atl/annotation/Export.java',
 	'android/atl/GskCanvas.java',
 	'android/atl/GVariantBuilderParcel.java',
