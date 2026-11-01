@@ -781,6 +781,39 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 			recreate(changes & ~handled);
 		else if (shouldReportChange(oldConfig, newConfig, mSizeConfigurations, handled))
 			onConfigurationChanged(new Configuration(newConfig));
+		mCurrentConfig = new Configuration(newConfig);
+	}
+
+	/* Activity.mCurrentConfig: the configuration the activity was created with or last told about */
+	private Configuration mCurrentConfig;
+
+	/* ActivityRecord.ensureActivityConfiguration() with shouldRelaunchLocked(), after a change of the global
+	 * configuration (ActivityThread.handleConfigurationChanged()): for the shown activity right away, for
+	 * the others when they come back. The activity is relaunched if its configChanges do not handle the
+	 * change, otherwise ActivityThread.shouldReportChange() decides on onConfigurationChanged(). */
+	@Export
+	void ensureActivityConfiguration() {
+		if (mCurrentConfig == null || finishing || mChangingConfigurations)
+			return;
+		Resources resources = getResources();
+		Configuration newConfig = new Configuration(resources.getConfiguration());
+		int diff = mCurrentConfig.diff(newConfig);
+		if (diff == 0)
+			return;
+		Configuration oldConfig = mCurrentConfig;
+		mCurrentConfig = newConfig;
+		int handled = 0;
+		try {
+			handled = getPackageManager().getActivityInfo(getComponentName(), 0).getRealConfigChanged();
+		} catch (PackageManager.NameNotFoundException e) {
+		}
+		if (mSizeConfigurations == null)
+			mSizeConfigurations = new SizeConfigurationBuckets(resources.getSizeConfigurations());
+		int changes = SizeConfigurationBuckets.filterDiff(diff, oldConfig, newConfig, mSizeConfigurations);
+		if ((changes & ~handled) != 0)
+			recreate(changes & ~handled);
+		else if (shouldReportChange(oldConfig, newConfig, mSizeConfigurations, handled))
+			onConfigurationChanged(new Configuration(newConfig));
 	}
 
 	/* ActivityThread.shouldReportChange(), without the window bounds and alwaysReportChange */
@@ -1225,6 +1258,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	/* called from native code instead of onCreate() etc., with the pre and post callbacks around them */
 	@Export
 	private void performCreate(Bundle savedInstanceState) {
+		mCurrentConfig = new Configuration(getResources().getConfiguration());
 		dispatchActivityPreCreated(savedInstanceState);
 		onCreate(savedInstanceState);
 		dispatchActivityPostCreated(savedInstanceState);
@@ -1263,6 +1297,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	@Export
 	private void performRestart() {
 		stopped = false;
+		ensureActivityConfiguration();
 		onRestart();
 		performStart();
 	}

@@ -8,3 +8,5 @@ void activity_close_all(void);
 GtkWidget *activity_pages_new(void);
 GtkWidget *activity_pages_stack(void);
 void current_activity_back_pressed(void);
+/* the global configuration changed: the shown activity is relaunched or told (see Activity.ensureActivityConfiguration()) */
+void activity_ensure_configuration(void);

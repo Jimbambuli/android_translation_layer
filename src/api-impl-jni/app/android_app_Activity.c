@@ -452,6 +452,18 @@ void activity_window_ready(void)
 		window_focus_changed(env, l->data, true);
 }
 
+void activity_ensure_configuration(void)
+{
+	JNIEnv *env = get_jni_env();
+	if (!activity_current)
+		return;
+	J__Activity__ensureActivityConfiguration(env, activity_current);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
 void current_activity_back_pressed(void)
 {
 	JNIEnv *env = get_jni_env();

@@ -19,6 +19,7 @@
 #include "../generated_headers/android_content_Context.h"
 
 #include "android_content_Context.h"
+#include "../app/android_app_Activity.h"
 
 static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject configuration)
 {
@@ -46,27 +47,69 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02 | layout_dir);
 }
 
-#ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
-static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namestpace, gchar *key, GVariant *value, jobject configuration)
+/* The appearance of the desktop, from the XDG settings portal (namespace org.freedesktop.appearance) and
+ * followed while the app runs, like the system settings on Android: color-scheme is the night mode
+ * (UiModeManagerService: UI_MODE_NIGHT_YES for dark, otherwise NO), contrast the contrast level
+ * (UiModeManager.getContrast(): 1 for high contrast). Without the portal, GTK's
+ * gtk-application-prefer-dark-theme decides, otherwise it is light. */
+static guint32 color_scheme = 0; // 0: no preference, 1: prefer dark, 2: prefer light
+static guint32 contrast = 0;     // 0: no preference, 1: high contrast
+static gboolean appearance_from_portal = FALSE;
+
+static jint appearance_ui_mode_night(void)
 {
-	JNIEnv *env;
-	if (!strcmp(namestpace, "org.freedesktop.appearance") && !strcmp(key, "color-scheme")) {
-		int color_sheme = g_variant_get_uint32(value);
-		g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", color_sheme == 1, NULL);
-		env = get_jni_env();
-		if (!configuration) {
-			configuration = _GET_STATIC_OBJ_FIELD(_CACHED_CLASS(Context), "sys_config", "Landroid/content/res/Configuration;");
-		}
-		if (color_sheme == 1) // Prefer dark appearance
-			_SET_INT_FIELD(configuration, "uiMode", /*UI_MODE_NIGHT_YES*/ 0x20);
-		else if (color_sheme == 2) // Prefer light appearance
-			_SET_INT_FIELD(configuration, "uiMode", /*UI_MODE_NIGHT_NO*/ 0x10);
-		else // No preference
-			_SET_INT_FIELD(configuration, "uiMode", /*UI_MODE_NIGHT_UNDEFINED*/ 0x00);
+	gboolean dark = color_scheme == 1;
+	if (!appearance_from_portal)
+		g_object_get(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", &dark, NULL);
+	return dark ? /*UI_MODE_NIGHT_YES*/ 0x20 : /*UI_MODE_NIGHT_NO*/ 0x10;
+}
+
+static jfloat appearance_contrast(void)
+{
+	return contrast == 1 ? 1.0f : 0.0f;
+}
+
+#ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
+static gboolean appearance_setting(const char *namespace, const char *key, GVariant *value)
+{
+	if (strcmp(namespace, "org.freedesktop.appearance"))
+		return FALSE;
+	if (!strcmp(key, "color-scheme") && g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) {
+		color_scheme = g_variant_get_uint32(value);
+		g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", color_scheme == 1, NULL);
+	} else if (!strcmp(key, "contrast") && g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) {
+		contrast = g_variant_get_uint32(value);
+	} else {
+		return FALSE;
 	}
+	appearance_from_portal = TRUE;
+	return TRUE;
+}
+
+/* a setting changed while the app runs: a change of the global configuration, as on Android */
+static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gchar *key, GVariant *value, gpointer user_data)
+{
+	if (!appearance_setting(namespace, key, value))
+		return;
+	JNIEnv *env = get_jni_env();
+	J__ActivityThread__setNightMode(env, appearance_ui_mode_night(), appearance_contrast());
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	activity_ensure_configuration();
 }
 
 static XdpSettings *xdp_settings = NULL;
+
+static void appearance_read(const char *key)
+{
+	GVariant *value = xdp_settings_read_value(xdp_settings, "org.freedesktop.appearance", key, NULL, NULL);
+	if (value) {
+		appearance_setting("org.freedesktop.appearance", key, value);
+		g_variant_unref(value);
+	}
+}
 #endif
 
 /* the window was resized: take the screen size of the configuration (and the window size that
@@ -110,21 +153,23 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv 
 	if (!xdp_settings) {
 		GError *error = NULL;
 		XdpPortal *portal = xdp_portal_initable_new(&error);
-		if (!portal) {
+		if (portal) {
+			xdp_settings = xdp_portal_get_settings(portal);
+			g_object_unref(portal);
+			g_signal_connect(xdp_settings, "changed", G_CALLBACK(settings_changed_cb), NULL);
+		} else {
 			printf("xdp_portal_initable_new failed: %s\n", error->message);
 			g_error_free(error);
-			return;
 		}
-		xdp_settings = xdp_portal_get_settings(portal);
-		g_object_unref(portal);
-		g_signal_connect(xdp_settings, "changed", G_CALLBACK(settings_changed_cb), NULL);
 	}
-	GVariant *color_sheme = xdp_settings_read_value(xdp_settings, "org.freedesktop.appearance", "color-scheme", NULL, NULL);
-	if (color_sheme) {
-		settings_changed_cb(xdp_settings, "org.freedesktop.appearance", "color-scheme", color_sheme, config);
-		g_variant_unref(color_sheme);
+	if (xdp_settings) {
+		appearance_read("color-scheme");
+		appearance_read("contrast");
 	}
 #endif
+	_SET_INT_FIELD(config, "uiMode", (_GET_INT_FIELD(config, "uiMode") & ~/*UI_MODE_NIGHT_MASK*/ 0x30) | appearance_ui_mode_night());
+	jclass ui_mode_manager = (*env)->FindClass(env, "android/app/UiModeManager");
+	(*env)->SetStaticFloatField(env, ui_mode_manager, _STATIC_FIELD_ID(ui_mode_manager, "sContrast", "F"), appearance_contrast());
 }
 
 void update_config_for_window(GtkWindow *window)

@@ -25,6 +25,8 @@ import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.WeakHashMap;
 import org.xmlpull.v1.XmlPullParserException;
 
 /**
@@ -46,6 +48,37 @@ public final class ATLLoadedApp {
 	private Resources.Theme default_theme;
 	/* the AssetManagers for the override configurations, see createResources() */
 	private final HashMap<Configuration, AssetManager> override_assets = new HashMap<>();
+	/* ResourcesManager.mResourceReferences: the Resources made here, with their override configuration
+	 * (null for none), which follow a change of the system configuration */
+	private static final WeakHashMap<Resources, Configuration> resource_references = new WeakHashMap<>();
+
+	private static Resources track(Resources resources, Configuration overrideConfiguration) {
+		synchronized (resource_references) {
+			resource_references.put(resources, overrideConfiguration);
+		}
+		return resources;
+	}
+
+	/* ResourcesManager.applyConfigurationToResources(): every Resources takes the new system configuration,
+	 * with its override configuration on top (ResourcesManager.generateConfig()) */
+	public static void applyConfigurationToResources(Configuration config) {
+		Resources.updateSystemConfiguration(config, null, null);
+		Map.Entry<Resources, Configuration>[] entries;
+		synchronized (resource_references) {
+			entries = resource_references.entrySet().toArray(new Map.Entry[0]);
+		}
+		for (Map.Entry<Resources, Configuration> entry : entries) {
+			Resources resources = entry.getKey();
+			if (resources == null)
+				continue;
+			Configuration resourcesConfig = config;
+			if (entry.getValue() != null) {
+				resourcesConfig = new Configuration(config);
+				resourcesConfig.updateFrom(entry.getValue());
+			}
+			resources.updateConfiguration(resourcesConfig, null);
+		}
+	}
 
 	ATLLoadedApp(Resources resources, ClassLoader classLoader,
 	             PackageParser.Package pkg) {
@@ -131,7 +164,7 @@ public final class ATLLoadedApp {
 			ATLSigHelper.addGMSSignatures(pkg);
 		}
 		pkg.applicationInfo.sourceDir = mainApk;
-		return new ATLLoadedApp(resources, classLoader, pkg);
+		return new ATLLoadedApp(track(resources, null), classLoader, pkg);
 	}
 
 	public Resources createDefaultResources() {
@@ -160,7 +193,8 @@ public final class ATLLoadedApp {
 			config = new Configuration(Context.sys_config);
 			config.updateFrom(overrideConfiguration);
 		}
-		return new Resources(assets, displayMetrics, config);
+		return track(new Resources(assets, displayMetrics, config),
+		             config == Context.sys_config ? null : new Configuration(overrideConfiguration));
 	}
 
 	public ContextImpl createContext(DisplayMetrics displayMetrics, Configuration overrideConfiguration, int theme) {
