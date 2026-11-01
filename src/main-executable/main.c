@@ -16,6 +16,7 @@
 #include "actions.h"
 #include "back_button.h"
 #include "libc_bio_path_overrides.h"
+#include "system_theme.h"
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -589,6 +590,11 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	(*env)->GetJavaVM(env, &jvm);
 
+	/* the desktop's GTK theme, also in a sandbox (see system_theme.c) */
+	char *host_config_dir = system_theme_host_config_dir();
+	system_theme_init(host_config_dir);
+	g_free(host_config_dir);
+
 	/* turning off animations on the desktop is what "Remove animations" (animator duration scale 0) is on Android */
 	g_signal_connect(gtk_settings_get_default(), "notify::gtk-enable-animations", G_CALLBACK(update_animator_duration_scale), NULL);
 	update_animator_duration_scale(gtk_settings_get_default());
@@ -1024,6 +1030,9 @@ int main(int argc, char **argv)
 	// locale on android is always either C or C.UTF-8, and some apps might unbeknownst to them depend on that
 	// for correct functionality
 	setenv("LC_ALL", "C.UTF-8", 1);
+
+	/* the desktop's themes and icons, if the sandbox can read the host's system files (see system_theme.c) */
+	system_theme_add_data_dirs("/run/host/usr/share");
 
 	libc_bio_set_apply_path_overrides_func(apply_path_overrides);
 
