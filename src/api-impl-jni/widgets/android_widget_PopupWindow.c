@@ -285,25 +285,35 @@ static void on_map_count_grab(GtkWidget *popover)
  * closes: GtkWindow then focuses the first widget it finds from the top, a button in the header bar,
  * where the keys no longer reach the app (Tab, Escape). Like on Android, where the app's window gets
  * the focus back with the view that had it, the focus goes back to that widget, or else into the
- * content of the window. */
+ * content of the window. Where no widget there takes it, the window keeps the focus itself, as an
+ * Android window with no focused view still gets the keys.
+ * The focus is also given back from a widget that was taken out of the popup while it had the focus
+ * (ListPopupWindow.dismiss() drops the content view during the exit fade): GtkWindow would move such
+ * a focus on, but GtkPopover's focus() claims to keep it while the popup grabs, so it stayed on the
+ * removed widget, and no key reached the window any more. */
+static void give_focus_back(GtkWidget *popover)
+{
+	GtkRoot *root = gtk_widget_get_root(popover);
+	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
+	if (!GTK_IS_WINDOW(root) || (focus && gtk_widget_get_root(focus) == root && !gtk_widget_is_ancestor(focus, popover)))
+		return;
+	GWeakRef *focus_before = g_object_get_data(G_OBJECT(popover), "focus-before");
+	GtkWidget *before = focus_before ? g_weak_ref_get(focus_before) : NULL;
+	if (!(before && gtk_widget_get_mapped(before) && !gtk_widget_is_ancestor(before, popover) && gtk_widget_grab_focus(before))) {
+		GtkWidget *content = gtk_window_get_child(GTK_WINDOW(root));
+		if (!(content && gtk_widget_child_focus(content, GTK_DIR_TAB_FORWARD)))
+			gtk_root_set_focus(root, NULL);
+	}
+	g_clear_object(&before);
+}
+
 static void on_unmap_count_grab(GtkWidget *popover)
 {
 	mapped_popovers = g_list_remove(mapped_popovers, popover);
 	if (!gtk_popover_get_autohide(GTK_POPOVER(popover)))
 		return;
 	grabbing_popovers--;
-	GtkRoot *root = gtk_widget_get_root(popover);
-	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
-	if (!GTK_IS_WINDOW(root) || (focus && !gtk_widget_is_ancestor(focus, popover)))
-		return;
-	GWeakRef *focus_before = g_object_get_data(G_OBJECT(popover), "focus-before");
-	GtkWidget *before = focus_before ? g_weak_ref_get(focus_before) : NULL;
-	if (!(before && gtk_widget_get_mapped(before) && !gtk_widget_is_ancestor(before, popover) && gtk_widget_grab_focus(before))) {
-		GtkWidget *content = gtk_window_get_child(GTK_WINDOW(root));
-		if (content)
-			gtk_widget_child_focus(content, GTK_DIR_TAB_FORWARD);
-	}
-	g_clear_object(&before);
+	give_focus_back(popover);
 }
 
 void atl_popover_count_grab(GtkPopover *popover)
@@ -585,6 +595,10 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1startFadeOut(JNIE
 	GtkWidget *popover = GTK_WIDGET(_PTR(popover_ptr));
 	g_object_set_data(G_OBJECT(popover), "fading-out", GINT_TO_POINTER(1));
 	gtk_widget_set_can_target(popover, FALSE);
+	/* AOSP's dismiss() makes the popup window FLAG_NOT_FOCUSABLE for the exit transition, so the
+	 * window below gets the keyboard focus back at once, not only when the popup is gone */
+	gtk_widget_set_can_focus(popover, FALSE);
+	give_focus_back(popover);
 	g_object_set_data(G_OBJECT(popover), "dismiss-notified", GINT_TO_POINTER(1));
 	notify_dismissed(popover);
 }
@@ -595,6 +609,7 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1fadeOutDone(JNIEn
 	g_object_set_data(G_OBJECT(popover), "fading-out", NULL);
 	gtk_popover_popdown(GTK_POPOVER(popover));
 	gtk_widget_set_can_target(popover, TRUE);
+	gtk_widget_set_can_focus(popover, GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "focusable")));
 	gtk_widget_set_opacity(popover, 1);
 }
 
@@ -605,6 +620,7 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1resetFade(JNIEnv 
 	g_object_set_data(G_OBJECT(popover), "fading-out", NULL);
 	g_object_set_data(G_OBJECT(popover), "dismiss-notified", NULL);
 	gtk_widget_set_can_target(popover, TRUE);
+	gtk_widget_set_can_focus(popover, GPOINTER_TO_INT(g_object_get_data(G_OBJECT(popover), "focusable")));
 	gtk_widget_set_opacity(popover, 1);
 }
 
