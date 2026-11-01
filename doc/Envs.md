@@ -77,3 +77,7 @@ The following environment variables are recognized by the main executable:
 ---
 
 `ATL_VALIDATE_CERTS` - if set, the signing certificate of the APK file will be validated on startup. This adds a few extra seconds to the startup time for large APKs.
+
+---
+
+`ATL_STUB_HITS=FILE` - count the calls of ATL's stub methods (found by their bytecode at build time) and append them to FILE once a second (diagnosis, e.g. atl-doctor; see src/api-impl/android/atl/ATLStubHits.java). Off: one static check per stub call.

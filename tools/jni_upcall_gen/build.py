@@ -9,7 +9,8 @@ import sys
 MVN_TMP_DIR = "/dev/shm/junk"
 
 srcs = [
-	"JNIUpcallWrapperGenerator.java"
+	"JNIUpcallWrapperGenerator.java",
+	"StubHitsInstrumenter.java",
 ]
 
 deps = [
@@ -104,6 +105,12 @@ wrapper_file = open(wrapper_file_path, mode="w")
 wrapper_file.write(wrapper_final)
 wrapper_file.close()
 os.chmod(wrapper_file_path, 0o755)
+
+# the same wrapper for the stub hit instrumenter (see src/api-impl/android/atl/ATLStubHits.java)
+stub_hits_path = out_dir + "/stub_hits_instr"
+with open(stub_hits_path, mode="w") as f:
+	f.write(wrapper_final.replace("classname=JNIUpcallWrapperGenerator", "classname=StubHitsInstrumenter"))
+os.chmod(stub_hits_path, 0o755)
 
 # compile the tool
 subprocess.run(["javac", "-d", out_dir, "-cp", deps_system_classpath+deps_vendored_classpath] + srcs, cwd=script_dir+"/src/")

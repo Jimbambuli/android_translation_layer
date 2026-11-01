@@ -57,11 +57,18 @@ endif
 # hax.jar
 subdir('src/api-impl')
 
+#tools
+subdir('tools/jni_upcall_gen')
+
+# stub methods count their calls when ATL_STUB_HITS is set (android/atl/ATLStubHits.java)
+hax_hits_jar = custom_target('hax-stub-hits.jar', input: [hax_jar], output: ['hax-stub-hits.jar', 'stub-hits.tsv'],
+                             command: [jni_upcall_gen[2], '@INPUT@', '@OUTPUT0@', '@OUTPUT1@'])
+
 # api-impl.jar
-custom_target('api-impl.jar', build_by_default: true, input: [hax_jar], output: ['api-impl.jar'],
+custom_target('api-impl.jar', build_by_default: true, input: [hax_hits_jar[0]], output: ['api-impl.jar'],
               install: true,
               install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
-              command: ['dx', '--dex', '--incremental', '--output='+join_paths(builddir_base, 'api-impl.jar'), hax_jar.full_path()])
+              command: ['dx', '--dex', '--incremental', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
 
 # gstub.jar
 subdir('src/gstub')
@@ -101,9 +108,6 @@ install_data([
              	'res/fonts/Roboto-NOTICE'
              ],
              install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/fonts')
-
-#tools
-subdir('tools/jni_upcall_gen')
 
 upcalls_header_tgt = custom_target('upcalls.h', input: [hax_jar, 'extern_upcalls.txt'], output: ['upcalls.h'],
                                    command: [jni_upcall_gen[0], '--jar-file', '@INPUT0@', '-d', meson.current_build_dir()+'/upcalls.h',
