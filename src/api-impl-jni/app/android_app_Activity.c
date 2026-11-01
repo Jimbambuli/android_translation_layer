@@ -495,6 +495,84 @@ void current_activity_back_pressed(void)
 	}
 }
 
+int activity_count(void)
+{
+	return g_list_length(activity_backlog);
+}
+
+static char *java_string(JNIEnv *env, jobject object)
+{
+	if (!object)
+		return NULL;
+	jmethodID to_string = (*env)->GetMethodID(env, _CLASS(object), "toString", "()Ljava/lang/String;");
+	jstring string = (*env)->CallObjectMethod(env, object, to_string);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		return NULL;
+	}
+	if (!string)
+		return NULL;
+	const char *chars = (*env)->GetStringUTFChars(env, string, NULL);
+	char *copy = g_strdup(chars);
+	(*env)->ReleaseStringUTFChars(env, string, chars);
+	(*env)->DeleteLocalRef(env, string);
+	return copy;
+}
+
+/* the title of the activity at index (0 is the shown one), else the simple name of its class */
+char *activity_title(int index)
+{
+	JNIEnv *env = get_jni_env();
+	jobject activity = g_list_nth_data(activity_backlog, index);
+	if (!activity)
+		return NULL;
+	jmethodID get_title = (*env)->GetMethodID(env, _CLASS(activity), "getTitle", "()Ljava/lang/CharSequence;");
+	jobject title_object = (*env)->CallObjectMethod(env, activity, get_title);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		title_object = NULL;
+	}
+	char *title = java_string(env, title_object);
+	if (title_object)
+		(*env)->DeleteLocalRef(env, title_object);
+	if (title && *title)
+		return title;
+	g_free(title);
+	jclass class_class = (*env)->FindClass(env, "java/lang/Class");
+	jmethodID simple_name = (*env)->GetMethodID(env, class_class, "getSimpleName", "()Ljava/lang/String;");
+	jobject name = (*env)->CallObjectMethod(env, _CLASS(activity), simple_name);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		return NULL;
+	}
+	title = java_string(env, name);
+	(*env)->DeleteLocalRef(env, name);
+	return title;
+}
+
+/* back to the activity at index: the ones above it finish, the shown one first (as pressing back would) */
+void activity_return_to(int index)
+{
+	JNIEnv *env = get_jni_env();
+	GList *above = NULL;
+	int i = 0;
+	for (GList *l = activity_backlog; l != NULL && i < index; l = l->next, i++)
+		above = g_list_append(above, _REF(l->data));
+	for (GList *l = above; l != NULL; l = l->next) {
+		jmethodID finish = (*env)->GetMethodID(env, _CLASS(l->data), "finish", "()V");
+		(*env)->CallVoidMethod(env, l->data, finish);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		_UNREF(l->data);
+	}
+	g_list_free(above);
+}
+
 void activity_close_all(void)
 {
 	GList *activities, *l;

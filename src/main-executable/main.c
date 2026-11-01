@@ -16,6 +16,7 @@
 #include "actions.h"
 #include "back_button.h"
 #include "libc_bio_path_overrides.h"
+#include "navigation_bar.h"
 #include "system_theme.h"
 
 #include <dlfcn.h>
@@ -189,6 +190,31 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 
 	free(options);
 	return env;
+}
+
+/* The title bar of the window (ATL_TITLEBAR): "atl" (the default) is ATL's own with a back button, in the
+ * desktop's GTK theme; "system" is the desktop's where the compositor draws one (server-side decorations, e.g.
+ * KWin), back is the Escape key and the back button of the mouse; "system-navigation" is the desktop's title bar
+ * and Android's navigation bar under the window (see navigation_bar.c). ATL_SYSTEM_TITLEBAR=1 is "system". */
+enum titlebar_kind {
+	TITLEBAR_ATL,
+	TITLEBAR_SYSTEM,
+	TITLEBAR_SYSTEM_NAVIGATION,
+};
+
+static enum titlebar_kind titlebar_kind(void)
+{
+	const char *kind = getenv("ATL_TITLEBAR");
+	if (kind && !strcmp(kind, "system"))
+		return TITLEBAR_SYSTEM;
+	if (kind && !strcmp(kind, "system-navigation"))
+		return TITLEBAR_SYSTEM_NAVIGATION;
+	if (kind)
+		return TITLEBAR_ATL;
+	const char *system = getenv("ATL_SYSTEM_TITLEBAR");
+	if (system && strcmp(system, "0") && strcmp(system, "false"))
+		return TITLEBAR_SYSTEM;
+	return TITLEBAR_ATL;
 }
 
 void icon_override(GtkWidget *window, GList *icon_list)
@@ -630,7 +656,16 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	/* -- misc -- */
 
 	window = gtk_application_window_new(app);
-	gtk_window_set_child(GTK_WINDOW(window), activity_pages_new());
+	if (titlebar_kind() == TITLEBAR_SYSTEM_NAVIGATION) {
+		GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+		GtkWidget *pages = activity_pages_new();
+		gtk_widget_set_vexpand(pages, TRUE);
+		gtk_box_append(GTK_BOX(box), pages);
+		gtk_box_append(GTK_BOX(box), navigation_bar_new());
+		gtk_window_set_child(GTK_WINDOW(window), box);
+	} else {
+		gtk_window_set_child(GTK_WINDOW(window), activity_pages_new());
+	}
 	atl_window_android_tab_focus(GTK_WINDOW(window));
 	atl_window_android_wheel_acceleration(GTK_WINDOW(window));
 	atl_window_android_mouse_back(GTK_WINDOW(window), G_CALLBACK(current_activity_back_pressed), NULL);
@@ -821,7 +856,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			printf("WARNING: RUN_FROM_BUILDDIR set and --install given: using current directory in desktop entry\n");
 			g_string_append_printf(exec_cmd, "-C %s ", g_get_current_dir());
 		}
-		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_SYSTEM_TITLEBAR", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
+		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_TITLEBAR", "ATL_SYSTEM_TITLEBAR", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
 		for (int i = 0; i < ARRAY_SIZE(envs); i++) {
 			if (getenv(envs[i])) {
 				g_string_append_printf(exec_cmd, "%s=%s ", envs[i], getenv(envs[i]));
@@ -874,21 +909,12 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	/* An Android window has no title bar of its own. ATL draws one with a back button, so that back is at
 	 * hand; the desktop's GTK theme styles it like the title bars of the other windows. With
-	 * ATL_SYSTEM_TITLEBAR=1 the window gets the desktop's title bar where the compositor draws one
-	 * (server-side decorations, e.g. KWin): GTK asks for it when the window has no title bar of its own,
-	 * and back is the Escape key and the back button of the mouse, as on Android with keyboard and mouse
+	 * ATL_TITLEBAR=system (or system-navigation) the window gets the desktop's title bar where the compositor
+	 * draws one (server-side decorations, e.g. KWin): GTK asks for it when the window has no title bar of its
+	 * own, and back is the Escape key and the back button of the mouse, as on Android with keyboard and mouse
 	 * (see on_escape_released()). Where GTK draws the title bar itself (client-side decorations, e.g.
-	 * Mutter), ATL's title bar is used all the same. GTK decides this when the window is realized and
-	 * marks client-side decorations with "csd". */
-	const char *system_titlebar_env = getenv("ATL_SYSTEM_TITLEBAR");
-	gboolean system_titlebar = system_titlebar_env && strcmp(system_titlebar_env, "0") && strcmp(system_titlebar_env, "false");
-	gboolean atl_titlebar = TRUE;
-	if (system_titlebar) {
-		gtk_widget_realize(window);
-		atl_titlebar = gtk_widget_has_css_class(window, "csd");
-		if (atl_titlebar)
-			gtk_widget_unrealize(window);
-	}
+	 * Mutter), it is GTK's default title bar, without a back button. */
+	gboolean atl_titlebar = titlebar_kind() == TITLEBAR_ATL;
 	if (atl_titlebar) {
 		GtkWidget *header_bar = gtk_header_bar_new();
 		GtkWidget *back_button = back_button_new();

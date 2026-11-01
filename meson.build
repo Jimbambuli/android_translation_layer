@@ -275,6 +275,7 @@ executable('android-translation-layer', [
                                         	'src/main-executable/back_button.c',
                                         	'src/main-executable/bionic_compat.c',
                                         	'src/main-executable/libc_bio_path_overrides.c',
+                                        	'src/main-executable/navigation_bar.c',
                                         	'src/main-executable/system_theme.c',
                                         	resources
                                         ],

@@ -19,7 +19,15 @@ The following environment variables are recognized by the main executable:
 
 ---
 
-`ATL_SYSTEM_TITLEBAR=1` - if set, the window gets the desktop's title bar where the compositor draws one (e.g. KWin),
+`ATL_TITLEBAR=` - the title bar of the window: `atl` (default) ATL draws it with a back button in the desktop's GTK
+                 theme (with the window buttons of the KWin decoration where KDE provides them in
+                 ~/.config/gtk-3.0/assets); `system` the desktop's title bar where the compositor draws one (e.g. KWin),
+                 back is Escape or the back button of the mouse; `system-navigation` the desktop's title bar and
+                 Android's navigation bar (back, first page, open pages) under the window
+
+---
+
+`ATL_SYSTEM_TITLEBAR=1` - same as `ATL_TITLEBAR=system`; if set, the window gets the desktop's title bar where the compositor draws one (e.g. KWin),
                           without ATL's back button (back is Escape or the back button of the mouse);
                           by default ATL draws the title bar with a back button in the desktop's GTK theme
 

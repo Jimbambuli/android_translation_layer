@@ -8,5 +8,9 @@ void activity_close_all(void);
 GtkWidget *activity_pages_new(void);
 GtkWidget *activity_pages_stack(void);
 void current_activity_back_pressed(void);
+/* for the navigation bar: the activities from the shown one (index 0) down to the first one */
+int activity_count(void);
+char *activity_title(int index);
+void activity_return_to(int index);
 /* the global configuration changed: the shown activity is relaunched or told (see Activity.ensureActivityConfiguration()) */
 void activity_ensure_configuration(void);
