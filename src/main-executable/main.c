@@ -217,6 +217,22 @@ static enum titlebar_kind titlebar_kind(void)
 	return TITLEBAR_ATL;
 }
 
+/* the app's icon also by name, for the icon of ATL's title bar ("icon" in the desktop's button layout, e.g.
+ * KDE's, as KWin shows it): GTK finds window icons by name only */
+static void set_window_icon_name(GtkWindow *window, GdkTexture *texture, const char *name)
+{
+	char *dir = g_build_filename(g_get_user_cache_dir(), "atl", "window-icons", NULL);
+	char *file_name = g_strconcat(name, ".png", NULL);
+	char *path = g_build_filename(dir, file_name, NULL);
+	if (g_mkdir_with_parents(dir, 0700) == 0 && gdk_texture_save_to_png(texture, path)) {
+		gtk_icon_theme_add_search_path(gtk_icon_theme_get_for_display(gtk_widget_get_display(GTK_WIDGET(window))), dir);
+		gtk_window_set_icon_name(window, name);
+	}
+	g_free(path);
+	g_free(file_name);
+	g_free(dir);
+}
+
 void icon_override(GtkWidget *window, GList *icon_list)
 {
 	GdkSurface *window_surface = gtk_native_get_surface(GTK_NATIVE(window));
@@ -949,6 +965,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			g_clear_error(&error);
 		}
 		icon_override(window, icon_list);
+		if (atl_titlebar && icon_list->data)
+			set_window_icon_name(GTK_WINDOW(window), icon_list->data, package_name);
 		/* if Gtk sets the icon list to NULL, override it again */
 		g_signal_connect_after(window, "realize", G_CALLBACK(icon_override), icon_list);
 	}

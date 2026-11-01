@@ -12,21 +12,27 @@
  *    (the font stays Roboto for the app, see main.c; the title bar gets the desktop's font)
  *  - the host's gtk.css (KDE: @import 'colors.css', the colors of the color scheme) is user CSS as in GTK
  *  - the title of the title bar is in the desktop's font.
- * The window buttons are the theme's (Breeze draws them like KWin's Breeze decoration). KDE's
- * window_decorations.css is not used: it is written for GTK 3 (class "titlebutton", images only in gtk-3.0),
- * GTK 4 does not load it, and GTK 4.24 draws its images (SVG from Qt) as nothing, which hid the buttons.
+ * The window buttons are the theme's, unless KDE drew the buttons of the KWin decoration (see
+ * load_window_buttons()). KDE's window_decorations.css itself is not used: it is written for GTK 3 (class
+ * "titlebutton", images only in gtk-3.0), GTK 4 does not load it, and GTK 4.24 draws its images (SVG from
+ * Qt) as nothing, which hid the buttons.
  *
  * A change of these files (another theme or color scheme) is applied while the app runs. Without these files
  * GTK keeps its default theme and the dark variant from the settings portal. */
 
+#include <glib/gstdio.h>
 #include <gtk/gtk.h>
 #include <string.h>
+#ifdef HAVE_LIBRSVG
+#include <librsvg/rsvg.h>
+#endif
 
 #include "system_theme.h"
 
 static char *config_dir = NULL;
 static GtkCssProvider *user_provider = NULL;
 static GtkCssProvider *titlebar_provider = NULL;
+static GtkCssProvider *buttons_provider = NULL;
 static GPtrArray *monitors = NULL;
 static guint reload_source = 0;
 
@@ -126,11 +132,202 @@ static void load_css(char *font_name)
 	g_string_free(css, TRUE);
 }
 
+/* KDE (kde-gtk-config) draws the buttons of the current KWin decoration (Breeze, Oxygen, Aurorae themes) as SVG
+ * files into gtk-3.0/assets, in every state, for the title bars of GTK 3. ATL puts the same pictures on the
+ * buttons of its title bar, so they look and react as KWin's: drawn here with librsvg into PNG files (GTK 4 shows
+ * these SVG files as nothing), for scale 1 and 2, in the cache, and on windowcontrols' buttons by CSS. The title
+ * bar then also gets the height of KWin's (Breeze: 36 px with a 10 pt font, the GTK theme's is 48 px). Without
+ * the files (another desktop, or no librsvg) the GTK theme's buttons and height stay. */
+#define BUTTON_SIZE 20
+#define TITLEBAR_HEIGHT 34 /* without the header bar's borders */
+
+static const char *button_names[] = {"close", "maximize", "maximized", "minimize"};
+static const struct {
+	const char *file;
+	const char *pseudo;
+} button_states[] = {
+	{"normal", ""},
+	{"hover", ":hover"},
+	{"active", ":active"},
+	{"backdrop-normal", ":backdrop"},
+	{"backdrop-hover", ":backdrop:hover"},
+	{"backdrop-active", ":backdrop:active"},
+};
+
+#ifdef HAVE_LIBRSVG
+static gboolean render_png(const char *svg, const char *png, int size)
+{
+	GError *error = NULL;
+	RsvgHandle *handle = rsvg_handle_new_from_file(svg, &error);
+	if (!handle) {
+		g_clear_error(&error);
+		return FALSE;
+	}
+	cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size, size);
+	cairo_t *cr = cairo_create(surface);
+	RsvgRectangle viewport = {0, 0, size, size};
+	gboolean ok = rsvg_handle_render_document(handle, cr, &viewport, &error);
+	cairo_destroy(cr);
+	ok = ok && cairo_surface_write_to_png(surface, png) == CAIRO_STATUS_SUCCESS;
+	cairo_surface_destroy(surface);
+	g_object_unref(handle);
+	g_clear_error(&error);
+	return ok;
+}
+
+/* removes the pictures of earlier decorations */
+static void remove_other_dirs(const char *parent, const char *keep)
+{
+	GDir *dir = g_dir_open(parent, 0, NULL);
+	if (!dir)
+		return;
+	const char *name;
+	while ((name = g_dir_read_name(dir))) {
+		if (!strcmp(name, keep))
+			continue;
+		char *path = g_build_filename(parent, name, NULL);
+		GDir *sub = g_dir_open(path, 0, NULL);
+		if (sub) {
+			const char *file;
+			while ((file = g_dir_read_name(sub))) {
+				char *file_path = g_build_filename(path, file, NULL);
+				g_unlink(file_path);
+				g_free(file_path);
+			}
+			g_dir_close(sub);
+		}
+		g_rmdir(path);
+		g_free(path);
+	}
+	g_dir_close(dir);
+}
+
+/* the newest time and the total size of the SVG files, NULL if one is missing */
+static char *assets_stamp(const char *assets)
+{
+	gint64 newest = 0, size = 0;
+	for (int i = 0; i < G_N_ELEMENTS(button_names); i++) {
+		for (int j = 0; j < G_N_ELEMENTS(button_states); j++) {
+			char *svg_name = g_strdup_printf("%s-%s.svg", button_names[i], button_states[j].file);
+			char *svg = g_build_filename(assets, svg_name, NULL);
+			GStatBuf st;
+			gboolean found = g_stat(svg, &st) == 0;
+			g_free(svg);
+			g_free(svg_name);
+			if (!found)
+				return NULL;
+			newest = MAX(newest, (gint64)st.st_mtime);
+			size += st.st_size;
+		}
+	}
+	return g_strdup_printf("%" G_GINT64_FORMAT "-%" G_GINT64_FORMAT, newest, size);
+}
+
+/* the PNG files of KDE's buttons in a directory named after the SVG files' time and size (KDE writes them anew
+ * for another decoration or color scheme); NULL if there are none */
+static char *window_button_pictures(void)
+{
+	char *assets = g_build_filename(config_dir, "gtk-3.0", "assets", NULL);
+	char *stamp = assets_stamp(assets);
+	if (!stamp) {
+		g_free(assets);
+		return NULL;
+	}
+	char *parent = g_build_filename(g_get_user_cache_dir(), "atl", "window-buttons", NULL);
+	char *dir = g_build_filename(parent, stamp, NULL);
+	char *done = g_build_filename(dir, "complete", NULL);
+	gboolean ok = g_file_test(done, G_FILE_TEST_EXISTS);
+	if (!ok && g_mkdir_with_parents(dir, 0700) == 0) {
+		ok = TRUE;
+		for (int i = 0; ok && i < G_N_ELEMENTS(button_names); i++) {
+			for (int j = 0; ok && j < G_N_ELEMENTS(button_states); j++) {
+				char *svg_name = g_strdup_printf("%s-%s.svg", button_names[i], button_states[j].file);
+				char *svg = g_build_filename(assets, svg_name, NULL);
+				for (int scale = 1; ok && scale <= 2; scale++) {
+					char *png_name = g_strdup_printf("%s-%s@%d.png", button_names[i], button_states[j].file, scale);
+					char *png = g_build_filename(dir, png_name, NULL);
+					ok = render_png(svg, png, BUTTON_SIZE * scale);
+					g_free(png);
+					g_free(png_name);
+				}
+				g_free(svg);
+				g_free(svg_name);
+			}
+		}
+		if (ok)
+			ok = g_file_set_contents(done, "", 0, NULL);
+	}
+	if (ok)
+		remove_other_dirs(parent, stamp);
+	g_free(done);
+	g_free(stamp);
+	g_free(parent);
+	g_free(assets);
+	if (!ok) {
+		g_free(dir);
+		return NULL;
+	}
+	return dir;
+}
+#else
+static char *window_button_pictures(void)
+{
+	return NULL;
+}
+#endif
+
+static void append_picture(GString *css, const char *dir, const char *name, const char *state)
+{
+	g_string_append(css, "background-image: -gtk-scaled(");
+	for (int scale = 1; scale <= 2; scale++) {
+		char *png_name = g_strdup_printf("%s-%s@%d.png", name, state, scale);
+		char *png = g_build_filename(dir, png_name, NULL);
+		char *uri = g_filename_to_uri(png, NULL, NULL);
+		g_string_append_printf(css, "%surl(\"%s\")", scale > 1 ? ", " : "", uri);
+		g_free(uri);
+		g_free(png);
+		g_free(png_name);
+	}
+	g_string_append(css, "); }\n");
+}
+
+static void load_window_buttons(void)
+{
+	char *dir = window_button_pictures();
+	if (!dir) {
+		gtk_css_provider_load_from_string(buttons_provider, "");
+		return;
+	}
+	GString *css = g_string_new("");
+	g_string_append_printf(css,
+	                       "headerbar.titlebar { min-height: %dpx; padding-top: 0; padding-bottom: 0; }\n"
+	                       "headerbar.titlebar button.atl-back { min-height: 26px; min-width: 26px; padding: 0 2px; margin-top: 0; margin-bottom: 0; }\n"
+	                       "headerbar.titlebar windowcontrols > button.close, headerbar.titlebar windowcontrols > button.maximize,"
+	                       " headerbar.titlebar windowcontrols > button.minimize {"
+	                       " min-width: %dpx; min-height: %dpx; padding: 0; margin: 0 3px; border: none; border-radius: 0;"
+	                       " box-shadow: none; outline: none; background-color: transparent; background-repeat: no-repeat;"
+	                       " background-position: center; background-size: %dpx %dpx; -gtk-icon-source: none; }\n"
+	                       "headerbar.titlebar windowcontrols > button > image { opacity: 0; }\n",
+	                       TITLEBAR_HEIGHT, BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE);
+	for (int i = 0; i < G_N_ELEMENTS(button_names); i++) {
+		gboolean maximized = !strcmp(button_names[i], "maximized");
+		for (int j = 0; j < G_N_ELEMENTS(button_states); j++) {
+			g_string_append_printf(css, "%sheaderbar.titlebar windowcontrols > button.%s%s { ", maximized ? "window.maximized " : "",
+			                       maximized ? "maximize" : button_names[i], button_states[j].pseudo);
+			append_picture(css, dir, button_names[i], button_states[j].file);
+		}
+	}
+	gtk_css_provider_load_from_string(buttons_provider, css->str);
+	g_string_free(css, TRUE);
+	g_free(dir);
+}
+
 static void apply(void)
 {
 	char *font_name = apply_settings();
 	load_css(font_name);
 	g_free(font_name);
+	load_window_buttons();
 }
 
 static gboolean reload(gpointer user_data)
@@ -171,11 +368,14 @@ void system_theme_init(const char *dir)
 	config_dir = g_strdup(dir);
 	user_provider = gtk_css_provider_new();
 	titlebar_provider = gtk_css_provider_new();
+	buttons_provider = gtk_css_provider_new();
 	GdkDisplay *display = gdk_display_get_default();
 	gtk_style_context_add_provider_for_display(display, GTK_STYLE_PROVIDER(user_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
 	gtk_style_context_add_provider_for_display(display, GTK_STYLE_PROVIDER(titlebar_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
+	gtk_style_context_add_provider_for_display(display, GTK_STYLE_PROVIDER(buttons_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
 	monitors = g_ptr_array_new_with_free_func(g_object_unref);
 	watch("gtk-4.0");
 	watch("gtk-3.0");
+	watch("gtk-3.0/assets");
 	apply();
 }

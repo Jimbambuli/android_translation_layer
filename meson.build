@@ -269,6 +269,9 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
 # atl.gresources.xml
 resources = gnome.compile_resources('com.gitlab.android_translation_layer.android_translation_layer', files('src/main-executable/atl.gresource.xml'))
 
+# librsvg draws the window buttons of the desktop (KDE) for ATL's title bar, see system_theme.c
+librsvg_dep = dependency('librsvg-2.0', version: '>=2.46', required: false)
+
 executable('android-translation-layer', [
                                         	'src/main-executable/main.c',
                                         	'src/main-executable/actions.c',
@@ -283,7 +286,8 @@ executable('android-translation-layer', [
                                         install: true,
                                         pie: true,
                                         dependencies: [
-                                        	dependency('gtk4'), dependency('jni'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'), dependency('pangoft2'), upcalls_header
+                                        	dependency('gtk4'), dependency('jni'), declare_dependency(link_with: libtranslationlayer_so), libart_dep, dependency('dl'), libdl_bio_dep, libc_bio_dep, dependency('libportal'), dependency('fontconfig'), dependency('pangoft2'), upcalls_header,
+                                        	librsvg_dep
                                         ],
                                         link_args: [
                                         	'-rdynamic'
@@ -291,5 +295,6 @@ executable('android-translation-layer', [
                                         install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
                                                        get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives',
                                         c_args: [
-						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"'
+						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"',
+						librsvg_dep.found() ? '-DHAVE_LIBRSVG' : '-UHAVE_LIBRSVG'
                                         ])

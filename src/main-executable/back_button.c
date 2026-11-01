@@ -6,7 +6,9 @@ GtkWidget *back_button;
 
 GtkWidget *back_button_new()
 {
-	back_button = gtk_button_new_from_icon_name("go-previous");
+	/* symbolic: drawn in the title bar's text color, so it shows also on a dark title bar */
+	back_button = gtk_button_new_from_icon_name("go-previous-symbolic");
+	gtk_widget_add_css_class(back_button, "atl-back");
 
 	g_signal_connect(back_button, "clicked", G_CALLBACK(current_activity_back_pressed), NULL);
 
