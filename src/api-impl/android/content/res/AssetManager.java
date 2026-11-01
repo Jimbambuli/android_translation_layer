@@ -636,7 +636,7 @@ public final class AssetManager {
 		String[] apk_paths = apk_resource_path.split(":");
 		if (path.endsWith("/")) { // directory
 			for (String apk_path : apk_paths) {
-				try (JarFile apk = new JarFile(apk_path)) {
+				try (JarFile apk = new JarFile(apk_path, false)) {
 					Enumeration<JarEntry> entries = apk.entries();
 					while (entries.hasMoreElements()) {
 						JarEntry entry = entries.nextElement();
@@ -651,7 +651,7 @@ public final class AssetManager {
 			for (String apk_path : apk_paths) {
 				File apk_file = new File(apk_path);
 				if (!Files.exists(file) || Files.getLastModifiedTime(file).toMillis() < Files.getLastModifiedTime(apk_file.toPath()).toMillis()) {
-					try (JarFile apk = new JarFile(apk_file)) {
+					try (JarFile apk = new JarFile(apk_file, false)) {
 						ZipEntry entry = apk.getEntry(path);
 						if (entry == null)
 							continue;
