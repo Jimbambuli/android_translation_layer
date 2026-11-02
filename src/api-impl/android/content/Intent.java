@@ -21,6 +21,7 @@ import org.xmlpull.v1.XmlPullParser;
 public class Intent implements Parcelable {
 	public static final int FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
 	public static final int FLAG_GRANT_PERSISTABLE_URI_PERMISSION = 0x00000040;
+	public static final int FLAG_ACTIVITY_CLEAR_TASK = 0x00008000;
 	public static final int FLAG_ACTIVITY_CLEAR_TOP = 1 << 26;
 	public static final int FLAG_ACTIVITY_NEW_TASK = 1 << 28;
 

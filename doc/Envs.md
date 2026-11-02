@@ -27,6 +27,11 @@ The following environment variables are recognized by the main executable:
 
 ---
 
+`ATL_NAVIGATION_TOOLTIPS=` - the tooltips of the navigation bar's ◁ ○ □ as three lines (e.g. in the desktop's
+                            language); missing or empty lines stay English
+
+---
+
 `ATL_APP_ICON=FILE` - a picture of the app's icon (e.g. PNG from the launcher) for the icon in ATL's title bar, for
                      APKs whose icon ATL cannot load itself (adaptive icons)
 

@@ -81,6 +81,22 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity
 
 /*
  * Class:     android_app_Activity
+ * Method:    nativeClearTaskMark
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeClearTaskMark
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeClearTaskFinish
+ * Signature: (Z)V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeClearTaskFinish
+  (JNIEnv *, jclass, jboolean);
+
+/*
+ * Class:     android_app_Activity
  * Method:    nativeOpenURI
  * Signature: (Ljava/lang/String;)V
  */

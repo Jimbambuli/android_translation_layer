@@ -9,6 +9,7 @@ import android.atl.ATLLoadedApp;
 import android.atl.ATLLoadedAppManager;
 import android.bluetooth.BluetoothManager;
 import android.content.*;
+import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageParser;
 import android.content.res.Configuration;
@@ -330,14 +331,29 @@ public final class ContextImpl extends Context {
 		}
 		final String className_ = className;
 		final Intent intent_ = intent;
+		/* like AOSP (ActivityStarter), the launch modes singleTask and singleInstance reuse the activity's instance
+		 * in the back stack as FLAG_ACTIVITY_CLEAR_TOP does: the ones above it finish and it gets onNewIntent() */
+		int launchMode = ActivityInfo.LAUNCH_MULTIPLE;
+		for (PackageParser.Activity activity : this.atl_loaded_app.pkg.activities) {
+			if (activity.className.equals(className))
+				launchMode = activity.info.launchMode;
+		}
+		/* FLAG_ACTIVITY_NEW_TASK with FLAG_ACTIVITY_CLEAR_TASK: the app's one task is cleared, the activity starts
+		 * anew as its root; the ones that were there finish after the start and what it started itself
+		 * (Activity.nativeClearTaskMark()) */
+		final boolean clear_task = (intent.getFlags() & (Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK))
+		    == (Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+		final boolean reuse = !clear_task && ((intent.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0
+		    || launchMode == ActivityInfo.LAUNCH_SINGLE_TASK || launchMode == ActivityInfo.LAUNCH_SINGLE_INSTANCE);
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
 				try {
-					if ((intent_.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0 && intent_.getComponent() != null) {
+					if (clear_task)
+						Activity.nativeClearTaskMark();
+					if (reuse) {
 						boolean found = Activity.nativeResumeActivity(
-						    ContextImpl.this.atl_loaded_app.loadClass(intent_.getComponent().getClassName())
-							.asSubclass(Activity.class),
+						    ContextImpl.this.atl_loaded_app.loadClass(className_).asSubclass(Activity.class),
 						    intent_);
 						if (found)
 							return;
@@ -347,8 +363,18 @@ public final class ContextImpl extends Context {
 					Activity activity = Activity.internalCreateActivity(
 					    className_, ContextImpl.this.atl_loaded_app.getNativeWindow(), intent_);
 					Activity.nativeStartActivity(activity);
+					if (clear_task) {
+						new Handler(Looper.getMainLooper()).post(new Runnable() {
+							@Override
+							public void run() {
+								Activity.nativeClearTaskFinish(true);
+							}
+						});
+					}
 				} catch (Exception e) {
 					e.printStackTrace();
+					if (clear_task)
+						Activity.nativeClearTaskFinish(false); // nothing started: the task stays
 					Activity.nativeResumeCurrentActivity();
 				}
 			}
