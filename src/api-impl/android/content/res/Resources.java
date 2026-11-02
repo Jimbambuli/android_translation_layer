@@ -2112,6 +2112,65 @@ public class Resources {
 		return mAssets;
 	}
 
+	/* ATL: the colors of all loaders apply to every Resources (AssetManager.setLoaderColors), the
+	 * resources tables of the providers are only read for their plain color values */
+	private static final java.util.ArrayList<android.content.res.loader.ResourcesLoader> sLoaders = new java.util.ArrayList<>();
+	private final java.util.ArrayList<android.content.res.loader.ResourcesLoader> mLoaders = new java.util.ArrayList<>();
+
+	public java.util.List<android.content.res.loader.ResourcesLoader> getLoaders() {
+		synchronized (sLoaders) {
+			return new java.util.ArrayList<>(mLoaders);
+		}
+	}
+
+	public void addLoaders(android.content.res.loader.ResourcesLoader... loaders) {
+		synchronized (sLoaders) {
+			for (android.content.res.loader.ResourcesLoader loader : loaders) {
+				if (!mLoaders.contains(loader)) {
+					mLoaders.add(loader);
+					sLoaders.add(loader);
+				}
+			}
+		}
+		atl_loadersChanged();
+	}
+
+	public void removeLoaders(android.content.res.loader.ResourcesLoader... loaders) {
+		synchronized (sLoaders) {
+			for (android.content.res.loader.ResourcesLoader loader : loaders)
+				if (mLoaders.remove(loader))
+					sLoaders.remove(loader);
+		}
+		atl_loadersChanged();
+	}
+
+	public void clearLoaders() {
+		synchronized (sLoaders) {
+			for (android.content.res.loader.ResourcesLoader loader : mLoaders)
+				sLoaders.remove(loader);
+			mLoaders.clear();
+		}
+		atl_loadersChanged();
+	}
+
+	/** @hide */
+	public static void atl_loadersChanged() {
+		Map<Integer, Integer> colors = new java.util.LinkedHashMap<>();
+		synchronized (sLoaders) {
+			for (android.content.res.loader.ResourcesLoader loader : sLoaders)
+				for (android.content.res.loader.ResourcesProvider provider : loader.getProviders())
+					colors.putAll(provider.atl_getColors()); // a later provider wins, as in AOSP
+		}
+		int[] ids = new int[colors.size()];
+		int[] values = new int[colors.size()];
+		int i = 0;
+		for (Map.Entry<Integer, Integer> e : colors.entrySet()) {
+			ids[i] = e.getKey();
+			values[i++] = e.getValue();
+		}
+		AssetManager.setLoaderColors(ids.length > 0 ? ids : null, ids.length > 0 ? values : null);
+	}
+
 	/**
 	 * Call this to remove all cached loaded layout resources from the
 	 * Resources object.  Only intended for use with performance testing
