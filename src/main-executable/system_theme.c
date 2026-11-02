@@ -22,7 +22,6 @@
 
 #include <glib/gstdio.h>
 #include <gtk/gtk.h>
-#include <math.h>
 #include <pango/pangocairo.h>
 #include <stdlib.h>
 #include <string.h>
@@ -224,15 +223,14 @@ static gboolean kwin_title_bar(int *height, int *button)
 	PangoRectangle ink;
 	pango_layout_get_extents(layout, &ink, NULL);
 	PangoFontMetrics *metrics = pango_context_get_metrics(context, font, NULL);
-	int font_height = (int)round((double)pango_font_metrics_get_ascent(metrics) / PANGO_SCALE) +
-	                  (int)round((double)pango_font_metrics_get_descent(metrics) / PANGO_SCALE);
+	int font_height = PANGO_PIXELS(pango_font_metrics_get_ascent(metrics)) + PANGO_PIXELS(pango_font_metrics_get_descent(metrics));
 	pango_font_metrics_unref(metrics);
 	g_object_unref(layout);
 	g_object_unref(context);
 	g_object_unref(font_map);
 	pango_font_description_free(font);
 
-	int grid_unit = (int)ceil((double)ink.height / PANGO_SCALE);
+	int grid_unit = PANGO_PIXELS_CEIL(ink.height);
 	if (grid_unit % 2)
 		grid_unit++;
 	int small_spacing = MAX(2, grid_unit / 4);
