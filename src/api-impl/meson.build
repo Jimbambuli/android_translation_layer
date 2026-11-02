@@ -881,6 +881,7 @@ srcs = [
 	'android/widget/RatingBar.java',
 	'android/widget/RelativeLayout.java',
 	'android/widget/RemoteViews.java',
+	'android/widget/RemoteViewsService.java',
 	'android/widget/Scroller.java',
 	'android/widget/ScrollView.java',
 	'android/widget/SectionIndexer.java',
