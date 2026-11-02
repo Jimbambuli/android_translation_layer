@@ -60,6 +60,15 @@ static GskRenderNode *patch_node(GskRenderNode *node, GskRenderNode *old_child, 
 			gsk_render_node_unref(child);
 			break;
 		}
+		case GSK_OPACITY_NODE: {
+			GskRenderNode *child = patch_node(gsk_opacity_node_get_child(node), old_child, new_child);
+			if (child != gsk_opacity_node_get_child(node))
+				new_node = gsk_opacity_node_new(child, gsk_opacity_node_get_opacity(node));
+			else
+				new_node = gsk_render_node_ref(node);
+			gsk_render_node_unref(child);
+			break;
+		}
 		default:
 			new_node = gsk_render_node_ref(node);
 	}
@@ -90,6 +99,32 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeTransform(JNIEnv *env
 		transformed_node = gsk_render_node_ref(node);
 	}
 	return _INTPTR(transformed_node);
+}
+
+/* android.graphics.RenderNode: like hwui, clip in the node's own coordinates, then apply the
+ * alpha and the transforms (position and translation, scale and rotation around the pivot) */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties(JNIEnv *env, jobject this, jlong node_ptr, jfloat width, jfloat height, jboolean clip_to_bounds, jboolean clip_to_rect, jfloat clip_left, jfloat clip_top, jfloat clip_right, jfloat clip_bottom, jfloat scale_x, jfloat scale_y, jfloat translate_x, jfloat translate_y, jfloat rotate, jfloat pivot_x, jfloat pivot_y, jfloat alpha)
+{
+	GskRenderNode *node = gsk_render_node_ref(_PTR(node_ptr));
+	GskRenderNode *new_node;
+	if (clip_to_bounds) {
+		new_node = gsk_clip_node_new(node, &GRAPHENE_RECT_INIT(0, 0, width, height));
+		gsk_render_node_unref(node);
+		node = new_node;
+	}
+	if (clip_to_rect) {
+		new_node = gsk_clip_node_new(node, &GRAPHENE_RECT_INIT(clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top));
+		gsk_render_node_unref(node);
+		node = new_node;
+	}
+	if (alpha < 1.f) {
+		new_node = gsk_opacity_node_new(node, MAX(alpha, 0.f));
+		gsk_render_node_unref(node);
+		node = new_node;
+	}
+	new_node = _PTR(Java_android_view_RenderNode_nativeTransform(env, this, _INTPTR(node), scale_x, scale_y, translate_x, translate_y, rotate, pivot_x, pivot_y));
+	gsk_render_node_unref(node);
+	return _INTPTR(new_node);
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeClip(JNIEnv *env, jobject this, jlong node_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom)

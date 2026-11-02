@@ -1,5 +1,6 @@
 package android.view;
 
+import android.content.res.Resources;
 import android.graphics.Rect;
 import android.os.SystemClock;
 import android.util.Slog;
@@ -65,6 +66,20 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 
 	public android.view.Display getDefaultDisplay() {
 		return new android.view.Display();
+	}
+
+	/* the window has the size of the display (see Display) and, as a desktop window, no system
+	 * bars, cutout or rounded corners, so its insets are empty */
+	@Override
+	public WindowMetrics getCurrentWindowMetrics() {
+		return new WindowMetrics(new Rect(0, 0, Display.window_width, Display.window_height),
+		                         new WindowInsets.Builder().build(),
+		                         Resources.getSystem().getDisplayMetrics().density);
+	}
+
+	@Override
+	public WindowMetrics getMaximumWindowMetrics() {
+		return getCurrentWindowMetrics();
 	}
 
 	@Override

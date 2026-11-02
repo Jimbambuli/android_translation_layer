@@ -1,10 +1,15 @@
 package android.app.job;
 
+import android.content.ClipData;
 import android.content.ComponentName;
+import android.net.NetworkRequest;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.PersistableBundle;
 
 public class JobInfo {
+	public static final int NETWORK_TYPE_NONE = 0;
+	public static final int NETWORK_TYPE_ANY = 1;
 
 	private ComponentName service;
 	long initialBackoffMillis;
@@ -14,6 +19,7 @@ public class JobInfo {
 	private int id;
 	boolean running;
 	long minLatencyMillis;
+	int networkType = NETWORK_TYPE_NONE;
 
 	public JobInfo() {}
 
@@ -23,6 +29,10 @@ public class JobInfo {
 
 	public PersistableBundle getExtras() {
 		return extras;
+	}
+
+	public int getNetworkType() {
+		return networkType;
 	}
 
 	public int getId() {
@@ -84,6 +94,7 @@ public class JobInfo {
 		}
 
 		public Builder setRequiredNetworkType(int networkType) {
+			jobInfo.networkType = networkType;
 			return this;
 		}
 
@@ -104,6 +115,55 @@ public class JobInfo {
 		}
 
 		public Builder addTriggerContentUri(TriggerContentUri triggerContentUri) {
+			return this;
+		}
+
+		public Builder setTriggerContentUpdateDelay(long durationMs) {
+			return this;
+		}
+
+		public Builder setTriggerContentMaxDelay(long durationMs) {
+			return this;
+		}
+
+		public Builder setTransientExtras(Bundle extras) {
+			return this;
+		}
+
+		public Builder setClipData(ClipData clip, int grantFlags) {
+			return this;
+		}
+
+		public Builder setRequiredNetwork(NetworkRequest networkRequest) {
+			jobInfo.networkType = networkRequest != null ? NETWORK_TYPE_ANY : NETWORK_TYPE_NONE;
+			return this;
+		}
+
+		public Builder setEstimatedNetworkBytes(long downloadBytes, long uploadBytes) {
+			return this;
+		}
+
+		public Builder setMinimumNetworkChunkBytes(long chunkSizeBytes) {
+			return this;
+		}
+
+		public Builder setImportantWhileForeground(boolean importantWhileForeground) {
+			return this;
+		}
+
+		public Builder setPrefetch(boolean prefetch) {
+			return this;
+		}
+
+		public Builder setExpedited(boolean expedited) {
+			return this;
+		}
+
+		public Builder setUserInitiated(boolean userInitiated) {
+			return this;
+		}
+
+		public Builder setPriority(int priority) {
 			return this;
 		}
 

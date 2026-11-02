@@ -68,6 +68,8 @@ public final class ContextImpl extends Context {
 	final int[] mServiceInitializationStateArray = new int[mServiceCache.length];
 
 	private final int atl_flags;
+	/* like AOSP's mContextType: activity contexts (and their configuration contexts) are UI contexts */
+	private boolean mIsUiContext;
 
 	public ContextImpl(Resources resources, ATLLoadedApp loadedApp, Resources.Theme theme) {
 		this(resources, loadedApp, 0, 0);
@@ -88,6 +90,13 @@ public final class ContextImpl extends Context {
 		this.atl_loaded_app = loadedApp;
 		mThemeResource = themeResource;
 		this.atl_flags = flags;
+	}
+
+	/* like AOSP's ContextImpl.createActivityContext(): the base context of an activity, a UI context */
+	public static ContextImpl createActivityContext(Resources resources, ATLLoadedApp loadedApp, int themeResource) {
+		ContextImpl context = new ContextImpl(resources, loadedApp, themeResource);
+		context.mIsUiContext = true;
+		return context;
 	}
 
 	@Nullable
@@ -376,12 +385,19 @@ public final class ContextImpl extends Context {
 		if (overrideConfiguration == null) {
 			throw new IllegalArgumentException("overrideConfiguration must not be null");
 		}
-		return this.atl_loaded_app.createContext(null, overrideConfiguration, getTheme());
+		ContextImpl context = this.atl_loaded_app.createContext(null, overrideConfiguration, getTheme());
+		context.mIsUiContext = mIsUiContext;
+		return context;
 	}
 
 	@Override
 	public Context createDisplayContext(Display display) {
 		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
+	}
+
+	@Override
+	public boolean isUiContext() {
+		return mIsUiContext;
 	}
 
 	@Override

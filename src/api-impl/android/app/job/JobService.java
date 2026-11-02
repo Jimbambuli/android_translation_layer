@@ -25,7 +25,7 @@ public abstract class JobService extends Service {
 				}
 			}, needsReschedule ? params.jobInfo.initialBackoffMillis : params.jobInfo.periodicMillis);
 		} else {
-			JobScheduler.pendingJobs.remove(params.jobInfo.getId());
+			JobScheduler.pendingJobs(params.namespace).remove(params.jobInfo.getId());
 		}
 	}
 }

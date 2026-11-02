@@ -46,6 +46,11 @@ public class RenderNode {
 	private native void nativeUnref(long node);
 	private native long nativeAddStubNode(long snapshot);
 	private native long nativeCreateEmpyNode();
+	/* the clip, transforms and alpha of android.graphics.RenderNode; returns a new node */
+	protected native long nativeApplyProperties(long node, float width, float height, boolean clipToBounds,
+	                                            boolean clipToRect, float clipLeft, float clipTop, float clipRight, float clipBottom,
+	                                            float scaleX, float scaleY, float translationX, float translationY,
+	                                            float rotation, float pivotX, float pivotY, float alpha);
 
 	public static RenderNode create(String name, View view) {
 		return new RenderNode();
@@ -293,7 +298,7 @@ public class RenderNode {
 			nativeUnref(transformed_node);
 			/* hwui RenderNode::applyViewPropertyTransforms(): the stretch applies inside the property transforms */
 			long node = (stretchX != 0 || stretchY != 0) ? nativeStretch(render_node, width, height, stretchX, stretchY) : render_node;
-			transformed_node = nativeTransform(node, scaleX, scaleY, translationX, translationY, rotation, pivotX, pivotY);
+			transformed_node = applyProperties(node);
 			if (node != render_node)
 				nativeUnref(node);
 			if (clipToOutline) {
@@ -305,19 +310,44 @@ public class RenderNode {
 		return transformed_node;
 	}
 
-	public DisplayListCanvas start(int width, int height) {
+	/* the node with the property transforms applied (a new node); android.graphics.RenderNode
+	 * also applies its position, clip and alpha */
+	protected long applyProperties(long node) {
+		return nativeTransform(node, scaleX, scaleY, translationX, translationY, rotation, pivotX, pivotY);
+	}
+
+	/* the properties changed, the node has to be transformed again */
+	protected void invalidateGskNode() {
+		nativeUnref(transformed_node);
+		transformed_node = 0;
+	}
+
+	protected void prepareRecording(int width, int height) {
 		this.width = width;
 		this.height = height;
 		children.clear();
 		children_nodes.clear();
+	}
+
+	protected long createRecordingSnapshot() {
+		return nativeCreateSnapshot();
+	}
+
+	/* a render node drawn into the recording canvas of this one */
+	protected void recordChild(long snapshot, RenderNode node) {
+		/* gtk_snapshot_append_node() may unpack container nodes since GTK 4.22 https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/9488
+		 * We prevent this using stub nodes, because we need the container nodes as handles in nativePatchNode() */
+		long stub_node = nativeAddStubNode(snapshot);
+		children.add(node);
+		children_nodes.add(stub_node);
+	}
+
+	public DisplayListCanvas start(int width, int height) {
+		prepareRecording(width, height);
 		return new GskCanvas(nativeCreateSnapshot()) {
 			@Override
 			public void drawRenderNode(RenderNode node) {
-				/* gtk_snapshot_append_node() may unpack container nodes since GTK 4.22 https://gitlab.gnome.org/GNOME/gtk/-/merge_requests/9488
-				 * We prevent this using stub nodes, because we need the container nodes as handles in nativePatchNode() */
-				long stub_node = nativeAddStubNode(snapshot);
-				children.add(node);
-				children_nodes.add(stub_node);
+				recordChild(snapshot, node);
 			}
 		};
 	}

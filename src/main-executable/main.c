@@ -702,8 +702,18 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	// construct Application
 	application_object = J__Context__createApplication(env, _INTPTR(window));
 	if ((*env)->ExceptionCheck(env)) {
+		/* like ActivityThread.handleBindApplication(): an app whose Application can't be created
+		 * (constructor or attachBaseContext() threw) dies with that exception. Going on with a
+		 * null Application made CheckJNI abort the runtime at Application.onCreate(). */
+		fprintf(stderr, "FATAL EXCEPTION: main\n");
 		(*env)->ExceptionDescribe(env);
+		jthrowable exception = (*env)->ExceptionOccurred(env);
 		(*env)->ExceptionClear(env);
+		jclass thread_class = (*env)->FindClass(env, "java/lang/Thread");
+		jobject thread = (*env)->CallStaticObjectMethod(env, thread_class, _STATIC_METHOD(thread_class, "currentThread", "()Ljava/lang/Thread;"));
+		(*env)->CallVoidMethod(env, thread, _METHOD(thread_class, "dispatchUncaughtException", "(Ljava/lang/Throwable;)V"), exception);
+		fflush(NULL);
+		_exit(10);
 	}
 
 	J__ContentProvider__createContentProviders(env);

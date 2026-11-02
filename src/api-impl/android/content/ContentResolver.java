@@ -196,6 +196,42 @@ public class ContentResolver {
 		return false;
 	}
 
+	public static final int SYNC_OBSERVER_TYPE_SETTINGS = 1 << 0;
+	public static final int SYNC_OBSERVER_TYPE_PENDING = 1 << 1;
+	public static final int SYNC_OBSERVER_TYPE_ACTIVE = 1 << 2;
+
+	/**
+	 * Request notifications when the different aspects of the SyncManager change. The
+	 * different items that can be requested are:
+	 * <ul>
+	 * <li> {@link #SYNC_OBSERVER_TYPE_PENDING}
+	 * <li> {@link #SYNC_OBSERVER_TYPE_ACTIVE}
+	 * <li> {@link #SYNC_OBSERVER_TYPE_SETTINGS}
+	 * </ul>
+	 * The caller can set one or more of the status types in the mask for any
+	 * given listener registration.
+	 * @param mask the status change types that will cause the callback to be invoked
+	 * @param callback observer to be invoked when the status changes
+	 * @return a handle that can be used to remove the listener at a later time
+	 */
+	public static Object addStatusChangeListener(int mask, final SyncStatusObserver callback) {
+		if (callback == null) {
+			throw new IllegalArgumentException("you passed in a null callback");
+		}
+		/* there is no SyncManager, so the sync status never changes */
+		return new Object();
+	}
+
+	/**
+	 * Remove a previously registered status change listener.
+	 * @param handle the handle that was returned by {@link #addStatusChangeListener}
+	 */
+	public static void removeStatusChangeListener(Object handle) {
+		if (handle == null) {
+			throw new IllegalArgumentException("you passed in a null handle");
+		}
+	}
+
 	private static native void native_query_file_info(String path, String[] attributes, Object[] result);
 
 	/* AOSP ContentResolver.OpenResourceIdResult and getResourceId() (@hide): a resource identified by the {@link Resources} that contains it, and a resource id.

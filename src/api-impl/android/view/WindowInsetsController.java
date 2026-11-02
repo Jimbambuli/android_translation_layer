@@ -12,4 +12,30 @@ public interface WindowInsetsController {
 	int getSystemBarsBehavior();
 	void show(@InsetsType int types);
 	void hide(@InsetsType int types);
+
+	/**
+	 * Adds a {@link OnControllableInsetsChangedListener} to the window insets controller.
+	 */
+	void addOnControllableInsetsChangedListener(OnControllableInsetsChangedListener listener);
+
+	/**
+	 * Removes a {@link OnControllableInsetsChangedListener} from the window insets controller.
+	 */
+	void removeOnControllableInsetsChangedListener(OnControllableInsetsChangedListener listener);
+
+	/**
+	 * Listener to be notified when the set of controllable {@link WindowInsets.Type} controlled by
+	 * a {@link WindowInsetsController} changes.
+	 */
+	interface OnControllableInsetsChangedListener {
+		/**
+		 * Called when the set of controllable {@link WindowInsets.Type} changes.
+		 *
+		 * @param controller The controller for which the set of controllable
+		 *                   {@link WindowInsets.Type}s are changing.
+		 * @param typeMask   Bitwise type-mask of the {@link WindowInsets.Type}s the controller is
+		 *                   currently able to control.
+		 */
+		void onControllableInsetsChanged(WindowInsetsController controller, @InsetsType int typeMask);
+	}
 }

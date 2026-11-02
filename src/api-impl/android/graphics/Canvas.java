@@ -727,6 +727,17 @@ public class Canvas {
 	/* there are no render nodes to reorder by elevation, so Z reordering has no effect */
 	public void enableZ() {}
 
+	/**
+	 * Draws the given RenderNode. This is only supported in hardware rendering, which is
+	 * {@link #isHardwareAccelerated()} returning true; otherwise an IllegalArgumentException
+	 * will be thrown.
+	 *
+	 * @param renderNode The RenderNode to draw.
+	 */
+	public void drawRenderNode(RenderNode renderNode) {
+		throw new IllegalArgumentException("Software rendering doesn't support drawRenderNode");
+	}
+
 	public void disableZ() {}
 
 	public void drawColor(long color) {

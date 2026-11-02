@@ -13,6 +13,16 @@ public interface WindowManager {
 
 	public void removeViewImmediate(View view);
 
+	/**
+	 * Returns the {@link WindowMetrics} according to the current system state.
+	 */
+	public WindowMetrics getCurrentWindowMetrics();
+
+	/**
+	 * Returns the largest {@link WindowMetrics} an app may expect in the current system state.
+	 */
+	public WindowMetrics getMaximumWindowMetrics();
+
 	public class LayoutParams extends ViewGroup.LayoutParams {
 		public static final int FLAG_KEEP_SCREEN_ON = 0;
 		public static final int FLAG_DIM_BEHIND = 2;

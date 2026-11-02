@@ -5,6 +5,12 @@ import java.util.Date;
 import java.util.Locale;
 
 public class DateUtils {
+	public static final long SECOND_IN_MILLIS = 1000;
+	public static final long MINUTE_IN_MILLIS = SECOND_IN_MILLIS * 60;
+	public static final long HOUR_IN_MILLIS = MINUTE_IN_MILLIS * 60;
+	public static final long DAY_IN_MILLIS = HOUR_IN_MILLIS * 24;
+	public static final long WEEK_IN_MILLIS = DAY_IN_MILLIS * 7;
+	public static final long YEAR_IN_MILLIS = WEEK_IN_MILLIS * 52;
 
 	public static CharSequence getRelativeTimeSpanString(Context context, long millis, boolean withPreposition) {
 		return new Date(millis).toString();

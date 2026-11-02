@@ -599,6 +599,31 @@ public abstract class Context {
 
 	public abstract boolean isRestricted();
 
+	/**
+	 * Returns {@code true} if the context is a UI context which can access UI components such as
+	 * {@link WindowManager}, {@link android.view.LayoutInflater LayoutInflater} or
+	 * {@link android.app.WallpaperManager WallpaperManager}. Accessing UI components from non-UI
+	 * contexts throws {@link android.os.strictmode.Violation} if
+	 * {@link android.os.StrictMode.VmPolicy.Builder#detectIncorrectContextUse()} is enabled.
+	 * <p>
+	 * Examples of UI contexts are
+	 * an {@link android.app.Activity Activity}, a context created from
+	 * {@link #createWindowContext(int, Bundle)} or
+	 * {@link android.inputmethodservice.InputMethodService InputMethodService}
+	 * </p>
+	 * <p>
+	 * Note that even if it is allowed programmatically, it is not suggested to override this
+	 * method to bypass {@link android.os.strictmode.IncorrectContextUseViolation} verification.
+	 * </p>
+	 *
+	 * @see #getDisplay()
+	 * @see #getSystemService(String)
+	 * @see android.os.StrictMode.VmPolicy.Builder#detectIncorrectContextUse()
+	 */
+	public boolean isUiContext() {
+		throw new RuntimeException("Not implemented. Must override in a subclass.");
+	}
+
 	/* ContextImpl.getDatabasePath() */
 	public File getDatabasePath(String name) {
 		File dir;

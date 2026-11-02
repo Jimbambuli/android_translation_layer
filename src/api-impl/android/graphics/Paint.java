@@ -68,6 +68,17 @@ public class Paint {
 		native_set_color(paint, color);
 	}
 
+	/**
+	 * Set the paint's color with a {@code ColorLong}. The color is converted to sRGB, as ATL
+	 * draws in sRGB only.
+	 *
+	 * @throws IllegalArgumentException if the color space encoded in the {@code ColorLong}
+	 *      is invalid or unknown.
+	 */
+	public void setColor(long color) {
+		setColor(Color.toArgb(color));
+	}
+
 	public void setARGB(int a, int r, int g, int b) {
 		setColor(Color.argb(a, r, g, b));
 	}
@@ -75,6 +86,13 @@ public class Paint {
 	@Export
 	public int getColor() {
 		return native_get_color(paint);
+	}
+
+	/**
+	 * Return the paint's color as a {@code ColorLong} in sRGB.
+	 */
+	public long getColorLong() {
+		return Color.pack(getColor());
 	}
 
 	public void setAlpha(int a) {
@@ -297,6 +315,10 @@ public class Paint {
 	}
 
 	public void setShadowLayer(float radius, float dx, float dy, int color) {}
+
+	public void setShadowLayer(float radius, float dx, float dy, long shadowColor) {
+		setShadowLayer(radius, dx, dy, Color.toArgb(shadowColor));
+	}
 
 	public Xfermode setXfermode(Xfermode xfermode) {
 		this.xfermode = xfermode;
