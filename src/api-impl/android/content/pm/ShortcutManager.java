@@ -25,4 +25,40 @@ public class ShortcutManager {
 	public boolean setDynamicShortcuts(List<ShortcutInfo> shortcutInfoList) {
 		return true;
 	}
+
+	// pinning needs a launcher that accepts shortcuts, as on an AOSP device whose launcher does not
+	public boolean isRequestPinShortcutSupported() {
+		return false;
+	}
+
+	// AOSP's default (ShortcutService.DEFAULT_MAX_SHORTCUTS_PER_ACTIVITY)
+	public int getMaxShortcutCountPerActivity() {
+		return 15;
+	}
+
+	public boolean isRateLimitingActive() {
+		return false;
+	}
+
+	public boolean addDynamicShortcuts(List<ShortcutInfo> shortcutInfoList) {
+		return true;
+	}
+
+	public boolean updateShortcuts(List<ShortcutInfo> shortcutInfoList) {
+		return true;
+	}
+
+	public void removeDynamicShortcuts(List<String> shortcutIds) {
+	}
+
+	public void pushDynamicShortcut(ShortcutInfo shortcut) {
+	}
+
+	public List<ShortcutInfo> getManifestShortcuts() {
+		return Collections.emptyList();
+	}
+
+	public List<ShortcutInfo> getPinnedShortcuts() {
+		return Collections.emptyList();
+	}
 }
