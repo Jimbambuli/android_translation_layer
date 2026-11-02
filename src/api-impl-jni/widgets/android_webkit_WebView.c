@@ -376,9 +376,9 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	 * of an activity that the app leaks would stay. Each view keeps its own user content manager: the
 	 * atlbridge handler below belongs to the view. */
 	static GWeakRef related_view;
-	/* Android's WebView applies a mouse wheel step at once (one frame per notch, the size already
-	 * accelerated by the InputReader). WebKit animates each step instead, with an ease-out curve that
-	 * starts over at every further step, so a spinning wheel scrolls in lurches. The setting has to be
+	/* WebKit animates each mouse wheel step with an ease-out curve that starts over at every further
+	 * step, so a spinning wheel scrolls in lurches; the page animates the steps like Chromium instead
+	 * (wheel_script below), and WebKit's animation stays off. The setting has to be
 	 * there when the view is created: the page may set up its threaded scrolling tree right away, and
 	 * that keeps the value it saw (WebKitGTK 2.54 ThreadedScrollingTree::m_scrollAnimatorEnabled). */
 	WebKitSettings *settings = webkit_settings_new();
@@ -455,6 +455,48 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	    WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, scroll_script);
 	webkit_user_script_unref(scroll_script);
+	/* Android's WebView animates a mouse wheel step (Chromium: enable_scroll_animator is on where
+	 * gfx::Animation::ScrollAnimationsEnabledBySystem(), always on Android), and a further step changes the
+	 * target of the running animation and keeps its speed. WebKit's own animation starts over at every step
+	 * and scrolls in lurches (see above), so the page scrolls with Chromium's curve instead:
+	 * cc/animation/scroll_offset_animation_curve.cc, kEaseInOut with DurationBehavior::kInverseDelta
+	 * (EaseInOutSegmentDuration()), UpdateTarget() with EaseInOutWithInitialSlope() and
+	 * VelocityBasedDurationBound(). A step the page cancels, or none of its boxes can take, stays WebKit's. */
+	WebKitUserScript *wheel_script = webkit_user_script_new(
+	    "(function(){var E=0.01,act=new Map();"
+	    "function bez(x1,y1,x2,y2){var cx=3*x1,bx=3*(x2-x1)-cx,ax=1-cx-bx,cy=3*y1,by=3*(y2-y1)-cy,ay=1-cy-by;"
+	    "function sx(t){return((ax*t+bx)*t+cx)*t;}function dx(t){return(3*ax*t+2*bx)*t+cx;}"
+	    "function sy(t){return((ay*t+by)*t+cy)*t;}function dy(t){return(3*ay*t+2*by)*t+cy;}"
+	    "function solve(x){var t=x,i,e,d,lo=0,hi=1;for(i=0;i<8;i++){e=sx(t)-x;if(Math.abs(e)<1e-7)return t;d=dx(t);"
+	    "if(Math.abs(d)<1e-6)break;t-=e/d;}t=x;for(i=0;i<60;i++){e=sx(t);if(Math.abs(e-x)<1e-7)break;if(x>e)lo=t;else hi=t;t=(lo+hi)/2;}return t;}"
+	    "return{y:function(x){return sy(solve(x));},v:function(x){var t=solve(x),d=dx(t);return d?dy(t)/d:0;}};}"
+	    "function md(x,y){return Math.abs(x)>Math.abs(y)?x:y;}"
+	    /* EaseInOutSegmentDuration(), kInverseDelta: (14 - |delta|/60) frames of 1/60 s, between 6 and 12 */
+	    "function segdur(x,y){return Math.min(12,Math.max(6,14-Math.abs(md(x,y))/60))/60;}"
+	    "function at(a,now){var x=(now-a.t0)/1000/a.d;if(x>=1)return[a.tx,a.ty,1];var p=a.f.y(x);"
+	    "return[a.ix+(a.tx-a.ix)*p,a.iy+(a.ty-a.iy)*p,0];}"
+	    "function vel(a,now){var x=Math.min(1,(now-a.t0)/1000/a.d);return a.f.v(x)*md(a.tx-a.ix,a.ty-a.iy)/a.d;}"
+	    "function retarget(a,now,tx,ty){if(Math.abs(md(a.tx-tx,a.ty-ty))<E)return;var c=at(a,now),nx=tx-c[0],ny=ty-c[1],m=md(nx,ny);"
+	    "a.tx=tx;a.ty=ty;if(Math.abs(m)<E){a.d=0;return;}var v=vel(a,now),d=segdur(nx,ny);"
+	    "if(Math.abs(v)>=E){var b=m/v*2.5;if(b>=0)d=Math.min(d,b);}if(d<E){a.d=0;return;}"
+	    "var s=Math.max(-1000,Math.min(1000,v*d/m));a.f=bez(0.42,0.42*s,0.58,1);a.ix=c[0];a.iy=c[1];a.t0=now;a.d=d;}"
+	    "function root(){return document.scrollingElement||document.documentElement;}"
+	    "function room(el,x,y){var a=act.get(el),l=a?a.tx:el.scrollLeft,t=a?a.ty:el.scrollTop;"
+	    "return(y>0&&t<el.scrollHeight-el.clientHeight-0.5)||(y<0&&t>0.5)||(x>0&&l<el.scrollWidth-el.clientWidth-0.5)||(x<0&&l>0.5);}"
+	    "function box(n,x,y){for(var el=n&&n.nodeType===1?n:n&&n.parentElement;el&&el!==root();el=el.parentElement||(el.getRootNode().host||null)){"
+	    "var s=getComputedStyle(el);if(/(auto|scroll|overlay)/.test(s.overflowX+s.overflowY)&&room(el,x,y))return el;}"
+	    "var r=root();return r&&room(r,x,y)?r:null;}"
+	    "function step(now){act.forEach(function(a,el){var p=a.d?at(a,now):[a.tx,a.ty,1];"
+	    "el.scrollTo({left:p[0],top:p[1],behavior:'instant'});if(p[2])act.delete(el);});if(act.size)requestAnimationFrame(step);}"
+	    "addEventListener('wheel',function(e){if(e.defaultPrevented||!e.cancelable||e.ctrlKey||e.deltaMode!==0||(!e.deltaX&&!e.deltaY))return;"
+	    "var el=box(e.target,e.deltaX,e.deltaY);if(!el)return;e.preventDefault();var now=performance.now(),a=act.get(el);"
+	    "function cl(v,m){return Math.max(0,Math.min(m,v));}var mx=el.scrollWidth-el.clientWidth,my=el.scrollHeight-el.clientHeight;"
+	    "if(a){retarget(a,now,cl(a.tx+e.deltaX,mx),cl(a.ty+e.deltaY,my));return;}"
+	    "a={ix:el.scrollLeft,iy:el.scrollTop,t0:now,f:bez(0.42,0,0.58,1)};a.tx=cl(a.ix+e.deltaX,mx);a.ty=cl(a.iy+e.deltaY,my);"
+	    "a.d=segdur(a.tx-a.ix,a.ty-a.iy);act.set(el,a);if(act.size===1)requestAnimationFrame(step);},{passive:false});})();",
+	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
+	webkit_user_content_manager_add_script(content_manager, wheel_script);
+	webkit_user_script_unref(wheel_script);
 	g_signal_connect(G_OBJECT(webview), "load-changed", G_CALLBACK(web_view_load_changed), NULL);
 	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
