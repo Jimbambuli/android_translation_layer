@@ -820,6 +820,18 @@ public class Intent implements Parcelable {
 		return extras.getChar(name, def);
 	}
 
+	public byte getByteExtra(String name, byte def) {
+		return extras.getByte(name, def);
+	}
+
+	public short getShortExtra(String name, short def) {
+		return extras.getShort(name, def);
+	}
+
+	public double getDoubleExtra(String name, double def) {
+		return extras.getDouble(name, def);
+	}
+
 	public Parcelable[] getParcelableArrayExtra(String name) {
 		return extras.getParcelableArray(name);
 	}
