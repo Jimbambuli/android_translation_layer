@@ -36,8 +36,13 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 	jclass display = (*env)->FindClass(env, "android/view/Display");
 	int window_width = (*env)->GetStaticIntField(env, display, _STATIC_FIELD_ID(display, "window_width", "I"));
 	int window_height = (*env)->GetStaticIntField(env, display, _STATIC_FIELD_ID(display, "window_height", "I"));
-	_SET_INT_FIELD(configuration, "screenWidthDp", window_width > 0 ? MIN(window_width, geometry.width) : geometry.width);
-	_SET_INT_FIELD(configuration, "screenHeightDp", window_height > 0 ? MIN(window_height, geometry.height) : geometry.height);
+	int screen_width_dp = window_width > 0 ? MIN(window_width, geometry.width) : geometry.width;
+	int screen_height_dp = window_height > 0 ? MIN(window_height, geometry.height) : geometry.height;
+	_SET_INT_FIELD(configuration, "screenWidthDp", screen_width_dp);
+	_SET_INT_FIELD(configuration, "screenHeightDp", screen_height_dp);
+	/* TaskFragment.computeConfigResourceOverrides(): the orientation follows the window's screen size,
+	 * without it no -port/-land resources match */
+	_SET_INT_FIELD(configuration, "orientation", screen_width_dp <= screen_height_dp ? /*ORIENTATION_PORTRAIT*/ 1 : /*ORIENTATION_LANDSCAPE*/ 2);
 	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on */
 	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(geometry.width, geometry.height));
 	/* the layout direction bits come from the locale (Configuration.setLayoutDirection()) */
