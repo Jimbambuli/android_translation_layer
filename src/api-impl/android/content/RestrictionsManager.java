@@ -11,4 +11,8 @@ public class RestrictionsManager {
 	public Bundle getApplicationRestrictions() {
 		return new Bundle();
 	}
+
+	public boolean hasRestrictionsProvider() {
+		return false;
+	}
 }

@@ -464,6 +464,13 @@ public interface Cursor extends Closeable {
 	Bundle getExtras();
 
 	/**
+	 * Sets a {@link Bundle} that will be returned by {@link #getExtras()}.
+	 *
+	 * @param extras {@link Bundle} to set, or null to set an empty bundle.
+	 */
+	void setExtras(Bundle extras);
+
+	/**
 	 * This is an out-of-band way for the the user of a cursor to communicate with the cursor. The
 	 * structure of each bundle is entirely defined by the cursor.
 	 *

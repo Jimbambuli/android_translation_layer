@@ -258,9 +258,40 @@ static void append_blurred(GdkSnapshot *snapshot, const GskRoundedRect *rect, co
  * right before the child, with SkShadowUtils::DrawShadow() for the outline at the child's Z and the
  * light source of the window. GSK draws Skia's blur variant of it: the ambient shadow is the outline
  * outset and blurred, the spot shadow the outline projected from the light onto the parent and
- * blurred (SkDrawShadowMetrics::GetSpotParams()). As in LightingInfo, the light is centered over the
- * window horizontally (ATL knows no display position) at lightY and lightZ. A translucent outline
- * (kTransparentOccluder) is drawn like an opaque one. */
+ * blurred (SkDrawShadowMetrics::GetSpotParams()). The light is given relative to the outline's
+ * coordinates, the colors carry the alphas. A translucent outline (kTransparentOccluder) is drawn like
+ * an opaque one. */
+void atl_snapshot_shadow(GdkSnapshot *snapshot, const graphene_rect_t *rect, float radius, float z, const GdkRGBA *ambient_color,
+                         const GdkRGBA *spot_color, float light_x, float light_y, float light_z, float light_radius)
+{
+	if (ambient_color->alpha > 0) {
+		/* SkShadowUtils::DrawShadow(), "draw with blur" for the ambient shadow */
+		float devSpaceOutset = ambient_blur_radius(z);
+		float oneOverA = ambient_recip_alpha(z);
+		float blurRadius = 0.5f * devSpaceOutset * oneOverA;
+		float strokeWidth = 0.5f * (devSpaceOutset - blurRadius);
+		GskRoundedRect ambient;
+		gsk_rounded_rect_init_from_rect(&ambient, rect, radius);
+		/* kStrokeAndFill_Style outsets the path by half the stroke width */
+		gsk_rounded_rect_shrink(&ambient, -strokeWidth / 2, -strokeWidth / 2, -strokeWidth / 2, -strokeWidth / 2);
+		append_blurred(snapshot, &ambient, ambient_color, radius_to_sigma(blurRadius));
+	}
+
+	if (spot_color->alpha > 0 && light_z > z) {
+		/* SkDrawShadowMetrics::GetSpotShadowTransform() with GetSpotParams() */
+		float zRatio = divide_and_pin(z, light_z - z, 0.0f, 0.95f);
+		float spot_radius = light_radius * zRatio;
+		float scale = divide_and_pin(light_z, light_z - z, 1.0f, 1.95f);
+		GskRoundedRect spot;
+		gsk_rounded_rect_init_from_rect(&spot, &GRAPHENE_RECT_INIT(scale * rect->origin.x - zRatio * light_x, scale * rect->origin.y - zRatio * light_y,
+		                                                           scale * rect->size.width, scale * rect->size.height),
+		                                scale * radius);
+		append_blurred(snapshot, &spot, spot_color, radius_to_sigma(spot_radius));
+	}
+}
+
+/* the shadow of a child view, in the parent; as in LightingInfo, the light is centered over the window
+ * horizontally (ATL knows no display position) at lightY and lightZ */
 void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnapshot *snapshot)
 {
 	if (!WRAPPER_IS_WIDGET(child) || !gtk_widget_get_visible(child))
@@ -273,42 +304,14 @@ void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnap
 	if (z <= 0 || caster_alpha <= 0 || !gtk_widget_compute_point(child, parent, &GRAPHENE_POINT_INIT(0, 0), &origin) ||
 	    !gtk_widget_compute_point(child, root, &GRAPHENE_POINT_INIT(0, 0), &window_origin))
 		return;
-	const float ambient_alpha = wrapper->ambient_shadow_alpha * caster_alpha;
-	const float spot_alpha = wrapper->spot_shadow_alpha * caster_alpha;
-	/* the light relative to the child */
-	const float light_x = gtk_widget_get_width(root) / 2.0f - window_origin.x;
-	const float light_y = wrapper->light_y - window_origin.y;
-	const float light_z = wrapper->light_z;
+	const GdkRGBA ambient_color = {0, 0, 0, wrapper->ambient_shadow_alpha * caster_alpha};
+	const GdkRGBA spot_color = {0, 0, 0, wrapper->spot_shadow_alpha * caster_alpha};
 
 	gtk_snapshot_save(snapshot);
 	gtk_snapshot_translate(snapshot, &origin);
-
-	if (ambient_alpha > 0) {
-		/* SkShadowUtils::DrawShadow(), "draw with blur" for the ambient shadow */
-		float devSpaceOutset = ambient_blur_radius(z);
-		float oneOverA = ambient_recip_alpha(z);
-		float blurRadius = 0.5f * devSpaceOutset * oneOverA;
-		float strokeWidth = 0.5f * (devSpaceOutset - blurRadius);
-		GskRoundedRect ambient;
-		gsk_rounded_rect_init_from_rect(&ambient, &wrapper->shadow_rect, wrapper->shadow_radius);
-		/* kStrokeAndFill_Style outsets the path by half the stroke width */
-		gsk_rounded_rect_shrink(&ambient, -strokeWidth / 2, -strokeWidth / 2, -strokeWidth / 2, -strokeWidth / 2);
-		append_blurred(snapshot, &ambient, &(GdkRGBA){0, 0, 0, ambient_alpha}, radius_to_sigma(blurRadius));
-	}
-
-	if (spot_alpha > 0 && light_z > z) {
-		/* SkDrawShadowMetrics::GetSpotShadowTransform() with GetSpotParams() */
-		float zRatio = divide_and_pin(z, light_z - z, 0.0f, 0.95f);
-		float radius = wrapper->light_radius * zRatio;
-		float scale = divide_and_pin(light_z, light_z - z, 1.0f, 1.95f);
-		const graphene_rect_t *r = &wrapper->shadow_rect;
-		GskRoundedRect spot;
-		gsk_rounded_rect_init_from_rect(&spot, &GRAPHENE_RECT_INIT(scale * r->origin.x - zRatio * light_x, scale * r->origin.y - zRatio * light_y,
-		                                                           scale * r->size.width, scale * r->size.height),
-		                                scale * wrapper->shadow_radius);
-		append_blurred(snapshot, &spot, &(GdkRGBA){0, 0, 0, spot_alpha}, radius_to_sigma(radius));
-	}
-
+	/* the light relative to the child */
+	atl_snapshot_shadow(snapshot, &wrapper->shadow_rect, wrapper->shadow_radius, z, &ambient_color, &spot_color,
+	                    gtk_widget_get_width(root) / 2.0f - window_origin.x, wrapper->light_y - window_origin.y, wrapper->light_z, wrapper->light_radius);
 	gtk_snapshot_restore(snapshot);
 }
 
@@ -421,10 +424,11 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		/* AOSP: EdgeEffect.draw() stretches the RenderNode of the view it draws into; View clears the
 		 * stretch before each draw and hwui applies it when it draws the node. A view that stretched
 		 * before draws into its own snapshot here, so the stretch can be applied to all it drew. */
-		GdkSnapshot *content = wrapper->may_stretch ? gtk_snapshot_new() : snapshot;
+		GdkSnapshot *content = (wrapper->may_stretch || wrapper->defers_render_nodes) ? gtk_snapshot_new() : snapshot;
 		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_x", 0);
 		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_y", 0);
 		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(content));
+		_SET_BOOL_FIELD(wrapper->canvas, "drew_render_node", FALSE);
 		J__View__draw(env, wrapper->jobj, wrapper->canvas);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
@@ -432,8 +436,19 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		}
 		float stretch_x = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_x");
 		float stretch_y = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_y");
+		if (!wrapper->defers_render_nodes && _GET_BOOL_FIELD(wrapper->canvas, "drew_render_node")) {
+			/* from the next frame on; this one may show a render node that was recorded again after it was drawn */
+			wrapper->defers_render_nodes = TRUE;
+			_SET_BOOL_FIELD(wrapper->canvas, "defer_render_nodes", TRUE);
+			gtk_widget_queue_draw(widget);
+		}
 		if (content != snapshot) {
 			GskRenderNode *node = gtk_snapshot_free_to_node(content);
+			jobject deferred_children = wrapper->defers_render_nodes ? _GET_OBJ_FIELD(wrapper->canvas, "deferred_children", "Landroid/view/RenderNode;") : NULL;
+			if (node && deferred_children)
+				node = _PTR(J__RenderNode__resolveDeferredChildren(env, deferred_children, _INTPTR(node)));
+			if (deferred_children)
+				(*env)->DeleteLocalRef(env, deferred_children);
 			if (node && (stretch_x != 0 || stretch_y != 0)) {
 				float w = wrapper->real_width > 0 ? wrapper->real_width : gtk_widget_get_width(widget);
 				float h = wrapper->real_height > 0 ? wrapper->real_height : gtk_widget_get_height(widget);
@@ -883,6 +898,18 @@ int atl_android_key_code(GtkEventControllerKey *controller, guint keyval, guint 
 #define META_META_ON      (1 << 16)
 #define META_CAPS_LOCK_ON (1 << 20)
 
+/* The character of a key like Generic.kcm gives it: Enter types '\n' (GDK's Return is '\r'), Tab '\t', and the
+ * other control keys (BackSpace, Delete, Escape) type none, so that an editor takes them as keys */
+int atl_android_unicode_char(guint keyval)
+{
+	gunichar c = gdk_keyval_to_unicode(keyval);
+	if (c == '\r')
+		return '\n';
+	if ((c < 0x20 && c != '\t' && c != '\n') || c == 0x7f)
+		return 0;
+	return c;
+}
+
 int atl_android_meta_state(GdkModifierType state)
 {
 	int meta_state = 0;
@@ -909,7 +936,7 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_DOWN, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
-	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
+	_SET_INT_FIELD(key_event, "unicodeValue", atl_android_unicode_char(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
@@ -925,7 +952,7 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
-	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
+	_SET_INT_FIELD(key_event, "unicodeValue", atl_android_unicode_char(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);

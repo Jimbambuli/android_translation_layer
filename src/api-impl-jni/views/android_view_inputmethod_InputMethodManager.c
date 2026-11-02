@@ -18,6 +18,21 @@ static void commit_cb(GtkIMContext *context, gchar *str, gpointer user_data)
 	}
 }
 
+/* GTK's preedit is Android's composing text: setComposingText() replaces it, the commit that follows replaces it with
+ * the final text (an empty preedit at the end removes it) */
+static void preedit_changed_cb(GtkIMContext *context, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	gchar *str;
+	gtk_im_context_get_preedit_string(context, &str, NULL, NULL);
+	J__InputConnection__setComposingText(env, connection, _JSTRING(str), 1);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	g_free(str);
+}
+
 static void retrieve_surrounding_cb(GtkIMContext *context, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
@@ -59,6 +74,7 @@ JNIEXPORT jlong JNICALL Java_android_view_inputmethod_InputMethodManager_nativeI
 {
 	GtkIMContext *context = gtk_im_multicontext_new();
 	g_signal_connect(context, "commit", G_CALLBACK(commit_cb), NULL);
+	g_signal_connect(context, "preedit-changed", G_CALLBACK(preedit_changed_cb), NULL);
 	g_signal_connect(context, "retrieve-surrounding", G_CALLBACK(retrieve_surrounding_cb), NULL);
 	g_signal_connect(context, "delete-surrounding", G_CALLBACK(delete_surrounding_cb), NULL);
 	return _INTPTR(context);
@@ -155,9 +171,11 @@ JNIEXPORT jboolean JNICALL Java_android_view_inputmethod_InputMethodManager_nati
 	gtk_im_context_set_client_widget(context, widget);
 	if (new_connection) {
 		set_input_type(context, input_type);
-		if (connection)
+		if (connection) {
+			/* a new connection (restartInput) starts without the old one's preedit */
+			gtk_im_context_reset(context);
 			_UNREF(connection);
-		else // GtkIMContext needs a few Wayland cycles to become functional after setting the initial client widget, so schedule a retry after 10ms.
+		} else // GtkIMContext needs a few Wayland cycles to become functional after setting the initial client widget, so schedule a retry after 10ms.
 			g_timeout_add(10, activate_osk, context);
 		connection = _REF(new_connection);
 	}

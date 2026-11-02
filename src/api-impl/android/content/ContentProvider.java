@@ -127,6 +127,94 @@ public abstract class ContentProvider {
 		}
 	}
 
+	/* the newer forms of query(), openFile() and openAssetFile() (API 16-26) fall back to the older ones, as in AOSP */
+	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) {
+		return query(uri, projection, selection, selectionArgs, sortOrder);
+	}
+
+	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) {
+		queryArgs = queryArgs != null ? queryArgs : Bundle.EMPTY;
+		String sortClause = queryArgs.getString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER);
+		if (sortClause == null && queryArgs.containsKey(ContentResolver.QUERY_ARG_SORT_COLUMNS)) {
+			sortClause = ContentResolver.createSqlSortClause(queryArgs);
+		}
+		return query(uri, projection, queryArgs.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+		             queryArgs.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS), sortClause, cancellationSignal);
+	}
+
+	public ParcelFileDescriptor openFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
+		return openFile(uri, mode);
+	}
+
+	public AssetFileDescriptor openAssetFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
+		return openAssetFile(uri, mode);
+	}
+
+	public String[] getStreamTypes(Uri uri, String mimeTypeFilter) {
+		return null;
+	}
+
+	public AssetFileDescriptor openTypedAssetFile(Uri uri, String mimeTypeFilter, Bundle opts) throws FileNotFoundException {
+		if ("*/*".equals(mimeTypeFilter)) {
+			// If they can take anything, the untyped open call is good enough.
+			return openAssetFile(uri, "r");
+		}
+		String baseType = getType(uri);
+		if (baseType != null && ClipDescription.compareMimeTypes(baseType, mimeTypeFilter)) {
+			// Use old untyped open call if this provider has a type for this
+			// URI and it matches the request.
+			return openAssetFile(uri, "r");
+		}
+		throw new FileNotFoundException("Can't open " + uri + " as type " + mimeTypeFilter);
+	}
+
+	public AssetFileDescriptor openTypedAssetFile(Uri uri, String mimeTypeFilter, Bundle opts, CancellationSignal signal) throws FileNotFoundException {
+		return openTypedAssetFile(uri, mimeTypeFilter, opts);
+	}
+
+	/* API 34: getType() for callers without read permission */
+	public String getTypeAnonymous(Uri uri) {
+		return getType(uri);
+	}
+
+	public Uri canonicalize(Uri url) {
+		return null;
+	}
+
+	public Uri uncanonicalize(Uri url) {
+		return url;
+	}
+
+	public Bundle call(String method, String arg, Bundle extras) {
+		return null;
+	}
+
+	public Bundle call(String authority, String method, String arg, Bundle extras) {
+		return call(method, arg, extras);
+	}
+
+	/**
+	 * ATL: the app is the only caller and has one user, so an incoming URI stays as it is.
+	 * @hide
+	 */
+	public Uri validateIncomingUri(Uri uri) throws SecurityException {
+		return uri;
+	}
+
+	/**
+	 * ATL: the permission checks of a call from the app itself, which may use its own provider
+	 * (AOSP passes the AttributionSource of the binder caller).
+	 * @hide
+	 */
+	protected int enforceReadPermissionInner(Uri uri) throws SecurityException {
+		return 0; // AppOpsManager.MODE_ALLOWED
+	}
+
+	/** @hide */
+	protected int enforceWritePermissionInner(Uri uri) throws SecurityException {
+		return 0; // AppOpsManager.MODE_ALLOWED
+	}
+
 	public String getCallingPackage() {
 		return ATLLoadedApp.getPrimaryApplication().pkg.packageName;
 	}

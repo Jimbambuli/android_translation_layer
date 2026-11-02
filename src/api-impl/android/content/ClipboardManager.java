@@ -63,12 +63,25 @@ public class ClipboardManager extends android.text.ClipboardManager {
 		 */
 		void onPrimaryClipChanged();
 	}
+
+	/* ATL: the clipboard service's state. GDK reads the system clipboard asynchronously, so the text of
+	 * another application's clip is read when the clipboard changes and kept here, like Android's
+	 * ClipboardService keeps the primary clip. Only text is exchanged with the system clipboard. */
+	private static ClipData primaryClip;
+	private static final ArrayList<OnPrimaryClipChangedListener> primaryClipChangedListeners = new ArrayList<OnPrimaryClipChangedListener>();
+	private static boolean nativeInitDone;
+
 	/**
 	 * {@hide}
 	 */
 	public ClipboardManager(Context context, Handler handler) {
+		this();
 	}
 	public ClipboardManager() {
+		if (!nativeInitDone) {
+			nativeInitDone = true;
+			native_init();
+		}
 	}
 	/**
 	 * Sets the current primary clip on the clipboard.  This is the clip that
@@ -77,37 +90,59 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * @param clip The clipped data item to set.
 	 */
 	public void setPrimaryClip(ClipData clip) {
+		if (clip == null)
+			throw new NullPointerException("clip");
+		primaryClip = clip;
 		// this is not the primary clipboard in UNIX sense (not middle click paste)
 		native_set_clipboard(clip.getItemCount() > 0 ? String.valueOf(clip.getItemAt(0).coerceToText(null)) : "");
+		reportPrimaryClipChanged();
+	}
+	/**
+	 * Clears any current primary clip on the clipboard.
+	 */
+	public void clearPrimaryClip() {
+		primaryClip = null;
+		native_set_clipboard(null);
+		reportPrimaryClipChanged();
 	}
 	/**
 	 * Returns the current primary clip on the clipboard.
 	 */
 	public ClipData getPrimaryClip() {
-		return null;
+		return primaryClip;
 	}
 	/**
 	 * Returns a description of the current primary clip on the clipboard
 	 * but not a copy of its data.
 	 */
 	public ClipDescription getPrimaryClipDescription() {
-		return null;
+		return primaryClip != null ? primaryClip.getDescription() : null;
 	}
 	/**
 	 * Returns true if there is currently a primary clip on the clipboard.
 	 */
 	public boolean hasPrimaryClip() {
-		return false;
+		return primaryClip != null;
 	}
 	public void addPrimaryClipChangedListener(OnPrimaryClipChangedListener what) {
+		synchronized (primaryClipChangedListeners) {
+			primaryClipChangedListeners.add(what);
+		}
 	}
 	public void removePrimaryClipChangedListener(OnPrimaryClipChangedListener what) {
+		synchronized (primaryClipChangedListeners) {
+			primaryClipChangedListeners.remove(what);
+		}
 	}
 	/**
 	 * @deprecated Use {@link #getPrimaryClip()} instead.  This retrieves
 	 * the primary clip and tries to coerce it to a string.
 	 */
 	public CharSequence getText() {
+		ClipData clip = getPrimaryClip();
+		if (clip != null && clip.getItemCount() > 0) {
+			return clip.getItemAt(0).coerceToText(null);
+		}
 		return null;
 	}
 	/**
@@ -122,10 +157,25 @@ public class ClipboardManager extends android.text.ClipboardManager {
 	 * @deprecated Use {@link #hasPrimaryClip()} instead.
 	 */
 	public boolean hasText() {
-		return false;
+		CharSequence text = getText();
+		return text != null && text.length() > 0;
 	}
-	void reportPrimaryClipChanged() {
+	static void reportPrimaryClipChanged() {
+		Object[] listeners;
+		synchronized (primaryClipChangedListeners) {
+			listeners = primaryClipChangedListeners.toArray();
+		}
+		for (Object listener : listeners) {
+			((OnPrimaryClipChangedListener)listener).onPrimaryClipChanged();
+		}
 	}
 
+	/* called on the main thread when another application put text (or nothing that is text) on the clipboard */
+	private static void onSystemClipboardText(String text) {
+		primaryClip = text != null ? ClipData.newPlainText(null, text) : null;
+		reportPrimaryClipChanged();
+	}
+
+	private static native void native_init();
 	public static native void native_set_clipboard(String text);
 }

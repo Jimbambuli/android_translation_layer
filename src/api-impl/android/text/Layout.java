@@ -299,9 +299,30 @@ public class Layout {
 		return spacing_add;
 	}
 
+	/* AOSP's getSelection() for left-to-right lines (isRtlCharAt() is false here): the range on its first and
+	 * last line, the first line filled to the right edge and the lines between over the whole width */
 	public void getSelectionPath(int start, int end, Path path) {
-		if (start != end && getLineDirections(0) == null)
-			throw new NullPointerException();
+		path.reset();
+		if (start == end)
+			return;
+		if (end < start) {
+			int temp = end;
+			end = start;
+			start = temp;
+		}
+		int startLine = getLineForOffset(start);
+		int endLine = getLineForOffset(end);
+		int top = getLineTop(startLine);
+		int bottom = getLineBottom(endLine);
+		if (startLine == endLine) {
+			path.addRect(getPrimaryHorizontal(start), top, getPrimaryHorizontal(end), bottom, Path.Direction.CW);
+			return;
+		}
+		int width = getWidth();
+		path.addRect(getPrimaryHorizontal(start), top, width, getLineBottom(startLine), Path.Direction.CW);
+		for (int i = startLine + 1; i < endLine; i++)
+			path.addRect(0, getLineTop(i), width, getLineBottom(i), Path.Direction.CW);
+		path.addRect(getLineLeft(endLine), getLineTop(endLine), getPrimaryHorizontal(end), bottom, Path.Direction.CW);
 	}
 
 	public int getParagraphRight(int line) {

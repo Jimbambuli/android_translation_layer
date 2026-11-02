@@ -101,6 +101,15 @@ static void on_selected_changed(GtkDropDown *dropdown, GParamSpec *pspec, jobjec
 	if (!selected)
 		return;
 	RangeListModel *model = RANGE_LIST_ITEM(selected)->model;
+	/* the listener asks the spinner for its selection (getSelectedItem()), which only knows what Java set */
+	jobject spinner = (*env)->NewLocalRef(env, model->jobject);
+	if (spinner) {
+		(*env)->CallVoidMethod(env, spinner, _METHOD(_CLASS(spinner), "setNextSelectedPositionInt", "(I)V"), index);
+		(*env)->CallVoidMethod(env, spinner, _METHOD(_CLASS(spinner), "setSelectedPositionInt", "(I)V"), index);
+		if ((*env)->ExceptionCheck(env))
+			(*env)->ExceptionDescribe(env);
+		(*env)->DeleteLocalRef(env, spinner);
+	}
 	J__AdapterView__OnItemSelectedListener__onItemSelected(env, listener, model->jobject, NULL, index, (long)0);
 }
 

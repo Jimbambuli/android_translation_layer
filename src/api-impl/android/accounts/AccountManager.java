@@ -19,6 +19,35 @@ import java.util.concurrent.TimeoutException;
  * the same way they are shared on Android.
  */
 public class AccountManager {
+	public static final String KEY_ACCOUNT_NAME = "authAccount";
+	public static final String KEY_ACCOUNT_TYPE = "accountType";
+	public static final String KEY_AUTHTOKEN = "authtoken";
+	public static final String KEY_INTENT = "intent";
+	public static final String KEY_PASSWORD = "password";
+	public static final String KEY_USERDATA = "userdata";
+	public static final String KEY_BOOLEAN_RESULT = "booleanResult";
+	public static final String KEY_ERROR_CODE = "errorCode";
+	public static final String KEY_ERROR_MESSAGE = "errorMessage";
+	public static final String KEY_ACCOUNT_AUTHENTICATOR_RESPONSE = "accountAuthenticatorResponse";
+	public static final String KEY_ACCOUNT_MANAGER_RESPONSE = "accountManagerResponse";
+	public static final String KEY_AUTH_FAILED_MESSAGE = "authFailedMessage";
+	public static final String KEY_AUTH_TOKEN_LABEL = "authTokenLabelKey";
+	public static final String KEY_CALLER_UID = "callerUid";
+	public static final String KEY_CALLER_PID = "callerPid";
+	public static final String KEY_ANDROID_PACKAGE_NAME = "androidPackageName";
+	public static final String KEY_NOTIFY_ON_FAILURE = "notifyOnAuthFailure";
+	public static final int ERROR_CODE_REMOTE_EXCEPTION = 1;
+	public static final int ERROR_CODE_NETWORK_ERROR = 3;
+	public static final int ERROR_CODE_CANCELED = 4;
+	public static final int ERROR_CODE_INVALID_RESPONSE = 5;
+	public static final int ERROR_CODE_UNSUPPORTED_OPERATION = 6;
+	public static final int ERROR_CODE_BAD_ARGUMENTS = 7;
+	public static final int ERROR_CODE_BAD_REQUEST = 8;
+	public static final int ERROR_CODE_BAD_AUTHENTICATION = 9;
+	public static final String ACTION_AUTHENTICATOR_INTENT = "android.accounts.AccountAuthenticator";
+	public static final String AUTHENTICATOR_META_DATA_NAME = "android.accounts.AccountAuthenticator";
+	public static final String AUTHENTICATOR_ATTRIBUTES_NAME = "account-authenticator";
+	public static final String LOGIN_ACCOUNTS_CHANGED_ACTION = "android.accounts.LOGIN_ACCOUNTS_CHANGED";
 
 	/**
 	 * Account is always visible to given application and only authenticator can revoke visibility.
@@ -178,8 +207,30 @@ public class AccountManager {
 		return true;
 	}
 
+	public void addOnAccountsUpdatedListener(OnAccountsUpdateListener listener, Handler handler, boolean updateImmediately) {
+		addOnAccountsUpdatedListener(listener, handler, updateImmediately, null);
+	}
+
+	/* changes are not reported yet; as AOSP, updateImmediately posts the current accounts to the handler */
 	public void addOnAccountsUpdatedListener(final OnAccountsUpdateListener listener,
 	                                         Handler handler, boolean updateImmediately, String[] accountTypes) {
+		if (listener == null)
+			throw new IllegalArgumentException("the listener is null");
+		if (!updateImmediately)
+			return;
+		Account[] all = getAccounts();
+		ArrayList<Account> wanted = new ArrayList<Account>();
+		for (Account account : all) {
+			if (accountTypes == null || java.util.Arrays.asList(accountTypes).contains(account.type))
+				wanted.add(account);
+		}
+		final Account[] accounts = wanted.toArray(new Account[0]);
+		(handler != null ? handler : new Handler(Looper.getMainLooper())).post(new Runnable() {
+			@Override
+			public void run() {
+				listener.onAccountsUpdated(accounts);
+			}
+		});
 	}
 
 	public void removeOnAccountsUpdatedListener(OnAccountsUpdateListener listener) {

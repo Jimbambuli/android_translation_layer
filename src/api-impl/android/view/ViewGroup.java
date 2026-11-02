@@ -1124,6 +1124,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void setClipToPadding(boolean clipToPadding) {}
 
 	public View findViewById(int id) {
+		if (id == NO_ID) // as in AOSP: views without an id are not found by it
+			return null;
 		if (Log.isLoggable(TAG, Log.VERBOSE))
 			Slog.v(TAG, "findViewById: looking for id: " + String.format("%x", id) + "(" + getResources().getAssets().getResourceName(id) + ")"
 			            + " | checking: " + this + ",id: " + String.format("%x", this.getId()) + ", id_str: " + this.getIdName());

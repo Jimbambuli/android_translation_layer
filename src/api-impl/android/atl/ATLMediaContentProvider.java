@@ -59,6 +59,10 @@ public class ATLMediaContentProvider extends ContentProvider {
 		}
 		// if we haven't selected a file, open the file chooser
 		if (!"0".equals(uri.getLastPathSegment()) && timestamp + 1000 < System.currentTimeMillis()) {
+			// the chooser is opened from the main thread, so waiting for it there would never end
+			// (Nextcloud scans the video folders in Application.onCreate): no file chosen
+			if (Looper.myLooper() == Looper.getMainLooper())
+				return new MatrixCursor(projection);
 			openFileChooser();
 		}
 		MatrixCursor cursor = new MatrixCursor(projection);

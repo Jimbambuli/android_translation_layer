@@ -50,7 +50,9 @@ void _AssetManager_unlock(struct AssetManager **asset_manager)
 static GRWLock overlay_lock;
 static GHashTable *overlay_colors; // resource id -> ARGB
 
-JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setOverlayColors(JNIEnv *env, jclass clazz, jintArray ids, jintArray colors)
+static GHashTable *loader_colors; // resource id -> ARGB, of any package (Resources.addLoaders())
+
+static GHashTable *color_table(JNIEnv *env, jintArray ids, jintArray colors)
 {
 	GHashTable *table = NULL;
 	if (ids && colors) {
@@ -63,22 +65,38 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setOverlayColors(JN
 		(*env)->ReleaseIntArrayElements(env, colors, color, JNI_ABORT);
 		(*env)->ReleaseIntArrayElements(env, ids, id, JNI_ABORT);
 	}
+	return table;
+}
+
+static void replace_table(GHashTable **where, GHashTable *table)
+{
 	g_rw_lock_writer_lock(&overlay_lock);
-	GHashTable *old = overlay_colors;
-	overlay_colors = table;
+	GHashTable *old = *where;
+	*where = table;
 	g_rw_lock_writer_unlock(&overlay_lock);
 	if (old)
 		g_hash_table_unref(old);
 }
 
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setOverlayColors(JNIEnv *env, jclass clazz, jintArray ids, jintArray colors)
+{
+	replace_table(&overlay_colors, color_table(env, ids, colors));
+}
+
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setLoaderColors(JNIEnv *env, jclass clazz, jintArray ids, jintArray colors)
+{
+	replace_table(&loader_colors, color_table(env, ids, colors));
+}
+
 /* the value of resource resid, with the overlay applied (type and data of a Res_value) */
 static void overlay_value(uint32_t resid, uint32_t *type, uint32_t *data)
 {
-	if (resid >> 24 != 0x01 || *type < TYPE_FIRST_COLOR_INT || *type > TYPE_LAST_COLOR_INT)
+	if (*type < TYPE_FIRST_COLOR_INT || *type > TYPE_LAST_COLOR_INT)
 		return;
 	gpointer color;
 	g_rw_lock_reader_lock(&overlay_lock);
-	if (overlay_colors && g_hash_table_lookup_extended(overlay_colors, GUINT_TO_POINTER(resid), NULL, &color)) {
+	if ((loader_colors && g_hash_table_lookup_extended(loader_colors, GUINT_TO_POINTER(resid), NULL, &color)) ||
+	    (resid >> 24 == 0x01 && overlay_colors && g_hash_table_lookup_extended(overlay_colors, GUINT_TO_POINTER(resid), NULL, &color))) {
 		*type = TYPE_INT_COLOR_ARGB8;
 		*data = GPOINTER_TO_UINT(color);
 	}

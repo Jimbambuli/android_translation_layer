@@ -3012,6 +3012,10 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 */
 	public int getUnicodeChar(int metaState) {
 		// return getKeyCharacterMap().get(mKeyCode, metaState);
+		/* like KeyCharacterMap.get(): a key behavior must match Ctrl, Alt and Meta exactly, and the keys of
+		 * Generic.kcm type no character with them (Ctrl+A is a shortcut, not an 'a') */
+		if ((metaState & (META_CTRL_MASK | META_ALT_MASK | META_META_MASK)) != 0)
+			return 0;
 		return unicodeValue;
 	}
 

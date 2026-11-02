@@ -415,7 +415,9 @@ public class Drawable {
 				return drawable;
 			}
 			case "transition": {
-				return new Drawable();
+				TransitionDrawable drawable = new TransitionDrawable();
+				drawable.inflate(resources, parser, attrs, theme);
+				return drawable;
 			}
 			case "ripple": {
 				RippleDrawable drawable = new RippleDrawable();

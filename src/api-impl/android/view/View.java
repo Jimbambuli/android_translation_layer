@@ -1412,7 +1412,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public View findViewById(int id) {
-		if (this.id == id)
+		if (id != NO_ID && this.id == id) // as in AOSP: views without an id are not found by it
 			return this;
 		else
 			return null;
@@ -2163,7 +2163,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected void onFinishInflate() {}
 
 	public void invalidateDrawable(Drawable drawable) {
-		invalidate();
+		invalidateInternal();
 	}
 
 	public void scheduleDrawable(Drawable drawable, Runnable runnable, long time) {
@@ -2180,12 +2180,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void unscheduleDrawable(Drawable drawable) {}
 
 	public void invalidate(Rect dirty) {
-		invalidate();
+		invalidateInternal();
 	}
 	public void invalidate(int l, int t, int r, int b) {
-		invalidate();
+		invalidateInternal();
 	}
 	public void invalidate() {
+		invalidateInternal();
+	}
+	/* as in AOSP, the other invalidations don't go through invalidate(), which a view may override: Material's
+	 * BaseProgressIndicator.invalidate() invalidates its drawable, and ProgressBar.invalidateDrawable()
+	 * invalidates the dirty rectangle */
+	private void invalidateInternal() {
 		propagateInvalidation();
 		nativeInvalidate(widget);
 	}

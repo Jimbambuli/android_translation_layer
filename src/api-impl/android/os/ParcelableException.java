@@ -32,6 +32,7 @@ import java.io.IOException;
  * call {@link #maybeRethrow(Class)} for all expected exception types.
  * </ul>
  *
+ * @hide
  */
 public final class ParcelableException extends RuntimeException implements Parcelable {
 	public ParcelableException(Throwable t) {
@@ -41,26 +42,33 @@ public final class ParcelableException extends RuntimeException implements Parce
 	@SuppressWarnings("unchecked")
 	public <T extends Throwable> void maybeRethrow(Class<T> clazz) throws T {
 		if (clazz.isAssignableFrom(getCause().getClass())) {
-			throw (T)getCause();
+			throw (T) getCause();
 		}
 	}
 
+	/** {@hide} */
 	public static Throwable readFromParcel(Parcel in) {
 		final String name = in.readString();
 		final String msg = in.readString();
 		try {
 			final Class<?> clazz = Class.forName(name, true, Parcelable.class.getClassLoader());
 			if (Throwable.class.isAssignableFrom(clazz)) {
-				return (Throwable)clazz.getConstructor(String.class).newInstance(msg);
+				return (Throwable) clazz.getConstructor(String.class).newInstance(msg);
 			}
 		} catch (ReflectiveOperationException e) {
 		}
 		return new RuntimeException(name + ": " + msg);
 	}
 
+	/** {@hide} */
 	public static void writeToParcel(Parcel out, Throwable t) {
 		out.writeString(t.getClass().getName());
 		out.writeString(t.getMessage());
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
 	}
 
 	@Override

@@ -1,6 +1,7 @@
 package android.view;
 
 import android.atl.GskCanvas;
+import android.atl.annotation.Export;
 import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
@@ -43,14 +44,20 @@ public class RenderNode {
 	private native long nativeTransform(long node, float scaleX, float scaleY, float translationX, float translationY, float rotation, float pivotX, float pivotY);
 	private native long nativeClip(long node, float left, float top, float right, float bottom);
 	private native long nativeStretch(long node, float width, float height, float stretchX, float stretchY);
-	private native void nativeUnref(long node);
+	protected native void nativeUnref(long node);
 	private native long nativeAddStubNode(long snapshot);
 	private native long nativeCreateEmpyNode();
 	/* the clip, transforms and alpha of android.graphics.RenderNode; returns a new node */
 	protected native long nativeApplyProperties(long node, float width, float height, boolean clipToBounds,
 	                                            boolean clipToRect, float clipLeft, float clipTop, float clipRight, float clipBottom,
+	                                            float clipRadius, long shadowNode,
 	                                            float scaleX, float scaleY, float translationX, float translationY,
 	                                            float rotation, float pivotX, float pivotY, float alpha);
+	/* the elevation shadow of an outline rectangle, a new node */
+	protected static native long nativeCreateShadowNode(float left, float top, float right, float bottom, float radius, float z,
+	                                                    int ambientColor, int spotColor, float lightZ, float lightRadius);
+	/* a blur of sigma and an offset (RenderEffect); returns a new node */
+	protected static native long nativeApplyEffect(long node, float sigma, float offsetX, float offsetY);
 
 	public static RenderNode create(String name, View view) {
 		return new RenderNode();
@@ -340,6 +347,21 @@ public class RenderNode {
 		long stub_node = nativeAddStubNode(snapshot);
 		children.add(node);
 		children_nodes.add(stub_node);
+	}
+
+	/* ATL: the render nodes drawn into the canvas of a view (GskCanvas.deferred_children) */
+	public void recordDeferredChild(long snapshot, RenderNode node) {
+		recordChild(snapshot, node);
+	}
+
+	/* ATL: what the view drew, with its render nodes as they are now; returns a new node */
+	@Export
+	public long resolveDeferredChildren(long node) {
+		for (int i = 0; i < children.size(); i++)
+			node = nativePatchNode(node, children_nodes.get(i), children.get(i).getGskNode());
+		children.clear();
+		children_nodes.clear();
+		return node;
 	}
 
 	public DisplayListCanvas start(int width, int height) {

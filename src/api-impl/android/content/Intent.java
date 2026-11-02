@@ -20,7 +20,9 @@ import org.xmlpull.v1.XmlPullParser;
 
 public class Intent implements Parcelable {
 	public static final int FLAG_GRANT_READ_URI_PERMISSION = 0x00000001;
+	public static final int FLAG_GRANT_WRITE_URI_PERMISSION = 0x00000002;
 	public static final int FLAG_GRANT_PERSISTABLE_URI_PERMISSION = 0x00000040;
+	public static final int FLAG_GRANT_PREFIX_URI_PERMISSION = 0x00000080;
 	public static final int FLAG_ACTIVITY_CLEAR_TASK = 0x00008000;
 	public static final int FLAG_ACTIVITY_CLEAR_TOP = 1 << 26;
 	public static final int FLAG_ACTIVITY_NEW_TASK = 1 << 28;
@@ -817,6 +819,18 @@ public class Intent implements Parcelable {
 
 	public char getCharExtra(String name, char def) {
 		return extras.getChar(name, def);
+	}
+
+	public byte getByteExtra(String name, byte def) {
+		return extras.getByte(name, def);
+	}
+
+	public short getShortExtra(String name, short def) {
+		return extras.getShort(name, def);
+	}
+
+	public double getDoubleExtra(String name, double def) {
+		return extras.getDouble(name, def);
 	}
 
 	public Parcelable[] getParcelableArrayExtra(String name) {

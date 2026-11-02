@@ -704,6 +704,13 @@ public final class AssetManager {
 	 */
 	public static native void setOverlayColors(int[] ids, int[] colors);
 
+	/**
+	 * ATL: the colors of the ResourcesLoaders added to any Resources (resource ids of any package and ARGB
+	 * values, null for none), which every AssetManager returns in place of the values of these resources.
+	 * @hide
+	 */
+	public static native void setLoaderColors(int[] ids, int[] colors);
+
 	/* the screen sizes (screenWidthDp, screenHeightDp, smallestScreenWidthDp) of all configurations
 	 * the app has resources for; a window resize that crosses one of them relaunches the activity */
 	public Configuration[] getSizeConfigurations() {
