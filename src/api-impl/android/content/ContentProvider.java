@@ -53,8 +53,11 @@ public abstract class ContentProvider {
 
 	public boolean onCreate() { return false; }
 
+	private Context mContext;
+
+	/* as AOSP, the context given to attachInfo(); ATL's own providers are not attached and run as the app */
 	public Context getContext() {
-		return ATLLoadedApp.getPrimaryApplication().getApplication();
+		return mContext != null ? mContext : ATLLoadedApp.getPrimaryApplication().getApplication();
 	}
 
 	public abstract Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder);
@@ -74,7 +77,12 @@ public abstract class ContentProvider {
 		return fd != null ? new AssetFileDescriptor(fd, 0, -1) : null;
 	}
 
-	public void attachInfo(Context context, ProviderInfo provider) {}
+	public void attachInfo(Context context, ProviderInfo provider) {
+		// only allow it to be set once, as AOSP
+		if (mContext == null) {
+			mContext = context;
+		}
+	}
 
 	public String getCallingPackage() {
 		return ATLLoadedApp.getPrimaryApplication().pkg.packageName;
