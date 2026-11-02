@@ -836,7 +836,11 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		}
 
 		gchar *dest_name = g_strdup_printf("%s.apk", package_name);
-		GFile *dest = g_file_new_build_filename(app_data_dir_base, "_installed_apks_", d->install_internal ? dest_name : apk_name, NULL);
+		/* like ATLPaths.installed_apks_dir */
+		const char *installed_apks_dir = g_getenv("ATL_INSTALLED_APKS_DIR");
+		GFile *dest = (installed_apks_dir && *installed_apks_dir)
+		                  ? g_file_new_build_filename(installed_apks_dir, d->install_internal ? dest_name : apk_name, NULL)
+		                  : g_file_new_build_filename(app_data_dir_base, "_installed_apks_", d->install_internal ? dest_name : apk_name, NULL);
 		free(dest_name);
 		printf("installing %s to %s\n", apk_name, g_file_get_path(dest));
 		g_file_make_directory(g_file_get_parent(dest), NULL, NULL);

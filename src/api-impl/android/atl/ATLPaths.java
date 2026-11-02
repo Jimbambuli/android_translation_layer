@@ -29,6 +29,11 @@ public final class ATLPaths {
 			}
 			app_data_dir_base = new File(user_data_dir + "/android_translation_layer").getAbsoluteFile();
 		}
-		installed_apks_dir = new File(app_data_dir_base, "_installed_apks_");
+		/* a launcher that keeps the installed APKs itself (as PACKAGE.apk) points ATL to them */
+		String ATL_INSTALLED_APKS_DIR = System.getenv("ATL_INSTALLED_APKS_DIR");
+		if (ATL_INSTALLED_APKS_DIR != null && !ATL_INSTALLED_APKS_DIR.isEmpty())
+			installed_apks_dir = new File(ATL_INSTALLED_APKS_DIR).getAbsoluteFile();
+		else
+			installed_apks_dir = new File(app_data_dir_base, "_installed_apks_");
 	}
 }

@@ -143,8 +143,16 @@ public final class ATLLoadedAppManager {
 		return app;
 	}
 
+	/* AOSP AppsFilterImpl.shouldFilterApplication(): an app holding QUERY_ALL_PACKAGES, or one that targets
+	 * SDK 29 or lower, sees every package (the <queries> element is not looked at yet) */
 	private static boolean isPackageVisible(String sourcePackageName, String targetPackageName) {
-		return always_visible_packages.contains(targetPackageName) || always_allow_query_all_packages.contains(sourcePackageName);
+		if (always_visible_packages.contains(targetPackageName) || always_allow_query_all_packages.contains(sourcePackageName))
+			return true;
+		ATLLoadedApp primary = ATLLoadedApp.getPrimaryApplication();
+		if (!primary.pkg.packageName.equals(sourcePackageName))
+			return false;
+		return primary.pkg.applicationInfo.targetSdkVersion <= 29
+		    || primary.pkg.requestedPermissions.contains("android.permission.QUERY_ALL_PACKAGES");
 	}
 
 	private static ATLLoadedApp loadGStub(String packageName) {
