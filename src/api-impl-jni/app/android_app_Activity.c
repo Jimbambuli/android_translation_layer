@@ -848,24 +848,32 @@ gboolean activity_same(int index, int other)
 	return a && b && (*env)->IsSameObject(env, a, b);
 }
 
-/* back to the activity at index: the ones above it finish, the shown one first (as pressing back would) */
-void activity_return_to(int index)
+/* the activity at index comes to the front, the others stay below it in their order (like
+ * FLAG_ACTIVITY_REORDER_TO_FRONT): the shown one is paused and stopped, the chosen one restarted and resumed */
+void activity_bring_to_front(int index)
 {
 	JNIEnv *env = get_jni_env();
-	GList *above = NULL;
-	int i = 0;
-	for (GList *l = activity_backlog; l != NULL && i < index; l = l->next, i++)
-		above = g_list_append(above, _REF(l->data));
-	for (GList *l = above; l != NULL; l = l->next) {
-		jmethodID finish = (*env)->GetMethodID(env, _CLASS(l->data), "finish", "()V");
-		(*env)->CallVoidMethod(env, l->data, finish);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-		_UNREF(l->data);
+	GList *l = g_list_nth(activity_backlog, index);
+	if (!l || l == activity_backlog)
+		return;
+	activity_backlog = g_list_remove_link(activity_backlog, l);
+	activity_backlog = g_list_concat(l, activity_backlog);
+	transition_from = activity_current;
+	transition_opening = TRUE;
+	activity_update_current(env);
+	transition_from = NULL;
+}
+
+void activity_go_to_start(void)
+{
+	JNIEnv *env = get_jni_env();
+	if (!activity_current)
+		return;
+	J__Activity__navigateToStart(env, activity_current);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
-	g_list_free(above);
 }
 
 /* ---- picture-in-picture: the pinned task of ActivityTaskManagerService ----

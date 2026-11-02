@@ -1,7 +1,10 @@
 /* Android's navigation bar under the window (ATL_TITLEBAR=system-navigation), for a title bar of the desktop
- * that has no back button: ◁ is back (as the Escape key), ○ goes back to the app's first activity (the one it
- * was started with), □ lists the open activities of the app, the shown one first, and goes back to the one
- * chosen. The bar is small (about 32 px) and takes the colors of the GTK theme. */
+ * that has no back button: ◁ is back (as the Escape key), ○ is Home inside the app (its start activity with
+ * FLAG_ACTIVITY_CLEAR_TOP: the activities above it finish, it gets onNewIntent()), □ lists the open activities
+ * of the app, the shown one first, and brings the chosen one to the front (the others stay, as with
+ * FLAG_ACTIVITY_REORDER_TO_FRONT). The bar is small (about 32 px) and takes the colors of the GTK theme; the
+ * tooltips come from ATL_NAVIGATION_TOOLTIPS (three lines: back, home, open pages; e.g. in the desktop's
+ * language from the launcher), else English. */
 
 #include "navigation_bar.h"
 
@@ -23,14 +26,14 @@ static void on_back(GtkButton *button, gpointer user_data)
 
 static void on_home(GtkButton *button, gpointer user_data)
 {
-	activity_return_to(activity_count() - 1);
+	activity_go_to_start();
 }
 
 static void on_activity_chosen(GtkButton *button, GtkPopover *popover)
 {
 	int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "atl-index"));
 	gtk_popover_popdown(popover);
-	activity_return_to(index);
+	activity_bring_to_front(index);
 }
 
 /* the list is made anew each time it opens; an activity is listed once, and activities with the same title
@@ -91,14 +94,21 @@ GtkWidget *navigation_bar_new(void)
 	gtk_widget_set_can_focus(bar, FALSE); // the keyboard stays with the app
 	GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 40);
 
-	GtkWidget *back = bar_button("◁", "Back");
+	const char *tooltips[3] = {"Back", "Start page of the app", "Open pages of the app"};
+	char **given = g_strsplit(g_getenv("ATL_NAVIGATION_TOOLTIPS") ? g_getenv("ATL_NAVIGATION_TOOLTIPS") : "", "\n", 3);
+	for (int i = 0; i < 3 && given[i]; i++)
+		if (*given[i])
+			tooltips[i] = given[i];
+
+	GtkWidget *back = bar_button("◁", tooltips[0]);
 	g_signal_connect(back, "clicked", G_CALLBACK(on_back), NULL);
-	GtkWidget *home = bar_button("○", "First page of the app");
+	GtkWidget *home = bar_button("○", tooltips[1]);
 	g_signal_connect(home, "clicked", G_CALLBACK(on_home), NULL);
 	GtkWidget *recents = gtk_menu_button_new();
 	gtk_menu_button_set_label(GTK_MENU_BUTTON(recents), "□");
 	gtk_menu_button_set_always_show_arrow(GTK_MENU_BUTTON(recents), FALSE);
-	gtk_widget_set_tooltip_text(recents, "Open pages of the app");
+	gtk_widget_set_tooltip_text(recents, tooltips[2]);
+	g_strfreev(given);
 	gtk_menu_button_set_has_frame(GTK_MENU_BUTTON(recents), FALSE);
 	GtkWidget *popover = gtk_popover_new();
 	g_signal_connect(popover, "show", G_CALLBACK(on_list_show), NULL);

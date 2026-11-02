@@ -1747,6 +1747,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	private native void nativeBackInvoked();
 
+	/* ○ of ATL's navigation bar (navigation_bar.c): Home inside the app, its start activity with
+	 * FLAG_ACTIVITY_CLEAR_TOP: the activities above it finish and it gets onNewIntent() (ContextImpl.startActivity());
+	 * if it is not in the back stack, it starts on top */
+	@Export
+	private void navigateToStart() {
+		Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
+		if (intent != null)
+			startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+	}
+
 	/* AOSP Activity.setMediaController(): the media keys the activity does not handle go to this session */
 	public final void setMediaController(android.media.session.MediaController controller) {
 		getWindow().setMediaController(controller);
