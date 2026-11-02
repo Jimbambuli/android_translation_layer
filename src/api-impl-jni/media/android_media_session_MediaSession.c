@@ -139,10 +139,10 @@ static void dict_insert_string(JNIEnv *env, GVariantDict *dict, const char *key,
 	(*env)->ReleaseStringUTFChars(env, value_str, value);
 }
 
-JNIEXPORT void JNICALL Java_android_media_session_MediaSession_nativeSetState(JNIEnv *env, jobject this, jint status, jlong actions, jlong position, jlong update_time, jfloat speed,
-                                                                              jstring title_str, jstring artist_str, jstring album_str, jlong duration_ms, jstring art_url_str)
+/* the org.mpris.MediaPlayer2.Player object; the MediaStyle notification may export it before the session
+ * set a state */
+MediaPlayer2Player *mpris_player_get(void)
 {
-	const char *playback_states[] = {"Stopped", "Paused", "Playing"};
 	if (!mpris_player) {
 		mpris_player = media_player2_player_skeleton_new();
 		GDBusInterfaceSkeletonClass *skeleton_class = G_DBUS_INTERFACE_SKELETON_GET_CLASS(mpris_player);
@@ -158,7 +158,19 @@ JNIEXPORT void JNICALL Java_android_media_session_MediaSession_nativeSetState(JN
 		                 "signal::handle-seek", on_media_player_handle_seek, NULL,
 		                 "signal::handle-set-position", on_media_player_handle_set_position, NULL,
 		                 NULL);
+		media_player2_player_set_playback_status(mpris_player, "Stopped");
+		media_player2_player_set_rate(mpris_player, 1.0);
+		media_player2_player_set_minimum_rate(mpris_player, 0.25);
+		media_player2_player_set_maximum_rate(mpris_player, 4.0);
 	}
+	return mpris_player;
+}
+
+JNIEXPORT void JNICALL Java_android_media_session_MediaSession_nativeSetState(JNIEnv *env, jobject this, jint status, jlong actions, jlong position, jlong update_time, jfloat speed,
+                                                                              jstring title_str, jstring artist_str, jstring album_str, jlong duration_ms, jstring art_url_str)
+{
+	const char *playback_states[] = {"Stopped", "Paused", "Playing"};
+	mpris_player_get();
 	jlong expected = current_position();
 	gboolean was_playing = is_playing;
 	is_playing = status == 2;
@@ -168,6 +180,7 @@ JNIEXPORT void JNICALL Java_android_media_session_MediaSession_nativeSetState(JN
 	duration = duration_ms;
 
 	media_player2_player_set_playback_status(mpris_player, playback_states[status]);
+	media_player2_player_set_rate(mpris_player, speed > 0 ? speed : 1.0);
 	media_player2_player_set_position(mpris_player, current_position() * 1000);
 	media_player2_player_set_can_control(mpris_player, !!(actions));
 	media_player2_player_set_can_play(mpris_player, !!(actions & (ACTION_PLAY | ACTION_PLAY_PAUSE)));

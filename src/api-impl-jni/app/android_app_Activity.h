@@ -4,6 +4,12 @@
 void activity_start(JNIEnv *env, jobject activity_object);
 void activity_window_ready(void);
 void activity_close_all(void);
+/* the window's close request: TRUE if the app keeps running without its window (a foreground service runs) */
+gboolean activity_window_close_request(void);
+/* shows the app's window again (also after it was closed while a foreground service kept the app running) */
+void activity_window_present(void);
+/* ends the app, even while a foreground service runs */
+void activity_app_quit(void);
 /* the window's child: the pages of the activities and the layers for their window animations */
 GtkWidget *activity_pages_new(void);
 GtkWidget *activity_pages_stack(void);

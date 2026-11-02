@@ -456,11 +456,9 @@ static void activity_update_current(JNIEnv *env)
  * window comes back, the activity on top of the back stack is resumed. */
 static gboolean window_hidden = FALSE;
 
-static void on_window_state_changed(GdkToplevel *toplevel, GParamSpec *pspec, gpointer user_data)
+static void window_set_hidden(gboolean hidden)
 {
 	JNIEnv *env = get_jni_env();
-	GdkToplevelState state = gdk_toplevel_get_state(toplevel);
-	gboolean hidden = !!(state & (GDK_TOPLEVEL_STATE_MINIMIZED | GDK_TOPLEVEL_STATE_SUSPENDED));
 	if (hidden == window_hidden)
 		return;
 	window_hidden = hidden;
@@ -482,6 +480,61 @@ static void on_window_state_changed(GdkToplevel *toplevel, GParamSpec *pspec, gp
 		else
 			activity_update_current(env);
 	}
+}
+
+/* the window closed while a foreground service kept the app running (see activity_window_close_request()) */
+static gboolean window_closed = FALSE;
+static gboolean app_quitting = FALSE;
+static int foreground_services = 0;
+
+static void on_window_state_changed(GdkToplevel *toplevel, GParamSpec *pspec, gpointer user_data)
+{
+	GdkToplevelState state = gdk_toplevel_get_state(toplevel);
+	if (!window_closed)
+		window_set_hidden(!!(state & (GDK_TOPLEVEL_STATE_MINIMIZED | GDK_TOPLEVEL_STATE_SUSPENDED)));
+}
+
+/* The user closed the app's window. Like leaving an Android app whose foreground service runs on (its
+ * process keeps running, e.g. for the music it plays, see Service.startForeground()), the window only hides
+ * then and the shown activity is stopped as with the Home button; the window comes back with
+ * activity_window_present() (MPRIS Raise), and the app ends once no foreground service is left. */
+gboolean activity_window_close_request(void)
+{
+	if (app_quitting || foreground_services <= 0)
+		return FALSE;
+	window_closed = TRUE;
+	window_set_hidden(TRUE);
+	gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
+	return TRUE;
+}
+
+void activity_window_present(void)
+{
+	gtk_window_present(window);
+	if (window_closed) {
+		window_closed = FALSE;
+		window_set_hidden(FALSE);
+	}
+}
+
+void activity_app_quit(void)
+{
+	app_quitting = TRUE;
+	gtk_window_close(window);
+}
+
+static void close_hidden_window(gpointer user_data)
+{
+	if (window_closed && foreground_services <= 0)
+		gtk_window_close(window);
+}
+
+/* Service.startForeground()/stopForeground(): the number of foreground services of the app */
+JNIEXPORT void JNICALL Java_android_app_Service_nativeSetForegroundServices(JNIEnv *env, jclass clazz, jint count)
+{
+	foreground_services = count;
+	if (count <= 0 && window_closed)
+		g_idle_add_once(close_hidden_window, NULL);
 }
 
 void activity_window_ready(void)
@@ -706,7 +759,7 @@ static void pinned_task_expand(void)
 	g_object_unref(page);
 	pinned_task_changed(env, activity, 0, 0);
 	activity_backlog = g_list_prepend(activity_backlog, activity);
-	gtk_window_present(window);
+	activity_window_present();
 	activity_update_current(env);
 }
 

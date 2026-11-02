@@ -50,6 +50,8 @@ char *apk_path;
 
 gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 {
+	if (activity_window_close_request())
+		return TRUE;
 	activity_close_all();
 	/* popups (PopupWindow, WindowManager windows) are popovers in the GtkStack next to the
 	 * activities' pages; GtkStack's dispose removes only pages and loops forever on any other

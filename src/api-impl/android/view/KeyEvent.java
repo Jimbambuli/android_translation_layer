@@ -2294,6 +2294,27 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	}
 
 	/**
+	 * Returns whether this key will be sent to the
+	 * {@link android.media.session.MediaSession.Callback} if not handled.
+	 */
+	public static final boolean isMediaSessionKey(int keyCode) {
+		switch (keyCode) {
+			case KeyEvent.KEYCODE_MEDIA_PLAY:
+			case KeyEvent.KEYCODE_MEDIA_PAUSE:
+			case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+			case KeyEvent.KEYCODE_HEADSETHOOK:
+			case KeyEvent.KEYCODE_MEDIA_STOP:
+			case KeyEvent.KEYCODE_MEDIA_NEXT:
+			case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+			case KeyEvent.KEYCODE_MEDIA_REWIND:
+			case KeyEvent.KEYCODE_MEDIA_RECORD:
+			case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+				return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Whether key will, by default, trigger a click on the focused view.
 	 * @hide
 	 */
