@@ -183,6 +183,7 @@ public final class ImageDecoder implements AutoCloseable {
 	private int mAllocator = ALLOCATOR_DEFAULT;
 	private int mMemoryPolicy = MEMORY_POLICY_DEFAULT;
 	private OnPartialImageListener mOnPartialImageListener;
+	private boolean mUnpremultipliedRequired = false;
 
 	private ImageDecoder(int width, int height, String mimeType) {
 		mWidth = width;
@@ -276,6 +277,15 @@ public final class ImageDecoder implements AutoCloseable {
 		return mMemoryPolicy;
 	}
 
+	/* AOSP ImageDecoder.setUnpremultipliedRequired(boolean) / isUnpremultipliedRequired() */
+	public void setUnpremultipliedRequired(boolean unpremultipliedRequired) {
+		mUnpremultipliedRequired = unpremultipliedRequired;
+	}
+
+	public boolean isUnpremultipliedRequired() {
+		return mUnpremultipliedRequired;
+	}
+
 	/**
 	 * Specify the desired {@link ColorSpace} for the output. Images are decoded to sRGB.
 	 */
@@ -367,6 +377,8 @@ public final class ImageDecoder implements AutoCloseable {
 		if (decoder.mDesiredWidth != decoder.mWidth || decoder.mDesiredHeight != decoder.mHeight) {
 			decoded = Bitmap.createScaledBitmap(decoded, decoder.mDesiredWidth, decoder.mDesiredHeight, true);
 		}
+		if (decoder.mUnpremultipliedRequired)
+			decoded.setPremultiplied(false);
 		return decoded;
 	}
 }

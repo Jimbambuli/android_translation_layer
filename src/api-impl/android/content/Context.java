@@ -139,6 +139,7 @@ public abstract class Context {
 	public static final String WIFI_P2P_SERVICE = "wifip2p";
 	public static final String NFC_SERVICE = "nfc";
 	public static final String MEDIA_SESSION_SERVICE = "media_session";
+	public static final String DOMAIN_VERIFICATION_SERVICE = "domain_verification";
 
 
 	public static PackageManager package_manager;

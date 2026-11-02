@@ -65,6 +65,71 @@ public final class NetworkCapabilities {
 	private long mNetworkCapabilities = DEFAULT_CAPABILITIES;
 	private long mTransportTypes;
 
+	public NetworkCapabilities() {
+	}
+
+	public NetworkCapabilities(NetworkCapabilities nc) {
+		if (nc != null) {
+			mNetworkCapabilities = nc.mNetworkCapabilities;
+			mTransportTypes = nc.mTransportTypes;
+		}
+	}
+
+	/** @hide AOSP NetworkCapabilities.clearAll() */
+	public void clearAll() {
+		mNetworkCapabilities = 0;
+		mTransportTypes = 0;
+	}
+
+	/* AOSP BitUtils.unpackBits() */
+	private static int[] unpackBits(long val) {
+		int size = Long.bitCount(val);
+		int[] result = new int[size];
+		int index = 0;
+		int bitPos = 0;
+		while (val != 0) {
+			if ((val & 1) == 1)
+				result[index++] = bitPos;
+			val = val >>> 1;
+			bitPos++;
+		}
+		return result;
+	}
+
+	public int[] getCapabilities() {
+		return unpackBits(mNetworkCapabilities);
+	}
+
+	public int[] getTransportTypes() {
+		return unpackBits(mTransportTypes);
+	}
+
+	/** @hide AOSP satisfiedByNetCapabilities() and satisfiedByTransportTypes(), the parts kept here */
+	public boolean satisfiedByNetworkCapabilities(NetworkCapabilities nc) {
+		return nc != null
+		    && (nc.mNetworkCapabilities & mNetworkCapabilities) == mNetworkCapabilities
+		    && (mTransportTypes == 0 || (mTransportTypes & nc.mTransportTypes) != 0);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (!(obj instanceof NetworkCapabilities))
+			return false;
+		NetworkCapabilities that = (NetworkCapabilities)obj;
+		return mNetworkCapabilities == that.mNetworkCapabilities && mTransportTypes == that.mTransportTypes;
+	}
+
+	@Override
+	public int hashCode() {
+		return (int)(mNetworkCapabilities ^ (mNetworkCapabilities >>> 32)) * 31 + (int)mTransportTypes;
+	}
+
+	@Override
+	public String toString() {
+		return "NetworkCapabilities: Capabilities: " + java.util.Arrays.toString(getCapabilities())
+		    + " Transports: " + java.util.Arrays.toString(getTransportTypes());
+	}
+
 	public boolean hasCapability(int capability) {
 		if (!isValidCapability(capability))
 			return false;

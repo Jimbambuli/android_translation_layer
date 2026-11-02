@@ -99,3 +99,7 @@ The following environment variables are recognized by the main executable:
 ---
 
 `ATL_STUB_HITS=FILE` - count the calls of ATL's stub methods (found by their bytecode at build time) and append them to FILE once a second (diagnosis, e.g. atl-doctor; see src/api-impl/android/atl/ATLStubHits.java). Off: one static check per stub call.
+
+`ATL_INSTALLED_APKS_DIR=DIR` - the directory with the installed APKs (`PACKAGE.apk`) instead of `_installed_apks_` in the app data directory; PackageManager finds other installed packages there (e.g. for an app store), `--install` copies there. For a launcher that keeps the installed APKs itself.
+
+`ATL_INSTALL_COMMAND=PROGRAM [ARGS]` - the program that installs the APKs of a committed PackageInstaller session after the app started the confirmation (ACTION_CONFIRM_INSTALL). ATL runs it with the base and split APKs as further arguments and ATL_INSTALLER_PACKAGE / ATL_INSTALLER_LABEL (the installing app) in the environment; it asks the user and installs. Its exit status is the PackageInstaller status (0 installed, 3 aborted by the user, 7 incompatible, others failed), its last line on stderr the status message. Unset: a single APK goes to `android-translation-layer --install`, split APKs fail.

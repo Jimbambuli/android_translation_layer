@@ -2272,6 +2272,11 @@ public class PackageParser {
 				    ANDROID_RESOURCES, "scheme");
 				if (!TextUtils.isEmpty(scheme))
 					outInfo.addDataScheme(scheme);
+				/* AOSP ParsedIntentInfoUtils.parseData(): host and port make an authority */
+				String host = parser.getAttributeValue(ANDROID_RESOURCES, "host");
+				String port = parser.getAttributeValue(ANDROID_RESOURCES, "port");
+				if (host != null)
+					outInfo.addDataAuthority(host, port);
 				XmlUtils.skipCurrentTag(parser);
 			} else if (!RIGID_PARSER) {
 				Slog.w(TAG, "Unknown element under <intent-filter>: "

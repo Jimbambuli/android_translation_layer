@@ -27,6 +27,7 @@ import android.content.Context;
 import android.content.RestrictionsManager;
 import android.content.pm.CrossProfileApps;
 import android.content.pm.ShortcutManager;
+import android.content.pm.verify.domain.DomainVerificationManager;
 import android.hardware.ConsumerIrManager;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
@@ -442,6 +443,13 @@ public final class SystemServiceRegistry {
             @Override
             public ShortcutManager createService(ContextImpl ctx) {
                 return new ShortcutManager();
+            }});
+
+        registerService(Context.DOMAIN_VERIFICATION_SERVICE, DomainVerificationManager.class,
+                new CachedServiceFetcher<DomainVerificationManager>() {
+            @Override
+            public DomainVerificationManager createService(ContextImpl ctx) {
+                return new DomainVerificationManager(ctx);
             }});
 
         registerService(Context.AUTOFILL_MANAGER_SERVICE, AutofillManager.class,
