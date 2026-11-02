@@ -231,8 +231,12 @@ public abstract class Context {
 
 	public abstract ApplicationInfo getApplicationInfo();
 
+	/* the application of the context's own package, like AOSP's LoadedApk.getApplication() */
 	public Context getApplicationContext() {
-		return ATLLoadedApp.getPrimaryApplication().getApplication();
+		ATLLoadedApp app = get_atl_loaded_app();
+		if (app == null || "android".equals(app.pkg.packageName))
+			app = ATLLoadedApp.getPrimaryApplication();
+		return app.getApplication();
 	}
 
 	public ContentResolver getContentResolver() {
@@ -315,9 +319,12 @@ public abstract class Context {
 
 	private final Object mSync = new Object();
 
+	/* like AOSP's LoadedApk.getDataDirFile(): the directory of the context's own package, so a
+	 * package loaded into the app's process (Play Services) keeps its own data */
 	private File getDataDirFile() {
 		if (data_dir == null) {
-			data_dir = android.os.Environment.getExternalStorageDirectory();
+			ApplicationInfo info = getApplicationInfo();
+			data_dir = info != null && info.dataDir != null ? new File(info.dataDir) : android.os.Environment.getExternalStorageDirectory();
 		}
 		return data_dir;
 	}
@@ -484,12 +491,14 @@ public abstract class Context {
 	public SharedPreferences getSharedPreferences(String name, int mode) {
 		if (Log.isLoggable(TAG, Log.VERBOSE))
 			Slog.v(TAG, "\n\n...> getSharedPreferences(" + name + ")\n\n");
-		if (sharedPrefs.containsKey(name)) {
-			return sharedPrefs.get(name);
-		} else {
-			File prefsFile = getSharedPrefsFile(name);
-			SharedPreferences prefs = new SharedPreferencesImpl(prefsFile, mode);
-			sharedPrefs.put(name, prefs);
+		/* by file as AOSP's sSharedPrefsCache: packages in the same process have their own */
+		File prefsFile = getSharedPrefsFile(name);
+		synchronized (sharedPrefs) {
+			SharedPreferences prefs = sharedPrefs.get(prefsFile.getPath());
+			if (prefs == null) {
+				prefs = new SharedPreferencesImpl(prefsFile, mode);
+				sharedPrefs.put(prefsFile.getPath(), prefs);
+			}
 			return prefs;
 		}
 	}
@@ -781,8 +790,11 @@ public abstract class Context {
 	}
 
 	public boolean deleteSharedPreferences(String name) {
-		getSharedPrefsFile(name).delete();
-		sharedPrefs.remove(name);
+		File prefsFile = getSharedPrefsFile(name);
+		prefsFile.delete();
+		synchronized (sharedPrefs) {
+			sharedPrefs.remove(prefsFile.getPath());
+		}
 		return true;
 	}
 

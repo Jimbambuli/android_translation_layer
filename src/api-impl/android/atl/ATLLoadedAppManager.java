@@ -94,6 +94,7 @@ public final class ATLLoadedAppManager {
 			pkg = packageParser.parsePackage(installed_apk_location,
 			                                 installed_apk_location.getPath(), new DisplayMetrics(), 0);
 			if (pkg != null) {
+				setInstalledPaths(pkg);
 				packageParser.collectCertificates(pkg, 0);
 				if (ATLLoadedApp.play_services.contains(packageName)) {
 					ATLSigHelper.addGMSSignatures(pkg);
@@ -119,7 +120,7 @@ public final class ATLLoadedAppManager {
 			}
 			Slog.i(TAG, "Attempting to load " + packageName + " into " + ATLLoadedApp.getPrimaryApplication().pkg.packageName);
 			File installed_apk_location = new File(ATLPaths.installed_apks_dir, packageName + ".apk");
-			File installed_lib_location = new File(ATLPaths.app_data_dir_base, packageName + "_/lib");
+			File installed_lib_location = new File(getDataDir(packageName), "lib");
 			if (!installed_apk_location.isFile()) {
 				if (ATLLoadedApp.play_services.contains(packageName)) {
 					return loadGStub(packageName);
@@ -130,8 +131,8 @@ public final class ATLLoadedAppManager {
 			String lib_path = installed_lib_location.isDirectory() ? installed_lib_location.getPath() : null;
 			try {
 				app = ATLLoadedApp.loadFromPath(apk_path, lib_path, apk_path);
+				setInstalledPaths(app.pkg);
 				app.pkg.applicationInfo.nativeLibraryDir = lib_path;
-				app.pkg.applicationInfo.sourceDir = apk_path;
 				Slog.i(TAG, "loadApplication(\"" + packageName + "\")");
 				loaded_packages.put(packageName, app.pkg);
 				loaded_apps.put(packageName, app);
@@ -141,6 +142,23 @@ public final class ATLLoadedAppManager {
 			}
 		}
 		return app;
+	}
+
+	/**
+	 * The data directory of an installed package: the one main.c gives the package when it is
+	 * started from its file in _installed_apks_, so the package keeps its data whether it runs as
+	 * the app or is loaded into another app's process.
+	 */
+	public static File getDataDir(String packageName) {
+		return new File(ATLPaths.app_data_dir_base, packageName + ".apk_");
+	}
+
+	private static void setInstalledPaths(PackageParser.Package pkg) {
+		File apk = new File(ATLPaths.installed_apks_dir, pkg.packageName + ".apk");
+		pkg.applicationInfo.sourceDir = apk.getPath();
+		pkg.applicationInfo.publicSourceDir = apk.getPath();
+		pkg.applicationInfo.dataDir = getDataDir(pkg.packageName).getPath();
+		pkg.applicationInfo.nativeLibraryDir = new File(getDataDir(pkg.packageName), "lib").getPath();
 	}
 
 	/**
