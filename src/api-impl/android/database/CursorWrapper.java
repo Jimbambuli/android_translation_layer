@@ -205,6 +205,10 @@ public class CursorWrapper implements Cursor {
 	}
 
 	@Override
+	public void setExtras(Bundle extras) {
+		cursor.setExtras(extras);
+	}
+
 	public Bundle getExtras() {
 		return cursor.getExtras();
 	}

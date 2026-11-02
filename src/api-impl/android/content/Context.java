@@ -531,6 +531,25 @@ public abstract class Context {
 		return checkCallingOrSelfPermission(permission);
 	}
 
+	/* ATL runs one app and no IPC: like AOSP outside of a binder call, there is no calling process that could
+	 * hold a permission, and the app itself may access its own URIs */
+	public int checkCallingPermission(String permission) {
+		return PackageManager.PERMISSION_DENIED;
+	}
+
+	public void enforceCallingPermission(String permission, String message) {
+		if (checkCallingPermission(permission) != PackageManager.PERMISSION_GRANTED)
+			throw new SecurityException((message != null ? message + ": " : "") + "Neither user nor current process has " + permission + ".");
+	}
+
+	public int checkCallingUriPermission(Uri uri, int modeFlags) {
+		return PackageManager.PERMISSION_DENIED;
+	}
+
+	public int checkCallingOrSelfUriPermission(Uri uri, int modeFlags) {
+		return PackageManager.PERMISSION_GRANTED;
+	}
+
 	public void registerComponentCallbacks(ComponentCallbacks callbacks) {}
 
 	public void unregisterComponentCallbacks(ComponentCallbacks callbacks) {}
