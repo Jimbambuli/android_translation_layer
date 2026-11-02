@@ -211,6 +211,11 @@ public class GskCanvas extends DisplayListCanvas {
 		native_drawRenderNode(snapshot, node.getGskNode());
 	}
 
+	@Override
+	public void drawRenderNode(android.graphics.RenderNode node) {
+		native_drawRenderNode(snapshot, node.getGskNode());
+	}
+
 	/* Stretch of the view this canvas records, set by EdgeEffect.draw(). In AOSP this is the
 	 * StretchEffect of the view's RenderNode (RenderNode.stretch(), hwui StretchEffect::mergeWith());
 	 * the WrapperWidget clears it before View.draw() and applies it to what the view drew. */
