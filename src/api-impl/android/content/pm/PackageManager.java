@@ -1922,6 +1922,11 @@ public class PackageManager {
 				return PERMISSION_GRANTED;
 			case "android.permission.ACCESS_NETWORK_STATE":
 				return PERMISSION_GRANTED;
+			// ATL serves these APIs without asking the user, so denying them only misleads the app
+			case "android.permission.GET_ACCOUNTS":
+			case "android.permission.READ_PHONE_STATE":
+			case "android.permission.POST_NOTIFICATIONS":
+				return PERMISSION_GRANTED;
 			// only tell the app that it can access location if it *actually* can
 			// (until we find apps that refuse to launch without being lied to anyway)
 			case "android.permission.ACCESS_FINE_LOCATION":
