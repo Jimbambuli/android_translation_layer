@@ -27,11 +27,38 @@ public class Binder implements IBinder {
 
 	public static void restoreCallingIdentity(long identityToken) {}
 
+	/* AOSP Binder.queryLocalInterface(): in the process that implements the interface, Stub.asInterface()
+	 * gets the implementation itself instead of a proxy */
 	@Override
-	public IInterface queryLocalInterface(String descriptor) { return null; }
+	public IInterface queryLocalInterface(String descriptor) {
+		if (mDescriptor != null && mDescriptor.equals(descriptor)) {
+			return mOwner;
+		}
+		return null;
+	}
 
+	/* AOSP Binder.transact(): the call stays in the process, onTransact() handles it. (Like ATL's IBinder,
+	 * without "throws RemoteException": a RemoteException of the app's onTransact() passes through unchecked.) */
 	@Override
-	public boolean transact(int code, Parcel data, Parcel reply, int flags) { return false; }
+	public final boolean transact(int code, Parcel data, Parcel reply, int flags) {
+		if (data != null) {
+			data.setDataPosition(0);
+		}
+		boolean r = onTransact(code, data, reply, flags);
+		if (reply != null) {
+			reply.setDataPosition(0);
+		}
+		return r;
+	}
+
+	/* AOSP Binder.onTransact() without dump, shell command and sysprops transactions */
+	protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) {
+		if (code == INTERFACE_TRANSACTION) {
+			reply.writeString(getInterfaceDescriptor());
+			return true;
+		}
+		return false;
+	}
 
 	public static int getCallingUid() { return ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.uid; }
 

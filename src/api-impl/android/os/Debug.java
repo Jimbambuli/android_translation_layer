@@ -240,4 +240,23 @@ public final class Debug {
 	public static void startNativeTracing() {}
 
 	public static void stopNativeTracing() {}
+
+	/* AOSP Debug.getCaller()/getCallers() */
+	private static String getCaller(StackTraceElement callStack[], int depth) {
+		// callStack[4] is the caller of the method that called getCallers()
+		if (4 + depth >= callStack.length) {
+			return "<bottom of call stack>";
+		}
+		StackTraceElement caller = callStack[4 + depth];
+		return caller.getClassName() + "." + caller.getMethodName() + ":" + caller.getLineNumber();
+	}
+
+	public static String getCallers(final int depth) {
+		final StackTraceElement[] callStack = Thread.currentThread().getStackTrace();
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < depth; i++) {
+			sb.append(getCaller(callStack, i)).append(" ");
+		}
+		return sb.toString();
+	}
 }
