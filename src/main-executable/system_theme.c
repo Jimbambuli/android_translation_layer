@@ -57,6 +57,26 @@ static char *config_file(const char *gtk_dir, const char *name)
  * gtk-xft-dpi (for X11, the scale comes from the compositor) */
 static const char *string_settings[] = {"gtk-icon-theme-name", "gtk-cursor-theme-name", "gtk-decoration-layout"};
 
+/* an icon theme that is not installed would hide GTK's own Adwaita icons (GTK then finds only hicolor); in a
+ * Flatpak, Icontheme extensions are in /usr/share/runtime/share, one of the system data dirs */
+static gboolean icon_theme_installed(const char *name)
+{
+	char *path = g_build_filename(g_get_user_data_dir(), "icons", name, "index.theme", NULL);
+	gboolean found = g_file_test(path, G_FILE_TEST_EXISTS);
+	g_free(path);
+	if (!found) {
+		path = g_build_filename(g_get_home_dir(), ".icons", name, "index.theme", NULL);
+		found = g_file_test(path, G_FILE_TEST_EXISTS);
+		g_free(path);
+	}
+	for (const char *const *dir = g_get_system_data_dirs(); !found && *dir; dir++) {
+		path = g_build_filename(*dir, "icons", name, "index.theme", NULL);
+		found = g_file_test(path, G_FILE_TEST_EXISTS);
+		g_free(path);
+	}
+	return found;
+}
+
 static char *apply_settings(void)
 {
 	GKeyFile *key_file = g_key_file_new();
@@ -68,7 +88,7 @@ static char *apply_settings(void)
 		GtkSettings *settings = gtk_settings_get_default();
 		for (int i = 0; i < G_N_ELEMENTS(string_settings); i++) {
 			char *value = g_key_file_get_string(key_file, "Settings", string_settings[i], NULL);
-			if (value)
+			if (value && (strcmp(string_settings[i], "gtk-icon-theme-name") || icon_theme_installed(g_strstrip(value))))
 				g_object_set(settings, string_settings[i], g_strstrip(value), NULL);
 			g_free(value);
 		}
