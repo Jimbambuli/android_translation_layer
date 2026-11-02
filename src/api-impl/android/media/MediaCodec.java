@@ -285,7 +285,14 @@ public class MediaCodec {
 		native_codec = 0;
 	}
 
+	/* AOSP MediaCodec.setOutputSurface(): the video codec renders into another surface from now on (a player
+	 * moves its video to another SurfaceView, e.g. into picture-in-picture); a surface that is no
+	 * SurfaceView's (a placeholder) gets no frames */
 	public void setOutputSurface(Surface surface) {
+		if (surface == null)
+			throw new IllegalArgumentException("surface must not be null");
+		if (native_codec != 0)
+			native_setOutputSurface(native_codec, surface.widget);
 	}
 
 	public void setParameters(Bundle parameters) {}
@@ -306,6 +313,7 @@ public class MediaCodec {
 	}
 
 	private native long native_constructor(String codecName);
+	private native void native_setOutputSurface(long codec, long surfaceWidget);
 	private native void native_configure_audio(long codec, ByteBuffer extradata, int sampleRate, int channelCount);
 	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface);
 	private native void native_start(long codec);
