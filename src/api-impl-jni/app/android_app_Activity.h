@@ -19,6 +19,8 @@ void activity_window_add_key_controller(GtkWindow *window);
 /* for the navigation bar: the activities from the shown one (index 0) down to the first one */
 int activity_count(void);
 char *activity_title(int index);
+char *activity_class_name(int index);
+gboolean activity_same(int index, int other);
 void activity_return_to(int index);
 /* the global configuration changed: the shown activity is relaunched or told (see Activity.ensureActivityConfiguration()) */
 void activity_ensure_configuration(void);

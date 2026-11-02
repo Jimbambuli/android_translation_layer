@@ -816,6 +816,16 @@ char *activity_title(int index)
 	if (title && *title)
 		return title;
 	g_free(title);
+	return activity_class_name(index);
+}
+
+/* the simple name of the class of the activity at index (0 is the shown one) */
+char *activity_class_name(int index)
+{
+	JNIEnv *env = get_jni_env();
+	jobject activity = g_list_nth_data(activity_backlog, index);
+	if (!activity)
+		return NULL;
 	jclass class_class = (*env)->FindClass(env, "java/lang/Class");
 	jmethodID simple_name = (*env)->GetMethodID(env, class_class, "getSimpleName", "()Ljava/lang/String;");
 	jobject name = (*env)->CallObjectMethod(env, _CLASS(activity), simple_name);
@@ -824,9 +834,18 @@ char *activity_title(int index)
 		(*env)->ExceptionClear(env);
 		return NULL;
 	}
-	title = java_string(env, name);
+	char *class_name = java_string(env, name);
 	(*env)->DeleteLocalRef(env, name);
-	return title;
+	return class_name;
+}
+
+/* whether the back stack holds the same activity at index and at other */
+gboolean activity_same(int index, int other)
+{
+	JNIEnv *env = get_jni_env();
+	jobject a = g_list_nth_data(activity_backlog, index);
+	jobject b = g_list_nth_data(activity_backlog, other);
+	return a && b && (*env)->IsSameObject(env, a, b);
 }
 
 /* back to the activity at index: the ones above it finish, the shown one first (as pressing back would) */
