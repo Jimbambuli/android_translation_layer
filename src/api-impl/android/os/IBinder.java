@@ -25,7 +25,7 @@ public interface IBinder {
 
 	public IInterface queryLocalInterface(String descriptor);
 
-	public boolean transact(int code, Parcel data, Parcel reply, int flags);
+	public boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException;
 
 	public String getInterfaceDescriptor();
 }

@@ -37,10 +37,9 @@ public class Binder implements IBinder {
 		return null;
 	}
 
-	/* AOSP Binder.transact(): the call stays in the process, onTransact() handles it. (Like ATL's IBinder,
-	 * without "throws RemoteException": a RemoteException of the app's onTransact() passes through unchecked.) */
+	/* AOSP Binder.transact(): the call stays in the process, onTransact() handles it */
 	@Override
-	public final boolean transact(int code, Parcel data, Parcel reply, int flags) {
+	public final boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
 		if (data != null) {
 			data.setDataPosition(0);
 		}
@@ -52,7 +51,7 @@ public class Binder implements IBinder {
 	}
 
 	/* AOSP Binder.onTransact() without dump, shell command and sysprops transactions */
-	protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) {
+	protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
 		if (code == INTERFACE_TRANSACTION) {
 			reply.writeString(getInterfaceDescriptor());
 			return true;
