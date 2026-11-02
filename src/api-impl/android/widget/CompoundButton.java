@@ -35,6 +35,47 @@ public abstract class CompoundButton extends Button implements Checkable {
 		}
 		typedArray.recycle();
 		setSwitchColorsFromTheme(context);
+		/* AndroidX SwitchCompat/MaterialSwitch draw thumb and track in onDraw() like AOSP's Switch;
+		 * the GtkSwitch would be drawn under them, so it stays as state holder only */
+		mDrawsItself = overridesOnDraw(getClass()) && native_hideSwitch(widget);
+	}
+
+	private boolean mDrawsItself;
+
+	private static boolean overridesOnDraw(Class<?> cls) {
+		for (; cls != null && !cls.getName().startsWith("android.widget."); cls = cls.getSuperclass()) {
+			try {
+				cls.getDeclaredMethod("onDraw", android.graphics.Canvas.class);
+				return true;
+			} catch (NoSuchMethodException e) {
+			}
+		}
+		return false;
+	}
+
+	/* hides the GtkSwitch; false for the other native widgets (CheckBox, RadioButton) */
+	private native boolean native_hideSwitch(long widget);
+
+	/* AOSP's TextView makes room for the compound paddings, through which SwitchCompat reserves the
+	 * width of the switch it draws; the native measurement only knows the label */
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+		if (!mDrawsItself)
+			return;
+		int extra = getCompoundPaddingLeft() - getPaddingLeft() + getCompoundPaddingRight() - getPaddingRight();
+		if (extra > 0)
+			setMeasuredDimension(resolveSizeAndState(getMeasuredWidth() + extra, widthMeasureSpec, 0), getMeasuredHeightAndState());
+	}
+
+	/* AOSP: a click toggles the button. The shown GtkSwitch toggles itself; a switch the app
+	 * draws gets its clicks through onTouchEvent() -> performClick() like on AOSP, which clicks
+	 * only clickable views (the switch of a SwitchPreference is not: the row toggles it) */
+	@Override
+	public boolean performClick() {
+		if (mDrawsItself && isClickable())
+			toggle();
+		return super.performClick();
 	}
 
 	/* like Material's switch_thumb_material and switch_track_material: the thumb is
