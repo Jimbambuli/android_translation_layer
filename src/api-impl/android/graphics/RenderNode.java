@@ -7,9 +7,10 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * ATL's display list is the GSK render node of android.view.RenderNode, which this class extends.
  * As in hwui, the node is drawn at its position (left, top) with the property transforms, clipped
- * to its bounds and to a rectangular outline, and with its alpha. Not drawn: shadows (elevation,
- * translationZ, shadow colors), the 3D rotations and camera distance, the render effect, the
- * compositing layer paint and the animation matrix; their values are kept and returned.
+ * to its bounds and to a rectangular or rounded outline, with its alpha, its blur and offset render
+ * effects and the elevation shadow of its outline (light over the node, see createShadowNode()).
+ * Not drawn: the 3D rotations and camera distance, the other render effects, the compositing layer
+ * paint and the animation matrix; their values are kept and returned.
  */
 public final class RenderNode extends android.view.RenderNode {
 	private static final AtomicLong sNextUniqueId = new AtomicLong(1);
@@ -111,25 +112,79 @@ public final class RenderNode extends android.view.RenderNode {
 		return hasDisplayList;
 	}
 
-	/* the property transforms, with hwui's order: clip in local coordinates, then translate by
-	 * the position and translation and transform around the pivot */
+	/* the property transforms, with hwui's order: the render effect, the clip in local coordinates (a
+	 * rounded outline clips round), the elevation shadow outside of it, then translate by the position and
+	 * translation and transform around the pivot */
 	@Override
 	protected long applyProperties(long node) {
+		long effected = 0;
+		if (renderEffect != null) {
+			float[] effect = new float[3];
+			renderEffect.accumulate(effect);
+			effected = nativeApplyEffect(node, (float)Math.sqrt(effect[0]), effect[1], effect[2]);
+			node = effected;
+		}
 		boolean clipToRect = false;
 		Rect clip = null;
+		float clipRadius = 0;
 		if (clipToOutline && outline != null && outline.getRect(outlineRect)) {
 			clip = outlineRect;
+			clipRadius = Math.max(outline.getRadius(), 0);
 		}
 		if (clipRect != null) {
 			clip = clip == null ? clipRect : new Rect(clip);
 			if (clip != clipRect && !clip.intersect(clipRect))
 				clip.setEmpty();
+			if (clip != outlineRect)
+				clipRadius = 0;
 		}
-		return nativeApplyProperties(node, right - left, bottom - top, clipToBounds,
-		                             clip != null, clip != null ? clip.left : 0, clip != null ? clip.top : 0,
-		                             clip != null ? clip.right : 0, clip != null ? clip.bottom : 0,
-		                             getScaleX(), getScaleY(), left + getTranslationX(), top + getTranslationY(),
-		                             getRotationZ(), getPivotX(), getPivotY(), getAlpha());
+		long shadow = createShadowNode();
+		long transformed = nativeApplyProperties(node, right - left, bottom - top, clipToBounds,
+		                                         clip != null, clip != null ? clip.left : 0, clip != null ? clip.top : 0,
+		                                         clip != null ? clip.right : 0, clip != null ? clip.bottom : 0, clipRadius, shadow,
+		                                         getScaleX(), getScaleY(), left + getTranslationX(), top + getTranslationY(),
+		                                         getRotationZ(), getPivotX(), getPivotY(), getAlpha());
+		if (shadow != 0)
+			nativeUnref(shadow);
+		if (effected != 0)
+			nativeUnref(effected);
+		return transformed;
+	}
+
+	/* hwui's LightingInfo with the light source of the Material theme (light_z, light_radius,
+	 * ambient_shadow_alpha and spot_shadow_alpha of the framework); a render node knows no window */
+	private static final float LIGHT_Z_DP = 500;
+	private static final float LIGHT_RADIUS_DP = 800;
+	private static final float AMBIENT_SHADOW_ALPHA = 0.039f;
+	private static final float SPOT_SHADOW_ALPHA = 0.19f;
+
+	/* the shadow of the outline at the node's Z, as hwui draws it for a node with elevation (0 for none) */
+	private long createShadowNode() {
+		float z = getElevation() + translationZ;
+		if (z <= 0 || outline == null || outline.isEmpty() || outline.getAlpha() <= 0)
+			return 0;
+		RectF bounds = new RectF();
+		float radius = 0;
+		if (outline.getRect(outlineRect)) {
+			bounds.set(outlineRect);
+			radius = Math.max(outline.getRadius(), 0);
+		} else if (outline.mPath != null) { // convex path: its bounds
+			outline.mPath.computeBounds(bounds, true);
+		} else {
+			return 0;
+		}
+		float casterAlpha = getAlpha() * outline.getAlpha();
+		float density = android.content.res.Resources.getSystem().getDisplayMetrics().density;
+		return nativeCreateShadowNode(bounds.left, bounds.top, bounds.right, bounds.bottom, radius, z,
+		                              shadowColor(ambientShadowColor, AMBIENT_SHADOW_ALPHA * casterAlpha),
+		                              shadowColor(spotShadowColor, SPOT_SHADOW_ALPHA * casterAlpha),
+		                              LIGHT_Z_DP * density, LIGHT_RADIUS_DP * density);
+	}
+
+	/* hwui multiplies the shadow color's alpha by the light's alpha and the caster's */
+	private static int shadowColor(int color, float alpha) {
+		int a = Math.round(Color.alpha(color) * Math.min(Math.max(alpha, 0), 1));
+		return (a << 24) | (color & 0xffffff);
 	}
 
 	/**
@@ -358,12 +413,22 @@ public final class RenderNode extends android.view.RenderNode {
 	}
 
 	public boolean hasShadow() {
-		return false;
+		return getElevation() + translationZ > 0 && outline != null && !outline.isEmpty() && outline.getAlpha() > 0;
+	}
+
+	@Override
+	public boolean setElevation(float elevation) {
+		boolean changed = super.setElevation(elevation);
+		if (changed)
+			invalidateGskNode();
+		return changed;
 	}
 
 	public boolean setTranslationZ(float translationZ) {
 		boolean changed = this.translationZ != translationZ;
 		this.translationZ = translationZ;
+		if (changed)
+			invalidateGskNode();
 		return changed;
 	}
 
@@ -374,6 +439,8 @@ public final class RenderNode extends android.view.RenderNode {
 	public boolean setAmbientShadowColor(int color) {
 		boolean changed = ambientShadowColor != color;
 		ambientShadowColor = color;
+		if (changed)
+			invalidateGskNode();
 		return changed;
 	}
 
@@ -384,6 +451,8 @@ public final class RenderNode extends android.view.RenderNode {
 	public boolean setSpotShadowColor(int color) {
 		boolean changed = spotShadowColor != color;
 		spotShadowColor = color;
+		if (changed)
+			invalidateGskNode();
 		return changed;
 	}
 
@@ -420,6 +489,8 @@ public final class RenderNode extends android.view.RenderNode {
 	public boolean setRenderEffect(RenderEffect renderEffect) {
 		boolean changed = this.renderEffect != renderEffect;
 		this.renderEffect = renderEffect;
+		if (changed)
+			invalidateGskNode();
 		return changed;
 	}
 

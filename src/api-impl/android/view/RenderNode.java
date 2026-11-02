@@ -44,14 +44,20 @@ public class RenderNode {
 	private native long nativeTransform(long node, float scaleX, float scaleY, float translationX, float translationY, float rotation, float pivotX, float pivotY);
 	private native long nativeClip(long node, float left, float top, float right, float bottom);
 	private native long nativeStretch(long node, float width, float height, float stretchX, float stretchY);
-	private native void nativeUnref(long node);
+	protected native void nativeUnref(long node);
 	private native long nativeAddStubNode(long snapshot);
 	private native long nativeCreateEmpyNode();
 	/* the clip, transforms and alpha of android.graphics.RenderNode; returns a new node */
 	protected native long nativeApplyProperties(long node, float width, float height, boolean clipToBounds,
 	                                            boolean clipToRect, float clipLeft, float clipTop, float clipRight, float clipBottom,
+	                                            float clipRadius, long shadowNode,
 	                                            float scaleX, float scaleY, float translationX, float translationY,
 	                                            float rotation, float pivotX, float pivotY, float alpha);
+	/* the elevation shadow of an outline rectangle, a new node */
+	protected static native long nativeCreateShadowNode(float left, float top, float right, float bottom, float radius, float z,
+	                                                    int ambientColor, int spotColor, float lightZ, float lightRadius);
+	/* a blur of sigma and an offset (RenderEffect); returns a new node */
+	protected static native long nativeApplyEffect(long node, float sigma, float offsetX, float offsetY);
 
 	public static RenderNode create(String name, View view) {
 		return new RenderNode();

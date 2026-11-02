@@ -139,7 +139,7 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeTransform(JNIEnv *env
 
 /* android.graphics.RenderNode: like hwui, clip in the node's own coordinates, then apply the
  * alpha and the transforms (position and translation, scale and rotation around the pivot) */
-JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties(JNIEnv *env, jobject this, jlong node_ptr, jfloat width, jfloat height, jboolean clip_to_bounds, jboolean clip_to_rect, jfloat clip_left, jfloat clip_top, jfloat clip_right, jfloat clip_bottom, jfloat scale_x, jfloat scale_y, jfloat translate_x, jfloat translate_y, jfloat rotate, jfloat pivot_x, jfloat pivot_y, jfloat alpha)
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties(JNIEnv *env, jobject this, jlong node_ptr, jfloat width, jfloat height, jboolean clip_to_bounds, jboolean clip_to_rect, jfloat clip_left, jfloat clip_top, jfloat clip_right, jfloat clip_bottom, jfloat clip_radius, jlong shadow_ptr, jfloat scale_x, jfloat scale_y, jfloat translate_x, jfloat translate_y, jfloat rotate, jfloat pivot_x, jfloat pivot_y, jfloat alpha)
 {
 	GskRenderNode *node = gsk_render_node_ref(_PTR(node_ptr));
 	GskRenderNode *new_node;
@@ -149,7 +149,14 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties(JNIEn
 		node = new_node;
 	}
 	if (clip_to_rect) {
-		new_node = gsk_clip_node_new(node, &GRAPHENE_RECT_INIT(clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top));
+		graphene_rect_t clip = GRAPHENE_RECT_INIT(clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top);
+		if (clip_radius > 0) {
+			GskRoundedRect rounded;
+			gsk_rounded_rect_init_from_rect(&rounded, &clip, clip_radius);
+			new_node = gsk_rounded_clip_node_new(node, &rounded);
+		} else {
+			new_node = gsk_clip_node_new(node, &clip);
+		}
 		gsk_render_node_unref(node);
 		node = new_node;
 	}
@@ -158,9 +165,48 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties(JNIEn
 		gsk_render_node_unref(node);
 		node = new_node;
 	}
+	/* the shadow is drawn before the node and outside its clip; its alpha includes the node's */
+	if (shadow_ptr) {
+		GskRenderNode *children[] = {_PTR(shadow_ptr), node};
+		new_node = gsk_container_node_new(children, 2);
+		gsk_render_node_unref(node);
+		node = new_node;
+	}
 	new_node = _PTR(Java_android_view_RenderNode_nativeTransform(env, this, _INTPTR(node), scale_x, scale_y, translate_x, translate_y, rotate, pivot_x, pivot_y));
 	gsk_render_node_unref(node);
 	return _INTPTR(new_node);
+}
+
+/* the elevation shadow of an outline (see atl_snapshot_shadow()); hwui places the light relative to the window,
+ * which a render node does not know: here it is over the outline's center */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateShadowNode(JNIEnv *env, jclass this_class, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat radius, jfloat z, jint ambient_color, jint spot_color, jfloat light_z, jfloat light_radius)
+{
+	GtkSnapshot *snapshot = gtk_snapshot_new();
+	const GdkRGBA ambient = {((ambient_color >> 16) & 0xff) / 255.f, ((ambient_color >> 8) & 0xff) / 255.f, (ambient_color & 0xff) / 255.f, ((ambient_color >> 24) & 0xff) / 255.f};
+	const GdkRGBA spot = {((spot_color >> 16) & 0xff) / 255.f, ((spot_color >> 8) & 0xff) / 255.f, (spot_color & 0xff) / 255.f, ((spot_color >> 24) & 0xff) / 255.f};
+	atl_snapshot_shadow(snapshot, &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, z, &ambient, &spot,
+	                    (left + right) / 2, (top + bottom) / 2, light_z, light_radius);
+	return _INTPTR(gtk_snapshot_free_to_node(snapshot));
+}
+
+/* RenderEffect: a blur of sigma (GSK's radius is twice the standard deviation) and an offset */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyEffect(JNIEnv *env, jclass this_class, jlong node_ptr, jfloat sigma, jfloat offset_x, jfloat offset_y)
+{
+	GskRenderNode *node = gsk_render_node_ref(_PTR(node_ptr));
+	GskRenderNode *new_node;
+	if (sigma > 0) {
+		new_node = gsk_blur_node_new(node, 2 * sigma);
+		gsk_render_node_unref(node);
+		node = new_node;
+	}
+	if (offset_x != 0 || offset_y != 0) {
+		GskTransform *transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(offset_x, offset_y));
+		new_node = gsk_transform_node_new(node, transform);
+		gsk_transform_unref(transform);
+		gsk_render_node_unref(node);
+		node = new_node;
+	}
+	return _INTPTR(node);
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeClip(JNIEnv *env, jobject this, jlong node_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom)
