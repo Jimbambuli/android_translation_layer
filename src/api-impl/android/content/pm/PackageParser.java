@@ -2434,6 +2434,10 @@ public class PackageParser {
 			a.info.screenOrientation = sa.getInt(
 			    com.android.internal.R.styleable.AndroidManifestActivity_screenOrientation,
 			    ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+			if (sa.getBoolean(com.android.internal.R.styleable.AndroidManifestActivity_supportsPictureInPicture,
+			    false)) {
+				a.info.flags |= ActivityInfo.FLAG_SUPPORTS_PICTURE_IN_PICTURE;
+			}
 			a.info.configChanges = sa.getInt(
 			    com.android.internal.R.styleable.AndroidManifestActivity_configChanges,
 			    0);

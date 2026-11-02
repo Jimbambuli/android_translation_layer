@@ -389,6 +389,101 @@ public class Window {
 		return decorView.dispatchKeyEvent(event);
 	}
 
+	/* like PhoneWindow.superDispatchKeyShortcutEvent() */
+	public boolean superDispatchKeyShortcutEvent(KeyEvent event) {
+		return decorView.dispatchKeyShortcutEvent(event);
+	}
+
+	/* PhoneWindow's media controller (Activity.setMediaController()) */
+	private android.media.session.MediaController mMediaController;
+
+	public void setMediaController(android.media.session.MediaController controller) {
+		mMediaController = controller;
+	}
+
+	public android.media.session.MediaController getMediaController() {
+		return mMediaController;
+	}
+
+	/* A key that no view consumed on its way through GTK (WrapperWidget.c) reaches the window, see
+	 * android_app_Activity.c. Like ViewRootImpl.ViewPostImeInputStage.processKeyEvent() it goes to the decor
+	 * view (AOSP DecorView.dispatchKeyEvent(): the Window.Callback, then PhoneWindow.onKeyDown()/onKeyUp()),
+	 * a Ctrl shortcut to dispatchKeyShortcutEvent(), and what nobody handled to the fallback event handler
+	 * (PhoneFallbackEventHandler: the media keys go to the media button session). */
+	@Export
+	public boolean dispatchKeyEventFromNative(KeyEvent event) {
+		final int keyCode = event.getKeyCode();
+		final boolean isDown = event.getAction() == KeyEvent.ACTION_DOWN;
+		final Window.Callback cb = getCallback();
+		final boolean handled = cb != null ? cb.dispatchKeyEvent(event) : superDispatchKeyEvent(event);
+		if (handled)
+			return true;
+		if (isDown ? onKeyDown(-1, keyCode, event) : onKeyUp(-1, keyCode, event))
+			return true;
+
+		// If the Control modifier is held, try to interpret the key as a shortcut.
+		if (event.getAction() == KeyEvent.ACTION_DOWN
+		    && event.isCtrlPressed()
+		    && event.getRepeatCount() == 0
+		    && !KeyEvent.isModifierKey(event.getKeyCode())) {
+			if (cb != null ? cb.dispatchKeyShortcutEvent(event) : superDispatchKeyShortcutEvent(event))
+				return true;
+		}
+
+		/* PhoneFallbackEventHandler.onKeyDown()/onKeyUp(): handleMediaKeyEvent() */
+		if (KeyEvent.isMediaSessionKey(keyCode) || keyCode == KeyEvent.KEYCODE_MUTE) {
+			((android.media.session.MediaSessionManager)context.getSystemService(Context.MEDIA_SESSION_SERVICE))
+			    .dispatchMediaKeyEventAsSystemService(event);
+			return true;
+		}
+		return false;
+	}
+
+	/* PhoneWindow.onKeyDown() for the window's own keys: the media keys go to the window's media controller
+	 * (if the activity set one); Back is tracked by the activity, ATL has no panels for the menu key and
+	 * leaves the volume keys to the desktop */
+	protected boolean onKeyDown(int featureId, int keyCode, KeyEvent event) {
+		switch (keyCode) {
+			// These are all the recognized media key codes in
+			// KeyEvent.isMediaSessionKey()
+			case KeyEvent.KEYCODE_MEDIA_PLAY:
+			case KeyEvent.KEYCODE_MEDIA_PAUSE:
+			case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+			case KeyEvent.KEYCODE_MUTE:
+			case KeyEvent.KEYCODE_HEADSETHOOK:
+			case KeyEvent.KEYCODE_MEDIA_STOP:
+			case KeyEvent.KEYCODE_MEDIA_NEXT:
+			case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+			case KeyEvent.KEYCODE_MEDIA_REWIND:
+			case KeyEvent.KEYCODE_MEDIA_RECORD:
+			case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD: {
+				if (mMediaController != null) {
+					if (((android.media.session.MediaSessionManager)context.getSystemService(Context.MEDIA_SESSION_SERVICE))
+						.dispatchMediaKeyEventToSessionAsSystemService(event, mMediaController.getSessionToken())) {
+						return true;
+					}
+				}
+				return false;
+			}
+		}
+		return false;
+	}
+
+	/* PhoneWindow.onKeyUp(): the key's tracking ends (KeyEvent.DispatcherState.handleUpEvent()) */
+	protected boolean onKeyUp(int featureId, int keyCode, KeyEvent event) {
+		final KeyEvent.DispatcherState dispatcher =
+		    decorView != null ? decorView.getKeyDispatcherState() : null;
+		if (dispatcher != null) {
+			dispatcher.handleUpEvent(event);
+		}
+		// the media keys go to the media controller as on the way down
+		if (mMediaController != null && KeyEvent.isMediaSessionKey(keyCode)) {
+			return ((android.media.session.MediaSessionManager)context.getSystemService(Context.MEDIA_SESSION_SERVICE))
+			    .dispatchMediaKeyEventToSessionAsSystemService(event, mMediaController.getSessionToken());
+		}
+		return false;
+	}
+
 	private boolean mCloseOnTouchOutside = false;
 	private boolean mSetCloseOnTouchOutside = false;
 

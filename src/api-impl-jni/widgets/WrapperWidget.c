@@ -557,40 +557,100 @@ static bool on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 	return ret;
 }
 
-#define KEYCODE_0             7 /* KEYCODE_[1-9] = [8-16] */
-#define KEYCODE_DPAD_UP       19
-#define KEYCODE_DPAD_DOWN     20
-#define KEYCODE_DPAD_LEFT     21
-#define KEYCODE_DPAD_RIGHT    22
-#define KEYCODE_A             29 /* KEYCODE_[B-Z] = [30-54] */
-#define KEYCODE_COMMA         55
-#define KEYCODE_PERIOD        56
-#define KEYCODE_TAB           61
-#define KEYCODE_SPACE         62
-#define KEYCODE_ENTER         66
-#define KEYCODE_DEL           67
-#define KEYCODE_GRAVE         68
-#define KEYCODE_MINUS         69
-#define KEYCODE_EQUALS        70
-#define KEYCODE_LEFT_BRACKET  71
-#define KEYCODE_RIGHT_BRACKET 72
-#define KEYCODE_BACKSLASH     73
-#define KEYCODE_SEMICOLON     74
-#define KEYCODE_APOSTROPHE    75
-#define KEYCODE_SLASH         76
-#define KEYCODE_AT            77
-#define KEYCODE_PLUS          81
-#define KEYCODE_PAGE_UP       92
-#define KEYCODE_PAGE_DOWN     93
-#define KEYCODE_ESCAPE        111
-#define KEYCODE_FORWARD_DEL   112
-#define KEYCODE_MOVE_HOME     122
-#define KEYCODE_MOVE_END      123
-#define KEYCODE_INSERT        124
-#define KEYCODE_F1            131 /* KEYCODE_F[2-12] = [132-142] */
-#define KEYCODE_NUMPAD_0      144 /* KEYCODE_NUMPAD_[1-9] = [145-153] */
+#define KEYCODE_UNKNOWN          0
+#define KEYCODE_BACK             4
+#define KEYCODE_0                7 /* KEYCODE_[1-9] = [8-16] */
+#define KEYCODE_DPAD_UP          19
+#define KEYCODE_DPAD_DOWN        20
+#define KEYCODE_DPAD_LEFT        21
+#define KEYCODE_DPAD_RIGHT       22
+#define KEYCODE_VOLUME_UP        24
+#define KEYCODE_VOLUME_DOWN      25
+#define KEYCODE_POWER            26
+#define KEYCODE_A                29 /* KEYCODE_[B-Z] = [30-54] */
+#define KEYCODE_COMMA            55
+#define KEYCODE_PERIOD           56
+#define KEYCODE_ALT_LEFT         57
+#define KEYCODE_ALT_RIGHT        58
+#define KEYCODE_SHIFT_LEFT       59
+#define KEYCODE_SHIFT_RIGHT      60
+#define KEYCODE_TAB              61
+#define KEYCODE_SPACE            62
+#define KEYCODE_EXPLORER         64
+#define KEYCODE_ENVELOPE         65
+#define KEYCODE_ENTER            66
+#define KEYCODE_DEL              67
+#define KEYCODE_GRAVE            68
+#define KEYCODE_MINUS            69
+#define KEYCODE_EQUALS           70
+#define KEYCODE_LEFT_BRACKET     71
+#define KEYCODE_RIGHT_BRACKET    72
+#define KEYCODE_BACKSLASH        73
+#define KEYCODE_SEMICOLON        74
+#define KEYCODE_APOSTROPHE       75
+#define KEYCODE_SLASH            76
+#define KEYCODE_AT               77
+#define KEYCODE_HEADSETHOOK      79
+#define KEYCODE_PLUS             81
+#define KEYCODE_MENU             82
+#define KEYCODE_SEARCH           84
+#define KEYCODE_MEDIA_PLAY_PAUSE 85
+#define KEYCODE_MEDIA_STOP       86
+#define KEYCODE_MEDIA_NEXT       87
+#define KEYCODE_MEDIA_PREVIOUS   88
+#define KEYCODE_MEDIA_REWIND     89
+#define KEYCODE_MEDIA_FAST_FWD   90
+#define KEYCODE_MUTE             91
+#define KEYCODE_PAGE_UP          92
+#define KEYCODE_PAGE_DOWN        93
+#define KEYCODE_ESCAPE           111
+#define KEYCODE_FORWARD_DEL      112
+#define KEYCODE_CTRL_LEFT        113
+#define KEYCODE_CTRL_RIGHT       114
+#define KEYCODE_CAPS_LOCK        115
+#define KEYCODE_SCROLL_LOCK      116
+#define KEYCODE_META_LEFT        117
+#define KEYCODE_META_RIGHT       118
+#define KEYCODE_SYSRQ            120
+#define KEYCODE_BREAK            121
+#define KEYCODE_MOVE_HOME        122
+#define KEYCODE_MOVE_END         123
+#define KEYCODE_INSERT           124
+#define KEYCODE_FORWARD          125
+#define KEYCODE_MEDIA_PLAY       126
+#define KEYCODE_MEDIA_PAUSE      127
+#define KEYCODE_MEDIA_EJECT      129
+#define KEYCODE_MEDIA_RECORD     130
+#define KEYCODE_F1               131 /* KEYCODE_F[2-12] = [132-142] */
+#define KEYCODE_NUM_LOCK         143
+#define KEYCODE_NUMPAD_0         144 /* KEYCODE_NUMPAD_[1-9] = [145-153] */
+#define KEYCODE_NUMPAD_DIVIDE    154
+#define KEYCODE_NUMPAD_MULTIPLY  155
+#define KEYCODE_NUMPAD_SUBTRACT  156
+#define KEYCODE_NUMPAD_ADD       157
+#define KEYCODE_NUMPAD_DOT       158
+#define KEYCODE_NUMPAD_COMMA     159
+#define KEYCODE_NUMPAD_ENTER     160
+#define KEYCODE_NUMPAD_EQUALS    161
+#define KEYCODE_VOLUME_MUTE      164
+#define KEYCODE_ZOOM_IN          168
+#define KEYCODE_ZOOM_OUT         169
+#define KEYCODE_BOOKMARK         174
+#define KEYCODE_CALCULATOR       210
+#define KEYCODE_BRIGHTNESS_DOWN  220
+#define KEYCODE_BRIGHTNESS_UP    221
+#define KEYCODE_SLEEP            223
+#define KEYCODE_WAKEUP           224
+#define KEYCODE_HELP             259
+#define KEYCODE_CUT              277
+#define KEYCODE_COPY             278
+#define KEYCODE_PASTE            279
+#define KEYCODE_REFRESH          285
 
-static int map_key_code(int key_code)
+/* the keys of AOSP's Generic.kl (frameworks/base/data/keyboards), by their GDK keyval: modifiers, keypad,
+ * media, volume and the other function keys of PC keyboards; a key without an Android key code is
+ * KEYCODE_UNKNOWN (its character still comes with the event) */
+static int map_key_code(guint key_code)
 {
 	if (key_code >= GDK_KEY_0 && key_code <= GDK_KEY_9)
 		return key_code - GDK_KEY_0 + KEYCODE_0;
@@ -604,12 +664,16 @@ static int map_key_code(int key_code)
 		return key_code - GDK_KEY_KP_0 + KEYCODE_NUMPAD_0;
 	switch (key_code) {
 		case GDK_KEY_Up:
+		case GDK_KEY_KP_Up:
 			return KEYCODE_DPAD_UP;
 		case GDK_KEY_Down:
+		case GDK_KEY_KP_Down:
 			return KEYCODE_DPAD_DOWN;
 		case GDK_KEY_Left:
+		case GDK_KEY_KP_Left:
 			return KEYCODE_DPAD_LEFT;
 		case GDK_KEY_Right:
+		case GDK_KEY_KP_Right:
 			return KEYCODE_DPAD_RIGHT;
 		case GDK_KEY_comma:
 			return KEYCODE_COMMA;
@@ -617,8 +681,10 @@ static int map_key_code(int key_code)
 			return KEYCODE_PERIOD;
 		case GDK_KEY_Tab:
 		case GDK_KEY_ISO_Left_Tab: // Shift+Tab
+		case GDK_KEY_KP_Tab:
 			return KEYCODE_TAB;
 		case GDK_KEY_space:
+		case GDK_KEY_KP_Space:
 			return KEYCODE_SPACE;
 		case GDK_KEY_Return:
 			return KEYCODE_ENTER;
@@ -647,22 +713,166 @@ static int map_key_code(int key_code)
 		case GDK_KEY_plus:
 			return KEYCODE_PLUS;
 		case GDK_KEY_Page_Up:
+		case GDK_KEY_KP_Page_Up:
 			return KEYCODE_PAGE_UP;
 		case GDK_KEY_Page_Down:
+		case GDK_KEY_KP_Page_Down:
 			return KEYCODE_PAGE_DOWN;
 		case GDK_KEY_Escape:
 			return KEYCODE_ESCAPE;
 		case GDK_KEY_Delete:
+		case GDK_KEY_KP_Delete:
 			return KEYCODE_FORWARD_DEL;
 		case GDK_KEY_Home:
+		case GDK_KEY_KP_Home:
 			return KEYCODE_MOVE_HOME;
 		case GDK_KEY_End:
+		case GDK_KEY_KP_End:
 			return KEYCODE_MOVE_END;
 		case GDK_KEY_Insert:
+		case GDK_KEY_KP_Insert:
 			return KEYCODE_INSERT;
+		/* modifiers */
+		case GDK_KEY_Shift_L:
+			return KEYCODE_SHIFT_LEFT;
+		case GDK_KEY_Shift_R:
+			return KEYCODE_SHIFT_RIGHT;
+		case GDK_KEY_Control_L:
+			return KEYCODE_CTRL_LEFT;
+		case GDK_KEY_Control_R:
+			return KEYCODE_CTRL_RIGHT;
+		case GDK_KEY_Alt_L:
+			return KEYCODE_ALT_LEFT;
+		case GDK_KEY_Alt_R:
+		case GDK_KEY_ISO_Level3_Shift: // AltGr
+			return KEYCODE_ALT_RIGHT;
+		case GDK_KEY_Super_L:
+		case GDK_KEY_Meta_L:
+			return KEYCODE_META_LEFT;
+		case GDK_KEY_Super_R:
+		case GDK_KEY_Meta_R:
+			return KEYCODE_META_RIGHT;
+		case GDK_KEY_Caps_Lock:
+			return KEYCODE_CAPS_LOCK;
+		case GDK_KEY_Num_Lock:
+			return KEYCODE_NUM_LOCK;
+		case GDK_KEY_Scroll_Lock:
+			return KEYCODE_SCROLL_LOCK;
+		case GDK_KEY_Print:
+		case GDK_KEY_Sys_Req:
+			return KEYCODE_SYSRQ;
+		case GDK_KEY_Pause:
+		case GDK_KEY_Break:
+			return KEYCODE_BREAK;
+		case GDK_KEY_Menu:
+			return KEYCODE_MENU;
+		/* keypad */
+		case GDK_KEY_KP_Enter:
+			return KEYCODE_NUMPAD_ENTER;
+		case GDK_KEY_KP_Divide:
+			return KEYCODE_NUMPAD_DIVIDE;
+		case GDK_KEY_KP_Multiply:
+			return KEYCODE_NUMPAD_MULTIPLY;
+		case GDK_KEY_KP_Subtract:
+			return KEYCODE_NUMPAD_SUBTRACT;
+		case GDK_KEY_KP_Add:
+			return KEYCODE_NUMPAD_ADD;
+		case GDK_KEY_KP_Decimal:
+			return KEYCODE_NUMPAD_DOT;
+		case GDK_KEY_KP_Separator:
+			return KEYCODE_NUMPAD_COMMA;
+		case GDK_KEY_KP_Equal:
+			return KEYCODE_NUMPAD_EQUALS;
+		/* media and the other function keys (XF86 keysyms) */
+		case GDK_KEY_AudioPlay:
+			return KEYCODE_MEDIA_PLAY_PAUSE;
+		case GDK_KEY_AudioPause:
+			return KEYCODE_MEDIA_PAUSE;
+		case GDK_KEY_AudioStop:
+			return KEYCODE_MEDIA_STOP;
+		case GDK_KEY_AudioNext:
+			return KEYCODE_MEDIA_NEXT;
+		case GDK_KEY_AudioPrev:
+			return KEYCODE_MEDIA_PREVIOUS;
+		case GDK_KEY_AudioRewind:
+			return KEYCODE_MEDIA_REWIND;
+		case GDK_KEY_AudioForward:
+			return KEYCODE_MEDIA_FAST_FWD;
+		case GDK_KEY_AudioRecord:
+			return KEYCODE_MEDIA_RECORD;
+		case GDK_KEY_AudioMedia:
+			return KEYCODE_HEADSETHOOK;
+		case GDK_KEY_Eject:
+			return KEYCODE_MEDIA_EJECT;
+		case GDK_KEY_AudioRaiseVolume:
+			return KEYCODE_VOLUME_UP;
+		case GDK_KEY_AudioLowerVolume:
+			return KEYCODE_VOLUME_DOWN;
+		case GDK_KEY_AudioMute:
+			return KEYCODE_VOLUME_MUTE;
+		case GDK_KEY_AudioMicMute:
+			return KEYCODE_MUTE;
+		case GDK_KEY_Back:
+			return KEYCODE_BACK;
+		case GDK_KEY_Forward:
+			return KEYCODE_FORWARD;
+		case GDK_KEY_Search:
+			return KEYCODE_SEARCH;
+		case GDK_KEY_HomePage:
+		case GDK_KEY_Explorer:
+			return KEYCODE_EXPLORER;
+		case GDK_KEY_Mail:
+			return KEYCODE_ENVELOPE;
+		case GDK_KEY_Calculator:
+			return KEYCODE_CALCULATOR;
+		case GDK_KEY_Favorites:
+			return KEYCODE_BOOKMARK;
+		case GDK_KEY_Refresh:
+		case GDK_KEY_Reload:
+			return KEYCODE_REFRESH;
+		case GDK_KEY_MonBrightnessUp:
+			return KEYCODE_BRIGHTNESS_UP;
+		case GDK_KEY_MonBrightnessDown:
+			return KEYCODE_BRIGHTNESS_DOWN;
+		case GDK_KEY_Sleep:
+			return KEYCODE_SLEEP;
+		case GDK_KEY_WakeUp:
+			return KEYCODE_WAKEUP;
+		case GDK_KEY_PowerOff:
+			return KEYCODE_POWER;
+		case GDK_KEY_ZoomIn:
+			return KEYCODE_ZOOM_IN;
+		case GDK_KEY_ZoomOut:
+			return KEYCODE_ZOOM_OUT;
+		case GDK_KEY_Help:
+			return KEYCODE_HELP;
+		case GDK_KEY_Cut:
+			return KEYCODE_CUT;
+		case GDK_KEY_Copy:
+			return KEYCODE_COPY;
+		case GDK_KEY_Paste:
+			return KEYCODE_PASTE;
 		default:
-			return key_code;
+			return KEYCODE_UNKNOWN;
 	}
+}
+
+/* The Android key code of a GTK key event. Like InputReader with Generic.kl and the key character map of the
+ * layout, the key code belongs to the key and the modifiers only change the character: the key code comes from
+ * the keyval of the key without modifiers (KEYCODE_1 for Shift+1), the character is the event's unicode value.
+ * Keypad keys keep their keyval, Num Lock decides between digit and cursor key on Android as well. */
+int atl_android_key_code(GtkEventControllerKey *controller, guint keyval, guint keycode)
+{
+	guint base = keyval;
+	if (!(keyval >= GDK_KEY_KP_Space && keyval <= GDK_KEY_KP_9)) {
+		GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+		guint group = gtk_event_controller_key_get_group(controller);
+		guint translated;
+		if (widget && gdk_display_translate_key(gtk_widget_get_display(widget), keycode, 0, group, &translated, NULL, NULL, NULL))
+			base = translated;
+	}
+	int code = map_key_code(base);
+	return code != KEYCODE_UNKNOWN ? code : map_key_code(keyval);
 }
 
 #define META_SHIFT_ON     (1 << 0)
@@ -671,7 +881,7 @@ static int map_key_code(int key_code)
 #define META_META_ON      (1 << 16)
 #define META_CAPS_LOCK_ON (1 << 20)
 
-static int map_meta_state(GdkModifierType state)
+int atl_android_meta_state(GdkModifierType state)
 {
 	int meta_state = 0;
 	if (state & GDK_SHIFT_MASK)
@@ -696,7 +906,7 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
 
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
-	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_DOWN, map_key_code(keyval), 0, map_meta_state(state));
+	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_DOWN, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
 	if ((*env)->ExceptionCheck(env)) {
@@ -712,7 +922,7 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
-	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, map_key_code(keyval), 0, map_meta_state(state));
+	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
 	if ((*env)->ExceptionCheck(env)) {

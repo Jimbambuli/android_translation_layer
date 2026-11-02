@@ -186,6 +186,12 @@ public class ActivityInfo extends ComponentInfo {
 	 */
 	public static final int FLAG_IMMERSIVE = 0x0800;
 	/**
+	 * Bit in {@link #flags} indicating that the activity supports picture-in-picture mode.
+	 * See {@link android.R.attr#supportsPictureInPicture}.
+	 * @hide
+	 */
+	public static final int FLAG_SUPPORTS_PICTURE_IN_PICTURE = 0x400000;
+	/**
 	 * @hide Bit in {@link #flags}: If set, this component will only be seen
 	 * by the primary user.  Only works with broadcast receivers.  Set from the
 	 * {@link android.R.attr#primaryUserOnly} attribute.
@@ -491,6 +497,11 @@ public class ActivityInfo extends ComponentInfo {
 	 * the public field will not have a value that breaks them, and let the
 	 * framework call here to get the real value.
 	 */
+	/** @hide */
+	public boolean supportsPictureInPicture() {
+		return (flags & FLAG_SUPPORTS_PICTURE_IN_PICTURE) != 0;
+	}
+
 	public int getRealConfigChanged() {
 		return applicationInfo.targetSdkVersion < android.os.Build.VERSION_CODES.HONEYCOMB_MR2
 		         ? (configChanges | ActivityInfo.CONFIG_SCREEN_SIZE | ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE)

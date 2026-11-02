@@ -278,6 +278,13 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 	ctx->video.surface_view_widget = surface_view_widget;
 }
 
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1setOutputSurface(JNIEnv *env, jobject this, jlong codec, jlong surface_widget)
+{
+	struct ATL_codec_context *ctx = _PTR(codec);
+	GtkWidget *widget = surface_widget ? gtk_widget_get_first_child(_PTR(surface_widget)) : NULL;
+	ctx->video.surface_view_widget = widget ? SURFACE_VIEW_WIDGET(widget) : NULL;
+}
+
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1start(JNIEnv *env, jobject this, jlong codec)
 {
 	struct ATL_codec_context *ctx = _PTR(codec);
@@ -453,7 +460,7 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		if (!frame)
 			return;
 
-		if (!render) {
+		if (!render || !ctx->video.surface_view_widget) {
 			fprintf(stderr, "skipping %dx%d frame!\n", frame->width, frame->height);
 			av_frame_free(&frame);
 			return;
