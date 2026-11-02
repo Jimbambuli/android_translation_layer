@@ -17,6 +17,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.animation.ValueAnimator;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -522,6 +523,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	/* Activity.finish(): the result of setResult() goes to the activity that started this one, which gets it
 	 * in onActivityResult() when it comes back (ActivityClient.finishActivity()); a second finish() changes
 	 * nothing */
+	@Export
 	public void finish() {
 		int resultCode;
 		Intent resultData;
@@ -793,10 +795,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	 * change, otherwise ActivityThread.shouldReportChange() decides on onConfigurationChanged(). */
 	@Export
 	void ensureActivityConfiguration() {
+		ensureActivityConfiguration(getResources().getConfiguration());
+	}
+
+	private void ensureActivityConfiguration(Configuration globalConfig) {
 		if (mCurrentConfig == null || finishing || mChangingConfigurations)
 			return;
 		Resources resources = getResources();
-		Configuration newConfig = new Configuration(resources.getConfiguration());
+		Configuration newConfig = new Configuration(globalConfig);
+		applyPictureInPictureBounds(newConfig);
 		int diff = mCurrentConfig.diff(newConfig);
 		if (diff == 0)
 			return;
@@ -1005,8 +1012,235 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void registerForContextMenu(View view) {}
 	public native boolean isInMultiWindowMode();
 
-	// we never put an activity into picture-in-picture, so this is always false
-	public boolean isInPictureInPictureMode() { return false; }
+	/* AOSP Activity, picture-in-picture. The part of ActivityTaskManagerService (ATMS: the pinned task, which
+	 * is a small window of its own here, its menu with the actions) is native, see android_app_Activity.c */
+	boolean mIsInPictureInPictureMode;
+	private boolean mCanEnterPictureInPicture = false;
+	/* ActivityRecord.pictureInPictureArgs */
+	private final PictureInPictureParams mPictureInPictureArgs = new PictureInPictureParams.Builder().build();
+	/* the size of the pinned task's window (the bounds of WINDOWING_MODE_PINNED), 0 when not pinned */
+	private int mPinnedWidth;
+	private int mPinnedHeight;
+
+	public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+		// Left deliberately empty. There should be no side effects if a direct
+		// subclass of Activity does not call super.
+		onPictureInPictureModeChanged(isInPictureInPictureMode);
+	}
+
+	public void onPictureInPictureUiStateChanged(@NonNull PictureInPictureUiState pipState) {
+		// Left deliberately empty. There should be no side effects if a direct
+		// subclass of Activity does not call super.
+	}
+
+	@Deprecated
+	public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
+		// Left deliberately empty. There should be no side effects if a direct
+		// subclass of Activity does not call super.
+	}
+
+	public boolean isInPictureInPictureMode() {
+		return mIsInPictureInPictureMode;
+	}
+
+	@Deprecated
+	public void enterPictureInPictureMode() {
+		enterPictureInPictureMode(new PictureInPictureParams.Builder().build());
+	}
+
+	public boolean enterPictureInPictureMode(@NonNull PictureInPictureParams params) {
+		if (!deviceSupportsPictureInPictureMode()) {
+			return false;
+		}
+		if (params == null) {
+			throw new IllegalArgumentException("Expected non-null picture-in-picture params");
+		}
+		if (!mCanEnterPictureInPicture) {
+			throw new IllegalStateException("Activity must be resumed to enter"
+			    + " picture-in-picture");
+		}
+		// Set mIsInPictureInPictureMode earlier and don't wait for
+		// onPictureInPictureModeChanged callback here. This is to ensure that
+		// isInPictureInPictureMode returns true in the following onPause callback.
+		// See https://developer.android.com/guide/topics/ui/picture-in-picture for guidance.
+		mIsInPictureInPictureMode = enterPictureInPictureModeInternal("enterPictureInPictureMode", params);
+		return mIsInPictureInPictureMode;
+	}
+
+	public void setPictureInPictureParams(@NonNull PictureInPictureParams params) {
+		if (!deviceSupportsPictureInPictureMode()) {
+			return;
+		}
+		if (params == null) {
+			throw new IllegalArgumentException("Expected non-null picture-in-picture params");
+		}
+		/* ATMS.setPictureInPictureParams(): the pinned task takes the new aspect ratio and actions */
+		ensureValidPictureInPictureActivityParams("setPictureInPictureParams", params);
+		mPictureInPictureArgs.copyOnlySet(params);
+		if (mIsInPictureInPictureMode)
+			nativeUpdatePictureInPicture(pictureInPictureAspectRatio());
+	}
+
+	public int getMaxNumPictureInPictureActions() {
+		return MAX_NUM_PICTURE_IN_PICTURE_ACTIONS;
+	}
+
+	private boolean deviceSupportsPictureInPictureMode() {
+		return getPackageManager().hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE);
+	}
+
+	public boolean onPictureInPictureRequested() {
+		return false;
+	}
+
+	final void dispatchPictureInPictureModeChanged(boolean isInPictureInPictureMode,
+						       Configuration newConfig) {
+		for (Fragment fragment : fragments) {
+			fragment.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+		}
+		mIsInPictureInPictureMode = isInPictureInPictureMode;
+		onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+	}
+
+	/* config_pictureInPictureMaxNumberOfActions and the aspect ratio limits of AOSP's config.xml */
+	private static final int MAX_NUM_PICTURE_IN_PICTURE_ACTIONS = 3;
+	private static final float PICTURE_IN_PICTURE_MIN_ASPECT_RATIO = 0.41841004184f;
+	private static final float PICTURE_IN_PICTURE_MAX_ASPECT_RATIO = 2.39f;
+
+	/* ATMS.ensureValidPictureInPictureActivityParams() */
+	private void ensureValidPictureInPictureActivityParams(String caller, PictureInPictureParams params) {
+		ActivityInfo info = null;
+		try {
+			info = getPackageManager().getActivityInfo(getComponentName(), 0);
+		} catch (PackageManager.NameNotFoundException e) {
+		}
+		if (info == null || !info.supportsPictureInPicture()) {
+			throw new IllegalStateException(caller
+			    + ": Current activity does not support picture-in-picture.");
+		}
+		if (params.hasSetAspectRatio()
+		    && (params.getAspectRatioFloat() < PICTURE_IN_PICTURE_MIN_ASPECT_RATIO
+			|| params.getAspectRatioFloat() > PICTURE_IN_PICTURE_MAX_ASPECT_RATIO)) {
+			throw new IllegalArgumentException(String.format(caller
+			    + ": Aspect ratio is too extreme (must be between %f and %f).",
+			    PICTURE_IN_PICTURE_MIN_ASPECT_RATIO, PICTURE_IN_PICTURE_MAX_ASPECT_RATIO));
+		}
+		// Truncate the number of actions if necessary
+		params.truncateActions(MAX_NUM_PICTURE_IN_PICTURE_ACTIONS);
+	}
+
+	/* ATMS.enterPictureInPictureMode(): the params become the activity's, then the activity moves to
+	 * the pinned task (native: its page moves into a window of its own, the activity below comes back) */
+	private boolean enterPictureInPictureModeInternal(String caller, PictureInPictureParams params) {
+		ensureValidPictureInPictureActivityParams(caller, params);
+		if (finishing)
+			return false;
+		mPictureInPictureArgs.copyOnlySet(params);
+		return nativeEnterPictureInPicture(pictureInPictureAspectRatio());
+	}
+
+	/* TaskFragment.startPausing() with shouldAutoPip: when the user leaves the app (its window is minimized), the
+	 * resumed activity whose params allow it (setAutoEnterEnabled()) enters picture-in-picture instead of being
+	 * paused; ActivityThread sets mIsInPictureInPictureMode before the activity is paused */
+	@Export
+	private boolean autoEnterPictureInPicture() {
+		if (paused || !mCanEnterPictureInPicture || !mPictureInPictureArgs.isAutoEnterEnabled()
+		    || !deviceSupportsPictureInPictureMode())
+			return false;
+		try {
+			mIsInPictureInPictureMode = enterPictureInPictureModeInternal("autoEnterPictureInPicture", mPictureInPictureArgs);
+		} catch (RuntimeException e) {
+			Slog.w(TAG, "autoEnterPictureInPicture: " + e);
+			return false;
+		}
+		return mIsInPictureInPictureMode;
+	}
+
+	/* the aspect ratio of the pinned task: the app's, else config_pictureInPictureDefaultAspectRatio */
+	private float pictureInPictureAspectRatio() {
+		return mPictureInPictureArgs.hasSetAspectRatio() ? mPictureInPictureArgs.getAspectRatioFloat() : 1.777778f;
+	}
+
+	/* the configuration of an activity in the pinned task: screen size and orientation of its bounds */
+	private void applyPictureInPictureBounds(Configuration config) {
+		if (mPinnedWidth <= 0 || mPinnedHeight <= 0)
+			return;
+		config.screenWidthDp = mPinnedWidth;
+		config.screenHeightDp = mPinnedHeight;
+		config.smallestScreenWidthDp = Math.min(mPinnedWidth, mPinnedHeight);
+		config.orientation = mPinnedWidth > mPinnedHeight ? Configuration.ORIENTATION_LANDSCAPE : Configuration.ORIENTATION_PORTRAIT;
+	}
+
+	/* called from native code when the activity moved into or out of the pinned task (width and height of its
+	 * window, 0 when it left it): like ActivityThread.performActivityConfigurationChanged(), the picture-in-picture
+	 * mode change (handleWindowingModeChangeIfNeeded()) comes before the configuration change */
+	@Export
+	private void pinnedTaskChanged(int width, int height) {
+		boolean pinned = width > 0 && height > 0;
+		mPinnedWidth = pinned ? width : 0;
+		mPinnedHeight = pinned ? height : 0;
+		Configuration newConfig = new Configuration(getResources().getConfiguration());
+		applyPictureInPictureBounds(newConfig);
+		if (pinned != mIsInPictureInPictureMode || !pinned)
+			dispatchPictureInPictureModeChanged(pinned, newConfig);
+		ensureActivityConfiguration(getResources().getConfiguration());
+	}
+
+	/* the actions of the pinned task's menu (PipMenuView.updateActionViews()), for the native code; the icons
+	 * stay loaded while the menu shows them */
+	private ArrayList<Drawable> mPictureInPictureActionIcons = new ArrayList<>();
+
+	@Export
+	private String[] getPictureInPictureActionTitles() {
+		List<RemoteAction> actions = mPictureInPictureArgs.getActions();
+		String[] titles = new String[actions == null ? 0 : actions.size()];
+		for (int i = 0; i < titles.length; i++) {
+			CharSequence title = actions.get(i).getTitle();
+			titles[i] = title == null ? null : title.toString();
+		}
+		return titles;
+	}
+
+	@Export
+	private long[] getPictureInPictureActionIcons() {
+		List<RemoteAction> actions = mPictureInPictureArgs.getActions();
+		long[] icons = new long[actions == null ? 0 : actions.size()];
+		mPictureInPictureActionIcons.clear();
+		for (int i = 0; i < icons.length; i++) {
+			RemoteAction action = actions.get(i);
+			Drawable icon = action.shouldShowIcon() && action.getIcon() != null ? action.getIcon().loadDrawable(this) : null;
+			if (icon != null) {
+				mPictureInPictureActionIcons.add(icon);
+				icons[i] = icon.paintable;
+			}
+		}
+		return icons;
+	}
+
+	@Export
+	private boolean[] getPictureInPictureActionsEnabled() {
+		List<RemoteAction> actions = mPictureInPictureArgs.getActions();
+		boolean[] enabled = new boolean[actions == null ? 0 : actions.size()];
+		for (int i = 0; i < enabled.length; i++)
+			enabled[i] = actions.get(i).isEnabled();
+		return enabled;
+	}
+
+	/* called from native code when the user clicked an action of the pinned task's menu (PipMenuView) */
+	@Export
+	private void performPictureInPictureAction(int index) {
+		List<RemoteAction> actions = mPictureInPictureArgs.getActions();
+		if (actions == null || index >= actions.size())
+			return;
+		try {
+			actions.get(index).getActionIntent().send();
+		} catch (Exception e) {
+			Slog.w(TAG, "Failed to send action " + actions.get(index), e);
+		}
+	}
+
+	private native boolean nativeEnterPictureInPicture(float aspectRatio);
+	private native void nativeUpdatePictureInPicture(float aspectRatio);
 
 	private final ArrayList<Application.ActivityLifecycleCallbacks> mActivityLifecycleCallbacks =
 			new ArrayList<Application.ActivityLifecycleCallbacks>();
@@ -1258,6 +1492,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	/* called from native code instead of onCreate() etc., with the pre and post callbacks around them */
 	@Export
 	private void performCreate(Bundle savedInstanceState) {
+		mCanEnterPictureInPicture = true;
 		mCurrentConfig = new Configuration(getResources().getConfiguration());
 		dispatchActivityPreCreated(savedInstanceState);
 		onCreate(savedInstanceState);
@@ -1296,6 +1531,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	/* like AOSP: a stopped activity that comes back gets onRestart() before onStart() */
 	@Export
 	private void performRestart() {
+		mCanEnterPictureInPicture = true;
 		stopped = false;
 		ensureActivityConfiguration();
 		onRestart();
@@ -1327,6 +1563,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	 * stopped, after onStop() for apps targeting API 28 and later, before it for older ones */
 	@Export
 	private void performStop(boolean saveState) {
+		// Disallow entering picture-in-picture after the activity has been stopped
+		mCanEnterPictureInPicture = false;
 		saveState = saveState && !finishing;
 		boolean preP = getApplicationInfo().targetSdkVersion < 28;
 		if (saveState && preP)

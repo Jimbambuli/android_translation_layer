@@ -23,6 +23,11 @@ public class PendingIntent implements Parcelable {
 		return new PendingIntent(requestCode, intent, 2);
 	}
 
+	/** @hide AOSP asks the system server for it, ATL holds it */
+	public Intent getIntent() {
+		return intent;
+	}
+
 	public IntentSender getIntentSender() {
 		return null;
 	}

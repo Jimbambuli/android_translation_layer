@@ -1273,6 +1273,22 @@ public class PackageManager {
 	public static final String FEATURE_WATCH = "android.hardware.type.watch";
 
 	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: The device supports picture-in-picture multi-window mode.
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_PICTURE_IN_PICTURE = "android.software.picture_in_picture";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: The device supports expanded picture-in-picture multi-window mode.
+	 *
+	 * @see android.app.PictureInPictureParams.Builder#setExpandedAspectRatio
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_EXPANDED_PICTURE_IN_PICTURE = "android.software.expanded_picture_in_picture";
+
+	/**
 	 * Action to external storage service to clean out removed apps.
 	 * @hide
 	 */
@@ -2194,6 +2210,9 @@ public class PackageManager {
 				return System.getenv("ATL_IS_TELEVISION") != null;
 			case FEATURE_WATCH:
 				return System.getenv("ATL_IS_WATCH") != null;
+			/* the activity's own window on the desktop, see Activity.enterPictureInPictureMode() */
+			case FEATURE_PICTURE_IN_PICTURE:
+				return true;
 			default:
 				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
 				return false;

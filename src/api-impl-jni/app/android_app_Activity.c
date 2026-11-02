@@ -2,6 +2,7 @@
 #include <libportal/portal.h>
 
 #include <jni.h>
+#include <math.h>
 #include <string.h>
 
 #include "../defines.h"
@@ -235,10 +236,13 @@ static void activity_stop(JNIEnv *env, jobject activity, bool save_state)
 /* AOSP stops the activity that was left once the next one is idle, not while the app is still in the
  * call that started or finished an activity: that call may still change the fragments of the activity
  * it left, which must not have saved its state yet */
+static jobject pinned_activity;
+
 static gboolean stop_when_idle(gpointer activity)
 {
 	JNIEnv *env = get_jni_env();
-	if (_GET_BOOL_FIELD(activity, "paused")) // unless it came back meanwhile
+	/* unless it came back meanwhile, or went into picture-in-picture: that one stays paused and visible */
+	if (_GET_BOOL_FIELD(activity, "paused") && !(pinned_activity && (*env)->IsSameObject(env, activity, pinned_activity)))
 		activity_stop(env, activity, true);
 	_UNREF(activity);
 	return G_SOURCE_REMOVE;
@@ -267,7 +271,8 @@ static void activity_close(JNIEnv *env, jobject activity)
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
 	GtkStack *stack = get_stack();
-	gtk_stack_remove(stack, decor_view);
+	if (gtk_widget_get_parent(decor_view) == GTK_WIDGET(stack))
+		gtk_stack_remove(stack, decor_view);
 
 	/* -- run the activity's onDestroy -- */
 	J__Activity__performDestroy(env, activity);
@@ -444,12 +449,53 @@ static void activity_update_current(JNIEnv *env)
 	}
 }
 
+/* The app's window was minimized or suspended (hidden, KWin: minimized), or came back: like leaving the app with
+ * the Home button and returning to its task on Android. The shown activity is paused with the user leaving
+ * (onUserLeaveHint()) and stopped, unless its params let it enter picture-in-picture by itself
+ * (PictureInPictureParams.isAutoEnterEnabled(); TaskFragment.startPausing() with shouldAutoPip). When the
+ * window comes back, the activity on top of the back stack is resumed. */
+static gboolean window_hidden = FALSE;
+
+static void on_window_state_changed(GdkToplevel *toplevel, GParamSpec *pspec, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	GdkToplevelState state = gdk_toplevel_get_state(toplevel);
+	gboolean hidden = !!(state & (GDK_TOPLEVEL_STATE_MINIMIZED | GDK_TOPLEVEL_STATE_SUSPENDED));
+	if (hidden == window_hidden)
+		return;
+	window_hidden = hidden;
+	if (hidden && activity_current) {
+		jobject activity = activity_current;
+		gboolean auto_pip = J__Activity__autoEnterPictureInPicture(env, activity);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			auto_pip = FALSE;
+		}
+		if (!auto_pip) {
+			activity_pause(env, activity, true);
+			activity_stop(env, activity, true);
+		}
+	} else if (!hidden) {
+		if (activity_current && activity_current == (activity_backlog ? activity_backlog->data : NULL))
+			activity_focus(env, activity_current);
+		else
+			activity_update_current(env);
+	}
+}
+
 void activity_window_ready(void)
 {
 	JNIEnv *env = get_jni_env();
 
 	for (GList *l = activity_backlog; l != NULL; l = l->next)
 		window_focus_changed(env, l->data, true);
+
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	if (surface && GDK_IS_TOPLEVEL(surface) && !g_object_get_data(G_OBJECT(surface), "atl-watches-state")) {
+		g_signal_connect(surface, "notify::state", G_CALLBACK(on_window_state_changed), NULL);
+		g_object_set_data(G_OBJECT(surface), "atl-watches-state", GINT_TO_POINTER(1));
+	}
 }
 
 void activity_ensure_configuration(void)
@@ -573,6 +619,334 @@ void activity_return_to(int index)
 	g_list_free(above);
 }
 
+/* ---- picture-in-picture: the pinned task of ActivityTaskManagerService ----
+ *
+ * Activity.enterPictureInPictureMode() moves the activity out of the back stack into a pinned task, which is a
+ * small undecorated window of its own here (AOSP: a floating window above all others, which a Wayland client
+ * cannot ask for; xdg-toplevel has no "keep above"). Its size is the default size of AOSP's WM Shell
+ * (PipSizeSpecHandler.SizeSpecDefaultImpl.getDefaultSize()) for the aspect ratio of the params; the activity
+ * below comes back in the app's window. Like AOSP's PiP menu (PipMenuView), the pinned window takes all
+ * pointer input itself: a click shows the menu with the actions of the params (RemoteAction, sent with their
+ * PendingIntent), expand and close, a drag moves the window. Expand (also Escape, the back button of a mouse
+ * and the back key: they go back to the app) returns the activity to the top of the back stack, close
+ * (also the window's close request) finishes it, as the dismissed pinned task finishes its activity. */
+static GtkWidget *pinned_window;
+static GtkWidget *pinned_menu;
+static int pinned_width, pinned_height;
+
+/* PipSizeSpecHandler.SizeSpecDefaultImpl.getDefaultSize() with the values of AOSP's config.xml (WM Shell):
+ * config_pictureInPictureDefaultSizePercent 0.23, config_pictureInPictureAspectRatioLimitForMinSize 1.777778
+ * and default_minimal_size_pip_resizable_task 108dp (a dp is a GTK pixel in ATL) */
+static void pinned_task_default_size(float aspect_ratio, int *width, int *height)
+{
+	const float default_size_percent = 0.23f;
+	const float max_aspect_ratio_for_min_size = 1.777778f;
+	const float min_aspect_ratio_for_min_size = 1.f / max_aspect_ratio_for_min_size;
+	const int min_edge_size = 108;
+	GdkRectangle display = {0, 0, 1280, 800};
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	GdkMonitor *monitor = surface ? gdk_display_get_monitor_at_surface(gdk_surface_get_display(surface), surface) : NULL;
+	if (monitor)
+		gdk_monitor_get_geometry(monitor, &display);
+	const int smallest_display_size = MIN(display.width, display.height);
+	const int min_size = (int)MAX(min_edge_size, smallest_display_size * default_size_percent);
+	if (aspect_ratio <= min_aspect_ratio_for_min_size || aspect_ratio > max_aspect_ratio_for_min_size) {
+		// Beyond these points, we can just use the min size as the shorter edge
+		if (aspect_ratio <= 1) {
+			*width = min_size;
+			*height = lroundf(*width / aspect_ratio);
+		} else {
+			*height = min_size;
+			*width = lroundf(*height * aspect_ratio);
+		}
+	} else {
+		// Within these points, ensure that the bounds fit within the radius of the limits at the points
+		const float width_at_max_aspect_ratio_for_min_size = max_aspect_ratio_for_min_size * min_size;
+		const float radius = hypotf(width_at_max_aspect_ratio_for_min_size, min_size);
+		*height = (int)lround(sqrt((radius * radius) / (aspect_ratio * aspect_ratio + 1)));
+		*width = lroundf(*height * aspect_ratio);
+	}
+}
+
+/* the activity leaves the pinned task: its page (returned with a reference) leaves the pinned window, which goes away */
+static jobject pinned_task_take(GtkWidget **page_out)
+{
+	jobject activity = pinned_activity;
+	pinned_activity = NULL;
+	GtkWidget *overlay = gtk_window_get_child(GTK_WINDOW(pinned_window));
+	GtkWidget *page = g_object_ref(gtk_overlay_get_child(GTK_OVERLAY(overlay)));
+	gtk_overlay_set_child(GTK_OVERLAY(overlay), NULL);
+	gtk_widget_set_can_target(page, TRUE);
+	gtk_window_destroy(GTK_WINDOW(pinned_window));
+	pinned_window = NULL;
+	pinned_menu = NULL;
+	pinned_width = pinned_height = 0;
+	*page_out = page;
+	return activity;
+}
+
+static void pinned_task_changed(JNIEnv *env, jobject activity, int width, int height)
+{
+	J__Activity__pinnedTaskChanged(env, activity, width, height);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
+/* PipTaskOrganizer.exitPip(): back to the top of the back stack, in the app's window */
+static void pinned_task_expand(void)
+{
+	JNIEnv *env = get_jni_env();
+	if (!pinned_activity)
+		return;
+	GtkWidget *page;
+	jobject activity = pinned_task_take(&page);
+	gtk_stack_add_child(get_stack(), page);
+	g_object_unref(page);
+	pinned_task_changed(env, activity, 0, 0);
+	activity_backlog = g_list_prepend(activity_backlog, activity);
+	gtk_window_present(window);
+	activity_update_current(env);
+}
+
+/* the activity of the pinned task finished: it is stopped and destroyed with the pinned window */
+static void pinned_task_finish(JNIEnv *env)
+{
+	GtkWidget *page;
+	jobject activity = pinned_task_take(&page);
+	activity_close(env, activity);
+	g_object_unref(page);
+	_UNREF(activity);
+}
+
+/* PipTaskOrganizer.removePip(): the activity leaves picture-in-picture, then the removed pinned task
+ * finishes it (it is stopped and destroyed, see pinned_task_finish()) */
+static void pinned_task_dismiss(void)
+{
+	JNIEnv *env = get_jni_env();
+	if (!pinned_activity)
+		return;
+	jobject activity = (*env)->NewLocalRef(env, pinned_activity);
+	pinned_task_changed(env, activity, 0, 0);
+	J__Activity__finish(env, activity);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, activity);
+}
+
+static gboolean on_pinned_close_request(GtkWindow *self, gpointer user_data)
+{
+	pinned_task_dismiss();
+	return TRUE;
+}
+
+static gboolean on_pinned_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	if (keyval == GDK_KEY_Escape || keyval == GDK_KEY_Back)
+		g_idle_add_once((GSourceOnceFunc)pinned_task_expand, NULL);
+	return FALSE;
+}
+
+static void on_pinned_mouse_back(gpointer user_data)
+{
+	g_idle_add_once((GSourceOnceFunc)pinned_task_expand, NULL);
+}
+
+static void on_pinned_action_clicked(GtkButton *button, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	if (!pinned_activity)
+		return;
+	J__Activity__performPictureInPictureAction(env, pinned_activity, GPOINTER_TO_INT(user_data));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
+/* PipMenuView.updateActionViews(): a button for each action of the params, then expand and close */
+static void pinned_menu_update(JNIEnv *env)
+{
+	GtkWidget *child;
+	while ((child = gtk_widget_get_first_child(pinned_menu)))
+		gtk_box_remove(GTK_BOX(pinned_menu), child);
+	jobjectArray titles = J__Activity__getPictureInPictureActionTitles(env, pinned_activity);
+	jlongArray icons = J__Activity__getPictureInPictureActionIcons(env, pinned_activity);
+	jbooleanArray enabled = J__Activity__getPictureInPictureActionsEnabled(env, pinned_activity);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		return;
+	}
+	jsize count = titles ? (*env)->GetArrayLength(env, titles) : 0;
+	jlong *icon_ptrs = count ? (*env)->GetLongArrayElements(env, icons, NULL) : NULL;
+	jboolean *enabled_flags = count ? (*env)->GetBooleanArrayElements(env, enabled, NULL) : NULL;
+	for (jsize i = 0; i < count; i++) {
+		jstring title_jstr = (*env)->GetObjectArrayElement(env, titles, i);
+		const char *title = title_jstr ? (*env)->GetStringUTFChars(env, title_jstr, NULL) : NULL;
+		GtkWidget *button = gtk_button_new();
+		if (icon_ptrs[i]) {
+			GtkWidget *image = gtk_image_new_from_paintable(GDK_PAINTABLE(_PTR(icon_ptrs[i])));
+			gtk_image_set_pixel_size(GTK_IMAGE(image), 20); // pip_action_inner_size
+			gtk_button_set_child(GTK_BUTTON(button), image);
+		} else if (title) {
+			gtk_button_set_label(GTK_BUTTON(button), title);
+		}
+		if (title) {
+			gtk_widget_set_tooltip_text(button, title);
+			(*env)->ReleaseStringUTFChars(env, title_jstr, title);
+		}
+		gtk_widget_set_sensitive(button, enabled_flags[i]);
+		gtk_widget_set_hexpand(button, TRUE);
+		g_signal_connect(button, "clicked", G_CALLBACK(on_pinned_action_clicked), GINT_TO_POINTER(i));
+		gtk_box_append(GTK_BOX(pinned_menu), button);
+		if (title_jstr)
+			(*env)->DeleteLocalRef(env, title_jstr);
+	}
+	if (icon_ptrs)
+		(*env)->ReleaseLongArrayElements(env, icons, icon_ptrs, JNI_ABORT);
+	if (enabled_flags)
+		(*env)->ReleaseBooleanArrayElements(env, enabled, enabled_flags, JNI_ABORT);
+	GtkWidget *expand = gtk_button_new_from_icon_name("window-maximize-symbolic");
+	gtk_widget_set_tooltip_text(expand, "Expand");
+	gtk_widget_set_hexpand(expand, TRUE);
+	g_signal_connect_swapped(expand, "clicked", G_CALLBACK(on_pinned_mouse_back), NULL);
+	gtk_box_append(GTK_BOX(pinned_menu), expand);
+	GtkWidget *close = gtk_button_new_from_icon_name("window-close-symbolic");
+	gtk_widget_set_tooltip_text(close, "Close");
+	g_signal_connect_swapped(close, "clicked", G_CALLBACK(pinned_task_dismiss), NULL);
+	gtk_box_append(GTK_BOX(pinned_menu), close);
+}
+
+/* a click shows or hides the menu (PipTouchHandler: a tap shows it), a drag moves the window */
+static void on_pinned_pressed(GtkGestureClick *gesture, int n_press, double x, double y, gpointer user_data)
+{
+	gtk_widget_set_visible(pinned_menu, !gtk_widget_get_visible(pinned_menu));
+}
+
+/* a drag beyond the drag threshold moves the window (the compositor moves it), a click shows the menu */
+static void on_pinned_drag_update(GtkGestureDrag *gesture, double offset_x, double offset_y, gpointer user_data)
+{
+	double x, y;
+	if (!gtk_drag_check_threshold(pinned_window, 0, 0, (int)offset_x, (int)offset_y))
+		return;
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(pinned_window));
+	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(gesture));
+	if (!surface || !event || !GDK_IS_TOPLEVEL(surface) || !gtk_gesture_drag_get_start_point(gesture, &x, &y))
+		return;
+	gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+	gdk_toplevel_begin_move(GDK_TOPLEVEL(surface), gdk_event_get_device(event),
+	                        gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture)), x + offset_x, y + offset_y,
+	                        gdk_event_get_time(event));
+	gtk_event_controller_reset(GTK_EVENT_CONTROLLER(gesture));
+}
+
+static void pinned_window_new(JNIEnv *env, GtkWidget *page)
+{
+	pinned_window = gtk_window_new();
+	gtk_window_set_application(GTK_WINDOW(pinned_window), gtk_window_get_application(window));
+	gtk_window_set_title(GTK_WINDOW(pinned_window), gtk_window_get_title(window));
+	gtk_window_set_decorated(GTK_WINDOW(pinned_window), FALSE);
+	gtk_window_set_default_size(GTK_WINDOW(pinned_window), pinned_width, pinned_height);
+	g_signal_connect(pinned_window, "close-request", G_CALLBACK(on_pinned_close_request), NULL);
+	atl_window_android_mouse_back(GTK_WINDOW(pinned_window), G_CALLBACK(on_pinned_mouse_back), NULL);
+	GtkEventController *keys = gtk_event_controller_key_new();
+	g_signal_connect(keys, "key-released", G_CALLBACK(on_pinned_key_released), NULL);
+	gtk_widget_add_controller(pinned_window, keys);
+
+	GtkWidget *overlay = gtk_overlay_new();
+	/* the app gets no input in the pinned task, the menu takes it */
+	gtk_widget_set_can_target(page, FALSE);
+	gtk_overlay_set_child(GTK_OVERLAY(overlay), page);
+	GtkGesture *click = gtk_gesture_click_new();
+	g_signal_connect(click, "released", G_CALLBACK(on_pinned_pressed), NULL);
+	gtk_widget_add_controller(overlay, GTK_EVENT_CONTROLLER(click));
+	GtkGesture *drag = gtk_gesture_drag_new();
+	g_signal_connect(drag, "drag-update", G_CALLBACK(on_pinned_drag_update), NULL);
+	gtk_widget_add_controller(overlay, GTK_EVENT_CONTROLLER(drag));
+	/* like PipMenuView: a dark scrim over the video (pip_menu_background 54 % black) with white icons */
+	static gboolean css_added = FALSE;
+	if (!css_added) {
+		GtkCssProvider *css = gtk_css_provider_new();
+		gtk_css_provider_load_from_string(css, ".atl-pip-menu { background: rgba(0, 0, 0, 0.54); padding: 4px; }"
+		                                       ".atl-pip-menu button { background: none; border: none; box-shadow: none;"
+		                                       " color: white; min-width: 40px; min-height: 40px; }"
+		                                       ".atl-pip-menu button:hover { background: rgba(255, 255, 255, 0.12); }");
+		gtk_style_context_add_provider_for_display(gtk_widget_get_display(pinned_window), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+		g_object_unref(css);
+		css_added = TRUE;
+	}
+	pinned_menu = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_widget_add_css_class(pinned_menu, "atl-pip-menu");
+	gtk_widget_set_halign(pinned_menu, GTK_ALIGN_FILL);
+	gtk_widget_set_valign(pinned_menu, GTK_ALIGN_END);
+	gtk_widget_set_visible(pinned_menu, FALSE);
+	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pinned_menu);
+	gtk_window_set_child(GTK_WINDOW(pinned_window), overlay);
+	pinned_menu_update(env);
+	gtk_window_present(GTK_WINDOW(pinned_window));
+}
+
+/* the transition into the pinned task, after enterPictureInPictureMode() returned (as from the system server) */
+static void pinned_task_entered(gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	if (!pinned_activity)
+		return;
+	pinned_task_changed(env, pinned_activity, pinned_width, pinned_height);
+	if (!window_hidden) {
+		activity_update_current(env);
+	} else if (activity_current && (*env)->IsSameObject(env, activity_current, pinned_activity)) {
+		/* entered by itself when the user left the app: the app's window stays hidden, the pinned activity is paused */
+		activity_pause(env, activity_current, false);
+		activity_current = NULL;
+	}
+}
+
+JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeEnterPictureInPicture(JNIEnv *env, jobject this, jfloat aspect_ratio)
+{
+	if (pinned_activity && (*env)->IsSameObject(env, this, pinned_activity))
+		return JNI_TRUE;
+	GList *l;
+	for (l = activity_backlog; l != NULL; l = l->next)
+		if ((*env)->IsSameObject(env, this, l->data))
+			break;
+	if (!l)
+		return JNI_FALSE;
+	/* there is one pinned task: the activity that was in it before is removed with it */
+	if (pinned_activity)
+		pinned_task_dismiss();
+	pinned_activity = l->data;
+	activity_backlog = g_list_delete_link(activity_backlog, l);
+	GtkWidget *page = get_decor_view(env, this);
+	g_object_ref(page);
+	gtk_stack_remove(get_stack(), page);
+	pinned_task_default_size(aspect_ratio, &pinned_width, &pinned_height);
+	pinned_window_new(env, page);
+	g_object_unref(page);
+	g_idle_add_once(pinned_task_entered, NULL);
+	return JNI_TRUE;
+}
+
+/* setPictureInPictureParams() while pinned: new size and actions */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeUpdatePictureInPicture(JNIEnv *env, jobject this, jfloat aspect_ratio)
+{
+	if (!pinned_activity || !(*env)->IsSameObject(env, this, pinned_activity))
+		return;
+	pinned_menu_update(env);
+	int width, height;
+	pinned_task_default_size(aspect_ratio, &width, &height);
+	if (width == pinned_width && height == pinned_height)
+		return;
+	pinned_width = width;
+	pinned_height = height;
+	gtk_window_set_default_size(GTK_WINDOW(pinned_window), width, height);
+	pinned_task_changed(env, this, width, height);
+}
+
 void activity_close_all(void)
 {
 	GList *activities, *l;
@@ -585,6 +959,8 @@ void activity_close_all(void)
 		activity_pause(env, activity_current, false);
 		activity_current = NULL;
 	}
+	if (pinned_activity)
+		pinned_task_finish(env);
 	// destroy all activities
 	for (l = activities; l != NULL; l = l->next) {
 		activity_close(env, l->data);
@@ -644,6 +1020,10 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 {
 	GList *l;
 	jobject removed_activity = NULL;
+	if (pinned_activity && (*env)->IsSameObject(env, this, pinned_activity)) {
+		pinned_task_finish(env);
+		return;
+	}
 	for (l = activity_backlog; l != NULL; l = l->next) {
 		if ((*env)->IsSameObject(env, this, l->data)) {
 			removed_activity = l->data;

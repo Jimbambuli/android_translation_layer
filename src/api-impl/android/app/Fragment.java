@@ -1,5 +1,6 @@
 package android.app;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 
 public class Fragment {
@@ -11,6 +12,15 @@ public class Fragment {
 	}
 
 	public void onStart() {
+	}
+
+	/* AOSP Fragment.onPictureInPictureModeChanged() */
+	@Deprecated
+	public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
+	}
+
+	public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+		onPictureInPictureModeChanged(isInPictureInPictureMode);
 	}
 
 	public void onResume() {
