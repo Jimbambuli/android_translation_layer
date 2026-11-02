@@ -128,10 +128,6 @@ public abstract class ContentProvider {
 	}
 
 	/* the newer forms of query(), openFile() and openAssetFile() (API 16-26) fall back to the older ones, as in AOSP */
-	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) {
-		return query(uri, projection, selection, selectionArgs, sortOrder);
-	}
-
 	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) {
 		queryArgs = queryArgs != null ? queryArgs : Bundle.EMPTY;
 		String sortClause = queryArgs.getString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER);
@@ -183,14 +179,6 @@ public abstract class ContentProvider {
 
 	public Uri uncanonicalize(Uri url) {
 		return url;
-	}
-
-	public Bundle call(String method, String arg, Bundle extras) {
-		return null;
-	}
-
-	public Bundle call(String authority, String method, String arg, Bundle extras) {
-		return call(method, arg, extras);
 	}
 
 	/**
