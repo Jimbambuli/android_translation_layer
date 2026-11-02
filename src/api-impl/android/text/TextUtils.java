@@ -383,7 +383,7 @@ public class TextUtils {
 		return s;
 	}
 
-	public static CharSequence concat(CharSequence[] array) {
+	public static CharSequence concat(CharSequence... array) {
 		StringBuilder sb = new StringBuilder();
 		for (CharSequence cs : array) {
 			sb.append(cs);

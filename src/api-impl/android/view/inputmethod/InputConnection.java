@@ -18,8 +18,6 @@ import android.atl.annotation.Export;
 import android.os.Bundle;
 import android.view.KeyEvent;
 
-class ExtractedText {}
-
 /**
  * The InputConnection interface is the communication channel from an
  * {@link InputMethod} back to the application that is receiving its input. It
@@ -177,6 +175,7 @@ public interface InputConnection {
 	 * @return Returns true on success, false if the input connection is no longer
 	 * valid.
 	 */
+	@Export
 	public boolean setComposingText(CharSequence text, int newCursorPosition);
 	/**
 	 * Mark a certain region of text as composing text. Any composing text set
