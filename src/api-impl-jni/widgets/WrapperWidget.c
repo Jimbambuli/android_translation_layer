@@ -399,7 +399,9 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 	}
 	/* AOSP order: the bounds (if the parent clips its children), the clip bounds, the outline */
 	int clips = 0;
-	if (wrapper->real_height > 0 && wrapper->real_width > 0 && parent_clips_children(widget)) {
+	/* AOSP clips to the bounds also when they are empty: a view laid out with no width (like a Toolbar
+	 * title next to a MATCH_PARENT custom view) shows nothing, while its GtkLabel would draw an ellipsis */
+	if ((wrapper->laid_out || (wrapper->real_height > 0 && wrapper->real_width > 0)) && parent_clips_children(widget)) {
 		gtk_snapshot_push_clip(snapshot, &GRAPHENE_RECT_INIT(0, 0, wrapper->real_width, wrapper->real_height));
 		clips++;
 	}

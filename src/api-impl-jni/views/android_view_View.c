@@ -1069,6 +1069,7 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1layout(JNIEnv *env, jobjec
 	int width = r - l;
 	int height = b - t;
 	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+	wrapper->laid_out = TRUE;
 	if (wrapper->real_width != width || wrapper->real_height != height) {
 		wrapper->real_width = width;
 		wrapper->real_height = height;
