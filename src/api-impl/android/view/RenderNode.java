@@ -1,6 +1,7 @@
 package android.view;
 
 import android.atl.GskCanvas;
+import android.atl.annotation.Export;
 import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
@@ -340,6 +341,21 @@ public class RenderNode {
 		long stub_node = nativeAddStubNode(snapshot);
 		children.add(node);
 		children_nodes.add(stub_node);
+	}
+
+	/* ATL: the render nodes drawn into the canvas of a view (GskCanvas.deferred_children) */
+	public void recordDeferredChild(long snapshot, RenderNode node) {
+		recordChild(snapshot, node);
+	}
+
+	/* ATL: what the view drew, with its render nodes as they are now; returns a new node */
+	@Export
+	public long resolveDeferredChildren(long node) {
+		for (int i = 0; i < children.size(); i++)
+			node = nativePatchNode(node, children_nodes.get(i), children.get(i).getGskNode());
+		children.clear();
+		children_nodes.clear();
+		return node;
 	}
 
 	public DisplayListCanvas start(int width, int height) {

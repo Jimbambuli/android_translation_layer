@@ -208,12 +208,30 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public void drawRenderNode(RenderNode node) {
-		native_drawRenderNode(snapshot, node.getGskNode());
+		drawRenderNodeOfView(node);
 	}
 
 	@Override
 	public void drawRenderNode(android.graphics.RenderNode node) {
-		native_drawRenderNode(snapshot, node.getGskNode());
+		drawRenderNodeOfView(node);
+	}
+
+	/* The canvas of a view: hwui renders a display list after the view has drawn, so a render node that is
+	 * recorded again later in the draw (Compose updates its dirty layers after drawing the root) shows in the
+	 * same frame. For a view that draws render nodes the WrapperWidget sets defer_render_nodes: the nodes are
+	 * stubs then, which deferred_children replaces when the view has drawn. */
+	public boolean defer_render_nodes;
+	public RenderNode deferred_children;
+	public boolean drew_render_node;
+
+	private void drawRenderNodeOfView(RenderNode node) {
+		drew_render_node = true;
+		if (defer_render_nodes) {
+			if (deferred_children == null)
+				deferred_children = new RenderNode();
+			deferred_children.recordDeferredChild(snapshot, node);
+		} else
+			native_drawRenderNode(snapshot, node.getGskNode());
 	}
 
 	/* Stretch of the view this canvas records, set by EdgeEffect.draw(). In AOSP this is the

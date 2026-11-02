@@ -69,6 +69,42 @@ static GskRenderNode *patch_node(GskRenderNode *node, GskRenderNode *old_child, 
 			gsk_render_node_unref(child);
 			break;
 		}
+		case GSK_ROUNDED_CLIP_NODE: {
+			GskRenderNode *child = patch_node(gsk_rounded_clip_node_get_child(node), old_child, new_child);
+			if (child != gsk_rounded_clip_node_get_child(node))
+				new_node = gsk_rounded_clip_node_new(child, gsk_rounded_clip_node_get_clip(node));
+			else
+				new_node = gsk_render_node_ref(node);
+			gsk_render_node_unref(child);
+			break;
+		}
+		case GSK_COLOR_MATRIX_NODE: {
+			GskRenderNode *child = patch_node(gsk_color_matrix_node_get_child(node), old_child, new_child);
+			if (child != gsk_color_matrix_node_get_child(node))
+				new_node = gsk_color_matrix_node_new(child, gsk_color_matrix_node_get_color_matrix(node), gsk_color_matrix_node_get_color_offset(node));
+			else
+				new_node = gsk_render_node_ref(node);
+			gsk_render_node_unref(child);
+			break;
+		}
+		case GSK_FILL_NODE: {
+			GskRenderNode *child = patch_node(gsk_fill_node_get_child(node), old_child, new_child);
+			if (child != gsk_fill_node_get_child(node))
+				new_node = gsk_fill_node_new(child, gsk_fill_node_get_path(node), gsk_fill_node_get_fill_rule(node));
+			else
+				new_node = gsk_render_node_ref(node);
+			gsk_render_node_unref(child);
+			break;
+		}
+		case GSK_MASK_NODE: {
+			GskRenderNode *source = patch_node(gsk_mask_node_get_source(node), old_child, new_child);
+			if (source != gsk_mask_node_get_source(node))
+				new_node = gsk_mask_node_new(source, gsk_mask_node_get_mask(node), gsk_mask_node_get_mask_mode(node));
+			else
+				new_node = gsk_render_node_ref(node);
+			gsk_render_node_unref(source);
+			break;
+		}
 		default:
 			new_node = gsk_render_node_ref(node);
 	}

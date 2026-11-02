@@ -419,10 +419,11 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		/* AOSP: EdgeEffect.draw() stretches the RenderNode of the view it draws into; View clears the
 		 * stretch before each draw and hwui applies it when it draws the node. A view that stretched
 		 * before draws into its own snapshot here, so the stretch can be applied to all it drew. */
-		GdkSnapshot *content = wrapper->may_stretch ? gtk_snapshot_new() : snapshot;
+		GdkSnapshot *content = (wrapper->may_stretch || wrapper->defers_render_nodes) ? gtk_snapshot_new() : snapshot;
 		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_x", 0);
 		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_y", 0);
 		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(content));
+		_SET_BOOL_FIELD(wrapper->canvas, "drew_render_node", FALSE);
 		J__View__draw(env, wrapper->jobj, wrapper->canvas);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
@@ -430,8 +431,19 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		}
 		float stretch_x = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_x");
 		float stretch_y = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_y");
+		if (!wrapper->defers_render_nodes && _GET_BOOL_FIELD(wrapper->canvas, "drew_render_node")) {
+			/* from the next frame on; this one may show a render node that was recorded again after it was drawn */
+			wrapper->defers_render_nodes = TRUE;
+			_SET_BOOL_FIELD(wrapper->canvas, "defer_render_nodes", TRUE);
+			gtk_widget_queue_draw(widget);
+		}
 		if (content != snapshot) {
 			GskRenderNode *node = gtk_snapshot_free_to_node(content);
+			jobject deferred_children = wrapper->defers_render_nodes ? _GET_OBJ_FIELD(wrapper->canvas, "deferred_children", "Landroid/view/RenderNode;") : NULL;
+			if (node && deferred_children)
+				node = _PTR(J__RenderNode__resolveDeferredChildren(env, deferred_children, _INTPTR(node)));
+			if (deferred_children)
+				(*env)->DeleteLocalRef(env, deferred_children);
 			if (node && (stretch_x != 0 || stretch_y != 0)) {
 				float w = wrapper->real_width > 0 ? wrapper->real_width : gtk_widget_get_width(widget);
 				float h = wrapper->real_height > 0 ? wrapper->real_height : gtk_widget_get_height(widget);

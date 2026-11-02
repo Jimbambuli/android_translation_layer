@@ -52,6 +52,8 @@ struct _WrapperWidget {
 	GskPath *outline_clip_path;
 	/* an EdgeEffect stretched this view once: it draws into its own snapshot from then on (see snapshot) */
 	gboolean may_stretch;
+	/* the view draws render nodes: they are resolved after its draw (GskCanvas.deferred_children) */
+	gboolean defers_render_nodes;
 };
 
 struct _WrapperWidgetClass {
