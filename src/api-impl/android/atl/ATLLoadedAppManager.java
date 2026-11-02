@@ -6,9 +6,11 @@ import android.util.DisplayMetrics;
 import android.util.Slog;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 public final class ATLLoadedAppManager {
 	private static final String TAG = "ATLLoadedAppManager";
@@ -159,6 +161,28 @@ public final class ATLLoadedAppManager {
 		pkg.applicationInfo.publicSourceDir = apk.getPath();
 		pkg.applicationInfo.dataDir = getDataDir(pkg.packageName).getPath();
 		pkg.applicationInfo.nativeLibraryDir = new File(getDataDir(pkg.packageName), "lib").getPath();
+	}
+
+	/**
+	 * The packages the app sees, as AOSP's getInstalledPackages() with package visibility: the app
+	 * itself and the packages in _installed_apks_ that it may see.
+	 */
+	public static List<String> getInstalledPackageNames() {
+		String primaryPackageName = ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+		List<String> names = new ArrayList<>();
+		names.add(primaryPackageName);
+		String[] files = ATLPaths.installed_apks_dir.list();
+		if (files != null) {
+			Arrays.sort(files);
+			for (String file : files) {
+				if (!file.endsWith(".apk"))
+					continue;
+				String packageName = file.substring(0, file.length() - ".apk".length());
+				if (!packageName.equals(primaryPackageName) && isPackageVisible(primaryPackageName, packageName))
+					names.add(packageName);
+			}
+		}
+		return names;
 	}
 
 	/**

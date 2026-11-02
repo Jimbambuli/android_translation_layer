@@ -1809,7 +1809,13 @@ public class PackageManager {
 	 */
 	public List<PackageInfo> getInstalledPackages(int flags) {
 		List<PackageInfo> ret = new ArrayList<PackageInfo>();
-		ret.add(package_info);
+		for (String packageName : ATLLoadedAppManager.getInstalledPackageNames()) {
+			try {
+				ret.add(getPackageInfo(packageName, flags));
+			} catch (NameNotFoundException e) {
+				Slog.w(TAG, "getInstalledPackages: cannot parse " + packageName);
+			}
+		}
 		return ret;
 	}
 
@@ -1886,7 +1892,7 @@ public class PackageManager {
 	 * @hide
 	 */
 	public List<PackageInfo> getInstalledPackages(int flags, int userId) {
-		return null;
+		return getInstalledPackages(flags);
 	}
 
 	/**
@@ -2171,7 +2177,13 @@ public class PackageManager {
 	 */
 	public List<ApplicationInfo> getInstalledApplications(int flags) {
 		List<ApplicationInfo> ret = new ArrayList<ApplicationInfo>();
-		ret.add(package_info.applicationInfo);
+		for (String packageName : ATLLoadedAppManager.getInstalledPackageNames()) {
+			try {
+				ret.add(getApplicationInfo(packageName, flags));
+			} catch (NameNotFoundException e) {
+				Slog.w(TAG, "getInstalledApplications: cannot parse " + packageName);
+			}
+		}
 		return ret;
 	}
 
@@ -2458,7 +2470,30 @@ public class PackageManager {
 			ri.activityInfo.exported = true;
 			return Arrays.asList(ri);
 		}
-		return new ArrayList<ResolveInfo>();
+		/* like queryIntentServices(): the receivers of the component's, the intent's or every visible package */
+		List<ResolveInfo> list = new ArrayList<ResolveInfo>();
+		String packageName = intent.getComponent() != null ? intent.getComponent().getPackageName() : intent.getPackage();
+		List<String> packageNames = packageName != null ? Collections.singletonList(packageName)
+		                                                : ATLLoadedAppManager.getInstalledPackageNames();
+		for (String name : packageNames) {
+			PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(name);
+			if (pkg == null)
+				continue;
+			for (PackageParser.Activity r : pkg.receivers) {
+				boolean match = r.getComponentName().equals(intent.getComponent());
+				for (PackageParser.ActivityIntentInfo intentinfo : r.intents) {
+					if (match)
+						break;
+					match = intent.getComponent() == null && intentinfo.matchAction(intent.getAction());
+				}
+				if (match) {
+					ResolveInfo ri = new ResolveInfo();
+					ri.activityInfo = r.info;
+					list.add(ri);
+				}
+			}
+		}
+		return list;
 	}
 
 	/**
@@ -2498,7 +2533,8 @@ public class PackageManager {
 	 * @see #GET_RESOLVED_FILTER
 	 */
 	public ResolveInfo resolveService(Intent intent, int flags) {
-		return null;
+		List<ResolveInfo> list = queryIntentServices(intent, flags);
+		return list.isEmpty() ? null : list.get(0);
 	}
 
 	/**
@@ -2519,17 +2555,22 @@ public class PackageManager {
 	public List<ResolveInfo> queryIntentServices(Intent intent,
 	                                             int flags) {
 		List<ResolveInfo> list = new ArrayList<ResolveInfo>(1);
-		String packageName;
-		PackageParser.Package pkg = null;
-		if ((packageName = intent.getPackage()) != null) {
-			pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
-		}
-		if (pkg == null) {
-			pkg = ATLLoadedApp.getPrimaryApplication().pkg;
-		}
-		for (Service s : pkg.services) {
-			for (ServiceIntentInfo intentinfo : s.intents) {
-				if (s.getComponentName().equals(intent.getComponent()) || intentinfo.matchAction(intent.getAction())) {
+		/* like AOSP: the component's or the intent's package, otherwise all packages the app sees */
+		String packageName = intent.getComponent() != null ? intent.getComponent().getPackageName() : intent.getPackage();
+		List<String> packageNames = packageName != null ? Collections.singletonList(packageName)
+		                                                : ATLLoadedAppManager.getInstalledPackageNames();
+		for (String name : packageNames) {
+			PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(name);
+			if (pkg == null)
+				continue;
+			for (Service s : pkg.services) {
+				boolean match = s.getComponentName().equals(intent.getComponent());
+				for (ServiceIntentInfo intentinfo : s.intents) {
+					if (match)
+						break;
+					match = intent.getComponent() == null && intentinfo.matchAction(intent.getAction());
+				}
+				if (match) {
 					ResolveInfo ri = new ResolveInfo();
 					ri.serviceInfo = s.info;
 					list.add(ri);
