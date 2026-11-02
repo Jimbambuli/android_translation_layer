@@ -498,6 +498,17 @@ static void watch(const char *gtk_dir)
 	g_free(path);
 }
 
+/* GTK also takes the icon theme from the settings portal (org.gnome.desktop.interface), maybe one that is not in
+ * the sandbox (KDE: breeze): keep an installed one */
+static void icon_theme_changed(GtkSettings *settings, GParamSpec *pspec, gpointer user_data)
+{
+	char *name = NULL;
+	g_object_get(settings, "gtk-icon-theme-name", &name, NULL);
+	if (!name || !icon_theme_installed(name))
+		g_object_set(settings, "gtk-icon-theme-name", "Adwaita", NULL);
+	g_free(name);
+}
+
 /* apply the GTK configuration in config_dir (the host's ~/.config) and follow its changes; needs GTK initialized */
 void system_theme_init(const char *dir)
 {
@@ -515,4 +526,6 @@ void system_theme_init(const char *dir)
 	watch("gtk-4.0");
 	watch("gtk-3.0/assets");
 	apply();
+	g_signal_connect(gtk_settings_get_default(), "notify::gtk-icon-theme-name", G_CALLBACK(icon_theme_changed), NULL);
+	icon_theme_changed(gtk_settings_get_default(), NULL, NULL);
 }
