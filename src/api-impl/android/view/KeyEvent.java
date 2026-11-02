@@ -1856,7 +1856,7 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 * initial down) or event count for multiple events.
 	 * @param metaState Flags indicating which meta keys are currently pressed.
 	 */
-	@Export
+	@Export("constructor")
 	public KeyEvent(long downTime, long eventTime, int action,
 	                int code, int repeat, int metaState) {
 		mDownTime = downTime;
@@ -1946,6 +1946,7 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 * @param flags The flags for this key event
 	 * @param source The input source such as {@link InputDevice#SOURCE_KEYBOARD}.
 	 */
+	@Export("constructor_full")
 	public KeyEvent(long downTime, long eventTime, int action,
 	                int code, int repeat, int metaState,
 	                int deviceId, int scancode, int flags, int source) {

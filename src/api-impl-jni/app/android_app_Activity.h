@@ -14,6 +14,8 @@ void activity_app_quit(void);
 GtkWidget *activity_pages_new(void);
 GtkWidget *activity_pages_stack(void);
 void current_activity_back_pressed(void);
+/* the keys that reach the app's window go to the shown activity (Window.dispatchKeyEventFromNative()) */
+void activity_window_add_key_controller(GtkWindow *window);
 /* for the navigation bar: the activities from the shown one (index 0) down to the first one */
 int activity_count(void);
 char *activity_title(int index);

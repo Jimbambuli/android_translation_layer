@@ -9,6 +9,7 @@
 #include "../util.h"
 #include "../generated_headers/android_app_Activity.h"
 #include "../../main-executable/back_button.h"
+#include "../widgets/WrapperWidget.h"
 #include "android_app_Activity.h"
 
 extern GtkWindow *window;
@@ -563,7 +564,10 @@ void activity_ensure_configuration(void)
 	}
 }
 
-void current_activity_back_pressed(void)
+/* What Back does once the activity let it go back (Activity.onKeyUp()): the callbacks of the
+ * OnBackInvokedDispatcher first, then onBackPressed(), unless the activity is the only one and has
+ * Activity's own onBackPressed() (Android 12+ would move its task to the back, it stays here) */
+static void activity_back_invoked(void)
 {
 	JNIEnv *env = get_jni_env();
 
@@ -592,6 +596,120 @@ void current_activity_back_pressed(void)
 	} else {
 		back_button_set_sensitive(false);
 	}
+}
+
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeBackInvoked(JNIEnv *env, jobject this)
+{
+	if (activity_current && (*env)->IsSameObject(env, this, activity_current))
+		activity_back_invoked();
+}
+
+/* ---- keys at the app's window: the part of InputDispatcher and ViewRootImpl ----
+ * GTK hands a key to the focused widget, the views get it on its way up (WrapperWidget.c). A key that no view
+ * consumed reaches the window and goes to the shown activity's Window (Window.dispatchKeyEventFromNative():
+ * DecorView, Window.Callback, PhoneWindow, fallback handler) with the repeat count, the long press flag of the
+ * first repeat and the time of the down key, as InputDispatcher sends it. Like InputDispatcher, a down key that
+ * nobody handled gets the fallback key of the key character map, which then gets the rest of the key with
+ * FLAG_FALLBACK: AOSP's Generic.kcm has Ctrl+ESCAPE fall back to MENU (Alt/Meta+ESCAPE to HOME, which ATL
+ * has not), and ATL adds the desktop's Escape as BACK, as its title bar promises (the back arrow, Esc and
+ * the mouse's back button); a Compose popup that takes only BACK keeps Escape, its window stops it. */
+#define ACTION_DOWN           0
+#define ACTION_UP             1
+#define FLAG_FROM_SYSTEM      0x8
+#define FLAG_VIRTUAL_HARD_KEY 0x40
+#define FLAG_LONG_PRESS       0x80
+#define FLAG_FALLBACK         0x400
+#define SOURCE_KEYBOARD       0x101
+#define VIRTUAL_KEYBOARD      -1
+#define KEYCODE_BACK          4
+#define KEYCODE_MENU          82
+#define KEYCODE_ESCAPE        111
+#define META_ALT_ON           (1 << 1)
+#define META_CTRL_ON          (1 << 12)
+#define META_META_ON          (1 << 16)
+
+static gboolean dispatch_window_key(JNIEnv *env, int action, int code, int repeat, int meta, int scancode, int flags, int unicode, jlong down_time)
+{
+	if (!activity_current)
+		return FALSE;
+	jobject window_jobj = _GET_OBJ_FIELD(activity_current, "window", "Landroid/view/Window;");
+	jlong now = g_get_monotonic_time() / 1000;
+	jobject event = J_new__KeyEvent__full(env, down_time ? down_time : now, now, action, code, repeat, meta,
+	                                      VIRTUAL_KEYBOARD, scancode, flags, SOURCE_KEYBOARD);
+	_SET_INT_FIELD(event, "unicodeValue", unicode);
+	gboolean ret = J__Window__dispatchKeyEventFromNative(env, window_jobj, event);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		ret = FALSE;
+	}
+	(*env)->DeleteLocalRef(env, event);
+	(*env)->DeleteLocalRef(env, window_jobj);
+	return ret;
+}
+
+/* the key that is down: GDK key code, repeat count, down time, fallback key code (0: none) */
+static guint key_down = 0;
+static int key_repeat = 0;
+static jlong key_down_time = 0;
+static int key_fallback = 0;
+
+static gboolean on_window_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	int code = atl_android_key_code(controller, keyval, keycode);
+	int meta = atl_android_meta_state(state);
+	int unicode = gdk_keyval_to_unicode(keyval);
+	if (keycode == key_down) {
+		key_repeat++;
+	} else {
+		key_down = keycode;
+		key_repeat = 0;
+		key_down_time = g_get_monotonic_time() / 1000;
+		key_fallback = 0;
+	}
+	int flags = FLAG_FROM_SYSTEM | (key_repeat == 1 ? FLAG_LONG_PRESS : 0);
+	if (key_fallback)
+		return dispatch_window_key(env, ACTION_DOWN, key_fallback, key_repeat, meta, keycode - 8, flags | FLAG_FALLBACK, 0, key_down_time);
+	gboolean handled = dispatch_window_key(env, ACTION_DOWN, code, key_repeat, meta, keycode - 8, flags, unicode, key_down_time);
+	if (!handled && key_repeat == 0 && code == KEYCODE_ESCAPE && !(meta & (META_ALT_ON | META_META_ON))) {
+		key_fallback = (meta & META_CTRL_ON) ? KEYCODE_MENU : KEYCODE_BACK;
+		handled = dispatch_window_key(env, ACTION_DOWN, key_fallback, 0, meta, keycode - 8, flags | FLAG_FALLBACK, 0, key_down_time);
+	}
+	return handled;
+}
+
+static void on_window_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	int meta = atl_android_meta_state(state);
+	int fallback = keycode == key_down ? key_fallback : 0;
+	jlong down_time = keycode == key_down ? key_down_time : 0;
+	if (keycode == key_down)
+		key_down = 0;
+	if (fallback)
+		dispatch_window_key(env, ACTION_UP, fallback, 0, meta, keycode - 8, FLAG_FROM_SYSTEM | FLAG_FALLBACK, 0, down_time);
+	else
+		dispatch_window_key(env, ACTION_UP, atl_android_key_code(controller, keyval, keycode), 0, meta, keycode - 8,
+		                    FLAG_FROM_SYSTEM, gdk_keyval_to_unicode(keyval), down_time);
+}
+
+void activity_window_add_key_controller(GtkWindow *window)
+{
+	GtkEventController *controller = gtk_event_controller_key_new();
+	g_signal_connect(controller, "key-pressed", G_CALLBACK(on_window_key_pressed), NULL);
+	g_signal_connect(controller, "key-released", G_CALLBACK(on_window_key_released), NULL);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+}
+
+/* The back button of the title bar, the navigation bar and the mouse: like the back button of SystemUI's
+ * navigation bar (KeyButtonView), a KEYCODE_BACK key from the system, down and up */
+void current_activity_back_pressed(void)
+{
+	JNIEnv *env = get_jni_env();
+	jlong now = g_get_monotonic_time() / 1000;
+	dispatch_window_key(env, ACTION_DOWN, KEYCODE_BACK, 0, 0, 0, FLAG_FROM_SYSTEM | FLAG_VIRTUAL_HARD_KEY, 0, now);
+	dispatch_window_key(env, ACTION_UP, KEYCODE_BACK, 0, 0, 0, FLAG_FROM_SYSTEM | FLAG_VIRTUAL_HARD_KEY, 0, now);
 }
 
 int activity_count(void)

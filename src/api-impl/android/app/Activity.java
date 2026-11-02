@@ -56,7 +56,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class Activity extends ContextThemeWrapper implements Window.Callback, LayoutInflater.Factory2 {
+public class Activity extends ContextThemeWrapper implements Window.Callback, KeyEvent.Callback, LayoutInflater.Factory2 {
 	private final static String TAG = "Activity";
 
 	public static final int RESULT_CANCELED = 0;
@@ -1008,7 +1008,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 	public void reportFullyDrawn() {}
 	public void setVisible(boolean visible) {}
 	public Uri getReferrer() { return null; }
-	public void setDefaultKeyMode(int flag) {}
+	/* AOSP Activity.setDefaultKeyMode(); of the modes, ATL has DEFAULT_KEYS_DISABLE (keys the activity does not
+	 * handle are dropped) and DEFAULT_KEYS_SHORTCUT, the others type nowhere */
+	public static final int DEFAULT_KEYS_DISABLE = 0;
+	public static final int DEFAULT_KEYS_DIALER = 1;
+	public static final int DEFAULT_KEYS_SHORTCUT = 2;
+	public static final int DEFAULT_KEYS_SEARCH_LOCAL = 3;
+	public static final int DEFAULT_KEYS_SEARCH_GLOBAL = 4;
+	private int mDefaultKeyMode = DEFAULT_KEYS_DISABLE;
+
+	public final void setDefaultKeyMode(int mode) {
+		mDefaultKeyMode = mode;
+	}
 	public void registerForContextMenu(View view) {}
 	public native boolean isInMultiWindowMode();
 
@@ -1649,17 +1660,103 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 		finish();
 	}
 
+	/* AOSP Activity.dispatchKeyEvent(): the window's views (Window.superDispatchKeyEvent()), then the activity
+	 * itself (KeyEvent.dispatch() to onKeyDown() etc.). Called for the keys the views did not consume on their
+	 * way through GTK (WrapperWidget.c), see Window.dispatchKeyEventFromNative(). ATL has no action bar that
+	 * would take the menu key first. */
 	public boolean dispatchKeyEvent(KeyEvent event) {
-		return false;
+		onUserInteraction();
+
+		Window win = getWindow();
+		if (win.superDispatchKeyEvent(event)) {
+			return true;
+		}
+		View decor = win.getDecorView();
+		return event.dispatch(this, decor != null
+		    ? decor.getKeyDispatcherState() : null, this);
 	}
 
-	/* the remaining Window.Callback methods; input reaches the views through GTK, so there is
-	 * nothing to dispatch here, and there is no action bar to start an action mode in */
-
+	/* AOSP Activity.dispatchKeyShortcutEvent() */
 	@Override
 	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
+		onUserInteraction();
+		if (getWindow().superDispatchKeyShortcutEvent(event)) {
+			return true;
+		}
+		return onKeyShortcut(event.getKeyCode(), event);
+	}
+
+	/* AOSP Activity.onKeyDown(): Back starts tracking (it goes back when released, see onKeyUp()), the other keys
+	 * go by the default key mode */
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_BACK) {
+			if (getApplicationInfo().targetSdkVersion
+			    >= Build.VERSION_CODES.ECLAIR) {
+				event.startTracking();
+			} else {
+				onBackPressed();
+			}
+			return true;
+		}
+
+		if (mDefaultKeyMode == DEFAULT_KEYS_DISABLE) {
+			return false;
+		} else if (mDefaultKeyMode == DEFAULT_KEYS_SHORTCUT) {
+			return false;
+		} else if (keyCode == KeyEvent.KEYCODE_TAB) {
+			// Don't consume TAB here since it's used for navigation. Arrow keys
+			// aren't considered "typing keys" so they already won't get consumed.
+			return false;
+		} else {
+			/* DEFAULT_KEYS_DIALER/SEARCH_*: ATL has no dialer or search to type into */
+			return false;
+		}
+	}
+
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
 		return false;
 	}
+
+	/* AOSP Activity.onKeyUp(): a tracked Back that was not canceled goes back. AOSP calls onBackPressed() here
+	 * (or the system hands Back to the OnBackInvokedDispatcher); ATL's back (nativeBackInvoked()) does what it
+	 * did for the back button so far: the OnBackInvokedDispatcher's callbacks first, then onBackPressed(),
+	 * unless the activity is the only one and has Activity's own onBackPressed() (its task would just move
+	 * to the back on Android 12+) */
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		int sdkVersion = getApplicationInfo().targetSdkVersion;
+		if (sdkVersion >= Build.VERSION_CODES.ECLAIR) {
+			if (keyCode == KeyEvent.KEYCODE_BACK
+			    && event.isTracking()
+			    && !event.isCanceled()) {
+				nativeBackInvoked();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
+		return false;
+	}
+
+	/* AOSP Activity.onKeyShortcut(): ATL has no action bar to give the shortcut to */
+	public boolean onKeyShortcut(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	private native void nativeBackInvoked();
+
+	/* AOSP Activity.setMediaController(): the media keys the activity does not handle go to this session */
+	public final void setMediaController(android.media.session.MediaController controller) {
+		getWindow().setMediaController(controller);
+	}
+
+	public final android.media.session.MediaController getMediaController() {
+		return getWindow().getMediaController();
+	}
+
+	/* the remaining Window.Callback methods; touches reach the views through GTK, so there is
+	 * nothing to dispatch here, and there is no action bar to start an action mode in */
 
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {

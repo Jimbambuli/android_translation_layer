@@ -439,28 +439,6 @@ static void update_animator_duration_scale(GtkSettings *settings)
 	(*env)->DeleteLocalRef(env, value_animator);
 }
 
-/* An Escape that no view consumed (the views get the keys before the window) is the back key, as on
- * Android: its Generic.kcm maps ESCAPE to "fallback BACK", so InputDispatcher sends KEYCODE_BACK when
- * the app does not handle KEYCODE_ESCAPE. Like the back button of the mouse (atl_window_android_mouse_back())
- * it goes back when it is released, if the window got its press. */
-static gboolean escape_pressed = FALSE;
-
-static gboolean on_escape_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
-{
-	if (keyval != GDK_KEY_Escape)
-		return FALSE;
-	escape_pressed = TRUE;
-	return TRUE;
-}
-
-static void on_escape_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
-{
-	if (keyval != GDK_KEY_Escape || !escape_pressed)
-		return;
-	escape_pressed = FALSE;
-	current_activity_back_pressed();
-}
-
 /* The fonts of the Android families that ATL brings along: Roboto as in AOSP's external/roboto-fonts
  * (android-14), one variable font for the families of frameworks/base/data/fonts/fonts.xml
  * sans-serif (and its -thin/-light/-medium/-black aliases, by weight) and sans-serif-condensed (axis
@@ -687,10 +665,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	atl_window_android_tab_focus(GTK_WINDOW(window));
 	atl_window_android_wheel_acceleration(GTK_WINDOW(window));
 	atl_window_android_mouse_back(GTK_WINDOW(window), G_CALLBACK(current_activity_back_pressed), NULL);
-	GtkEventController *escape_controller = gtk_event_controller_key_new();
-	g_signal_connect(escape_controller, "key-pressed", G_CALLBACK(on_escape_pressed), NULL);
-	g_signal_connect(escape_controller, "key-released", G_CALLBACK(on_escape_released), NULL);
-	gtk_widget_add_controller(window, escape_controller);
+	/* the keys no view consumed go to the activity; an Escape nobody handled is the back key */
+	activity_window_add_key_controller(GTK_WINDOW(window));
 	atl_window_android_touch_targets(GTK_WINDOW(window));
 
 	const char *disable_decoration_env = getenv("ATL_DISABLE_WINDOW_DECORATIONS");

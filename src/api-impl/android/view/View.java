@@ -4606,6 +4606,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
+	/* AOSP View.dispatchKeyShortcutEvent()/onKeyShortcut() */
+	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
+		return onKeyShortcut(event.getKeyCode(), event);
+	}
+
+	public boolean onKeyShortcut(int keyCode, KeyEvent event) {
+		return false;
+	}
+
 	/* AOSP View.onKeyLongPress() */
 	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
 		return false;
