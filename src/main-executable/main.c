@@ -1090,9 +1090,6 @@ int main(int argc, char **argv)
 	// for correct functionality
 	setenv("LC_ALL", "C.UTF-8", 1);
 
-	/* the desktop's themes and icons, if the sandbox can read the host's system files (see system_theme.c) */
-	system_theme_add_data_dirs("/run/host/usr/share");
-
 	libc_bio_set_apply_path_overrides_func(apply_path_overrides);
 
 	struct jni_callback_data *callback_data = malloc(sizeof(struct jni_callback_data));

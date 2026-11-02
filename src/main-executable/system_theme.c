@@ -1,24 +1,23 @@
-/* The GTK theme of the desktop, also in a sandbox.
+/* The look of the desktop, also in a sandbox.
  *
- * GTK takes its theme from settings.ini and the user's gtk.css in $XDG_CONFIG_HOME/gtk-4.0 and looks for the
- * theme in the themes directories of $XDG_DATA_DIRS. In a Flatpak these are the app's own directories, so the
- * windows would have GTK's default theme on every desktop. With read access to the host's system files
- * (--filesystem=host-os:ro, under /run/host) and to its GTK configuration (--filesystem=xdg-config/gtk-4.0:ro,
- * xdg-config/gtk-3.0:ro), ATL does what GTK does outside the sandbox:
+ * GTK takes its settings and the user's gtk.css from $XDG_CONFIG_HOME/gtk-4.0; in a Flatpak that is the app's
+ * own directory. With read access to the host's GTK 4 configuration (--filesystem=xdg-config/gtk-4.0:ro) ATL
+ * applies it as GTK does outside the sandbox, on GTK's own theme (Adwaita: the host's theme itself is not
+ * visible in the sandbox, by design):
  *
- *  - the host's themes and icons become visible by adding /run/host/usr/share to $XDG_DATA_DIRS (before GTK
- *    reads it, see system_theme_add_data_dirs())
- *  - theme, icons, cursor and the layout of the title bar buttons come from the host's settings.ini
- *    (the font stays Roboto for the app, see main.c; the title bar gets the desktop's font)
+ *  - icons, cursor and the layout of the title bar buttons come from the host's settings.ini; an icon theme
+ *    is found when it is installed for the runtime (Flatpak extension org.freedesktop.Platform.Icontheme.*),
+ *    else GTK's Adwaita icons stay (the font stays Roboto for the app, see main.c; the title bar gets the
+ *    desktop's font)
  *  - the host's gtk.css (KDE: @import 'colors.css', the colors of the color scheme) is user CSS as in GTK
  *  - the title of the title bar is in the desktop's font.
  * The window buttons are the theme's, unless KDE drew the buttons of the KWin decoration (see
- * load_window_buttons()). KDE's window_decorations.css itself is not used: it is written for GTK 3 (class
- * "titlebutton", images only in gtk-3.0), GTK 4 does not load it, and GTK 4.24 draws its images (SVG from
- * Qt) as nothing, which hid the buttons.
+ * load_window_buttons()): window_decorations.css names them, the pictures are in gtk-3.0/assets
+ * (--filesystem=xdg-config/gtk-3.0/assets:ro). The CSS itself is not used: it is written for GTK 3 (class
+ * "titlebutton"), and GTK 4.24 draws its images (SVG from Qt) as nothing, which hid the buttons.
  *
- * A change of these files (another theme or color scheme) is applied while the app runs. Without these files
- * GTK keeps its default theme and the dark variant from the settings portal. */
+ * A change of these files (another color scheme) is applied while the app runs. Without these files GTK keeps
+ * its default look and the dark variant from the settings portal. */
 
 #include <glib/gstdio.h>
 #include <gtk/gtk.h>
@@ -38,28 +37,6 @@ static GtkCssProvider *buttons_provider = NULL;
 static GPtrArray *monitors = NULL;
 static guint reload_source = 0;
 
-/* add the host's share directories with themes to $XDG_DATA_DIRS, at the end so the app's own data comes first;
- * must run before GLib reads the variable (g_get_system_data_dirs() keeps the first result) */
-void system_theme_add_data_dirs(const char *host_share)
-{
-	char *themes = g_build_filename(host_share, "themes", NULL);
-	gboolean has_themes = g_file_test(themes, G_FILE_TEST_IS_DIR);
-	g_free(themes);
-	if (!has_themes)
-		return;
-	const char *dirs = g_getenv("XDG_DATA_DIRS");
-	if (!dirs || !*dirs)
-		dirs = "/usr/local/share:/usr/share"; // the default of the XDG Base Directory Specification
-	char **list = g_strsplit(dirs, ":", -1);
-	gboolean present = g_strv_contains((const char *const *)list, host_share);
-	g_strfreev(list);
-	if (!present) {
-		char *new_dirs = g_strconcat(dirs, ":", host_share, NULL);
-		g_setenv("XDG_DATA_DIRS", new_dirs, TRUE);
-		g_free(new_dirs);
-	}
-}
-
 /* the host's configuration directory: Flatpak passes the host's $XDG_CONFIG_HOME as $HOST_XDG_CONFIG_HOME
  * if it was set, the default is ~/.config */
 char *system_theme_host_config_dir(void)
@@ -75,9 +52,10 @@ static char *config_file(const char *gtk_dir, const char *name)
 	return g_build_filename(config_dir, gtk_dir, name, NULL);
 }
 
-/* the settings of settings.ini that make up the look; not the font (Roboto for the app), not the dark variant
- * (settings portal) and not gtk-xft-dpi (for X11, the scale comes from the compositor) */
-static const char *string_settings[] = {"gtk-theme-name", "gtk-icon-theme-name", "gtk-cursor-theme-name", "gtk-decoration-layout"};
+/* the settings of settings.ini that make up the look; not the theme (the host's is not in the sandbox, GTK's
+ * own Adwaita stays), not the font (Roboto for the app), not the dark variant (settings portal) and not
+ * gtk-xft-dpi (for X11, the scale comes from the compositor) */
+static const char *string_settings[] = {"gtk-icon-theme-name", "gtk-cursor-theme-name", "gtk-decoration-layout"};
 
 static char *apply_settings(void)
 {
@@ -85,11 +63,6 @@ static char *apply_settings(void)
 	char *path = config_file("gtk-4.0", "settings.ini");
 	gboolean loaded = g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, NULL);
 	g_free(path);
-	if (!loaded) {
-		path = config_file("gtk-3.0", "settings.ini");
-		loaded = g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, NULL);
-		g_free(path);
-	}
 	char *font_name = NULL;
 	if (loaded) {
 		GtkSettings *settings = gtk_settings_get_default();
@@ -440,11 +413,7 @@ static void load_window_buttons(void)
 	 * back button like KWin's buttons */
 	char *colors = NULL;
 	char *colors_path = config_file("gtk-4.0", "colors.css");
-	if (!g_file_get_contents(colors_path, &colors, NULL, NULL)) {
-		g_free(colors_path);
-		colors_path = config_file("gtk-3.0", "colors.css");
-		g_file_get_contents(colors_path, &colors, NULL, NULL);
-	}
+	g_file_get_contents(colors_path, &colors, NULL, NULL);
 	g_free(colors_path);
 	if (colors && strstr(colors, "theme_titlebar_background_breeze") && strstr(colors, "theme_titlebar_foreground_backdrop_breeze"))
 		g_string_append(css,
@@ -524,7 +493,6 @@ void system_theme_init(const char *dir)
 	gtk_style_context_add_provider_for_display(display, GTK_STYLE_PROVIDER(buttons_provider), GTK_STYLE_PROVIDER_PRIORITY_USER);
 	monitors = g_ptr_array_new_with_free_func(g_object_unref);
 	watch("gtk-4.0");
-	watch("gtk-3.0");
 	watch("gtk-3.0/assets");
 	apply();
 }
