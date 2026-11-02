@@ -183,9 +183,11 @@ static char *kconfig_value(const char *file, const char *group, const char *key)
  * 96 dpi on Wayland, the output scale comes on top for both). As in Breeze's Decoration::bordersFor() and
  * KDecoration's DecorationSettings: the grid unit is the height of «M» in the title font (made even), the small
  * spacing a quarter of it (at least 2), a button two grid units (breezerc ButtonSize), and the bar is
- * max(font height, button) + 4 small spacings. The title font is kdeglobals [WM] activeFont, KDE's default
- * Noto Sans 10. FALSE for another decoration (kwinrc [org.kde.kdecoration2] library): the theme's height stays. */
-static gboolean kwin_title_bar(int *height, int *button)
+ * max(font height, button) + 4 small spacings. The buttons are 2 small spacings apart and 2 small spacings from
+ * the window's edge (Breeze's TitleBar_ButtonSpacing and TitleBar_SideMargin). The title font is kdeglobals [WM]
+ * activeFont, KDE's default Noto Sans 10. FALSE for another decoration (kwinrc [org.kde.kdecoration2] library): the
+ * theme's height stays. */
+static gboolean kwin_title_bar(int *height, int *button, int *spacing)
 {
 	char *library = kconfig_value("kwinrc", "org.kde.kdecoration2", "library");
 	gboolean breeze = !library || !strcmp(library, "org.kde.breeze");
@@ -247,6 +249,7 @@ static gboolean kwin_title_bar(int *height, int *button)
 	g_free(size);
 	*button = (int)(grid_unit * factor);
 	*height = MAX(font_height, *button) + 4 * small_spacing;
+	*spacing = 2 * small_spacing;
 	return TRUE;
 }
 
@@ -404,8 +407,8 @@ static void append_picture(GString *css, const char *dir, const char *name, cons
 
 static void load_window_buttons(void)
 {
-	int height, button;
-	gboolean kwin_size = kwin_title_bar(&height, &button);
+	int height, button, spacing = 6;
+	gboolean kwin_size = kwin_title_bar(&height, &button, &spacing);
 	if (!kwin_size)
 		button = BUTTON_SIZE;
 	char *dir = window_button_pictures(button);
@@ -414,20 +417,25 @@ static void load_window_buttons(void)
 		return;
 	}
 	GString *css = g_string_new("");
-	/* the header bar has a border of 1 px above and below */
+	/* the header bar has a border of 1 px above and below. KWin's spacing: the buttons `spacing` apart, the last one
+	 * `spacing` from the window's edge (half of it as the button's margin, the other half as the bar's padding on
+	 * the side of the buttons) */
 	if (kwin_size)
 		g_string_append_printf(css,
 		                       "headerbar.titlebar { min-height: %dpx; padding-top: 0; padding-bottom: 0; }\n"
-		                       "headerbar.titlebar button.atl-back { min-height: %dpx; min-width: %dpx; padding: 0 2px; margin-top: 0; margin-bottom: 0; }\n",
-		                       height - 2, button + 2, button + 2);
+		                       "headerbar.titlebar button.atl-back { min-height: %dpx; min-width: %dpx; padding: 0 2px; margin-top: 0; margin-bottom: 0; }\n"
+		                       "headerbar.titlebar windowcontrols.end { margin: 0; padding: 0; border-spacing: 0; }\n"
+		                       "headerbar.titlebar:dir(ltr) { padding-right: %dpx; }\n"
+		                       "headerbar.titlebar:dir(rtl) { padding-left: %dpx; }\n",
+		                       height - 2, button + 2, button + 2, spacing - spacing / 2, spacing - spacing / 2);
 	g_string_append_printf(css,
 	                       "headerbar.titlebar windowcontrols > button.close, headerbar.titlebar windowcontrols > button.maximize,"
 	                       " headerbar.titlebar windowcontrols > button.minimize {"
-	                       " min-width: %dpx; min-height: %dpx; padding: 0; margin: 0 3px; border: none; border-radius: 0;"
+	                       " min-width: %dpx; min-height: %dpx; padding: 0; margin: 0 %dpx; border: none; border-radius: 0;"
 	                       " box-shadow: none; outline: none; background-color: transparent; background-repeat: no-repeat;"
 	                       " background-position: center; background-size: %dpx %dpx; -gtk-icon-source: none; }\n"
 	                       "headerbar.titlebar windowcontrols > button > image { opacity: 0; }\n",
-	                       button, button, button, button);
+	                       button, button, spacing / 2, button, button);
 	/* KWin's colors of the title bar where KDE's colors.css has them (the pictures are drawn for them), and a flat
 	 * back button like KWin's buttons */
 	char *colors = NULL;

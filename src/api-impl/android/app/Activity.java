@@ -1006,6 +1006,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	static native void nativePauseCurrentActivity(Intent intent);
 	static native void nativeResumeCurrentActivity();
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
+	static native void nativeClearTaskMark();
+	static native void nativeClearTaskFinish(boolean finish);
 	public static native void nativeOpenURI(String uri);
 	public native void nativeFileChooser(int action, String type, String title, int requestCode);
 	public native void nativePickImages(String[] mimeTypes, int maxItems, int requestCode);
@@ -1750,6 +1752,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	private native void nativeBackInvoked();
 
+	/* ○ of ATL's navigation bar (navigation_bar.c): Home inside the app, the task back to its root: the launch
+	 * intent with FLAG_ACTIVITY_NEW_TASK and FLAG_ACTIVITY_CLEAR_TASK starts the start activity anew and the open
+	 * ones finish (ContextImpl.startActivity()). FLAG_ACTIVITY_CLEAR_TOP is not enough: a launcher activity that
+	 * is a trampoline (JW Library's MainActivity starts its singleTask SiloContainer and finishes) is not in the
+	 * back stack, and the singleTask activity it starts only gets onNewIntent() and stays on its page. */
+	@Export
+	private void navigateToStart() {
+		Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
+		if (intent != null)
+			startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+	}
+
 	/* AOSP Activity.setMediaController(): the media keys the activity does not handle go to this session */
 	public final void setMediaController(android.media.session.MediaController controller) {
 		getWindow().setMediaController(controller);
@@ -1866,9 +1880,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return false;
 	}
 
-	public void requestPermissions(String[] permissions, int requestCode) {
-		Slog.w(TAG, "requestPermissions(" + Arrays.toString(permissions) + "): not handled");
+	public void requestPermissions(String[] permissions, final int requestCode) {
+		if (requestCode < 0)
+			throw new IllegalArgumentException("requestCode should be >= 0");
+		// ATL has no permission dialog: like AOSP, the answer always arrives later on the main thread,
+		// here with the current grant state of each permission
+		final String[] requested = permissions.clone();
+		final int[] results = new int[requested.length];
+		for (int i = 0; i < requested.length; i++)
+			results[i] = checkSelfPermission(requested[i]);
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			public void run() {
+				onRequestPermissionsResult(requestCode, requested, results);
+			}
+		});
 	}
+
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {}
 
 	public boolean shouldShowRequestPermissionRationale(String permission) {
 		return true;

@@ -21,6 +21,8 @@ int activity_count(void);
 char *activity_title(int index);
 char *activity_class_name(int index);
 gboolean activity_same(int index, int other);
-void activity_return_to(int index);
+void activity_bring_to_front(int index);
+/* Home inside the app: the task back to its root (Activity.navigateToStart()) */
+void activity_go_to_start(void);
 /* the global configuration changed: the shown activity is relaunched or told (see Activity.ensureActivityConfiguration()) */
 void activity_ensure_configuration(void);

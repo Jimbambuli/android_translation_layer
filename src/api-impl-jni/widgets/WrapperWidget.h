@@ -17,6 +17,7 @@ struct _WrapperWidget {
 	int layout_height;
 	int real_width;
 	int real_height;
+	gboolean laid_out; /* real_width/real_height come from View.layout(), 0 included */
 	gboolean needs_allocation;
 	gboolean intercepting_touch;
 	gboolean custom_dispatch_touch;

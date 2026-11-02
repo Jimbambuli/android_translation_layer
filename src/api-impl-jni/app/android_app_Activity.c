@@ -848,24 +848,32 @@ gboolean activity_same(int index, int other)
 	return a && b && (*env)->IsSameObject(env, a, b);
 }
 
-/* back to the activity at index: the ones above it finish, the shown one first (as pressing back would) */
-void activity_return_to(int index)
+/* the activity at index comes to the front, the others stay below it in their order (like
+ * FLAG_ACTIVITY_REORDER_TO_FRONT): the shown one is paused and stopped, the chosen one restarted and resumed */
+void activity_bring_to_front(int index)
 {
 	JNIEnv *env = get_jni_env();
-	GList *above = NULL;
-	int i = 0;
-	for (GList *l = activity_backlog; l != NULL && i < index; l = l->next, i++)
-		above = g_list_append(above, _REF(l->data));
-	for (GList *l = above; l != NULL; l = l->next) {
-		jmethodID finish = (*env)->GetMethodID(env, _CLASS(l->data), "finish", "()V");
-		(*env)->CallVoidMethod(env, l->data, finish);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-		_UNREF(l->data);
+	GList *l = g_list_nth(activity_backlog, index);
+	if (!l || l == activity_backlog)
+		return;
+	activity_backlog = g_list_remove_link(activity_backlog, l);
+	activity_backlog = g_list_concat(l, activity_backlog);
+	transition_from = activity_current;
+	transition_opening = TRUE;
+	activity_update_current(env);
+	transition_from = NULL;
+}
+
+void activity_go_to_start(void)
+{
+	JNIEnv *env = get_jni_env();
+	if (!activity_current)
+		return;
+	J__Activity__navigateToStart(env, activity_current);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
-	g_list_free(above);
 }
 
 /* ---- picture-in-picture: the pinned task of ActivityTaskManagerService ----
@@ -1373,13 +1381,15 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	activity_update_current(env);
 }
 
+static gboolean task_clearing_has(JNIEnv *env, jobject activity);
+
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv *env, jclass class, jclass activity_class, jobject intent)
 {
 	GList *l;
 	GList *activities_to_close = NULL;
 	jboolean found = JNI_FALSE;
 	for (l = activity_backlog; l != NULL; l = l->next) {
-		if ((*env)->IsSameObject(env, activity_class, _CLASS(l->data))) {
+		if ((*env)->IsSameObject(env, activity_class, _CLASS(l->data)) && !task_clearing_has(env, l->data)) {
 			if (l != activity_backlog) {
 				activities_to_close = activity_backlog;
 				activity_backlog = l;
@@ -1409,6 +1419,43 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
 	g_list_free(activities_to_close);
 
 	return found;
+}
+
+/* FLAG_ACTIVITY_CLEAR_TASK: the activities of the task before the start (nativeClearTaskMark()) finish once the
+ * new root is up (nativeClearTaskFinish(), posted after the start: a launcher activity that is a trampoline
+ * starts the real one from its onCreate() and finishes); meanwhile none of them is reused for singleTask or
+ * FLAG_ACTIVITY_CLEAR_TOP, and the back stack is never empty (that would close the window) */
+static GList *task_clearing = NULL;
+
+static gboolean task_clearing_has(JNIEnv *env, jobject activity)
+{
+	for (GList *l = task_clearing; l != NULL; l = l->next)
+		if ((*env)->IsSameObject(env, l->data, activity))
+			return TRUE;
+	return FALSE;
+}
+
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeClearTaskMark(JNIEnv *env, jclass class)
+{
+	for (GList *l = activity_backlog; l != NULL; l = l->next)
+		if (!task_clearing_has(env, l->data))
+			task_clearing = g_list_append(task_clearing, _REF(l->data));
+}
+
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeClearTaskFinish(JNIEnv *env, jclass class, jboolean finish)
+{
+	GList *clearing = task_clearing;
+	task_clearing = NULL;
+	for (GList *l = clearing; l != NULL; l = l->next) {
+		if (finish)
+			(*env)->CallVoidMethod(env, l->data, (*env)->GetMethodID(env, _CLASS(l->data), "finish", "()V"));
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		_UNREF(l->data);
+	}
+	g_list_free(clearing);
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeOpenURI(JNIEnv *env, jclass class, jstring uriString)
