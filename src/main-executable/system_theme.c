@@ -22,6 +22,9 @@
 
 #include <glib/gstdio.h>
 #include <gtk/gtk.h>
+#include <math.h>
+#include <pango/pangocairo.h>
+#include <stdlib.h>
 #include <string.h>
 #ifdef HAVE_LIBRSVG
 #include <librsvg/rsvg.h>
@@ -136,10 +139,118 @@ static void load_css(char *font_name)
  * files into gtk-3.0/assets, in every state, for the title bars of GTK 3. ATL puts the same pictures on the
  * buttons of its title bar, so they look and react as KWin's: drawn here with librsvg into PNG files (GTK 4 shows
  * these SVG files as nothing), for scale 1 and 2, in the cache, and on windowcontrols' buttons by CSS. The title
- * bar then also gets the height of KWin's (Breeze: 36 px with a 10 pt font, the GTK theme's is 48 px). Without
- * the files (another desktop, or no librsvg) the GTK theme's buttons and height stay. */
-#define BUTTON_SIZE 24
-#define TITLEBAR_HEIGHT 34 /* without the header bar's borders */
+ * bar then also gets the height of KWin's (see kwin_title_bar()). Without the files (another desktop, or no
+ * librsvg) the GTK theme's buttons and height stay. */
+#define BUTTON_SIZE 24 /* KWin's Breeze buttons with KDE's default font, for other decorations */
+
+/* a value of a KDE configuration file (KConfig: [group] and key=value lines; groups such as
+ * [Colors:Header][Inactive] are not valid for GKeyFile); NULL if missing */
+static char *kconfig_value(const char *file, const char *group, const char *key)
+{
+	char *path = g_build_filename(config_dir, file, NULL);
+	char *contents = NULL;
+	gboolean read = g_file_get_contents(path, &contents, NULL, NULL);
+	g_free(path);
+	if (!read)
+		return NULL;
+	char *wanted_group = g_strdup_printf("[%s]", group);
+	char *value = NULL;
+	gboolean in_group = FALSE;
+	char **lines = g_strsplit(contents, "\n", -1);
+	for (char **line = lines; *line && !value; line++) {
+		char *text = g_strstrip(*line);
+		if (text[0] == '[') {
+			in_group = !strcmp(text, wanted_group);
+			continue;
+		}
+		char *equals = strchr(text, '=');
+		if (!in_group || !equals)
+			continue;
+		*equals = '\0';
+		char *name = g_strstrip(text);
+		char *flags = strstr(name, "[$"); // key[$e] and the like
+		if (flags)
+			*flags = '\0';
+		if (!strcmp(name, key))
+			value = g_strdup(g_strstrip(equals + 1));
+	}
+	g_strfreev(lines);
+	g_free(wanted_group);
+	g_free(contents);
+	return value;
+}
+
+/* The size of KWin's title bar and buttons with the Breeze decoration, in logical pixels (KWin's fonts have
+ * 96 dpi on Wayland, the output scale comes on top for both). As in Breeze's Decoration::bordersFor() and
+ * KDecoration's DecorationSettings: the grid unit is the height of «M» in the title font (made even), the small
+ * spacing a quarter of it (at least 2), a button two grid units (breezerc ButtonSize), and the bar is
+ * max(font height, button) + 4 small spacings. The title font is kdeglobals [WM] activeFont, KDE's default
+ * Noto Sans 10. FALSE for another decoration (kwinrc [org.kde.kdecoration2] library): the theme's height stays. */
+static gboolean kwin_title_bar(int *height, int *button)
+{
+	char *library = kconfig_value("kwinrc", "org.kde.kdecoration2", "library");
+	gboolean breeze = !library || !strcmp(library, "org.kde.breeze");
+	g_free(library);
+	if (!breeze)
+		return FALSE;
+	/* Qt's font string: family,point size,pixel size,... */
+	char *font_value = kconfig_value("kdeglobals", "WM", "activeFont");
+	char **fields = g_strsplit(font_value ? font_value : "Noto Sans,10", ",", -1);
+	g_free(font_value);
+	PangoFontDescription *font = pango_font_description_new();
+	pango_font_description_set_family(font, fields[0] && *fields[0] ? fields[0] : "Noto Sans");
+	double points = fields[0] && fields[1] ? g_ascii_strtod(fields[1], NULL) : 0;
+	int pixels = fields[0] && fields[1] && fields[2] ? atoi(fields[2]) : 0;
+	if (points > 0)
+		pango_font_description_set_size(font, (int)(points * PANGO_SCALE));
+	else if (pixels > 0)
+		pango_font_description_set_absolute_size(font, pixels * PANGO_SCALE);
+	else
+		pango_font_description_set_size(font, 10 * PANGO_SCALE);
+	g_strfreev(fields);
+
+	/* Qt measures without hinting: «M» 9.5 px high at 10 pt gives 10 as in KWin */
+	PangoFontMap *font_map = pango_cairo_font_map_new();
+	pango_cairo_font_map_set_resolution(PANGO_CAIRO_FONT_MAP(font_map), 96);
+	PangoContext *context = pango_font_map_create_context(font_map);
+	cairo_font_options_t *options = cairo_font_options_create();
+	cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
+	cairo_font_options_set_hint_style(options, CAIRO_HINT_STYLE_NONE);
+	pango_cairo_context_set_font_options(context, options);
+	cairo_font_options_destroy(options);
+	PangoLayout *layout = pango_layout_new(context);
+	pango_layout_set_font_description(layout, font);
+	pango_layout_set_text(layout, "M", -1);
+	PangoRectangle ink;
+	pango_layout_get_extents(layout, &ink, NULL);
+	PangoFontMetrics *metrics = pango_context_get_metrics(context, font, NULL);
+	int font_height = (int)round((double)pango_font_metrics_get_ascent(metrics) / PANGO_SCALE) +
+	                  (int)round((double)pango_font_metrics_get_descent(metrics) / PANGO_SCALE);
+	pango_font_metrics_unref(metrics);
+	g_object_unref(layout);
+	g_object_unref(context);
+	g_object_unref(font_map);
+	pango_font_description_free(font);
+
+	int grid_unit = (int)ceil((double)ink.height / PANGO_SCALE);
+	if (grid_unit % 2)
+		grid_unit++;
+	int small_spacing = MAX(2, grid_unit / 4);
+	char *size = kconfig_value("breezerc", "Common", "ButtonSize");
+	double factor = 2;
+	if (size && !strcmp(size, "ButtonTiny"))
+		factor = 1;
+	else if (size && !strcmp(size, "ButtonSmall"))
+		factor = 1.5;
+	else if (size && !strcmp(size, "ButtonLarge"))
+		factor = 2.5;
+	else if (size && !strcmp(size, "ButtonVeryLarge"))
+		factor = 3.5;
+	g_free(size);
+	*button = (int)(grid_unit * factor);
+	*height = MAX(font_height, *button) + 4 * small_spacing;
+	return TRUE;
+}
 
 static const char *button_names[] = {"close", "maximize", "maximized", "minimize"};
 static const struct {
@@ -223,16 +334,18 @@ static char *assets_stamp(const char *assets)
 	return g_strdup_printf("%" G_GINT64_FORMAT "-%" G_GINT64_FORMAT, newest, size);
 }
 
-/* the PNG files of KDE's buttons in a directory named after the SVG files' time and size (KDE writes them anew
- * for another decoration or color scheme); NULL if there are none */
-static char *window_button_pictures(void)
+/* the PNG files of KDE's buttons, button_size pixels, in a directory named after the SVG files' time and size
+ * (KDE writes them anew for another decoration or color scheme) and button_size; NULL if there are none */
+static char *window_button_pictures(int button_size)
 {
 	char *assets = g_build_filename(config_dir, "gtk-3.0", "assets", NULL);
-	char *stamp = assets_stamp(assets);
-	if (!stamp) {
+	char *svg_stamp = assets_stamp(assets);
+	if (!svg_stamp) {
 		g_free(assets);
 		return NULL;
 	}
+	char *stamp = g_strdup_printf("%s-%d", svg_stamp, button_size);
+	g_free(svg_stamp);
 	char *parent = g_build_filename(g_get_user_cache_dir(), "atl", "window-buttons", NULL);
 	char *dir = g_build_filename(parent, stamp, NULL);
 	char *done = g_build_filename(dir, "complete", NULL);
@@ -246,7 +359,7 @@ static char *window_button_pictures(void)
 				for (int scale = 1; ok && scale <= 2; scale++) {
 					char *png_name = g_strdup_printf("%s-%s@%d.png", button_names[i], button_states[j].file, scale);
 					char *png = g_build_filename(dir, png_name, NULL);
-					ok = render_png(svg, png, BUTTON_SIZE * scale);
+					ok = render_png(svg, png, button_size * scale);
 					g_free(png);
 					g_free(png_name);
 				}
@@ -270,7 +383,7 @@ static char *window_button_pictures(void)
 	return dir;
 }
 #else
-static char *window_button_pictures(void)
+static char *window_button_pictures(int button_size)
 {
 	return NULL;
 }
@@ -293,22 +406,30 @@ static void append_picture(GString *css, const char *dir, const char *name, cons
 
 static void load_window_buttons(void)
 {
-	char *dir = window_button_pictures();
+	int height, button;
+	gboolean kwin_size = kwin_title_bar(&height, &button);
+	if (!kwin_size)
+		button = BUTTON_SIZE;
+	char *dir = window_button_pictures(button);
 	if (!dir) {
 		gtk_css_provider_load_from_string(buttons_provider, "");
 		return;
 	}
 	GString *css = g_string_new("");
+	/* the header bar has a border of 1 px above and below */
+	if (kwin_size)
+		g_string_append_printf(css,
+		                       "headerbar.titlebar { min-height: %dpx; padding-top: 0; padding-bottom: 0; }\n"
+		                       "headerbar.titlebar button.atl-back { min-height: %dpx; min-width: %dpx; padding: 0 2px; margin-top: 0; margin-bottom: 0; }\n",
+		                       height - 2, button + 2, button + 2);
 	g_string_append_printf(css,
-	                       "headerbar.titlebar { min-height: %dpx; padding-top: 0; padding-bottom: 0; }\n"
-	                       "headerbar.titlebar button.atl-back { min-height: 26px; min-width: 26px; padding: 0 2px; margin-top: 0; margin-bottom: 0; }\n"
 	                       "headerbar.titlebar windowcontrols > button.close, headerbar.titlebar windowcontrols > button.maximize,"
 	                       " headerbar.titlebar windowcontrols > button.minimize {"
 	                       " min-width: %dpx; min-height: %dpx; padding: 0; margin: 0 3px; border: none; border-radius: 0;"
 	                       " box-shadow: none; outline: none; background-color: transparent; background-repeat: no-repeat;"
 	                       " background-position: center; background-size: %dpx %dpx; -gtk-icon-source: none; }\n"
 	                       "headerbar.titlebar windowcontrols > button > image { opacity: 0; }\n",
-	                       TITLEBAR_HEIGHT, BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE);
+	                       button, button, button, button);
 	/* KWin's colors of the title bar where KDE's colors.css has them (the pictures are drawn for them), and a flat
 	 * back button like KWin's buttons */
 	char *colors = NULL;
