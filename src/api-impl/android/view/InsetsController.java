@@ -36,4 +36,14 @@ public class InsetsController implements WindowInsetsController {
 	public void hide(@InsetsType int types) {
 		window.setInsetsVisible(types, false);
 	}
+
+	/* like AOSP, the listener learns the controllable types at once; a desktop window has no
+	 * system bars or IME insets an app could animate, so there are none and they never change */
+	@Override
+	public void addOnControllableInsetsChangedListener(OnControllableInsetsChangedListener listener) {
+		listener.onControllableInsetsChanged(this, 0);
+	}
+
+	@Override
+	public void removeOnControllableInsetsChangedListener(OnControllableInsetsChangedListener listener) {}
 }

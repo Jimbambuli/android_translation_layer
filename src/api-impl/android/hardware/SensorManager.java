@@ -19,6 +19,16 @@ public class SensorManager {
 		return true; // we could try saying that the sensor doesn't exist and hope the app just doesn't use it then, but as long as we never call the handler the app should leave this alone
 	}
 
+	/* the sensor events are not batched, maxReportLatencyUs is only a hint (as in AOSP for a
+	 * sensor without a FIFO) */
+	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, int maxReportLatencyUs, Handler handler) {
+		return registerListener(listener, sensor, samplingPeriodUs, handler);
+	}
+
+	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, int maxReportLatencyUs) {
+		return registerListener(listener, sensor, samplingPeriodUs);
+	}
+
 	public boolean registerListener(final SensorEventListener listener, final Sensor sensor, int samplingPeriodUs) {
 		switch (sensor.getType()) {
 			case Sensor.TYPE_ORIENTATION:

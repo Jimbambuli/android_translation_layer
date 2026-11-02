@@ -18,4 +18,8 @@ public class AutofillManager {
 	public void notifyValueChanged(View view, int id, AutofillValue value) {}
 
 	public void notifyViewExited(View view, int id) {}
+
+	public void notifyViewVisibilityChanged(View view, boolean isVisible) {}
+
+	public void notifyViewVisibilityChanged(View view, int virtualId, boolean isVisible) {}
 }
