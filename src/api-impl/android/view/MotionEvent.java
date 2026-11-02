@@ -1868,6 +1868,56 @@ public final class MotionEvent extends InputEvent {
 	}
 
 	/**
+	 * Classification constant: None.
+	 *
+	 * No additional information is available about the current motion event stream.
+	 */
+	public static final int CLASSIFICATION_NONE = 0;
+
+	/**
+	 * Classification constant: Ambiguous gesture.
+	 *
+	 * The user's intent with respect to the current event stream is not yet determined.
+	 */
+	public static final int CLASSIFICATION_AMBIGUOUS_GESTURE = 1;
+
+	/**
+	 * Classification constant: Deep press.
+	 *
+	 * The current event stream represents the user intentionally pressing harder on the screen.
+	 */
+	public static final int CLASSIFICATION_DEEP_PRESS = 2;
+
+	/**
+	 * Classification constant: touchpad scroll.
+	 */
+	public static final int CLASSIFICATION_TWO_FINGER_SWIPE = 3;
+
+	/**
+	 * Classification constant: multi-finger swipe.
+	 */
+	public static final int CLASSIFICATION_MULTI_FINGER_SWIPE = 4;
+
+	/**
+	 * Classification constant: touchpad pinch.
+	 */
+	public static final int CLASSIFICATION_PINCH = 5;
+
+	/**
+	 * Returns the classification for the current gesture.
+	 * The classification may change as more events become available for the same gesture.
+	 *
+	 * <p>ATL has no gesture classifier, like a device without one the events are not classified.
+	 *
+	 * @see #CLASSIFICATION_NONE
+	 * @see #CLASSIFICATION_AMBIGUOUS_GESTURE
+	 * @see #CLASSIFICATION_DEEP_PRESS
+	 */
+	public int getClassification() {
+		return CLASSIFICATION_NONE;
+	}
+
+	/**
 	 * @hide
 	 */
 	@Override
