@@ -73,6 +73,25 @@ public class SweepGradient extends Shader {
 	 * @param color0   The color to use at the start of the sweep
 	 * @param color1   The color to use at the end of the sweep
 	 */
+	/**
+	 * A Shader that draws a sweep gradient around a center point, with the colors as
+	 * {@code ColorLong}s, which are converted to sRGB.
+	 */
+	public SweepGradient(float cx, float cy, long[] colors, float[] positions) {
+		this(cx, cy, toArgb(colors), positions);
+	}
+
+	public SweepGradient(float cx, float cy, long color0, long color1) {
+		this(cx, cy, Color.toArgb(color0), Color.toArgb(color1));
+	}
+
+	private static int[] toArgb(long[] colors) {
+		int[] argb = new int[colors.length];
+		for (int i = 0; i < colors.length; i++)
+			argb[i] = Color.toArgb(colors[i]);
+		return argb;
+	}
+
 	public SweepGradient(float cx, float cy, int color0, int color1) {
 		mType = TYPE_COLOR_START_AND_COLOR_END;
 		mCx = cx;

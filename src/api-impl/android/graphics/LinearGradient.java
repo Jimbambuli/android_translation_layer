@@ -29,11 +29,11 @@ public class LinearGradient extends Shader {
 		this(x0, y0, x1, y1, new int[] {color0, color1}, null, tile);
 	}
 
-	/* only sRGB color longs are supported, their upper 32 bits are the ARGB color int */
+	/* the color longs converted to sRGB */
 	private static int[] toArgb(long[] colors) {
 		int[] argb = new int[colors.length];
 		for (int i = 0; i < colors.length; i++)
-			argb[i] = (int)(colors[i] >>> 32);
+			argb[i] = Color.toArgb(colors[i]);
 		return argb;
 	}
 }
