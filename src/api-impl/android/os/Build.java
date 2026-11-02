@@ -107,6 +107,14 @@ public class Build {
 	 */
 	public static final String SERIAL = getString("ro.serialno");
 
+	/**
+	 * Gets the hardware serial number, if available. AOSP asks the device identifiers policy, which
+	 * answers like SERIAL for a caller that may read it; ATL has no permission model.
+	 */
+	public static String getSerial() {
+		return SERIAL;
+	}
+
 	public static final String[] SUPPORTED_ABIS = getString("ro.product.cpu.abilist").split(",");
 
 	public static final String[] SUPPORTED_32_BIT_ABIS = getStringList("ro.product.cpu.abilist32", ",");
