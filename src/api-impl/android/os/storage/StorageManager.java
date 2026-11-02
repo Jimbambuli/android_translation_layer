@@ -25,4 +25,17 @@ public class StorageManager {
 	public long getCacheQuotaBytes(UUID storageUuid) throws IOException {
 		return new StatFs(Environment.getDataDirectory().getPath()).getAvailableBytes();
 	}
+
+	/* AOSP StorageManager.getAllocatableBytes(UUID): free space plus the cache the system could clear. ATL
+	 * clears no caches of other apps, so it is the free space of the single volume */
+	public long getAllocatableBytes(UUID storageUuid) throws IOException {
+		return new StatFs(Environment.getDataDirectory().getPath()).getAvailableBytes();
+	}
+
+	/* AOSP StorageManager.allocateBytes(UUID, long): makes room by clearing caches, or throws IOException */
+	public void allocateBytes(UUID storageUuid, long bytes) throws IOException {
+		long allocatable = getAllocatableBytes(storageUuid);
+		if (bytes > allocatable)
+			throw new IOException("Failed to allocate " + bytes + " because only " + allocatable + " allocatable");
+	}
 }
