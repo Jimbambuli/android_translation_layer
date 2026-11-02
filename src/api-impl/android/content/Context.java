@@ -15,6 +15,7 @@ import android.app.StatusBarManager;
 import android.app.UiModeManager;
 import android.app.job.JobScheduler;
 import android.atl.ATLLoadedApp;
+import android.atl.ATLLoadedAppManager;
 import android.atl.annotation.Export;
 import android.bluetooth.BluetoothManager;
 import android.content.pm.ApplicationInfo;
@@ -671,11 +672,21 @@ public abstract class Context {
 				receiverMap.get(filter).onReceive(this, intent);
 			}
 		}
-		ATLLoadedApp.getPrimaryApplication().receiveBroadcast(this, intent);
+		// a broadcast for another package goes to that package's receivers (loaded into this process)
+		String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : intent.getPackage();
+		ATLLoadedApp target = targetPackage != null ? ATLLoadedAppManager.getAppFromPackageName(targetPackage) : ATLLoadedApp.getPrimaryApplication();
+		if (target != null)
+			target.receiveBroadcast(this, intent);
 	}
 
 	public void sendBroadcast(Intent intent, String receiverPermission) {
 		sendBroadcast(intent);
+	}
+
+	/* the receivers get the broadcast one after the other already, so it is ordered (by registration
+	 * instead of priority, nobody aborts it) */
+	public void sendOrderedBroadcast(Intent intent, String receiverPermission) {
+		sendBroadcast(intent, receiverPermission);
 	}
 
 	public abstract boolean stopService(Intent intent);
