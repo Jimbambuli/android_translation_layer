@@ -2092,7 +2092,18 @@ public class PackageManager {
 	 * id, or null if there are no known packages with the given id.
 	 */
 	public String[] getPackagesForUid(int uid) {
-		return null;
+		// ATL runs the app and Play Services in one process under one uid (Binder.getCallingUid());
+		// like packages sharing a uid on AOSP, all of them belong to it
+		PackageParser.Package primary = ATLLoadedApp.getPrimaryApplication().pkg;
+		if (uid != primary.applicationInfo.uid)
+			return null;
+		ArrayList<String> packages = new ArrayList<>();
+		packages.add(primary.packageName);
+		for (String packageName : ATLLoadedApp.play_services) {
+			if (!packageName.equals(primary.packageName) && ATLLoadedAppManager.getPackageFromPackageName(packageName) != null)
+				packages.add(packageName);
+		}
+		return packages.toArray(new String[0]);
 	}
 
 	/**
