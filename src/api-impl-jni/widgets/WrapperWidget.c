@@ -881,6 +881,18 @@ int atl_android_key_code(GtkEventControllerKey *controller, guint keyval, guint 
 #define META_META_ON      (1 << 16)
 #define META_CAPS_LOCK_ON (1 << 20)
 
+/* The character of a key like Generic.kcm gives it: Enter types '\n' (GDK's Return is '\r'), Tab '\t', and the
+ * other control keys (BackSpace, Delete, Escape) type none, so that an editor takes them as keys */
+int atl_android_unicode_char(guint keyval)
+{
+	gunichar c = gdk_keyval_to_unicode(keyval);
+	if (c == '\r')
+		return '\n';
+	if ((c < 0x20 && c != '\t' && c != '\n') || c == 0x7f)
+		return 0;
+	return c;
+}
+
 int atl_android_meta_state(GdkModifierType state)
 {
 	int meta_state = 0;
@@ -907,7 +919,7 @@ static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, 
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_DOWN, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
-	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
+	_SET_INT_FIELD(key_event, "unicodeValue", atl_android_unicode_char(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
@@ -923,7 +935,7 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
-	_SET_INT_FIELD(key_event, "unicodeValue", gdk_keyval_to_unicode(keyval));
+	_SET_INT_FIELD(key_event, "unicodeValue", atl_android_unicode_char(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);

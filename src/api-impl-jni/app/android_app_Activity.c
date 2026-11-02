@@ -718,7 +718,7 @@ static gboolean on_window_key_pressed(GtkEventControllerKey *controller, guint k
 	JNIEnv *env = get_jni_env();
 	int code = atl_android_key_code(controller, keyval, keycode);
 	int meta = atl_android_meta_state(state);
-	int unicode = gdk_keyval_to_unicode(keyval);
+	int unicode = atl_android_unicode_char(keyval);
 	if (keycode == key_down) {
 		key_repeat++;
 	} else {
@@ -750,7 +750,7 @@ static void on_window_key_released(GtkEventControllerKey *controller, guint keyv
 		dispatch_window_key(env, ACTION_UP, fallback, 0, meta, keycode - 8, FLAG_FROM_SYSTEM | FLAG_FALLBACK, 0, down_time);
 	else
 		dispatch_window_key(env, ACTION_UP, atl_android_key_code(controller, keyval, keycode), 0, meta, keycode - 8,
-		                    FLAG_FROM_SYSTEM, gdk_keyval_to_unicode(keyval), down_time);
+		                    FLAG_FROM_SYSTEM, atl_android_unicode_char(keyval), down_time);
 }
 
 void activity_window_add_key_controller(GtkWindow *window)

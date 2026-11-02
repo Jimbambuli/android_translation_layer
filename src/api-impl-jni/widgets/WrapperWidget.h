@@ -72,6 +72,7 @@ void wrapper_widget_add_key_controller(WrapperWidget *wrapper, gboolean focus_on
 /* the Android key code and meta state of a GTK key event */
 int atl_android_key_code(GtkEventControllerKey *controller, guint keyval, guint keycode);
 int atl_android_meta_state(GdkModifierType state);
+int atl_android_unicode_char(guint keyval);
 void wrapper_widget_set_background(WrapperWidget *wrapper, GdkPaintable *paintable);
 void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, float radius, float z, float alpha);
 void wrapper_widget_set_outline_clip(WrapperWidget *wrapper, gboolean enabled, graphene_rect_t *rect, float radius, GskPath *path);
