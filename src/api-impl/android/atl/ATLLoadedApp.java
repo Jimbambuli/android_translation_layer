@@ -364,20 +364,32 @@ public final class ATLLoadedApp {
 	}
 
 	public void receiveBroadcast(Context context, Intent intent) {
+		ComponentName component = intent.getComponent();
 		for (PackageParser.Activity receiver : pkg.receivers) {
+			// an explicit broadcast goes only to its receiver, whatever its intent filters
+			if (component != null) {
+				if (component.getPackageName().equals(pkg.packageName) && component.getClassName().equals(receiver.className))
+					deliverBroadcast(receiver, context, intent);
+				continue;
+			}
 			if (receiver.intents == null)
 				continue;
 			for (PackageParser.IntentInfo intentInfo : receiver.intents) {
 				if (intentInfo.matchAction(intent.getAction())) {
-					try {
-						Class<? extends BroadcastReceiver> cls = this.loadClass(receiver.className).asSubclass(BroadcastReceiver.class);
-						BroadcastReceiver receiverInstance = cls.newInstance();
-						receiverInstance.onReceive(context, intent);
-					} catch (ReflectiveOperationException e) {
-						Slog.e(TAG, "startService: failed to receive broadcast " + receiver.className, e);
-					}
+					deliverBroadcast(receiver, context, intent);
 				}
 			}
+		}
+	}
+
+	private void deliverBroadcast(PackageParser.Activity receiver, Context context, Intent intent) {
+		try {
+			Class<? extends BroadcastReceiver> cls = this.loadClass(receiver.className).asSubclass(BroadcastReceiver.class);
+			BroadcastReceiver receiverInstance = cls.newInstance();
+			// a receiver of another package runs with that package's context, as in its own process
+			receiverInstance.onReceive(pkg.packageName.equals(context.getPackageName()) ? context : getApplication(), intent);
+		} catch (ReflectiveOperationException e) {
+			Slog.e(TAG, "startService: failed to receive broadcast " + receiver.className, e);
 		}
 	}
 
