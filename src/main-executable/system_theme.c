@@ -138,7 +138,7 @@ static void load_css(char *font_name)
  * these SVG files as nothing), for scale 1 and 2, in the cache, and on windowcontrols' buttons by CSS. The title
  * bar then also gets the height of KWin's (Breeze: 36 px with a 10 pt font, the GTK theme's is 48 px). Without
  * the files (another desktop, or no librsvg) the GTK theme's buttons and height stay. */
-#define BUTTON_SIZE 20
+#define BUTTON_SIZE 24
 #define TITLEBAR_HEIGHT 34 /* without the header bar's borders */
 
 static const char *button_names[] = {"close", "maximize", "maximized", "minimize"};
@@ -309,6 +309,28 @@ static void load_window_buttons(void)
 	                       " background-position: center; background-size: %dpx %dpx; -gtk-icon-source: none; }\n"
 	                       "headerbar.titlebar windowcontrols > button > image { opacity: 0; }\n",
 	                       TITLEBAR_HEIGHT, BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE);
+	/* KWin's colors of the title bar where KDE's colors.css has them (the pictures are drawn for them), and a flat
+	 * back button like KWin's buttons */
+	char *colors = NULL;
+	char *colors_path = config_file("gtk-4.0", "colors.css");
+	if (!g_file_get_contents(colors_path, &colors, NULL, NULL)) {
+		g_free(colors_path);
+		colors_path = config_file("gtk-3.0", "colors.css");
+		g_file_get_contents(colors_path, &colors, NULL, NULL);
+	}
+	g_free(colors_path);
+	if (colors && strstr(colors, "theme_titlebar_background_breeze") && strstr(colors, "theme_titlebar_foreground_backdrop_breeze"))
+		g_string_append(css,
+		                "headerbar.titlebar { background-image: none; background-color: @theme_titlebar_background_breeze;"
+		                " color: @theme_titlebar_foreground_breeze; }\n"
+		                "headerbar.titlebar:backdrop { background-color: @theme_titlebar_background_backdrop_breeze;"
+		                " color: @theme_titlebar_foreground_backdrop_breeze; }\n");
+	g_free(colors);
+	g_string_append(css,
+	                "headerbar.titlebar button.atl-back { background: none; border: none; box-shadow: none; color: inherit; }\n"
+	                "headerbar.titlebar button.atl-back:hover { background-color: alpha(currentColor, 0.15); }\n"
+	                "headerbar.titlebar button.atl-back:active { background-color: alpha(currentColor, 0.3); }\n"
+	                "headerbar.titlebar button.atl-back:disabled { opacity: 0.5; }\n");
 	for (int i = 0; i < G_N_ELEMENTS(button_names); i++) {
 		gboolean maximized = !strcmp(button_names[i], "maximized");
 		for (int j = 0; j < G_N_ELEMENTS(button_states); j++) {

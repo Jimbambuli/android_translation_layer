@@ -8,7 +8,10 @@
 #include "../api-impl-jni/app/android_app_Activity.h"
 
 static const char navigation_bar_css[] =
-	".atl-navigation-bar { min-height: 32px; padding: 0; border-top: 1px solid alpha(currentColor, 0.12); }\n"
+	/* the window of an app that draws its own background has none (ATL-no-background): the bar takes the
+	 * theme's window color (GTK's own and Breeze both name it theme_bg_color) */
+	"actionbar.atl-navigation-bar > revealer > box { min-height: 32px; padding: 0; background-color: @theme_bg_color;"
+	" border-top: 1px solid alpha(currentColor, 0.15); }\n"
 	".atl-navigation-bar button { min-height: 28px; min-width: 72px; padding: 0; margin: 2px 0; }\n"
 	".atl-navigation-bar button label { font-size: 16px; }\n"
 	".atl-activity-list { padding: 4px; }\n";
@@ -54,7 +57,6 @@ static GtkWidget *bar_button(const char *symbol, const char *tooltip)
 	GtkWidget *button = gtk_button_new_with_label(symbol);
 	gtk_widget_add_css_class(button, "flat");
 	gtk_widget_set_tooltip_text(button, tooltip);
-	gtk_widget_set_focusable(button, FALSE); // the keyboard stays with the app
 	return button;
 }
 
@@ -65,12 +67,11 @@ GtkWidget *navigation_bar_new(void)
 	gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 	g_object_unref(css);
 
-	GtkWidget *bar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 40);
+	/* an action bar: every GTK theme gives it the colors of a bar at the bottom of a window */
+	GtkWidget *bar = gtk_action_bar_new();
 	gtk_widget_add_css_class(bar, "atl-navigation-bar");
-	gtk_widget_set_halign(bar, GTK_ALIGN_FILL);
+	gtk_widget_set_can_focus(bar, FALSE); // the keyboard stays with the app
 	GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 40);
-	gtk_widget_set_hexpand(buttons, TRUE);
-	gtk_widget_set_halign(buttons, GTK_ALIGN_CENTER);
 
 	GtkWidget *back = bar_button("◁", "Back");
 	g_signal_connect(back, "clicked", G_CALLBACK(on_back), NULL);
@@ -80,7 +81,6 @@ GtkWidget *navigation_bar_new(void)
 	gtk_menu_button_set_label(GTK_MENU_BUTTON(recents), "□");
 	gtk_menu_button_set_always_show_arrow(GTK_MENU_BUTTON(recents), FALSE);
 	gtk_widget_set_tooltip_text(recents, "Open pages of the app");
-	gtk_widget_set_focusable(recents, FALSE);
 	gtk_menu_button_set_has_frame(GTK_MENU_BUTTON(recents), FALSE);
 	GtkWidget *popover = gtk_popover_new();
 	g_signal_connect(popover, "show", G_CALLBACK(on_list_show), NULL);
@@ -89,6 +89,6 @@ GtkWidget *navigation_bar_new(void)
 	gtk_box_append(GTK_BOX(buttons), back);
 	gtk_box_append(GTK_BOX(buttons), home);
 	gtk_box_append(GTK_BOX(buttons), recents);
-	gtk_box_append(GTK_BOX(bar), buttons);
+	gtk_action_bar_set_center_widget(GTK_ACTION_BAR(bar), buttons);
 	return bar;
 }

@@ -27,6 +27,11 @@ The following environment variables are recognized by the main executable:
 
 ---
 
+`ATL_APP_ICON=FILE` - a picture of the app's icon (e.g. PNG from the launcher) for the icon in ATL's title bar, for
+                     APKs whose icon ATL cannot load itself (adaptive icons)
+
+---
+
 `ATL_SYSTEM_TITLEBAR=1` - same as `ATL_TITLEBAR=system`; if set, the window gets the desktop's title bar where the compositor draws one (e.g. KWin),
                           without ATL's back button (back is Escape or the back button of the mouse);
                           by default ATL draws the title bar with a back button in the desktop's GTK theme

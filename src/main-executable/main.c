@@ -872,7 +872,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			printf("WARNING: RUN_FROM_BUILDDIR set and --install given: using current directory in desktop entry\n");
 			g_string_append_printf(exec_cmd, "-C %s ", g_get_current_dir());
 		}
-		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_TITLEBAR", "ATL_SYSTEM_TITLEBAR", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
+		char *envs[] = {"RUN_FROM_BUILDDIR", "LD_LIBRARY_PATH", "ANDROID_APP_DATA_DIR", "ATL_UGLY_ENABLE_LOCATION", "ATL_UGLY_ENABLE_MICROPHONE", "ATL_UGLY_ENABLE_WEBVIEW", "ATL_DISABLE_WINDOW_DECORATIONS", "ATL_TITLEBAR", "ATL_SYSTEM_TITLEBAR", "ATL_APP_ICON", "ATL_FORCE_FULLSCREEN", "ATL_IS_AUTOMOTIVE", "ATL_IS_TELEVISION", "ATL_IS_WATCH"};
 		for (int i = 0; i < ARRAY_SIZE(envs); i++) {
 			if (getenv(envs[i])) {
 				g_string_append_printf(exec_cmd, "%s=%s ", envs[i], getenv(envs[i]));
@@ -965,10 +965,20 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			g_clear_error(&error);
 		}
 		icon_override(window, icon_list);
-		if (atl_titlebar && icon_list->data)
+		if (atl_titlebar && icon_list->data && !getenv("ATL_APP_ICON"))
 			set_window_icon_name(GTK_WINDOW(window), icon_list->data, package_name);
 		/* if Gtk sets the icon list to NULL, override it again */
 		g_signal_connect_after(window, "realize", G_CALLBACK(icon_override), icon_list);
+	}
+	/* ATL_APP_ICON: a picture of the app's icon from the launcher, for an APK whose icon ATL cannot load itself
+	 * (e.g. an adaptive icon) */
+	const char *app_icon_file = getenv("ATL_APP_ICON");
+	if (atl_titlebar && !d->apk_instrumentation_class && app_icon_file && *app_icon_file) {
+		GdkTexture *texture = gdk_texture_new_from_filename(app_icon_file, NULL);
+		if (texture) {
+			set_window_icon_name(GTK_WINDOW(window), texture, package_name);
+			g_object_unref(texture);
+		}
 	}
 
 	if (!d->apk_instrumentation_class) {
