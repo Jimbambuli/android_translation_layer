@@ -5145,8 +5145,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public CharSequence getStateDescription() { return stateDescription; }
 	public String[] getReceiveContentMimeTypes() { return null; }
 	public void setRenderEffect(android.graphics.RenderEffect renderEffect) {}
+	/* AOSP View.isShowingLayoutBounds(): DEBUG_DRAW || mAttachInfo.mDebugLayout, both only set by the developer
+	 * option "Show layout bounds" (debug.layout), which ATL does not have */
 	public boolean isShowingLayoutBounds() {
-		return true;
+		return false;
 	}
 
 	/* AOSP View.callOnClick() */
