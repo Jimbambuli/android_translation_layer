@@ -116,6 +116,13 @@ public final class ContextImpl extends Context {
 		return targetApp;
 	}
 
+	/* Cloud Messaging goes to Play Services (microG) when it is installed, it keeps its own
+	 * connection; otherwise to the gcm_service over DBus */
+	private static boolean atl_use_gcm_service(Intent intent) {
+		return intent.getAction() != null && intent.getAction().startsWith("com.google.android.c2dm") &&
+		    !ATLLoadedAppManager.isInstalled("com.google.android.gms");
+	}
+
 	@Override
 	public ApplicationInfo getApplicationInfo() {
 		return atl_loaded_app.pkg.applicationInfo;
@@ -180,7 +187,7 @@ public final class ContextImpl extends Context {
 	public ComponentName startService(Intent intent) {
 		// One way Messenger interface for GCM. Request per intent and response per Messenger.
 		// Wrap the response part in a BroadcastReceiver for compatibility with our gcm_service
-		if ("com.google.android.c2dm.intent.REGISTER".equals(intent.getAction()) && intent.getParcelableExtra("google.messenger") instanceof Messenger) {
+		if (atl_use_gcm_service(intent) && "com.google.android.c2dm.intent.REGISTER".equals(intent.getAction()) && intent.getParcelableExtra("google.messenger") instanceof Messenger) {
 			final Messenger messenger = (Messenger)intent.getParcelableExtra("google.messenger");
 			this.registerReceiver(new BroadcastReceiver() {
 				@Override
@@ -194,8 +201,8 @@ public final class ContextImpl extends Context {
 			}, new IntentFilter("com.google.android.c2dm.intent.REGISTRATION"));
 		}
 		ATLLoadedApp targetApp = this.atl_get_intent_target(intent);
-		// Cloud Messaging (c2dm) intents should always be started using DBus. Delivering them to the in process gstub is pointless
-		if (targetApp == null || (intent.getAction() != null && intent.getAction().startsWith("com.google.android.c2dm"))) {
+		// Without Play Services, Cloud Messaging (c2dm) intents are started using DBus. Delivering them to the in process gstub is pointless
+		if (targetApp == null || atl_use_gcm_service(intent)) {
 			// External package. Try to start using DBus Action
 			if (intent.getPackage() != null)
 				nativeStartExternalService(intent);
@@ -208,7 +215,7 @@ public final class ContextImpl extends Context {
 	public boolean bindService(Intent intent, ServiceConnection serviceConnection, int flags) {
 		// Two way Messenger interface for GCM. Request and response are send over Messenger.
 		// Wrap it on top of the old intent interface for compatibility with our gcm_service
-		if ("com.google.android.c2dm.intent.REGISTER".equals(intent.getAction())) {
+		if (atl_use_gcm_service(intent) && "com.google.android.c2dm.intent.REGISTER".equals(intent.getAction())) {
 			Messenger requestMessenger = new Messenger(new Handler(Looper.getMainLooper()) {
 				@Override
 				public void handleMessage(Message requestMessage) {

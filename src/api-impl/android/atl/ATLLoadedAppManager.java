@@ -155,6 +155,10 @@ public final class ATLLoadedAppManager {
 		return new File(ATLPaths.app_data_dir_base, packageName + ".apk_");
 	}
 
+	public static boolean isInstalled(String packageName) {
+		return new File(ATLPaths.installed_apks_dir, packageName + ".apk").isFile();
+	}
+
 	private static void setInstalledPaths(PackageParser.Package pkg) {
 		File apk = new File(ATLPaths.installed_apks_dir, pkg.packageName + ".apk");
 		pkg.applicationInfo.sourceDir = apk.getPath();
