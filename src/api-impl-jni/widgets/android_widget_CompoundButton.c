@@ -100,3 +100,12 @@ JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setSwitchColor
 	gtk_widget_add_css_class(switcher, css_class);
 	g_free(css_class);
 }
+
+JNIEXPORT jboolean JNICALL Java_android_widget_CompoundButton_native_1hideSwitch(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *switcher = gtk_widget_get_last_child(GTK_WIDGET(_PTR(widget_ptr)));
+	if (!GTK_IS_SWITCH(switcher))
+		return JNI_FALSE;
+	gtk_widget_set_visible(switcher, FALSE);
+	return JNI_TRUE;
+}
