@@ -207,6 +207,14 @@ public class PackageManager {
 	public static final int MATCH_DEFAULT_ONLY = 0x00010000;
 
 	/**
+	 * {@link PackageInfo} flag: return the signing certificates associated with
+	 * this package.  Each entry is a signing certificate that the package
+	 * has proven it is authorized to use, usually a past signing certificate from
+	 * which it has rotated.
+	 */
+	public static final int GET_SIGNING_CERTIFICATES = 0x08000000;
+
+	/**
 	 * Permission check result: this is returned by {@link #checkPermission}
 	 * if the permission has been granted to the given package.
 	 */

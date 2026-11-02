@@ -460,6 +460,9 @@ public class PackageParser {
 				pi.signatures = new Signature[0];
 			}
 		}
+		if ((flags & PackageManager.GET_SIGNING_CERTIFICATES) != 0) {
+			pi.signingInfo = (p.mSignatures != null) ? new SigningInfo(p.mSignatures) : null;
+		}
 		return pi;
 	}
 
