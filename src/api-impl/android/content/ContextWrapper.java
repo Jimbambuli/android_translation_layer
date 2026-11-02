@@ -87,6 +87,11 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
+	public boolean isUiContext() {
+		return baseContext == null ? false : baseContext.isUiContext();
+	}
+
+	@Override
 	public boolean stopService(Intent intent) {
 		return this.baseContext.stopService(intent);
 	}
