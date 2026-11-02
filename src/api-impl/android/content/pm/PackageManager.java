@@ -130,6 +130,12 @@ public class PackageManager {
 	 * This applies for any API returning a ComponentInfo subclass.
 	 */
 	public static final int GET_META_DATA = 0x00000080;
+	/* AOSP PackageManager.INSTALL_REASON_* */
+	public static final int INSTALL_REASON_UNKNOWN = 0;
+	public static final int INSTALL_REASON_POLICY = 1;
+	public static final int INSTALL_REASON_DEVICE_RESTORE = 2;
+	public static final int INSTALL_REASON_DEVICE_SETUP = 3;
+	public static final int INSTALL_REASON_USER = 4;
 
 	/**
 	 * {@link PackageInfo} flag: return the
@@ -3652,8 +3658,20 @@ public class PackageManager {
 		return new PackageInstaller();
 	}
 
+	/* AOSP: true when the app holds REQUEST_INSTALL_PACKAGES and the user allowed it to install. ATL installs
+	 * through PackageInstaller (which asks the user at each commit), so a requesting app may */
+	/* AOSP PackageManager.getSharedLibraries(): the shared library packages; ATL has none */
+	public List<SharedLibraryInfo> getSharedLibraries(int flags) {
+		return new ArrayList<SharedLibraryInfo>();
+	}
+
+	public List<SharedLibraryInfo> getSharedLibraries(PackageInfoFlags flags) {
+		return new ArrayList<SharedLibraryInfo>();
+	}
+
 	public boolean canRequestPackageInstalls() {
-		return false;
+		String[] requested = ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.toArray(new String[0]);
+		return java.util.Arrays.asList(requested).contains("android.permission.REQUEST_INSTALL_PACKAGES");
 	}
 
 	/* API 33: the flags as a long, wrapped per kind */

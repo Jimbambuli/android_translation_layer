@@ -203,6 +203,7 @@ srcs = [
 	'android/content/pm/ProviderInfo.java',
 	'android/content/pm/ResolveInfo.java',
 	'android/content/pm/ServiceInfo.java',
+	'android/content/pm/SharedLibraryInfo.java',
 	'android/content/pm/ShortcutInfo.java',
 	'android/content/pm/ShortcutManager.java',
 	'android/content/pm/Signature.java',

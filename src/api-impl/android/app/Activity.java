@@ -407,6 +407,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
 		Slog.i(TAG, "startActivityForResult(" + intent + ", " + requestCode + "," + options + ") called");
+		/* AOSP: the system's PackageInstallerActivity confirms a PackageInstaller session */
+		if (android.content.pm.PackageInstaller.handleConfirmIntent(intent))
+			return;
 		if (intent.getComponent() != null) {
 			/* like on Android (and like Context.startActivity), the new activity starts after the
 			 * caller has returned: started from onCreate(), it must come up after the caller's

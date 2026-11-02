@@ -248,6 +248,9 @@ public final class ContextImpl extends Context {
 	@Override
 	public void startActivity(Intent intent) {
 		Slog.i(TAG, "startActivity(" + intent + ") called");
+		/* AOSP: the system's PackageInstallerActivity confirms a PackageInstaller session */
+		if (android.content.pm.PackageInstaller.handleConfirmIntent(intent))
+			return;
 		CharSequence chooser_title = null;
 		if (intent.getAction() != null && intent.getAction().equals("android.intent.action.CHOOSER")) {
 			chooser_title = intent.getCharSequenceExtra(Intent.EXTRA_TITLE);

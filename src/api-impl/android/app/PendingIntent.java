@@ -36,12 +36,25 @@ public class PendingIntent implements Parcelable {
 	}
 
 	public IntentSender getIntentSender() {
-		return null;
+		return new IntentSender(this);
 	}
 
-	public void send(Context context, int code, Intent intent) {}
+	/* AOSP PendingIntent.send(Context, int, Intent): the system fills the extras of the given intent into the
+	 * stored one (Intent.fillIn() always merges extras) */
+	public void send(Context context, int code, Intent intent) throws CanceledException {
+		Intent filled = this.intent;
+		if (intent != null) {
+			filled = new Intent(this.intent);
+			filled.putExtras(intent);
+		}
+		dispatch(filled);
+	}
 
 	public void send() {
+		dispatch(intent);
+	}
+
+	private void dispatch(Intent intent) {
 		Context context = ATLLoadedApp.getPrimaryApplication().getApplication();
 		if (type == 0) { // type Activity
 			context.startActivity(intent);
@@ -71,7 +84,17 @@ public class PendingIntent implements Parcelable {
 
 	public void cancel() {}
 
-	public class CanceledException extends Exception {
+	public static class CanceledException extends android.util.AndroidException {
+		public CanceledException() {
+		}
+
+		public CanceledException(String name) {
+			super(name);
+		}
+
+		public CanceledException(Exception cause) {
+			super(cause);
+		}
 	}
 
 	public String getCreatorPackage() {
