@@ -3,6 +3,7 @@ package android.content;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
@@ -27,6 +28,14 @@ public class ContentProviderClient implements AutoCloseable {
 
 	public Cursor query(Uri url, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) throws RemoteException {
 		return contentProvider.query(url, projection, selection, selectionArgs, sortOrder, cancellationSignal);
+	}
+
+	public Bundle call(String method, String arg, Bundle extras) throws RemoteException {
+		return contentProvider.call(method, arg, extras);
+	}
+
+	public Bundle call(String authority, String method, String arg, Bundle extras) throws RemoteException {
+		return contentProvider.call(authority, method, arg, extras);
 	}
 
 	public String getType(Uri url) throws RemoteException {

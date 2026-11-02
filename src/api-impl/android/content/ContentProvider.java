@@ -10,9 +10,11 @@ import android.content.pm.ProviderInfo;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -68,11 +70,32 @@ public abstract class ContentProvider {
 
 	public boolean onCreate() { return false; }
 
+	public Bundle call(String method, String arg, Bundle extras) {
+		return null;
+	}
+
+	public Bundle call(String authority, String method, String arg, Bundle extras) {
+		return call(method, arg, extras);
+	}
+
 	private Context mContext;
 
 	/* as AOSP, the context given to attachInfo(); ATL's own providers are not attached and run as the app */
 	public Context getContext() {
 		return mContext != null ? mContext : ATLLoadedApp.getPrimaryApplication().getApplication();
+	}
+
+	public ContentProviderResult[] applyBatch(String authority, ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
+		return applyBatch(operations);
+	}
+
+	public ContentProviderResult[] applyBatch(ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
+		final int numOperations = operations.size();
+		final ContentProviderResult[] results = new ContentProviderResult[numOperations];
+		for (int i = 0; i < numOperations; i++) {
+			results[i] = operations.get(i).apply(this, results, i);
+		}
+		return results;
 	}
 
 	public abstract Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder);
