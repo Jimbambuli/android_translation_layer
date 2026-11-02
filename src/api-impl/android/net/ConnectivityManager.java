@@ -31,11 +31,14 @@ public class ConnectivityManager {
 	private static final Network NETWORK = new Network();
 
 	private static class Registration {
+		final NetworkRequest request;
 		final NetworkCallback callback;
 		final PendingIntent operation;
 		final Handler handler;
+		boolean reported;
 
-		Registration(NetworkCallback callback, PendingIntent operation, Handler handler) {
+		Registration(NetworkRequest request, NetworkCallback callback, PendingIntent operation, Handler handler) {
+			this.request = request;
 			this.callback = callback;
 			this.operation = operation;
 			this.handler = handler;
@@ -99,23 +102,23 @@ public class ConnectivityManager {
 	}
 
 	public void registerNetworkCallback(NetworkRequest request, NetworkCallback callback) {
-		register(callback, null, null);
+		register(request, callback, null, null);
 	}
 
 	public void registerNetworkCallback(NetworkRequest request, NetworkCallback callback, Handler handler) {
-		register(callback, null, handler);
+		register(request, callback, null, handler);
 	}
 
 	public void registerNetworkCallback(NetworkRequest request, PendingIntent operation) {
-		register(null, operation, null);
+		register(request, null, operation, null);
 	}
 
 	public void registerDefaultNetworkCallback(NetworkCallback callback) {
-		register(callback, null, null);
+		register(null, callback, null, null);
 	}
 
 	public void registerDefaultNetworkCallback(NetworkCallback callback, Handler handler) {
-		register(callback, null, handler);
+		register(null, callback, null, handler);
 	}
 
 	public void unregisterNetworkCallback(NetworkCallback callback) {
@@ -134,11 +137,12 @@ public class ConnectivityManager {
 		}
 	}
 
-	private void register(NetworkCallback callback, PendingIntent operation, Handler handler) {
+	/* request null: the default network, which is the one network ATL knows */
+	private void register(NetworkRequest request, NetworkCallback callback, PendingIntent operation, Handler handler) {
 		if (callback == null && operation == null)
 			throw new IllegalArgumentException("null NetworkCallback");
 		nativeStartMonitoring();
-		Registration r = new Registration(callback, operation, handler != null ? handler : getConnectivityThreadHandler());
+		Registration r = new Registration(request, callback, operation, handler != null ? handler : getConnectivityThreadHandler());
 		synchronized (registrations) {
 			registrations.add(r);
 			lastAvailable = nativeGetNetworkAvailable();
@@ -160,6 +164,14 @@ public class ConnectivityManager {
 	}
 
 	private static void notify(final Registration r, final boolean available) {
+		// like AOSP: only a network that satisfies the request is reported, and lost only after that
+		if (available) {
+			if (r.request != null && !r.request.canBeSatisfiedBy(new ConnectivityManager().getNetworkCapabilities(NETWORK)))
+				return;
+		} else if (!r.reported) {
+			return;
+		}
+		r.reported = available;
 		if (r.operation != null) {
 			if (available) {
 				r.handler.post(new Runnable() {
