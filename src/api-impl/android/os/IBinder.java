@@ -25,6 +25,15 @@ public interface IBinder {
 
 	public IInterface queryLocalInterface(String descriptor);
 
+	/* the object lives in this process (ATL has no other), so it is alive as AOSP's local Binder */
+	public default boolean pingBinder() {
+		return true;
+	}
+
+	public default boolean isBinderAlive() {
+		return true;
+	}
+
 	public boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException;
 
 	public String getInterfaceDescriptor();
