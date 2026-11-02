@@ -208,6 +208,8 @@ srcs = [
 	'android/content/pm/Signature.java',
 	'android/content/pm/SigningInfo.java',
 	'android/content/pm/VerifierInfo.java',
+	'android/content/pm/verify/domain/DomainVerificationManager.java',
+	'android/content/pm/verify/domain/DomainVerificationUserState.java',
 	'android/content/res/AssetFileDescriptor.java',
 	'android/content/res/AssetManager.java',
 	'android/content/res/ColorStateList.java',
