@@ -1877,9 +1877,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return false;
 	}
 
-	public void requestPermissions(String[] permissions, int requestCode) {
-		Slog.w(TAG, "requestPermissions(" + Arrays.toString(permissions) + "): not handled");
+	public void requestPermissions(String[] permissions, final int requestCode) {
+		if (requestCode < 0)
+			throw new IllegalArgumentException("requestCode should be >= 0");
+		// ATL has no permission dialog: like AOSP, the answer always arrives later on the main thread,
+		// here with the current grant state of each permission
+		final String[] requested = permissions.clone();
+		final int[] results = new int[requested.length];
+		for (int i = 0; i < requested.length; i++)
+			results[i] = checkSelfPermission(requested[i]);
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			public void run() {
+				onRequestPermissionsResult(requestCode, requested, results);
+			}
+		});
 	}
+
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {}
 
 	public boolean shouldShowRequestPermissionRationale(String permission) {
 		return true;
