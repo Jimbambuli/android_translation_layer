@@ -279,7 +279,8 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
 		if ((mode & MODE_WORLD_WRITEABLE) != 0)
 			realMode |= S_IWOTH;
 		try {
-			return android.system.Os.open(file.getPath(), flags, realMode);
+			// ATL: e.g. a content provider handing out a font of /system/fonts (microG's FontsProvider)
+			return android.system.Os.open(Environment.atlApplyPathOverrides(file.getPath()), flags, realMode);
 		} catch (ErrnoException e) {
 			throw new FileNotFoundException(e.getMessage());
 		}

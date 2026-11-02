@@ -336,6 +336,17 @@ public class Environment {
 	private static native String native_get_app_data_dir();
 
 	/**
+	 * ATL: the path a file of an Android system path is at on this system (fonts of /system/fonts
+	 * are where fontconfig has them), as for the native code of the app.
+	 * {@hide}
+	 */
+	public static String atlApplyPathOverrides(String path) {
+		return native_apply_path_overrides(path);
+	}
+
+	private static native String native_apply_path_overrides(String path);
+
+	/**
 	 * {@hide}
 	 */
 	public static File getLegacyExternalStorageDirectory() {

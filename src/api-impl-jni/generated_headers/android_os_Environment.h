@@ -15,6 +15,14 @@ extern "C" {
 JNIEXPORT jstring JNICALL Java_android_os_Environment_native_1get_1app_1data_1dir
   (JNIEnv *, jclass);
 
+/*
+ * Class:     android_os_Environment
+ * Method:    native_apply_path_overrides
+ * Signature: (Ljava/lang/String;)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_os_Environment_native_1apply_1path_1overrides
+  (JNIEnv *, jclass, jstring);
+
 #ifdef __cplusplus
 }
 #endif
