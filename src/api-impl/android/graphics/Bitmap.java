@@ -208,6 +208,21 @@ public final class Bitmap implements Parcelable {
 		return bm;
 	}
 
+	/* AOSP: a bitmap of the picture's size with the picture drawn into it */
+	public static Bitmap createBitmap(Picture source) {
+		return createBitmap(source, source.getWidth(), source.getHeight(), Config.ARGB_8888);
+	}
+
+	public static Bitmap createBitmap(Picture source, int width, int height, Config config) {
+		Bitmap bitmap = createBitmap(width, height, config);
+		Canvas canvas = new Canvas(bitmap);
+		if (source.getWidth() != width || source.getHeight() != height)
+			canvas.scale(width / (float)source.getWidth(), height / (float)source.getHeight());
+		canvas.drawPicture(source);
+		bitmap.mutable = false;
+		return bitmap;
+	}
+
 	public static Bitmap createBitmap(Bitmap src) {
 		return new Bitmap(native_ref_texture(src.getTexture()));
 	}
