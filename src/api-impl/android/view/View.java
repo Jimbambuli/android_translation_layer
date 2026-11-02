@@ -1412,7 +1412,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public View findViewById(int id) {
-		if (this.id == id)
+		if (id != NO_ID && this.id == id) // as in AOSP: views without an id are not found by it
 			return this;
 		else
 			return null;
