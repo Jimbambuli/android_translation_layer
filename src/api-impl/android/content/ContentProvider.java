@@ -10,6 +10,7 @@ import android.content.pm.ProviderInfo;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import java.io.FileNotFoundException;
 import java.util.HashMap;
@@ -75,6 +76,11 @@ public abstract class ContentProvider {
 	}
 
 	public abstract Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder);
+
+	/* as AOSP: providers that can cancel a query override this one */
+	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) {
+		return query(uri, projection, selection, selectionArgs, sortOrder);
+	}
 
 	public abstract Uri insert(Uri uri, ContentValues values);
 

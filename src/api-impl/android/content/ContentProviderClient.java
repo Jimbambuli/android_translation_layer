@@ -3,6 +3,7 @@ package android.content;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import java.io.FileNotFoundException;
@@ -22,6 +23,10 @@ public class ContentProviderClient implements AutoCloseable {
 
 	public Cursor query(Uri url, String[] projection, String selection, String[] selectionArgs, String sortOrder) throws RemoteException {
 		return contentProvider.query(url, projection, selection, selectionArgs, sortOrder);
+	}
+
+	public Cursor query(Uri url, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) throws RemoteException {
+		return contentProvider.query(url, projection, selection, selectionArgs, sortOrder, cancellationSignal);
 	}
 
 	public String getType(Uri url) throws RemoteException {
