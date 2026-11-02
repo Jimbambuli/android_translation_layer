@@ -7,6 +7,7 @@ srcs = [
 	'android/accounts/AccountManagerFuture.java',
 	'android/accounts/AccountsException.java',
 	'android/accounts/AuthenticatorException.java',
+	'android/accounts/OnAccountsUpdateListener.java',
 	'android/accounts/OperationCanceledException.java',
 	'android/animation/AnimationHandler.java',
 	'android/animation/Animator.java',
