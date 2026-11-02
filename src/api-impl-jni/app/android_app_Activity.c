@@ -488,11 +488,69 @@ static gboolean window_closed = FALSE;
 static gboolean app_quitting = FALSE;
 static int foreground_services = 0;
 
-static void on_window_state_changed(GdkToplevel *toplevel, GParamSpec *pspec, gpointer user_data)
+/* GTK applies a new toplevel state only when it paints the next frame (before-paint), and it does not paint
+ * while it waits for the compositor's frame callback for the last one. A compositor does not send frame
+ * callbacks to a window it does not show (xdg_toplevel "suspended"): minimized while a frame was on its way,
+ * e.g. during a video, GTK never learns that it is hidden. So when the window has not painted for a while,
+ * ATL asks for a frame; a window that cannot paint it within WINDOW_STALL_MS waits for the compositor and
+ * counts as hidden, until it paints again. */
+#define WINDOW_IDLE_MS  500
+#define WINDOW_STALL_MS 1000
+static gboolean window_stalled = FALSE;
+static gboolean window_probing = FALSE;
+static guint window_stall_check = 0;
+static gint64 window_last_paint = 0;
+
+static void update_window_hidden(GdkToplevel *toplevel)
 {
 	GdkToplevelState state = gdk_toplevel_get_state(toplevel);
 	if (!window_closed)
-		window_set_hidden(!!(state & (GDK_TOPLEVEL_STATE_MINIMIZED | GDK_TOPLEVEL_STATE_SUSPENDED)));
+		window_set_hidden(window_stalled || !!(state & (GDK_TOPLEVEL_STATE_MINIMIZED | GDK_TOPLEVEL_STATE_SUSPENDED)));
+}
+
+static void on_window_state_changed(GdkToplevel *toplevel, GParamSpec *pspec, gpointer user_data)
+{
+	update_window_hidden(toplevel);
+}
+
+/* low priority: a frame callback that is already there is handled first */
+static gboolean check_window_stalled(gpointer user_data)
+{
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	GdkFrameClock *clock = surface ? gdk_surface_get_frame_clock(surface) : NULL;
+
+	window_stall_check = 0;
+	if (!clock)
+		return G_SOURCE_REMOVE;
+	if (window_probing) {
+		window_stalled = TRUE;
+		update_window_hidden(GDK_TOPLEVEL(surface));
+		return G_SOURCE_REMOVE;
+	}
+	gint64 idle_ms = (g_get_monotonic_time() - window_last_paint) / 1000;
+	if (idle_ms < WINDOW_IDLE_MS) {
+		window_stall_check = g_timeout_add_full(G_PRIORITY_LOW, WINDOW_IDLE_MS - idle_ms + 1, check_window_stalled, NULL, NULL);
+		return G_SOURCE_REMOVE;
+	}
+	window_probing = TRUE;
+	gdk_frame_clock_request_phase(clock, GDK_FRAME_CLOCK_PHASE_AFTER_PAINT);
+	window_stall_check = g_timeout_add_full(G_PRIORITY_LOW, WINDOW_STALL_MS, check_window_stalled, NULL, NULL);
+	return G_SOURCE_REMOVE;
+}
+
+static void on_frame_clock_after_paint(GdkFrameClock *clock, GdkSurface *surface)
+{
+	window_last_paint = g_get_monotonic_time();
+	if (window_stalled) {
+		window_stalled = FALSE;
+		update_window_hidden(GDK_TOPLEVEL(surface));
+	}
+	if (window_probing) { // the window can paint: check again once it paints by itself
+		window_probing = FALSE;
+		g_clear_handle_id(&window_stall_check, g_source_remove);
+	} else if (!window_stall_check) {
+		window_stall_check = g_timeout_add_full(G_PRIORITY_LOW, WINDOW_IDLE_MS, check_window_stalled, NULL, NULL);
+	}
 }
 
 /* The user closed the app's window. Like leaving an Android app whose foreground service runs on (its
@@ -548,6 +606,7 @@ void activity_window_ready(void)
 	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
 	if (surface && GDK_IS_TOPLEVEL(surface) && !g_object_get_data(G_OBJECT(surface), "atl-watches-state")) {
 		g_signal_connect(surface, "notify::state", G_CALLBACK(on_window_state_changed), NULL);
+		g_signal_connect(gdk_surface_get_frame_clock(surface), "after-paint", G_CALLBACK(on_frame_clock_after_paint), surface);
 		g_object_set_data(G_OBJECT(surface), "atl-watches-state", GINT_TO_POINTER(1));
 	}
 }
