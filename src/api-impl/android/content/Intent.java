@@ -505,7 +505,8 @@ public class Intent implements Parcelable {
 	public Intent(Intent o) {
 		this.action = o.action;
 		this.data = o.data;
-		this.extras = o.extras;
+		/* AOSP: the copy has its own extras */
+		this.extras = o.extras != null ? new Bundle(o.extras) : new Bundle();
 		this.component = o.component;
 		this.clipData = o.clipData;
 		if (o.mCategories != null)
@@ -675,15 +676,19 @@ public class Intent implements Parcelable {
 		return this;
 	}
 
+	/* AOSP Intent.putExtras(Intent): copies the extras of src into this intent's, keeping the others */
 	public Intent putExtras(Intent src) {
-		// FIXME HACK
-		this.extras = src.getExtras();
+		if (src.extras != null)
+			putExtras(src.extras);
 		return this;
 	}
 
+	/* AOSP Intent.putExtras(Bundle): adds the given extras to this intent's */
 	public Intent putExtras(Bundle extras) {
-		// FIXME HACK
-		this.extras = extras;
+		if (this.extras == null)
+			this.extras = new Bundle(extras);
+		else
+			this.extras.putAll(extras);
 		return this;
 	}
 
