@@ -1,6 +1,6 @@
 /* Android's navigation bar under the window (ATL_TITLEBAR=system-navigation), for a title bar of the desktop
- * that has no back button: ◁ is back (as the Escape key), ○ is Home inside the app (its start activity with
- * FLAG_ACTIVITY_CLEAR_TOP: the activities above it finish, it gets onNewIntent()), □ lists the open activities
+ * that has no back button: ◁ is back (as the Escape key), ○ is Home inside the app (the task back to its root:
+ * the start activity anew, the open ones finish; Activity.navigateToStart()), □ lists the open activities
  * of the app, the shown one first, and brings the chosen one to the front (the others stay, as with
  * FLAG_ACTIVITY_REORDER_TO_FRONT). The bar is small (about 32 px) and takes the colors of the GTK theme; the
  * tooltips come from ATL_NAVIGATION_TOOLTIPS (three lines: back, home, open pages; e.g. in the desktop's

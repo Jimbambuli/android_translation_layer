@@ -1003,6 +1003,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	static native void nativePauseCurrentActivity(Intent intent);
 	static native void nativeResumeCurrentActivity();
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
+	static native void nativeClearTaskMark();
+	static native void nativeClearTaskFinish(boolean finish);
 	public static native void nativeOpenURI(String uri);
 	public native void nativeFileChooser(int action, String type, String title, int requestCode);
 	public native void nativePickImages(String[] mimeTypes, int maxItems, int requestCode);
@@ -1747,14 +1749,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	private native void nativeBackInvoked();
 
-	/* ○ of ATL's navigation bar (navigation_bar.c): Home inside the app, its start activity with
-	 * FLAG_ACTIVITY_CLEAR_TOP: the activities above it finish and it gets onNewIntent() (ContextImpl.startActivity());
-	 * if it is not in the back stack, it starts on top */
+	/* ○ of ATL's navigation bar (navigation_bar.c): Home inside the app, the task back to its root: the launch
+	 * intent with FLAG_ACTIVITY_NEW_TASK and FLAG_ACTIVITY_CLEAR_TASK starts the start activity anew and the open
+	 * ones finish (ContextImpl.startActivity()). FLAG_ACTIVITY_CLEAR_TOP is not enough: a launcher activity that
+	 * is a trampoline (JW Library's MainActivity starts its singleTask SiloContainer and finishes) is not in the
+	 * back stack, and the singleTask activity it starts only gets onNewIntent() and stays on its page. */
 	@Export
 	private void navigateToStart() {
 		Intent intent = getPackageManager().getLaunchIntentForPackage(getPackageName());
 		if (intent != null)
-			startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+			startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
 	}
 
 	/* AOSP Activity.setMediaController(): the media keys the activity does not handle go to this session */
