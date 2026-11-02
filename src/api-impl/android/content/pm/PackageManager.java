@@ -1544,7 +1544,25 @@ public class PackageManager {
 	 */
 	public PermissionInfo getPermissionInfo(String name, int flags)
 	    throws NameNotFoundException {
-		return null;
+		// AOSP asks the permission registry of all packages; ATL knows the app, the framework
+		// (framework-res's manifest) and Play Services, which it always makes visible
+		ArrayList<PackageParser.Package> pkgs = new ArrayList<>();
+		pkgs.add(ATLLoadedApp.getPrimaryApplication().pkg);
+		pkgs.add(ATLLoadedApp.getSystemApplication().pkg);
+		for (String packageName : ATLLoadedApp.play_services) {
+			PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
+			if (pkg != null) {
+				pkgs.add(pkg);
+			}
+		}
+		for (PackageParser.Package pkg : pkgs) {
+			for (PackageParser.Permission permission : pkg.permissions) {
+				if (name.equals(permission.info.name)) {
+					return PackageParser.generatePermissionInfo(permission, flags);
+				}
+			}
+		}
+		throw new NameNotFoundException(name);
 	}
 
 	/**

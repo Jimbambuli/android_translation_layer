@@ -23,9 +23,11 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -34,8 +36,8 @@ import org.xmlpull.v1.XmlPullParserException;
  */
 public final class ATLLoadedApp {
 	private final static String TAG = "ATLLoadedApp";
-	static final HashSet<String> play_services = new HashSet<>(Arrays.asList(
-	    "com.android.vending", "com.google.android.gms", "com.google.android.gsf"));
+	public static final Set<String> play_services = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+	    "com.android.vending", "com.google.android.gms", "com.google.android.gsf")));
 	private static ATLLoadedApp system_application;
 	private static ATLLoadedApp primary_application;
 	public final Resources default_resources;
