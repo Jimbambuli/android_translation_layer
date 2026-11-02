@@ -143,6 +143,31 @@ public final class ATLLoadedAppManager {
 		return app;
 	}
 
+	/**
+	 * Find an exported content provider of another package, as AOSP's provider lookup over all
+	 * packages; ATL looks only at the packages every app may see (Play Services), the provider
+	 * then runs in the app's process like the rest of the package.
+	 */
+	@Nullable
+	public static PackageParser.Provider findForeignProvider(String authority) {
+		String primaryPackageName = ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+		for (String packageName : always_visible_packages) {
+			if (packageName.equals(primaryPackageName)) {
+				continue;
+			}
+			PackageParser.Package pkg = getPackageFromPackageName(packageName);
+			if (pkg == null) {
+				continue;
+			}
+			for (PackageParser.Provider provider : pkg.providers) {
+				if (provider.info.exported && authority.equals(provider.info.authority)) {
+					return provider;
+				}
+			}
+		}
+		return null;
+	}
+
 	private static boolean isPackageVisible(String sourcePackageName, String targetPackageName) {
 		return always_visible_packages.contains(targetPackageName) || always_allow_query_all_packages.contains(sourcePackageName);
 	}

@@ -2602,6 +2602,11 @@ public class PackageManager {
 				return p.info;
 		}
 
+		PackageParser.Provider provider = ATLLoadedAppManager.findForeignProvider(authority);
+		if (provider != null) {
+			return provider.info;
+		}
+
 		Slog.w(TAG, "Provider not found: " + authority);
 		return null;
 	}

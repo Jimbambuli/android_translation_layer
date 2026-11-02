@@ -1,6 +1,7 @@
 package android.content;
 
 import android.atl.ATLLoadedApp;
+import android.atl.ATLLoadedAppManager;
 import android.atl.ATLMediaContentProvider;
 import android.atl.ATLProvider;
 import android.atl.annotation.Export;
@@ -47,7 +48,20 @@ public abstract class ContentProvider {
 	}
 
 	static ContentProvider atl_get_content_provider(String authority) {
-		ATLProvider atlProvider = atl_providers.get(authority);
+		ATLProvider atlProvider;
+		synchronized (atl_providers) {
+			atlProvider = atl_providers.get(authority);
+			if (atlProvider == null && authority != null) {
+				// a provider of another package (Play Services), loaded into this process on first use
+				PackageParser.Provider provider = ATLLoadedAppManager.findForeignProvider(authority);
+				ATLLoadedApp app = provider == null ? null : ATLLoadedAppManager.getAppFromPackageName(provider.owner.packageName);
+				if (app == null) {
+					return null;
+				}
+				atlProvider = new ATLProvider(app, provider);
+				atl_providers.put(authority, atlProvider);
+			}
+		}
 		return atlProvider == null ? null : atlProvider.getContentProvider();
 	}
 
