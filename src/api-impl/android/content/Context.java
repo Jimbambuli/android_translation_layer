@@ -108,6 +108,7 @@ public abstract class Context {
 	public static final String JOB_SCHEDULER_SERVICE = "jobscheduler";
 	public static final String APP_OPS_SERVICE = "appops";
 	public static final String USER_SERVICE = "user";
+	public static final String CROSS_PROFILE_APPS_SERVICE = "crossprofileapps";
 	public static final String CAPTIONING_SERVICE = "captioning";
 	public static final String STATUS_BAR_SERVICE = "statusbar";
 	public static final String CAMERA_SERVICE = "camera";

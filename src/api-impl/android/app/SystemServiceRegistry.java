@@ -25,6 +25,7 @@ import android.bluetooth.BluetoothManager;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.RestrictionsManager;
+import android.content.pm.CrossProfileApps;
 import android.content.pm.ShortcutManager;
 import android.hardware.ConsumerIrManager;
 import android.hardware.SensorManager;
@@ -273,6 +274,13 @@ public final class SystemServiceRegistry {
             @Override
             public UserManager createService(ContextImpl ctx) {
                 return new UserManager();
+            }});
+
+        registerService(Context.CROSS_PROFILE_APPS_SERVICE, CrossProfileApps.class,
+                new CachedServiceFetcher<CrossProfileApps>() {
+            @Override
+            public CrossProfileApps createService(ContextImpl ctx) {
+                return new CrossProfileApps();
             }});
 
         registerService(Context.CAPTIONING_SERVICE, CaptioningManager.class,
