@@ -330,4 +330,16 @@ public final class Trace {
 	public static boolean isEnabled() {
 		return isTagEnabled(TRACE_TAG_APP);
 	}
+
+	/**
+	 * Writes trace message to indicate the value of a given counter.
+	 *
+	 * @param counterName The counter name to appear in the trace.
+	 * @param counterValue The counter value.
+	 */
+	public static void setCounter(String counterName, long counterValue) {
+		if (isTagEnabled(TRACE_TAG_APP)) {
+			nativeTraceCounter(TRACE_TAG_APP, counterName, (int)counterValue);
+		}
+	}
 }

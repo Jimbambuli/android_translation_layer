@@ -13,6 +13,15 @@ public class Vibrator {
 		return true;
 	}
 
+	/**
+	 * Check whether the vibrator supports all of the given primitives.
+	 *
+	 * <p>A vibrator without support for any primitive, like this one, returns false.
+	 */
+	public boolean areAllPrimitivesSupported(int... primitiveIds) {
+		return false;
+	}
+
 	public void vibrate(long millis) {
 		if (fd != -1)
 			native_vibrate(fd, millis);

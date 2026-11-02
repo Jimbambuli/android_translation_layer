@@ -3209,6 +3209,16 @@ public class PackageManager {
 	}
 
 	/**
+	 * Retrieves information about how a package was installed or updated.
+	 *
+	 * @param packageName The name of the package to query
+	 */
+	public InstallSourceInfo getInstallSourceInfo(String packageName) throws NameNotFoundException {
+		String installer = getInstallerPackageName(packageName);
+		return new InstallSourceInfo(installer, null, null, installer);
+	}
+
+	/**
 	 * Attempts to clear the user data directory of an application.
 	 * Since this may take a little while, the result will
 	 * be posted back to the given observer.  A deletion will fail if the

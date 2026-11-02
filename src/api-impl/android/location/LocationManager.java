@@ -1,5 +1,6 @@
 package android.location;
 
+import android.app.PendingIntent;
 import android.atl.annotation.Export;
 import android.os.Bundle;
 import android.os.Handler;
@@ -54,6 +55,9 @@ public class LocationManager {
 	}
 
 	public void removeUpdates(LocationListener listener) {
+	}
+
+	public void removeUpdates(PendingIntent pendingIntent) {
 	}
 
 	public List<String> getAllProviders() {

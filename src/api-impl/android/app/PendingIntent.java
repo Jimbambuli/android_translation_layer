@@ -9,6 +9,13 @@ import android.os.Parcelable;
 import android.view.GestureDetector;
 
 public class PendingIntent implements Parcelable {
+	public static final int FLAG_ONE_SHOT = 1 << 30;
+	public static final int FLAG_NO_CREATE = 1 << 29;
+	public static final int FLAG_CANCEL_CURRENT = 1 << 28;
+	public static final int FLAG_UPDATE_CURRENT = 1 << 27;
+	public static final int FLAG_IMMUTABLE = 1 << 26;
+	public static final int FLAG_MUTABLE = 1 << 25;
+	public static final int FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT = 1 << 24;
 
 	private int requestCode;
 	Intent intent;
