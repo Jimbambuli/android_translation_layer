@@ -2248,7 +2248,20 @@ public class PackageManager {
 	 * that are available on the system, or null if there are none(!!).
 	 */
 	public FeatureInfo[] getSystemAvailableFeatures() {
-		return new FeatureInfo[0];
+		/* the features hasSystemFeature() reports (AOSP: SystemConfig); app stores send them to Google Play, which
+		 * offers no app to a device without them (android.hardware.touchscreen is implied by most apps) */
+		String[] names = {FEATURE_TOUCHSCREEN, "android.hardware.touchscreen.multitouch.distinct", FEATURE_LOCATION,
+		                  FEATURE_LOCATION_NETWORK, FEATURE_AUTOMOTIVE,
+		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE};
+		List<FeatureInfo> features = new ArrayList<>();
+		for (String name : names) {
+			if (hasSystemFeature(name)) {
+				FeatureInfo info = new FeatureInfo();
+				info.name = name;
+				features.add(info);
+			}
+		}
+		return features.toArray(new FeatureInfo[0]);
 	}
 
 	/**
@@ -2262,6 +2275,11 @@ public class PackageManager {
 		switch (name) {
 			case FEATURE_TOUCHSCREEN:
 			case "android.hardware.touchscreen.multitouch.distinct":
+				return true;
+			/* LocationManager (desktop portal; off unless ATL_UGLY_ENABLE_LOCATION, like a device with location
+			 * turned off); Google Play implies android.hardware.location from ACCESS_COARSE_LOCATION */
+			case FEATURE_LOCATION:
+			case FEATURE_LOCATION_NETWORK:
 				return true;
 			case FEATURE_AUTOMOTIVE:
 				return System.getenv("ATL_IS_AUTOMOTIVE") != null;
