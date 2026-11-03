@@ -10,10 +10,13 @@ import android.content.pm.ProviderInfo;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
+import android.util.Log;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -205,5 +208,35 @@ public abstract class ContentProvider {
 
 	public String getCallingPackage() {
 		return ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+	}
+
+	/* AOSP ContentProvider.PipeDataWriter and openPipeHelper() */
+	public interface PipeDataWriter<T> {
+		public void writeDataToPipe(ParcelFileDescriptor output, Uri uri, String mimeType, Bundle opts, T args);
+	}
+
+	public <T> ParcelFileDescriptor openPipeHelper(final Uri uri, final String mimeType, final Bundle opts, final T args,
+	                                               final PipeDataWriter<T> func) throws FileNotFoundException {
+		try {
+			final ParcelFileDescriptor[] fds = ParcelFileDescriptor.createPipe();
+
+			AsyncTask<Object, Object, Object> task = new AsyncTask<Object, Object, Object>() {
+				@Override
+				protected Object doInBackground(Object... params) {
+					func.writeDataToPipe(fds[1], uri, mimeType, opts, args);
+					try {
+						fds[1].close();
+					} catch (IOException e) {
+						Log.w("ContentProvider", "Failure closing pipe", e);
+					}
+					return null;
+				}
+			};
+			task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, (Object[])null);
+
+			return fds[0];
+		} catch (IOException e) {
+			throw new FileNotFoundException("failure making pipe");
+		}
 	}
 }
