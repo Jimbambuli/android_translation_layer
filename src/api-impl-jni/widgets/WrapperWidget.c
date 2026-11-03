@@ -1009,12 +1009,18 @@ static void focus_visible_changed_cb(GtkWindow *window, GParamSpec *pspec, gpoin
 static void focus_changed_cb(GtkWidget *widget, GParamSpec *pspec, WrapperWidget *wrapper)
 {
 	gboolean focused = gtk_widget_has_focus(GTK_WIDGET(wrapper)) || (wrapper->child && gtk_widget_has_focus(wrapper->child));
+	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(wrapper));
+	/* the GTK focus moves between the wrapper and its child (GTK's popovers and keyboard navigation
+	 * pick one, View.requestFocus() may pick the other): GTK takes it from the one before it gives it
+	 * to the other, but the view keeps the focus, as on AOSP (Compose drops its focused node on a loss) */
+	GtkWidget *root_focus = root ? gtk_root_get_focus(root) : NULL;
+	if (!focused && root_focus && (root_focus == GTK_WIDGET(wrapper) || root_focus == wrapper->child))
+		return;
 	if (focused == wrapper->has_focus)
 		return;
 	wrapper->has_focus = focused;
 
 	JNIEnv *env = get_jni_env();
-	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(wrapper));
 	gboolean visible = focused && GTK_IS_WINDOW(root) && gtk_window_get_focus_visible(GTK_WINDOW(root));
 	if (GTK_IS_WINDOW(root) && !g_object_get_data(G_OBJECT(root), "atl-focus-visible-handler")) {
 		g_signal_connect(root, "notify::focus-visible", G_CALLBACK(focus_visible_changed_cb), NULL);
