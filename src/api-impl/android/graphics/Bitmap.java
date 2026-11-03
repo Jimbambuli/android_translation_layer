@@ -1,6 +1,7 @@
 package android.graphics;
 
 import android.atl.annotation.Export;
+import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.DisplayMetrics;
 import java.io.IOException;
@@ -405,6 +406,45 @@ public final class Bitmap implements Parcelable {
 
 	public boolean isMutable() {
 		return mutable;
+	}
+
+	/* AOSP Bitmap.CREATOR: AOSP's nativeCreateFromParcel() reads what nativeWriteToParcel() wrote, here the
+	 * pixels as colors (ATL's parcels stay in the process) */
+	public static final Parcelable.Creator<Bitmap> CREATOR = new Parcelable.Creator<Bitmap>() {
+		public Bitmap createFromParcel(Parcel p) {
+			boolean mutable = p.readInt() != 0;
+			Config config = Config.valueOf(p.readString());
+			int width = p.readInt();
+			int height = p.readInt();
+			int density = p.readInt();
+			boolean hasAlpha = p.readInt() != 0;
+			int[] colors = p.createIntArray();
+			Bitmap bm = createBitmap(width, height, config);
+			bm.setPixels(colors, 0, width, 0, 0, width, height);
+			bm.density = density;
+			bm.hasAlpha = hasAlpha;
+			bm.mutable = mutable;
+			return bm;
+		}
+
+		public Bitmap[] newArray(int size) {
+			return new Bitmap[size];
+		}
+	};
+
+	/* AOSP Bitmap.writeToParcel() */
+	public void writeToParcel(Parcel p, int flags) {
+		if (recycled)
+			throw new IllegalStateException("Can't parcel a recycled bitmap");
+		int[] colors = new int[width * height];
+		getPixels(colors, 0, width, 0, 0, width, height);
+		p.writeInt(mutable ? 1 : 0);
+		p.writeString(config.name());
+		p.writeInt(width);
+		p.writeInt(height);
+		p.writeInt(density);
+		p.writeInt(hasAlpha ? 1 : 0);
+		p.writeIntArray(colors);
 	}
 
 	public boolean compress(Bitmap.CompressFormat format, int quality, OutputStream stream) {
