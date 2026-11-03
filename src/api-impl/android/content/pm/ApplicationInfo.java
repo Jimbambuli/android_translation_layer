@@ -366,6 +366,18 @@ public class ApplicationInfo extends PackageItemInfo {
 	public int flags = 0;
 
 	/**
+	 * Value for {@link #privateFlags}: whether this app is a resource overlay.
+	 * @hide
+	 */
+	public static final int PRIVATE_FLAG_IS_RESOURCE_OVERLAY = 1 << 28;
+
+	/**
+	 * Private/hidden flags. See {@code PRIVATE_FLAG_...} constants.
+	 * @hide
+	 */
+	public int privateFlags;
+
+	/**
 	 * The required smallest screen width the application can run on.  If 0,
 	 * nothing has been specified.  Comes from
 	 * {@link android.R.styleable#AndroidManifestSupportsScreens_requiresSmallestWidthDp
@@ -541,6 +553,14 @@ public class ApplicationInfo extends PackageItemInfo {
 	 * @return true if "supportsRtl" has been set to true in the AndroidManifest
 	 * @hide
 	 */
+	/**
+	 * Returns true if the package has declared in its manifest that it is a
+	 * runtime resource overlay.
+	 */
+	public boolean isResourceOverlay() {
+		return (privateFlags & ApplicationInfo.PRIVATE_FLAG_IS_RESOURCE_OVERLAY) != 0;
+	}
+
 	public boolean hasRtlSupport() {
 		return (flags & FLAG_SUPPORTS_RTL) == FLAG_SUPPORTS_RTL;
 	}
@@ -584,6 +604,7 @@ public class ApplicationInfo extends PackageItemInfo {
 		className = orig.className;
 		theme = orig.theme;
 		flags = orig.flags;
+		privateFlags = orig.privateFlags;
 		requiresSmallestWidthDp = orig.requiresSmallestWidthDp;
 		compatibleWidthLimitDp = orig.compatibleWidthLimitDp;
 		largestWidthLimitDp = orig.largestWidthLimitDp;

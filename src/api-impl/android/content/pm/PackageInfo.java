@@ -231,6 +231,11 @@ public class PackageInfo implements Parcelable {
 	public boolean requiredForAllUsers;
 
 	/**
+	 * Whether the package is an APEX package.
+	 */
+	public boolean isApex;
+
+	/**
 	 * @hide
 	 */
 	public String restrictedAccountType;
