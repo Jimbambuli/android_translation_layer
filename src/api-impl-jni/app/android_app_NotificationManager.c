@@ -24,6 +24,46 @@ static GHashTable *pending_notifications = NULL;
 static GMutex pending_notifications_mutex = {0};
 static GSource *send_notifcation_timer = NULL;
 
+/* The notification's id at the desktop: the portal keeps one list per Flatpak, which every app of the
+   APK Starter shares, so the id names the app (its GApplication id) besides Android's id. */
+static char *desktop_id(int id)
+{
+	return g_strdup_printf("%s.%d", g_application_get_application_id(g_application_get_default()), id);
+}
+
+/* GIO's portal backend sends notifications but leaves the clicks (ActionInvoked) to the app: activate the
+   action of the button or of the notification here, as GIO's other backends do. Without an action of the
+   app, the click brings its window to the front. */
+static void portal_action_invoked(GDBusConnection *connection, const char *sender, const char *path, const char *iface,
+                                  const char *signal, GVariant *parameters, gpointer user_data)
+{
+	GApplication *app = g_application_get_default();
+	const char *id, *action;
+	g_autoptr(GVariant) args = NULL;
+	g_autofree char *prefix = g_strdup_printf("%s.", g_application_get_application_id(app));
+	g_variant_get(parameters, "(&s&s@av)", &id, &action, &args);
+	if (!g_str_has_prefix(id, prefix))
+		return;
+	g_autoptr(GVariant) target = NULL;
+	for (gsize i = 0; i < g_variant_n_children(args); i++) {
+		g_autoptr(GVariant) arg = g_variant_get_child_value(args, i);
+		g_autoptr(GVariant) value = g_variant_get_variant(arg);
+		const char *token;
+		if (g_variant_is_of_type(value, G_VARIANT_TYPE_VARDICT)) {
+			/* platform data: the activation token lets the window come to the front on Wayland */
+			GtkWindow *active = gtk_application_get_active_window(GTK_APPLICATION(app));
+			if (active && g_variant_lookup(value, "activation-token", "&s", &token))
+				gtk_window_set_startup_id(active, token);
+		} else if (!target) {
+			target = g_steal_pointer(&value);
+		}
+	}
+	if (g_str_has_prefix(action, "app.") && g_action_group_has_action(G_ACTION_GROUP(app), action + 4))
+		g_action_group_activate_action(G_ACTION_GROUP(app), action + 4, target);
+	else
+		activity_window_present();
+}
+
 static gboolean send_notifcation_func(GSource *send_notifcation_timer, GSourceFunc callback, gpointer user_data)
 {
 	GApplication *app = g_application_get_default();
@@ -34,7 +74,7 @@ static gboolean send_notifcation_func(GSource *send_notifcation_timer, GSourceFu
 	g_mutex_lock(&pending_notifications_mutex);
 	g_hash_table_iter_init(&iter, pending_notifications);
 	while (g_hash_table_iter_next(&iter, &key, &value)) {
-		char *id_string = g_strdup_printf("%d", GPOINTER_TO_INT(key));
+		char *id_string = desktop_id(GPOINTER_TO_INT(key));
 		if (value)
 			g_application_send_notification(app, id_string, value);
 		else
@@ -75,9 +115,16 @@ static void queue_notification(int id, GNotification *notification)
 		   There is no public API to force a specific backend, so we have to set the environment variable.
 		   The GNOTIFICATION_BACKEND variable will be read by GIO the first time the notification backend is used.
 		   This method should be future proof unless the freedesktop backend is removed. */
-		if (!info)
+		if (g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS)) {
+			/* in a Flatpak only the portal may show notifications: GIO picks it */
+			g_dbus_connection_signal_subscribe(g_application_get_dbus_connection(app) ?: g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL),
+			                                   "org.freedesktop.portal.Desktop", "org.freedesktop.portal.Notification",
+			                                   "ActionInvoked", "/org/freedesktop/portal/desktop", NULL,
+			                                   G_DBUS_SIGNAL_FLAGS_NONE, portal_action_invoked, NULL, NULL);
+		} else if (!info) {
 			setenv("GNOTIFICATION_BACKEND", "freedesktop", 0);
-		else
+		}
+		if (info)
 			g_object_unref(info);
 		g_free(desktop_id);
 		ongoing_notifications = g_hash_table_new(NULL, NULL);
@@ -106,9 +153,11 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeAddAction(JNIE
 		(*env)->ReleaseStringUTFChars(env, name_jstr, name);
 }
 
-JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotification(JNIEnv *env, jobject this, jlong builder_ptr, jint id, jstring title_jstr, jstring text_jstr, jstring icon_jstr, jboolean ongoing, jint type, jobject intent)
+JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotification(JNIEnv *env, jobject this, jlong builder_ptr, jint id, jstring title_jstr, jstring text_jstr, jstring icon_jstr, jboolean ongoing, jint priority, jint type, jobject intent)
 {
 	GNotification *notification = _PTR(builder_ptr);
+
+	g_notification_set_priority(notification, priority);
 
 	if (title_jstr) {
 		const char *title = (*env)->GetStringUTFChars(env, title_jstr, NULL);
@@ -151,7 +200,7 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeCancel(JNIEnv 
 
 static void remove_ongoing_notification(gpointer key, gpointer value, gpointer user_data)
 {
-	char *id_string = g_strdup_printf("%d", GPOINTER_TO_INT(key));
+	char *id_string = desktop_id(GPOINTER_TO_INT(key));
 	g_application_withdraw_notification(g_application_get_default(), id_string);
 	g_free(id_string);
 }

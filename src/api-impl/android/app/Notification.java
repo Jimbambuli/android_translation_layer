@@ -54,6 +54,16 @@ public class Notification implements Parcelable {
 
 	public String category;
 
+	public static final int PRIORITY_DEFAULT = 0;
+	public static final int PRIORITY_LOW = -1;
+	public static final int PRIORITY_MIN = -2;
+	public static final int PRIORITY_HIGH = 1;
+	public static final int PRIORITY_MAX = 2;
+
+	public int priority;
+
+	String channelId;
+
 	String text;
 	String title;
 	List<Action> actions = new ArrayList<Action>();
@@ -68,6 +78,10 @@ public class Notification implements Parcelable {
 
 	public String getGroup() { return null; }
 
+	public String getChannelId() {
+		return channelId;
+	}
+
 	public static class Builder {
 		private final Context mContext;
 		private Notification notification;
@@ -77,8 +91,9 @@ public class Notification implements Parcelable {
 			notification = new Notification();
 		}
 
-		public Builder(Context context, String tag) {
+		public Builder(Context context, String channelId) {
 			this(context);
+			notification.channelId = channelId;
 		}
 
 		public Builder setWhen(long when) { return this; }
@@ -145,7 +160,10 @@ public class Notification implements Parcelable {
 
 		public Builder setUsesChronometer(boolean useChronometer) { return this; }
 
-		public Builder setPriority(int priority) { return this; }
+		public Builder setPriority(int priority) {
+			notification.priority = priority;
+			return this;
+		}
 
 		public Builder setShowWhen(boolean showWhen) { return this; }
 
@@ -231,6 +249,11 @@ public class Notification implements Parcelable {
 		int icon;
 		String title;
 		PendingIntent intent;
+		List<RemoteInput> remoteInputs = new ArrayList<RemoteInput>();
+
+		public RemoteInput[] getRemoteInputs() {
+			return remoteInputs.isEmpty() ? null : remoteInputs.toArray(new RemoteInput[0]);
+		}
 
 		public String toString() {
 			return "Action [" + icon + ", " + title + ", " + intent + "]";
@@ -252,7 +275,10 @@ public class Notification implements Parcelable {
 
 			public Builder addExtras(Bundle extras) { return this; }
 
-			public Builder addRemoteInput(RemoteInput remoteInput) { return this; }
+			public Builder addRemoteInput(RemoteInput remoteInput) {
+				action.remoteInputs.add(remoteInput);
+				return this;
+			}
 
 			public Builder setAllowGeneratedReplies(boolean allowGeneratedReplies) { return this; }
 
