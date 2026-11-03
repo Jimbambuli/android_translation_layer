@@ -118,6 +118,8 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1translate(JNIEnv *env,
 
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1rotate(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat angle)
 {
+	if (!isfinite(angle)) // GSK asserts on it
+		return;
 	GtkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
 	gtk_snapshot_rotate(snapshot, angle);
 }
@@ -136,7 +138,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1restore(JNIEnv *env, j
 
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLine(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat x0, jfloat y0, jfloat x1, jfloat y1, jlong paint_ptr)
 {
-	if (isnan(x0) || isnan(y0) || isnan(x1) || isnan(y1)) {
+	if (!isfinite(x0) || !isfinite(y0) || !isfinite(x1) || !isfinite(y1)) {
 		return;
 	}
 	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
