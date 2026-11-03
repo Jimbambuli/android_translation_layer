@@ -281,6 +281,11 @@ public abstract class Context {
 		return getApplicationInfo().packageName;
 	}
 
+	/* AOSP ContextImpl.getOpPackageName(): the package the app ops are noted for, the app's own */
+	public String getOpPackageName() {
+		return getPackageName();
+	}
+
 	public String getPackageCodePath() {
 		return getApplicationInfo().sourceDir;
 	}
