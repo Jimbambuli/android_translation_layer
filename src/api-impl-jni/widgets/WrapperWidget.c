@@ -1142,6 +1142,9 @@ void wrapper_widget_set_background(WrapperWidget *wrapper, GdkPaintable *paintab
 	}
 	if (!wrapper->background) {
 		wrapper->background = gtk_picture_new();
+		/* AOSP View.drawBackground(): the background gets the bounds of the view, whatever its
+		 * intrinsic size; GtkPicture would keep the aspect ratio of the drawable's intrinsic size */
+		gtk_picture_set_content_fit(GTK_PICTURE(wrapper->background), GTK_CONTENT_FIT_FILL);
 		gtk_widget_insert_after(wrapper->background, GTK_WIDGET(wrapper), NULL);
 	}
 	gtk_picture_set_paintable(GTK_PICTURE(wrapper->background), paintable);
