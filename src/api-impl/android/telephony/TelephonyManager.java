@@ -50,6 +50,11 @@ public class TelephonyManager {
 		return 0; // NETWORK_TYPE_UNKNOWN
 	}
 
+	/* AOSP TelephonyManager.getDataNetworkType(): no mobile data network */
+	public int getDataNetworkType() {
+		return 0; // NETWORK_TYPE_UNKNOWN
+	}
+
 	public String getLine1Number() {
 		return null;
 	}
