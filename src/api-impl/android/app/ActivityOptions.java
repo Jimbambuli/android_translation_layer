@@ -1,6 +1,7 @@
 package android.app;
 
 import android.content.Context;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.util.Pair;
 import android.view.View;
@@ -88,5 +89,26 @@ public class ActivityOptions {
 	 */
 	public void setAllowPassThroughOnTouchOutside(boolean allowPassThroughOnTouchOutside) {
 		mAllowPassThroughOnTouchOutside = allowPassThroughOnTouchOutside;
+	}
+
+	/* AOSP: where the activity's window should go (VLC asks for the full screen); ATL's windows are placed by
+	 * the desktop, so it is kept for the getter only */
+	private Rect mLaunchBounds;
+
+	/**
+	 * Sets the bounds (window size and position) that the activity should be launched in.
+	 * Rect position should be provided in pixels and in screen coordinates.
+	 * Set to {@code null} to explicitly launch fullscreen.
+	 */
+	public ActivityOptions setLaunchBounds(Rect screenSpacePixelRect) {
+		mLaunchBounds = screenSpacePixelRect != null ? new Rect(screenSpacePixelRect) : null;
+		return this;
+	}
+
+	/**
+	 * Returns the bounds that should be used to launch the activity.
+	 */
+	public Rect getLaunchBounds() {
+		return mLaunchBounds;
 	}
 }
