@@ -276,10 +276,19 @@ public class LocationManager {
 	}
 
 	public boolean registerGnssStatusCallback(GnssStatus.Callback callback, Handler handler) {
-		new Handler(Looper.getMainLooper()).post(new Runnable() {
+		return registerGnssStatusCallback(handlerExecutor(handler != null ? handler.getLooper() : null), callback);
+	}
+
+	public boolean registerGnssStatusCallback(GnssStatus.Callback callback) {
+		return registerGnssStatusCallback(callback, null);
+	}
+
+	/* the desktop's position comes without satellites: one status with none */
+	public boolean registerGnssStatusCallback(Executor executor, final GnssStatus.Callback callback) {
+		executor.execute(new Runnable() {
 			@Override
 			public void run() {
-				callback.onSatelliteStatusChanged(new GnssStatus());
+				callback.onSatelliteStatusChanged(new GnssStatus.Builder().build());
 			}
 		});
 		return true;

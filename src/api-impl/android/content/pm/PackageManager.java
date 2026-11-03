@@ -1950,6 +1950,8 @@ public class PackageManager {
 			// (until we find apps that refuse to launch without being lied to anyway)
 			case "android.permission.ACCESS_FINE_LOCATION":
 			case "android.permission.ACCESS_COARSE_LOCATION":
+			// the portal gives the position whether the window is shown or not
+			case "android.permission.ACCESS_BACKGROUND_LOCATION":
 				if (android.location.LocationManager.available()) // in a Flatpak the location portal asks the user
 					return PERMISSION_GRANTED;
 				else
