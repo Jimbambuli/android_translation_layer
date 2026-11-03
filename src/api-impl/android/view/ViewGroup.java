@@ -457,18 +457,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public void attachViewToParent(View view, int index, LayoutParams params) {
 		final boolean wasDetached = detachedChildren.remove(view);
 		if (!wasDetached) {
+			/* a view that was never added (ViewPager2 attaches its RecyclerView so): addViewInternal()
+			 * puts it into the children once, as AOSP's addInArray() does */
 			addViewInternal(view, index, params, false);
-		}
-		if (!checkLayoutParams(params))
-			params = generateLayoutParams(params);
+		} else {
+			if (!checkLayoutParams(params))
+				params = generateLayoutParams(params);
 
-		view.parent = this;
-		view.applyLayoutParams(params);
-		if (index < 0)
-			index = children.size();
-		children.add(index, view);
-		if (wasDetached && view.hasTransientState()) {
-			childHasTransientStateChanged(view, true);
+			view.parent = this;
+			view.applyLayoutParams(params);
+			if (index < 0)
+				index = children.size();
+			children.add(index, view);
+			if (view.hasTransientState()) {
+				childHasTransientStateChanged(view, true);
+			}
 		}
 		view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha() * view.getTransitionAlpha(), view.isEnabled());
 	}
