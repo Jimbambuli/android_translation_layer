@@ -18,6 +18,11 @@ public class AudioRecord {
 	private native int native_read(long pcm_handle, short[] audioData, int offsetInShorts, int framesToWrite);
 	private native void native_release(long pcm_handle);
 
+	/** in a Flatpak the microphone is PulseAudio's (--socket=pulseaudio); outside only with ATL_UGLY_ENABLE_MICROPHONE */
+	public static boolean microphoneAvailable() {
+		return System.getenv("ATL_UGLY_ENABLE_MICROPHONE") != null || new java.io.File("/.flatpak-info").exists();
+	}
+
 	public AudioRecord(int streamType, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes) {
 		this.sampleRateInHz = sampleRateInHz;
 		pcm_handle = native_constructor(streamType, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);

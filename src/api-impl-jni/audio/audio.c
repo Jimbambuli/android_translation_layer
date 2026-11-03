@@ -1,4 +1,5 @@
 #include <alsa/asoundlib.h>
+#include <glib.h>
 
 #include "audio.h"
 
@@ -34,4 +35,9 @@ void helper_hw_params_init(snd_pcm_t *pcm_handle, snd_pcm_hw_params_t *params, u
 	ret = snd_pcm_hw_params_set_rate_near(pcm_handle, params, &rate, 0);
 	if (ret < 0)
 		printf("ERROR: Can't set rate. %s\n", snd_strerror(ret));
+}
+
+int microphone_allowed(void)
+{
+	return getenv("ATL_UGLY_ENABLE_MICROPHONE") || g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS);
 }

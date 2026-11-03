@@ -1950,7 +1950,7 @@ public class PackageManager {
 				else
 					return PERMISSION_DENIED;
 			case "android.permission.RECORD_AUDIO":
-				if (System.getenv("ATL_UGLY_ENABLE_MICROPHONE") != null)
+				if (android.media.AudioRecord.microphoneAvailable())
 					return PERMISSION_GRANTED;
 				else
 					return PERMISSION_DENIED;
