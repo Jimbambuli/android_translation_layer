@@ -91,7 +91,7 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 	jlong *configs_base = get_long_array_crit(env, egl_configs);
 	jint *num_config_base = get_int_array_crit(env, num_config);
 
-	ret = eglChooseConfig(_PTR(egl_display), attrib_base, egl_configs ? _PTR(configs_base) : NULL, config_size, num_config_base);
+	ret = bionic_eglChooseConfig(_PTR(egl_display), attrib_base, egl_configs ? _PTR(configs_base) : NULL, config_size, num_config_base);
 	printf(".. eglChooseConfig: egl_display: %w64x, egl_configs: %p, _PTR(configs_base): %p, config_size: %d, num_config_base[0]: %d\n", egl_display, egl_configs, _PTR(configs_base), config_size, num_config_base[0]);
 
 	release_int_array_crit(env, attrib_list, attrib_base);
@@ -155,7 +155,7 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreatePbufferSurface(JNIEnv *env, jobject this, jlong display, jlong config, jintArray _attrib_list)
 {
 	EGLint *attrib_list = get_int_array_crit(env, _attrib_list);
-	EGLSurface ret = eglCreatePbufferSurface(_PTR(display), _PTR(config), attrib_list);
+	EGLSurface ret = bionic_eglCreatePbufferSurface(_PTR(display), _PTR(config), attrib_list);
 	release_int_array_crit(env, _attrib_list, attrib_list);
 	return _INTPTR(ret);
 }

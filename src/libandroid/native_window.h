@@ -23,6 +23,8 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface);
 EGLDisplay bionic_eglGetDisplay(NativeDisplayType native_display);
 EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface read, EGLContext context);
 EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface);
+EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, EGLint const *attrib_list);
 void bionic_glBindFramebuffer(GLenum target, GLuint framebuffer);
 void ANativeWindow_acquire(struct ANativeWindow *native_window);
 void ANativeWindow_release(struct ANativeWindow *native_window);

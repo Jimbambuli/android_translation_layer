@@ -168,7 +168,7 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 			size_t attrib_list_len = 0;
 			for (EGLint *attr = (EGLint *)attrib_list; *attr != EGL_NONE; attr++)
 				attrib_list_len++;
-			new_attrib_list = malloc(attrib_list_len);
+			new_attrib_list = malloc(sizeof(EGLint) * (attrib_list_len + 1));
 			EGLint *new_attr_pos = new_attrib_list;
 			for (EGLint *attr = (EGLint *)attrib_list; *attr != EGL_NONE; attr += 2) {
 				if (*attr == EGL_WIDTH) {
