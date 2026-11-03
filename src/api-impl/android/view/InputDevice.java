@@ -15,6 +15,11 @@ public class InputDevice {
 	public static final int SOURCE_MOUSE = 0x00002000 | SOURCE_CLASS_POINTER;
 	public static final int SOURCE_ROTARY_ENCODER = 0x00400000 | SOURCE_CLASS_NONE;
 
+	/* AOSP: the keyboard type of the device; ATL's one device includes the computer's keyboard */
+	public static final int KEYBOARD_TYPE_NONE = 0;
+	public static final int KEYBOARD_TYPE_NON_ALPHABETIC = 1;
+	public static final int KEYBOARD_TYPE_ALPHABETIC = 2;
+
 	public static int[] getDeviceIds() {
 		return new int[] {0}; // might work?
 	}
@@ -41,6 +46,10 @@ public class InputDevice {
 
 	public String getDescriptor() {
 		return "FIXME-descriptor";
+	}
+
+	public int getKeyboardType() {
+		return KEYBOARD_TYPE_ALPHABETIC;
 	}
 
 	public boolean isVirtual() {
