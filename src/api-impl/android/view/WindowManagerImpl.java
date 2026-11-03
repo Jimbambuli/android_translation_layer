@@ -2,6 +2,8 @@ package android.view;
 
 import android.content.res.Resources;
 import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Slog;
 
@@ -13,6 +15,9 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	 * GTK lays out and invalidates the window itself, and there is nothing above to intercept
 	 * touch events or to take part in nested scrolling. */
 	private static class WindowViewParent implements ViewParent {
+
+		/* like AOSP's ViewRootImpl.mTraversalScheduled: a layout of the window is pending */
+		boolean traversalScheduled;
 
 		@Override
 		public android.view.ViewParent getParent() {
@@ -117,12 +122,32 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	@Override
 	public void updateViewLayout(View view, android.view.ViewGroup.LayoutParams params) {
 		Slog.v(TAG, "updateViewLayout(" + view + ", " + params + ") called");
+		view.setLayoutParams(params);
+		/* as on AOSP (ViewRootImpl.setLayoutParams() -> scheduleTraversals()), the window is measured
+		 * and placed later, not within this call: Compose's popups call it from their own layout pass,
+		 * which a measure here re-enters ("performMeasureAndLayout called during measure layout") */
+		if (!(view.parent instanceof WindowViewParent))
+			return;
+		WindowViewParent parent = (WindowViewParent)view.parent;
+		if (parent.traversalScheduled)
+			return;
+		parent.traversalScheduled = true;
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				parent.traversalScheduled = false;
+				if (view.parent == parent) // not removed meanwhile
+					performUpdateViewLayout(view);
+			}
+		});
+	}
+
+	private static void performUpdateViewLayout(View view) {
 		Rect displayFrame = new Rect();
 		view.getWindowVisibleDisplayFrame(displayFrame);
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
-		WindowManager.LayoutParams windowParams = (WindowManager.LayoutParams)params;
-		view.setLayoutParams(params);
-		native_updateViewLayout(view.widget, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
+		WindowManager.LayoutParams windowParams = (WindowManager.LayoutParams)view.getLayoutParams();
+		native_updateViewLayout(view.widget, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, windowParams.width, windowParams.height);
 	}
 
 	@Override
