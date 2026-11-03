@@ -574,7 +574,10 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 				decor.clearAnimation();
 			return;
 		}
-		if (animation == null) {
+		/* AOSP animates the window in the window manager; here the decor view runs the animation as it
+		 * draws, so a decor that is not shown (AlertDialog shows native GTK widgets instead) would
+		 * keep the window open for ever */
+		if (animation == null || !decor.isShown()) {
 			decor.clearAnimation();
 			closeWindow();
 			return;
