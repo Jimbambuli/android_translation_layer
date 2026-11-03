@@ -19,6 +19,7 @@ package android.app;
 import android.accounts.AccountManager;
 import android.app.admin.DevicePolicyManager;
 import android.app.job.JobScheduler;
+import android.app.usage.StorageStatsManager;
 import android.app.usage.UsageStatsManager;
 import android.appwidget.AppWidgetManager;
 import android.bluetooth.BluetoothManager;
@@ -422,6 +423,13 @@ public final class SystemServiceRegistry {
             @Override
             public UsageStatsManager createService(ContextImpl ctx) {
                 return new UsageStatsManager();
+            }});
+
+        registerService(Context.STORAGE_STATS_SERVICE, StorageStatsManager.class,
+                new CachedServiceFetcher<StorageStatsManager>() {
+            @Override
+            public StorageStatsManager createService(ContextImpl ctx) {
+                return new StorageStatsManager(ctx);
             }});
 
         registerService(Context.MEDIA_PROJECTION_SERVICE, MediaProjectionManager.class,

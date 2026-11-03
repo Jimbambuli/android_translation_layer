@@ -45,6 +45,7 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.HandlerExecutor;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
@@ -77,6 +78,7 @@ import java.security.Security;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 
 public abstract class Context {
 	private final static String TAG = "Context";
@@ -130,6 +132,7 @@ public abstract class Context {
 	public static final String FINGERPRINT_SERVICE = "fingerprint";
 	public static final String TV_INPUT_SERVICE = "tv_input";
 	public static final String USAGE_STATS_SERVICE = "usagestats";
+	public static final String STORAGE_STATS_SERVICE = "storagestats";
 	public static final String MEDIA_PROJECTION_SERVICE = "media_projection";
 	public static final String APPWIDGET_SERVICE = "appwidget";
 	public static final String SHORTCUT_SERVICE = "shortcut";
@@ -266,6 +269,11 @@ public abstract class Context {
 
 	public Looper getMainLooper() {
 		return Looper.getMainLooper();
+	}
+
+	/* AOSP Context.getMainExecutor() */
+	public Executor getMainExecutor() {
+		return new HandlerExecutor(new Handler(getMainLooper()));
 	}
 
 	@Export
@@ -721,6 +729,10 @@ public abstract class Context {
 	public static final int CONTEXT_INCLUDE_CODE = 0x00000001;
 	public static final int CONTEXT_IGNORE_SECURITY = 0x00000002;
 	public static final int CONTEXT_RESTRICTED = 0x00000004;
+
+	/* AOSP Context.bindService() flags */
+	public static final int BIND_AUTO_CREATE = 0x0001;
+	public static final int BIND_INCLUDE_CAPABILITIES = 0x000001000;
 
 	public abstract Context createPackageContext(String packageName, int flags);
 

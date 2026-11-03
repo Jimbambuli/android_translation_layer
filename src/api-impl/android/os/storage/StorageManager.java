@@ -4,7 +4,11 @@ import android.os.Environment;
 import android.os.StatFs;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 public class StorageManager {
 	// AOSP: uuid -v5 ad99aa3d-308e-4191-a200-ebcab371c0ad default
@@ -15,6 +19,13 @@ public class StorageManager {
 	}
 
 	public StorageVolume getStorageVolume(File file) { return null; }
+
+	/* AOSP StorageManager.getStorageVolumes() */
+	public List<StorageVolume> getStorageVolumes() {
+		final ArrayList<StorageVolume> res = new ArrayList<>();
+		Collections.addAll(res, getVolumeList());
+		return res;
+	}
 
 	// there is a single storage volume, so every path is hosted by internal storage
 	public UUID getUuidForPath(File path) throws IOException {
@@ -38,4 +49,14 @@ public class StorageManager {
 		if (bytes > allocatable)
 			throw new IOException("Failed to allocate " + bytes + " because only " + allocatable + " allocatable");
 	}
+
+	/* AOSP StorageManager.StorageVolumeCallback */
+	public static class StorageVolumeCallback {
+		public void onStateChanged(StorageVolume volume) {}
+	}
+
+	/* AOSP registers the callback with the storage service; ATL has no volume state changes to report */
+	public void registerStorageVolumeCallback(Executor executor, StorageVolumeCallback callback) {}
+
+	public void unregisterStorageVolumeCallback(StorageVolumeCallback callback) {}
 }
