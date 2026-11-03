@@ -254,6 +254,36 @@ public final class ContextImpl extends Context {
 		return targetApp.startOrBindService(intent, serviceConnection) != null;
 	}
 
+	/* AOSP resolves an implicit intent with data against all packages with MATCH_DEFAULT_ONLY: the app's own
+	 * activity takes it if one of its filters in CATEGORY_DEFAULT matches. A web link only if the filter is
+	 * verified (android:autoVerify, Android 12) or the intent names the package (a link the desktop hands to
+	 * this app); otherwise the desktop opens it. Files (content:, file:) stay with the desktop, where Android would
+	 * offer a chooser. */
+	private String ownActivityForData(Intent intent) {
+		Uri data = intent.getData();
+		String scheme = data.getScheme();
+		if (scheme == null || "content".equals(scheme) || "file".equals(scheme))
+			return null;
+		boolean web = "http".equals(scheme) || "https".equals(scheme);
+		boolean forUs = this.atl_loaded_app.pkg.packageName.equals(intent.getPackage());
+		String className = null;
+		int best = 0;
+		for (PackageParser.Activity activity : this.atl_loaded_app.pkg.activities) {
+			if (!activity.info.enabled)
+				continue;
+			for (PackageParser.IntentInfo filter : activity.intents) {
+				if (!filter.hasCategory(Intent.CATEGORY_DEFAULT) || (web && !forUs && !filter.getAutoVerify()))
+					continue;
+				int score = filter.match(intent.getAction(), intent.getType(), scheme, data, intent.getCategories(), TAG);
+				if (score > best) {
+					className = activity.info.targetActivity != null ? activity.info.targetActivity : activity.className;
+					best = score;
+				}
+			}
+		}
+		return className;
+	}
+
 	@Override
 	public void startActivity(Intent intent) {
 		Slog.i(TAG, "startActivity(" + intent + ") called");
@@ -306,6 +336,8 @@ public final class ContextImpl extends Context {
 					new Handler(Looper.getMainLooper()).post(runnable);
 				}
 				return;
+			} else if (intent.getData() != null && (className = ownActivityForData(intent)) != null) {
+				Slog.i(TAG, "startActivity: " + className + " of the app takes " + intent.getData());
 			} else if (intent.getData() != null) {
 				Slog.i(TAG, "starting extern activity with intent: " + intent);
 				if (intent.getData().getScheme().equals("content")) {
@@ -322,6 +354,8 @@ public final class ContextImpl extends Context {
 				return;
 			}
 			for (PackageParser.Activity activity : this.atl_loaded_app.pkg.activities) {
+				if (className != null)
+					break;
 				for (PackageParser.IntentInfo intentInfo : activity.intents) {
 					if (intentInfo.matchAction(intent.getAction())) {
 						className = activity.className;
