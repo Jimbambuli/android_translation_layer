@@ -17,6 +17,10 @@ public class HorizontalScrollView extends FrameLayout {
 
 	public void smoothScrollTo(int x, int y) {}
 
+	public boolean fullScroll(int direction) {
+		return true;
+	}
+
 	public void setFillViewport(boolean fillViewport) {}
 
 	/* AOSP: a child's pressed state is delayed, as the touch may start a scroll */
