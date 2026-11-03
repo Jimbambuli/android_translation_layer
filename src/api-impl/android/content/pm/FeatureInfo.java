@@ -30,6 +30,19 @@ public class FeatureInfo {
 	public String name;
 
 	/**
+	 * If this object represents a feature supported by a device, this is the
+	 * maximum version of this feature supported by the device. The device
+	 * implicitly supports all older versions of this feature.
+	 * <p>
+	 * If this object represents a feature requested by an app, this is the
+	 * minimum version of the feature required by the app.
+	 * <p>
+	 * When a feature version is undefined by a device, it's assumed to be
+	 * version 0.
+	 */
+	public int version;
+
+	/**
 	 * Default value for {@link #reqGlEsVersion};
 	 */
 	public static final int GL_ES_VERSION_UNDEFINED = 0;
@@ -56,13 +69,14 @@ public class FeatureInfo {
 
 	public FeatureInfo(FeatureInfo orig) {
 		name = orig.name;
+		version = orig.version;
 		reqGlEsVersion = orig.reqGlEsVersion;
 		flags = orig.flags;
 	}
 
 	public String toString() {
 		if (name != null) {
-			return "FeatureInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + name + " fl=0x" + Integer.toHexString(flags) + "}";
+			return "FeatureInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + name + " v=" + version + " fl=0x" + Integer.toHexString(flags) + "}";
 		} else {
 			return "FeatureInfo{" + Integer.toHexString(System.identityHashCode(this)) + " glEsVers=" + getGlEsVersion() + " fl=0x" + Integer.toHexString(flags) + "}";
 		}
