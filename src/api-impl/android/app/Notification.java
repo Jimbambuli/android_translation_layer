@@ -84,7 +84,14 @@ public class Notification implements Parcelable {
 		public Builder setWhen(long when) { return this; }
 
 		public Builder setSmallIcon(int icon, int level) {
-			notification.iconPath = mContext.getString(icon);
+			/* the drawable's file, also through an alias (@drawable/a for @drawable/b) */
+			android.util.TypedValue value = new android.util.TypedValue();
+			try {
+				mContext.getResources().getValue(icon, value, true);
+				notification.iconPath = value.string != null ? value.string.toString() : null;
+			} catch (android.content.res.Resources.NotFoundException e) {
+				notification.iconPath = null;
+			}
 			return this;
 		}
 
