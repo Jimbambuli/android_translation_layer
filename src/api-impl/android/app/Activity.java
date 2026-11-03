@@ -1512,7 +1512,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mCanEnterPictureInPicture = true;
 		mCurrentConfig = new Configuration(getResources().getConfiguration());
 		dispatchActivityPreCreated(savedInstanceState);
-		onCreate(savedInstanceState);
+		Activity outer = creating;
+		creating = this;
+		try {
+			onCreate(savedInstanceState);
+		} finally {
+			creating = outer;
+		}
 		dispatchActivityPostCreated(savedInstanceState);
 		postCreatePending = true;
 		createdFromState = savedInstanceState;
@@ -1865,6 +1871,21 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			               "' in manifest");
 			return null;
 		}
+	}
+
+	/* the activity whose onCreate() runs */
+	private static Activity creating;
+
+	/** @hide ATL: the activity being created belongs to another process than the application
+	 * (android:process); ATL runs all of them in one */
+	public static boolean isCreatingInOtherProcess() {
+		Activity a = creating;
+		ActivityInfo info = a != null ? a.getActivityInfo() : null;
+		if (info == null || info.processName == null)
+			return false;
+		/* as with AOSP's PackageParser, the application's process is named after the package by default */
+		String app = a.getApplicationInfo().processName;
+		return !info.processName.equals(app != null ? app : a.getPackageName());
 	}
 
 	/* AOSP's mActivityInfo, from the manifest */

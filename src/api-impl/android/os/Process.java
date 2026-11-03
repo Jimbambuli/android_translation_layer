@@ -443,6 +443,9 @@ public class Process {
 	 */
 	public static final native int getUidForName(String name);
 
+	/** @hide ATL: the exit status by which the app asks to be started again (EX_TEMPFAIL of sysexits.h) */
+	public static final int EXIT_RESTART = 75;
+
 	/**
 	 * Returns the GID assigned to a particular user name, or -1 if there is
 	 * none.  If the given string consists of only numbers, it is converted
@@ -679,6 +682,13 @@ public class Process {
 	 */
 	public static final void killProcess(int pid) {
 		if (pid == Process.myPid()) {
+			/* on AOSP a component of another process (android:process) kills the app's main process this
+			 * way and then starts the app anew (ProcessPhoenix); its own process lives on. ATL runs all
+			 * components in one process: end with EXIT_RESTART, on which a launcher starts the app again */
+			if (android.app.Activity.isCreatingInOtherProcess()) {
+				System.out.println("the app restarts its process (exit " + EXIT_RESTART + ")");
+				System.exit(EXIT_RESTART);
+			}
 			System.out.println("the app called killProcess on itself");
 			System.exit(0);
 		}
