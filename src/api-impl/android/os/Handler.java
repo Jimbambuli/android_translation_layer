@@ -388,6 +388,15 @@ public class Handler {
 	}
 
 	/**
+	 * Causes the Runnable r to be added to the message queue, to be run
+	 * after the specified amount of time elapses; the token can be used to
+	 * cancel it with {@link #removeCallbacksAndMessages}.
+	 */
+	public final boolean postDelayed(Runnable r, Object token, long delayMillis) {
+		return sendMessageDelayed(getPostMessage(r, token), delayMillis);
+	}
+
+	/**
 	 * Posts a message to an object that implements Runnable.
 	 * Causes the Runnable r to executed on the next iteration through the
 	 * message queue. The runnable will be run on the thread to which this

@@ -453,6 +453,7 @@ srcs = [
 	'android/media/session/PlaybackState.java',
 	'android/media/tv/TvInputManager.java',
 	'android/net/ConnectivityManager.java',
+	'android/net/LinkAddress.java',
 	'android/net/LinkProperties.java',
 	'android/net/LocalServerSocket.java',
 	'android/net/LocalSocket.java',

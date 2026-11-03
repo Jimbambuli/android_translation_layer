@@ -194,7 +194,7 @@ public class ConnectivityManager {
 				NetworkCapabilities caps = new ConnectivityManager().getNetworkCapabilities(NETWORK);
 				if (caps != null)
 					cb.onCapabilitiesChanged(NETWORK, caps);
-				cb.onLinkPropertiesChanged(NETWORK, new LinkProperties());
+				cb.onLinkPropertiesChanged(NETWORK, LinkProperties.forHost());
 				cb.onBlockedStatusChanged(NETWORK, false);
 			}
 		});
@@ -213,5 +213,8 @@ public class ConnectivityManager {
 
 	public ProxyInfo getDefaultProxy() { return null; }
 
-	public LinkProperties getLinkProperties(Network network) { return null; }
+	/* AOSP: the link of the given network; ATL has one, the computer's */
+	public LinkProperties getLinkProperties(Network network) {
+		return network != null ? LinkProperties.forHost() : null;
+	}
 }
