@@ -762,9 +762,9 @@ public class Intent implements Parcelable {
 		return extras.getParcelable(name);
 	}
 
-	public <T> T getSerializableExtra(String name, Class<T> clazz) {
-		Object o = extras.get(name);
-		return clazz.isInstance(o) ? clazz.cast(o) : null;
+	/* AOSP: <T extends Serializable>, so apps link against the variant returning Serializable */
+	public <T extends Serializable> T getSerializableExtra(String name, Class<T> clazz) {
+		return extras == null ? null : extras.getSerializable(name, clazz);
 	}
 
 	public <T> T getParcelableExtra(String name, Class<T> clazz) {
