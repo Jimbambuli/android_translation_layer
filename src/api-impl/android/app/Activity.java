@@ -1009,6 +1009,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public void setTaskDescription(ActivityManager.TaskDescription description) {}
 
+	/**
+	 * If set to false, this indicates to the system that it should never take a
+	 * screenshot of the activity to be used as a representation in recents screen.
+	 * ATL shows no recents screen.
+	 */
+	public void setRecentsScreenshotEnabled(boolean enabled) {}
+
 	private native void nativeFinish(long native_window);
 	public static native void nativeStartActivity(Activity activity);
 	private native void nativeRecreate();

@@ -7,7 +7,9 @@ import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.notification.StatusBarNotification;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 public class NotificationManager {
@@ -82,7 +84,27 @@ public class NotificationManager {
 		cancel(null, id);
 	}
 
-	public void createNotificationChannel(NotificationChannel channel) {}
+	/* AOSP keeps the channels per package in the NotificationManagerService; ATL runs one app */
+	private static final LinkedHashMap<String, NotificationChannel> channels = new LinkedHashMap<>();
+
+	/**
+	 * Creates a notification channel that notifications can be posted to. Creating an existing
+	 * channel with its original values performs no operation; only its name, description and
+	 * group are updated, as in AOSP.
+	 */
+	public void createNotificationChannel(NotificationChannel channel) {
+		synchronized (channels) {
+			NotificationChannel existing = channels.get(channel.getId());
+			if (existing == null) {
+				channels.put(channel.getId(), channel);
+				return;
+			}
+			existing.setName(channel.getName());
+			existing.setDescription(channel.getDescription());
+			if (channel.getGroup() != null)
+				existing.setGroup(channel.getGroup());
+		}
+	}
 
 	protected native long nativeInitBuilder();
 	protected native void nativeAddAction(long builder, String title, int intentType, Intent intent);
@@ -94,7 +116,9 @@ public class NotificationManager {
 	public void createNotificationChannelGroup(NotificationChannelGroup v) {}
 
 	public List<NotificationChannel> getNotificationChannels() {
-		return Collections.emptyList();
+		synchronized (channels) {
+			return new ArrayList<>(channels.values());
+		}
 	}
 
 	public List<NotificationChannelGroup> getNotificationChannelGroups() {
@@ -105,17 +129,26 @@ public class NotificationManager {
 		return true;
 	}
 
-	public void deleteNotificationChannel(String channelId) {}
+	public void deleteNotificationChannel(String channelId) {
+		synchronized (channels) {
+			channels.remove(channelId);
+		}
+	}
 
 	public void createNotificationChannelGroups(List<NotificationChannelGroup> groups) {}
 
-	public void createNotificationChannels(List<NotificationChannel> channels) {}
+	public void createNotificationChannels(List<NotificationChannel> channels) {
+		for (NotificationChannel channel : channels)
+			createNotificationChannel(channel);
+	}
 
 	public StatusBarNotification[] getActiveNotifications() {
 		return new StatusBarNotification[0];
 	}
 
-	public NotificationChannel getNotificationChannel(String channel) {
-		return null;
+	public NotificationChannel getNotificationChannel(String channelId) {
+		synchronized (channels) {
+			return channels.get(channelId);
+		}
 	}
 }

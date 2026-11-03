@@ -43,4 +43,50 @@ public class ActivityOptions {
 	public Bundle toBundle() {
 		return null;
 	}
+
+	/* AOSP (android-14, setAllowPassThroughOnTouchOutside android-15): stored for the getters; ATL starts
+	 * activities of the app only, so they change nothing */
+	private boolean mShareIdentity;
+	private int mPendingIntentBackgroundActivityStartMode;  // MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED
+	private boolean mAllowPassThroughOnTouchOutside;
+
+	/**
+	 * Returns whether the launching app has opted-in to sharing its identity with the launched
+	 * activity.
+	 */
+	public boolean isShareIdentityEnabled() {
+		return mShareIdentity;
+	}
+
+	/**
+	 * Sets whether the identity of the launching app should be shared with the activity.
+	 */
+	public ActivityOptions setShareIdentityEnabled(boolean shareIdentity) {
+		mShareIdentity = shareIdentity;
+		return this;
+	}
+
+	/**
+	 * Sets the mode for allowing or denying the senders privileges to start background activities
+	 * to the PendingIntent.
+	 */
+	public ActivityOptions setPendingIntentBackgroundActivityStartMode(int state) {
+		mPendingIntentBackgroundActivityStartMode = state;
+		return this;
+	}
+
+	/**
+	 * Get the mode for allowing or denying the senders privileges to start background activities
+	 * to the PendingIntent.
+	 */
+	public int getPendingIntentBackgroundActivityStartMode() {
+		return mPendingIntentBackgroundActivityStartMode;
+	}
+
+	/**
+	 * Sets whether the insecure launch of the activity (touches outside it) passes through.
+	 */
+	public void setAllowPassThroughOnTouchOutside(boolean allowPassThroughOnTouchOutside) {
+		mAllowPassThroughOnTouchOutside = allowPassThroughOnTouchOutside;
+	}
 }

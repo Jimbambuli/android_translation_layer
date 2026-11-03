@@ -237,6 +237,7 @@ srcs = [
 	'android/content/res/loader/AssetsProvider.java',
 	'android/content/res/loader/ResourcesLoader.java',
 	'android/content/res/loader/ResourcesProvider.java',
+	'android/credentials/CredentialManager.java',
 	'android/database/AbstractCursor.java',
 	'android/database/AbstractWindowedCursor.java',
 	'android/database/CharArrayBuffer.java',
