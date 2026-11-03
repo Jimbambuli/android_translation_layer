@@ -264,18 +264,23 @@ public final class ATLLoadedApp {
 		int theme_res = 0;
 		int label_res = 0;
 		int soft_input_mode = 0;
+		String activityClass = className;
 		for (PackageParser.Activity activity : pkg.activities) {
 			if (className.equals(activity.className)) {
 				soft_input_mode = activity.info.softInputMode;
 				label_res = activity.info.labelRes;
 				theme_res = activity.info.getThemeResource();
+				// an <activity-alias> (e.g. the launch intent of an app with switchable icons) runs its target,
+				// the activity keeps the alias as its component like in AOSP
+				if (activity.info.targetActivity != null)
+					activityClass = activity.info.targetActivity;
 				break;
 			}
 		}
 
 		theme_res = Resources.selectDefaultTheme(theme_res, this.effective_sdk_compat);
 
-		Class<? extends Activity> cls = this.loadClass(className).asSubclass(Activity.class);
+		Class<? extends Activity> cls = this.loadClass(activityClass).asSubclass(Activity.class);
 		Constructor<? extends Activity> constructor = cls.getConstructor();
 		Activity activity = constructor.newInstance();
 		intent.setComponent(new ComponentName(pkg.packageName, className));
