@@ -11,11 +11,19 @@ extern "C" {
 #define android_content_ClipboardManager_MSG_REPORT_PRIMARY_CLIP_CHANGED 1L
 /*
  * Class:     android_content_ClipboardManager
+ * Method:    native_init
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_content_ClipboardManager_native_1init
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_content_ClipboardManager
  * Method:    native_set_clipboard
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Ljava/lang/String;Ljava/lang/String;[B)V
  */
 JNIEXPORT void JNICALL Java_android_content_ClipboardManager_native_1set_1clipboard
-  (JNIEnv *, jclass, jstring);
+  (JNIEnv *, jclass, jstring, jstring, jbyteArray);
 
 #ifdef __cplusplus
 }

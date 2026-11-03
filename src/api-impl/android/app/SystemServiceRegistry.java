@@ -107,7 +107,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<ClipboardManager>() {
             @Override
             public ClipboardManager createService(ContextImpl ctx) {
-                return new ClipboardManager();
+                return new ClipboardManager(ctx, null);
             }});
 
         registerService(Context.SENSOR_SERVICE, SensorManager.class,

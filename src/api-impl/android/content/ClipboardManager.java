@@ -16,11 +16,18 @@
 package android.content;
 import android.app.Activity;
 import android.content.Context;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.os.RemoteException;
 import android.util.Log;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 
 /**
@@ -64,24 +71,33 @@ public class ClipboardManager extends android.text.ClipboardManager {
 		void onPrimaryClipChanged();
 	}
 
-	/* ATL: the clipboard service's state. GDK reads the system clipboard asynchronously, so the text of
-	 * another application's clip is read when the clipboard changes and kept here, like Android's
-	 * ClipboardService keeps the primary clip. Only text is exchanged with the system clipboard. */
+	/* ATL: the clipboard service's state. GDK reads the system clipboard asynchronously, so another
+	 * application's clip is read when the clipboard changes and kept here, like Android's ClipboardService
+	 * keeps the primary clip: text as text, an image as a PNG file in the cache that the clip names with a
+	 * content URI (ContentResolver.atlUriForFile()), as an app on Android gets an image from another app.
+	 * The listeners are called on the main thread after the change, as AOSP posts them to its handler. */
 	private static ClipData primaryClip;
 	private static final ArrayList<OnPrimaryClipChangedListener> primaryClipChangedListeners = new ArrayList<OnPrimaryClipChangedListener>();
 	private static boolean nativeInitDone;
+	private static Context sContext;
+	private static Handler sHandler;
+	private static File pastedImage;	/* the file of the desktop's last image */
 
 	/**
 	 * {@hide}
 	 */
 	public ClipboardManager(Context context, Handler handler) {
-		this();
-	}
-	public ClipboardManager() {
+		if (sContext == null && context != null)
+			sContext = context.getApplicationContext() != null ? context.getApplicationContext() : context;
+		if (sHandler == null)
+			sHandler = new Handler(Looper.getMainLooper());
 		if (!nativeInitDone) {
 			nativeInitDone = true;
 			native_init();
 		}
+	}
+	public ClipboardManager() {
+		this(null, null);
 	}
 	/**
 	 * Sets the current primary clip on the clipboard.  This is the clip that
@@ -93,17 +109,57 @@ public class ClipboardManager extends android.text.ClipboardManager {
 		if (clip == null)
 			throw new NullPointerException("clip");
 		primaryClip = clip;
-		// this is not the primary clipboard in UNIX sense (not middle click paste)
-		native_set_clipboard(clip.getItemCount() > 0 ? String.valueOf(clip.getItemAt(0).coerceToText(null)) : "");
-		reportPrimaryClipChanged();
+		publish(clip);
+		postPrimaryClipChanged();
+	}
+
+	/* the clip on the desktop's clipboard (not the primary selection of middle click paste): the first item's
+	 * image if the clip is one (read through its content URI), and its text */
+	private static void publish(ClipData clip) {
+		if (clip.getItemCount() == 0) {
+			native_set_clipboard(null, null, null);
+			return;
+		}
+		ClipData.Item item = clip.getItemAt(0);
+		String type = null;
+		byte[] data = null;
+		Uri uri = item.getUri();
+		if (uri != null && clip.getDescription().hasMimeType("image/*") && sContext != null) {
+			ContentResolver resolver = sContext.getContentResolver();
+			type = resolver.getType(uri);
+			if (type == null || !type.startsWith("image/"))
+				type = clip.getDescription().filterMimeTypes("image/*")[0];
+			data = readAll(resolver, uri);
+			if (data == null || type.endsWith("/*"))
+				type = null;
+		}
+		String text = null;
+		if (item.getText() != null || item.getHtmlText() != null || type == null)
+			text = String.valueOf(item.coerceToText(sContext));
+		native_set_clipboard(text, type, type != null ? data : null);
+	}
+
+	private static byte[] readAll(ContentResolver resolver, Uri uri) {
+		try (InputStream in = resolver.openInputStream(uri)) {
+			if (in == null)
+				return null;
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			byte[] buf = new byte[65536];
+			for (int n; (n = in.read(buf)) > 0;)
+				out.write(buf, 0, n);
+			return out.toByteArray();
+		} catch (IOException | SecurityException e) {
+			Log.w("ClipboardManager", "cannot read " + uri + ": " + e);
+			return null;
+		}
 	}
 	/**
 	 * Clears any current primary clip on the clipboard.
 	 */
 	public void clearPrimaryClip() {
 		primaryClip = null;
-		native_set_clipboard(null);
-		reportPrimaryClipChanged();
+		native_set_clipboard(null, null, null);
+		postPrimaryClipChanged();
 	}
 	/**
 	 * Returns the current primary clip on the clipboard.
@@ -170,12 +226,47 @@ public class ClipboardManager extends android.text.ClipboardManager {
 		}
 	}
 
+	/* AOSP's service calls the listeners through the handler of the app's main thread */
+	private static void postPrimaryClipChanged() {
+		if (sHandler == null)
+			sHandler = new Handler(Looper.getMainLooper());
+		sHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				reportPrimaryClipChanged();
+			}
+		});
+	}
+
 	/* called on the main thread when another application put text (or nothing that is text) on the clipboard */
 	private static void onSystemClipboardText(String text) {
 		primaryClip = text != null ? ClipData.newPlainText(null, text) : null;
-		reportPrimaryClipChanged();
+		postPrimaryClipChanged();
+	}
+
+	/* called on the main thread when another application put an image on the clipboard, as PNG */
+	private static void onSystemClipboardImage(byte[] png) {
+		if (sContext == null) {
+			onSystemClipboardText(null);
+			return;
+		}
+		File dir = new File(sContext.getCacheDir(), "clipboard");
+		File file = new File(dir, "image-" + System.currentTimeMillis() + ".png");
+		dir.mkdirs();
+		try (FileOutputStream out = new FileOutputStream(file)) {
+			out.write(png);
+		} catch (IOException e) {
+			Log.w("ClipboardManager", "cannot keep the clipboard image: " + e);
+			onSystemClipboardText(null);
+			return;
+		}
+		if (pastedImage != null)
+			pastedImage.delete();
+		pastedImage = file;
+		primaryClip = new ClipData(null, new String[] {"image/png"}, new ClipData.Item(ContentResolver.atlUriForFile(file.getPath())));
+		postPrimaryClipChanged();
 	}
 
 	private static native void native_init();
-	public static native void native_set_clipboard(String text);
+	private static native void native_set_clipboard(String text, String mimeType, byte[] data);
 }

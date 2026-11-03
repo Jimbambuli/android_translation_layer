@@ -125,9 +125,12 @@ public class ClipData {
 		return new ClipData(label, new String[] {ClipDescription.MIMETYPE_TEXT_URILIST}, new Item(uri));
 	}
 
-	/* the ContentResolver could tell the type of a content: Uri; ATL does not ask it */
+	/* AOSP: the type of a content: Uri from the ContentResolver, else text/uri-list (ATL has no stream types) */
 	public static ClipData newUri(ContentResolver resolver, CharSequence label, Uri uri) {
-		return newRawUri(label, uri);
+		String type = ContentResolver.SCHEME_CONTENT.equals(uri.getScheme()) ? resolver.getType(uri) : null;
+		if (type == null)
+			return newRawUri(label, uri);
+		return new ClipData(label, new String[] {type}, new Item(uri));
 	}
 
 	public ClipDescription getDescription() {
