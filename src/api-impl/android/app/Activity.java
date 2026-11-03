@@ -110,34 +110,44 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	@Export
 	private static Activity createMainActivity(String className, long native_window, String uriString) throws ReflectiveOperationException {
 		Uri uri = uriString != null ? Uri.parse(uriString) : null;
+		/* a link from the desktop, like a browser starts it on Android: VIEW, BROWSABLE, for an activity with
+		 * a matching filter in CATEGORY_DEFAULT (MATCH_DEFAULT_ONLY) */
+		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : new Intent();
 		if (className == null) {
+			int best = 0;
 			for (PackageParser.Activity activity : ATLLoadedApp.getPrimaryApplication().pkg.activities) {
 				if (!activity.info.enabled)
 					continue;
-				boolean done = false;
-				for (PackageParser.IntentInfo intent : activity.intents) {
-					Slog.i(TAG, intent.toString());
-					if ((uri == null && intent.hasCategory("android.intent.category.LAUNCHER") && intent.hasAction("android.intent.action.MAIN")) ||        // NOLINT
-					    (uri != null && intent.hasDataScheme(uri.getScheme())                  && intent.hasCategory("android.intent.category.DEFAULT"))) { // NOLINT
+				for (PackageParser.IntentInfo filter : activity.intents) {
+					Slog.i(TAG, filter.toString());
+					int score;
+					if (uri == null)
+						score = filter.hasCategory("android.intent.category.LAUNCHER") && filter.hasAction("android.intent.action.MAIN") ? 1 : 0;
+					else if (filter.hasCategory(Intent.CATEGORY_DEFAULT))
+						score = filter.match(intent.getAction(), null, uri.getScheme(), uri, intent.getCategories(), TAG);
+					else
+						score = 0;
+					if (score > best) {
 						className = activity.info.targetActivity != null ? activity.info.targetActivity : activity.className;
-						done = true;
-						break;
+						best = score;
 					}
 				}
-				if (done)
+				if (uri == null && className != null)
 					break;
 			}
 		} else {
 			className = className.replace('/', '.');
 		}
+		if (className == null && uri != null) {
+			/* «Open with» offers the app for every link of a scheme; one it has no filter for starts the app */
+			System.err.println("Failed to find Activity to launch URI: " + uri);
+			return createMainActivity(null, native_window, null);
+		}
 		if (className == null) {
-			if (uri != null)
-				System.err.println("Failed to find Activity to launch URI: " + uri);
-			else
-				System.err.println("Failed to find main Activity");
+			System.err.println("Failed to find main Activity");
 			System.exit(1);
 		}
-		return internalCreateActivity(className, native_window, uri != null ? new Intent("android.intent.action.VIEW", uri) : new Intent());
+		return internalCreateActivity(className, native_window, intent);
 	}
 
 	public Activity() {
