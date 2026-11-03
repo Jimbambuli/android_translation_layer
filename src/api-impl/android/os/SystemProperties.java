@@ -18,17 +18,18 @@ public class SystemProperties {
 		properties.put("ro.product.brand", "google");
 		properties.put("ro.build.tags", "release-keys");
 		properties.put("ro.build.type", "user");
-		// TODO how to actually get the system's supported abis?
-		if (System.getProperty("os.arch").equals("x86_64")) {
-			properties.put("ro.product.cpu.abi", "x86_64");
-			properties.put("ro.product.cpu.abi2", "x86");
-			properties.put("ro.product.cpu.abilist", "x86_64,x86");
-			properties.put("ro.product.cpu.abilist64", "x86_64");
-			properties.put("ro.product.cpu.abilist32", "x86");
-		} else if (System.getProperty("os.arch").equals("aarch64")) {
-			properties.put("ro.product.cpu.abi", "arm64-v8a");
-			properties.put("ro.product.cpu.abilist", "arm64-v8a");
-			properties.put("ro.product.cpu.abilist64", "arm64-v8a");
+		// AOSP sets the ABI lists from the zygotes the device runs. ATL runs the app in one process of the
+		// host architecture (os.arch of this VM) and can load native code only of that ABI, so it lists that
+		// one alone, like a 64-bit-only device (no ro.product.cpu.abilist32, no ro.product.cpu.abi2)
+		String abi = null;
+		if (System.getProperty("os.arch").equals("x86_64"))
+			abi = "x86_64";
+		else if (System.getProperty("os.arch").equals("aarch64"))
+			abi = "arm64-v8a";
+		if (abi != null) {
+			properties.put("ro.product.cpu.abi", abi);
+			properties.put("ro.product.cpu.abilist", abi);
+			properties.put("ro.product.cpu.abilist64", abi);
 		}
 		// on Android the time zone service keeps persist.sys.timezone; here it follows the host
 		String timezone = hostTimeZoneId();

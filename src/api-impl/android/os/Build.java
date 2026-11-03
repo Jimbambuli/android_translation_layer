@@ -59,12 +59,12 @@ public class Build {
 	/**
 	 * The name of the instruction set (CPU type + ABI convention) of native code.
 	 */
-	public static final String CPU_ABI = getString("ro.product.cpu.abi");
+	public static final String CPU_ABI;
 
 	/**
 	 * The name of the second instruction set (CPU type + ABI convention) of native code.
 	 */
-	public static final String CPU_ABI2 = getString("ro.product.cpu.abi2");
+	public static final String CPU_ABI2;
 
 	/**
 	 * The manufacturer of the product/hardware.
@@ -115,11 +115,18 @@ public class Build {
 		return SERIAL;
 	}
 
-	public static final String[] SUPPORTED_ABIS = getString("ro.product.cpu.abilist").split(",");
+	public static final String[] SUPPORTED_ABIS = getStringList("ro.product.cpu.abilist", ",");
 
 	public static final String[] SUPPORTED_32_BIT_ABIS = getStringList("ro.product.cpu.abilist32", ",");
 
 	public static final String[] SUPPORTED_64_BIT_ABIS = getStringList("ro.product.cpu.abilist64", ",");
+
+	/* AOSP Build: CPU_ABI and CPU_ABI2 are the first two ABIs of the process (ATL runs 64 bit) */
+	static {
+		final String[] abiList = SUPPORTED_64_BIT_ABIS.length > 0 ? SUPPORTED_64_BIT_ABIS : SUPPORTED_ABIS;
+		CPU_ABI = abiList.length > 0 ? abiList[0] : UNKNOWN;
+		CPU_ABI2 = abiList.length > 1 ? abiList[1] : "";
+	}
 
 	/**
 	 * Various version strings.
