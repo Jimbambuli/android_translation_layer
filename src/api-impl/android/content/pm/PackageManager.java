@@ -2250,7 +2250,8 @@ public class PackageManager {
 	public FeatureInfo[] getSystemAvailableFeatures() {
 		/* the features hasSystemFeature() reports (AOSP: SystemConfig); app stores send them to Google Play, which
 		 * offers no app to a device without them (android.hardware.touchscreen is implied by most apps) */
-		String[] names = {FEATURE_TOUCHSCREEN, "android.hardware.touchscreen.multitouch.distinct", FEATURE_LOCATION,
+		String[] names = {FEATURE_TOUCHSCREEN, "android.hardware.touchscreen.multitouch.distinct", FEATURE_FAKETOUCH, FEATURE_SCREEN_PORTRAIT,
+		                  FEATURE_SCREEN_LANDSCAPE, FEATURE_LOCATION,
 		                  FEATURE_LOCATION_NETWORK, FEATURE_AUTOMOTIVE,
 		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE};
 		List<FeatureInfo> features = new ArrayList<>();
@@ -2275,6 +2276,13 @@ public class PackageManager {
 		switch (name) {
 			case FEATURE_TOUCHSCREEN:
 			case "android.hardware.touchscreen.multitouch.distinct":
+			/* AOSP lists it on every device with a touchscreen; Google Play implies it for apps that do not
+			 * require android.hardware.touchscreen */
+			case FEATURE_FAKETOUCH:
+			/* the window takes either orientation (AOSP: every device that can rotate or is square lists both);
+			 * Google Play implies android.hardware.screen.portrait from screenOrientation="portrait" */
+			case FEATURE_SCREEN_PORTRAIT:
+			case FEATURE_SCREEN_LANDSCAPE:
 				return true;
 			/* LocationManager (desktop portal; off unless ATL_UGLY_ENABLE_LOCATION, like a device with location
 			 * turned off); Google Play implies android.hardware.location from ACCESS_COARSE_LOCATION */
