@@ -64,6 +64,61 @@ static void portal_action_invoked(GDBusConnection *connection, const char *sende
 		activity_window_present();
 }
 
+/* GNOME's and KDE's portal backends activate a notification's action with org.freedesktop.Application
+   ActivateAction on the bus name of the Flatpak, not of the app (each app of the APK Starter has its own
+   GApplication id under it). One running app owns the Flatpak's name and passes the call on to the app the
+   action's intent names (its last field), which answers ActivateAction on its own name. */
+static const char application_xml[] =
+    "<node><interface name='org.freedesktop.Application'>"
+    "<method name='Activate'><arg type='a{sv}' direction='in'/></method>"
+    "<method name='Open'><arg type='as' direction='in'/><arg type='a{sv}' direction='in'/></method>"
+    "<method name='ActivateAction'><arg type='s' direction='in'/><arg type='av' direction='in'/><arg type='a{sv}' direction='in'/></method>"
+    "</interface></node>";
+
+static char *object_path_for(const char *bus_name)
+{
+	char *path = g_strconcat("/", bus_name, NULL);
+	g_strdelimit(path, ".", '/');
+	g_strdelimit(path, "-", '_');
+	return path;
+}
+
+static void flatpak_application_call(GDBusConnection *connection, const char *sender, const char *path, const char *iface,
+                                     const char *method, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data)
+{
+	const char *target = NULL;
+	if (!strcmp(method, "ActivateAction")) {
+		g_autoptr(GVariant) args = g_variant_get_child_value(parameters, 1);
+		if (g_variant_n_children(args) > 0) {
+			g_autoptr(GVariant) arg = g_variant_get_child_value(args, 0);
+			g_autoptr(GVariant) intent = g_variant_get_variant(arg);
+			if (g_variant_is_of_type(intent, G_VARIANT_TYPE(INTENT_G_VARIANT_TYPE_STRING)))
+				g_variant_get_child(intent, 4, "&s", &target);
+		}
+	}
+	if (target && *target) {
+		g_autofree char *target_path = object_path_for(target);
+		g_dbus_connection_call(connection, target, target_path, iface, method, parameters, NULL,
+		                       G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL, NULL);
+	} else {
+		activity_window_present();
+	}
+	g_dbus_method_invocation_return_value(invocation, NULL);
+}
+
+static void own_flatpak_name(GDBusConnection *connection)
+{
+	const char *flatpak_id = g_getenv("FLATPAK_ID");
+	if (!flatpak_id)
+		return;
+	static const GDBusInterfaceVTable vtable = {flatpak_application_call};
+	g_autoptr(GDBusNodeInfo) info = g_dbus_node_info_new_for_xml(application_xml, NULL);
+	g_autofree char *path = object_path_for(flatpak_id);
+	g_dbus_connection_register_object(connection, path, info->interfaces[0], &vtable, NULL, NULL, NULL);
+	/* queued: when the owning app ends, the next running one takes over */
+	g_bus_own_name_on_connection(connection, flatpak_id, G_BUS_NAME_OWNER_FLAGS_NONE, NULL, NULL, NULL, NULL);
+}
+
 static gboolean send_notifcation_func(GSource *send_notifcation_timer, GSourceFunc callback, gpointer user_data)
 {
 	GApplication *app = g_application_get_default();
@@ -117,10 +172,11 @@ static void queue_notification(int id, GNotification *notification)
 		   This method should be future proof unless the freedesktop backend is removed. */
 		if (g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS)) {
 			/* in a Flatpak only the portal may show notifications: GIO picks it */
-			g_dbus_connection_signal_subscribe(g_application_get_dbus_connection(app) ?: g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL),
-			                                   "org.freedesktop.portal.Desktop", "org.freedesktop.portal.Notification",
+			GDBusConnection *bus = g_application_get_dbus_connection(app) ?: g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+			g_dbus_connection_signal_subscribe(bus, "org.freedesktop.portal.Desktop", "org.freedesktop.portal.Notification",
 			                                   "ActionInvoked", "/org/freedesktop/portal/desktop", NULL,
 			                                   G_DBUS_SIGNAL_FLAGS_NONE, portal_action_invoked, NULL, NULL);
+			own_flatpak_name(bus);
 		} else if (!info) {
 			setenv("GNOTIFICATION_BACKEND", "freedesktop", 0);
 		}
