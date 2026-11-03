@@ -6,6 +6,7 @@ import android.content.pm.ConfigurationInfo;
 import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Debug;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.Process;
@@ -99,6 +100,17 @@ public class ActivityManager {
 	public int getLargeMemoryClass() { return 60; } // value chosen arbitrarily
 
 	public static void getMyMemoryState(RunningAppProcessInfo outInfo) {}
+
+	/* AOSP ActivityManager.getProcessMemoryInfo(): ActivityManagerService fills each MemoryInfo with
+	 * Debug.getMemoryInfo() of the process */
+	public Debug.MemoryInfo[] getProcessMemoryInfo(int[] pids) {
+		Debug.MemoryInfo[] infos = new Debug.MemoryInfo[pids.length];
+		for (int i = 0; i < pids.length; i++) {
+			infos[i] = new Debug.MemoryInfo();
+			Debug.getMemoryInfo(infos[i]);
+		}
+		return infos;
+	}
 
 	public boolean clearApplicationUserData() { return false; }
 
