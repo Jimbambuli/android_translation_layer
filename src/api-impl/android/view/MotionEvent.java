@@ -2353,7 +2353,12 @@ public final class MotionEvent extends InputEvent {
 	public final void getPointerProperties(int pointerIndex,
 	                                       PointerProperties outPointerProperties) {
 		// nativeGetPointerProperties(mNativePtr, pointerIndex, outPointerProperties);
+		/* as AOSP (android_view_MotionEvent.cpp pointerPropertiesFromNative()): the id and the tool type. Compose
+		 * copies them into the hover event it sends after a layout change; with an invalid id it took the
+		 * pointer for a second one, and the next press of the hovering mouse was not a down for it */
 		outPointerProperties.clear();
+		outPointerProperties.id = getPointerId(pointerIndex);
+		outPointerProperties.toolType = getToolType(pointerIndex);
 	}
 
 	/**
