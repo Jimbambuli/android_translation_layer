@@ -453,6 +453,60 @@ public class TypedValue {
 	}
 
 	/**
+	 * Converts a pixel value to the given dimension, e.g. PX to DP (AOSP 14). Inverse of
+	 * {@link #applyDimension(int, float, DisplayMetrics)}; without a FontScaleConverter SP uses scaledDensity
+	 * as AOSP does.
+	 */
+	public static float deriveDimension(int unitToConvertTo, float pixelValue, DisplayMetrics metrics) {
+		switch (unitToConvertTo) {
+			case COMPLEX_UNIT_PX:
+				return pixelValue;
+			case COMPLEX_UNIT_DIP: {
+				// Avoid divide-by-zero, and return 0 since that's what the inverse function will do
+				if (metrics.density == 0) {
+					return 0;
+				}
+				return pixelValue / metrics.density;
+			}
+			case COMPLEX_UNIT_SP:
+				if (metrics.scaledDensity == 0) {
+					return 0;
+				}
+				return pixelValue / metrics.scaledDensity;
+			case COMPLEX_UNIT_PT: {
+				if (metrics.xdpi == 0) {
+					return 0;
+				}
+				return pixelValue / metrics.xdpi / (1.0f / 72);
+			}
+			case COMPLEX_UNIT_IN: {
+				if (metrics.xdpi == 0) {
+					return 0;
+				}
+				return pixelValue / metrics.xdpi;
+			}
+			case COMPLEX_UNIT_MM: {
+				if (metrics.xdpi == 0) {
+					return 0;
+				}
+				return pixelValue / metrics.xdpi / (1.0f / 25.4f);
+			}
+			default:
+				throw new IllegalArgumentException("Invalid unitToConvertTo " + unitToConvertTo);
+		}
+	}
+
+	/** Same as {@link #deriveDimension(int, float, DisplayMetrics)} (AOSP 14). */
+	public static float convertPixelsToDimension(int unitToConvertTo, float pixelValue, DisplayMetrics metrics) {
+		return deriveDimension(unitToConvertTo, pixelValue, metrics);
+	}
+
+	/** Same as {@link #applyDimension(int, float, DisplayMetrics)} (AOSP 14). */
+	public static float convertDimensionToPixels(int unitToConvertFrom, float value, DisplayMetrics metrics) {
+		return applyDimension(unitToConvertFrom, value, metrics);
+	}
+
+	/**
 	 * Return the data for this value as a dimension.  Only use for values
 	 * whose type is {@link #TYPE_DIMENSION}.
 	 *
