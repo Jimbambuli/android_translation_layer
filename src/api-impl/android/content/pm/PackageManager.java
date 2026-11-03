@@ -892,6 +892,14 @@ public class PackageManager {
 
 	/**
 	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: The device includes at least one form of audio
+	 * output, as defined in the Android Compatibility Definition Document (CDD)
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_AUDIO_OUTPUT = "android.hardware.audio.output";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
 	 * {@link #hasSystemFeature}: The device is capable of communicating with
 	 * other devices via Bluetooth.
 	 */
@@ -2251,7 +2259,7 @@ public class PackageManager {
 		/* the features hasSystemFeature() reports (AOSP: SystemConfig); app stores send them to Google Play, which
 		 * offers no app to a device without them (android.hardware.touchscreen is implied by most apps) */
 		String[] names = {FEATURE_TOUCHSCREEN, "android.hardware.touchscreen.multitouch.distinct", FEATURE_FAKETOUCH, FEATURE_SCREEN_PORTRAIT,
-		                  FEATURE_SCREEN_LANDSCAPE, FEATURE_LOCATION,
+		                  FEATURE_SCREEN_LANDSCAPE, FEATURE_AUDIO_OUTPUT, FEATURE_MICROPHONE, FEATURE_LOCATION,
 		                  FEATURE_LOCATION_NETWORK, FEATURE_AUTOMOTIVE,
 		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE};
 		List<FeatureInfo> features = new ArrayList<>();
@@ -2283,6 +2291,10 @@ public class PackageManager {
 			 * Google Play implies android.hardware.screen.portrait from screenOrientation="portrait" */
 			case FEATURE_SCREEN_PORTRAIT:
 			case FEATURE_SCREEN_LANDSCAPE:
+			/* AudioTrack and AudioRecord (PulseAudio); Google Play implies android.hardware.microphone from
+			 * RECORD_AUDIO */
+			case FEATURE_AUDIO_OUTPUT:
+			case FEATURE_MICROPHONE:
 				return true;
 			/* LocationManager (desktop portal; off unless ATL_UGLY_ENABLE_LOCATION, like a device with location
 			 * turned off); Google Play implies android.hardware.location from ACCESS_COARSE_LOCATION */
