@@ -113,6 +113,16 @@ public class ConnectivityManager {
 		register(request, null, operation, null);
 	}
 
+	/* AOSP ConnectivityManager.requestNetwork(): the callback follows the network that satisfies the
+	 * request; ATL has only the host's network, so it is the network the request matches */
+	public void requestNetwork(NetworkRequest request, NetworkCallback callback) {
+		register(request, callback, null, null);
+	}
+
+	public void requestNetwork(NetworkRequest request, NetworkCallback callback, Handler handler) {
+		register(request, callback, null, handler);
+	}
+
 	public void registerDefaultNetworkCallback(NetworkCallback callback) {
 		register(null, callback, null, null);
 	}
