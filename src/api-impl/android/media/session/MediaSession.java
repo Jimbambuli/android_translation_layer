@@ -19,6 +19,7 @@ import android.util.Pair;
 import android.view.KeyEvent;
 import android.view.ViewConfiguration;
 import android.media.session.MediaSessionManager.RemoteUserInfo;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MediaSession {
@@ -190,6 +191,60 @@ public class MediaSession {
 		playback_state = state;
 		updateNativeState();
 		updateMediaButtonSession();
+		notifyControllers(MSG_CONTROLLER_PLAYBACK_STATE, state);
+	}
+
+	/* the callbacks of this session's MediaControllers, which AOSP's MediaSessionRecord calls over
+	 * binder (pushPlaybackStateUpdate() and so on) */
+	private final ArrayList<Pair<MediaController.Callback, Handler>> controllerCallbacks = new ArrayList<>();
+	private static final int MSG_CONTROLLER_PLAYBACK_STATE = 1;
+	private static final int MSG_CONTROLLER_METADATA = 2;
+	private static final int MSG_CONTROLLER_QUEUE = 3;
+	private static final int MSG_CONTROLLER_QUEUE_TITLE = 4;
+	private static final int MSG_CONTROLLER_EXTRAS = 5;
+	private static final int MSG_CONTROLLER_DESTROYED = 6;
+
+	void addControllerCallback(MediaController.Callback callback, Handler handler) {
+		synchronized (controllerCallbacks) {
+			for (Pair<MediaController.Callback, Handler> p : controllerCallbacks)
+				if (p.first == callback)
+					return;
+			controllerCallbacks.add(new Pair<>(callback, handler));
+		}
+	}
+
+	void removeControllerCallback(MediaController.Callback callback) {
+		synchronized (controllerCallbacks) {
+			for (int i = 0; i < controllerCallbacks.size(); i++) {
+				if (controllerCallbacks.get(i).first == callback) {
+					controllerCallbacks.remove(i);
+					return;
+				}
+			}
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private void notifyControllers(final int what, final Object arg) {
+		ArrayList<Pair<MediaController.Callback, Handler>> callbacks;
+		synchronized (controllerCallbacks) {
+			callbacks = new ArrayList<>(controllerCallbacks);
+		}
+		for (final Pair<MediaController.Callback, Handler> p : callbacks) {
+			p.second.post(new Runnable() {
+				@Override
+				public void run() {
+					switch (what) {
+						case MSG_CONTROLLER_PLAYBACK_STATE: p.first.onPlaybackStateChanged((PlaybackState)arg); break;
+						case MSG_CONTROLLER_METADATA: p.first.onMetadataChanged((MediaMetadata)arg); break;
+						case MSG_CONTROLLER_QUEUE: p.first.onQueueChanged((List<QueueItem>)arg); break;
+						case MSG_CONTROLLER_QUEUE_TITLE: p.first.onQueueTitleChanged((CharSequence)arg); break;
+						case MSG_CONTROLLER_EXTRAS: p.first.onExtrasChanged((Bundle)arg); break;
+						case MSG_CONTROLLER_DESTROYED: p.first.onSessionDestroyed(); break;
+					}
+				}
+			});
+		}
 	}
 
 	/* MediaSessionStack.updateMediaButtonSessionIfNeeded(): the active session that plays becomes the
@@ -206,6 +261,7 @@ public class MediaSession {
 	public void setMetadata(MediaMetadata metadata) {
 		this.metadata = metadata;
 		updateNativeState();
+		notifyControllers(MSG_CONTROLLER_METADATA, metadata);
 	}
 
 	/* Hands the state to the MPRIS bridge. The fields are the ones Android's SystemUI media
@@ -254,6 +310,7 @@ public class MediaSession {
 
 	public void setQueue(List<QueueItem> queue) {
 		this.queue = queue;
+		notifyControllers(MSG_CONTROLLER_QUEUE, queue);
 	}
 
 	/* AOSP MediaSession.release() */
@@ -261,11 +318,17 @@ public class MediaSession {
 		setCallback(null);
 		mActive = false;
 		updateMediaButtonSession();
+		notifyControllers(MSG_CONTROLLER_DESTROYED, null);
+		synchronized (controllerCallbacks) {
+			controllerCallbacks.clear();
+		}
 	}
 
 	public void setPlaybackToLocal(AudioAttributes audioAttributes) {}
 
-	public void setExtras(Bundle extras) {}
+	public void setExtras(Bundle extras) {
+		notifyControllers(MSG_CONTROLLER_EXTRAS, extras);
+	}
 
 	public void setSessionActivity(PendingIntent pendingIntent) {}
 
@@ -277,6 +340,7 @@ public class MediaSession {
 
 	public void setQueueTitle(CharSequence title) {
 		queue_title = title;
+		notifyControllers(MSG_CONTROLLER_QUEUE_TITLE, title);
 	}
 
 	List<QueueItem> getQueue() {
