@@ -1928,6 +1928,20 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return false;
 	}
 
+	/**
+	 * Create {@link android.view.DragAndDropPermissions} object bound to this activity and controlling the
+	 * access permissions for content URIs associated with the {@link android.view.DragEvent}.
+	 * @return The {@link android.view.DragAndDropPermissions} object used to control access to the content URIs.
+	 * Null if no content URIs are associated with the event or if permissions could not be granted.
+	 */
+	public android.view.DragAndDropPermissions requestDragAndDropPermissions(android.view.DragEvent event) {
+		android.view.DragAndDropPermissions dragAndDropPermissions = android.view.DragAndDropPermissions.obtain(event);
+		if (dragAndDropPermissions != null && dragAndDropPermissions.take(null)) {
+			return dragAndDropPermissions;
+		}
+		return null;
+	}
+
 	public void requestPermissions(String[] permissions, final int requestCode) {
 		if (requestCode < 0)
 			throw new IllegalArgumentException("requestCode should be >= 0");

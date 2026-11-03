@@ -721,6 +721,8 @@ srcs = [
 	'android/view/DisplayCutout.java',
 	'android/view/DisplayListCanvas.java',
 	'android/view/DisplayShape.java',
+	'android/view/DragAndDropPermissions.java',
+	'android/view/DragEvent.java',
 	'android/view/FocusFinder.java',
 	'android/view/GestureDetector.java',
 	'android/view/Gravity.java',

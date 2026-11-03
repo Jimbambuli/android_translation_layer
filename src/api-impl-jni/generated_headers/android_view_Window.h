@@ -59,6 +59,14 @@ JNIEXPORT void JNICALL Java_android_view_Window_remove_1gtk_1background
 JNIEXPORT void JNICALL Java_android_view_Window_set_1screen_1brightness
   (JNIEnv *, jobject, jfloat);
 
+/*
+ * Class:     android_view_Window
+ * Method:    native_set_drop_target
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_view_Window_native_1set_1drop_1target
+  (JNIEnv *, jobject, jlong);
+
 #ifdef __cplusplus
 }
 #endif

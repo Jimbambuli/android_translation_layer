@@ -213,6 +213,168 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	private View touchTarget;
 	private boolean intercepting_touch = false;
 
+	/* AOSP ViewGroup's drag state: the child under the drag point, the children that are interested in the
+	 * drag, the ACTION_DRAG_STARTED event for them and whether the group itself is interested */
+	private View mCurrentDragChild;
+	private DragEvent mCurrentDragStartEvent;
+	private boolean mIsInterestedInDrag;
+	private java.util.HashSet<View> mChildrenInterestedInDrag;
+
+	/* ATL: the point (x, y) in the child's coordinates, the same mapping as isTouchPointInView() */
+	private void transformPointToChild(float x, float y, View child, float[] out) {
+		out[0] = x + getScrollX() - child.getLeft() - child.getTranslationX();
+		out[1] = y + getScrollY() - child.getTop() - child.getTranslationY();
+	}
+
+	@Override
+	public boolean dispatchDragEvent(DragEvent event) {
+		boolean retval = false;
+		final float tx = event.mX;
+		final float ty = event.mY;
+
+		// Dispatch down the view hierarchy
+		final float[] localPoint = new float[2];
+
+		switch (event.mAction) {
+		case DragEvent.ACTION_DRAG_STARTED: {
+			// Clear the state to recalculate which views we drag over.
+			mCurrentDragChild = null;
+
+			// Set up our tracking of drag-started notifications
+			mCurrentDragStartEvent = DragEvent.obtain(event);
+			if (mChildrenInterestedInDrag == null) {
+				mChildrenInterestedInDrag = new java.util.HashSet<View>();
+			} else {
+				mChildrenInterestedInDrag.clear();
+			}
+
+			// Now dispatch down to our children, caching the responses
+			final int count = children.size();
+			for (int i = 0; i < count; i++) {
+				final View child = children.get(i);
+				child.mPrivateFlags2 &= ~View.DRAG_MASK;
+				if (child.getVisibility() == VISIBLE) {
+					if (notifyChildOfDragStart(child)) {
+						retval = true;
+					}
+				}
+			}
+
+			// Notify itself of the drag start.
+			mIsInterestedInDrag = super.dispatchDragEvent(event);
+			if (mIsInterestedInDrag) {
+				retval = true;
+			}
+
+			if (!retval) {
+				// Neither us nor any of our children are interested in this drag, so stop tracking
+				// the current drag event.
+				mCurrentDragStartEvent.recycle();
+				mCurrentDragStartEvent = null;
+			}
+		} break;
+
+		case DragEvent.ACTION_DRAG_ENDED: {
+			// Release the bookkeeping now that the drag lifecycle has ended
+			final java.util.HashSet<View> childrenInterestedInDrag = mChildrenInterestedInDrag;
+			if (childrenInterestedInDrag != null) {
+				for (View child : childrenInterestedInDrag) {
+					// If a child was interested in the ongoing drag, it's told that it's over
+					if (child.dispatchDragEvent(event)) {
+						retval = true;
+					}
+				}
+				childrenInterestedInDrag.clear();
+			}
+			if (mCurrentDragStartEvent != null) {
+				mCurrentDragStartEvent.recycle();
+				mCurrentDragStartEvent = null;
+			}
+
+			if (mIsInterestedInDrag) {
+				if (super.dispatchDragEvent(event)) {
+					retval = true;
+				}
+				mIsInterestedInDrag = false;
+			}
+		} break;
+
+		case DragEvent.ACTION_DRAG_LOCATION:
+		case DragEvent.ACTION_DROP: {
+			// Find the [possibly new] drag target
+			View target = findFrontmostDroppableChildAt(event.mX, event.mY, localPoint);
+			mCurrentDragChild = target;
+
+			if (target == null && mIsInterestedInDrag) {
+				target = this;
+			}
+
+			// Dispatch the actual drag notice, localized into the target coordinates.
+			if (target != null) {
+				if (target != this) {
+					event.mX = localPoint[0];
+					event.mY = localPoint[1];
+
+					retval = target.dispatchDragEvent(event);
+
+					event.mX = tx;
+					event.mY = ty;
+
+					if (mIsInterestedInDrag && !event.mEventHandlerWasCalled) {
+						retval = super.dispatchDragEvent(event);
+					}
+				} else {
+					retval = super.dispatchDragEvent(event);
+				}
+			}
+		} break;
+		}
+
+		return retval;
+	}
+
+	// Find the frontmost child view that lies under the given point, and calculate
+	// the position within its own local coordinate system.
+	View findFrontmostDroppableChildAt(float x, float y, float[] outLocalPoint) {
+		for (int i = children.size() - 1; i >= 0; i--) {
+			final View child = children.get(i);
+			if (!child.canAcceptDrag()) {
+				continue;
+			}
+
+			if (isTouchPointInView(x, y, child)) {
+				transformPointToChild(x, y, child, outLocalPoint);
+				return child;
+			}
+		}
+		return null;
+	}
+
+	boolean notifyChildOfDragStart(View child) {
+		// The caller guarantees that the child is not in mChildrenInterestedInDrag yet.
+
+		final float tx = mCurrentDragStartEvent.mX;
+		final float ty = mCurrentDragStartEvent.mY;
+
+		final float[] point = new float[2];
+		transformPointToChild(tx, ty, child, point);
+
+		mCurrentDragStartEvent.mX = point[0];
+		mCurrentDragStartEvent.mY = point[1];
+		final boolean canAccept = child.dispatchDragEvent(mCurrentDragStartEvent);
+		mCurrentDragStartEvent.mX = tx;
+		mCurrentDragStartEvent.mY = ty;
+		mCurrentDragStartEvent.mEventHandlerWasCalled = false;
+		if (canAccept) {
+			mChildrenInterestedInDrag.add(child);
+			if (!child.canAcceptDrag()) {
+				child.mPrivateFlags2 |= View.PFLAG2_DRAG_CAN_ACCEPT;
+				child.refreshDrawableState();
+			}
+		}
+		return canAccept;
+	}
+
 	private boolean isTouchPointInView(float x, float y, View child) {
 		if (child.getVisibility() != View.VISIBLE)
 			return false;

@@ -195,6 +195,55 @@ public class Window {
 		// DecorView grabs all touch events and propagates them in Java
 		decorView.native_registerTouchEventPropagation(decorView.widget);
 		decorView.setId(android.R.id.content);
+		// files dragged from the desktop come as drag events (handleDragEvent())
+		native_set_drop_target(decorView.widget);
+	}
+
+	/* AOSP ViewRootImpl.handleDragEvent() for files dragged from the desktop onto the window (a GtkDropTarget on
+	 * the decor view, android_view_Window.c), which plays the window manager: ACTION_DRAG_STARTED with the
+	 * files' types, ACTION_DRAG_LOCATION, ACTION_DROP with their content URIs (ContentResolver.atlUriForFile(),
+	 * like a drag from AOSP's Files app), ACTION_DRAG_EXITED and ACTION_DRAG_ENDED after the drop or when the
+	 * drag leaves the window (GTK does not tell where a drag outside ends). Returns what the views returned. */
+	private android.content.ClipDescription dragDescription;
+
+	private boolean handleDragEvent(int action, float x, float y, String[] paths, boolean dropResult) {
+		android.content.ClipData data = null;
+		if (paths != null) {
+			android.content.ContentResolver resolver = getContext().getContentResolver();
+			java.util.LinkedHashSet<String> types = new java.util.LinkedHashSet<>();
+			android.content.ClipData.Item[] items = new android.content.ClipData.Item[paths.length];
+			for (int i = 0; i < paths.length; i++) {
+				android.net.Uri uri = android.content.ContentResolver.atlUriForFile(paths[i]);
+				String type = resolver.getType(uri);
+				types.add(type != null ? type : android.content.ClipDescription.MIMETYPE_UNKNOWN);
+				items[i] = new android.content.ClipData.Item(uri);
+			}
+			if (items.length == 0)
+				return false;
+			data = new android.content.ClipData(new android.content.ClipDescription(null, types.toArray(new String[0])), items[0]);
+			for (int i = 1; i < items.length; i++)
+				data.addItem(items[i]);
+		}
+		if (action == DragEvent.ACTION_DRAG_STARTED) {
+			View.sCurrentDragView = null; // Start the current-recipient tracking
+			dragDescription = data != null ? data.getDescription() : null;
+		}
+		DragEvent event = DragEvent.obtain(action, x, y, 0, 0, null, dragDescription,
+		                                   action == DragEvent.ACTION_DROP ? data : null, null,
+		                                   action == DragEvent.ACTION_DROP ? Boolean.TRUE : null, dropResult);
+		if (action == DragEvent.ACTION_DRAG_ENDED)
+			dragDescription = null;
+		boolean result = false;
+		if (action == DragEvent.ACTION_DRAG_EXITED) {
+			View.setDragFocus(null, event);
+		} else {
+			result = decorView.dispatchDragEvent(event);
+			// If we've been sent a LOCATION and no view has accepted it, the drag focus is cleared
+			if (action == DragEvent.ACTION_DRAG_LOCATION && !event.mEventHandlerWasCalled)
+				View.setDragFocus(null, event);
+		}
+		event.recycle();
+		return result;
 	}
 
 	/** @hide like View.AttachInfo.mKeyDispatchState, one for the views of a window */
@@ -727,4 +776,5 @@ public class Window {
 	private static native void set_jobject(long ptr, Window obj);
 	private native void remove_gtk_background(long native_window);
 	private native void set_screen_brightness(float brightness);
+	private native void native_set_drop_target(long decor_widget);
 }

@@ -523,6 +523,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 */
 	static final int PFLAG2_DRAG_HOVERED = 0x00000002;
 
+	static final int DRAG_MASK = PFLAG2_DRAG_CAN_ACCEPT | PFLAG2_DRAG_HOVERED;
+
 	/**
 	 * Horizontal layout direction of this view is from Left to Right.
 	 * Use with {@link #setLayoutDirection}.
@@ -775,7 +777,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		//void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo);
 	}
 
-	public interface OnDragListener {}
+	/**
+	 * Interface definition for a callback to be invoked when a drag is being dispatched
+	 * to this view.
+	 */
+	public interface OnDragListener {
+		/**
+		 * Called when a drag event is dispatched to a view. This allows listeners
+		 * to get a chance to override base View behavior.
+		 */
+		boolean onDrag(View v, DragEvent event);
+	}
 	// --- end of interfaces
 
 	// --- subclasses
@@ -1057,6 +1069,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		OnKeyListener mOnKeyListener;
 		OnGenericMotionListener mOnGenericMotionListener;
 		OnHoverListener mOnHoverListener;
+		OnDragListener mOnDragListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -1365,7 +1378,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	/* AOSP View.onCreateDrawableState(); ATL: state_focused follows whether GTK shows the focus
-	 * (AOSP: focused, which outside of touch mode is the same), no accelerated/hovered/drag states */
+	 * (AOSP: focused, which outside of touch mode is the same), no accelerated/hovered states */
 	protected int[] onCreateDrawableState(int extraSpace) {
 		if (duplicate_parent_state && parent instanceof View) {
 			return ((View) parent).onCreateDrawableState(extraSpace);
@@ -1382,6 +1395,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if ((privateFlags & PFLAG_SELECTED) != 0) viewStateIndex |= StateSet.VIEW_STATE_SELECTED;
 		if (hasWindowFocus()) viewStateIndex |= StateSet.VIEW_STATE_WINDOW_FOCUSED;
 		if ((privateFlags & PFLAG_ACTIVATED) != 0) viewStateIndex |= StateSet.VIEW_STATE_ACTIVATED;
+
+		final int privateFlags2 = mPrivateFlags2;
+		if ((privateFlags2 & PFLAG2_DRAG_CAN_ACCEPT) != 0) {
+			viewStateIndex |= StateSet.VIEW_STATE_DRAG_CAN_ACCEPT;
+		}
+		if ((privateFlags2 & PFLAG2_DRAG_HOVERED) != 0) {
+			viewStateIndex |= StateSet.VIEW_STATE_DRAG_HOVERED;
+		}
 
 		drawableState = StateSet.get(viewStateIndex);
 
@@ -4397,7 +4418,113 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mTouchDelegate = touchDelegate;
 	}
 
-	public void setOnDragListener(OnDragListener onDragListener) {}
+	/**
+	 * Register a drag event listener callback object for this View. The parameter is
+	 * an implementation of {@link android.view.View.OnDragListener}.
+	 */
+	public void setOnDragListener(OnDragListener l) {
+		getListenerInfo().mOnDragListener = l;
+	}
+
+	/**
+	 * Handles drag events sent by the system following a call to startDragAndDrop() or, in ATL, a drag of files
+	 * from the desktop. AOSP accepts drag events by default if there is an OnReceiveContentListener; ATL has none.
+	 */
+	public boolean onDragEvent(DragEvent event) {
+		return false;
+	}
+
+	/**
+	 * Detects if this View is enabled and has a drag event listener.
+	 * If both are true, then it calls the drag event listener with the
+	 * {@link android.view.DragEvent} it received. If the drag event listener returns
+	 * {@code true}, then dispatchDragEvent() returns {@code true}.
+	 * <p>
+	 * For all other cases, the method calls the
+	 * {@link android.view.View#onDragEvent(DragEvent) onDragEvent()} drag event handler
+	 * method and returns its result.
+	 * </p>
+	 */
+	public boolean dispatchDragEvent(DragEvent event) {
+		event.mEventHandlerWasCalled = true;
+		if (event.mAction == DragEvent.ACTION_DRAG_LOCATION ||
+		    event.mAction == DragEvent.ACTION_DROP) {
+			// About to deliver an event with coordinates to this view. Notify that now this view
+			// has drag focus. This will send exit/enter events as needed.
+			setDragFocus(this, event);
+		}
+		return callDragEventHandler(event);
+	}
+
+	final boolean callDragEventHandler(DragEvent event) {
+		final boolean result;
+
+		ListenerInfo li = mListenerInfo;
+		//noinspection SimplifiableIfStatement
+		if (li != null && li.mOnDragListener != null && (mViewFlags & ENABLED_MASK) == ENABLED
+		    && li.mOnDragListener.onDrag(this, event)) {
+			result = true;
+		} else {
+			result = onDragEvent(event);
+		}
+
+		switch (event.mAction) {
+			case DragEvent.ACTION_DRAG_ENTERED: {
+				mPrivateFlags2 |= View.PFLAG2_DRAG_HOVERED;
+				refreshDrawableState();
+			} break;
+			case DragEvent.ACTION_DRAG_EXITED: {
+				mPrivateFlags2 &= ~View.PFLAG2_DRAG_HOVERED;
+				refreshDrawableState();
+			} break;
+			case DragEvent.ACTION_DRAG_ENDED: {
+				mPrivateFlags2 &= ~View.DRAG_MASK;
+				refreshDrawableState();
+			} break;
+		}
+
+		return result;
+	}
+
+	boolean canAcceptDrag() {
+		return (mPrivateFlags2 & PFLAG2_DRAG_CAN_ACCEPT) != 0;
+	}
+
+	/* AOSP ViewRootImpl.mCurrentDragView and setDragFocus(): the view that gets the drag's location, with
+	 * ACTION_DRAG_EXITED and ACTION_DRAG_ENTERED as it changes. ATL: one drag at a time, one drag focus */
+	static View sCurrentDragView;
+
+	static void setDragFocus(View newDragTarget, DragEvent event) {
+		if (sCurrentDragView != newDragTarget) {
+			// Send EXITED and ENTERED notifications to the old and new drag focus views.
+
+			final float tx = event.mX;
+			final float ty = event.mY;
+			final int action = event.mAction;
+			final android.content.ClipData td = event.mClipData;
+			// Position should not be available for ACTION_DRAG_ENTERED and ACTION_DRAG_EXITED.
+			event.mX = 0;
+			event.mY = 0;
+			event.mClipData = null;
+
+			if (sCurrentDragView != null) {
+				event.mAction = DragEvent.ACTION_DRAG_EXITED;
+				sCurrentDragView.callDragEventHandler(event);
+			}
+
+			if (newDragTarget != null) {
+				event.mAction = DragEvent.ACTION_DRAG_ENTERED;
+				newDragTarget.callDragEventHandler(event);
+			}
+
+			event.mAction = action;
+			event.mX = tx;
+			event.mY = ty;
+			event.mClipData = td;
+		}
+
+		sCurrentDragView = newDragTarget;
+	}
 
 	public void setTransitionName(String transitionName) {}
 

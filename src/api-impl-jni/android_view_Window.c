@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 
 #include "defines.h"
+#include "util.h"
 
 #include "generated_headers/android_view_Window.h"
 
@@ -111,4 +112,128 @@ JNIEXPORT void JNICALL Java_android_view_Window_set_1screen_1brightness(JNIEnv *
 	                       NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, set_brightness_done, FLOAT_TO_POINTER(brightness));
 
 	g_object_unref(connection);
+}
+
+/* Files dragged from the desktop onto the window, as Android drag events (Window.handleDragEvent(), which
+ * plays AOSP's ViewRootImpl and window manager). The drop target loads the file list while the drag is over
+ * the window (preload), so ACTION_DRAG_STARTED knows the files' types like a drag from AOSP's Files app. In
+ * the Flatpak, GTK passes the files through the document portal. */
+enum {
+	DRAG_STARTED = 1, DRAG_LOCATION = 2, DROP = 3, DRAG_ENDED = 4, DRAG_EXITED = 6,
+};
+
+struct drop_state {
+	jobject window;		/* android.view.Window */
+	gboolean inside;	/* the drag is over the window */
+	gboolean started;	/* ACTION_DRAG_STARTED went out */
+	double x, y;
+};
+
+static jboolean send_drag_event(struct drop_state *state, int action, double x, double y, const GValue *value, gboolean drop_result)
+{
+	JNIEnv *env = get_jni_env();
+	jobjectArray paths = NULL;
+	if (value && G_VALUE_HOLDS(value, GDK_TYPE_FILE_LIST)) {
+		GSList *files = gdk_file_list_get_files(g_value_get_boxed(value));
+		paths = (*env)->NewObjectArray(env, g_slist_length(files), (*env)->FindClass(env, "java/lang/String"), NULL);
+		int i = 0;
+		for (GSList *l = files; l; l = l->next) {
+			char *path = g_file_get_path(l->data);	/* NULL for a file that is not local */
+			if (path)
+				(*env)->SetObjectArrayElement(env, paths, i++, _JSTRING(path));
+			g_free(path);
+		}
+		g_slist_free(files);
+		if (i == 0)
+			return JNI_FALSE;
+		if (i < (*env)->GetArrayLength(env, paths)) { /* only the local files */
+			jobjectArray all = paths;
+			paths = (*env)->NewObjectArray(env, i, (*env)->FindClass(env, "java/lang/String"), NULL);
+			for (int k = 0; k < i; k++)
+				(*env)->SetObjectArrayElement(env, paths, k, (*env)->GetObjectArrayElement(env, all, k));
+		}
+	}
+	jboolean ret = (*env)->CallBooleanMethod(env, state->window, _METHOD(_CLASS(state->window), "handleDragEvent", "(IFF[Ljava/lang/String;Z)Z"),
+	                                         action, (jfloat)x, (jfloat)y, paths, drop_result);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		ret = JNI_FALSE;
+	}
+	return ret;
+}
+
+/* ACTION_DRAG_STARTED once the files are known, then the location */
+static void start_drag(GtkDropTarget *target, struct drop_state *state)
+{
+	const GValue *value = gtk_drop_target_get_value(target);
+	if (state->started || !state->inside || !value)
+		return;
+	state->started = TRUE;
+	send_drag_event(state, DRAG_STARTED, state->x, state->y, value, FALSE);
+	send_drag_event(state, DRAG_LOCATION, state->x, state->y, NULL, FALSE);
+}
+
+static void on_drop_value(GtkDropTarget *target, GParamSpec *pspec, struct drop_state *state)
+{
+	start_drag(target, state);
+}
+
+static GdkDragAction on_drop_enter(GtkDropTarget *target, double x, double y, struct drop_state *state)
+{
+	state->inside = TRUE;
+	state->started = FALSE;
+	state->x = x;
+	state->y = y;
+	start_drag(target, state);
+	return GDK_ACTION_COPY;
+}
+
+static GdkDragAction on_drop_motion(GtkDropTarget *target, double x, double y, struct drop_state *state)
+{
+	state->x = x;
+	state->y = y;
+	if (state->started)
+		send_drag_event(state, DRAG_LOCATION, x, y, NULL, FALSE);
+	return GDK_ACTION_COPY;
+}
+
+/* the drag left the window: GTK does not tell whether it ends elsewhere, so it ends for the app */
+static void on_drop_leave(GtkDropTarget *target, struct drop_state *state)
+{
+	state->inside = FALSE;
+	if (!state->started)
+		return;
+	state->started = FALSE;
+	send_drag_event(state, DRAG_EXITED, 0, 0, NULL, FALSE);
+	send_drag_event(state, DRAG_ENDED, 0, 0, NULL, FALSE);
+}
+
+static gboolean on_drop(GtkDropTarget *target, const GValue *value, double x, double y, struct drop_state *state)
+{
+	state->x = x;
+	state->y = y;
+	start_drag(target, state);
+	if (!state->started)
+		return FALSE;
+	gboolean result = send_drag_event(state, DROP, x, y, value, FALSE);
+	state->started = FALSE;
+	state->inside = FALSE;
+	send_drag_event(state, DRAG_ENDED, 0, 0, NULL, result);
+	return result;
+}
+
+JNIEXPORT void JNICALL Java_android_view_Window_native_1set_1drop_1target(JNIEnv *env, jobject this, jlong decor_widget)
+{
+	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(decor_widget)));
+	struct drop_state *state = g_new0(struct drop_state, 1);
+	state->window = _REF(this);
+	GtkDropTarget *target = gtk_drop_target_new(GDK_TYPE_FILE_LIST, GDK_ACTION_COPY);
+	gtk_drop_target_set_preload(target, TRUE);
+	g_signal_connect(target, "notify::value", G_CALLBACK(on_drop_value), state);
+	g_signal_connect(target, "enter", G_CALLBACK(on_drop_enter), state);
+	g_signal_connect(target, "motion", G_CALLBACK(on_drop_motion), state);
+	g_signal_connect(target, "leave", G_CALLBACK(on_drop_leave), state);
+	g_signal_connect(target, "drop", G_CALLBACK(on_drop), state);
+	gtk_widget_add_controller(wrapper, GTK_EVENT_CONTROLLER(target));
 }
