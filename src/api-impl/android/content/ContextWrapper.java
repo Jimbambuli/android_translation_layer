@@ -4,6 +4,7 @@ import android.atl.ATLLoadedApp;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.os.Bundle;
 import android.view.Display;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Objects;
@@ -109,6 +110,16 @@ public class ContextWrapper extends Context {
 	@Override
 	public Context createDisplayContext(Display display) {
 		return this.baseContext.createDisplayContext(display);
+	}
+
+	@Override
+	public Context createWindowContext(int type, Bundle options) {
+		return this.baseContext.createWindowContext(type, options);
+	}
+
+	@Override
+	public Context createWindowContext(Display display, int type, Bundle options) {
+		return this.baseContext.createWindowContext(display, type, options);
 	}
 
 	@Override

@@ -765,6 +765,20 @@ public abstract class Context {
 
 	public abstract Context createDisplayContext(Display display);
 
+	/**
+	 * Creates a Context for a non-activity window.
+	 */
+	public Context createWindowContext(int type, Bundle options) {
+		throw new RuntimeException("Not implemented. Must override in a subclass.");
+	}
+
+	/**
+	 * Creates a Context for a non-activity window on the given Display.
+	 */
+	public Context createWindowContext(Display display, int type, Bundle options) {
+		throw new RuntimeException("Not implemented. Must override in a subclass.");
+	}
+
 	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, Handler scheduler) {
 		return registerReceiver(receiver, filter);
 	}

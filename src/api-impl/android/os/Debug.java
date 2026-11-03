@@ -2,15 +2,57 @@ package android.os;
 
 import dalvik.system.VMDebug;
 import java.io.IOException;
+import java.util.Map;
 
 public final class Debug {
+	/* AOSP fills it from /proc/<pid>/smaps; ATL fills nothing (getMemoryInfo()), so all values are 0 */
 	public static class MemoryInfo {
+		/** The proportional set size for dalvik heap. */
+		public int dalvikPss;
+		/** The private dirty pages used by dalvik heap. */
+		public int dalvikPrivateDirty;
+		/** The shared dirty pages used by dalvik heap. */
+		public int dalvikSharedDirty;
+		/** The proportional set size for the native heap. */
+		public int nativePss;
+		/** The private dirty pages used by the native heap. */
+		public int nativePrivateDirty;
+		/** The shared dirty pages used by the native heap. */
+		public int nativeSharedDirty;
+		/** The proportional set size for everything else. */
+		public int otherPss;
+		/** The private dirty pages used by everything else. */
+		public int otherPrivateDirty;
+		/** The shared dirty pages used by everything else. */
+		public int otherSharedDirty;
+
+		/**
+		 * Return total PSS memory usage in kB.
+		 */
 		public int getTotalPss() {
-			return 0;
+			return dalvikPss + nativePss + otherPss;
 		}
 
+		/**
+		 * Returns the value of a particular memory statistic or {@code null} if no
+		 * such memory statistic exists.
+		 */
 		public String getMemoryStat(String statName) {
-			return "fixme getMemoryStat";
+			switch (statName) {
+				case "summary.java-heap":
+				case "summary.native-heap":
+				case "summary.code":
+				case "summary.stack":
+				case "summary.graphics":
+				case "summary.private-other":
+				case "summary.system":
+				case "summary.total-swap":
+					return "0";
+				case "summary.total-pss":
+					return Integer.toString(getTotalPss());
+				default:
+					return null;
+			}
 		}
 	}
 
@@ -258,5 +300,21 @@ public final class Debug {
 			sb.append(getCaller(callStack, i)).append(" ");
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * Returns the value of a particular runtime statistic or {@code null} if no
+	 * such runtime statistic exists.
+	 */
+	public static String getRuntimeStat(String statName) {
+		return VMDebug.getRuntimeStat(statName);
+	}
+
+	/**
+	 * Returns a map of the names/values of the runtime statistics
+	 * that {@link #getRuntimeStat(String)} supports.
+	 */
+	public static Map<String, String> getRuntimeStats() {
+		return VMDebug.getRuntimeStats();
 	}
 }

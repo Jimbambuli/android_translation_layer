@@ -41,4 +41,25 @@ public class DisplayCutout {
 	public DisplayCutout inset(int insetLeft, int insetTop, int insetRight, int insetBottom) {
 		return this;
 	}
+
+	/* AOSP: the bounding rectangles of the cutout on each side; empty ones for no cutout */
+	public java.util.List<Rect> getBoundingRects() {
+		return new java.util.ArrayList<>();
+	}
+
+	public Rect getBoundingRectLeft() {
+		return new Rect();
+	}
+
+	public Rect getBoundingRectTop() {
+		return new Rect();
+	}
+
+	public Rect getBoundingRectRight() {
+		return new Rect();
+	}
+
+	public Rect getBoundingRectBottom() {
+		return new Rect();
+	}
 }

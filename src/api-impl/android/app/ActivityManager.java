@@ -280,6 +280,17 @@ public class ActivityManager {
 		return Collections.emptyList();
 	}
 
+	/**
+	 * Set custom state data for this process. It will be included in the record of
+	 * {@link ApplicationExitInfo} on the death of the current calling process; ATL keeps
+	 * no such records (getHistoricalProcessExitReasons() is empty).
+	 */
+	public void setProcessStateSummary(byte[] state) {
+		if (state != null && state.length > 128) {
+			throw new IllegalArgumentException("Data size is too large");
+		}
+	}
+
 	public static boolean isUserAMonkey() { return false; }
 
 	public void moveTaskToFront(int taskId, int flags, Bundle options) {

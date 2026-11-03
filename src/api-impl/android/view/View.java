@@ -4970,7 +4970,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void announceForAccessibility(CharSequence text) {}
 
 	public WindowInsetsController getWindowInsetsController() {
-		return native_get_window(widget).getInsetsController();
+		/* like AOSP, null while the view is not attached to a window */
+		Window window = native_get_window(widget);
+		return window != null ? window.getInsetsController() : null;
 	}
 
 	public final boolean isKeyboardNavigationCluster() { return false; }

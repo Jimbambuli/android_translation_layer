@@ -434,6 +434,19 @@ public final class ContextImpl extends Context {
 		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
 	}
 
+	/* AOSP: a WindowContext, a UI context for windows of the given type (toasts, overlays); ATL has one display */
+	@Override
+	public Context createWindowContext(int type, Bundle options) {
+		return createWindowContext(null, type, options);
+	}
+
+	@Override
+	public Context createWindowContext(Display display, int type, Bundle options) {
+		ContextImpl context = new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
+		context.mIsUiContext = true;
+		return context;
+	}
+
 	@Override
 	public boolean isUiContext() {
 		return mIsUiContext;
