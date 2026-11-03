@@ -46,6 +46,7 @@ import android.view.WindowManagerImpl;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
+import android.webkit.MimeTypeMap;
 import android.window.SizeConfigurationBuckets;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -113,6 +114,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		/* a link from the desktop, like a browser starts it on Android: VIEW, BROWSABLE, for an activity with
 		 * a matching filter in CATEGORY_DEFAULT (MATCH_DEFAULT_ONLY) */
 		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : new Intent();
+		/* a local file comes with its type, as from a file manager on Android (Intent.setDataAndType()); players
+		 * decide by it whether to show a video (VLC's StartActivity plays it in the background without one) */
+		if (uri != null && "file".equals(uri.getScheme())) {
+			String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(uriString));
+			if (type != null)
+				intent.setDataAndType(uri, type);
+		}
 		if (className == null) {
 			int best = 0;
 			for (PackageParser.Activity activity : ATLLoadedApp.getPrimaryApplication().pkg.activities) {
@@ -124,7 +132,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 					if (uri == null)
 						score = filter.hasCategory("android.intent.category.LAUNCHER") && filter.hasAction("android.intent.action.MAIN") ? 1 : 0;
 					else if (filter.hasCategory(Intent.CATEGORY_DEFAULT))
-						score = filter.match(intent.getAction(), null, uri.getScheme(), uri, intent.getCategories(), TAG);
+						score = filter.match(intent.getAction(), intent.getType(), uri.getScheme(), uri, intent.getCategories(), TAG);
 					else
 						score = 0;
 					if (score > best) {
