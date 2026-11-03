@@ -15,6 +15,8 @@ JNIEXPORT void JNICALL Java_android_content_ContentResolver_native_1query_1file_
 			g_string_append(attrs, G_FILE_ATTRIBUTE_STANDARD_DISPLAY_NAME);
 		} else if (!strcmp(attr, "mime_type")) {
 			g_string_append(attrs, G_FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE);
+		} else if (!strcmp(attr, "_size")) {
+			g_string_append(attrs, G_FILE_ATTRIBUTE_STANDARD_SIZE);
 		}
 		(*env)->ReleaseStringUTFChars(env, (*env)->GetObjectArrayElement(env, attributes, i), attr);
 	}
@@ -34,6 +36,10 @@ JNIEXPORT void JNICALL Java_android_content_ContentResolver_native_1query_1file_
 		} else if (!strcmp(attr, "mime_type")) {
 			jstring mime_type = _JSTRING(g_content_type_get_mime_type(g_file_info_get_content_type(file_info)));
 			(*env)->SetObjectArrayElement(env, results, i, mime_type);
+		} else if (!strcmp(attr, "_size")) { /* OpenableColumns.SIZE, a long */
+			jclass long_class = (*env)->FindClass(env, "java/lang/Long");
+			jobject size = (*env)->CallStaticObjectMethod(env, long_class, _STATIC_METHOD(long_class, "valueOf", "(J)Ljava/lang/Long;"), (jlong)g_file_info_get_size(file_info));
+			(*env)->SetObjectArrayElement(env, results, i, size);
 		}
 		(*env)->ReleaseStringUTFChars(env, (*env)->GetObjectArrayElement(env, attributes, i), attr);
 	}
