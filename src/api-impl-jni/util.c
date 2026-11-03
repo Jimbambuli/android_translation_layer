@@ -729,6 +729,111 @@ static gboolean on_gesture_event(GtkEventControllerLegacy *controller, GdkEvent 
 	}
 }
 
+/* AOSP's InputDispatcher finds the window and view under the pointer anew for every ACTION_DOWN. GTK
+ * delivers a press to the widget it picked at the last motion of the pointer, so after the views moved
+ * under a pointer that stands still (a pager turned the page, a new screen came up) the press would go
+ * to the view that was there before: the first click after it was lost. So after each frame, if the
+ * pointer is over another widget than the one GTK picked, GTK picks again: it does that when the old
+ * widget's sensitivity changes (gtk_window_update_pointer_focus_on_state_change()). */
+struct pointer_pick {
+	GtkWidget *window;
+	GWeakRef target; /* the widget GTK picked at the last pointer event */
+	double x, y;
+	gboolean inside;
+	guint settle; /* timeout that picks again once the views stopped moving */
+};
+
+static void pointer_pick_free(struct pointer_pick *p)
+{
+	g_clear_handle_id(&p->settle, g_source_remove);
+	g_weak_ref_clear(&p->target);
+	g_free(p);
+}
+
+static void pointer_pick_update(GdkEvent *event, struct pointer_pick *p)
+{
+	switch (gdk_event_get_event_type(event)) {
+	case GDK_LEAVE_NOTIFY:
+		p->inside = FALSE;
+		g_weak_ref_set(&p->target, NULL);
+		return;
+	case GDK_ENTER_NOTIFY:
+	case GDK_MOTION_NOTIFY:
+	case GDK_BUTTON_RELEASE:
+		if (gdk_device_get_source(gdk_event_get_device(event)) == GDK_SOURCE_TOUCHSCREEN)
+			return;
+		if (gdk_event_get_surface(event) != gtk_native_get_surface(GTK_NATIVE(p->window)))
+			return;
+		double x, y;
+		if (!gdk_event_get_position(event, &x, &y))
+			return;
+		graphene_point_t point;
+		if (!gtk_widget_compute_point(GTK_WIDGET(gtk_widget_get_native(p->window)), p->window, &GRAPHENE_POINT_INIT(x, y), &point))
+			return;
+		p->x = point.x;
+		p->y = point.y;
+		p->inside = TRUE;
+		/* as GTK picks for a motion; after a release it picks anew, too (gtkmain.c) */
+		g_weak_ref_set(&p->target, gtk_widget_pick(p->window, p->x, p->y, GTK_PICK_DEFAULT));
+		return;
+	default:
+		return;
+	}
+}
+
+static gboolean pointer_pick_update_cb(GtkEventControllerLegacy *controller, GdkEvent *event, struct pointer_pick *p)
+{
+	pointer_pick_update(event, p);
+	return FALSE;
+}
+
+/* once the views under the pointer stopped moving: an animation passes widgets on its way (the gap
+ * between two pages) which may contain the one that ends up under the pointer */
+static gboolean pointer_pick_settled(struct pointer_pick *p)
+{
+	p->settle = 0;
+	GtkWidget *target = g_weak_ref_get(&p->target);
+	if (!target)
+		return G_SOURCE_REMOVE;
+	GtkWidget *now = gtk_widget_pick(p->window, p->x, p->y, GTK_PICK_DEFAULT);
+	GdkSeat *seat = gdk_display_get_default_seat(gtk_widget_get_display(p->window));
+	gboolean button_down = seat && (gdk_device_get_modifier_state(gdk_seat_get_pointer(seat)) & BUTTONS_MASK);
+	/* not while a button is held (the gesture stays with its widget), and not when the new widget is
+	 * inside the old one: GTK picks while the old one is insensitive and would stop above it */
+	if (p->inside && now && now != target && !button_down && !gtk_widget_is_ancestor(now, target) && gtk_widget_get_sensitive(target)) {
+		gtk_widget_set_sensitive(target, FALSE);
+		GtkWidget *picked = gtk_widget_pick(p->window, p->x, p->y, GTK_PICK_DEFAULT); /* what GTK picked */
+		gtk_widget_set_sensitive(target, TRUE);
+		g_weak_ref_set(&p->target, picked);
+	}
+	g_object_unref(target);
+	return G_SOURCE_REMOVE;
+}
+
+static void pointer_pick_after_paint(GdkFrameClock *clock, struct pointer_pick *p)
+{
+	if (!p->inside)
+		return;
+	GtkWidget *target = g_weak_ref_get(&p->target);
+	if (!target)
+		return;
+	if (gtk_widget_pick(p->window, p->x, p->y, GTK_PICK_DEFAULT) != target) {
+		g_clear_handle_id(&p->settle, g_source_remove);
+		p->settle = g_timeout_add(100, G_SOURCE_FUNC(pointer_pick_settled), p);
+	}
+	g_object_unref(target);
+}
+
+static void pointer_pick_realize(GtkWidget *window, struct pointer_pick *p)
+{
+	g_signal_connect(gtk_widget_get_frame_clock(window), "after-paint", G_CALLBACK(pointer_pick_after_paint), p);
+}
+
+static void pointer_pick_unrealize(GtkWidget *window, struct pointer_pick *p)
+{
+	g_signal_handlers_disconnect_by_func(gtk_widget_get_frame_clock(window), pointer_pick_after_paint, p);
+}
+
 void atl_window_android_touch_targets(GtkWindow *window)
 {
 	GHashTable *pressed = g_hash_table_new(g_direct_hash, g_direct_equal);
@@ -737,6 +842,19 @@ void atl_window_android_touch_targets(GtkWindow *window)
 	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
 	g_signal_connect(controller, "event", G_CALLBACK(on_gesture_event), pressed);
 	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+
+	struct pointer_pick *p = g_new0(struct pointer_pick, 1);
+	p->window = GTK_WIDGET(window);
+	g_weak_ref_init(&p->target, NULL);
+	g_object_set_data_full(G_OBJECT(window), "pointer-pick", p, (GDestroyNotify)pointer_pick_free);
+	controller = gtk_event_controller_legacy_new();
+	gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
+	g_signal_connect(controller, "event", G_CALLBACK(pointer_pick_update_cb), p);
+	gtk_widget_add_controller(GTK_WIDGET(window), controller);
+	g_signal_connect(window, "realize", G_CALLBACK(pointer_pick_realize), p);
+	g_signal_connect(window, "unrealize", G_CALLBACK(pointer_pick_unrealize), p);
+	if (gtk_widget_get_realized(GTK_WIDGET(window)))
+		pointer_pick_realize(GTK_WIDGET(window), p);
 }
 
 void atl_window_press_taken(GtkWidget *widget, GdkEvent *event)
