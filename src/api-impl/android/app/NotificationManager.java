@@ -16,6 +16,17 @@ public class NotificationManager {
 
 	public void cancelAll() {}
 
+	/* AOSP keeps the delegate per package in the NotificationManagerService; ATL runs one app */
+	private static String notification_delegate;
+
+	public void setNotificationDelegate(String delegate) {
+		notification_delegate = delegate;
+	}
+
+	public String getNotificationDelegate() {
+		return notification_delegate;
+	}
+
 	public void notify(String tag, int id, Notification notification) {
 		if (notification.style instanceof MediaStyle) { // MPRIS content is handled by MediaSession implementation
 			if (mpris_notification_id == -1) {

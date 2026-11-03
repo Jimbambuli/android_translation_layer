@@ -439,6 +439,15 @@ public class Process {
 	}
 
 	/**
+	 * Return the name of this process. This name may be modified by the app via
+	 * setArgV0(), so it may not reflect the original process name.
+	 */
+	public static String myProcessName() {
+		/* AOSP: the process name ActivityThread set; ATL runs the app in its default process */
+		return android.app.Application.getProcessName();
+	}
+
+	/**
 	 * Returns whether the current process is in an isolated sandbox.
 	 * @hide
 	 */

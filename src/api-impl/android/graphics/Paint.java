@@ -1,6 +1,7 @@
 package android.graphics;
 
 import android.atl.annotation.Export;
+import android.os.LocaleList;
 import java.util.Locale;
 
 public class Paint {
@@ -50,8 +51,18 @@ public class Paint {
 		copyJavaState(paint);
 	}
 
+	/* AOSP hands them to the text shaper; ATL keeps them for the getters (Pango uses the default locale) */
+	private LocaleList text_locales;
+	private String font_feature_settings;
+	private String font_variation_settings;
+	private boolean elegant_text_height;
+
 	private void copyJavaState(Paint paint) {
 		flags = paint.flags;
+		text_locales = paint.text_locales;
+		font_feature_settings = paint.font_feature_settings;
+		font_variation_settings = paint.font_variation_settings;
+		elegant_text_height = paint.elegant_text_height;
 		typeface = paint.typeface;
 		text_scale_x = paint.text_scale_x;
 		stroke_miter = paint.stroke_miter;
@@ -112,7 +123,15 @@ public class Paint {
 	}
 
 	public boolean setFontVariationSettings(String fvs) {
+		font_variation_settings = fvs;
 		return true;
+	}
+
+	/**
+	 * Returns the font variation settings.
+	 */
+	public String getFontVariationSettings() {
+		return font_variation_settings;
 	}
 
 	public void setStrokeWidth(float width) {
@@ -461,7 +480,38 @@ public class Paint {
 		return Join.values[native_get_stroke_join(paint)];
 	}
 
-	public Locale getTextLocale() { return Locale.getDefault(); }
+	public Locale getTextLocale() { return text_locales != null ? text_locales.get(0) : Locale.getDefault(); }
+
+	/**
+	 * Get the text locale list.
+	 */
+	public LocaleList getTextLocales() {
+		return text_locales != null ? text_locales : new LocaleList(Locale.getDefault());
+	}
+
+	/**
+	 * Set the text locale list.
+	 */
+	public void setTextLocales(LocaleList locales) {
+		if (locales == null || locales.isEmpty()) {
+			throw new IllegalArgumentException("locales cannot be null or empty");
+		}
+		text_locales = locales;
+	}
+
+	/**
+	 * Get the elegant metrics flag.
+	 */
+	public boolean isElegantTextHeight() {
+		return elegant_text_height;
+	}
+
+	/**
+	 * Set the paint's elegant height metrics flag.
+	 */
+	public void setElegantTextHeight(boolean elegant) {
+		elegant_text_height = elegant;
+	}
 
 	public float getLetterSpacing() {
 		return native_get_letter_spacing(paint);
@@ -483,7 +533,19 @@ public class Paint {
 		return (flags & FAKE_BOLD_TEXT_FLAG) != 0;
 	}
 
-	public void setFontFeatureSettings(String settings) {}
+	public void setFontFeatureSettings(String settings) {
+		if (settings != null && settings.equals("")) {
+			settings = null;
+		}
+		font_feature_settings = settings;
+	}
+
+	/**
+	 * Returns the font feature settings.
+	 */
+	public String getFontFeatureSettings() {
+		return font_feature_settings;
+	}
 
 	public boolean getFillPath(Path src, Path dst) {
 		return false;

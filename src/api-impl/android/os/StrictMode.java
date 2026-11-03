@@ -103,6 +103,14 @@ public final class StrictMode {
 	public static final class VmPolicy {
 		public static final VmPolicy LAX;
 		public static final class Builder {
+			public Builder() {
+			}
+			/* AOSP copies the policy's mask, limits and listener; ATL's VmPolicy has none (no checks) */
+			public Builder(VmPolicy base) {
+			}
+			public Builder permitUnsafeIntentLaunch() {
+				return this;
+			}
 			public Builder detectActivityLeaks() {
 				return this;
 			}
