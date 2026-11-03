@@ -415,6 +415,7 @@ srcs = [
 	'android/location/LocationListener.java',
 	'android/location/LocationManager.java',
 	'android/location/LocationProvider.java',
+	'android/location/LocationRequest.java',
 	'android/location/OnNmeaMessageListener.java',
 	'android/location/provider/ProviderProperties.java',
 	'android/media/AudioAttributes.java',

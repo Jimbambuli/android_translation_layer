@@ -1923,6 +1923,11 @@ public class PackageManager {
 	 * @see #PERMISSION_GRANTED
 	 * @see #PERMISSION_DENIED
 	 */
+	/* AOSP takes it from the permission controller: its label of the background location option */
+	public CharSequence getBackgroundPermissionOptionLabel() {
+		return "Allow all the time";
+	}
+
 	public int checkPermission(String permName, String pkgName) {
 		if (permName != null && permName.endsWith(".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"))
 			return PERMISSION_GRANTED;

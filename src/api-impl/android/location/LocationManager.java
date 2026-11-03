@@ -124,6 +124,19 @@ public class LocationManager {
 		register(pendingIntent, provider, handlerExecutor(Looper.getMainLooper()), false);
 	}
 
+	/* API 31: the request's interval and quality do not change the desktop's position */
+	public void requestLocationUpdates(String provider, LocationRequest request, Executor executor, LocationListener listener) {
+		register(listener, provider, executor, false);
+	}
+
+	public void requestLocationUpdates(String provider, LocationRequest request, PendingIntent pendingIntent) {
+		register(pendingIntent, provider, handlerExecutor(Looper.getMainLooper()), false);
+	}
+
+	public void getCurrentLocation(String provider, LocationRequest request, CancellationSignal cancellationSignal, Executor executor, Consumer<Location> consumer) {
+		getCurrentLocation(provider, cancellationSignal, executor, consumer);
+	}
+
 	public void requestSingleUpdate(String provider, LocationListener listener, Looper looper) {
 		register(listener, provider, handlerExecutor(looper), true);
 	}
