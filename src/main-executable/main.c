@@ -475,6 +475,55 @@ static void add_android_fonts(void)
 		pango_fc_font_map_config_changed(PANGO_FC_FONT_MAP(font_map));
 }
 
+/* --uri while the app runs already (it owns its application ID on the bus): like a browser on Android, hand the
+ * link to the running instance as a VIEW intent (startActivity there, onNewIntent() for a singleTop/singleTask
+ * activity) instead of starting the app a second time. Returns TRUE if the running instance took it. */
+static gboolean forward_uri_to_running_app(GApplication *app, const char *uri)
+{
+	const char *app_id = g_application_get_application_id(app);
+	GDBusConnection *bus = g_application_get_dbus_connection(app);
+	if (!bus || !strcmp(app_id, "com.example.demo_application"))
+		return FALSE;
+	GVariant *has_owner = g_dbus_connection_call_sync(bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+	                                                  "NameHasOwner", g_variant_new("(s)", app_id), G_VARIANT_TYPE("(b)"),
+	                                                  G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL);
+	gboolean running = FALSE;
+	if (has_owner) {
+		g_variant_get(has_owner, "(b)", &running);
+		g_variant_unref(has_owner);
+	}
+	if (!running)
+		return FALSE;
+	/* object path of a GApplication: the ID with '/' for '.' and '_' for '-' */
+	char *path = g_strdup_printf("/%s", app_id);
+	g_strdelimit(path, ".", '/');
+	g_strdelimit(path, "-", '_');
+	GVariantBuilder platform_data;
+	g_variant_builder_init(&platform_data, G_VARIANT_TYPE_VARDICT);
+	const char *token = getenv("XDG_ACTIVATION_TOKEN");
+	if (token && *token)
+		g_variant_builder_add(&platform_data, "{sv}", "activation-token", g_variant_new_string(token));
+	const char *startup_id = getenv("DESKTOP_STARTUP_ID");
+	if (startup_id && *startup_id)
+		g_variant_builder_add(&platform_data, "{sv}", "desktop-startup-id", g_variant_new_string(startup_id));
+	GVariant *intent = g_variant_new(INTENT_G_VARIANT_TYPE_STRING, "android.intent.action.VIEW", "", uri, NULL, "");
+	GError *error = NULL;
+	GVariant *ret = g_dbus_connection_call_sync(bus, app_id, path, "org.freedesktop.Application", "ActivateAction",
+	                                            g_variant_new("(s@av@a{sv})", "startActivity",
+	                                                          g_variant_new_array(G_VARIANT_TYPE_VARIANT, (GVariant *[]){g_variant_new_variant(intent)}, 1),
+	                                                          g_variant_builder_end(&platform_data)),
+	                                            NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+	g_free(path);
+	if (!ret) {
+		fprintf(stderr, "the running app did not take the URI: %s\n", error->message);
+		g_error_free(error);
+		return FALSE;
+	}
+	g_variant_unref(ret);
+	fprintf(stderr, "handed the URI to the running app: %s\n", uri);
+	return TRUE;
+}
+
 static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
 {
 	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
@@ -492,6 +541,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		activity_start(env, activity);
 		return;
 	}
+	if (uri_option && *uri_option && forward_uri_to_running_app(G_APPLICATION(app), uri_option))
+		exit(0);
 	char *dex_install_dir;
 	char *api_impl_jar;
 	char *test_runner_jar = NULL;

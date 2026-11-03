@@ -1,4 +1,5 @@
 #include <gio/gio.h>
+#include <gtk/gtk.h>
 #include <jni.h>
 
 #include "../api-impl-jni/defines.h"
@@ -10,11 +11,17 @@ static void action_start_activity(GSimpleAction *action, GVariant *parameter, gp
 
 	jobject intent = intent_deserialize(env, parameter);
 	jobject context = _GET_STATIC_OBJ_FIELD(_CACHED_CLASS(Context), "this_application", "Landroid/app/Application;");
+	/* sent to this app's bus name: the intent names the package, like Intent.setPackage() */
+	_SET_OBJ_FIELD(intent, "packageName", "Ljava/lang/String;", J__Context__getPackageName(env, context));
 	J__Context__startActivity(env, context, intent);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
+	/* to the front, with the activation token GtkApplication took from the call's platform data */
+	GtkWindow *window = gtk_application_get_active_window(GTK_APPLICATION(g_application_get_default()));
+	if (window)
+		gtk_window_present(window);
 }
 
 static void action_start_service(GSimpleAction *action, GVariant *parameter, gpointer user_data)
