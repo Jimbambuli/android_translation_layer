@@ -410,7 +410,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		/* AOSP: the system's PackageInstallerActivity confirms a PackageInstaller session */
 		if (android.content.pm.PackageInstaller.handleConfirmIntent(intent))
 			return;
-		if (intent.getComponent() != null) {
+		if (intent.getComponent() != null && android.atl.ATLLoadedAppManager.startInstalledApp(getPackageName(), intent.getComponent().getPackageName())) {
+			return;
+		} else if (intent.getComponent() != null) {
 			/* like on Android (and like Context.startActivity), the new activity starts after the
 			 * caller has returned: started from onCreate(), it must come up after the caller's
 			 * onResume(), not be paused by it; and like AOSP, the caller is paused before the new

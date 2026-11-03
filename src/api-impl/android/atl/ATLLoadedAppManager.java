@@ -159,6 +159,35 @@ public final class ATLLoadedAppManager {
 		return new File(ATLPaths.installed_apks_dir, packageName + ".apk").isFile();
 	}
 
+	/**
+	 * Start an activity of another installed package, as Android starts it in that package's own
+	 * process: ATL hands the package to the program in ATL_LAUNCH_COMMAND (an app starter), or
+	 * starts its file in _installed_apks_ with android-translation-layer. False when the package is
+	 * the caller's own, runs in the app's process (Play Services) or is not installed.
+	 */
+	public static boolean startInstalledApp(String callerPackageName, String packageName) {
+		if (packageName == null || packageName.equals(callerPackageName) ||
+		    always_visible_packages.contains(packageName) || !isInstalled(packageName))
+			return false;
+		List<String> command = new ArrayList<>();
+		String launchCommand = System.getenv("ATL_LAUNCH_COMMAND");
+		if (launchCommand != null && !launchCommand.trim().isEmpty()) {
+			command.addAll(Arrays.asList(launchCommand.trim().split("\\s+")));
+			command.add(packageName);
+		} else {
+			command.addAll(Arrays.asList("/usr/bin/env", "android-translation-layer",
+			                             new File(ATLPaths.installed_apks_dir, packageName + ".apk").getPath()));
+		}
+		Slog.i(TAG, "starting installed app " + packageName + ": " + command);
+		try {
+			new ProcessBuilder(command).inheritIO().start();
+			return true;
+		} catch (IOException e) {
+			Slog.e(TAG, "cannot start " + packageName, e);
+			return false;
+		}
+	}
+
 	private static void setInstalledPaths(PackageParser.Package pkg) {
 		File apk = new File(ATLPaths.installed_apks_dir, pkg.packageName + ".apk");
 		pkg.applicationInfo.sourceDir = apk.getPath();

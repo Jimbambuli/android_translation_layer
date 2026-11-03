@@ -268,6 +268,8 @@ public final class ContextImpl extends Context {
 
 		String className = null;
 		if (intent.getComponent() != null) {
+			if (ATLLoadedAppManager.startInstalledApp(this.atl_loaded_app.pkg.packageName, intent.getComponent().getPackageName()))
+				return;
 			className = intent.getComponent().getClassName();
 		} else {
 			if (intent.getAction() != null && intent.getAction().equals("android.intent.action.SEND")) {
