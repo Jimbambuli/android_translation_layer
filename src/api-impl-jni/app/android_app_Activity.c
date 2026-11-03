@@ -1458,6 +1458,30 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeClearTaskFinish(JNIEnv *e
 	g_list_free(clearing);
 }
 
+/* Activity.finishAndRemoveTask(): every activity of the task finishes, the one that asked last; when the back
+ * stack is empty, the window closes (nativeFinish()). An activity in picture-in-picture is the only one of
+ * its pinned task */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinishTask(JNIEnv *env, jobject this)
+{
+	jmethodID finish = (*env)->GetMethodID(env, _CLASS(this), "finish", "()V");
+	GList *others = NULL;
+	if (!(pinned_activity && (*env)->IsSameObject(env, this, pinned_activity))) {
+		for (GList *l = activity_backlog; l != NULL; l = l->next)
+			if (!(*env)->IsSameObject(env, this, l->data))
+				others = g_list_prepend(others, _REF(l->data));
+	}
+	for (GList *l = others; l != NULL; l = l->next) {
+		(*env)->CallVoidMethod(env, l->data, (*env)->GetMethodID(env, _CLASS(l->data), "finish", "()V"));
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		_UNREF(l->data);
+	}
+	g_list_free(others);
+	(*env)->CallVoidMethod(env, this, finish);
+}
+
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeOpenURI(JNIEnv *env, jclass class, jstring uriString)
 {
 	static XdpPortal *portal = NULL;

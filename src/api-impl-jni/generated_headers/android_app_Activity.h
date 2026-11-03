@@ -97,6 +97,14 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeClearTaskFinish
 
 /*
  * Class:     android_app_Activity
+ * Method:    nativeFinishTask
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinishTask
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     android_app_Activity
  * Method:    nativeOpenURI
  * Signature: (Ljava/lang/String;)V
  */

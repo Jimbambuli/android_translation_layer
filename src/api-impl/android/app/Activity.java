@@ -896,6 +896,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		finish();
 	}
 
+	/* AOSP Activity.finishAndRemoveTask(): finish(FINISH_TASK_WITH_ACTIVITY), the task is removed with all its
+	 * activities (ActivityClientController.finishActivity() -> ActivityTaskSupervisor.removeTask()). ATL has the
+	 * app's one task (the back stack) and the pinned task of picture-in-picture (nativeFinishTask()) */
+	public void finishAndRemoveTask() {
+		nativeFinishTask();
+	}
+
 	/* animations of the next activity change, set by overridePendingTransition() */
 	private static boolean pendingTransitionSet;
 	private static int pendingEnterAnim;
@@ -1008,6 +1015,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
 	static native void nativeClearTaskMark();
 	static native void nativeClearTaskFinish(boolean finish);
+	private native void nativeFinishTask();
 	public static native void nativeOpenURI(String uri);
 	public native void nativeFileChooser(int action, String type, String title, int requestCode);
 	public native void nativePickImages(String[] mimeTypes, int maxItems, int requestCode);
