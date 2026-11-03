@@ -187,6 +187,20 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	}
 
 	/**
+	 * AOSP compares a parcelled Bundle by its data, else by its map; ATL's Bundle always has the map.
+	 */
+	public boolean kindofEquals(Bundle other) {
+		return other != null && mMap.equals(other.mMap);
+	}
+
+	/**
+	 * AOSP lets such a Bundle drop unknown classes when it is unparcelled; ATL's Bundle is never parcelled.
+	 */
+	public static Bundle setDefusable(Bundle bundle, boolean defusable) {
+		return bundle;
+	}
+
+	/**
 	 * Removes all elements from the mapping of this Bundle.
 	 */
 	public void clear() {

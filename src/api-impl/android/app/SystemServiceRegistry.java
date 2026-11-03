@@ -212,7 +212,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<LocationManager>() {
             @Override
             public LocationManager createService(ContextImpl ctx) {
-                return new LocationManager();
+                return new LocationManager(ctx);
             }});
 
         registerService(Context.UI_MODE_SERVICE, UiModeManager.class,

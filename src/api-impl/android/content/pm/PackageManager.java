@@ -1945,7 +1945,7 @@ public class PackageManager {
 			// (until we find apps that refuse to launch without being lied to anyway)
 			case "android.permission.ACCESS_FINE_LOCATION":
 			case "android.permission.ACCESS_COARSE_LOCATION":
-				if (System.getenv("ATL_UGLY_ENABLE_LOCATION") != null)
+				if (android.location.LocationManager.available()) // in a Flatpak the location portal asks the user
 					return PERMISSION_GRANTED;
 				else
 					return PERMISSION_DENIED;
