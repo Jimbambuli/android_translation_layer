@@ -121,6 +121,21 @@ public class GskCanvas extends DisplayListCanvas {
 	 * has no shader or the shader is not supported.
 	 */
 	private boolean fillWithShader(float left, float top, float right, float bottom, Paint paint) {
+		if (paint != null && paint.getStyle() == Paint.Style.FILL && paint.getShader() instanceof BitmapShader) {
+			/* the bitmap, mapped by the shader's local matrix (AOSP SkBitmapProcShader); the edges are not
+			 * extended (TileMode.CLAMP) or repeated: what is outside the bitmap stays empty */
+			BitmapShader shader = (BitmapShader)paint.getShader();
+			if (shader.bitmap == null)
+				return false;
+			Matrix local = new Matrix();
+			save();
+			clipRect(left, top, right, bottom);
+			if (shader.getLocalMatrix(local))
+				concat(local);
+			drawBitmap(shader.bitmap, null, new Rect(0, 0, shader.bitmap.getWidth(), shader.bitmap.getHeight()), paint);
+			restore();
+			return true;
+		}
 		if (paint == null || paint.getStyle() != Paint.Style.FILL || !(paint.getShader() instanceof LinearGradient))
 			return false;
 		LinearGradient gradient = (LinearGradient)paint.getShader();
