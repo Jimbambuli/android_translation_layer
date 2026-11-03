@@ -85,6 +85,16 @@ public class AudioManager {
 		return AUDIOFOCUS_REQUEST_GRANTED;
 	}
 
+	/**
+	 * Sets a variable number of parameter values to audio hardware.
+	 *
+	 * @param keyValuePairs list of parameters key value pairs in the form:
+	 *    key1=value1;key2=value2;...
+	 *
+	 * AOSP hands them to the audio HAL (AudioSystem.setParameters()); PulseAudio has none of them
+	 */
+	public void setParameters(String keyValuePairs) {}
+
 	public boolean isWiredHeadsetOn() {
 		return false;
 	}
