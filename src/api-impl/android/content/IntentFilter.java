@@ -1,6 +1,8 @@
 package android.content;
 
 import android.net.Uri;
+import android.os.PatternMatcher;
+import android.util.AndroidException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -9,10 +11,37 @@ import java.util.Set;
 
 public class IntentFilter {
 
+	public static final int MATCH_CATEGORY_MASK = 0xfff0000;
+	public static final int MATCH_ADJUSTMENT_MASK = 0x000ffff;
+	public static final int MATCH_ADJUSTMENT_NORMAL = 0x8000;
+	public static final int MATCH_CATEGORY_EMPTY = 0x0100000;
+	public static final int MATCH_CATEGORY_SCHEME = 0x0200000;
+	public static final int MATCH_CATEGORY_HOST = 0x0300000;
+	public static final int MATCH_CATEGORY_PORT = 0x0400000;
+	public static final int MATCH_CATEGORY_PATH = 0x0500000;
+	public static final int MATCH_CATEGORY_SCHEME_SPECIFIC_PART = 0x0580000;
+	public static final int MATCH_CATEGORY_TYPE = 0x0600000;
+	public static final int NO_MATCH_TYPE = -1;
+	public static final int NO_MATCH_DATA = -2;
+	public static final int NO_MATCH_ACTION = -3;
+	public static final int NO_MATCH_CATEGORY = -4;
+
+	public static class MalformedMimeTypeException extends AndroidException {
+		public MalformedMimeTypeException() {}
+		public MalformedMimeTypeException(String name) {
+			super(name);
+		}
+	}
+
 	private List<String> actions = new ArrayList<>();
 	private Set<String> categories = new HashSet<>();
 	private List<String> dataSchemes = new ArrayList<>();
 	private List<AuthorityEntry> dataAuthorities = new ArrayList<>();
+	/* AOSP: paths, MIME types and android:autoVerify of the filter */
+	private List<PatternMatcher> dataPaths;
+	private List<String> dataTypes;
+	private boolean hasPartialTypes;
+	private boolean autoVerify;
 
 	public IntentFilter() {}
 	public IntentFilter(String action) {
@@ -51,7 +80,7 @@ public class IntentFilter {
 		dataSchemes.add(dataScheme);
 	}
 
-	/* AOSP IntentFilter.addDataAuthority(String, String): the authorities are kept, matching does not use them yet */
+	/* AOSP IntentFilter.addDataAuthority(String, String) */
 	public void addDataAuthority(String host, String port) {
 		if (port != null)
 			port = port.intern();
@@ -102,7 +131,92 @@ public class IntentFilter {
 		return onlyWebSchemes;
 	}
 
-	public void addDataPath(String path, int type) {}
+	public final void addDataPath(String path, int type) {
+		if (dataPaths == null)
+			dataPaths = new ArrayList<>();
+		dataPaths.add(new PatternMatcher(path.intern(), type));
+	}
+
+	public final int countDataPaths() {
+		return dataPaths != null ? dataPaths.size() : 0;
+	}
+
+	public final PatternMatcher getDataPath(int index) {
+		return dataPaths.get(index);
+	}
+
+	/* AOSP IntentFilter.hasDataPath(String) */
+	public final boolean hasDataPath(String data) {
+		if (dataPaths == null)
+			return false;
+		for (PatternMatcher pe : dataPaths) {
+			if (pe.match(data))
+				return true;
+		}
+		return false;
+	}
+
+	/* AOSP IntentFilter.addDataType(String), via processMimeType() */
+	public final void addDataType(String type) throws MalformedMimeTypeException {
+		final int slashpos = type.indexOf('/');
+		final int typelen = type.length();
+		if (slashpos <= 0 || typelen < slashpos + 2)
+			throw new MalformedMimeTypeException(type);
+		String internalType = type;
+		if (typelen == slashpos + 2 && type.charAt(slashpos + 1) == '*') {
+			internalType = type.substring(0, slashpos);
+			hasPartialTypes = true;
+		}
+		if (dataTypes == null)
+			dataTypes = new ArrayList<>();
+		if (!dataTypes.contains(internalType))
+			dataTypes.add(internalType.intern());
+	}
+
+	public final int countDataTypes() {
+		return dataTypes != null ? dataTypes.size() : 0;
+	}
+
+	public final boolean hasDataType(String type) {
+		return dataTypes != null && findMimeType(type);
+	}
+
+	/* AOSP IntentFilter.findMimeType(String) */
+	private boolean findMimeType(String type) {
+		final List<String> t = dataTypes;
+		if (type == null)
+			return false;
+		if (t.contains(type))
+			return true;
+		// Deal with an Intent wanting to match every type in the IntentFilter.
+		final int typeLength = type.length();
+		if (typeLength == 3 && type.equals("*/*"))
+			return !t.isEmpty();
+		// Deal with this IntentFilter wanting to match every Intent type.
+		if (hasPartialTypes && t.contains("*"))
+			return true;
+		final int slashpos = type.indexOf('/');
+		if (slashpos > 0) {
+			if (hasPartialTypes && t.contains(type.substring(0, slashpos)))
+				return true;
+			if (typeLength == slashpos + 2 && type.charAt(slashpos + 1) == '*') {
+				// Need to look through all types for one that matches our base...
+				for (String v : t) {
+					if (type.regionMatches(0, v, 0, slashpos + 1))
+						return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	public final void setAutoVerify(boolean autoVerify) {
+		this.autoVerify = autoVerify;
+	}
+
+	public final boolean getAutoVerify() {
+		return autoVerify;
+	}
 
 	public final void addDataSchemeSpecificPart(String ssp, int type) {
 		/* FIXME */
@@ -128,19 +242,84 @@ public class IntentFilter {
 		return actions.contains(action);
 	}
 
-	public int match(String action, String type, String scheme, Uri data, Set<String> categories, String logTag) {
-		int ret = 0;
-		if (!matchAction(action)) {
-			ret = -3 /*NO_MATCH_ACTION*/;
+	/* AOSP IntentFilter.match(String, String, String, Uri, Set, String), without wildcards and extras */
+	public final int match(String action, String type, String scheme, Uri data, Set<String> categories, String logTag) {
+		if (action != null && !matchAction(action))
+			return NO_MATCH_ACTION;
+		int dataMatch = matchData(type, scheme, data);
+		if (dataMatch < 0)
+			return dataMatch;
+		if (matchCategories(categories) != null)
+			return NO_MATCH_CATEGORY;
+		return dataMatch;
+	}
+
+	/* AOSP IntentFilter.matchCategories(Set) */
+	public final String matchCategories(Set<String> categories) {
+		if (categories == null)
+			return null;
+		for (String category : categories) {
+			if (!this.categories.contains(category))
+				return category;
 		}
-		if (scheme == null) {
-			ret = 0x00100000 /*MATCH_CATEGORY_EMPTY*/ | 0x00008000 /*MATCH_ADJUSTMENT_NORMAL*/;
-		} else if (hasDataScheme(scheme)) {
-			ret = 0x00200000 /*MATCH_CATEGORY_SCHEME*/ | 0x00008000 /*MATCH_ADJUSTMENT_NORMAL*/;
+		return null;
+	}
+
+	/* AOSP IntentFilter.matchDataAuthority(Uri) */
+	public final int matchDataAuthority(Uri data) {
+		if (data == null)
+			return NO_MATCH_DATA;
+		for (AuthorityEntry ae : dataAuthorities) {
+			int match = ae.match(data);
+			if (match >= 0)
+				return match;
+		}
+		return NO_MATCH_DATA;
+	}
+
+	/* AOSP IntentFilter.matchData(String, String, Uri), without scheme specific parts and wildcards */
+	public final int matchData(String type, String scheme, Uri data) {
+		final List<String> types = dataTypes;
+		final List<String> schemes = dataSchemes;
+		int match = MATCH_CATEGORY_EMPTY;
+		if (types == null && schemes.isEmpty())
+			return ((type == null && data == null) ? (MATCH_CATEGORY_EMPTY + MATCH_ADJUSTMENT_NORMAL) : NO_MATCH_DATA);
+		if (!schemes.isEmpty()) {
+			if (schemes.contains(scheme != null ? scheme : ""))
+				match = MATCH_CATEGORY_SCHEME;
+			else
+				return NO_MATCH_DATA;
+			if (!dataAuthorities.isEmpty()) {
+				int authMatch = matchDataAuthority(data);
+				if (authMatch >= 0) {
+					if (dataPaths == null)
+						match = authMatch;
+					else if (hasDataPath(data.getPath()))
+						match = MATCH_CATEGORY_PATH;
+					else
+						return NO_MATCH_DATA;
+				} else {
+					return NO_MATCH_DATA;
+				}
+			}
 		} else {
-			ret = -2 /*NO_MATCH_DATA*/;
+			// Special case: match either an Intent with no data URI, or with a scheme: URI. This is to give a
+			// convenience for the common case where you want to deal with data in a content provider, which is
+			// done by type, and we don't want to force everyone to say they handle content: or file: URIs.
+			if (scheme != null && !"".equals(scheme) && !"content".equals(scheme) && !"file".equals(scheme))
+				return NO_MATCH_DATA;
 		}
-		return ret;
+		if (types != null) {
+			if (findMimeType(type))
+				match = MATCH_CATEGORY_TYPE;
+			else
+				return NO_MATCH_TYPE;
+		} else {
+			// If no MIME types are specified, then we will only match against an Intent that does not have a MIME type.
+			if (type != null)
+				return NO_MATCH_TYPE;
+		}
+		return match + MATCH_ADJUSTMENT_NORMAL;
 	}
 
 	public final Iterator<String> schemesIterator() {
@@ -171,6 +350,26 @@ public class IntentFilter {
 
 		public int getPort() {
 			return mPort;
+		}
+
+		/* AOSP AuthorityEntry.match(Uri, boolean), without wildcards */
+		public int match(Uri data) {
+			String host = data.getHost();
+			if (host == null)
+				return NO_MATCH_DATA;
+			if (mWild) {
+				if (host.length() < mHost.length())
+					return NO_MATCH_DATA;
+				host = host.substring(host.length() - mHost.length());
+			}
+			if (host.compareToIgnoreCase(mHost) != 0)
+				return NO_MATCH_DATA;
+			if (mPort >= 0) {
+				if (mPort != data.getPort())
+					return NO_MATCH_DATA;
+				return MATCH_CATEGORY_PORT;
+			}
+			return MATCH_CATEGORY_HOST;
 		}
 
 		public boolean match(AuthorityEntry other) {

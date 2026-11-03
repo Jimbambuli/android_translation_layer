@@ -45,6 +45,10 @@ public class PatternMatcher implements Parcelable {
 	 */
 	public static final int PATTERN_SIMPLE_GLOB = 2;
 
+	/* AOSP: an advanced pattern (not matched here) and a suffix */
+	public static final int PATTERN_ADVANCED_GLOB = 3;
+	public static final int PATTERN_SUFFIX = 4;
+
 	private final String mPattern;
 	private final int mType;
 
@@ -113,6 +117,8 @@ public class PatternMatcher implements Parcelable {
 		}
 		if (type == PATTERN_PREFIX) {
 			return match.startsWith(pattern);
+		} else if (type == PATTERN_SUFFIX) {
+			return match.endsWith(pattern);
 		} else if (type != PATTERN_SIMPLE_GLOB) {
 			return false;
 		}

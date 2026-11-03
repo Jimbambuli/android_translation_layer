@@ -2240,6 +2240,9 @@ public class PackageParser {
 		    com.android.internal.R.styleable.AndroidManifestIntentFilter_logo, 0);
 		outInfo.priority = sa.getInt(
 		    com.android.internal.R.styleable.AndroidManifestIntentFilter_priority, 0);
+		if (allowAutoVerify)
+			outInfo.setAutoVerify(sa.getBoolean(
+			    com.android.internal.R.styleable.AndroidManifestIntentFilter_autoVerify, false));
 		sa.recycle();
 		int outerDepth = parser.getDepth();
 		int type;
@@ -2277,6 +2280,24 @@ public class PackageParser {
 				String port = parser.getAttributeValue(ANDROID_RESOURCES, "port");
 				if (host != null)
 					outInfo.addDataAuthority(host, port);
+				/* AOSP ParsedIntentInfoUtils.parseData(): MIME type and paths */
+				String mimeType = parser.getAttributeValue(ANDROID_RESOURCES, "mimeType");
+				if (mimeType != null) {
+					try {
+						outInfo.addDataType(mimeType);
+					} catch (IntentFilter.MalformedMimeTypeException e) {
+						outError[0] = e.toString();
+						return false;
+					}
+				}
+				String[] pathAttrs = {"path", "pathPrefix", "pathPattern", "pathAdvancedPattern", "pathSuffix"};
+				int[] pathTypes = {PatternMatcher.PATTERN_LITERAL, PatternMatcher.PATTERN_PREFIX, PatternMatcher.PATTERN_SIMPLE_GLOB,
+				                   PatternMatcher.PATTERN_ADVANCED_GLOB, PatternMatcher.PATTERN_SUFFIX};
+				for (int i = 0; i < pathTypes.length; i++) {
+					String path = parser.getAttributeValue(ANDROID_RESOURCES, pathAttrs[i]);
+					if (path != null)
+						outInfo.addDataPath(path, pathTypes[i]);
+				}
 				XmlUtils.skipCurrentTag(parser);
 			} else if (!RIGID_PARSER) {
 				Slog.w(TAG, "Unknown element under <intent-filter>: "
