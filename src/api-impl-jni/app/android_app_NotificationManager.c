@@ -116,8 +116,9 @@ static void own_flatpak_name(GDBusConnection *connection)
 	g_autoptr(GDBusNodeInfo) info = g_dbus_node_info_new_for_xml(application_xml, NULL);
 	g_autofree char *path = object_path_for(flatpak_id);
 	g_dbus_connection_register_object(connection, path, info->interfaces[0], &vtable, NULL, NULL, NULL);
-	/* queued: when the owning app ends, the next running one takes over */
-	g_bus_own_name_on_connection(connection, flatpak_id, G_BUS_NAME_OWNER_FLAGS_NONE, NULL, NULL, NULL, NULL);
+	/* queued: when the owning app ends, the next running one takes over; the launcher's own window (a
+	 * GApplication with this ID and G_APPLICATION_REPLACE) may take it, the app gets it back after it */
+	g_bus_own_name_on_connection(connection, flatpak_id, G_BUS_NAME_OWNER_FLAGS_ALLOW_REPLACEMENT, NULL, NULL, NULL, NULL);
 }
 
 static gboolean send_notifcation_func(GSource *send_notifcation_timer, GSourceFunc callback, gpointer user_data)
