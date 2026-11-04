@@ -151,6 +151,9 @@ EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLCo
 	}
 }
 
+/* the pbuffers that are wl_egl_window surfaces of an unmapped wl_surface (Wayland has none) */
+static GHashTable *wayland_pbuffers = NULL;
+
 EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, EGLint const *attrib_list)
 {
 	GdkDisplay *gdk_display = gtk_root_get_display(GTK_ROOT(window));
@@ -185,6 +188,11 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 		}
 		struct wl_egl_window *egl_window = wl_egl_window_create(wayland_surface, width, height);
 		EGLSurface surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType)egl_window, new_attrib_list);
+		if (surface) {
+			if (!wayland_pbuffers)
+				wayland_pbuffers = g_hash_table_new(NULL, NULL);
+			g_hash_table_add(wayland_pbuffers, surface);
+		}
 		return surface;
 	}
 }
@@ -311,6 +319,8 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 
 EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 {
+	if (wayland_pbuffers)
+		g_hash_table_remove(wayland_pbuffers, surface);
 	struct ANativeWindow *native_window = g_hash_table_lookup(egl_surface_hashtable, surface);
 
 	if (!native_window)
@@ -455,6 +465,10 @@ static gboolean queue_texture(gpointer data)
 
 EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 {
+	/* EGL: on a pbuffer eglSwapBuffers has no effect. The window surface standing in for it would wait
+	 * forever for a frame callback of its never shown wl_surface (OsmAnd's GLThread drew one frame) */
+	if (wayland_pbuffers && g_hash_table_contains(wayland_pbuffers, surface))
+		return EGL_TRUE;
 	if (getenv("ATL_DIRECT_EGL"))
 		return eglSwapBuffers(display, surface);
 	struct ANativeWindow *native_window = g_hash_table_lookup(egl_surface_hashtable, surface);
