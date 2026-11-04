@@ -39,6 +39,11 @@ public interface WindowManager {
 
 		public static final int SOFT_INPUT_STATE_UNSPECIFIED = 0;
 
+		/* AOSP: FIRST_SYSTEM_WINDOW + 30 and + 37, and the type that is none */
+		public static final int TYPE_PRIVATE_PRESENTATION = 2030;
+		public static final int TYPE_PRESENTATION = 2037;
+		public static final int INVALID_WINDOW_TYPE = -1;
+
 		public float screenBrightness = -1;
 		public int softInputMode;
 		public int x;

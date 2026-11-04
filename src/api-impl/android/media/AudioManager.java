@@ -103,6 +103,11 @@ public class AudioManager {
 		nativeSetStreamVolume(index);
 	}
 
+	/* AOSP: AudioService.isVolumeFixed() is config_useFixedVolume, false; ATL sets the volume (nativeSetStreamVolume) */
+	public boolean isVolumeFixed() {
+		return false;
+	}
+
 	public boolean isStreamMute(int streamType) {
 		return false;
 	}
