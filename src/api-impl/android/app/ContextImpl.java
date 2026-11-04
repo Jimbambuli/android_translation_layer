@@ -284,9 +284,9 @@ public final class ContextImpl extends Context {
 		return className;
 	}
 
-	/* ACTION_SEND / SEND_MULTIPLE without a target (AOSP: the chooser). A file or a link goes to the desktop's own
-	 * choice of applications (OpenURI portal, «ask»); text, or without the portal, gets ATL's share sheet (copy,
-	 * mail, save). SEND_MULTIPLE hands over its first file. */
+	/* ACTION_SEND / SEND_MULTIPLE without a target (AOSP: the chooser). A link goes to the desktop's own choice of
+	 * applications (OpenURI portal, «ask»); a file or text, or without the portal, gets ATL's share sheet (open
+	 * with, copy, mail, save). SEND_MULTIPLE hands over its first file. */
 	private void share(Intent intent, CharSequence chooser_title) {
 		Slog.i(TAG, "share: " + intent);
 		final String text = intent.getStringExtra(Intent.EXTRA_TEXT);
@@ -308,11 +308,14 @@ public final class ContextImpl extends Context {
 		final ParcelFileDescriptor fd_final = fd;
 		final String[] labels = {chooser_title != null ? chooser_title.toString() : getString(com.android.internal.R.string.share),
 		                         getString(com.android.internal.R.string.copy),
-		                         getString(com.android.internal.R.string.autofill_save_yes)};
+		                         getString(com.android.internal.R.string.autofill_save_yes),
+		                         getString(com.android.internal.R.string.whichViewApplication)};
 		Runnable runnable = new Runnable() {
 			@Override
 			public void run() {
-				boolean asked = (fd_final != null || link != null) && nativeOpenWith(fd_final != null ? fd_final.getFd() : -1, link);
+				/* a link: the desktop's choice of applications; a file: the sheet, with «Open with» (the desktop's
+				 * choice) and «Save» (the file chooser portal writes where the user chooses, e.g. an export) */
+				boolean asked = link != null && nativeOpenWith(-1, link);
 				if (!asked)
 					nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1, labels);
 				if (fd_final != null) {

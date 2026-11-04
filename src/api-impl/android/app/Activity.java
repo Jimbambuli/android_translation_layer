@@ -469,7 +469,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	// callback from native code
 	@Export
 	protected void fileChooserResultCallback(int requestCode, int resultCode, int action, String uri) {
-		dispatchActivityResult(null, requestCode, resultCode, new Intent(FILE_CHOOSER_ACTIONS.get(action), uri != null ? Uri.parse(uri) : null), "fileChooserResult");
+		Uri result = uri != null ? Uri.parse(uri) : null;
+		/* AOSP's DocumentsUI answers OPEN_DOCUMENT/GET_CONTENT and CREATE_DOCUMENT with a document's content URI
+		 * (apps check the scheme, use DocumentFile); ATL's names the file the dialog chose (in a Flatpak the file
+		 * chooser portal's document, writable for a file to save) like DownloadsProvider's "raw:" documents */
+		if (result != null && action != 2 && "file".equals(result.getScheme()))
+			result = android.content.ContentResolver.atlUriForFile(result.getPath());
+		Intent data = new Intent(FILE_CHOOSER_ACTIONS.get(action), result);
+		if (result != null)
+			data.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | (action == 1 ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : 0));
+		dispatchActivityResult(null, requestCode, resultCode, data, "fileChooserResult");
 	}
 
 	// callback from native code; no uris: the user cancelled

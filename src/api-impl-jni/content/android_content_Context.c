@@ -218,13 +218,13 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeOpenFile(JNIEnv *env, 
 	g_object_unref(connection);
 }
 
-/* the desktop's choice of applications for a shared file or link: OpenURI with «ask» (the dialog of the desktop's
- * portal); FALSE if the portal does not take the call, then ATL's share sheet is shown */
-JNIEXPORT jboolean JNICALL Java_android_content_Context_nativeOpenWith(JNIEnv *env, jclass class, jint fd, jstring uri_jstr)
+/* the desktop's choice of applications for a shared file (fd) or link: OpenURI with «ask» (the dialog of the
+ * desktop's portal); FALSE if the portal does not take the call */
+static gboolean open_with(int fd, const char *uri)
 {
 	GDBusConnection *connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
 	if (!connection)
-		return JNI_FALSE;
+		return FALSE;
 	GError *error = NULL;
 	OpenURI *openuri = open_uri_proxy_new_sync(connection, 0, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", NULL, &error);
 	gboolean ok = FALSE;
@@ -236,19 +236,26 @@ JNIEXPORT jboolean JNICALL Java_android_content_Context_nativeOpenWith(JNIEnv *e
 			GUnixFDList *fd_list = g_unix_fd_list_new_from_array((int[]){dup(fd)}, 1);
 			ok = open_uri_call_open_file_sync(openuri, "", g_variant_new("h", 0), g_variant_builder_end(&opt_builder), fd_list, NULL, NULL, NULL, &error);
 			g_object_unref(fd_list);
-		} else if (uri_jstr) {
-			const char *uri = (*env)->GetStringUTFChars(env, uri_jstr, NULL);
+		} else if (uri) {
 			ok = open_uri_call_open_uri_sync(openuri, "", uri, g_variant_builder_end(&opt_builder), NULL, NULL, &error);
-			(*env)->ReleaseStringUTFChars(env, uri_jstr, uri);
 		} else {
 			g_variant_builder_clear(&opt_builder);
 		}
 		g_object_unref(openuri);
 	}
 	if (!ok && error)
-		fprintf(stderr, "nativeOpenWith: %s\n", error->message);
+		fprintf(stderr, "open_with: %s\n", error->message);
 	g_clear_error(&error);
 	g_object_unref(connection);
+	return ok;
+}
+
+JNIEXPORT jboolean JNICALL Java_android_content_Context_nativeOpenWith(JNIEnv *env, jclass class, jint fd, jstring uri_jstr)
+{
+	const char *uri = uri_jstr ? (*env)->GetStringUTFChars(env, uri_jstr, NULL) : NULL;
+	gboolean ok = open_with(fd, uri);
+	if (uri)
+		(*env)->ReleaseStringUTFChars(env, uri_jstr, uri);
 	return ok;
 }
 
@@ -298,6 +305,7 @@ enum {
 	SHARE_COPY,
 	SHARE_EMAIL,
 	SHARE_SAVE,
+	SHARE_OPEN_WITH,
 };
 
 /* runs the share target the user picked in the share sheet, after it was closed */
@@ -350,6 +358,8 @@ static void share_sheet_destroyed(GtkWindow *sheet, gpointer text_jstr)
 		g_object_unref(fd_list);
 		g_object_unref(email);
 		g_object_unref(connection);
+	} else if (button_id == SHARE_OPEN_WITH) {
+		open_with(fd, NULL);
 	} else if (button_id == SHARE_SAVE) {
 		GtkFileDialog *save_dialog = gtk_file_dialog_new();
 		char *path = fd_get_path(fd);
@@ -413,10 +423,12 @@ static const char *jstring_or(JNIEnv *env, jobjectArray labels, int index, const
  */
 JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd, jobjectArray labels)
 {
-	char *title_free = NULL, *copy_free = NULL, *save_free = NULL;
+	char *title_free = NULL, *copy_free = NULL, *save_free = NULL, *open_with_free = NULL;
 	const char *title = jstring_or(env, labels, 0, "Share", &title_free);
 	const char *copy = jstring_or(env, labels, 1, "Copy", &copy_free);
 	const char *save = jstring_or(env, labels, 2, "Save", &save_free);
+	const char *open_with_label = labels && (*env)->GetArrayLength(env, labels) > 3 ?
+	    jstring_or(env, labels, 3, "Open with", &open_with_free) : "Open with";
 
 	GtkWidget *sheet = gtk_window_new();
 	gtk_window_set_title(GTK_WINDOW(sheet), title);
@@ -480,7 +492,13 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 	}
 
 	GtkWidget *targets = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-	GIcon *icon = g_themed_icon_new("edit-copy");
+	GIcon *icon;
+	if (fd != -1) {                 /* the desktop's choice of applications for the file (OpenURI portal) */
+		icon = g_themed_icon_new("document-open");
+		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_OPEN_WITH, icon, open_with_label);
+		g_object_unref(icon);
+	}
+	icon = g_themed_icon_new("edit-copy");
 	share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_COPY, icon, copy);
 	g_object_unref(icon);
 	GAppInfo *mail = g_app_info_get_default_for_uri_scheme("mailto");
@@ -509,6 +527,7 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 	g_free(title_free);
 	g_free(copy_free);
 	g_free(save_free);
+	g_free(open_with_free);
 }
 
 static void on_bus_acquired(GDBusConnection *connection, const char *name, gpointer user_data)
