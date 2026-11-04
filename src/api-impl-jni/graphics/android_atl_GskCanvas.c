@@ -8,6 +8,20 @@
 
 #include "../generated_headers/android_atl_GskCanvas.h"
 
+/* like Skia, the paint's alpha modulates the bitmap before the color filter (RippleDrawable draws its
+ * ALPHA_8 mask with an opaque SRC_IN filter and puts the ripple's alpha into the paint) */
+static void push_paint_alpha(GdkSnapshot *snapshot, struct AndroidPaint *paint)
+{
+	if (paint->color.alpha < 1.f)
+		gtk_snapshot_push_opacity(snapshot, paint->color.alpha);
+}
+
+static void pop_paint_alpha(GdkSnapshot *snapshot, struct AndroidPaint *paint)
+{
+	if (paint->color.alpha < 1.f)
+		gtk_snapshot_pop(snapshot);
+}
+
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawBitmap__JJIIIIJ(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong texture_ptr, jint x, jint y, jint width, jint height, jlong paint_ptr)
 {
 	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);
@@ -16,7 +30,9 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawBitmap__JJIIIIJ(JN
 	if (paint->use_color_filter) {
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
 	}
+	push_paint_alpha(snapshot, paint);
 	gtk_snapshot_append_texture(snapshot, texture, &GRAPHENE_RECT_INIT(x, y, width, height));
+	pop_paint_alpha(snapshot, paint);
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
 }
@@ -34,7 +50,9 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawBitmap__JJIIIIIIII
 	float yscale = height / (float)src_height;
 	float scaled_width = gdk_texture_get_width(texture) * xscale;
 	float scaled_height = gdk_texture_get_height(texture) * yscale;
+	push_paint_alpha(snapshot, paint);
 	gtk_snapshot_append_texture(snapshot, texture, &GRAPHENE_RECT_INIT(x - src_x * xscale, y - src_y * yscale, scaled_width, scaled_height));
+	pop_paint_alpha(snapshot, paint);
 	gtk_snapshot_pop(snapshot);
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
