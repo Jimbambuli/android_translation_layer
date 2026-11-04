@@ -585,6 +585,36 @@ public abstract class Context {
 
 	public abstract boolean bindService(final Intent intent, final ServiceConnection serviceConnection, int flags);
 
+	/* AOSP Context.bindService(Intent, int, Executor, ServiceConnection) (API 29): like ContextImpl's
+	 * ServiceDispatcher with an executor, the connection's callbacks run on the executor */
+	public boolean bindService(Intent service, int flags, final java.util.concurrent.Executor executor, final ServiceConnection conn) {
+		if (executor == null)
+			throw new IllegalArgumentException("executor must not be null");
+		if (conn == null)
+			throw new IllegalArgumentException("connection is null");
+		return bindService(service, new ServiceConnection() {
+			@Override
+			public void onServiceConnected(final ComponentName name, final android.os.IBinder binder) {
+				executor.execute(new Runnable() {
+					@Override
+					public void run() {
+						conn.onServiceConnected(name, binder);
+					}
+				});
+			}
+
+			@Override
+			public void onServiceDisconnected(final ComponentName name) {
+				executor.execute(new Runnable() {
+					@Override
+					public void run() {
+						conn.onServiceDisconnected(name);
+					}
+				});
+			}
+		}, flags);
+	}
+
 	/* For use from native code */
 	@Export
 	static Activity resolveActivityInternal(Intent intent) throws ReflectiveOperationException {

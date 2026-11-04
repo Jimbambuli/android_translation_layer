@@ -53,6 +53,75 @@ public final class Display {
 		return 0; // what else would we return here?
 	}
 
+	/* AOSP 14 Display: the desktop display has no HDR capabilities (DisplayInfo.hdrCapabilities null),
+	 * no HDR/SDR ratio and no rounded corners */
+	public HdrCapabilities getHdrCapabilities() {
+		return null;
+	}
+
+	public boolean isHdr() {
+		HdrCapabilities hdrCapabilities = getHdrCapabilities();
+		if (hdrCapabilities == null) {
+			return false;
+		}
+		return !(hdrCapabilities.getSupportedHdrTypes().length == 0);
+	}
+
+	public float getHdrSdrRatio() {
+		return 1.0f;
+	}
+
+	public RoundedCorner getRoundedCorner(int position) {
+		return null;
+	}
+
+	/* AOSP 14 Display.HdrCapabilities without the Parcelable part */
+	public static final class HdrCapabilities {
+		public static final float INVALID_LUMINANCE = -1;
+		public static final int HDR_TYPE_INVALID = -1;
+		public static final int HDR_TYPE_DOLBY_VISION = 1;
+		public static final int HDR_TYPE_HDR10 = 2;
+		public static final int HDR_TYPE_HLG = 3;
+		public static final int HDR_TYPE_HDR10_PLUS = 4;
+
+		private int[] mSupportedHdrTypes = new int[0];
+		private float mMaxLuminance = INVALID_LUMINANCE;
+		private float mMaxAverageLuminance = INVALID_LUMINANCE;
+		private float mMinLuminance = INVALID_LUMINANCE;
+
+		public HdrCapabilities() {
+		}
+
+		public HdrCapabilities(int[] supportedHdrTypes, float maxLuminance, float maxAverageLuminance, float minLuminance) {
+			mSupportedHdrTypes = supportedHdrTypes;
+			java.util.Arrays.sort(mSupportedHdrTypes);
+			mMaxLuminance = maxLuminance;
+			mMaxAverageLuminance = maxAverageLuminance;
+			mMinLuminance = minLuminance;
+		}
+
+		public int[] getSupportedHdrTypes() {
+			return java.util.Arrays.copyOf(mSupportedHdrTypes, mSupportedHdrTypes.length);
+		}
+
+		public float getDesiredMaxLuminance() {
+			return mMaxLuminance;
+		}
+
+		public float getDesiredMaxAverageLuminance() {
+			return mMaxAverageLuminance;
+		}
+
+		public float getDesiredMinLuminance() {
+			return mMinLuminance;
+		}
+	}
+
+	/* AOSP 14: deprecated, always RGBA_8888 */
+	public int getPixelFormat() {
+		return android.graphics.PixelFormat.RGBA_8888;
+	}
+
 	public int getDisplayId() {
 		return 0;
 	}

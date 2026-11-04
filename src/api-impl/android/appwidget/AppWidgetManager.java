@@ -15,5 +15,14 @@ public class AppWidgetManager {
 
 	public void notifyAppWidgetViewDataChanged(int appWidgetId, int viewId) {}
 
+	/* AOSP asks the default launcher (AppWidgetServiceImpl); the desktop has none that pins widgets */
+	public boolean isRequestPinAppWidgetSupported() {
+		return false;
+	}
+
+	public boolean requestPinAppWidget(ComponentName provider, android.os.Bundle extras, android.app.PendingIntent successCallback) {
+		return false;
+	}
+
 	public void notifyAppWidgetViewDataChanged(int[] appWidgetIds, int viewId) {}
 }
