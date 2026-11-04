@@ -129,6 +129,8 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/media.c',
                                           	'src/libandroid/native_window.c',
                                           	'src/libandroid/sensor.c',
+                                          	'src/libandroid/sharedmem.c',
+                                          	'src/libandroid/system_fonts.c',
                                           	'src/libandroid/trace.c',
                                           ],
                                           include_directories: shared_includes_dir,
@@ -136,8 +138,11 @@ libandroid_so = shared_library('android', [
                                           soversion: 0,
                                           dependencies: [
                                           	dependency('gtk4'), dependency('jni'), dependency('vulkan'), dependency('openxr').partial_dependency(includes: true),
-                                          	art_incdir_dep, upcalls_header
+                                          	art_incdir_dep, upcalls_header,
+                                          	dependency('fontconfig'),
+                                          	declare_dependency(link_args: ['-L' + libart_dep.get_variable(pkgconfig: 'libdir') / 'art', '-lcutils']), # ashmem
                                           ],
+                                          install_rpath: get_option('prefix') / get_option('libdir') / 'art',
                                           c_args: [
                                           	'-D_LARGEFILE64_SOURCE',
                                           ],
