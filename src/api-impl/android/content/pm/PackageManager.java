@@ -1928,7 +1928,25 @@ public class PackageManager {
 		return "Allow all the time";
 	}
 
+	private static java.util.Set<String> deniedByUser;
+
+	/* a permission the user switched off for this app (the launcher passes them in ATL_DENIED_PERMISSIONS, comma
+	 * separated): like a permission revoked in Android's settings, ATL answers «denied» and the API refuses */
+	public static synchronized boolean deniedByUser(String permName) {
+		if (deniedByUser == null) {
+			deniedByUser = new java.util.HashSet<>();
+			String list = System.getenv("ATL_DENIED_PERMISSIONS");
+			if (list != null)
+				for (String p : list.split(","))
+					if (!p.trim().isEmpty())
+						deniedByUser.add(p.trim());
+		}
+		return permName != null && deniedByUser.contains(permName);
+	}
+
 	public int checkPermission(String permName, String pkgName) {
+		if (deniedByUser(permName))
+			return PERMISSION_DENIED;
 		if (permName != null && permName.endsWith(".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"))
 			return PERMISSION_GRANTED;
 

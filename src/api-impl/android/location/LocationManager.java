@@ -62,6 +62,9 @@ public class LocationManager {
 
 	/** whether ATL may ask the desktop for the position */
 	public static boolean available() {
+		if (android.content.pm.PackageManager.deniedByUser("android.permission.ACCESS_FINE_LOCATION")
+		    || android.content.pm.PackageManager.deniedByUser("android.permission.ACCESS_COARSE_LOCATION"))
+			return false;                   // switched off for this app: no provider, no position
 		return System.getenv("ATL_UGLY_ENABLE_LOCATION") != null || new File("/.flatpak-info").exists();
 	}
 

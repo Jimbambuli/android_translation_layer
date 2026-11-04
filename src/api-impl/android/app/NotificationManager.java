@@ -78,6 +78,10 @@ public class NotificationManager {
 	}
 
 	public void notify(String tag, int id, Notification notification) {
+		/* Android 13: without POST_NOTIFICATIONS the system drops the app's notifications */
+		if (android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS")
+		    && !(notification.style instanceof MediaStyle))
+			return;
 		if (notification.style instanceof MediaStyle) { // MPRIS content is handled by MediaSession implementation
 			if (mpris_notification_id == -1) {
 				Application application = ATLLoadedApp.getPrimaryApplication().getApplication();
@@ -186,7 +190,7 @@ public class NotificationManager {
 	}
 
 	public boolean areNotificationsEnabled() {
-		return true;
+		return !android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS");
 	}
 
 	public void deleteNotificationChannel(String channelId) {
