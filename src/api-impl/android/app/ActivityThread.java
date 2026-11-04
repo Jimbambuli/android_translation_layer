@@ -34,7 +34,7 @@ public class ActivityThread {
 	 * change, which goes to the app as in ActivityThread.handleConfigurationChanged() */
 	@Export
 	static void setNightMode(int uiModeNight, float contrast) {
-		UiModeManager.sContrast = contrast;
+		UiModeManager.notifyContrastChanged(contrast);
 		Configuration config = new Configuration(Context.sys_config);
 		config.uiMode = (config.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | uiModeNight;
 		handleConfigurationChanged(config);

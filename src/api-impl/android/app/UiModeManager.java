@@ -2,6 +2,9 @@ package android.app;
 
 import android.content.Context;
 import android.content.res.Configuration;
+import android.util.ArrayMap;
+import java.util.Objects;
+import java.util.concurrent.Executor;
 
 public class UiModeManager {
 
@@ -22,5 +25,49 @@ public class UiModeManager {
 	 */
 	public float getContrast() {
 		return sContrast;
+	}
+
+	/* AOSP UiModeManager.ContrastChangeListener */
+	public interface ContrastChangeListener {
+		void onContrastChanged(float contrast);
+	}
+
+	/* AOSP keeps the listeners per UiModeManager and the service calls each of them back; ATL has no
+	 * service, the desktop contrast arrives in ActivityThread.setNightMode() */
+	private static final ArrayMap<ContrastChangeListener, Executor> sContrastChangeListeners = new ArrayMap<>();
+
+	public void addContrastChangeListener(Executor executor, ContrastChangeListener listener) {
+		Objects.requireNonNull(executor);
+		Objects.requireNonNull(listener);
+		synchronized (sContrastChangeListeners) {
+			sContrastChangeListeners.put(listener, executor);
+		}
+	}
+
+	public void removeContrastChangeListener(ContrastChangeListener listener) {
+		Objects.requireNonNull(listener);
+		synchronized (sContrastChangeListeners) {
+			sContrastChangeListeners.remove(listener);
+		}
+	}
+
+	/* AOSP mCallback.notifyContrastChanged() */
+	static void notifyContrastChanged(final float contrast) {
+		final ArrayMap<ContrastChangeListener, Executor> listeners;
+		synchronized (sContrastChangeListeners) {
+			if (Math.abs(sContrast - contrast) < 1e-10)
+				return;
+			sContrast = contrast;
+			listeners = new ArrayMap<>(sContrastChangeListeners);
+		}
+		for (int i = 0; i < listeners.size(); i++) {
+			final ContrastChangeListener listener = listeners.keyAt(i);
+			listeners.valueAt(i).execute(new Runnable() {
+				@Override
+				public void run() {
+					listener.onContrastChanged(contrast);
+				}
+			});
+		}
 	}
 }

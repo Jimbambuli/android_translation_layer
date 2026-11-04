@@ -782,6 +782,11 @@ public abstract class Context {
 
 	public abstract Context createDisplayContext(Display display);
 
+	/* AOSP Context.getDisplay() (API 30) */
+	public Display getDisplay() {
+		throw new RuntimeException("Not implemented. Must override in a subclass.");
+	}
+
 	/**
 	 * Creates a Context for a non-activity window.
 	 */

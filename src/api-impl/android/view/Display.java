@@ -8,6 +8,9 @@ import android.util.DisplayMetrics;
 @Export
 public final class Display {
 
+	/* AOSP Display.DEFAULT_DISPLAY */
+	public static final int DEFAULT_DISPLAY = 0;
+
 	public static int window_width = 960;
 	public static int window_height = 540;
 

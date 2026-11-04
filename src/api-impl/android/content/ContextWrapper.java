@@ -113,6 +113,11 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
+	public Display getDisplay() {
+		return this.baseContext.getDisplay();
+	}
+
+	@Override
 	public Context createWindowContext(int type, Bundle options) {
 		return this.baseContext.createWindowContext(type, options);
 	}

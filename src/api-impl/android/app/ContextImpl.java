@@ -463,6 +463,13 @@ public final class ContextImpl extends Context {
 		return context;
 	}
 
+	/* AOSP ContextImpl.getDisplay() throws for a context without a display (application or service);
+	 * ATL does not tell the contexts apart and has the one display, which every context is on */
+	@Override
+	public Display getDisplay() {
+		return getSystemService(DisplayManager.class).getDisplay(Display.DEFAULT_DISPLAY);
+	}
+
 	@Override
 	public Context createDisplayContext(Display display) {
 		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
