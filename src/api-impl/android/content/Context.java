@@ -105,6 +105,7 @@ public abstract class Context {
 	public static final String ALARM_SERVICE = "alarm";
 	public static final String INPUT_SERVICE = "input";
 	public static final String UI_MODE_SERVICE = "uimode";
+	public static final String ROLE_SERVICE = "role";
 	public static final String ACCESSIBILITY_SERVICE = "accessibility";
 	public static final String WIFI_SERVICE = "wifi";
 	public static final String BLUETOOTH_SERVICE = "bluetooth";

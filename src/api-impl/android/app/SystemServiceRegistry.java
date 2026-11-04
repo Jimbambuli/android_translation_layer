@@ -215,6 +215,14 @@ public final class SystemServiceRegistry {
                 return new LocationManager(ctx);
             }});
 
+        /* AOSP: RoleFrameworkInitializer of the Permission module */
+        registerService(Context.ROLE_SERVICE, android.app.role.RoleManager.class,
+                new CachedServiceFetcher<android.app.role.RoleManager>() {
+            @Override
+            public android.app.role.RoleManager createService(ContextImpl ctx) {
+                return new android.app.role.RoleManager(ctx);
+            }});
+
         registerService(Context.UI_MODE_SERVICE, UiModeManager.class,
                 new CachedServiceFetcher<UiModeManager>() {
             @Override

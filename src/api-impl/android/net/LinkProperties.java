@@ -80,6 +80,15 @@ public class LinkProperties {
 	/**
 	 * Gets any non-default MTU size set for this link; 0 if not set.
 	 */
+	/* AOSP: true only with a private DNS (DNS over TLS) server set up; ATL leaves DNS to the desktop */
+	public boolean isPrivateDnsActive() {
+		return false;
+	}
+
+	public String getPrivateDnsServerName() {
+		return null;
+	}
+
 	public int getMtu() {
 		return mMtu;
 	}

@@ -98,6 +98,7 @@ srcs = [
 	'android/app/SearchableInfo.java',
 	'android/app/SearchManager.java',
 	'android/app/Service.java',
+	'android/app/role/RoleManager.java',
 	'android/app/SharedElementCallback.java',
 	'android/app/SharedPreferencesImpl.java',
 	'android/app/StatusBarManager.java',
