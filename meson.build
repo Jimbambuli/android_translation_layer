@@ -132,6 +132,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/sharedmem.c',
                                           	'src/libandroid/system_fonts.c',
                                           	'src/libandroid/trace.c',
+                                          	'src/libandroid/unsupported_ndk.c',
                                           ],
                                           include_directories: shared_includes_dir,
                                           install: true,
