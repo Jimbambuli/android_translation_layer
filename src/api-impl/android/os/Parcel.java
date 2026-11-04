@@ -150,20 +150,14 @@ public class Parcel {
 		}
 	}
 
+	/* like AOSP, a boolean is an int: GMS SafeParcelReader reads typed arrays and lists through
+	 * createTypedArray(), whose items start with readInt() != 0 (AOSP readTypedObject()) */
 	public void writeBoolean(boolean value) {
-		try {
-			os.writeBoolean(value);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+		writeInt(value ? 1 : 0);
 	}
 
 	public boolean readBoolean() {
-		try {
-			return is.readBoolean();
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+		return readInt() != 0;
 	}
 
 	public void writeIntArray(int[] value) {
