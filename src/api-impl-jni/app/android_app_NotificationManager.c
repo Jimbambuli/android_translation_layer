@@ -12,8 +12,9 @@
 #define MPRIS_BUS_NAME_PREFIX "org.mpris.MediaPlayer2."
 #define MPRIS_OBJECT_NAME     "/org/mpris/MediaPlayer2"
 
-/* ongoing notifications to be removed when the app is closed */
-static GHashTable *ongoing_notifications = NULL;
+/* the apps notifications on the desktop: like AOSPs NotificationManagerService, which cancels all
+   notifications of a package that is force-stopped (ACTION_PACKAGE_RESTARTED), they go when the app ends */
+static GHashTable *posted_notifications = NULL;
 
 /* We queue up notification updates in pending_notifications to make sure that there is at least 200ms
    delay between consecutive updates. This prevents dynamic notification updated from arriving in wrong
@@ -156,6 +157,8 @@ static void unref_nullsafe(void *data)
 		g_object_unref(data);
 }
 
+void remove_app_notifications(void);
+
 static void queue_notification(int id, GNotification *notification)
 {
 	g_mutex_lock(&pending_notifications_mutex);
@@ -183,9 +186,15 @@ static void queue_notification(int id, GNotification *notification)
 		if (info)
 			g_object_unref(info);
 		g_free(desktop_id);
-		ongoing_notifications = g_hash_table_new(NULL, NULL);
+		posted_notifications = g_hash_table_new(NULL, NULL);
+		/* also when the app ends with System.exit() */
+		atexit(remove_app_notifications);
 	}
 	g_hash_table_insert(pending_notifications, GINT_TO_POINTER(id), notification);
+	if (notification)
+		g_hash_table_add(posted_notifications, GINT_TO_POINTER(id));
+	else
+		g_hash_table_remove(posted_notifications, GINT_TO_POINTER(id));
 	g_mutex_unlock(&pending_notifications_mutex);
 	if (g_source_get_ready_time(send_notifcation_timer) == -1)
 		g_source_set_ready_time(send_notifcation_timer, 0); // immediately
@@ -245,8 +254,6 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotificati
 	if (action)
 		g_notification_set_default_action_and_target_value(notification, action, intent_serialize(env, intent));
 	queue_notification(id, notification);
-	if (ongoing)
-		g_hash_table_add(ongoing_notifications, GINT_TO_POINTER(id));
 }
 
 JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeCancel(JNIEnv *env, jobject this, jint id)
@@ -254,17 +261,27 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeCancel(JNIEnv 
 	queue_notification(id, NULL);
 }
 
-static void remove_ongoing_notification(gpointer key, gpointer value, gpointer user_data)
+static void remove_app_notification(gpointer key, gpointer value, gpointer user_data)
 {
 	char *id_string = desktop_id(GPOINTER_TO_INT(key));
-	g_application_withdraw_notification(g_application_get_default(), id_string);
+	g_application_withdraw_notification(user_data, id_string);
 	g_free(id_string);
 }
 
-void remove_ongoing_notifications()
+void remove_app_notifications(void)
 {
-	if (ongoing_notifications)
-		g_hash_table_foreach(ongoing_notifications, remove_ongoing_notification, NULL);
+	GApplication *app = g_application_get_default();
+	if (!posted_notifications || !app)
+		return;
+	g_mutex_lock(&pending_notifications_mutex);
+	g_hash_table_remove_all(pending_notifications);
+	g_hash_table_foreach(posted_notifications, remove_app_notification, app);
+	g_hash_table_remove_all(posted_notifications);
+	g_mutex_unlock(&pending_notifications_mutex);
+	/* the withdrawals are D-Bus calls: send them before the process ends */
+	GDBusConnection *bus = g_application_get_dbus_connection(app) ?: g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+	if (bus)
+		g_dbus_connection_flush_sync(bus, NULL, NULL);
 }
 
 static MediaPlayer2 *mpris = NULL;

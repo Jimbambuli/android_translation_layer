@@ -1097,7 +1097,7 @@ void init_cmd_parameters(GApplication *app, struct jni_callback_data *d)
 }
 
 void init__r_debug();
-void remove_ongoing_notifications();
+void remove_app_notifications(void);
 
 typedef bool(apply_path_overrides_func_type)(char **);
 void libc_bio_set_apply_path_overrides_func(apply_path_overrides_func_type *func);
@@ -1170,7 +1170,7 @@ int main(int argc, char **argv)
 	g_signal_connect(app, "open", G_CALLBACK(open), callback_data);
 	g_action_map_add_action_entries(G_ACTION_MAP(app), action_entries, action_entries_count, NULL);
 	status = g_application_run(G_APPLICATION(app), argc, argv);
-	remove_ongoing_notifications();
+	remove_app_notifications();
 	g_object_unref(app);
 
 	if (jvm) {
