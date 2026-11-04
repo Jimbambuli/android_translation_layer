@@ -570,6 +570,7 @@ srcs = [
 	'android/provider/SyncStateContract.java',
 	'android/provider/Telephony.java',
 	'android/provider/UserDictionary.java',
+	'android/security/KeyPairGeneratorSpec.java',
 	'android/security/NetworkSecurityPolicy.java',
 	'android/security/keystore/AndroidKeyStore.java',
 	'android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java',
