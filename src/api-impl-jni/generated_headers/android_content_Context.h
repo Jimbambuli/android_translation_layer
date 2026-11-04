@@ -61,6 +61,14 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile
 
 /*
  * Class:     android_content_Context
+ * Method:    nativeOpenWith
+ * Signature: (ILjava/lang/String;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_content_Context_nativeOpenWith
+  (JNIEnv *, jclass, jint, jstring);
+
+/*
+ * Class:     android_content_Context
  * Method:    nativeExportUnifiedPush
  * Signature: (Ljava/lang/String;)V
  */

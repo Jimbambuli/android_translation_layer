@@ -343,31 +343,10 @@ public class PackageInstaller {
 				status = STATUS_FAILURE_INCOMPATIBLE;
 				message = "Split APKs need ATL_INSTALL_COMMAND";
 			} else {
-				try {
-					ProcessBuilder pb = new ProcessBuilder(command);
-					Map<String, String> env = pb.environment();
-					env.put("ATL_INSTALLER_PACKAGE", ownPackage());
-					CharSequence label = appContext().getApplicationInfo().loadLabel(appContext().getPackageManager());
-					env.put("ATL_INSTALLER_LABEL", label != null ? label.toString() : ownPackage());
-					pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-					java.lang.Process p = pb.start();
-					String lastLine = null;
-					try (BufferedReader err = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
-						String line;
-						while ((line = err.readLine()) != null) {
-							System.err.println(line);
-							if (!line.trim().isEmpty())
-								lastLine = line.trim();
-						}
-					}
-					int exit = p.waitFor();
-					status = (exit >= STATUS_SUCCESS && exit <= STATUS_FAILURE_TIMEOUT) ? exit : STATUS_FAILURE;
-					if (status != STATUS_SUCCESS)
-						message = lastLine;
-				} catch (IOException | InterruptedException e) {
-					status = STATUS_FAILURE;
-					message = e.toString();
-				}
+				String[] result = runLauncher(command);
+				status = Integer.parseInt(result[0]);
+				if (status != STATUS_SUCCESS)
+					message = result[1];
 			}
 		}
 		if (message != null)
@@ -382,6 +361,158 @@ public class PackageInstaller {
 				destroy(state, finalStatus == STATUS_SUCCESS);
 			}
 		});
+	}
+
+	/* Runs the launcher's command (ATL_INSTALL_COMMAND, ATL_UNINSTALL_COMMAND) with the caller as installer:
+	 * { status (exit status as PackageInstaller.STATUS_*), last line on stderr or the exception } */
+	private static String[] runLauncher(List<String> command) {
+		try {
+			ProcessBuilder pb = new ProcessBuilder(command);
+			Map<String, String> env = pb.environment();
+			env.put("ATL_INSTALLER_PACKAGE", ownPackage());
+			CharSequence label = appContext().getApplicationInfo().loadLabel(appContext().getPackageManager());
+			env.put("ATL_INSTALLER_LABEL", label != null ? label.toString() : ownPackage());
+			pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+			java.lang.Process p = pb.start();
+			String lastLine = null;
+			try (BufferedReader err = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+				String line;
+				while ((line = err.readLine()) != null) {
+					System.err.println(line);
+					if (!line.trim().isEmpty())
+						lastLine = line.trim();
+				}
+			}
+			int exit = p.waitFor();
+			int status = (exit >= STATUS_SUCCESS && exit <= STATUS_FAILURE_TIMEOUT) ? exit : STATUS_FAILURE;
+			return new String[] {String.valueOf(status), lastLine};
+		} catch (IOException | InterruptedException e) {
+			return new String[] {String.valueOf(STATUS_FAILURE), e.toString()};
+		}
+	}
+
+	private static List<String> launcherCommand(String variable, String packageName) {
+		String command = System.getenv(variable);
+		if (command == null || command.trim().isEmpty())
+			return null;
+		List<String> out = new ArrayList<>(Arrays.asList(command.trim().split("\\s+")));
+		out.add(packageName);
+		return out;
+	}
+
+	/* AOSP: PackageInstallerService.uninstall() through the system's UninstallerActivity, which asks the user.
+	 * ATL hands the package to ATL_UNINSTALL_COMMAND (the launcher asks and uninstalls; exit status as for
+	 * installs) and, like the system, tells the app with ACTION_PACKAGE_REMOVED. `done` gets the status. */
+	private static void uninstallPackage(final String packageName, final java.util.function.IntConsumer done) {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				List<String> command = launcherCommand("ATL_UNINSTALL_COMMAND", packageName);
+				final int status;
+				if (command == null || !android.atl.ATLLoadedAppManager.isInstalled(packageName)) {
+					Slog.w(TAG, "cannot uninstall " + packageName + (command == null ? ": no ATL_UNINSTALL_COMMAND" : ": not installed"));
+					status = STATUS_FAILURE;
+				} else {
+					status = Integer.parseInt(runLauncher(command)[0]);
+				}
+				Slog.i(TAG, "uninstall " + packageName + ": status " + status);
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
+					@Override
+					public void run() {
+						if (status == STATUS_SUCCESS) {
+							Intent removed = new Intent(Intent.ACTION_PACKAGE_REMOVED, Uri.fromParts("package", packageName, null));
+							removed.putExtra(Intent.EXTRA_REPLACING, false);
+							appContext().sendBroadcast(removed);
+						}
+						done.accept(status);
+					}
+				});
+			}
+		}, "PackageInstaller-uninstall").start();
+	}
+
+	public void uninstall(final String packageName, final IntentSender statusReceiver) {
+		uninstallPackage(packageName, new java.util.function.IntConsumer() {
+			@Override
+			public void accept(int status) {
+				if (statusReceiver == null)
+					return;
+				Intent fillIn = new Intent();
+				fillIn.putExtra(EXTRA_PACKAGE_NAME, packageName);
+				fillIn.putExtra(EXTRA_STATUS, status);
+				try {
+					statusReceiver.sendIntent(appContext(), 0, fillIn, null, null);
+				} catch (IntentSender.SendIntentException e) {
+					Slog.w(TAG, "uninstall status not delivered: " + e);
+				}
+			}
+		});
+	}
+
+	/* package:<name> and market: intents (AOSP: the system's UninstallerActivity and Settings' app info; the store
+	 * app that has a filter for market:). None of them goes to the desktop's «Open with». Returns false for other
+	 * intents; `result` (may be null) gets an activity result: RESULT_OK, RESULT_CANCELED, or 1
+	 * (RESULT_FIRST_USER, failed) like UninstallerActivity with EXTRA_RETURN_RESULT. */
+	public static boolean handlePackageIntent(Context context, Intent intent, final java.util.function.IntConsumer result) {
+		Uri data = intent != null ? intent.getData() : null;
+		if (data == null)
+			return false;
+		String action = intent.getAction();
+		if ("package".equals(data.getScheme())) {
+			String packageName = data.getSchemeSpecificPart();
+			if (Intent.ACTION_DELETE.equals(action) || Intent.ACTION_UNINSTALL_PACKAGE.equals(action)) {
+				uninstallPackage(packageName, new java.util.function.IntConsumer() {
+					@Override
+					public void accept(int status) {
+						if (result != null)
+							result.accept(status == STATUS_SUCCESS ? -1 : status == STATUS_FAILURE_ABORTED ? 0 : 1);
+					}
+				});
+			} else if ("android.settings.APPLICATION_DETAILS_SETTINGS".equals(action)) {
+				List<String> command = launcherCommand("ATL_APP_DETAILS_COMMAND", packageName);
+				try {
+					if (command != null)
+						new ProcessBuilder(command).inheritIO().start();
+				} catch (IOException e) {
+					Slog.w(TAG, "cannot show the details of " + packageName + ": " + e);
+				}
+			} else {
+				Slog.w(TAG, "not handled: " + intent);
+			}
+			return true;
+		}
+		if ("market".equals(data.getScheme())) {
+			String store = marketApp(intent);
+			if (store == null)
+				throw new android.content.ActivityNotFoundException("No Activity found to handle " + intent);
+			android.atl.ATLLoadedAppManager.startInstalledApp(context.getPackageName(), store, data.toString());
+			return true;
+		}
+		return false;
+	}
+
+	/* the installed app (not the caller) with an activity whose filter takes the market: link, e.g. Aurora Store */
+	private static String marketApp(Intent intent) {
+		String[] files = android.atl.ATLPaths.installed_apks_dir.list();
+		if (files == null)
+			return null;
+		Arrays.sort(files);
+		for (String file : files) {
+			if (!file.endsWith(".apk"))
+				continue;
+			String name = file.substring(0, file.length() - 4);
+			if (name.equals(ownPackage()))
+				continue;
+			PackageParser.Package pkg = android.atl.ATLLoadedAppManager.getPackageFromPackageName(name);
+			if (pkg == null)
+				continue;
+			for (PackageParser.Activity activity : pkg.activities)
+				for (PackageParser.IntentInfo filter : activity.intents)
+					if (filter.hasCategory(Intent.CATEGORY_DEFAULT) &&
+					    filter.match(intent.getAction(), null, "market", intent.getData(), intent.getCategories(), TAG) > 0)
+						return name;
+		}
+		return null;
 	}
 
 	public static class Session implements java.io.Closeable {

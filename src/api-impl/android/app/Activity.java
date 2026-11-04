@@ -114,12 +114,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		/* a link from the desktop, like a browser starts it on Android: VIEW, BROWSABLE, for an activity with
 		 * a matching filter in CATEGORY_DEFAULT (MATCH_DEFAULT_ONLY) */
 		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : new Intent();
-		/* a local file comes with its type, as from a file manager on Android (Intent.setDataAndType()); players
-		 * decide by it whether to show a video (VLC's StartActivity plays it in the background without one) */
-		if (uri != null && "file".equals(uri.getScheme())) {
-			String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(uriString));
-			if (type != null)
-				intent.setDataAndType(uri, type);
+		/* a local file: VIEW with its type, else SEND, as from a file manager on Android */
+		if (className == null && uri != null && "file".equals(uri.getScheme())) {
+			Intent file = desktopFileIntent(uri);
+			if (file != null) {
+				intent = file;
+				className = file.getComponent().getClassName();
+			}
 		}
 		if (className == null) {
 			int best = 0;
@@ -156,6 +157,63 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			System.exit(1);
 		}
 		return internalCreateActivity(className, native_window, intent);
+	}
+
+	/**
+	 * A file the desktop hands to the app («Open with»), like a file manager on Android: VIEW with the file's type
+	 * (Intent.setDataAndType(); players decide by it whether to show a video) for an activity that takes it, else
+	 * what the share sheet sends: SEND (or SEND_MULTIPLE with one item) with a content URI in EXTRA_STREAM and
+	 * ClipData, readable (FLAG_GRANT_READ_URI_PERMISSION). Returns the intent with its activity, or null.
+	 */
+	public static Intent desktopFileIntent(Uri file) {
+		String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(file.toString()));
+		Intent view = new Intent(Intent.ACTION_VIEW);
+		if (type != null)
+			view.setDataAndType(file, type);
+		else
+			view.setData(file);
+		ComponentName viewer = ownActivityFor(view, file);
+		if (viewer != null)
+			return view.setComponent(viewer);
+		Uri content = android.content.ContentResolver.atlUriForFile(file.getPath());
+		for (String action : new String[] {Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE}) {
+			Intent send = new Intent(action).setType(type != null ? type : "application/octet-stream");
+			ComponentName target = ownActivityFor(send, content);
+			if (target == null)
+				continue;
+			if (Intent.ACTION_SEND.equals(action)) {
+				send.putExtra(Intent.EXTRA_STREAM, content);
+			} else {
+				java.util.ArrayList<Uri> uris = new java.util.ArrayList<>();
+				uris.add(content);
+				send.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+			}
+			send.setClipData(android.content.ClipData.newRawUri(null, content));
+			send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+			return send.setComponent(target);
+		}
+		return null;
+	}
+
+	/* the app's activity whose filter in CATEGORY_DEFAULT matches best (MATCH_DEFAULT_ONLY), with `data` as the URI */
+	private static ComponentName ownActivityFor(Intent intent, Uri data) {
+		PackageParser.Package pkg = ATLLoadedApp.getPrimaryApplication().pkg;
+		String className = null;
+		int best = 0;
+		for (PackageParser.Activity activity : pkg.activities) {
+			if (!activity.info.enabled)
+				continue;
+			for (PackageParser.IntentInfo filter : activity.intents) {
+				if (!filter.hasCategory(Intent.CATEGORY_DEFAULT))
+					continue;
+				int score = filter.match(intent.getAction(), intent.getType(), data.getScheme(), data, intent.getCategories(), TAG);
+				if (score > best) {
+					className = activity.info.targetActivity != null ? activity.info.targetActivity : activity.className;
+					best = score;
+				}
+			}
+		}
+		return className != null ? new ComponentName(pkg.packageName, className) : null;
 	}
 
 	public Activity() {
@@ -427,6 +485,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		Slog.i(TAG, "startActivityForResult(" + intent + ", " + requestCode + "," + options + ") called");
 		/* AOSP: the system's PackageInstallerActivity confirms a PackageInstaller session */
 		if (android.content.pm.PackageInstaller.handleConfirmIntent(intent))
+			return;
+		/* package: (uninstall, app info) and market: intents never go to the desktop */
+		if (android.content.pm.PackageInstaller.handlePackageIntent(this, intent, requestCode < 0 ? null : new java.util.function.IntConsumer() {
+			    @Override
+			    public void accept(int resultCode) {
+				    onActivityResult(requestCode, resultCode, new Intent());
+			    }
+		    }))
 			return;
 		if (intent.getComponent() != null && android.atl.ATLLoadedAppManager.startInstalledApp(getPackageName(), intent.getComponent().getPackageName())) {
 			return;

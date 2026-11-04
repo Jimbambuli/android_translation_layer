@@ -212,6 +212,9 @@ public abstract class Context {
 	protected static native void native_updateConfigFromWindow(long window, Configuration config);
 	protected static native void nativeOpenFile(int fd);
 	protected static native void nativeShareFile(String text, int fd, String[] labels);
+	/* the desktop's choice of applications (OpenURI portal with «ask») for a file (fd) or a link; false without
+	 * the portal */
+	protected static native boolean nativeOpenWith(int fd, String uri);
 	private static native void nativeExportUnifiedPush(String packageName);
 	private static native void nativeRegisterUnifiedPush(String token, String application);
 	protected static native void nativeStartExternalService(Intent service);

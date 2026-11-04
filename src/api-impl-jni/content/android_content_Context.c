@@ -218,6 +218,40 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeOpenFile(JNIEnv *env, 
 	g_object_unref(connection);
 }
 
+/* the desktop's choice of applications for a shared file or link: OpenURI with «ask» (the dialog of the desktop's
+ * portal); FALSE if the portal does not take the call, then ATL's share sheet is shown */
+JNIEXPORT jboolean JNICALL Java_android_content_Context_nativeOpenWith(JNIEnv *env, jclass class, jint fd, jstring uri_jstr)
+{
+	GDBusConnection *connection = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+	if (!connection)
+		return JNI_FALSE;
+	GError *error = NULL;
+	OpenURI *openuri = open_uri_proxy_new_sync(connection, 0, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", NULL, &error);
+	gboolean ok = FALSE;
+	if (openuri) {
+		GVariantBuilder opt_builder;
+		g_variant_builder_init(&opt_builder, G_VARIANT_TYPE_VARDICT);
+		g_variant_builder_add(&opt_builder, "{sv}", "ask", g_variant_new_boolean(TRUE));
+		if (fd >= 0) {
+			GUnixFDList *fd_list = g_unix_fd_list_new_from_array((int[]){dup(fd)}, 1);
+			ok = open_uri_call_open_file_sync(openuri, "", g_variant_new("h", 0), g_variant_builder_end(&opt_builder), fd_list, NULL, NULL, NULL, &error);
+			g_object_unref(fd_list);
+		} else if (uri_jstr) {
+			const char *uri = (*env)->GetStringUTFChars(env, uri_jstr, NULL);
+			ok = open_uri_call_open_uri_sync(openuri, "", uri, g_variant_builder_end(&opt_builder), NULL, NULL, &error);
+			(*env)->ReleaseStringUTFChars(env, uri_jstr, uri);
+		} else {
+			g_variant_builder_clear(&opt_builder);
+		}
+		g_object_unref(openuri);
+	}
+	if (!ok && error)
+		fprintf(stderr, "nativeOpenWith: %s\n", error->message);
+	g_clear_error(&error);
+	g_object_unref(connection);
+	return ok;
+}
+
 char *fd_get_path(int fd)
 {
 	char *fdlink = g_strdup_printf("/proc/self/fd/%d", fd);

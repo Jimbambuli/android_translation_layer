@@ -284,6 +284,61 @@ public final class ContextImpl extends Context {
 		return className;
 	}
 
+	/* ACTION_SEND / SEND_MULTIPLE without a target (AOSP: the chooser). A file or a link goes to the desktop's own
+	 * choice of applications (OpenURI portal, «ask»); text, or without the portal, gets ATL's share sheet (copy,
+	 * mail, save). SEND_MULTIPLE hands over its first file. */
+	private void share(Intent intent, CharSequence chooser_title) {
+		Slog.i(TAG, "share: " + intent);
+		final String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+		Uri stream = null;
+		Object extra = intent.getExtras() != null ? intent.getExtras().get(Intent.EXTRA_STREAM) : null;
+		if (extra instanceof Uri)
+			stream = (Uri)extra;
+		else if (extra instanceof java.util.List && !((java.util.List<?>)extra).isEmpty() && ((java.util.List<?>)extra).get(0) instanceof Uri)
+			stream = (Uri)((java.util.List<?>)extra).get(0);
+		ParcelFileDescriptor fd = null;
+		if (stream != null) {
+			try {
+				fd = getContentResolver().openFileDescriptor(stream, "r");
+			} catch (FileNotFoundException | SecurityException e) {
+				e.printStackTrace();
+			}
+		}
+		final String link = fd == null && text != null && isLink(text.trim()) ? text.trim() : null;
+		final ParcelFileDescriptor fd_final = fd;
+		final String[] labels = {chooser_title != null ? chooser_title.toString() : getString(com.android.internal.R.string.share),
+		                         getString(com.android.internal.R.string.copy),
+		                         getString(com.android.internal.R.string.autofill_save_yes)};
+		Runnable runnable = new Runnable() {
+			@Override
+			public void run() {
+				boolean asked = (fd_final != null || link != null) && nativeOpenWith(fd_final != null ? fd_final.getFd() : -1, link);
+				if (!asked)
+					nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1, labels);
+				if (fd_final != null) {
+					try {
+						fd_final.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		};
+		if (Looper.myLooper() == Looper.getMainLooper())
+			runnable.run();
+		else
+			new Handler(Looper.getMainLooper()).post(runnable);
+	}
+
+	/* one URI with a scheme and nothing else (what NewPipe or a browser shares), not prose with a link in it */
+	private static boolean isLink(String text) {
+		if (text.isEmpty() || text.length() > 8192 || text.matches("(?s).*\\s.*"))
+			return false;
+		Uri uri = Uri.parse(text);
+		return uri.getScheme() != null && uri.getScheme().matches("[a-zA-Z][a-zA-Z0-9+.-]*")
+		    && !"file".equalsIgnoreCase(uri.getScheme()) && !"content".equalsIgnoreCase(uri.getScheme());
+	}
+
 	@Override
 	public void startActivity(Intent intent) {
 		Slog.i(TAG, "startActivity(" + intent + ") called");
@@ -295,6 +350,8 @@ public final class ContextImpl extends Context {
 			chooser_title = intent.getCharSequenceExtra(Intent.EXTRA_TITLE);
 			intent = (Intent)intent.getExtras().get("android.intent.extra.INTENT");
 		}
+		if (android.content.pm.PackageInstaller.handlePackageIntent(this, intent, null))
+			return;
 
 		String className = null;
 		if (intent.getComponent() != null) {
@@ -302,40 +359,16 @@ public final class ContextImpl extends Context {
 				return;
 			className = intent.getComponent().getClassName();
 		} else {
-			if (intent.getAction() != null && intent.getAction().equals("android.intent.action.SEND")) {
-				Slog.i(TAG, "sharing intent via composeMail: " + intent);
-				String text = intent.getStringExtra("android.intent.extra.TEXT");
-				ParcelFileDescriptor fd = null;
-				if (intent.hasExtra(Intent.EXTRA_STREAM)) {
-					try {
-						fd = getContentResolver().openFileDescriptor((Uri)intent.getParcelableExtra(Intent.EXTRA_STREAM), "r");
-					} catch (FileNotFoundException e) {
-						e.printStackTrace();
-					}
-				}
-				final ParcelFileDescriptor fd_final = fd;
-				final String[] labels = {chooser_title != null ? chooser_title.toString() : getString(com.android.internal.R.string.share),
-				                         getString(com.android.internal.R.string.copy),
-				                         getString(com.android.internal.R.string.autofill_save_yes)};
-				Runnable runnable = new Runnable() {
-					@Override
-					public void run() {
-						nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1, labels);
-						if (fd_final != null) {
-							try {
-								fd_final.close();
-							} catch (IOException e) {
-								e.printStackTrace();
-							}
-						}
-					}
-				};
-				if (Looper.myLooper() == Looper.getMainLooper()) {
-					runnable.run();
-				} else {
-					new Handler(Looper.getMainLooper()).post(runnable);
-				}
+			if (Intent.ACTION_SEND.equals(intent.getAction()) || Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
+				share(intent, chooser_title);
 				return;
+			} else if (intent.getData() != null && "file".equals(intent.getData().getScheme())
+			           && this.atl_loaded_app.pkg.packageName.equals(intent.getPackage())
+			           && Activity.desktopFileIntent(intent.getData()) != null) {
+				/* a file the desktop hands to the running app (main.c: --uri while it runs) */
+				intent = Activity.desktopFileIntent(intent.getData());
+				className = intent.getComponent().getClassName();
+				Slog.i(TAG, "startActivity: " + className + " takes the file from the desktop: " + intent);
 			} else if (intent.getData() != null && (className = ownActivityForData(intent)) != null) {
 				Slog.i(TAG, "startActivity: " + className + " of the app takes " + intent.getData());
 			} else if (intent.getData() != null) {

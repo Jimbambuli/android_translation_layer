@@ -166,6 +166,11 @@ public final class ATLLoadedAppManager {
 	 * the caller's own, runs in the app's process (Play Services) or is not installed.
 	 */
 	public static boolean startInstalledApp(String callerPackageName, String packageName) {
+		return startInstalledApp(callerPackageName, packageName, null);
+	}
+
+	/* uri: a link for the app, as from its menu entry (--uri) */
+	public static boolean startInstalledApp(String callerPackageName, String packageName, String uri) {
 		if (packageName == null || packageName.equals(callerPackageName) ||
 		    always_visible_packages.contains(packageName) || !isInstalled(packageName))
 			return false;
@@ -173,10 +178,14 @@ public final class ATLLoadedAppManager {
 		String launchCommand = System.getenv("ATL_LAUNCH_COMMAND");
 		if (launchCommand != null && !launchCommand.trim().isEmpty()) {
 			command.addAll(Arrays.asList(launchCommand.trim().split("\\s+")));
+			if (uri != null)
+				command.addAll(Arrays.asList("--uri", uri));
 			command.add(packageName);
 		} else {
 			command.addAll(Arrays.asList("/usr/bin/env", "android-translation-layer",
 			                             new File(ATLPaths.installed_apks_dir, packageName + ".apk").getPath()));
+			if (uri != null)
+				command.add("--uri=" + uri);
 		}
 		Slog.i(TAG, "starting installed app " + packageName + ": " + command);
 		try {
