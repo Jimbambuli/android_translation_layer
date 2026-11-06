@@ -385,6 +385,22 @@ public final class Bitmap implements Parcelable {
 		native_get_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
 	}
 
+	public boolean sameAs(Bitmap other) {
+		if (this == other)
+			return true;
+		if (other == null)
+			return false;
+		if (isRecycled() || other.isRecycled())
+			throw new IllegalArgumentException("Can't compare a recycled bitmap!");
+		if (getWidth() != other.getWidth() || getHeight() != other.getHeight() || getConfig() != other.getConfig())
+			return false;
+		int[] a = new int[getWidth() * getHeight()];
+		int[] b = new int[a.length];
+		getPixels(a, 0, getWidth(), 0, 0, getWidth(), getHeight());
+		other.getPixels(b, 0, getWidth(), 0, 0, getWidth(), getHeight());
+		return java.util.Arrays.equals(a, b);
+	}
+
 	public int getPixel(int x, int y) {
 		int[] pixels = new int[1];
 		native_get_pixels(getTexture(), pixels, 0, 1, x, y, 1, 1);
