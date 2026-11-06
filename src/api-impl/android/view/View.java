@@ -2861,6 +2861,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			backgroundDrawable.setCallback(this);
 			if (backgroundTint != 0)
 				backgroundDrawable.setTint(backgroundTint);
+			applyBackgroundTint();
 			/* View.setBackgroundDrawable() of android-14: the padding of the background (the insets of an
 			 * InsetDrawable, a nine-patch's padding) becomes the view's padding, so that a window or view
 			 * with such a background is measured and laid out with room for it */
@@ -4153,7 +4154,30 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return clipBounds != null ? new Rect(clipBounds) : null;
 	}
 
-	public void setBackgroundTintList(ColorStateList tint) {}
+	/* AOSP View.setBackgroundTintList(): the tint (ColorStateList, stateful) and mode of the background
+	 * drawable; AppCompat's ViewCompat and the Material buttons colour their backgrounds this way */
+	private ColorStateList mBackgroundTintList;
+	private PorterDuff.Mode mBackgroundTintMode;
+	private boolean mHasBackgroundTintList;
+	private boolean mHasBackgroundTintMode;
+
+	public void setBackgroundTintList(ColorStateList tint) {
+		mBackgroundTintList = tint;
+		mHasBackgroundTintList = true;
+		applyBackgroundTint();
+	}
+
+	private void applyBackgroundTint() {
+		if (background != null && (mHasBackgroundTintList || mHasBackgroundTintMode)) {
+			background = background.mutate();
+			if (mHasBackgroundTintList)
+				background.setTintList(mBackgroundTintList);
+			if (mHasBackgroundTintMode)
+				background.setTintMode(mBackgroundTintMode);
+			if (background.isStateful())
+				background.setState(getDrawableState());
+		}
+	}
 
 	protected int computeHorizontalScrollRange() {
 		return getWidth();
@@ -4413,9 +4437,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setScrollIndicators(int indicators, int mask) {}
 
 
-	public ColorStateList getBackgroundTintList() { return null; }
+	public ColorStateList getBackgroundTintList() { return mBackgroundTintList; }
 
-	public PorterDuff.Mode getBackgroundTintMode() { return null; }
+	public PorterDuff.Mode getBackgroundTintMode() { return mBackgroundTintMode; }
 
 	public String getTransitionName() { return null; }
 
@@ -4982,7 +5006,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public boolean isDuplicateParentStateEnabled() { return duplicate_parent_state; }
 
-	public void setBackgroundTintMode(PorterDuff.Mode tintMode) {}
+	public void setBackgroundTintMode(PorterDuff.Mode tintMode) {
+		mBackgroundTintMode = tintMode;
+		mHasBackgroundTintMode = true;
+		applyBackgroundTint();
+	}
 
 	int mNextFocusLeftId = NO_ID;
 	int mNextFocusRightId = NO_ID;
