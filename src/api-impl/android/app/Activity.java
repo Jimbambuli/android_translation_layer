@@ -1653,10 +1653,21 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		onPostCreate(state);
 	}
 
+	/* AOSP Activity.getLoaderManager(): the activity's loaders, started and stopped with it */
+	private LoaderManagerImpl mLoaderManager;
+
+	public LoaderManager getLoaderManager() {
+		if (mLoaderManager == null)
+			mLoaderManager = new LoaderManagerImpl("(root)", this, started);
+		return mLoaderManager;
+	}
+
 	@Export
 	private void performStart() {
 		dispatchActivityPreStarted();
 		onStart();
+		if (mLoaderManager != null)
+			mLoaderManager.doStart();
 		dispatchActivityPostStarted();
 		started = true;
 		performPostStart();
@@ -1705,6 +1716,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			savedState = performSaveInstanceState();
 		dispatchActivityPreStopped();
 		onStop();
+		if (mLoaderManager != null)
+			mLoaderManager.doStop();
 		dispatchActivityPostStopped();
 		started = false;
 		stopped = true;
@@ -1723,6 +1736,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private void performDestroy() {
 		dispatchActivityPreDestroyed();
 		onDestroy();
+		if (mLoaderManager != null)
+			mLoaderManager.doDestroy();
 		dispatchActivityPostDestroyed();
 		Dialog.closeWindowsOf(this);
 		if (window != null)
