@@ -578,6 +578,11 @@ public class Canvas {
 		drawColor(Color.argb(a, r, g, b));
 	}
 
+	public static final int MATRIX_SAVE_FLAG = 0x01;
+	public static final int FULL_COLOR_LAYER_SAVE_FLAG = 0x08;
+	public static final int CLIP_TO_LAYER_SAVE_FLAG = 0x10;
+	public static final int ALL_SAVE_FLAG = 0x1F;
+
 	public int saveLayer(RectF bounds, Paint paint, int flags) {
 		return save();
 	}
@@ -588,6 +593,32 @@ public class Canvas {
 
 	public int saveLayer(float left, float top, float right, float bottom, Paint paint) {
 		return save();
+	}
+
+	public int saveLayer(float left, float top, float right, float bottom, Paint paint, int flags) {
+		return saveLayer(left, top, right, bottom, paint);
+	}
+
+	/* AOSP Canvas.saveLayerAlpha(): saveLayer() with a paint that only has the alpha */
+	public int saveLayerAlpha(RectF bounds, int alpha, int saveFlags) {
+		if (bounds == null)
+			bounds = new RectF(getClipBounds());
+		return saveLayerAlpha(bounds.left, bounds.top, bounds.right, bounds.bottom, alpha, saveFlags);
+	}
+
+	public int saveLayerAlpha(RectF bounds, int alpha) {
+		return saveLayerAlpha(bounds, alpha, ALL_SAVE_FLAG);
+	}
+
+	public int saveLayerAlpha(float left, float top, float right, float bottom, int alpha, int saveFlags) {
+		alpha = Math.min(255, Math.max(0, alpha));
+		Paint paint = new Paint();
+		paint.setAlpha(alpha);
+		return saveLayer(left, top, right, bottom, paint, saveFlags);
+	}
+
+	public int saveLayerAlpha(float left, float top, float right, float bottom, int alpha) {
+		return saveLayerAlpha(left, top, right, bottom, alpha, ALL_SAVE_FLAG);
 	}
 
 	public void drawOval(RectF oval, Paint paint) {

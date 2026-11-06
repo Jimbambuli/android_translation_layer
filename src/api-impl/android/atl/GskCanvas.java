@@ -46,6 +46,40 @@ public class GskCanvas extends DisplayListCanvas {
 		native_restore(snapshot);
 	}
 
+	/* AOSP saveLayer(): what is drawn until restore() is composed as a group, clipped to the bounds, with the
+	 * paint's alpha (ATL has no blend modes or color filters for a layer) */
+	private int saveLayerOf(float left, float top, float right, float bottom, boolean clip, Paint paint) {
+		int count = save();
+		if (clip)
+			clipRect(left, top, right, bottom);
+		int alpha = paint != null ? paint.getAlpha() : 255;
+		if (alpha != 255) {
+			native_pushOpacity(snapshot, alpha / 255f);
+			int save_count = getSaveCount();
+			if (push_history == null)
+				push_history = new int[save_count + 1];
+			else if (push_history.length <= save_count)
+				push_history = Arrays.copyOf(push_history, save_count + 1);
+			push_history[save_count]++;
+		}
+		return count;
+	}
+
+	@Override
+	public int saveLayer(RectF bounds, Paint paint, int flags) {
+		return bounds != null ? saveLayerOf(bounds.left, bounds.top, bounds.right, bounds.bottom, true, paint) : saveLayerOf(0, 0, 0, 0, false, paint);
+	}
+
+	@Override
+	public int saveLayer(RectF bounds, Paint paint) {
+		return saveLayer(bounds, paint, ALL_SAVE_FLAG);
+	}
+
+	@Override
+	public int saveLayer(float left, float top, float right, float bottom, Paint paint) {
+		return saveLayerOf(left, top, right, bottom, true, paint);
+	}
+
 	@Override
 	public int getSaveCount() {
 		return state_stack.size();
@@ -316,5 +350,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_clipRect(long snapshot, float left, float top, float right, float bottom);
 	protected native void native_clipPath(long snapshot, long path, int fill_rule);
 	protected native void native_pop(long snapshot, int pop_count);
+
+	protected native void native_pushOpacity(long snapshot, float opacity);
 	protected native void native_drawRenderNode(long snapshot, long render_node);
 }

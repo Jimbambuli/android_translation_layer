@@ -45,4 +45,13 @@ public class AutofillManager {
 	public boolean isEnabled() {
 		return false;
 	}
+
+	/* AOSP: no autofill service is enabled, as ATL has none */
+	public boolean hasEnabledAutofillServices() {
+		return false;
+	}
+
+	public boolean isAutofillSupported() {
+		return false;
+	}
 }
