@@ -1,6 +1,6 @@
 package android.net;
 
-public class NetworkInfo {
+public class NetworkInfo implements android.os.Parcelable {
 	public enum State {
 		CONNECTED,
 		CONNECTING,
@@ -47,7 +47,7 @@ public class NetworkInfo {
 	}
 
 	public String getTypeName() {
-		return "UNKNOWN";
+		return state == State.CONNECTED ? "WIFI" : "UNKNOWN";
 	}
 
 	public String getSubtypeName() {
@@ -55,7 +55,7 @@ public class NetworkInfo {
 	}
 
 	public boolean isAvailable() {
-		return false;
+		return state == State.CONNECTED;
 	}
 
 	public DetailedState getDetailedState() {
@@ -69,4 +69,22 @@ public class NetworkInfo {
 	public String getReason() {
 		return null;
 	}
+
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(state == State.CONNECTED ? 1 : 0);
+	}
+
+	public static final Creator<NetworkInfo> CREATOR = new Creator<NetworkInfo>() {
+		public NetworkInfo createFromParcel(android.os.Parcel in) {
+			return new NetworkInfo(in.readInt() != 0);
+		}
+
+		public NetworkInfo[] newArray(int size) {
+			return new NetworkInfo[size];
+		}
+	};
 }

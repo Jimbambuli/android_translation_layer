@@ -2,6 +2,9 @@ package android.net;
 
 import android.app.PendingIntent;
 import android.atl.annotation.Export;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Handler;
 import android.os.HandlerThread;
 import java.util.ArrayList;
@@ -9,6 +12,33 @@ import java.util.ArrayList;
 class ProxyInfo {}
 
 public class ConnectivityManager {
+	public static final String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
+	public static final String EXTRA_NO_CONNECTIVITY = "noConnectivity";
+	public static final String EXTRA_REASON = "reason";
+	public static final String EXTRA_IS_FAILOVER = "isFailover";
+	public static final String EXTRA_NETWORK_INFO = "networkInfo";
+	public static final String EXTRA_EXTRA_INFO = "extraInfo";
+	public static final String EXTRA_NETWORK_TYPE = "networkType";
+	public static final int TYPE_MOBILE = 0;
+	public static final int TYPE_WIFI = 1;
+	public static final int TYPE_ETHERNET = 9;
+	public static final int TYPE_VPN = 17;
+
+	/* AOSP ConnectivityService.sendGeneralBroadcast(): the sticky CONNECTIVITY_ACTION of the default network */
+	static Intent connectivityIntent() {
+		boolean available = nativeGetNetworkAvailable();
+		Intent intent = new Intent(CONNECTIVITY_ACTION);
+		intent.putExtra(EXTRA_NETWORK_TYPE, available ? TYPE_WIFI : TYPE_MOBILE);
+		intent.putExtra(EXTRA_NO_CONNECTIVITY, !available);
+		intent.putExtra(EXTRA_IS_FAILOVER, false);
+		intent.putExtra(EXTRA_NETWORK_INFO, new NetworkInfo(available));
+		return intent;
+	}
+
+	/* AOSP: a receiver registered for CONNECTIVITY_ACTION gets the sticky broadcast at once */
+	public static Intent stickyIntentFor(IntentFilter filter) {
+		return filter != null && filter.matchAction(CONNECTIVITY_ACTION) ? connectivityIntent() : null;
+	}
 
 	// static like in AOSP: apps call the no-argument constructor of their subclasses
 	public static class NetworkCallback {
@@ -219,6 +249,7 @@ public class ConnectivityManager {
 			for (Registration r : registrations)
 				notify(r, available);
 		}
+		Context.sendBroadcastToReceivers(connectivityIntent());
 	}
 
 	public ProxyInfo getDefaultProxy() { return null; }

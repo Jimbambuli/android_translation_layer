@@ -264,10 +264,21 @@ public abstract class Context {
 
 	public abstract String getSystemServiceName(Class<?> serviceClass);
 
-	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter) {
+	public Intent registerReceiver(final BroadcastReceiver receiver, IntentFilter filter) {
 		if (receiver == null)
 			return null;
 		receiverMap.put(filter, receiver);
+		// like AOSP: the sticky broadcast of the system is delivered to the new receiver at once, on the main thread
+		final Intent sticky = android.net.ConnectivityManager.stickyIntentFor(filter);
+		if (sticky != null) {
+			final Context context = this;
+			new Handler(Looper.getMainLooper()).post(new Runnable() {
+				public void run() {
+					receiver.onReceive(context, sticky);
+				}
+			});
+			return sticky;
+		}
 		return new Intent();
 	}
 
@@ -744,6 +755,19 @@ public abstract class Context {
 		ATLLoadedApp target = targetPackage != null ? ATLLoadedAppManager.getAppFromPackageName(targetPackage) : ATLLoadedApp.getPrimaryApplication();
 		if (target != null)
 			target.receiveBroadcast(this, intent);
+	}
+
+	/* a broadcast of the system: to the receivers registered at run time, on the main thread */
+	public static void sendBroadcastToReceivers(final Intent intent) {
+		for (final java.util.Map.Entry<IntentFilter, BroadcastReceiver> e : receiverMap.entrySet()) {
+			if (e.getKey().matchAction(intent.getAction())) {
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
+					public void run() {
+						e.getValue().onReceive(android.app.ActivityThread.currentApplication(), intent);
+					}
+				});
+			}
+		}
 	}
 
 	public void sendBroadcast(Intent intent, String receiverPermission) {
