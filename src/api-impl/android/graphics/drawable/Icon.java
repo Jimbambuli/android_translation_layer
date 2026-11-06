@@ -14,6 +14,7 @@ public class Icon {
 
 	public static final int TYPE_BITMAP = 1;
 	public static final int TYPE_RESOURCE = 2;
+	public static final int TYPE_ADAPTIVE_BITMAP = 5;
 
 	private final int mType;
 	private Object mObj1; // Bitmap or Resources
@@ -29,7 +30,7 @@ public class Icon {
 	}
 
 	public Bitmap getBitmap() {
-		if (mType != TYPE_BITMAP)
+		if (mType != TYPE_BITMAP && mType != TYPE_ADAPTIVE_BITMAP)
 			throw new IllegalStateException("called getBitmap() on " + this);
 		return (Bitmap)mObj1;
 	}
@@ -81,10 +82,20 @@ public class Icon {
 		return rep;
 	}
 
+	public static Icon createWithAdaptiveBitmap(Bitmap bits) {
+		if (bits == null)
+			throw new IllegalArgumentException("Bitmap must not be null.");
+		final Icon rep = new Icon(TYPE_ADAPTIVE_BITMAP);
+		rep.mObj1 = bits;
+		return rep;
+	}
+
 	public Drawable loadDrawable(Context context) {
 		switch (mType) {
 			case TYPE_BITMAP:
 				return new BitmapDrawable(context.getResources(), getBitmap());
+			case TYPE_ADAPTIVE_BITMAP:
+				return new AdaptiveIconDrawable(null, new BitmapDrawable(context.getResources(), getBitmap()));
 			case TYPE_RESOURCE:
 				Resources res = mObj1 instanceof Resources ? (Resources)mObj1 : null;
 				if (res == null) {
@@ -104,7 +115,7 @@ public class Icon {
 
 	@Override
 	public String toString() {
-		return "Icon(typ=" + (mType == TYPE_BITMAP ? "BITMAP" : "RESOURCE")
+		return "Icon(typ=" + (mType == TYPE_BITMAP ? "BITMAP" : mType == TYPE_ADAPTIVE_BITMAP ? "BITMAP_MASKABLE" : "RESOURCE")
 		    + (mType == TYPE_RESOURCE ? " pkg=" + mString1 + " id=" + String.format("0x%08x", mInt1) : "") + ")";
 	}
 }
