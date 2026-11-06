@@ -1436,9 +1436,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return baseState;
 	}
 
-	public View findViewById(int id) {
+	@SuppressWarnings("unchecked")
+	public <T extends View> T findViewById(int id) {
 		if (id != NO_ID && this.id == id) // as in AOSP: views without an id are not found by it
-			return this;
+			return (T) this;
 		else
 			return null;
 	}
@@ -4121,6 +4122,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (keepScreenOn)
 			native_keep_screen_on(widget, false);
 	}
+
+	public static final int LAYER_TYPE_NONE = 0;
+	public static final int LAYER_TYPE_SOFTWARE = 1;
+	public static final int LAYER_TYPE_HARDWARE = 2;
 
 	public void setLayerType(int layerType, Paint paint) {}
 

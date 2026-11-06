@@ -18,6 +18,7 @@ package android.app;
 
 import android.content.Loader;
 import android.os.Bundle;
+import android.util.DebugUtils;
 import android.util.Log;
 import android.util.SparseArray;
 
@@ -204,25 +205,10 @@ public abstract class LoaderManager {
     }
 
     /** @hide for internal testing only */
-    public Object getObject() { return null; }
+    public FragmentHostCallback getFragmentHostCallback() { return null; }
 }
 
 class LoaderManagerImpl extends LoaderManager {
-    /* AOSP DebugUtils.buildShortClassTag() */
-    static void shortTag(Object cls, StringBuilder out) {
-        if (cls == null) {
-            out.append("null");
-        } else {
-            String simpleName = cls.getClass().getSimpleName();
-            if (simpleName == null || simpleName.isEmpty()) {
-                simpleName = cls.getClass().getName();
-                int end = simpleName.lastIndexOf('.');
-                if (end > 0) simpleName = simpleName.substring(end + 1);
-            }
-            out.append(simpleName).append('{').append(Integer.toHexString(System.identityHashCode(cls)));
-        }
-    }
-
     static final String TAG = "LoaderManager";
     static boolean DEBUG = false;
 
@@ -244,7 +230,7 @@ class LoaderManagerImpl extends LoaderManager {
     boolean mRetainingStarted;
     
     boolean mCreatingLoader;
-    private Object mHost;
+    private FragmentHostCallback mHost;
 
     final class LoaderInfo implements Loader.OnLoadCompleteListener<Object>,
             Loader.OnLoadCanceledListener<Object> {
@@ -385,11 +371,14 @@ class LoaderManagerImpl extends LoaderManager {
                 if (DEBUG) Log.v(TAG, "  Reseting: " + this);
                 String lastBecause = null;
                 if (mHost != null) {
+                    lastBecause = mHost.mFragmentManager.mNoTransactionsBecause;
+                    mHost.mFragmentManager.mNoTransactionsBecause = "onLoaderReset";
                 }
                 try {
                     mCallbacks.onLoaderReset(mLoader);
                 } finally {
                     if (mHost != null) {
+                        mHost.mFragmentManager.mNoTransactionsBecause = lastBecause;
                     }
                 }
             }
@@ -491,6 +480,7 @@ class LoaderManagerImpl extends LoaderManager {
             }
 
             if (mHost != null && !hasRunningLoaders()) {
+                mHost.mFragmentManager.startPendingDeferredFragments();
             }
         }
 
@@ -498,6 +488,8 @@ class LoaderManagerImpl extends LoaderManager {
             if (mCallbacks != null) {
                 String lastBecause = null;
                 if (mHost != null) {
+                    lastBecause = mHost.mFragmentManager.mNoTransactionsBecause;
+                    mHost.mFragmentManager.mNoTransactionsBecause = "onLoadFinished";
                 }
                 try {
                     if (DEBUG) Log.v(TAG, "  onLoadFinished in " + loader + ": "
@@ -505,6 +497,7 @@ class LoaderManagerImpl extends LoaderManager {
                     mCallbacks.onLoadFinished(loader, data);
                 } finally {
                     if (mHost != null) {
+                        mHost.mFragmentManager.mNoTransactionsBecause = lastBecause;
                     }
                 }
                 mDeliveredData = true;
@@ -519,7 +512,7 @@ class LoaderManagerImpl extends LoaderManager {
             sb.append(" #");
             sb.append(mId);
             sb.append(" : ");
-            LoaderManagerImpl.shortTag(mLoader, sb);
+            DebugUtils.buildShortClassTag(mLoader, sb);
             sb.append("}}");
             return sb.toString();
         }
@@ -551,17 +544,17 @@ class LoaderManagerImpl extends LoaderManager {
         }
     }
     
-    LoaderManagerImpl(String who, Object host, boolean started) {
+    LoaderManagerImpl(String who, FragmentHostCallback host, boolean started) {
         mWho = who;
         mHost = host;
         mStarted = started;
     }
     
-    void updateHostController(Object host) {
+    void updateHostController(FragmentHostCallback host) {
         mHost = host;
     }
 
-    public Object getObject() {
+    public FragmentHostCallback getFragmentHostCallback() {
         return mHost;
     }
     
@@ -757,6 +750,7 @@ class LoaderManagerImpl extends LoaderManager {
             info.destroy();
         }
         if (mHost != null && !hasRunningLoaders()) {
+            mHost.mFragmentManager.startPendingDeferredFragments();
         }
     }
 
@@ -875,7 +869,7 @@ class LoaderManagerImpl extends LoaderManager {
         sb.append("LoaderManager{");
         sb.append(Integer.toHexString(System.identityHashCode(this)));
         sb.append(" in ");
-        LoaderManagerImpl.shortTag(mHost, sb);
+        DebugUtils.buildShortClassTag(mHost, sb);
         sb.append("}}");
         return sb.toString();
     }

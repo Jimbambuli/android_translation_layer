@@ -445,6 +445,16 @@ public class WebView extends ViewGroup {
 
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
 
+	/* AOSP WebView.getCurrentWebViewPackage(): the package of the WebView implementation; ATL's is WebKitGTK,
+	 * which is part of the runtime and not a package, so it is described as one */
+	public static android.content.pm.PackageInfo getCurrentWebViewPackage() {
+		android.content.pm.PackageInfo info = new android.content.pm.PackageInfo();
+		info.packageName = "org.webkit.webkitgtk";
+		info.versionName = "2.0";
+		info.versionCode = 1;
+		return info;
+	}
+
 	public void clearFormData() {}
 
 	public void clearHistory() {}

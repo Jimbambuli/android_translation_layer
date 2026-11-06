@@ -54,6 +54,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import android.util.ArrayMap;
+import android.os.Parcelable;
 import java.util.List;
 import java.util.Map;
 
@@ -91,7 +93,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private boolean stopped = false; // stopped and not started again: the next start is a restart
 	private Bundle savedState; // what it saved when it was last stopped, recreate() creates the new instance from it
 	private CharSequence title = null;
-	List<Fragment> fragments = new ArrayList<>();
+	final Handler mHandler = new Handler(Looper.getMainLooper());
+	final FragmentController mFragments = FragmentController.createController(new HostCallbacks());
+	static final String FRAGMENTS_TAG = "android:fragments";
+	private final HashMap<Integer, String> mFragmentResultWho = new HashMap<>();
 	boolean destroyed = false;
 	private boolean finishing = false;
 	private SizeConfigurationBuckets mSizeConfigurations;
@@ -264,9 +269,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	protected void onCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onCreate - yay!");
 
-		for (Fragment fragment : fragments) {
-			fragment.onCreate(savedInstanceState);
+		if (mLastNonConfigurationInstances != null) {
+			mFragments.restoreLoaderNonConfig(mLastNonConfigurationInstances.loaders);
 		}
+		if (savedInstanceState != null) {
+			Parcelable p = savedInstanceState.getParcelable(FRAGMENTS_TAG);
+			mFragments.restoreAllState(p, mLastNonConfigurationInstances != null ? mLastNonConfigurationInstances.fragments : null);
+		}
+		mFragments.dispatchCreate();
 		dispatchActivityCreated(savedInstanceState);
 
 		return;
@@ -281,9 +291,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		Slog.i(TAG, "- onStart - yay!");
 		window.setTitle(title);
 
-		for (Fragment fragment : fragments) {
-			fragment.onStart();
-		}
+		mFragments.doLoaderStart();
 		dispatchActivityStarted();
 
 		return;
@@ -299,9 +307,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		android.atl.ATLViewDump.resumed(this); // debugging aid (atl-doctor)
 		Slog.i(TAG, "- onResume - yay!");
 
-		for (Fragment fragment : fragments) {
-			fragment.onResume();
-		}
 		dispatchActivityResumed();
 
 		paused = false;
@@ -317,9 +322,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	protected void onPause() {
 		Slog.i(TAG, "- onPause - yay!");
 
-		for (Fragment fragment : fragments) {
-			fragment.onPause();
-		}
 		dispatchActivityPaused();
 
 		paused = true;
@@ -329,9 +331,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	protected void onStop() {
 		Slog.i(TAG, "- onStop - yay!");
 
-		for (Fragment fragment : fragments) {
-			fragment.onStop();
-		}
 		dispatchActivityStopped();
 
 		return;
@@ -340,9 +339,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	protected void onDestroy() {
 		Slog.i(TAG, "- onDestroy - yay!");
 
-		for (Fragment fragment : fragments) {
-			fragment.onDestroy();
-		}
 		dispatchActivityDestroyed();
 
 		destroyed = true;
@@ -366,13 +362,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	protected void onSaveInstanceState(Bundle outState) {
 		outState.putBundle(WINDOW_HIERARCHY_TAG, getWindow().saveHierarchyState());
+		Parcelable p = mFragments.saveAllState();
+		if (p != null) {
+			outState.putParcelable(FRAGMENTS_TAG, p);
+		}
 		dispatchActivitySaveInstanceState(outState);
 	}
 
 	public void onConfigurationChanged(Configuration newConfig) {
+		mFragments.dispatchConfigurationChanged(newConfig);
 	}
 
 	public void onLowMemory() {
+		mFragments.dispatchLowMemory();
+	}
+
+	public void onTrimMemory(int level) {
+		mFragments.dispatchTrimMemory(level);
 	}
 
 	/* --- */
@@ -426,7 +432,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	/* Activity.dispatchActivityResult(). ATL: only the results of activities (who == null); there are no
 	 * results for fragments, permission requests, views or autofill */
 	void dispatchActivityResult(String who, int requestCode, int resultCode, Intent data, String reason) {
-		onActivityResult(requestCode, resultCode, data);
+		mFragments.noteStateNotSaved();
+		if (who == null)
+			who = mFragmentResultWho.remove(requestCode);
+		Fragment frag = who != null ? mFragments.findFragmentByWho(who) : null;
+		if (frag != null)
+			frag.onActivityResult(requestCode, resultCode, data);
+		else
+			onActivityResult(requestCode, resultCode, data);
 	}
 
 	/* what finish() of the started activity does in ActivityRecord.finishIfPossible(): queue the result for
@@ -650,6 +663,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	static final class NonConfigurationInstances {
 		Object activity;
 		HashMap<String, Object> children;
+		FragmentManagerNonConfig fragments;
+		ArrayMap<String, LoaderManager> loaders;
 	}
 	NonConfigurationInstances mLastNonConfigurationInstances;
 
@@ -676,14 +691,22 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	NonConfigurationInstances retainNonConfigurationInstances() {
 		Object activity = onRetainNonConfigurationInstance();
 		HashMap<String, Object> children = onRetainNonConfigurationChildInstances();
+		FragmentManagerNonConfig fragments = mFragments.retainNestedNonConfig();
 
-		if (activity == null && children == null) {
+		// we are already stopped but asked to retain: mark the loaders for retention
+		mFragments.doLoaderStart();
+		mFragments.doLoaderStop(true);
+		ArrayMap<String, LoaderManager> loaders = mFragments.retainLoaderNonConfig();
+
+		if (activity == null && children == null && fragments == null && loaders == null) {
 			return null;
 		}
 
 		NonConfigurationInstances nci = new NonConfigurationInstances();
 		nci.activity = activity;
 		nci.children = children;
+		nci.fragments = fragments;
+		nci.loaders = loaders;
 		return nci;
 	}
 
@@ -707,7 +730,94 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	public FragmentManager getFragmentManager() {
-		return new FragmentManager(this);
+		return mFragments.getFragmentManager();
+	}
+
+	/* AOSP Activity.onAttachFragment() */
+	public void onAttachFragment(Fragment fragment) {
+	}
+
+	void startActivityFromFragment(Fragment fragment, Intent intent, int requestCode, Bundle options) {
+		if (requestCode >= 0)
+			mFragmentResultWho.put(requestCode, fragment.mWho);
+		startActivityForResult(intent, requestCode, options);
+	}
+
+	/* AOSP Activity.HostCallbacks */
+	class HostCallbacks extends FragmentHostCallback<Activity> {
+		public HostCallbacks() {
+			super(Activity.this /*activity*/);
+		}
+
+		@Override
+		public void onDump(String prefix, java.io.FileDescriptor fd, java.io.PrintWriter writer, String[] args) {
+		}
+
+		@Override
+		public boolean onShouldSaveFragmentState(Fragment fragment) {
+			return !isFinishing();
+		}
+
+		@Override
+		public LayoutInflater onGetLayoutInflater() {
+			final LayoutInflater result = Activity.this.getLayoutInflater();
+			if (onUseFragmentManagerInflaterFactory()) {
+				return result.cloneInContext(Activity.this);
+			}
+			return result;
+		}
+
+		@Override
+		public boolean onUseFragmentManagerInflaterFactory() {
+			return getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.LOLLIPOP;
+		}
+
+		@Override
+		public Activity onGetHost() {
+			return Activity.this;
+		}
+
+		@Override
+		public void onInvalidateOptionsMenu() {
+			Activity.this.invalidateOptionsMenu();
+		}
+
+		@Override
+		public void onStartActivityFromFragment(Fragment fragment, Intent intent, int requestCode, Bundle options) {
+			Activity.this.startActivityFromFragment(fragment, intent, requestCode, options);
+		}
+
+		@Override
+		public void onRequestPermissionsFromFragment(Fragment fragment, String[] permissions, int requestCode) {
+			Activity.this.requestPermissions(permissions, requestCode);
+		}
+
+		@Override
+		public boolean onHasWindowAnimations() {
+			return getWindow() != null;
+		}
+
+		@Override
+		public int onGetWindowAnimations() {
+			final Window w = getWindow();
+			return (w == null) ? 0 : w.getAttributes().windowAnimations;
+		}
+
+		@Override
+		public void onAttachFragment(Fragment fragment) {
+			Activity.this.onAttachFragment(fragment);
+		}
+
+		@Override
+		public <T extends View> T onFindViewById(int id) {
+			return Activity.this.findViewById(id);
+		}
+
+		@Override
+		public boolean onHasView() {
+			final Window w = getWindow();
+			return (w != null && w.peekDecorView() != null);
+		}
 	}
 
 	public LayoutInflater getLayoutInflater() {
@@ -738,7 +848,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		if (featureId == Window.FEATURE_OPTIONS_PANEL) {
 			// HACK: catch non critical error occuring in Open Sudoku app
 			try {
-				return onCreateOptionsMenu(menu);
+				boolean show = onCreateOptionsMenu(menu);
+				show |= mFragments.dispatchCreateOptionsMenu(menu, getMenuInflater());
+				return show;
 			} catch (Exception e) {
 				e.printStackTrace();
 				return false;
@@ -763,7 +875,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	@Override
 	public boolean onPreparePanel(int featureId, View view, Menu menu) {
 		if (featureId == Window.FEATURE_OPTIONS_PANEL && menu != null) {
-			return onPrepareOptionsMenu(menu);
+			boolean goforit = onPrepareOptionsMenu(menu);
+			goforit |= mFragments.dispatchPrepareOptionsMenu(menu);
+			return goforit;
 		}
 		return true;
 	}
@@ -771,7 +885,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	@Override
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
 		if (featureId == Window.FEATURE_OPTIONS_PANEL) {
-			return onOptionsItemSelected(item);
+			return onOptionsItemSelected(item) || mFragments.dispatchOptionsItemSelected(item);
 		}
 		return false;
 	}
@@ -786,6 +900,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public void onPanelClosed(int featureId, Menu menu) {
 		if (featureId == Window.FEATURE_OPTIONS_PANEL) {
 			onOptionsMenuClosed(menu);
+			mFragments.dispatchOptionsMenuClosed(menu);
 		}
 	}
 
@@ -1138,6 +1253,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mDefaultKeyMode = mode;
 	}
 	public void registerForContextMenu(View view) {}
+
+	public void onCreateContextMenu(android.view.ContextMenu menu, View v, android.view.ContextMenu.ContextMenuInfo menuInfo) {}
 	public native boolean isInMultiWindowMode();
 
 	/* AOSP Activity, picture-in-picture. The part of ActivityTaskManagerService (ATMS: the pinned task, which
@@ -1223,9 +1340,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	final void dispatchPictureInPictureModeChanged(boolean isInPictureInPictureMode,
 						       Configuration newConfig) {
-		for (Fragment fragment : fragments) {
-			fragment.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-		}
+		mFragments.dispatchPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
 		mIsInPictureInPictureMode = isInPictureInPictureMode;
 		onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
 	}
@@ -1620,6 +1735,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	/* called from native code instead of onCreate() etc., with the pre and post callbacks around them */
 	@Export
 	private void performCreate(Bundle savedInstanceState) {
+		mFragments.attachHost(null /*parent*/);
 		mCanEnterPictureInPicture = true;
 		mCurrentConfig = new Configuration(getResources().getConfiguration());
 		dispatchActivityPreCreated(savedInstanceState);
@@ -1630,6 +1746,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		} finally {
 			creating = outer;
 		}
+		mFragments.dispatchActivityCreated();
 		dispatchActivityPostCreated(savedInstanceState);
 		postCreatePending = true;
 		createdFromState = savedInstanceState;
@@ -1654,20 +1771,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	/* AOSP Activity.getLoaderManager(): the activity's loaders, started and stopped with it */
-	private LoaderManagerImpl mLoaderManager;
-
 	public LoaderManager getLoaderManager() {
-		if (mLoaderManager == null)
-			mLoaderManager = new LoaderManagerImpl("(root)", this, started);
-		return mLoaderManager;
+		return mFragments.getLoaderManager();
 	}
 
 	@Export
 	private void performStart() {
 		dispatchActivityPreStarted();
+		mFragments.noteStateNotSaved();
+		mFragments.execPendingActions();
 		onStart();
-		if (mLoaderManager != null)
-			mLoaderManager.doStart();
+		mFragments.dispatchStart();
+		mFragments.reportLoaderStart();
 		dispatchActivityPostStarted();
 		started = true;
 		performPostStart();
@@ -1678,6 +1793,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private void performRestart() {
 		mCanEnterPictureInPicture = true;
 		stopped = false;
+		mFragments.noteStateNotSaved();
 		ensureActivityConfiguration();
 		onRestart();
 		performStart();
@@ -1693,13 +1809,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		if (window != null && window.native_window != 0)
 			window.set_native_window(window.native_window);
 		dispatchActivityPreResumed();
+		mFragments.execPendingActions();
 		onResume();
+		mFragments.dispatchResume();
+		mFragments.execPendingActions();
 		dispatchActivityPostResumed();
 	}
 
 	@Export
 	private void performPause() {
 		dispatchActivityPrePaused();
+		mFragments.dispatchPause();
 		onPause();
 		dispatchActivityPostPaused();
 	}
@@ -1714,10 +1834,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		boolean preP = getApplicationInfo().targetSdkVersion < 28;
 		if (saveState && preP)
 			savedState = performSaveInstanceState();
+		mFragments.doLoaderStop(mChangingConfigurations);
 		dispatchActivityPreStopped();
+		mFragments.dispatchStop();
 		onStop();
-		if (mLoaderManager != null)
-			mLoaderManager.doStop();
 		dispatchActivityPostStopped();
 		started = false;
 		stopped = true;
@@ -1735,9 +1855,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	@Export
 	private void performDestroy() {
 		dispatchActivityPreDestroyed();
+		mFragments.dispatchDestroy();
 		onDestroy();
-		if (mLoaderManager != null)
-			mLoaderManager.doDestroy();
+		mFragments.doLoaderDestroy();
 		dispatchActivityPostDestroyed();
 		Dialog.closeWindowsOf(this);
 		if (window != null)
@@ -1753,7 +1873,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	public View onCreateView(View parent, String name, Context context, AttributeSet attrs) {
-		return null;
+		return mFragments.onCreateView(parent, name, context, attrs);
 	}
 
 	public View onCreateView(String name, Context context, AttributeSet attrs) {
