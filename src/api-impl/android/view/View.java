@@ -2859,6 +2859,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		if (backgroundDrawable != null) {
 			backgroundDrawable.setCallback(this);
+			/* AOSP View.setBackgroundDrawable(): a stateful background (selector, ripple) starts in the
+			 * view's current state, not in the empty one (which a state_enabled=false item matches) */
+			if (backgroundDrawable.isStateful())
+				backgroundDrawable.setState(getDrawableState());
 			if (backgroundTint != 0)
 				backgroundDrawable.setTint(backgroundTint);
 			applyBackgroundTint();
