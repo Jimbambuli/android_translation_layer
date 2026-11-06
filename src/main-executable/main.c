@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #ifndef DEFFILEMODE
 	#define DEFFILEMODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) /* 0666*/
@@ -69,6 +70,28 @@ gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 
 // this is the equivalent of /data/data/com.example.app/
 char *app_data_dir = NULL;
+
+/* Android's public directories of the external storage are the user's folders on this system */
+static void link_media_dirs(void)
+{
+	static const struct {
+		const char *name;
+		GUserDirectory dir;
+	} dirs[] = {
+		{"Movies", G_USER_DIRECTORY_VIDEOS},
+		{"Music", G_USER_DIRECTORY_MUSIC},
+		{"Download", G_USER_DIRECTORY_DOWNLOAD},
+	};
+	for (size_t i = 0; i < G_N_ELEMENTS(dirs); i++) {
+		const char *target = g_get_user_special_dir(dirs[i].dir);
+		if (!target || !strcmp(target, g_get_home_dir()))
+			continue;
+		char *link = g_strdup_printf("%s/%s", app_data_dir, dirs[i].name);
+		if (g_file_test(target, G_FILE_TEST_IS_DIR) && !g_file_test(link, G_FILE_TEST_EXISTS) && symlink(target, link))
+			fprintf(stderr, "can't link %s to %s (%s)\n", link, target, strerror(errno));
+		g_free(link);
+	}
+}
 char *get_app_data_dir()
 {
 	return app_data_dir;
@@ -613,6 +636,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		fprintf(stderr, "can't create app data dir %s (%s)\n", app_data_dir, strerror(errno));
 		exit(1);
 	}
+	link_media_dirs();
 
 	// check for jars and apks  in './' (if running from builddir), or in system install path
 	api_impl_jar = find_jar_or_die(API_IMPL_JAR_PATH_LOCAL, REL_API_IMPL_JAR_INSTALL_PATH, dex_install_dir);
