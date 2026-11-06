@@ -614,6 +614,15 @@ public class PackageParser {
 		}
 	}
 
+	/** Fallback for APKs that only have a v2/v3 signature, which JarFile can't see. */
+	private boolean collectSigningBlockCertificates(Package pkg) {
+		Signature[] signatures = ApkSigningBlock.readSignatures(mArchiveSourcePath);
+		if (signatures == null)
+			return false;
+		pkg.mSignatures = signatures;
+		return true;
+	}
+
 	public boolean collectCertificates(Package pkg, int flags) {
 		pkg.mSignatures = null;
 
@@ -644,8 +653,10 @@ public class PackageParser {
 				JarEntry jarEntry = jarFile.getJarEntry(ANDROID_MANIFEST_FILENAME);
 				certs = loadCertificates(jarFile, jarEntry, readBuffer);
 				if (certs == null) {
-					Slog.e(TAG, "Package " + pkg.packageName + " has no certificates at entry " + jarEntry.getName() + "; ignoring!");
 					jarFile.close();
+					if (collectSigningBlockCertificates(pkg))
+						return true;
+					Slog.e(TAG, "Package " + pkg.packageName + " has no certificates at entry " + jarEntry.getName() + "; ignoring!");
 					mParseError = PackageManager.INSTALL_PARSE_FAILED_NO_CERTIFICATES;
 					return false;
 				}
@@ -721,6 +732,8 @@ public class PackageParser {
 					pkg.mSignatures[i] = new Signature(
 					    certs[i].getEncoded());
 				}
+			} else if (collectSigningBlockCertificates(pkg)) {
+				return true;
 			} else {
 				Slog.e(TAG, "Package " + pkg.packageName + " has no certificates; ignoring!");
 				mParseError = PackageManager.INSTALL_PARSE_FAILED_NO_CERTIFICATES;

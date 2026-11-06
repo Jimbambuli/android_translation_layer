@@ -221,6 +221,7 @@ srcs = [
 	'android/content/pm/ShortcutManager.java',
 	'android/content/pm/Signature.java',
 	'android/content/pm/SigningInfo.java',
+	'android/content/pm/ApkSigningBlock.java',
 	'android/content/pm/VerifierInfo.java',
 	'android/content/pm/verify/domain/DomainVerificationManager.java',
 	'android/content/pm/verify/domain/DomainVerificationUserState.java',
