@@ -840,12 +840,22 @@ public class TextView extends View {
 	@Override
 	public void setGravity(int gravity) {
 		this.gravity = gravity;
+		applyAlignment();
+	}
+
+	/* the horizontal alignment is the one of the resolved text alignment (the gravity for the
+	 * default), the vertical one is the gravity's */
+	private void applyAlignment() {
 		float xalign = 0.f;
-		int horizontal = gravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK;
-		if (horizontal == Gravity.CENTER_HORIZONTAL)
-			xalign = 0.5f;
-		else if (horizontal == Gravity.RIGHT || horizontal == Gravity.END)
-			xalign = 1.f;
+		switch (getLayoutAlignment()) {
+			case ALIGN_CENTER:
+				xalign = 0.5f;
+				break;
+			case ALIGN_OPPOSITE:
+			case ALIGN_RIGHT:
+				xalign = 1.f;
+				break;
+		}
 		float yalign = 0.f;
 		int vertical = gravity & Gravity.VERTICAL_GRAVITY_MASK;
 		if (vertical == Gravity.CENTER_VERTICAL)
@@ -853,6 +863,12 @@ public class TextView extends View {
 		else if (vertical == Gravity.BOTTOM)
 			yalign = 1.f;
 		native_setAlignment(xalign, yalign);
+	}
+
+	@Override
+	public void onRtlPropertiesChanged(int layoutDirection) {
+		super.onRtlPropertiesChanged(layoutDirection);
+		applyAlignment();
 	}
 	private native void native_setAlignment(float xalign, float yalign);
 
