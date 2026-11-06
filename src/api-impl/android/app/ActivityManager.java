@@ -53,6 +53,8 @@ public class ActivityManager {
 
 		public long totalMem = 10000;
 
+		public long advertisedMem = 10000;
+
 		public long threshold = 200;
 
 		public boolean lowMemory = false;
@@ -64,6 +66,7 @@ public class ActivityManager {
 		public void writeToParcel(Parcel dest, int flags) {
 			dest.writeLong(availMem);
 			dest.writeLong(totalMem);
+			dest.writeLong(advertisedMem);
 			dest.writeLong(threshold);
 			dest.writeInt(lowMemory ? 1 : 0);
 		}
@@ -71,6 +74,7 @@ public class ActivityManager {
 		public void readFromParcel(Parcel source) {
 			availMem = source.readLong();
 			totalMem = source.readLong();
+			advertisedMem = source.readLong();
 			threshold = source.readLong();
 			lowMemory = source.readInt() != 0;
 		}
