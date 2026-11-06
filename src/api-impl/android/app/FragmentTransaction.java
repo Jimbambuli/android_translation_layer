@@ -15,7 +15,16 @@ public class FragmentTransaction {
 		return this;
 	}
 
+	public FragmentTransaction remove(Fragment fragment) {
+		activity.fragments.remove(fragment);
+		return this;
+	}
+
 	public int commit() {
+		return 0;
+	}
+
+	public int commitAllowingStateLoss() {
 		return 0;
 	}
 }

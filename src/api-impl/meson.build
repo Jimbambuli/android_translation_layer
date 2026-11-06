@@ -74,6 +74,7 @@ srcs = [
 	'android/app/DatePickerDialog.java',
 	'android/app/Dialog.java',
 	'android/app/DownloadManager.java',
+	'android/app/DialogFragment.java',
 	'android/app/Fragment.java',
 	'android/app/FragmentManager.java',
 	'android/app/FragmentTransaction.java',
