@@ -64,6 +64,11 @@ public final class NetworkCapabilities {
 
 	private long mNetworkCapabilities = DEFAULT_CAPABILITIES;
 	private long mTransportTypes;
+	private int mLinkUpBandwidthKbps;
+	private int mLinkDownBandwidthKbps;
+	private int mSignalStrength = SIGNAL_STRENGTH_UNSPECIFIED;
+
+	public static final int SIGNAL_STRENGTH_UNSPECIFIED = Integer.MIN_VALUE;
 
 	public NetworkCapabilities() {
 	}
@@ -72,6 +77,9 @@ public final class NetworkCapabilities {
 		if (nc != null) {
 			mNetworkCapabilities = nc.mNetworkCapabilities;
 			mTransportTypes = nc.mTransportTypes;
+			mLinkUpBandwidthKbps = nc.mLinkUpBandwidthKbps;
+			mLinkDownBandwidthKbps = nc.mLinkDownBandwidthKbps;
+			mSignalStrength = nc.mSignalStrength;
 		}
 	}
 
@@ -79,6 +87,9 @@ public final class NetworkCapabilities {
 	public void clearAll() {
 		mNetworkCapabilities = 0;
 		mTransportTypes = 0;
+		mLinkUpBandwidthKbps = 0;
+		mLinkDownBandwidthKbps = 0;
+		mSignalStrength = SIGNAL_STRENGTH_UNSPECIFIED;
 	}
 
 	/* AOSP BitUtils.unpackBits() */
@@ -116,7 +127,9 @@ public final class NetworkCapabilities {
 		if (!(obj instanceof NetworkCapabilities))
 			return false;
 		NetworkCapabilities that = (NetworkCapabilities)obj;
-		return mNetworkCapabilities == that.mNetworkCapabilities && mTransportTypes == that.mTransportTypes;
+		return mNetworkCapabilities == that.mNetworkCapabilities && mTransportTypes == that.mTransportTypes
+		    && mLinkUpBandwidthKbps == that.mLinkUpBandwidthKbps && mLinkDownBandwidthKbps == that.mLinkDownBandwidthKbps
+		    && mSignalStrength == that.mSignalStrength;
 	}
 
 	@Override
@@ -138,6 +151,28 @@ public final class NetworkCapabilities {
 
 	public boolean hasTransport(int transportType) {
 		return isValidTransport(transportType) && ((mTransportTypes & (1L << transportType)) != 0);
+	}
+
+	public NetworkCapabilities setLinkUpstreamBandwidthKbps(int upKbps) {
+		mLinkUpBandwidthKbps = upKbps;
+		return this;
+	}
+
+	public int getLinkUpstreamBandwidthKbps() {
+		return mLinkUpBandwidthKbps;
+	}
+
+	public NetworkCapabilities setLinkDownstreamBandwidthKbps(int downKbps) {
+		mLinkDownBandwidthKbps = downKbps;
+		return this;
+	}
+
+	public int getLinkDownstreamBandwidthKbps() {
+		return mLinkDownBandwidthKbps;
+	}
+
+	public int getSignalStrength() {
+		return mSignalStrength;
 	}
 
 	public NetworkCapabilities addCapability(int capability) {
