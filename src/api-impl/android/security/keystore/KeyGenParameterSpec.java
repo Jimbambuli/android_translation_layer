@@ -41,6 +41,10 @@ public class KeyGenParameterSpec {
 			return this;
 		}
 
+		public Builder setUserConfirmationRequired(boolean required) {
+			return this;
+		}
+
 		public Builder setCertificateSerialNumber(BigInteger serialNumber) {
 			return this;
 		}
