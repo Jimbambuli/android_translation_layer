@@ -283,7 +283,8 @@ public final class ATLLoadedApp {
 		Class<? extends Activity> cls = this.loadClass(activityClass).asSubclass(Activity.class);
 		Constructor<? extends Activity> constructor = cls.getConstructor();
 		Activity activity = constructor.newInstance();
-		intent.setComponent(new ComponentName(pkg.packageName, className));
+		activity.component = new ComponentName(pkg.packageName, className);
+		intent.setComponent(activity.component);
 		activity.intent = intent;
 		Resources r = this.createDefaultResources();
 		// Like ActivityThread.performLaunchActivity(): the base context only carries the default

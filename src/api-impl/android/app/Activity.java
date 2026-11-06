@@ -66,6 +66,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	Window window;
 	int requested_orientation = -1 /*ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED*/; // dummy
 	public Intent intent;
+	public ComponentName component;
 	private Activity resultActivity; // the activity that started this one with startActivityForResult()
 	private int resultRequestCode;
 	/* like AOSP: what setResult() set, handed over by finish() */
@@ -235,7 +236,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	public ComponentName getComponentName() {
-		return intent.getComponent();
+		return component;
 	}
 
 	public Intent getIntent() {
