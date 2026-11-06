@@ -1764,11 +1764,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return System.identityHashCode(this.getApplicationContext());
 	}
 
-	boolean moveTaskToBack(boolean nonroot) {
+	public boolean moveTaskToBack(boolean nonroot) {
 		return true;
 	}
 
-	void setFinishOnTouchOutside(boolean finish) {
+	public void setFinishOnTouchOutside(boolean finish) {
 	}
 
 	public void closeOptionsMenu() {
