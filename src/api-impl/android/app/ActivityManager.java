@@ -334,6 +334,10 @@ public class ActivityManager {
 
 	public static boolean isUserAMonkey() { return false; }
 
+	/* AOSP ActivityManager.isRunningInTestHarness()/isRunningInUserTestHarness(): never a test harness */
+	public static boolean isRunningInTestHarness() { return false; }
+	public static boolean isRunningInUserTestHarness() { return false; }
+
 	public void moveTaskToFront(int taskId, int flags, Bundle options) {
 	}
 }

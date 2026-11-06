@@ -503,6 +503,74 @@ public class Intent implements Parcelable {
 	public Intent() {}
 	private android.util.ArraySet<String> mCategories;
 
+	/* AOSP Intent.URI_* flags */
+	public static final int URI_INTENT_SCHEME = 1 << 0;
+	public static final int URI_ANDROID_APP_SCHEME = 1 << 1;
+	public static final int URI_ALLOW_UNSAFE = 1 << 2;
+
+	/** @deprecated AOSP Intent.toURI() */
+	public String toURI() {
+		return toUri(0);
+	}
+
+	/* AOSP Intent.toUri()/toUriInner(): the intent as a URI string, "intent:...#Intent;...;end" or, when
+	 * only the data is set and the flags allow it, the data itself */
+	public String toUri(int flags) {
+		StringBuilder uri = new StringBuilder(128);
+		String scheme = null;
+		if (data != null) {
+			String data = this.data.toString();
+			if ((flags & URI_INTENT_SCHEME) != 0) {
+				final int N = data.length();
+				for (int i = 0; i < N; i++) {
+					char c = data.charAt(i);
+					if (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '.' || c == '-' || c == '+') {
+						continue;
+					}
+					if (c == ':' && i > 0) {
+						scheme = data.substring(0, i);
+						uri.append("intent:");
+						data = data.substring(i + 1);
+						break;
+					}
+					break;
+				}
+			}
+			uri.append(data);
+		} else if ((flags & URI_INTENT_SCHEME) != 0) {
+			uri.append("intent:");
+		}
+		uri.append("#Intent;");
+		if (scheme != null)
+			uri.append("scheme=").append(scheme).append(';');
+		if (action != null)
+			uri.append("action=").append(Uri.encode(action)).append(';');
+		if (mCategories != null)
+			for (String category : mCategories)
+				uri.append("category=").append(Uri.encode(category)).append(';');
+		if (type != null)
+			uri.append("type=").append(Uri.encode(type, "/")).append(';');
+		if (this.flags != 0)
+			uri.append("launchFlags=0x").append(Integer.toHexString(this.flags)).append(';');
+		if (packageName != null)
+			uri.append("package=").append(Uri.encode(packageName)).append(';');
+		if (component != null)
+			uri.append("component=").append(Uri.encode(component.flattenToShortString(), "/")).append(';');
+		if (selector != null)
+			uri.append("SEL;").append(selector.toUri(flags).substring(selector.toUri(flags).indexOf("#Intent;") + 8));
+		else if (extras != null) {
+			for (String key : extras.keySet()) {
+				Object value = extras.get(key);
+				char prefix = value instanceof String ? 'S' : value instanceof Boolean ? 'B' : value instanceof Byte ? 'b' : value instanceof Character ? 'c'
+				            : value instanceof Double ? 'd' : value instanceof Float ? 'f' : value instanceof Integer ? 'i' : value instanceof Long ? 'l' : value instanceof Short ? 's' : '\0';
+				if (prefix != '\0')
+					uri.append(prefix).append('.').append(Uri.encode(key)).append('=').append(Uri.encode(value.toString())).append(';');
+			}
+		}
+		uri.append("end");
+		return uri.toString();
+	}
+
 	public Intent(Intent o) {
 		this.action = o.action;
 		this.data = o.data;
