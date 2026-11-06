@@ -1565,6 +1565,25 @@ public final class MotionEvent extends InputEvent {
 	 * @deprecated Use {@link #obtain(long, long, int, int, PointerProperties[], PointerCoords[], int, int, float, float, int, int, int, int)}
 	 * instead.
 	 */
+	static public MotionEvent obtain(long downTime, long eventTime,
+	                                 int action, int pointerCount, PointerProperties[] pointerProperties,
+	                                 PointerCoords[] pointerCoords, int metaState, int buttonState,
+	                                 float xPrecision, float yPrecision, int deviceId,
+	                                 int edgeFlags, int source, int displayId, int flags) {
+		return obtain(downTime, eventTime, action, pointerCount, pointerProperties, pointerCoords,
+		              metaState, buttonState, xPrecision, yPrecision, deviceId, edgeFlags, source,
+		              displayId, flags, CLASSIFICATION_NONE);
+	}
+
+	static public MotionEvent obtain(long downTime, long eventTime,
+	                                 int action, int pointerCount, PointerProperties[] pointerProperties,
+	                                 PointerCoords[] pointerCoords, int metaState, int buttonState,
+	                                 float xPrecision, float yPrecision, int deviceId,
+	                                 int edgeFlags, int source, int displayId, int flags, int classification) {
+		return obtain(downTime, eventTime, action, pointerCount, pointerProperties, pointerCoords,
+		              metaState, buttonState, xPrecision, yPrecision, deviceId, edgeFlags, source, flags);
+	}
+
 	@Deprecated
 	static public MotionEvent obtain(long downTime, long eventTime,
 	                                 int action, int pointerCount, int[] pointerIds, PointerCoords[] pointerCoords,
