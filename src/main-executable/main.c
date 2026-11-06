@@ -23,6 +23,7 @@
 #include <errno.h>
 #include <libgen.h>
 #include <locale.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -49,10 +50,36 @@ char *apk_path;
 
 // standard Gtk Application stuff, more or less
 
+/* The process ends with its last window, like an Android app that has nothing left to run. Normally
+ * g_application_run() returns and System.exit() ends the VM; a non-daemon thread, a shutdown hook or a
+ * GApplication hold that never lets go would keep the process (and the Flatpak instance around it)
+ * alive for good, so a watchdog ends it hard after a grace period. */
+#define EXIT_GRACE_SECONDS 10
+static void *exit_watchdog(void *unused)
+{
+	sleep(EXIT_GRACE_SECONDS);
+	fprintf(stderr, "the app did not end within %d s of its last window, ending it\n", EXIT_GRACE_SECONDS);
+	fflush(NULL);
+	_exit(0);
+	return NULL;
+}
+
+static void start_exit_watchdog(void)
+{
+	static gboolean started = FALSE;
+	pthread_t thread;
+	if (started)
+		return;
+	started = TRUE;
+	if (!pthread_create(&thread, NULL, exit_watchdog, NULL))
+		pthread_detach(thread);
+}
+
 gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 {
 	if (activity_window_close_request())
 		return TRUE;
+	start_exit_watchdog();
 	activity_close_all();
 	/* popups (PopupWindow, WindowManager windows) are popovers in the GtkStack next to the
 	 * activities' pages; GtkStack's dispose removes only pages and loops forever on any other
@@ -1194,6 +1221,7 @@ int main(int argc, char **argv)
 	g_signal_connect(app, "open", G_CALLBACK(open), callback_data);
 	g_action_map_add_action_entries(G_ACTION_MAP(app), action_entries, action_entries_count, NULL);
 	status = g_application_run(G_APPLICATION(app), argc, argv);
+	start_exit_watchdog();
 	remove_app_notifications();
 	g_object_unref(app);
 
