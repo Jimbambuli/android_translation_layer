@@ -3882,4 +3882,63 @@ public class PackageManager {
 	public List<ResolveInfo> queryIntentContentProviders(Intent intent, ResolveInfoFlags flags) {
 		return queryIntentContentProviders(intent, (int)flags.getValue());
 	}
+
+	public static final class ComponentInfoFlags {
+		private final long value;
+		private ComponentInfoFlags(long value) { this.value = value; }
+		public static ComponentInfoFlags of(long value) { return new ComponentInfoFlags(value); }
+		public long getValue() { return value; }
+	}
+
+	/* AOSP 13 (API 33): the overloads that take the flags wrapped (PackageInfoFlags, ComponentInfoFlags,
+	 * ResolveInfoFlags); they hand the flags on to the overloads with an int */
+	public PackageInfo getPackageArchiveInfo(String archiveFilePath, PackageInfoFlags flags) {
+		return getPackageArchiveInfo(archiveFilePath, (int)flags.getValue());
+	}
+
+	public ActivityInfo getActivityInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		return getActivityInfo(component, (int)flags.getValue());
+	}
+
+	public ActivityInfo getReceiverInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		return getReceiverInfo(component, (int)flags.getValue());
+	}
+
+	public ServiceInfo getServiceInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		return getServiceInfo(component, (int)flags.getValue());
+	}
+
+	public ProviderInfo getProviderInfo(ComponentName component, ComponentInfoFlags flags) throws NameNotFoundException {
+		try {
+			return getProviderInfo(component, (int)flags.getValue());
+		} catch (NameNotFoundException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new NameNotFoundException(component.toString());
+		}
+	}
+
+	public ProviderInfo resolveContentProvider(String authority, ComponentInfoFlags flags) {
+		return resolveContentProvider(authority, (int)flags.getValue());
+	}
+
+	public List<ProviderInfo> queryContentProviders(String processName, int uid, ComponentInfoFlags flags) {
+		return queryContentProviders(processName, uid, (int)flags.getValue());
+	}
+
+	public List<ResolveInfo> queryBroadcastReceivers(Intent intent, ResolveInfoFlags flags) {
+		return queryBroadcastReceivers(intent, (int)flags.getValue());
+	}
+
+	public List<PackageInfo> getPackagesHoldingPermissions(String[] permissions, PackageInfoFlags flags) {
+		return getPackagesHoldingPermissions(permissions, (int)flags.getValue());
+	}
+
+	public int[] getPackageGids(String packageName, PackageInfoFlags flags) throws NameNotFoundException {
+		return getPackageGids(packageName);
+	}
+
+	public int getPackageUid(String packageName, PackageInfoFlags flags) throws NameNotFoundException {
+		return getPackageUid(packageName, (int)flags.getValue());
+	}
 }

@@ -1,6 +1,7 @@
 package android.app;
 
 import android.atl.ATLLoadedApp;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ConfigurationInfo;
 import android.graphics.Bitmap;
@@ -23,15 +24,39 @@ public class ActivityManager {
 		public int pid;
 		public int uid;
 		public String processName;
+		public String[] pkgList;
+		public String[] pkgDeps;
+		public int lru;
+		public int lastTrimLevel;
+		public int importanceReasonCode;
+		public int importanceReasonPid;
+		public ComponentName importanceReasonComponent;
+		public int importanceReasonImportance;
+		public int processState;
+
+		public static final int IMPORTANCE_FOREGROUND = 100;
+		public static final int IMPORTANCE_FOREGROUND_SERVICE = 125;
+		public static final int IMPORTANCE_TOP_SLEEPING = 150;
+		public static final int IMPORTANCE_VISIBLE = 200;
+		public static final int IMPORTANCE_PERCEPTIBLE = 230;
+		public static final int IMPORTANCE_CANT_SAVE_STATE = 350;
+		public static final int IMPORTANCE_SERVICE = 300;
+		public static final int IMPORTANCE_CACHED = 400;
+		public static final int IMPORTANCE_GONE = 1000;
+		public static final int REASON_UNKNOWN = 0;
+		public static final int REASON_PROVIDER_IN_USE = 1;
+		public static final int REASON_SERVICE_IN_USE = 2;
 
 		public RunningAppProcessInfo(String processName, int pid, String[] pkgList) {
 			this.processName = processName;
 			this.pid = pid;
+			this.pkgList = pkgList;
 		}
 
 		private RunningAppProcessInfo(int pid, String processName) {
 			this.pid = pid;
 			this.processName = processName;
+			this.pkgList = new String[] {processName};
 		}
 	}
 
