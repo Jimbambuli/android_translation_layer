@@ -2268,11 +2268,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		userPaddingEnd = UNDEFINED_PADDING;
 		userPaddingLeftInitial = left;
 		userPaddingRightInitial = right;
+		/* AOSP View.internalSetPadding(): a changed padding needs a new measure and layout */
+		boolean paddingChanged = paddingLeft != left || paddingTop != top || paddingRight != right || paddingBottom != bottom;
 		paddingLeft = left;
 		paddingTop = top;
 		paddingRight = right;
 		paddingBottom = bottom;
 		native_setPadding(widget, left, top, right, bottom);
+		if (paddingChanged) {
+			requestLayout();
+		}
 	}
 	public native void native_setPadding(long widget, int left, int top, int right, int bottom);
 
@@ -2880,11 +2885,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 					userPaddingLeftInitial = bgPadding.left;
 					userPaddingRightInitial = bgPadding.right;
 				}
+				/* AOSP View.setBackgroundDrawable(): a background that brings another padding needs a new measure */
+				boolean bgPaddingChanged = paddingLeft != userPaddingLeftInitial || paddingRight != userPaddingRightInitial
+				                           || paddingTop != bgPadding.top || paddingBottom != bgPadding.bottom;
 				paddingLeft = userPaddingLeftInitial;
 				paddingRight = userPaddingRightInitial;
 				paddingTop = bgPadding.top;
 				paddingBottom = bgPadding.bottom;
 				native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+				if (bgPaddingChanged)
+					requestLayout();
 			}
 		}
 		native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0);
@@ -3774,11 +3784,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			userPaddingLeftInitial = start;
 			userPaddingRightInitial = end;
 		}
+		boolean paddingChanged = paddingLeft != userPaddingLeftInitial || paddingTop != top || paddingRight != userPaddingRightInitial || paddingBottom != bottom;
 		paddingLeft = userPaddingLeftInitial;
 		paddingTop = top;
 		paddingRight = userPaddingRightInitial;
 		paddingBottom = bottom;
 		native_setPadding(widget, paddingLeft, top, paddingRight, bottom);
+		if (paddingChanged)
+			requestLayout();
 	}
 
 	private native boolean nativeIsAttachedToWindow(long widget);
