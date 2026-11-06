@@ -1121,6 +1121,8 @@ public class VectorDrawable extends Drawable {
 					path.rLineTo(0, 0); // fix bug in measure
 				}
 				mRenderPath.addPath(path, mFinalPathMatrix);
+				// android:fillType: nonZero (0) or evenOdd (1), as VectorDrawable's native Path does
+				mRenderPath.setFillType(fullPath.mFillRule == 1 ? Path.FillType.EVEN_ODD : Path.FillType.WINDING);
 
 				if (fullPath.mFillColor != Color.TRANSPARENT) {
 					if (mFillPaint == null) {
@@ -1731,6 +1733,7 @@ public class VectorDrawable extends Drawable {
 				mFillColor = fillColor.getDefaultColor();
 			mFillAlpha = a.getFloat(R.styleable.VectorDrawablePath_fillAlpha,
 			                        mFillAlpha);
+			mFillRule = a.getInt(R.styleable.VectorDrawablePath_fillType, mFillRule);
 			mStrokeLineCap = getStrokeLineCap(a.getInt(
 							      R.styleable.VectorDrawablePath_strokeLineCap, -1),
 			                                  mStrokeLineCap);
