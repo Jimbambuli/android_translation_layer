@@ -84,6 +84,23 @@ public class AccountManager {
 		return accounts.toArray(new Account[0]);
 	}
 
+	/* AOSP getAccountsByTypeAndFeatures(): the accounts of the type whose authenticator has all the features. ATL's
+	 * accounts come from the keyring, their authenticators (microG) are not asked: no feature is known, so a
+	 * request with features finds none */
+	public AccountManagerFuture<Account[]> getAccountsByTypeAndFeatures(final String type, final String[] features,
+	                                                                  AccountManagerCallback<Account[]> callback, Handler handler) {
+		if (type == null)
+			throw new IllegalArgumentException("type is null");
+		return runAsync(new Callable<Account[]>() {
+			@Override
+			public Account[] call() {
+				if (features != null && features.length > 0)
+					return new Account[0];
+				return getAccountsByType(type);
+			}
+		}, callback, handler);
+	}
+
 	public Account[] getAccountsByTypeForPackage(String type, String packageName) {
 		return getAccountsByType(type);
 	}

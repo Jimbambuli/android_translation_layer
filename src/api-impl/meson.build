@@ -517,6 +517,7 @@ srcs = [
 	'android/os/ConditionVariable.java',
 	'android/os/CountDownTimer.java',
 	'android/os/DeadObjectException.java',
+	'android/os/TransactionTooLargeException.java',
 	'android/os/Debug.java',
 	'android/os/DropBoxManager.java',
 	'android/os/Environment.java',
