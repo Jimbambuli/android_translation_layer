@@ -612,6 +612,7 @@ srcs = [
 	'android/text/ParcelableSpan.java',
 	'android/text/Selection.java',
 	'android/text/Spannable.java',
+	'android/text/PrecomputedText.java',
 	'android/text/SpannableString.java',
 	'android/text/SpannableStringBuilder.java',
 	'android/text/SpannableStringInternal.java',

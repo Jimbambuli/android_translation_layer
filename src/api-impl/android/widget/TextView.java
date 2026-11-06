@@ -1090,6 +1090,18 @@ public class TextView extends View {
 
 	public float getLineSpacingMultiplier() { return 1.f; }
 
+	/* AOSP TextView.getTextMetricsParams()/setTextMetricsParams(): how this view measures its text */
+	public android.text.PrecomputedText.Params getTextMetricsParams() {
+		return new android.text.PrecomputedText.Params.Builder(getPaint()).setBreakStrategy(getBreakStrategy())
+		    .setHyphenationFrequency(getHyphenationFrequency()).setTextDirection(getTextDirectionHeuristic()).build();
+	}
+
+	public void setTextMetricsParams(android.text.PrecomputedText.Params params) {
+		getPaint().set(params.getTextPaint());
+		setBreakStrategy(params.getBreakStrategy());
+		setHyphenationFrequency(params.getHyphenationFrequency());
+	}
+
 	public TextDirectionHeuristic getTextDirectionHeuristic() {
 		return TextDirectionHeuristics.LTR;
 	}
