@@ -140,7 +140,8 @@ public class ATLViewDump {
 		        + "\" atl-class=\"" + esc(v.getClass().getName()) + "\" atl-visibility=\"" + vis + "\" atl-alpha=\"" + v.getAlpha() + "\" atl-shown=\"" + v.isShown()
 		        + "\" atl-gtk-rect=\"" + gok + "\" atl-jbounds=\"[" + l + "," + t + "][" + (l + v.getWidth()) + "," + (t + v.getHeight()) + "]\""
 		        + (hider != null ? " atl-hidden-by=\"" + esc(hider) + "\"" : "")
-		        + (v.getAnimation() != null ? " atl-animation=\"" + esc(v.getAnimation().getClass().getName()) + "\"" : ""));
+		        + (v.getAnimation() != null ? " atl-animation=\"" + esc(v.getAnimation().getClass().getName()) + "\"" : "")
+		        + (v instanceof android.widget.ImageView ? " atl-drawable=\"" + esc(drawableInfo(((android.widget.ImageView)v).getDrawable())) + "\"" : ""));
 		if (v instanceof ViewGroup && ((ViewGroup)v).getChildCount() > 0) {
 			w.write(">\n");
 			ViewGroup vg = (ViewGroup)v;
@@ -174,5 +175,20 @@ public class ATLViewDump {
 			}
 		}
 		return b.toString();
+	}
+
+	/* the class of a drawable and, for a layer list, of its layers (debugging aid) */
+	private static String drawableInfo(android.graphics.drawable.Drawable d) {
+		if (d == null)
+			return "";
+		StringBuilder sb = new StringBuilder(d.getClass().getName());
+		if (d instanceof android.graphics.drawable.LayerDrawable) {
+			android.graphics.drawable.LayerDrawable ld = (android.graphics.drawable.LayerDrawable)d;
+			sb.append('[');
+			for (int i = 0; i < ld.getNumberOfLayers(); i++)
+				sb.append(i > 0 ? "," : "").append(drawableInfo(ld.getDrawable(i)));
+			sb.append(']');
+		}
+		return sb.toString();
 	}
 }
