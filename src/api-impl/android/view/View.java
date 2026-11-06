@@ -739,6 +739,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		boolean onKey(View v, int keyCode, KeyEvent event);
 	}
 
+	public interface OnContextClickListener {
+		boolean onContextClick(View v);
+	}
+
 	public interface OnLongClickListener {
 		public boolean onLongClick(View v);
 	}
@@ -2554,6 +2558,30 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	private OnLongClickListener on_long_click_listener = null;
+	private OnContextClickListener mOnContextClickListener;
+	private boolean mContextClickable;
+
+	public void setOnContextClickListener(OnContextClickListener l) {
+		if (!isContextClickable())
+			setContextClickable(true);
+		mOnContextClickListener = l;
+	}
+
+	public boolean isContextClickable() {
+		return mContextClickable;
+	}
+
+	public void setContextClickable(boolean contextClickable) {
+		mContextClickable = contextClickable;
+	}
+
+	public boolean performContextClick(float x, float y) {
+		return performContextClick();
+	}
+
+	public boolean performContextClick() {
+		return mOnContextClickListener != null && mOnContextClickListener.onContextClick(this);
+	}
 
 	/* AOSP View.performLongClick() and performLongClickInternal(), without the accessibility event,
 	 * context menu, tooltip and haptic feedback ATL has no counterpart for */
