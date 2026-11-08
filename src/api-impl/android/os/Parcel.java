@@ -4,6 +4,7 @@ import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.os.Parcelable.Creator;
+import android.text.TextUtils;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import java.io.DataInputStream;
@@ -437,6 +438,15 @@ public class Parcel {
 
 	public String readString8() {
 		return readString();
+	}
+
+	/** android-14 Parcel.writeCharSequence(): the same format as TextUtils.writeToParcel(). */
+	public void writeCharSequence(CharSequence val) {
+		TextUtils.writeToParcel(val, this, 0);
+	}
+
+	public CharSequence readCharSequence() {
+		return TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(this);
 	}
 
 	/** android-14 Parcel.writeTypedObject(): a presence flag, then the object. */
