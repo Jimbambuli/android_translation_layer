@@ -4,7 +4,10 @@ import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.os.Binder;
 import android.os.Bundle;
+import android.os.IBinder;
+import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.GestureDetector;
 
@@ -104,6 +107,39 @@ public class PendingIntent implements Parcelable {
 	public int getCreatorUid() {
 		return ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.uid;
 	}
+
+	/* AOSP writes the binder of the system's PendingIntentRecord, so that every PendingIntent read back is the
+	 * same one. ATL has no system server; the binder written here is a token of this very object, and a
+	 * parcel is never read in another process (see Parcel.writeStrongBinder()). */
+	private static class Token extends Binder {
+		final PendingIntent target;
+
+		Token(PendingIntent target) {
+			this.target = target;
+		}
+	}
+
+	private Token token;
+
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		synchronized (this) {
+			if (token == null)
+				token = new Token(this);
+		}
+		out.writeStrongBinder(token);
+	}
+
+	public static final Parcelable.Creator<PendingIntent> CREATOR = new Parcelable.Creator<PendingIntent>() {
+		public PendingIntent createFromParcel(Parcel in) {
+			IBinder b = in.readStrongBinder();
+			return b instanceof Token ? ((Token)b).target : null;
+		}
+
+		public PendingIntent[] newArray(int size) {
+			return new PendingIntent[size];
+		}
+	};
 
 	public static PendingIntent getForegroundService(Context context, int requestCode, Intent intent, int flags) {
 		return getService(context, requestCode, intent, flags);
