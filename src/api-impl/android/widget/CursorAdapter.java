@@ -36,7 +36,7 @@ import android.view.ViewGroup;
  * not work if the merged Cursors have overlapping values in their "_id"
  * columns.
  */
-public abstract class CursorAdapter extends BaseAdapter implements Filterable {
+public abstract class CursorAdapter extends BaseAdapter implements Filterable, CursorFilter.CursorFilterClient {
 	/**
 	 * This field should be made private, so it is hidden from the SDK.
 	 * {@hide}
@@ -81,7 +81,7 @@ public abstract class CursorAdapter extends BaseAdapter implements Filterable {
 	 * This field should be made private, so it is hidden from the SDK.
 	 * {@hide}
 	 */
-	// protected CursorFilter mCursorFilter;
+	protected CursorFilter mCursorFilter;
 	/**
 	 * This field should be made private, so it is hidden from the SDK.
 	 * {@hide}
@@ -428,20 +428,20 @@ public abstract class CursorAdapter extends BaseAdapter implements Filterable {
 	 * @see #getFilterQueryProvider()
 	 * @see #setFilterQueryProvider(android.widget.FilterQueryProvider)
 	 */
-	// public Cursor runQueryOnBackgroundThread(CharSequence constraint) {
-	// 	if (mFilterQueryProvider != null) {
-	// 		return mFilterQueryProvider.runQuery(constraint);
-	// 	}
+	public Cursor runQueryOnBackgroundThread(CharSequence constraint) {
+		if (mFilterQueryProvider != null) {
+			return mFilterQueryProvider.runQuery(constraint);
+		}
 
-	// 	return mCursor;
-	// }
+		return mCursor;
+	}
 
-	// public Filter getFilter() {
-	// 	if (mCursorFilter == null) {
-	// 		mCursorFilter = new CursorFilter(this);
-	// 	}
-	// 	return mCursorFilter;
-	// }
+	public Filter getFilter() {
+		if (mCursorFilter == null) {
+			mCursorFilter = new CursorFilter(this);
+		}
+		return mCursorFilter;
+	}
 
 	/**
 	 * Returns the query filter provider used for filtering. When the
