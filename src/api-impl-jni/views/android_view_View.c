@@ -456,6 +456,7 @@ static void on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 
 	if (!J__View__isClickable(env, wrapper->jobj))
 		return;
+	J__InputTrace__userTouch(env, wrapper->jobj, 0);
 	jboolean handled = J__View__performClick(env, wrapper->jobj);
 
 	if ((*env)->ExceptionCheck(env)) {
@@ -629,6 +630,7 @@ static gboolean on_scroll_event(WrapperWidget *wrapper, GdkEvent *event)
 	transform_coords_to_widget_relative(GTK_WIDGET(wrapper), &x, &y);
 
 	JNIEnv *env = get_jni_env();
+	J__InputTrace__scroll(env, wrapper->jobj, (jint)(dx * 100), (jint)(dy * 100));
 	jobject motion_event = J_new__MotionEvent__scroll(env, SOURCE_MOUSE, ACTION_SCROLL, gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
 	GdkEvent *outer = synthetic_propagation_failed;
 	synthetic_propagation_failed = NULL;
@@ -1217,6 +1219,7 @@ static void on_long_click(GtkGestureLongPress *gesture, double x, double y, gpoi
 	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(widget));
 
+	J__InputTrace__userTouch(env, wrapper->jobj, 1);
 	bool ret = J__View__performLongClick(env, wrapper->jobj, x, y);
 
 	if ((*env)->ExceptionCheck(env)) {

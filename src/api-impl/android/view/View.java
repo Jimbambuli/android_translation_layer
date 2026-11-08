@@ -7,6 +7,7 @@ import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.atl.GskCanvas;
+import android.atl.InputTrace;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.ContextWrapper;
@@ -1628,8 +1629,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (!handled)
 			handled = onTouchEvent(event);
 
-		if (handle_gestures && !handled && event.getAction() == MotionEvent.ACTION_UP)
+		if (handle_gestures && !handled && event.getAction() == MotionEvent.ACTION_UP) {
+			InputTrace.userTouch(this, InputTrace.CLICK);
 			handled = performClick();
+		}
 
 		return handled;
 	}
@@ -1711,6 +1714,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 									mPerformClick = new PerformClick();
 								}
 								if (!post(mPerformClick)) {
+									InputTrace.userTouch(View.this, InputTrace.CLICK);
 									performClick();
 								}
 							}
@@ -1867,6 +1871,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		@Override
 		public void run() {
 			if ((mOriginalPressedState == isPressed()) && (parent != null) && mOriginalWindowAttachCount == mWindowAttachCount) {
+				InputTrace.userTouch(View.this, InputTrace.LONG_CLICK);
 				if (performLongClick(mX, mY)) {
 					mHasPerformedLongPress = true;
 				}
@@ -1903,6 +1908,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private final class PerformClick implements Runnable {
 		@Override
 		public void run() {
+			InputTrace.userTouch(View.this, InputTrace.CLICK);
 			performClick();
 		}
 	}
@@ -4840,6 +4846,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 					// This is a tap, so remove the longpress check
 					removeLongPressCallback();
 					if (!event.isCanceled()) {
+						InputTrace.userTouch(this, InputTrace.CLICK);
 						return performClick();
 					}
 				}

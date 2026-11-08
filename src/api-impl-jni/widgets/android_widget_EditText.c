@@ -7,12 +7,16 @@
 
 #include "../generated_headers/android_widget_EditText.h"
 
+static void changed_cb(GtkEditable *self, gpointer user_data);
+
 JNIEXPORT jlong JNICALL Java_android_widget_EditText_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *gtk_text = gtk_text_new();
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), gtk_text);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
+	/* InputTrace: the text the user types, whether or not the app has a TextWatcher */
+	g_signal_connect(GTK_EDITABLE(gtk_text), "changed", G_CALLBACK(changed_cb), NULL);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
 	return _INTPTR(gtk_text);
 }

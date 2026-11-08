@@ -564,6 +564,7 @@ static bool on_click(GtkGestureClick *gesture, int n_press, double x, double y, 
 	if (!this)
 		return false;
 
+	J__InputTrace__userTouch(env, this, 0);
 	bool ret = J__View__performClick(env, this);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);

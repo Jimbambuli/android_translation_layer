@@ -1,5 +1,6 @@
 package android.widget;
 
+import android.atl.InputTrace;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -56,7 +57,9 @@ public class EditText extends TextView {
 	@Override
 	public void setText(CharSequence text) {
 		text = applyFilters(text);
+		programmatic_text = true;
 		native_setText(widget, text == null ? "" : text.toString());
+		programmatic_text = false;
 	}
 
 	/* as AOSP's Editor: typed or pasted text goes through the filters before it is inserted */
@@ -116,9 +119,14 @@ public class EditText extends TextView {
 		native_setOnEditorActionListener(widget, l);
 	}
 
+	/* the text is being set by the app, not typed (InputTrace) */
+	private boolean programmatic_text;
+
 	/* called from native code when the text changed */
 	@Export
 	private void sendTextChanged(String text) {
+		if (!programmatic_text)
+			InputTrace.textChanged(this, text.length());
 		if (listeners == null)
 			return;
 		SpannableStringBuilder s = new SpannableStringBuilder(text);

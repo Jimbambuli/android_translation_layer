@@ -693,6 +693,7 @@ static gboolean dispatch_window_key(JNIEnv *env, int action, int code, int repea
 		return FALSE;
 	jobject window_jobj = _GET_OBJ_FIELD(activity_current, "window", "Landroid/view/Window;");
 	jlong now = g_get_monotonic_time() / 1000;
+	J__InputTrace__key(env, code, action);
 	jobject event = J_new__KeyEvent__full(env, down_time ? down_time : now, now, action, code, repeat, meta,
 	                                      VIRTUAL_KEYBOARD, scancode, flags, SOURCE_KEYBOARD);
 	_SET_INT_FIELD(event, "unicodeValue", unicode);

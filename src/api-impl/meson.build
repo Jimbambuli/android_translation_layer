@@ -145,6 +145,7 @@ srcs = [
 	'android/atl/ATLThemeOverlay.java',
 	'android/atl/ATLToggles.java',
 	'android/atl/EarlyPackageParser.java',
+	'android/atl/InputTrace.java',
 	'android/atl/annotation/Export.java',
 	'android/atl/crypto/IvParameters.java',
 	'android/atl/crypto/KeyGeneratorImpl.java',

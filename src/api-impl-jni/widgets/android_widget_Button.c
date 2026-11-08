@@ -59,6 +59,7 @@ static void clicked_cb(GtkWidget *button, gpointer user_data)
 	JNIEnv *env = get_jni_env();
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(button));
 
+	J__InputTrace__userTouch(env, wrapper->jobj, 0);
 	J__View__performClick(env, wrapper->jobj);
 
 	if ((*env)->ExceptionCheck(env)) {
