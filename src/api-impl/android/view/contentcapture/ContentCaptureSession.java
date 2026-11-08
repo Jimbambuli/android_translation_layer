@@ -36,6 +36,28 @@ public abstract class ContentCaptureSession {
 		return new AutofillId(hostId, virtualChildId, getId());
 	}
 
+	/**
+	 * Creates a {@link ViewStructure} for a "standard" view.
+	 *
+	 * <p>This method should be called after a {@link View} is laid out, so the view structure can be
+	 * filled and then passed to {@link #notifyViewAppeared(ViewStructure)}.
+	 */
+	public final ViewStructure newViewStructure(View view) {
+		return new ViewNode.ViewStructureImpl(view);
+	}
+
+	/**
+	 * Creates a {@link ViewStructure} for a "virtual" view, so it can be passed to
+	 * {@link #notifyViewAppeared(ViewStructure)} by the view managing the virtual view hierarchy.
+	 *
+	 * @param parentId id of the virtual view parent (it can be obtained by calling
+	 * {@link ViewStructure#getAutofillId()} on the parent).
+	 * @param virtualId id of the virtual child, relative to the parent.
+	 */
+	public final ViewStructure newVirtualViewStructure(AutofillId parentId, long virtualId) {
+		return new ViewNode.ViewStructureImpl(parentId, virtualId, getId());
+	}
+
 	public final void notifyViewAppeared(ViewStructure node) {
 		Objects.requireNonNull(node);
 	}

@@ -21,7 +21,7 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.graphics.drawable.ColorDrawable;
-// import android.graphics.Movie;
+import android.graphics.Movie;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Drawable.ConstantState;
 import android.icu.text.PluralRules;
@@ -50,7 +50,6 @@ import java.util.Map;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
-class Movie {}
 
 /**
  * Class for accessing an application's resources.  This sits on top of the
@@ -825,18 +824,15 @@ public class Resources {
 	 * @throws NotFoundException Throws NotFoundException if the given ID does not exist.
 	 *
 	 */
-	public Movie getMovie(int id) throws NotFoundException { /*
-	     InputStream is = openRawResource(id);
-	     Movie movie = Movie.decodeStream(is);
-	     try {
-		 is.close();
-	     }
-	     catch (java.io.IOException e) {
-		 // don't care, since the return value is valid
-	     }
-	     return movie;
-	 */
-		return null;
+	public Movie getMovie(int id) throws NotFoundException {
+		InputStream is = openRawResource(id);
+		Movie movie = Movie.decodeStream(is);
+		try {
+			is.close();
+		} catch (java.io.IOException e) {
+			// don't care, since the return value is valid
+		}
+		return movie;
 	}
 
 	/**
