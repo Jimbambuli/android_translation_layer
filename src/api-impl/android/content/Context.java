@@ -19,6 +19,7 @@ import android.atl.ATLLoadedAppManager;
 import android.atl.annotation.Export;
 import android.bluetooth.BluetoothManager;
 import android.content.pm.ApplicationInfo;
+import android.os.UserHandle;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.pm.ShortcutManager;
@@ -264,22 +265,47 @@ public abstract class Context {
 
 	public abstract String getSystemServiceName(Class<?> serviceClass);
 
-	public Intent registerReceiver(final BroadcastReceiver receiver, IntentFilter filter) {
-		if (receiver == null)
-			return null;
-		receiverMap.put(filter, receiver);
-		// like AOSP: the sticky broadcast of the system is delivered to the new receiver at once, on the main thread
-		final Intent sticky = android.net.ConnectivityManager.stickyIntentFor(filter);
-		if (sticky != null) {
-			final Context context = this;
-			new Handler(Looper.getMainLooper()).post(new Runnable() {
-				public void run() {
-					receiver.onReceive(context, sticky);
-				}
-			});
-			return sticky;
+	/* the sticky broadcasts apps sent with sendStickyBroadcast(), by action */
+	private static final Map<String, Intent> stickyIntents = new ConcurrentHashMap<>();
+
+	/* AOSP ActivityManagerService.registerReceiver(): every sticky broadcast the filter matches, an app's
+	 * own over the system's of the same action; the system's are ACTION_BATTERY_CHANGED and
+	 * CONNECTIVITY_ACTION, built from the current state */
+	private static java.util.List<Intent> stickyIntentsFor(IntentFilter filter) {
+		java.util.ArrayList<Intent> found = new java.util.ArrayList<>();
+		if (filter == null)
+			return found;
+		for (int i = 0; i < filter.countActions(); i++) {
+			String action = filter.getAction(i);
+			Intent sticky = stickyIntents.get(action);
+			if (sticky == null && Intent.ACTION_BATTERY_CHANGED.equals(action))
+				sticky = android.os.BatteryManager.batteryChangedIntent();
+			if (sticky == null && android.net.ConnectivityManager.CONNECTIVITY_ACTION.equals(action))
+				sticky = android.net.ConnectivityManager.stickyIntentFor(filter);
+			if (sticky != null)
+				found.add(new Intent(sticky));
 		}
-		return new Intent();
+		return found;
+	}
+
+	/* AOSP: with a receiver the sticky broadcasts are delivered at once (on the main thread); the first of
+	 * them is returned. Without a receiver (the state query registerReceiver(null, filter)) nothing is
+	 * registered; the result is null when no sticky broadcast matches */
+	public Intent registerReceiver(final BroadcastReceiver receiver, IntentFilter filter) {
+		if (receiver != null)
+			receiverMap.put(filter, receiver);
+		java.util.List<Intent> stickies = stickyIntentsFor(filter);
+		if (receiver != null) {
+			final Context context = this;
+			for (final Intent sticky : stickies) {
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
+					public void run() {
+						receiver.onReceive(context, new Intent(sticky));
+					}
+				});
+			}
+		}
+		return stickies.isEmpty() ? null : stickies.get(0);
 	}
 
 	public Looper getMainLooper() {
@@ -772,6 +798,34 @@ public abstract class Context {
 
 	public void sendBroadcast(Intent intent, String receiverPermission) {
 		sendBroadcast(intent);
+	}
+
+	/* AOSP (deprecated): the broadcast stays and goes to every receiver that registers for it later */
+	public void sendStickyBroadcast(Intent intent) {
+		if (intent.getAction() != null)
+			stickyIntents.put(intent.getAction(), new Intent(intent));
+		sendBroadcast(intent);
+	}
+
+	public void sendStickyBroadcast(Intent intent, Bundle options) {
+		sendStickyBroadcast(intent);
+	}
+
+	public void sendStickyOrderedBroadcast(Intent intent, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+		sendStickyBroadcast(intent);
+	}
+
+	public void removeStickyBroadcast(Intent intent) {
+		if (intent.getAction() != null)
+			stickyIntents.remove(intent.getAction());
+	}
+
+	public void sendStickyBroadcastAsUser(Intent intent, UserHandle user) {
+		sendStickyBroadcast(intent);
+	}
+
+	public void removeStickyBroadcastAsUser(Intent intent, UserHandle user) {
+		removeStickyBroadcast(intent);
 	}
 
 	/* the receivers get the broadcast one after the other already, so it is ordered (by registration
