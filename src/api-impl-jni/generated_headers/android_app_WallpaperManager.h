@@ -7,6 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_app_WallpaperManager_FLAG_SYSTEM
+#define android_app_WallpaperManager_FLAG_SYSTEM 1L
+#undef android_app_WallpaperManager_FLAG_LOCK
+#define android_app_WallpaperManager_FLAG_LOCK 2L
 /*
  * Class:     android_app_WallpaperManager
  * Method:    set_bitmap

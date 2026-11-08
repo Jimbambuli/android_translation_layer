@@ -7,6 +7,28 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_app_NotificationManager_IMPORTANCE_UNSPECIFIED
+#define android_app_NotificationManager_IMPORTANCE_UNSPECIFIED -1000L
+#undef android_app_NotificationManager_IMPORTANCE_NONE
+#define android_app_NotificationManager_IMPORTANCE_NONE 0L
+#undef android_app_NotificationManager_IMPORTANCE_MIN
+#define android_app_NotificationManager_IMPORTANCE_MIN 1L
+#undef android_app_NotificationManager_IMPORTANCE_LOW
+#define android_app_NotificationManager_IMPORTANCE_LOW 2L
+#undef android_app_NotificationManager_IMPORTANCE_DEFAULT
+#define android_app_NotificationManager_IMPORTANCE_DEFAULT 3L
+#undef android_app_NotificationManager_IMPORTANCE_HIGH
+#define android_app_NotificationManager_IMPORTANCE_HIGH 4L
+#undef android_app_NotificationManager_IMPORTANCE_MAX
+#define android_app_NotificationManager_IMPORTANCE_MAX 5L
+#undef android_app_NotificationManager_G_NORMAL
+#define android_app_NotificationManager_G_NORMAL 0L
+#undef android_app_NotificationManager_G_LOW
+#define android_app_NotificationManager_G_LOW 1L
+#undef android_app_NotificationManager_G_HIGH
+#define android_app_NotificationManager_G_HIGH 2L
+#undef android_app_NotificationManager_G_URGENT
+#define android_app_NotificationManager_G_URGENT 3L
 /*
  * Class:     android_app_NotificationManager
  * Method:    nativeInitBuilder
@@ -26,10 +48,10 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeAddAction
 /*
  * Class:     android_app_NotificationManager
  * Method:    nativeShowNotification
- * Signature: (JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILandroid/content/Intent;)V
+ * Signature: (JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;ZIILandroid/content/Intent;)V
  */
 JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotification
-  (JNIEnv *, jobject, jlong, jint, jstring, jstring, jstring, jboolean, jint, jobject);
+  (JNIEnv *, jobject, jlong, jint, jstring, jstring, jstring, jboolean, jint, jint, jobject);
 
 /*
  * Class:     android_app_NotificationManager

@@ -93,6 +93,8 @@ extern "C" {
 #define android_os_Process_SIGNAL_USR1 10L
 #undef android_os_Process_ZYGOTE_RETRY_MILLIS
 #define android_os_Process_ZYGOTE_RETRY_MILLIS 500L
+#undef android_os_Process_EXIT_RESTART
+#define android_os_Process_EXIT_RESTART 75L
 #undef android_os_Process_PROC_TERM_MASK
 #define android_os_Process_PROC_TERM_MASK 255L
 #undef android_os_Process_PROC_ZERO_TERM

@@ -9,6 +9,18 @@ extern "C" {
 #endif
 #undef android_atl_GskCanvas_HAS_ALPHA_LAYER_SAVE_FLAG
 #define android_atl_GskCanvas_HAS_ALPHA_LAYER_SAVE_FLAG 4L
+#undef android_atl_GskCanvas_CLIP_SAVE_FLAG
+#define android_atl_GskCanvas_CLIP_SAVE_FLAG 2L
+#undef android_atl_GskCanvas_MATRIX_SAVE_FLAG
+#define android_atl_GskCanvas_MATRIX_SAVE_FLAG 1L
+#undef android_atl_GskCanvas_FULL_COLOR_LAYER_SAVE_FLAG
+#define android_atl_GskCanvas_FULL_COLOR_LAYER_SAVE_FLAG 8L
+#undef android_atl_GskCanvas_CLIP_TO_LAYER_SAVE_FLAG
+#define android_atl_GskCanvas_CLIP_TO_LAYER_SAVE_FLAG 16L
+#undef android_atl_GskCanvas_ALL_SAVE_FLAG
+#define android_atl_GskCanvas_ALL_SAVE_FLAG 31L
+#undef android_atl_GskCanvas_CLIP_OUT_EXTENT
+#define android_atl_GskCanvas_CLIP_OUT_EXTENT 1000000.0f
 /*
  * Class:     android_atl_GskCanvas
  * Method:    native_drawBitmap
@@ -152,6 +164,14 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipPath
  */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pop
   (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     android_atl_GskCanvas
+ * Method:    native_pushOpacity
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pushOpacity
+  (JNIEnv *, jobject, jlong, jfloat);
 
 /*
  * Class:     android_atl_GskCanvas

@@ -7,6 +7,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_view_inputmethod_InputMethodManager_RESULT_UNCHANGED_SHOWN
+#define android_view_inputmethod_InputMethodManager_RESULT_UNCHANGED_SHOWN 0L
+#undef android_view_inputmethod_InputMethodManager_RESULT_UNCHANGED_HIDDEN
+#define android_view_inputmethod_InputMethodManager_RESULT_UNCHANGED_HIDDEN 1L
+#undef android_view_inputmethod_InputMethodManager_RESULT_SHOWN
+#define android_view_inputmethod_InputMethodManager_RESULT_SHOWN 2L
+#undef android_view_inputmethod_InputMethodManager_RESULT_HIDDEN
+#define android_view_inputmethod_InputMethodManager_RESULT_HIDDEN 3L
 /*
  * Class:     android_view_inputmethod_InputMethodManager
  * Method:    nativeInit

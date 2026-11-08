@@ -11,6 +11,8 @@ extern "C" {
 #define android_view_Window_FEATURE_OPTIONS_PANEL 0L
 #undef android_view_Window_FEATURE_NO_TITLE
 #define android_view_Window_FEATURE_NO_TITLE 1L
+#undef android_view_Window_FEATURE_CONTEXT_MENU
+#define android_view_Window_FEATURE_CONTEXT_MENU 6L
 /*
  * Class:     android_view_Window
  * Method:    set_title

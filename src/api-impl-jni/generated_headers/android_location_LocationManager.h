@@ -9,11 +9,19 @@ extern "C" {
 #endif
 /*
  * Class:     android_location_LocationManager
- * Method:    nativeGetLocation
+ * Method:    nativeStart
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_android_location_LocationManager_nativeGetLocation
-  (JNIEnv *, jobject);
+JNIEXPORT void JNICALL Java_android_location_LocationManager_nativeStart
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_location_LocationManager
+ * Method:    nativeStop
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_location_LocationManager_nativeStop
+  (JNIEnv *, jclass);
 
 #ifdef __cplusplus
 }

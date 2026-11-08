@@ -7,14 +7,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/*
- * Class:     android_net_ConnectivityManager
- * Method:    registerNetworkCallback
- * Signature: (Landroid/net/NetworkRequest;Landroid/net/ConnectivityManager/NetworkCallback;)V
- */
-JNIEXPORT void JNICALL Java_android_net_ConnectivityManager_registerNetworkCallback
-  (JNIEnv *, jobject, jobject, jobject);
-
+#undef android_net_ConnectivityManager_TYPE_MOBILE
+#define android_net_ConnectivityManager_TYPE_MOBILE 0L
+#undef android_net_ConnectivityManager_TYPE_WIFI
+#define android_net_ConnectivityManager_TYPE_WIFI 1L
+#undef android_net_ConnectivityManager_TYPE_ETHERNET
+#define android_net_ConnectivityManager_TYPE_ETHERNET 9L
+#undef android_net_ConnectivityManager_TYPE_VPN
+#define android_net_ConnectivityManager_TYPE_VPN 17L
 /*
  * Class:     android_net_ConnectivityManager
  * Method:    isActiveNetworkMetered
@@ -29,7 +29,15 @@ JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_isActiveNetworkM
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_nativeGetNetworkAvailable
-  (JNIEnv *, jobject);
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_net_ConnectivityManager
+ * Method:    nativeStartMonitoring
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_net_ConnectivityManager_nativeStartMonitoring
+  (JNIEnv *, jclass);
 
 #ifdef __cplusplus
 }

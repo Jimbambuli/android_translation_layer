@@ -129,6 +129,8 @@ extern "C" {
 #define android_view_MotionEvent_AXIS_DISTANCE 24L
 #undef android_view_MotionEvent_AXIS_TILT
 #define android_view_MotionEvent_AXIS_TILT 25L
+#undef android_view_MotionEvent_AXIS_SCROLL
+#define android_view_MotionEvent_AXIS_SCROLL 26L
 #undef android_view_MotionEvent_AXIS_GENERIC_1
 #define android_view_MotionEvent_AXIS_GENERIC_1 32L
 #undef android_view_MotionEvent_AXIS_GENERIC_2
@@ -193,6 +195,18 @@ extern "C" {
 #define android_view_MotionEvent_RAW_X_OFFSET 2L
 #undef android_view_MotionEvent_RAW_Y_OFFSET
 #define android_view_MotionEvent_RAW_Y_OFFSET 3L
+#undef android_view_MotionEvent_CLASSIFICATION_NONE
+#define android_view_MotionEvent_CLASSIFICATION_NONE 0L
+#undef android_view_MotionEvent_CLASSIFICATION_AMBIGUOUS_GESTURE
+#define android_view_MotionEvent_CLASSIFICATION_AMBIGUOUS_GESTURE 1L
+#undef android_view_MotionEvent_CLASSIFICATION_DEEP_PRESS
+#define android_view_MotionEvent_CLASSIFICATION_DEEP_PRESS 2L
+#undef android_view_MotionEvent_CLASSIFICATION_TWO_FINGER_SWIPE
+#define android_view_MotionEvent_CLASSIFICATION_TWO_FINGER_SWIPE 3L
+#undef android_view_MotionEvent_CLASSIFICATION_MULTI_FINGER_SWIPE
+#define android_view_MotionEvent_CLASSIFICATION_MULTI_FINGER_SWIPE 4L
+#undef android_view_MotionEvent_CLASSIFICATION_PINCH
+#define android_view_MotionEvent_CLASSIFICATION_PINCH 5L
 /*
  * Class:     android_view_MotionEvent
  * Method:    nativeInitialize

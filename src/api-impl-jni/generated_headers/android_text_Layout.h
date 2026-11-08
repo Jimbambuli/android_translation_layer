@@ -23,6 +23,8 @@ extern "C" {
 #define android_text_Layout_ATTR_UNDERLINE 6L
 #undef android_text_Layout_ATTR_STRIKETHROUGH
 #define android_text_Layout_ATTR_STRIKETHROUGH 7L
+#undef android_text_Layout_ATTR_HYPHENS
+#define android_text_Layout_ATTR_HYPHENS 8L
 /*
  * Class:     android_text_Layout
  * Method:    native_constructor

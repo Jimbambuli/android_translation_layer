@@ -14,7 +14,9 @@ extern "C" {
 #undef android_widget_Button_FOCUSABLE
 #define android_widget_Button_FOCUSABLE 1L
 #undef android_widget_Button_FOCUSABLE_MASK
-#define android_widget_Button_FOCUSABLE_MASK 1L
+#define android_widget_Button_FOCUSABLE_MASK 17L
+#undef android_widget_Button_FOCUSABLE_AUTO
+#define android_widget_Button_FOCUSABLE_AUTO 16L
 #undef android_widget_Button_FITS_SYSTEM_WINDOWS
 #define android_widget_Button_FITS_SYSTEM_WINDOWS 2L
 #undef android_widget_Button_VISIBLE
@@ -127,10 +129,28 @@ extern "C" {
 #define android_widget_Button_MEASURED_HEIGHT_STATE_SHIFT 16L
 #undef android_widget_Button_MEASURED_STATE_TOO_SMALL
 #define android_widget_Button_MEASURED_STATE_TOO_SMALL 16777216L
+#undef android_widget_Button_PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT
+#define android_widget_Button_PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT 13L
+#undef android_widget_Button_PFLAG2_TEXT_ALIGNMENT_MASK
+#define android_widget_Button_PFLAG2_TEXT_ALIGNMENT_MASK 57344L
+#undef android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED
+#define android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED 65536L
+#undef android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT
+#define android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT 17L
+#undef android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK
+#define android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK 917504L
+#undef android_widget_Button_TEXT_ALIGNMENT_DEFAULT
+#define android_widget_Button_TEXT_ALIGNMENT_DEFAULT 1L
+#undef android_widget_Button_TEXT_ALIGNMENT_RESOLVED_DEFAULT
+#define android_widget_Button_TEXT_ALIGNMENT_RESOLVED_DEFAULT 1L
+#undef android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT
+#define android_widget_Button_PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT 131072L
 #undef android_widget_Button_PFLAG2_DRAG_CAN_ACCEPT
 #define android_widget_Button_PFLAG2_DRAG_CAN_ACCEPT 1L
 #undef android_widget_Button_PFLAG2_DRAG_HOVERED
 #define android_widget_Button_PFLAG2_DRAG_HOVERED 2L
+#undef android_widget_Button_DRAG_MASK
+#define android_widget_Button_DRAG_MASK 3L
 #undef android_widget_Button_LAYOUT_DIRECTION_LTR
 #define android_widget_Button_LAYOUT_DIRECTION_LTR 0L
 #undef android_widget_Button_LAYOUT_DIRECTION_RTL
@@ -211,6 +231,10 @@ extern "C" {
 #define android_widget_Button_TEXT_DIRECTION_LTR 3L
 #undef android_widget_Button_TEXT_DIRECTION_RTL
 #define android_widget_Button_TEXT_DIRECTION_RTL 4L
+#undef android_widget_Button_PFLAG_FORCE_LAYOUT
+#define android_widget_Button_PFLAG_FORCE_LAYOUT 4096L
+#undef android_widget_Button_PFLAG_LAYOUT_REQUIRED
+#define android_widget_Button_PFLAG_LAYOUT_REQUIRED 8192L
 #undef android_widget_Button_PFLAG_SELECTED
 #define android_widget_Button_PFLAG_SELECTED 4L
 #undef android_widget_Button_PFLAG_DRAWABLE_STATE_DIRTY
@@ -223,8 +247,114 @@ extern "C" {
 #define android_widget_Button_PFLAG3_IS_LAID_OUT 4L
 #undef android_widget_Button_UNDEFINED_PADDING
 #define android_widget_Button_UNDEFINED_PADDING -2147483648L
+#undef android_widget_Button_PFLAG_PREPRESSED
+#define android_widget_Button_PFLAG_PREPRESSED 33554432L
 #undef android_widget_Button_PFLAG_SAVE_STATE_CALLED
 #define android_widget_Button_PFLAG_SAVE_STATE_CALLED 131072L
+#undef android_widget_Button_LAYER_TYPE_NONE
+#define android_widget_Button_LAYER_TYPE_NONE 0L
+#undef android_widget_Button_LAYER_TYPE_SOFTWARE
+#define android_widget_Button_LAYER_TYPE_SOFTWARE 1L
+#undef android_widget_Button_LAYER_TYPE_HARDWARE
+#define android_widget_Button_LAYER_TYPE_HARDWARE 2L
+#undef android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_AUTO
+#define android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_AUTO 0L
+#undef android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_YES
+#define android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_YES 1L
+#undef android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_NO
+#define android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_NO 2L
+#undef android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+#define android_widget_Button_IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS 4L
+#undef android_widget_Button_ACCESSIBILITY_LIVE_REGION_NONE
+#define android_widget_Button_ACCESSIBILITY_LIVE_REGION_NONE 0L
+#undef android_widget_Button_ACCESSIBILITY_LIVE_REGION_POLITE
+#define android_widget_Button_ACCESSIBILITY_LIVE_REGION_POLITE 1L
+#undef android_widget_Button_ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+#define android_widget_Button_ACCESSIBILITY_LIVE_REGION_ASSERTIVE 2L
+#undef android_widget_Button_ACCESSIBILITY_DATA_SENSITIVE_AUTO
+#define android_widget_Button_ACCESSIBILITY_DATA_SENSITIVE_AUTO 0L
+#undef android_widget_Button_ACCESSIBILITY_DATA_SENSITIVE_YES
+#define android_widget_Button_ACCESSIBILITY_DATA_SENSITIVE_YES 1L
+#undef android_widget_Button_ACCESSIBILITY_DATA_SENSITIVE_NO
+#define android_widget_Button_ACCESSIBILITY_DATA_SENSITIVE_NO 2L
+#undef android_widget_Button_POPULATING_ACCESSIBILITY_EVENT_TYPES
+#define android_widget_Button_POPULATING_ACCESSIBILITY_EVENT_TYPES 8511935L
+#undef android_widget_Button_FIND_VIEWS_WITH_TEXT
+#define android_widget_Button_FIND_VIEWS_WITH_TEXT 1L
+#undef android_widget_Button_FIND_VIEWS_WITH_CONTENT_DESCRIPTION
+#define android_widget_Button_FIND_VIEWS_WITH_CONTENT_DESCRIPTION 2L
+#undef android_widget_Button_SCROLL_INDICATOR_TOP
+#define android_widget_Button_SCROLL_INDICATOR_TOP 1L
+#undef android_widget_Button_SCROLL_INDICATOR_BOTTOM
+#define android_widget_Button_SCROLL_INDICATOR_BOTTOM 2L
+#undef android_widget_Button_SCROLL_INDICATOR_LEFT
+#define android_widget_Button_SCROLL_INDICATOR_LEFT 4L
+#undef android_widget_Button_SCROLL_INDICATOR_RIGHT
+#define android_widget_Button_SCROLL_INDICATOR_RIGHT 8L
+#undef android_widget_Button_SCROLL_INDICATOR_START
+#define android_widget_Button_SCROLL_INDICATOR_START 16L
+#undef android_widget_Button_SCROLL_INDICATOR_END
+#define android_widget_Button_SCROLL_INDICATOR_END 32L
+#undef android_widget_Button_CONTENT_SENSITIVITY_AUTO
+#define android_widget_Button_CONTENT_SENSITIVITY_AUTO 0L
+#undef android_widget_Button_CONTENT_SENSITIVITY_SENSITIVE
+#define android_widget_Button_CONTENT_SENSITIVITY_SENSITIVE 1L
+#undef android_widget_Button_CONTENT_SENSITIVITY_NOT_SENSITIVE
+#define android_widget_Button_CONTENT_SENSITIVITY_NOT_SENSITIVE 2L
+#undef android_widget_Button_AUTOFILL_TYPE_NONE
+#define android_widget_Button_AUTOFILL_TYPE_NONE 0L
+#undef android_widget_Button_AUTOFILL_TYPE_TEXT
+#define android_widget_Button_AUTOFILL_TYPE_TEXT 1L
+#undef android_widget_Button_AUTOFILL_TYPE_TOGGLE
+#define android_widget_Button_AUTOFILL_TYPE_TOGGLE 2L
+#undef android_widget_Button_AUTOFILL_TYPE_LIST
+#define android_widget_Button_AUTOFILL_TYPE_LIST 3L
+#undef android_widget_Button_AUTOFILL_TYPE_DATE
+#define android_widget_Button_AUTOFILL_TYPE_DATE 4L
+#undef android_widget_Button_IMPORTANT_FOR_AUTOFILL_AUTO
+#define android_widget_Button_IMPORTANT_FOR_AUTOFILL_AUTO 0L
+#undef android_widget_Button_IMPORTANT_FOR_AUTOFILL_YES
+#define android_widget_Button_IMPORTANT_FOR_AUTOFILL_YES 1L
+#undef android_widget_Button_IMPORTANT_FOR_AUTOFILL_NO
+#define android_widget_Button_IMPORTANT_FOR_AUTOFILL_NO 2L
+#undef android_widget_Button_IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS
+#define android_widget_Button_IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS 4L
+#undef android_widget_Button_IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+#define android_widget_Button_IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS 8L
+#undef android_widget_Button_AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+#define android_widget_Button_AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS 1L
+#undef android_widget_Button_LINES
+#define android_widget_Button_LINES 1L
+#undef android_widget_Button_EMS
+#define android_widget_Button_EMS 1L
+#undef android_widget_Button_PIXELS
+#define android_widget_Button_PIXELS 2L
+#undef android_widget_Button_MAX_LENGTH_FOR_SINGLE_LINE_EDIT_TEXT
+#define android_widget_Button_MAX_LENGTH_FOR_SINGLE_LINE_EDIT_TEXT 5000L
+#undef android_widget_Button_ELLIPSIZE_NOT_SET
+#define android_widget_Button_ELLIPSIZE_NOT_SET -1L
+#undef android_widget_Button_ELLIPSIZE_NONE
+#define android_widget_Button_ELLIPSIZE_NONE 0L
+#undef android_widget_Button_ELLIPSIZE_START
+#define android_widget_Button_ELLIPSIZE_START 1L
+#undef android_widget_Button_ELLIPSIZE_MIDDLE
+#define android_widget_Button_ELLIPSIZE_MIDDLE 2L
+#undef android_widget_Button_ELLIPSIZE_END
+#define android_widget_Button_ELLIPSIZE_END 3L
+#undef android_widget_Button_ELLIPSIZE_MARQUEE
+#define android_widget_Button_ELLIPSIZE_MARQUEE 4L
+#undef android_widget_Button_SANS
+#define android_widget_Button_SANS 1L
+#undef android_widget_Button_SERIF
+#define android_widget_Button_SERIF 2L
+#undef android_widget_Button_MONOSPACE
+#define android_widget_Button_MONOSPACE 3L
+#undef android_widget_Button_DEFAULT_TYPEFACE
+#define android_widget_Button_DEFAULT_TYPEFACE -1L
+#undef android_widget_Button_AUTO_SIZE_TEXT_TYPE_NONE
+#define android_widget_Button_AUTO_SIZE_TEXT_TYPE_NONE 0L
+#undef android_widget_Button_AUTO_SIZE_TEXT_TYPE_UNIFORM
+#define android_widget_Button_AUTO_SIZE_TEXT_TYPE_UNIFORM 1L
 /*
  * Class:     android_widget_Button
  * Method:    native_constructor
@@ -267,19 +397,19 @@ JNIEXPORT jobject JNICALL Java_android_widget_Button_getText
 
 /*
  * Class:     android_widget_Button
- * Method:    native_updateCompoundDrawable
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_android_widget_Button_native_1updateCompoundDrawable
-  (JNIEnv *, jobject, jlong);
-
-/*
- * Class:     android_widget_Button
  * Method:    native_setTextSize
  * Signature: (JF)V
  */
 JNIEXPORT void JNICALL Java_android_widget_Button_native_1setTextSize
   (JNIEnv *, jobject, jlong, jfloat);
+
+/*
+ * Class:     android_widget_Button
+ * Method:    native_updateCompoundDrawable
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_Button_native_1updateCompoundDrawable
+  (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
 }

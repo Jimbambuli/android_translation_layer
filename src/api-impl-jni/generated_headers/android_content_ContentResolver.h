@@ -7,6 +7,16 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_content_ContentResolver_QUERY_SORT_DIRECTION_ASCENDING
+#define android_content_ContentResolver_QUERY_SORT_DIRECTION_ASCENDING 0L
+#undef android_content_ContentResolver_QUERY_SORT_DIRECTION_DESCENDING
+#define android_content_ContentResolver_QUERY_SORT_DIRECTION_DESCENDING 1L
+#undef android_content_ContentResolver_SYNC_OBSERVER_TYPE_SETTINGS
+#define android_content_ContentResolver_SYNC_OBSERVER_TYPE_SETTINGS 1L
+#undef android_content_ContentResolver_SYNC_OBSERVER_TYPE_PENDING
+#define android_content_ContentResolver_SYNC_OBSERVER_TYPE_PENDING 2L
+#undef android_content_ContentResolver_SYNC_OBSERVER_TYPE_ACTIVE
+#define android_content_ContentResolver_SYNC_OBSERVER_TYPE_ACTIVE 4L
 /*
  * Class:     android_content_ContentResolver
  * Method:    native_query_file_info

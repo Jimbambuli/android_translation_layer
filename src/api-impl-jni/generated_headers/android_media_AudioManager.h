@@ -43,6 +43,8 @@ extern "C" {
 #define android_media_AudioManager_GET_DEVICES_OUTPUTS 2L
 #undef android_media_AudioManager_GET_DEVICES_ALL
 #define android_media_AudioManager_GET_DEVICES_ALL 3L
+#undef android_media_AudioManager_FX_KEY_CLICK
+#define android_media_AudioManager_FX_KEY_CLICK 0L
 #undef android_media_AudioManager_PLAYBACK_OFFLOAD_NOT_SUPPORTED
 #define android_media_AudioManager_PLAYBACK_OFFLOAD_NOT_SUPPORTED 0L
 /*
@@ -52,6 +54,22 @@ extern "C" {
  */
 JNIEXPORT void JNICALL Java_android_media_AudioManager_nativeSetStreamVolume
   (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     android_media_AudioManager
+ * Method:    nativeGetStreamVolume
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_android_media_AudioManager_nativeGetStreamVolume
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     android_media_AudioManager
+ * Method:    nativeIsStreamMute
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_media_AudioManager_nativeIsStreamMute
+  (JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }

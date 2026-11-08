@@ -57,6 +57,14 @@ JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1setColors
 
 /*
  * Class:     android_widget_PopupMenu
+ * Method:    native_dismiss
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupMenu_native_1dismiss
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_widget_PopupMenu
  * Method:    native_show
  * Signature: (JJIII)V
  */

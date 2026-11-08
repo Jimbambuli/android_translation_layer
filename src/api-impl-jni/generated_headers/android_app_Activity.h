@@ -9,12 +9,18 @@ extern "C" {
 #endif
 #undef android_app_Activity_MODE_PRIVATE
 #define android_app_Activity_MODE_PRIVATE 0L
+#undef android_app_Activity_MODE_APPEND
+#define android_app_Activity_MODE_APPEND 32768L
 #undef android_app_Activity_CONTEXT_INCLUDE_CODE
 #define android_app_Activity_CONTEXT_INCLUDE_CODE 1L
 #undef android_app_Activity_CONTEXT_IGNORE_SECURITY
 #define android_app_Activity_CONTEXT_IGNORE_SECURITY 2L
 #undef android_app_Activity_CONTEXT_RESTRICTED
 #define android_app_Activity_CONTEXT_RESTRICTED 4L
+#undef android_app_Activity_BIND_AUTO_CREATE
+#define android_app_Activity_BIND_AUTO_CREATE 1L
+#undef android_app_Activity_BIND_INCLUDE_CAPABILITIES
+#define android_app_Activity_BIND_INCLUDE_CAPABILITIES 4096L
 #undef android_app_Activity_MODE_ENABLE_WRITE_AHEAD_LOGGING
 #define android_app_Activity_MODE_ENABLE_WRITE_AHEAD_LOGGING 8L
 #undef android_app_Activity_MODE_NO_LOCALIZED_COLLATORS
@@ -23,6 +29,26 @@ extern "C" {
 #define android_app_Activity_RESULT_CANCELED 0L
 #undef android_app_Activity_RESULT_OK
 #define android_app_Activity_RESULT_OK -1L
+#undef android_app_Activity_DEFAULT_KEYS_DISABLE
+#define android_app_Activity_DEFAULT_KEYS_DISABLE 0L
+#undef android_app_Activity_DEFAULT_KEYS_DIALER
+#define android_app_Activity_DEFAULT_KEYS_DIALER 1L
+#undef android_app_Activity_DEFAULT_KEYS_SHORTCUT
+#define android_app_Activity_DEFAULT_KEYS_SHORTCUT 2L
+#undef android_app_Activity_DEFAULT_KEYS_SEARCH_LOCAL
+#define android_app_Activity_DEFAULT_KEYS_SEARCH_LOCAL 3L
+#undef android_app_Activity_DEFAULT_KEYS_SEARCH_GLOBAL
+#define android_app_Activity_DEFAULT_KEYS_SEARCH_GLOBAL 4L
+#undef android_app_Activity_MAX_NUM_PICTURE_IN_PICTURE_ACTIONS
+#define android_app_Activity_MAX_NUM_PICTURE_IN_PICTURE_ACTIONS 3L
+#undef android_app_Activity_PICTURE_IN_PICTURE_MIN_ASPECT_RATIO
+#define android_app_Activity_PICTURE_IN_PICTURE_MIN_ASPECT_RATIO 0.41841003f
+#undef android_app_Activity_PICTURE_IN_PICTURE_MAX_ASPECT_RATIO
+#define android_app_Activity_PICTURE_IN_PICTURE_MAX_ASPECT_RATIO 2.39f
+#undef android_app_Activity_OVERRIDE_TRANSITION_OPEN
+#define android_app_Activity_OVERRIDE_TRANSITION_OPEN 0L
+#undef android_app_Activity_OVERRIDE_TRANSITION_CLOSE
+#define android_app_Activity_OVERRIDE_TRANSITION_CLOSE 1L
 /*
  * Class:     android_app_Activity
  * Method:    isTaskRoot
@@ -133,6 +159,30 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativePickImages
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_isInMultiWindowMode
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeEnterPictureInPicture
+ * Signature: (F)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeEnterPictureInPicture
+  (JNIEnv *, jobject, jfloat);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeUpdatePictureInPicture
+ * Signature: (F)V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeUpdatePictureInPicture
+  (JNIEnv *, jobject, jfloat);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeBackInvoked
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeBackInvoked
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

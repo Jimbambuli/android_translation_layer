@@ -93,6 +93,14 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setOverlayColors
 
 /*
  * Class:     android_content_res_AssetManager
+ * Method:    setLoaderColors
+ * Signature: ([I[I)V
+ */
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_setLoaderColors
+  (JNIEnv *, jclass, jintArray, jintArray);
+
+/*
+ * Class:     android_content_res_AssetManager
  * Method:    getSizeConfigurationsNative
  * Signature: ()[I
  */

@@ -79,6 +79,30 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeAddStubNode
 JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateEmpyNode
   (JNIEnv *, jobject);
 
+/*
+ * Class:     android_view_RenderNode
+ * Method:    nativeApplyProperties
+ * Signature: (JFFZZFFFFFJFFFFFFFF)J
+ */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties
+  (JNIEnv *, jobject, jlong, jfloat, jfloat, jboolean, jboolean, jfloat, jfloat, jfloat, jfloat, jfloat, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
+
+/*
+ * Class:     android_view_RenderNode
+ * Method:    nativeCreateShadowNode
+ * Signature: (FFFFFFIIFF)J
+ */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateShadowNode
+  (JNIEnv *, jclass, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jint, jint, jfloat, jfloat);
+
+/*
+ * Class:     android_view_RenderNode
+ * Method:    nativeApplyEffect
+ * Signature: (JFFF)J
+ */
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyEffect
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat);
+
 #ifdef __cplusplus
 }
 #endif

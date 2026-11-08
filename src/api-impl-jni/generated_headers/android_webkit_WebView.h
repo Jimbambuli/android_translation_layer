@@ -14,7 +14,9 @@ extern "C" {
 #undef android_webkit_WebView_FOCUSABLE
 #define android_webkit_WebView_FOCUSABLE 1L
 #undef android_webkit_WebView_FOCUSABLE_MASK
-#define android_webkit_WebView_FOCUSABLE_MASK 1L
+#define android_webkit_WebView_FOCUSABLE_MASK 17L
+#undef android_webkit_WebView_FOCUSABLE_AUTO
+#define android_webkit_WebView_FOCUSABLE_AUTO 16L
 #undef android_webkit_WebView_FITS_SYSTEM_WINDOWS
 #define android_webkit_WebView_FITS_SYSTEM_WINDOWS 2L
 #undef android_webkit_WebView_VISIBLE
@@ -127,10 +129,28 @@ extern "C" {
 #define android_webkit_WebView_MEASURED_HEIGHT_STATE_SHIFT 16L
 #undef android_webkit_WebView_MEASURED_STATE_TOO_SMALL
 #define android_webkit_WebView_MEASURED_STATE_TOO_SMALL 16777216L
+#undef android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT
+#define android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_MASK_SHIFT 13L
+#undef android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_MASK
+#define android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_MASK 57344L
+#undef android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED
+#define android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED 65536L
+#undef android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT
+#define android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK_SHIFT 17L
+#undef android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK
+#define android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED_MASK 917504L
+#undef android_webkit_WebView_TEXT_ALIGNMENT_DEFAULT
+#define android_webkit_WebView_TEXT_ALIGNMENT_DEFAULT 1L
+#undef android_webkit_WebView_TEXT_ALIGNMENT_RESOLVED_DEFAULT
+#define android_webkit_WebView_TEXT_ALIGNMENT_RESOLVED_DEFAULT 1L
+#undef android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT
+#define android_webkit_WebView_PFLAG2_TEXT_ALIGNMENT_RESOLVED_DEFAULT 131072L
 #undef android_webkit_WebView_PFLAG2_DRAG_CAN_ACCEPT
 #define android_webkit_WebView_PFLAG2_DRAG_CAN_ACCEPT 1L
 #undef android_webkit_WebView_PFLAG2_DRAG_HOVERED
 #define android_webkit_WebView_PFLAG2_DRAG_HOVERED 2L
+#undef android_webkit_WebView_DRAG_MASK
+#define android_webkit_WebView_DRAG_MASK 3L
 #undef android_webkit_WebView_LAYOUT_DIRECTION_LTR
 #define android_webkit_WebView_LAYOUT_DIRECTION_LTR 0L
 #undef android_webkit_WebView_LAYOUT_DIRECTION_RTL
@@ -211,6 +231,10 @@ extern "C" {
 #define android_webkit_WebView_TEXT_DIRECTION_LTR 3L
 #undef android_webkit_WebView_TEXT_DIRECTION_RTL
 #define android_webkit_WebView_TEXT_DIRECTION_RTL 4L
+#undef android_webkit_WebView_PFLAG_FORCE_LAYOUT
+#define android_webkit_WebView_PFLAG_FORCE_LAYOUT 4096L
+#undef android_webkit_WebView_PFLAG_LAYOUT_REQUIRED
+#define android_webkit_WebView_PFLAG_LAYOUT_REQUIRED 8192L
 #undef android_webkit_WebView_PFLAG_SELECTED
 #define android_webkit_WebView_PFLAG_SELECTED 4L
 #undef android_webkit_WebView_PFLAG_DRAWABLE_STATE_DIRTY
@@ -223,8 +247,82 @@ extern "C" {
 #define android_webkit_WebView_PFLAG3_IS_LAID_OUT 4L
 #undef android_webkit_WebView_UNDEFINED_PADDING
 #define android_webkit_WebView_UNDEFINED_PADDING -2147483648L
+#undef android_webkit_WebView_PFLAG_PREPRESSED
+#define android_webkit_WebView_PFLAG_PREPRESSED 33554432L
 #undef android_webkit_WebView_PFLAG_SAVE_STATE_CALLED
 #define android_webkit_WebView_PFLAG_SAVE_STATE_CALLED 131072L
+#undef android_webkit_WebView_LAYER_TYPE_NONE
+#define android_webkit_WebView_LAYER_TYPE_NONE 0L
+#undef android_webkit_WebView_LAYER_TYPE_SOFTWARE
+#define android_webkit_WebView_LAYER_TYPE_SOFTWARE 1L
+#undef android_webkit_WebView_LAYER_TYPE_HARDWARE
+#define android_webkit_WebView_LAYER_TYPE_HARDWARE 2L
+#undef android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_AUTO
+#define android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_AUTO 0L
+#undef android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_YES
+#define android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_YES 1L
+#undef android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_NO
+#define android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_NO 2L
+#undef android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+#define android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS 4L
+#undef android_webkit_WebView_ACCESSIBILITY_LIVE_REGION_NONE
+#define android_webkit_WebView_ACCESSIBILITY_LIVE_REGION_NONE 0L
+#undef android_webkit_WebView_ACCESSIBILITY_LIVE_REGION_POLITE
+#define android_webkit_WebView_ACCESSIBILITY_LIVE_REGION_POLITE 1L
+#undef android_webkit_WebView_ACCESSIBILITY_LIVE_REGION_ASSERTIVE
+#define android_webkit_WebView_ACCESSIBILITY_LIVE_REGION_ASSERTIVE 2L
+#undef android_webkit_WebView_ACCESSIBILITY_DATA_SENSITIVE_AUTO
+#define android_webkit_WebView_ACCESSIBILITY_DATA_SENSITIVE_AUTO 0L
+#undef android_webkit_WebView_ACCESSIBILITY_DATA_SENSITIVE_YES
+#define android_webkit_WebView_ACCESSIBILITY_DATA_SENSITIVE_YES 1L
+#undef android_webkit_WebView_ACCESSIBILITY_DATA_SENSITIVE_NO
+#define android_webkit_WebView_ACCESSIBILITY_DATA_SENSITIVE_NO 2L
+#undef android_webkit_WebView_POPULATING_ACCESSIBILITY_EVENT_TYPES
+#define android_webkit_WebView_POPULATING_ACCESSIBILITY_EVENT_TYPES 8511935L
+#undef android_webkit_WebView_FIND_VIEWS_WITH_TEXT
+#define android_webkit_WebView_FIND_VIEWS_WITH_TEXT 1L
+#undef android_webkit_WebView_FIND_VIEWS_WITH_CONTENT_DESCRIPTION
+#define android_webkit_WebView_FIND_VIEWS_WITH_CONTENT_DESCRIPTION 2L
+#undef android_webkit_WebView_SCROLL_INDICATOR_TOP
+#define android_webkit_WebView_SCROLL_INDICATOR_TOP 1L
+#undef android_webkit_WebView_SCROLL_INDICATOR_BOTTOM
+#define android_webkit_WebView_SCROLL_INDICATOR_BOTTOM 2L
+#undef android_webkit_WebView_SCROLL_INDICATOR_LEFT
+#define android_webkit_WebView_SCROLL_INDICATOR_LEFT 4L
+#undef android_webkit_WebView_SCROLL_INDICATOR_RIGHT
+#define android_webkit_WebView_SCROLL_INDICATOR_RIGHT 8L
+#undef android_webkit_WebView_SCROLL_INDICATOR_START
+#define android_webkit_WebView_SCROLL_INDICATOR_START 16L
+#undef android_webkit_WebView_SCROLL_INDICATOR_END
+#define android_webkit_WebView_SCROLL_INDICATOR_END 32L
+#undef android_webkit_WebView_CONTENT_SENSITIVITY_AUTO
+#define android_webkit_WebView_CONTENT_SENSITIVITY_AUTO 0L
+#undef android_webkit_WebView_CONTENT_SENSITIVITY_SENSITIVE
+#define android_webkit_WebView_CONTENT_SENSITIVITY_SENSITIVE 1L
+#undef android_webkit_WebView_CONTENT_SENSITIVITY_NOT_SENSITIVE
+#define android_webkit_WebView_CONTENT_SENSITIVITY_NOT_SENSITIVE 2L
+#undef android_webkit_WebView_AUTOFILL_TYPE_NONE
+#define android_webkit_WebView_AUTOFILL_TYPE_NONE 0L
+#undef android_webkit_WebView_AUTOFILL_TYPE_TEXT
+#define android_webkit_WebView_AUTOFILL_TYPE_TEXT 1L
+#undef android_webkit_WebView_AUTOFILL_TYPE_TOGGLE
+#define android_webkit_WebView_AUTOFILL_TYPE_TOGGLE 2L
+#undef android_webkit_WebView_AUTOFILL_TYPE_LIST
+#define android_webkit_WebView_AUTOFILL_TYPE_LIST 3L
+#undef android_webkit_WebView_AUTOFILL_TYPE_DATE
+#define android_webkit_WebView_AUTOFILL_TYPE_DATE 4L
+#undef android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_AUTO
+#define android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_AUTO 0L
+#undef android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_YES
+#define android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_YES 1L
+#undef android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_NO
+#define android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_NO 2L
+#undef android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS
+#define android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS 4L
+#undef android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+#define android_webkit_WebView_IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS 8L
+#undef android_webkit_WebView_AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+#define android_webkit_WebView_AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS 1L
 #undef android_webkit_WebView_FLAG_CLIP_CHILDREN
 #define android_webkit_WebView_FLAG_CLIP_CHILDREN 1L
 #undef android_webkit_WebView_FLAG_INVALIDATE_REQUIRED
@@ -257,6 +355,14 @@ extern "C" {
 #define android_webkit_WebView_FLAG_IS_TRANSITION_GROUP_SET 33554432L
 #undef android_webkit_WebView_FLAG_TOUCHSCREEN_BLOCKS_FOCUS
 #define android_webkit_WebView_FLAG_TOUCHSCREEN_BLOCKS_FOCUS 67108864L
+#undef android_webkit_WebView_LAYOUT_MODE_CLIP_BOUNDS
+#define android_webkit_WebView_LAYOUT_MODE_CLIP_BOUNDS 0L
+#undef android_webkit_WebView_LAYOUT_MODE_OPTICAL_BOUNDS
+#define android_webkit_WebView_LAYOUT_MODE_OPTICAL_BOUNDS 1L
+#undef android_webkit_WebView_LAYOUT_MODE_UNDEFINED
+#define android_webkit_WebView_LAYOUT_MODE_UNDEFINED -1L
+#undef android_webkit_WebView_LAYOUT_MODE_DEFAULT
+#define android_webkit_WebView_LAYOUT_MODE_DEFAULT 0L
 /*
  * Class:     android_webkit_WebView
  * Method:    native_constructor
@@ -307,11 +413,35 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_finishJavaBridgeCall
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishJavaBridgeCall
+  (JNIEnv *, jobject, jlong, jstring);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_firePointerCancel
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1firePointerCancel
   (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_scrollTo
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1scrollTo
+  (JNIEnv *, jobject, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setVerticalScrollBarEnabled
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setVerticalScrollBarEnabled
+  (JNIEnv *, jobject, jlong, jboolean);
 
 /*
  * Class:     android_webkit_WebView

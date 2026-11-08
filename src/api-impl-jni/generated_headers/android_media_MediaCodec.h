@@ -19,6 +19,14 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor
 
 /*
  * Class:     android_media_MediaCodec
+ * Method:    native_setOutputSurface
+ * Signature: (JJ)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1setOutputSurface
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     android_media_MediaCodec
  * Method:    native_configure_audio
  * Signature: (JLjava/nio/ByteBuffer;II)V
  */
