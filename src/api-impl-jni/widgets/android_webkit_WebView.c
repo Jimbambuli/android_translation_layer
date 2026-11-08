@@ -427,7 +427,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	WebKitUserScript *console_script = webkit_user_script_new(
 	    "(function(){['log','info','warn','error','debug'].forEach(function(level){var orig=console[level];"
 	    "console[level]=function(){var msg=Array.prototype.map.call(arguments,String).join(' ');"
-	    "try{window.webkit.messageHandlers.atlbridge.postMessage('\u0001console\u0001'+level+'\u0001'+msg);}catch(e){}"
+	    "try{window.webkit.messageHandlers.atlbridge.postMessage('\001console\001'+level+'\001'+msg);}catch(e){}"
 	    "if(orig)orig.apply(console,arguments);};});})();",
 	    WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_START, NULL, NULL);
 	webkit_user_content_manager_add_script(content_manager, console_script);
