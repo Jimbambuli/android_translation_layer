@@ -760,12 +760,12 @@ public class ColorStateList extends ComplexColor implements Parcelable {
 		}
 	}
 
-	//@Override
+	@Override
 	public int describeContents() {
 		return 0;
 	}
 
-	/*@Override
+	@Override
 	public void writeToParcel(Parcel dest, int flags) {
 		if (canApplyTheme()) {
 			Log.w(TAG, "Wrote partially-resolved ColorStateList to parcel!");
@@ -776,9 +776,9 @@ public class ColorStateList extends ComplexColor implements Parcelable {
 			dest.writeIntArray(mStateSpecs[i]);
 		}
 		dest.writeIntArray(mColors);
-	}*/
+	}
 
-	/*public static final @android.annotation.NonNull Parcelable.Creator<ColorStateList> CREATOR = new Parcelable.Creator<ColorStateList>() {
+	public static final @android.annotation.NonNull Parcelable.Creator<ColorStateList> CREATOR = new Parcelable.Creator<ColorStateList>() {
 		@Override
 		public ColorStateList[] newArray(int size) {
 			return new ColorStateList[size];
@@ -794,7 +794,7 @@ public class ColorStateList extends ComplexColor implements Parcelable {
 			final int[] colors = source.createIntArray();
 			return new ColorStateList(stateSpecs, colors);
 		}
-	};*/
+	};
 
 	/**
 	 * @hide
