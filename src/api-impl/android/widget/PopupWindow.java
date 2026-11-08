@@ -183,6 +183,10 @@ public class PopupWindow {
 		return colors;
 	}
 
+	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr) {
+		this(context, attrs, defStyleAttr, 0);
+	}
+
 	public PopupWindow(Context context) {
 		this(context, null, 0, 0);
 	}

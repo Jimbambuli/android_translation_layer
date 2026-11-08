@@ -149,11 +149,33 @@ public abstract class CompoundButton extends Button implements Checkable {
 		return mText == null ? "" : mText;
 	}
 
+	/* AOSP CompoundButton.setButtonTintList()/setButtonTintMode(): the tint of the button drawable, kept and applied to it */
+	private ColorStateList mButtonTintList;
+	private PorterDuff.Mode mButtonTintMode;
+
 	public void setButtonTintList(ColorStateList list) {
+		mButtonTintList = list;
+		applyButtonTint();
+	}
+
+	public void setButtonTintMode(PorterDuff.Mode tintMode) {
+		mButtonTintMode = tintMode;
+		applyButtonTint();
+	}
+
+	private void applyButtonTint() {
+		if (button_drawable != null && (mButtonTintList != null || mButtonTintMode != null)) {
+			button_drawable = button_drawable.mutate();
+			if (mButtonTintList != null)
+				button_drawable.setTintList(mButtonTintList);
+			if (mButtonTintMode != null)
+				button_drawable.setTintMode(mButtonTintMode);
+		}
 	}
 
 	public void setButtonDrawable(Drawable drawable) {
 		button_drawable = drawable;
+		applyButtonTint();
 	}
 
 	public Drawable getButtonDrawable() {
@@ -161,13 +183,13 @@ public abstract class CompoundButton extends Button implements Checkable {
 	}
 
 	public ColorStateList getButtonTintList() {
-		return null;
+		return mButtonTintList;
 	}
 
 	@Override
 	public void setCompoundDrawables(Drawable left, Drawable top, Drawable right, Drawable bottom) {}
 
 	public PorterDuff.Mode getButtonTintMode() {
-		return null;
+		return mButtonTintMode;
 	}
 }

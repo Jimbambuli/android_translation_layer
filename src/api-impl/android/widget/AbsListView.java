@@ -71,6 +71,16 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 									      ViewTreeObserver.OnGlobalLayoutListener, Filter.FilterListener,
 									      ViewTreeObserver.OnTouchModeChangeListener {
 
+	/* AOSP AbsListView.setSelectedChildViewEnabled(): whether the selected item's view is enabled (a list that is not
+	 * focused shows its selection disabled by default in AOSP); the flag is kept and returned */
+	public void setSelectedChildViewEnabled(boolean selectedChildViewEnabled) {
+		mIsChildViewEnabled = selectedChildViewEnabled;
+	}
+
+	public boolean isSelectedChildViewEnabled() {
+		return mIsChildViewEnabled;
+	}
+
 	@SuppressWarnings("UnusedDeclaration")
 	private static final String TAG = "AbsListView";
 

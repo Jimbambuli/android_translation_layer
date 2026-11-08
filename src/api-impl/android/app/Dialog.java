@@ -130,6 +130,15 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		return context;
 	}
 
+	/* AOSP Dialog.addContentView(): the view is added to the dialog's content */
+	public void addContentView(View view, ViewGroup.LayoutParams params) {
+		mWindowAddContentViewHelper(view, params);
+	}
+
+	private void mWindowAddContentViewHelper(View view, ViewGroup.LayoutParams params) {
+		getWindow().addContentView(view, params);
+	}
+
 	public void setContentView(View view) {
 		getWindow().setContentView(view);
 	}

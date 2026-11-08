@@ -4,6 +4,9 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
+import java.io.InputStream;
 import android.graphics.PorterDuff;
 import android.os.AsyncTask;
 import android.os.Handler;
@@ -21,12 +24,16 @@ public class Icon implements Parcelable {
 
 	public static final int TYPE_BITMAP = 1;
 	public static final int TYPE_RESOURCE = 2;
+	public static final int TYPE_DATA = 3;
+	public static final int TYPE_URI = 4;
 	public static final int TYPE_ADAPTIVE_BITMAP = 5;
+	public static final int TYPE_URI_ADAPTIVE_BITMAP = 6;
 
 	private final int mType;
 	private Object mObj1; // Bitmap or Resources
 	private String mString1; // resource package
-	private int mInt1; // resource id
+	private int mInt1; // resource id, or the length of the data
+	private int mInt2; // the offset of the data
 	private ColorStateList mTintList;
 	private PorterDuff.Mode mTintMode = PorterDuff.Mode.SRC_IN; // as AOSP's DEFAULT_TINT_BLEND_MODE
 
@@ -81,6 +88,53 @@ public class Icon implements Parcelable {
 		rep.mInt1 = resId;
 		rep.mString1 = resPackage;
 		return rep;
+	}
+
+	/** AOSP Icon.createWithData(): an icon from the bytes of an image file (PNG, JPEG, ...) at an offset */
+	public static Icon createWithData(byte[] data, int offset, int length) {
+		if (data == null)
+			throw new IllegalArgumentException("Data must not be null.");
+		final Icon rep = new Icon(TYPE_DATA);
+		rep.mObj1 = data;
+		rep.mInt1 = length;
+		rep.mInt2 = offset;
+		return rep;
+	}
+
+	/** AOSP Icon.createWithContentUri(): an icon from the image a content URI points to, read when it is loaded */
+	public static Icon createWithContentUri(String uri) {
+		if (uri == null)
+			throw new IllegalArgumentException("Uri must not be null.");
+		final Icon rep = new Icon(TYPE_URI);
+		rep.mString1 = uri;
+		return rep;
+	}
+
+	public static Icon createWithContentUri(Uri uri) {
+		if (uri == null)
+			throw new IllegalArgumentException("Uri must not be null.");
+		return createWithContentUri(uri.toString());
+	}
+
+	public static Icon createWithAdaptiveBitmapContentUri(String uri) {
+		if (uri == null)
+			throw new IllegalArgumentException("Uri must not be null.");
+		final Icon rep = new Icon(TYPE_URI_ADAPTIVE_BITMAP);
+		rep.mString1 = uri;
+		return rep;
+	}
+
+	public static Icon createWithAdaptiveBitmapContentUri(Uri uri) {
+		if (uri == null)
+			throw new IllegalArgumentException("Uri must not be null.");
+		return createWithAdaptiveBitmapContentUri(uri.toString());
+	}
+
+	/** AOSP Icon.getUri(): the URI of an icon made with createWithContentUri() */
+	public Uri getUri() {
+		if (mType != TYPE_URI && mType != TYPE_URI_ADAPTIVE_BITMAP)
+			throw new IllegalStateException("called getUri() on " + this);
+		return Uri.parse(mString1);
 	}
 
 	public static Icon createWithBitmap(Bitmap bits) {
@@ -176,6 +230,20 @@ public class Icon implements Parcelable {
 				return new BitmapDrawable(context.getResources(), getBitmap());
 			case TYPE_ADAPTIVE_BITMAP:
 				return new AdaptiveIconDrawable(null, new BitmapDrawable(context.getResources(), getBitmap()));
+			case TYPE_DATA:
+				return new BitmapDrawable(context.getResources(), BitmapFactory.decodeByteArray((byte[])mObj1, mInt2, mInt1));
+			case TYPE_URI:
+			case TYPE_URI_ADAPTIVE_BITMAP:
+				try (InputStream is = context.getContentResolver().openInputStream(getUri())) {
+					if (is == null)
+						return null;
+					Bitmap bitmap = BitmapFactory.decodeStream(is);
+					return mType == TYPE_URI ? new BitmapDrawable(context.getResources(), bitmap)
+					                         : new AdaptiveIconDrawable(null, new BitmapDrawable(context.getResources(), bitmap));
+				} catch (Exception e) {
+					Log.w(TAG, "Unable to load image from URI: " + getUri(), e);
+				}
+				break;
 			case TYPE_RESOURCE:
 				Resources res = mObj1 instanceof Resources ? (Resources)mObj1 : null;
 				if (res == null) {
@@ -211,6 +279,14 @@ public class Icon implements Parcelable {
 				dest.writeString(mString1);
 				dest.writeInt(mInt1);
 				break;
+			case TYPE_DATA:
+				dest.writeInt(mInt1);
+				dest.writeByteArray((byte[])mObj1, mInt2, mInt1);
+				break;
+			case TYPE_URI:
+			case TYPE_URI_ADAPTIVE_BITMAP:
+				dest.writeString(mString1);
+				break;
 		}
 	}
 
@@ -224,6 +300,15 @@ public class Icon implements Parcelable {
 			case TYPE_RESOURCE:
 				mString1 = in.readString();
 				mInt1 = in.readInt();
+				break;
+			case TYPE_DATA:
+				mInt1 = in.readInt();
+				mObj1 = in.createByteArray();
+				mInt2 = 0;
+				break;
+			case TYPE_URI:
+			case TYPE_URI_ADAPTIVE_BITMAP:
+				mString1 = in.readString();
 				break;
 			default:
 				throw new RuntimeException("invalid icon type " + mType + " in parcel");
@@ -242,7 +327,8 @@ public class Icon implements Parcelable {
 
 	@Override
 	public String toString() {
-		return "Icon(typ=" + (mType == TYPE_BITMAP ? "BITMAP" : mType == TYPE_ADAPTIVE_BITMAP ? "BITMAP_MASKABLE" : "RESOURCE")
-		    + (mType == TYPE_RESOURCE ? " pkg=" + mString1 + " id=" + String.format("0x%08x", mInt1) : "") + ")";
+		return "Icon(typ=" + (mType == TYPE_BITMAP ? "BITMAP" : mType == TYPE_ADAPTIVE_BITMAP ? "BITMAP_MASKABLE" : mType == TYPE_DATA ? "DATA" : mType == TYPE_URI ? "URI" : mType == TYPE_URI_ADAPTIVE_BITMAP ? "URI_MASKABLE" : "RESOURCE")
+		    + (mType == TYPE_RESOURCE ? " pkg=" + mString1 + " id=" + String.format("0x%08x", mInt1) : "")
+		    + ((mType == TYPE_URI || mType == TYPE_URI_ADAPTIVE_BITMAP) ? " uri=" + mString1 : "") + ")";
 	}
 }

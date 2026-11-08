@@ -17,6 +17,7 @@
 package android.view;
 
 import android.atl.annotation.Export;
+import android.os.Parcel;
 import android.os.Parcelable;
 //import android.text.method.MetaKeyKeyListener;
 import android.util.Log;
@@ -1726,6 +1727,55 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	private static KeyEvent gRecyclerTop;
 
 	private KeyEvent mNext;
+
+	/* AOSP KeyEvent.CREATOR/writeToParcel(): the wire format of android-14. ATL's KeyEvent has no event id, display id or
+	 * HMAC: they are written as 0, the default display and no HMAC, and skipped when read. */
+	public static final Parcelable.Creator<KeyEvent> CREATOR = new Parcelable.Creator<KeyEvent>() {
+		public KeyEvent createFromParcel(Parcel in) {
+			in.readInt(); // PARCEL_TOKEN_KEY_EVENT
+			return new KeyEvent(in);
+		}
+
+		public KeyEvent[] newArray(int size) {
+			return new KeyEvent[size];
+		}
+	};
+
+	private KeyEvent(Parcel in) {
+		in.readInt(); // id
+		mDeviceId = in.readInt();
+		mSource = in.readInt();
+		in.readInt(); // display id
+		in.createByteArray(); // hmac
+		mAction = in.readInt();
+		mKeyCode = in.readInt();
+		mRepeatCount = in.readInt();
+		mMetaState = in.readInt();
+		mScanCode = in.readInt();
+		mFlags = in.readInt();
+		mDownTime = in.readLong();
+		mEventTime = in.readLong();
+		mCharacters = in.readString();
+	}
+
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeInt(PARCEL_TOKEN_KEY_EVENT);
+		out.writeInt(0); // id
+		out.writeInt(mDeviceId);
+		out.writeInt(mSource);
+		out.writeInt(0); // display id: Display.DEFAULT_DISPLAY
+		out.writeByteArray(null); // hmac
+		out.writeInt(mAction);
+		out.writeInt(mKeyCode);
+		out.writeInt(mRepeatCount);
+		out.writeInt(mMetaState);
+		out.writeInt(mScanCode);
+		out.writeInt(mFlags);
+		out.writeLong(mDownTime);
+		out.writeLong(mEventTime);
+		out.writeString(mCharacters);
+	}
 
 	private int mDeviceId;
 	private int mSource;

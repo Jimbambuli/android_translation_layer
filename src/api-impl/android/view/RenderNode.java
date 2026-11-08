@@ -268,12 +268,40 @@ public class RenderNode {
 		return false;
 	}
 
+	/* AOSP RenderNode: whether the node's content overlaps (then a layer is needed for a translucent alpha). The
+	 * flag is kept; the node is not rendered by HWUI here. setHasOverlappingRendering() returns whether the
+	 * node accepted the property, as AOSP's does. */
+	private boolean mHasOverlappingRendering;
+
 	public boolean hasOverlappingRendering() {
-		return false;
+		return mHasOverlappingRendering;
 	}
 
 	public boolean setHasOverlappingRendering(boolean hasOverlappingRendering) {
-		return false;
+		mHasOverlappingRendering = hasOverlappingRendering;
+		return true;
+	}
+
+	/* AOSP RenderNode shadow colors (default black); kept and returned */
+	private int mAmbientShadowColor = 0xFF000000;
+	private int mSpotShadowColor = 0xFF000000;
+
+	public boolean setAmbientShadowColor(int color) {
+		mAmbientShadowColor = color;
+		return true;
+	}
+
+	public int getAmbientShadowColor() {
+		return mAmbientShadowColor;
+	}
+
+	public boolean setSpotShadowColor(int color) {
+		mSpotShadowColor = color;
+		return true;
+	}
+
+	public int getSpotShadowColor() {
+		return mSpotShadowColor;
 	}
 
 	public boolean setLayerPaint(Paint paint) {
