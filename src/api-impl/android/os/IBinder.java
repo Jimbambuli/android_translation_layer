@@ -1,6 +1,14 @@
 package android.os;
 
 public interface IBinder {
+	/** AOSP IBinder.MAX_IPC_SIZE: the size of a transaction that is safe; ATL has no binder transactions */
+	int MAX_IPC_SIZE = 64 * 1024;
+
+	/** AOSP IBinder.getSuggestedMaxIpcSizeBytes(): the largest payload to send in one transaction */
+	static int getSuggestedMaxIpcSizeBytes() {
+		return MAX_IPC_SIZE;
+	}
+
 
 	int FIRST_CALL_TRANSACTION = 0x00000001;
 	int LAST_CALL_TRANSACTION = 0x00ffffff;

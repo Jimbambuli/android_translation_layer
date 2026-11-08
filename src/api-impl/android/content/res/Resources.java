@@ -731,6 +731,12 @@ public class Resources {
 		return getDrawable(id, null);
 	}
 
+	/* AOSP Resources.getDrawableForDensity(): the drawable for a density other than the display's; ATL's resource table
+	 * is picked for the configuration's density only, the drawable is that one */
+	public Drawable getDrawableForDensity(int id, int density, Theme theme) {
+		return getDrawable(id, theme);
+	}
+
 	public Drawable getDrawable(int id, Theme theme) throws NotFoundException {
 		TypedValue value;
 		synchronized (mAccessLock) {
