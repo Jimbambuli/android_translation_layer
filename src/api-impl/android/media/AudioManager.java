@@ -9,6 +9,8 @@ public class AudioManager {
 	public static final int STREAM_MUSIC = 0x3;
 
 	private native void nativeSetStreamVolume(int volume);
+	private native int nativeGetStreamVolume();
+	private native boolean nativeIsStreamMute();
 
 	public boolean isBluetoothA2dpOn() {
 		return false;
@@ -55,8 +57,12 @@ public class AudioManager {
 		return 0;
 	}
 
+	/* AOSP AudioManager.getStreamVolume(): the volume index of the stream. ATL has the one volume of the
+	 * ALSA «Master» control (0 to getStreamMaxVolume() = 100) for every stream; without that control it is the
+	 * last value setStreamVolume() was given, 0 before */
 	public int getStreamVolume(int streamType) {
-		return 0; // arbitrary, shouldn't matter too much?
+		int volume = nativeGetStreamVolume();
+		return volume >= 0 ? volume : mLastStreamVolume;
 	}
 
 	public int getStreamMaxVolume(int streamType) {
@@ -99,7 +105,10 @@ public class AudioManager {
 		return false;
 	}
 
+	private int mLastStreamVolume;
+
 	public void setStreamVolume(int streamType, int index, int flags) {
+		mLastStreamVolume = Math.max(0, Math.min(index, getStreamMaxVolume(streamType)));
 		nativeSetStreamVolume(index);
 	}
 
@@ -108,8 +117,10 @@ public class AudioManager {
 		return false;
 	}
 
+	/* AOSP AudioManager.isStreamMute(): whether the stream is muted. ATL has the mute switch of the ALSA
+	 * «Master» control for every stream; false without it */
 	public boolean isStreamMute(int streamType) {
-		return false;
+		return nativeIsStreamMute();
 	}
 
 	public boolean isMusicActive() {
@@ -149,8 +160,17 @@ public class AudioManager {
 		return 0;
 	}
 
-	public AudioDeviceInfo[] getDevices(int mode) {
-		return new AudioDeviceInfo[0];
+	/* AOSP AudioManager.getDevices(): the audio devices of the requested direction. ATL has no audio policy, the
+	 * devices are the default ALSA output (speaker) and input (microphone) the app plays on and records from */
+	public AudioDeviceInfo[] getDevices(int flags) {
+		java.util.ArrayList<AudioDeviceInfo> devices = new java.util.ArrayList<>();
+		if ((flags & GET_DEVICES_OUTPUTS) != 0) {
+			devices.add(new AudioDeviceInfo(1, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, "default", true));
+		}
+		if ((flags & GET_DEVICES_INPUTS) != 0) {
+			devices.add(new AudioDeviceInfo(2, AudioDeviceInfo.TYPE_BUILTIN_MIC, "default", false));
+		}
+		return devices.toArray(new AudioDeviceInfo[0]);
 	}
 
 	public void registerAudioDeviceCallback(AudioDeviceCallback callback, Handler handler) {}

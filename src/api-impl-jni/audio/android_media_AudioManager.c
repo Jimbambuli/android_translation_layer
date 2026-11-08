@@ -40,3 +40,50 @@ JNIEXPORT void JNICALL Java_android_media_AudioManager_nativeSetStreamVolume(JNI
 	g_task_run_in_thread(task, set_stream_volume);
 	g_object_unref(task);
 }
+
+/* the «Master» control of the default mixer, null if there is none; the caller closes the handle */
+static snd_mixer_elem_t *open_master(snd_mixer_t **handle)
+{
+	snd_mixer_selem_id_t *sid;
+	if (snd_mixer_open(handle, 0) < 0)
+		return NULL;
+	if (snd_mixer_attach(*handle, "default") < 0 || snd_mixer_selem_register(*handle, NULL, NULL) < 0 || snd_mixer_load(*handle) < 0) {
+		snd_mixer_close(*handle);
+		return NULL;
+	}
+	snd_mixer_selem_id_alloca(&sid);
+	snd_mixer_selem_id_set_index(sid, 0);
+	snd_mixer_selem_id_set_name(sid, "Master");
+	snd_mixer_elem_t *elem = snd_mixer_find_selem(*handle, sid);
+	if (!elem)
+		snd_mixer_close(*handle);
+	return elem;
+}
+
+/* the volume of the «Master» control from 0 to 100, -1 if there is none */
+JNIEXPORT jint JNICALL Java_android_media_AudioManager_nativeGetStreamVolume(JNIEnv *env, jobject clazz)
+{
+	snd_mixer_t *handle;
+	snd_mixer_elem_t *elem = open_master(&handle);
+	if (!elem)
+		return -1;
+	long minv, maxv, value = 0;
+	snd_mixer_selem_get_playback_volume_range(elem, &minv, &maxv);
+	snd_mixer_selem_get_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT, &value);
+	snd_mixer_close(handle);
+	return maxv > minv ? (value - minv) * 100 / (maxv - minv) : 0;
+}
+
+/* whether the «Master» control is switched off */
+JNIEXPORT jboolean JNICALL Java_android_media_AudioManager_nativeIsStreamMute(JNIEnv *env, jobject clazz)
+{
+	snd_mixer_t *handle;
+	snd_mixer_elem_t *elem = open_master(&handle);
+	if (!elem)
+		return JNI_FALSE;
+	int on = 1;
+	if (snd_mixer_selem_has_playback_switch(elem))
+		snd_mixer_selem_get_playback_switch(elem, SND_MIXER_SCHN_FRONT_LEFT, &on);
+	snd_mixer_close(handle);
+	return on ? JNI_FALSE : JNI_TRUE;
+}

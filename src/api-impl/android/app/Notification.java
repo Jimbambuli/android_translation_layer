@@ -14,7 +14,10 @@ import java.util.List;
 
 public class Notification implements Parcelable {
 
-	public static final AudioAttributes AUDIO_ATTRIBUTES_DEFAULT = new AudioAttributes();
+	public static final AudioAttributes AUDIO_ATTRIBUTES_DEFAULT = new AudioAttributes.Builder()
+	                                                                               .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+	                                                                               .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+	                                                                               .build();
 
 	public long when;
 

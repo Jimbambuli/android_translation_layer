@@ -11,7 +11,15 @@ public class AudioTrack {
 		void onPeriodicNotification(AudioTrack track);
 	}
 
+	public static final int SUCCESS = 0;
+	public static final int ERROR = -1;
 	public static final int ERROR_BAD_VALUE = -2; // basically EINVAL
+	public static final int ERROR_INVALID_OPERATION = -3;
+	public static final int ERROR_DEAD_OBJECT = -6;
+
+	/** AOSP: write() returns when all of the data is written; ATL's output blocks, so this is also what WRITE_NON_BLOCKING does */
+	public static final int WRITE_BLOCKING = 0;
+	public static final int WRITE_NON_BLOCKING = 1;
 
 	public static final int STATE_UNINITIALIZED = 0;
 	public static final int STATE_INITIALIZED = 1;
@@ -59,7 +67,7 @@ public class AudioTrack {
 	}
 
 	public AudioTrack(AudioAttributes attributes, AudioFormat format, int bufferSizeInBytes, int mode, int sessionId) {
-		this(attributes.streamType, format.sampleRate, format.channelMask, format.encoding, bufferSizeInBytes, mode, sessionId);
+		this(AudioAttributes.toLegacyStreamType(attributes), format.sampleRate, format.channelMask, format.encoding, bufferSizeInBytes, mode, sessionId);
 	}
 
 	public static native int getMinBufferSize(int sampleRateInHz, int channelConfig, int audioFormat);
@@ -126,10 +134,52 @@ public class AudioTrack {
 		return ret * channels * 2; // 2 means PCM16
 	}
 
+	/* AOSP AudioTrack.write(ByteBuffer, int, int): the bytes from the position, a direct buffer too */
 	public int write(ByteBuffer audioData, int sizeInBytes, int writeMode) {
-		int ret = write(audioData.array(), audioData.arrayOffset() + audioData.position(), sizeInBytes);
-		audioData.position(audioData.position() + ret);
+		if (audioData == null || sizeInBytes < 0 || sizeInBytes > audioData.remaining()) {
+			return ERROR_BAD_VALUE;
+		}
+		int ret;
+		if (audioData.hasArray()) {
+			ret = write(audioData.array(), audioData.arrayOffset() + audioData.position(), sizeInBytes);
+		} else {
+			byte[] copy = new byte[sizeInBytes];
+			audioData.duplicate().get(copy);
+			ret = write(copy, 0, sizeInBytes);
+		}
+		if (ret > 0) {
+			audioData.position(audioData.position() + ret);
+		}
 		return ret;
+	}
+
+	/* AOSP AudioTrack.write(ByteBuffer, int, int, long): the timestamp is for tunneled A/V sync playback (HW_AV_SYNC), which
+	 * ATL does not have */
+	public int write(ByteBuffer audioData, int sizeInBytes, int writeMode, long timestamp) {
+		return write(audioData, sizeInBytes, writeMode);
+	}
+
+	public int write(byte[] audioData, int offsetInBytes, int sizeInBytes, int writeMode) {
+		return write(audioData, offsetInBytes, sizeInBytes);
+	}
+
+	public int write(short[] audioData, int offsetInShorts, int sizeInShorts, int writeMode) {
+		return write(audioData, offsetInShorts, sizeInShorts);
+	}
+
+	/* AOSP AudioTrack.write(float[], ...): ENCODING_PCM_FLOAT data. ATL's output is PCM16 (native_constructor), the
+	 * samples are converted (-1.0 to 1.0 to 16 bit, clipped). Returns the number of floats written. */
+	public int write(float[] audioData, int offsetInFloats, int sizeInFloats, int writeMode) {
+		if (audioData == null || offsetInFloats < 0 || sizeInFloats < 0
+		    || offsetInFloats + sizeInFloats < 0 || offsetInFloats + sizeInFloats > audioData.length) {
+			return ERROR_BAD_VALUE;
+		}
+		short[] pcm = new short[sizeInFloats];
+		for (int i = 0; i < sizeInFloats; i++) {
+			float sample = audioData[offsetInFloats + i];
+			pcm[i] = (short)Math.max(-32768, Math.min(32767, Math.round(sample * 32768f)));
+		}
+		return write(pcm, 0, sizeInFloats);
 	}
 
 	public int write(short audioData[], int offsetInShorts, int sizeInShorts) {
@@ -191,8 +241,68 @@ public class AudioTrack {
 		return 0;
 	}
 
+	/* AOSP AudioTrack.getTimestamp(): the frame that was presented at the time (CLOCK_MONOTONIC) of nanoTime; only
+	 * while the track plays. ATL knows the position from the ALSA delay (getPlaybackHeadPosition()) and takes
+	 * the time of the call. */
 	public boolean getTimestamp(AudioTimestamp timestamp) {
-		return false;
+		if (timestamp == null) {
+			throw new IllegalArgumentException();
+		}
+		if (playbackState != PLAYSTATE_PLAYING || getState() != STATE_INITIALIZED) {
+			return false;
+		}
+		timestamp.framePosition = getPlaybackHeadPosition() & 0xFFFFFFFFL;
+		timestamp.nanoTime = System.nanoTime();
+		return true;
+	}
+
+	private PlaybackParams mPlaybackParams = new PlaybackParams();
+	private float mAuxEffectSendLevel;
+	private AudioDeviceInfo mPreferredDevice;
+
+	/* AOSP AudioTrack.setPlaybackParams(): ATL's ALSA output plays at the sample rate it was opened with, the
+	 * speed and pitch are kept (getPlaybackParams()) and not applied */
+	public void setPlaybackParams(PlaybackParams params) {
+		if (params == null) {
+			throw new IllegalArgumentException("params is null");
+		}
+		mPlaybackParams = params;
+	}
+
+	public PlaybackParams getPlaybackParams() {
+		return mPlaybackParams;
+	}
+
+	/* AOSP AudioTrack.attachAuxEffect(): ATL has no audio effects. 0 detaches (always possible); an effect id
+	 * names an effect the audio framework cannot find, AOSP's answer is ERROR_BAD_VALUE. */
+	public int attachAuxEffect(int effectId) {
+		if (getState() == STATE_UNINITIALIZED) {
+			return ERROR_INVALID_OPERATION;
+		}
+		return effectId == 0 ? SUCCESS : ERROR_BAD_VALUE;
+	}
+
+	/* AOSP AudioTrack.setAuxEffectSendLevel(): kept for the attached effect, which there is none to apply it to */
+	public int setAuxEffectSendLevel(float level) {
+		if (getState() == STATE_UNINITIALIZED) {
+			return ERROR_INVALID_OPERATION;
+		}
+		mAuxEffectSendLevel = Math.max(0f, Math.min(level, 1f));
+		return SUCCESS;
+	}
+
+	/* AOSP AudioTrack.setPreferredDevice(): an output device, or null for none; ATL has the one output
+	 * (AudioManager.getDevices()), so the preference is always met */
+	public boolean setPreferredDevice(AudioDeviceInfo deviceInfo) {
+		if (deviceInfo != null && !deviceInfo.isSink()) {
+			return false;
+		}
+		mPreferredDevice = deviceInfo;
+		return true;
+	}
+
+	public AudioDeviceInfo getPreferredDevice() {
+		return mPreferredDevice;
 	}
 
 	private native int native_getPlaybackHeadPosition();
@@ -218,6 +328,9 @@ public class AudioTrack {
 		public Builder() {}
 
 		public AudioTrack build() {
+			if (mAttributes == null) {
+				mAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build();
+			}
 			return new AudioTrack(mAttributes, mFormat, mBufferSizeInBytes, mTransferMode, mSessionId);
 		}
 
