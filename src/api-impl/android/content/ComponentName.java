@@ -16,6 +16,7 @@
 
 package android.content;
 
+import android.os.Parcel;
 import android.os.Parcelable;
 import java.io.PrintWriter;
 import java.lang.Comparable;
@@ -265,7 +266,65 @@ public final class ComponentName implements Cloneable, Comparable<ComponentName>
 		return this.mClass.compareTo(that.mClass);
 	}
 
+	@Override
 	public int describeContents() {
 		return 0;
+	}
+
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeString(mPackage);
+		out.writeString(mClass);
+	}
+
+	/**
+	 * Write a ComponentName to a Parcel, handling null pointers. Must be
+	 * read with {@link #readFromParcel(Parcel)}.
+	 */
+	public static void writeToParcel(ComponentName c, Parcel out) {
+		if (c != null) {
+			c.writeToParcel(out, 0);
+		} else {
+			out.writeString(null);
+		}
+	}
+
+	/**
+	 * Read a ComponentName from a Parcel that was previously written with
+	 * {@link #writeToParcel(ComponentName, Parcel)}, returning either a null or a new object.
+	 */
+	public static ComponentName readFromParcel(Parcel in) {
+		String pkg = in.readString();
+		return pkg != null ? new ComponentName(pkg, in) : null;
+	}
+
+	public static final Parcelable.Creator<ComponentName> CREATOR = new Parcelable.Creator<ComponentName>() {
+		public ComponentName createFromParcel(Parcel in) {
+			return new ComponentName(in);
+		}
+
+		public ComponentName[] newArray(int size) {
+			return new ComponentName[size];
+		}
+	};
+
+	/**
+	 * Instantiate a new ComponentName from the data in a Parcel that was
+	 * previously written with {@link #writeToParcel(Parcel, int)}.
+	 */
+	public ComponentName(Parcel in) {
+		mPackage = in.readString();
+		if (mPackage == null) {
+			throw new NullPointerException("package name is null");
+		}
+		mClass = in.readString();
+		if (mClass == null) {
+			throw new NullPointerException("class name is null");
+		}
+	}
+
+	private ComponentName(String pkg, Parcel in) {
+		mPackage = pkg;
+		mClass = in.readString();
 	}
 }
