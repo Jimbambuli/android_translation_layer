@@ -1102,11 +1102,102 @@ public class TextView extends View {
 
 	public boolean isAllCaps() { return false; }
 
-	public int getAutoSizeStepGranularity() {
-		return -1;
+	/* The configuration of uniform auto-sizing as AOSP keeps it. ATL's TextView does not resize
+	 * the text itself; what an app sets is what the getters report. */
+	public static final int AUTO_SIZE_TEXT_TYPE_NONE = 0;
+	public static final int AUTO_SIZE_TEXT_TYPE_UNIFORM = 1;
+	private int mAutoSizeTextType = AUTO_SIZE_TEXT_TYPE_NONE;
+	private float mAutoSizeMinTextSizeInPx = -1;
+	private float mAutoSizeMaxTextSizeInPx = -1;
+	private float mAutoSizeStepGranularityInPx = -1;
+	private int[] mAutoSizeTextSizesInPx = new int[0];
+
+	private float autoSizeToPx(int unit, float size) {
+		return android.util.TypedValue.applyDimension(unit, size, getContext().getResources().getDisplayMetrics());
 	}
 
-	public void setAutoSizeTextTypeUniformWithPresetSizes(int[] presetSizes, int unit) {}
+	public int getAutoSizeTextType() {
+		return mAutoSizeTextType;
+	}
+
+	public int getAutoSizeStepGranularity() {
+		return Math.round(mAutoSizeStepGranularityInPx);
+	}
+
+	public int getAutoSizeMinTextSize() {
+		return Math.round(mAutoSizeMinTextSizeInPx);
+	}
+
+	public int getAutoSizeMaxTextSize() {
+		return Math.round(mAutoSizeMaxTextSizeInPx);
+	}
+
+	public int[] getAutoSizeTextAvailableSizes() {
+		return mAutoSizeTextSizesInPx.clone();
+	}
+
+	public void setAutoSizeTextTypeWithDefaults(int autoSizeTextType) {
+		switch (autoSizeTextType) {
+			case AUTO_SIZE_TEXT_TYPE_NONE:
+				mAutoSizeTextType = AUTO_SIZE_TEXT_TYPE_NONE;
+				mAutoSizeMinTextSizeInPx = mAutoSizeMaxTextSizeInPx = mAutoSizeStepGranularityInPx = -1;
+				mAutoSizeTextSizesInPx = new int[0];
+				break;
+			case AUTO_SIZE_TEXT_TYPE_UNIFORM:
+				setAutoSizeTextTypeUniformWithConfiguration(12, 112, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+				break;
+			default:
+				throw new IllegalArgumentException("Unknown auto-size text type: " + autoSizeTextType);
+		}
+	}
+
+	public void setAutoSizeTextTypeUniformWithConfiguration(int autoSizeMinTextSize, int autoSizeMaxTextSize, int autoSizeStepGranularity, int unit) {
+		float min = autoSizeToPx(unit, autoSizeMinTextSize);
+		float max = autoSizeToPx(unit, autoSizeMaxTextSize);
+		float step = autoSizeToPx(unit, autoSizeStepGranularity);
+		if (min <= 0)
+			throw new IllegalArgumentException("Minimum auto-size text size (" + min + "px) is less or equal to (0px)");
+		if (max <= min)
+			throw new IllegalArgumentException("Maximum auto-size text size (" + max + "px) is less or equal to minimum auto-size text size (" + min + "px)");
+		if (step <= 0)
+			throw new IllegalArgumentException("The auto-size step granularity (" + step + "px) is less or equal to (0px)");
+		mAutoSizeTextType = AUTO_SIZE_TEXT_TYPE_UNIFORM;
+		mAutoSizeMinTextSizeInPx = min;
+		mAutoSizeMaxTextSizeInPx = max;
+		mAutoSizeStepGranularityInPx = step;
+		int count = (int)Math.floor((max - min) / step) + 1;
+		int[] sizes = new int[count];
+		for (int i = 0; i < count; i++)
+			sizes[i] = Math.round(min + (i * step));
+		mAutoSizeTextSizesInPx = cleanupAutoSizePresetSizes(sizes);
+	}
+
+	public void setAutoSizeTextTypeUniformWithPresetSizes(int[] presetSizes, int unit) {
+		int[] sizes = new int[presetSizes.length];
+		for (int i = 0; i < sizes.length; i++)
+			sizes[i] = Math.round(autoSizeToPx(unit, presetSizes[i]));
+		sizes = cleanupAutoSizePresetSizes(sizes);
+		if (sizes.length <= 0)
+			throw new IllegalArgumentException("None of the preset sizes is valid: " + java.util.Arrays.toString(presetSizes));
+		mAutoSizeTextType = AUTO_SIZE_TEXT_TYPE_UNIFORM;
+		mAutoSizeTextSizesInPx = sizes;
+		mAutoSizeMinTextSizeInPx = sizes[0];
+		mAutoSizeMaxTextSizeInPx = sizes[sizes.length - 1];
+		mAutoSizeStepGranularityInPx = -1;
+	}
+
+	/* as AOSP: only positive values, sorted, without duplicates */
+	private static int[] cleanupAutoSizePresetSizes(int[] presetValues) {
+		java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+		for (int v : presetValues)
+			if (v > 0)
+				set.add(v);
+		int[] ret = new int[set.size()];
+		int i = 0;
+		for (int v : set)
+			ret[i++] = v;
+		return ret;
+	}
 
 	public int getHyphenationFrequency() {
 		return hyphenation_frequency;
