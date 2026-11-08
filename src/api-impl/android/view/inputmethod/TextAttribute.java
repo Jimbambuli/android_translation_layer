@@ -34,15 +34,18 @@ import java.util.List;
 public final class TextAttribute implements Parcelable {
 	private final @NonNull List<String> mTextConversionSuggestions;
 	private final @NonNull PersistableBundle mExtras;
+	private final boolean mTextSuggestionSelected;
 
 	private TextAttribute(Builder builder) {
 		mTextConversionSuggestions = builder.mTextConversionSuggestions;
 		mExtras = builder.mExtras;
+		mTextSuggestionSelected = builder.mTextSuggestionSelected;
 	}
 
 	private TextAttribute(Parcel source) {
 		mTextConversionSuggestions = source.createStringArrayList();
 		mExtras = source.readPersistableBundle();
+		mTextSuggestionSelected = source.readBoolean();
 	}
 
 	/**
@@ -52,6 +55,13 @@ public final class TextAttribute implements Parcelable {
 	 * @return List of text conversion suggestions. If the list is empty, it means that IME not set
 	 * this field or IME didn't have suggestions for applications.
 	 */
+	/**
+	 * Whether the committed text is one of the IME's suggestions the user selected (AOSP TextAttribute).
+	 */
+	public boolean isTextSuggestionSelected() {
+		return mTextSuggestionSelected;
+	}
+
 	public @NonNull List<String> getTextConversionSuggestions() {
 		return mTextConversionSuggestions;
 	}
@@ -100,6 +110,13 @@ public final class TextAttribute implements Parcelable {
 		 *
 		 * @return This builder.
 		 */
+		private boolean mTextSuggestionSelected;
+
+		public @NonNull Builder setTextSuggestionSelected(boolean textSuggestionSelected) {
+			mTextSuggestionSelected = textSuggestionSelected;
+			return this;
+		}
+
 		public @NonNull Builder setExtras(@NonNull PersistableBundle extras) {
 			mExtras = extras;
 			return this;
@@ -122,6 +139,7 @@ public final class TextAttribute implements Parcelable {
 	public void writeToParcel(@NonNull Parcel dest, int flags) {
 		dest.writeStringList(mTextConversionSuggestions);
 		dest.writePersistableBundle(mExtras);
+		dest.writeBoolean(mTextSuggestionSelected);
 	}
 
 	public static final @NonNull Parcelable.Creator<TextAttribute> CREATOR =

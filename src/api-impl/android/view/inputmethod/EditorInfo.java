@@ -520,6 +520,20 @@ public class EditorInfo implements InputType {
 
 	private @HandwritingGesture.GestureTypeFlags int mSupportedHandwritingGesturePreviewTypes;
 
+	private boolean mStylusHandwritingEnabled = true;
+
+	/**
+	 * Set whether stylus handwriting is enabled for this editor (AOSP EditorInfo.setStylusHandwritingEnabled(),
+	 * on by default). ATL has no stylus handwriting service, the editor's choice is only kept.
+	 */
+	public void setStylusHandwritingEnabled(boolean enabled) {
+		mStylusHandwritingEnabled = enabled;
+	}
+
+	public boolean isStylusHandwritingEnabled() {
+		return mStylusHandwritingEnabled;
+	}
+
 	/**
 	 * Set the Handwriting gestures supported by the current {@code Editor}.
 	 * For an editor that supports Stylus Handwriting

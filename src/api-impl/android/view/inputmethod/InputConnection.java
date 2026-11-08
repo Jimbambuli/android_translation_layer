@@ -367,5 +367,114 @@ public interface InputConnection {
 	 *
 	 * <p>Note: This does nothing when called from input methods.</p>
 	 */
+	/* ---- the part of AOSP's InputConnection that a connection of ATL did not have; the defaults are AOSP's ---- */
+
+	public static final int HANDWRITING_GESTURE_RESULT_UNKNOWN = 0;
+	public static final int HANDWRITING_GESTURE_RESULT_SUCCESS = 1;
+	public static final int HANDWRITING_GESTURE_RESULT_UNSUPPORTED = 2;
+	public static final int HANDWRITING_GESTURE_RESULT_FAILED = 3;
+	public static final int HANDWRITING_GESTURE_RESULT_CANCELLED = 4;
+	public static final int HANDWRITING_GESTURE_RESULT_FALLBACK = 5;
+
+	/** The content comes with the permission to read its URI (AOSP: INPUT_CONTENT_GRANT_READ_URI_PERMISSION) */
+	public static final int INPUT_CONTENT_GRANT_READ_URI_PERMISSION = 0x00000001;
+
+	public static final int CURSOR_UPDATE_IMMEDIATE = 1 << 0;
+	public static final int CURSOR_UPDATE_MONITOR = 1 << 1;
+
+	/** AOSP: an editor that takes no content from the keyboard answers false */
+	default boolean commitContent(InputContentInfo inputContentInfo, int flags, Bundle opts) {
+		return false;
+	}
+
+	/** AOSP: BaseInputConnection deletes by code points; a connection of ATL that does not do that says no */
+	default boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) {
+		return false;
+	}
+
+	/** AOSP: the handler of the thread the connection is called on; null means the main thread's */
+	default android.os.Handler getHandler() {
+		return null;
+	}
+
+	default boolean requestCursorUpdates(int cursorUpdateMode) {
+		return false;
+	}
+
+	default boolean requestCursorUpdates(int cursorUpdateMode, int cursorUpdateFilter) {
+		if (cursorUpdateFilter == 0) {
+			return requestCursorUpdates(cursorUpdateMode);
+		}
+		return false;
+	}
+
+	default void performHandwritingGesture(HandwritingGesture gesture, java.util.concurrent.Executor executor, java.util.function.IntConsumer consumer) {
+		if (executor != null && consumer != null) {
+			executor.execute(() -> consumer.accept(HANDWRITING_GESTURE_RESULT_UNSUPPORTED));
+		}
+	}
+
+	default boolean previewHandwritingGesture(PreviewableHandwritingGesture gesture, android.os.CancellationSignal cancellationSignal) {
+		return false;
+	}
+
+	default SurroundingText getSurroundingText(int beforeLength, int afterLength, int flags) {
+		if (beforeLength < 0 || afterLength < 0) {
+			throw new IllegalArgumentException("lengths must be non-negative");
+		}
+		CharSequence textBeforeCursor = getTextBeforeCursor(beforeLength, flags);
+		if (textBeforeCursor == null) {
+			return null;
+		}
+		CharSequence textAfterCursor = getTextAfterCursor(afterLength, flags);
+		if (textAfterCursor == null) {
+			return null;
+		}
+		CharSequence selectedText = getSelectedText(flags);
+		if (selectedText == null) {
+			selectedText = "";
+		}
+		CharSequence surroundingText = android.text.TextUtils.concat(textBeforeCursor, selectedText, textAfterCursor);
+		return new SurroundingText(surroundingText, textBeforeCursor.length(), textBeforeCursor.length() + selectedText.length(), -1);
+	}
+
+	default boolean setComposingText(CharSequence text, int newCursorPosition, TextAttribute textAttribute) {
+		return setComposingText(text, newCursorPosition);
+	}
+
+	default boolean setComposingRegion(int start, int end, TextAttribute textAttribute) {
+		return setComposingRegion(start, end);
+	}
+
+	default boolean commitText(CharSequence text, int newCursorPosition, TextAttribute textAttribute) {
+		return commitText(text, newCursorPosition);
+	}
+
+	default boolean performSpellCheck() {
+		return false;
+	}
+
+	default boolean setImeConsumesInput(boolean imeConsumesInput) {
+		return false;
+	}
+
+	default boolean replaceText(
+	        int start,
+	        int end,
+	        CharSequence text,
+	        int newCursorPosition,
+	        TextAttribute textAttribute) {
+	    if (start < 0) throw new IllegalArgumentException("start must be non-negative");
+	    if (end < 0) throw new IllegalArgumentException("end must be non-negative");
+
+	    beginBatchEdit();
+	    finishComposingText();
+	    setSelection(start, end);
+	    commitText(text, newCursorPosition, textAttribute);
+	    endBatchEdit();
+	    return true;
+	}
+
+
 	void closeConnection();
 }

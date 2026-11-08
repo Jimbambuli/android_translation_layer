@@ -40,10 +40,16 @@ class ComposingText {
  */
 public class BaseInputConnection implements InputConnection {
 
+	private InputMethodManager mIMM;
+	private View mTargetView;
+
 	BaseInputConnection(InputMethodManager mgr, boolean fullEditor) {
+		mIMM = mgr;
 	}
 
 	public BaseInputConnection(View targetView, boolean fullEditor) {
+		mIMM = (InputMethodManager)targetView.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+		mTargetView = targetView;
 	}
 
 	public static final void removeComposingSpans(Spannable text) {
@@ -216,6 +222,11 @@ public class BaseInputConnection implements InputConnection {
 	 * attached to the input connection's view.
 	 */
 	public boolean sendKeyEvent(KeyEvent event) {
+		/* AOSP: the key goes to the target view's window as if typed; the answer is false, the IME does not
+		 * wait for it */
+		if (mIMM != null) {
+			mIMM.dispatchKeyEventFromInputMethod(mTargetView, event);
+		}
 		return false;
 	}
 
