@@ -23,6 +23,7 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
+import android.view.SearchEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -763,6 +764,23 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 
 	@Override
 	public boolean onSearchRequested() {
+		return false;
+	}
+
+	/* AOSP Dialog.onSearchRequested(SearchEvent) */
+	@Override
+	public boolean onSearchRequested(SearchEvent searchEvent) {
+		return onSearchRequested();
+	}
+
+	/* AOSP Dialog.dispatchPopulateAccessibilityEvent(): the dialog's class, package and title describe its window */
+	@Override
+	public boolean dispatchPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {
+		event.setClassName(getClass().getName());
+		event.setPackageName(getContext().getPackageName());
+		android.view.WindowManager.LayoutParams params = getWindow().getAttributes();
+		boolean isFullScreen = (params.width == android.view.WindowManager.LayoutParams.MATCH_PARENT) && (params.height == android.view.WindowManager.LayoutParams.MATCH_PARENT);
+		event.setFullScreen(isFullScreen);
 		return false;
 	}
 

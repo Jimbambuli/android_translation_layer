@@ -22,7 +22,8 @@ public class PendingIntent implements Parcelable {
 
 	private int requestCode;
 	Intent intent;
-	int type; // 0: activity, 1: service, 2: broadcast
+	int type; // 0: activity, 1: service, 2: broadcast, 3: result for an activity (Activity.createPendingResult())
+	private Activity resultActivity;
 
 	private PendingIntent(int requestCode, Intent intent, int type) {
 		this.requestCode = requestCode;
@@ -50,14 +51,30 @@ public class PendingIntent implements Parcelable {
 			filled = new Intent(this.intent);
 			filled.putExtras(intent);
 		}
-		dispatch(filled);
+		dispatch(filled, code);
 	}
 
 	public void send() {
-		dispatch(intent);
+		try {
+			dispatch(intent, 0);
+		} catch (CanceledException e) {
+			/* send() of the PendingIntent of an activity that is gone: AOSP throws the CanceledException
+			 * only from the variants that declare it */
+		}
 	}
 
-	private void dispatch(Intent intent) {
+	/** @hide AOSP: Activity.createPendingResult(); the PendingIntent delivers a result to the activity */
+	static PendingIntent getActivityResult(Activity activity, int requestCode, Intent data) {
+		PendingIntent pi = new PendingIntent(requestCode, data, 3);
+		pi.resultActivity = activity;
+		return pi;
+	}
+
+	private void dispatch(Intent intent, int resultCode) throws CanceledException {
+		if (type == 3) {
+			resultActivity.deliverPendingResult(requestCode, resultCode, intent);
+			return;
+		}
 		Context context = ATLLoadedApp.getPrimaryApplication().getApplication();
 		if (type == 0) { // type Activity
 			context.startActivity(intent);

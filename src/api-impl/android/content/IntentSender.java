@@ -48,6 +48,11 @@ public class IntentSender implements Parcelable {
 		}
 	}
 
+	/** @hide AOSP: getTarget() gives the IIntentSender, ATL the PendingIntent it stands for */
+	public PendingIntent getPendingIntent() {
+		return mPendingIntent;
+	}
+
 	public String getCreatorPackage() {
 		return mPendingIntent != null ? mPendingIntent.getCreatorPackage() : null;
 	}

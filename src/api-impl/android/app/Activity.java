@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentSender;
+import android.content.LocusId;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
@@ -39,6 +41,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.SearchEvent;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
@@ -48,7 +51,12 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
 import android.webkit.MimeTypeMap;
 import android.window.SizeConfigurationBuckets;
+import android.app.assist.AssistContent;
+import android.os.PersistableBundle;
+import java.io.FileDescriptor;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.concurrent.Executor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -236,8 +244,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return new WindowManagerImpl();
 	}
 
+	/* AOSP: the package of the activity that started this one with startActivityForResult(); null if that one
+	 * expects no result (it passed no request code, or a negative one) */
 	public String getCallingPackage() {
-		return null; // [from api reference] Note: if the calling activity is not expecting a result (that is it did not use the startActivityForResult(Intent, int) form that includes a request code), then the calling package will be null.
+		return resultActivity == null ? null : resultActivity.getPackageName();
 	}
 
 	public ComponentName getComponentName() {
@@ -284,12 +294,19 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	protected void onPostCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onPostCreate - yay!");
+		/* AOSP Activity.onPostCreate(): from now on a changed title reaches the window */
+		mTitleReady = true;
+		onTitleChanged(getTitle(), getTitleColor());
 		return;
 	}
 
 	protected void onStart() {
 		Slog.i(TAG, "- onStart - yay!");
 		window.setTitle(title);
+		if (!mMultiWindowKnown) {
+			mIsInMultiWindowMode = isInMultiWindowMode();
+			mMultiWindowKnown = true;
+		}
 
 		mFragments.doLoaderStart();
 		dispatchActivityStarted();
@@ -536,6 +553,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 						onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 						return;
 					}
+					activity.mLaunchedFromPackage = getPackageName();
 					/* like AOSP, a negative request code asks for no result */
 					if (requestCode >= 0) {
 						activity.resultRequestCode = requestCode;
@@ -599,37 +617,62 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	protected Dialog onCreateDialog(int id) {
-		Slog.i(TAG, "Activity.onCreateDialog(" + id + ") called");
 		return null;
 	}
 
-	protected void onPrepareDialog(int id, Dialog dialog) {
-		Slog.i(TAG, "Activity.onPrepareDialog(" + id + ") called");
+	/* AOSP: the dialog of a showDialog(id, args) is created with the arguments */
+	protected Dialog onCreateDialog(int id, Bundle args) {
+		return onCreateDialog(id);
 	}
 
-	private Map<Integer, Dialog> dialogs = new HashMap<Integer, Dialog>();
+	protected void onPrepareDialog(int id, Dialog dialog) {
+		dialog.setOwnerActivity(this);
+	}
+
+	protected void onPrepareDialog(int id, Dialog dialog, Bundle args) {
+		onPrepareDialog(id, dialog);
+	}
+
+	/* AOSP: the dialogs of showDialog() are managed: created once per id, shown again by the next showDialog(),
+	 * dismissed by dismissDialog() and discarded by removeDialog(). ATL does not save and restore them with
+	 * the activity's state. */
+	private final HashMap<Integer, Dialog> dialogs = new HashMap<Integer, Dialog>();
 
 	public final void showDialog(int id) {
-		Slog.i(TAG, "Activity.showDialog(" + id + ") called");
+		showDialog(id, null);
+	}
+
+	public final boolean showDialog(int id, Bundle args) {
+		Dialog dialog = dialogs.get(id);
+		if (dialog == null) {
+			dialog = onCreateDialog(id, args);
+			if (dialog == null)
+				return false;
+			dialog.dispatchOnCreate(null);
+			dialogs.put(id, dialog);
+		}
+		onPrepareDialog(id, dialog, args);
+		dialog.show();
+		return true;
+	}
+
+	public final void dismissDialog(int id) {
 		Dialog dialog = dialogs.get(id);
 		if (dialog == null)
-			dialogs.put(id, dialog = onCreateDialog(id));
-		if (dialog == null) {
-			Slog.w(TAG, "Dialog " + id + " was not created");
-			return;
-		}
-		onPrepareDialog(id, dialog);
-		dialog.show();
+			throw missingDialog(id);
+		dialog.dismiss();
 	}
 
-	public boolean showDialog(int id, Bundle args) {
-		return false;
+	private IllegalArgumentException missingDialog(int id) {
+		return new IllegalArgumentException("no dialog with id " + id + " was ever "
+						    + "shown via Activity#showDialog");
 	}
 
-	public void removeDialog(int id) {
+	public final void removeDialog(int id) {
 		Dialog dialog = dialogs.remove(id);
-		if (dialog != null)
+		if (dialog != null) {
 			dialog.dismiss();
+		}
 	}
 
 	/* Activity.finish(): the result of setResult() goes to the activity that started this one, which gets it
@@ -904,12 +947,38 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		}
 	}
 
+	/* AOSP Activity.setTitle(): a title change goes to onTitleChanged(), once onPostCreate() has run */
 	public void setTitle(CharSequence title) {
 		this.title = title;
+		onTitleChanged(title, mTitleColor);
 	}
 
 	public void setTitle(int titleId) {
-		this.title = getText(titleId);
+		setTitle(getText(titleId));
+	}
+
+	private boolean mTitleReady = false;
+	private int mTitleColor = 0;
+
+	/* AOSP: the color of the title; the window's title bar is the desktop's, which has no color to set */
+	@Deprecated
+	public void setTitleColor(int textColor) {
+		mTitleColor = textColor;
+		onTitleChanged(title, textColor);
+	}
+
+	public final int getTitleColor() {
+		return mTitleColor;
+	}
+
+	/* AOSP Activity.onTitleChanged(): the window gets the title (and an action bar, which ATL does not have) */
+	protected void onTitleChanged(CharSequence title, int color) {
+		if (mTitleReady) {
+			final Window win = getWindow();
+			if (win != null) {
+				win.setTitle(title);
+			}
+		}
 	}
 
 	public CharSequence getTitle() {
@@ -1019,6 +1088,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		Resources resources = getResources();
 		Configuration newConfig = new Configuration(globalConfig);
 		applyPictureInPictureBounds(newConfig);
+		/* ActivityThread.handleMultiWindowModeChanged(): ATL's multi-window mode is a window that is not
+		 * maximized (isInMultiWindowMode()); a change comes with a change of the size */
+		if (mMultiWindowKnown) {
+			boolean multiWindow = isInMultiWindowMode();
+			if (multiWindow != mIsInMultiWindowMode) {
+				mIsInMultiWindowMode = multiWindow;
+				onMultiWindowModeChanged(multiWindow, new Configuration(newConfig));
+			}
+		}
 		int diff = mCurrentConfig.diff(newConfig);
 		if (diff == 0)
 			return;
@@ -1034,8 +1112,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		int changes = SizeConfigurationBuckets.filterDiff(diff, oldConfig, newConfig, mSizeConfigurations);
 		if ((changes & ~handled) != 0)
 			recreate(changes & ~handled);
-		else if (shouldReportChange(oldConfig, newConfig, mSizeConfigurations, handled))
+		else if (shouldReportChange(oldConfig, newConfig, mSizeConfigurations, handled)) {
 			onConfigurationChanged(new Configuration(newConfig));
+			/* ViewRootImpl.updateConfiguration(): the views of the window hear it as well */
+			if (window.peekDecorView() != null)
+				window.peekDecorView().dispatchConfigurationChanged(newConfig);
+		}
 	}
 
 	/* ActivityThread.shouldReportChange(), without the window bounds and alwaysReportChange */
@@ -1884,8 +1966,39 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return false;
 	}
 
+	private SearchEvent mSearchEvent;
+
+	/* AOSP Activity.onSearchRequested(SearchEvent): the event is kept while the plain callback runs (getSearchEvent()) */
+	@Override
+	public boolean onSearchRequested(SearchEvent searchEvent) {
+		mSearchEvent = searchEvent;
+		boolean result = onSearchRequested();
+		mSearchEvent = null;
+		return result;
+	}
+
+	public final SearchEvent getSearchEvent() {
+		return mSearchEvent;
+	}
+
+	/* AOSP Activity.dispatchPopulateAccessibilityEvent(): the window's event gets the activity's class, package,
+	 * whether it fills the screen and its title */
+	@Override
+	public boolean dispatchPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent event) {
+		event.setClassName(getClass().getName());
+		event.setPackageName(getPackageName());
+		WindowManager.LayoutParams params = getWindow().getAttributes();
+		boolean isFullScreen = (params.width == WindowManager.LayoutParams.MATCH_PARENT) && (params.height == WindowManager.LayoutParams.MATCH_PARENT);
+		event.setFullScreen(isFullScreen);
+		CharSequence title = getTitle();
+		if (!TextUtils.isEmpty(title)) {
+			event.getText().add(title);
+		}
+		return true;
+	}
+
 	public View getCurrentFocus() {
-		return null;
+		return window != null ? window.getCurrentFocus() : null;
 	}
 
 	public void setProgressBarIndeterminateVisibility(boolean indeterminate) {}
@@ -2030,16 +2143,35 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {
-		return false;
+		if (event.getAction() == MotionEvent.ACTION_DOWN) {
+			onUserInteraction();
+		}
+		if (window.superDispatchTouchEvent(event)) {
+			return true;
+		}
+		return onTouchEvent(event);
 	}
 
 	@Override
 	public boolean dispatchTrackballEvent(MotionEvent event) {
-		return false;
+		onUserInteraction();
+		if (window.superDispatchTrackballEvent(event)) {
+			return true;
+		}
+		return onTrackballEvent(event);
 	}
 
 	@Override
 	public boolean dispatchGenericMotionEvent(MotionEvent event) {
+		onUserInteraction();
+		if (window.superDispatchGenericMotionEvent(event)) {
+			return true;
+		}
+		return onGenericMotionEvent(event);
+	}
+
+	/* AOSP Activity.onGenericMotionEvent(): joystick and mouse events no view handled */
+	public boolean onGenericMotionEvent(MotionEvent event) {
 		return false;
 	}
 
@@ -2185,6 +2317,318 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public ActionBar getActionBar() {
 		return null;
+	}
+
+	/* ---- AOSP Activity members that the apps call and that had no counterpart here ---- */
+
+	/* AOSP Activity.addContentView(): the view goes into the content next to what is there */
+	public void addContentView(View view, ViewGroup.LayoutParams params) {
+		window.addContentView(view, params);
+		onContentChanged();
+	}
+
+	/* AOSP: Activity.onCreate() for an activity that is persistable and was started with persisted state */
+	public void onCreate(Bundle savedInstanceState, PersistableBundle persistentState) {
+		onCreate(savedInstanceState);
+	}
+
+	/* ATL has no context menus (View.showContextMenu() shows none), so openContextMenu() opens none and the
+	 * window has no FEATURE_CONTEXT_MENU panel for closeContextMenu() to close, as AOSP does when the window
+	 * lacks the feature; onContextItemSelected() and onContextMenuClosed() are only AOSP's defaults */
+	public void openContextMenu(View view) {
+		view.showContextMenu();
+	}
+
+	public void closeContextMenu() {
+		if (window.hasFeature(Window.FEATURE_CONTEXT_MENU)) {
+			/* not reachable: Window.hasFeature() says no */
+		}
+	}
+
+	public boolean onContextItemSelected(@NonNull MenuItem item) {
+		if (getParent() != null) {
+			return getParent().onContextItemSelected(item);
+		}
+		return false;
+	}
+
+	public void onContextMenuClosed(@NonNull Menu menu) {
+		if (getParent() != null) {
+			getParent().onContextMenuClosed(menu);
+		}
+	}
+
+	/* AOSP Activity.openOptionsMenu(): the options menu in the window's panel. ATL's options menu is the desktop
+	 * header bar's, which the user opens; nothing in the window can be opened from here, so this changes
+	 * nothing (AOSP does the same when the window has no options panel) */
+	public void openOptionsMenu() {
+	}
+
+	/* AOSP Activity.createPendingResult(): a PendingIntent whose sending delivers onActivityResult() to this
+	 * activity (resultCode is the code of send(), data the given intent filled in with the sent one); null
+	 * if the flags ask for a PendingIntent that does not exist (FLAG_NO_CREATE) */
+	public PendingIntent createPendingResult(int requestCode, @NonNull Intent data, int flags) {
+		if ((flags & PendingIntent.FLAG_NO_CREATE) != 0)
+			return null;
+		return PendingIntent.getActivityResult(this, requestCode, data);
+	}
+
+	/* what PendingIntent.send() of createPendingResult() does (ActivityThread.handleSendResult()): the result
+	 * goes to onActivityResult() at once when the activity is running, else when it comes back */
+	void deliverPendingResult(int requestCode, int resultCode, Intent data) throws PendingIntent.CanceledException {
+		if (finishing || destroyed)
+			throw new PendingIntent.CanceledException();
+		if (paused || stopped) {
+			addPendingResult(requestCode, resultCode, data);
+			return;
+		}
+		mHandler.post(new Runnable() {
+			@Override
+			public void run() {
+				if (!finishing && !destroyed)
+					dispatchActivityResult(null, requestCode, resultCode, data, "ACTIVITY_RESULT");
+			}
+		});
+	}
+
+	/* AOSP: activities are in no bubble; ATL has no bubbles */
+	public boolean isLaunchedFromBubble() {
+		return false;
+	}
+
+	/* AOSP: the package that started this activity (ActivityClient, from the ActivityRecord); only
+	 * activities that another activity of the app started have one, the first one comes from the desktop */
+	String mLaunchedFromPackage;
+	/* AOSP: Activity.mIsInMultiWindowMode, kept to tell onMultiWindowModeChanged() when it changes */
+	private boolean mIsInMultiWindowMode;
+	private boolean mMultiWindowKnown;
+
+	public String getLaunchedFromPackage() {
+		return mLaunchedFromPackage;
+	}
+
+	/* AOSP: every activity has this Window.Callback method, which does nothing */
+	public void onEnterAnimationComplete() {
+	}
+
+	/* AOSP Activity.onMultiWindowModeChanged(): the two variants call each other the way AOSP's do */
+	public void onMultiWindowModeChanged(boolean isInMultiWindowMode, Configuration newConfig) {
+		onMultiWindowModeChanged(isInMultiWindowMode);
+	}
+
+	@Deprecated
+	public void onMultiWindowModeChanged(boolean isInMultiWindowMode) {
+	}
+
+	public void onProvideAssistContent(AssistContent outContent) {
+	}
+
+	/* AOSP Activity.onTouchEvent(): a touch outside of the window closes a window that asked for it
+	 * (setFinishOnTouchOutside()) */
+	public boolean onTouchEvent(MotionEvent event) {
+		if (window.shouldCloseOnTouch(this, event)) {
+			finish();
+			return true;
+		}
+		return false;
+	}
+
+	public boolean onTrackballEvent(MotionEvent event) {
+		return false;
+	}
+
+	/* AOSP: only activities that are translucent behind (visible behind) have this and it is gone since
+	 * Android 5; requestVisibleBehind() says no and nothing is ever cancelled */
+	public boolean requestVisibleBehind(boolean visible) {
+		return false;
+	}
+
+	public void onVisibleBehindCanceled() {
+	}
+
+	/* AOSP Activity.overrideActivityTransition(): the animation of opening or closing this activity. ATL does
+	 * not animate windows, so nothing shows the override; the check of the type is AOSP's. */
+	public static final int OVERRIDE_TRANSITION_OPEN = 0;
+	public static final int OVERRIDE_TRANSITION_CLOSE = 1;
+
+	public void overrideActivityTransition(int overrideType, int enterAnim, int exitAnim) {
+		overrideActivityTransition(overrideType, enterAnim, exitAnim, 0);
+	}
+
+	public void overrideActivityTransition(int overrideType, int enterAnim, int exitAnim, int backgroundColor) {
+		if (overrideType != OVERRIDE_TRANSITION_OPEN && overrideType != OVERRIDE_TRANSITION_CLOSE) {
+			throw new IllegalArgumentException("Override type must be either "
+							   + "OVERRIDE_TRANSITION_OPEN or OVERRIDE_TRANSITION_CLOSE, but was " + overrideType);
+		}
+	}
+
+	public void clearOverrideActivityTransition(int overrideType) {
+		if (overrideType != OVERRIDE_TRANSITION_OPEN && overrideType != OVERRIDE_TRANSITION_CLOSE) {
+			throw new IllegalArgumentException("Override type must be either "
+							   + "OVERRIDE_TRANSITION_OPEN or OVERRIDE_TRANSITION_CLOSE, but was " + overrideType);
+		}
+	}
+
+	/* AOSP Activity.ScreenCaptureCallback: told when the user takes a screenshot (permission
+	 * DETECT_SCREEN_CAPTURE). The desktop does not tell ATL, so the callbacks are kept and never called. */
+	public interface ScreenCaptureCallback {
+		void onScreenCaptured();
+	}
+
+	private final ArrayList<ScreenCaptureCallback> mScreenCaptureCallbacks = new ArrayList<ScreenCaptureCallback>();
+
+	public void registerScreenCaptureCallback(@NonNull Executor executor, @NonNull ScreenCaptureCallback callback) {
+		if (executor == null || callback == null)
+			throw new NullPointerException();
+		synchronized (mScreenCaptureCallbacks) {
+			if (!mScreenCaptureCallbacks.contains(callback))
+				mScreenCaptureCallbacks.add(callback);
+		}
+	}
+
+	public void unregisterScreenCaptureCallback(@NonNull ScreenCaptureCallback callback) {
+		synchronized (mScreenCaptureCallbacks) {
+			mScreenCaptureCallbacks.remove(callback);
+		}
+	}
+
+	/* AOSP: where the activity shows when the screen is locked or turned off by the system (keyguard); the
+	 * desktop session decides, so the flags are only kept (getWindow() has them as FLAG_SHOW_WHEN_LOCKED
+	 * and FLAG_TURN_SCREEN_ON, as in AOSP) */
+	public void setShowWhenLocked(boolean showWhenLocked) {
+		if (showWhenLocked)
+			window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+		else
+			window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED);
+	}
+
+	public void setTurnScreenOn(boolean turnScreenOn) {
+		if (turnScreenOn)
+			window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+		else
+			window.clearFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+	}
+
+	/* AOSP Activity.setTranslucent(): makes the activity's window see through to what is behind it, true if the
+	 * conversion happened. A GTK window on the desktop is composited by the desktop, never converted by
+	 * ATL, so the answer is false for both directions (AOSP answers false when the system refuses) */
+	public boolean setTranslucent(boolean translucent) {
+		return false;
+	}
+
+	/* AOSP Activity.setVrModeEnabled(): the system's VR service; a device without the VR feature
+	 * (FEATURE_VR_MODE) has none, which AOSP reports with a PackageManager.NameNotFoundException when the
+	 * component is not a VR listener service; here no component is one */
+	public void setVrModeEnabled(boolean enabled, @NonNull ComponentName requestedComponent) throws PackageManager.NameNotFoundException {
+		throw new PackageManager.NameNotFoundException(requestedComponent.flattenToString() + " is not a VR listener service");
+	}
+
+	/* AOSP Activity.setLocusContext(): tells the system's shortcut, content capture and usage services what the
+	 * activity shows; ATL has none of them to tell */
+	public void setLocusContext(@Nullable LocusId locusId, @Nullable Bundle bundle) {
+	}
+
+	/* AOSP Activity.startActionMode(): the decor view starts it; ATL has no action mode (View.startActionMode()
+	 * answers null) */
+	public ActionMode startActionMode(ActionMode.Callback callback) {
+		return window.getDecorView().startActionMode(callback);
+	}
+
+	public ActionMode startActionMode(ActionMode.Callback callback, int type) {
+		return window.getDecorView().startActionMode(callback, type);
+	}
+
+	/* AOSP Activity.startSearch(): shows the search dialog / global search. ATL has no search UI (SearchManager
+	 * has only getSearchableInfo()); onSearchRequested() answers false for the same reason */
+	public void startSearch(@Nullable String initialQuery, boolean selectInitialQuery, @Nullable Bundle appSearchData, boolean globalSearch) {
+	}
+
+	/* AOSP Activity.startActivityIfNeeded(): like startActivityForResult(), except that nothing starts when the
+	 * activity for the intent is this one and it is single top (the flag, launchMode singleTop, singleTask or
+	 * singleInstance) - then false is returned and the intent is not delivered, as for START_RETURN_INTENT_TO_CALLER */
+	public boolean startActivityIfNeeded(@NonNull Intent intent, int requestCode) {
+		return startActivityIfNeeded(intent, requestCode, null);
+	}
+
+	public boolean startActivityIfNeeded(@NonNull Intent intent, int requestCode, @Nullable Bundle options) {
+		ComponentName target = intent.getComponent();
+		if (target != null && target.equals(getComponentName())) {
+			boolean singleTop = (intent.getFlags() & Intent.FLAG_ACTIVITY_SINGLE_TOP) != 0;
+			ActivityInfo info = getActivityInfo();
+			if (info != null) {
+				singleTop |= info.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP || info.launchMode == ActivityInfo.LAUNCH_SINGLE_TASK
+				    || info.launchMode == ActivityInfo.LAUNCH_SINGLE_INSTANCE;
+			}
+			if (singleTop)
+				return false;
+		}
+		startActivityForResult(intent, requestCode, options);
+		return true;
+	}
+
+	/* AOSP Activity.startIntentSender() and startIntentSenderForResult(): what the IntentSender stands for is
+	 * started in the name of the activity. For a PendingIntent of an activity this is startActivityForResult()
+	 * of its intent with the fill-in intent merged in and the flags set as flagsValues says for the bits of
+	 * flagsMask; a service or a broadcast is sent. */
+	public void startIntentSender(IntentSender intent, @Nullable Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags) throws IntentSender.SendIntentException {
+		startIntentSender(intent, fillInIntent, flagsMask, flagsValues, extraFlags, null);
+	}
+
+	public void startIntentSender(IntentSender intent, @Nullable Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags, @Nullable Bundle options) throws IntentSender.SendIntentException {
+		startIntentSenderForResult(intent, -1, fillInIntent, flagsMask, flagsValues, extraFlags, options);
+	}
+
+	public void startIntentSenderForResult(IntentSender intent, int requestCode, @Nullable Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags) throws IntentSender.SendIntentException {
+		startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags, null);
+	}
+
+	public void startIntentSenderForResult(IntentSender intent, int requestCode, @Nullable Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags, @Nullable Bundle options) throws IntentSender.SendIntentException {
+		PendingIntent target = intent.getPendingIntent();
+		if (target == null)
+			throw new IntentSender.SendIntentException("no PendingIntent");
+		Intent filled = new Intent(target.getIntent());
+		if (fillInIntent != null)
+			filled.putExtras(fillInIntent);
+		filled.setFlags((filled.getFlags() & ~flagsMask) | (flagsValues & flagsMask));
+		if (target.type == 0) {
+			startActivityForResult(filled, requestCode, options);
+		} else {
+			try {
+				target.send(this, 0, fillInIntent);
+			} catch (PendingIntent.CanceledException e) {
+				throw new IntentSender.SendIntentException(e);
+			}
+		}
+	}
+
+	/* AOSP Activity.dump(): what dumpsys prints about the activity; the part AOSP prints about the
+	 * fragments and loaders is the fragment controller's */
+	public void dump(@NonNull String prefix, @Nullable FileDescriptor fd, @NonNull PrintWriter writer, @Nullable String[] args) {
+		String innerPrefix = prefix + "  ";
+		writer.print(prefix);
+		writer.print("Local Activity ");
+		writer.print(Integer.toHexString(System.identityHashCode(this)));
+		writer.println(" State:");
+		writer.print(innerPrefix);
+		writer.print("mResumed=");
+		writer.print(!paused && started);
+		writer.print(" mStopped=");
+		writer.print(stopped);
+		writer.print(" mFinished=");
+		writer.println(finishing);
+		writer.print(innerPrefix);
+		writer.print("mIsInMultiWindowMode=");
+		writer.print(mIsInMultiWindowMode);
+		writer.print(" mIsInPictureInPictureMode=");
+		writer.println(mIsInPictureInPictureMode);
+		writer.print(innerPrefix);
+		writer.print("mChangingConfigurations=");
+		writer.println(mChangingConfigurations);
+		writer.print(innerPrefix);
+		writer.print("mCurrentConfig=");
+		writer.println(mCurrentConfig);
+		mFragments.dumpLoaders(innerPrefix, fd, writer, args);
+		mFragments.getFragmentManager().dump(innerPrefix, fd, writer, args);
 	}
 
 	@Override

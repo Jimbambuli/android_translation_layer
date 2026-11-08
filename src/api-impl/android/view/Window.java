@@ -64,6 +64,12 @@ public class Window {
 
 		public boolean onSearchRequested();
 
+		/** AOSP Window.Callback.onSearchRequested(SearchEvent): the same, with the event that asked */
+		public boolean onSearchRequested(SearchEvent searchEvent);
+
+		/** AOSP Window.Callback.dispatchPopulateAccessibilityEvent(): lets the callback add the window's description */
+		public boolean dispatchPopulateAccessibilityEvent(android.view.accessibility.AccessibilityEvent event);
+
 		public ActionMode onWindowStartingActionMode(ActionMode.Callback callback);
 
 		public ActionMode onWindowStartingActionMode(ActionMode.Callback callback, int type);
