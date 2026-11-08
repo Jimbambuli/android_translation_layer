@@ -10,6 +10,8 @@ public final class Display {
 
 	/* AOSP Display.DEFAULT_DISPLAY */
 	public static final int DEFAULT_DISPLAY = 0;
+	/* AOSP Display.INVALID_DISPLAY */
+	public static final int INVALID_DISPLAY = -1;
 
 	public static int window_width = 960;
 	public static int window_height = 540;
