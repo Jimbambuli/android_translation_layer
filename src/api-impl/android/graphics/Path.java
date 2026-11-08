@@ -283,6 +283,68 @@ public class Path {
 		}
 	}
 
+	/**
+	 * Approximate the <code>Path</code> with a series of line segments.
+	 * This returns float[] with the array containing point components.
+	 * There are three components for each point, in order:
+	 * <ul>
+	 *     <li>Fraction along the length of the path that the point resides</li>
+	 *     <li>The x coordinate of the point</li>
+	 *     <li>The y coordinate of the point</li>
+	 * </ul>
+	 * <p>Two points may share the same fraction along its length when there is
+	 * a move action within the Path.</p>
+	 *
+	 * ATL: the points are measured along each contour with PathMeasure, one point per
+	 * max(2 * acceptableError, 0.25) of length (at most 4096 per contour); AOSP's Skia picks the
+	 * points by the flatness of each segment.
+	 *
+	 * @param acceptableError The acceptable error for a line on the
+	 *                        Path. Typically this would be 0.5 so that
+	 *                        the error is less than half a pixel.
+	 * @return An array of components for points approximating the Path.
+	 */
+	public float[] approximate(float acceptableError) {
+		if (acceptableError < 0) {
+			throw new IllegalArgumentException("AcceptableError must be greater than or equal to 0");
+		}
+		float step = Math.max(2 * acceptableError, 0.25f);
+		PathMeasure measure = new PathMeasure(this, false);
+		float total = 0;
+		do {
+			total += measure.getLength();
+		} while (measure.nextContour());
+		if (!(total > 0)) {
+			return new float[] {0, 0, 0, 1, 0, 0};
+		}
+		float[] out = new float[3 * 256];
+		int n = 0;
+		float done = 0;
+		float[] pos = new float[2];
+		measure = new PathMeasure(this, false);
+		do {
+			float length = measure.getLength();
+			if (!(length > 0)) {
+				continue;
+			}
+			int count = (int)Math.min(4096, Math.ceil(length / step));
+			for (int i = 0; i <= count; i++) {
+				float d = i == count ? length : length * i / count;
+				if (!measure.getPosTan(d, pos, null)) {
+					continue;
+				}
+				if (n + 3 > out.length) {
+					out = java.util.Arrays.copyOf(out, out.length * 2);
+				}
+				out[n++] = (done + d) / total;
+				out[n++] = pos[0];
+				out[n++] = pos[1];
+			}
+			done += length;
+		} while (measure.nextContour());
+		return java.util.Arrays.copyOf(out, n);
+	}
+
 	private static native long native_create_builder(long path, long builder);
 	private static native long native_create_path(long builder);
 	private static native long native_ref_path(long path);

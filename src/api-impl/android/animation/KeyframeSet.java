@@ -19,7 +19,7 @@ package android.animation;
 import android.animation.Keyframe.FloatKeyframe;
 import android.animation.Keyframe.IntKeyframe;
 import android.animation.Keyframe.ObjectKeyframe;
-//import android.graphics.Path;
+import android.graphics.Path;
 import android.util.Log;
 import java.util.Arrays;
 import java.util.List;
@@ -142,15 +142,13 @@ public class KeyframeSet implements Keyframes {
 		return new KeyframeSet(keyframes);
 	}
 
-	/* ATL: PathKeyframes needs Path.approximate(), which ATL's GskPath-based Path does not have
-    public static PathKeyframes ofPath(Path path) {
-        return new PathKeyframes(path);
-    }
+	public static PathKeyframes ofPath(Path path) {
+		return new PathKeyframes(path);
+	}
 
-    public static PathKeyframes ofPath(Path path, float error) {
-        return new PathKeyframes(path, error);
-    }
-    */
+	public static PathKeyframes ofPath(Path path, float error) {
+		return new PathKeyframes(path, error);
+	}
 
 	/**
      * Sets the TypeEvaluator to be used when calculating animated values. This object

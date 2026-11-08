@@ -16,7 +16,7 @@
 
 package android.animation;
 
-//import android.graphics.Path;
+import android.graphics.Path;
 import android.graphics.PointF;
 import android.util.FloatProperty;
 import android.util.IntProperty;
@@ -202,24 +202,23 @@ public class PropertyValuesHolder implements Cloneable {
 		return new MultiIntValuesHolder(propertyName, null, evaluator, (Object[])values);
 	}
 
-	// ATL: no PathKeyframes, KeyframeSet.ofPath() needs Path.approximate()
-	//    /**
-	//     * Constructs and returns a PropertyValuesHolder with a given property name to use
-	//     * as a multi-int setter. The values are animated along the path, with the first
-	//     * parameter of the setter set to the x coordinate and the second set to the y coordinate.
-	//     *
-	//     * @param propertyName The name of the property being animated. Can also be the
-	//     *                     case-sensitive name of the entire setter method. Should not be null.
-	//     *                     The setter must take exactly two <code>int</code> parameters.
-	//     * @param path The Path along which the values should be animated.
-	//     * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
-	//     * @see ObjectAnimator#ofPropertyValuesHolder(Object, PropertyValuesHolder...)
-	//     */
-	//    public static PropertyValuesHolder ofMultiInt(String propertyName, Path path) {
-	//        Keyframes keyframes = KeyframeSet.ofPath(path);
-	//        PointFToIntArray converter = new PointFToIntArray();
-	//        return new MultiIntValuesHolder(propertyName, converter, null, keyframes);
-	//    }
+	/**
+	 * Constructs and returns a PropertyValuesHolder with a given property name to use
+	 * as a multi-int setter. The values are animated along the path, with the first
+	 * parameter of the setter set to the x coordinate and the second set to the y coordinate.
+	 *
+	 * @param propertyName The name of the property being animated. Can also be the
+	 *                     case-sensitive name of the entire setter method. Should not be null.
+	 *                     The setter must take exactly two <code>int</code> parameters.
+	 * @param path The Path along which the values should be animated.
+	 * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
+	 * @see ObjectAnimator#ofPropertyValuesHolder(Object, PropertyValuesHolder...)
+	 */
+	public static PropertyValuesHolder ofMultiInt(String propertyName, Path path) {
+		Keyframes keyframes = KeyframeSet.ofPath(path);
+		PointFToIntArray converter = new PointFToIntArray();
+		return new MultiIntValuesHolder(propertyName, converter, null, keyframes);
+	}
 
 	/**
      * Constructs and returns a PropertyValuesHolder with a given property and
@@ -322,24 +321,23 @@ public class PropertyValuesHolder implements Cloneable {
 		return new MultiFloatValuesHolder(propertyName, null, evaluator, (Object[])values);
 	}
 
-	// ATL: no PathKeyframes, KeyframeSet.ofPath() needs Path.approximate()
-	//    /**
-	//     * Constructs and returns a PropertyValuesHolder with a given property name to use
-	//     * as a multi-float setter. The values are animated along the path, with the first
-	//     * parameter of the setter set to the x coordinate and the second set to the y coordinate.
-	//     *
-	//     * @param propertyName The name of the property being animated. Can also be the
-	//     *                     case-sensitive name of the entire setter method. Should not be null.
-	//     *                     The setter must take exactly two <code>float</code> parameters.
-	//     * @param path The Path along which the values should be animated.
-	//     * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
-	//     * @see ObjectAnimator#ofPropertyValuesHolder(Object, PropertyValuesHolder...)
-	//     */
-	//    public static PropertyValuesHolder ofMultiFloat(String propertyName, Path path) {
-	//        Keyframes keyframes = KeyframeSet.ofPath(path);
-	//        PointFToFloatArray converter = new PointFToFloatArray();
-	//        return new MultiFloatValuesHolder(propertyName, converter, null, keyframes);
-	//    }
+	/**
+	 * Constructs and returns a PropertyValuesHolder with a given property name to use
+	 * as a multi-float setter. The values are animated along the path, with the first
+	 * parameter of the setter set to the x coordinate and the second set to the y coordinate.
+	 *
+	 * @param propertyName The name of the property being animated. Can also be the
+	 *                     case-sensitive name of the entire setter method. Should not be null.
+	 *                     The setter must take exactly two <code>float</code> parameters.
+	 * @param path The Path along which the values should be animated.
+	 * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
+	 * @see ObjectAnimator#ofPropertyValuesHolder(Object, PropertyValuesHolder...)
+	 */
+	public static PropertyValuesHolder ofMultiFloat(String propertyName, Path path) {
+		Keyframes keyframes = KeyframeSet.ofPath(path);
+		PointFToFloatArray converter = new PointFToFloatArray();
+		return new MultiFloatValuesHolder(propertyName, converter, null, keyframes);
+	}
 
 	/**
      * Constructs and returns a PropertyValuesHolder with a given property and
@@ -410,31 +408,30 @@ public class PropertyValuesHolder implements Cloneable {
 		return pvh;
 	}
 
-	// ATL: no PathKeyframes, KeyframeSet.ofPath() needs Path.approximate()
-	//    /**
-	//     * Constructs and returns a PropertyValuesHolder with a given property name and
-	//     * a Path along which the values should be animated. This variant supports a
-	//     * <code>TypeConverter</code> to convert from <code>PointF</code> to the target
-	//     * type.
-	//     *
-	//     * <p>The PointF passed to <code>converter</code> or <code>property</code>, if
-	//     * <code>converter</code> is <code>null</code>, is reused on each animation frame and should
-	//     * not be stored by the setter or TypeConverter.</p>
-	//     *
-	//     * @param propertyName The name of the property being animated.
-	//     * @param converter Converts a PointF to the type associated with the setter. May be
-	//     *                  null if conversion is unnecessary.
-	//     * @param path The Path along which the values should be animated.
-	//     * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
-	//     */
-	//    public static PropertyValuesHolder ofObject(String propertyName,
-	//            TypeConverter<PointF, ?> converter, Path path) {
-	//        PropertyValuesHolder pvh = new PropertyValuesHolder(propertyName);
-	//        pvh.mKeyframes = KeyframeSet.ofPath(path);
-	//        pvh.mValueType = PointF.class;
-	//        pvh.setConverter(converter);
-	//        return pvh;
-	//    }
+	/**
+	 * Constructs and returns a PropertyValuesHolder with a given property name and
+	 * a Path along which the values should be animated. This variant supports a
+	 * <code>TypeConverter</code> to convert from <code>PointF</code> to the target
+	 * type.
+	 *
+	 * <p>The PointF passed to <code>converter</code> or <code>property</code>, if
+	 * <code>converter</code> is <code>null</code>, is reused on each animation frame and should
+	 * not be stored by the setter or TypeConverter.</p>
+	 *
+	 * @param propertyName The name of the property being animated.
+	 * @param converter Converts a PointF to the type associated with the setter. May be
+	 *                  null if conversion is unnecessary.
+	 * @param path The Path along which the values should be animated.
+	 * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
+	 */
+	public static PropertyValuesHolder ofObject(String propertyName,
+			TypeConverter<PointF, ?> converter, Path path) {
+		PropertyValuesHolder pvh = new PropertyValuesHolder(propertyName);
+		pvh.mKeyframes = KeyframeSet.ofPath(path);
+		pvh.mValueType = PointF.class;
+		pvh.setConverter(converter);
+		return pvh;
+	}
 
 	/**
      * Constructs and returns a PropertyValuesHolder with a given property and
@@ -496,31 +493,30 @@ public class PropertyValuesHolder implements Cloneable {
 		return pvh;
 	}
 
-	// ATL: no PathKeyframes, KeyframeSet.ofPath() needs Path.approximate()
-	//    /**
-	//     * Constructs and returns a PropertyValuesHolder with a given property and
-	//     * a Path along which the values should be animated. This variant supports a
-	//     * <code>TypeConverter</code> to convert from <code>PointF</code> to the target
-	//     * type.
-	//     *
-	//     * <p>The PointF passed to <code>converter</code> or <code>property</code>, if
-	//     * <code>converter</code> is <code>null</code>, is reused on each animation frame and should
-	//     * not be stored by the setter or TypeConverter.</p>
-	//     *
-	//     * @param property The property being animated. Should not be null.
-	//     * @param converter Converts a PointF to the type associated with the setter. May be
-	//     *                  null if conversion is unnecessary.
-	//     * @param path The Path along which the values should be animated.
-	//     * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
-	//     */
-	//    public static <V> PropertyValuesHolder ofObject(Property<?, V> property,
-	//            TypeConverter<PointF, V> converter, Path path) {
-	//        PropertyValuesHolder pvh = new PropertyValuesHolder(property);
-	//        pvh.mKeyframes = KeyframeSet.ofPath(path);
-	//        pvh.mValueType = PointF.class;
-	//        pvh.setConverter(converter);
-	//        return pvh;
-	//    }
+	/**
+	 * Constructs and returns a PropertyValuesHolder with a given property and
+	 * a Path along which the values should be animated. This variant supports a
+	 * <code>TypeConverter</code> to convert from <code>PointF</code> to the target
+	 * type.
+	 *
+	 * <p>The PointF passed to <code>converter</code> or <code>property</code>, if
+	 * <code>converter</code> is <code>null</code>, is reused on each animation frame and should
+	 * not be stored by the setter or TypeConverter.</p>
+	 *
+	 * @param property The property being animated. Should not be null.
+	 * @param converter Converts a PointF to the type associated with the setter. May be
+	 *                  null if conversion is unnecessary.
+	 * @param path The Path along which the values should be animated.
+	 * @return PropertyValuesHolder The constructed PropertyValuesHolder object.
+	 */
+	public static <V> PropertyValuesHolder ofObject(Property<?, V> property,
+			TypeConverter<PointF, V> converter, Path path) {
+		PropertyValuesHolder pvh = new PropertyValuesHolder(property);
+		pvh.mKeyframes = KeyframeSet.ofPath(path);
+		pvh.mValueType = PointF.class;
+		pvh.setConverter(converter);
+		return pvh;
+	}
 
 	/**
      * Constructs and returns a PropertyValuesHolder object with the specified property name and set
@@ -1092,11 +1088,9 @@ public class PropertyValuesHolder implements Cloneable {
             values.endValue = new PathParser.PathData((PathParser.PathData) values.endValue);
         }
 		// TODO: We need a better way to get data out of keyframes.
-		if (/* ATL: no PathKeyframes
-                mKeyframes instanceof PathKeyframes.FloatKeyframesBase
-                || mKeyframes instanceof PathKeyframes.IntKeyframesBase
-                || */
-		    (mKeyframes.getKeyframes() != null && mKeyframes.getKeyframes().size() > 2)) {
+		if (mKeyframes instanceof PathKeyframes.FloatKeyframesBase
+		    || mKeyframes instanceof PathKeyframes.IntKeyframesBase
+		    || (mKeyframes.getKeyframes() != null && mKeyframes.getKeyframes().size() > 2)) {
 			// When a pvh has more than 2 keyframes, that means there are intermediate values in
 			// addition to start/end values defined for animators. Another case where such
 			// intermediate values are defined is when animator has a path to animate along. In
