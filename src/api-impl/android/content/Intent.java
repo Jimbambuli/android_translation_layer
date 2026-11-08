@@ -8,6 +8,7 @@ import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import com.android.internal.R;
@@ -584,6 +585,104 @@ public class Intent implements Parcelable {
 		if (o.mCategories != null)
 			this.mCategories = new android.util.ArraySet<String>(o.mCategories);
 	}
+	/* AOSP Intent(Parcel) / readFromParcel() / writeToParcel() / CREATOR, wire format of android-14.
+	 * ATL keeps no identifier, extended flags, source bounds, content user hint or original intent: they
+	 * are written as AOSP's defaults (null, 0, null, USER_CURRENT = -2, null) and skipped when read. */
+	protected Intent(Parcel in) {
+		readFromParcel(in);
+	}
+
+	public void readFromParcel(Parcel in) {
+		setAction(in.readString8());
+		data = Uri.CREATOR.createFromParcel(in);
+		type = in.readString8();
+		in.readString8(); /* identifier */
+		flags = in.readInt();
+		in.readInt(); /* extended flags */
+		packageName = in.readString8();
+		component = ComponentName.readFromParcel(in);
+
+		if (in.readInt() != 0) {
+			Rect.CREATOR.createFromParcel(in); /* source bounds */
+		}
+
+		int n = in.readInt();
+		if (n > 0) {
+			mCategories = new android.util.ArraySet<String>();
+			for (int i = 0; i < n; i++) {
+				mCategories.add(in.readString8().intern());
+			}
+		} else {
+			mCategories = null;
+		}
+
+		if (in.readInt() != 0) {
+			selector = new Intent(in);
+		}
+
+		if (in.readInt() != 0) {
+			clipData = ClipData.CREATOR.createFromParcel(in);
+		}
+		in.readInt(); /* content user hint */
+		extras = in.readBundle();
+		if (extras == null) {
+			extras = new Bundle();
+		}
+		if (in.readInt() != 0) {
+			new Intent(in); /* original intent */
+		}
+	}
+
+	@Override
+	public void writeToParcel(Parcel out, int parcelFlags) {
+		out.writeString8(action);
+		Uri.writeToParcel(out, data);
+		out.writeString8(type);
+		out.writeString8(null); /* identifier */
+		out.writeInt(flags);
+		out.writeInt(0); /* extended flags */
+		out.writeString8(packageName);
+		ComponentName.writeToParcel(component, out);
+		out.writeInt(0); /* source bounds */
+
+		if (mCategories != null) {
+			int n = mCategories.size();
+			out.writeInt(n);
+			for (int i = 0; i < n; i++) {
+				out.writeString8(mCategories.valueAt(i));
+			}
+		} else {
+			out.writeInt(0);
+		}
+
+		if (selector != null) {
+			out.writeInt(1);
+			selector.writeToParcel(out, parcelFlags);
+		} else {
+			out.writeInt(0);
+		}
+
+		if (clipData != null) {
+			out.writeInt(1);
+			clipData.writeToParcel(out, parcelFlags);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeInt(-2); /* content user hint: UserHandle.USER_CURRENT */
+		out.writeBundle(extras);
+		out.writeInt(0); /* original intent */
+	}
+
+	public static final Parcelable.Creator<Intent> CREATOR = new Parcelable.Creator<Intent>() {
+		public Intent createFromParcel(Parcel in) {
+			return new Intent(in);
+		}
+
+		public Intent[] newArray(int size) {
+			return new Intent[size];
+		}
+	};
+
 	public Intent(String action) {
 		this.action = action;
 	}

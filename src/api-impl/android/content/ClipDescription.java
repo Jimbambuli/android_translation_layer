@@ -1,6 +1,12 @@
 package android.content;
 
-public class ClipDescription /*implements Parcelable*/ {
+import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.os.PersistableBundle;
+import android.text.TextUtils;
+
+public class ClipDescription implements Parcelable {
 	public static final String MIMETYPE_TEXT_PLAIN = "text/plain";
 	public static final String MIMETYPE_TEXT_HTML = "text/html";
 	public static final String MIMETYPE_TEXT_URILIST = "text/uri-list";
@@ -21,17 +27,81 @@ public class ClipDescription /*implements Parcelable*/ {
 
 	private final CharSequence label;
 	private final String[] mimeTypes;
+	private PersistableBundle extras;
+	private long timeStamp;
+	private boolean isStyledText;
+	private int classificationStatus = CLASSIFICATION_NOT_COMPLETE;
 
 	public ClipDescription(CharSequence label, String[] mimeTypes) {
 		if (mimeTypes == null)
 			throw new NullPointerException("mimeTypes is null");
 		this.label = label;
 		this.mimeTypes = mimeTypes;
+		timeStamp = System.currentTimeMillis();
 	}
 
 	public ClipDescription(ClipDescription o) {
 		this(o.label, o.mimeTypes);
+		timeStamp = o.timeStamp;
 	}
+
+	public void setTimestamp(long timeStamp) {
+		this.timeStamp = timeStamp;
+	}
+
+	public long getTimestamp() {
+		return timeStamp;
+	}
+
+	public PersistableBundle getExtras() {
+		return extras;
+	}
+
+	public void setExtras(PersistableBundle extras) {
+		this.extras = new PersistableBundle(extras);
+	}
+
+	public boolean isStyledText() {
+		return isStyledText;
+	}
+
+	public int getClassificationStatus() {
+		return classificationStatus;
+	}
+
+	/* AOSP ClipDescription(Parcel) / writeToParcel() / CREATOR (android-14 wire format; ATL has no text
+	 * classifier, so the confidence scores are an empty Bundle) */
+	ClipDescription(Parcel in) {
+		label = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+		java.util.ArrayList<String> types = in.createStringArrayList();
+		mimeTypes = types.toArray(new String[0]);
+		extras = in.readPersistableBundle();
+		timeStamp = in.readLong();
+		isStyledText = in.readBoolean();
+		classificationStatus = in.readInt();
+		in.readBundle();
+	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		TextUtils.writeToParcel(label, dest, flags);
+		dest.writeStringList(java.util.Arrays.asList(mimeTypes));
+		dest.writePersistableBundle(extras);
+		dest.writeLong(timeStamp);
+		dest.writeBoolean(isStyledText);
+		dest.writeInt(classificationStatus);
+		dest.writeBundle(new Bundle());
+	}
+
+	public static final Parcelable.Creator<ClipDescription> CREATOR = new Parcelable.Creator<ClipDescription>() {
+		public ClipDescription createFromParcel(Parcel source) {
+			return new ClipDescription(source);
+		}
+
+		public ClipDescription[] newArray(int size) {
+			return new ClipDescription[size];
+		}
+	};
 
 	/**
 	 * Compares a MIME type with a filter that may contain wildcards ("text/*", "*&#47;*").
