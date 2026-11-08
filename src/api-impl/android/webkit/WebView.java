@@ -455,6 +455,14 @@ public class WebView extends ViewGroup {
 		return info;
 	}
 
+	/* AOSP WebView.getWebViewClassLoader() (@hide): the ClassLoader of the WebView implementation package. ATL's
+	 * implementation is WebView itself, so it is the loader of this class; the implementation's own classes
+	 * (e.g. the chromium support-lib boundary) are not in it, a lookup of them fails with ClassNotFoundException
+	 * just as with a provider that does not have them. */
+	public static ClassLoader getWebViewClassLoader() {
+		return WebView.class.getClassLoader();
+	}
+
 	public void clearFormData() {}
 
 	public void clearHistory() {}
