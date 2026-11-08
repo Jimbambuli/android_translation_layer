@@ -18,6 +18,73 @@ public class BaseBundle {
 		mMap = new ArrayMap<String, Object>();
 	}
 
+	BaseBundle(int capacity) {
+		mMap = new ArrayMap<String, Object>(capacity);
+	}
+
+	/** Copy constructor, as in AOSP: the map is copied, values by reference. */
+	BaseBundle(BaseBundle b) {
+		this(b, false);
+	}
+
+	/** As in AOSP: with deep, nested bundles and lists are copied too. */
+	BaseBundle(BaseBundle from, boolean deep) {
+		ArrayMap<String, Object> fromMap = from.mMap;
+		if (!deep) {
+			mMap = new ArrayMap<String, Object>(fromMap);
+		} else {
+			final int n = fromMap.size();
+			mMap = new ArrayMap<String, Object>(n);
+			for (int i = 0; i < n; i++) {
+				mMap.append(fromMap.keyAt(i), deepCopyValue(fromMap.valueAt(i)));
+			}
+		}
+	}
+
+	private static Object deepCopyValue(Object value) {
+		if (value == null) {
+			return null;
+		}
+		if (value instanceof Bundle) {
+			return new Bundle((Bundle)value);
+		}
+		if (value instanceof PersistableBundle) {
+			return ((PersistableBundle)value).deepCopy();
+		}
+		if (value instanceof java.util.ArrayList) {
+			java.util.ArrayList<?> from = (java.util.ArrayList<?>)value;
+			java.util.ArrayList<Object> out = new java.util.ArrayList<>(from.size());
+			for (int i = 0; i < from.size(); i++) {
+				out.add(deepCopyValue(from.get(i)));
+			}
+			return out;
+		}
+		return value;
+	}
+
+	/** As in AOSP: the entries of a Bundle, with nested Bundles left as they are. */
+	ArrayMap<String, Object> getItemwiseMap() {
+		return mMap;
+	}
+
+	/**
+	 * Removes all elements from the mapping of this Bundle.
+	 */
+	public void clear() {
+		mMap.clear();
+	}
+
+	/**
+	 * Inserts all mappings from the given PersistableBundle into this BaseBundle.
+	 */
+	public void putAll(PersistableBundle bundle) {
+		mMap.putAll(bundle.mMap);
+	}
+
+	void putAll(ArrayMap<String, Object> map) {
+		mMap.putAll(map);
+	}
+
 	// Log a message if the value was non-null but not of the expected type
 	void typeWarning(String key, Object value, String className,
 	                 Object defaultValue, ClassCastException e) {

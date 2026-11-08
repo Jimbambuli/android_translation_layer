@@ -402,6 +402,33 @@ public class Parcel {
 		}
 	}
 
+	/** Flatten a PersistableBundle into the parcel at the current dataPosition(); null is written as -1. */
+	public final void writePersistableBundle(PersistableBundle val) {
+		writeMap(val == null ? null : val.mMap);
+	}
+
+	/** Read and return a new PersistableBundle object from the parcel at the current dataPosition(), or null. */
+	public final PersistableBundle readPersistableBundle() {
+		return readPersistableBundle(null);
+	}
+
+	/** Same as {@link #readPersistableBundle()} but explicitly specifying the ClassLoader. */
+	public final PersistableBundle readPersistableBundle(ClassLoader loader) {
+		int size = readInt();
+		if (size == -1)
+			return null;
+		PersistableBundle bundle = new PersistableBundle(size);
+		try {
+			for (int i = 0; i < size; i++) {
+				String key = readString();
+				bundle.mMap.put(key, readValue(loader));
+			}
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
+		}
+		return bundle;
+	}
+
 	public void writeInterfaceToken(String value) {
 		writeString(value);
 	}
@@ -920,6 +947,9 @@ public class Parcel {
 		} else if (value instanceof Bundle) {
 			writeInt(14);
 			writeBundle((Bundle)value);
+		} else if (value instanceof PersistableBundle) {
+			writeInt(25);
+			writePersistableBundle((PersistableBundle)value);
 		} else if (value instanceof Parcelable) {
 			writeInt(15);
 			writeParcelable((Parcelable)value, 0);
@@ -997,6 +1027,8 @@ public class Parcel {
 				return new Binder();
 			case 22:
 				return readSerializable();
+			case 25:
+				return readPersistableBundle(loader);
 			default:
 				throw new RuntimeException("Unsupported value type: " + type);
 		}
