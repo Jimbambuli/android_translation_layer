@@ -20,6 +20,7 @@ package android.text;
 
 import android.icu.text.CaseMap;
 import android.icu.text.Edits;
+import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.icu.util.ULocale;
@@ -29,7 +30,9 @@ import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.CharacterStyle;
 import android.text.style.LeadingMarginSpan;
+import android.text.style.ParagraphStyle;
 import android.text.style.QuoteSpan;
+import android.text.style.ReplacementSpan;
 import android.text.style.SuggestionSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
@@ -40,15 +43,22 @@ import android.text.style.SubscriptSpan;
 import android.text.style.SuperscriptSpan;
 import android.text.style.TypefaceSpan;
 import android.text.style.URLSpan;
+import android.text.style.UpdateAppearance;
 import android.text.style.UnderlineSpan;
 import android.util.Log;
 import android.view.View;
 import com.android.internal.util.ArrayUtils;
+import com.android.internal.util.Preconditions;
+import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
 public class TextUtils {
+
+	public static final int LINE_FEED_CODE_POINT = 10;
+	private static final int NBSP_CODE_POINT = 160;
+	private static final int PARCEL_SAFE_TEXT_LENGTH = 100000;
 	/* like AOSP: RTL for the locales whose script is written right to left */
 	public static int getLayoutDirectionFromLocale(Locale locale) {
 		return (locale != null && !locale.equals(Locale.ROOT) && ULocale.forLocale(locale).isRightToLeft())
@@ -779,5 +789,385 @@ public class TextUtils {
 
     private static void readSpan(Parcel p, Spannable sp, Object o) {
         sp.setSpan(o, p.readInt(), p.readInt(), p.readInt());
+    }
+
+    public static String nullIfEmpty(@Nullable String str) {
+        return isEmpty(str) ? null : str;
+    }
+
+    public static String emptyIfNull(@Nullable String str) {
+        return str == null ? "" : str;
+    }
+
+    public static String firstNotEmpty(@Nullable String a, @NonNull String b) {
+        return !isEmpty(a) ? a : Preconditions.checkStringNotEmpty(b);
+    }
+
+    public static int length(@Nullable String s) {
+        return s != null ? s.length() : 0;
+    }
+
+    public static String safeIntern(String s) {
+        return (s != null) ? s.intern() : null;
+    }
+
+    public static CharSequence replace(CharSequence template,
+                                       String[] sources,
+                                       CharSequence[] destinations) {
+        SpannableStringBuilder tb = new SpannableStringBuilder(template);
+
+        for (int i = 0; i < sources.length; i++) {
+            int where = indexOf(tb, sources[i]);
+
+            if (where >= 0)
+                tb.setSpan(sources[i], where, where + sources[i].length(),
+                           Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+
+        for (int i = 0; i < sources.length; i++) {
+            int start = tb.getSpanStart(sources[i]);
+            int end = tb.getSpanEnd(sources[i]);
+
+            if (start >= 0) {
+                tb.replace(start, end, destinations[i]);
+            }
+        }
+
+        return tb;
+    }
+
+    public static CharSequence expandTemplate(CharSequence template,
+                                              CharSequence... values) {
+        if (values.length > 9) {
+            throw new IllegalArgumentException("max of 9 values are supported");
+        }
+
+        SpannableStringBuilder ssb = new SpannableStringBuilder(template);
+
+        try {
+            int i = 0;
+            while (i < ssb.length()) {
+                if (ssb.charAt(i) == '^') {
+                    char next = ssb.charAt(i+1);
+                    if (next == '^') {
+                        ssb.delete(i+1, i+2);
+                        ++i;
+                        continue;
+                    } else if (Character.isDigit(next)) {
+                        int which = Character.getNumericValue(next) - 1;
+                        if (which < 0) {
+                            throw new IllegalArgumentException(
+                                "template requests value ^" + (which+1));
+                        }
+                        if (which >= values.length) {
+                            throw new IllegalArgumentException(
+                                "template requests value ^" + (which+1) +
+                                "; only " + values.length + " provided");
+                        }
+                        ssb.replace(i, i+2, values[which]);
+                        i += values[which].length();
+                        continue;
+                    }
+                }
+                ++i;
+            }
+        } catch (IndexOutOfBoundsException ignore) {
+            // happens when ^ is the last character in the string.
+        }
+        return ssb;
+    }
+
+    public static int getOffsetBefore(CharSequence text, int offset) {
+        if (offset == 0)
+            return 0;
+        if (offset == 1)
+            return 0;
+
+        char c = text.charAt(offset - 1);
+
+        if (c >= '\uDC00' && c <= '\uDFFF') {
+            char c1 = text.charAt(offset - 2);
+
+            if (c1 >= '\uD800' && c1 <= '\uDBFF')
+                offset -= 2;
+            else
+                offset -= 1;
+        } else {
+            offset -= 1;
+        }
+
+        if (text instanceof Spanned) {
+            ReplacementSpan[] spans = ((Spanned) text).getSpans(offset, offset,
+                                                       ReplacementSpan.class);
+
+            for (int i = 0; i < spans.length; i++) {
+                int start = ((Spanned) text).getSpanStart(spans[i]);
+                int end = ((Spanned) text).getSpanEnd(spans[i]);
+
+                if (start < offset && end > offset)
+                    offset = start;
+            }
+        }
+
+        return offset;
+    }
+
+    public static int getOffsetAfter(CharSequence text, int offset) {
+        int len = text.length();
+
+        if (offset == len)
+            return len;
+        if (offset == len - 1)
+            return len;
+
+        char c = text.charAt(offset);
+
+        if (c >= '\uD800' && c <= '\uDBFF') {
+            char c1 = text.charAt(offset + 1);
+
+            if (c1 >= '\uDC00' && c1 <= '\uDFFF')
+                offset += 2;
+            else
+                offset += 1;
+        } else {
+            offset += 1;
+        }
+
+        if (text instanceof Spanned) {
+            ReplacementSpan[] spans = ((Spanned) text).getSpans(offset, offset,
+                                                       ReplacementSpan.class);
+
+            for (int i = 0; i < spans.length; i++) {
+                int start = ((Spanned) text).getSpanStart(spans[i]);
+                int end = ((Spanned) text).getSpanEnd(spans[i]);
+
+                if (start < offset && end > offset)
+                    offset = end;
+            }
+        }
+
+        return offset;
+    }
+
+    public static void copySpansFrom(Spanned source, int start, int end,
+                                     Class kind,
+                                     Spannable dest, int destoff) {
+        if (kind == null) {
+            kind = Object.class;
+        }
+
+        Object[] spans = source.getSpans(start, end, kind);
+
+        for (int i = 0; i < spans.length; i++) {
+            int st = source.getSpanStart(spans[i]);
+            int en = source.getSpanEnd(spans[i]);
+            int fl = source.getSpanFlags(spans[i]);
+
+            if (st < start)
+                st = start;
+            if (en > end)
+                en = end;
+
+            dest.setSpan(spans[i], st - start + destoff, en - start + destoff,
+                         fl);
+        }
+    }
+
+    public static boolean isGraphic(CharSequence str) {
+        final int len = str.length();
+        for (int cp, i=0; i<len; i+=Character.charCount(cp)) {
+            cp = Character.codePointAt(str, i);
+            int gc = Character.getType(cp);
+            if (gc != Character.CONTROL
+                    && gc != Character.FORMAT
+                    && gc != Character.SURROGATE
+                    && gc != Character.UNASSIGNED
+                    && gc != Character.LINE_SEPARATOR
+                    && gc != Character.PARAGRAPH_SEPARATOR
+                    && gc != Character.SPACE_SEPARATOR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Deprecated
+    public static boolean isGraphic(char c) {
+        int gc = Character.getType(c);
+        return     gc != Character.CONTROL
+                && gc != Character.FORMAT
+                && gc != Character.SURROGATE
+                && gc != Character.UNASSIGNED
+                && gc != Character.LINE_SEPARATOR
+                && gc != Character.PARAGRAPH_SEPARATOR
+                && gc != Character.SPACE_SEPARATOR;
+    }
+
+    public static boolean isPrintableAscii(final char c) {
+        final int asciiFirst = 0x20;
+        final int asciiLast = 0x7E;  // included
+        return (asciiFirst <= c && c <= asciiLast) || c == '\r' || c == '\n';
+    }
+
+    public static boolean isPrintableAsciiOnly(final CharSequence str) {
+        final int len = str.length();
+        for (int i = 0; i < len; i++) {
+            if (!isPrintableAscii(str.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public static boolean delimitedStringContains(
+            String delimitedString, char delimiter, String item) {
+        if (isEmpty(delimitedString) || isEmpty(item)) {
+            return false;
+        }
+        int pos = -1;
+        int length = delimitedString.length();
+        while ((pos = delimitedString.indexOf(item, pos + 1)) != -1) {
+            if (pos > 0 && delimitedString.charAt(pos - 1) != delimiter) {
+                continue;
+            }
+            int expectedDelimiterPos = pos + item.length();
+            if (expectedDelimiterPos == length) {
+                // Match at end of string.
+                return true;
+            }
+            if (delimitedString.charAt(expectedDelimiterPos) == delimiter) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T[] removeEmptySpans(T[] spans, Spanned spanned, Class<T> klass) {
+        T[] copy = null;
+        int count = 0;
+
+        for (int i = 0; i < spans.length; i++) {
+            final T span = spans[i];
+            final int start = spanned.getSpanStart(span);
+            final int end = spanned.getSpanEnd(span);
+
+            if (start == end) {
+                if (copy == null) {
+                    copy = (T[]) Array.newInstance(klass, spans.length - 1);
+                    System.arraycopy(spans, 0, copy, 0, i);
+                    count = i;
+                }
+            } else {
+                if (copy != null) {
+                    copy[count] = span;
+                    count++;
+                }
+            }
+        }
+
+        if (copy != null) {
+            T[] result = (T[]) Array.newInstance(klass, count);
+            System.arraycopy(copy, 0, result, 0, count);
+            return result;
+        } else {
+            return spans;
+        }
+    }
+
+    public static long packRangeInLong(int start, int end) {
+        return (((long) start) << 32) | end;
+    }
+
+    public static int unpackRangeStartFromLong(long range) {
+        return (int) (range >>> 32);
+    }
+
+    public static int unpackRangeEndFromLong(long range) {
+        return (int) (range & 0x00000000FFFFFFFFL);
+    }
+
+    public static boolean hasStyleSpan(@NonNull Spanned spanned) {
+        Preconditions.checkArgument(spanned != null);
+        final Class<?>[] styleClasses = {
+                CharacterStyle.class, ParagraphStyle.class, UpdateAppearance.class};
+        for (Class<?> clazz : styleClasses) {
+            if (spanned.nextSpanTransition(-1, spanned.length(), clazz) < spanned.length()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    public static CharSequence trimNoCopySpans(@Nullable CharSequence charSequence) {
+        if (charSequence != null && charSequence instanceof Spanned) {
+            // SpannableStringBuilder copy constructor trims NoCopySpans.
+            return new SpannableStringBuilder(charSequence);
+        }
+        return charSequence;
+    }
+
+    public static void wrap(StringBuilder builder, String start, String end) {
+        builder.insert(0, start);
+        builder.append(end);
+    }
+
+    @Nullable
+    public static <T extends CharSequence> T trimToParcelableSize(@Nullable T text) {
+        return trimToSize(text, PARCEL_SAFE_TEXT_LENGTH);
+    }
+
+    @Nullable
+    public static <T extends CharSequence> T trimToSize(@Nullable T text,
+            @IntRange(from = 1) int size) {
+        Preconditions.checkArgument(size > 0);
+        if (TextUtils.isEmpty(text) || text.length() <= size) return text;
+        if (Character.isHighSurrogate(text.charAt(size - 1))
+                && Character.isLowSurrogate(text.charAt(size))) {
+            size = size - 1;
+        }
+        return (T) text.subSequence(0, size);
+    }
+
+    @Nullable
+    public static <T extends CharSequence> T trimToLengthWithEllipsis(@Nullable T text,
+            @IntRange(from = 1) int size) {
+        T trimmed = trimToSize(text, size);
+        if (text != null && trimmed.length() < text.length()) {
+            trimmed = (T) (trimmed.toString() + "...");
+        }
+        return trimmed;
+    }
+
+    public static boolean isNewline(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.PARAGRAPH_SEPARATOR || type == Character.LINE_SEPARATOR
+                || codePoint == LINE_FEED_CODE_POINT;
+    }
+
+    public static boolean isWhitespace(int codePoint) {
+        return Character.isWhitespace(codePoint) || codePoint == NBSP_CODE_POINT;
+    }
+
+    public static boolean isWhitespaceExceptNewline(int codePoint) {
+        return isWhitespace(codePoint) && !isNewline(codePoint);
+    }
+
+    public static boolean isPunctuation(int codePoint) {
+        int type = Character.getType(codePoint);
+        return type == Character.CONNECTOR_PUNCTUATION
+                || type == Character.DASH_PUNCTUATION
+                || type == Character.END_PUNCTUATION
+                || type == Character.FINAL_QUOTE_PUNCTUATION
+                || type == Character.INITIAL_QUOTE_PUNCTUATION
+                || type == Character.OTHER_PUNCTUATION
+                || type == Character.START_PUNCTUATION;
+    }
+
+    @Nullable
+    public static String withoutPrefix(@Nullable String prefix, @Nullable String str) {
+        if (prefix == null || str == null) return str;
+        return str.startsWith(prefix) ? str.substring(prefix.length()) : str;
     }
 }
