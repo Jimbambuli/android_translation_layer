@@ -635,6 +635,7 @@ public class PackageInstaller {
 		public int requireUserAction = USER_ACTION_UNSPECIFIED;
 		public boolean requestUpdateOwnership;
 		public boolean applicationEnabledSettingPersistent;
+		public int installFlags;
 
 		public SessionParams(int mode) {
 			this.mode = mode;
@@ -656,6 +657,7 @@ public class PackageInstaller {
 			p.requireUserAction = requireUserAction;
 			p.requestUpdateOwnership = requestUpdateOwnership;
 			p.applicationEnabledSettingPersistent = applicationEnabledSettingPersistent;
+			p.installFlags = installFlags;
 			return p;
 		}
 
@@ -708,6 +710,20 @@ public class PackageInstaller {
 		public int installReason;
 		public int packageSource;
 		public int requireUserAction;
+		public boolean isStaged;
+		public int parentSessionId = INVALID_ID;
+		public int[] childSessionIds = new int[0];
+		public boolean isSessionApplied;
+		public boolean isSessionReady;
+		public boolean isSessionFailed;
+		private int mSessionErrorCode;
+		private String mSessionErrorMessage = "";
+
+		@Deprecated public static final int STAGED_SESSION_NO_ERROR = 0;
+		@Deprecated public static final int STAGED_SESSION_VERIFICATION_FAILED = 1;
+		@Deprecated public static final int STAGED_SESSION_ACTIVATION_FAILED = 2;
+		@Deprecated public static final int STAGED_SESSION_UNKNOWN = 3;
+		@Deprecated public static final int STAGED_SESSION_CONFLICT = 4;
 
 		public int getSessionId() { return sessionId; }
 		public String getInstallerPackageName() { return installerPackageName; }
@@ -725,11 +741,29 @@ public class PackageInstaller {
 		public Uri getReferrerUri() { return referrerUri; }
 		public int getInstallReason() { return installReason; }
 		public boolean isMultiPackage() { return false; }
-		public boolean isStaged() { return false; }
+		public boolean isStaged() { return isStaged; }
 		public boolean isCommitted() { return sealed; }
-		public boolean hasParentSessionId() { return false; }
-		public int getParentSessionId() { return INVALID_ID; }
-		public int[] getChildSessionIds() { return new int[0]; }
+		public boolean hasParentSessionId() { return parentSessionId != INVALID_ID; }
+		public int getParentSessionId() { return parentSessionId; }
+		public int[] getChildSessionIds() { return childSessionIds; }
+
+		public boolean isStagedSessionActive() {
+			return isStaged && isCommitted() && !isSessionApplied && !isSessionFailed && !hasParentSessionId();
+		}
+		private void checkSessionIsStaged() {
+			if (!isStaged) {
+				throw new IllegalStateException("Session is not marked as staged.");
+			}
+		}
+		public boolean isStagedSessionApplied() { checkSessionIsStaged(); return isSessionApplied; }
+		public boolean isStagedSessionReady() { checkSessionIsStaged(); return isSessionReady; }
+		public boolean isStagedSessionFailed() { checkSessionIsStaged(); return isSessionFailed; }
+		public int getStagedSessionErrorCode() { checkSessionIsStaged(); return mSessionErrorCode; }
+		public String getStagedSessionErrorMessage() { checkSessionIsStaged(); return mSessionErrorMessage; }
+		public void setSessionErrorCode(int errorCode, String errorMessage) {
+			mSessionErrorCode = errorCode;
+			mSessionErrorMessage = errorMessage;
+		}
 		public int getRequireUserAction() { return requireUserAction; }
 		public int getUserActionRequired() { return requireUserAction; }
 		public android.os.UserHandle getUser() { return Process.myUserHandle(); }
