@@ -7,6 +7,12 @@ package android.os;
 
 import android.content.ComponentName;
 import android.content.res.ColorStateList;
+import android.graphics.Point;
+import android.graphics.PointF;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import java.util.ArrayList;
+import java.util.Arrays;
 import junit.framework.TestCase;
 
 public class ParcelCreatorsTest extends TestCase {
@@ -64,5 +70,38 @@ public class ParcelCreatorsTest extends TestCase {
 			fail();
 		} catch (BadParcelableException e) {
 		}
+	}
+
+	public void testGeometry() {
+		Parcel p = Parcel.obtain();
+		new Point(1, -2).writeToParcel(p, 0);
+		new PointF(1.5f, -2.5f).writeToParcel(p, 0);
+		new Rect(1, 2, 3, 4).writeToParcel(p, 0);
+		new RectF(1.5f, 2.5f, 3.5f, 4.5f).writeToParcel(p, 0);
+		p.writeTypedObject(new Rect(5, 6, 7, 8), 0);
+		p.setDataPosition(0);
+		assertEquals(new Point(1, -2), Point.CREATOR.createFromParcel(p));
+		assertEquals(new PointF(1.5f, -2.5f), PointF.CREATOR.createFromParcel(p));
+		assertEquals(new Rect(1, 2, 3, 4), Rect.CREATOR.createFromParcel(p));
+		assertEquals(new RectF(1.5f, 2.5f, 3.5f, 4.5f), RectF.CREATOR.createFromParcel(p));
+		assertEquals(new Rect(5, 6, 7, 8), p.readTypedObject(Rect.CREATOR));
+		assertEquals(0, p.dataAvail());
+	}
+
+	public void testParcelableList() {
+		Parcel p = Parcel.obtain();
+		p.writeParcelableList(Arrays.asList(new Rect(1, 1, 2, 2), null), 0);
+		p.writeParcelableList(null, 0);
+		p.writeString8Array(new String[] {"a", "b"});
+		p.setDataPosition(0);
+		ArrayList<Rect> list = new ArrayList<>(Arrays.asList(new Rect(), new Rect(), new Rect()));
+		ClassLoader cl = ClassLoader.getSystemClassLoader();
+		assertSame(list, p.readParcelableList(list, cl, Rect.class));
+		assertEquals(2, list.size());
+		assertEquals(new Rect(1, 1, 2, 2), list.get(0));
+		assertNull(list.get(1));
+		p.readParcelableList(list, cl, Rect.class);
+		assertEquals(0, list.size());
+		assertTrue(Arrays.equals(new String[] {"a", "b"}, p.createString8Array()));
 	}
 }

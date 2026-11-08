@@ -467,6 +467,15 @@ public class Parcel {
 		return readString();
 	}
 
+	/** android-14 Parcel.writeString8Array(): the same wire format as writeStringArray(). */
+	public void writeString8Array(String[] val) {
+		writeStringArray(val);
+	}
+
+	public String[] createString8Array() {
+		return createStringArray();
+	}
+
 	/** android-14 Parcel.writeCharSequence(): the same format as TextUtils.writeToParcel(). */
 	public void writeCharSequence(CharSequence val) {
 		TextUtils.writeToParcel(val, this, 0);
@@ -699,6 +708,45 @@ public class Parcel {
 				array[i] = creator.createFromParcel(this);
 		}
 		return array;
+	}
+
+	/**
+	 * Flatten a List containing arbitrary Parcelable objects into the parcel at the current dataPosition()
+	 * (a null list as -1); read back with {@link #readParcelableList(List, ClassLoader, Class)}.
+	 */
+	public <T extends Parcelable> void writeParcelableList(List<T> val, int flags) {
+		if (val == null) {
+			writeInt(-1);
+			return;
+		}
+		int n = val.size();
+		writeInt(n);
+		for (int i = 0; i < n; i++)
+			writeParcelable(val.get(i), flags);
+	}
+
+	/**
+	 * Read into the given List items Parcelable objects that were written with writeParcelableList().
+	 * Existing items of the list are reused as far as it reaches, the rest is added or removed, as in AOSP.
+	 * @return the list that was passed in (cleared if a null list was written)
+	 */
+	public <T> List<T> readParcelableList(List<T> list, ClassLoader cl, Class<? extends T> clazz) {
+		int n = readInt();
+		if (n == -1) {
+			list.clear();
+			return list;
+		}
+		int i = 0;
+		for (; i < n; i++) {
+			T item = (T)readParcelable(cl, clazz);
+			if (i < list.size())
+				list.set(i, item);
+			else
+				list.add(item);
+		}
+		for (; i < list.size(); i++)
+			list.remove(list.size() - 1);
+		return list;
 	}
 
 	public <T extends Parcelable> void writeTypedList(List<T> list) {
