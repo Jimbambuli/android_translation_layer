@@ -26,7 +26,7 @@ import java.util.Iterator;
  * through WindowManager are then written to <dir>/<name>.xml in the form of `uiautomator dump`
  * (node class/resource-id/text/content-desc/bounds), plus ATL-only attributes: real class,
  * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. <dir>/request is
- * deleted when done. */
+ * deleted when done. The window of the app is also saved as <dir>/shots/<name>.png. */
 public class ATLViewDump {
 	private static final String DIR = System.getenv("ATL_VIEWDUMP");
 	private static Handler handler;
@@ -73,6 +73,7 @@ public class ATLViewDump {
 					dump(w);
 				}
 				tmp.renameTo(new File(DIR, name + ".xml"));
+				shot(name);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -80,6 +81,25 @@ public class ATLViewDump {
 		}
 		handler.postDelayed(POLL, 250);
 	}
+
+	/* the window of the app (not the screen) as <dir>/shots/<name>.png, the same name as the tree */
+	private static void shot(String name) {
+		Activity a = activity.get();
+		long window = a != null && a.getWindow() != null ? a.getWindow().native_window : 0;
+		if (window == 0) {
+			System.err.println("ATLViewDump: no window, no screenshot");
+			return;
+		}
+		File dir = new File(DIR, "shots");
+		dir.mkdirs();
+		File tmp = new File(dir, name + ".png.tmp");
+		if (native_screenshot(window, tmp.getPath()))
+			tmp.renameTo(new File(dir, name + ".png"));
+		else
+			System.err.println("ATLViewDump: screenshot failed");
+	}
+
+	private static native boolean native_screenshot(long window, String path);
 
 	private static void dump(Writer w) throws java.io.IOException {
 		w.write("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\" atl=\"1\">\n");
