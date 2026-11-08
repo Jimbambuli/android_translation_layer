@@ -715,8 +715,9 @@ public class Window {
 		set_title(native_window, title != null ? title.toString() : context.getPackageName());
 	}
 
+	/* AOSP's Transition is abstract; an empty TransitionSet is the transition that does nothing (no shared elements) */
 	public Transition getSharedElementEnterTransition() {
-		return new Transition();
+		return new android.transition.TransitionSet();
 	}
 
 	public void setSharedElementExitTransition(Transition transition) {}
@@ -725,12 +726,14 @@ public class Window {
 
 	public void setSharedElementReturnTransition(Transition transition) {}
 
+	/* AOSP's Transition is abstract; an empty TransitionSet is the transition that does nothing (no shared elements) */
 	public Transition getSharedElementExitTransition() {
-		return new Transition();
+		return new android.transition.TransitionSet();
 	}
 
+	/* AOSP's Transition is abstract; an empty TransitionSet is the transition that does nothing (no shared elements) */
 	public Transition getSharedElementReenterTransition() {
-		return new Transition();
+		return new android.transition.TransitionSet();
 	}
 
 	public void setReturnTransition(Transition transition) {}
