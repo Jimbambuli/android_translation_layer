@@ -1128,11 +1128,7 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	public static final Parcelable.Creator<Bundle> CREATOR = new Parcelable.Creator<Bundle>() {
 		public Bundle createFromParcel(Parcel in) {
 			Bundle b = new Bundle();
-			try {
-				in.readMap(b.mMap, b.getClassLoader());
-			} catch (ReflectiveOperationException e) {
-				throw new RuntimeException(e);
-			}
+			in.readMap(b.mMap, b.getClassLoader());
 			return b;
 		}
 

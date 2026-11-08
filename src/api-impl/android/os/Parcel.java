@@ -641,13 +641,18 @@ public class Parcel {
 		}
 	}
 
-	public void readMap(Map<String, Object> map, ClassLoader loader) throws ReflectiveOperationException {
+	/* AOSP Parcel.readMap(): no checked exception, a class that cannot be loaded is a BadParcelableException */
+	public final void readMap(Map outVal, ClassLoader loader) {
 		int size = readInt();
-		map.clear();
-		for (int i = 0; i < size; i++) {
-			String key = readString();
-			Object value = readValue(loader);
-			map.put(key, value);
+		outVal.clear();
+		try {
+			for (int i = 0; i < size; i++) {
+				String key = readString();
+				Object value = readValue(loader);
+				outVal.put(key, value);
+			}
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
 		}
 	}
 
@@ -673,15 +678,20 @@ public class Parcel {
 		}
 	}
 
-	public SparseArray<Object> readSparseArray(ClassLoader loader) throws ReflectiveOperationException {
+	/* AOSP Parcel.readSparseArray(): no checked exception, a class that cannot be loaded is a BadParcelableException */
+	public <T> SparseArray<T> readSparseArray(ClassLoader loader) {
 		int size = readInt();
 		if (size == -1)
 			return null;
-		SparseArray<Object> array = new SparseArray<>(size);
-		for (int i = 0; i < size; i++) {
-			int key = readInt();
-			Object value = readValue(loader);
-			array.put(key, value);
+		SparseArray<T> array = new SparseArray<>(size);
+		try {
+			for (int i = 0; i < size; i++) {
+				int key = readInt();
+				T value = (T)readValue(loader);
+				array.put(key, value);
+			}
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
 		}
 		return array;
 	}
