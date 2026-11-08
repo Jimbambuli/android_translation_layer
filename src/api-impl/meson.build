@@ -984,6 +984,7 @@ srcs = [
 	'android/view/inputmethod/CursorAnchorInfo.java',
 	'android/view/inputmethod/DeleteGesture.java',
 	'android/view/inputmethod/DeleteRangeGesture.java',
+	'android/view/inputmethod/EditorBoundsInfo.java',
 	'android/view/inputmethod/EditorInfo.java',
 	'android/view/inputmethod/ExtractedText.java',
 	'android/view/inputmethod/ExtractedTextRequest.java',
