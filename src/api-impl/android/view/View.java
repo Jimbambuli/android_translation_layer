@@ -30,6 +30,8 @@ import android.graphics.drawable.Drawable;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityNodeProvider;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -2531,6 +2533,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public static class AccessibilityDelegate {
 		public void sendAccessibilityEvent(View view, int eventType) {}
+
+		/** As AOSP: the delegate provides no AccessibilityNodeProvider of its own. */
+		public AccessibilityNodeProvider getAccessibilityNodeProvider(View host) {
+			return null;
+		}
+
+		/** As AOSP: the default fills the node with the host's state, which ATL has no accessibility service to ask for. */
+		public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {}
+
+		/** As AOSP: the default asks the host. */
+		public boolean performAccessibilityAction(View host, int action, Bundle args) {
+			return host.performAccessibilityAction(action, args);
+		}
 	}
 
 	public Drawable getBackground() {
