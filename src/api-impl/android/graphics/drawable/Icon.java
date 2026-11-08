@@ -2,7 +2,9 @@ package android.graphics.drawable;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
+import android.graphics.PorterDuff;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.Log;
@@ -22,6 +24,8 @@ public class Icon implements Parcelable {
 	private Object mObj1; // Bitmap or Resources
 	private String mString1; // resource package
 	private int mInt1; // resource id
+	private ColorStateList mTintList;
+	private PorterDuff.Mode mTintMode = PorterDuff.Mode.SRC_IN; // as AOSP's DEFAULT_TINT_BLEND_MODE
 
 	private Icon(int type) {
 		mType = type;
@@ -92,7 +96,35 @@ public class Icon implements Parcelable {
 		return rep;
 	}
 
+	/** Store a color to use as a tint for this icon; it is applied by loadDrawable(), not parceled. */
+	public Icon setTint(int tint) {
+		return setTintList(ColorStateList.valueOf(tint));
+	}
+
+	/** Store a color state list to use as a tint for this icon. */
+	public Icon setTintList(ColorStateList tintList) {
+		mTintList = tintList;
+		return this;
+	}
+
+	/** Store a blending mode to use for the tint of this icon (default SRC_IN). */
+	public Icon setTintMode(PorterDuff.Mode mode) {
+		mTintMode = mode;
+		return this;
+	}
+
+	/** Loads the drawable and, as AOSP's loadDrawable(), applies the tint. */
 	public Drawable loadDrawable(Context context) {
+		final Drawable result = loadDrawableInner(context);
+		if (result != null && mTintList != null) {
+			result.mutate();
+			result.setTintList(mTintList);
+			result.setTintMode(mTintMode);
+		}
+		return result;
+	}
+
+	private Drawable loadDrawableInner(Context context) {
 		switch (mType) {
 			case TYPE_BITMAP:
 				return new BitmapDrawable(context.getResources(), getBitmap());
