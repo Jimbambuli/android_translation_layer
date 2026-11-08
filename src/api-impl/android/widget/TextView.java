@@ -749,10 +749,15 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		}
 	}
 
-	/* AOSP updateTextColors(): the color for the current drawable state, which the label is given as well */
+	/* AOSP updateTextColors(): the color for the current drawable state (0 if no state matches), which the
+	 * label is given as well; the text that is drawn in Java is redrawn when it changed */
 	private void updateTextColors() {
-		mCurTextColor = colors.getColorForState(getDrawableState(), colors.getDefaultColor());
-		native_setTextColor(mCurTextColor);
+		final int color = colors.getColorForState(getDrawableState(), 0);
+		final boolean changed = color != mCurTextColor;
+		mCurTextColor = color;
+		native_setTextColor(color);
+		if (changed)
+			invalidate();
 	}
 
 	@Override
