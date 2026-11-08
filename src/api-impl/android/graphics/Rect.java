@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package android.graphics;
+import android.os.Parcel;
+import android.os.Parcelable;
 import java.io.PrintWriter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,7 +26,7 @@ import java.util.regex.Pattern;
  * the rectangle's width and height. Note: most methods do not check to see that
  * the coordinates are sorted correctly (i.e. left <= right and top <= bottom).
  */
-public final class Rect {
+public final class Rect implements Parcelable {
 	public int left;
 	public int top;
 	public int right;
@@ -538,5 +540,41 @@ public final class Rect {
 			right = (int)(right * scale + 0.5f);
 			bottom = (int)(bottom * scale + 0.5f);
 		}
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	/** Write this Rect to the specified parcel. To restore a Rect from a parcel, use readFromParcel(). */
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeInt(left);
+		out.writeInt(top);
+		out.writeInt(right);
+		out.writeInt(bottom);
+	}
+
+	public static final Parcelable.Creator<Rect> CREATOR = new Parcelable.Creator<Rect>() {
+		/** Return a new Rect from the data in the specified parcel. */
+		public Rect createFromParcel(Parcel in) {
+			Rect r = new Rect();
+			r.readFromParcel(in);
+			return r;
+		}
+
+		/** Return an array of Rects of the specified size. */
+		public Rect[] newArray(int size) {
+			return new Rect[size];
+		}
+	};
+
+	/** Set the Rect's coordinates from the data stored in the specified parcel. */
+	public void readFromParcel(Parcel in) {
+		left = in.readInt();
+		top = in.readInt();
+		right = in.readInt();
+		bottom = in.readInt();
 	}
 }

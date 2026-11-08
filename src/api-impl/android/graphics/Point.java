@@ -16,6 +16,7 @@
 
 package android.graphics;
 
+import android.os.Parcel;
 import android.os.Parcelable;
 
 /**
@@ -95,5 +96,37 @@ public class Point implements Parcelable {
 	@Override
 	public String toString() {
 		return "Point(" + x + ", " + y + ")";
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	/** Write this Point to the specified parcel. To restore a Point from a parcel, use readFromParcel(). */
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeInt(x);
+		out.writeInt(y);
+	}
+
+	public static final Parcelable.Creator<Point> CREATOR = new Parcelable.Creator<Point>() {
+		/** Return a new Point from the data in the specified parcel. */
+		public Point createFromParcel(Parcel in) {
+			Point r = new Point();
+			r.readFromParcel(in);
+			return r;
+		}
+
+		/** Return an array of Points of the specified size. */
+		public Point[] newArray(int size) {
+			return new Point[size];
+		}
+	};
+
+	/** Set the Point's coordinates from the data stored in the specified parcel. */
+	public void readFromParcel(Parcel in) {
+		x = in.readInt();
+		y = in.readInt();
 	}
 }

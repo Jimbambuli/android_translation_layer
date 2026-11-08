@@ -16,6 +16,7 @@
 
 package android.graphics;
 
+import android.os.Parcel;
 import android.os.Parcelable;
 
 /**
@@ -118,5 +119,37 @@ public class PointF implements Parcelable {
 	 */
 	public static float length(float x, float y) {
 		return (float)Math.hypot(x, y);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	/** Write this PointF to the specified parcel. To restore a PointF from a parcel, use readFromParcel(). */
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeFloat(x);
+		out.writeFloat(y);
+	}
+
+	public static final Parcelable.Creator<PointF> CREATOR = new Parcelable.Creator<PointF>() {
+		/** Return a new PointF from the data in the specified parcel. */
+		public PointF createFromParcel(Parcel in) {
+			PointF r = new PointF();
+			r.readFromParcel(in);
+			return r;
+		}
+
+		/** Return an array of PointFs of the specified size. */
+		public PointF[] newArray(int size) {
+			return new PointF[size];
+		}
+	};
+
+	/** Set the PointF's coordinates from the data stored in the specified parcel. */
+	public void readFromParcel(Parcel in) {
+		x = in.readFloat();
+		y = in.readFloat();
 	}
 }
