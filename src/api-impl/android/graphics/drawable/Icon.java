@@ -3,13 +3,15 @@ package android.graphics.drawable;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.Log;
 
 /* The resource and bitmap icons of AOSP's Icon (graphics/java/android/graphics/drawable/Icon.java):
  * createWithResource(), createWithBitmap() and loadDrawable() (loadDrawableInner()). An icon from a
  * resource of another package or of "android" is looked up in the app's or the system's resources,
- * the only ones ATL has; no tint, no URIs, no data, no parceling. */
-public class Icon {
+ * the only ones ATL has; no tint, no URIs, no data. Parceled as type and payload (bitmap, or package and id). */
+public class Icon implements Parcelable {
 	private static final String TAG = "Icon";
 
 	public static final int TYPE_BITMAP = 1;
@@ -112,6 +114,53 @@ public class Icon {
 		}
 		return null;
 	}
+
+	@Override
+	public int describeContents() {
+		return mType == TYPE_BITMAP || mType == TYPE_ADAPTIVE_BITMAP ? Parcelable.CONTENTS_FILE_DESCRIPTOR : 0;
+	}
+
+	/* AOSP Icon.writeToParcel() without the tint fields: the type, then the bitmap or the package and id */
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeInt(mType);
+		switch (mType) {
+			case TYPE_BITMAP:
+			case TYPE_ADAPTIVE_BITMAP:
+				getBitmap().writeToParcel(dest, flags);
+				break;
+			case TYPE_RESOURCE:
+				dest.writeString(mString1);
+				dest.writeInt(mInt1);
+				break;
+		}
+	}
+
+	private Icon(Parcel in) {
+		this(in.readInt());
+		switch (mType) {
+			case TYPE_BITMAP:
+			case TYPE_ADAPTIVE_BITMAP:
+				mObj1 = Bitmap.CREATOR.createFromParcel(in);
+				break;
+			case TYPE_RESOURCE:
+				mString1 = in.readString();
+				mInt1 = in.readInt();
+				break;
+			default:
+				throw new RuntimeException("invalid icon type " + mType + " in parcel");
+		}
+	}
+
+	public static final Parcelable.Creator<Icon> CREATOR = new Parcelable.Creator<Icon>() {
+		public Icon createFromParcel(Parcel in) {
+			return new Icon(in);
+		}
+
+		public Icon[] newArray(int size) {
+			return new Icon[size];
+		}
+	};
 
 	@Override
 	public String toString() {
