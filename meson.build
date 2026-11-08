@@ -68,7 +68,7 @@ hax_hits_jar = custom_target('hax-stub-hits.jar', input: [hax_jar], output: ['ha
 custom_target('api-impl.jar', build_by_default: true, input: [hax_hits_jar[0]], output: ['api-impl.jar'],
               install: true,
               install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
-              command: ['dx', '--dex', '--incremental', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
+              command: ['dx', '--dex', '--incremental', '--min-sdk-version=26', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
 
 # gstub.jar
 subdir('src/gstub')
