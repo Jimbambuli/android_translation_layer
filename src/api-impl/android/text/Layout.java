@@ -221,6 +221,17 @@ public class Layout {
 		return native_get_secondary_horizontal(layout, offset);
 	}
 
+	/* AOSP Layout.getLineBounds(): the bounds of the line (the whole width of the layout) and its baseline */
+	public int getLineBounds(int line, android.graphics.Rect bounds) {
+		if (bounds != null) {
+			bounds.left = 0;
+			bounds.top = getLineTop(line);
+			bounds.right = getWidth();
+			bounds.bottom = getLineTop(line + 1);
+		}
+		return getLineBaseline(line);
+	}
+
 	public int getLineForVertical(int y) {
 		return native_get_line_for_vertical(layout, y);
 	}

@@ -8,6 +8,7 @@
 #include "../generated_headers/android_widget_EditText.h"
 
 static void changed_cb(GtkEditable *self, gpointer user_data);
+static void selection_changed_cb(GObject *self, GParamSpec *pspec, gpointer user_data);
 
 JNIEXPORT jlong JNICALL Java_android_widget_EditText_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
@@ -17,6 +18,9 @@ JNIEXPORT jlong JNICALL Java_android_widget_EditText_native_1constructor(JNIEnv 
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	/* InputTrace: the text the user types, whether or not the app has a TextWatcher */
 	g_signal_connect(GTK_EDITABLE(gtk_text), "changed", G_CALLBACK(changed_cb), NULL);
+	/* TextView.onSelectionChanged(): the cursor or the selection moved */
+	g_signal_connect(gtk_text, "notify::cursor-position", G_CALLBACK(selection_changed_cb), NULL);
+	g_signal_connect(gtk_text, "notify::selection-bound", G_CALLBACK(selection_changed_cb), NULL);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
 	return _INTPTR(gtk_text);
 }
@@ -49,6 +53,42 @@ static void changed_cb(GtkEditable *self, gpointer user_data)
 		(*env)->ExceptionClear(env);
 	}
 	(*env)->DeleteLocalRef(env, this);
+}
+
+static void selection_changed_cb(GObject *self, GParamSpec *pspec, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = get_edit_text(env, GTK_WIDGET(self));
+	if (!this)
+		return;
+	J__EditText__sendSelectionChanged(env, this);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, this);
+}
+
+/* the selection as {start, end} in characters (not UTF-16 units); both are the cursor if nothing is selected */
+JNIEXPORT jintArray JNICALL Java_android_widget_EditText_native_1getSelectionBounds(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkEditable *editable = GTK_EDITABLE(_PTR(widget_ptr));
+	int start, end;
+	if (!gtk_editable_get_selection_bounds(editable, &start, &end))
+		start = end = gtk_editable_get_position(editable);
+	jint bounds[2] = {start, end};
+	jintArray result = (*env)->NewIntArray(env, 2);
+	(*env)->SetIntArrayRegion(env, result, 0, 2, bounds);
+	return result;
+}
+
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setSelectionBounds(JNIEnv *env, jobject this, jlong widget_ptr, jint start, jint end)
+{
+	GtkEditable *editable = GTK_EDITABLE(_PTR(widget_ptr));
+	if (start == end)
+		gtk_editable_set_position(editable, start);
+	else
+		gtk_editable_select_region(editable, start, end);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1addTextChangedListener(JNIEnv *env, jobject this, jlong widget_ptr, jobject listener)

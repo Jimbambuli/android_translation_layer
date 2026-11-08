@@ -127,14 +127,23 @@ public class EditText extends TextView {
 	private void sendTextChanged(String text) {
 		if (!programmatic_text)
 			InputTrace.textChanged(this, text.length());
-		if (listeners == null)
-			return;
+		String previous = mPreviousText;
+		mPreviousText = text;
 		SpannableStringBuilder s = new SpannableStringBuilder(text);
-		for (TextWatcher watcher : new ArrayList<TextWatcher>(listeners)) {
-			watcher.onTextChanged(s, 0, 0, s.length());
+		/* AOSP TextView.sendBeforeTextChanged(), sendOnTextChanged(), onTextChanged(), sendAfterTextChanged(): the
+		 * GtkText has changed already, so the "before" call gets the text from before with the new length */
+		ArrayList<TextWatcher> watchers = listeners == null ? new ArrayList<TextWatcher>() : new ArrayList<TextWatcher>(listeners);
+		SpannableStringBuilder old = new SpannableStringBuilder(previous);
+		for (TextWatcher watcher : watchers)
+			watcher.beforeTextChanged(old, 0, old.length(), s.length());
+		for (TextWatcher watcher : watchers)
+			watcher.onTextChanged(s, 0, old.length(), s.length());
+		onTextChanged(s, 0, old.length(), s.length());
+		for (TextWatcher watcher : watchers)
 			watcher.afterTextChanged(s);
-		}
 	}
+
+	private String mPreviousText = "";
 
 	/* called from native code when Enter was pressed */
 	@Export
@@ -176,5 +185,80 @@ public class EditText extends TextView {
 		return native_getHint(widget);
 	}
 
-	public void selectAll() {}
+	/* ---- selection: the GtkText's. GTK counts characters, Android UTF-16 units. ---- */
+
+	private native int[] native_getSelectionBounds(long widget);
+	private native void native_setSelectionBounds(long widget, int start, int end);
+
+	private int toUtf16(String s, int codePoints) {
+		return s.offsetByCodePoints(0, Math.max(0, Math.min(codePoints, s.codePointCount(0, s.length()))));
+	}
+
+	@Override
+	public int getSelectionStart() {
+		String s = native_getText(widget);
+		return toUtf16(s, native_getSelectionBounds(widget)[0]);
+	}
+
+	@Override
+	public int getSelectionEnd() {
+		String s = native_getText(widget);
+		return toUtf16(s, native_getSelectionBounds(widget)[1]);
+	}
+
+	/* AOSP EditText.setSelection(): Selection.setSelection() on the text, which throws if the range is not in it */
+	@Override
+	public void setSelection(int start, int stop) {
+		String s = native_getText(widget);
+		int length = s.length();
+		if (start < 0 || stop < 0 || start > length || stop > length) {
+			throw new IndexOutOfBoundsException("setSpan (" + start + " ... " + stop + ") ends beyond length " + length);
+		}
+		native_setSelectionBounds(widget, s.codePointCount(0, start), s.codePointCount(0, stop));
+	}
+
+	@Override
+	public void setSelection(int index) {
+		setSelection(index, index);
+	}
+
+	public void extendSelection(int index) {
+		setSelection(getSelectionStart(), index);
+	}
+
+	public void selectAll() {
+		setSelection(0, native_getText(widget).length());
+	}
+
+	/* called from native code when the cursor or the selection moved */
+	@Export
+	private void sendSelectionChanged() {
+		onSelectionChanged(getSelectionStart(), getSelectionEnd());
+	}
+
+	@Override
+	boolean textChangesComeFromNative() {
+		return true;
+	}
+
+	/* the paste, cut and typed replacement of the range [min, max) by new text: the cursor is after it */
+	@Override
+	void replaceText_internal(int min, int max, CharSequence newText) {
+		StringBuilder sb = new StringBuilder(native_getText(widget));
+		sb.replace(min, max, newText.toString());
+		setText(sb);
+		setSelection(min + newText.length());
+	}
+
+	@Override
+	public CharSequence getAccessibilityClassName() {
+		return EditText.class.getName();
+	}
+
+	@Override
+	public void onInitializeAccessibilityNodeInfoInternal(android.view.accessibility.AccessibilityNodeInfo info) {
+		super.onInitializeAccessibilityNodeInfoInternal(info);
+		info.setClassName(EditText.class.getName());
+		info.setEditable(isEnabled());
+	}
 }

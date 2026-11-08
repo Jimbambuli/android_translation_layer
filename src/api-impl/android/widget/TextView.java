@@ -51,7 +51,16 @@ import android.util.TypedValue;
 import android.view.ActionMode;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.PointerIcon;
 import android.view.View;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.autofill.AutofillValue;
+import android.view.textclassifier.TextClassifier;
+import android.text.Selection;
+import android.util.Log;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.TreeSet;
@@ -242,9 +251,15 @@ public class TextView extends View {
 		if (text == null)
 			text = "";
 		text = applyFilters(text);
+		final CharSequence oldText = this.text;
+		final int oldLength = oldText == null ? 0 : oldText.length();
+		final boolean notify = !textChangesComeFromNative();
+		final boolean needEditableForNotification = notify && mWatchers != null && mWatchers.size() != 0;
+		if (notify)
+			sendBeforeTextChanged(oldText, 0, oldLength, text.length());
 		/* as AOSP's setText(): the buffer type (or a movement method, which needs spans) decides what getText()
 		 * returns; the Editor, PrecomputedText and autoLink parts of AOSP do not apply here */
-		if (type == BufferType.EDITABLE) {
+		if (type == BufferType.EDITABLE || needEditableForNotification) {
 			text = Editable.Factory.getInstance().newEditable(text);
 		} else if (type == BufferType.SPANNABLE || mMovement != null) {
 			text = Spannable.Factory.getInstance().newSpannable(text);
@@ -257,6 +272,11 @@ public class TextView extends View {
 		updateNativeText();
 		if (!isLayoutRequested())
 			requestLayout();
+		if (notify) {
+			handleTextChanged(this.text, 0, oldLength, this.text.length());
+			if (needEditableForNotification)
+				sendAfterTextChanged((Editable)this.text);
+		}
 	}
 
 	private void updateNativeText() {
@@ -548,8 +568,6 @@ public class TextView extends View {
 		}
 		return text;
 	}
-	public void setCursorVisible(boolean visible) {}
-	public void setImeOptions(int imeOptions) {}
 
 	public final ColorStateList getTextColors() { return colors; }
 	public static ColorStateList getTextColors(Context context, TypedArray attrs) { return new ColorStateList(new int[][] {new int[0]}, new int[1]); }
@@ -558,9 +576,6 @@ public class TextView extends View {
 		return paint;
 	}
 
-	public void addTextChangedListener(TextWatcher watcher) {}
-	public void removeTextChangedListener(TextWatcher watcher) {}
-	public void setOnEditorActionListener(TextView.OnEditorActionListener l) {}
 
 	// the hint is not shown, but the colors are kept for getHintTextColors()
 	private ColorStateList hint_colors = null;
@@ -592,16 +607,6 @@ public class TextView extends View {
 
 	public void setSingleLine() {
 		setSingleLine(true);
-	}
-	public void setSelection(int i) {}
-	public void setSelection(int i, int j) {}
-
-	public int getSelectionStart() {
-		return 0;
-	}
-
-	public int getSelectionEnd() {
-		return 0;
 	}
 
 	/* AOSP: values of the typeface attribute */
@@ -856,23 +861,12 @@ public class TextView extends View {
 	}
 	private native void native_setLines(int lines, int ellipsize_mode);
 
-	public void setMinWidth(int minWidth) {}
-
-	public void setMinEms(int minEms) {}
-
-	public void setMaxEms(int maxEms) {}
-
-	public Locale getTextLocale() {
-		return Locale.getDefault();
-	}
-
 	// there is no input method connection to batch or configure
 	public void beginBatchEdit() {}
 
 	public void endBatchEdit() {}
 
 	public void setPrivateImeOptions(String type) {}
-	public void setMaxWidth(int maxWidth) {}
 
 	public Typeface getTypeface() { return typeface; }
 
@@ -941,6 +935,7 @@ public class TextView extends View {
 	protected native void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom);
 
 	public void setAllCaps(boolean allCaps) {
+		mAllCaps = allCaps;
 		String[] classesToRemove = {"ATL-text-uppercase"};
 		native_removeClasses(widget, classesToRemove);
 
@@ -954,15 +949,11 @@ public class TextView extends View {
 
 	public void setEditableFactory(Editable.Factory factory) {}
 
-	public KeyListener getKeyListener() { return null; }
-
 	public int getInputType() { return mInputType; }
 
 	public InputFilter[] getFilters() { return filters; }
 
 	public int getLineCount() { return 1; }
-
-	public URLSpan[] getUrls() { return new URLSpan[0]; }
 
 	/* as AOSP: the movement method, null unless set (or the default of a subclass) */
 	private MovementMethod mMovement;
@@ -991,10 +982,6 @@ public class TextView extends View {
 	}
 
 
-	public int getMinHeight() { return 0; }
-	public int getMinWidth() { return 0; }
-	public void setMinHeight(int minHeight) {}
-	public void setMaxHeight(int maxHeight) {}
 
 
 	public static interface OnEditorActionListener {
@@ -1072,7 +1059,6 @@ public class TextView extends View {
 		return new SpannableStringBuilder(getText());
 	}
 
-	public int getMaxWidth() { return 1000; }
 
 	public void nullLayouts() {}
 
@@ -1080,7 +1066,6 @@ public class TextView extends View {
 		setLinkTextColor(ColorStateList.valueOf(color));
 	}
 
-	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {}
 
 	public void setRawInputType(int type) {
 		mInputType = type;
@@ -1088,19 +1073,9 @@ public class TextView extends View {
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
 
-	public int getPaintFlags() { return 0; }
-
-	public void setPaintFlags(int flags) {}
-
 	public int getLineHeight() {
 		return 10; // FIXME
 	}
-
-	public int getMaxHeight() {
-		return -1;
-	}
-
-	public boolean isAllCaps() { return false; }
 
 	/* The configuration of uniform auto-sizing as AOSP keeps it. ATL's TextView does not resize
 	 * the text itself; what an app sets is what the getters report. */
@@ -1250,10 +1225,6 @@ public class TextView extends View {
 		System.out.println("ERROR: " + error);
 	}
 
-	public int getImeOptions() { return 0; }
-
-	public void setShadowLayer(float radius, float dx, float dy, int color) {}
-
 	public int getBreakStrategy() {
 		return break_strategy;
 	}
@@ -1264,9 +1235,6 @@ public class TextView extends View {
 
 	public void clearComposingText() {}
 
-	public void setKeyListener(KeyListener keyListener) {}
-
-
 	public void setWidth(int width) {}
 	public void setHeight(int height) {}
 
@@ -1276,17 +1244,9 @@ public class TextView extends View {
 
 	public void setMarqueeRepeatLimit(int marqueeLimit) {}
 
-	public void setShowSoftInputOnFocus(boolean showSoftInputOnFocus) {}
-
-	public void setCustomInsertionActionModeCallback(ActionMode.Callback actionModeCallback) {}
-
 	public int getJustificationMode() {
 		return 0; // JUSTIFICATION_MODE_NONE
 	}
-
-	public void setImeActionLabel(CharSequence label, int actionId) {}
-
-	public boolean hasSelection() { return false; }
 
 	@UnsupportedAppUsage /* androidx ACTVAutoSizeHelper seems to love this */
 	/* Copyright (C) 2006 The Android Open Source Project */
@@ -2361,5 +2321,621 @@ public class TextView extends View {
 
 	public CharSequence getHint() {
 		return mHint;
+	}
+
+	/* ---- AOSP TextView members that apps call and override and that ATL had no counterpart for. ATL's TextView is
+	 * a GtkLabel, an EditText a GtkText: what the label cannot show or the app cannot reach (a floating selection
+	 * toolbar, the shadow, text locales for the shaper, the IME's hints) is kept and returned, as AOSP does, and said
+	 * so where it matters. ---- */
+
+	/* AOSP TextView.getCurrentHintTextColor(): the hint color for the drawable state; the text color while no
+	 * hint color is set */
+	public final int getCurrentHintTextColor() {
+		return hint_colors != null ? hint_colors.getColorForState(getDrawableState(), hint_colors.getDefaultColor()) : mCurTextColor;
+	}
+
+	/* AOSP TextView.bringPointIntoView(): scrolls the text so that the offset is visible. The label does not scroll
+	 * its text inside the view (a single line label is cut or ellipsized), so nothing moves and AOSP's answer for
+	 * a text that did not scroll is false */
+	public boolean bringPointIntoView(int offset) {
+		return false;
+	}
+
+	private ActionMode.Callback mCustomSelectionActionModeCallback;
+	private ActionMode.Callback mCustomInsertionActionModeCallback;
+
+	/* the callbacks are kept; ATL starts no selection or insertion action mode, so they are never called */
+	public void setCustomSelectionActionModeCallback(ActionMode.Callback actionModeCallback) {
+		mCustomSelectionActionModeCallback = actionModeCallback;
+	}
+
+	public ActionMode.Callback getCustomSelectionActionModeCallback() {
+		return mCustomSelectionActionModeCallback;
+	}
+
+	public void setCustomInsertionActionModeCallback(ActionMode.Callback actionModeCallback) {
+		mCustomInsertionActionModeCallback = actionModeCallback;
+	}
+
+	public ActionMode.Callback getCustomInsertionActionModeCallback() {
+		return mCustomInsertionActionModeCallback;
+	}
+
+	private int mImeActionId;
+	private CharSequence mImeActionLabel;
+
+	public void setImeActionLabel(CharSequence label, int actionId) {
+		mImeActionLabel = label;
+		mImeActionId = actionId;
+	}
+
+	public CharSequence getImeActionLabel() {
+		return mImeActionLabel;
+	}
+
+	public int getImeActionId() {
+		return mImeActionId;
+	}
+
+	private int mImeOptions = 0; // EditorInfo.IME_NULL
+
+	public void setImeOptions(int imeOptions) {
+		mImeOptions = imeOptions;
+	}
+
+	public int getImeOptions() {
+		return mImeOptions;
+	}
+
+	private LocaleList mImeHintLocales;
+
+	public void setImeHintLocales(LocaleList hintLocales) {
+		mImeHintLocales = hintLocales;
+	}
+
+	public LocaleList getImeHintLocales() {
+		return mImeHintLocales;
+	}
+
+	private boolean mShowSoftInputOnFocus = true;
+
+	public final void setShowSoftInputOnFocus(boolean show) {
+		mShowSoftInputOnFocus = show;
+	}
+
+	public final boolean getShowSoftInputOnFocus() {
+		return mShowSoftInputOnFocus;
+	}
+
+	private boolean mCursorVisible = true;
+
+	public void setCursorVisible(boolean visible) {
+		mCursorVisible = visible;
+	}
+
+	public boolean isCursorVisible() {
+		return mCursorVisible;
+	}
+
+	private boolean mRevealOnFocusHint = true;
+
+	public final void setRevealOnFocusHint(boolean revealOnFocus) {
+		mRevealOnFocusHint = revealOnFocus;
+	}
+
+	public final boolean getRevealOnFocusHint() {
+		return mRevealOnFocusHint;
+	}
+
+	private boolean mUseBoundsForWidth;
+
+	public void setUseBoundsForWidth(boolean useBoundsForWidth) {
+		mUseBoundsForWidth = useBoundsForWidth;
+	}
+
+	public boolean getUseBoundsForWidth() {
+		return mUseBoundsForWidth;
+	}
+
+	/* AOSP TextView.setShadowLayer(): the shadow of the text (a Paint's); a GtkLabel draws none, the values are kept
+	 * and the paint holds them like AOSP's */
+	private float mShadowRadius;
+	private float mShadowDx;
+	private float mShadowDy;
+	private int mShadowColor;
+
+	public void setShadowLayer(float radius, float dx, float dy, int color) {
+		mShadowRadius = radius;
+		mShadowDx = dx;
+		mShadowDy = dy;
+		mShadowColor = color;
+		getPaint().setShadowLayer(radius, dx, dy, color);
+	}
+
+	public float getShadowRadius() {
+		return mShadowRadius;
+	}
+
+	public float getShadowDx() {
+		return mShadowDx;
+	}
+
+	public float getShadowDy() {
+		return mShadowDy;
+	}
+
+	public int getShadowColor() {
+		return mShadowColor;
+	}
+
+	/* AOSP TextView.setTextScaleX(): the horizontal scale of the glyphs, the paint's */
+	public void setTextScaleX(float size) {
+		if (size != getPaint().getTextScaleX()) {
+			getPaint().setTextScaleX(size);
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	public float getTextScaleX() {
+		return getPaint().getTextScaleX();
+	}
+
+	/* AOSP TextView.setFontVariationSettings(): true if the settings are valid and the paint took them */
+	public boolean setFontVariationSettings(String fontVariationSettings) {
+		final String existingSettings = getPaint().getFontVariationSettings();
+		if (fontVariationSettings == existingSettings || (fontVariationSettings != null && fontVariationSettings.equals(existingSettings))) {
+			return true;
+		}
+		boolean effective = getPaint().setFontVariationSettings(fontVariationSettings);
+		if (effective) {
+			requestLayout();
+			invalidate();
+		}
+		return effective;
+	}
+
+	public String getFontVariationSettings() {
+		return getPaint().getFontVariationSettings();
+	}
+
+	private LocaleList mTextLocales;
+
+	/* AOSP TextView.setTextLocales(): the locales the shaper picks the glyphs by (Han unification, hyphenation);
+	 * the paint keeps them, Pango picks by the label's language */
+	public void setTextLocales(LocaleList locales) {
+		mTextLocales = locales;
+		getPaint().setTextLocales(locales);
+		requestLayout();
+		invalidate();
+	}
+
+	public LocaleList getTextLocales() {
+		return mTextLocales != null ? mTextLocales : LocaleList.getDefault();
+	}
+
+	public void setTextLocale(Locale locale) {
+		setTextLocales(new LocaleList(locale));
+	}
+
+	public Locale getTextLocale() {
+		return getTextLocales().get(0);
+	}
+
+	private TextClassifier mTextClassifier;
+
+	public void setTextClassifier(TextClassifier textClassifier) {
+		mTextClassifier = textClassifier;
+	}
+
+	/* AOSP TextView.getTextClassifier(): the one set, else the system's; ATL has no TextClassificationManager,
+	 * AOSP then answers TextClassifier.NO_OP */
+	public TextClassifier getTextClassifier() {
+		if (mTextClassifier == null) {
+			return TextClassifier.NO_OP;
+		}
+		return mTextClassifier;
+	}
+
+	/* AOSP TextView.onPrivateIMECommand(): a command an input method sent to this editor; none does here */
+	public boolean onPrivateIMECommand(String action, Bundle data) {
+		return false;
+	}
+
+	/* AOSP TextView.onTextChanged(), onSelectionChanged(): the hooks a subclass overrides */
+	protected void onTextChanged(CharSequence text, int start, int lengthBefore, int lengthAfter) {
+	}
+
+	protected void onSelectionChanged(int selStart, int selEnd) {
+		sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED);
+	}
+
+	/* an EditText's text comes from the GtkText, which calls back; for a label setText() calls the listeners */
+	boolean textChangesComeFromNative() {
+		return false;
+	}
+
+	private ArrayList<TextWatcher> mWatchers;
+
+	public void addTextChangedListener(TextWatcher watcher) {
+		if (mWatchers == null) {
+			mWatchers = new ArrayList<TextWatcher>();
+		}
+		mWatchers.add(watcher);
+	}
+
+	public void removeTextChangedListener(TextWatcher watcher) {
+		if (mWatchers != null) {
+			int i = mWatchers.indexOf(watcher);
+			if (i >= 0) {
+				mWatchers.remove(i);
+			}
+		}
+	}
+
+	/* AOSP TextView.sendBeforeTextChanged(), sendOnTextChanged(), sendAfterTextChanged(): the watchers hear the
+	 * change, in this order, then the view's own onTextChanged() */
+	void sendBeforeTextChanged(CharSequence text, int start, int before, int after) {
+		if (mWatchers != null) {
+			for (TextWatcher w : new ArrayList<TextWatcher>(mWatchers)) {
+				w.beforeTextChanged(text, start, before, after);
+			}
+		}
+	}
+
+	void handleTextChanged(CharSequence buffer, int start, int before, int after) {
+		if (mWatchers != null) {
+			for (TextWatcher w : new ArrayList<TextWatcher>(mWatchers)) {
+				w.onTextChanged(buffer, start, before, after);
+			}
+		}
+		onTextChanged(buffer, start, before, after);
+	}
+
+	void sendAfterTextChanged(Editable text) {
+		if (mWatchers != null) {
+			for (TextWatcher w : new ArrayList<TextWatcher>(mWatchers)) {
+				w.afterTextChanged(text);
+			}
+		}
+	}
+
+	public void setText(int resid, BufferType type) {
+		setText(getContext().getResources().getText(resid), type);
+	}
+
+	/* AOSP TextView.setEms(), setMinEms(), setMaxEms(), setMinWidth()...: the size limits in ems or pixels, as set */
+	private int mMaxWidth = Integer.MAX_VALUE;
+	private int mMaxWidthMode = PIXELS;
+	private int mMinWidth = 0;
+	private int mMinWidthMode = PIXELS;
+	private int mMinHeight = 0;
+	private int mMaxHeightValue = -1;
+
+	public void setEms(int ems) {
+		mMaxWidth = mMinWidth = ems;
+		mMaxWidthMode = mMinWidthMode = EMS;
+		requestLayout();
+		invalidate();
+	}
+
+	public void setMinEms(int minEms) {
+		mMinWidth = minEms;
+		mMinWidthMode = EMS;
+		requestLayout();
+		invalidate();
+	}
+
+	public void setMaxEms(int maxEms) {
+		mMaxWidth = maxEms;
+		mMaxWidthMode = EMS;
+		requestLayout();
+		invalidate();
+	}
+
+	public int getMinEms() {
+		return mMinWidthMode == EMS ? mMinWidth : -1;
+	}
+
+	public int getMaxEms() {
+		return mMaxWidthMode == EMS ? mMaxWidth : -1;
+	}
+
+	public void setMinWidth(int minPixels) {
+		mMinWidth = minPixels;
+		mMinWidthMode = PIXELS;
+		requestLayout();
+		invalidate();
+	}
+
+	public int getMinWidth() {
+		return mMinWidthMode == PIXELS ? mMinWidth : -1;
+	}
+
+	public void setMaxWidth(int maxPixels) {
+		mMaxWidth = maxPixels;
+		mMaxWidthMode = PIXELS;
+		requestLayout();
+		invalidate();
+	}
+
+	public int getMaxWidth() {
+		return mMaxWidthMode == PIXELS ? mMaxWidth : -1;
+	}
+
+	public void setMinHeight(int minPixels) {
+		mMinHeight = minPixels;
+		requestLayout();
+		invalidate();
+	}
+
+	public int getMinHeight() {
+		return mMinHeight;
+	}
+
+	public void setMaxHeight(int maxPixels) {
+		mMaxHeightValue = maxPixels;
+		requestLayout();
+		invalidate();
+	}
+
+	public int getMaxHeight() {
+		return mMaxHeightValue;
+	}
+
+	private KeyListener mKeyListener;
+
+	public void setKeyListener(KeyListener input) {
+		mKeyListener = input;
+	}
+
+	public KeyListener getKeyListener() {
+		return mKeyListener;
+	}
+
+	public void setPaintFlags(int flags) {
+		if (getPaint().getFlags() != flags) {
+			getPaint().setFlags(flags);
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	public int getPaintFlags() {
+		return getPaint().getFlags();
+	}
+
+	private boolean mAllCaps;
+
+	public boolean isAllCaps() {
+		return mAllCaps;
+	}
+
+	/* AOSP TextView.getUrls(): the URLSpans of the text */
+	public URLSpan[] getUrls() {
+		if (text instanceof Spanned) {
+			return ((Spanned)text).getSpans(0, text.length(), URLSpan.class);
+		} else {
+			return new URLSpan[0];
+		}
+	}
+
+	public boolean isSingleLine() {
+		return mSingleLine;
+	}
+
+	/* AOSP TextView.getLineBounds(): the bounds of the line in the view's coordinates, and its baseline */
+	public int getLineBounds(int line, Rect bounds) {
+		Layout layout = getLayout();
+		if (layout == null) {
+			if (bounds != null) {
+				bounds.set(0, 0, 0, 0);
+			}
+			return 0;
+		} else {
+			int baseline = layout.getLineBounds(line, bounds);
+			int voffset = getExtendedPaddingTop();
+			if (bounds != null) {
+				bounds.offset(getCompoundPaddingLeft(), voffset);
+			}
+			return baseline + voffset;
+		}
+	}
+
+	/* AOSP TextView.getOffsetForPosition(): the character offset closest to the point, -1 without a layout */
+	public int getOffsetForPosition(float x, float y) {
+		Layout layout = getLayout();
+		if (layout == null) {
+			return -1;
+		}
+		float xInLayout = Math.max(0, Math.min(x - getTotalPaddingLeft() + getScrollX(), getWidth() - getTotalPaddingRight() + getScrollX() - 1));
+		final int line = layout.getLineForVertical((int)(y - getTotalPaddingTop() + getScrollY()));
+		return layout.getOffsetForHorizontal(line, xInLayout);
+	}
+
+	@Override
+	public CharSequence getAccessibilityClassName() {
+		return TextView.class.getName();
+	}
+
+	/* AOSP TextView accessibility: the event and the node get the class, whether it is a password and the text
+	 * (a password's text is left out) */
+	@Override
+	public void onInitializeAccessibilityEventInternal(AccessibilityEvent event) {
+		super.onInitializeAccessibilityEventInternal(event);
+		event.setClassName(getAccessibilityClassName());
+		final boolean isPassword = (mInputType & 0x0fff) == 0x81 || (mInputType & 0x0fff) == 0x91 || (mInputType & 0x0fff) == 0xe1 || (mInputType & 0x0fff) == 0x12;
+		event.setPassword(isPassword);
+		if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) {
+			event.setFromIndex(getSelectionStart());
+			event.setToIndex(getSelectionEnd());
+			event.setItemCount(text.length());
+		}
+	}
+
+	@Override
+	public void onPopulateAccessibilityEventInternal(AccessibilityEvent event) {
+		super.onPopulateAccessibilityEventInternal(event);
+		CharSequence t = getText();
+		if (!TextUtils.isEmpty(t)) {
+			event.getText().add(t);
+		}
+	}
+
+	@Override
+	public void onInitializeAccessibilityNodeInfoInternal(AccessibilityNodeInfo info) {
+		super.onInitializeAccessibilityNodeInfoInternal(info);
+		info.setClassName(getAccessibilityClassName());
+		final boolean isPassword = (mInputType & 0x0fff) == 0x81 || (mInputType & 0x0fff) == 0x91 || (mInputType & 0x0fff) == 0xe1 || (mInputType & 0x0fff) == 0x12;
+		info.setPassword(isPassword);
+		if (!isPassword) {
+			info.setText(getText());
+		}
+	}
+
+	@Override
+	public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
+		if (this instanceof EditText) {
+			return PointerIcon.getSystemIcon(getContext(), PointerIcon.TYPE_TEXT);
+		}
+		return super.onResolvePointerIcon(event, pointerIndex);
+	}
+
+	/* AOSP TextView autofill: an editable text takes a text value and gives its text */
+	public int getAutofillType() {
+		return this instanceof EditText ? AUTOFILL_TYPE_TEXT : AUTOFILL_TYPE_NONE;
+	}
+
+	public void autofill(AutofillValue value) {
+		if (!(this instanceof EditText)) {
+			return;
+		}
+		if (!value.isText()) {
+			Log.w("TextView", value + " could not be autofilled into " + this);
+			return;
+		}
+		setText(value.getTextValue(), mBufferType);
+		// Move cursor to the end of the text
+		final CharSequence editableText = getText();
+		if (editableText != null) {
+			setSelection(editableText.length());
+		}
+	}
+
+	public AutofillValue getAutofillValue() {
+		return this instanceof EditText ? AutofillValue.forText(getText()) : null;
+	}
+
+	/* AOSP TextView.onEditorAction(): the OnEditorActionListener first; without one or if it did not take it, the
+	 * default of the action: NEXT/PREVIOUS move the focus (IME_ACTION_DONE has nothing to hide here: ATL shows no
+	 * soft keyboard) */
+	public void onEditorAction(int actionCode) {
+		if (mOnEditorActionListener != null && mOnEditorActionListener.onEditorAction(this, actionCode, null)) {
+			return;
+		}
+		if (actionCode == 5 /* IME_ACTION_NEXT */) {
+			View v = focusSearch(View.FOCUS_FORWARD);
+			if (v != null && !v.requestFocus(View.FOCUS_FORWARD)) {
+				throw new IllegalStateException("focus search returned a view that wasn't able to take focus!");
+			}
+		} else if (actionCode == 7 /* IME_ACTION_PREVIOUS */) {
+			View v = focusSearch(View.FOCUS_BACKWARD);
+			if (v != null && !v.requestFocus(View.FOCUS_BACKWARD)) {
+				throw new IllegalStateException("focus search returned a view that wasn't able to take focus!");
+			}
+		}
+	}
+
+	OnEditorActionListener mOnEditorActionListener;
+
+	public void setOnEditorActionListener(TextView.OnEditorActionListener l) {
+		mOnEditorActionListener = l;
+	}
+
+	/* AOSP TextView.onTextContextMenuItem(): copy, cut, paste and select all of the text and the selection, which
+	 * the (here absent) context menu and the keyboard shortcuts use */
+	public boolean onTextContextMenuItem(int id) {
+		int min = 0;
+		int max = text.length();
+		if (isFocused()) {
+			final int selStart = getSelectionStart();
+			final int selEnd = getSelectionEnd();
+			min = Math.max(0, Math.min(selStart, selEnd));
+			max = Math.max(0, Math.max(selStart, selEnd));
+		}
+		android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+		switch (id) {
+		case android.R.id.selectAll:
+			if (this instanceof EditText) {
+				setSelection(0, text.length());
+				return true;
+			}
+			return false;
+		case android.R.id.cut:
+			if (this instanceof EditText && clipboard != null) {
+				clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, getTransformedText(min, max)));
+				deleteText_internal(min, max);
+				return true;
+			}
+			return false;
+		case android.R.id.copy:
+			if (clipboard != null && max > min) {
+				clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, getTransformedText(min, max)));
+				return true;
+			}
+			return false;
+		case android.R.id.paste:
+			if (this instanceof EditText && clipboard != null && clipboard.hasPrimaryClip()) {
+				android.content.ClipData clip = clipboard.getPrimaryClip();
+				StringBuilder paste = new StringBuilder();
+				for (int i = 0; i < clip.getItemCount(); i++) {
+					paste.append(clip.getItemAt(i).coerceToText(getContext()));
+				}
+				replaceText_internal(min, max, paste);
+				return true;
+			}
+			return false;
+		default:
+			return false;
+		}
+	}
+
+	CharSequence getTransformedText(int start, int end) {
+		return text.subSequence(Math.max(0, start), Math.min(text.length(), Math.max(0, end)));
+	}
+
+	/* replace the characters [min, max) of the text by the new ones and put the cursor after them; a label has no
+	 * editing, an EditText overrides this with the GtkText's */
+	void replaceText_internal(int min, int max, CharSequence newText) {
+	}
+
+	void deleteText_internal(int min, int max) {
+		replaceText_internal(min, max, "");
+	}
+
+	/* AOSP TextView selection: the Selection span of a Spannable text; getSelectionStart() is -1 without one */
+	public void setSelection(int start, int stop) {
+		if (text instanceof Spannable) {
+			Selection.setSelection((Spannable)text, start, stop);
+			onSelectionChanged(start, stop);
+		}
+	}
+
+	public void setSelection(int index) {
+		setSelection(index, index);
+	}
+
+	public int getSelectionStart() {
+		return text instanceof Spannable ? Selection.getSelectionStart(text) : -1;
+	}
+
+	public int getSelectionEnd() {
+		return text instanceof Spannable ? Selection.getSelectionEnd(text) : -1;
+	}
+
+	public boolean hasSelection() {
+		final int selectionStart = getSelectionStart();
+		final int selectionEnd = getSelectionEnd();
+		return selectionStart >= 0 && selectionStart != selectionEnd;
 	}
 }
