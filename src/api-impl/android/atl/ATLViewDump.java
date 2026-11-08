@@ -22,11 +22,12 @@ import java.util.Iterator;
 /* DEBUGGING AID for atl-doctor (https://github.com/Jimbambuli/atl-doctor).
  *
  * With ATL_VIEWDUMP=<dir> set, the main thread checks every 250 ms for <dir>/request. The file
- * holds a name; the View trees of the resumed Activity, of showing Dialogs and of views added
+ * holds a name in its first line; the View trees of the resumed Activity, of showing Dialogs and of views added
  * through WindowManager are then written to <dir>/<name>.xml in the form of `uiautomator dump`
  * (node class/resource-id/text/content-desc/bounds), plus ATL-only attributes: real class,
  * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. <dir>/request is
- * deleted when done. The window of the app is also saved as <dir>/shots/<name>.png. */
+ * deleted when done. Only if a further line of the request reads "shot" is the window of the app
+ * also saved as <dir>/shots/<name>.png; otherwise no image is rendered. */
 public class ATLViewDump {
 	private static final String DIR = System.getenv("ATL_VIEWDUMP");
 	private static Handler handler;
@@ -67,13 +68,18 @@ public class ATLViewDump {
 		File req = new File(DIR, "request");
 		if (req.exists()) {
 			try {
-				String name = new String(Files.readAllBytes(req.toPath()), StandardCharsets.UTF_8).trim();
+				String[] lines = new String(Files.readAllBytes(req.toPath()), StandardCharsets.UTF_8).trim().split("\\s*\\n\\s*");
+				String name = lines[0].trim();
+				boolean wantShot = false;
+				for (int i = 1; i < lines.length; i++)
+					wantShot |= lines[i].equals("shot");
 				File tmp = new File(DIR, name + ".xml.tmp");
 				try (Writer w = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
 					dump(w);
 				}
 				tmp.renameTo(new File(DIR, name + ".xml"));
-				shot(name);
+				if (wantShot)
+					shot(name);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -93,8 +99,10 @@ public class ATLViewDump {
 		File dir = new File(DIR, "shots");
 		dir.mkdirs();
 		File tmp = new File(dir, name + ".png.tmp");
-		if (native_screenshot(window, tmp.getPath()))
+		if (native_screenshot(window, tmp.getPath())) {
 			tmp.renameTo(new File(dir, name + ".png"));
+			System.err.println("ATLViewDump: window image " + name);
+		}
 		else
 			System.err.println("ATLViewDump: screenshot failed");
 	}
