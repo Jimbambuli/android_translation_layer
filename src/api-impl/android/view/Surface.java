@@ -5,7 +5,7 @@ import android.graphics.SurfaceTexture;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-public class Surface {
+public class Surface implements android.os.Parcelable {
 
 	/** @hide */
 	@IntDef(prefix = {"ROTATION_"}, value = {ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270})
@@ -25,6 +25,50 @@ public class Surface {
 	public static final int ROTATION_270 = 3;
 
 	public long widget;
+
+	/* AOSP Surface.writeToParcel()/readFromParcel()/CREATOR: a Surface travels as the handle of the native surface it
+	 * holds. ATL's Surface is the pointer of the GTK widget it draws into, which is valid in this process only: a
+	 * parcel read in this process (what an app does with it, e.g. an in-process Bundle) gives a Surface on the same
+	 * widget; there is no other process to read it in. */
+	public static final android.os.Parcelable.Creator<Surface> CREATOR = new android.os.Parcelable.Creator<Surface>() {
+		@Override
+		public Surface createFromParcel(android.os.Parcel source) {
+			try {
+				Surface s = new Surface();
+				s.readFromParcel(source);
+				return s;
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
+
+		@Override
+		public Surface[] newArray(int size) {
+			return new Surface[size];
+		}
+	};
+
+	public void readFromParcel(android.os.Parcel source) {
+		if (source == null) {
+			throw new IllegalArgumentException("source must not be null");
+		}
+		source.readString(); // the name AOSP gives a surface of a view, none here
+		widget = source.readLong();
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		if (dest == null) {
+			throw new IllegalArgumentException("dest must not be null");
+		}
+		dest.writeString(null);
+		dest.writeLong(widget);
+	}
 
 	public Surface() {}
 

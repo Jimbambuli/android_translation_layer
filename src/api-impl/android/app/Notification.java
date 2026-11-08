@@ -82,6 +82,12 @@ public class Notification implements Parcelable {
 		return channelId;
 	}
 
+	android.graphics.drawable.Icon mSmallIcon;
+
+	public android.graphics.drawable.Icon getSmallIcon() {
+		return mSmallIcon;
+	}
+
 	public static class Builder {
 		private final Context mContext;
 		private Notification notification;
@@ -217,6 +223,17 @@ public class Notification implements Parcelable {
 		public Builder setSound(Uri sound) { return this; }
 
 		public Builder setSmallIcon(int icon) { return this.setSmallIcon(icon, -1); }
+
+		/* AOSP Notification.Builder.setSmallIcon(Icon): ATL shows the notification with the icon's file; that is
+		 * known for an icon of a resource, a bitmap icon has no file and the notification goes without one */
+		public Builder setSmallIcon(android.graphics.drawable.Icon icon) {
+			notification.mSmallIcon = icon;
+			if (icon != null && icon.getType() == android.graphics.drawable.Icon.TYPE_RESOURCE) {
+				return setSmallIcon(icon.getResId(), -1);
+			}
+			notification.iconPath = null;
+			return this;
+		}
 
 		public Builder setTicker(CharSequence tickerText) { return this; }
 

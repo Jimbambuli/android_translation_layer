@@ -5,6 +5,9 @@ import android.content.res.Resources;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.PorterDuff;
+import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Message;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.Log;
@@ -122,6 +125,49 @@ public class Icon implements Parcelable {
 			result.setTintMode(mTintMode);
 		}
 		return result;
+	}
+
+	/**
+	 * AOSP Icon.OnDrawableLoadedListener: called on the handler's thread with the loaded drawable
+	 */
+	public interface OnDrawableLoadedListener {
+		void onDrawableLoaded(Drawable d);
+	}
+
+	/**
+	 * AOSP Icon.loadDrawableAsync(Context, Message): loads the drawable on a worker thread and sends the message
+	 * with the drawable as its obj to its target handler.
+	 */
+	public void loadDrawableAsync(Context context, Message andThen) {
+		if (andThen.getTarget() == null) {
+			throw new IllegalArgumentException("callback message must have a target handler");
+		}
+		AsyncTask.THREAD_POOL_EXECUTOR.execute(new Runnable() {
+			@Override
+			public void run() {
+				andThen.obj = loadDrawable(context);
+				andThen.sendToTarget();
+			}
+		});
+	}
+
+	/**
+	 * AOSP Icon.loadDrawableAsync(Context, OnDrawableLoadedListener, Handler): loads the drawable on a worker thread
+	 * and calls the listener on the handler's thread.
+	 */
+	public void loadDrawableAsync(Context context, final OnDrawableLoadedListener listener, Handler handler) {
+		AsyncTask.THREAD_POOL_EXECUTOR.execute(new Runnable() {
+			@Override
+			public void run() {
+				final Drawable result = loadDrawable(context);
+				handler.post(new Runnable() {
+					@Override
+					public void run() {
+						listener.onDrawableLoaded(result);
+					}
+				});
+			}
+		});
 	}
 
 	private Drawable loadDrawableInner(Context context) {
