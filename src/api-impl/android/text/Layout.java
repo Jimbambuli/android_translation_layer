@@ -13,6 +13,7 @@ import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
+import android.text.style.TextAppearanceSpan;
 import android.text.style.UnderlineSpan;
 
 public class Layout {
@@ -76,6 +77,17 @@ public class Layout {
 					native_add_attribute(layout, ATTR_BOLD, start, end, 0, 0);
 				if ((style & Typeface.ITALIC) != 0)
 					native_add_attribute(layout, ATTR_ITALIC, start, end, 0, 0);
+			} else if (span instanceof TextAppearanceSpan) {
+				/* AOSP TextAppearanceSpan.updateDrawState(): colour, size and style of the appearance */
+				TextAppearanceSpan appearance = (TextAppearanceSpan)span;
+				if (appearance.getTextColor() != null)
+					native_add_attribute(layout, ATTR_FOREGROUND, start, end, appearance.getTextColor().getDefaultColor(), 0);
+				if (appearance.getTextSize() > 0)
+					native_add_attribute(layout, ATTR_SIZE, start, end, 0, appearance.getTextSize());
+				if ((appearance.getTextStyle() & Typeface.BOLD) != 0)
+					native_add_attribute(layout, ATTR_BOLD, start, end, 0, 0);
+				if ((appearance.getTextStyle() & Typeface.ITALIC) != 0)
+					native_add_attribute(layout, ATTR_ITALIC, start, end, 0, 0);
 			} else if (span instanceof UnderlineSpan) {
 				native_add_attribute(layout, ATTR_UNDERLINE, start, end, 0, 0);
 			} else if (span instanceof StrikethroughSpan) {
@@ -92,6 +104,15 @@ public class Layout {
 	private static final int ATTR_ITALIC = 5;
 	private static final int ATTR_UNDERLINE = 6;
 	private static final int ATTR_STRIKETHROUGH = 7;
+	private static final int ATTR_HYPHENS = 8;
+
+	/* StaticLayout.Builder.setHyphenationFrequency(): HYPHENATION_FREQUENCY_NONE (0) breaks a word that
+	 * does not fit without a hyphen; Pango has no hyphenation dictionary, so normal and full both leave
+	 * the hyphen it inserts where it has to break a word */
+	void setHyphenation(boolean hyphens) {
+		if (text.length() > 0)
+			native_add_attribute(layout, ATTR_HYPHENS, 0, text.length(), 0, hyphens ? 1 : 0);
+	}
 
 	/* for StaticLayout.Builder, which builds the layout before its setters are called */
 	void setAlignment(Alignment align) {

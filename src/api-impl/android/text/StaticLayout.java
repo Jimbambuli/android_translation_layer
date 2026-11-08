@@ -33,6 +33,10 @@ public class StaticLayout extends Layout {
 		private float spacingMult = 1.0f;
 		private int justificationMode = 0; // JUSTIFICATION_MODE_NONE
 		private int[] leftIndents;
+		private int hyphenationFrequency = -1; // not set: Pango's own default
+		private int breakStrategy = 0; // BREAK_STRATEGY_SIMPLE
+		private boolean includePad = true;
+		private TextDirectionHeuristic textDir;
 
 		public static Builder obtain(CharSequence source, int bufstart, int bufend, TextPaint paint, int outerwidth) {
 			Builder builder = new Builder();
@@ -40,7 +44,13 @@ public class StaticLayout extends Layout {
 			return builder;
 		}
 
-		public Builder setTextDirection(TextDirectionHeuristic textDir) { return this; }
+		/* AOSP: the heuristic that finds the paragraph direction. Pango finds it itself from the first
+		 * strong character (auto direction, = FIRSTSTRONG_LTR) and has a base direction only per
+		 * context, which every layout of the app shares, so the heuristic is kept and not applied */
+		public Builder setTextDirection(TextDirectionHeuristic textDir) {
+			this.textDir = textDir;
+			return this;
+		}
 
 		public Builder setAlignment(Alignment align) {
 			layout.setAlignment(align);
@@ -66,13 +76,27 @@ public class StaticLayout extends Layout {
 			return this;
 		}
 
-		public Builder setIncludePad(boolean includepad) { return this; }
+		/* AOSP adds the space between the font's top/bottom and its ascent/descent above the first and below
+		 * the last line; Pango's lines are the logical extents of the font, with that space (the paddings
+		 * Layout.getTopPadding()/getBottomPadding() answer are fixed), so the value is kept and not applied */
+		public Builder setIncludePad(boolean includepad) {
+			this.includePad = includepad;
+			return this;
+		}
 
-		/* Pango has a single (greedy) line breaker */
-		public Builder setBreakStrategy(int strategy) { return this; }
+		/* Pango has a single (greedy) line breaker = BREAK_STRATEGY_SIMPLE; balanced and high quality break
+		 * the same way, the value is kept */
+		public Builder setBreakStrategy(int strategy) {
+			this.breakStrategy = strategy;
+			return this;
+		}
 
-		/* Pango has no hyphenation dictionary */
-		public Builder setHyphenationFrequency(int hyphenationFrequency) { return this; }
+		/* HYPHENATION_FREQUENCY_NONE: no hyphen where a word is broken (Layout.setHyphenation()); Pango has no
+		 * hyphenation dictionary, normal and full leave Pango's hyphens */
+		public Builder setHyphenationFrequency(int hyphenationFrequency) {
+			this.hyphenationFrequency = hyphenationFrequency;
+			return this;
+		}
 
 		/* only the left indents: Pango indents the first line or all others (hanging) */
 		public Builder setIndents(int[] indents, int[] widths) {
@@ -98,6 +122,8 @@ public class StaticLayout extends Layout {
 				rest = leftIndents.length > 1 ? leftIndents[1] : first;
 			}
 			layout.setParagraphStyle(spacingMult, spacingAdd, justificationMode == 1, first, rest);
+			if (hyphenationFrequency >= 0)
+				layout.setHyphenation(hyphenationFrequency != 0);
 			layout.setMaxLines(maxLines, ellipsize);
 			return layout;
 		}

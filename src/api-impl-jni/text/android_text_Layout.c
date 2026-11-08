@@ -71,6 +71,9 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1attribute(JNIEnv *e
 		case 7: // StrikethroughSpan
 			attr = pango_attr_strikethrough_new(TRUE);
 			break;
+		case 8: // StaticLayout.Builder.setHyphenationFrequency(): a hyphen where a word is broken
+			attr = pango_attr_insert_hyphens_new(value != 0);
+			break;
 	}
 	guint start_index = utf16_to_byte_offset(text, start);
 	guint end_index = start_index + utf16_to_byte_offset(text + start_index, end - start);
