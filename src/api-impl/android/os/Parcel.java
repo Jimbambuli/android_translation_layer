@@ -485,6 +485,55 @@ public class Parcel {
 		return TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(this);
 	}
 
+	/** android-14 Parcel.writeCharSequenceArray(): the length (-1 for null), then each element as writeCharSequence(). */
+	public void writeCharSequenceArray(CharSequence[] val) {
+		if (val != null) {
+			writeInt(val.length);
+			for (CharSequence cs : val) {
+				writeCharSequence(cs);
+			}
+		} else {
+			writeInt(-1);
+		}
+	}
+
+	public CharSequence[] readCharSequenceArray() {
+		int n = readInt();
+		if (n < 0) {
+			return null;
+		}
+		CharSequence[] array = new CharSequence[n];
+		for (int i = 0; i < n; i++) {
+			array[i] = readCharSequence();
+		}
+		return array;
+	}
+
+	/** android-14 Parcel.writeArraySet(): the size (-1 for null), then each value as writeValue(). */
+	public void writeArraySet(android.util.ArraySet<? extends Object> val) {
+		int size = val != null ? val.size() : -1;
+		writeInt(size);
+		for (int i = 0; i < size; i++) {
+			writeValue(val.valueAt(i));
+		}
+	}
+
+	public android.util.ArraySet<? extends Object> readArraySet(ClassLoader loader) {
+		int size = readInt();
+		if (size < 0) {
+			return null;
+		}
+		android.util.ArraySet<Object> set = new android.util.ArraySet<>(size);
+		try {
+			for (int i = 0; i < size; i++) {
+				set.add(readValue(loader));
+			}
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
+		}
+		return set;
+	}
+
 	/** android-14 Parcel.writeTypedObject(): a presence flag, then the object. */
 	public <T extends Parcelable> void writeTypedObject(T val, int parcelableFlags) {
 		if (val != null) {
