@@ -1,13 +1,54 @@
 package android.content.pm;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 /**
  * Information pertaining to the signing certificates used to sign a package.
  *
  * As AOSP's SigningInfo over PackageParser.SigningDetails, with only the APK's signers
  * (ATL knows no key rotation, so there are no past signing certificates).
  */
-public final class SigningInfo {
+public final class SigningInfo implements Parcelable {
 	private final Signature[] signatures;
+
+	/* AOSP SigningInfo(Parcel) / writeToParcel() / CREATOR: the wire format of android-14's SigningDetails (unknown flag,
+	 * signers, signature scheme version, public keys, past signing certificates). ATL knows neither the scheme
+	 * version (written as 0, SignatureSchemeVersion.UNKNOWN), the public keys nor rotation (both written as null). */
+	private SigningInfo(Parcel in) {
+		if (in.readBoolean()) {
+			signatures = null;
+			return;
+		}
+		signatures = in.createTypedArray(Signature.CREATOR);
+		in.readInt();
+		in.readArraySet(null);
+		in.createTypedArray(Signature.CREATOR);
+	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int parcelableFlags) {
+		dest.writeBoolean(signatures == null);
+		if (signatures == null) {
+			return;
+		}
+		dest.writeTypedArray(signatures, parcelableFlags);
+		dest.writeInt(0);
+		dest.writeArraySet(null);
+		dest.writeTypedArray(null, parcelableFlags);
+	}
+
+	public static final Parcelable.Creator<SigningInfo> CREATOR = new Parcelable.Creator<SigningInfo>() {
+		@Override
+		public SigningInfo createFromParcel(Parcel source) {
+			return new SigningInfo(source);
+		}
+
+		@Override
+		public SigningInfo[] newArray(int size) {
+			return new SigningInfo[size];
+		}
+	};
 
 	public SigningInfo() {
 		this.signatures = null;
