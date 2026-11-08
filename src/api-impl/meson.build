@@ -594,6 +594,7 @@ srcs = [
 	'android/security/keystore/AndroidKeyStoreSecretKey.java',
 	'android/security/keystore/KeyGenerator.java',
 	'android/security/keystore/KeyGenParameterSpec.java',
+	'android/service/chooser/ChooserAction.java',
 	'android/service/media/IMediaBrowserService.java',
 	'android/service/media/IMediaBrowserServiceCallbacks.java',
 	'android/service/media/MediaBrowserService.java',
