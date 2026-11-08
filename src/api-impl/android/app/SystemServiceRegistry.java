@@ -67,6 +67,7 @@ import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.CaptioningManager;
 import android.view.autofill.AutofillManager;
 import android.view.inputmethod.InputMethodManager;
+import android.view.textclassifier.TextClassificationManager;
 import android.view.textservice.TextServicesManager;
 import com.android.internal.policy.PhoneLayoutInflater;
 import java.util.Map;
@@ -108,6 +109,20 @@ public final class SystemServiceRegistry {
             @Override
             public ClipboardManager createService(ContextImpl ctx) {
                 return new ClipboardManager(ctx, null);
+            }});
+
+        registerService(Context.TEXT_CLASSIFICATION_SERVICE, TextClassificationManager.class,
+                new CachedServiceFetcher<TextClassificationManager>() {
+            @Override
+            public TextClassificationManager createService(ContextImpl ctx) {
+                return new TextClassificationManager(ctx);
+            }});
+
+        registerService(Context.LOCALE_SERVICE, LocaleManager.class,
+                new CachedServiceFetcher<LocaleManager>() {
+            @Override
+            public LocaleManager createService(ContextImpl ctx) {
+                return new LocaleManager(ctx);
             }});
 
         registerService(Context.SENSOR_SERVICE, SensorManager.class,

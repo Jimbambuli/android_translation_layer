@@ -41,6 +41,7 @@ import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
 import android.text.style.SubscriptSpan;
 import android.text.style.SuperscriptSpan;
+import android.text.style.TextAppearanceSpan;
 import android.text.style.TypefaceSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
@@ -57,6 +58,7 @@ import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.autofill.AutofillValue;
+import android.view.textclassifier.TextClassificationManager;
 import android.view.textclassifier.TextClassifier;
 import android.text.Selection;
 import android.util.Log;
@@ -343,6 +345,24 @@ public class TextView extends View {
 					tag = "sup";
 				} else if (span instanceof SubscriptSpan) {
 					tag = "sub";
+				} else if (span instanceof TextAppearanceSpan) {
+					/* AOSP TextAppearanceSpan.updateDrawState(): colour, size, family and style of the appearance */
+					TextAppearanceSpan appearance = (TextAppearanceSpan)span;
+					StringBuilder sb = new StringBuilder();
+					if (appearance.getTextColor() != null)
+						sb.append(pangoColor(appearance.getTextColor().getColorForState(getDrawableState(), appearance.getTextColor().getDefaultColor()))).append(' ');
+					if (appearance.getTextSize() > 0 && getTextSize() > 0)
+						sb.append(String.format(Locale.ROOT, "size=\"%d%%\" ", Math.max(1, Math.round(appearance.getTextSize() * 100 / getTextSize()))));
+					if (appearance.getFamily() != null)
+						sb.append("font_family=\"").append(appearance.getFamily().replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;")).append("\" ");
+					if ((appearance.getTextStyle() & Typeface.BOLD) != 0)
+						sb.append("font_weight=\"bold\" ");
+					if ((appearance.getTextStyle() & Typeface.ITALIC) != 0)
+						sb.append("font_style=\"italic\" ");
+					if (sb.length() > 0) {
+						tag = "span";
+						attrs = sb.toString().trim();
+					}
 				} else if (span instanceof TypefaceSpan && ((TypefaceSpan)span).getFamily() != null) {
 					tag = "span";
 					attrs = "font_family=\"" + ((TypefaceSpan)span).getFamily().replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;") + "\"";
@@ -2528,10 +2548,13 @@ public class TextView extends View {
 		mTextClassifier = textClassifier;
 	}
 
-	/* AOSP TextView.getTextClassifier(): the one set, else the system's; ATL has no TextClassificationManager,
-	 * AOSP then answers TextClassifier.NO_OP */
+	/* AOSP TextView.getTextClassifier(): the one set, else the one of the TextClassificationManager */
 	public TextClassifier getTextClassifier() {
 		if (mTextClassifier == null) {
+			TextClassificationManager manager = (TextClassificationManager)getContext().getSystemService(Context.TEXT_CLASSIFICATION_SERVICE);
+			if (manager != null) {
+				return manager.getTextClassifier();
+			}
 			return TextClassifier.NO_OP;
 		}
 		return mTextClassifier;
