@@ -21,11 +21,11 @@ import java.util.Iterator;
 
 /* DEBUGGING AID for atl-doctor (https://github.com/Jimbambuli/atl-doctor).
  *
- * With ATL_VIEWDUMP=<dir> set, the main thread checks every 250 ms for <dir>/anfrage. The file
+ * With ATL_VIEWDUMP=<dir> set, the main thread checks every 250 ms for <dir>/request. The file
  * holds a name; the View trees of the resumed Activity, of showing Dialogs and of views added
  * through WindowManager are then written to <dir>/<name>.xml in the form of `uiautomator dump`
  * (node class/resource-id/text/content-desc/bounds), plus ATL-only attributes: real class,
- * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. <dir>/anfrage is
+ * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. <dir>/request is
  * deleted when done. */
 public class ATLViewDump {
 	private static final String DIR = System.getenv("ATL_VIEWDUMP");
@@ -64,7 +64,7 @@ public class ATLViewDump {
 	}
 
 	private static void poll() {
-		File req = new File(DIR, "anfrage");
+		File req = new File(DIR, "request");
 		if (req.exists()) {
 			try {
 				String name = new String(Files.readAllBytes(req.toPath()), StandardCharsets.UTF_8).trim();
