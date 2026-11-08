@@ -33,8 +33,15 @@ import android.text.method.MovementMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TransformationMethod;
 import android.text.style.CharacterStyle;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.BackgroundColorSpan;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.ReplacementSpan;
+import android.text.style.SubscriptSpan;
+import android.text.style.SuperscriptSpan;
+import android.text.style.TypefaceSpan;
 import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
 import android.text.style.URLSpan;
@@ -267,6 +274,7 @@ public class TextView extends View {
 	private String toPangoMarkup(Spanned text) {
 		CharacterStyle[] spans = text.getSpans(0, text.length(), CharacterStyle.class);
 		linkSpans = text.getSpans(0, text.length(), ClickableSpan.class);
+		ReplacementSpan[] replacements = text.getSpans(0, text.length(), ReplacementSpan.class);
 		TreeSet<Integer> bounds = new TreeSet<>();
 		bounds.add(0);
 		bounds.add(text.length());
@@ -299,6 +307,25 @@ public class TextView extends View {
 				} else if (span instanceof ForegroundColorSpan) {
 					tag = "span";
 					attrs = pangoColor(((ForegroundColorSpan)span).getForegroundColor());
+				} else if (span instanceof BackgroundColorSpan) {
+					int color = ((BackgroundColorSpan)span).getBackgroundColor();
+					tag = "span";
+					attrs = String.format("background=\"#%06x\" bgalpha=\"%d\"", color & 0xffffff, Math.max(1, (color >>> 24) * 65535 / 255));
+				} else if (span instanceof RelativeSizeSpan) {
+					tag = "span";
+					attrs = String.format(Locale.ROOT, "size=\"%d%%\"", Math.max(1, Math.round(((RelativeSizeSpan)span).getSizeChange() * 100)));
+				} else if (span instanceof AbsoluteSizeSpan && getTextSize() > 0) {
+					AbsoluteSizeSpan abs = (AbsoluteSizeSpan)span;
+					float px = abs.getDip() ? abs.getSize() * getResources().getDisplayMetrics().density : abs.getSize();
+					tag = "span";
+					attrs = String.format(Locale.ROOT, "size=\"%d%%\"", Math.max(1, Math.round(px * 100 / getTextSize())));
+				} else if (span instanceof SuperscriptSpan) {
+					tag = "sup";
+				} else if (span instanceof SubscriptSpan) {
+					tag = "sub";
+				} else if (span instanceof TypefaceSpan && ((TypefaceSpan)span).getFamily() != null) {
+					tag = "span";
+					attrs = "font_family=\"" + ((TypefaceSpan)span).getFamily().replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;") + "\"";
 				}
 				if (tag == null)
 					continue;
@@ -309,6 +336,24 @@ public class TextView extends View {
 			}
 			markup.append(open);
 			for (int i = start; i < end; i++) {
+				/* AOSP draws a ReplacementSpan (ImageSpan) instead of its text; Pango markup cannot draw the
+				 * image, so the characters of the range give way to a gap as wide as the span (getSize()) */
+				ReplacementSpan replaced = null;
+				for (ReplacementSpan r : replacements) {
+					if (text.getSpanStart(r) <= i && i < text.getSpanEnd(r)) {
+						replaced = r;
+						break;
+					}
+				}
+				if (replaced != null) {
+					if (i == Math.max(0, text.getSpanStart(replaced))) {
+						float space = getPaint().measureText(" ");
+						int width = replaced.getSize(getPaint(), text, text.getSpanStart(replaced), text.getSpanEnd(replaced), null);
+						for (int n = space > 0 ? Math.max(1, Math.round(width / space)) : 1; n > 0; n--)
+							markup.append(' ');
+					}
+					continue;
+				}
 				char c = text.charAt(i);
 				markup.append(c == '&' ? "&amp;" : c == '<' ? "&lt;" : c == '>' ? "&gt;" : String.valueOf(c));
 			}
