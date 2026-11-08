@@ -780,6 +780,38 @@ public class Parcel {
 		}
 	}
 
+	/**
+	 * Read a new Serializable object from a Parcel, as in android-14: the class is looked up with the given
+	 * loader (if not null), and an object that is not an instance of clazz throws a BadParcelableException.
+	 */
+	public <T> T readSerializable(ClassLoader loader, Class<T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		Object object;
+		try {
+			object = new ObjectInputStream(is) {
+				@Override
+				protected Class<?> resolveClass(java.io.ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+					if (loader != null) {
+						try {
+							return Class.forName(desc.getName(), false, loader);
+						} catch (ClassNotFoundException e) {
+							// fall back to the default lookup
+						}
+					}
+					return super.resolveClass(desc);
+				}
+			}.readObject();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (ClassNotFoundException e) {
+			throw new RuntimeException("Parcelable encountered ClassNotFoundException reading a Serializable object (name = " + e.getMessage() + ")", e);
+		}
+		if (object != null && !clazz.isInstance(object)) {
+			throw new BadParcelableException("Serializable object " + object.getClass().getName() + " is not a subclass of required class " + clazz.getName() + " provided in the parameter");
+		}
+		return clazz.cast(object);
+	}
+
 	public void writeException(Exception e) throws Exception {
 		if (!(e instanceof BadParcelableException || e instanceof IllegalArgumentException || e instanceof IllegalStateException || e instanceof NullPointerException || e instanceof SecurityException || e instanceof UnsupportedOperationException))
 			throw e;
