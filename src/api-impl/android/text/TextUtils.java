@@ -377,9 +377,161 @@ public class TextUtils {
 		}
 	}
 
-	public static int getCapsMode(CharSequence cs, int off, int reqModes) {
-		return 0;
+	/**
+	 * Capitalization mode for {@link #getCapsMode}: capitalize all
+	 * characters.  This value is explicitly defined to be the same as
+	 * {@link InputType#TYPE_TEXT_FLAG_CAP_CHARACTERS}.
+	 */
+	public static final int CAP_MODE_CHARACTERS
+			= InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS;
+
+	/**
+	 * Capitalization mode for {@link #getCapsMode}: capitalize the first
+	 * character of all words.  This value is explicitly defined to be the same as
+	 * {@link InputType#TYPE_TEXT_FLAG_CAP_WORDS}.
+	 */
+	public static final int CAP_MODE_WORDS
+			= InputType.TYPE_TEXT_FLAG_CAP_WORDS;
+
+	/**
+	 * Capitalization mode for {@link #getCapsMode}: capitalize the first
+	 * character of each sentence.  This value is explicitly defined to be the same as
+	 * {@link InputType#TYPE_TEXT_FLAG_CAP_SENTENCES}.
+	 */
+	public static final int CAP_MODE_SENTENCES
+			= InputType.TYPE_TEXT_FLAG_CAP_SENTENCES;
+
+	/**
+	 * Debugging tool to print the spans in a CharSequence.  The output will
+	 * be printed one span per line.  If the CharSequence is not a Spanned,
+	 * then the entire string will be printed on a single line.
+	 */
+	public static void dumpSpans(CharSequence cs, android.util.Printer printer, String prefix) {
+		if (cs instanceof Spanned) {
+			Spanned sp = (Spanned)cs;
+			Object[] os = sp.getSpans(0, cs.length(), Object.class);
+
+			for (int i = 0; i < os.length; i++) {
+				Object o = os[i];
+				printer.println(prefix + cs.subSequence(sp.getSpanStart(o), sp.getSpanEnd(o)) + ": " + Integer.toHexString(System.identityHashCode(o)) + " " + o.getClass().getCanonicalName() + " (" + sp.getSpanStart(o) + "-" + sp.getSpanEnd(o) + ") fl=#" + sp.getSpanFlags(o));
+			}
+		} else {
+			printer.println(prefix + cs + ": (no spans)");
+		}
 	}
+
+	/**
+	 * Determine what caps mode should be in effect at the current offset in
+	 * the text.  Only the mode bits set in <var>reqModes</var> will be
+	 * checked.  Note that the caps mode flags here are explicitly defined
+	 * to match those in {@link InputType}.
+	 *
+	 * @param cs The text that should be checked for caps modes.
+	 * @param off Location in the text at which to check.
+	 * @param reqModes The modes to be checked: may be any combination of
+	 * {@link #CAP_MODE_CHARACTERS}, {@link #CAP_MODE_WORDS}, and
+	 * {@link #CAP_MODE_SENTENCES}.
+	 *
+	 * @return Returns the actual capitalization modes that can be in effect
+	 * at the current position, which is any combination of
+	 * {@link #CAP_MODE_CHARACTERS}, {@link #CAP_MODE_WORDS}, and
+	 * {@link #CAP_MODE_SENTENCES}.
+	 */
+	public static int getCapsMode(CharSequence cs, int off, int reqModes) {
+		if (off < 0) {
+			return 0;
+		}
+
+		int i;
+		char c;
+		int mode = 0;
+
+		if ((reqModes&CAP_MODE_CHARACTERS) != 0) {
+			mode |= CAP_MODE_CHARACTERS;
+		}
+		if ((reqModes&(CAP_MODE_WORDS|CAP_MODE_SENTENCES)) == 0) {
+			return mode;
+		}
+
+		// Back over allowed opening punctuation.
+
+		for (i = off; i > 0; i--) {
+			c = cs.charAt(i - 1);
+
+			if (c != '"' && c != '\'' &&
+				Character.getType(c) != Character.START_PUNCTUATION) {
+				break;
+			}
+		}
+
+		// Start of paragraph, with optional whitespace.
+
+		int j = i;
+		while (j > 0 && ((c = cs.charAt(j - 1)) == ' ' || c == '\t')) {
+			j--;
+		}
+		if (j == 0 || cs.charAt(j - 1) == '\n') {
+			return mode | CAP_MODE_WORDS;
+		}
+
+		// Or start of word if we are that style.
+
+		if ((reqModes&CAP_MODE_SENTENCES) == 0) {
+			if (i != j) mode |= CAP_MODE_WORDS;
+			return mode;
+		}
+
+		// There must be a space if not the start of paragraph.
+
+		if (i == j) {
+			return mode;
+		}
+
+		// Back over allowed closing punctuation.
+
+		for (; j > 0; j--) {
+			c = cs.charAt(j - 1);
+
+			if (c != '"' && c != '\'' &&
+				Character.getType(c) != Character.END_PUNCTUATION) {
+				break;
+			}
+		}
+
+		if (j > 0) {
+			c = cs.charAt(j - 1);
+
+			if (c == '.' || c == '?' || c == '!') {
+				// Do not capitalize if the word ends with a period but
+				// also contains a period, in which case it is an abbreviation.
+
+				if (c == '.') {
+					for (int k = j - 2; k >= 0; k--) {
+						c = cs.charAt(k);
+
+						if (c == '.') {
+							return mode;
+						}
+
+						if (!Character.isLetter(c)) {
+							break;
+						}
+					}
+				}
+
+				return mode | CAP_MODE_SENTENCES;
+			}
+		}
+
+		return mode;
+	}
+
+	/**
+	 * Does a comma-delimited list 'delimitedString' contain a certain item?
+	 * (without allocating memory)
+	 *
+	 * @hide
+	 */
 
 	private static Object sLock = new Object();
 
