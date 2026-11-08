@@ -79,8 +79,6 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-class WindowId {}
-
 public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	// --- constants from android source
@@ -3084,6 +3082,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setTag(int key, Object tag) {
 		tags.put(key, tag);
 	}
+
+	/* AOSP View.setTagInternal(): the keyed tag of the framework's own ids, without checking the key */
+	public void setTagInternal(int key, Object tag) {
+		tags.put(key, tag);
+	}
 	public Object getTag(int key) {
 		return tags.get(key);
 	}
@@ -4274,6 +4277,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return clipBounds != null ? new Rect(clipBounds) : null;
 	}
 
+	/* AOSP View.getClipBounds(Rect): copies the clip bounds into outRect, false if there are none */
+	public boolean getClipBounds(Rect outRect) {
+		if (clipBounds != null) {
+			outRect.set(clipBounds);
+			return true;
+		}
+		return false;
+	}
+
 	/* AOSP View.setBackgroundTintList(): the tint (ColorStateList, stateful) and mode of the background
 	 * drawable; AppCompat's ViewCompat and the Material buttons colour their backgrounds this way */
 	private ColorStateList mBackgroundTintList;
@@ -4559,7 +4571,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public PorterDuff.Mode getBackgroundTintMode() { return mBackgroundTintMode; }
 
 
-	public WindowId getWindowId() { return null; }
+	/* AOSP View.getWindowId(): the id of the window that holds the view, null while it is detached */
+	public WindowId getWindowId() {
+		return isAttachedToWindow() ? WindowId.of(getRootView()) : null;
+	}
 
 	public boolean isInLayout() {
 		return false; // FIXME
