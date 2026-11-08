@@ -244,6 +244,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return new WindowManagerImpl();
 	}
 
+	/* AOSP Activity.getVoiceInteractor(): the interactor of the voice interaction session the activity runs in,
+	 * null for an activity that is not part of one. ATL has no voice interaction service, so no activity is. */
+	public VoiceInteractor getVoiceInteractor() {
+		return null;
+	}
+
 	/* AOSP: the package of the activity that started this one with startActivityForResult(); null if that one
 	 * expects no result (it passed no request code, or a negative one) */
 	public String getCallingPackage() {
