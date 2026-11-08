@@ -28,6 +28,7 @@ public class AndroidKeyStore extends KeyStoreSpi {
 	private final static String TAG = "AndroidKeyStore";
 
 	private static native byte[] nativeGetKey(String package_name, String alias);
+	private static native void nativeDeleteKey(String package_name, String alias);
 
 	/* Like keystore2, which keeps an app's keys until the app's data is cleared, the keys live in the app's data
 	 * dir, one file per alias. Keys that earlier versions kept in the desktop keyring (libsecret) are moved there
@@ -132,8 +133,14 @@ public class AndroidKeyStore extends KeyStoreSpi {
 
 	@Override
 	public void engineDeleteEntry(String alias) throws KeyStoreException {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'engineDeleteEntry'");
+		// like keystore2: an unknown alias is not an error, any other failure is a KeyStoreException
+		try {
+			Files.deleteIfExists(keyFile(alias).toPath());
+		} catch (IOException e) {
+			throw new KeyStoreException("Failed to delete entry: " + alias, e);
+		}
+		// a key an earlier version left in the keyring would otherwise be moved back by readKey()
+		nativeDeleteKey(packageName(), alias);
 	}
 
 	@Override
