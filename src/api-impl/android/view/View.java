@@ -30,6 +30,8 @@ import android.graphics.drawable.Drawable;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeProvider;
 import android.os.Handler;
@@ -49,10 +51,17 @@ import android.util.SparseArray;
 import android.util.StateSet;
 import android.util.TypedValue;
 import android.view.WindowInsets;
+import android.widget.Checkable;
+import java.util.List;
+import java.util.Collections;
+import java.util.Arrays;
+import android.view.contentcapture.ContentCaptureSession;
+import android.content.ClipData;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.animation.Transformation;
 import android.view.autofill.AutofillId;
+import android.view.autofill.AutofillValue;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.translation.ViewTranslationCallback;
@@ -119,7 +128,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * This view wants keystrokes. Use with TAKES_FOCUS_MASK when calling
 	 * setFlags.
 	 */
-	private static final int FOCUSABLE = 0x00000001;
+	public static final int FOCUSABLE = 0x00000001;
 
 	/**
 	 * Mask for use with setFlags indicating bits used for focus.
@@ -129,7 +138,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/**
 	 * This view determines focusability automatically. This is the default.
 	 */
-	static final int FOCUSABLE_AUTO = 0x00000010;
+	public static final int FOCUSABLE_AUTO = 0x00000010;
 
 	/**
 	 * This view will adjust its padding to fit sytem windows (e.g. status bar)
@@ -762,8 +771,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		public void onLayoutChange(View view, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom);
 	}
 
+	/* AOSP View.OnUnhandledKeyEventListener: asked about a key the view tree did not handle */
 	public interface OnUnhandledKeyEventListener {
-		// TODO
+		boolean onUnhandledKeyEvent(View v, KeyEvent event);
 	}
 
 	public interface OnFocusChangeListener {
@@ -1090,6 +1100,31 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mListenerInfo = new ListenerInfo();
 		return mListenerInfo;
 	}
+
+	/* AOSP View.X and View.Y: the properties of the view's position (getX()/setX(), getY()/setY()) */
+	public static final Property<View, Float> X = new Property<View, Float>(Float.class, "x") {
+		@Override
+		public void set(View object, Float value) {
+			object.setX(value);
+		}
+
+		@Override
+		public Float get(View object) {
+			return object.getX();
+		}
+	};
+
+	public static final Property<View, Float> Y = new Property<View, Float>(Float.class, "y") {
+		@Override
+		public void set(View object, Float value) {
+			object.setY(value);
+		}
+
+		@Override
+		public Float get(View object) {
+			return object.getY();
+		}
+	};
 
 	public static final Property<View, Float> TRANSLATION_X = new Property<View, Float>(Float.class, "translationX") {
 		@Override
@@ -2270,6 +2305,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (visibility == GONE && currentAnimation != null && animationMore)
 			getHandler().post(new GoneAnimationTicker(currentAnimation));
 		dispatchVisibilityChanged(this, visibility);
+		if (isAttachedToWindow()) {
+			dispatchVisibilityAggregated(!(parent instanceof View) || ((View)parent).isShown());
+		}
 	}
 
 	public void setPadding(int left, int top, int right, int bottom) {
@@ -2297,7 +2335,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void getHitRect(Rect outRect) {
 		outRect.set(left, top, right, bottom);
 	}
-	public final boolean getLocalVisibleRect(Rect r) { return false; }
 
 	@Export
 	public final int getScrollX() {
@@ -2531,20 +2568,47 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mAccessibilityDelegate = delegate;
 	}
 
+	/* AOSP View.AccessibilityDelegate: every method does what the view itself does */
 	public static class AccessibilityDelegate {
-		public void sendAccessibilityEvent(View view, int eventType) {}
+		public void sendAccessibilityEvent(View host, int eventType) {
+			host.sendAccessibilityEventInternal(eventType);
+		}
+
+		public boolean performAccessibilityAction(View host, int action, Bundle args) {
+			return host.performAccessibilityActionInternal(action, args);
+		}
+
+		public void sendAccessibilityEventUnchecked(View host, AccessibilityEvent event) {
+			host.sendAccessibilityEventUncheckedInternal(event);
+		}
+
+		public boolean dispatchPopulateAccessibilityEvent(View host, AccessibilityEvent event) {
+			return host.dispatchPopulateAccessibilityEventInternal(event);
+		}
+
+		public void onPopulateAccessibilityEvent(View host, AccessibilityEvent event) {
+			host.onPopulateAccessibilityEventInternal(event);
+		}
+
+		public void onInitializeAccessibilityEvent(View host, AccessibilityEvent event) {
+			host.onInitializeAccessibilityEventInternal(event);
+		}
+
+		public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {
+			host.onInitializeAccessibilityNodeInfoInternal(info);
+		}
+
+		public boolean onRequestSendAccessibilityEvent(ViewGroup host, View child, AccessibilityEvent event) {
+			return host.onRequestSendAccessibilityEventInternal(child, event);
+		}
 
 		/** As AOSP: the delegate provides no AccessibilityNodeProvider of its own. */
 		public AccessibilityNodeProvider getAccessibilityNodeProvider(View host) {
 			return null;
 		}
 
-		/** As AOSP: the default fills the node with the host's state, which ATL has no accessibility service to ask for. */
-		public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfo info) {}
-
-		/** As AOSP: the default asks the host. */
-		public boolean performAccessibilityAction(View host, int action, Bundle args) {
-			return host.performAccessibilityAction(action, args);
+		public AccessibilityNodeInfo createAccessibilityNodeInfo(View host) {
+			return host.createAccessibilityNodeInfoInternal();
 		}
 	}
 
@@ -2745,6 +2809,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private boolean layouted = false;
 	private boolean in_layout = false;
 
+	/* AOSP View.setFrame(): sets the view's bounds and tells whether they changed. ATL calls onSizeChanged() from its
+	 * own layout path (after GTK has allocated the widget), not from here. */
+	protected boolean setFrame(int left, int top, int right, int bottom) {
+		boolean changed = false;
+		if (this.left != left || this.right != right || this.top != top || this.bottom != bottom) {
+			changed = true;
+			this.left = left;
+			this.top = top;
+			this.right = right;
+			this.bottom = bottom;
+		}
+		return changed;
+	}
+
 	public void layout(int l, int t, int r, int b) {
 		boolean sizeChanged = r - l != right - left || b - t != bottom - top;
 		boolean changed = sizeChanged || l != left || t != top;
@@ -2755,10 +2833,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		int oldW = right - left;
 		int oldH = bottom - top;
 		this.layouted = true;
-		this.left = l;
-		this.top = t;
-		this.right = r;
-		this.bottom = b;
+		setFrame(l, t, r, b);
 		if (this.in_layout)                   // check re-entrancy
 			native_queueAllocate(widget); // GTK is not re-entrant-safe. Queue allocation
 		else {
@@ -2935,7 +3010,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * the system window flags have no effect here */
 	public void makeOptionalFitsSystemWindows() {}
 
-	public void setWillNotDraw(boolean value) {}
 
 	public void setScrollContainer(boolean isScrollContainer) {}
 
@@ -3043,8 +3117,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public boolean isSelected() {
 		return (mPrivateFlags & PFLAG_SELECTED) != 0;
 	}
-
-	public void sendAccessibilityEvent(int eventType) {}
 
 	public void setMinimumHeight(int minHeight) {
 		this.minHeight = minHeight;
@@ -3487,7 +3559,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		saveEnabled = enabled;
 	}
 
-	public boolean willNotDraw() { return false; }
 
 	public void setOnCreateContextMenuListener(View.OnCreateContextMenuListener l) {}
 
@@ -3788,9 +3859,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		postDelayed(action, delayMillis);
 	}
 
-	public void setHorizontalScrollBarEnabled(boolean enabled) {}
 
-	public void setVerticalScrollBarEnabled(boolean enabled) {}
 
 	public void postInvalidateOnAnimation() {
 		postInvalidate();
@@ -3863,7 +3932,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public int getMinimumHeight() { return minHeight; }
 	public int getMinimumWidth() { return minWidth; }
 
-	public boolean isNestedScrollingEnabled() { return false; }
 
 	private boolean clipToOutline;
 	private boolean has_outline_clip;
@@ -4059,7 +4127,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public boolean isInTouchMode() { return false; }
 
-	public void stopNestedScroll() {}
 
 	public long getDrawingTime() {
 		return System.currentTimeMillis();
@@ -4093,6 +4160,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		 * window's root view before); Compose initialises its layout direction there */
 		resolveRtlPropertiesIfNeeded();
 		onAttachedToWindow();
+		/* AOSP View.dispatchAttachedToWindow(): the window the view joined is visible; the view hears it, and that it
+		 * is visible itself if it and its ancestors are */
+		onWindowVisibilityChanged(VISIBLE);
+		if (isShown()) {
+			onVisibilityAggregated(true);
+		}
 
 		ListenerInfo li = mListenerInfo;
 		final CopyOnWriteArrayList<OnAttachStateChangeListener> listeners = li != null ? li.mOnAttachStateChangeListeners : null;
@@ -4111,6 +4184,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	void dispatchDetachedFromWindow() {
 		if (!attachedToWindow)
 			return;
+		/* AOSP View.dispatchDetachedFromWindow(): the window is gone for the view */
+		onWindowVisibilityChanged(GONE);
+		if (isShown()) {
+			onVisibilityAggregated(false);
+		}
 		onDetachedFromWindow();
 		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT; // AOSP's onDetachedFromWindowInternal()
 		removeUnsetPressCallback();
@@ -4148,7 +4226,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public static final int LAYER_TYPE_SOFTWARE = 1;
 	public static final int LAYER_TYPE_HARDWARE = 2;
 
-	public void setLayerType(int layerType, Paint paint) {}
 
 	public float getZ() {
 		return elevation + translation_z;
@@ -4237,8 +4314,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected int computeVerticalScrollExtent() {
 		return getHeight();
 	}
-
-	public void setAccessibilityLiveRegion(int mode) {}
 
 	/* the outline is needed for the elevation shadow and for setClipToOutline() */
 	private boolean needsOutline() {
@@ -4477,14 +4552,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return 0;
 	}
 
-	public void setScrollIndicators(int indicators, int mask) {}
 
 
 	public ColorStateList getBackgroundTintList() { return mBackgroundTintList; }
 
 	public PorterDuff.Mode getBackgroundTintMode() { return mBackgroundTintMode; }
 
-	public String getTransitionName() { return null; }
 
 	public WindowId getWindowId() { return null; }
 
@@ -4492,7 +4565,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false; // FIXME
 	}
 
-	public void setTextDirection(int textDirection) {}
 
 	public Drawable getForeground() {
 		return mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
@@ -4504,7 +4576,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setVerticalScrollbarPosition(int position) {}
 
-	public void setNestedScrollingEnabled(boolean enabled) {}
 
 	/* AOSP View.setTouchDelegate(). The delegate is asked in onTouchEvent(), which GTK calls for a view with a touch
 	 * or click listener or an onTouchEvent() override; it does not add the touch controller itself, because that
@@ -4621,7 +4692,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		sCurrentDragView = newDragTarget;
 	}
 
-	public void setTransitionName(String transitionName) {}
 
 	/**
 	 * Get the animation currently associated with this view.
@@ -4757,12 +4827,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	private native void native_setTooltipText(long widget, String tooltip);
 
-	public int getImportantForAutofill() { return 0; }
-
-	public void setImportantForAutofill(int flag) {}
 
 
-	public void setHorizontalFadingEdgeEnabled(boolean horizontalFadingEdgeEnabled) {}
+
 
 	public Handler getHandler() {
 		if (handler == null)
@@ -4804,11 +4871,36 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		layout(left, top, right, bottom);
 	}
 
-	public void setCameraDistance(float distance) {}
 
-	public boolean requestRectangleOnScreen(Rect rectangle, boolean immediate) { return false; }
+	/* AOSP View.requestRectangleOnScreen(): the parents, from the closest, are asked to make the rectangle (in the
+	 * view's coordinates) visible, e.g. by scrolling; true if any of them moved */
+	public boolean requestRectangleOnScreen(Rect rectangle, boolean immediate) {
+		if (parent == null) {
+			return false;
+		}
+		View child = this;
+		RectF position = new RectF();
+		position.set(rectangle);
+		ViewParent p = parent;
+		boolean scrolled = false;
+		while (p != null) {
+			rectangle.set((int)position.left, (int)position.top, (int)position.right, (int)position.bottom);
+			scrolled |= p.requestChildRectangleOnScreen(child, rectangle, immediate);
+			position.offset(child.getLeft(), child.getTop());
+			if (!(p instanceof View)) {
+				break;
+			}
+			View parentView = (View)p;
+			position.offset(-parentView.getScrollX(), -parentView.getScrollY());
+			child = parentView;
+			p = child.getParent();
+		}
+		return scrolled;
+	}
 
-	public boolean requestRectangleOnScreen(Rect rectangle) { return false; }
+	public boolean requestRectangleOnScreen(Rect rectangle) {
+		return requestRectangleOnScreen(rectangle, false);
+	}
 
 	/* AOSP View.onKeyDown(): Enter and the other confirm keys press a clickable view */
 	@Export
@@ -4903,13 +4995,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return window != null ? window.getWindowInsets() : null;
 	}
 
-	public PointerIcon getPointerIcon() { return null; }
 
-	public void setPointerIcon(PointerIcon pointerIcon) {}
 
 	public IBinder getApplicationWindowToken() { return null; }
 
-	public int getVerticalFadingEdgeLength() { return 0; }
 	public int getVerticalScrollbarWidth() { return 0; }
 
 	public void saveAttributeDataForStyleable(Context ctxt, int[] styleable, AttributeSet attrs, TypedArray t, int defStyleAttr, int defStyleRes) {}
@@ -5019,7 +5108,56 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	}
 
-	public boolean performAccessibilityAction(int action, Bundle arguments) { return false; }
+	/* AOSP View.performAccessibilityAction(): the delegate, else the view, does what an accessibility service asks */
+	public boolean performAccessibilityAction(int action, Bundle arguments) {
+		if (mAccessibilityDelegate != null) {
+			return mAccessibilityDelegate.performAccessibilityAction(this, action, arguments);
+		} else {
+			return performAccessibilityActionInternal(action, arguments);
+		}
+	}
+
+	public boolean performAccessibilityActionInternal(int action, Bundle arguments) {
+		switch (action) {
+		case AccessibilityNodeInfo.ACTION_CLICK:
+			if (isClickable()) {
+				performClick();
+				return true;
+			}
+			break;
+		case AccessibilityNodeInfo.ACTION_LONG_CLICK:
+			if (isLongClickable()) {
+				performLongClick();
+				return true;
+			}
+			break;
+		case AccessibilityNodeInfo.ACTION_FOCUS:
+			if (!hasFocus()) {
+				// Get out of touch mode since accessibility wants to move focus around.
+				return requestFocus();
+			}
+			break;
+		case AccessibilityNodeInfo.ACTION_CLEAR_FOCUS:
+			if (hasFocus()) {
+				clearFocus();
+				return !isFocused();
+			}
+			break;
+		case AccessibilityNodeInfo.ACTION_SELECT:
+			if (!isSelected()) {
+				setSelected(true);
+				return isSelected();
+			}
+			break;
+		case AccessibilityNodeInfo.ACTION_CLEAR_SELECTION:
+			if (isSelected()) {
+				setSelected(false);
+				return !isSelected();
+			}
+			break;
+		}
+		return false;
+	}
 
 	public boolean isDirty() { return false; }
 
@@ -5036,7 +5174,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return result;
 	}
 
-	public boolean isHovered() { return false; }
 
 	public void scrollBy(int x, int y) {
 		scrollTo(scrollX + x, scrollY + y);
@@ -5184,9 +5321,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	protected void onConfigurationChanged(Configuration newConfig) {}
 
-	public boolean isDrawingCacheEnabled() { return false; }
 
-	public void setDrawingCacheEnabled(boolean enabled) {}
 
 	public void setDrawingCacheQuality(int quality) {}
 
@@ -5206,7 +5341,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setKeyboardNavigationCluster(boolean isCluster) {}
 
-	public AutofillId getAutofillId() { return new AutofillId(); }
 
 	public AccessibilityDelegate getAccessibilityDelegate() {
 		return mAccessibilityDelegate;
@@ -5349,7 +5483,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setImportantForContentCapture(int mode) { importantForContentCapture = mode; }
 	public int getImportantForContentCapture() { return importantForContentCapture; }
 	public boolean isImportantForContentCapture() { return false; }
-	public android.view.contentcapture.ContentCaptureSession getContentCaptureSession() { return null; }
 
 	private int outlineAmbientShadowColor = 0xff000000;
 	private int outlineSpotShadowColor = 0xff000000;
@@ -5372,7 +5505,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public CharSequence getAccessibilityPaneTitle() { return accessibilityPaneTitle; }
 	public void setStateDescription(CharSequence description) { stateDescription = description; }
 	public CharSequence getStateDescription() { return stateDescription; }
-	public String[] getReceiveContentMimeTypes() { return null; }
 	public void setRenderEffect(android.graphics.RenderEffect renderEffect) {}
 	/* AOSP View.isShowingLayoutBounds(): DEBUG_DRAW || mAttachInfo.mDebugLayout, both only set by the developer
 	 * option "Show layout bounds" (debug.layout), which ATL does not have */
@@ -5392,37 +5524,1407 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void destroyDrawingCache() {}
 
-	public void setHovered(boolean isHovered) {}
 
-	public void setVerticalFadingEdgeEnabled(boolean verticalFadingEdgeEnabled) {}
 
-	public void setFadingEdgeLength(int length) {}
 
-	public int getAccessibilityLiveRegion() { return 0; }
-
-	public void setLabelFor(int id) {}
-
-	public ArrayList<View> getFocusables(int direction) { return new ArrayList<View>(); }
+	/* AOSP View.getFocusables(): the views a focus search in the direction could go to */
+	public ArrayList<View> getFocusables(int direction) {
+		ArrayList<View> result = new ArrayList<View>(24);
+		addFocusables(result, direction);
+		return result;
+	}
 
 	public WindowInsets onApplyWindowInsets(WindowInsets insets) {
 		return insets;
 	}
 
-	public void setAccessibilityTraversalBefore(int id) {}
-
-	public int getLayerType() { return 0; /* LAYER_TYPE_NONE */ }
-
 	public boolean isAccessibilityFocused() { return false; }
 
-	public float getCameraDistance() { return 0; }
 
 	public OnFocusChangeListener getOnFocusChangeListener() { return onFocusChangeListener; }
 
-	public int getTextDirection() { return 0; /* TEXT_DIRECTION_INHERIT */ }
 
 	public TouchDelegate getTouchDelegate() {
 		return mTouchDelegate;
 	}
 
 	public void setZ(float z) {}
+
+	/* ---- AOSP View, accessibility. ATL has no accessibility service, so nothing asks for these, but an app's
+	 * views and delegates call and override them and expect what AOSP returns and calls. The events and nodes
+	 * are built as in AOSP; AccessibilityManager.isEnabled() is false, so sendAccessibilityEvent() sends none. ---- */
+
+	public static final int IMPORTANT_FOR_ACCESSIBILITY_AUTO = 0x00000000;
+	public static final int IMPORTANT_FOR_ACCESSIBILITY_YES = 0x00000001;
+	public static final int IMPORTANT_FOR_ACCESSIBILITY_NO = 0x00000002;
+	public static final int IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS = 0x00000004;
+	public static final int ACCESSIBILITY_LIVE_REGION_NONE = 0x00000000;
+	public static final int ACCESSIBILITY_LIVE_REGION_POLITE = 0x00000001;
+	public static final int ACCESSIBILITY_LIVE_REGION_ASSERTIVE = 0x00000002;
+	public static final int ACCESSIBILITY_DATA_SENSITIVE_AUTO = 0x00000000;
+	public static final int ACCESSIBILITY_DATA_SENSITIVE_YES = 0x00000001;
+	public static final int ACCESSIBILITY_DATA_SENSITIVE_NO = 0x00000002;
+
+	/** AOSP: ENABLED_FOCUSED_STATE_SET and the others of the combinations of the state sets */
+	protected static final int[] ENABLED_FOCUSED_STATE_SET = new int[] {R.attr.state_enabled, R.attr.state_focused};
+
+	private int mAccessibilityViewId = NO_ID;
+	private int mLabelForId = NO_ID;
+	private int mAccessibilityTraversalBeforeId = NO_ID;
+	private int mAccessibilityTraversalAfterId = NO_ID;
+	private int mAccessibilityDataSensitive = ACCESSIBILITY_DATA_SENSITIVE_AUTO;
+	private int mAccessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_NONE;
+	private static int sNextAccessibilityViewId;
+
+	/* AOSP View.getAccessibilityViewId(): the id the node ids of an accessibility service are made of, given out
+	 * once per view */
+	public int getAccessibilityViewId() {
+		if (mAccessibilityViewId == NO_ID) {
+			mAccessibilityViewId = sNextAccessibilityViewId++;
+		}
+		return mAccessibilityViewId;
+	}
+
+	/* AOSP: the id of the window in the accessibility service's view of the windows; ATL has one window per
+	 * root view and UNDEFINED_WINDOW_ID (-1) for a view that is in none */
+	public int getAccessibilityWindowId() {
+		return isAttachedToWindow() ? System.identityHashCode(getRootView()) & 0x7fffffff : -1;
+	}
+
+	public CharSequence getAccessibilityClassName() {
+		return View.class.getName();
+	}
+
+	public int getLabelFor() {
+		return mLabelForId;
+	}
+
+	public void setLabelFor(int id) {
+		if (mLabelForId == id) {
+			return;
+		}
+		mLabelForId = id;
+		if (mLabelForId != View.NO_ID && this.id == NO_ID) {
+			this.id = generateViewId();
+		}
+	}
+
+	public int getAccessibilityTraversalBefore() {
+		return mAccessibilityTraversalBeforeId;
+	}
+
+	public void setAccessibilityTraversalBefore(int beforeId) {
+		if (mAccessibilityTraversalBeforeId == beforeId) {
+			return;
+		}
+		mAccessibilityTraversalBeforeId = beforeId;
+	}
+
+	public int getAccessibilityTraversalAfter() {
+		return mAccessibilityTraversalAfterId;
+	}
+
+	public void setAccessibilityTraversalAfter(int afterId) {
+		if (mAccessibilityTraversalAfterId == afterId) {
+			return;
+		}
+		mAccessibilityTraversalAfterId = afterId;
+	}
+
+	public int getAccessibilityLiveRegion() {
+		return mAccessibilityLiveRegion;
+	}
+
+	public void setAccessibilityLiveRegion(int mode) {
+		if (mode != mAccessibilityLiveRegion) {
+			mAccessibilityLiveRegion = mode;
+		}
+	}
+
+	/* AOSP View.setAccessibilityDataSensitive(): ACCESSIBILITY_DATA_SENSITIVE_* ; an auto view is sensitive
+	 * when an ancestor is, isAccessibilityDataSensitive() answers for the view itself */
+	public void setAccessibilityDataSensitive(int mode) {
+		mAccessibilityDataSensitive = mode;
+	}
+
+	public boolean isAccessibilityDataSensitive() {
+		if (mAccessibilityDataSensitive == ACCESSIBILITY_DATA_SENSITIVE_YES) {
+			return true;
+		}
+		if (mAccessibilityDataSensitive == ACCESSIBILITY_DATA_SENSITIVE_NO) {
+			return false;
+		}
+		ViewParent p = parent;
+		while (p instanceof View) {
+			View v = (View)p;
+			if (v.mAccessibilityDataSensitive != ACCESSIBILITY_DATA_SENSITIVE_AUTO) {
+				return v.mAccessibilityDataSensitive == ACCESSIBILITY_DATA_SENSITIVE_YES;
+			}
+			p = v.parent;
+		}
+		return false;
+	}
+
+	/* AOSP: the view takes part in the accessibility tree of an accessibility service */
+	public boolean isImportantForAccessibility() {
+		final int mode = getImportantForAccessibility();
+		if (mode == IMPORTANT_FOR_ACCESSIBILITY_NO || mode == IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS) {
+			return false;
+		}
+		// Check parent mode to ensure we're not hidden.
+		ViewParent p = parent;
+		while (p instanceof View) {
+			if (((View)p).getImportantForAccessibility() == IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS) {
+				return false;
+			}
+			p = p.getParent();
+		}
+		return mode == IMPORTANT_FOR_ACCESSIBILITY_YES || isActionableForAccessibility() || hasListenersForAccessibility()
+		    || getAccessibilityNodeProvider() != null || getAccessibilityLiveRegion() != ACCESSIBILITY_LIVE_REGION_NONE
+		    || isAccessibilityPane();
+	}
+
+	boolean isAccessibilityPane() {
+		return getAccessibilityPaneTitle() != null;
+	}
+
+	/* AOSP View.isActionableForAccessibility() */
+	public boolean isActionableForAccessibility() {
+		return (isClickable() || isLongClickable() || isFocusable());
+	}
+
+	private boolean hasListenersForAccessibility() {
+		ListenerInfo li = mListenerInfo;
+		return mTouchDelegate != null || on_touch_listener != null || (li != null && (li.mOnKeyListener != null || li.mOnGenericMotionListener != null || li.mOnHoverListener != null || li.mOnDragListener != null));
+	}
+
+	/* AOSP View.includeForAccessibility(): without an accessibility service that asks for the unimportant
+	 * views as well, a view is in the tree if it is important */
+	public boolean includeForAccessibility() {
+		return isAttachedToWindow() && isImportantForAccessibility();
+	}
+
+	/* AOSP View.getParentForAccessibility(): the closest ancestor that is in the accessibility tree */
+	public ViewParent getParentForAccessibility() {
+		if (parent instanceof View) {
+			View parentView = (View)parent;
+			if (parentView.includeForAccessibility()) {
+				return parent;
+			} else {
+				return parentView.getParentForAccessibility();
+			}
+		}
+		return null;
+	}
+
+	/* AOSP View.isVisibleToUser(): attached, shown, not transparent and with a part in the visible rectangle */
+	public boolean isVisibleToUser() {
+		return isVisibleToUser(null);
+	}
+
+	protected boolean isVisibleToUser(Rect boundInView) {
+		if (!isAttachedToWindow() || getWindowVisibility() != VISIBLE) {
+			return false;
+		}
+		View current = this;
+		while (current != null) {
+			if (current.getAlpha() <= 0 || current.getTransitionAlpha() <= 0 || current.getVisibility() != VISIBLE) {
+				return false;
+			}
+			current = current.parent instanceof View ? (View)current.parent : null;
+		}
+		Rect visibleRect = new Rect();
+		if (!getGlobalVisibleRect(visibleRect)) {
+			return false;
+		}
+		if (boundInView != null) {
+			boundInView.set(visibleRect);
+		}
+		return true;
+	}
+
+	public AccessibilityNodeProvider getAccessibilityNodeProvider() {
+		if (mAccessibilityDelegate != null) {
+			return mAccessibilityDelegate.getAccessibilityNodeProvider(this);
+		}
+		return null;
+	}
+
+	/* AOSP View.sendAccessibilityEvent(): the delegate, else the view itself, builds the event and sends it if
+	 * an accessibility service asks for events */
+	public void sendAccessibilityEvent(int eventType) {
+		if (mAccessibilityDelegate != null) {
+			mAccessibilityDelegate.sendAccessibilityEvent(this, eventType);
+		} else {
+			sendAccessibilityEventInternal(eventType);
+		}
+	}
+
+	public void sendAccessibilityEventInternal(int eventType) {
+		if (AccessibilityManager.getInstance(context).isEnabled()) {
+			sendAccessibilityEventUnchecked(AccessibilityEvent.obtain(eventType));
+		}
+	}
+
+	public void sendAccessibilityEventUnchecked(AccessibilityEvent event) {
+		if (mAccessibilityDelegate != null) {
+			mAccessibilityDelegate.sendAccessibilityEventUnchecked(this, event);
+		} else {
+			sendAccessibilityEventUncheckedInternal(event);
+		}
+	}
+
+	public void sendAccessibilityEventUncheckedInternal(AccessibilityEvent event) {
+		// Panes disappearing are relevant even if though the view is no longer visible.
+		boolean isWindowStateChanged = (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED);
+		boolean isWindowDisappearedEvent = isWindowStateChanged && ((event.getContentChangeTypes() & AccessibilityEvent.CONTENT_CHANGE_TYPE_PANE_DISAPPEARED) != 0);
+		if (!isShown() && !isWindowDisappearedEvent) {
+			return;
+		}
+		onInitializeAccessibilityEvent(event);
+		// Only a subset of accessibility events populates text content.
+		if ((event.getEventType() & POPULATING_ACCESSIBILITY_EVENT_TYPES) != 0) {
+			dispatchPopulateAccessibilityEvent(event);
+		}
+		// In the beginning we called #isShown(), so we know that getParent() is not null.
+		ViewParent parent = getParent();
+		if (parent != null) {
+			parent.requestSendAccessibilityEvent(this, event);
+		}
+	}
+
+	private static final int POPULATING_ACCESSIBILITY_EVENT_TYPES = AccessibilityEvent.TYPE_VIEW_CLICKED | AccessibilityEvent.TYPE_VIEW_LONG_CLICKED
+	    | AccessibilityEvent.TYPE_VIEW_SELECTED | AccessibilityEvent.TYPE_VIEW_FOCUSED | AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+	    | AccessibilityEvent.TYPE_VIEW_HOVER_ENTER | AccessibilityEvent.TYPE_VIEW_HOVER_EXIT | AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
+	    | AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED | AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED
+	    | AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED | AccessibilityEvent.TYPE_VIEW_CONTEXT_CLICKED
+	    | AccessibilityEvent.TYPE_ANNOUNCEMENT;
+
+	public boolean dispatchPopulateAccessibilityEvent(AccessibilityEvent event) {
+		boolean handled = false;
+		if (mAccessibilityDelegate != null) {
+			handled = mAccessibilityDelegate.dispatchPopulateAccessibilityEvent(this, event);
+		} else {
+			handled = dispatchPopulateAccessibilityEventInternal(event);
+		}
+		return handled;
+	}
+
+	public boolean dispatchPopulateAccessibilityEventInternal(AccessibilityEvent event) {
+		onPopulateAccessibilityEvent(event);
+		return false;
+	}
+
+	public void onPopulateAccessibilityEvent(AccessibilityEvent event) {
+		if (mAccessibilityDelegate != null) {
+			mAccessibilityDelegate.onPopulateAccessibilityEvent(this, event);
+		} else {
+			onPopulateAccessibilityEventInternal(event);
+		}
+	}
+
+	public void onPopulateAccessibilityEventInternal(AccessibilityEvent event) {
+		if ((event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) && !TextUtils.isEmpty(getAccessibilityPaneTitle())) {
+			event.getText().add(getAccessibilityPaneTitle());
+		}
+	}
+
+	public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
+		if (mAccessibilityDelegate != null) {
+			mAccessibilityDelegate.onInitializeAccessibilityEvent(this, event);
+		} else {
+			onInitializeAccessibilityEventInternal(event);
+		}
+	}
+
+	public void onInitializeAccessibilityEventInternal(AccessibilityEvent event) {
+		event.setSource(this);
+		event.setClassName(getAccessibilityClassName());
+		event.setPackageName(getContext().getPackageName());
+		event.setEnabled(isEnabled());
+		event.setContentDescription(getContentDescription());
+		if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_FOCUSED) {
+			ArrayList<View> focusablesTempList = new ArrayList<View>();
+			getRootView().addFocusables(focusablesTempList, View.FOCUS_FORWARD, FOCUSABLES_ALL);
+			event.setItemCount(focusablesTempList.size());
+			event.setCurrentItemIndex(focusablesTempList.indexOf(this));
+		}
+	}
+
+	public AccessibilityNodeInfo createAccessibilityNodeInfo() {
+		if (mAccessibilityDelegate != null) {
+			return mAccessibilityDelegate.createAccessibilityNodeInfo(this);
+		} else {
+			return createAccessibilityNodeInfoInternal();
+		}
+	}
+
+	public AccessibilityNodeInfo createAccessibilityNodeInfoInternal() {
+		AccessibilityNodeProvider provider = getAccessibilityNodeProvider();
+		if (provider != null) {
+			return provider.createAccessibilityNodeInfo(AccessibilityNodeProvider.HOST_VIEW_ID);
+		} else {
+			AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain(this);
+			onInitializeAccessibilityNodeInfo(info);
+			return info;
+		}
+	}
+
+	public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+		if (mAccessibilityDelegate != null) {
+			mAccessibilityDelegate.onInitializeAccessibilityNodeInfo(this, info);
+		} else {
+			onInitializeAccessibilityNodeInfoInternal(info);
+		}
+	}
+
+	public void onInitializeAccessibilityNodeInfoInternal(AccessibilityNodeInfo info) {
+		if (!isAttachedToWindow()) {
+			return;
+		}
+		Rect bounds = new Rect();
+		getDrawingRect(bounds);
+		info.setBoundsInParent(bounds);
+		int[] location = new int[2];
+		getLocationOnScreen(location);
+		bounds.offsetTo(location[0], location[1]);
+		info.setBoundsInScreen(bounds);
+		ViewParent parentForAccessibility = getParentForAccessibility();
+		if (parentForAccessibility instanceof View) {
+			info.setParent((View)parentForAccessibility);
+		}
+		info.setVisibleToUser(isVisibleToUser());
+		info.setImportantForAccessibility(isImportantForAccessibility());
+		info.setAccessibilityDataSensitive(isAccessibilityDataSensitive());
+		info.setPackageName(getContext().getPackageName());
+		info.setClassName(getAccessibilityClassName());
+		info.setContentDescription(getContentDescription());
+		info.setEnabled(isEnabled());
+		info.setClickable(isClickable());
+		info.setFocusable(isFocusable());
+		info.setScreenReaderFocusable(isScreenReaderFocusable());
+		info.setFocused(isFocused());
+		info.setAccessibilityFocused(isAccessibilityFocused());
+		info.setSelected(isSelected());
+		info.setLongClickable(isLongClickable());
+		info.setContextClickable(isContextClickable());
+		info.setHeading(isAccessibilityHeading());
+	}
+
+
+	/* ---- AOSP View members that apps call and override and that ATL had no counterpart for. Where the state
+	 * only matters to AOSP's own renderer or to a system service that ATL does not have, the state is kept and
+	 * returned, as AOSP does; what stays without effect is said at the member. ---- */
+
+	public static final int FIND_VIEWS_WITH_TEXT = 0x00000001;
+	public static final int FIND_VIEWS_WITH_CONTENT_DESCRIPTION = 0x00000002;
+	public static final int SCROLL_INDICATOR_TOP = 0x1;
+	public static final int SCROLL_INDICATOR_BOTTOM = 0x2;
+	public static final int SCROLL_INDICATOR_LEFT = 0x4;
+	public static final int SCROLL_INDICATOR_RIGHT = 0x8;
+	public static final int SCROLL_INDICATOR_START = 0x10;
+	public static final int SCROLL_INDICATOR_END = 0x20;
+	public static final int CONTENT_SENSITIVITY_AUTO = 0x0;
+	public static final int CONTENT_SENSITIVITY_SENSITIVE = 0x1;
+	public static final int CONTENT_SENSITIVITY_NOT_SENSITIVE = 0x2;
+
+	/* AOSP View.findViewsWithText(): the views whose content description (or, for a TextView, text) holds the
+	 * searched text, ignoring case */
+	public void findViewsWithText(ArrayList<View> outViews, CharSequence searched, int flags) {
+		if ((flags & FIND_VIEWS_WITH_CONTENT_DESCRIPTION) != 0 && !TextUtils.isEmpty(searched) && !TextUtils.isEmpty(getContentDescription())) {
+			String searchedLowerCase = searched.toString().toLowerCase();
+			String contentDescriptionLowerCase = getContentDescription().toString().toLowerCase();
+			if (contentDescriptionLowerCase.contains(searchedLowerCase)) {
+				outViews.add(this);
+			}
+		}
+	}
+
+	/* AOSP View.getLocalVisibleRect(): the visible part of the view in its own coordinates */
+	public final boolean getLocalVisibleRect(Rect r) {
+		final Point offset = new Point();
+		if (getGlobalVisibleRect(r, offset)) {
+			r.offset(-offset.x, -offset.y); // make r local
+			return true;
+		}
+		return false;
+	}
+
+	/* AOSP View.getFocusable(): FOCUSABLE_AUTO, FOCUSABLE or NOT_FOCUSABLE as set */
+	public int getFocusable() {
+		return (mViewFlags & FOCUSABLE_AUTO) > 0 ? FOCUSABLE_AUTO : mViewFlags & FOCUSABLE;
+	}
+
+	private boolean mFocusedByDefault;
+
+	public boolean isFocusedByDefault() {
+		return mFocusedByDefault;
+	}
+
+	public void setFocusedByDefault(boolean isFocusedByDefault) {
+		mFocusedByDefault = isFocusedByDefault;
+	}
+
+	/* AOSP: the scroll bars and the fading edges are drawn by the view's own renderer. A GTK scrolled view draws
+	 * its own, so these keep what the app set and the view draws neither; awakenScrollBars() reports that no
+	 * scroll bar was shown (AOSP: false when the view has none to show). */
+	private boolean mHorizontalScrollBarEnabled;
+	private boolean mVerticalScrollBarEnabled;
+	private boolean mHorizontalFadingEdgeEnabled;
+	private boolean mVerticalFadingEdgeEnabled;
+	private int mFadingEdgeLength = -1;
+
+	public boolean isHorizontalScrollBarEnabled() {
+		return mHorizontalScrollBarEnabled;
+	}
+
+	public void setHorizontalScrollBarEnabled(boolean enabled) {
+		mHorizontalScrollBarEnabled = enabled;
+	}
+
+	public boolean isVerticalScrollBarEnabled() {
+		return mVerticalScrollBarEnabled;
+	}
+
+	public void setVerticalScrollBarEnabled(boolean enabled) {
+		mVerticalScrollBarEnabled = enabled;
+	}
+
+	public boolean isHorizontalFadingEdgeEnabled() {
+		return mHorizontalFadingEdgeEnabled;
+	}
+
+	public void setHorizontalFadingEdgeEnabled(boolean enabled) {
+		mHorizontalFadingEdgeEnabled = enabled;
+	}
+
+	public boolean isVerticalFadingEdgeEnabled() {
+		return mVerticalFadingEdgeEnabled;
+	}
+
+	public void setVerticalFadingEdgeEnabled(boolean enabled) {
+		mVerticalFadingEdgeEnabled = enabled;
+	}
+
+	public void setFadingEdgeLength(int length) {
+		mFadingEdgeLength = length;
+	}
+
+	private int fadingEdgeLength() {
+		return mFadingEdgeLength >= 0 ? mFadingEdgeLength : ViewConfiguration.get(context).getScaledFadingEdgeLength();
+	}
+
+	public int getVerticalFadingEdgeLength() {
+		return isVerticalFadingEdgeEnabled() ? fadingEdgeLength() : 0;
+	}
+
+	public int getHorizontalFadingEdgeLength() {
+		return isHorizontalFadingEdgeEnabled() ? fadingEdgeLength() : 0;
+	}
+
+	protected float getTopFadingEdgeStrength() {
+		return computeVerticalScrollOffset() > 0 ? 1.0f : 0.0f;
+	}
+
+	protected float getBottomFadingEdgeStrength() {
+		return computeVerticalScrollOffset() + computeVerticalScrollExtent() < computeVerticalScrollRange() ? 1.0f : 0.0f;
+	}
+
+	protected float getLeftFadingEdgeStrength() {
+		return computeHorizontalScrollOffset() > 0 ? 1.0f : 0.0f;
+	}
+
+	protected float getRightFadingEdgeStrength() {
+		return computeHorizontalScrollOffset() + computeHorizontalScrollExtent() < computeHorizontalScrollRange() ? 1.0f : 0.0f;
+	}
+
+	protected boolean awakenScrollBars(int startDelay) {
+		return false;
+	}
+
+	protected boolean awakenScrollBars(int startDelay, boolean invalidate) {
+		return false;
+	}
+
+	/* AOSP View.getSolidColor(): the color a view with a fading edge fades to; 0, no color, by default */
+	public int getSolidColor() {
+		return 0;
+	}
+
+	private int mScrollIndicators;
+
+	public int getScrollIndicators() {
+		return mScrollIndicators;
+	}
+
+	public void setScrollIndicators(int indicators) {
+		setScrollIndicators(indicators, SCROLL_INDICATOR_TOP | SCROLL_INDICATOR_BOTTOM | SCROLL_INDICATOR_LEFT | SCROLL_INDICATOR_RIGHT | SCROLL_INDICATOR_START | SCROLL_INDICATOR_END);
+	}
+
+	public void setScrollIndicators(int indicators, int mask) {
+		mask &= SCROLL_INDICATOR_TOP | SCROLL_INDICATOR_BOTTOM | SCROLL_INDICATOR_LEFT | SCROLL_INDICATOR_RIGHT | SCROLL_INDICATOR_START | SCROLL_INDICATOR_END;
+		mScrollIndicators = (mScrollIndicators & ~mask) | (indicators & mask);
+	}
+
+	private List<Rect> mPreferKeepClearRects;
+
+	/* AOSP View.setPreferKeepClearRects(): the areas the system should keep clear of other windows' overlays;
+	 * the desktop has no such overlays, the list is only kept */
+	public void setPreferKeepClearRects(List<Rect> rects) {
+		mPreferKeepClearRects = (rects == null || rects.isEmpty()) ? null : new ArrayList<Rect>(rects);
+	}
+
+	public List<Rect> getPreferKeepClearRects() {
+		return mPreferKeepClearRects == null ? Collections.<Rect>emptyList() : new ArrayList<Rect>(mPreferKeepClearRects);
+	}
+
+	private boolean mFilterTouchesWhenObscured;
+
+	/* AOSP: touches are dropped while another window covers the view; on a desktop GTK delivers them to the
+	 * window under the pointer, so the flag is kept (getFilterTouchesWhenObscured()) and not acted on */
+	public void setFilterTouchesWhenObscured(boolean enabled) {
+		mFilterTouchesWhenObscured = enabled;
+	}
+
+	public boolean getFilterTouchesWhenObscured() {
+		return mFilterTouchesWhenObscured;
+	}
+
+	private int mContentSensitivity = CONTENT_SENSITIVITY_AUTO;
+
+	public final void setContentSensitivity(int mode) {
+		mContentSensitivity = mode;
+	}
+
+	public final int getContentSensitivity() {
+		return mContentSensitivity;
+	}
+
+	/* AOSP View.isContentSensitive(): auto is sensitive when an ancestor is */
+	public final boolean isContentSensitive() {
+		if (mContentSensitivity != CONTENT_SENSITIVITY_AUTO) {
+			return mContentSensitivity == CONTENT_SENSITIVITY_SENSITIVE;
+		}
+		ViewParent p = parent;
+		while (p instanceof View) {
+			View v = (View)p;
+			if (v.mContentSensitivity != CONTENT_SENSITIVITY_AUTO) {
+				return v.mContentSensitivity == CONTENT_SENSITIVITY_SENSITIVE;
+			}
+			p = v.parent;
+		}
+		return false;
+	}
+
+	private float mFrameContentVelocity = 0;
+	private float mRequestedFrameRate = 0;
+
+	/* AOSP View.setFrameContentVelocity() and setRequestedFrameRate(): hints to the display's frame rate chooser.
+	 * GTK paints at the monitor's rate, the hints are kept and returned */
+	public void setFrameContentVelocity(float pixelsPerSecond) {
+		mFrameContentVelocity = pixelsPerSecond;
+	}
+
+	public float getFrameContentVelocity() {
+		return mFrameContentVelocity;
+	}
+
+	public void setRequestedFrameRate(float frameRate) {
+		mRequestedFrameRate = frameRate;
+	}
+
+	public float getRequestedFrameRate() {
+		return mRequestedFrameRate;
+	}
+
+	public void dispatchStartTemporaryDetach() {
+		onStartTemporaryDetach();
+	}
+
+	public void dispatchFinishTemporaryDetach() {
+		onFinishTemporaryDetach();
+	}
+
+	/* AOSP: the view is cleaned up for the time it is detached (a list view recycling it): its pending click and
+	 * pressed state go; ATL keeps neither as view state, so nothing is left to clear */
+	public void onStartTemporaryDetach() {
+	}
+
+	public void onFinishTemporaryDetach() {
+	}
+
+	public void dispatchConfigurationChanged(Configuration newConfig) {
+		onConfigurationChanged(newConfig);
+	}
+
+	public void onCancelPendingInputEvents() {
+		cancelLongPress();
+	}
+
+	public void dispatchCancelPendingInputEvents() {
+		onCancelPendingInputEvents();
+	}
+
+	/* AOSP View.onTrackballEvent() and dispatchTrackballEvent(): no trackball here, so the events never come, but
+	 * a view that is sent one lets onTrackballEvent() decide */
+	public boolean onTrackballEvent(MotionEvent event) {
+		return false;
+	}
+
+	public boolean dispatchTrackballEvent(MotionEvent event) {
+		return onTrackballEvent(event);
+	}
+
+	public boolean dispatchKeyEventPreIme(KeyEvent event) {
+		return onKeyPreIme(event.getKeyCode(), event);
+	}
+
+	public boolean dispatchUnhandledMove(View focused, int direction) {
+		return false;
+	}
+
+	/* AOSP View.fitSystemWindows(): the deprecated way to take the window insets; the view that fits system
+	 * windows pads itself by them */
+	@Deprecated
+	protected boolean fitSystemWindows(Rect insets) {
+		if (getFitsSystemWindows()) {
+			setPadding(insets.left, insets.top, insets.right, insets.bottom);
+			return true;
+		}
+		return false;
+	}
+
+	/* AOSP View.onWindowVisibilityChanged(): a view is told when the visibility of its window changes; ATL's window
+	 * is visible while the view is attached */
+	protected void onWindowVisibilityChanged(int visibility) {
+	}
+
+	public void dispatchWindowVisibilityChanged(int visibility) {
+		onWindowVisibilityChanged(visibility);
+	}
+
+	public void onVisibilityAggregated(boolean isVisible) {
+	}
+
+	/* AOSP: tells onVisibilityAggregated() whether the view and all its ancestors are visible */
+	boolean dispatchVisibilityAggregated(boolean isVisible) {
+		final boolean thisVisible = getVisibility() == VISIBLE;
+		// If we're not visible but something is telling us we are, ignore it.
+		if (thisVisible || !isVisible) {
+			onVisibilityAggregated(isVisible);
+		}
+		return thisVisible && isVisible;
+	}
+
+	public void onWindowSystemUiVisibilityChanged(int visible) {
+	}
+
+	public void dispatchWindowSystemUiVisiblityChanged(int visible) {
+		onWindowSystemUiVisibilityChanged(visible);
+	}
+
+	/* AOSP View.onSetAlpha(): a subclass that draws with the alpha itself returns true */
+	protected boolean onSetAlpha(int alpha) {
+		return false;
+	}
+
+	/* AOSP View.onResolvePointerIcon(): the icon for the pointer over the view */
+	public PointerIcon onResolvePointerIcon(MotionEvent event, int pointerIndex) {
+		return getPointerIcon();
+	}
+
+	private PointerIcon mPointerIcon;
+
+	public PointerIcon getPointerIcon() {
+		return mPointerIcon;
+	}
+
+	public void setPointerIcon(PointerIcon pointerIcon) {
+		mPointerIcon = pointerIcon;
+	}
+
+	public View keyboardNavigationClusterSearch(View currentCluster, int direction) {
+		if (isKeyboardNavigationCluster()) {
+			currentCluster = this;
+		}
+		/* AOSP asks the root of the cluster namespace, which finds the next cluster of the tree; ATL has none
+		 * (isKeyboardNavigationCluster() is always false), so there is no other cluster to go to */
+		return null;
+	}
+
+	private int mLayerType;
+	private Paint mLayerPaint;
+
+	/* AOSP View.setLayerType(): the hardware layer of the view; a GTK widget renders into its own surface
+	 * already, the type and the paint are kept and returned */
+	public void setLayerType(int layerType, Paint paint) {
+		if (layerType < 0 || layerType > 2) {
+			throw new IllegalArgumentException("Layer type can only be one of: LAYER_TYPE_NONE, "
+							   + "LAYER_TYPE_SOFTWARE or LAYER_TYPE_HARDWARE");
+		}
+		mLayerType = layerType;
+		mLayerPaint = paint;
+	}
+
+	public void setLayerPaint(Paint paint) {
+		mLayerPaint = paint;
+	}
+
+	public int getLayerType() {
+		return mLayerType;
+	}
+
+	public void buildLayer() {
+		if (mLayerType == 0) {
+			return;
+		}
+		if (!isAttachedToWindow()) {
+			throw new IllegalStateException("This view must be attached to a window first");
+		}
+	}
+
+	private boolean mDrawingCacheEnabled;
+
+	public boolean isDrawingCacheEnabled() {
+		return mDrawingCacheEnabled;
+	}
+
+	public void setDrawingCacheEnabled(boolean enabled) {
+		mDrawingCacheEnabled = enabled;
+	}
+
+	public void buildDrawingCache() {
+		buildDrawingCache(false);
+	}
+
+	private boolean mWillNotDraw;
+
+	public void setWillNotDraw(boolean willNotDraw) {
+		mWillNotDraw = willNotDraw;
+	}
+
+	public boolean willNotDraw() {
+		return mWillNotDraw;
+	}
+
+	private String mTransitionName;
+
+	public String getTransitionName() {
+		return mTransitionName;
+	}
+
+	public void setTransitionName(String transitionName) {
+		mTransitionName = transitionName;
+	}
+
+	private int mTextDirection = 0; // TEXT_DIRECTION_INHERIT
+
+	public void setTextDirection(int textDirection) {
+		mTextDirection = textDirection;
+	}
+
+	/* AOSP View.getTextDirection(): the resolved direction (TEXT_DIRECTION_INHERIT is resolved through the parents and
+	 * the default is first strong, in an LTR or RTL locale) */
+	public int getTextDirection() {
+		int direction = mTextDirection;
+		ViewParent p = parent;
+		while (direction == 0 && p instanceof View) {
+			direction = ((View)p).mTextDirection;
+			p = ((View)p).parent;
+		}
+		return direction == 0 ? 1 /* TEXT_DIRECTION_FIRST_STRONG */ : direction;
+	}
+
+	private float mCameraDistance;
+
+	public void setCameraDistance(float distance) {
+		mCameraDistance = distance;
+	}
+
+	public float getCameraDistance() {
+		return mCameraDistance;
+	}
+
+	private boolean mHovered;
+
+	public boolean isHovered() {
+		return mHovered;
+	}
+
+	public void setHovered(boolean hovered) {
+		mHovered = hovered;
+	}
+
+	/* AOSP View.postInvalidateDelayed() and postInvalidateOnAnimation(): invalidate later / at the next frame */
+	public void postInvalidateDelayed(long delayMilliseconds) {
+		postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				invalidate();
+			}
+		}, delayMilliseconds);
+	}
+
+	public void postInvalidateOnAnimation(int left, int top, int right, int bottom) {
+		postInvalidate(left, top, right, bottom);
+	}
+
+	/* AOSP View.showContextMenu(): ATL has no context menus (the OnCreateContextMenuListener is never asked), so
+	 * no menu is shown and AOSP's answer for a view whose menu could not be shown is false */
+	public boolean showContextMenu() {
+		return false;
+	}
+
+	/* AOSP View.OnUnhandledKeyEventListener: asked after the tree did not handle a key, the listeners of the
+	 * children first */
+	private ArrayList<OnUnhandledKeyEventListener> mUnhandledKeyListeners;
+
+	public void addOnUnhandledKeyEventListener(OnUnhandledKeyEventListener listener) {
+		if (mUnhandledKeyListeners == null) {
+			mUnhandledKeyListeners = new ArrayList<OnUnhandledKeyEventListener>();
+		}
+		mUnhandledKeyListeners.add(listener);
+	}
+
+	public void removeOnUnhandledKeyEventListener(OnUnhandledKeyEventListener listener) {
+		if (mUnhandledKeyListeners != null) {
+			mUnhandledKeyListeners.remove(listener);
+			if (mUnhandledKeyListeners.size() == 0) {
+				mUnhandledKeyListeners = null;
+			}
+		}
+	}
+
+	boolean hasUnhandledKeyListener() {
+		return mUnhandledKeyListeners != null;
+	}
+
+	boolean dispatchUnhandledKeyEvent(KeyEvent evt) {
+		if (mUnhandledKeyListeners != null) {
+			for (int i = mUnhandledKeyListeners.size() - 1; i >= 0; i--) {
+				if (mUnhandledKeyListeners.get(i).onUnhandledKeyEvent(this, evt)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/* AOSP View.setOnReceiveContentListener() and performReceiveContent(): content (a paste, a drop, a keyboard
+	 * image) goes to the listener, which gives back what it did not take; onReceiveContent() is the default for a
+	 * view without one */
+	private OnReceiveContentListener mOnReceiveContentListener;
+	private String[] mOnReceiveContentMimeTypes;
+
+	public void setOnReceiveContentListener(String[] mimeTypes, OnReceiveContentListener listener) {
+		if (listener == null) {
+			mimeTypes = null;
+		}
+		if (mimeTypes != null) {
+			boolean hasMimeType = false;
+			for (String mimeType : mimeTypes) {
+				if (mimeType.startsWith("*")) {
+					throw new IllegalArgumentException("A MIME type set here must not start with *: '" + mimeType + "'");
+				}
+				hasMimeType = true;
+			}
+			if (!hasMimeType) {
+				throw new IllegalArgumentException("MIME types can't be empty");
+			}
+		}
+		mOnReceiveContentMimeTypes = mimeTypes == null ? null : Arrays.copyOf(mimeTypes, mimeTypes.length);
+		mOnReceiveContentListener = listener;
+	}
+
+	public String[] getReceiveContentMimeTypes() {
+		return mOnReceiveContentMimeTypes;
+	}
+
+	public ContentInfo performReceiveContent(ContentInfo payload) {
+		final OnReceiveContentListener listener = mOnReceiveContentListener;
+		if (listener != null) {
+			final ContentInfo remaining = listener.onReceiveContent(this, payload);
+			return (remaining == null) ? null : onReceiveContent(remaining);
+		}
+		return onReceiveContent(payload);
+	}
+
+	public ContentInfo onReceiveContent(ContentInfo payload) {
+		return payload;
+	}
+
+	/* AOSP View.startDragAndDrop(), updateDragShadow() and cancelDragAndDrop(): the drag of a view's data to a
+	 * view of any window. ATL has no drag source (GTK's GtkDragSource is not wired to the views, only drops from the
+	 * desktop reach onDragEvent()), so a drag cannot start: AOSP's answer for a drag that did not start is false, and
+	 * with no drag going on updateDragShadow() and cancelDragAndDrop() do what AOSP does then, log and return. */
+	public final boolean startDragAndDrop(ClipData data, DragShadowBuilder shadowBuilder, Object myLocalState, int flags) {
+		Slog.w("View", "startDragAndDrop: ATL has no drag source, no drag is started");
+		return false;
+	}
+
+	@Deprecated
+	public final boolean startDrag(ClipData data, DragShadowBuilder shadowBuilder, Object myLocalState, int flags) {
+		return startDragAndDrop(data, shadowBuilder, myLocalState, flags);
+	}
+
+	public final void updateDragShadow(DragShadowBuilder shadowBuilder) {
+		Slog.w("View", "updateDragShadow called when not dragging.");
+	}
+
+	public final void cancelDragAndDrop() {
+		Slog.w("View", "No active drag to cancel");
+	}
+
+	/* ---- AOSP View, autofill and assist structure. ATL has no autofill service or assist: the system never calls
+	 * onProvide*Structure(), but the methods are the ones apps override and call themselves (a custom view fills
+	 * its virtual children in them), and they fill the ViewStructure as AOSP does. ---- */
+
+	public static final int AUTOFILL_TYPE_NONE = 0;
+	public static final int AUTOFILL_TYPE_TEXT = 1;
+	public static final int AUTOFILL_TYPE_TOGGLE = 2;
+	public static final int AUTOFILL_TYPE_LIST = 3;
+	public static final int AUTOFILL_TYPE_DATE = 4;
+	public static final int IMPORTANT_FOR_AUTOFILL_AUTO = 0x0;
+	public static final int IMPORTANT_FOR_AUTOFILL_YES = 0x1;
+	public static final int IMPORTANT_FOR_AUTOFILL_NO = 0x2;
+	public static final int IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS = 0x4;
+	public static final int IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS = 0x8;
+	public static final int AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS = 0x1;
+
+	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+	public @interface AutofillType {
+	}
+
+	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+	public @interface AutofillImportance {
+	}
+
+	private String[] mAutofillHints;
+	private AutofillId mAutofillId;
+	private boolean mAutofillIdExplicitlySet;
+	private int mAutofillViewId = NO_ID;
+	private int mImportantForAutofill = IMPORTANT_FOR_AUTOFILL_AUTO;
+	private static int sNextAutofillViewId = 1;
+	private ContentCaptureSession mContentCaptureSession;
+
+	public void setAutofillHints(String... autofillHints) {
+		if (autofillHints == null || autofillHints.length == 0) {
+			mAutofillHints = null;
+		} else {
+			mAutofillHints = autofillHints;
+		}
+	}
+
+	public String[] getAutofillHints() {
+		return mAutofillHints;
+	}
+
+	/* AOSP View.getAutofillId(): the id is made once, from an id that is unique in the app */
+	public final AutofillId getAutofillId() {
+		if (mAutofillId == null) {
+			mAutofillId = new AutofillId(getAutofillViewId());
+		}
+		return mAutofillId;
+	}
+
+	private int getAutofillViewId() {
+		if (mAutofillViewId == NO_ID) {
+			mAutofillViewId = sNextAutofillViewId++;
+		}
+		return mAutofillViewId;
+	}
+
+	public void setAutofillId(AutofillId id) {
+		if (isAttachedToWindow()) {
+			throw new IllegalStateException("Cannot set autofill id when view is attached");
+		}
+		if (id != null && !id.isNonVirtual()) {
+			throw new IllegalStateException("Cannot set autofill id assigned to virtual views");
+		}
+		if (id == null && !mAutofillIdExplicitlySet) {
+			// Ignore reset because it was never explicitly set before.
+			return;
+		}
+		mAutofillId = id;
+		if (id != null) {
+			mAutofillViewId = id.getViewId();
+			mAutofillIdExplicitlySet = true;
+		} else {
+			mAutofillViewId = NO_ID;
+			mAutofillIdExplicitlySet = false;
+		}
+	}
+
+	public int getAutofillType() {
+		return AUTOFILL_TYPE_NONE;
+	}
+
+	public AutofillValue getAutofillValue() {
+		return null;
+	}
+
+	public void autofill(AutofillValue value) {
+	}
+
+	public int getImportantForAutofill() {
+		return mImportantForAutofill;
+	}
+
+	public void setImportantForAutofill(int mode) {
+		mImportantForAutofill = mode;
+	}
+
+	/* AOSP View.isImportantForAutofill(): not hidden by an ancestor and either said so or has an id the app made */
+	public final boolean isImportantForAutofill() {
+		// Check parent mode to ensure we're not hidden.
+		ViewParent p = parent;
+		while (p instanceof View) {
+			int parentImportance = ((View)p).getImportantForAutofill();
+			if (parentImportance == IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS || parentImportance == IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS) {
+				return false;
+			}
+			p = p.getParent();
+		}
+		final int importance = getImportantForAutofill();
+		// First, check the explicit states.
+		if (importance == IMPORTANT_FOR_AUTOFILL_YES_EXCLUDE_DESCENDANTS || importance == IMPORTANT_FOR_AUTOFILL_YES) {
+			return true;
+		}
+		if (importance == IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS || importance == IMPORTANT_FOR_AUTOFILL_NO) {
+			return false;
+		}
+		// Then use some heuristics to handle AUTO: a view with an explicit resource id of the app
+		final int viewId = this.id;
+		if (viewId != NO_ID && !isViewIdGenerated(viewId)) {
+			Resources res = getResources();
+			String entry = null;
+			String pkg = null;
+			try {
+				entry = res.getResourceEntryName(viewId);
+				pkg = res.getResourcePackageName(viewId);
+			} catch (Resources.NotFoundException e) {
+				// ignore
+			}
+			if (entry != null && pkg != null && pkg.equals(getContext().getPackageName())) {
+				return true;
+			}
+		}
+		// Otherwise, assume it's not important...
+		return false;
+	}
+
+	private static boolean isViewIdGenerated(int id) {
+		return (id & 0xFF000000) == 0 && (id & 0x00FFFFFF) != 0;
+	}
+
+	public void setContentCaptureSession(ContentCaptureSession contentCaptureSession) {
+		mContentCaptureSession = contentCaptureSession;
+	}
+
+	/* AOSP View.getContentCaptureSession(): the session set on the view or its closest ancestor; without a
+	 * ContentCaptureManager (ATL has none) the main session is null as well */
+	public ContentCaptureSession getContentCaptureSession() {
+		if (mContentCaptureSession != null) {
+			return mContentCaptureSession;
+		}
+		ViewParent p = parent;
+		while (p instanceof View) {
+			if (((View)p).mContentCaptureSession != null) {
+				return ((View)p).mContentCaptureSession;
+			}
+			p = p.getParent();
+		}
+		return null;
+	}
+
+	public void onProvideStructure(ViewStructure structure) {
+		onProvideStructureForAssistOrAutofill(structure, false, 0);
+	}
+
+	public void onProvideAutofillStructure(ViewStructure structure, int flags) {
+		onProvideStructureForAssistOrAutofill(structure, true, flags);
+	}
+
+	private void onProvideStructureForAssistOrAutofill(ViewStructure structure, boolean forAutofill, int flags) {
+		final int viewId = this.id;
+		if (viewId != NO_ID && !isViewIdGenerated(viewId)) {
+			String pkg, type, entry;
+			try {
+				Resources res = getResources();
+				entry = res.getResourceEntryName(viewId);
+				type = res.getResourceTypeName(viewId);
+				pkg = res.getResourcePackageName(viewId);
+			} catch (Resources.NotFoundException e) {
+				entry = type = pkg = null;
+			}
+			structure.setId(viewId, pkg, type, entry);
+		} else {
+			structure.setId(viewId, null, null, null);
+		}
+		if (forAutofill) {
+			final int autofillType = getAutofillType();
+			// Don't need to fill autofill info if view does not support it.
+			if (autofillType != AUTOFILL_TYPE_NONE) {
+				structure.setAutofillType(autofillType);
+				structure.setAutofillHints(getAutofillHints());
+				structure.setAutofillValue(getAutofillValue());
+			}
+			structure.setImportantForAutofill(getImportantForAutofill());
+		}
+		int ignoredParentLeft = 0;
+		int ignoredParentTop = 0;
+		if (forAutofill && (flags & AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS) == 0) {
+			View parentGroup = null;
+			ViewParent viewParent = getParent();
+			if (viewParent instanceof View) {
+				parentGroup = (View)viewParent;
+			}
+			while (parentGroup != null && !parentGroup.isImportantForAutofill()) {
+				ignoredParentLeft += parentGroup.getLeft();
+				ignoredParentTop += parentGroup.getTop();
+				viewParent = parentGroup.getParent();
+				if (viewParent instanceof View) {
+					parentGroup = (View)viewParent;
+				} else {
+					break;
+				}
+			}
+		}
+		structure.setDimens(ignoredParentLeft + getLeft(), ignoredParentTop + getTop(), getScrollX(), getScrollY(), getRight() - getLeft(), getBottom() - getTop());
+		if (!forAutofill) {
+			if (hasTransform) {
+				structure.setTransformation(getMatrix());
+			}
+			structure.setElevation(getZ());
+			structure.setVisibility(getVisibility());
+			structure.setEnabled(isEnabled());
+			if (isClickable()) {
+				structure.setClickable(true);
+			}
+			if (isFocusable()) {
+				structure.setFocusable(true);
+			}
+			if (isFocused()) {
+				structure.setFocused(true);
+			}
+			if (isAccessibilityFocused()) {
+				structure.setAccessibilityFocused(true);
+			}
+			if (isSelected()) {
+				structure.setSelected(true);
+			}
+			if (isActivated()) {
+				structure.setActivated(true);
+			}
+			if (isLongClickable()) {
+				structure.setLongClickable(true);
+			}
+			if (this instanceof Checkable) {
+				structure.setCheckable(true);
+				if (((Checkable)this).isChecked()) {
+					structure.setChecked(true);
+				}
+			}
+			if (isOpaque()) {
+				structure.setOpaque(true);
+			}
+			if (isContextClickable()) {
+				structure.setContextClickable(true);
+			}
+			structure.setClassName(getAccessibilityClassName().toString());
+			structure.setContentDescription(getContentDescription());
+		}
+	}
+
+	/* AOSP: views that draw virtual children (a calendar's cells) fill them here */
+	public void onProvideVirtualStructure(ViewStructure structure) {
+	}
+
+	public void onProvideAutofillVirtualStructure(ViewStructure structure, int flags) {
+	}
+
+	public void dispatchProvideStructure(ViewStructure structure) {
+		dispatchProvideStructureForAssistOrAutofill(structure, false, 0);
+	}
+
+	public void dispatchProvideAutofillStructure(ViewStructure structure, int flags) {
+		dispatchProvideStructureForAssistOrAutofill(structure, true, flags);
+	}
+
+	private void dispatchProvideStructureForAssistOrAutofill(ViewStructure structure, boolean forAutofill, int flags) {
+		if (forAutofill) {
+			structure.setAutofillId(getAutofillId());
+			onProvideAutofillStructure(structure, flags);
+			onProvideAutofillVirtualStructure(structure, flags);
+		} else {
+			onProvideStructure(structure);
+			onProvideVirtualStructure(structure);
+		}
+	}
+
+	/* ---- AOSP View, nested scrolling (NestedScrollingChild): the view tells the closest ancestor that takes part
+	 * (onStartNestedScroll() answers true) about its scrolling and lets it consume before and after ---- */
+
+	private ViewParent mNestedScrollingParent;
+	private boolean mNestedScrollingEnabled;
+	private int[] mTempNestedScrollConsumed;
+
+	public void setNestedScrollingEnabled(boolean enabled) {
+		if (enabled) {
+			mNestedScrollingEnabled = true;
+		} else {
+			stopNestedScroll();
+			mNestedScrollingEnabled = false;
+		}
+	}
+
+	public boolean isNestedScrollingEnabled() {
+		return mNestedScrollingEnabled;
+	}
+
+	public boolean startNestedScroll(int axes) {
+		if (hasNestedScrollingParent()) {
+			// Already in progress
+			return true;
+		}
+		if (isNestedScrollingEnabled()) {
+			ViewParent p = getParent();
+			View child = this;
+			while (p != null) {
+				if (p.onStartNestedScroll(child, this, axes)) {
+					mNestedScrollingParent = p;
+					p.onNestedScrollAccepted(child, this, axes);
+					return true;
+				}
+				if (p instanceof View) {
+					child = (View)p;
+				}
+				p = p.getParent();
+			}
+		}
+		return false;
+	}
+
+	public void stopNestedScroll() {
+		if (mNestedScrollingParent != null) {
+			mNestedScrollingParent.onStopNestedScroll(this);
+			mNestedScrollingParent = null;
+		}
+	}
+
+	public boolean hasNestedScrollingParent() {
+		return mNestedScrollingParent != null;
+	}
+
+	public boolean dispatchNestedScroll(int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed, int[] offsetInWindow) {
+		if (isNestedScrollingEnabled() && mNestedScrollingParent != null) {
+			if (dxConsumed != 0 || dyConsumed != 0 || dxUnconsumed != 0 || dyUnconsumed != 0) {
+				int startX = 0;
+				int startY = 0;
+				if (offsetInWindow != null) {
+					getLocationInWindow(offsetInWindow);
+					startX = offsetInWindow[0];
+					startY = offsetInWindow[1];
+				}
+				mNestedScrollingParent.onNestedScroll(this, dxConsumed, dyConsumed, dxUnconsumed, dyUnconsumed);
+				if (offsetInWindow != null) {
+					getLocationInWindow(offsetInWindow);
+					offsetInWindow[0] -= startX;
+					offsetInWindow[1] -= startY;
+				}
+				return true;
+			} else if (offsetInWindow != null) {
+				// No motion, no dispatch. Keep offsetInWindow up to date.
+				offsetInWindow[0] = 0;
+				offsetInWindow[1] = 0;
+			}
+		}
+		return false;
+	}
+
+	public boolean dispatchNestedPreScroll(int dx, int dy, int[] consumed, int[] offsetInWindow) {
+		if (isNestedScrollingEnabled() && mNestedScrollingParent != null) {
+			if (dx != 0 || dy != 0) {
+				int startX = 0;
+				int startY = 0;
+				if (offsetInWindow != null) {
+					getLocationInWindow(offsetInWindow);
+					startX = offsetInWindow[0];
+					startY = offsetInWindow[1];
+				}
+				if (consumed == null) {
+					if (mTempNestedScrollConsumed == null) {
+						mTempNestedScrollConsumed = new int[2];
+					}
+					consumed = mTempNestedScrollConsumed;
+				}
+				consumed[0] = 0;
+				consumed[1] = 0;
+				mNestedScrollingParent.onNestedPreScroll(this, dx, dy, consumed);
+				if (offsetInWindow != null) {
+					getLocationInWindow(offsetInWindow);
+					offsetInWindow[0] -= startX;
+					offsetInWindow[1] -= startY;
+				}
+				return consumed[0] != 0 || consumed[1] != 0;
+			} else if (offsetInWindow != null) {
+				offsetInWindow[0] = 0;
+				offsetInWindow[1] = 0;
+			}
+		}
+		return false;
+	}
+
+	public boolean dispatchNestedFling(float velocityX, float velocityY, boolean consumed) {
+		if (isNestedScrollingEnabled() && mNestedScrollingParent != null) {
+			return mNestedScrollingParent.onNestedFling(this, velocityX, velocityY, consumed);
+		}
+		return false;
+	}
+
+	public boolean dispatchNestedPreFling(float velocityX, float velocityY) {
+		if (isNestedScrollingEnabled() && mNestedScrollingParent != null) {
+			return mNestedScrollingParent.onNestedPreFling(this, velocityX, velocityY);
+		}
+		return false;
+	}
+
+	/* AOSP View.setHandwritingBoundsOffsets() and setHandwritingDelegatorCallback(): the stylus handwriting
+	 * delegation of the input method framework. ATL has no stylus handwriting service; the values are kept. */
+	private float mHandwritingBoundsOffsetLeft;
+	private float mHandwritingBoundsOffsetTop;
+	private float mHandwritingBoundsOffsetRight;
+	private float mHandwritingBoundsOffsetBottom;
+	private Runnable mHandwritingDelegatorCallback;
+
+	public void setHandwritingBoundsOffsets(float offsetLeft, float offsetTop, float offsetRight, float offsetBottom) {
+		mHandwritingBoundsOffsetLeft = offsetLeft;
+		mHandwritingBoundsOffsetTop = offsetTop;
+		mHandwritingBoundsOffsetRight = offsetRight;
+		mHandwritingBoundsOffsetBottom = offsetBottom;
+	}
+
+	public float getHandwritingBoundsOffsetLeft() {
+		return mHandwritingBoundsOffsetLeft;
+	}
+
+	public float getHandwritingBoundsOffsetTop() {
+		return mHandwritingBoundsOffsetTop;
+	}
+
+	public float getHandwritingBoundsOffsetRight() {
+		return mHandwritingBoundsOffsetRight;
+	}
+
+	public float getHandwritingBoundsOffsetBottom() {
+		return mHandwritingBoundsOffsetBottom;
+	}
+
+	public void setHandwritingDelegatorCallback(Runnable callback) {
+		mHandwritingDelegatorCallback = callback;
+	}
+
+	public Runnable getHandwritingDelegatorCallback() {
+		return mHandwritingDelegatorCallback;
+	}
 }

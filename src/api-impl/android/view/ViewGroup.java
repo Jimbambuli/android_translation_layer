@@ -2,6 +2,11 @@ package android.view;
 
 import android.R;
 import android.animation.LayoutTransition;
+import android.content.res.Configuration;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.animation.Animation;
+import android.view.animation.LayoutAnimationController;
 import android.annotation.UnsupportedAppUsage;
 import android.atl.GskCanvas;
 import android.atl.annotation.Export;
@@ -1262,14 +1267,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
-	protected void setChildrenDrawingOrderEnabled(boolean enabled) {}
-
 	public void requestDisallowInterceptTouchEvent(boolean disallowIntercept) {
 		for (ViewGroup iter = this; iter != null; iter = iter.parent instanceof ViewGroup ? (ViewGroup)iter.parent : null)
 			iter.disallowIntercept = disallowIntercept;
 	}
-
-	protected boolean isChildrenDrawingOrderEnabled() { return false; }
 
 	@Override
 	public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
@@ -1286,7 +1287,9 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
-	public void setClipToPadding(boolean clipToPadding) {}
+	public void setClipToPadding(boolean clipToPadding) {
+		mClipToPadding = clipToPadding;
+	}
 
 	public View findViewById(int id) {
 		if (id == NO_ID) // as in AOSP: views without an id are not found by it
@@ -1429,10 +1432,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		native_offsetRect(widget, descendant.widget, rect);
 	}
 
-	public boolean getClipToPadding() { return false; }
-
-	public boolean isTransitionGroup() { return false; }
-
 	public static class LayoutParams {
 		public static final int FILL_PARENT = -1;
 		public static final int MATCH_PARENT = -1;
@@ -1477,7 +1476,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		/**
 		 * Used to animate layouts.
 		 */
-		//public LayoutAnimationController.AnimationParameters layoutAnimationParameters;
+		public LayoutAnimationController.AnimationParameters layoutAnimationParameters;
 	}
 
 	public static class MarginLayoutParams extends ViewGroup.LayoutParams {
@@ -1664,18 +1663,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	 * other NestedScrollingParent callbacks; subclasses that take part override them */
 
 	@Override
-	public void onNestedScrollAccepted(View child, View target, int nestedScrollAxes) {}
-
-	@Override
 	public void onNestedPreScroll(View target, int dx, int dy, int[] consumed) {}
 
 	@Override
 	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {}
-
-	@Override
-	public void onStopNestedScroll(View target) {}
-
-	public void requestChildFocus(View child, View focused) {}
 
 	public boolean getClipChildren() {
 		return clipChildren;
@@ -1691,8 +1682,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			viewGroupOverlay = new ViewGroupOverlay();
 		return viewGroupOverlay;
 	}
-
-	public void scheduleLayoutAnimation() {}
 
 	private boolean layoutSuppressed;
 
@@ -1712,5 +1701,440 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	/* API 29; children are drawn in the order of their index */
 	public final int getChildDrawingOrder(int drawingPosition) {
 		return drawingPosition;
+	}
+
+	/* ---- AOSP ViewGroup members that apps call and override and that ATL had no counterpart for ---- */
+
+	public static final int LAYOUT_MODE_CLIP_BOUNDS = 0;
+	public static final int LAYOUT_MODE_OPTICAL_BOUNDS = 1;
+	public static final int LAYOUT_MODE_UNDEFINED = -1;
+	private static final int LAYOUT_MODE_DEFAULT = LAYOUT_MODE_CLIP_BOUNDS;
+
+	private int mLayoutMode = LAYOUT_MODE_UNDEFINED;
+
+	/* AOSP ViewGroup.getLayoutMode(): clip bounds or optical bounds, taken from the parent group while not set */
+	public int getLayoutMode() {
+		if (mLayoutMode == LAYOUT_MODE_UNDEFINED) {
+			return parent instanceof ViewGroup ? ((ViewGroup)parent).getLayoutMode() : LAYOUT_MODE_DEFAULT;
+		}
+		return mLayoutMode;
+	}
+
+	/* the mode is kept and a layout pass follows; optical bounds (the 9-patch's insets) are not used by ATL's
+	 * layout, which places the views by their clip bounds */
+	public void setLayoutMode(int layoutMode) {
+		if (mLayoutMode != layoutMode) {
+			mLayoutMode = layoutMode;
+			requestLayout();
+		}
+	}
+
+	private boolean mClipToPadding = true;
+
+	public boolean getClipToPadding() {
+		return mClipToPadding;
+	}
+
+	private boolean mChildrenDrawingOrderEnabled;
+
+	/* AOSP: the order the children are drawn in comes from getChildDrawingOrder(); GTK draws the children in
+	 * their order in the group, so the order is kept and asked for but does not change the drawing */
+	protected boolean isChildrenDrawingOrderEnabled() {
+		return mChildrenDrawingOrderEnabled;
+	}
+
+	protected void setChildrenDrawingOrderEnabled(boolean enabled) {
+		mChildrenDrawingOrderEnabled = enabled;
+	}
+
+	protected int getChildDrawingOrder(int childCount, int drawingPosition) {
+		return drawingPosition;
+	}
+
+	private boolean mIsTransitionGroup;
+
+	public void setTransitionGroup(boolean isTransitionGroup) {
+		mIsTransitionGroup = isTransitionGroup;
+	}
+
+	public boolean isTransitionGroup() {
+		return mIsTransitionGroup;
+	}
+
+	public void setChildrenDrawingCacheEnabled(boolean enabled) {
+		for (View child : children) {
+			child.setDrawingCacheEnabled(enabled);
+		}
+	}
+
+	/* AOSP ViewGroup nested scrolling (NestedScrollingParent): the axes the group got to accept */
+	private int mNestedScrollAxes;
+
+	public int getNestedScrollAxes() {
+		return mNestedScrollAxes;
+	}
+
+	@Override
+	public void onNestedScrollAccepted(View child, View target, int axes) {
+		mNestedScrollAxes = axes;
+	}
+
+	@Override
+	public void onStopNestedScroll(View child) {
+		// Stop any recursive nested scrolling.
+		stopNestedScroll();
+		mNestedScrollAxes = SCROLL_AXIS_NONE;
+	}
+
+	/* AOSP ViewGroup.requestChildFocus() and clearChildFocus(): the group does not record the focused child, GTK's
+	 * focus does (getFocusedChild()), the parents are told as in AOSP */
+	@Override
+	public void requestChildFocus(View child, View focused) {
+		if (getDescendantFocusability() == FOCUS_BLOCK_DESCENDANTS) {
+			return;
+		}
+		if (parent != null) {
+			parent.requestChildFocus(this, focused);
+		}
+	}
+
+	@Override
+	public void clearChildFocus(View child) {
+		if (parent != null) {
+			parent.clearChildFocus(this);
+		}
+	}
+
+	@Override
+	public boolean requestChildRectangleOnScreen(View child, Rect rectangle, boolean immediate) {
+		return false;
+	}
+
+	@Override
+	public boolean showContextMenuForChild(View originalView) {
+		return parent != null && parent.showContextMenuForChild(originalView);
+	}
+
+	@Override
+	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback, int type) {
+		return parent != null ? parent.startActionModeForChild(originalView, callback, type) : null;
+	}
+
+	/* AOSP ViewGroup.invalidateChildInParent(): the deprecated invalidation walk; the dirty rectangle moves into
+	 * the group's coordinates and the parent is next, null if the group is not visible */
+	@Deprecated
+	public ViewParent invalidateChildInParent(int[] location, Rect dirty) {
+		if (getVisibility() != VISIBLE) {
+			return null;
+		}
+		dirty.offset(location[0] - getScrollX(), location[1] - getScrollY());
+		location[0] = getLeft();
+		location[1] = getTop();
+		return parent;
+	}
+
+	@Override
+	public void dispatchStartTemporaryDetach() {
+		super.dispatchStartTemporaryDetach();
+		for (View child : children) {
+			child.dispatchStartTemporaryDetach();
+		}
+	}
+
+	@Override
+	public void dispatchFinishTemporaryDetach() {
+		super.dispatchFinishTemporaryDetach();
+		for (View child : children) {
+			child.dispatchFinishTemporaryDetach();
+		}
+	}
+
+	@Override
+	public void dispatchConfigurationChanged(Configuration newConfig) {
+		super.dispatchConfigurationChanged(newConfig);
+		for (View child : new ArrayList<View>(children)) {
+			child.dispatchConfigurationChanged(newConfig);
+		}
+	}
+
+	@Override
+	public void dispatchCancelPendingInputEvents() {
+		super.dispatchCancelPendingInputEvents();
+		for (View child : children) {
+			child.dispatchCancelPendingInputEvents();
+		}
+	}
+
+	@Override
+	public void dispatchWindowVisibilityChanged(int visibility) {
+		super.dispatchWindowVisibilityChanged(visibility);
+		for (View child : children) {
+			child.dispatchWindowVisibilityChanged(visibility);
+		}
+	}
+
+	@Override
+	public void dispatchWindowSystemUiVisiblityChanged(int visible) {
+		super.dispatchWindowSystemUiVisiblityChanged(visible);
+		for (View child : children) {
+			child.dispatchWindowSystemUiVisiblityChanged(visible);
+		}
+	}
+
+	@Override
+	boolean dispatchVisibilityAggregated(boolean isVisible) {
+		isVisible = super.dispatchVisibilityAggregated(isVisible);
+		for (View child : new ArrayList<View>(children)) {
+			// Only dispatch to visible children. Not visible children and their subtrees already know that they aren't visible
+			if (child.getVisibility() == VISIBLE) {
+				child.dispatchVisibilityAggregated(isVisible);
+			}
+		}
+		return isVisible;
+	}
+
+	/* AOSP ViewGroup.dispatchKeyEventPreIme(): the focused view of the group gets the key first */
+	@Override
+	public boolean dispatchKeyEventPreIme(KeyEvent event) {
+		if (isFocused()) {
+			return super.dispatchKeyEventPreIme(event);
+		}
+		View focused = getFocusedChild();
+		if (focused != null) {
+			return focused.dispatchKeyEventPreIme(event);
+		}
+		return false;
+	}
+
+	@Override
+	public boolean dispatchTrackballEvent(MotionEvent event) {
+		if (isFocused()) {
+			return super.dispatchTrackballEvent(event);
+		}
+		View focused = getFocusedChild();
+		if (focused != null) {
+			return focused.dispatchTrackballEvent(event);
+		}
+		return false;
+	}
+
+	@Override
+	public boolean dispatchUnhandledMove(View focused, int direction) {
+		View focusedChild = getFocusedChild();
+		return focusedChild != null && focusedChild.dispatchUnhandledMove(focused, direction);
+	}
+
+	/* AOSP ViewGroup.dispatchUnhandledKeyEvent(): the descendants' listeners are asked before the group's own */
+	@Override
+	boolean dispatchUnhandledKeyEvent(KeyEvent evt) {
+		for (int i = children.size() - 1; i >= 0; --i) {
+			if (children.get(i).dispatchUnhandledKeyEvent(evt)) {
+				return true;
+			}
+		}
+		return super.dispatchUnhandledKeyEvent(evt);
+	}
+
+	@Override
+	public void findViewsWithText(ArrayList<View> outViews, CharSequence text, int flags) {
+		super.findViewsWithText(outViews, text, flags);
+		for (View child : children) {
+			if (child.getVisibility() == VISIBLE) {
+				child.findViewsWithText(outViews, text, flags);
+			}
+		}
+	}
+
+	@Override
+	public CharSequence getAccessibilityClassName() {
+		return ViewGroup.class.getName();
+	}
+
+	/* AOSP ViewGroup accessibility: a group that is in the tree lets its own view populate the event first, then
+	 * the visible children; an event of a child goes up through onRequestSendAccessibilityEvent() of each group */
+	@Override
+	public boolean dispatchPopulateAccessibilityEventInternal(AccessibilityEvent event) {
+		boolean handled = false;
+		if (includeForAccessibility()) {
+			handled = super.dispatchPopulateAccessibilityEventInternal(event);
+			if (handled) {
+				return handled;
+			}
+		}
+		// Let our children have a shot in populating the event.
+		for (View child : children) {
+			if (child.getVisibility() == View.VISIBLE) {
+				handled = child.dispatchPopulateAccessibilityEvent(event);
+				if (handled) {
+					return handled;
+				}
+			}
+		}
+		return false;
+	}
+
+	@Override
+	public void onInitializeAccessibilityNodeInfoInternal(AccessibilityNodeInfo info) {
+		super.onInitializeAccessibilityNodeInfoInternal(info);
+		info.setClassName(ViewGroup.class.getName());
+	}
+
+	@Override
+	public void onInitializeAccessibilityEventInternal(AccessibilityEvent event) {
+		super.onInitializeAccessibilityEventInternal(event);
+		event.setClassName(ViewGroup.class.getName());
+	}
+
+	public boolean onRequestSendAccessibilityEvent(View child, AccessibilityEvent event) {
+		return onRequestSendAccessibilityEventInternal(child, event);
+	}
+
+	public boolean onRequestSendAccessibilityEventInternal(View child, AccessibilityEvent event) {
+		return true;
+	}
+
+	@Override
+	public boolean requestSendAccessibilityEvent(View child, AccessibilityEvent event) {
+		if (parent == null) {
+			return false;
+		}
+		final boolean propagate = onRequestSendAccessibilityEvent(child, event);
+		if (!propagate) {
+			return false;
+		}
+		return parent.requestSendAccessibilityEvent(this, event);
+	}
+
+	@Override
+	public void notifySubtreeAccessibilityStateChanged(View child, View source, int changeType) {
+		if (parent != null) {
+			parent.notifySubtreeAccessibilityStateChanged(this, source, changeType);
+		}
+	}
+
+	/* AOSP ViewGroup.dispatchProvideStructure() and dispatchProvideAutofillStructure(): the group fills its own
+	 * node and one child node for each child */
+	@Override
+	public void dispatchProvideStructure(ViewStructure structure) {
+		super.dispatchProvideStructure(structure);
+		if (structure.getChildCount() != 0) {
+			return;
+		}
+		if (!isLaidOut()) {
+			return;
+		}
+		final int childrenCount = children.size();
+		structure.setChildCount(childrenCount);
+		for (int i = 0; i < childrenCount; i++) {
+			ViewStructure cstructure = structure.newChild(i);
+			children.get(i).dispatchProvideStructure(cstructure);
+		}
+	}
+
+	@Override
+	public void dispatchProvideAutofillStructure(ViewStructure structure, int flags) {
+		super.dispatchProvideAutofillStructure(structure, flags);
+		if (structure.getChildCount() != 0) {
+			return;
+		}
+		if (!isLaidOut()) {
+			return;
+		}
+		final int childrenCount = children.size();
+		structure.setChildCount(childrenCount);
+		for (int i = 0; i < childrenCount; i++) {
+			ViewStructure cstructure = structure.newChild(i);
+			children.get(i).dispatchProvideAutofillStructure(cstructure, flags);
+		}
+	}
+
+	/* AOSP ViewGroup layout animation: the controller gives each child its animation when the group is laid out
+	 * after startLayoutAnimation()/scheduleLayoutAnimation() (or setLayoutAnimation()); the listener hears the
+	 * start and, when the last child's animation (offset and duration) is over, the end */
+	private LayoutAnimationController mLayoutAnimationController;
+	private Animation.AnimationListener mAnimationListener;
+	private boolean mRunLayoutAnimation;
+
+	public void setLayoutAnimation(LayoutAnimationController controller) {
+		mLayoutAnimationController = controller;
+		if (mLayoutAnimationController != null) {
+			mRunLayoutAnimation = true;
+		}
+	}
+
+	public LayoutAnimationController getLayoutAnimation() {
+		return mLayoutAnimationController;
+	}
+
+	public void setLayoutAnimationListener(Animation.AnimationListener animationListener) {
+		mAnimationListener = animationListener;
+	}
+
+	public Animation.AnimationListener getLayoutAnimationListener() {
+		return mAnimationListener;
+	}
+
+	public void startLayoutAnimation() {
+		if (mLayoutAnimationController != null) {
+			mRunLayoutAnimation = true;
+			requestLayout();
+		}
+	}
+
+	public void scheduleLayoutAnimation() {
+		mRunLayoutAnimation = true;
+	}
+
+	protected void attachLayoutAnimationParameters(View child, ViewGroup.LayoutParams params, int index, int count) {
+		LayoutAnimationController.AnimationParameters animationParams = params.layoutAnimationParameters;
+		if (animationParams == null) {
+			animationParams = new LayoutAnimationController.AnimationParameters();
+			params.layoutAnimationParameters = animationParams;
+		}
+		animationParams.count = count;
+		animationParams.index = index;
+	}
+
+	@Override
+	public void layout(int l, int t, int r, int b) {
+		super.layout(l, t, r, b);
+		if (mRunLayoutAnimation) {
+			runLayoutAnimation();
+		}
+	}
+
+	private void runLayoutAnimation() {
+		mRunLayoutAnimation = false;
+		final LayoutAnimationController controller = mLayoutAnimationController;
+		if (controller == null) {
+			return;
+		}
+		controller.start();
+		final int count = children.size();
+		long total = 0;
+		for (int i = 0; i < count; i++) {
+			View child = children.get(i);
+			if (child.getVisibility() != VISIBLE) {
+				continue;
+			}
+			LayoutParams params = child.getLayoutParams();
+			attachLayoutAnimationParameters(child, params, i, count);
+			Animation a = controller.getAnimationForView(child);
+			a.setStartTime(Animation.START_ON_FIRST_FRAME);
+			child.setAnimation(a);
+			child.invalidate();
+			total = Math.max(total, a.getStartOffset() + a.getDuration());
+		}
+		if (mAnimationListener != null) {
+			mAnimationListener.onAnimationStart(controller.getAnimation());
+		}
+		postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				if (mAnimationListener != null) {
+					mAnimationListener.onAnimationEnd(controller.getAnimation());
+				}
+			}
+		}, total);
 	}
 }

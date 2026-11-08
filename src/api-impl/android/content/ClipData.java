@@ -108,6 +108,12 @@ public class ClipData implements Parcelable {
 		items.add(item);
 	}
 
+	/** @hide AOSP ClipData(ClipDescription, ArrayList<Item>) */
+	public ClipData(ClipDescription description, ArrayList<Item> items) {
+		this.description = description;
+		this.items.addAll(items);
+	}
+
 	/* AOSP ClipData(Parcel) / writeToParcel() / CREATOR, wire format of android-14. ATL has no icon, IntentSender,
 	 * ActivityInfo or TextLinks in a ClipData: they are written as null (AOSP also writes the ActivityInfo
 	 * as null for a ClipData that does not parcel them) and a parcel that holds one is rejected. */

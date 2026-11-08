@@ -67,6 +67,51 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 
 		@Override
 		public void requestLayout() {}
+
+		/* like ViewRootImpl: the root view of the window; the focus search of a window is the focus search in it */
+		View root;
+
+		@Override
+		public View focusSearch(View v, int direction) {
+			if (!(root instanceof ViewGroup))
+				return null;
+			return FocusFinder.getInstance().findNextFocus((ViewGroup)root, v, direction);
+		}
+
+		/* ViewRootImpl.requestChildFocus()/clearChildFocus(): the window's focus is GTK's, which follows the view
+		 * that took the focus; there is nothing more to record */
+		@Override
+		public void requestChildFocus(View child, View focused) {}
+
+		@Override
+		public void clearChildFocus(View child) {}
+
+		/* ViewRootImpl.requestSendAccessibilityEvent(): hands the event on to the AccessibilityManager, which has
+		 * no service to deliver it to; the root accepts it */
+		@Override
+		public boolean requestSendAccessibilityEvent(View child, android.view.accessibility.AccessibilityEvent event) {
+			return true;
+		}
+
+		@Override
+		public void notifySubtreeAccessibilityStateChanged(View child, View source, int changeType) {}
+
+		/* ViewRootImpl.requestChildRectangleOnScreen(): scrolls the window's surface, which does not scroll */
+		@Override
+		public boolean requestChildRectangleOnScreen(View child, Rect rectangle, boolean immediate) {
+			return false;
+		}
+
+		/* ATL has no context menus and no action mode */
+		@Override
+		public boolean showContextMenuForChild(View originalView) {
+			return false;
+		}
+
+		@Override
+		public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback, int type) {
+			return null;
+		}
 	}
 
 	public android.view.Display getDefaultDisplay() {
@@ -91,7 +136,9 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	public void addView(View view, android.view.ViewGroup.LayoutParams params) {
 		Slog.v(TAG, "addView(" + view + ", " + params + ") called");
 		view.setLayoutParams(params);
-		view.parent = new WindowViewParent();
+		WindowViewParent windowParent = new WindowViewParent();
+		windowParent.root = view;
+		view.parent = windowParent;
 		view.dispatchAttachedToWindow();
 		android.atl.ATLViewDump.addRoot(view); // debugging aid (atl-doctor)
 		Rect displayFrame = new Rect();

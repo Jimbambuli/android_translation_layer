@@ -24,6 +24,7 @@ import android.window.WindowOnBackInvokedDispatcher;
 public class Window {
 	public static final int FEATURE_OPTIONS_PANEL = 0;
 	public static final int FEATURE_NO_TITLE = 1;
+	public static final int FEATURE_CONTEXT_MENU = 6;
 
 	public ViewTreeObserver view_tree_observer = null;
 	private WindowManager.LayoutParams params = new WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, 0, 0, 0);
@@ -423,6 +424,13 @@ public class Window {
 		decorView.addView(view);
 	}
 
+	/* AOSP PhoneWindow.addContentView(): the view is added to the content next to what is there, with the given
+	 * layout parameters (setContentView() replaces the content) */
+	public void addContentView(View view, ViewGroup.LayoutParams params) {
+		installDecor();
+		decorView.addView(view, params);
+	}
+
 	public OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
 		return onBackInvokedDispatcher;
 	}
@@ -434,6 +442,25 @@ public class Window {
 
 	/* like PhoneWindow: the decor view gets the key first; AppCompat's KeyEventDispatcher calls this
 	 * before it hands the key to the Window.Callback (a dialog's Back, for instance) */
+	/* AOSP PhoneWindow.superDispatchTouchEvent(), superDispatchTrackballEvent(), superDispatchGenericMotionEvent():
+	 * the decor view dispatches the event to the views */
+	public boolean superDispatchTouchEvent(MotionEvent event) {
+		return getDecorView().dispatchTouchEvent(event);
+	}
+
+	public boolean superDispatchTrackballEvent(MotionEvent event) {
+		return getDecorView().dispatchTrackballEvent(event);
+	}
+
+	public boolean superDispatchGenericMotionEvent(MotionEvent event) {
+		return getDecorView().dispatchGenericMotionEvent(event);
+	}
+
+	/* AOSP Window.getCurrentFocus(): the view of the window that has the focus */
+	public View getCurrentFocus() {
+		return peekDecorView() != null ? peekDecorView().findFocus() : null;
+	}
+
 	public boolean superDispatchKeyEvent(KeyEvent event) {
 		return decorView.dispatchKeyEvent(event);
 	}
@@ -468,6 +495,11 @@ public class Window {
 		if (handled)
 			return true;
 		if (isDown ? onKeyDown(-1, keyCode, event) : onKeyUp(-1, keyCode, event))
+			return true;
+
+		/* ViewRootImpl.dispatchUnhandledKeyEvent(): the views' OnUnhandledKeyEventListeners are asked about a key
+		 * nothing handled */
+		if (peekDecorView() != null && peekDecorView().dispatchUnhandledKeyEvent(event))
 			return true;
 
 		// If the Control modifier is held, try to interpret the key as a shortcut.

@@ -804,7 +804,130 @@ public class AccessibilityNodeInfo {
 		public static final int RANGE_TYPE_PERCENT = 2;
 	}
 
-	public static AccessibilityNodeInfo obtain() { return null; }
+	/* AOSP: constants, ids and flags of the node id and of the prefetching of the nodes of an accessibility
+	 * service; the ids are what AccessibilityRecord.setSource() stores */
+	public static final int ACTION_FOCUS = 0x00000001;
+	public static final int ACTION_CLEAR_FOCUS = 0x00000002;
+	public static final int ACTION_SELECT = 0x00000004;
+	public static final int ACTION_CLEAR_SELECTION = 0x00000008;
+	public static final int ACTION_CLICK = 0x00000010;
+	public static final int ACTION_LONG_CLICK = 0x00000020;
+	public static final int ACTION_ACCESSIBILITY_FOCUS = 0x00000040;
+	public static final int ACTION_CLEAR_ACCESSIBILITY_FOCUS = 0x00000080;
+	public static final int ACTION_SCROLL_FORWARD = 0x00001000;
+	public static final int ACTION_SCROLL_BACKWARD = 0x00002000;
+	public static final int UNDEFINED_ITEM_ID = Integer.MAX_VALUE;
+	public static final int ROOT_ITEM_ID = Integer.MAX_VALUE - 1;
+	private static final long VIRTUAL_DESCENDANT_ID_MASK = 0xffffffff00000000L;
+	private static final int VIRTUAL_DESCENDANT_ID_SHIFT = 32;
+	public static final long UNDEFINED_NODE_ID = makeNodeId(UNDEFINED_ITEM_ID, UNDEFINED_ITEM_ID);
+	public static final long ROOT_NODE_ID = makeNodeId(ROOT_ITEM_ID, AccessibilityNodeProvider.HOST_VIEW_ID);
+	public static final int FLAG_PREFETCH_ANCESTORS = 1 /* << 0 */;
+	public static final int FLAG_PREFETCH_SIBLINGS = 1 << 1;
+	public static final int FLAG_PREFETCH_DESCENDANTS_HYBRID = 1 << 2;
+	public static final int FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST = 1 << 3;
+	public static final int FLAG_PREFETCH_DESCENDANTS_BREADTH_FIRST = 1 << 4;
+	public static final int FLAG_PREFETCH_UNINTERRUPTIBLE = 1 << 5;
+	public static final int FLAG_PREFETCH_MASK = 0x0000003F;
+	public static final int FLAG_PREFETCH_DESCENDANTS_MASK = 0x0000001C;
+
+	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+	public @interface PrefetchingStrategy {
+	}
+
+	public static int getAccessibilityViewId(long accessibilityNodeId) {
+		return (int)accessibilityNodeId;
+	}
+
+	public static int getVirtualDescendantId(long accessibilityNodeId) {
+		return (int)((accessibilityNodeId & VIRTUAL_DESCENDANT_ID_MASK) >> VIRTUAL_DESCENDANT_ID_SHIFT);
+	}
+
+	public static long makeNodeId(int accessibilityViewId, int virtualDescendantId) {
+		return (((long)virtualDescendantId) << VIRTUAL_DESCENDANT_ID_SHIFT) | accessibilityViewId;
+	}
+
+	/* AOSP keeps a pool of nodes, obtain() takes one from it; the pool is deprecated and recycle() only
+	 * matters to it, so a new node is as good */
+	public static AccessibilityNodeInfo obtain() {
+		return new AccessibilityNodeInfo();
+	}
+
+	public static AccessibilityNodeInfo obtain(View source) {
+		AccessibilityNodeInfo info = obtain();
+		info.setSource(source);
+		return info;
+	}
+
+	public static AccessibilityNodeInfo obtain(View root, int virtualDescendantId) {
+		AccessibilityNodeInfo info = obtain();
+		info.setSource(root, virtualDescendantId);
+		return info;
+	}
+
+	public static AccessibilityNodeInfo obtain(AccessibilityNodeInfo info) {
+		AccessibilityNodeInfo copy = obtain();
+		copy.init(info);
+		return copy;
+	}
+
+	public void recycle() {}
+
+	private long mSourceNodeId = UNDEFINED_NODE_ID;
+
+	public void setSource(View source) {
+		setSource(source, AccessibilityNodeProvider.HOST_VIEW_ID);
+	}
+
+	public void setSource(View root, int virtualDescendantId) {
+		int rootAccessibilityViewId = root != null ? root.getAccessibilityViewId() : UNDEFINED_ITEM_ID;
+		mSourceNodeId = makeNodeId(rootAccessibilityViewId, virtualDescendantId);
+	}
+
+	private void init(AccessibilityNodeInfo other) {
+		mSourceNodeId = other.mSourceNodeId;
+		mClassName = other.mClassName;
+		mPackageName = other.mPackageName;
+		mText = other.mText;
+		mContentDescription = other.mContentDescription;
+		mViewIdResourceName = other.mViewIdResourceName;
+		mBoundsInParent.set(other.mBoundsInParent);
+		mBoundsInScreen.set(other.mBoundsInScreen);
+		mExtras = other.mExtras != null ? new Bundle(other.mExtras) : null;
+		mParentRoot = other.mParentRoot;
+		mParentVirtualDescendantId = other.mParentVirtualDescendantId;
+		mFlags = other.mFlags;
+	}
+
+	private static final int FLAG_CHECKABLE = 1 << 0;
+	private static final int FLAG_CHECKED = 1 << 1;
+	private static final int FLAG_CLICKABLE = 1 << 2;
+	private static final int FLAG_EDITABLE = 1 << 3;
+	private static final int FLAG_ENABLED = 1 << 4;
+	private static final int FLAG_FOCUSABLE = 1 << 5;
+	private static final int FLAG_FOCUSED = 1 << 6;
+	private static final int FLAG_SCROLLABLE = 1 << 7;
+	private static final int FLAG_VISIBLE_TO_USER = 1 << 8;
+	private static final int FLAG_LONG_CLICKABLE = 1 << 9;
+	private static final int FLAG_SELECTED = 1 << 10;
+	private static final int FLAG_PASSWORD = 1 << 11;
+	private static final int FLAG_ACCESSIBILITY_FOCUSED = 1 << 12;
+	private static final int FLAG_IMPORTANT = 1 << 13;
+	private static final int FLAG_CONTEXT_CLICKABLE = 1 << 14;
+	private static final int FLAG_DISMISSABLE = 1 << 15;
+	private static final int FLAG_SCREEN_READER_FOCUSABLE = 1 << 16;
+	private static final int FLAG_HEADING = 1 << 17;
+	private static final int FLAG_DATA_SENSITIVE = 1 << 18;
+	/* AOSP: the importance is true unless told otherwise */
+	private int mFlags = FLAG_IMPORTANT;
+
+	private void setFlag(int flag, boolean value) {
+		mFlags = value ? (mFlags | flag) : (mFlags & ~flag);
+	}
+
+	private boolean getFlag(int flag) {
+		return (mFlags & flag) != 0;
+	}
 
 	/* state as AOSP's AccessibilityNodeInfo; there is no accessibility service in ATL that reads it */
 	private CharSequence mClassName;
@@ -886,11 +1009,29 @@ public class AccessibilityNodeInfo {
 
 	public void addAction(int action) {}
 
-	public void setCheckable(boolean checkable) {}
+	public void setCheckable(boolean checkable) {
+		setFlag(FLAG_CHECKABLE, checkable);
+	}
 
-	public void setChecked(boolean checked) {}
+	public boolean isCheckable() {
+		return getFlag(FLAG_CHECKABLE);
+	}
 
-	public void setClickable(boolean clickable) {}
+	public void setChecked(boolean checked) {
+		setFlag(FLAG_CHECKED, checked);
+	}
+
+	public boolean isChecked() {
+		return getFlag(FLAG_CHECKED);
+	}
+
+	public void setClickable(boolean clickable) {
+		setFlag(FLAG_CLICKABLE, clickable);
+	}
+
+	public boolean isClickable() {
+		return getFlag(FLAG_CLICKABLE);
+	}
 
 	public void setContentDescription(CharSequence description) {
 		mContentDescription = description;
@@ -900,19 +1041,135 @@ public class AccessibilityNodeInfo {
 		return mContentDescription;
 	}
 
-	public void setEditable(boolean editable) {}
+	public void setEditable(boolean editable) {
+		setFlag(FLAG_EDITABLE, editable);
+	}
 
-	public void setEnabled(boolean enabled) {}
+	public boolean isEditable() {
+		return getFlag(FLAG_EDITABLE);
+	}
 
-	public void setFocusable(boolean focusable) {}
+	public void setEnabled(boolean enabled) {
+		setFlag(FLAG_ENABLED, enabled);
+	}
 
-	public void setFocused(boolean focused) {}
+	public boolean isEnabled() {
+		return getFlag(FLAG_ENABLED);
+	}
 
-	public void setScrollable(boolean scrollable) {}
+	public void setFocusable(boolean focusable) {
+		setFlag(FLAG_FOCUSABLE, focusable);
+	}
 
-	public void setVisibleToUser(boolean visible) {}
+	public boolean isFocusable() {
+		return getFlag(FLAG_FOCUSABLE);
+	}
+
+	public void setFocused(boolean focused) {
+		setFlag(FLAG_FOCUSED, focused);
+	}
+
+	public boolean isFocused() {
+		return getFlag(FLAG_FOCUSED);
+	}
+
+	public void setScrollable(boolean scrollable) {
+		setFlag(FLAG_SCROLLABLE, scrollable);
+	}
+
+	public boolean isScrollable() {
+		return getFlag(FLAG_SCROLLABLE);
+	}
+
+	public void setVisibleToUser(boolean visible) {
+		setFlag(FLAG_VISIBLE_TO_USER, visible);
+	}
+
+	public boolean isVisibleToUser() {
+		return getFlag(FLAG_VISIBLE_TO_USER);
+	}
 
 	public void setTextSelection(int start, int end) {}
 
 	public void setRangeInfo(RangeInfo info) {}
+
+	public void setLongClickable(boolean longClickable) {
+		setFlag(FLAG_LONG_CLICKABLE, longClickable);
+	}
+
+	public boolean isLongClickable() {
+		return getFlag(FLAG_LONG_CLICKABLE);
+	}
+
+	public void setSelected(boolean selected) {
+		setFlag(FLAG_SELECTED, selected);
+	}
+
+	public boolean isSelected() {
+		return getFlag(FLAG_SELECTED);
+	}
+
+	public void setPassword(boolean password) {
+		setFlag(FLAG_PASSWORD, password);
+	}
+
+	public boolean isPassword() {
+		return getFlag(FLAG_PASSWORD);
+	}
+
+	public void setAccessibilityFocused(boolean accessibilityFocused) {
+		setFlag(FLAG_ACCESSIBILITY_FOCUSED, accessibilityFocused);
+	}
+
+	public boolean isAccessibilityFocused() {
+		return getFlag(FLAG_ACCESSIBILITY_FOCUSED);
+	}
+
+	public void setContextClickable(boolean contextClickable) {
+		setFlag(FLAG_CONTEXT_CLICKABLE, contextClickable);
+	}
+
+	public boolean isContextClickable() {
+		return getFlag(FLAG_CONTEXT_CLICKABLE);
+	}
+
+	public void setDismissable(boolean dismissable) {
+		setFlag(FLAG_DISMISSABLE, dismissable);
+	}
+
+	public boolean isDismissable() {
+		return getFlag(FLAG_DISMISSABLE);
+	}
+
+	public void setScreenReaderFocusable(boolean screenReaderFocusable) {
+		setFlag(FLAG_SCREEN_READER_FOCUSABLE, screenReaderFocusable);
+	}
+
+	public boolean isScreenReaderFocusable() {
+		return getFlag(FLAG_SCREEN_READER_FOCUSABLE);
+	}
+
+	public void setHeading(boolean heading) {
+		setFlag(FLAG_HEADING, heading);
+	}
+
+	public boolean isHeading() {
+		return getFlag(FLAG_HEADING);
+	}
+
+	public void setImportantForAccessibility(boolean important) {
+		setFlag(FLAG_IMPORTANT, important);
+	}
+
+	public boolean isImportantForAccessibility() {
+		return getFlag(FLAG_IMPORTANT);
+	}
+
+	public void setAccessibilityDataSensitive(boolean dataSensitive) {
+		setFlag(FLAG_DATA_SENSITIVE, dataSensitive);
+	}
+
+	public boolean isAccessibilityDataSensitive() {
+		return getFlag(FLAG_DATA_SENSITIVE);
+	}
 }
