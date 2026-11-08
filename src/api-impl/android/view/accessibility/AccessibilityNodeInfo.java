@@ -1,6 +1,9 @@
 package android.view.accessibility;
 
 import android.annotation.NonNull;
+import android.graphics.Rect;
+import android.os.Bundle;
+import android.view.View;
 import android.annotation.Nullable;
 import java.lang.CharSequence;
 
@@ -803,7 +806,83 @@ public class AccessibilityNodeInfo {
 
 	public static AccessibilityNodeInfo obtain() { return null; }
 
-	public void setClassName(CharSequence className) {}
+	/* state as AOSP's AccessibilityNodeInfo; there is no accessibility service in ATL that reads it */
+	private CharSequence mClassName;
+	private CharSequence mPackageName;
+	private CharSequence mText;
+	private CharSequence mContentDescription;
+	private String mViewIdResourceName;
+	private final Rect mBoundsInParent = new Rect();
+	private final Rect mBoundsInScreen = new Rect();
+	private Bundle mExtras;
+	private View mParentRoot;
+	private int mParentVirtualDescendantId = View.NO_ID;
+
+	public void setClassName(CharSequence className) {
+		mClassName = className;
+	}
+
+	public CharSequence getClassName() {
+		return mClassName;
+	}
+
+	public void setPackageName(CharSequence packageName) {
+		mPackageName = packageName;
+	}
+
+	public CharSequence getPackageName() {
+		return mPackageName;
+	}
+
+	public void setText(CharSequence text) {
+		mText = text;
+	}
+
+	/** The text of this node (AOSP replaces clickable spans by accessibility ones; there is no service here). */
+	public CharSequence getText() {
+		return mText;
+	}
+
+	public void setViewIdResourceName(String viewIdResName) {
+		mViewIdResourceName = viewIdResName;
+	}
+
+	public String getViewIdResourceName() {
+		return mViewIdResourceName;
+	}
+
+	public void setBoundsInParent(Rect bounds) {
+		mBoundsInParent.set(bounds.left, bounds.top, bounds.right, bounds.bottom);
+	}
+
+	public void getBoundsInParent(Rect outBounds) {
+		outBounds.set(mBoundsInParent.left, mBoundsInParent.top, mBoundsInParent.right, mBoundsInParent.bottom);
+	}
+
+	public void setBoundsInScreen(Rect bounds) {
+		mBoundsInScreen.set(bounds.left, bounds.top, bounds.right, bounds.bottom);
+	}
+
+	public void getBoundsInScreen(Rect outBounds) {
+		outBounds.set(mBoundsInScreen.left, mBoundsInScreen.top, mBoundsInScreen.right, mBoundsInScreen.bottom);
+	}
+
+	/** Gets an unparcelled Bundle with additional data; created on first use, as in AOSP. */
+	public Bundle getExtras() {
+		if (mExtras == null) {
+			mExtras = new Bundle();
+		}
+		return mExtras;
+	}
+
+	public void setParent(View parent) {
+		setParent(parent, View.NO_ID);
+	}
+
+	public void setParent(View root, int virtualDescendantId) {
+		mParentRoot = root;
+		mParentVirtualDescendantId = virtualDescendantId;
+	}
 
 	public void addAction(int action) {}
 
@@ -813,7 +892,13 @@ public class AccessibilityNodeInfo {
 
 	public void setClickable(boolean clickable) {}
 
-	public void setContentDescription(CharSequence description) {}
+	public void setContentDescription(CharSequence description) {
+		mContentDescription = description;
+	}
+
+	public CharSequence getContentDescription() {
+		return mContentDescription;
+	}
 
 	public void setEditable(boolean editable) {}
 
