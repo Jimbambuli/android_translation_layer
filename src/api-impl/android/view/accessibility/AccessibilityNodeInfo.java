@@ -104,7 +104,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 
 	private static final String TAG = "AccessibilityNodeInfo";
 
-	private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG) && Build.IS_DEBUGGABLE;
+	private static final boolean DEBUG = false; // AOSP: Log.isLoggable(TAG, Log.DEBUG) && Build.IS_DEBUGGABLE
 
 	/**
 	 * @hide
