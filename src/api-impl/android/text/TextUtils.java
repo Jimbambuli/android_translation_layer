@@ -552,45 +552,6 @@ public class TextUtils {
 	}
 
 	/* android-14 TextUtils.stringOrSpannedString() */
-	/**
-	 * AOSP TextUtils.expandTemplate(): replaces ^1 ... ^9 in the template with the values, keeping their spans; ^^
-	 * is a ^. Throws IllegalArgumentException for more than nine values or a reference to a value that is not given.
-	 */
-	public static CharSequence expandTemplate(CharSequence template, CharSequence... values) {
-		if (values.length > 9) {
-			throw new IllegalArgumentException("max of 9 values are supported");
-		}
-		SpannableStringBuilder ssb = new SpannableStringBuilder(template);
-		try {
-			int i = 0;
-			while (i < ssb.length()) {
-				if (ssb.charAt(i) == '^') {
-					char next = ssb.charAt(i + 1);
-					if (next == '^') {
-						ssb.delete(i + 1, i + 2);
-						++i;
-						continue;
-					} else if (Character.isDigit(next)) {
-						int which = Character.getNumericValue(next) - 1;
-						if (which < 0) {
-							throw new IllegalArgumentException("template requests value ^" + (which + 1));
-						}
-						if (which >= values.length) {
-							throw new IllegalArgumentException("template requests value ^" + (which + 1) + "; only " + values.length + " provided");
-						}
-						ssb.replace(i, i + 2, values[which]);
-						i += values[which].length();
-						continue;
-					}
-				}
-				++i;
-			}
-		} catch (IndexOutOfBoundsException ignore) {
-			// happens when ^ is the last character in the string.
-		}
-		return ssb;
-	}
-
 	public static CharSequence stringOrSpannedString(CharSequence source) {
 		if (source == null)
 			return null;
