@@ -341,9 +341,33 @@ public class Typeface {
 			return this;
 		}
 
+		/* as in AOSP: -1 and null leave weight and slant to what the font file says */
+		private int mWeight = -1;
+		private Boolean mItalic;
+
+		/**
+		 * Sets weight of the font.
+		 * @param weight a weight value, from 1 to 1000
+		 * @throws IllegalArgumentException if the weight is outside of [1, 1000]
+		 */
+		public Builder setWeight(int weight) {
+			if (weight < 1 || weight > 1000)
+				throw new IllegalArgumentException("weight value must be [1, 1000]");
+			mWeight = weight;
+			return this;
+		}
+
+		/** Sets italic information of the font. */
+		public Builder setItalic(boolean italic) {
+			mItalic = italic;
+			return this;
+		}
+
 		public Typeface build() {
 			try {
 				Typeface ret = registerFont(copyToFontFile(mgr.open(path)), new int[2]);
+				if (ret != null && (mWeight != -1 || mItalic != null))
+					ret = createAbsolute(ret.family, mWeight != -1 ? mWeight : ret.weight, mItalic != null ? mItalic : ret.italic);
 				return ret; // null when the font cannot be read, as in AOSP
 			} catch (java.io.IOException e) {
 				return null;
