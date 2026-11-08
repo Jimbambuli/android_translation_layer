@@ -2655,6 +2655,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return this.context;
 	}
 
+	@Export
 	public void refreshDrawableState() {
 		mPrivateFlags |= PFLAG_DRAWABLE_STATE_DIRTY;
 		drawableStateChanged();
