@@ -4144,6 +4144,37 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return offset < range - 1;
 	}
 
+	/** @hide */
+	@android.annotation.IntDef(flag = true, prefix = {"SCROLL_CAPTURE_HINT_"}, value = {SCROLL_CAPTURE_HINT_AUTO, SCROLL_CAPTURE_HINT_EXCLUDE, SCROLL_CAPTURE_HINT_INCLUDE, SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS})
+	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+	public @interface ScrollCaptureHint {}
+
+	public static final int SCROLL_CAPTURE_HINT_AUTO = 0;
+	public static final int SCROLL_CAPTURE_HINT_EXCLUDE = 0x1;
+	public static final int SCROLL_CAPTURE_HINT_INCLUDE = 0x2;
+	public static final int SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS = 0x4;
+
+	/* AOSP keeps the hint in PFLAG4_SCROLL_CAPTURE_HINT_MASK, the callback in the ListenerInfo; ATL has no scroll
+	 * capture (the screenshot of a window that scrolls), so both are only kept */
+	private int mScrollCaptureHint;
+	private ScrollCaptureCallback mScrollCaptureCallback;
+
+	@ScrollCaptureHint
+	public int getScrollCaptureHint() {
+		return mScrollCaptureHint;
+	}
+
+	public void setScrollCaptureHint(@ScrollCaptureHint int hint) {
+		// Since include/exclude are mutually exclusive, exclude takes precedence.
+		if ((hint & SCROLL_CAPTURE_HINT_EXCLUDE) != 0)
+			hint &= ~SCROLL_CAPTURE_HINT_INCLUDE;
+		mScrollCaptureHint = hint & (SCROLL_CAPTURE_HINT_INCLUDE | SCROLL_CAPTURE_HINT_EXCLUDE | SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS);
+	}
+
+	public final void setScrollCaptureCallback(ScrollCaptureCallback callback) {
+		mScrollCaptureCallback = callback;
+	}
+
 	private static native boolean nativeIsInTouchMode(long widget);
 
 	/* AOSP View.isInTouchMode(): whether the window of the view is in touch mode, which the pointer enters and

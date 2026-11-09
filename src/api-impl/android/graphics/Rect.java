@@ -577,4 +577,9 @@ public final class Rect implements Parcelable {
 		right = in.readInt();
 		bottom = in.readInt();
 	}
+
+	/** @hide */
+	public static Rect copyOrNull(Rect r) {
+		return r == null ? null : new Rect(r);
+	}
 }
