@@ -35,7 +35,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 		}
 		typedArray.recycle();
 		setSwitchColorsFromTheme(context);
-		/* AndroidX SwitchCompat/MaterialSwitch draw thumb and track in onDraw() like AOSP's Switch;
+		/* AndroidX SwitchCompat/MaterialSwitch and ATL's own Switch draw thumb and track in onDraw() like AOSP's Switch;
 		 * the GtkSwitch would be drawn under them, so it stays as state holder only */
 		mDrawsItself = overridesOnDraw(getClass()) && native_hideSwitch(widget);
 	}
@@ -43,7 +43,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 	private boolean mDrawsItself;
 
 	private static boolean overridesOnDraw(Class<?> cls) {
-		for (; cls != null && !cls.getName().startsWith("android.widget."); cls = cls.getSuperclass()) {
+		for (; cls != null && (cls == Switch.class || !cls.getName().startsWith("android.widget.")); cls = cls.getSuperclass()) {
 			try {
 				cls.getDeclaredMethod("onDraw", android.graphics.Canvas.class);
 				return true;
