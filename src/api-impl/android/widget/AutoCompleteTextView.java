@@ -1205,8 +1205,9 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
 	}
 
 	protected boolean setFrame(final int l, int t, final int r, int b) {
-		boolean result = l != getLeft() || t != getTop() || r != getRight() || b != getBottom();
-		layout(l, t, r, b);
+		/* AOSP: super.setFrame(). ATL's View.layout() calls setFrame(), so calling layout() from here never ends:
+		 * the StackOverflowError when the search field of an appcompat SearchView is laid out */
+		boolean result = super.setFrame(l, t, r, b);
 
 		if (isPopupShowing()) {
 			showDropDown();

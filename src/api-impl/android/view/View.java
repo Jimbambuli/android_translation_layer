@@ -2961,6 +2961,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setBackgroundDrawable(Drawable backgroundDrawable) {
+		/* AOSP: the same drawable again changes nothing (no padding, no layout request). Material's FloatingActionButton
+		 * sets its background in every onMeasure(): its padding was set back and requestLayout() was called, without end */
+		if (backgroundDrawable == this.background)
+			return;
 		this.background = backgroundDrawable;
 		if (backgroundDrawable != null) {
 			/* AOSP View.setBackgroundDrawable() */
