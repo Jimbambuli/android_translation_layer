@@ -219,26 +219,28 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1bottom(JNIEnv
 	return baseline + PANGO_DESCENT(logical_rect) / PANGO_SCALE;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1left(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1line_1left(JNIEnv *env, jobject object, jlong layout, jint line)
 {
 	PangoRectangle logical_rect;
 	line_extents(PANGO_LAYOUT(_PTR(layout)), line, &logical_rect);
-	return logical_rect.x / PANGO_SCALE;
+	return (jfloat)logical_rect.x / PANGO_SCALE;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1right(JNIEnv *env, jobject object, jlong layout, jint line)
+JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1line_1right(JNIEnv *env, jobject object, jlong layout, jint line)
 {
 	PangoRectangle logical_rect;
 	line_extents(PANGO_LAYOUT(_PTR(layout)), line, &logical_rect);
-	return (logical_rect.x + logical_rect.width) / PANGO_SCALE;
+	return (jfloat)(logical_rect.x + logical_rect.width) / PANGO_SCALE;
 }
 
-JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1width(JNIEnv *env, jobject object, jlong layout, jint line)
+/* Layout.getLineWidth() is a float: callers that make a layout as wide as its line (Compose rounds it up) wrap
+ * the line when the width was cut down to whole pixels */
+JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1line_1width(JNIEnv *env, jobject object, jlong layout, jint line)
 {
 	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(PANGO_LAYOUT(_PTR(layout)), line);
 	PangoRectangle logical_rect;
 	pango_layout_line_get_extents(pango_line, NULL, &logical_rect);
-	return logical_rect.width / PANGO_SCALE;
+	return (jfloat)logical_rect.width / PANGO_SCALE;
 }
 
 JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1baseline(JNIEnv *env, jobject object, jlong layout, jint line)
