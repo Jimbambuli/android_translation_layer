@@ -9,6 +9,8 @@ import android.graphics.BlendMode;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.graphics.fonts.FontStyle;
 import android.os.Build.VERSION_CODES;
@@ -33,6 +35,8 @@ import android.text.method.MovementMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TransformationMethod;
 import android.text.style.CharacterStyle;
+import android.text.style.DynamicDrawableSpan;
+import android.text.style.ImageSpan;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ClickableSpan;
@@ -283,7 +287,7 @@ public class TextView extends View {
 
 	private void updateNativeText() {
 		if (mTransformed instanceof Spanned)
-			native_setMarkup(toPangoMarkup((Spanned)mTransformed));
+			setPangoMarkup((Spanned)mTransformed);
 		else
 			native_setText(mTransformed.toString());
 	}
@@ -293,7 +297,54 @@ public class TextView extends View {
 	private ColorStateList linkTextColor;
 
 	/* the character spans as Pango markup; a ClickableSpan becomes a link whose URI is its index in linkSpans */
+	/* the images of ImageSpans in the markup: UTF-16 index of the placeholder in the markup's text and the
+	 * size and vertical offset (relative to the baseline) the placeholder takes in the line */
+	private final ArrayList<int[]> imagePlaces = new ArrayList<>();
+
+	private void setPangoMarkup(Spanned text) {
+		String markup = toPangoMarkup(text);
+		int[] places = new int[imagePlaces.size() * 4];
+		for (int i = 0; i < imagePlaces.size(); i++)
+			System.arraycopy(imagePlaces.get(i), 0, places, i * 4, 4);
+		native_setMarkup(markup, places);
+		if (!imageDrawables.isEmpty()) {
+			if (mImageOverlay == null)
+				mImageOverlay = new ImageSpansDrawable();
+			getOverlay().add(mImageOverlay);
+			mImageOverlay.invalidateSelf();
+		} else if (mImageOverlay != null) {
+			getOverlay().remove(mImageOverlay);
+		}
+	}
+
+	/* the images of the ImageSpans: the label leaves a gap of their size (PangoAttrShape) and they are drawn there
+	 * by the overlay of the view, at the position Pango has set for the placeholder */
+	private ImageSpansDrawable mImageOverlay;
+	private final ArrayList<Drawable> imageDrawables = new ArrayList<>();
+
+	private final class ImageSpansDrawable extends Drawable {
+		@Override
+		public void draw(Canvas canvas) {
+			float[] xy = new float[2];
+			for (int i = 0; i < imageDrawables.size(); i++) {
+				Drawable image = imageDrawables.get(i);
+				if (!native_getImagePosition(widget, i, xy))
+					continue;
+				Rect bounds = image.getBounds();
+				canvas.save();
+				canvas.translate(xy[0] - bounds.left, xy[1] - bounds.top);
+				image.draw(canvas);
+				canvas.restore();
+			}
+		}
+	}
+
+	private native boolean native_getImagePosition(long widget, int index, float[] xy);
+
 	private String toPangoMarkup(Spanned text) {
+		imagePlaces.clear();
+		imageDrawables.clear();
+		int plain = 0;
 		CharacterStyle[] spans = text.getSpans(0, text.length(), CharacterStyle.class);
 		linkSpans = text.getSpans(0, text.length(), ClickableSpan.class);
 		ReplacementSpan[] replacements = text.getSpans(0, text.length(), ReplacementSpan.class);
@@ -387,15 +438,33 @@ public class TextView extends View {
 				}
 				if (replaced != null) {
 					if (i == Math.max(0, text.getSpanStart(replaced))) {
-						float space = getPaint().measureText(" ");
+						Drawable image = replaced instanceof ImageSpan ? ((ImageSpan)replaced).getDrawable() : null;
 						int width = replaced.getSize(getPaint(), text, text.getSpanStart(replaced), text.getSpanEnd(replaced), null);
-						for (int n = space > 0 ? Math.max(1, Math.round(width / space)) : 1; n > 0; n--)
-							markup.append(' ');
+						if (image != null && width > 0 && image.getBounds().height() > 0) {
+							/* a placeholder character, for which Pango leaves a gap of the size of the image (PangoAttrShape,
+							 * see native_setMarkup); the vertical position as DynamicDrawableSpan.draw() */
+							Paint.FontMetricsInt fm = getPaint().getFontMetricsInt();
+							int height = image.getBounds().height();
+							int align = ((ImageSpan)replaced).getVerticalAlignment();
+							int y = align == DynamicDrawableSpan.ALIGN_BASELINE ? -height
+								: align == DynamicDrawableSpan.ALIGN_CENTER ? (fm.ascent + fm.descent - height) / 2 : fm.descent - height;
+							imagePlaces.add(new int[] {plain, width, height, y});
+							imageDrawables.add(image);
+							markup.append('\uFFFC');
+							plain++;
+						} else {
+							float space = getPaint().measureText(" ");
+							for (int n = space > 0 ? Math.max(1, Math.round(width / space)) : 1; n > 0; n--) {
+								markup.append(' ');
+								plain++;
+							}
+						}
 					}
 					continue;
 				}
 				char c = text.charAt(i);
 				markup.append(c == '&' ? "&amp;" : c == '<' ? "&lt;" : c == '>' ? "&gt;" : String.valueOf(c));
+				plain++;
 			}
 			markup.append(close);
 			start = end;
@@ -431,7 +500,7 @@ public class TextView extends View {
 		setText(SpannableStringBuilder.valueOf(this.text).append(text, start, end));
 	}
 
-	private native final void native_setMarkup(String markup);
+	private native final void native_setMarkup(String markup, int[] places);
 
 	public native final void native_setText(String text);
 
@@ -611,7 +680,7 @@ public class TextView extends View {
 	public void setLinkTextColor(ColorStateList colorStateList) {
 		linkTextColor = colorStateList;
 		if (mTransformed instanceof Spanned)
-			native_setMarkup(toPangoMarkup((Spanned)mTransformed));
+			setPangoMarkup((Spanned)mTransformed);
 	}
 
 	public final ColorStateList getLinkTextColors() {

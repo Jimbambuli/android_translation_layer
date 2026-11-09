@@ -365,11 +365,19 @@ JNIEXPORT jlong JNICALL Java_android_widget_TextView_native_1constructor
 
 /*
  * Class:     android_widget_TextView
+ * Method:    native_getImagePosition
+ * Signature: (JI[F)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getImagePosition
+  (JNIEnv *, jobject, jlong, jint, jfloatArray);
+
+/*
+ * Class:     android_widget_TextView
  * Method:    native_setMarkup
- * Signature: (Ljava/lang/String;)V
+ * Signature: (Ljava/lang/String;[I)V
  */
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup
-  (JNIEnv *, jobject, jstring);
+  (JNIEnv *, jobject, jstring, jintArray);
 
 /*
  * Class:     android_widget_TextView

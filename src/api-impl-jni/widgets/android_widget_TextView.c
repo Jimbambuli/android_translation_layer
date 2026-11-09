@@ -221,7 +221,10 @@ JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline(JNIEnv *
 	return baseline + MAX(height - natural, 0) * gtk_label_get_yalign(label);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *env, jobject this, jstring markup_jstr)
+/* the markup, with the placeholders of its ImageSpans: places is (UTF-16 index of the placeholder character in the
+ * text of the markup, width, height, y relative to the baseline) per image, in pixels. Pango leaves a gap of that
+ * size (PangoAttrShape); GtkLabel does not draw a shape, the TextView draws the image there (native_getImagePosition) */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *env, jobject this, jstring markup_jstr, jintArray places_array)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
 	if (!label)
@@ -229,6 +232,57 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *en
 	const char *markup = (*env)->GetStringUTFChars(env, markup_jstr, NULL);
 	gtk_label_set_markup(label, markup);
 	(*env)->ReleaseStringUTFChars(env, markup_jstr, markup);
+
+	PangoAttrList *pango_attrs = pango_attr_list_new();
+	pango_attr_list_insert(pango_attrs, pango_attr_font_features_new("tnum"));
+	jsize count = places_array ? (*env)->GetArrayLength(env, places_array) / 4 : 0;
+	GArray *bytes = g_array_new(FALSE, FALSE, sizeof(guint));
+	if (count > 0) {
+		jint *places = (*env)->GetIntArrayElements(env, places_array, NULL);
+		const char *text = gtk_label_get_text(label);
+		for (jsize i = 0; i < count; i++) {
+			/* UTF-16 index to byte index */
+			const char *p = text;
+			jint units = 0;
+			while (*p && units < places[i * 4]) {
+				units += g_utf8_get_char(p) > 0xFFFF ? 2 : 1;
+				p = g_utf8_next_char(p);
+			}
+			guint index = *p ? p - text : G_MAXUINT; /* G_MAXUINT: the text has no such place */
+			g_array_append_val(bytes, index);
+			if (!*p)
+				continue;
+			PangoRectangle rect = {0, places[i * 4 + 3] * PANGO_SCALE, places[i * 4 + 1] * PANGO_SCALE, places[i * 4 + 2] * PANGO_SCALE};
+			PangoAttribute *shape = pango_attr_shape_new(&rect, &rect);
+			shape->start_index = index;
+			shape->end_index = g_utf8_next_char(p) - text;
+			pango_attr_list_insert(pango_attrs, shape);
+		}
+		(*env)->ReleaseIntArrayElements(env, places_array, places, JNI_ABORT);
+	}
+	g_object_set_data_full(G_OBJECT(label), "atl-image-bytes", bytes, (GDestroyNotify)g_array_unref);
+	gtk_label_set_attributes(label, pango_attrs);
+	pango_attr_list_unref(pango_attrs);
+}
+
+/* where the label has put the placeholder of the image: x, y of its top left corner in the view */
+JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getImagePosition(JNIEnv *env, jobject this, jlong widget_ptr, jint index, jfloatArray xy_array)
+{
+	GtkLabel *label = box_get_label(env, _PTR(widget_ptr));
+	GArray *bytes = label ? g_object_get_data(G_OBJECT(label), "atl-image-bytes") : NULL;
+	if (!bytes || index < 0 || (guint)index >= bytes->len || g_array_index(bytes, guint, index) == G_MAXUINT)
+		return JNI_FALSE;
+	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
+	graphene_point_t origin;
+	if (!gtk_widget_compute_point(GTK_WIDGET(label), wrapper, &GRAPHENE_POINT_INIT(0, 0), &origin))
+		return JNI_FALSE;
+	int offset_x, offset_y;
+	gtk_label_get_layout_offsets(label, &offset_x, &offset_y);
+	PangoRectangle pos;
+	pango_layout_index_to_pos(gtk_label_get_layout(label), g_array_index(bytes, guint, index), &pos);
+	jfloat xy[2] = {origin.x + offset_x + (float)pos.x / PANGO_SCALE, origin.y + offset_y + (float)pos.y / PANGO_SCALE};
+	(*env)->SetFloatArrayRegion(env, xy_array, 0, 2, xy);
+	return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawablePadding(JNIEnv *env, jobject this, jlong widget_ptr, jint pad)
