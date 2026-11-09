@@ -75,10 +75,11 @@ JNIEXPORT jlong JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeC
 	return _INTPTR(paintable);
 }
 
-JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSetTint(JNIEnv *env, jobject this, jlong paintable_ptr, jint color)
+JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSetTint(JNIEnv *env, jobject this, jlong paintable_ptr, jint color, jboolean multiply)
 {
 	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
 	paintable->tint = color;
+	paintable->tint_multiply = multiply;
 	gdk_paintable_invalidate_contents(GDK_PAINTABLE(paintable));
 }
 
@@ -86,4 +87,18 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSe
 {
 	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
 	paintable->scale = scale; // set right after creation, before the paintable is shown
+}
+
+/* the size of the image in logical pixels (AOSP NinePatchDrawable.getIntrinsicWidth/Height()): the texels
+ * divided by the texels per logical pixel */
+JNIEXPORT jint JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeGetWidth(JNIEnv *env, jobject this, jlong paintable_ptr)
+{
+	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
+	return (jint)(paintable->width / paintable->scale + 0.5f);
+}
+
+JNIEXPORT jint JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeGetHeight(JNIEnv *env, jobject this, jlong paintable_ptr)
+{
+	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
+	return (jint)(paintable->height / paintable->scale + 0.5f);
 }

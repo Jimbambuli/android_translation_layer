@@ -26,10 +26,10 @@ JNIEXPORT jlong JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeC
 /*
  * Class:     android_graphics_drawable_NinePatchDrawable
  * Method:    nativeSetTint
- * Signature: (JI)V
+ * Signature: (JIZ)V
  */
 JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSetTint
-  (JNIEnv *, jobject, jlong, jint);
+  (JNIEnv *, jobject, jlong, jint, jboolean);
 
 /*
  * Class:     android_graphics_drawable_NinePatchDrawable
@@ -38,6 +38,22 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSe
  */
 JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSetScale
   (JNIEnv *, jobject, jlong, jfloat);
+
+/*
+ * Class:     android_graphics_drawable_NinePatchDrawable
+ * Method:    nativeGetWidth
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeGetWidth
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_graphics_drawable_NinePatchDrawable
+ * Method:    nativeGetHeight
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeGetHeight
+  (JNIEnv *, jobject, jlong);
 
 #ifdef __cplusplus
 }

@@ -92,9 +92,14 @@ public class NinePatchDrawable extends Drawable {
 		if (filter == null && tintList != null && tintMode != null)
 			filter = new PorterDuffColorFilter(tintList.getColorForState(getState(), Color.TRANSPARENT), tintMode);
 		int color = 0;
-		if (filter instanceof PorterDuffColorFilter && ((PorterDuffColorFilter)filter).getMode() == PorterDuff.Mode.SRC_IN)
-			color = ((PorterDuffColorFilter)filter).getColor();
-		nativeSetTint(paintable, color);
+		boolean multiply = false;
+		if (filter instanceof PorterDuffColorFilter) {
+			PorterDuff.Mode mode = ((PorterDuffColorFilter)filter).getMode();
+			if (mode == PorterDuff.Mode.SRC_IN || mode == PorterDuff.Mode.MULTIPLY)
+				color = ((PorterDuffColorFilter)filter).getColor();
+			multiply = mode == PorterDuff.Mode.MULTIPLY;
+		}
+		nativeSetTint(paintable, color, multiply);
 	}
 
 	/* <nine-patch android:src="..." android:tint="..."/> */
@@ -110,6 +115,8 @@ public class NinePatchDrawable extends Drawable {
 		setPaintable(src.paintable);
 		sourcePadding = ((NinePatchDrawable)src).sourcePadding;
 		mPadding = ((NinePatchDrawable)src).mPadding;
+		if (a.hasValue(R.styleable.NinePatchDrawable_tintMode))
+			tintMode = Drawable.parseTintMode(a.getInt(R.styleable.NinePatchDrawable_tintMode, -1), tintMode);
 		if (a.hasValue(R.styleable.NinePatchDrawable_tint))
 			setTintList(a.getColorStateList(R.styleable.NinePatchDrawable_tint));
 		a.recycle();
@@ -157,6 +164,18 @@ public class NinePatchDrawable extends Drawable {
 
 	private native long nativeCreate(byte[] data, long texture);
 	private native long nativeCreate(String path);
-	private native void nativeSetTint(long paintable, int tint);
+	private native void nativeSetTint(long paintable, int tint, boolean multiply);
 	private native void nativeSetScale(long paintable, float scale);
+	private native int nativeGetWidth(long paintable);
+	private native int nativeGetHeight(long paintable);
+
+	@Override
+	public int getIntrinsicWidth() {
+		return paintable != 0 ? nativeGetWidth(paintable) : -1;
+	}
+
+	@Override
+	public int getIntrinsicHeight() {
+		return paintable != 0 ? nativeGetHeight(paintable) : -1;
+	}
 }
