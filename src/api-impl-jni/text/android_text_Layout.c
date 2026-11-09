@@ -14,9 +14,12 @@ JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env
 	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
 	pango_layout_set_font_description(layout, android_paint->font);
 	android_paint_apply_letter_spacing(layout, android_paint);
-	const char *str = (*env)->GetStringUTFChars(env, text, NULL);
-	pango_layout_set_text(layout, str, -1);
-	(*env)->ReleaseStringUTFChars(env, text, str);
+	/* real UTF-8: GetStringUTFChars would give surrogate pairs of emoji as two 3-byte sequences (CESU-8), which Pango rejects */
+	const jchar *chars = (*env)->GetStringChars(env, text, NULL);
+	gchar *str = g_utf16_to_utf8((const gunichar2 *)chars, (*env)->GetStringLength(env, text), NULL, NULL, NULL);
+	(*env)->ReleaseStringChars(env, text, chars);
+	pango_layout_set_text(layout, str ? str : "", -1);
+	g_free(str);
 	pango_layout_set_width(layout, width == -1 ? -1 : width * PANGO_SCALE);
 	return _INTPTR(layout);
 }
@@ -30,6 +33,18 @@ static guint utf16_to_byte_offset(const char *text, int offset)
 		p = g_utf8_next_char(p);
 	}
 	return p - text;
+}
+
+/* the offset in UTF-16 units of a byte offset in the UTF-8 text (Pango indexes in bytes, Java in UTF-16 units) */
+static jint byte_to_utf16_offset(const char *text, int byte_index)
+{
+	const char *p = text, *end = text + byte_index;
+	jint offset = 0;
+	while (*p && p < end) {
+		offset += g_utf8_get_char(p) > 0xFFFF ? 2 : 1;
+		p = g_utf8_next_char(p);
+	}
+	return offset;
 }
 
 static guint16 color_channel(jint argb, int shift)
@@ -167,7 +182,7 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1start(JNIEnv 
 	PangoLayout *pango_layout = _PTR(layout);
 	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(pango_layout, line);
 	int byte_index = pango_layout_line_get_start_index(pango_line);
-	return g_utf8_strlen(pango_layout_get_text(pango_layout), byte_index);
+	return byte_to_utf16_offset(pango_layout_get_text(pango_layout), byte_index);
 }
 
 JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1end(JNIEnv *env, jobject object, jlong layout, jint line)
@@ -175,7 +190,7 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1end(JNIEnv *e
 	PangoLayout *pango_layout = _PTR(layout);
 	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(pango_layout, line);
 	int byte_index = pango_layout_line_get_start_index(pango_line) + pango_layout_line_get_length(pango_line);
-	return g_utf8_strlen(pango_layout_get_text(pango_layout), byte_index);
+	return byte_to_utf16_offset(pango_layout_get_text(pango_layout), byte_index);
 }
 
 static void get_line_metrics(PangoLayout *pango_layout, jint line, int *baseline, PangoRectangle *logical_rect)
@@ -314,7 +329,7 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1for_1offset(J
 {
 	PangoLayout *pango_layout = _PTR(layout);
 	int line;
-	pango_layout_index_to_line_x(pango_layout, offset, FALSE, &line, NULL);
+	pango_layout_index_to_line_x(pango_layout, utf16_to_byte_offset(pango_layout_get_text(pango_layout), offset), FALSE, &line, NULL);
 	return line;
 }
 
@@ -322,7 +337,7 @@ JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1primary_1horizont
 {
 	PangoLayout *pango_layout = _PTR(layout);
 	PangoRectangle cursor_rect;
-	pango_layout_get_cursor_pos(pango_layout, offset, &cursor_rect, NULL);
+	pango_layout_get_cursor_pos(pango_layout, utf16_to_byte_offset(pango_layout_get_text(pango_layout), offset), &cursor_rect, NULL);
 	return (jfloat)cursor_rect.x / PANGO_SCALE;
 }
 
@@ -330,7 +345,7 @@ JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1secondary_1horizo
 {
 	PangoLayout *pango_layout = _PTR(layout);
 	PangoRectangle cursor_rect;
-	pango_layout_get_cursor_pos(pango_layout, offset, NULL, &cursor_rect);
+	pango_layout_get_cursor_pos(pango_layout, utf16_to_byte_offset(pango_layout_get_text(pango_layout), offset), NULL, &cursor_rect);
 	return (jfloat)cursor_rect.x / PANGO_SCALE;
 }
 
@@ -340,7 +355,8 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1offset_1for_1horizo
 	PangoLayoutLine *pango_line = pango_layout_get_line_readonly(pango_layout, line);
 	int index;
 	pango_layout_line_x_to_index(pango_line, x * PANGO_SCALE, &index, NULL);
-	return index;
+	/* a byte index of Pango is not an offset in UTF-16 units */
+	return byte_to_utf16_offset(pango_layout_get_text(pango_layout), index);
 }
 
 JNIEXPORT jfloat JNICALL Java_android_text_Layout_native_1get_1desired_1width(JNIEnv *env, jclass class, jlong layout)
