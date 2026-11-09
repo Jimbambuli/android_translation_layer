@@ -5,7 +5,9 @@ public class Shader {
 	public enum TileMode {
 		CLAMP,
 		MIRROR,
-		REPEAT
+		REPEAT,
+		/* API 31: the edge colors are not extended, outside the shader nothing is drawn */
+		DECAL
 	}
 
 	protected void init(long ni) {

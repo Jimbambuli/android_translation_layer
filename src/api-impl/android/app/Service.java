@@ -23,9 +23,27 @@ public abstract class Service extends ContextWrapper {
 
 	public abstract IBinder onBind(Intent intent);
 
+	public static final int START_CONTINUATION_MASK = 0xf;
+	public static final int START_STICKY_COMPATIBILITY = 0;
+	public static final int START_STICKY = 1;
+	public static final int START_NOT_STICKY = 2;
+	public static final int START_REDELIVER_INTENT = 3;
+	public static final int START_FLAG_REDELIVERY = 0x0001;
+	public static final int START_FLAG_RETRY = 0x0002;
+
+	/**
+	 * @deprecated Implement {@link #onStartCommand(Intent, int, int)} instead.
+	 */
+	@Deprecated
+	public void onStart(Intent intent, int startId) {
+	}
+
+	/* AOSP Service.onStartCommand(): the old onStart() of apps that have not moved on gets the start; the service is
+	 * sticky, as a service of an app of the target SDK of today (START_STICKY_COMPATIBILITY is for apps before ECLAIR) */
 	public int onStartCommand(Intent intent, int flags, int startId) {
 		System.out.println("Service.onStartCommand(" + intent + ", " + flags + ", " + startId + ") called");
-		return 0;
+		onStart(intent, startId);
+		return START_STICKY;
 	}
 
 	public static final int STOP_FOREGROUND_LEGACY = 0;

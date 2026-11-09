@@ -961,6 +961,14 @@ public class Canvas {
 		return false;
 	}
 
+	public boolean quickReject(RectF rect, EdgeType type) {
+		return false;
+	}
+
+	public boolean quickReject(Path path, EdgeType type) {
+		return false;
+	}
+
 	public boolean quickReject(Path path) {
 		return false;
 	}

@@ -30,6 +30,9 @@ public class AccessibilityManager {
 
 	public boolean isEnabled() { return false; }
 
+	/* no accessibility tool requests nodes of ATL's views (AOSP: valid only while a node request is in progress) */
+	public boolean isRequestFromAccessibilityTool() { return false; }
+
 	public List getEnabledAccessibilityServiceList(int feedbackTypeFlags) {
 		return new ArrayList<>();
 	}
