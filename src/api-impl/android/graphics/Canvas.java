@@ -267,6 +267,18 @@ public class Canvas {
 		drawText(text, start, end, x, y, paint);
 	}
 
+	/** Draw a run of the measured text: the characters of the range, with the paint */
+	public void drawTextRun(android.graphics.text.MeasuredText text, int start, int end, int contextStart, int contextEnd, float x, float y, boolean isRtl, Paint paint) {
+		if (text == null)
+			throw new NullPointerException("text is null");
+		if (paint == null)
+			throw new NullPointerException("paint is null");
+		char[] chars = text.getChars();
+		if ((start | end | (end - start) | (chars.length - end) | contextStart | contextEnd | (start - contextStart) | (contextEnd - end) | (chars.length - contextEnd)) < 0)
+			throw new IndexOutOfBoundsException();
+		drawText(chars, start, end - start, x, y, paint);
+	}
+
 	public void drawTextRun(char[] text, int index, int count, int contextIndex, int contextCount, float x, float y, boolean isRtl, Paint paint) {
 		if (text == null)
 			throw new NullPointerException("text is null");

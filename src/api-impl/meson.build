@@ -481,6 +481,7 @@ srcs = [
 	'android/graphics/fonts/FontStyle.java',
 	'android/graphics/fonts/FontVariationAxis.java',
 	'android/graphics/text/LineBreakConfig.java',
+	'android/graphics/text/MeasuredText.java',
 	'android/hardware/Camera.java',
 	'android/hardware/ConsumerIrManager.java',
 	'android/hardware/DataSpace.java',
