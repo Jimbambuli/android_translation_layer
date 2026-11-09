@@ -18,6 +18,7 @@ package android.provider;
 
 import android.accounts.Account;
 import android.content.ContentProviderClient;
+import android.content.ContentProviderOperation;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -145,7 +146,42 @@ public class SyncStateContract {
 			return null;
 		}
 
-		/* ATL: newSetOperation() and newUpdateOperation() are left out, there is no
-		 * ContentProviderOperation */
+		/**
+		 * Creates and returns a ContentProviderOperation that assigns the data array as the
+		 * sync state for the given account.
+		 * @param uri the uri of the sync state
+		 * @param account the {@link Account} whose sync state should be set
+		 * @param data the byte[] that contains the sync state
+		 * @return the new ContentProviderOperation that assigns the data array as the
+		 * account's sync state
+		 */
+		public static ContentProviderOperation newSetOperation(Uri uri,
+				Account account, byte[] data) {
+			ContentValues values = new ContentValues();
+			values.put(Columns.DATA, data);
+			return ContentProviderOperation
+					.newInsert(uri)
+					.withValue(Columns.ACCOUNT_NAME, account.name)
+					.withValue(Columns.ACCOUNT_TYPE, account.type)
+					.withValues(values)
+					.build();
+		}
+
+		/**
+		 * Creates and returns a ContentProviderOperation that assigns the data array as the
+		 * sync state for the given account.
+		 * @param uri the uri of the specific sync state to set
+		 * @param data the byte[] that contains the sync state
+		 * @return the new ContentProviderOperation that assigns the data array as the
+		 * account's sync state
+		 */
+		public static ContentProviderOperation newUpdateOperation(Uri uri, byte[] data) {
+			ContentValues values = new ContentValues();
+			values.put(Columns.DATA, data);
+			return ContentProviderOperation
+					.newUpdate(uri)
+					.withValues(values)
+					.build();
+		}
 	}
 }

@@ -28,4 +28,18 @@ public class RemoteException extends AndroidException {
 	public RemoteException(String message) {
 		super(message);
 	}
+
+	/**
+	 * Rethrow this exception when we know it came from the system server.
+	 */
+	public RuntimeException rethrowFromSystemServer() {
+		throw new RuntimeException(this);
+	}
+
+	/**
+	 * Rethrow as a RuntimeException, wrapping this exception.
+	 */
+	public RuntimeException rethrowAsRuntimeException() {
+		throw new RuntimeException(this);
+	}
 }

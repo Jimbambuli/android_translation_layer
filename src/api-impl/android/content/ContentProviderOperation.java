@@ -254,6 +254,19 @@ public class ContentProviderOperation implements Parcelable {
 			mValues.put(key, value);
 		}
 
+		public Builder withValue(String key, Object value) {
+			if (mType != TYPE_INSERT && mType != TYPE_UPDATE && mType != TYPE_ASSERT) {
+				throw new IllegalArgumentException("only inserts, updates, and asserts can have values");
+			}
+			if (value == null || value instanceof String || value instanceof Byte || value instanceof Short || value instanceof Integer
+			    || value instanceof Long || value instanceof Float || value instanceof Double || value instanceof Boolean || value instanceof byte[]) {
+				setValue(key, value);
+			} else {
+				throw new IllegalArgumentException("bad value type: " + value.getClass().getName());
+			}
+			return this;
+		}
+
 		public Builder withValues(ContentValues values) {
 			final Set<Map.Entry<String, Object>> rawValues = values.valueSet();
 			for (Map.Entry<String, Object> entry : rawValues) {
