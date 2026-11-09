@@ -1124,6 +1124,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	};
 
+
 	public static final Property<View, Float> TRANSLATION_X = new Property<View, Float>(Float.class, "translationX") {
 		@Override
 		public Float get(View view) {

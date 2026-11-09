@@ -253,6 +253,13 @@ public class Typeface {
 		return cached(family.family, family.baseWeight, style, weight, (style & ITALIC) != 0);
 	}
 
+	public static Typeface create(Typeface family, int weight, boolean italic) {
+		if (family == null) {
+			family = sDefaultTypeface;
+		}
+		return createAbsolute(family.family, weight, italic);
+	}
+
 	public static Typeface createFromFile(String path) {
 		return createFromFile(new File(path));
 	}
@@ -289,13 +296,6 @@ public class Typeface {
 
 	public int getWeight() {
 		return weight;
-	}
-
-	public static Typeface create(Typeface family, int weight, boolean italic) {
-		if (family == null) {
-			family = sDefaultTypeface;
-		}
-		return createAbsolute(family.family, weight, italic);
 	}
 
 	/* the typeface uses the family of the first font; Pango does the fallback for missing glyphs */
