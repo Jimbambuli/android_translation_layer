@@ -205,8 +205,76 @@ public class Canvas {
 		drawText(new String(text), start, end, x, y, paint);
 	}
 
-	public void drawTextOnPath(String text, Path path, float x_offset, float y_offset, Paint paint) {
-		Log.w("Canvas", "STUB: drawTextOnPath");
+	/**
+	 * Draw the text, with origin at (x,y), along the specified path: each glyph is put where the path is at the
+	 * middle of its advance, turned by the tangent there (as Skia's text on a path); glyphs beyond the ends of the
+	 * path are not drawn. hOffset moves along the path, vOffset away from it.
+	 */
+	public void drawTextOnPath(String text, Path path, float hOffset, float vOffset, Paint paint) {
+		PathMeasure measure = new PathMeasure(path, false);
+		float length = measure.getLength();
+		float[] pos = new float[2];
+		float[] tan = new float[2];
+		float h = hOffset;
+		for (int i = 0; i < text.length();) {
+			int count = Character.charCount(text.codePointAt(i));
+			String glyph = text.substring(i, i + count);
+			float width = paint.measureText(glyph);
+			float middle = h + width / 2;
+			if (middle >= 0 && middle <= length && measure.getPosTan(middle, pos, tan)) {
+				save();
+				translate(pos[0], pos[1]);
+				rotate((float)Math.toDegrees(Math.atan2(tan[1], tan[0])));
+				drawText(glyph, -width / 2, vOffset, paint);
+				restore();
+			}
+			h += width;
+			i += count;
+		}
+	}
+
+	public void drawTextOnPath(char[] text, int index, int count, Path path, float hOffset, float vOffset, Paint paint) {
+		if ((index | count) < 0 || index + count > text.length)
+			throw new ArrayIndexOutOfBoundsException();
+		drawTextOnPath(new String(text, index, count), path, hOffset, vOffset, paint);
+	}
+
+	/** Draw each character at its own position: pos is x, y per character (AOSP: deprecated drawPosText()) */
+	@Deprecated
+	public void drawPosText(char[] text, int index, int count, float[] pos, Paint paint) {
+		if (index < 0 || index + count > text.length || count * 2 > pos.length)
+			throw new IndexOutOfBoundsException();
+		for (int i = 0; i < count; i++)
+			drawText(text, index + i, 1, pos[i * 2], pos[i * 2 + 1], paint);
+	}
+
+	@Deprecated
+	public void drawPosText(String text, float[] pos, Paint paint) {
+		drawPosText(text.toCharArray(), 0, text.length(), pos, paint);
+	}
+
+	/**
+	 * Draw a run of text, all in one direction. The context is what shapes the run's ends (Pango takes it from the
+	 * text itself), the direction comes from the text, isRtl is not applied.
+	 */
+	public void drawTextRun(CharSequence text, int start, int end, int contextStart, int contextEnd, float x, float y, boolean isRtl, Paint paint) {
+		if (text == null)
+			throw new NullPointerException("text is null");
+		if (paint == null)
+			throw new NullPointerException("paint is null");
+		if ((start | end | (end - start) | (text.length() - end) | contextStart | contextEnd | (start - contextStart) | (contextEnd - end) | (text.length() - contextEnd)) < 0)
+			throw new IndexOutOfBoundsException();
+		drawText(text, start, end, x, y, paint);
+	}
+
+	public void drawTextRun(char[] text, int index, int count, int contextIndex, int contextCount, float x, float y, boolean isRtl, Paint paint) {
+		if (text == null)
+			throw new NullPointerException("text is null");
+		if (paint == null)
+			throw new NullPointerException("paint is null");
+		if ((index | count | text.length - index - count | contextIndex | contextCount | index - contextIndex | (contextIndex + contextCount) - (index + count) | text.length - (contextIndex + contextCount)) < 0)
+			throw new IndexOutOfBoundsException();
+		drawText(text, index, count, x, y, paint);
 	}
 
 	// ---
@@ -659,7 +727,18 @@ public class Canvas {
 	}
 
 	public boolean clipPath(Path path, Region.Op op) {
+		if (op == Region.Op.DIFFERENCE)
+			return clipOutPath(path);
 		return clipPath(path);
+	}
+
+	/* as clipRect() with DIFFERENCE: an even-odd path of a very large rectangle with the path cut out */
+	public boolean clipOutPath(Path path) {
+		Path outer = new Path();
+		outer.setFillType(Path.FillType.EVEN_ODD);
+		outer.addRect(-CLIP_OUT_EXTENT, -CLIP_OUT_EXTENT, CLIP_OUT_EXTENT, CLIP_OUT_EXTENT, Path.Direction.CW);
+		outer.addPath(path);
+		return clipPath(outer);
 	}
 
 	public boolean isHardwareAccelerated() {
@@ -827,5 +906,189 @@ public class Canvas {
 
 	public boolean quickReject(Path path) {
 		return false;
+	}
+
+	public void drawRGB(int r, int g, int b) {
+		drawColor(Color.rgb(r, g, b));
+	}
+
+	/** Preconcat the current matrix with the specified skew. */
+	public void skew(float sx, float sy) {
+		Matrix m = new Matrix();
+		m.setSkew(sx, sy);
+		concat(m);
+	}
+
+	private DrawFilter mDrawFilter;
+
+	/** The filter is kept; ATL does not apply its paint flags to what is drawn. */
+	public void setDrawFilter(DrawFilter filter) {
+		mDrawFilter = filter;
+	}
+
+	public DrawFilter getDrawFilter() {
+		return mDrawFilter;
+	}
+
+	/* AOSP: the software canvas has no limit but the size of a bitmap (32766); a hardware canvas the size of a GPU texture */
+	private static final int MAXIMUM_BITMAP_SIZE = 32766;
+
+	public int getMaximumBitmapWidth() {
+		return MAXIMUM_BITMAP_SIZE;
+	}
+
+	public int getMaximumBitmapHeight() {
+		return MAXIMUM_BITMAP_SIZE;
+	}
+
+	/** Returns true if the canvas has an opaque bitmap, as AOSP's software canvas does */
+	public boolean isOpaque() {
+		return bitmap != null && !bitmap.hasAlpha();
+	}
+
+	public enum VertexMode {
+		TRIANGLES(0),
+		TRIANGLE_STRIP(1),
+		TRIANGLE_FAN(2);
+
+		VertexMode(int nativeInt) {
+			this.nativeInt = nativeInt;
+		}
+
+		final int nativeInt;
+	}
+
+	/* the triangle of the source points s (three x,y pairs) drawn as the triangle of the points d with the bitmap */
+	private void drawBitmapTriangle(Bitmap bitmap, float[] s, float[] d, Paint paint) {
+		Matrix m = new Matrix();
+		if (!m.setPolyToPoly(s, 0, d, 0, 3))
+			return;
+		save();
+		Path triangle = new Path();
+		triangle.moveTo(d[0], d[1]);
+		triangle.lineTo(d[2], d[3]);
+		triangle.lineTo(d[4], d[5]);
+		triangle.close();
+		clipPath(triangle);
+		concat(m);
+		drawBitmap(bitmap, 0, 0, paint);
+		restore();
+	}
+
+	/**
+	 * Draw the bitmap through a mesh with meshWidth+1 points across and meshHeight+1 down, verts is x, y per point.
+	 * Each cell is two triangles, each mapped from the bitmap by the affine transformation of its three points;
+	 * colors (per point) are not applied.
+	 */
+	public void drawBitmapMesh(Bitmap bitmap, int meshWidth, int meshHeight, float[] verts, int vertOffset, int[] colors, int colorOffset, Paint paint) {
+		if ((meshWidth | meshHeight | vertOffset | colorOffset) < 0)
+			throw new ArrayIndexOutOfBoundsException();
+		if (meshWidth == 0 || meshHeight == 0)
+			return;
+		int count = (meshWidth + 1) * (meshHeight + 1);
+		if (verts.length < vertOffset + count * 2)
+			throw new ArrayIndexOutOfBoundsException();
+		if (colors != null && colors.length < colorOffset + count)
+			throw new ArrayIndexOutOfBoundsException();
+		float w = bitmap.getWidth(), h = bitmap.getHeight();
+		for (int y = 0; y < meshHeight; y++) {
+			for (int x = 0; x < meshWidth; x++) {
+				int[] corner = {y * (meshWidth + 1) + x, y * (meshWidth + 1) + x + 1, (y + 1) * (meshWidth + 1) + x, (y + 1) * (meshWidth + 1) + x + 1};
+				float[][] src = new float[4][];
+				float[][] dst = new float[4][];
+				for (int c = 0; c < 4; c++) {
+					src[c] = new float[] {w * ((c & 1) + x) / meshWidth, h * ((c >> 1) + y) / meshHeight};
+					dst[c] = new float[] {verts[vertOffset + corner[c] * 2], verts[vertOffset + corner[c] * 2 + 1]};
+				}
+				drawBitmapTriangle(bitmap, new float[] {src[0][0], src[0][1], src[1][0], src[1][1], src[2][0], src[2][1]},
+					new float[] {dst[0][0], dst[0][1], dst[1][0], dst[1][1], dst[2][0], dst[2][1]}, paint);
+				drawBitmapTriangle(bitmap, new float[] {src[1][0], src[1][1], src[3][0], src[3][1], src[2][0], src[2][1]},
+					new float[] {dst[1][0], dst[1][1], dst[3][0], dst[3][1], dst[2][0], dst[2][1]}, paint);
+			}
+		}
+	}
+
+	/**
+	 * Draw the triangles of the vertices: with texs and a BitmapShader in the paint the bitmap is mapped onto
+	 * each triangle by texs (in pixels of the bitmap); otherwise a triangle is filled with the paint, or with the
+	 * average of the colors of its vertices if there are colors.
+	 */
+	public void drawVertices(VertexMode mode, int vertexCount, float[] verts, int vertOffset, float[] texs, int texOffset, int[] colors, int colorOffset, short[] indices, int indexOffset, int indexCount, Paint paint) {
+		if ((vertexCount | vertOffset | texOffset | colorOffset | indexOffset | indexCount) < 0 || vertOffset + vertexCount > verts.length || (vertexCount & 1) != 0)
+			throw new ArrayIndexOutOfBoundsException();
+		int points = vertexCount / 2;
+		/* the order of the points of the triangles */
+		int[] order;
+		if (indices != null) {
+			order = new int[indexCount];
+			for (int i = 0; i < indexCount; i++)
+				order[i] = indices[indexOffset + i] & 0xFFFF;
+		} else {
+			int triangles = mode == VertexMode.TRIANGLES ? points / 3 : Math.max(points - 2, 0);
+			order = new int[triangles * 3];
+			for (int t = 0; t < triangles; t++) {
+				order[t * 3] = mode == VertexMode.TRIANGLE_FAN ? 0 : mode == VertexMode.TRIANGLES ? t * 3 : t;
+				order[t * 3 + 1] = mode == VertexMode.TRIANGLE_FAN ? t + 1 : mode == VertexMode.TRIANGLES ? t * 3 + 1 : t + 1;
+				order[t * 3 + 2] = mode == VertexMode.TRIANGLE_FAN ? t + 2 : mode == VertexMode.TRIANGLES ? t * 3 + 2 : t + 2;
+			}
+		}
+		/* an index list of TRIANGLE_STRIP / TRIANGLE_FAN is a strip/fan of the indexed points */
+		if (indices != null && mode != VertexMode.TRIANGLES) {
+			int triangles = Math.max(indexCount - 2, 0);
+			int[] strip = new int[triangles * 3];
+			for (int t = 0; t < triangles; t++) {
+				strip[t * 3] = mode == VertexMode.TRIANGLE_FAN ? order[0] : order[t];
+				strip[t * 3 + 1] = order[t + 1];
+				strip[t * 3 + 2] = order[t + 2];
+			}
+			order = strip;
+		}
+		Bitmap bitmap = null;
+		if (texs != null && paint != null && paint.getShader() instanceof BitmapShader)
+			bitmap = ((BitmapShader)paint.getShader()).bitmap;
+		for (int t = 0; t + 2 < order.length; t += 3) {
+			float[] d = new float[6];
+			float[] s = new float[6];
+			int r = 0, g = 0, b = 0, a = 0;
+			boolean valid = true;
+			for (int c = 0; c < 3; c++) {
+				int index = order[t + c];
+				if (index >= points) {
+					valid = false;
+					break;
+				}
+				d[c * 2] = verts[vertOffset + index * 2];
+				d[c * 2 + 1] = verts[vertOffset + index * 2 + 1];
+				if (texs != null) {
+					s[c * 2] = texs[texOffset + index * 2];
+					s[c * 2 + 1] = texs[texOffset + index * 2 + 1];
+				}
+				if (colors != null) {
+					int color = colors[colorOffset + index];
+					a += color >>> 24;
+					r += (color >> 16) & 0xFF;
+					g += (color >> 8) & 0xFF;
+					b += color & 0xFF;
+				}
+			}
+			if (!valid)
+				continue;
+			if (bitmap != null) {
+				drawBitmapTriangle(bitmap, s, d, null);
+			} else {
+				Path triangle = new Path();
+				triangle.moveTo(d[0], d[1]);
+				triangle.lineTo(d[2], d[3]);
+				triangle.lineTo(d[4], d[5]);
+				triangle.close();
+				if (colors != null) {
+					Paint fill = new Paint(paint);
+					fill.setColor(Color.argb(a / 3, r / 3, g / 3, b / 3));
+					drawPath(triangle, fill);
+				} else {
+					drawPath(triangle, paint);
+				}
+			}
+		}
 	}
 }

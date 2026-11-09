@@ -21,6 +21,8 @@ extern "C" {
 #define android_atl_GskCanvas_ALL_SAVE_FLAG 31L
 #undef android_atl_GskCanvas_CLIP_OUT_EXTENT
 #define android_atl_GskCanvas_CLIP_OUT_EXTENT 1000000.0f
+#undef android_atl_GskCanvas_MAXIMUM_BITMAP_SIZE
+#define android_atl_GskCanvas_MAXIMUM_BITMAP_SIZE 32766L
 /*
  * Class:     android_atl_GskCanvas
  * Method:    native_drawBitmap

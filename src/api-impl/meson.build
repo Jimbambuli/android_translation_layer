@@ -398,6 +398,8 @@ srcs = [
 	'android/graphics/BlurMaskFilter.java',
 	'android/graphics/Camera.java',
 	'android/graphics/Canvas.java',
+	'android/graphics/DrawFilter.java',
+	'android/graphics/PaintFlagsDrawFilter.java',
 	'android/graphics/Color.java',
 	'android/graphics/ColorFilter.java',
 	'android/graphics/Compatibility.java',
