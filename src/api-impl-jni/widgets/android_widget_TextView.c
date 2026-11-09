@@ -235,6 +235,20 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *en
 
 	PangoAttrList *pango_attrs = pango_attr_list_new();
 	pango_attr_list_insert(pango_attrs, pango_attr_font_features_new("tnum"));
+	/* the list replaces the one of the label, which carries the size of the text (native_setTextSize);
+	 * the size spans of the markup are percentages of it. Without it every styled text had the default size. */
+	PangoAttrList *old_attrs = gtk_label_get_attributes(label);
+	if (old_attrs) {
+		GSList *old = pango_attr_list_get_attributes(old_attrs);
+		for (GSList *l = old; l; l = l->next) {
+			PangoAttribute *attr = l->data;
+			if (attr->klass->type == PANGO_ATTR_ABSOLUTE_SIZE || attr->klass->type == PANGO_ATTR_SIZE)
+				pango_attr_list_insert(pango_attrs, attr);
+			else
+				pango_attribute_destroy(attr);
+		}
+		g_slist_free(old);
+	}
 	jsize count = places_array ? (*env)->GetArrayLength(env, places_array) / 4 : 0;
 	GArray *bytes = g_array_new(FALSE, FALSE, sizeof(guint));
 	if (count > 0) {
