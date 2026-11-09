@@ -338,6 +338,9 @@ static void on_move_focus(GtkWidget *widget, GtkDirectionType direction, gpointe
 	if (direction != GTK_DIR_TAB_FORWARD && direction != GTK_DIR_TAB_BACKWARD)
 		return;
 	g_signal_stop_emission_by_name(widget, "move-focus");
+	/* a key leaves touch mode before it is handled (ViewRootImpl.ensureTouchMode(false)): the focus search
+	 * of the views then finds the views that are not focusable in touch mode, too */
+	gtk_window_set_focus_visible(window, TRUE);
 	GtkWidget *root = gtk_window_get_child(window);
 	GtkWidget *stack = activity_pages_stack();
 	if (stack && gtk_widget_get_root(stack) == GTK_ROOT(window))

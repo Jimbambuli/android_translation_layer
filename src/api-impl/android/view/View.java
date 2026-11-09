@@ -2881,6 +2881,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/** Helper function to be called from GTKs LayoutManager via JNI */
 	@Export
 	private void layoutInternal(int width, int height) {
+		sLayoutDepth++;
+		try {
+			layoutInternalImpl(width, height);
+		} finally {
+			sLayoutDepth--;
+		}
+	}
+
+	/* the layout passes under way (AOSP: ViewRootImpl.mInLayout of the root the view is in) */
+	private static int sLayoutDepth;
+
+	private void layoutInternalImpl(int width, int height) {
 		in_layout = true;
 		// if the layout is triggered from a native widget, we might not have measured yet
 		// also measure again if a descendant requested a layout without our size changing
@@ -4132,7 +4144,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return offset < range - 1;
 	}
 
-	public boolean isInTouchMode() { return false; }
+	private static native boolean nativeIsInTouchMode(long widget);
+
+	/* AOSP View.isInTouchMode(): whether the window of the view is in touch mode, which the pointer enters and
+	 * the keyboard leaves; for a view that is not attached AOSP asks the window manager, which says yes as long as
+	 * nothing has left it */
+	public boolean isInTouchMode() {
+		return !isAttachedToWindow() || widget == 0 || nativeIsInTouchMode(widget);
+	}
 
 
 	public long getDrawingTime() {
@@ -4564,8 +4583,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	}
 
+	/* AOSP View.getWindowSystemUiVisibility(): the system UI flags the window has got, which here are the ones the
+	 * last setSystemUiVisibility() of a view of the window set */
 	public int getWindowSystemUiVisibility() {
-		return 0;
+		return isAttachedToWindow() ? getRootView().system_ui_visibility : 0;
 	}
 
 
@@ -4580,8 +4601,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return isAttachedToWindow() ? WindowId.of(getRootView()) : null;
 	}
 
+	/* AOSP View.isInLayout(): true while the root of the view is in a layout pass */
 	public boolean isInLayout() {
-		return false; // FIXME
+		return sLayoutDepth > 0;
 	}
 
 
@@ -5026,7 +5048,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 
 
-	public IBinder getApplicationWindowToken() { return null; }
+	/* AOSP View.getApplicationWindowToken(): the token of the window the view is in; ATL has no panel windows
+	 * that belong to the window of an application, so it is the window token itself (null while detached) */
+	public IBinder getApplicationWindowToken() {
+		return getWindowToken();
+	}
 
 	public int getVerticalScrollbarWidth() { return 0; }
 

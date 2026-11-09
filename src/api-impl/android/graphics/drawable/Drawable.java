@@ -607,7 +607,9 @@ public class Drawable {
 		return bm != null ? new BitmapDrawable(bm) : null;
 	}
 
+	/* AOSP Drawable.getPadding(): no padding is all zero */
 	public boolean getPadding(Rect padding) {
+		padding.set(0, 0, 0, 0);
 		return false;
 	}
 

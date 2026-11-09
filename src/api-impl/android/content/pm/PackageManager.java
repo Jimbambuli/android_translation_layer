@@ -2531,7 +2531,32 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentActivityOptions(
 	    ComponentName caller, Intent[] specifics, Intent intent, int flags) {
-		return Collections.emptyList();
+		/* AOSP ComputerEngine.queryIntentActivitiesInternal() for the options: the activities of the specific intents come
+		 * first, each in the order of its own query, then those of the intent; one activity is listed once, and the
+		 * caller's own never */
+		List<ResolveInfo> result = new ArrayList<>();
+		java.util.HashSet<String> seen = new java.util.HashSet<>();
+		if (caller != null)
+			seen.add(caller.getPackageName() + "/" + caller.getClassName());
+		List<Intent> queries = new ArrayList<>();
+		if (specifics != null) {
+			for (Intent specific : specifics) {
+				if (specific != null)
+					queries.add(specific);
+			}
+		}
+		queries.add(intent);
+		for (Intent query : queries) {
+			for (ResolveInfo info : queryIntentActivities(query, flags)) {
+				if (info.activityInfo == null || seen.add(info.activityInfo.packageName + "/" + info.activityInfo.name))
+					result.add(info);
+			}
+		}
+		return result;
+	}
+
+	public List<ResolveInfo> queryIntentActivityOptions(ComponentName caller, List<Intent> specifics, Intent intent, ResolveInfoFlags flags) {
+		return queryIntentActivityOptions(caller, specifics != null ? specifics.toArray(new Intent[0]) : null, intent, (int)flags.getValue());
 	}
 
 	/**

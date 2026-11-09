@@ -1420,6 +1420,8 @@ public final class MotionEvent extends InputEvent {
 	int buttonState;
 	int actionButton;
 	int[] ids;
+	/* the edges of the screen the event touched (EDGE_*), as given to obtain() or setEdgeFlags() */
+	private int mEdgeFlags;
 	float[] coords;
 
 	/* probably don't need multitouch handling for this...? */
@@ -1654,7 +1656,8 @@ public final class MotionEvent extends InputEvent {
 			//                                 downTime * NS_PER_MS, eventTime * NS_PER_MS,
 			//                                 1, pp, pc);
 			ev.action = action;
-			ev.ids = new int[] {1};
+			ev.mEdgeFlags = edgeFlags;
+			ev.ids = new int[] {0}; /* AOSP obtain() of one pointer: pointer id 0 */
 			ev.coords = new float[] {x, y, 0, 0};
 			ev.eventTime = eventTime;
 			return ev;
@@ -1737,6 +1740,7 @@ public final class MotionEvent extends InputEvent {
 		ev.buttonState = other.buttonState;
 		ev.actionButton = other.actionButton;
 		ev.ids = other.ids.clone();
+		ev.mEdgeFlags = other.mEdgeFlags;
 		ev.coords = other.coords.clone();
 		ev.eventTime = other.eventTime;
 
@@ -2163,7 +2167,11 @@ public final class MotionEvent extends InputEvent {
 	 * that pointer identifier.
 	 */
 	public final int findPointerIndex(int pointerId) {
-		return 0 /*nativeFindPointerIndex(mNativePtr, pointerId)*/;
+		for (int i = 0; i < ids.length; i++) {
+			if (ids[i] == pointerId)
+				return i;
+		}
+		return -1;
 	}
 
 	/**
@@ -2906,8 +2914,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see #EDGE_BOTTOM
 	 */
 	public final int getEdgeFlags() {
-		// return nativeGetEdgeFlags(mNativePtr);
-		return 0;
+		return mEdgeFlags;
 	}
 
 	/**
@@ -2917,7 +2924,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see #getEdgeFlags()
 	 */
 	public final void setEdgeFlags(int flags) {
-		nativeSetEdgeFlags(mNativePtr, flags);
+		mEdgeFlags = flags;
 	}
 
 	/**

@@ -2419,21 +2419,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return true;
 	}
 
-	/* AOSP Activity.getActionBar()/initWindowDecorActionBar(): there is an action bar when the theme
-	 * asks for one (windowActionBar, not windowNoTitle, not floating) and the activity is not a child;
+	/* AOSP Activity.getActionBar()/initWindowDecorActionBar(): there is an action bar when the window has the feature
+	 * (its theme has windowActionBar and not windowNoTitle, or the app asked for it) and the activity is no child;
 	 * with a theme without action bar (AppCompat's, dialogs, NoActionBar) it is null as in AOSP.
 	 * ATL's window has no decor bar widget: ActivityActionBar keeps the state and runs the callbacks. */
 	private ActionBar mActionBar;
 
 	public ActionBar getActionBar() {
-		if (mActionBar != null || isChild())
-			return mActionBar;
-		TypedArray a = getTheme().obtainStyledAttributes(com.android.internal.R.styleable.Window);
-		boolean noTitle = a.getBoolean(com.android.internal.R.styleable.Window_windowNoTitle, false);
-		boolean bar = a.getBoolean(com.android.internal.R.styleable.Window_windowActionBar, false);
-		boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
-		a.recycle();
-		if (bar && !noTitle && !floating)
+		window.getDecorView(); // initializing the decor can change the window's features
+		if (!isChild() && mActionBar == null && window.hasFeature(Window.FEATURE_ACTION_BAR))
 			mActionBar = new ActivityActionBar(this);
 		return mActionBar;
 	}

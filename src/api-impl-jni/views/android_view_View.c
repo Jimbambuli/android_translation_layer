@@ -1474,6 +1474,14 @@ JNIEXPORT jobject JNICALL Java_android_view_View_native_1get_1window(JNIEnv *env
 
 extern GtkWindow *window;
 
+/* View.isInTouchMode(): a press of the pointer enters touch mode, which hides the focus; Tab leaves it
+ * (util.c, on_pointer_event() and on_move_focus(); AOSP ViewRootImpl.ensureTouchMode()) */
+JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsInTouchMode(JNIEnv *env, jclass class, jlong widget_ptr)
+{
+	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(_PTR(widget_ptr)));
+	return !GTK_IS_WINDOW(root) || !gtk_window_get_focus_visible(GTK_WINDOW(root));
+}
+
 JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame(JNIEnv *env, jobject this, jobject rect)
 {
 	int width;

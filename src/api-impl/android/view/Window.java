@@ -24,7 +24,25 @@ import android.window.WindowOnBackInvokedDispatcher;
 public class Window {
 	public static final int FEATURE_OPTIONS_PANEL = 0;
 	public static final int FEATURE_NO_TITLE = 1;
+	public static final int FEATURE_PROGRESS = 2;
+	public static final int FEATURE_LEFT_ICON = 3;
+	public static final int FEATURE_RIGHT_ICON = 4;
+	public static final int FEATURE_INDETERMINATE_PROGRESS = 5;
 	public static final int FEATURE_CONTEXT_MENU = 6;
+	public static final int FEATURE_CUSTOM_TITLE = 7;
+	public static final int FEATURE_ACTION_BAR = 8;
+	public static final int FEATURE_ACTION_BAR_OVERLAY = 9;
+	public static final int FEATURE_ACTION_MODE_OVERLAY = 10;
+	public static final int FEATURE_SWIPE_TO_DISMISS = 11;
+	public static final int FEATURE_CONTENT_TRANSITIONS = 12;
+	public static final int FEATURE_ACTIVITY_TRANSITIONS = 13;
+	public static final int FEATURE_MAX = FEATURE_ACTIVITY_TRANSITIONS;
+	public static final int DEFAULT_FEATURES = (1 << FEATURE_OPTIONS_PANEL) | (1 << FEATURE_CONTEXT_MENU);
+
+	/* AOSP Window.mFeatures: the features the window has, from its start the default ones; the theme adds its own in
+	 * installDecor() and requestFeature() the ones the app asks for before it sets the content */
+	private int mFeatures = DEFAULT_FEATURES;
+	private boolean mContentParentExplicitlySet = false;
 
 	public ViewTreeObserver view_tree_observer = null;
 	private WindowManager.LayoutParams params = new WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT, 0, 0, 0);
@@ -397,6 +415,15 @@ public class Window {
 			setFlags(0, flagsToUpdate); // AOSP sets the size to WRAP_CONTENT as well; ATL's dialogs size themselves
 		else
 			setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR, flagsToUpdate);
+		/* the features of the theme, as PhoneWindow.generateLayout() asks for them */
+		if (a.getBoolean(com.android.internal.R.styleable.Window_windowNoTitle, false))
+			requestFeatureInternal(FEATURE_NO_TITLE);
+		else if (a.getBoolean(com.android.internal.R.styleable.Window_windowActionBar, false))
+			requestFeatureInternal(FEATURE_ACTION_BAR);
+		if (a.getBoolean(com.android.internal.R.styleable.Window_windowActionBarOverlay, false))
+			requestFeatureInternal(FEATURE_ACTION_BAR_OVERLAY);
+		if (a.getBoolean(com.android.internal.R.styleable.Window_windowActionModeOverlay, false))
+			requestFeatureInternal(FEATURE_ACTION_MODE_OVERLAY);
 		setThemeFlag(a, com.android.internal.R.styleable.Window_windowFullscreen, false, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 		setThemeFlag(a, com.android.internal.R.styleable.Window_windowTranslucentStatus, false, WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
 		setThemeFlag(a, com.android.internal.R.styleable.Window_windowTranslucentNavigation, false, WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
@@ -420,6 +447,7 @@ public class Window {
 
 	public void setContentView(View view) {
 		installDecor();
+		mContentParentExplicitlySet = true;
 		if (decorView.getBackground() == null) {
 			TypedArray ta = context.obtainStyledAttributes(new int[] {R.attr.windowBackground});
 			if (ta.hasValue(0))
@@ -434,6 +462,7 @@ public class Window {
 	 * layout parameters (setContentView() replaces the content) */
 	public void addContentView(View view, ViewGroup.LayoutParams params) {
 		installDecor();
+		mContentParentExplicitlySet = true;
 		decorView.addView(view, params);
 	}
 
@@ -612,8 +641,30 @@ public class Window {
 		take_input_queue(native_window, callback, new InputQueue());
 	}
 
+	/* AOSP PhoneWindow.requestFeature() */
 	public boolean requestFeature(int featureId) {
-		return false;
+		if (mContentParentExplicitlySet)
+			throw new android.util.AndroidRuntimeException("requestFeature() must be called before adding content");
+		return requestFeatureInternal(featureId);
+	}
+
+	private boolean requestFeatureInternal(int featureId) {
+		final int features = mFeatures;
+		final int newFeatures = features | (1 << featureId);
+		if ((newFeatures & (1 << FEATURE_CUSTOM_TITLE)) != 0 && (newFeatures & ~CUSTOM_TITLE_COMPATIBLE_FEATURES) != 0)
+			throw new android.util.AndroidRuntimeException("You cannot combine custom titles with other title features");
+		if ((features & (1 << FEATURE_NO_TITLE)) != 0 && featureId == FEATURE_ACTION_BAR)
+			return false; // Ignore. No title dominates.
+		if ((features & (1 << FEATURE_ACTION_BAR)) != 0 && featureId == FEATURE_NO_TITLE)
+			mFeatures &= ~(1 << FEATURE_ACTION_BAR); // Remove the action bar feature if we have no title. No title dominates.
+		mFeatures |= 1 << featureId;
+		return (mFeatures & (1 << featureId)) != 0;
+	}
+
+	private static final int CUSTOM_TITLE_COMPATIBLE_FEATURES = DEFAULT_FEATURES | (1 << FEATURE_CUSTOM_TITLE) | (1 << FEATURE_CONTENT_TRANSITIONS) | (1 << FEATURE_ACTIVITY_TRANSITIONS) | (1 << FEATURE_ACTION_MODE_OVERLAY);
+
+	public final int getFeatures() {
+		return mFeatures;
 	}
 
 	public View findViewById(int id) {
@@ -708,7 +759,7 @@ public class Window {
 	}
 
 	public boolean hasFeature(int featureId) {
-		return false;
+		return (getFeatures() & (1 << featureId)) != 0;
 	}
 
 	public void setTitle(CharSequence title) {
