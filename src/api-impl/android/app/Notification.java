@@ -621,7 +621,8 @@ public class Notification implements Parcelable {
 		/** @deprecated Use {@link android.app.Notification.Action.Builder}. */
 		@Deprecated
 		public Action(int icon, CharSequence title, PendingIntent intent) {
-			this(resourceIcon(icon), title, intent, new Bundle(), null, true, SEMANTIC_ACTION_NONE, false, false);
+			this((Icon)null, title, intent, new Bundle(), null, true, SEMANTIC_ACTION_NONE, false, false);
+			this.icon = icon; // getIcon() makes the Icon when it is asked for
 		}
 
 		private Action(Icon icon, CharSequence title, PendingIntent intent, Bundle extras, RemoteInput[] remoteInputs,
@@ -642,7 +643,7 @@ public class Notification implements Parcelable {
 		/** Return an icon representing the action. */
 		public Icon getIcon() {
 			if (mIcon == null && icon != 0) {
-				// an icon without the builder; keep it
+				// the icon of a resource id (the deprecated constructors): made when asked for
 				mIcon = resourceIcon(icon);
 			}
 			return mIcon;
@@ -700,11 +701,13 @@ public class Notification implements Parcelable {
 			private @SemanticAction int mSemanticAction;
 			private boolean mIsContextual;
 			private boolean mAuthenticationRequired;
+			private int mIconRes;
 
 			/** @deprecated Use {@link #Builder(Icon, CharSequence, PendingIntent)} instead. */
 			@Deprecated
 			public Builder(int icon, CharSequence title, PendingIntent intent) {
-				this(resourceIcon(icon), title, intent);
+				this((Icon)null, title, intent);
+				mIconRes = icon;
 			}
 
 			public Builder(Icon icon, CharSequence title, PendingIntent intent) {
@@ -788,7 +791,10 @@ public class Notification implements Parcelable {
 				/* AOSP puts the inputs that take data only (RemoteInput.isDataOnly(): allowed data types, no free-form text,
 				 * no choices) into the extras; ATL's RemoteInput has no allowed data types, so every input takes text */
 				RemoteInput[] textInputs = mRemoteInputs == null || mRemoteInputs.isEmpty() ? null : mRemoteInputs.toArray(new RemoteInput[0]);
-				return new Action(mIcon, mTitle, mIntent, mExtras, textInputs, mAllowGeneratedReplies, mSemanticAction, mIsContextual, mAuthenticationRequired);
+				Action action = new Action(mIcon, mTitle, mIntent, mExtras, textInputs, mAllowGeneratedReplies, mSemanticAction, mIsContextual, mAuthenticationRequired);
+				if (mIcon == null)
+					action.icon = mIconRes;
+				return action;
 			}
 		}
 
