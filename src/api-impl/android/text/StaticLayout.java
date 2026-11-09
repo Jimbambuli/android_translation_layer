@@ -36,6 +36,7 @@ public class StaticLayout extends Layout {
 		private int hyphenationFrequency = -1; // not set: Pango's own default
 		private int breakStrategy = 0; // BREAK_STRATEGY_SIMPLE
 		private boolean includePad = true;
+		private boolean useBoundsForWidth = false;
 		private TextDirectionHeuristic textDir;
 
 		public static Builder obtain(CharSequence source, int bufstart, int bufend, TextPaint paint, int outerwidth) {
@@ -111,6 +112,18 @@ public class StaticLayout extends Layout {
 
 		public Builder setUseLineSpacingFromFallbacks(boolean useLineSpacingFromFallbacks) { return this; }
 
+		/* Android 15 (a @FlaggedApi in android-14.0.0_r75, which has it): the width of the layout from the bounding
+		 * boxes of the glyphs instead of their advances. The flag is kept and reported by Layout.getUseBoundsForWidth();
+		 * Pango's lines are still measured by advance. */
+		public Builder setUseBoundsForWidth(boolean useBoundsForWidth) {
+			this.useBoundsForWidth = useBoundsForWidth;
+			return this;
+		}
+
+		public boolean getUseBoundsForWidth() {
+			return useBoundsForWidth;
+		}
+
 		public Builder setLineBreakConfig(android.graphics.text.LineBreakConfig lineBreakConfig) { return this; }
 
 		/* the layout exists since obtain(); apply what the setters collected, in the order AOSP's
@@ -125,6 +138,7 @@ public class StaticLayout extends Layout {
 			if (hyphenationFrequency >= 0)
 				layout.setHyphenation(hyphenationFrequency != 0);
 			layout.setMaxLines(maxLines, ellipsize);
+			layout.mUseBoundsForWidth = useBoundsForWidth;
 			return layout;
 		}
 	}

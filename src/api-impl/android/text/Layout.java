@@ -141,6 +141,13 @@ public class Layout {
 			native_set_max_lines(layout, maxLines, ellipsize.ordinal() + 1);
 	}
 
+	/* StaticLayout.Builder.setUseBoundsForWidth() */
+	boolean mUseBoundsForWidth = false;
+
+	public boolean getUseBoundsForWidth() {
+		return mUseBoundsForWidth;
+	}
+
 	public int getLineCount() {
 		return Math.min(native_get_line_count(layout), maxLines);
 	}
