@@ -156,8 +156,10 @@ public class Layout {
 	}
 
 	public int getEllipsisCount(int line) {
+		/* like AOSP StaticLayout for a layout without ellipsis: 0, no range check
+		 * (VLC asks for line -1 of an empty text) */
 		if (line < 0 || line >= getLineCount())
-			throw new ArrayIndexOutOfBoundsException();
+			return 0;
 		return native_get_ellipsis_count(layout, line);
 	}
 
@@ -403,7 +405,7 @@ public class Layout {
 
 	public int getEllipsisStart(int line) {
 		if (line < 0 || line >= getLineCount())
-			throw new ArrayIndexOutOfBoundsException();
+			return 0;
 		return 0;
 	}
 
