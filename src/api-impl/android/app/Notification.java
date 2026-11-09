@@ -7,7 +7,9 @@ import android.media.AudioAttributes;
 import android.media.session.MediaSession;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.os.Parcelable;
+import android.text.TextUtils;
 import android.widget.RemoteViews;
 import java.util.ArrayList;
 import java.util.List;
@@ -545,53 +547,305 @@ public class Notification implements Parcelable {
 		}
 	}
 
-	public static class Action {
+	/**
+	 * Structure to encapsulate a named action that can be shown as part of this notification (AOSP Notification.Action).
+	 * The desktop notification shows the title and the PendingIntent of the button; the rest is kept as the app gave it.
+	 */
+	public static class Action implements Parcelable {
+		/** {@link #extras} key: Keys to a {@link Parcelable} {@link ArrayList} of {@link RemoteInput}s. */
+		private static final String EXTRA_DATA_ONLY_INPUTS = "android.extra.DATA_ONLY_INPUTS";
 
-		int icon;
-		String title;
-		PendingIntent intent;
-		List<RemoteInput> remoteInputs = new ArrayList<RemoteInput>();
+		public static final int SEMANTIC_ACTION_NONE = 0;
+		public static final int SEMANTIC_ACTION_REPLY = 1;
+		public static final int SEMANTIC_ACTION_MARK_AS_READ = 2;
+		public static final int SEMANTIC_ACTION_MARK_AS_UNREAD = 3;
+		public static final int SEMANTIC_ACTION_DELETE = 4;
+		public static final int SEMANTIC_ACTION_ARCHIVE = 5;
+		public static final int SEMANTIC_ACTION_MUTE = 6;
+		public static final int SEMANTIC_ACTION_UNMUTE = 7;
+		public static final int SEMANTIC_ACTION_THUMBS_UP = 8;
+		public static final int SEMANTIC_ACTION_THUMBS_DOWN = 9;
+		public static final int SEMANTIC_ACTION_CALL = 10;
+		/** @hide */
+		public static final int SEMANTIC_ACTION_MARK_CONVERSATION_AS_PRIORITY = 11;
+		/** @hide */
+		public static final int SEMANTIC_ACTION_CONVERSATION_IS_PHISHING = 12;
 
+		private final Bundle mExtras;
+		private Icon mIcon;
+		private final RemoteInput[] mRemoteInputs;
+		private boolean mAllowGeneratedReplies = true;
+		private final @SemanticAction int mSemanticAction;
+		private final boolean mIsContextual;
+		private final boolean mAuthenticationRequired;
+
+		/** Small icon representing the action. @deprecated Use {@link Action#getIcon()} instead. */
+		@Deprecated
+		public int icon;
+
+		/** Title of the action. */
+		public CharSequence title;
+
+		/** Intent to send when the user invokes this action. May be null, in which case the action may be rendered in a disabled presentation. */
+		public PendingIntent actionIntent;
+
+		private Action(Parcel in) {
+			if (in.readInt() != 0) {
+				mIcon = Icon.CREATOR.createFromParcel(in);
+				if (mIcon.getType() == Icon.TYPE_RESOURCE)
+					icon = mIcon.getResId();
+			}
+			title = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+			if (in.readInt() == 1)
+				actionIntent = PendingIntent.CREATOR.createFromParcel(in);
+			mExtras = Bundle.setDefusable(in.readBundle(), true);
+			mRemoteInputs = in.createTypedArray(RemoteInput.CREATOR);
+			mAllowGeneratedReplies = in.readInt() == 1;
+			mSemanticAction = in.readInt();
+			mIsContextual = in.readInt() == 1;
+			mAuthenticationRequired = in.readInt() == 1;
+		}
+
+		/** @deprecated Use {@link android.app.Notification.Action.Builder}. */
+		@Deprecated
+		public Action(int icon, CharSequence title, PendingIntent intent) {
+			this(resourceIcon(icon), title, intent, new Bundle(), null, true, SEMANTIC_ACTION_NONE, false, false);
+		}
+
+		private Action(Icon icon, CharSequence title, PendingIntent intent, Bundle extras, RemoteInput[] remoteInputs,
+		               boolean allowGeneratedReplies, @SemanticAction int semanticAction, boolean isContextual, boolean requireAuth) {
+			this.mIcon = icon;
+			if (icon != null && icon.getType() == Icon.TYPE_RESOURCE)
+				this.icon = icon.getResId();
+			this.title = title;
+			this.actionIntent = intent;
+			this.mExtras = extras != null ? extras : new Bundle();
+			this.mRemoteInputs = remoteInputs;
+			this.mAllowGeneratedReplies = allowGeneratedReplies;
+			this.mSemanticAction = semanticAction;
+			this.mIsContextual = isContextual;
+			this.mAuthenticationRequired = requireAuth;
+		}
+
+		/** Return an icon representing the action. */
+		public Icon getIcon() {
+			if (mIcon == null && icon != 0) {
+				// an icon without the builder; keep it
+				mIcon = resourceIcon(icon);
+			}
+			return mIcon;
+		}
+
+		/** Get additional metadata carried around with this Action. */
+		public Bundle getExtras() {
+			return mExtras;
+		}
+
+		/** Return whether the platform should automatically generate possible replies for this {@link Action} */
+		public boolean getAllowGeneratedReplies() {
+			return mAllowGeneratedReplies;
+		}
+
+		/** Get the list of inputs to be collected from the user when this action is sent. May return null if no remote inputs were added. Only returns inputs which accept free-form text input. */
 		public RemoteInput[] getRemoteInputs() {
-			return remoteInputs.isEmpty() ? null : remoteInputs.toArray(new RemoteInput[0]);
+			return mRemoteInputs;
 		}
 
-		public String toString() {
-			return "Action [" + icon + ", " + title + ", " + intent + "]";
+		/** Returns the {@code SemanticAction} associated with this {@link Action}. */
+		public @SemanticAction int getSemanticAction() {
+			return mSemanticAction;
 		}
 
+		/** Returns whether this is a contextual Action, i.e. whether the action is dependent on the notification message body. */
+		public boolean isContextual() {
+			return mIsContextual;
+		}
+
+		/** Get the list of inputs to be collected from the user that ONLY accept data when this action is sent. */
+		public RemoteInput[] getDataOnlyRemoteInputs() {
+			android.os.Parcelable[] inputs = mExtras != null ? mExtras.getParcelableArray(EXTRA_DATA_ONLY_INPUTS) : null;
+			if (inputs == null)
+				return null;
+			RemoteInput[] result = new RemoteInput[inputs.length];
+			for (int i = 0; i < inputs.length; i++)
+				result[i] = (RemoteInput)inputs[i];
+			return result;
+		}
+
+		/** Returns whether the OS should only send this action's {@link PendingIntent} on an unlocked device. */
+		public boolean isAuthenticationRequired() {
+			return mAuthenticationRequired;
+		}
+
+		/** Builder class for {@link Action} objects. */
 		public static final class Builder {
+			private final Icon mIcon;
+			private final CharSequence mTitle;
+			private final PendingIntent mIntent;
+			private boolean mAllowGeneratedReplies = true;
+			private final Bundle mExtras;
+			private ArrayList<RemoteInput> mRemoteInputs;
+			private @SemanticAction int mSemanticAction;
+			private boolean mIsContextual;
+			private boolean mAuthenticationRequired;
 
-			private Action action;
+			/** @deprecated Use {@link #Builder(Icon, CharSequence, PendingIntent)} instead. */
+			@Deprecated
 			public Builder(int icon, CharSequence title, PendingIntent intent) {
-				action = new Action();
-				action.icon = icon;
-				action.title = String.valueOf(title);
-				action.intent = intent;
+				this(resourceIcon(icon), title, intent);
 			}
 
 			public Builder(Icon icon, CharSequence title, PendingIntent intent) {
-				this(0, title, intent);
+				this(icon, title, intent, new Bundle(), null, true, SEMANTIC_ACTION_NONE, false);
 			}
 
-			public Builder addExtras(Bundle extras) { return this; }
+			/** Construct a new builder, copying the content of an existing Action. */
+			public Builder(Action action) {
+				this(action.getIcon(), action.title, action.actionIntent, new Bundle(action.mExtras), action.getRemoteInputs(),
+				     action.getAllowGeneratedReplies(), action.getSemanticAction(), action.isContextual());
+				mAuthenticationRequired = action.isAuthenticationRequired();
+			}
 
-			public Builder addRemoteInput(RemoteInput remoteInput) {
-				action.remoteInputs.add(remoteInput);
+			private Builder(Icon icon, CharSequence title, PendingIntent intent, Bundle extras, RemoteInput[] remoteInputs,
+			                boolean allowGeneratedReplies, @SemanticAction int semanticAction, boolean isContextual) {
+				mIcon = icon;
+				mTitle = title;
+				mIntent = intent;
+				mExtras = extras;
+				if (remoteInputs != null) {
+					mRemoteInputs = new ArrayList<RemoteInput>(remoteInputs.length);
+					java.util.Collections.addAll(mRemoteInputs, remoteInputs);
+				}
+				mAllowGeneratedReplies = allowGeneratedReplies;
+				mSemanticAction = semanticAction;
+				mIsContextual = isContextual;
+			}
+
+			/** Merge additional metadata into this builder. */
+			public Builder addExtras(Bundle extras) {
+				if (extras != null)
+					mExtras.putAll(extras);
 				return this;
 			}
 
-			public Builder setAllowGeneratedReplies(boolean allowGeneratedReplies) { return this; }
-
-			public Builder setSemanticAction(int semanticAction) { return this; }
-
-			public Builder setContextual(boolean isContextual) { return this; }
-
-			public Builder setAuthenticationRequired(boolean authenticationRequired) { return this; }
-
-			public Action build() {
-				return action;
+			/** Get the metadata Bundle used by this Builder. */
+			public Bundle getExtras() {
+				return mExtras;
 			}
+
+			/** Add an input to be collected from the user when this action is sent. */
+			public Builder addRemoteInput(RemoteInput remoteInput) {
+				if (mRemoteInputs == null)
+					mRemoteInputs = new ArrayList<RemoteInput>();
+				mRemoteInputs.add(remoteInput);
+				return this;
+			}
+
+			/** Set whether the platform should automatically generate possible replies to add to {@link RemoteInput#getChoices()}. */
+			public Builder setAllowGeneratedReplies(boolean allowGeneratedReplies) {
+				mAllowGeneratedReplies = allowGeneratedReplies;
+				return this;
+			}
+
+			/** Sets the {@code SemanticAction} for this {@link Action}. */
+			public Builder setSemanticAction(@SemanticAction int semanticAction) {
+				mSemanticAction = semanticAction;
+				return this;
+			}
+
+			/** Sets whether this {@link Action} is a contextual action. */
+			public Builder setContextual(boolean isContextual) {
+				mIsContextual = isContextual;
+				return this;
+			}
+
+			/** Apply an extender to this action builder. */
+			public Builder extend(Extender extender) {
+				extender.extend(this);
+				return this;
+			}
+
+			/** Sets whether the OS should only send this action's {@link PendingIntent} on an unlocked device. */
+			public Builder setAuthenticationRequired(boolean authenticationRequired) {
+				mAuthenticationRequired = authenticationRequired;
+				return this;
+			}
+
+			/** Combine all of the options that have been set and return a new {@link Action} object. */
+			public Action build() {
+				/* AOSP puts the inputs that take data only (RemoteInput.isDataOnly(): allowed data types, no free-form text,
+				 * no choices) into the extras; ATL's RemoteInput has no allowed data types, so every input takes text */
+				RemoteInput[] textInputs = mRemoteInputs == null || mRemoteInputs.isEmpty() ? null : mRemoteInputs.toArray(new RemoteInput[0]);
+				return new Action(mIcon, mTitle, mIntent, mExtras, textInputs, mAllowGeneratedReplies, mSemanticAction, mIsContextual, mAuthenticationRequired);
+			}
+		}
+
+		/* the icon of a resource of the app (AOSP: Icon.createWithResource("", id), the package of the app) */
+		private static Icon resourceIcon(int resId) {
+			android.atl.ATLLoadedApp loaded = android.atl.ATLLoadedApp.getPrimaryApplication();
+			android.app.Application app = loaded != null ? loaded.getApplication() : null;
+			return app != null ? Icon.createWithResource(app, resId) : null;
+		}
+
+		@Override
+		public Action clone() {
+			return new Action(getIcon(), title, actionIntent, mExtras == null ? new Bundle() : new Bundle(mExtras), getRemoteInputs(),
+			                  getAllowGeneratedReplies(), getSemanticAction(), isContextual(), isAuthenticationRequired());
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		@Override
+		public void writeToParcel(Parcel out, int flags) {
+			final Icon ic = getIcon();
+			if (ic != null) {
+				out.writeInt(1);
+				ic.writeToParcel(out, 0);
+			} else {
+				out.writeInt(0);
+			}
+			TextUtils.writeToParcel(title, out, flags);
+			if (actionIntent != null) {
+				out.writeInt(1);
+				actionIntent.writeToParcel(out, flags);
+			} else {
+				out.writeInt(0);
+			}
+			out.writeBundle(mExtras);
+			out.writeTypedArray(mRemoteInputs, flags);
+			out.writeInt(mAllowGeneratedReplies ? 1 : 0);
+			out.writeInt(mSemanticAction);
+			out.writeInt(mIsContextual ? 1 : 0);
+			out.writeInt(mAuthenticationRequired ? 1 : 0);
+		}
+
+		public static final Parcelable.Creator<Action> CREATOR = new Parcelable.Creator<Action>() {
+			@Override
+			public Action createFromParcel(Parcel in) {
+				return new Action(in);
+			}
+
+			@Override
+			public Action[] newArray(int size) {
+				return new Action[size];
+			}
+		};
+
+		/** Extender interface for use with {@link Builder#extend}. */
+		public interface Extender {
+			/** Apply this extender to a notification action builder. */
+			public Builder extend(Builder builder);
+		}
+
+		@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
+		@android.annotation.IntDef(prefix = {"SEMANTIC_ACTION_"}, value = {SEMANTIC_ACTION_NONE, SEMANTIC_ACTION_REPLY, SEMANTIC_ACTION_MARK_AS_READ, SEMANTIC_ACTION_MARK_AS_UNREAD, SEMANTIC_ACTION_DELETE, SEMANTIC_ACTION_ARCHIVE, SEMANTIC_ACTION_MUTE, SEMANTIC_ACTION_UNMUTE, SEMANTIC_ACTION_THUMBS_UP, SEMANTIC_ACTION_THUMBS_DOWN, SEMANTIC_ACTION_CALL, SEMANTIC_ACTION_MARK_CONVERSATION_AS_PRIORITY, SEMANTIC_ACTION_CONVERSATION_IS_PHISHING})
+		public @interface SemanticAction {}
+
+		public String toString() {
+			return "Action [" + icon + ", " + title + ", " + actionIntent + "]";
 		}
 	}
 

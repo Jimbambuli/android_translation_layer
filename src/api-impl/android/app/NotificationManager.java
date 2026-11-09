@@ -52,7 +52,7 @@ public class NotificationManager {
 
 	/* The desktop portals have no text field for a reply (RemoteInput): that button opens the app instead. */
 	static PendingIntent buttonIntent(Notification notification, Notification.Action action) {
-		return action.remoteInputs.isEmpty() ? action.intent : notification.intent;
+		return action.getRemoteInputs() == null ? action.actionIntent : notification.intent;
 	}
 
 	private static int mpris_notification_id = -1;
@@ -104,7 +104,7 @@ public class NotificationManager {
 				intentType = pendingIntent.type;
 				intent = pendingIntent.intent;
 			}
-			nativeAddAction(builder, action.title, intentType, intent);
+			nativeAddAction(builder, String.valueOf(action.title), intentType, intent);
 		}
 		int intentType = -1;
 		Intent intent = null;
