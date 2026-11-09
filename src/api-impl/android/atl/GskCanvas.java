@@ -222,6 +222,12 @@ public class GskCanvas extends DisplayListCanvas {
 	}
 
 	@Override
+	public void drawGlyphs(int[] glyphIds, int glyphIdOffset, float[] positions, int positionOffset, int glyphCount, android.graphics.fonts.Font font, Paint paint) {
+		checkGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, paint);
+		native_drawGlyphs(snapshot, glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font.getFamilyName(), font.getStyle().getWeight(), font.getStyle().getSlant(), paint.paint);
+	}
+
+	@Override
 	public void drawLine(float startX, float startY, float stopX, float stopY, Paint paint) {
 		native_drawLine(snapshot, startX, startY, stopX, stopY, paint != null ? paint.paint : default_paint.paint);
 	}
@@ -344,6 +350,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_drawLine(long snapshot, float startX, float startY, float stopX, float stopY, long paint);
 	protected native void native_drawLines(long snapshot, float[] points, int offset, int count, long paint);
 	protected native void native_drawText(long snapshot, String text, float x, float y, long paint);
+	protected native void native_drawGlyphs(long snapshot, int[] glyphIds, int glyphIdOffset, float[] positions, int positionOffset, int glyphCount, String family, int weight, int slant, long paint);
 	protected native void native_drawRoundRect(long snapshot, float left, float top, float right, float bottom, float rx, float ry, long paint);
 	protected native void native_scale(long snapshot, float sx, float sy);
 	protected native void native_concat(long snapshot, long matrix);

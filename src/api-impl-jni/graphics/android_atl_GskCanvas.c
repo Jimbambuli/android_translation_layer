@@ -212,6 +212,55 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawText(JNIEnv *env, 
 	g_object_unref(layout);
 }
 
+/* Canvas.drawGlyphs(): the glyphs of the font (a family registered with fontconfig by Font.Builder) by glyph id,
+ * each at its own position, at the size and with the color of the paint. */
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawGlyphs(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jintArray ids_arr, jint id_offset, jfloatArray pos_arr, jint pos_offset, jint count, jstring family, jint weight, jint slant, jlong paint_ptr)
+{
+	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	if (count <= 0)
+		return;
+	PangoFontDescription *desc = pango_font_description_copy(paint->font);
+	if (family) {
+		const char *family_str = (*env)->GetStringUTFChars(env, family, NULL);
+		pango_font_description_set_family(desc, family_str);
+		(*env)->ReleaseStringUTFChars(env, family, family_str);
+	}
+	pango_font_description_set_weight(desc, CLAMP(weight, 100, 1000));
+	pango_font_description_set_style(desc, slant ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
+	PangoFont *font = pango_context_load_font(gtk_widget_get_pango_context(window), desc);
+	pango_font_description_free(desc);
+	if (!font)
+		return;
+	jint *ids = (*env)->GetIntArrayElements(env, ids_arr, NULL);
+	jfloat *pos = (*env)->GetFloatArrayElements(env, pos_arr, NULL);
+	if (paint->use_color_filter)
+		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	PangoGlyphString *glyphs = pango_glyph_string_new();
+	pango_glyph_string_set_size(glyphs, 1);
+	for (jint i = 0; i < count; i++) {
+		PangoRectangle logical;
+		pango_font_get_glyph_extents(font, ids[id_offset + i], NULL, &logical);
+		glyphs->glyphs[0].glyph = ids[id_offset + i];
+		glyphs->glyphs[0].geometry.width = logical.width;
+		glyphs->glyphs[0].geometry.x_offset = 0;
+		glyphs->glyphs[0].geometry.y_offset = 0;
+		glyphs->glyphs[0].attr.is_cluster_start = 1;
+		glyphs->log_clusters[0] = 0;
+		GskRenderNode *node = gsk_text_node_new(font, glyphs, &paint->color, &GRAPHENE_POINT_INIT(pos[pos_offset + i * 2], pos[pos_offset + i * 2 + 1]));
+		if (node) {
+			gtk_snapshot_append_node(snapshot, node);
+			gsk_render_node_unref(node);
+		}
+	}
+	pango_glyph_string_free(glyphs);
+	if (paint->use_color_filter)
+		gtk_snapshot_pop(snapshot);
+	(*env)->ReleaseIntArrayElements(env, ids_arr, ids, JNI_ABORT);
+	(*env)->ReleaseFloatArrayElements(env, pos_arr, pos, JNI_ABORT);
+	g_object_unref(font);
+}
+
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRoundRect(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat rx, jfloat ry, jlong paint_ptr)
 {
 	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);

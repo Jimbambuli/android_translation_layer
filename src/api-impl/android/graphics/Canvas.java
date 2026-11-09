@@ -206,6 +206,51 @@ public class Canvas {
 	}
 
 	/**
+	 * Draw the specified NinePatch into the canvas at dst, with the color filter of the paint (the pieces
+	 * that stretch fill the space, the others keep their size).
+	 */
+	public void drawPatch(NinePatch patch, Rect dst, Paint paint) {
+		drawPatchImpl(patch, dst, paint);
+	}
+
+	public void drawPatch(NinePatch patch, RectF dst, Paint paint) {
+		drawPatchImpl(patch, new Rect(Math.round(dst.left), Math.round(dst.top), Math.round(dst.right), Math.round(dst.bottom)), paint);
+	}
+
+	private void drawPatchImpl(NinePatch patch, Rect dst, Paint paint) {
+		android.graphics.drawable.NinePatchDrawable d = patch.getDrawable();
+		d.setBounds(dst);
+		d.setColorFilter(paint != null ? paint.getColorFilter() : null);
+		d.draw(this);
+	}
+
+	/** The checks of AOSP BaseCanvas.drawGlyphs() */
+	protected static void checkGlyphs(int[] glyphIds, int glyphIdOffset, float[] positions, int positionOffset, int glyphCount, android.graphics.fonts.Font font, Paint paint) {
+		java.util.Objects.requireNonNull(glyphIds, "glyphIds must not be null.");
+		java.util.Objects.requireNonNull(positions, "positions must not be null.");
+		java.util.Objects.requireNonNull(font, "font must not be null.");
+		java.util.Objects.requireNonNull(paint, "paint must not be null.");
+		if (glyphCount < 0)
+			throw new IllegalArgumentException("glyphCount must not be negative");
+		if (glyphIdOffset < 0 || glyphIdOffset + glyphCount > glyphIds.length)
+			throw new IndexOutOfBoundsException("glyphIds must have at least " + (glyphIdOffset + glyphCount) + " of elements");
+		if (positionOffset < 0 || positionOffset + glyphCount * 2 > positions.length)
+			throw new IndexOutOfBoundsException("positions must have at least " + (positionOffset + glyphCount * 2) + " of elements");
+	}
+
+	/**
+	 * Draw glyphs of the font by glyph id, each at its x, y in positions (Android 12). The typeface of the paint is
+	 * ignored, size and color come from the paint.
+	 */
+	public void drawGlyphs(int[] glyphIds, int glyphIdOffset, float[] positions, int positionOffset, int glyphCount, android.graphics.fonts.Font font, Paint paint) {
+		checkGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, paint);
+		synchronized (bitmap) {
+			gsk_canvas.snapshot = bitmap.getSnapshot();
+			gsk_canvas.drawGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, paint);
+		}
+	}
+
+	/**
 	 * Draw the text, with origin at (x,y), along the specified path: each glyph is put where the path is at the
 	 * middle of its advance, turned by the tangent there (as Skia's text on a path); glyphs beyond the ends of the
 	 * path are not drawn. hOffset moves along the path, vOffset away from it.
