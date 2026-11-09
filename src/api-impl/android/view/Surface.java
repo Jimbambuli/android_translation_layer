@@ -80,6 +80,29 @@ public class Surface implements android.os.Parcelable {
 
 	public void release() {}
 
+	/* AOSP Surface.lockCanvas()/lockHardwareCanvas()/unlockCanvasAndPost(): the canvas draws into a snapshot, which
+	 * unlockCanvasAndPost() hands to the SurfaceView the surface belongs to (as SurfaceHolder.lockCanvas() does).
+	 * AOSP locks the buffer for software drawing; there is only the one kind of canvas here. */
+	public android.graphics.Canvas lockCanvas(android.graphics.Rect inOutDirty) {
+		if (!isValid())
+			throw new IllegalStateException("Surface has no native object.");
+		return new android.atl.GskCanvas(SurfaceView.native_createSnapshot());
+	}
+
+	public android.graphics.Canvas lockHardwareCanvas() {
+		return lockCanvas(null);
+	}
+
+	public void unlockCanvasAndPost(android.graphics.Canvas canvas) {
+		if (canvas == null)
+			throw new IllegalArgumentException("canvas must not be null");
+		if (!(canvas instanceof android.atl.GskCanvas))
+			throw new IllegalArgumentException("canvas object must be the same instance that was previously returned by lockCanvas");
+		if (!isValid())
+			throw new IllegalStateException("Surface has no native object.");
+		SurfaceView.native_postSnapshot(widget, ((android.atl.GskCanvas)canvas).snapshot);
+	}
+
 	/* API 30/31: only a hint for the display's refresh rate, which ATL does not adjust */
 	public static final int FRAME_RATE_COMPATIBILITY_DEFAULT = 0;
 	public static final int FRAME_RATE_COMPATIBILITY_FIXED_SOURCE = 1;

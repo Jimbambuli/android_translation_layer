@@ -159,6 +159,11 @@ public class ContentResolver {
 		return openAssetFileDescriptor(uri, mode);
 	}
 
+	/** @hide AOSP ContentResolver.openTypedAssetFile(): the same as openTypedAssetFileDescriptor() */
+	public final AssetFileDescriptor openTypedAssetFile(Uri uri, String mimeTypeFilter, Bundle opts, CancellationSignal signal) throws FileNotFoundException {
+		return openTypedAssetFileDescriptor(uri, mimeTypeFilter, opts, signal);
+	}
+
 	public final AssetFileDescriptor openTypedAssetFileDescriptor(Uri uri, String mimeType, Bundle opts) throws FileNotFoundException {
 		/* FIXME */
 		return openAssetFileDescriptor(uri, "r");
@@ -269,8 +274,57 @@ public class ContentResolver {
 		return provider.applyBatch(authority, operations);
 	}
 
-	public List getPersistedUriPermissions() {
-		return Collections.emptyList();
+	/* AOSP ContentResolver.take/releasePersistableUriPermission(), getPersistedUriPermissions(): the grants an app keeps
+	 * across restarts (UriGrantsManagerService writes them to urigrants.xml). There is no grant to check here (the file
+	 * chooser and the intents that bring a Uri are the grants of an ATL app), so a call takes what the flags say;
+	 * they are kept in the shared preferences "atl_uri_permissions" of the package: uri -> "flags,time". */
+	private static final int PERSISTABLE_MODE_FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+
+	private android.content.SharedPreferences persistedUriPermissions() {
+		return mContext.getSharedPreferences("atl_uri_permissions", Context.MODE_PRIVATE);
+	}
+
+	public void takePersistableUriPermission(Uri uri, int modeFlags) {
+		if (uri == null)
+			throw new NullPointerException("uri");
+		takePersistableUriPermission(uri.toString(), modeFlags);
+	}
+
+	private synchronized void takePersistableUriPermission(String uri, int modeFlags) {
+		modeFlags &= PERSISTABLE_MODE_FLAGS;
+		if (modeFlags == 0)
+			throw new IllegalArgumentException("Must specify a read or write mode flag");
+		android.content.SharedPreferences prefs = persistedUriPermissions();
+		String old = prefs.getString(uri, null);
+		int flags = old != null ? Integer.parseInt(old.substring(0, old.indexOf(','))) : 0;
+		long time = old != null ? Long.parseLong(old.substring(old.indexOf(',') + 1)) : System.currentTimeMillis();
+		prefs.edit().putString(uri, (flags | modeFlags) + "," + time).apply();
+	}
+
+	public synchronized void releasePersistableUriPermission(Uri uri, int modeFlags) {
+		if (uri == null)
+			throw new NullPointerException("uri");
+		modeFlags &= PERSISTABLE_MODE_FLAGS;
+		android.content.SharedPreferences prefs = persistedUriPermissions();
+		String old = prefs.getString(uri.toString(), null);
+		if (old == null)
+			return;
+		int flags = Integer.parseInt(old.substring(0, old.indexOf(','))) & ~modeFlags;
+		android.content.SharedPreferences.Editor edit = prefs.edit();
+		if (flags == 0)
+			edit.remove(uri.toString());
+		else
+			edit.putString(uri.toString(), flags + old.substring(old.indexOf(',')));
+		edit.apply();
+	}
+
+	public synchronized List<UriPermission> getPersistedUriPermissions() {
+		List<UriPermission> result = new ArrayList<>();
+		for (java.util.Map.Entry<String, ?> e : persistedUriPermissions().getAll().entrySet()) {
+			String v = String.valueOf(e.getValue());
+			result.add(new UriPermission(Uri.parse(e.getKey()), Integer.parseInt(v.substring(0, v.indexOf(','))), Long.parseLong(v.substring(v.indexOf(',') + 1))));
+		}
+		return result;
 	}
 
 	public final ContentProviderClient acquireContentProviderClient(Uri uri) {

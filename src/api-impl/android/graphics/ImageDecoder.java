@@ -75,6 +75,28 @@ public final class ImageDecoder implements AutoCloseable {
 		}
 	}
 
+	private static class StreamSource extends Source {
+		private final java.util.concurrent.Callable<InputStream> mOpener;
+
+		StreamSource(java.util.concurrent.Callable<InputStream> opener) {
+			mOpener = opener;
+		}
+
+		@Override
+		InputStream open() throws IOException {
+			try {
+				InputStream in = mOpener.call();
+				if (in == null)
+					throw new java.io.FileNotFoundException("no data for the source");
+				return in;
+			} catch (IOException e) {
+				throw e;
+			} catch (Exception e) {
+				throw new IOException(e);
+			}
+		}
+	}
+
 	/**
 	 * Information about an encoded image.
 	 */
@@ -213,6 +235,41 @@ public final class ImageDecoder implements AutoCloseable {
 	 */
 	public static Source createSource(byte[] data) {
 		return createSource(data, 0, data.length);
+	}
+
+	/** Create a new {@link Source Source} from a resource. */
+	public static Source createSource(final android.content.res.Resources res, final int resId) {
+		return new StreamSource(() -> res.openRawResource(resId));
+	}
+
+	/** Create a new {@link Source Source} from a {@link android.net.Uri}. */
+	public static Source createSource(final android.content.ContentResolver cr, final android.net.Uri uri) {
+		if (uri == null)
+			throw new IllegalArgumentException("Uri must not be null!");
+		return new StreamSource(() -> cr.openInputStream(uri));
+	}
+
+	/** Create a new {@link Source Source} from a file in the assets directory. */
+	public static Source createSource(final android.content.res.AssetManager assets, final String fileName) {
+		return new StreamSource(() -> assets.open(fileName));
+	}
+
+	/** Create a new {@link Source Source} from a {@link java.nio.ByteBuffer} (from its position to its limit). */
+	public static Source createSource(java.nio.ByteBuffer buffer) {
+		final java.nio.ByteBuffer dup = buffer.slice();
+		return new StreamSource(() -> {
+			byte[] data = new byte[dup.remaining()];
+			dup.duplicate().get(data);
+			return new ByteArrayInputStream(data);
+		});
+	}
+
+	/** Create a new {@link Source Source} from a {@link java.util.concurrent.Callable} that returns a new AssetFileDescriptor each time it is called. */
+	public static Source createSource(final java.util.concurrent.Callable<android.content.res.AssetFileDescriptor> callable) {
+		return new StreamSource(() -> {
+			android.content.res.AssetFileDescriptor afd = callable.call();
+			return afd != null ? afd.createInputStream() : null;
+		});
 	}
 
 	/**
