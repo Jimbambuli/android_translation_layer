@@ -346,7 +346,14 @@ public final class ATLLoadedApp {
 					}
 
 					if (serviceConnection != null) {
-						serviceConnection.onServiceConnected(intent.getComponent(), service.onBind(intent));
+						// AOSP delivers onNullBinding when the service's onBind returns null, never
+						// onServiceConnected with a null binder (which crashes callers that dereference it).
+						android.os.IBinder binder = service.onBind(intent);
+						if (binder != null) {
+							serviceConnection.onServiceConnected(intent.getComponent(), binder);
+						} else {
+							serviceConnection.onNullBinding(intent.getComponent());
+						}
 					} else {
 						service.onStartCommand(intent, 0, 0);
 					}

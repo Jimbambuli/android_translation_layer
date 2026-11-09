@@ -3966,4 +3966,48 @@ public class PackageManager {
 	public int getPackageUid(String packageName, PackageInfoFlags flags) throws NameNotFoundException {
 		return getPackageUid(packageName, (int)flags.getValue());
 	}
+
+	/** The certificate input is an encoded X.509 certificate (as from {@link Signature#toByteArray}). */
+	public static final int CERT_INPUT_RAW_X509 = 0;
+	/** The certificate input is the SHA-256 hash of the encoded X.509 certificate. */
+	public static final int CERT_INPUT_SHA256 = 1;
+
+	public boolean hasSigningCertificate(String packageName, byte[] certificate, int type) {
+		try {
+			SigningInfo signingInfo = getPackageInfo(packageName, GET_SIGNING_CERTIFICATES).signingInfo;
+			return signingInfo != null && hasSigningCertificate(signingInfo.getApkContentsSigners(), certificate, type);
+		} catch (NameNotFoundException e) {
+			return false;
+		}
+	}
+
+	public boolean hasSigningCertificate(int uid, byte[] certificate, int type) {
+		String[] packageNames = getPackagesForUid(uid);
+		if (packageNames == null) {
+			return false;
+		}
+		for (String packageName : packageNames) {
+			if (hasSigningCertificate(packageName, certificate, type)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/* Like AOSP's SigningDetails.hasCertificate: a match only for a package signed by exactly the one
+	 * certificate; rotation is not supported for multiple signers, so a multi-signer package never matches. */
+	private static boolean hasSigningCertificate(Signature[] signers, byte[] certificate, int type) {
+		if (signers == null || signers.length != 1) {
+			return false;
+		}
+		byte[] signature = signers[0].toByteArray();
+		if (type == CERT_INPUT_SHA256) {
+			try {
+				signature = java.security.MessageDigest.getInstance("SHA-256").digest(signature);
+			} catch (java.security.NoSuchAlgorithmException e) {
+				return false;
+			}
+		}
+		return java.util.Arrays.equals(signature, certificate);
+	}
 }
