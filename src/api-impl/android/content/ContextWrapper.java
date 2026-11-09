@@ -73,6 +73,16 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
+	public void startActivities(Intent[] intents) {
+		baseContext.startActivities(intents);
+	}
+
+	@Override
+	public void startActivities(Intent[] intents, Bundle options) {
+		baseContext.startActivities(intents, options);
+	}
+
+	@Override
 	public void startActivity(Intent intent) {
 		this.baseContext.startActivity(intent);
 	}

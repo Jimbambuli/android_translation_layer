@@ -1376,8 +1376,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public void startPostponedEnterTransition() {}
 
+	/* AOSP: mParent != null */
 	public boolean isChild() {
-		return false;
+		return getParent() != null;
 	}
 
 	public void setTaskDescription(ActivityManager.TaskDescription description) {}
@@ -2357,8 +2358,26 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		}
 	}
 
+	/**
+	 * AOSP asks the task whether it has the task affinity of the target: ATL's activities of an app are one task,
+	 * whose affinity is that of this activity, so a target with another affinity belongs to another task.
+	 */
 	public boolean shouldUpRecreateTask(Intent targetIntent) {
-		return false;
+		try {
+			PackageManager pm = getPackageManager();
+			ComponentName cn = targetIntent.getComponent();
+			if (cn == null) {
+				cn = targetIntent.resolveActivity(pm);
+			}
+			ActivityInfo info = pm.getActivityInfo(cn, 0);
+			if (info.taskAffinity == null) {
+				return false;
+			}
+			ActivityInfo own = pm.getActivityInfo(getComponentName(), 0);
+			return !info.taskAffinity.equals(own.taskAffinity);
+		} catch (PackageManager.NameNotFoundException e) {
+			return false;
+		}
 	}
 
 	/**

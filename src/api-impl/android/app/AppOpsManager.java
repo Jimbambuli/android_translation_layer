@@ -16,8 +16,19 @@ public class AppOpsManager {
 		return permission;
 	}
 
-	public int noteProxyOpNoThrow(String op, String pkg) {
-		return 0;
+	@Deprecated
+	public int noteProxyOpNoThrow(String op, String proxiedPackageName) {
+		return noteProxyOpNoThrow(op, proxiedPackageName, android.os.Binder.getCallingUid(), null, null);
+	}
+
+	@Deprecated
+	public int noteProxyOpNoThrow(String op, String proxiedPackageName, int proxiedUid) {
+		return noteProxyOpNoThrow(op, proxiedPackageName, proxiedUid, null, null);
+	}
+
+	/* the op is noted and the mode answered: ATL has no AppOpsService to note it with, every op is allowed */
+	public int noteProxyOpNoThrow(String op, String proxiedPackageName, int proxiedUid, String proxiedAttributionTag, String message) {
+		return MODE_ALLOWED;
 	}
 
 	@Deprecated

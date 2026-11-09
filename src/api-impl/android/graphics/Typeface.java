@@ -331,6 +331,22 @@ public class Typeface {
 	public static class Builder {
 		private AssetManager mgr;
 		private String path;
+		private File mFile;
+		private java.io.FileDescriptor mFd;
+
+		/** Constructs a builder from a file path (the path of a font file, not of an asset). */
+		public Builder(String path) {
+			this(new File(path));
+		}
+
+		public Builder(File path) {
+			mFile = path;
+		}
+
+		/** Constructs a builder from a file descriptor, which is read from its start. */
+		public Builder(java.io.FileDescriptor fd) {
+			mFd = fd;
+		}
 
 		public Builder(AssetManager mgr, String path) {
 			this.mgr = mgr;
@@ -365,7 +381,17 @@ public class Typeface {
 
 		public Typeface build() {
 			try {
-				Typeface ret = registerFont(copyToFontFile(mgr.open(path)), new int[2]);
+				File font;
+				if (mFile != null) {
+					font = mFile;
+				} else if (mFd != null) {
+					try (java.io.FileInputStream in = new java.io.FileInputStream(mFd)) {
+						font = copyToFontFile(in);
+					}
+				} else {
+					font = copyToFontFile(mgr.open(path));
+				}
+				Typeface ret = registerFont(font, new int[2]);
 				if (ret != null && (mWeight != -1 || mItalic != null))
 					ret = createAbsolute(ret.family, mWeight != -1 ? mWeight : ret.weight, mItalic != null ? mItalic : ret.italic);
 				return ret; // null when the font cannot be read, as in AOSP

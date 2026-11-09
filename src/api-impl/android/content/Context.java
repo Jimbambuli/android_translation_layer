@@ -685,6 +685,16 @@ public abstract class Context {
 	@Export
 	public abstract void startActivity(Intent intent);
 
+	/* AOSP: starts all of them, the last one on top of the others */
+	public void startActivities(Intent[] intents) {
+		startActivities(intents, null);
+	}
+
+	public void startActivities(Intent[] intents, Bundle options) {
+		for (Intent intent : intents)
+			startActivity(intent, options);
+	}
+
 	public void startActivity(Intent intent, Bundle options) {
 		startActivity(intent);
 	}
