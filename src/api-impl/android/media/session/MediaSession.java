@@ -179,6 +179,14 @@ public class MediaSession {
 
 	public void setMediaButtonReceiver(PendingIntent pendingIntent) {}
 
+	/* API 31: the receiver that gets the media buttons while the session is inactive; ATL has no media button routing
+	 * to apps (MPRIS handles the keys), so it is only kept */
+	private android.content.ComponentName mMediaButtonBroadcastReceiver;
+
+	public void setMediaButtonBroadcastReceiver(android.content.ComponentName broadcastReceiver) {
+		mMediaButtonBroadcastReceiver = broadcastReceiver;
+	}
+
 	/* AOSP MediaSession.setActive(): only an active session gets the media keys */
 	public void setActive(boolean active) {
 		if (mActive == active)

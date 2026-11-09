@@ -87,6 +87,11 @@ public class Settings {
 	}
 
 	public static final class System extends NameValueTable {
+		/* AOSP: null when the setting is not set, which none is here */
+		public static String getString(ContentResolver cr, String key) {
+			return null;
+		}
+
 		private final static String TAG = "Settings$System";
 		public static final Uri CONTENT_URI = Uri.parse("content://settings/system");
 

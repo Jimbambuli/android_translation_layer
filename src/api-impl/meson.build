@@ -728,6 +728,7 @@ srcs = [
 	'android/security/KeyChainAliasCallback.java',
 	'android/security/KeyPairGeneratorSpec.java',
 	'android/security/NetworkSecurityPolicy.java',
+	'android/security/keystore/AndroidCAStore.java',
 	'android/security/keystore/AndroidKeyStore.java',
 	'android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java',
 	'android/security/keystore/AndroidKeyStoreSecretKey.java',

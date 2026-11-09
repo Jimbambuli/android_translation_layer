@@ -193,6 +193,12 @@ public class Notification implements Parcelable {
 			notification.visibility = VISIBILITY_PRIVATE;
 		}
 
+		/* AOSP Notification.Builder.setChannelId() */
+		public Builder setChannelId(String channelId) {
+			notification.channelId = channelId;
+			return this;
+		}
+
 		public Builder(Context context, String channelId) {
 			this(context);
 			notification.channelId = channelId;
@@ -383,6 +389,12 @@ public class Notification implements Parcelable {
 			notification.sound = sound;
 			notification.audioAttributes = audioAttributes;
 			return this;
+		}
+
+		/** @deprecated AOSP Notification.Builder.addAction(int, CharSequence, PendingIntent) */
+		@Deprecated
+		public Builder addAction(int icon, CharSequence title, PendingIntent intent) {
+			return addAction(new Action.Builder(icon, title, intent).build());
 		}
 
 		public Builder addAction(Action action) {

@@ -474,6 +474,11 @@ public class Environment {
 	 */
 	public static String DIRECTORY_DOCUMENTS = "Documents";
 
+	/** Standard directory in which to place audio books (API 29), screenshots (API 29) and recordings (API 31). */
+	public static String DIRECTORY_AUDIOBOOKS = "Audiobooks";
+	public static String DIRECTORY_SCREENSHOTS = "Screenshots";
+	public static String DIRECTORY_RECORDINGS = "Recordings";
+
 	/**
 	 * Get a top-level public external storage directory for placing files of
 	 * a particular type.  This is where the user will typically place and

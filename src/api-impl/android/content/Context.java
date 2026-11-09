@@ -189,6 +189,7 @@ public abstract class Context {
 
 		Provider provider = new Provider("AndroidKeyStore", 1.0, "Android KeyStore provider") {};
 		provider.put("KeyStore.AndroidKeyStore", "android.security.keystore.AndroidKeyStore");
+		provider.put("KeyStore.AndroidCAStore", "android.security.keystore.AndroidCAStore");
 		provider.put("KeyGenerator.AES", "android.security.keystore.KeyGenerator$AES");
 		provider.put("KeyGenerator.HmacSHA512", "android.security.keystore.KeyGenerator$HmacSHA512");
 		Security.addProvider(provider);
@@ -352,6 +353,28 @@ public abstract class Context {
 	}
 
 	public abstract Resources getResources();
+
+	/** The default device ID, which is of the physical device on which the app is running (Android 14). */
+	public static final int DEVICE_ID_DEFAULT = 0;
+	/** Invalid device ID. */
+	public static final int DEVICE_ID_INVALID = -1;
+
+	/* AOSP Context.getDeviceId(): the id of the device the context is associated with; the one device of ATL has the
+	 * default id (there are no virtual devices) */
+	public int getDeviceId() {
+		return DEVICE_ID_DEFAULT;
+	}
+
+	/* the device id never changes: there is one device, so no listener is ever called */
+	public void registerDeviceIdChangeListener(java.util.concurrent.Executor executor, java.util.function.IntConsumer listener) {
+		if (executor == null || listener == null)
+			throw new NullPointerException("executor and listener must not be null");
+	}
+
+	public void unregisterDeviceIdChangeListener(java.util.function.IntConsumer listener) {
+		if (listener == null)
+			throw new NullPointerException("listener must not be null");
+	}
 
 	public AssetManager getAssets() {
 		return getResources().getAssets();

@@ -22,6 +22,24 @@ public class PendingIntent implements Parcelable {
 
 	private int requestCode;
 	Intent intent;
+	/* API 31 */
+	public boolean isActivity() {
+		return type == 0;
+	}
+
+	public boolean isBroadcast() {
+		return type == 2;
+	}
+
+	/* a foreground service start is a service start here; ATL keeps no difference */
+	public boolean isForegroundService() {
+		return false;
+	}
+
+	public boolean isService() {
+		return type == 1;
+	}
+
 	int type; // 0: activity, 1: service, 2: broadcast, 3: result for an activity (Activity.createPendingResult())
 	private Activity resultActivity;
 

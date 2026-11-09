@@ -703,6 +703,17 @@ public class Window {
 
 	public void setNavigationBarColor(int color) {}
 
+	/* API 28: the divider between the app and the navigation bar, which ATL's window has none of; the color is kept */
+	private int mNavigationBarDividerColor;
+
+	public void setNavigationBarDividerColor(int dividerColor) {
+		mNavigationBarDividerColor = dividerColor;
+	}
+
+	public int getNavigationBarDividerColor() {
+		return mNavigationBarDividerColor;
+	}
+
 	public void setFormat(int format) {
 		params.format = format;
 		dispatchWindowAttributesChanged(params);

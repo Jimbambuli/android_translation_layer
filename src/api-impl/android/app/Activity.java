@@ -2516,6 +2516,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private boolean mIsInMultiWindowMode;
 	private boolean mMultiWindowKnown;
 
+	/** @hide AOSP Activity.getLaunchedFromUid(): the uid of the one that started the activity, which here is the app itself (or the launcher it was started from, which has no uid of its own to give) */
+	public int getLaunchedFromUid() {
+		return android.system.Os.getuid();
+	}
+
 	public String getLaunchedFromPackage() {
 		return mLaunchedFromPackage;
 	}
