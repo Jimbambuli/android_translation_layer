@@ -993,12 +993,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return mTitleColor;
 	}
 
-	/* AOSP Activity.onTitleChanged(): the window gets the title (and an action bar, which ATL does not have) */
+	/* AOSP Activity.onTitleChanged(): the window gets the title (and the action bar, which keeps it) */
 	protected void onTitleChanged(CharSequence title, int color) {
+		if (mActionBar != null)
+			mActionBar.setWindowTitle(title);
 		if (mTitleReady) {
 			final Window win = getWindow();
 			if (win != null) {
-				win.setTitle(title);
+				/* the title of an action bar that was given one stays the title of the window */
+				win.setTitle(mActionBar != null ? mActionBar.getTitle() : title);
 			}
 		}
 	}
@@ -2416,8 +2419,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return true;
 	}
 
+	/* AOSP Activity.getActionBar()/initWindowDecorActionBar(): there is an action bar when the theme
+	 * asks for one (windowActionBar, not windowNoTitle, not floating) and the activity is not a child;
+	 * with a theme without action bar (AppCompat's, dialogs, NoActionBar) it is null as in AOSP.
+	 * ATL's window has no decor bar widget: ActivityActionBar keeps the state and runs the callbacks. */
+	private ActionBar mActionBar;
+
 	public ActionBar getActionBar() {
-		return null;
+		if (mActionBar != null || isChild())
+			return mActionBar;
+		TypedArray a = getTheme().obtainStyledAttributes(com.android.internal.R.styleable.Window);
+		boolean noTitle = a.getBoolean(com.android.internal.R.styleable.Window_windowNoTitle, false);
+		boolean bar = a.getBoolean(com.android.internal.R.styleable.Window_windowActionBar, false);
+		boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
+		a.recycle();
+		if (bar && !noTitle && !floating)
+			mActionBar = new ActivityActionBar(this);
+		return mActionBar;
 	}
 
 	/* ---- AOSP Activity members that the apps call and that had no counterpart here ---- */
