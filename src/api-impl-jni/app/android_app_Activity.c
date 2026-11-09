@@ -1399,7 +1399,7 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
 			}
 
 			/* -- run the activity's onNewIntent -- */
-			J__Activity__onNewIntent(env, l->data, intent);
+			J__Activity__performNewIntent(env, l->data, intent);
 			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
 				(*env)->ExceptionClear(env);

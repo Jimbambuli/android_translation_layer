@@ -452,6 +452,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	protected void onActivityResult(int requestCode, int resultCode, Intent data) {}
 
+	/** Same as {@link #onActivityResult(int, int, Intent)}, with the caller that sent the result. */
+	public void onActivityResult(int requestCode, int resultCode, @NonNull Intent data, @NonNull ComponentCaller caller) {
+		onActivityResult(requestCode, resultCode, data);
+	}
+
 	/* Activity.dispatchActivityResult(). ATL: only the results of activities (who == null); there are no
 	 * results for fragments, permission requests, views or autofill */
 	void dispatchActivityResult(String who, int requestCode, int resultCode, Intent data, String reason) {
@@ -462,7 +467,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		if (frag != null)
 			frag.onActivityResult(requestCode, resultCode, data);
 		else
-			onActivityResult(requestCode, resultCode, data);
+			deliverActivityResult(requestCode, resultCode, data);
+	}
+
+	/* onActivityResult() with the ComponentCaller of Android 15: the result comes from an activity of this app */
+	private void deliverActivityResult(int requestCode, int resultCode, Intent data) {
+		ComponentCaller caller = new ComponentCaller(null, null, getPackageName(), android.system.Os.getuid());
+		mCurrentCaller = caller;
+		try {
+			onActivityResult(requestCode, resultCode, data, caller);
+		} finally {
+			mCurrentCaller = null;
+		}
 	}
 
 	/* what finish() of the started activity does in ActivityRecord.finishIfPossible(): queue the result for
@@ -536,7 +552,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		if (android.content.pm.PackageInstaller.handlePackageIntent(this, intent, requestCode < 0 ? null : new java.util.function.IntConsumer() {
 			    @Override
 			    public void accept(int resultCode) {
-				    onActivityResult(requestCode, resultCode, new Intent());
+				    deliverActivityResult(requestCode, resultCode, new Intent());
 			    }
 		    }))
 			return;
@@ -556,7 +572,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 						activity = internalCreateActivity(intent.getComponent().getClassName(), getWindow().native_window, intent);
 					} catch (ReflectiveOperationException e) {
 						nativeResumeCurrentActivity();
-						onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
+						deliverActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 						return;
 					}
 					activity.mLaunchedFromPackage = getPackageName();
@@ -591,17 +607,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 				Process p = new ProcessBuilder("/usr/bin/env", "android-translation-layer", "--install", intent.getData().getPath()).start();
 				int exitValue = p.waitFor();
 				if (exitValue == 0) {
-					onActivityResult(requestCode, -1 /*RESULT_OK*/, new Intent());
+					deliverActivityResult(requestCode, -1 /*RESULT_OK*/, new Intent());
 				} else {
-					onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
+					deliverActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 				}
 			} catch (IOException | InterruptedException e) {
 				e.printStackTrace();
-				onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
+				deliverActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 			}
 		} else {
 			Slog.i(TAG, "startActivityForResult: intent was not handled. Calling onActivityResult(RESULT_CANCELED).");
-			onActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
+			deliverActivityResult(requestCode, 0 /*RESULT_CANCELED*/, new Intent());
 		}
 	}
 	public void startActivityForResult(Intent intent, int requestCode) {
@@ -1009,7 +1025,63 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	public void setIntent(Intent newIntent) {
+		internalSetIntent(newIntent, null);
+	}
+
+	/* Android 15 (AOSP android-14 QPR source): the app that launched this activity, that sent it a new
+	 * intent, or that sent it a result. ATL knows only activities of the same app as callers. */
+	private ComponentCaller mInitialCaller;
+	private ComponentCaller mCaller;
+	private ComponentCaller mCurrentCaller;
+	private boolean mCallerSet;
+
+	private ComponentCaller callerOfStarter() {
+		Activity starter = resultActivity;
+		return new ComponentCaller(null, null, starter != null ? starter.getPackageName() : null,
+		                           starter != null ? android.system.Os.getuid() : -1);
+	}
+
+	/** The caller of the intent returned by {@link #getIntent()}. */
+	public @Nullable ComponentCaller getCaller() {
+		return mCallerSet ? mCaller : getInitialCaller();
+	}
+
+	/** Changes the intent returned by getIntent() and the caller returned by getCaller(). */
+	public void setIntent(@Nullable Intent newIntent, @Nullable ComponentCaller newCaller) {
+		internalSetIntent(newIntent, newCaller);
+	}
+
+	private void internalSetIntent(Intent newIntent, ComponentCaller newCaller) {
 		this.intent = newIntent;
+		mCaller = newCaller;
+		mCallerSet = true;
+	}
+
+	/** The caller of the intent that launched this activity. */
+	public @NonNull ComponentCaller getInitialCaller() {
+		if (mInitialCaller == null)
+			mInitialCaller = callerOfStarter();
+		return mInitialCaller;
+	}
+
+	/** The caller of the new intent or result being delivered; only valid in onNewIntent()/onActivityResult(). */
+	public @NonNull ComponentCaller getCurrentCaller() {
+		if (mCurrentCaller == null) {
+			throw new IllegalStateException("The caller is null because #getCurrentCaller should be"
+			                                + " called within #onNewIntent method");
+		}
+		return mCurrentCaller;
+	}
+
+	/* AOSP Activity.performNewIntent(): ATL's native side delivers the new intent here */
+	@Export
+	private void performNewIntent(Intent intent) {
+		mCurrentCaller = callerOfStarter();
+		try {
+			onNewIntent(intent, mCurrentCaller);
+		} finally {
+			mCurrentCaller = null;
+		}
 	}
 
 	@Override
@@ -1176,8 +1248,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return getSharedPreferences(getLocalClassName(), mode);
 	}
 
-	@Export
 	protected void onNewIntent(Intent intent) {}
+
+	/** Same as {@link #onNewIntent(Intent)}, with the caller that sent the intent. */
+	public void onNewIntent(@NonNull Intent intent, @NonNull ComponentCaller caller) {
+		onNewIntent(intent);
+	}
 
 	public final Activity getParent() {
 		return null;

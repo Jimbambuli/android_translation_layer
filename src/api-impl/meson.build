@@ -106,6 +106,7 @@ srcs = [
 	'android/annotation/WorkerThread.java',
 	'android/annotation/XmlRes.java',
 	'android/app/ActionBar.java',
+	'android/app/ComponentCaller.java',
 	'android/app/Activity.java',
 	'android/app/LoaderManager.java',
 	'android/app/ActivityGroup.java',
