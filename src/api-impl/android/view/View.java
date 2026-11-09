@@ -1504,6 +1504,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		} catch (IllegalArgumentException e) {
 			e.printStackTrace();
 		}
+		if (mOverlay != null && !mOverlay.isEmpty()) {
+			mOverlay.draw(canvas);
+		}
 		onDrawForeground(canvas);
 		drawDefaultFocusHighlight(canvas);
 	}
@@ -4243,7 +4246,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		// an invalidation loop. This effectively prevents the scroll bar
 		// drawable from triggering invalidations and scheduling runnables.
 		return who == background || (mForegroundInfo != null && mForegroundInfo.mDrawable == who)
-				|| (mDefaultFocusHighlight == who);
+				|| (mDefaultFocusHighlight == who) || (mOverlay != null && mOverlay.verifyDrawable(who));
 	}
 
 	/* AOSP View.drawableHotspotChanged */
@@ -4716,8 +4719,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return currentAnimation;
 	}
 
+	ViewOverlay mOverlay;
+
 	public ViewOverlay getOverlay() {
-		return new ViewOverlay();
+		if (mOverlay == null) {
+			mOverlay = new ViewOverlay(this);
+		}
+		return mOverlay;
+	}
+
+	/* the wrapper widget calls draw() only for views that draw something themselves: an overlay is drawn by it */
+	void overlayChanged() {
+		native_drawThroughJava(widget);
 	}
 
 	/* AOSP View.getTextAlignment(): the resolved text alignment */

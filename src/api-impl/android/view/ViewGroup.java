@@ -1678,8 +1678,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	public boolean getTouchscreenBlocksFocus() { return touchscreenBlocksFocus; }
 
 	public ViewGroupOverlay getOverlay() {
-		if (viewGroupOverlay == null)
-			viewGroupOverlay = new ViewGroupOverlay();
+		if (viewGroupOverlay == null) {
+			viewGroupOverlay = new ViewGroupOverlay(this);
+			mOverlay = viewGroupOverlay;
+		}
 		return viewGroupOverlay;
 	}
 
