@@ -3030,4 +3030,20 @@ public class TextView extends View {
 		final int selectionEnd = getSelectionEnd();
 		return selectionStart >= 0 && selectionStart != selectionEnd;
 	}
+
+	/* AOSP: TextView.getWordIterator(), for the key listeners' word-wise deletion */
+	private android.text.method.WordIterator mWordIterator;
+
+	/** @hide */
+	public android.text.method.WordIterator getWordIterator() {
+		if (mWordIterator == null) {
+			mWordIterator = new android.text.method.WordIterator(getTextLocale());
+		}
+		return mWordIterator;
+	}
+
+	/* ATL has no OffsetMapping (TransformationMethod2 / InsertModeTransformationMethod) */
+	public boolean isOffsetMappingAvailable() {
+		return false;
+	}
 }

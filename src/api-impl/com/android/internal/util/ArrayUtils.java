@@ -37,6 +37,31 @@ public class ArrayUtils {
 	private ArrayUtils() { /* cannot be instantiated */
 	}
 
+	/** Checks if all elements of {@code check} are in {@code array} (AOSP: containsAll(char[], char[])) */
+	public static boolean containsAll(char[] array, char[] check) {
+		if (check == null) {
+			return true;
+		}
+		for (char checkItem : check) {
+			if (!contains(array, checkItem)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Checks if {@code value} is in {@code array} */
+	public static boolean contains(char[] array, char value) {
+		if (array == null)
+			return false;
+		for (char element : array) {
+			if (element == value) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public static byte[] newUnpaddedByteArray(int minLen) {
 		return (byte[])VMRuntime.getRuntime().newUnpaddedArray(byte.class, minLen);
 	}

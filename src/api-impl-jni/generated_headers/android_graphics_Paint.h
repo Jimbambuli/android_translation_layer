@@ -37,6 +37,16 @@ extern "C" {
 #define android_graphics_Paint_HINTING_OFF 0L
 #undef android_graphics_Paint_HINTING_ON
 #define android_graphics_Paint_HINTING_ON 1L
+#undef android_graphics_Paint_CURSOR_AFTER
+#define android_graphics_Paint_CURSOR_AFTER 0L
+#undef android_graphics_Paint_CURSOR_AT_OR_AFTER
+#define android_graphics_Paint_CURSOR_AT_OR_AFTER 1L
+#undef android_graphics_Paint_CURSOR_BEFORE
+#define android_graphics_Paint_CURSOR_BEFORE 2L
+#undef android_graphics_Paint_CURSOR_AT_OR_BEFORE
+#define android_graphics_Paint_CURSOR_AT_OR_BEFORE 3L
+#undef android_graphics_Paint_CURSOR_AT
+#define android_graphics_Paint_CURSOR_AT 4L
 /*
  * Class:     android_graphics_Paint
  * Method:    native_create

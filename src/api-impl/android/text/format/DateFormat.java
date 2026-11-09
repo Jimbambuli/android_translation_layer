@@ -598,4 +598,11 @@ public class DateFormat {
 	private static String zeroPad(int inValue, int inMinDigits) {
 		return String.format(Locale.getDefault(), "%0" + inMinDigits + "d", inValue);
 	}
+
+    /**
+     * @hide
+     */
+    public static android.icu.text.DateFormatSymbols getIcuDateFormatSymbols(Locale locale) {
+        return new android.icu.text.DateFormatSymbols(android.icu.util.ULocale.forLocale(locale));
+    }
 }

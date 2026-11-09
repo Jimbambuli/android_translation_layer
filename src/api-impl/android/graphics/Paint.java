@@ -587,4 +587,63 @@ public class Paint {
 	private static native void native_set_text_align(long paint, int align);
 	private static native float native_get_font_metrics(long paint, FontMetrics metrics);
 	private static native int native_get_font_metrics_int(long paint, FontMetricsInt metrics);
+
+	/** Option for getTextRunCursor: the next cursor position after the offset */
+	public static final int CURSOR_AFTER = 0;
+	public static final int CURSOR_AT_OR_AFTER = 1;
+	public static final int CURSOR_BEFORE = 2;
+	public static final int CURSOR_AT_OR_BEFORE = 3;
+	public static final int CURSOR_AT = 4;
+
+	/**
+	 * Returns the next cursor position in the run, as AOSP's native getTextRunCursor() does: positions are the
+	 * grapheme cluster boundaries (the run's direction does not change which they are), -1 if there is none.
+	 */
+	public int getTextRunCursor(char[] text, int contextStart, int contextLength, boolean isRtl, int offset, int cursorOpt) {
+		int contextEnd = contextStart + contextLength;
+		if ((contextStart | contextEnd | offset | (contextEnd - contextStart) | (offset - contextStart) | (contextEnd - offset)
+				| (text.length - contextEnd) | cursorOpt) < 0 || cursorOpt > CURSOR_AT) {
+			throw new IndexOutOfBoundsException();
+		}
+		return getTextRunCursor(new String(text), contextStart, contextEnd, isRtl, offset, cursorOpt);
+	}
+
+	public int getTextRunCursor(CharSequence text, int contextStart, int contextEnd, boolean isRtl, int offset, int cursorOpt) {
+		if (text instanceof String || text instanceof android.text.SpannedString || text instanceof android.text.SpannableString) {
+			return getTextRunCursor(text.toString(), contextStart, contextEnd, isRtl, offset, cursorOpt);
+		}
+		if (text instanceof android.text.GetChars || text instanceof StringBuffer || text instanceof StringBuilder) {
+			return getTextRunCursor(text.toString(), contextStart, contextEnd, isRtl, offset, cursorOpt);
+		}
+		return getTextRunCursor(text.toString(), contextStart, contextEnd, isRtl, offset, cursorOpt);
+	}
+
+	public int getTextRunCursor(String text, int contextStart, int contextEnd, boolean isRtl, int offset, int cursorOpt) {
+		if (((contextStart | contextEnd | offset | (contextEnd - contextStart) | (offset - contextStart) | (contextEnd - offset)
+				| (text.length() - contextEnd) | cursorOpt) < 0) || cursorOpt > CURSOR_AT) {
+			throw new IndexOutOfBoundsException();
+		}
+		java.text.BreakIterator it = java.text.BreakIterator.getCharacterInstance();
+		it.setText(text.substring(contextStart, contextEnd));
+		int o = offset - contextStart;
+		int result;
+		switch (cursorOpt) {
+			case CURSOR_AFTER:
+				result = it.following(o);
+				break;
+			case CURSOR_AT_OR_AFTER:
+				result = it.isBoundary(o) ? o : it.following(o);
+				break;
+			case CURSOR_BEFORE:
+				result = it.preceding(o);
+				break;
+			case CURSOR_AT_OR_BEFORE:
+				result = it.isBoundary(o) ? o : it.preceding(o);
+				break;
+			default:
+				result = it.isBoundary(o) ? o : -1;
+				break;
+		}
+		return result == java.text.BreakIterator.DONE ? -1 : result + contextStart;
+	}
 }
