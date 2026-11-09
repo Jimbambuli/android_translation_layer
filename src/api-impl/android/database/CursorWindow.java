@@ -22,6 +22,7 @@ package android.database;
 import android.content.res.Resources;
 import android.database.sqlite.SQLiteClosable;
 import android.database.sqlite.SQLiteException;
+import android.os.Parcel;
 import android.os.Parcelable;
 import java.util.ArrayList;
 import java.util.List;
@@ -602,8 +603,79 @@ public class CursorWindow extends SQLiteClosable implements Parcelable {
 		return true;
 	}
 
+	/** Reads a window written by {@link #writeToParcel}; the copy is a plain local window. */
+	private CursorWindow(Parcel source) {
+		this(source.readString(), 0L);
+		startPos = source.readInt();
+		numColumns = source.readInt();
+		int numRows = source.readInt();
+		for (int r = 0; r < numRows; r++) {
+			Object[] row = new Object[numColumns];
+			for (int c = 0; c < numColumns; c++) {
+				switch (source.readInt()) {
+				case Cursor.FIELD_TYPE_INTEGER:
+					row[c] = source.readLong();
+					break;
+				case Cursor.FIELD_TYPE_FLOAT:
+					row[c] = source.readDouble();
+					break;
+				case Cursor.FIELD_TYPE_STRING:
+					row[c] = source.readString();
+					break;
+				case Cursor.FIELD_TYPE_BLOB:
+					row[c] = source.createByteArray();
+					break;
+				default:
+					row[c] = null;
+				}
+			}
+			rows.add(row);
+		}
+	}
+
+	public static final Parcelable.Creator<CursorWindow> CREATOR = new Parcelable.Creator<CursorWindow>() {
+		public CursorWindow createFromParcel(Parcel source) {
+			return new CursorWindow(source);
+		}
+
+		public CursorWindow[] newArray(int size) {
+			return new CursorWindow[size];
+		}
+	};
+
+	public static CursorWindow newFromParcel(Parcel p) {
+		return CREATOR.createFromParcel(p);
+	}
+
 	public int describeContents() {
 		return 0;
+	}
+
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeString(name);
+		dest.writeInt(startPos);
+		dest.writeInt(numColumns);
+		dest.writeInt(rows.size());
+		for (Object[] row : rows) {
+			for (int c = 0; c < numColumns; c++) {
+				Object v = row[c];
+				if (v instanceof Long) {
+					dest.writeInt(Cursor.FIELD_TYPE_INTEGER);
+					dest.writeLong((Long)v);
+				} else if (v instanceof Double) {
+					dest.writeInt(Cursor.FIELD_TYPE_FLOAT);
+					dest.writeDouble((Double)v);
+				} else if (v instanceof String) {
+					dest.writeInt(Cursor.FIELD_TYPE_STRING);
+					dest.writeString((String)v);
+				} else if (v instanceof byte[]) {
+					dest.writeInt(Cursor.FIELD_TYPE_BLOB);
+					dest.writeByteArray((byte[])v);
+				} else {
+					dest.writeInt(Cursor.FIELD_TYPE_NULL);
+				}
+			}
+		}
 	}
 
 	@Override
