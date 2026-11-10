@@ -124,10 +124,11 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeTransform(JNIEnv *env
 	GskRenderNode *node = _PTR(node_ptr);
 	GskTransform *transform = NULL;
 	GskRenderNode *transformed_node;
-	transform = gsk_transform_translate(transform, &GRAPHENE_POINT_INIT(-pivot_x, -pivot_y));
-	transform = gsk_transform_scale(transform, scale_x, scale_y);
-	transform = gsk_transform_rotate(transform, rotate);
+	/* hwui: translate, preRotate and preScale around the pivot; GSK applies the last operation first */
 	transform = gsk_transform_translate(transform, &GRAPHENE_POINT_INIT(translate_x + pivot_x, translate_y + pivot_y));
+	transform = gsk_transform_rotate(transform, rotate);
+	transform = gsk_transform_scale(transform, scale_x, scale_y);
+	transform = gsk_transform_translate(transform, &GRAPHENE_POINT_INIT(-pivot_x, -pivot_y));
 	if (transform) {
 		transformed_node = gsk_transform_node_new(node, transform);
 		gsk_transform_unref(transform);
