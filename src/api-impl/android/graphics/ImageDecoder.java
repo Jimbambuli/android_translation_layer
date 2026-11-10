@@ -16,6 +16,8 @@
 
 package android.graphics;
 
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.media.ExifInterface;
 import android.util.Size;
 
@@ -206,6 +208,19 @@ public final class ImageDecoder implements AutoCloseable {
 	private int mMemoryPolicy = MEMORY_POLICY_DEFAULT;
 	private OnPartialImageListener mOnPartialImageListener;
 	private boolean mUnpremultipliedRequired = false;
+	private PostProcessor mPostProcessor;
+
+	public interface PostProcessor {
+		int onPostProcess(Canvas canvas);
+	}
+
+	public void setPostProcessor(PostProcessor postProcessor) {
+		mPostProcessor = postProcessor;
+	}
+
+	public PostProcessor getPostProcessor() {
+		return mPostProcessor;
+	}
 
 	private ImageDecoder(int width, int height, String mimeType) {
 		mWidth = width;
@@ -436,6 +451,23 @@ public final class ImageDecoder implements AutoCloseable {
 		}
 		if (decoder.mUnpremultipliedRequired)
 			decoded.setPremultiplied(false);
+		if (decoder.mPostProcessor != null) {
+			if (!decoded.isMutable())
+				decoded = decoded.copy(decoded.getConfig(), true);
+			decoder.mPostProcessor.onPostProcess(new Canvas(decoded));
+		}
 		return decoded;
+	}
+
+	public static Drawable decodeDrawable(Source src, OnHeaderDecodedListener listener) throws IOException {
+		if (listener == null) {
+			throw new IllegalArgumentException("listener cannot be null! "
+			                                   + "Use decodeDrawable(Source) to not have a listener");
+		}
+		return new BitmapDrawable(decodeBitmapImpl(src, listener));
+	}
+
+	public static Drawable decodeDrawable(Source src) throws IOException {
+		return new BitmapDrawable(decodeBitmapImpl(src, null));
 	}
 }

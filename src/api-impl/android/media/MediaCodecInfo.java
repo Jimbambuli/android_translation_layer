@@ -54,6 +54,9 @@ public class MediaCodecInfo {
 
 		public CodecProfileLevel[] profileLevels;
 
+		/* Public modifiable field, as in AOSP; ATL advertises no specific color formats. */
+		public int[] colorFormats = new int[0];
+
 		public boolean isFeatureSupported(String feature) {
 			System.out.println("CodecCapabilities.isFeatureSupported(" + feature + ")");
 			return false;
@@ -209,6 +212,15 @@ public class MediaCodecInfo {
 
 		public boolean areSizeAndRateSupported(int width, int height, double frameRate) {
 			return width > 0 && height > 0 && frameRate > 0;
+		}
+
+		public boolean isSizeSupported(int width, int height) {
+			return width > 0 && height > 0;
+		}
+
+		/* No codec-specific limits are published; report the full non-negative range. */
+		public android.util.Range<Integer> getBitrateRange() {
+			return new android.util.Range<Integer>(0, Integer.MAX_VALUE);
 		}
 
 		/* API 29: an empty list means the codec does not publish performance points */

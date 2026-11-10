@@ -1,8 +1,11 @@
 package android.media;
 
 import android.media.metrics.LogSessionId;
+import android.os.Handler;
+import android.os.PersistableBundle;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.UUID;
 
 /* API 18. DRM key management. ATL ships no DRM plugin, so no crypto scheme is supported:
@@ -61,6 +64,30 @@ public final class MediaDrm {
 	public void setPropertyString(String propertyName, String value) {
 	}
 
+	public byte[] getPropertyByteArray(String propertyName) {
+		return new byte[0];
+	}
+
+	public void setPropertyByteArray(String propertyName, byte[] value) {
+	}
+
+	/* No DRM metrics are collected. */
+	public PersistableBundle getMetrics() {
+		return new PersistableBundle();
+	}
+
+	/* Stored for parity; with no DRM backend there is no session whose keys could change or expire. */
+	public void setOnExpirationUpdateListener(OnExpirationUpdateListener listener, Handler handler) {
+		onExpirationUpdateListener = listener;
+	}
+
+	public void setOnKeyStatusChangeListener(OnKeyStatusChangeListener listener, Handler handler) {
+		onKeyStatusChangeListener = listener;
+	}
+
+	private OnExpirationUpdateListener onExpirationUpdateListener;
+	private OnKeyStatusChangeListener onKeyStatusChangeListener;
+
 	public boolean requiresSecureDecoder(String mime) {
 		return false;
 	}
@@ -77,6 +104,39 @@ public final class MediaDrm {
 
 	public interface OnEventListener {
 		void onEvent(MediaDrm md, byte[] sessionId, int event, int extra, byte[] data);
+	}
+
+	public interface OnExpirationUpdateListener {
+		void onExpirationUpdate(MediaDrm md, byte[] sessionId, long expirationTime);
+	}
+
+	public interface OnKeyStatusChangeListener {
+		void onKeyStatusChange(MediaDrm md, byte[] sessionId, List<KeyStatus> keyInformation, boolean hasNewUsableKey);
+	}
+
+	public static final class KeyStatus {
+		public static final int STATUS_USABLE = 0;
+		public static final int STATUS_EXPIRED = 1;
+		public static final int STATUS_OUTPUT_NOT_ALLOWED = 2;
+		public static final int STATUS_PENDING = 3;
+		public static final int STATUS_INTERNAL_ERROR = 4;
+		public static final int STATUS_USABLE_IN_FUTURE = 5;
+
+		private final byte[] keyId;
+		private final int statusCode;
+
+		KeyStatus(byte[] keyId, int statusCode) {
+			this.keyId = keyId;
+			this.statusCode = statusCode;
+		}
+
+		public int getStatusCode() {
+			return statusCode;
+		}
+
+		public byte[] getKeyId() {
+			return keyId;
+		}
 	}
 
 	public interface PlaybackComponent {

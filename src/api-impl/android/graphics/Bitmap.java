@@ -253,6 +253,11 @@ public final class Bitmap implements Parcelable {
 		return config;
 	}
 
+	/* ATL bitmaps are sRGB; report that rather than a per-bitmap color space. */
+	public ColorSpace getColorSpace() {
+		return ColorSpace.get(ColorSpace.Named.SRGB);
+	}
+
 	@Export
 	public synchronized long getTexture() {
 		if (texture == 0) {

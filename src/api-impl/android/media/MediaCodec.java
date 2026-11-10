@@ -2,6 +2,7 @@ package android.media;
 
 import android.media.MediaCodec.BufferInfo;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.view.Surface;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -297,6 +298,18 @@ public class MediaCodec {
 
 	public void setParameters(Bundle parameters) {}
 
+	private OnFrameRenderedListener onFrameRenderedListener;
+
+	/* Stored for parity; ATL produces no rendered output frames, so the callback is never invoked. */
+	public void setOnFrameRenderedListener(OnFrameRenderedListener listener, android.os.Handler handler) {
+		onFrameRenderedListener = listener;
+	}
+
+	/* No codec metrics are collected; AOSP may likewise return an empty/absent bundle. */
+	public PersistableBundle getMetrics() {
+		return new PersistableBundle();
+	}
+
 	public static MediaCodec createEncoderByType(String type) throws IOException {
 		System.out.println("MediaCodec.createEncoderByType(" + type + ")");
 		throw new IOException("encoder not yet implemented");
@@ -345,6 +358,50 @@ public class MediaCodec {
 			public int getSkipBlocks() {
 				return blocksToSkip;
 			}
+		}
+
+		public int numSubSamples;
+		public int[] numBytesOfClearData;
+		public int[] numBytesOfEncryptedData;
+		public byte[] key;
+		public byte[] iv;
+		public int mode;
+
+		private static final Pattern ZERO_PATTERN = new Pattern(0, 0);
+		private Pattern pattern = ZERO_PATTERN;
+
+		public void set(int newNumSubSamples, int[] newNumBytesOfClearData, int[] newNumBytesOfEncryptedData,
+		                byte[] newKey, byte[] newIV, int newMode) {
+			numSubSamples = newNumSubSamples;
+			numBytesOfClearData = newNumBytesOfClearData;
+			numBytesOfEncryptedData = newNumBytesOfEncryptedData;
+			key = newKey;
+			iv = newIV;
+			mode = newMode;
+			pattern = ZERO_PATTERN;
+		}
+
+		public Pattern getPattern() {
+			return new Pattern(pattern.getEncryptBlocks(), pattern.getSkipBlocks());
+		}
+
+		public void setPattern(Pattern newPattern) {
+			if (newPattern == null)
+				newPattern = ZERO_PATTERN;
+			pattern = new Pattern(newPattern.getEncryptBlocks(), newPattern.getSkipBlocks());
+		}
+	}
+
+	public static final class CryptoException extends RuntimeException implements MediaDrmThrowable {
+		private final int errorCode;
+
+		public CryptoException(int errorCode, String detailMessage) {
+			super(detailMessage);
+			this.errorCode = errorCode;
+		}
+
+		public int getErrorCode() {
+			return errorCode;
 		}
 	}
 
