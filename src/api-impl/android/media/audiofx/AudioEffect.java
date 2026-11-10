@@ -12,4 +12,7 @@ public class AudioEffect {
 	public boolean getEnabled() { return false; }
 
 	public int setEnabled(boolean enable) { return SUCCESS; }
+
+	/* AOSP releases the native effect engine; ATL has none */
+	public void release() {}
 }
