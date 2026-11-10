@@ -120,9 +120,9 @@ JNIEXPORT jbyteArray JNICALL Java_android_media_MediaMetadataRetriever_native_1g
 /*
  * Class:     android_media_MediaMetadataRetriever
  * Method:    native_extractMetadata
- * Signature: (Ljava/lang/String;IJJI)Ljava/lang/String;
+ * Signature: (Ljava/lang/String;IJJI)[Ljava/lang/String;
  */
-JNIEXPORT jstring JNICALL Java_android_media_MediaMetadataRetriever_native_1extractMetadata
+JNIEXPORT jobjectArray JNICALL Java_android_media_MediaMetadataRetriever_native_1extractMetadata
   (JNIEnv *, jclass, jstring, jint, jlong, jlong, jint);
 
 #ifdef __cplusplus

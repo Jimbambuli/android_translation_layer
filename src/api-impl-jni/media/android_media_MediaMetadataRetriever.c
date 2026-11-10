@@ -1,5 +1,7 @@
 #include <errno.h>
 #include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <libavcodec/avcodec.h>
@@ -19,9 +21,15 @@
 #define OPTION_CLOSEST 3
 
 /* MediaMetadataRetriever.METADATA_KEY_* */
+#define METADATA_KEY_DATE         5
+#define METADATA_KEY_YEAR         8
 #define METADATA_KEY_DURATION 9
+#define METADATA_KEY_NUM_TRACKS   10
+#define METADATA_KEY_HAS_AUDIO    16
+#define METADATA_KEY_HAS_VIDEO    17
 #define METADATA_KEY_VIDEO_WIDTH 18
 #define METADATA_KEY_VIDEO_HEIGHT 19
+#define METADATA_KEY_BITRATE      20
 
 /* a region of a file descriptor, like setDataSource(FileDescriptor, long, long) */
 struct fd_region {
@@ -246,27 +254,92 @@ JNIEXPORT jbyteArray JNICALL Java_android_media_MediaMetadataRetriever_native_1g
 	return array;
 }
 
-/* METADATA_KEY_DURATION (ms), METADATA_KEY_VIDEO_WIDTH/HEIGHT, read from the container like AOSP's
- * retriever does without preparing a player; NULL if the source does not have it */
-JNIEXPORT jstring JNICALL Java_android_media_MediaMetadataRetriever_native_1extractMetadata(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length, jint key)
+/* a tag of the container, else of its first stream that has it (Ogg keeps the Vorbis comments there) */
+static const char *get_tag(AVFormatContext *format, const char *key)
 {
+	AVDictionaryEntry *entry = av_dict_get(format->metadata, key, NULL, 0);
+	for (unsigned int i = 0; !entry && i < format->nb_streams; i++)
+		entry = av_dict_get(format->streams[i]->metadata, key, NULL, 0);
+	return entry ? entry->value : NULL;
+}
+
+static void set_value(JNIEnv *env, jobjectArray values, int key, const char *value)
+{
+	if (value && value[0])
+		(*env)->SetObjectArrayElement(env, values, key, _JSTRING(value));
+}
+
+/* the values of the METADATA_KEY_* (the array index) that the container has, read once like AOSP's retriever
+ * does in setDataSource(): durations in ms, tags as text, "yes" for HAS_AUDIO/HAS_VIDEO, DATE as
+ * yyyyMMdd'T'HHmmss.SSS'Z'; null where the source does not have it */
+JNIEXPORT jobjectArray JNICALL Java_android_media_MediaMetadataRetriever_native_1extractMetadata(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length, jint count)
+{
+	/* METADATA_KEY_CD_TRACK_NUMBER, ALBUM, ARTIST, AUTHOR, COMPOSER, GENRE, TITLE, WRITER, ALBUMARTIST,
+	 * DISC_NUMBER, COMPILATION */
+	static const struct {
+		int key;
+		const char *tag;
+	} tags[] = {
+		{ 0,        "track"},
+		{ 1,        "album"},
+		{ 2,       "artist"},
+		{ 3,       "author"},
+		{ 4,     "composer"},
+		{ 6,        "genre"},
+		{ 7,        "title"},
+		{11,     "lyricist"},
+		{13, "album_artist"},
+		{14,         "disc"},
+		{15,  "compilation"},
+	};
 	struct fd_region region = {.fd = fd, .offset = offset, .length = length};
 	const char *path = get_source(env, path_jstr, &region);
 	AVIOContext *io;
 	AVFormatContext *format = open_input(path, &region, &io);
-	char value[32] = "";
+	jobjectArray values = (*env)->NewObjectArray(env, count, (*env)->FindClass(env, "java/lang/String"), NULL);
+	char value[64];
 
-	if (format && key == METADATA_KEY_DURATION && format->duration != AV_NOPTS_VALUE) {
-		snprintf(value, sizeof(value), "%" PRId64, format->duration / 1000);
-	} else if (format && (key == METADATA_KEY_VIDEO_WIDTH || key == METADATA_KEY_VIDEO_HEIGHT)) {
+	if (format) {
+		for (size_t i = 0; i < G_N_ELEMENTS(tags); i++)
+			set_value(env, values, tags[i].key, get_tag(format, tags[i].tag));
+		const char *date = get_tag(format, "date");
+		if (!date)
+			date = get_tag(format, "year");
+		if (date && strlen(date) >= 4 && g_ascii_isdigit(date[0]) && g_ascii_isdigit(date[1]) && g_ascii_isdigit(date[2]) && g_ascii_isdigit(date[3])) {
+			snprintf(value, sizeof(value), "%.4s", date);
+			set_value(env, values, METADATA_KEY_YEAR, value);
+		}
+		int year, month, day, hour, minute, second;
+		const char *creation = get_tag(format, "creation_time");
+		if (creation && sscanf(creation, "%4d-%2d-%2dT%2d:%2d:%2d", &year, &month, &day, &hour, &minute, &second) == 6) {
+			snprintf(value, sizeof(value), "%04d%02d%02dT%02d%02d%02d.000Z", year, month, day, hour, minute, second);
+			set_value(env, values, METADATA_KEY_DATE, value);
+		}
+		if (format->duration != AV_NOPTS_VALUE) {
+			snprintf(value, sizeof(value), "%" PRId64, format->duration / 1000);
+			set_value(env, values, METADATA_KEY_DURATION, value);
+		}
+		snprintf(value, sizeof(value), "%u", format->nb_streams);
+		set_value(env, values, METADATA_KEY_NUM_TRACKS, value);
+		if (format->bit_rate > 0) {
+			snprintf(value, sizeof(value), "%" PRId64, format->bit_rate);
+			set_value(env, values, METADATA_KEY_BITRATE, value);
+		}
+		if (av_find_best_stream(format, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0) >= 0)
+			set_value(env, values, METADATA_KEY_HAS_AUDIO, "yes");
+		/* a cover picture is a video stream to FFmpeg, but not video */
 		int stream_index = av_find_best_stream(format, AVMEDIA_TYPE_VIDEO, -1, -1, NULL, 0);
-		if (stream_index >= 0) {
+		if (stream_index >= 0 && !(format->streams[stream_index]->disposition & AV_DISPOSITION_ATTACHED_PIC)) {
 			AVCodecParameters *par = format->streams[stream_index]->codecpar;
-			snprintf(value, sizeof(value), "%d", key == METADATA_KEY_VIDEO_WIDTH ? par->width : par->height);
+			set_value(env, values, METADATA_KEY_HAS_VIDEO, "yes");
+			snprintf(value, sizeof(value), "%d", par->width);
+			set_value(env, values, METADATA_KEY_VIDEO_WIDTH, value);
+			snprintf(value, sizeof(value), "%d", par->height);
+			set_value(env, values, METADATA_KEY_VIDEO_HEIGHT, value);
 		}
 	}
 	close_input(format, io);
 	if (path)
 		(*env)->ReleaseStringUTFChars(env, path_jstr, path);
-	return value[0] ? _JSTRING(value) : NULL;
+	return values;
 }

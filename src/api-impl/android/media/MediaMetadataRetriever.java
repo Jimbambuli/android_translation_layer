@@ -18,6 +18,7 @@ public class MediaMetadataRetriever implements AutoCloseable {
 	private long fdOffset;
 	private long fdLength;
 	private File tempFile;
+	private String[] metadata;
 
 	public void release() {
 		if (mediaPlayer != null)
@@ -32,6 +33,7 @@ public class MediaMetadataRetriever implements AutoCloseable {
 
 	public void setDataSource(String path) {
 		this.path = path;
+		metadata = null;
 		mediaPlayer = new MediaPlayer();
 		mediaPlayer.setDataSource(path);
 	}
@@ -45,6 +47,7 @@ public class MediaMetadataRetriever implements AutoCloseable {
 		this.fd = fd;
 		fdOffset = offset;
 		fdLength = length;
+		metadata = null;
 		mediaPlayer = new MediaPlayer();
 		mediaPlayer.setDataSource(fd, offset, length);
 	}
@@ -92,15 +95,11 @@ public class MediaMetadataRetriever implements AutoCloseable {
 		return native_getEmbeddedPicture(path, nativeFd(), fdOffset, fdLength);
 	}
 
+	/* AOSP's retriever reads the metadata once with the data source; here on the first call */
 	public String extractMetadata(int key) {
-		switch (key) {
-			case METADATA_KEY_DURATION:
-			case METADATA_KEY_VIDEO_WIDTH:
-			case METADATA_KEY_VIDEO_HEIGHT:
-				return native_extractMetadata(path, nativeFd(), fdOffset, fdLength, key);
-			default:
-				return null;
-		}
+		if (metadata == null)
+			metadata = native_extractMetadata(path, nativeFd(), fdOffset, fdLength, METADATA_KEY_XMP_LENGTH + 1);
+		return key >= 0 && key < metadata.length ? metadata[key] : null;
 	}
 
 	public Bitmap getFrameAtTime(long timeUs, int option) {
@@ -143,7 +142,7 @@ public class MediaMetadataRetriever implements AutoCloseable {
 	private static native int[] native_getFrameAtTime(String path, int fd, long offset, long length, long timeUs,
 	                                                  int option, int dstWidth, int dstHeight, int[] size);
 	private static native byte[] native_getEmbeddedPicture(String path, int fd, long offset, long length);
-	private static native String native_extractMetadata(String path, int fd, long offset, long length, int key);
+	private static native String[] native_extractMetadata(String path, int fd, long offset, long length, int count);
 
 	public static final class BitmapParams {
 		private Bitmap.Config inPreferredConfig = Bitmap.Config.ARGB_8888;
