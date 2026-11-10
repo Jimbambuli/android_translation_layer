@@ -42,4 +42,28 @@ public class SystemPropertiesTest extends TestCase {
 	public void testNothingLeavesItToLibcore() {
 		assertNull(SystemProperties.hostTimeZoneId(null, null, null));
 	}
+
+	private static String written(String content) throws java.io.IOException {
+		java.io.File f = java.io.File.createTempFile("firmware", null);
+		f.deleteOnExit();
+		try (java.io.FileOutputStream out = new java.io.FileOutputStream(f)) {
+			out.write(content.getBytes("UTF-8"));
+		}
+		return f.getPath();
+	}
+
+	public void testFirmwareNameDmiLine() throws Exception {
+		assertEquals("HP ProDesk 600 G6 Small Form Factor PC", SystemProperties.firmwareName(written("HP ProDesk 600 G6 Small Form Factor PC\n")));
+	}
+
+	public void testFirmwareNameDeviceTreeNul() throws Exception {
+		assertEquals("PINE64 PinePhone", SystemProperties.firmwareName(written("PINE64 PinePhone\0")));
+	}
+
+	public void testFirmwareNamePlaceholderAndMissing() throws Exception {
+		assertNull(SystemProperties.firmwareName(written("To Be Filled By O.E.M.\n")));
+		assertNull(SystemProperties.firmwareName(written("System Product Name\n")));
+		assertNull(SystemProperties.firmwareName(written(" \n")));
+		assertNull(SystemProperties.firmwareName("/nonexistent/sys_vendor"));
+	}
 }

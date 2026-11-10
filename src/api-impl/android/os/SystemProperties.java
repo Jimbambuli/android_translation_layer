@@ -9,6 +9,10 @@ import libcore.io.IoUtils;
 
 public class SystemProperties {
 	private static final Properties properties = new Properties();
+	/* fillers of board makers for fields they leave unset (before the static block, which uses it) */
+	private static final java.util.Set<String> DMI_PLACEHOLDERS = new java.util.HashSet<>(java.util.Arrays.asList(
+		"to be filled by o.e.m.", "system manufacturer", "system product name", "default string", "not specified",
+		"not applicable", "o.e.m.", "none"));
 
 	static {
 		String SDK_INT_str = System.getProperty("Build.VERSION.SDK_INT");
@@ -31,10 +35,36 @@ public class SystemProperties {
 			properties.put("ro.product.cpu.abilist", abi);
 			properties.put("ro.product.cpu.abilist64", abi);
 		}
+		// a phone names itself (ro.product.manufacturer/model, set by the vendor); the device ATL runs on is
+		// this computer: its firmware names it (DMI, else the device tree); unnamed stays "unknown" as in AOSP
+		putIfNamed("ro.product.manufacturer", "/sys/class/dmi/id/sys_vendor", "/sys/class/dmi/id/board_vendor");
+		putIfNamed("ro.product.model", "/sys/class/dmi/id/product_name", "/sys/class/dmi/id/board_name",
+		           "/sys/firmware/devicetree/base/model");
 		// on Android the time zone service keeps persist.sys.timezone; here it follows the host
 		String timezone = hostTimeZoneId();
 		if (timezone != null)
 			properties.put("persist.sys.timezone", timezone);
+	}
+
+	private static void putIfNamed(String property, String... files) {
+		for (String file : files) {
+			String name = firmwareName(file);
+			if (name != null) {
+				properties.put(property, name);
+				return;
+			}
+		}
+	}
+
+	static String firmwareName(String file) {
+		String name;
+		try {
+			name = IoUtils.readFileAsString(file);
+		} catch (IOException e) {
+			return null;
+		}
+		name = name.trim(); // also drops the NUL that ends device tree strings
+		return name.isEmpty() || DMI_PLACEHOLDERS.contains(name.toLowerCase(java.util.Locale.ROOT)) ? null : name;
 	}
 
 	private static String hostTimeZoneId() {

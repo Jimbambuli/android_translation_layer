@@ -71,7 +71,7 @@ public class Build {
 	 */
 	public static final String SOC_MANUFACTURER = UNKNOWN; /* AOSP: ro.soc.manufacturer, "unknown" when not set */
 
-	public static final String MANUFACTURER = "HTC" /* HTC picked at random; getString("ro.product.manufacturer")*/;
+	public static final String MANUFACTURER = getString("ro.product.manufacturer");
 
 	/**
 	 * The brand (e.g., carrier) the software is customized for, if any.
