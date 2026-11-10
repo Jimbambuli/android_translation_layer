@@ -539,7 +539,11 @@ public class Paint {
 		return align;
 	}
 
-	public boolean hasGlyph(String text) { return false; }
+	/* AOSP Paint.hasGlyph(): whether the font (with its fallbacks) has a glyph for the string - for more than
+	 * one character only if they make a single glyph (a ligature, an emoji sequence) */
+	public boolean hasGlyph(String text) {
+		return native_has_glyph(paint, text);
+	}
 
 	public MaskFilter setMaskFilter(MaskFilter filter) { return filter; }
 
@@ -598,6 +602,7 @@ public class Paint {
 	private static native float native_get_letter_spacing(long paint);
 	private static native void native_set_color_filter(long paint, int mode, int color);
 	private static native void native_get_text_bounds(long paint, String text, Rect bounds);
+	private static native boolean native_has_glyph(long paint, String text);
 	private static native void native_set_text_align(long paint, int align);
 	private static native float native_get_font_metrics(long paint, FontMetrics metrics);
 	private static native int native_get_font_metrics_int(long paint, FontMetricsInt metrics);

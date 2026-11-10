@@ -214,6 +214,43 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1text_1bounds(JNI
 	g_object_unref(layout);
 }
 
+/* like AOSP's hasGlyph() (hwui Paint.cpp): lay the string out with the paint's font and its fallbacks; true if
+ * there is no missing glyph (.notdef) and, for more than one character, they made exactly one glyph */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Paint_native_1has_1glyph(JNIEnv *env, jclass clazz, jlong paint_ptr, jstring text_ptr)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	const jchar *chars = (*env)->GetStringChars(env, text_ptr, NULL);
+	gchar *str = g_utf16_to_utf8((const gunichar2 *)chars, (*env)->GetStringLength(env, text_ptr), NULL, NULL, NULL);
+	(*env)->ReleaseStringChars(env, text_ptr, chars);
+	if (!str) // unpaired surrogate
+		return false;
+	glong n_chars = g_utf8_strlen(str, -1);
+	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
+	pango_layout_set_font_description(layout, paint->font);
+	pango_layout_set_text(layout, str, -1);
+	g_free(str);
+	int n_glyphs = 0;
+	gboolean notdef = pango_layout_get_unknown_glyphs_count(layout) > 0;
+	PangoLayoutIter *iter = pango_layout_get_iter(layout);
+	do {
+		PangoLayoutRun *run = pango_layout_iter_get_run_readonly(iter);
+		if (!run)
+			continue;
+		for (int i = 0; i < run->glyphs->num_glyphs; i++) {
+			PangoGlyph glyph = run->glyphs->glyphs[i].glyph;
+			if (glyph & PANGO_GLYPH_UNKNOWN_FLAG)
+				notdef = TRUE;
+			else if (glyph != PANGO_GLYPH_EMPTY) // what AOSP's countNonSpaceGlyphs() leaves out
+				n_glyphs++;
+		}
+	} while (pango_layout_iter_next_run(iter));
+	pango_layout_iter_free(iter);
+	g_object_unref(layout);
+	if (n_glyphs != 1 && n_chars > 1)
+		return false;
+	return n_glyphs > 0 && !notdef;
+}
+
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1align(JNIEnv *env, jclass clazz, jlong paint_ptr, jint align)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);

@@ -225,6 +225,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1text_1bounds
 
 /*
  * Class:     android_graphics_Paint
+ * Method:    native_has_glyph
+ * Signature: (JLjava/lang/String;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Paint_native_1has_1glyph
+  (JNIEnv *, jclass, jlong, jstring);
+
+/*
+ * Class:     android_graphics_Paint
  * Method:    native_set_text_align
  * Signature: (JI)V
  */
