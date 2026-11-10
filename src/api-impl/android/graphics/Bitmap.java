@@ -388,6 +388,11 @@ public final class Bitmap implements Parcelable {
 		return hasAlpha;
 	}
 
+	/* AOSP: whether the decoder attached the gainmap of an Ultra HDR image; ATL's decoders never read one */
+	public boolean hasGainmap() {
+		return false;
+	}
+
 	/* AOSP keeps the flag in the native bitmap; nothing here uses mip maps, but BitmapDrawable reads and sets it */
 	private boolean hasMipMap;
 
