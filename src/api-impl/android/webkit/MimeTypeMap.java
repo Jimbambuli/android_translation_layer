@@ -170,7 +170,7 @@ public class MimeTypeMap {
 			sMimeTypeMap.loadEntry("application/mathematica", "nb");
 			sMimeTypeMap.loadEntry("application/msaccess", "mdb");
 			sMimeTypeMap.loadEntry("application/oda", "oda");
-			sMimeTypeMap.loadEntry("application/ogg", "ogg");
+			sMimeTypeMap.loadEntry("application/ogg", "ogx");
 			sMimeTypeMap.loadEntry("application/pdf", "pdf");
 			sMimeTypeMap.loadEntry("application/pgp-keys", "key");
 			sMimeTypeMap.loadEntry("application/pgp-signature", "pgp");
@@ -357,6 +357,8 @@ public class MimeTypeMap {
 			sMimeTypeMap.loadEntry("application/x-xfig", "fig");
 			sMimeTypeMap.loadEntry("application/xhtml+xml", "xhtml");
 			sMimeTypeMap.loadEntry("audio/3gpp", "3gpp");
+			sMimeTypeMap.loadEntry("audio/aac", "aac");
+			sMimeTypeMap.loadEntry("audio/flac", "flac");
 			sMimeTypeMap.loadEntry("audio/basic", "snd");
 			sMimeTypeMap.loadEntry("audio/midi", "mid");
 			sMimeTypeMap.loadEntry("audio/midi", "midi");
@@ -367,6 +369,9 @@ public class MimeTypeMap {
 			sMimeTypeMap.loadEntry("audio/mpeg", "mp3");
 			sMimeTypeMap.loadEntry("audio/mpeg", "m4a");
 			sMimeTypeMap.loadEntry("audio/mpegurl", "m3u");
+			sMimeTypeMap.loadEntry("audio/ogg", "ogg");
+			sMimeTypeMap.loadEntry("audio/ogg", "oga");
+			sMimeTypeMap.loadEntry("audio/ogg", "opus");
 			sMimeTypeMap.loadEntry("audio/prs.sid", "sid");
 			sMimeTypeMap.loadEntry("audio/x-aiff", "aif");
 			sMimeTypeMap.loadEntry("audio/x-aiff", "aiff");
@@ -392,10 +397,12 @@ public class MimeTypeMap {
 			sMimeTypeMap.loadEntry("image/jpeg", "jpe");
 			sMimeTypeMap.loadEntry("image/pcx", "pcx");
 			sMimeTypeMap.loadEntry("image/png", "png");
+			sMimeTypeMap.loadEntry("image/webp", "webp");
 			sMimeTypeMap.loadEntry("image/svg+xml", "svg");
 			sMimeTypeMap.loadEntry("image/svg+xml", "svgz");
 			sMimeTypeMap.loadEntry("image/tiff", "tiff");
 			sMimeTypeMap.loadEntry("image/tiff", "tif");
+			sMimeTypeMap.loadEntry("image/heic", "heic");
 			sMimeTypeMap.loadEntry("image/vnd.djvu", "djvu");
 			sMimeTypeMap.loadEntry("image/vnd.djvu", "djv");
 			sMimeTypeMap.loadEntry("image/vnd.wap.wbmp", "wbmp");
@@ -488,6 +495,7 @@ public class MimeTypeMap {
 			sMimeTypeMap.loadEntry("video/quicktime", "qt");
 			sMimeTypeMap.loadEntry("video/quicktime", "mov");
 			sMimeTypeMap.loadEntry("video/vnd.mpegurl", "mxu");
+			sMimeTypeMap.loadEntry("video/webm", "webm");
 			sMimeTypeMap.loadEntry("video/x-la-asf", "lsf");
 			sMimeTypeMap.loadEntry("video/x-la-asf", "lsx");
 			sMimeTypeMap.loadEntry("video/x-mng", "mng");
@@ -497,6 +505,7 @@ public class MimeTypeMap {
 			sMimeTypeMap.loadEntry("video/x-ms-wmv", "wmv");
 			sMimeTypeMap.loadEntry("video/x-ms-wmx", "wmx");
 			sMimeTypeMap.loadEntry("video/x-ms-wvx", "wvx");
+			sMimeTypeMap.loadEntry("video/x-matroska", "mkv");
 			sMimeTypeMap.loadEntry("video/x-msvideo", "avi");
 			sMimeTypeMap.loadEntry("video/x-sgi-movie", "movie");
 			sMimeTypeMap.loadEntry("x-conference/x-cooltalk", "ice");
