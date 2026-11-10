@@ -329,6 +329,10 @@ public class Paint {
 	public float getFontMetrics(FontMetrics metrics) {
 		return native_get_font_metrics(paint, metrics);
 	}
+	/* AOSP: getFontMetrics(null), i.e. descent - ascent + leading */
+	public float getFontSpacing() {
+		return getFontMetrics(null);
+	}
 	public int getFontMetricsInt(FontMetricsInt fmi) {
 		return native_get_font_metrics_int(paint, fmi);
 	}

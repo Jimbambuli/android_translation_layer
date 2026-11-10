@@ -14,6 +14,11 @@ public class AppWidgetManager {
 		return new int[0];
 	}
 
+	/* AOSP: List<AppWidgetProviderInfo> from AppWidgetServiceImpl (ATL has no such class); the desktop has no widget host */
+	public java.util.List<?> getInstalledProviders() {
+		return new java.util.ArrayList<>();
+	}
+
 	public void notifyAppWidgetViewDataChanged(int appWidgetId, int viewId) {}
 
 	/* AOSP asks the default launcher (AppWidgetServiceImpl); the desktop has none that pins widgets */

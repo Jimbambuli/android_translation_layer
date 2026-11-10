@@ -343,6 +343,19 @@ public class ActivityManager {
 	public static boolean isRunningInTestHarness() { return false; }
 	public static boolean isRunningInUserTestHarness() { return false; }
 
+	/* AOSP hands the listener the ApplicationStartInfo of this process; ATL has neither ApplicationStartInfo nor start records (Consumer<ApplicationStartInfo> erases to Consumer), so it is never called */
+	public void addApplicationStartInfoCompletionListener(java.util.concurrent.Executor executor, java.util.function.Consumer<?> listener) {
+		if (executor == null || listener == null) {
+			throw new NullPointerException("executor and listener must not be null");
+		}
+	}
+
+	public void removeApplicationStartInfoCompletionListener(java.util.function.Consumer<?> listener) {
+		if (listener == null) {
+			throw new NullPointerException("listener must not be null");
+		}
+	}
+
 	public void moveTaskToFront(int taskId, int flags, Bundle options) {
 	}
 }

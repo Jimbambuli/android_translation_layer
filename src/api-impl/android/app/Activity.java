@@ -1016,6 +1016,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		finish();
 	}
 
+	/* AOSP calls the exit listener only when a splash screen was shown for this launch; ATL shows none,
+	 * so the listener is never called and the theme is not used */
+	public android.window.SplashScreen getSplashScreen() {
+		return new android.window.SplashScreen() {
+			public void setOnExitAnimationListener(android.window.SplashScreen.OnExitAnimationListener listener) {}
+			public void clearOnExitAnimationListener() {}
+			public void setSplashScreenTheme(int themeId) {}
+		};
+	}
+
 	public android.window.OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
 		return getWindow().getOnBackInvokedDispatcher();
 	}

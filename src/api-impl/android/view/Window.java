@@ -802,6 +802,17 @@ public class Window {
 
 	public void setEnterTransition(Transition transition) {}
 
+	/* AOSP stores the transition in the Window; ATL plays no window transitions */
+	private Transition mExitTransition;
+
+	public void setExitTransition(Transition transition) {
+		mExitTransition = transition;
+	}
+
+	public Transition getExitTransition() {
+		return mExitTransition;
+	}
+
 	public void setGravity(int gravity) {
 		params.gravity = gravity;
 		dispatchWindowAttributesChanged(params);

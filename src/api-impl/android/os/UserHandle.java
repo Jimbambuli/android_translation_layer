@@ -193,6 +193,11 @@ public final class UserHandle {
 		return 1000;
 	}
 
+	/* AOSP: UserHandle.of(getUserId(uid)); ATL has no UserHandle cache, so make a new handle */
+	public static UserHandle getUserHandleForUid(int uid) {
+		return new UserHandle(getUserId(uid));
+	}
+
 	/**
 	 * @hide
 	 */
