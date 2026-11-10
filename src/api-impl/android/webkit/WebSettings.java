@@ -51,7 +51,15 @@ public class WebSettings {
 
 	public void setAppCachePath(String path) {}
 
-	public void setLoadWithOverviewMode(boolean overview) {}
+	private boolean loadWithOverviewMode;
+
+	public void setLoadWithOverviewMode(boolean overview) {
+		loadWithOverviewMode = overview;
+	}
+
+	public boolean getLoadWithOverviewMode() {
+		return loadWithOverviewMode;
+	}
 
 	public void setNeedInitialFocus(boolean flag) {}
 	public void setRenderPriority(RenderPriority priority) {}

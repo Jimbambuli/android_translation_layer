@@ -61,6 +61,13 @@ public class AudioManager {
 	public static final int AUDIOFOCUS_REQUEST_GRANTED = 1;
 	public static final int AUDIOFOCUS_REQUEST_DELAYED = 2;
 
+	public static final int ADJUST_LOWER = -1;
+	public static final int ADJUST_SAME = 0;
+	public static final int ADJUST_RAISE = 1;
+	public static final int ADJUST_MUTE = -100;
+	public static final int ADJUST_UNMUTE = 100;
+	public static final int ADJUST_TOGGLE_MUTE = 101;
+
 	public static final int GET_DEVICES_INPUTS = 0x0001;
 	public static final int GET_DEVICES_OUTPUTS = 0x0002;
 	public static final int GET_DEVICES_ALL = GET_DEVICES_OUTPUTS | GET_DEVICES_INPUTS;
@@ -132,7 +139,39 @@ public class AudioManager {
 	/* AOSP AudioManager.isStreamMute(): whether the stream is muted. ATL has the mute switch of the ALSA
 	 * «Master» control for every stream; false without it */
 	public boolean isStreamMute(int streamType) {
-		return nativeIsStreamMute();
+		return mStreamMuted || nativeIsStreamMute();
+	}
+
+	private boolean mStreamMuted;
+
+	/* AOSP AudioManager.adjustStreamVolume(): moves the volume index of the stream by one step in the given
+	 * direction, or mutes/unmutes it. ATL has one volume for every stream, so this goes through
+	 * setStreamVolume() and the mute is only remembered (isStreamMute()); no hardware mute is switched */
+	public void adjustStreamVolume(int streamType, int direction, int flags) {
+		switch (direction) {
+		case ADJUST_RAISE:
+			setStreamVolume(streamType, getStreamVolume(streamType) + 1, flags);
+			break;
+		case ADJUST_LOWER:
+			setStreamVolume(streamType, getStreamVolume(streamType) - 1, flags);
+			break;
+		case ADJUST_MUTE:
+			mStreamMuted = true;
+			break;
+		case ADJUST_UNMUTE:
+			mStreamMuted = false;
+			break;
+		case ADJUST_TOGGLE_MUTE:
+			mStreamMuted = !mStreamMuted;
+			break;
+		default:
+			break;
+		}
+	}
+
+	/* AOSP AudioManager.setStreamMute() (deprecated): remembered only, see adjustStreamVolume() */
+	public void setStreamMute(int streamType, boolean state) {
+		mStreamMuted = state;
 	}
 
 	public boolean isMusicActive() {

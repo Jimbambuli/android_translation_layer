@@ -483,6 +483,16 @@ public class Paint {
 	public Locale getTextLocale() { return text_locales != null ? text_locales.get(0) : Locale.getDefault(); }
 
 	/**
+	 * Set the text locale, i.e. a list of just that locale.
+	 */
+	public void setTextLocale(Locale locale) {
+		if (locale == null) {
+			throw new IllegalArgumentException("locale cannot be null");
+		}
+		setTextLocales(new LocaleList(locale));
+	}
+
+	/**
 	 * Get the text locale list.
 	 */
 	public LocaleList getTextLocales() {

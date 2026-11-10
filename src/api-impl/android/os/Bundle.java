@@ -361,6 +361,34 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	}
 
 	/**
+	 * Returns the value associated with the given key, or null if no mapping of the
+	 * desired type exists for the given key or a null value is explicitly associated with the key.
+	 */
+	public Size getSize(String key) {
+		Object o = mMap.get(key);
+		try {
+			return (Size)o;
+		} catch (ClassCastException e) {
+			typeWarning(key, o, "Size", e);
+			return null;
+		}
+	}
+
+	/**
+	 * Returns the value associated with the given key, or null if no mapping of the
+	 * desired type exists for the given key or a null value is explicitly associated with the key.
+	 */
+	public SizeF getSizeF(String key) {
+		Object o = mMap.get(key);
+		try {
+			return (SizeF)o;
+		} catch (ClassCastException e) {
+			typeWarning(key, o, "SizeF", e);
+			return null;
+		}
+	}
+
+	/**
 	 * Inserts a Parcelable value into the mapping of this Bundle, replacing
 	 * any existing value for the given key.  Either key or value may be null.
 	 *

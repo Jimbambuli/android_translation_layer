@@ -69,6 +69,8 @@ public class Build {
 	/**
 	 * The manufacturer of the product/hardware.
 	 */
+	public static final String SOC_MANUFACTURER = UNKNOWN; /* AOSP: ro.soc.manufacturer, "unknown" when not set */
+
 	public static final String MANUFACTURER = "HTC" /* HTC picked at random; getString("ro.product.manufacturer")*/;
 
 	/**

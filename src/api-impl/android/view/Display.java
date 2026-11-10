@@ -48,6 +48,29 @@ public final class Display {
 		return window_height; // what's the difference?
 	}
 
+	public static final int STATE_UNKNOWN = 0;
+	public static final int STATE_OFF = 1;
+	public static final int STATE_ON = 2;
+
+	/* ATL has the one display and it is always on and valid */
+	public boolean isValid() {
+		return true;
+	}
+
+	public int getState() {
+		return STATE_ON;
+	}
+
+	/* AOSP: smallest/largest size the application can see after rotation; ATL does not rotate */
+	public void getCurrentSizeRange(Point outSmallestSize, Point outLargestSize) {
+		int smallest = Math.min(window_width, window_height);
+		int largest = Math.max(window_width, window_height);
+		outSmallestSize.x = smallest;
+		outSmallestSize.y = smallest;
+		outLargestSize.x = largest;
+		outLargestSize.y = largest;
+	}
+
 	public int getRotation() {
 		return 0 /*ROTATION_0*/;
 	}

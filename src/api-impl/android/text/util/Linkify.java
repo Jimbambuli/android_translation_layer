@@ -13,6 +13,8 @@ public class Linkify {
 	public static final boolean addLinks(TextView text, int mask) { return true; }
 	public static final boolean addLinks(Spannable text, Pattern urlPattern, String urlScheme) { return true; }
 
-	public interface MatchFilter {}
+	public interface MatchFilter {
+		boolean acceptMatch(CharSequence s, int start, int end);
+	}
 	public interface TransformFilter {}
 }

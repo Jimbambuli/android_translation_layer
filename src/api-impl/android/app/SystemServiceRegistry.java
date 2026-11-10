@@ -41,6 +41,7 @@ import android.location.LocationManager;
 import android.media.AudioManager;
 import android.media.MediaRouter;
 import android.media.projection.MediaProjectionManager;
+import android.media.metrics.MediaMetricsManager;
 import android.media.session.MediaSessionManager;
 import android.media.tv.TvInputManager;
 import android.net.ConnectivityManager;
@@ -523,6 +524,13 @@ public final class SystemServiceRegistry {
             @Override
             public MediaSessionManager createService(ContextImpl ctx) {
                 return new MediaSessionManager();
+            }});
+
+        registerService(Context.MEDIA_METRICS_SERVICE, MediaMetricsManager.class,
+                new CachedServiceFetcher<MediaMetricsManager>() {
+            @Override
+            public MediaMetricsManager createService(ContextImpl ctx) {
+                return new MediaMetricsManager();
             }});
     }
 
