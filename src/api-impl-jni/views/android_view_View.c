@@ -1106,7 +1106,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1layout(JNIEnv *env, jobjec
 	/* scale and rotation about the pivot like AOSP's RenderNode (View.getMatrix()); GTK draws and
 	 * picks the widget through this transform */
 	GskTransform *transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(allocation.x, allocation.y));
-	if (wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform")) {
+	/* a matrix without inverse (scale 0) draws nothing, but AOSP hit-tests the view as if it had no matrix
+	 * (View.getInverseMatrix() falls back to the identity); GTK would invert it to NaN and pick the view anywhere */
+	wrapper->singular_matrix = wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform") &&
+	                           (_GET_FLOAT_FIELD(wrapper->jobj, "scaleX") == 0 || _GET_FLOAT_FIELD(wrapper->jobj, "scaleY") == 0);
+	if (wrapper->singular_matrix) {
+		gsk_transform_unref(transform);
+		transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(l, t));
+	} else if (wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform")) {
 		graphene_point_t pivot = GRAPHENE_POINT_INIT(width / 2.f, height / 2.f);
 		if (_GET_BOOL_FIELD(wrapper->jobj, "pivotExplicit"))
 			pivot = GRAPHENE_POINT_INIT(_GET_FLOAT_FIELD(wrapper->jobj, "pivotX"), _GET_FLOAT_FIELD(wrapper->jobj, "pivotY"));

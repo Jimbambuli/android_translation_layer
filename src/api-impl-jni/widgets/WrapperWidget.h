@@ -55,6 +55,8 @@ struct _WrapperWidget {
 	gboolean may_stretch;
 	/* the view draws render nodes: they are resolved after its draw (GskCanvas.deferred_children) */
 	gboolean defers_render_nodes;
+	/* the view's matrix has no inverse (scale 0): laid out without it and not drawn (see native_layout()) */
+	gboolean singular_matrix;
 };
 
 struct _WrapperWidgetClass {

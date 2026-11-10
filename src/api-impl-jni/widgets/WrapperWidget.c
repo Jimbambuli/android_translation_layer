@@ -297,6 +297,8 @@ void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnap
 	if (!WRAPPER_IS_WIDGET(child) || !gtk_widget_get_visible(child))
 		return;
 	WrapperWidget *wrapper = WRAPPER_WIDGET(child);
+	if (wrapper->singular_matrix)
+		return;
 	float z = wrapper->shadow_z;
 	const float caster_alpha = gtk_widget_get_opacity(child) * wrapper->shadow_alpha;
 	graphene_point_t origin, window_origin;
@@ -368,9 +370,11 @@ GskRenderNode *atl_stretch_node(GskRenderNode *node, float width, float height, 
 int snapshot_in_progress = 0;
 static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 {
+	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+	if (wrapper->singular_matrix) // scaled to nothing
+		return;
 	snapshot_in_progress++;
 
-	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
 	jobject transformation = NULL;
 	gboolean push_opacity = FALSE;
 	if (wrapper->animating && wrapper->jobj) {
