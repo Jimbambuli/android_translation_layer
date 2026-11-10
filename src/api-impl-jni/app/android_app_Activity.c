@@ -1578,9 +1578,12 @@ static void file_dialog_callback(GObject *source_object, GAsyncResult *res, gpoi
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeFileChooser(JNIEnv *env, jobject this, jint action, jstring type_jstring, jstring filename_jstring, jint request_code)
 {
-	const char *chooser_title = ((char *[]){"Open File", "Save File", "Select Folder"})[action];
+	/* GTK's own titles and buttons for these dialogs, in the user's language */
+	static const char *const titles[] = {"Pick a File", "Save a File", "Select a Folder"};
+	static const char *const accept_labels[] = {"_Open", "_Save", "_Select"};
 	GtkFileDialog *dialog = gtk_file_dialog_new();
-	gtk_file_dialog_set_title(GTK_FILE_DIALOG(dialog), chooser_title);
+	gtk_file_dialog_set_title(GTK_FILE_DIALOG(dialog), atl_gtk_text(titles[action]));
+	gtk_file_dialog_set_accept_label(GTK_FILE_DIALOG(dialog), atl_gtk_text(accept_labels[action]));
 
 	const char *type = type_jstring ? (*env)->GetStringUTFChars(env, type_jstring, NULL) : NULL;
 	if (type && !strchr(type, '*')) {
@@ -1659,7 +1662,8 @@ static void pick_images_callback(GObject *source_object, GAsyncResult *res, gpoi
 JNIEXPORT void JNICALL Java_android_app_Activity_nativePickImages(JNIEnv *env, jobject this, jobjectArray mime_types, jint max_items, jint request_code)
 {
 	GtkFileDialog *dialog = gtk_file_dialog_new();
-	gtk_file_dialog_set_title(dialog, max_items > 1 ? "Select Photos and Videos" : "Select a Photo or Video");
+	gtk_file_dialog_set_title(dialog, atl_gtk_text(max_items > 1 ? "Pick Files" : "Pick a File"));
+	gtk_file_dialog_set_accept_label(dialog, atl_gtk_text("_Open"));
 
 	GtkFileFilter *filter = gtk_file_filter_new();
 	if (mime_types) {

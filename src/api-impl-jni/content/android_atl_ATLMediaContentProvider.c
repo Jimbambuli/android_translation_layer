@@ -20,7 +20,8 @@ static void file_dialog_callback(GObject *dialog, GAsyncResult *res, gpointer us
 JNIEXPORT void JNICALL Java_android_atl_ATLMediaContentProvider_native_1open_1media_1folder(JNIEnv *env, jobject this)
 {
 	GtkFileDialog *dialog = gtk_file_dialog_new();
-	gtk_file_dialog_set_title(GTK_FILE_DIALOG(dialog), "Open Media Folder");
+	gtk_file_dialog_set_title(GTK_FILE_DIALOG(dialog), atl_gtk_text("Pick a File"));
+	gtk_file_dialog_set_accept_label(GTK_FILE_DIALOG(dialog), atl_gtk_text("_Open"));
 	gtk_file_dialog_set_modal(GTK_FILE_DIALOG(dialog), TRUE);
 	gtk_file_dialog_open(dialog, window, NULL, file_dialog_callback, _REF(this));
 }

@@ -362,6 +362,8 @@ static void share_sheet_destroyed(GtkWindow *sheet, gpointer text_jstr)
 		open_with(fd, NULL);
 	} else if (button_id == SHARE_SAVE) {
 		GtkFileDialog *save_dialog = gtk_file_dialog_new();
+		gtk_file_dialog_set_title(save_dialog, atl_gtk_text("Save a File"));
+		gtk_file_dialog_set_accept_label(save_dialog, atl_gtk_text("_Save"));
 		char *path = fd_get_path(fd);
 		if (path) {
 			char *name = g_path_get_basename(path);

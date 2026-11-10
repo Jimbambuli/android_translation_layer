@@ -1192,6 +1192,7 @@ int main(int argc, char **argv)
 
 	// the Java locale should follow the user's locale, even though the C locale is overridden below
 	init_locale_options();
+	atl_remember_user_locale();
 	// locale on android is always either C or C.UTF-8, and some apps might unbeknownst to them depend on that
 	// for correct functionality
 	setenv("LC_ALL", "C.UTF-8", 1);

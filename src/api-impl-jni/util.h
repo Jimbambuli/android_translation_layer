@@ -51,6 +51,9 @@ void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **arr
 void release_nio_buffer(JNIEnv *env, jarray array_ref, jbyte *array);
 int get_nio_buffer_size(JNIEnv *env, jobject buffer);
 
+void atl_remember_user_locale(void);
+const char *atl_gtk_text(const char *msgid);
+
 void atl_ensure_widget_snapshotability(GtkWidget *widget);
 void atl_safe_gtk_label_set_text(GtkLabel *label, const char *str);
 void atl_safe_gtk_widget_set_visible(GtkWidget *widget, gboolean visible);
