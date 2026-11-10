@@ -58,14 +58,21 @@ public class AlertDialog extends Dialog implements DialogInterface {
 
 	public static class Builder {
 		private AlertDialog dialog;
+		private Context context;
 
 		public Builder(Context context) {
 			System.out.println("making an AlertDialog$Builder as we speak, my word!");
+			this.context = context;
 			dialog = new AlertDialog(context);
 		}
 
 		public Builder(Context context, int themeResId) {
+			this.context = context;
 			dialog = new AlertDialog(context, themeResId);
+		}
+
+		public Context getContext() {
+			return context;
 		}
 
 		public AlertDialog.Builder setPositiveButton(int textId, DialogInterface.OnClickListener listener) {

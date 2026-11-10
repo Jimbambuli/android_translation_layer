@@ -27,6 +27,11 @@ public final class Display {
 		getMetrics(outMetrics); // probably?
 	}
 
+	/* ATL has no display flags (no secure/private/presentation displays) */
+	public int getFlags() {
+		return 0;
+	}
+
 	public int getWidth() {
 		return window_width;
 	}

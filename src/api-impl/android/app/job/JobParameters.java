@@ -41,6 +41,11 @@ public class JobParameters implements Parcelable {
 		return jobInfo.getExtras();
 	}
 
+	/* ATL never stops jobs, so STOP_REASON_UNDEFINED */
+	public int getStopReason() {
+		return 0;
+	}
+
 	public Uri[] getTriggeredContentUris() {
 		return new Uri[0];
 	}

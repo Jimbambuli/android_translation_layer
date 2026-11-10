@@ -179,7 +179,11 @@ public class ContentResolver {
 	}
 
 	public OutputStream openOutputStream(Uri uri) throws FileNotFoundException {
-		ParcelFileDescriptor fd = openFileDescriptor(uri, "w");
+		return openOutputStream(uri, "w");
+	}
+
+	public OutputStream openOutputStream(Uri uri, String mode) throws FileNotFoundException {
+		ParcelFileDescriptor fd = openFileDescriptor(uri, mode);
 		return fd != null ? new ParcelFileDescriptor.AutoCloseOutputStream(fd) : null;
 	}
 

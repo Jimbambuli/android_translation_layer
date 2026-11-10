@@ -32,6 +32,31 @@ public class MediaFormat {
 		return (int)map.get(name);
 	}
 
+	public float getFloat(String name) {
+		return (Float)map.get(name);
+	}
+
+	public float getFloat(String name, float defaultValue) {
+		Object value = map.get(name);
+		return value instanceof Float ? (Float)value : defaultValue;
+	}
+
+	public int getInteger(String name, int defaultValue) {
+		Object value = map.get(name);
+		return value instanceof Integer ? (Integer)value : defaultValue;
+	}
+
+	public long getLong(String name, long defaultValue) {
+		Object value = map.get(name);
+		return value instanceof Long ? (Long)value : defaultValue;
+	}
+
+	public void setFeatureEnabled(String feature, boolean enabled) {
+		map.put(KEY_FEATURE_PREFIX + feature, enabled ? 1 : 0);
+	}
+
+	private static final String KEY_FEATURE_PREFIX = "feature-";
+
 	public boolean containsKey(String name) {
 		return map.containsKey(name);
 	}
