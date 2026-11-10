@@ -274,8 +274,8 @@ public abstract class Context {
 	private static final Map<String, Intent> stickyIntents = new ConcurrentHashMap<>();
 
 	/* AOSP ActivityManagerService.registerReceiver(): every sticky broadcast the filter matches, an app's
-	 * own over the system's of the same action; the system's are ACTION_BATTERY_CHANGED and
-	 * CONNECTIVITY_ACTION, built from the current state */
+	 * own over the system's of the same action; the system's are ACTION_BATTERY_CHANGED,
+	 * CONNECTIVITY_ACTION and ACTION_HDMI_AUDIO_PLUG, built from the current state */
 	private static java.util.List<Intent> stickyIntentsFor(IntentFilter filter) {
 		java.util.ArrayList<Intent> found = new java.util.ArrayList<>();
 		if (filter == null)
@@ -287,6 +287,8 @@ public abstract class Context {
 				sticky = android.os.BatteryManager.batteryChangedIntent();
 			if (sticky == null && android.net.ConnectivityManager.CONNECTIVITY_ACTION.equals(action))
 				sticky = android.net.ConnectivityManager.stickyIntentFor(filter);
+			if (sticky == null && android.media.AudioManager.ACTION_HDMI_AUDIO_PLUG.equals(action))
+				sticky = android.media.AudioManager.hdmiAudioPlugStickyIntent();
 			if (sticky != null)
 				found.add(new Intent(sticky));
 		}

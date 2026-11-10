@@ -8,6 +8,18 @@ public class AudioManager {
 
 	public static final int STREAM_MUSIC = 0x3;
 
+	public static final String ACTION_HDMI_AUDIO_PLUG = "android.media.action.HDMI_AUDIO_PLUG";
+	public static final String EXTRA_AUDIO_PLUG_STATE = "android.media.extra.AUDIO_PLUG_STATE";
+
+	/* AOSP AudioService sends ACTION_HDMI_AUDIO_PLUG as a sticky broadcast at boot; ATL has no HDMI audio
+	 * output, so a receiver that registers for it gets the sticky reporting it unplugged (state 0), as on a
+	 * device without HDMI. */
+	public static android.content.Intent hdmiAudioPlugStickyIntent() {
+		android.content.Intent intent = new android.content.Intent(ACTION_HDMI_AUDIO_PLUG);
+		intent.putExtra(EXTRA_AUDIO_PLUG_STATE, 0);
+		return intent;
+	}
+
 	private native void nativeSetStreamVolume(int volume);
 	private native int nativeGetStreamVolume();
 	private native boolean nativeIsStreamMute();

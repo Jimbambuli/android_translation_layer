@@ -24,9 +24,11 @@ public class ConnectivityManager {
 	public static final int TYPE_ETHERNET = 9;
 	public static final int TYPE_VPN = 17;
 
-	/* AOSP ConnectivityService.sendGeneralBroadcast(): the sticky CONNECTIVITY_ACTION of the default network */
+	/* AOSP ConnectivityService.sendGeneralBroadcast(): the sticky CONNECTIVITY_ACTION of the default network.
+	 * Built on the app's main thread at registerReceiver() time, so it reads the last known state without
+	 * waiting for the initial async network probe; a later network-changed re-sends the sticky (onNetworkChanged). */
 	static Intent connectivityIntent() {
-		boolean available = nativeGetNetworkAvailable();
+		boolean available = nativeGetNetworkAvailableCached();
 		Intent intent = new Intent(CONNECTIVITY_ACTION);
 		intent.putExtra(EXTRA_NETWORK_TYPE, available ? TYPE_WIFI : TYPE_MOBILE);
 		intent.putExtra(EXTRA_NO_CONNECTIVITY, !available);
@@ -96,6 +98,10 @@ public class ConnectivityManager {
 	public native boolean isActiveNetworkMetered();
 
 	protected static native boolean nativeGetNetworkAvailable();
+
+	/* like nativeGetNetworkAvailable() but never waits for the initial async network probe: the sticky built
+	 * on the main thread at registration must not block (microG's one-shot isConnected() keeps the blocking one) */
+	protected static native boolean nativeGetNetworkAvailableCached();
 
 	/* starts watching GNetworkMonitor; changes arrive in onNetworkChanged() */
 	private static native void nativeStartMonitoring();

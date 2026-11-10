@@ -87,7 +87,7 @@ static gpointer monitor_thread(gpointer user_data)
 	return NULL;
 }
 
-static GNetworkMonitor *get_monitor(JNIEnv *env)
+static void ensure_monitor_started(JNIEnv *env)
 {
 	static gsize started = 0;
 	if (g_once_init_enter(&started)) {
@@ -96,6 +96,11 @@ static GNetworkMonitor *get_monitor(JNIEnv *env)
 		g_thread_unref(g_thread_new("GNetworkMonitor", monitor_thread, jvm));
 		g_once_init_leave(&started, 1);
 	}
+}
+
+static GNetworkMonitor *get_monitor(JNIEnv *env)
+{
+	ensure_monitor_started(env);
 
 	gint64 deadline = g_get_monotonic_time() + INITIAL_STATE_TIMEOUT_US;
 	g_mutex_lock(&state_mutex);
@@ -119,6 +124,28 @@ JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_isActiveNetworkM
 JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_nativeGetNetworkAvailable(JNIEnv *env, jclass clazz)
 {
 	return g_network_monitor_get_network_available(get_monitor(env));
+}
+
+/*
+ * Like nativeGetNetworkAvailable(), but it waits only for the monitor to exist, not for the initial
+ * asynchronous GetStatus reply. The CONNECTIVITY_ACTION sticky is built on the app's main thread when it
+ * registers its receiver; blocking there up to INITIAL_STATE_TIMEOUT_US stalls the UI (seen as ~1.5 s jank).
+ * The monitor's current value answers at once (correct for an already-up network); the portal monitor that
+ * starts FALSE is corrected by the network-changed that follows its GetStatus reply, which re-sends the sticky.
+ */
+JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_nativeGetNetworkAvailableCached(JNIEnv *env, jclass clazz)
+{
+	ensure_monitor_started(env);
+
+	gint64 deadline = g_get_monotonic_time() + INITIAL_STATE_TIMEOUT_US;
+	g_mutex_lock(&state_mutex);
+	while (!monitor) {
+		if (!g_cond_wait_until(&state_cond, &state_mutex, deadline))
+			break;
+	}
+	GNetworkMonitor *m = monitor;
+	g_mutex_unlock(&state_mutex);
+	return g_network_monitor_get_network_available(m ? m : g_network_monitor_get_default());
 }
 
 JNIEXPORT void JNICALL Java_android_net_ConnectivityManager_nativeStartMonitoring(JNIEnv *env, jclass clazz)
