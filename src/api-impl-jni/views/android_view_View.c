@@ -59,6 +59,9 @@ int canceled_action = 0;
 static struct pointer pointers[MAX_POINTERS] = {};
 
 static GdkEvent *synthetic_propagation_failed = NULL;
+/* the widget of the view whose Java dispatch handed the event over to GTK (native_gtkEventPropagation());
+ * the views below it have not seen the event in Java yet. Only compared, never dereferenced. */
+static GtkWidget *propagation_handed_over = NULL;
 
 /** JavaWidget:
  * Minimal gtk widget class which does nothing.
@@ -125,7 +128,9 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 	}
 
 	if (wrapper->custom_dispatch_touch) {
-		if (synthetic_propagation_failed != event) { // New event. Try to handle again.
+		/* a new event, or one the Java dispatch of an ancestor handed over to GTK above this view: like
+		 * AOSP's ViewGroup dispatch would, let the view handle it */
+		if (synthetic_propagation_failed != event || (propagation_handed_over && gtk_widget_is_ancestor(GTK_WIDGET(wrapper), propagation_handed_over))) {
 			synthetic_propagation_failed = NULL;
 			ret = J__View__dispatchTouchEvent(env, this, motion_event);
 			if ((*env)->ExceptionCheck(env)) {
@@ -1505,6 +1510,7 @@ JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame(JNIEn
 
 JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkEventPropagation(JNIEnv *env, jobject this)
 {
+	propagation_handed_over = GTK_WIDGET(_PTR(_GET_LONG_FIELD(this, "widget")));
 	synthetic_propagation_failed = GINT_TO_POINTER(1);
 	return true;
 }
@@ -1512,6 +1518,7 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkEventPropagation(JN
 JNIEXPORT jboolean JNICALL Java_android_view_View_native_1gtkScrollTarget(JNIEnv *env, jobject this, jlong widget_ptr)
 {
 	gtk_scroll_target = GTK_WIDGET(_PTR(widget_ptr));
+	propagation_handed_over = gtk_scroll_target;
 	synthetic_propagation_failed = GINT_TO_POINTER(1);
 	return true;
 }
