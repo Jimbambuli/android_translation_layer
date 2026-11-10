@@ -1232,6 +1232,20 @@ public final class MotionEvent extends InputEvent {
 	 */
 	public static final int BUTTON_FORWARD = 1 << 4;
 
+	/**
+	 * Button constant: Primary stylus button pressed.
+	 *
+	 * @see #getButtonState
+	 */
+	public static final int BUTTON_STYLUS_PRIMARY = 1 << 5;
+
+	/**
+	 * Button constant: Secondary stylus button pressed.
+	 *
+	 * @see #getButtonState
+	 */
+	public static final int BUTTON_STYLUS_SECONDARY = 1 << 6;
+
 	// NOTE: If you add a new axis here you must also add it to:
 	//  native/include/android/input.h
 
