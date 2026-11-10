@@ -2,6 +2,7 @@ package android.text.format;
 
 import android.content.Context;
 import java.util.Date;
+import java.util.Formatter;
 import java.util.Locale;
 
 public class DateUtils {
@@ -14,6 +15,10 @@ public class DateUtils {
 	public static final int FORMAT_SHOW_YEAR = 0x00004;
 	public static final int FORMAT_SHOW_DATE = 0x00010;
 	public static final int FORMAT_ABBREV_MONTH = 0x10000;
+
+	public static CharSequence getRelativeTimeSpanString(Context c, long millis) {
+		return getRelativeTimeSpanString(c, millis, false /* no preposition */);
+	}
 
 	public static CharSequence getRelativeTimeSpanString(Context context, long millis, boolean withPreposition) {
 		return new Date(millis).toString();
@@ -56,6 +61,11 @@ public class DateUtils {
 			return formatDateTime(context, fromMillis, flags);
 		else
 			return formatDateTime(context, fromMillis, flags) + " - " + formatDateTime(context, toMillis, flags);
+	}
+
+	public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis, long endMillis, int flags) {
+		formatter.format("%s", formatDateRange(context, startMillis, endMillis, flags));
+		return formatter;
 	}
 
 	public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolution) {

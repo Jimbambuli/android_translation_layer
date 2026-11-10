@@ -13,11 +13,37 @@ import java.util.Set;
 public class ShortcutInfo implements Parcelable {
 	public static final Creator<ShortcutInfo> CREATOR = null;
 
+	private String mId;
+	private Set<String> mCategories;
+	private int mRank;
+
+	public String getId() {
+		return mId;
+	}
+
+	public Set<String> getCategories() {
+		return mCategories;
+	}
+
+	public int getRank() {
+		return mRank;
+	}
+
 	public static class Builder {
-		public Builder(Context context, String id) {}
+		private final String mId;
+		private Set<String> mCategories;
+		private int mRank;
+
+		public Builder(Context context, String id) {
+			mId = id;
+		}
 
 		public ShortcutInfo build() {
-			return new ShortcutInfo();
+			ShortcutInfo info = new ShortcutInfo();
+			info.mId = mId;
+			info.mCategories = mCategories;
+			info.mRank = mRank;
+			return info;
 		}
 
 		public Builder setActivity(ComponentName activity) {
@@ -25,6 +51,7 @@ public class ShortcutInfo implements Parcelable {
 		}
 
 		public Builder setCategories(Set<String> categories) {
+			mCategories = categories;
 			return this;
 		}
 
@@ -69,6 +96,7 @@ public class ShortcutInfo implements Parcelable {
 		}
 
 		public Builder setRank(int rank) {
+			mRank = rank;
 			return this;
 		}
 

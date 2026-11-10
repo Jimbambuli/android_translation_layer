@@ -2,6 +2,7 @@ package android.appwidget;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.widget.RemoteViews;
 
 public class AppWidgetManager {
 
@@ -25,4 +26,9 @@ public class AppWidgetManager {
 	}
 
 	public void notifyAppWidgetViewDataChanged(int[] appWidgetIds, int viewId) {}
+
+	/* AOSP returns early when mService == null; the desktop has no widget host */
+	public void updateAppWidget(int appWidgetId, RemoteViews views) {}
+
+	public void partiallyUpdateAppWidget(int appWidgetId, RemoteViews views) {}
 }

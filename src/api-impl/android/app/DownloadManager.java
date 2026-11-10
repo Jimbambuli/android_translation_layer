@@ -20,6 +20,14 @@ public class DownloadManager {
 
 		public Request setDestinationInExternalFilesDir(Context context, String dirType, String path) { return this; }
 
+		public Request addRequestHeader(String header, String value) { return this; }
+
+		public Request setAllowedOverMetered(boolean allow) { return this; }
+
+		public Request setDestinationUri(Uri uri) { return this; }
+
+		public Request setVisibleInDownloadsUi(boolean isVisible) { return this; }
+
 		public Request setNotificationVisibility(int visibility) { return this; }
 	}
 
@@ -38,5 +46,18 @@ public class DownloadManager {
 	public Cursor query(Query query) {
 		Slog.i("DownloadManager", "query() called");
 		return new MatrixCursor(new String[] {"_id"});
+	}
+
+	/* no download backend: nothing is ever registered, so the "not found" results of AOSP apply */
+	public long addCompletedDownload(String title, String description, boolean isMediaScannerScannable, String mimeType, String path, long length, boolean showNotification) {
+		return 0;
+	}
+
+	public static Long getMaxBytesOverMobile(Context context) {
+		return null;
+	}
+
+	public Uri getUriForDownloadedFile(long id) {
+		return null;
 	}
 }
