@@ -1,14 +1,17 @@
 package android.accounts;
 
+import android.app.Activity;
 import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -122,6 +125,22 @@ public class AccountManager {
 		return true;
 	}
 
+	/* AOSP: AccountManagerService binds the authenticator of the account type, which adds the account (usually with
+	 * its own activity). ATL knows no authenticators (see getAccountsByTypeAndFeatures), so the bind fails as for a
+	 * type without one: onError(ERROR_CODE_REMOTE_EXCEPTION, "bind failure") -> AuthenticatorException */
+	public AccountManagerFuture<Bundle> addAccount(final String accountType, final String authTokenType,
+	                                               final String[] requiredFeatures, final Bundle addAccountOptions,
+	                                               final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (accountType == null)
+			throw new IllegalArgumentException("accountType is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
 	/**
 	 * Removes an account from the AccountManager.  Does nothing if the account
 	 * does not exist.  Does not delete the account from the server.
@@ -175,20 +194,43 @@ public class AccountManager {
 				});
 			}
 
-			public V getResult() {
-				try {
-					return get();
-				} catch (InterruptedException | ExecutionException e) {
-					throw new RuntimeException(e);
-				}
+			public V getResult() throws OperationCanceledException, IOException, AuthenticatorException {
+				return internalGetResult(null, null);
 			}
 
-			public V getResult(long timeout, TimeUnit unit) {
+			public V getResult(long timeout, TimeUnit unit) throws OperationCanceledException, IOException, AuthenticatorException {
+				return internalGetResult(timeout, unit);
+			}
+
+			/* AOSP AmsTask.internalGetResult: the work's exception as the caller expects it */
+			private V internalGetResult(Long timeout, TimeUnit unit) throws OperationCanceledException, IOException, AuthenticatorException {
 				try {
-					return get(timeout, unit);
-				} catch (InterruptedException | ExecutionException | TimeoutException e) {
-					throw new RuntimeException(e);
+					if (timeout == null) {
+						return get();
+					} else {
+						return get(timeout, unit);
+					}
+				} catch (InterruptedException | TimeoutException | CancellationException e) {
+					// fall through and cancel
+				} catch (ExecutionException e) {
+					final Throwable cause = e.getCause();
+					if (cause instanceof IOException) {
+						throw (IOException) cause;
+					} else if (cause instanceof UnsupportedOperationException) {
+						throw new AuthenticatorException(cause);
+					} else if (cause instanceof AuthenticatorException) {
+						throw (AuthenticatorException) cause;
+					} else if (cause instanceof RuntimeException) {
+						throw (RuntimeException) cause;
+					} else if (cause instanceof Error) {
+						throw (Error) cause;
+					} else {
+						throw new IllegalStateException(cause);
+					}
+				} finally {
+					cancel(true /* interrupt if running */);
 				}
+				throw new OperationCanceledException();
 			}
 		}
 		Future future = new Future();
