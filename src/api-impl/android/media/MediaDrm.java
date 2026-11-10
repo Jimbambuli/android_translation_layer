@@ -27,6 +27,11 @@ public final class MediaDrm {
 		return false;
 	}
 
+	/* API 30: the schemes of the installed DRM plugins, none */
+	public static final List<UUID> getSupportedCryptoSchemes() {
+		return new java.util.ArrayList<UUID>();
+	}
+
 	public byte[] openSession() throws MediaDrmException {
 		throw new MediaDrmException("no DRM");
 	}
