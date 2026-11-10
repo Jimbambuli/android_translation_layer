@@ -5,9 +5,11 @@ import android.app.Activity;
 import android.app.Application;
 import android.app.ContextImpl;
 import android.app.Service;
+import android.atl.annotation.Export;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
+import android.content.pm.ServiceInfo;
 import android.graphics.Compatibility;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
@@ -22,6 +24,7 @@ import dalvik.system.PathClassLoader;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,7 +48,7 @@ public final class ATLLoadedApp {
 	public final PackageParser.Package pkg;
 	public final int effective_sdk_compat;
 	private final Object init_lock;
-	private final HashMap<String, Service> running_services;
+	private final HashMap<String, ServiceRecord> running_services;
 	private Application application;
 	private Resources.Theme default_theme;
 	/* the AssetManagers for the override configurations, see createResources() */
@@ -308,7 +311,33 @@ public final class ATLLoadedApp {
 		return activity;
 	}
 
+	/* ActiveServices' ServiceRecord: a running service of the app and what keeps it running */
+	private static final class ServiceRecord {
+		final Service service;
+		final int flags; // ServiceInfo.flags
+		boolean startRequested;
+		int lastStartId;
+		/* the bound connections with their bind flags (ConnectionRecord) and the intent of the binding */
+		final HashMap<ServiceConnection, Integer> connections = new HashMap<>();
+		Intent bindIntent;
+
+		ServiceRecord(Service service, int flags) {
+			this.service = service;
+			this.flags = flags;
+		}
+	}
+
+	private ServiceRecord getServiceRecord(String className) {
+		synchronized (running_services) {
+			return running_services.get(className);
+		}
+	}
+
 	public ComponentName startOrBindService(final Intent intent, final ServiceConnection serviceConnection) {
+		return startOrBindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+	}
+
+	public ComponentName startOrBindService(final Intent intent, final ServiceConnection serviceConnection, final int flags) {
 		ComponentName component = intent.getComponent();
 		if (component == null) {
 			int priority = Integer.MIN_VALUE;
@@ -334,28 +363,46 @@ public final class ATLLoadedApp {
 			@Override
 			public void run() {
 				try {
-					Service service = running_services.get(className);
-					if (service == null) {
+					ServiceRecord r = getServiceRecord(className);
+					if (r == null) {
 						Class<? extends Service> cls = ATLLoadedApp.this.loadClass(className).asSubclass(Service.class);
-						service = cls.getConstructor().newInstance();
+						Service service = cls.getConstructor().newInstance();
 						service.attachBaseContext(new ContextImpl(
 						    ATLLoadedApp.this.createDefaultResources(), ATLLoadedApp.this,
 						    pkg.applicationInfo.theme));
 						service.onCreate();
-						running_services.put(className, service);
+						int serviceFlags = 0;
+						for (PackageParser.Service s : pkg.services) {
+							if (className.equals(s.className))
+								serviceFlags = s.info.flags;
+						}
+						r = new ServiceRecord(service, serviceFlags);
+						synchronized (running_services) {
+							running_services.put(className, r);
+						}
 					}
 
 					if (serviceConnection != null) {
+						synchronized (running_services) {
+							r.connections.put(serviceConnection, flags);
+						}
+						if (r.bindIntent == null)
+							r.bindIntent = intent;
 						// AOSP delivers onNullBinding when the service's onBind returns null, never
 						// onServiceConnected with a null binder (which crashes callers that dereference it).
-						android.os.IBinder binder = service.onBind(intent);
+						android.os.IBinder binder = r.service.onBind(intent);
 						if (binder != null) {
 							serviceConnection.onServiceConnected(intent.getComponent(), binder);
 						} else {
 							serviceConnection.onNullBinding(intent.getComponent());
 						}
 					} else {
-						service.onStartCommand(intent, 0, 0);
+						int startId;
+						synchronized (running_services) {
+							r.startRequested = true;
+							startId = ++r.lastStartId;
+						}
+						r.service.onStartCommand(intent, 0, startId);
 					}
 				} catch (ReflectiveOperationException e) {
 					Slog.e(TAG, "startService: failed to start service " + className, e);
@@ -366,16 +413,128 @@ public final class ATLLoadedApp {
 		return component;
 	}
 
+	/* ActiveServices.bringDownServiceIfNeededLocked(): a service runs as long as it is started or bound with
+	 * BIND_AUTO_CREATE (isServiceNeededLocked()); otherwise it is destroyed, on the main thread */
+	private void bringDownServiceIfNeeded(final String className, final ServiceRecord r) {
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				synchronized (running_services) {
+					if (running_services.get(className) != r || r.startRequested)
+						return;
+					for (int bindFlags : r.connections.values()) {
+						if ((bindFlags & Context.BIND_AUTO_CREATE) != 0)
+							return;
+					}
+					running_services.remove(className);
+				}
+				Slog.i(TAG, "destroying service " + className);
+				r.service.atl_destroy();
+			}
+		});
+	}
+
 	public boolean stopService(Intent intent) {
 		if (intent.getComponent() == null)
 			return false;
 		String className = intent.getComponent().getClassName();
-		Service service = running_services.get(className);
-		if (service == null)
+		ServiceRecord r = getServiceRecord(className);
+		if (r == null)
 			return false;
-		service.onDestroy();
-		running_services.remove(className);
+		synchronized (running_services) {
+			r.startRequested = false;
+		}
+		bringDownServiceIfNeeded(className, r);
 		return true;
+	}
+
+	/* ActiveServices.stopServiceTokenLocked(): Service.stopSelf(startId) stops the service only when startId is
+	 * the last start (or negative, stopSelf()) */
+	public boolean stopServiceToken(Service service, int startId) {
+		String className = service.getClass().getName();
+		ServiceRecord r = getServiceRecord(className);
+		if (r == null || r.service != service)
+			return false;
+		synchronized (running_services) {
+			if (startId >= 0 && r.lastStartId != startId)
+				return false;
+			r.startRequested = false;
+		}
+		bringDownServiceIfNeeded(className, r);
+		return true;
+	}
+
+	/* ActiveServices.unbindServiceLocked()/removeConnectionLocked(): when the last connection of the service goes,
+	 * it is unbound (onUnbind()); a connection with BIND_AUTO_CREATE no longer keeps it running */
+	public void unbindService(final ServiceConnection serviceConnection) {
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				String className = null;
+				ServiceRecord r = null;
+				Integer bindFlags = null;
+				synchronized (running_services) {
+					for (Map.Entry<String, ServiceRecord> entry : running_services.entrySet()) {
+						bindFlags = entry.getValue().connections.remove(serviceConnection);
+						if (bindFlags != null) {
+							className = entry.getKey();
+							r = entry.getValue();
+							break;
+						}
+					}
+				}
+				if (r == null)
+					return;
+				if (r.connections.isEmpty())
+					r.service.onUnbind(r.bindIntent);
+				if ((bindFlags & Context.BIND_AUTO_CREATE) != 0)
+					bringDownServiceIfNeeded(className, r);
+			}
+		});
+	}
+
+	/* Task.intent: the intent that started the app's task, kept apart from the root activity's getIntent(),
+	 * which the app may replace (setIntent()) */
+	private static Intent task_base_intent;
+
+	public static synchronized void setTaskBaseIntent(Intent intent) {
+		if (task_base_intent == null)
+			task_base_intent = new Intent(intent);
+	}
+
+	/* The app's task was removed (its window closed): ActiveServices.cleanUpServices() stops the started services
+	 * with android:stopWithTask and tells the others with Service.onTaskRemoved() */
+	@Export
+	private static void cleanUpServices() {
+		final ATLLoadedApp app = getPrimaryApplication();
+		final Intent baseIntent;
+		synchronized (ATLLoadedApp.class) {
+			baseIntent = task_base_intent;
+		}
+		ArrayList<Map.Entry<String, ServiceRecord>> services;
+		synchronized (app.running_services) {
+			services = new ArrayList<>(app.running_services.entrySet());
+		}
+		for (Map.Entry<String, ServiceRecord> entry : services) {
+			final ServiceRecord r = entry.getValue();
+			if (!r.startRequested)
+				continue;
+			if ((r.flags & ServiceInfo.FLAG_STOP_WITH_TASK) != 0) {
+				Slog.i(TAG, "Stopping service " + entry.getKey() + ": remove task");
+				synchronized (app.running_services) {
+					r.startRequested = false;
+				}
+				app.bringDownServiceIfNeeded(entry.getKey(), r);
+			} else {
+				final Intent rootIntent = new Intent(baseIntent);
+				new Handler(Looper.getMainLooper()).post(new Runnable() {
+					@Override
+					public void run() {
+						r.service.onTaskRemoved(rootIntent);
+					}
+				});
+			}
+		}
 	}
 
 	public void receiveBroadcast(Context context, Intent intent) {

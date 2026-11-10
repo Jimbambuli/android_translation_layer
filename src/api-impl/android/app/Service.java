@@ -83,6 +83,8 @@ public abstract class Service extends ContextWrapper {
 		System.out.println("stopForeground(" + notificationBehavior + ") called");
 		if ((notificationBehavior & STOP_FOREGROUND_REMOVE) != 0)
 			new NotificationManager().cancel(notification_id);
+		if ((notificationBehavior & (STOP_FOREGROUND_REMOVE | STOP_FOREGROUND_DETACH)) != 0)
+			notification_id = 0; // the service no longer owns the notification (ServiceRecord.foregroundId)
 		setForeground(false);
 	}
 
@@ -106,17 +108,32 @@ public abstract class Service extends ContextWrapper {
 		return this.get_atl_loaded_app().getApplication();
 	}
 
+	/* AOSP Service.stopSelf(): ActivityManager.stopServiceToken(), see ATLLoadedApp.stopServiceToken() */
 	public void stopSelf(int startId) {
-		System.out.println("Service.stopSelf(" + startId + ") called");
+		stopSelfResult(startId);
 	}
 
 	public void stopSelf() {
-		System.out.println("Service.stopSelf() called");
+		stopSelf(-1);
 	}
 
 	public boolean stopSelfResult(int startId) {
-		System.out.println("Service.stopSelfResult(" + startId + ") called");
-		return true;
+		return get_atl_loaded_app().stopServiceToken(this, startId);
+	}
+
+	/* ActiveServices.bringDownServiceLocked(): the service stops being a foreground service and its notification
+	 * goes (unless stopForeground() detached it), then ActivityThread.handleStopService() calls onDestroy() */
+	public final void atl_destroy() {
+		if (notification_id != 0) {
+			new NotificationManager().cancel(notification_id);
+			notification_id = 0;
+		}
+		setForeground(false);
+		onDestroy();
+	}
+
+	public boolean onUnbind(Intent intent) {
+		return false;
 	}
 
 	public void attachBaseContext(Context newBase) {

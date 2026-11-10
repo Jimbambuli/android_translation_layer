@@ -108,6 +108,11 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
+	public void unbindService(ServiceConnection serviceConnection) {
+		this.baseContext.unbindService(serviceConnection);
+	}
+
+	@Override
 	public Context createPackageContext(String packageName, int flags) {
 		return this.baseContext.createPackageContext(packageName, flags);
 	}

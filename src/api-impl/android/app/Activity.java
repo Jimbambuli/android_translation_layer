@@ -170,6 +170,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			System.err.println("Failed to find main Activity");
 			System.exit(1);
 		}
+		ATLLoadedApp.setTaskBaseIntent(intent);
 		return internalCreateActivity(className, native_window, intent);
 	}
 

@@ -564,6 +564,17 @@ gboolean activity_window_close_request(void)
 	window_closed = TRUE;
 	window_set_hidden(TRUE);
 	gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
+	/* The user removed the task (ActivityTaskSupervisor.removeTask() -> cleanUpRemovedTask()): its services get
+	 * onTaskRemoved() with the task's base intent, android:stopWithTask services stop. Not when the
+	 * last activity finished (Task.removeIfPossible() does not clean up services). */
+	if (activity_backlog) {
+		JNIEnv *env = get_jni_env();
+		J__ATLLoadedApp__cleanUpServices(env);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+	}
 	return TRUE;
 }
 

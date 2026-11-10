@@ -50,6 +50,8 @@ public final class ContextImpl extends Context {
 	private final static String TAG = "ContextImpl";
 	private final Resources resources;
 	private final ATLLoadedApp atl_loaded_app;
+	/* LoadedApk.mServices: the service connections bound with this context, and the app of their service */
+	private final java.util.HashMap<ServiceConnection, ATLLoadedApp> bound_services = new java.util.HashMap<>();
 	/**
 	 * While not being part of the official Android API, some applications use it to reset/reload the theme in the context.
 	 */
@@ -251,7 +253,24 @@ public final class ContextImpl extends Context {
 		if (targetApp == null) {
 			return false;
 		}
-		return targetApp.startOrBindService(intent, serviceConnection) != null;
+		if (targetApp.startOrBindService(intent, serviceConnection, flags) == null)
+			return false;
+		synchronized (bound_services) {
+			bound_services.put(serviceConnection, targetApp);
+		}
+		return true;
+	}
+
+	/* LoadedApk.forgetServiceDispatcher(): a connection this context did not bind (or a Cloud Messaging one,
+	 * which has no service behind it) is ignored instead of AOSP's IllegalArgumentException */
+	@Override
+	public void unbindService(ServiceConnection serviceConnection) {
+		ATLLoadedApp targetApp;
+		synchronized (bound_services) {
+			targetApp = bound_services.remove(serviceConnection);
+		}
+		if (targetApp != null)
+			targetApp.unbindService(serviceConnection);
 	}
 
 	/* AOSP resolves an implicit intent with data against all packages with MATCH_DEFAULT_ONLY: the app's own
