@@ -9,8 +9,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import java.util.ArrayList;
 
-class ProxyInfo {}
-
 public class ConnectivityManager {
 	public static final String CONNECTIVITY_ACTION = "android.net.conn.CONNECTIVITY_CHANGE";
 	public static final String EXTRA_NO_CONNECTIVITY = "noConnectivity";

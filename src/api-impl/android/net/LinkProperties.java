@@ -20,6 +20,7 @@ public class LinkProperties {
 	private final ArrayList<InetAddress> mDnses = new ArrayList<>();
 	private String mDomains;
 	private int mMtu;
+	private ProxyInfo mHttpProxy;
 
 	public LinkProperties() {
 	}
@@ -91,6 +92,21 @@ public class LinkProperties {
 
 	public int getMtu() {
 		return mMtu;
+	}
+
+	/**
+	 * Sets the recommended {@link ProxyInfo} to use on this link, or {@code null} for none.
+	 */
+	public void setHttpProxy(ProxyInfo proxy) {
+		mHttpProxy = proxy;
+	}
+
+	/**
+	 * Gets the recommended {@link ProxyInfo} (or {@code null}) set on this link.
+	 * ATL: the host's link has none set; proxies are left to the desktop like DNS.
+	 */
+	public ProxyInfo getHttpProxy() {
+		return mHttpProxy;
 	}
 
 	@Override
