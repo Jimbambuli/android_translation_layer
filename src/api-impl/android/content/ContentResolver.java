@@ -38,6 +38,12 @@ public class ContentResolver {
 	public static final String QUERY_ARG_SORT_COLUMNS = "android:query-arg-sort-columns";
 	public static final String QUERY_ARG_SORT_DIRECTION = "android:query-arg-sort-direction";
 	public static final String QUERY_ARG_SORT_COLLATION = "android:query-arg-sort-collation";
+	public static final String QUERY_ARG_SQL_GROUP_BY = "android:query-arg-sql-group-by";
+	public static final String QUERY_ARG_SQL_HAVING = "android:query-arg-sql-having";
+	public static final String QUERY_ARG_SQL_LIMIT = "android:query-arg-sql-limit";
+	public static final String QUERY_ARG_GROUP_COLUMNS = "android:query-arg-group-columns";
+	public static final String QUERY_ARG_LIMIT = "android:query-arg-limit";
+	public static final String QUERY_ARG_OFFSET = "android:query-arg-offset";
 	public static final int QUERY_SORT_DIRECTION_ASCENDING = 0;
 	public static final int QUERY_SORT_DIRECTION_DESCENDING = 1;
 
@@ -189,7 +195,11 @@ public class ContentResolver {
 
 	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) {
 		String path = filePath(uri);
-		if (path != null) {
+		ContentProvider provider = path == null ? ContentProvider.atl_get_content_provider(uri.getAuthority()) : null;
+		if (provider != null) {
+			// as AOSP: the provider gets the arguments, so one that knows them (MediaStore) honours limits
+			return provider.query(uri, projection, queryArgs, cancellationSignal);
+		} else if (path != null) {
 			if (projection == null)
 				projection = new String[] {"_display_name", "_size", "mime_type"};
 			MatrixCursor cursor = new MatrixCursor(projection);
