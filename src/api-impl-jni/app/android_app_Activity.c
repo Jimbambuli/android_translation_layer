@@ -596,6 +596,18 @@ JNIEXPORT void JNICALL Java_android_app_Service_nativeSetForegroundServices(JNIE
 		g_idle_add_once(close_hidden_window, NULL);
 }
 
+/* GTK drops the compositor's close request (GDK_DELETE) for the app's window while a modal dialog of
+ * it holds the grab, e.g. the file chooser of ACTION_OPEN_DOCUMENT; only then the event is left
+ * unhandled and reaches this handler. On Android, removing the task also removes the picker activity
+ * on top, so the request closes the app's window all the same. */
+static gboolean on_surface_event(GdkSurface *surface, GdkEvent *event, gpointer user_data)
+{
+	if (gdk_event_get_event_type(event) != GDK_DELETE)
+		return FALSE;
+	gtk_window_close(GTK_WINDOW(window));
+	return TRUE;
+}
+
 void activity_window_ready(void)
 {
 	JNIEnv *env = get_jni_env();
@@ -607,6 +619,7 @@ void activity_window_ready(void)
 	if (surface && GDK_IS_TOPLEVEL(surface) && !g_object_get_data(G_OBJECT(surface), "atl-watches-state")) {
 		g_signal_connect(surface, "notify::state", G_CALLBACK(on_window_state_changed), NULL);
 		g_signal_connect(gdk_surface_get_frame_clock(surface), "after-paint", G_CALLBACK(on_frame_clock_after_paint), surface);
+		g_signal_connect(surface, "event", G_CALLBACK(on_surface_event), NULL);
 		g_object_set_data(G_OBJECT(surface), "atl-watches-state", GINT_TO_POINTER(1));
 	}
 }
