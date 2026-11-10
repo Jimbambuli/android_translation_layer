@@ -1,15 +1,67 @@
 package android.provider;
 
 import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.util.Size;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
+/* the URIs and helpers of AOSP 14's MediaStore; ATLMediaContentProvider answers them */
 public class MediaStore {
+
+	public static final String AUTHORITY = "media";
+	public static final Uri AUTHORITY_URI = Uri.parse("content://" + AUTHORITY);
+
+	public static final String VOLUME_INTERNAL = "internal";
+	public static final String VOLUME_EXTERNAL = "external";
+	public static final String VOLUME_EXTERNAL_PRIMARY = "external_primary";
+
+	public static final String PARAM_INCLUDE_PENDING = "includePending";
+	public static final String PARAM_LIMIT = "limit";
+
+	public static final String QUERY_ARG_MATCH_PENDING = "android:query-arg-match-pending";
+	public static final String QUERY_ARG_MATCH_TRASHED = "android:query-arg-match-trashed";
+	public static final String QUERY_ARG_MATCH_FAVORITE = "android:query-arg-match-favorite";
+	public static final int MATCH_DEFAULT = 0;
+	public static final int MATCH_INCLUDE = 1;
+	public static final int MATCH_EXCLUDE = 2;
+	public static final int MATCH_ONLY = 3;
+
+	public static final String UNKNOWN_STRING = "<unknown>";
+
+	public static boolean getIncludePending(Uri uri) {
+		return uri.getBooleanQueryParameter(PARAM_INCLUDE_PENDING, false);
+	}
+
+	public static String getVolumeName(Uri uri) {
+		final List<String> segments = uri.getPathSegments();
+		if (AUTHORITY.equals(uri.getAuthority()) && segments != null && segments.size() > 0) {
+			return segments.get(0);
+		}
+		throw new IllegalArgumentException("Missing volume name: " + uri);
+	}
+
+	/* AOSP: the app op of MANAGE_MEDIA, which ATL does not have: its default, the permission */
+	public static boolean canManageMedia(Context context) {
+		return context.checkPermission("android.permission.MANAGE_MEDIA", android.os.Process.myPid(),
+		                               context.getApplicationInfo().uid)
+		    == android.content.pm.PackageManager.PERMISSION_GRANTED;
+	}
+
+	/* ATL has one external volume, the user's folders (ATLMediaContentProvider) */
+	public static Set<String> getExternalVolumeNames(Context context) {
+		return Collections.singleton(VOLUME_EXTERNAL_PRIMARY);
+	}
 
 	/** @hide */
 	public static class ThumbnailConstants {
@@ -38,13 +90,34 @@ public class MediaStore {
 
 		public static class Media {
 
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/images/media");
-			public static final Uri INTERNAL_CONTENT_URI = Uri.parse("content://media/internal/images/media");
+			public static final Bitmap getBitmap(ContentResolver cr, Uri url) throws FileNotFoundException, IOException {
+				InputStream input = cr.openInputStream(url);
+				Bitmap bitmap = BitmapFactory.decodeStream(input);
+				input.close();
+				return bitmap;
+			}
+
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("images").appendPath("media").build();
+			}
+
+			public static Uri getContentUri(String volumeName, long id) {
+				return ContentUris.withAppendedId(getContentUri(volumeName), id);
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/image";
 		}
 
 		public static class Thumbnails {
 
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/images/media");
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("images").appendPath("thumbnails").build();
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 
 			public static final int MINI_KIND = ThumbnailConstants.MINI_KIND;
 			public static final int FULL_SCREEN_KIND = ThumbnailConstants.FULL_SCREEN_KIND;
@@ -67,13 +140,27 @@ public class MediaStore {
 
 		public static class Media {
 
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/video/media");
-			public static final Uri INTERNAL_CONTENT_URI = Uri.parse("content://media/internal/video/media");
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("video").appendPath("media").build();
+			}
+
+			public static Uri getContentUri(String volumeName, long id) {
+				return ContentUris.withAppendedId(getContentUri(volumeName), id);
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/video";
 		}
 
 		public static class Thumbnails {
 
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/video/media");
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("video").appendPath("thumbnails").build();
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 
 			public static final int MINI_KIND = ThumbnailConstants.MINI_KIND;
 			public static final int FULL_SCREEN_KIND = ThumbnailConstants.FULL_SCREEN_KIND;
@@ -92,26 +179,102 @@ public class MediaStore {
 
 		public static class Media {
 
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/audio/media");
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("media").build();
+			}
+
+			public static Uri getContentUri(String volumeName, long id) {
+				return ContentUris.withAppendedId(getContentUri(volumeName), id);
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/audio";
+			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/audio";
 		}
 
 		public static class Artists {
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/audio/artists");
+
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("artists").build();
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/artists";
+			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/artist";
 		}
 
 		public static class Albums {
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/audio/albums");
+
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("albums").build();
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/albums";
+			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/album";
 		}
 
 		public static class Genres {
-			public static final Uri EXTERNAL_CONTENT_URI = Uri.parse("content://media/external/audio/genres");
+
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("genres").build();
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/genre";
+			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/genre";
 		}
+
+		public static class Playlists {
+
+			public static Uri getContentUri(String volumeName) {
+				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("playlists").build();
+			}
+
+			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/playlist";
+			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/playlist";
+		}
+	}
+
+	public static class Downloads {
+
+		public static Uri getContentUri(String volumeName) {
+			return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("downloads").build();
+		}
+
+		public static Uri getContentUri(String volumeName, long id) {
+			return ContentUris.withAppendedId(getContentUri(volumeName), id);
+		}
+
+		public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
+		public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
+		public static final String CONTENT_TYPE = "vnd.android.cursor.dir/download";
 	}
 
 	public static class Files {
 
-		public static Uri getContentUri(String type) {
-			return Uri.parse("content://media/files/" + type);
+		public static Uri getContentUri(String volumeName) {
+			return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("file").build();
+		}
+
+		public static Uri getContentUri(String volumeName, long rowId) {
+			return ContentUris.withAppendedId(getContentUri(volumeName), rowId);
+		}
+
+		public static class FileColumns {
+			public static final int MEDIA_TYPE_NONE = 0;
+			public static final int MEDIA_TYPE_IMAGE = 1;
+			public static final int MEDIA_TYPE_AUDIO = 2;
+			public static final int MEDIA_TYPE_VIDEO = 3;
+			public static final int MEDIA_TYPE_PLAYLIST = 4;
+			public static final int MEDIA_TYPE_SUBTITLE = 5;
+			public static final int MEDIA_TYPE_DOCUMENT = 6;
 		}
 	}
 
