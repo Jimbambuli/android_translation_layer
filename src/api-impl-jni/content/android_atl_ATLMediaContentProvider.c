@@ -1,27 +1,20 @@
-#include <gtk/gtk.h>
-#include <stdbool.h>
+#include <glib.h>
+#include <string.h>
 
 #include "../defines.h"
 #include "../util.h"
 #include "../generated_headers/android_atl_ATLMediaContentProvider.h"
 
-extern GtkWindow *window;
-
-static void file_dialog_callback(GObject *dialog, GAsyncResult *res, gpointer user_data)
+/* the user's folders for Pictures, Music, Movies and Download (in this order), as main.c's link_media_dirs()
+ * takes them: null when unset or the home directory */
+JNIEXPORT jobjectArray JNICALL Java_android_atl_ATLMediaContentProvider_native_1user_1dirs(JNIEnv *env, jclass class)
 {
-	GFile *file = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(dialog), res, NULL);
-	JNIEnv *env = get_jni_env();
-	jobject this = (jobject)user_data;
-	J__ATLMediaContentProvider__setSelectedFile(env, this, _JSTRING(g_file_get_path(file)));
-	g_object_unref(file);
-	_UNREF(this);
-}
-
-JNIEXPORT void JNICALL Java_android_atl_ATLMediaContentProvider_native_1open_1media_1folder(JNIEnv *env, jobject this)
-{
-	GtkFileDialog *dialog = gtk_file_dialog_new();
-	gtk_file_dialog_set_title(GTK_FILE_DIALOG(dialog), atl_gtk_text("Pick a File"));
-	gtk_file_dialog_set_accept_label(GTK_FILE_DIALOG(dialog), atl_gtk_text("_Open"));
-	gtk_file_dialog_set_modal(GTK_FILE_DIALOG(dialog), TRUE);
-	gtk_file_dialog_open(dialog, window, NULL, file_dialog_callback, _REF(this));
+	static const GUserDirectory dirs[] = {G_USER_DIRECTORY_PICTURES, G_USER_DIRECTORY_MUSIC, G_USER_DIRECTORY_VIDEOS, G_USER_DIRECTORY_DOWNLOAD};
+	jobjectArray array = (*env)->NewObjectArray(env, G_N_ELEMENTS(dirs), (*env)->FindClass(env, "java/lang/String"), NULL);
+	for (size_t i = 0; i < G_N_ELEMENTS(dirs); i++) {
+		const char *dir = g_get_user_special_dir(dirs[i]);
+		if (dir && strcmp(dir, g_get_home_dir()))
+			(*env)->SetObjectArrayElement(env, array, i, _JSTRING(dir));
+	}
+	return array;
 }
