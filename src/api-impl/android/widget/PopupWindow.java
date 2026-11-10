@@ -370,6 +370,8 @@ public class PopupWindow {
 
 		attachToAnchor(anchor, xoff, yoff, gravity);
 		anchored_gravity = gravity;
+		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
+		android.atl.ATLViewDump.addRoot(this);
 		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
 		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
 		startEnterAnimation();
@@ -491,6 +493,8 @@ public class PopupWindow {
 
 		if (gravity == Gravity.NO_GRAVITY)
 			gravity = Gravity.TOP | Gravity.START;
+		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
+		android.atl.ATLViewDump.addRoot(this);
 		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
 		startEnterAnimation();
 		takeWindowFocus(parent);

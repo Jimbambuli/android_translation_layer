@@ -50,7 +50,7 @@ public class ATLViewDump {
 		}
 	}
 
-	/* a Dialog or a root View added through WindowManager */
+	/* a Dialog, a PopupWindow or a root View added through WindowManager */
 	public static void addRoot(Object root) {
 		if (DIR != null)
 			roots.add(new WeakReference<>(root));
@@ -118,6 +118,8 @@ public class ATLViewDump {
 			Object o = ref.get();
 			if (o instanceof Dialog && ((Dialog)o).isShowing())
 				window(w, "dialog " + o.getClass().getName(), ((Dialog)o).getWindow().getDecorView());
+			else if (o instanceof android.widget.PopupWindow && ((android.widget.PopupWindow)o).isShowing())
+				window(w, "popup " + o.getClass().getName(), ((android.widget.PopupWindow)o).getContentView().getRootView());
 			else if (o instanceof View)
 				window(w, "wm " + o.getClass().getName(), (View)o);
 		}
