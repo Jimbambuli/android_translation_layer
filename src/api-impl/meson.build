@@ -592,6 +592,7 @@ srcs = [
 	'android/media/tv/TvContentRating.java',
 	'android/media/tv/TvInputManager.java',
 	'android/net/ConnectivityManager.java',
+	'android/net/DhcpInfo.java',
 	'android/net/LinkAddress.java',
 	'android/net/LinkProperties.java',
 	'android/net/LocalServerSocket.java',

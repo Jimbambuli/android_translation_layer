@@ -1,5 +1,7 @@
 package android.net.wifi;
 
+import android.net.DhcpInfo;
+
 public class WifiManager {
 
 	public static final int WIFI_STATE_DISABLED = 1;
@@ -29,6 +31,12 @@ public class WifiManager {
 
 	public WifiInfo getConnectionInfo() {
 		return new WifiInfo();
+	}
+
+	/* like WifiServiceImpl without a DHCP lease: all fields 0 */
+	@Deprecated
+	public DhcpInfo getDhcpInfo() {
+		return new DhcpInfo();
 	}
 
 	public int getWifiState() {
