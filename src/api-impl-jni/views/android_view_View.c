@@ -828,6 +828,11 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
                                                                       jint leftMargin, jint topMargin, jint rightMargin, jint bottomMargin)
 {
 	GtkWidget *widget = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
+	GtkWidget *parent = gtk_widget_get_parent(widget);
+	/* GTK places the child, not a Java layout (the child of a ScrollView): as AOSP's FrameLayout does, it
+	 * goes where its gravity puts it at its measured size, a match_parent one that measured itself smaller
+	 * (maxWidth) as well */
+	gboolean gtk_places = parent && !ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(parent));
 
 	GtkAlign halign = GTK_ALIGN_FILL;
 	GtkAlign valign = GTK_ALIGN_FILL;
@@ -839,6 +844,8 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
 			valign = GTK_ALIGN_END;
 		else if (gravity & GRAVITY_TOP)
 			valign = GTK_ALIGN_START;
+		else if (gtk_places && (gravity & GRAVITY_CENTER_VERTICAL))
+			valign = GTK_ALIGN_CENTER;
 		else
 			valign = GTK_ALIGN_FILL;
 
@@ -846,6 +853,8 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
 			halign = GTK_ALIGN_END;
 		else if (gravity & GRAVITY_LEFT)
 			halign = GTK_ALIGN_START;
+		else if (gtk_places && (gravity & GRAVITY_CENTER_HORIZONTAL))
+			halign = GTK_ALIGN_CENTER;
 		else
 			halign = GTK_ALIGN_FILL;
 
@@ -864,11 +873,13 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
 
 	if (width == MATCH_PARENT) {
 		hexpand = true;
-		halign = GTK_ALIGN_FILL;
+		if (!gtk_places || gravity == -1 || !(gravity & (GRAVITY_LEFT | GRAVITY_RIGHT | GRAVITY_CENTER_HORIZONTAL)))
+			halign = GTK_ALIGN_FILL;
 	}
 	if (height == MATCH_PARENT) {
 		vexpand = true;
-		valign = GTK_ALIGN_FILL;
+		if (!gtk_places || gravity == -1 || !(gravity & (GRAVITY_TOP | GRAVITY_BOTTOM | GRAVITY_CENTER_VERTICAL)))
+			valign = GTK_ALIGN_FILL;
 	}
 
 	gtk_widget_set_hexpand(widget, hexpand);
@@ -876,9 +887,8 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
 	gtk_widget_set_halign(widget, halign);
 	gtk_widget_set_valign(widget, valign);
 
-	GtkWidget *parent = gtk_widget_get_parent(widget);
 	// if parent is Java widget, it will handle the margins by itself
-	if (parent && !ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(parent))) {
+	if (gtk_places) {
 		gtk_widget_set_margin_start(widget, leftMargin);
 		gtk_widget_set_margin_top(widget, topMargin);
 		gtk_widget_set_margin_end(widget, rightMargin);

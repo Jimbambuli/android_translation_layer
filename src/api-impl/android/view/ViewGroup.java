@@ -205,6 +205,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			}
 		}
 		native_addView(widget, child.widget, sortedIndex, params);
+		/* a native container (ScrollView) places the child in GTK: now that GTK knows the parent, the
+		 * gravity and margins of the layout params apply to it there */
+		if (!native_hasAndroidLayout(widget))
+			child.applyLayoutParams(params);
 		requestLayout();
 		if (child.isDuplicateParentStateEnabled())
 			child.refreshDrawableState();

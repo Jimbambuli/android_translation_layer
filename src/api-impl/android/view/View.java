@@ -1997,7 +1997,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	protected native long native_constructor(Context context, AttributeSet attrs); // will create a custom GtkWidget with a custom drawing function
-	private static native boolean native_hasAndroidLayout(long widget);
+	static native boolean native_hasAndroidLayout(long widget);
 	private native void native_drawThroughJava(long widget);
 	public native void native_setLayoutParams(long widget, int width, int height, int gravity, float weight, int leftMargin, int topMargin, int rightMargin, int bottomMargin);
 	protected native void native_destructor(long widget);
