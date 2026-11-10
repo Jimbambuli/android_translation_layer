@@ -112,6 +112,8 @@ public class Notification implements Parcelable {
 
 	public static final String EXTRA_INFO_TEXT = "android.infoText";
 	public static final String EXTRA_SUB_TEXT = "android.subText";
+
+	public static final String EXTRA_SHORT_CRITICAL_TEXT = "android.shortCriticalText";
 	public static final String EXTRA_SHOW_WHEN = "android.showWhen";
 	public static final String EXTRA_SHOW_CHRONOMETER = "android.showChronometer";
 	public static final String EXTRA_PROGRESS = "android.progress";
@@ -327,6 +329,12 @@ public class Notification implements Parcelable {
 
 		public Builder setSubText(CharSequence subText) {
 			mExtras.putCharSequence(EXTRA_SUB_TEXT, subText);
+			return this;
+		}
+
+		/** Short critical text of the notification (AOSP 16); kept in the extras, not rendered. */
+		public Builder setShortCriticalText(String shortCriticalText) {
+			mExtras.putString(EXTRA_SHORT_CRITICAL_TEXT, shortCriticalText);
 			return this;
 		}
 
@@ -698,6 +706,8 @@ public class Notification implements Parcelable {
 			private boolean mAllowGeneratedReplies = true;
 			private final Bundle mExtras;
 			private ArrayList<RemoteInput> mRemoteInputs;
+			private int mStyleHint;
+			private int mEmphasisHint;
 			private @SemanticAction int mSemanticAction;
 			private boolean mIsContextual;
 			private boolean mAuthenticationRequired;
@@ -765,6 +775,18 @@ public class Notification implements Parcelable {
 			/** Sets the {@code SemanticAction} for this {@link Action}. */
 			public Builder setSemanticAction(@SemanticAction int semanticAction) {
 				mSemanticAction = semanticAction;
+				return this;
+			}
+
+			/** Style hint of the action (AOSP 16); stored only, the desktop notification does not render it. */
+			public Builder setStyleHint(int styleHint) {
+				mStyleHint = styleHint;
+				return this;
+			}
+
+			/** Emphasis hint of the action (AOSP 16); stored only, the desktop notification does not render it. */
+			public Builder setEmphasisHint(int emphasisHint) {
+				mEmphasisHint = emphasisHint;
 				return this;
 			}
 

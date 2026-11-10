@@ -162,6 +162,7 @@ public class Build {
 			String RESOURCES_SDK_INT_str = System.getProperty("Build.VERSION.RESOURCES_SDK_INT");
 
 			SDK_INT = SDK_INT_tmp;
+			SDK_INT_FULL = SDK_INT_tmp * 100000; /* ATL reports no minor SDK version, so the minor part is 0 */
 			RESOURCES_SDK_INT = (RESOURCES_SDK_INT_str != null) ? Math.max(Integer.parseInt(RESOURCES_SDK_INT_str), 1) : SDK_INT_tmp;
 		}
 
@@ -182,6 +183,11 @@ public class Build {
 		 * values are defined in {@link Build.VERSION_CODES}.
 		 */
 		public static final int SDK_INT;
+
+		/**
+		 * The SDK version including the minor version: SDK_INT * 100000 + minor.
+		 */
+		public static final int SDK_INT_FULL;
 
 		/**
 		 * The user-visible SDK version of the framework in its raw String

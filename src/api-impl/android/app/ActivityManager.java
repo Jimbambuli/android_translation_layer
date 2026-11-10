@@ -207,6 +207,7 @@ public class ActivityManager {
 		public android.content.ComponentName origActivity;
 		public CharSequence description;
 		public int userId;
+		public int numActivities;
 
 		public int describeContents() {
 			return 0;

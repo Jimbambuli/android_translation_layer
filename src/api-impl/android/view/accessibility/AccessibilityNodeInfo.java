@@ -870,6 +870,17 @@ public class AccessibilityNodeInfo implements Parcelable {
 
 	private static final int BOOLEAN_PROPERTY_CHECKABLE = 1 /* << 0 */;
 
+	/** AOSP 16 checked states, as returned by {@link #getChecked()}. */
+	public static final int CHECKED_STATE_FALSE = 0;
+	public static final int CHECKED_STATE_TRUE = 1;
+	public static final int CHECKED_STATE_PARTIAL = 2;
+
+	/** AOSP 16 expanded states, as returned by {@link #getExpandedState()}. */
+	public static final int EXPANDED_STATE_UNDEFINED = 0;
+	public static final int EXPANDED_STATE_COLLAPSED = 1;
+	public static final int EXPANDED_STATE_PARTIAL = 2;
+	public static final int EXPANDED_STATE_FULL = 3;
+
 	private static final int BOOLEAN_PROPERTY_CHECKED = 1 << 1;
 
 	private static final int BOOLEAN_PROPERTY_FOCUSABLE = 1 << 2;
@@ -1013,6 +1024,9 @@ public class AccessibilityNodeInfo implements Parcelable {
 	private String mViewIdResourceName;
 	private String mUniqueId;
 	private CharSequence mContainerTitle;
+	private CharSequence mSupplementalDescription;
+	private int mExpandedState = EXPANDED_STATE_UNDEFINED;
+	private boolean mFieldRequired;
 	private ArrayList<String> mExtraDataKeys;
 
 	@UnsupportedAppUsage
@@ -3476,6 +3490,41 @@ public class AccessibilityNodeInfo implements Parcelable {
 	 */
 	public @Nullable CharSequence getStateDescription() {
 		return mStateDescription;
+	}
+
+	/** Gets the checked state of this node (AOSP 16); partial is never set, so it follows {@link #isChecked()}. */
+	public int getChecked() {
+		return isChecked() ? CHECKED_STATE_TRUE : CHECKED_STATE_FALSE;
+	}
+
+	/** Gets the expanded state of this node (AOSP 16), {@link #EXPANDED_STATE_UNDEFINED} unless set. */
+	public int getExpandedState() {
+		return mExpandedState;
+	}
+
+	public void setExpandedState(int state) {
+		enforceNotSealed();
+		mExpandedState = state;
+	}
+
+	/** Gets whether this node is a required field (AOSP 16). */
+	public boolean isFieldRequired() {
+		return mFieldRequired;
+	}
+
+	public void setFieldRequired(boolean required) {
+		enforceNotSealed();
+		mFieldRequired = required;
+	}
+
+	/** Gets the supplemental description of this node (AOSP 16), null unless set. */
+	public @Nullable CharSequence getSupplementalDescription() {
+		return mSupplementalDescription;
+	}
+
+	public void setSupplementalDescription(@Nullable CharSequence supplementalDescription) {
+		enforceNotSealed();
+		mSupplementalDescription = supplementalDescription == null ? null : supplementalDescription.subSequence(0, supplementalDescription.length());
 	}
 
 	/**

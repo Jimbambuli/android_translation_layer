@@ -24,6 +24,8 @@ public class DownloadManager {
 
 		public Request setAllowedOverMetered(boolean allow) { return this; }
 
+		public Request setDestinationInExternalPublicDir(String dirType, String subPath) { return this; }
+
 		public Request setDestinationUri(Uri uri) { return this; }
 
 		public Request setVisibleInDownloadsUi(boolean isVisible) { return this; }

@@ -20,6 +20,8 @@ public class ProgressDialog extends AlertDialog {
 
 	public void setMax(int max) {}
 
+	public void setProgressNumberFormat(String format) {}
+
 	public static ProgressDialog show(Context context, CharSequence title, CharSequence message) {
 		return show(context, title, message, false);
 	}

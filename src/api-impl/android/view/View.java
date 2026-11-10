@@ -3363,6 +3363,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	protected static final int[] EMPTY_STATE_SET = new int[0];
 
+	protected static final int[] PRESSED_STATE_SET = new int[] {R.attr.state_pressed};
+
 	protected static final int[] ENABLED_STATE_SET = new int[] {R.attr.state_enabled};
 
 	protected static final int[] PRESSED_ENABLED_STATE_SET = new int[] {R.attr.state_pressed, R.attr.state_enabled};
@@ -6458,6 +6460,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void postInvalidateOnAnimation(int left, int top, int right, int bottom) {
 		postInvalidate(left, top, right, bottom);
 	}
+
+	/* AOSP View.onCreateContextMenu(ContextMenu): empty hook; ATL never shows context menus */
+	protected void onCreateContextMenu(ContextMenu menu) {}
 
 	/* AOSP View.showContextMenu(): ATL has no context menus (the OnCreateContextMenuListener is never asked), so
 	 * no menu is shown and AOSP's answer for a view whose menu could not be shown is false */
