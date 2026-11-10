@@ -169,20 +169,23 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setFontPadding(JNIEn
 	PangoLayoutLine *line = include ? pango_layout_get_line_readonly(gtk_label_get_layout(label), 0) : NULL;
 	if (line && line->runs) {
 		PangoFont *font = ((PangoGlyphItem *)line->runs->data)->item->analysis.font;
-		hb_blob_t *head = hb_face_reference_table(hb_font_get_face(pango_font_get_hb_font(font)), HB_TAG('h', 'e', 'a', 'd'));
+		hb_font_t *hb_font = pango_font_get_hb_font(font);
+		hb_blob_t *head = hb_face_reference_table(hb_font_get_face(hb_font), HB_TAG('h', 'e', 'a', 'd'));
 		unsigned int length;
 		const uint8_t *data = (const uint8_t *)hb_blob_get_data(head, &length);
-		if (length >= 44) {
+		hb_font_extents_t extents;
+		if (length >= 44 && hb_font_get_h_extents(hb_font, &extents)) {
 			int units_per_em = data[18] << 8 | data[19];
 			int y_min = (int16_t)(data[38] << 8 | data[39]);
 			int y_max = (int16_t)(data[42] << 8 | data[43]);
-			PangoFontDescription *description = pango_font_describe_with_absolute_size(font);
-			float size = (float)pango_font_description_get_size(description) / PANGO_SCALE;
-			pango_font_description_free(description);
-			PangoFontMetrics *metrics = pango_font_get_metrics(font, NULL);
-			top = MAX(0, (int)roundf(y_max * size / units_per_em - (float)pango_font_metrics_get_ascent(metrics) / PANGO_SCALE));
-			bottom = MAX(0, (int)roundf(-y_min * size / units_per_em - (float)pango_font_metrics_get_descent(metrics) / PANGO_SCALE));
-			pango_font_metrics_unref(metrics);
+			/* the size the run is laid out at, from the HarfBuzz font like its ascent and descent:
+			 * pango's font description and metrics of a bitmap font (color emoji) are those of its
+			 * strike (109 px for Noto Color Emoji), which made an 18 px flag label 146 px high */
+			int x_scale, y_scale;
+			hb_font_get_scale(hb_font, &x_scale, &y_scale);
+			float size = (float)y_scale / PANGO_SCALE;
+			top = MAX(0, (int)roundf(y_max * size / units_per_em - (float)extents.ascender / PANGO_SCALE));
+			bottom = MAX(0, (int)roundf(-y_min * size / units_per_em + (float)extents.descender / PANGO_SCALE));
 		}
 		hb_blob_destroy(head);
 	}
