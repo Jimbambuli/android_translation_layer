@@ -154,6 +154,11 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return this;
 		}
 
+		public Builder setOnDismissListener(DialogInterface.OnDismissListener onDismissListener) {
+			dialog.setOnDismissListener(onDismissListener);
+			return this;
+		}
+
 		public AlertDialog create() {
 			return dialog;
 		}

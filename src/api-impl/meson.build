@@ -702,6 +702,7 @@ srcs = [
 	'android/preference/ListPreference.java',
 	'android/preference/Preference.java',
 	'android/preference/PreferenceActivity.java',
+	'android/preference/PreferenceFragment.java',
 	'android/preference/PreferenceManager.java',
 	'android/print/PageRange.java',
 	'android/print/PrintDocumentInfo.java',
