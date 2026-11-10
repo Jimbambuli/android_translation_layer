@@ -1,14 +1,22 @@
 package android.widget;
 
 import android.content.Context;
+import android.content.res.TypedArray;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import com.android.internal.R;
 
 public class ScrollView extends FrameLayout {
+	private boolean mFillViewport;
+
 	public ScrollView(Context context, AttributeSet attrs) {
 		super(context, attrs);
+		final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ScrollView, R.attr.scrollViewStyle, 0);
+		setFillViewport(a.getBoolean(R.styleable.ScrollView_fillViewport, false));
+		a.recycle();
 	}
 
 	public ScrollView(Context context) {
@@ -53,9 +61,45 @@ public class ScrollView extends FrameLayout {
 			height = child.getMeasuredHeight();
 		}
 		setMeasuredDimension(resolveSize(width, widthMeasureSpec), resolveSize(height, heightMeasureSpec));
+
+		/* AOSP ScrollView.onMeasure(): with fillViewport, a child smaller than the viewport is measured again
+		 * to fill it */
+		if (!mFillViewport)
+			return;
+		if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED)
+			return;
+		if (getChildCount() > 0) {
+			final View child = getChildAt(0);
+			final int widthPadding;
+			final int heightPadding;
+			final ViewGroup.LayoutParams lp = child.getLayoutParams();
+			final ViewGroup.MarginLayoutParams mlp = lp instanceof ViewGroup.MarginLayoutParams ? (ViewGroup.MarginLayoutParams)lp : new ViewGroup.MarginLayoutParams(lp);
+			if (getContext().getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.M) {
+				widthPadding = getPaddingLeft() + getPaddingRight() + mlp.leftMargin + mlp.rightMargin;
+				heightPadding = getPaddingTop() + getPaddingBottom() + mlp.topMargin + mlp.bottomMargin;
+			} else {
+				widthPadding = getPaddingLeft() + getPaddingRight();
+				heightPadding = getPaddingTop() + getPaddingBottom();
+			}
+			final int desiredHeight = getMeasuredHeight() - heightPadding;
+			if (child.getMeasuredHeight() < desiredHeight) {
+				final int childWidthMeasureSpec = getChildMeasureSpec(widthMeasureSpec, widthPadding, lp.width);
+				final int childHeightMeasureSpec = MeasureSpec.makeMeasureSpec(desiredHeight, MeasureSpec.EXACTLY);
+				child.measure(childWidthMeasureSpec, childHeightMeasureSpec);
+			}
+		}
 	}
 
-	public void setFillViewport(boolean fillViewport) {}
+	public boolean isFillViewport() {
+		return mFillViewport;
+	}
+
+	public void setFillViewport(boolean fillViewport) {
+		if (fillViewport != mFillViewport) {
+			mFillViewport = fillViewport;
+			requestLayout();
+		}
+	}
 
 	public boolean fullScroll(int direction) {
 		return true;
