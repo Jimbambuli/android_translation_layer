@@ -1955,6 +1955,11 @@ public class PackageManager {
 			// for now, the app can access anything it wants, so no point telling it otherwise
 			case "android.permission.WRITE_EXTERNAL_STORAGE":
 			case "android.permission.READ_EXTERNAL_STORAGE":
+			// Android 13 split these off READ_EXTERNAL_STORAGE (platform.xml split-permission, targetSdk 33):
+			// the same access, so the same answer
+			case "android.permission.READ_MEDIA_AUDIO":
+			case "android.permission.READ_MEDIA_IMAGES":
+			case "android.permission.READ_MEDIA_VIDEO":
 			case "com.google.android.c2dm.permission.SEND":
 				return PERMISSION_GRANTED;
 			case "android.permission.ACCESS_NETWORK_STATE":
