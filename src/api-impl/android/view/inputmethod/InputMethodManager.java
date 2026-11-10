@@ -117,6 +117,11 @@ public class InputMethodManager {
 		return activeView == view;
 	}
 
+	/* AOSP InputMethodManager.hasActiveInputConnection(): the input method's connection is the view's own */
+	public boolean hasActiveInputConnection(View view) {
+		return view != null && activeView == view && activeConnection != null;
+	}
+
 	public List<InputMethodInfo> getEnabledInputMethodList() {
 		return input_method_list;
 	}

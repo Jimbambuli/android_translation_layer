@@ -5466,6 +5466,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public InputConnection onCreateInputConnection(EditorInfo outAttrs) { return null; }
 
+	/* AOSP View.checkInputConnectionProxy(): whether another view may talk to the input method for this one */
+	public boolean checkInputConnectionProxy(View view) { return false; }
+
 	public ActionMode startActionMode(ActionMode.Callback callback) { return null; }
 
 	/* AOSP: the whole view; a text view gives the cursor */
