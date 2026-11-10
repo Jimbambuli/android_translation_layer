@@ -90,6 +90,10 @@ public class InputDevice {
 		return new MotionRange(axis);
 	}
 
+	public MotionRange getMotionRange(int axis) {
+		return new MotionRange(axis);
+	}
+
 	public class MotionRange {
 		int axis;
 
@@ -99,6 +103,10 @@ public class InputDevice {
 
 		public int getAxis() {
 			return this.axis;
+		}
+
+		public float getRange() {
+			return 0.0f;
 		}
 	};
 }

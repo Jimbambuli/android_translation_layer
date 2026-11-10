@@ -81,6 +81,10 @@ public class PendingIntent implements Parcelable {
 		}
 	}
 
+	public void send(Bundle options) throws CanceledException {
+		send();
+	}
+
 	/** @hide AOSP: Activity.createPendingResult(); the PendingIntent delivers a result to the activity */
 	static PendingIntent getActivityResult(Activity activity, int requestCode, Intent data) {
 		PendingIntent pi = new PendingIntent(requestCode, data, 3);

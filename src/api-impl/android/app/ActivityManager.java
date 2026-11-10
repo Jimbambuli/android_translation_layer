@@ -191,7 +191,11 @@ public class ActivityManager {
 		};
 	}
 
-	public static class AppTask {}
+	public static class AppTask {
+		public RecentTaskInfo getTaskInfo() {
+			return new RecentTaskInfo();
+		}
+	}
 	public List<ActivityManager.AppTask> getAppTasks() {
 		return new ArrayList<>();
 	}

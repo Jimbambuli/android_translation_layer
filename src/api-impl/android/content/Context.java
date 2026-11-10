@@ -952,6 +952,16 @@ public abstract class Context {
 		throw new RuntimeException("Not implemented. Must override in a subclass.");
 	}
 
+	/* ATL has a single Context; an attribution tag does not change it */
+	public Context createAttributionContext(String attributionTag) {
+		return this;
+	}
+
+	/* ATL has a single (default) device; a device context is the same Context */
+	public Context createDeviceContext(int deviceId) {
+		return this;
+	}
+
 	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, Handler scheduler) {
 		return registerReceiver(receiver, filter);
 	}

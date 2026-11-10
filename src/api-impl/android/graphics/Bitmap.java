@@ -139,6 +139,10 @@ public final class Bitmap implements Parcelable {
 		return bitmap;
 	}
 
+	public static Bitmap createBitmap(int width, int height, Config config, boolean hasAlpha, ColorSpace colorSpace) {
+		return createBitmap(null, width, height, config, hasAlpha, colorSpace);
+	}
+
 	public static Bitmap createBitmap(Bitmap src, int x, int y, int width, int height) {
 		Bitmap dest = new Bitmap(width, height, src.getConfig());
 		new Canvas(dest).drawBitmap(src, new Rect(x, y, x + width, y + height), new Rect(0, 0, width, height), null);

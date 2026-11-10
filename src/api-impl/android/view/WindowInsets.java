@@ -418,6 +418,11 @@ public final class WindowInsets {
         return getSystemWindowInsets().top;
     }
 
+    /* ATL does not track per-type bounding rects; there are none to report */
+    public java.util.List<Rect> getBoundingRects(int typeMask) {
+        return java.util.Collections.emptyList();
+    }
+
     /**
      * Returns the right system window inset in pixels.
      *

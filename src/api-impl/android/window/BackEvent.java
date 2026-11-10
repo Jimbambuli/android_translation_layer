@@ -48,6 +48,8 @@ public final class BackEvent {
     @SwipeEdge
     private final int mSwipeEdge;
 
+    private long mFrameTimeMillis;
+
     /**
      * Creates a new {@link BackMotionEvent} instance.
      *
@@ -107,6 +109,10 @@ public final class BackEvent {
     @SwipeEdge
     public int getSwipeEdge() {
         return mSwipeEdge;
+    }
+
+    public long getFrameTimeMillis() {
+        return mFrameTimeMillis;
     }
 
     @Override

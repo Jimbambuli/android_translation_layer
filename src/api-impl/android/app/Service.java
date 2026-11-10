@@ -123,4 +123,7 @@ public abstract class Service extends ContextWrapper {
 		super.attachBaseContext(newBase);
 		System.out.println("Service.attachBaseContext(" + newBase + ") called");
 	}
+
+	public void onTaskRemoved(Intent rootIntent) {
+	}
 }

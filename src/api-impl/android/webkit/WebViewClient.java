@@ -8,4 +8,5 @@ public class WebViewClient {
 	public boolean shouldOverrideUrlLoading(WebView view, String url) {
 		return false; // continue loading the URL
 	}
+	public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {}
 }

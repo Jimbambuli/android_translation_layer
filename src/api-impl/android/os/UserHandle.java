@@ -232,4 +232,8 @@ public final class UserHandle {
 	public int describeContents() {
 		return 0;
 	}
+
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeInt(mHandle);
+	}
 }

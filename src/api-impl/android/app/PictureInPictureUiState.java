@@ -30,6 +30,8 @@ public final class PictureInPictureUiState implements Parcelable {
 
     private boolean mIsStashed;
 
+    private boolean mIsTransitioningToPip;
+
     /** {@hide} */
     PictureInPictureUiState(Parcel in) {
         mIsStashed = in.readBoolean();
@@ -59,6 +61,10 @@ public final class PictureInPictureUiState implements Parcelable {
      */
     public boolean isStashed() {
         return mIsStashed;
+    }
+
+    public boolean isTransitioningToPip() {
+        return mIsTransitioningToPip;
     }
 
     @Override

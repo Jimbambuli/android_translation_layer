@@ -472,6 +472,10 @@ public class PopupWindow {
 		native_setTouchable(popover, touchable);
 	}
 
+	public void showAsDropDown(View anchor) {
+		showAsDropDown(anchor, 0, 0);
+	}
+
 	public void showAsDropDown(View anchor, int xoff, int yoff) {
 		if (!anchor.isAttachedToWindow()) {
 			Log.e("PopupWindow", "anchor is not attached to window");
