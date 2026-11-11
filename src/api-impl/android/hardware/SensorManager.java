@@ -61,6 +61,97 @@ public class SensorManager {
 		return Arrays.asList(getDefaultSensor(type));
 	}
 
+	/* AOSP SensorManager.AXIS_* and remapCoordinateSystem() */
+	public static final int AXIS_X = 1;
+	public static final int AXIS_Y = 2;
+	public static final int AXIS_Z = 3;
+	public static final int AXIS_MINUS_X = AXIS_X | 0x80;
+	public static final int AXIS_MINUS_Y = AXIS_Y | 0x80;
+	public static final int AXIS_MINUS_Z = AXIS_Z | 0x80;
+
+	private static final float[] sTempMatrix = new float[16];
+
+	public static boolean remapCoordinateSystem(float[] inR, int X, int Y, float[] outR) {
+		if (inR == outR) {
+			final float[] temp = sTempMatrix;
+			synchronized (temp) {
+				// we don't expect to have a lot of contention
+				if (remapCoordinateSystemImpl(inR, X, Y, temp)) {
+					final int size = outR.length;
+					for (int i = 0; i < size; i++) {
+						outR[i] = temp[i];
+					}
+					return true;
+				}
+			}
+		}
+		return remapCoordinateSystemImpl(inR, X, Y, outR);
+	}
+
+	private static boolean remapCoordinateSystemImpl(float[] inR, int X, int Y, float[] outR) {
+		/*
+		 * X and Y define a rotation matrix 'r':
+		 *
+		 *  (X==1)?((X&0x80)?-1:1):0    (X==2)?((X&0x80)?-1:1):0    (X==3)?((X&0x80)?-1:1):0
+		 *  (Y==1)?((Y&0x80)?-1:1):0    (Y==2)?((Y&0x80)?-1:1):0    (Y==3)?((X&0x80)?-1:1):0
+		 *                              r[0] ^ r[1]
+		 *
+		 * where the 3rd line is the vector product of the first 2 lines
+		 *
+		 */
+
+		final int length = outR.length;
+		if (inR.length != length) {
+			return false;   // invalid parameter
+		}
+		if ((X & 0x7C) != 0 || (Y & 0x7C) != 0) {
+			return false;   // invalid parameter
+		}
+		if (((X & 0x3) == 0) || ((Y & 0x3) == 0)) {
+			return false;   // no axis specified
+		}
+		if ((X & 0x3) == (Y & 0x3)) {
+			return false;   // same axis specified
+		}
+
+		// Z is "the other" axis, its sign is either +/- sign(X)*sign(Y)
+		// this can be calculated by exclusive-or'ing X and Y; except for
+		// the sign inversion (+/-) which is calculated below.
+		int Z = X ^ Y;
+
+		// extract the axis (remove the sign), offset in the range 0 to 2.
+		final int x = (X & 0x3) - 1;
+		final int y = (Y & 0x3) - 1;
+		final int z = (Z & 0x3) - 1;
+
+		// compute the sign of Z (whether it needs to be inverted)
+		final int axis_y = (z + 1) % 3;
+		final int axis_z = (z + 2) % 3;
+		if (((x ^ axis_y) | (y ^ axis_z)) != 0) {
+			Z ^= 0x80;
+		}
+
+		final boolean sx = (X >= 0x80);
+		final boolean sy = (Y >= 0x80);
+		final boolean sz = (Z >= 0x80);
+
+		// Perform R * r, in avoiding actual muls and adds.
+		final int rowLength = ((length == 16) ? 4 : 3);
+		for (int j = 0; j < 3; j++) {
+			final int offset = j * rowLength;
+			for (int i = 0; i < 3; i++) {
+				if (x == i)   outR[offset + i] = sx ? -inR[offset + 0] : inR[offset + 0];
+				if (y == i)   outR[offset + i] = sy ? -inR[offset + 1] : inR[offset + 1];
+				if (z == i)   outR[offset + i] = sz ? -inR[offset + 2] : inR[offset + 2];
+			}
+		}
+		if (length == 16) {
+			outR[3] = outR[7] = outR[11] = outR[12] = outR[13] = outR[14] = 0;
+			outR[15] = 1;
+		}
+		return true;
+	}
+
 	public static float[] getOrientation(float[] R, float[] values) {
 		if (R.length == 9) {
 			values[0] = (float) Math.atan2(R[1], R[4]);

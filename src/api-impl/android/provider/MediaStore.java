@@ -28,6 +28,7 @@ public class MediaStore {
 
 	public static final String PARAM_INCLUDE_PENDING = "includePending";
 	public static final String PARAM_LIMIT = "limit";
+	public static final String PARAM_REQUIRE_ORIGINAL = "requireOriginal";
 
 	public static final String QUERY_ARG_MATCH_PENDING = "android:query-arg-match-pending";
 	public static final String QUERY_ARG_MATCH_TRASHED = "android:query-arg-match-trashed";
@@ -41,6 +42,16 @@ public class MediaStore {
 
 	public static boolean getIncludePending(Uri uri) {
 		return uri.getBooleanQueryParameter(PARAM_INCLUDE_PENDING, false);
+	}
+
+	/* AOSP MediaStore.setRequireOriginal()/getRequireOriginal(): ask for the file without location redaction;
+	 * ATLMediaContentProvider never redacts, so every file is the original */
+	public static Uri setRequireOriginal(Uri uri) {
+		return uri.buildUpon().appendQueryParameter(PARAM_REQUIRE_ORIGINAL, "1").build();
+	}
+
+	public static boolean getRequireOriginal(Uri uri) {
+		return uri.getBooleanQueryParameter(PARAM_REQUIRE_ORIGINAL, false);
 	}
 
 	public static String getVolumeName(Uri uri) {
