@@ -402,6 +402,12 @@ public class Window {
 
 	private boolean decorInstalled;
 	private boolean hasSoftInputMode;
+	private boolean isFloating;
+
+	/* PhoneWindow.isFloating(): windowIsFloating of the theme, read when the decor is installed */
+	public boolean isFloating() {
+		return isFloating;
+	}
 
 	/* like PhoneWindow.installDecor()/generateLayout(), once, when the decor view is first asked
 	 * for: the window flags from the theme, each set with setFlags(), so the Window.Callback hears
@@ -412,6 +418,7 @@ public class Window {
 		decorInstalled = true;
 		TypedArray a = context.obtainStyledAttributes(com.android.internal.R.styleable.Window);
 		final boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
+		isFloating = floating;
 		final int flagsToUpdate = (WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR) & ~forcedWindowFlags;
 		if (floating)
 			setFlags(0, flagsToUpdate); // AOSP sets the size to WRAP_CONTENT as well; ATL's dialogs size themselves
