@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.media.AudioAttributes;
 import android.media.MediaDescription;
 import android.media.MediaMetadata;
+import android.media.Rating;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -170,9 +171,15 @@ public class MediaSession {
 	}
 
 	void postToCallback(RemoteUserInfo caller, int what, Object obj, long delayMs) {
+		postToCallback(caller, what, obj, null, delayMs);
+	}
+
+	/* AOSP MediaSession.postToCallback(): MediaController.TransportControls of this process call it directly,
+	 * where AOSP goes through MediaSessionRecord and the session's CallbackStub */
+	void postToCallback(RemoteUserInfo caller, int what, Object obj, Bundle data, long delayMs) {
 		synchronized (this) {
 			if (mCallback != null) {
-				mCallback.post(caller, what, obj, delayMs);
+				mCallback.post(caller, what, obj, data, delayMs);
 			}
 		}
 	}
@@ -376,15 +383,28 @@ public class MediaSession {
 
 	/* AOSP MediaSession.CallbackMessageHandler, with the transport controls the MPRIS bridge sends and
 	 * the media buttons */
-	private class CallbackMessageHandler extends Handler {
-		private static final int MSG_MEDIA_BUTTON = 2;
-		private static final int MSG_PLAY = 7;
-		private static final int MSG_PAUSE = 12;
-		private static final int MSG_STOP = 13;
-		private static final int MSG_NEXT = 14;
-		private static final int MSG_PREVIOUS = 15;
-		private static final int MSG_SEEK_TO = 18;
-		private static final int MSG_PLAY_PAUSE_KEY_DOUBLE_TAP_TIMEOUT = 24;
+	class CallbackMessageHandler extends Handler {
+		static final int MSG_MEDIA_BUTTON = 2;
+		static final int MSG_PREPARE = 3;
+		static final int MSG_PREPARE_MEDIA_ID = 4;
+		static final int MSG_PREPARE_SEARCH = 5;
+		static final int MSG_PREPARE_URI = 6;
+		static final int MSG_PLAY = 7;
+		static final int MSG_PLAY_MEDIA_ID = 8;
+		static final int MSG_PLAY_SEARCH = 9;
+		static final int MSG_PLAY_URI = 10;
+		static final int MSG_SKIP_TO_ITEM = 11;
+		static final int MSG_PAUSE = 12;
+		static final int MSG_STOP = 13;
+		static final int MSG_NEXT = 14;
+		static final int MSG_PREVIOUS = 15;
+		static final int MSG_FAST_FORWARD = 16;
+		static final int MSG_REWIND = 17;
+		static final int MSG_SEEK_TO = 18;
+		static final int MSG_RATE = 19;
+		static final int MSG_SET_PLAYBACK_SPEED = 20;
+		static final int MSG_CUSTOM_ACTION = 21;
+		static final int MSG_PLAY_PAUSE_KEY_DOUBLE_TAP_TIMEOUT = 24;
 
 		private MediaSession.Callback mCallback;
 		private RemoteUserInfo mCurrentControllerInfo;
@@ -395,10 +415,11 @@ public class MediaSession {
 			mCallback.mHandler = this;
 		}
 
-		void post(RemoteUserInfo caller, int what, Object obj, long delayMs) {
+		void post(RemoteUserInfo caller, int what, Object obj, Bundle data, long delayMs) {
 			Pair<RemoteUserInfo, Object> objWithCaller = Pair.create(caller, obj);
 			Message msg = obtainMessage(what, objWithCaller);
 			msg.setAsynchronous(true);
+			msg.setData(data);
 			if (delayMs > 0) {
 				sendMessageDelayed(msg, delayMs);
 			} else {
@@ -417,8 +438,32 @@ public class MediaSession {
 				case MSG_MEDIA_BUTTON:
 					mCallback.onMediaButtonEvent((Intent)obj);
 					break;
+				case MSG_PREPARE:
+					mCallback.onPrepare();
+					break;
+				case MSG_PREPARE_MEDIA_ID:
+					mCallback.onPrepareFromMediaId((String)obj, msg.getData());
+					break;
+				case MSG_PREPARE_SEARCH:
+					mCallback.onPrepareFromSearch((String)obj, msg.getData());
+					break;
+				case MSG_PREPARE_URI:
+					mCallback.onPrepareFromUri((Uri)obj, msg.getData());
+					break;
 				case MSG_PLAY:
 					mCallback.onPlay();
+					break;
+				case MSG_PLAY_MEDIA_ID:
+					mCallback.onPlayFromMediaId((String)obj, msg.getData());
+					break;
+				case MSG_PLAY_SEARCH:
+					mCallback.onPlayFromSearch((String)obj, msg.getData());
+					break;
+				case MSG_PLAY_URI:
+					mCallback.onPlayFromUri((Uri)obj, msg.getData());
+					break;
+				case MSG_SKIP_TO_ITEM:
+					mCallback.onSkipToQueueItem((Long)obj);
 					break;
 				case MSG_PAUSE:
 					mCallback.onPause();
@@ -432,8 +477,23 @@ public class MediaSession {
 				case MSG_PREVIOUS:
 					mCallback.onSkipToPrevious();
 					break;
+				case MSG_FAST_FORWARD:
+					mCallback.onFastForward();
+					break;
+				case MSG_REWIND:
+					mCallback.onRewind();
+					break;
 				case MSG_SEEK_TO:
 					mCallback.onSeekTo((Long)obj);
+					break;
+				case MSG_RATE:
+					mCallback.onSetRating((Rating)obj);
+					break;
+				case MSG_SET_PLAYBACK_SPEED:
+					mCallback.onSetPlaybackSpeed((Float)obj);
+					break;
+				case MSG_CUSTOM_ACTION:
+					mCallback.onCustomAction((String)obj, msg.getData());
 					break;
 				case MSG_PLAY_PAUSE_KEY_DOUBLE_TAP_TIMEOUT:
 					mCallback.handleMediaPlayPauseKeySingleTapIfPending();
@@ -591,7 +651,7 @@ public class MediaSession {
 
 		public void onSeekTo(long pos) {}
 
-		//public void onSetRating(@NonNull Rating rating) {}
+		public void onSetRating(@NonNull Rating rating) {}
 
 		public void onSetPlaybackSpeed(float speed) {}
 
