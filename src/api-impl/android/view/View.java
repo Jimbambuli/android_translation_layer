@@ -1048,6 +1048,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	static final int PFLAG3_IS_LAID_OUT = 0x4;
 	static final int PFLAG3_APPLYING_INSETS = 0x20;
 	static final int PFLAG3_FITTING_SYSTEM_WINDOWS = 0x40;
+	static final int PFLAG3_CLUSTER = 0x8000;
 	private Drawable background;
 	private int backgroundTint = 0;
 
@@ -1219,6 +1220,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mNextClusterForwardId = a.getResourceId(com.android.internal.R.styleable.View_nextClusterForward, View.NO_ID);
 		if (a.getBoolean(com.android.internal.R.styleable.View_fitsSystemWindows, false))
 			setFitsSystemWindows(true);
+		if (a.peekValue(com.android.internal.R.styleable.View_keyboardNavigationCluster) != null)
+			setKeyboardNavigationCluster(a.getBoolean(com.android.internal.R.styleable.View_keyboardNavigationCluster, true));
 		if (a.hasValue(com.android.internal.R.styleable.View_backgroundTint))
 			backgroundTint = a.getColor(com.android.internal.R.styleable.View_backgroundTint, 0);
 		if (a.hasValue(com.android.internal.R.styleable.View_background)) {
@@ -5532,9 +5535,32 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return window != null ? window.getInsetsController() : null;
 	}
 
-	public final boolean isKeyboardNavigationCluster() { return false; }
+	/* AOSP View.isKeyboardNavigationCluster() and setKeyboardNavigationCluster(): the root of a group of views
+	 * that Meta+Tab moves the focus between (Window.performKeyboardGroupNavigation()) */
+	public final boolean isKeyboardNavigationCluster() {
+		return (mPrivateFlags3 & PFLAG3_CLUSTER) != 0;
+	}
 
-	public void setKeyboardNavigationCluster(boolean isCluster) {}
+	public void setKeyboardNavigationCluster(boolean isCluster) {
+		if (isCluster) {
+			mPrivateFlags3 |= PFLAG3_CLUSTER;
+		} else {
+			mPrivateFlags3 &= ~PFLAG3_CLUSTER;
+		}
+	}
+
+	/* AOSP View.restoreFocusInCluster() and restoreFocusNotInCluster() */
+	public boolean restoreFocusInCluster(int direction) {
+		// Prioritize focusableByDefault over algorithmic focus selection.
+		if (restoreDefaultFocus()) {
+			return true;
+		}
+		return requestFocus(direction);
+	}
+
+	public boolean restoreFocusNotInCluster() {
+		return requestFocus(View.FOCUS_DOWN);
+	}
 
 
 	public AccessibilityDelegate getAccessibilityDelegate() {
@@ -6545,9 +6571,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (isKeyboardNavigationCluster()) {
 			currentCluster = this;
 		}
-		/* AOSP asks the root of the cluster namespace, which finds the next cluster of the tree; ATL has none
-		 * (isKeyboardNavigationCluster() is always false), so there is no other cluster to go to */
-		return null;
+		if (parent instanceof View) {
+			return ((View)parent).keyboardNavigationClusterSearch(currentCluster, direction);
+		}
+		/* the root of the tree, as ViewRootImpl.keyboardNavigationClusterSearch(): the next cluster of the tree */
+		return FocusFinder.getInstance().findNextKeyboardNavigationCluster(this, currentCluster, direction);
 	}
 
 	private int mLayerType;

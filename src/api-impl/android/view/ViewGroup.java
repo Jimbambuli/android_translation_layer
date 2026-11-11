@@ -1093,6 +1093,33 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return null;
 	}
 
+	/* AOSP ViewGroup.restoreFocusNotInCluster(), without the remembered focus of the cluster (mFocusedInCluster):
+	 * the first view outside of the clusters takes the focus */
+	@Override
+	public boolean restoreFocusNotInCluster() {
+		if (isKeyboardNavigationCluster() || getVisibility() != VISIBLE) {
+			return false;
+		}
+		int descendentFocusability = getDescendantFocusability();
+		if (descendentFocusability == FOCUS_BLOCK_DESCENDANTS) {
+			return super.requestFocus(FOCUS_DOWN, null);
+		}
+		if (descendentFocusability == FOCUS_BEFORE_DESCENDANTS
+		    && super.requestFocus(FOCUS_DOWN, null)) {
+			return true;
+		}
+		for (View child : children) {
+			if (!child.isKeyboardNavigationCluster()
+			    && child.restoreFocusNotInCluster()) {
+				return true;
+			}
+		}
+		if (descendentFocusability == FOCUS_AFTER_DESCENDANTS && !hasFocusableChild(false)) {
+			return super.requestFocus(FOCUS_DOWN, null);
+		}
+		return false;
+	}
+
 	/* AOSP ViewGroup.hasFocusable(boolean, boolean) and hasFocusableChild(): this group or, unless it blocks them,
 	 * one of its descendants is focusable */
 	@Override

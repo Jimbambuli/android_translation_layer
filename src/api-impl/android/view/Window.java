@@ -554,7 +554,48 @@ public class Window {
 			    .dispatchMediaKeyEventAsSystemService(event);
 			return true;
 		}
+
+		/* ViewRootImpl.ViewPostImeInputStage.processKeyEvent(): Meta+Tab and Meta+Shift+Tab move the focus to the
+		 * next or previous keyboard navigation cluster (Tab alone is GTK's move-focus, see moveFocusOnTab()) */
+		if (isDown && keyCode == KeyEvent.KEYCODE_TAB && peekDecorView() != null) {
+			int groupNavigationDirection = 0;
+			if (KeyEvent.metaStateHasModifiers(event.getMetaState(), KeyEvent.META_META_ON)) {
+				groupNavigationDirection = View.FOCUS_FORWARD;
+			} else if (KeyEvent.metaStateHasModifiers(event.getMetaState(), KeyEvent.META_META_ON | KeyEvent.META_SHIFT_ON)) {
+				groupNavigationDirection = View.FOCUS_BACKWARD;
+			}
+			if (groupNavigationDirection != 0 && performKeyboardGroupNavigation(peekDecorView(), groupNavigationDirection))
+				return true;
+		}
 		return false;
+	}
+
+	/* ViewRootImpl.performKeyboardGroupNavigation(), without the sound effect; root is the window's mView */
+	private static boolean performKeyboardGroupNavigation(View root, int direction) {
+		final View focused = root.findFocus();
+		if (focused == null && root.restoreDefaultFocus()) {
+			return true;
+		}
+		View cluster = focused == null ? root.keyboardNavigationClusterSearch(null, direction)
+		                               : focused.keyboardNavigationClusterSearch(null, direction);
+
+		// Since requestFocus only takes "real" focus directions (and therefore also
+		// restoreFocusInCluster), convert forward/backward focus into FOCUS_DOWN.
+		int realDirection = direction;
+		if (direction == View.FOCUS_FORWARD || direction == View.FOCUS_BACKWARD) {
+			realDirection = View.FOCUS_DOWN;
+		}
+
+		if (cluster != null && cluster == root) {
+			// the default cluster. Try to find a non-clustered view to focus.
+			if (cluster.restoreFocusNotInCluster()) {
+				return true;
+			}
+			// otherwise skip to next actual cluster
+			cluster = root.keyboardNavigationClusterSearch(null, direction);
+		}
+
+		return cluster != null && cluster.restoreFocusInCluster(realDirection);
 	}
 
 	/* PhoneWindow.onKeyDown() for the window's own keys: the media keys go to the window's media controller

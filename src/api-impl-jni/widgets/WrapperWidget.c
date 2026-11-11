@@ -922,7 +922,8 @@ int atl_android_meta_state(GdkModifierType state)
 		meta_state |= META_SHIFT_ON;
 	if (state & GDK_CONTROL_MASK)
 		meta_state |= META_CTRL_ON;
-	if (state & GDK_META_MASK)
+	/* Android's Meta key is the Super (Windows) key; its keycode is KEYCODE_META_LEFT/RIGHT (as in View.c) */
+	if (state & (GDK_META_MASK | GDK_SUPER_MASK))
 		meta_state |= META_META_ON;
 	if (state & GDK_ALT_MASK)
 		meta_state |= META_ALT_ON;
