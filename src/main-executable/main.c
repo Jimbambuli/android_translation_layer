@@ -1053,16 +1053,20 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		extract_from_apk(app_icon_path, app_icon_path);
 
 		GError *error = NULL;
-		GList *icon_list = g_list_append(NULL, gdk_texture_new_from_filename(app_icon_path_full, &error));
+		GdkTexture *icon_texture = gdk_texture_new_from_filename(app_icon_path_full, &error);
 		if (error) {
 			fprintf(stderr, "gdk_texture_new_from_filename: %s\n", error->message);
 			g_clear_error(&error);
 		}
-		icon_override(window, icon_list);
-		if (atl_titlebar && icon_list->data && !getenv("ATL_APP_ICON"))
-			set_window_icon_name(GTK_WINDOW(window), icon_list->data, package_name);
-		/* if Gtk sets the icon list to NULL, override it again */
-		g_signal_connect_after(window, "realize", G_CALLBACK(icon_override), icon_list);
+		/* an icon that cannot be loaded leaves the window without one (a list with NULL in it is no icon list) */
+		if (icon_texture) {
+			GList *icon_list = g_list_append(NULL, icon_texture);
+			icon_override(window, icon_list);
+			if (atl_titlebar && !getenv("ATL_APP_ICON"))
+				set_window_icon_name(GTK_WINDOW(window), icon_texture, package_name);
+			/* if Gtk sets the icon list to NULL, override it again */
+			g_signal_connect_after(window, "realize", G_CALLBACK(icon_override), icon_list);
+		}
 	}
 	/* ATL_APP_ICON: a picture of the app's icon from the launcher, for an APK whose icon ATL cannot load itself
 	 * (e.g. an adaptive icon) */

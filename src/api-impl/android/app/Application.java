@@ -19,8 +19,10 @@ public class Application extends ContextWrapper {
 	@Export
 	private String get_app_icon_path() {
 		String icon_path = null;
+		int icon = this.get_atl_loaded_app().pkg.applicationInfo.icon;
 		try {
-			icon_path = getString(this.get_atl_loaded_app().pkg.applicationInfo.icon);
+			if (icon != 0) // no android:icon: the default icon below
+				icon_path = getString(icon);
 		} catch (android.content.res.Resources.NotFoundException e) {
 			e.printStackTrace();
 		}
