@@ -23,6 +23,8 @@ public interface ViewParent {
 
 	public void onDescendantInvalidated(View child, View target);
 
+	public void bringChildToFront(View child);
+
 	public void requestLayout();
 
 	/** AOSP ViewParent.childHasTransientStateChanged(): a child's setHasTransientState() changed its state */

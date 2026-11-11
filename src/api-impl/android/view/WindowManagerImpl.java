@@ -16,6 +16,10 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	 * touch events or to take part in nested scrolling. */
 	private static class WindowViewParent implements ViewParent {
 
+		/* AOSP ViewRootImpl.bringChildToFront(): the root has one child */
+		@Override
+		public void bringChildToFront(View child) {}
+
 		/* like AOSP's ViewRootImpl.mTraversalScheduled: a layout of the window is pending */
 		boolean traversalScheduled;
 

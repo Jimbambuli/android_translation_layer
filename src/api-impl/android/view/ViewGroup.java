@@ -728,8 +728,31 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return p;
 	}
 
+	/* AOSP ViewGroup.bringChildToFront(): the child becomes the last one, drawn above and picked before its siblings
+	 * (in GTK's order of the children as addView() sorts them by z) */
 	public void bringChildToFront(View child) {
-		// TODO: actually implement this (might make sense to implement it in the subclasses instead), when applicable
+		int index = children.indexOf(child);
+		if (index < 0)
+			return;
+		children.remove(index);
+		children.add(child);
+		int sortedIndex = children.size() - 1;
+		for (View v : children) {
+			if (v.getZ() != 0.0f) {
+				ArrayList<View> sortedChildren = new ArrayList<View>(children);
+				sortedChildren.sort(new Comparator<View>() {
+					@Override
+					public int compare(View o1, View o2) {
+						return (int)(o1.getZ() - o2.getZ());
+					}
+				});
+				sortedIndex = sortedChildren.indexOf(child);
+				break;
+			}
+		}
+		native_addView(widget, child.widget, sortedIndex, null);
+		requestLayout();
+		invalidate();
 	}
 
 	/**

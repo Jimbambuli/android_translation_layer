@@ -2237,18 +2237,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		invalidateInternal();
 	}
 
+	/* AOSP View.scheduleDrawable()/unscheduleDrawable(): the drawable is the token of its runnables (AOSP: the
+	 * Choreographer's), so unscheduleDrawable(who) removes all of them */
 	public void scheduleDrawable(Drawable drawable, Runnable runnable, long time) {
-		postDelayed(runnable, time - SystemClock.uptimeMillis());
+		if (runnable != null)
+			getHandler().postAtTime(runnable, drawable, time);
 	}
 
-	/* AOSP removes the callbacks posted with the drawable as token; scheduleDrawable() has none here,
-	 * so the runnable itself is removed */
 	public void unscheduleDrawable(Drawable drawable, Runnable runnable) {
 		if (runnable != null)
-			removeCallbacks(runnable);
+			getHandler().removeCallbacks(runnable, drawable);
 	}
 
-	public void unscheduleDrawable(Drawable drawable) {}
+	public void unscheduleDrawable(Drawable drawable) {
+		if (drawable != null)
+			getHandler().removeCallbacksAndMessages(drawable);
+	}
 
 	public void invalidate(Rect dirty) {
 		invalidateInternal();
@@ -3190,7 +3194,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 
-	public void bringToFront() {}
+	/* AOSP View.bringToFront() */
+	public void bringToFront() {
+		if (parent != null)
+			parent.bringChildToFront(this);
+	}
 
 	public boolean isEnabled() {
 		return (mViewFlags & ENABLED_MASK) == ENABLED;
@@ -5417,9 +5425,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setDrawingCacheQuality(int quality) {}
 
-	public void buildDrawingCache(boolean autoScale) {}
+	/* AOSP View.buildDrawingCache()/getDrawingCache(): the view drawn into a bitmap of its size, as the software
+	 * drawing cache (rebuilt on each getDrawingCache() while the cache is enabled) */
+	private Bitmap mDrawingCache;
 
-	public Bitmap getDrawingCache() { return null; }
+	public void buildDrawingCache(boolean autoScale) {
+		int width = right - left;
+		int height = bottom - top;
+		if (width <= 0 || height <= 0) {
+			destroyDrawingCache();
+			return;
+		}
+		if (mDrawingCache == null || mDrawingCache.isRecycled() || mDrawingCache.getWidth() != width || mDrawingCache.getHeight() != height) {
+			destroyDrawingCache();
+			mDrawingCache = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+		} else {
+			mDrawingCache.eraseColor(0);
+		}
+		Canvas canvas = new Canvas(mDrawingCache);
+		canvas.translate(-getScrollX(), -getScrollY());
+		draw(canvas);
+	}
+
+	public Bitmap getDrawingCache() {
+		return getDrawingCache(false);
+	}
+
+	public Bitmap getDrawingCache(boolean autoScale) {
+		if ((mViewFlags & WILL_NOT_CACHE_DRAWING) == WILL_NOT_CACHE_DRAWING)
+			return null;
+		if (isDrawingCacheEnabled())
+			buildDrawingCache(autoScale);
+		return mDrawingCache;
+	}
 
 	public void announceForAccessibility(CharSequence text) {}
 
@@ -5617,7 +5655,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
-	public void destroyDrawingCache() {}
+	public void destroyDrawingCache() {
+		if (mDrawingCache != null) {
+			mDrawingCache.recycle();
+			mDrawingCache = null;
+		}
+	}
 
 
 
@@ -6385,6 +6428,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setDrawingCacheEnabled(boolean enabled) {
+		if (mDrawingCacheEnabled && !enabled)
+			destroyDrawingCache(); // as AOSP's setFlags() when DRAWING_CACHE_ENABLED goes
 		mDrawingCacheEnabled = enabled;
 	}
 
