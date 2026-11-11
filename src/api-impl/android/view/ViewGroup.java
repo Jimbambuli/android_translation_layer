@@ -229,10 +229,13 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	private boolean mIsInterestedInDrag;
 	private java.util.HashSet<View> mChildrenInterestedInDrag;
 
-	/* ATL: the point (x, y) in the child's coordinates, the same mapping as isTouchPointInView() */
+	/* AOSP's ViewGroup.transformPointToViewLocal(): the point (x, y) in the child's coordinates, through the
+	 * inverse of its matrix (translation, rotation, scale, camera) */
 	private void transformPointToChild(float x, float y, View child, float[] out) {
-		out[0] = x + getScrollX() - child.getLeft() - child.getTranslationX();
-		out[1] = y + getScrollY() - child.getTop() - child.getTranslationY();
+		out[0] = x + getScrollX() - child.getLeft();
+		out[1] = y + getScrollY() - child.getTop();
+		if (!child.hasIdentityMatrix())
+			child.getInverseMatrix().mapPoints(out);
 	}
 
 	@Override
@@ -384,24 +387,36 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return canAccept;
 	}
 
+	/* AOSP's ViewGroup.isTransformedTouchPointInView() */
 	private boolean isTouchPointInView(float x, float y, View child) {
 		if (child.getVisibility() != View.VISIBLE)
 			return false;
-		float localX = x + getScrollX() - child.getLeft() - child.getTranslationX();
-		float localY = y + getScrollY() - child.getTop() - child.getTranslationY();
-		return localX >= 0 && localX <= child.getWidth() && localY >= 0 && localY <= child.getHeight();
+		float[] point = new float[2];
+		transformPointToChild(x, y, child, point);
+		return point[0] >= 0 && point[0] <= child.getWidth() && point[1] >= 0 && point[1] <= child.getHeight();
 	}
 
+	/* AOSP's ViewGroup.dispatchTransformedTouchEvent(): the event in the child's coordinates; AOSP hands a
+	 * transformed copy to a child with a matrix, here the event's positions are restored afterwards */
 	private boolean dispatchTransformedTouchEvent(MotionEvent event, boolean cancel, View child) {
 		int oldAction = event.getAction();
 		if (cancel)
 			event.setAction(MotionEvent.ACTION_CANCEL);
 
-		float offsetX = getScrollX() - child.getLeft() - child.getTranslationX();
-		float offsetY = getScrollY() - child.getTop() - child.getTranslationY();
-		event.offsetLocation(offsetX, offsetY);
-		boolean handled = child.dispatchTouchEvent(event);
-		event.offsetLocation(-offsetX, -offsetY);
+		float offsetX = getScrollX() - child.getLeft();
+		float offsetY = getScrollY() - child.getTop();
+		boolean handled;
+		if (child.hasIdentityMatrix()) {
+			event.offsetLocation(offsetX, offsetY);
+			handled = child.dispatchTouchEvent(event);
+			event.offsetLocation(-offsetX, -offsetY);
+		} else {
+			float[] coords = event.coords.clone();
+			event.offsetLocation(offsetX, offsetY);
+			event.transform(child.getInverseMatrix());
+			handled = child.dispatchTouchEvent(event);
+			event.coords = coords;
+		}
 
 		if (cancel)
 			event.setAction(oldAction);
@@ -425,11 +440,20 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	/* AOSP's ViewGroup.dispatchTransformedGenericPointerEvent(), in the child's coordinates as
 	 * dispatchTransformedTouchEvent() */
 	private boolean dispatchTransformedGenericPointerEvent(MotionEvent event, View child) {
-		float offsetX = getScrollX() - child.getLeft() - child.getTranslationX();
-		float offsetY = getScrollY() - child.getTop() - child.getTranslationY();
-		event.offsetLocation(offsetX, offsetY);
-		boolean handled = child.dispatchGenericMotionEvent(event);
-		event.offsetLocation(-offsetX, -offsetY);
+		float offsetX = getScrollX() - child.getLeft();
+		float offsetY = getScrollY() - child.getTop();
+		boolean handled;
+		if (child.hasIdentityMatrix()) {
+			event.offsetLocation(offsetX, offsetY);
+			handled = child.dispatchGenericMotionEvent(event);
+			event.offsetLocation(-offsetX, -offsetY);
+		} else {
+			float[] coords = event.coords.clone();
+			event.offsetLocation(offsetX, offsetY);
+			event.transform(child.getInverseMatrix());
+			handled = child.dispatchGenericMotionEvent(event);
+			event.coords = coords;
+		}
 		return handled;
 	}
 

@@ -3382,7 +3382,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	final Matrix getInverseMatrix() {
 		if (inverseMatrix == null)
 			inverseMatrix = new Matrix();
-		getMatrix().invert(inverseMatrix);
+		/* as AOSP's RenderNode: a matrix without inverse (scale 0) gives the identity */
+		if (!getMatrix().invert(inverseMatrix))
+			inverseMatrix.reset();
 		return inverseMatrix;
 	}
 

@@ -1419,9 +1419,6 @@ public final class MotionEvent extends InputEvent {
 	                                                      int pointerIndex, PointerProperties outPointerProperties);
 
 	private static native void nativeScale(int nativePtr, float scale);
-	private static /* native */ void nativeTransform(int nativePtr, Matrix matrix) {
-	}
-
 	private static final int X_OFFSET = 0;
 	private static final int Y_OFFSET = 1;
 	private static final int RAW_X_OFFSET = 2;
@@ -2996,7 +2993,15 @@ public final class MotionEvent extends InputEvent {
 			throw new IllegalArgumentException("matrix must not be null");
 		}
 
-		nativeTransform(mNativePtr, matrix);
+		/* AOSP's MotionEvent::transform(): every pointer's position (ATL keeps no history or orientation) */
+		float[] point = new float[2];
+		for (int i = 0; i < ids.length; i++) {
+			point[0] = coords[4 * i + X_OFFSET];
+			point[1] = coords[4 * i + Y_OFFSET];
+			matrix.mapPoints(point);
+			coords[4 * i + X_OFFSET] = point[0];
+			coords[4 * i + Y_OFFSET] = point[1];
+		}
 	}
 
 	/**
