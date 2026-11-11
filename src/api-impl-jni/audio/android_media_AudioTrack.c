@@ -92,6 +92,8 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 	_SET_LONG_FIELD(this, "pcm_handle", _INTPTR(pcm_handle));
 	_SET_LONG_FIELD(this, "params", _INTPTR(params));
 	_SET_INT_FIELD(this, "channels", channels_out);
+	snd_pcm_hw_params_get_buffer_size(params, &buffer_size_as_uframes_t);
+	_SET_INT_FIELD(this, "bufferSizeInFrames", buffer_size_as_uframes_t);
 	_SET_INT_FIELD(this, "period_time", period_time);
 }
 
@@ -206,7 +208,7 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1play(JNIEnv *env, j
 	/*--↑*/
 }
 
-static int write_frames(snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume)
+static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume)
 {
 	if (!pcm_handle)
 		return -1; // uninitialized track (no audio device): report a write error
@@ -217,6 +219,7 @@ static int write_frames(snd_pcm_t *pcm_handle, const void *buffer, int frames_to
 	snd_pcm_sframes_t frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
 	if (frames_written == -EPIPE) {
 		printf("XRUN.\n");
+		_SET_INT_FIELD(this, "underrunCount", _GET_INT_FIELD(this, "underrunCount") + 1); // AudioTrack.getUnderrunCount()
 		snd_pcm_recover(pcm_handle, frames_written, 0);
 		frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
 		snd_pcm_start(pcm_handle);
@@ -233,7 +236,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIF(JNIEn
 	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
 
 	jbyte *buffer = _GET_BYTE_ARRAY_ELEMENTS(audio_data);
-	snd_pcm_sframes_t frames_written = write_frames(pcm_handle, buffer + offset_in_bytes, frames_to_write, volume);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_bytes, frames_to_write, volume);
 	_RELEASE_BYTE_ARRAY_ELEMENTS(audio_data, buffer);
 
 	return frames_written;
@@ -244,7 +247,7 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIF(JNIEn
 	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
 
 	jshort *buffer = (*env)->GetShortArrayElements(env, audio_data, NULL);
-	snd_pcm_sframes_t frames_written = write_frames(pcm_handle, buffer + offset_in_shorts, frames_to_write, volume);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_shorts, frames_to_write, volume);
 	(*env)->ReleaseShortArrayElements(env, audio_data, buffer, 0);
 
 	return frames_written;

@@ -535,6 +535,7 @@ srcs = [
 	'android/media/AudioHandle.java',
 	'android/media/AudioManager.java',
 	'android/media/AudioRecord.java',
+	'android/media/AudioRouting.java',
 	'android/media/AudioTimestamp.java',
 	'android/media/AudioTrack.java',
 	'android/media/DeniedByServerException.java',

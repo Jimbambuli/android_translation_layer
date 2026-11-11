@@ -150,6 +150,15 @@ public final class AudioDeviceInfo {
 	}
 
 	/**
+	 * @return The speaker layout of a TYPE_BUILTIN_SPEAKER device (API 36). ATL's output is whatever ALSA
+	 * plays on, whose layout is not known: AudioFormat.CHANNEL_INVALID, as for a device whose audio HAL
+	 * reports none.
+	 */
+	public int getSpeakerLayoutChannelMask() {
+		return AudioFormat.CHANNEL_INVALID;
+	}
+
+	/**
 	 * @return The device type identifier of the audio device (i.e. TYPE_BUILTIN_SPEAKER).
 	 */
 	public int getType() {

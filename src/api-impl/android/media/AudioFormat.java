@@ -2,6 +2,9 @@ package android.media;
 
 public class AudioFormat {
 
+	/** Invalid audio channel mask */
+	public static final int CHANNEL_INVALID = 0;
+
 	int sampleRate = 44100;
 	int channelMask;
 	int encoding;

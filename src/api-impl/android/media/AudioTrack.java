@@ -3,7 +3,7 @@ package android.media;
 import android.atl.annotation.Export;
 import java.nio.ByteBuffer;
 
-public class AudioTrack {
+public class AudioTrack implements AudioRouting {
 	public interface OnPlaybackPositionUpdateListener {
 		void onMarkerReached(AudioTrack track);
 
@@ -44,6 +44,8 @@ public class AudioTrack {
 	long params;
 	int channels;
 	int period_time;
+	int bufferSizeInFrames; // the ALSA buffer
+	int underrunCount;      // ALSA underruns (EPIPE) the writes recovered from
 	// mostly
 	static int frames;
 	OnPlaybackPositionUpdateListener periodic_update_listener;
@@ -304,6 +306,30 @@ public class AudioTrack {
 	public AudioDeviceInfo getPreferredDevice() {
 		return mPreferredDevice;
 	}
+
+	/* AOSP AudioTrack.getBufferSizeInFrames(): the frames the buffer holds, here the ALSA buffer's */
+	public int getBufferSizeInFrames() {
+		return bufferSizeInFrames;
+	}
+
+	/* AOSP AudioTrack.getUnderrunCount(): how often the buffer ran empty while playing */
+	public int getUnderrunCount() {
+		return underrunCount;
+	}
+
+	/* AOSP AudioTrack.getRoutedDevice(): the device the track plays on, the one output */
+	@Override
+	public AudioDeviceInfo getRoutedDevice() {
+		return new AudioDeviceInfo(1, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, "default", true);
+	}
+
+	/* AOSP AudioTrack.addOnRoutingChangedListener(): ATL never reroutes a track (one output), so the
+	 * listeners are never called */
+	@Override
+	public void addOnRoutingChangedListener(AudioRouting.OnRoutingChangedListener listener, android.os.Handler handler) {}
+
+	@Override
+	public void removeOnRoutingChangedListener(AudioRouting.OnRoutingChangedListener listener) {}
 
 	private native int native_getPlaybackHeadPosition();
 	public native void native_play();

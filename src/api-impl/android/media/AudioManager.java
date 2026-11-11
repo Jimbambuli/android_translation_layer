@@ -224,6 +224,19 @@ public class AudioManager {
 		return devices.toArray(new AudioDeviceInfo[0]);
 	}
 
+	/* AOSP AudioManager.getParameters(): the audio HAL's values of the keys ("key=value;..."). ATL has no HAL,
+	 * which answers as one that knows none of the keys: an empty string */
+	public String getParameters(String keys) {
+		return "";
+	}
+
+	/* AOSP AudioManager.getAudioDevicesForAttributes() (API 33): the output devices the audio policy routes the
+	 * attributes to; ATL plays everything on the one default output */
+	public java.util.List<AudioDeviceInfo> getAudioDevicesForAttributes(AudioAttributes attributes) {
+		java.util.Objects.requireNonNull(attributes);
+		return new java.util.ArrayList<>(java.util.Arrays.asList(getDevices(GET_DEVICES_OUTPUTS)));
+	}
+
 	public void registerAudioDeviceCallback(AudioDeviceCallback callback, Handler handler) {}
 
 	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
@@ -247,6 +260,16 @@ public class AudioManager {
 
 	public static int getPlaybackOffloadSupport(AudioFormat format, AudioAttributes attributes) {
 		return PLAYBACK_OFFLOAD_NOT_SUPPORTED;
+	}
+
+	/* API 33: no output plays the format directly (no compressed passthrough or offload), as in
+	 * isOffloadedPlaybackSupported() */
+	public static final int DIRECT_PLAYBACK_NOT_SUPPORTED = 0;
+
+	public static int getDirectPlaybackSupport(AudioFormat format, AudioAttributes attributes) {
+		java.util.Objects.requireNonNull(format);
+		java.util.Objects.requireNonNull(attributes);
+		return DIRECT_PLAYBACK_NOT_SUPPORTED;
 	}
 
 	/* API 28 */
