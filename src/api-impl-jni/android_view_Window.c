@@ -41,6 +41,11 @@ JNIEXPORT void JNICALL Java_android_view_Window_take_1input_1queue(JNIEnv *env, 
 JNIEXPORT void JNICALL Java_android_view_Window_set_1layout(JNIEnv *env, jobject this, jlong window, jint width, jint height)
 {
 	GtkWindow *gtk_window = GTK_WINDOW(_PTR(window));
+	/* an AlertDialog with a view (setView()) holds the decor view next to its message, list and
+	 * buttons: GTK sizes the window from all of them */
+	GtkWidget *decor = g_object_get_data(G_OBJECT(gtk_window), "decor");
+	if (decor && gtk_widget_get_parent(decor))
+		return;
 	if (width > 0 && height > 0)
 		gtk_window_set_default_size(gtk_window, width, height);
 }

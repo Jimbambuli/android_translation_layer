@@ -13,6 +13,9 @@ public class AlertDialog extends Dialog implements DialogInterface {
 	private native void nativeConstruct(long ptr, long button_positive, long button_negative, long button_neutral);
 	private native void nativeSetMessage(long ptr, String message);
 	private native void nativeSetItems(long ptr, String[] items, DialogInterface.OnClickListener listener);
+	private native void nativeSetView(long ptr);
+
+	private boolean hasView;
 
 	public AlertDialog(Context context) {
 		this(context, 0);
@@ -52,8 +55,13 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		return buttons[-1 - whichButton];
 	}
 
+	/* AOSP's customPanel: the view goes below the message and the list, above the buttons */
 	public void setView(View view) {
 		setContentView(view);
+		if (!hasView) {
+			hasView = true;
+			nativeSetView(nativePtr);
+		}
 	}
 
 	public static class Builder {
@@ -134,6 +142,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		}
 
 		public AlertDialog.Builder setView(View view) {
+			dialog.setView(view);
 			return this;
 		}
 

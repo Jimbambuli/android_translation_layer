@@ -64,7 +64,17 @@ JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeConstruct(JNIEnv *env,
 	gtk_box_append(content_area, gtk_widget_get_parent(GTK_WIDGET(_PTR(button_negative_ptr))));
 	gtk_box_append(content_area, gtk_widget_get_parent(GTK_WIDGET(_PTR(button_neutral_ptr))));
 
+	/* the window's decor view (the child nativeInit gave the dialog) holds a view set with
+	 * setView(); kept for nativeSetView() */
+	g_object_set_data_full(G_OBJECT(dialog), "decor", g_object_ref(gtk_window_get_child(dialog)), g_object_unref);
 	gtk_window_set_child(dialog, GTK_WIDGET(content_area));
+}
+
+JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetView(JNIEnv *env, jobject this, jlong ptr)
+{
+	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
+	GtkWidget *list = g_object_get_data(G_OBJECT(dialog), "list");
+	gtk_box_insert_child_after(GTK_BOX(gtk_widget_get_parent(list)), g_object_get_data(G_OBJECT(dialog), "decor"), list);
 }
 
 JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeSetMessage(JNIEnv *env, jobject this, jlong ptr, jstring message)
