@@ -1039,6 +1039,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	static final int PFLAG_DRAWABLE_STATE_DIRTY        = 0x00000400;
 	private static final int PFLAG_PRESSED             = 0x00004000;
 	static final int PFLAG_ACTIVATED                   = 0x40000000;
+	static final int PFLAG_HOVERED                     = 0x10000000;
 
 	private int[] mDrawableState = null;
 
@@ -1422,7 +1423,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	/* AOSP View.onCreateDrawableState(); ATL: state_focused follows whether GTK shows the focus
-	 * (AOSP: focused, which outside of touch mode is the same), no accelerated/hovered states */
+	 * (AOSP: focused, which outside of touch mode is the same), no accelerated state */
 	protected int[] onCreateDrawableState(int extraSpace) {
 		if (duplicate_parent_state && parent instanceof View) {
 			return ((View) parent).onCreateDrawableState(extraSpace);
@@ -1439,6 +1440,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if ((privateFlags & PFLAG_SELECTED) != 0) viewStateIndex |= StateSet.VIEW_STATE_SELECTED;
 		if (hasWindowFocus()) viewStateIndex |= StateSet.VIEW_STATE_WINDOW_FOCUSED;
 		if ((privateFlags & PFLAG_ACTIVATED) != 0) viewStateIndex |= StateSet.VIEW_STATE_ACTIVATED;
+		if ((privateFlags & PFLAG_HOVERED) != 0) viewStateIndex |= StateSet.VIEW_STATE_HOVERED;
 
 		final int privateFlags2 = mPrivateFlags2;
 		if ((privateFlags2 & PFLAG2_DRAG_CAN_ACCEPT) != 0) {
@@ -2117,6 +2119,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			updateKeyboardFocusable();
 		}
 
+		if ((changed & (CLICKABLE | LONG_CLICKABLE | ENABLED_MASK)) != 0) {
+			updateHoverable();
+		}
+
 		if ((changed & ENABLED_MASK) != 0) {
 			if ((mViewFlags & ENABLED_MASK) != ENABLED) {
 				if (isFocused()) clearFocus();
@@ -2673,6 +2679,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setContextClickable(boolean contextClickable) {
 		mContextClickable = contextClickable;
+		updateHoverable();
 	}
 
 	public boolean performContextClick(float x, float y) {
@@ -5539,9 +5546,64 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return onHoverEvent(event);
 	}
 
-	/* AOSP's View.onHoverEvent() without the accessibility and the hovered state (not implemented) */
+	/* the hover controllers call this: whether the view took the hover (ViewGroup.dispatchHoverEvent() of its
+	 * ancestors asks, see hasHoverHandledDescendant(); GTK hands the motion to the deepest view first) */
+	boolean mHoverHandled;
+
 	@Export
-	public boolean onHoverEvent(MotionEvent event) { return false; }
+	boolean dispatchHoverEventFromNative(MotionEvent event) {
+		boolean handled = dispatchHoverEvent(event);
+		mHoverHandled = handled && event.getAction() != MotionEvent.ACTION_HOVER_EXIT;
+		return handled;
+	}
+
+	/* AOSP's View.onHoverEvent() without the accessibility events, the touch delegate's touch exploration and
+	 * the scroll bars (ATL draws none) */
+	@Export
+	public boolean onHoverEvent(MotionEvent event) {
+		final int action = event.getActionMasked();
+		// If we consider ourself hoverable, or if we we're already hovered,
+		// handle changing state in response to ENTER and EXIT events.
+		if (isHoverable() || isHovered()) {
+			switch (action) {
+				case MotionEvent.ACTION_HOVER_ENTER:
+					setHovered(true);
+					break;
+				case MotionEvent.ACTION_HOVER_EXIT:
+					setHovered(false);
+					break;
+			}
+
+			// Dispatch the event to onGenericMotionEvent before returning true.
+			// This is to provide compatibility with existing applications that
+			// handled HOVER_MOVE events in onGenericMotionEvent and that would
+			// break because onHoverEvent consumes all events here.
+			dispatchGenericMotionEventInternal(event);
+			// The event was already handled by calling setHovered(), so always
+			// return true.
+			return true;
+		}
+
+		return false;
+	}
+
+	/* AOSP's View.isHoverable() */
+	private boolean isHoverable() {
+		final int viewFlags = mViewFlags;
+		if ((viewFlags & ENABLED_MASK) == DISABLED) {
+			return false;
+		}
+
+		return (viewFlags & CLICKABLE) == CLICKABLE
+		    || (viewFlags & LONG_CLICKABLE) == LONG_CLICKABLE
+		    || isContextClickable();
+	}
+
+	/* a hoverable view needs the hover events to be hovered: its GTK motion controller delivers them */
+	private void updateHoverable() {
+		if (widget != 0 && isHoverable())
+			nativeSetOnHoverListener(widget);
+	}
 
 	public ActionMode startActionMode(ActionMode.Callback callback, int type) { return null; }
 
@@ -6538,14 +6600,28 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return -(cameraLocationZ * dpi);
 	}
 
-	private boolean mHovered;
-
+	/* AOSP's View.isHovered(), setHovered() and onHoverChanged(): the hovered drawable state */
 	public boolean isHovered() {
-		return mHovered;
+		return (mPrivateFlags & PFLAG_HOVERED) != 0;
 	}
 
 	public void setHovered(boolean hovered) {
-		mHovered = hovered;
+		if (hovered) {
+			if ((mPrivateFlags & PFLAG_HOVERED) == 0) {
+				mPrivateFlags |= PFLAG_HOVERED;
+				refreshDrawableState();
+				onHoverChanged(true);
+			}
+		} else {
+			if ((mPrivateFlags & PFLAG_HOVERED) != 0) {
+				mPrivateFlags &= ~PFLAG_HOVERED;
+				refreshDrawableState();
+				onHoverChanged(false);
+			}
+		}
+	}
+
+	public void onHoverChanged(boolean hovered) {
 	}
 
 	/* AOSP View.postInvalidateDelayed() and postInvalidateOnAnimation(): invalidate later / at the next frame */

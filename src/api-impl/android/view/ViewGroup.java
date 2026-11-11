@@ -465,12 +465,79 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 
 	/* AOSP's ViewGroup.dispatchHoverEvent() asks onInterceptHoverEvent() first and then hands the event to the
 	 * children. Here every view with a hover handler has its own GTK motion controller (see
-	 * View.native_constructor()), so the children get their events there and only the interception is kept. */
+	 * View.native_constructor()), so the children get their events there, before the group (GTK hands the
+	 * motion to the deepest widget first). Kept from AOSP: the group itself is hovered only while no child
+	 * took the hover, with the ENTER and EXIT it gets when that changes (mHoveredSelf). */
+	private boolean mHoveredSelf;
+
 	@Export
 	@Override
 	protected boolean dispatchHoverEvent(MotionEvent event) {
-		onInterceptHoverEvent(event);
-		return super.dispatchHoverEvent(event);
+		final int action = event.getAction();
+		final boolean interceptHover = onInterceptHoverEvent(event);
+		boolean handled = !interceptHover && action != MotionEvent.ACTION_HOVER_EXIT && hasHoverHandledDescendant();
+
+		// Figure out whether to dispatch the event to the view group itself.
+		boolean newHoveredSelf = !handled && (action != MotionEvent.ACTION_HOVER_EXIT);
+		MotionEvent eventNoHistory = event;
+		if (newHoveredSelf == mHoveredSelf) {
+			if (newHoveredSelf) {
+				handled |= super.dispatchHoverEvent(event);
+			}
+		} else {
+			if (mHoveredSelf) {
+				// Send EXIT to self.
+				if (action == MotionEvent.ACTION_HOVER_EXIT) {
+					handled |= super.dispatchHoverEvent(event);
+				} else {
+					// Synthesize EXIT from MOVE.
+					if (action == MotionEvent.ACTION_HOVER_MOVE) {
+						super.dispatchHoverEvent(event);
+					}
+					eventNoHistory = MotionEvent.obtainNoHistory(event);
+					eventNoHistory.setAction(MotionEvent.ACTION_HOVER_EXIT);
+					super.dispatchHoverEvent(eventNoHistory);
+					eventNoHistory.setAction(action);
+				}
+				mHoveredSelf = false;
+			}
+
+			if (newHoveredSelf) {
+				// Send ENTER to self.
+				if (action == MotionEvent.ACTION_HOVER_ENTER) {
+					handled |= super.dispatchHoverEvent(event);
+				} else {
+					// Synthesize ENTER from MOVE.
+					if (eventNoHistory == event)
+						eventNoHistory = MotionEvent.obtainNoHistory(event);
+					eventNoHistory.setAction(MotionEvent.ACTION_HOVER_ENTER);
+					handled |= super.dispatchHoverEvent(eventNoHistory);
+					eventNoHistory.setAction(action);
+					if (action == MotionEvent.ACTION_HOVER_MOVE) {
+						handled |= super.dispatchHoverEvent(eventNoHistory);
+					}
+				}
+				mHoveredSelf = true;
+			}
+		}
+
+		if (eventNoHistory != event) {
+			eventNoHistory.recycle();
+		}
+		return handled;
+	}
+
+	/* AOSP's mFirstHoverTarget != null: a visible child (or a child of it) under the pointer took the hover */
+	boolean hasHoverHandledDescendant() {
+		for (View child : children) {
+			if (child.getVisibility() != VISIBLE)
+				continue;
+			if (child.mHoverHandled)
+				return true;
+			if (child instanceof ViewGroup && ((ViewGroup)child).hasHoverHandledDescendant())
+				return true;
+		}
+		return false;
 	}
 
 	@Export

@@ -229,7 +229,7 @@ static void call_hover_callback(jobject this, int action, float x, float y, floa
 	jfloatArray coords = (*env)->NewFloatArray(env, 4);
 	(*env)->SetFloatArrayRegion(env, coords, 0, 4, (jfloat[]){x, y, raw_x, raw_y});
 	jobject motion_event = J_new__MotionEvent(env, SOURCE_MOUSE, action, (jlong)0, ids, coords);
-	J__View__dispatchHoverEvent(env, this, motion_event);
+	J__View__dispatchHoverEventFromNative(env, this, motion_event);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
