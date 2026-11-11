@@ -102,16 +102,16 @@ public class SensorManager {
 
 		final int length = outR.length;
 		if (inR.length != length) {
-			return false;   // invalid parameter
+			return false; // invalid parameter
 		}
 		if ((X & 0x7C) != 0 || (Y & 0x7C) != 0) {
-			return false;   // invalid parameter
+			return false; // invalid parameter
 		}
 		if (((X & 0x3) == 0) || ((Y & 0x3) == 0)) {
-			return false;   // no axis specified
+			return false; // no axis specified
 		}
 		if ((X & 0x3) == (Y & 0x3)) {
-			return false;   // same axis specified
+			return false; // same axis specified
 		}
 
 		// Z is "the other" axis, its sign is either +/- sign(X)*sign(Y)
@@ -140,9 +140,12 @@ public class SensorManager {
 		for (int j = 0; j < 3; j++) {
 			final int offset = j * rowLength;
 			for (int i = 0; i < 3; i++) {
-				if (x == i)   outR[offset + i] = sx ? -inR[offset + 0] : inR[offset + 0];
-				if (y == i)   outR[offset + i] = sy ? -inR[offset + 1] : inR[offset + 1];
-				if (z == i)   outR[offset + i] = sz ? -inR[offset + 2] : inR[offset + 2];
+				if (x == i)
+					outR[offset + i] = sx ? -inR[offset + 0] : inR[offset + 0];
+				if (y == i)
+					outR[offset + i] = sy ? -inR[offset + 1] : inR[offset + 1];
+				if (z == i)
+					outR[offset + i] = sz ? -inR[offset + 2] : inR[offset + 2];
 			}
 		}
 		if (length == 16) {

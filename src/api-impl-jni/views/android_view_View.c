@@ -1108,8 +1108,7 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1layout(JNIEnv *env, jobjec
 	GskTransform *transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(allocation.x, allocation.y));
 	/* a matrix without inverse (scale 0) draws nothing, but AOSP hit-tests the view as if it had no matrix
 	 * (View.getInverseMatrix() falls back to the identity); GTK would invert it to NaN and pick the view anywhere */
-	wrapper->singular_matrix = wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform") &&
-	                           (_GET_FLOAT_FIELD(wrapper->jobj, "scaleX") == 0 || _GET_FLOAT_FIELD(wrapper->jobj, "scaleY") == 0);
+	wrapper->singular_matrix = wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform") && (_GET_FLOAT_FIELD(wrapper->jobj, "scaleX") == 0 || _GET_FLOAT_FIELD(wrapper->jobj, "scaleY") == 0);
 	if (wrapper->singular_matrix) {
 		gsk_transform_unref(transform);
 		transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(l, t));

@@ -24,7 +24,7 @@ import android.os.Looper;
  * AudioTrack and AudioRecord objects.
  */
 public interface AudioRouting {
-    /**
+	/**
      * Specifies an audio device (via an {@link AudioDeviceInfo} object) to route
      * the output/input to/from.
      * @param deviceInfo The {@link AudioDeviceInfo} specifying the audio sink or source.
@@ -32,23 +32,23 @@ public interface AudioRouting {
      * @return true if succesful, false if the specified {@link AudioDeviceInfo} is non-null and
      * does not correspond to a valid audio device.
      */
-    public boolean setPreferredDevice(AudioDeviceInfo deviceInfo);
+	public boolean setPreferredDevice(AudioDeviceInfo deviceInfo);
 
-    /**
+	/**
      * Returns the selected output/input specified by {@link #setPreferredDevice}. Note that this
      * is not guaranteed to correspond to the actual device being used for playback/recording.
      */
-    public AudioDeviceInfo getPreferredDevice();
+	public AudioDeviceInfo getPreferredDevice();
 
-    /**
+	/**
      * Returns an {@link AudioDeviceInfo} identifying the current routing of this
      * AudioTrack/AudioRecord.
      * Note: The query is only valid if the AudioTrack/AudioRecord is currently playing.
      * If it is not, <code>getRoutedDevice()</code> will return null.
      */
-    public AudioDeviceInfo getRoutedDevice();
+	public AudioDeviceInfo getRoutedDevice();
 
-    /**
+	/**
      * Adds an {@link AudioRouting.OnRoutingChangedListener} to receive notifications of routing
      * changes on this AudioTrack/AudioRecord.
      * @param listener The {@link AudioRouting.OnRoutingChangedListener} interface to receive
@@ -57,22 +57,22 @@ public interface AudioRouting {
      * the callback. If <code>null</code>, the {@link Handler} associated with the main
      * {@link Looper} will be used.
      */
-    public void addOnRoutingChangedListener(OnRoutingChangedListener listener,
-            Handler handler);
+	public void addOnRoutingChangedListener(OnRoutingChangedListener listener,
+	                                        Handler handler);
 
-    /**
+	/**
      * Removes an {@link AudioRouting.OnRoutingChangedListener} which has been previously added
      * to receive rerouting notifications.
      * @param listener The previously added {@link AudioRouting.OnRoutingChangedListener} interface
      * to remove.
      */
-    public void removeOnRoutingChangedListener(OnRoutingChangedListener listener);
+	public void removeOnRoutingChangedListener(OnRoutingChangedListener listener);
 
-    /**
+	/**
      * Defines the interface by which applications can receive notifications of routing
      * changes for the associated {@link AudioRouting}.
      */
-    public interface OnRoutingChangedListener {
-        public void onRoutingChanged(AudioRouting router);
-    }
+	public interface OnRoutingChangedListener {
+		public void onRoutingChanged(AudioRouting router);
+	}
 }

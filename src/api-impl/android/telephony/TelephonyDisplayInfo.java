@@ -18,7 +18,6 @@ package android.telephony;
 
 import android.os.Parcel;
 import android.os.Parcelable;
-
 import java.util.Objects;
 
 /**
@@ -32,43 +31,43 @@ import java.util.Objects;
  * Override the onDisplayInfoChanged() method to handle the broadcast.
  */
 public final class TelephonyDisplayInfo implements Parcelable {
-    /**
+	/**
      * No override. {@link #getNetworkType()} should be used for display network
      * type.
      */
-    public static final int OVERRIDE_NETWORK_TYPE_NONE = 0;
+	public static final int OVERRIDE_NETWORK_TYPE_NONE = 0;
 
-    /**
+	/**
      * Override network type when the device is connected to
      * {@link TelephonyManager#NETWORK_TYPE_LTE} cellular network and is using carrier aggregation.
      */
-    public static final int OVERRIDE_NETWORK_TYPE_LTE_CA = 1;
+	public static final int OVERRIDE_NETWORK_TYPE_LTE_CA = 1;
 
-    /**
+	/**
      * Override network type when the device is connected to advanced pro
      * {@link TelephonyManager#NETWORK_TYPE_LTE} cellular network.
      */
-    public static final int OVERRIDE_NETWORK_TYPE_LTE_ADVANCED_PRO = 2;
+	public static final int OVERRIDE_NETWORK_TYPE_LTE_ADVANCED_PRO = 2;
 
-    /**
+	/**
      * Override network type when the device is connected to
      * {@link TelephonyManager#NETWORK_TYPE_LTE} network and has E-UTRA-NR Dual Connectivity(EN-DC)
      * capability or is currently connected to the secondary
      * {@link TelephonyManager#NETWORK_TYPE_NR} cellular network.
      */
-    public static final int OVERRIDE_NETWORK_TYPE_NR_NSA = 3;
+	public static final int OVERRIDE_NETWORK_TYPE_NR_NSA = 3;
 
-    /**
+	/**
      * Override network type when the device is connected to
      * {@link TelephonyManager#NETWORK_TYPE_LTE} network and has E-UTRA-NR Dual Connectivity(EN-DC)
      * capability or is currently connected to the secondary
      * {@link TelephonyManager#NETWORK_TYPE_NR} cellular network on millimeter wave bands.
      * @deprecated Use{@link #OVERRIDE_NETWORK_TYPE_NR_ADVANCED} instead.
      */
-    @Deprecated
-    public static final int OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE = 4;
+	@Deprecated
+	public static final int OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE = 4;
 
-    /**
+	/**
      * Override network type when the device is connected NR cellular network and the data rate is
      * higher than the generic 5G date rate.
      * Including but not limited to
@@ -81,15 +80,15 @@ public final class TelephonyDisplayInfo implements Parcelable {
      * </ul>
      * One of the use case is that UX can show a different icon, for example, "5G+"
      */
-    public static final int OVERRIDE_NETWORK_TYPE_NR_ADVANCED = 5;
+	public static final int OVERRIDE_NETWORK_TYPE_NR_ADVANCED = 5;
 
-    private final int mNetworkType;
+	private final int mNetworkType;
 
-    private final int mOverrideNetworkType;
+	private final int mOverrideNetworkType;
 
-    private final boolean mIsRoaming;
+	private final boolean mIsRoaming;
 
-    /**
+	/**
      * Constructor
      *
      * @param networkType Current packet-switching cellular network type
@@ -98,13 +97,13 @@ public final class TelephonyDisplayInfo implements Parcelable {
      * @deprecated will not use this constructor anymore.
      * @hide
      */
-    @Deprecated
-    public TelephonyDisplayInfo(int networkType,
-            int overrideNetworkType) {
-        this(networkType, overrideNetworkType, false);
-    }
+	@Deprecated
+	public TelephonyDisplayInfo(int networkType,
+	                            int overrideNetworkType) {
+		this(networkType, overrideNetworkType, false);
+	}
 
-    /**
+	/**
      * Constructor
      *
      * @param networkType Current packet-switching cellular network type
@@ -113,43 +112,43 @@ public final class TelephonyDisplayInfo implements Parcelable {
      *
      * @hide
      */
-    public TelephonyDisplayInfo(int networkType,
-            int overrideNetworkType,
-            boolean isRoaming) {
-        mNetworkType = networkType;
-        mOverrideNetworkType = overrideNetworkType;
-        mIsRoaming = isRoaming;
-    }
+	public TelephonyDisplayInfo(int networkType,
+	                            int overrideNetworkType,
+	                            boolean isRoaming) {
+		mNetworkType = networkType;
+		mOverrideNetworkType = overrideNetworkType;
+		mIsRoaming = isRoaming;
+	}
 
-    /** @hide */
-    public TelephonyDisplayInfo(Parcel p) {
-        mNetworkType = p.readInt();
-        mOverrideNetworkType = p.readInt();
-        mIsRoaming = p.readBoolean();
-    }
+	/** @hide */
+	public TelephonyDisplayInfo(Parcel p) {
+		mNetworkType = p.readInt();
+		mOverrideNetworkType = p.readInt();
+		mIsRoaming = p.readBoolean();
+	}
 
-    /**
+	/**
      * Get current packet-switching cellular network type. This is the actual network type the
      * device is camped on.
      *
      * @return The network type.
      */
-    public int getNetworkType() {
-        return mNetworkType;
-    }
+	public int getNetworkType() {
+		return mNetworkType;
+	}
 
-    /**
+	/**
      * Get the override network type. Note the override network type is for market branding
      * or visualization purposes only. It cannot be treated as the actual network type device is
      * camped on.
      *
      * @return The override network type.
      */
-    public int getOverrideNetworkType() {
-        return mOverrideNetworkType;
-    }
+	public int getOverrideNetworkType() {
+		return mOverrideNetworkType;
+	}
 
-    /**
+	/**
      * Get device is roaming or not. Note the isRoaming is for market branding or visualization
      * purposes only. It cannot be treated as the actual roaming device is camped on.
      *
@@ -159,73 +158,82 @@ public final class TelephonyDisplayInfo implements Parcelable {
      * @see CarrierConfigManager#KEY_CDMA_ROAMING_NETWORKS_STRING_ARRAY
      * @see CarrierConfigManager#KEY_CDMA_NONROAMING_NETWORKS_STRING_ARRAY
      */
-    public boolean isRoaming() {
-        return mIsRoaming;
-    }
+	public boolean isRoaming() {
+		return mIsRoaming;
+	}
 
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
-        dest.writeInt(mNetworkType);
-        dest.writeInt(mOverrideNetworkType);
-        dest.writeBoolean(mIsRoaming);
-    }
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeInt(mNetworkType);
+		dest.writeInt(mOverrideNetworkType);
+		dest.writeBoolean(mIsRoaming);
+	}
 
-    public static final Parcelable.Creator<TelephonyDisplayInfo> CREATOR =
-            new Parcelable.Creator<TelephonyDisplayInfo>() {
-                @Override
-                public TelephonyDisplayInfo createFromParcel(Parcel source) {
-                    return new TelephonyDisplayInfo(source);
-                }
+	public static final Parcelable.Creator<TelephonyDisplayInfo> CREATOR =
+	    new Parcelable.Creator<TelephonyDisplayInfo>() {
+		    @Override
+		    public TelephonyDisplayInfo createFromParcel(Parcel source) {
+			    return new TelephonyDisplayInfo(source);
+		    }
 
-                @Override
-                public TelephonyDisplayInfo[] newArray(int size) {
-                    return new TelephonyDisplayInfo[size];
-                }
-            };
+		    @Override
+		    public TelephonyDisplayInfo[] newArray(int size) {
+			    return new TelephonyDisplayInfo[size];
+		    }
+	    };
 
-    @Override
-    public int describeContents() {
-        return 0;
-    }
+	@Override
+	public int describeContents() {
+		return 0;
+	}
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        TelephonyDisplayInfo that = (TelephonyDisplayInfo) o;
-        return mNetworkType == that.mNetworkType
-                && mOverrideNetworkType == that.mOverrideNetworkType
-                && mIsRoaming == that.mIsRoaming;
-    }
+	@Override
+	public boolean equals(Object o) {
+		if (this == o)
+			return true;
+		if (o == null || getClass() != o.getClass())
+			return false;
+		TelephonyDisplayInfo that = (TelephonyDisplayInfo)o;
+		return mNetworkType == that.mNetworkType
+		    && mOverrideNetworkType == that.mOverrideNetworkType
+		    && mIsRoaming == that.mIsRoaming;
+	}
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(mNetworkType, mOverrideNetworkType, mIsRoaming);
-    }
+	@Override
+	public int hashCode() {
+		return Objects.hash(mNetworkType, mOverrideNetworkType, mIsRoaming);
+	}
 
-    /**
+	/**
      * Convert override network type to string.
      *
      * @param type Override network type
      * @return Override network type in string format
      * @hide
      */
-    public static String overrideNetworkTypeToString(int type) {
-        switch (type) {
-            case OVERRIDE_NETWORK_TYPE_NONE: return "NONE";
-            case OVERRIDE_NETWORK_TYPE_LTE_CA: return "LTE_CA";
-            case OVERRIDE_NETWORK_TYPE_LTE_ADVANCED_PRO: return "LTE_ADV_PRO";
-            case OVERRIDE_NETWORK_TYPE_NR_NSA: return "NR_NSA";
-            case OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE: return "NR_NSA_MMWAVE";
-            case OVERRIDE_NETWORK_TYPE_NR_ADVANCED: return "NR_ADVANCED";
-            default: return "UNKNOWN";
-        }
-    }
+	public static String overrideNetworkTypeToString(int type) {
+		switch (type) {
+			case OVERRIDE_NETWORK_TYPE_NONE:
+				return "NONE";
+			case OVERRIDE_NETWORK_TYPE_LTE_CA:
+				return "LTE_CA";
+			case OVERRIDE_NETWORK_TYPE_LTE_ADVANCED_PRO:
+				return "LTE_ADV_PRO";
+			case OVERRIDE_NETWORK_TYPE_NR_NSA:
+				return "NR_NSA";
+			case OVERRIDE_NETWORK_TYPE_NR_NSA_MMWAVE:
+				return "NR_NSA_MMWAVE";
+			case OVERRIDE_NETWORK_TYPE_NR_ADVANCED:
+				return "NR_ADVANCED";
+			default:
+				return "UNKNOWN";
+		}
+	}
 
-    @Override
-    public String toString() {
-        return "TelephonyDisplayInfo {network=" + TelephonyManager.getNetworkTypeName(mNetworkType)
-                + ", overrideNetwork=" + overrideNetworkTypeToString(mOverrideNetworkType)
-                + ", isRoaming=" + mIsRoaming + "}";
-    }
+	@Override
+	public String toString() {
+		return "TelephonyDisplayInfo {network=" + TelephonyManager.getNetworkTypeName(mNetworkType)
+		     + ", overrideNetwork=" + overrideNetworkTypeToString(mOverrideNetworkType)
+		     + ", isRoaming=" + mIsRoaming + "}";
+	}
 }
