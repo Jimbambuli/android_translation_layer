@@ -186,6 +186,13 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
 	return ret;
 }
 
+/* the modifier keys of a GDK event as MotionEvent.getMetaState() (KeyEvent.META_*_ON; GDK does not tell left from right) */
+static int32_t meta_state(GdkEvent *event)
+{
+	GdkModifierType state = gdk_event_get_modifier_state(event);
+	return (state & GDK_SHIFT_MASK ? 0x1 /* META_SHIFT_ON */ : 0) | (state & GDK_ALT_MASK ? 0x2 /* META_ALT_ON */ : 0) | (state & GDK_CONTROL_MASK ? 0x1000 /* META_CTRL_ON */ : 0) | (state & GDK_SUPER_MASK ? 0x10000 /* META_META_ON */ : 0) | (state & GDK_LOCK_MASK ? 0x100000 /* META_CAPS_LOCK_ON */ : 0);
+}
+
 static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct pointer pointers[MAX_POINTERS], GPtrArray *pointer_indices, GtkPropagationPhase phase, guint32 timestamp, GdkEvent *event, int32_t source, int32_t button_state)
 {
 	bool ret;
@@ -203,6 +210,7 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
 
 	jobject motion_event = J_new__MotionEvent(env, source, action, timestamp, ids, coords);
 	_SET_INT_FIELD(motion_event, "buttonState", button_state);
+	_SET_INT_FIELD(motion_event, "metaState", meta_state(event));
 
 	ret = view_dispatch_motionevent(env, wrapper, phase, motion_event, event, action);
 

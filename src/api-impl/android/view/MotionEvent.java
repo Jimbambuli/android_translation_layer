@@ -1432,6 +1432,8 @@ public final class MotionEvent extends InputEvent {
 	long eventTime;
 	/* only kept for mouse events, see getButtonState() */
 	int buttonState;
+	/* the modifier keys held (KeyEvent.META_*), set for the pointer events from GDK */
+	int metaState;
 	int actionButton;
 	int[] ids;
 	/* the edges of the screen the event touched (EDGE_*), as given to obtain() or setEdgeFlags() */
@@ -1493,6 +1495,7 @@ public final class MotionEvent extends InputEvent {
 		ev.prepareForReuse();
 		ev.buttonState = 0;
 		ev.actionButton = 0;
+		ev.metaState = 0;
 		return ev;
 	}
 
@@ -1540,6 +1543,7 @@ public final class MotionEvent extends InputEvent {
 		ev.action = action;
 		ev.eventTime = eventTime;
 		ev.buttonState = buttonState;
+		ev.metaState = metaState;
 		ev.ids = new int[pointerCount];
 		ev.coords = new float[pointerCount * 4];
 		for (int i = 0; i < pointerCount; i++) {
@@ -1753,6 +1757,7 @@ public final class MotionEvent extends InputEvent {
 		ev.action = other.action;
 		ev.buttonState = other.buttonState;
 		ev.actionButton = other.actionButton;
+		ev.metaState = other.metaState;
 		ev.ids = other.ids.clone();
 		ev.mEdgeFlags = other.mEdgeFlags;
 		ev.coords = other.coords.clone();
@@ -2050,8 +2055,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see #AXIS_PRESSURE
 	 */
 	public final float getPressure() {
-		//return nativeGetAxisValue(mNativePtr, AXIS_PRESSURE, 0, HISTORY_CURRENT);
-		return 0;
+		return getPressure(0);
 	}
 
 	/**
@@ -2241,9 +2245,15 @@ public final class MotionEvent extends InputEvent {
 	 *
 	 * @see #AXIS_PRESSURE
 	 */
+	/* AOSP's InputReader for devices without a pressure axis: a pointer that touches has pressure 1, a mouse 1
+	 * while a button is held (CursorInputMapper), a hovering pointer 0 */
 	public final float getPressure(int pointerIndex) {
-		//return nativeGetAxisValue(mNativePtr, AXIS_PRESSURE, pointerIndex, HISTORY_CURRENT);
-		return 0;
+		final int actionMasked = getActionMasked();
+		if (actionMasked == ACTION_HOVER_ENTER || actionMasked == ACTION_HOVER_MOVE || actionMasked == ACTION_HOVER_EXIT || actionMasked == ACTION_SCROLL)
+			return 0;
+		if (isFromSource(InputDevice.SOURCE_MOUSE))
+			return buttonState != 0 ? 1 : 0;
+		return 1;
 	}
 
 	/**
@@ -2413,8 +2423,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see KeyEvent#getMetaState()
 	 */
 	public final int getMetaState() {
-		// return nativeGetMetaState(mNativePtr);
-		return 0;
+		return metaState;
 	}
 
 	/**
