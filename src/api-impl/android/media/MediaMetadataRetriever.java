@@ -11,7 +11,6 @@ import java.util.Map;
 
 public class MediaMetadataRetriever implements AutoCloseable {
 
-	private MediaPlayer mediaPlayer;
 	/* the data source for frame extraction: a path, or a region of a file descriptor */
 	private String path;
 	private FileDescriptor fd;
@@ -21,8 +20,6 @@ public class MediaMetadataRetriever implements AutoCloseable {
 	private String[] metadata;
 
 	public void release() {
-		if (mediaPlayer != null)
-			mediaPlayer.release();
 		if (tempFile != null)
 			tempFile.delete();
 	}
@@ -34,8 +31,6 @@ public class MediaMetadataRetriever implements AutoCloseable {
 	public void setDataSource(String path) {
 		this.path = path;
 		metadata = null;
-		mediaPlayer = new MediaPlayer();
-		mediaPlayer.setDataSource(path);
 	}
 
 	/* request headers are not supported by the media backend */
@@ -48,8 +43,6 @@ public class MediaMetadataRetriever implements AutoCloseable {
 		fdOffset = offset;
 		fdLength = length;
 		metadata = null;
-		mediaPlayer = new MediaPlayer();
-		mediaPlayer.setDataSource(fd, offset, length);
 	}
 
 	/* the media backend reads files, so the data source is copied into a temporary file that
