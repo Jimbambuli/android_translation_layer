@@ -252,6 +252,13 @@ public class MediaCodec {
 		}
 	}
 
+	/* AOSP MediaCodec.queueSecureInputBuffer(): ATL has no DRM (MediaDrm supports no scheme), so no codec
+	 * decrypts; AOSP's MediaCodec refuses a secure buffer without crypto or descrambler with BAD_VALUE, which
+	 * the JNI layer throws as IllegalArgumentException */
+	public final void queueSecureInputBuffer(int index, int offset, CryptoInfo info, long presentationTimeUs, int flags) {
+		throw new IllegalArgumentException("queuing secure buffer without mCrypto or mDescrambler!");
+	}
+
 	public synchronized void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags) {
 		if ((flags & BUFFER_FLAG_END_OF_STREAM) != 0) {
 			queuedInputBuffers.add(-1);
