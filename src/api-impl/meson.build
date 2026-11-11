@@ -912,6 +912,7 @@ srcs = [
 	'android/util/ContainerHelpers.java',
 	'android/util/DecompiledXmlResourceParser.java',
 	'android/util/DisplayMetrics.java',
+	'android/util/EventLog.java',
 	'android/util/FloatMath.java',
 	'android/util/FloatProperty.java',
 	'android/util/Half.java',
