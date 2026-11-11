@@ -17,6 +17,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.ParcelFileDescriptor;
 import android.provider.MediaStore;
 import android.text.TextUtils;
@@ -43,9 +45,9 @@ import java.util.regex.Pattern;
 
 /* MediaStore's provider (authority "media") after AOSP 14's MediaProvider: a SQLite index of the shared storage
  * (the table files and the views of DatabaseHelper), which answers queries without any user interface. The
- * shared storage is the user's folders Pictures, Music, Videos and Download (read only; Pictures/, Music/,
- * Movies/ and Download/ to the app) and the standard directories of ATL's external storage (the app data dir),
- * where insert() puts new media. The index lives in the app data dir and is brought up to date (like
+ * shared storage is the user's folders Pictures, Music, Videos and Download (Pictures/, Music/, Movies/ and
+ * Download/ to the app; only Download is written to) and the standard directories of ATL's external storage
+ * (the app data dir), where insert() puts new media. The index lives in the app data dir and is brought up to date (like
  * ModernMediaScanner) on the first use in a process. Picking a file is the file dialog of ACTION_OPEN_DOCUMENT,
  * GET_CONTENT and ACTION_PICK_IMAGES (Activity), not this provider. */
 public class ATLMediaContentProvider extends ContentProvider {
@@ -937,8 +939,8 @@ public class ATLMediaContentProvider extends ContentProvider {
 		return null;
 	}
 
-	/* the file of an item; writing only to the items this app inserted (the user's folders are read only),
-	 * album art as the picture embedded in a song */
+	/* the file of an item; writing only to the items this app inserted, which are read again when the file is
+	 * closed (MediaProvider's onOpenFileClose() scans it); album art as the picture embedded in a song */
 	@Override
 	public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
 		final int match = MATCHER.match(uri);
@@ -948,16 +950,43 @@ public class ATLMediaContentProvider extends ContentProvider {
 			throw new FileNotFoundException("No file for " + uri);
 		String path;
 		String owner;
-		try (Cursor c = queryItem(uri, new String[] {"_data", "owner_package_name"})) {
+		long id;
+		try (Cursor c = queryItem(uri, new String[] {"_data", "owner_package_name", "_id"})) {
 			if (c == null)
 				throw new FileNotFoundException("No item at " + uri);
 			path = c.getString(0);
 			owner = c.getString(1);
+			id = c.getLong(2);
 		}
 		int modeBits = ParcelFileDescriptor.parseMode(mode);
-		if ((modeBits & ParcelFileDescriptor.MODE_READ_ONLY) != modeBits && !packageName().equals(owner))
+		if ((modeBits & ParcelFileDescriptor.MODE_READ_ONLY) == modeBits)
+			return ParcelFileDescriptor.open(new File(path), modeBits);
+		if (!packageName().equals(owner))
 			throw new SecurityException(packageName() + " has no access to " + uri);
-		return ParcelFileDescriptor.open(new File(path), modeBits);
+		final File file = new File(path);
+		try {
+			return ParcelFileDescriptor.open(file, modeBits, getHandler(), e -> {
+				ContentValues values = new ContentValues();
+				values.put("_size", file.length());
+				values.put("date_modified", file.lastModified() / 1000);
+				getDatabase().update("files", values, "_id=" + id, null);
+			});
+		} catch (FileNotFoundException e) {
+			throw e;
+		} catch (IOException e) {
+			throw new FileNotFoundException(e.toString());
+		}
+	}
+
+	private static Handler handler;
+
+	private static synchronized Handler getHandler() {
+		if (handler == null) {
+			HandlerThread thread = new HandlerThread(TAG);
+			thread.start();
+			handler = new Handler(thread.getLooper());
+		}
+		return handler;
 	}
 
 	private ParcelFileDescriptor openAlbumArt(Uri uri, int match) throws FileNotFoundException {
@@ -994,8 +1023,8 @@ public class ATLMediaContentProvider extends ContentProvider {
 	}
 
 	/* MediaProvider.insertFile() for a new item: the file is created in the standard directory of ATL's external
-	 * storage; a directory that is a link to the user's folders is not written to (null, as a provider that
-	 * fails) */
+	 * storage, Download/ is the user's Download folder where main.c's link_media_dirs() linked it; the other
+	 * links to the user's folders (Music, Movies) are not written to (null, as a provider that fails) */
 	@Override
 	public Uri insert(Uri uri, ContentValues initialValues) {
 		final int match = MATCHER.match(uri);
@@ -1051,11 +1080,13 @@ public class ATLMediaContentProvider extends ContentProvider {
 		File file;
 		try {
 			String base = external.getCanonicalPath() + "/";
-			dir.mkdirs();
-			if (!dir.getCanonicalPath().startsWith(base) || relativePath.contains("../")) {
+			String download = new File(external, "Download").getCanonicalPath() + "/";
+			String target = dir.getCanonicalPath() + "/";
+			if (!(target.startsWith(base) || relativePath.startsWith("Download/") && target.startsWith(download)) || relativePath.contains("../")) {
 				Log.w(TAG, "insert " + uri + ": " + relativePath + " is not in the app's storage, not written");
 				return null;
 			}
+			dir.mkdirs();
 			file = new File(dir, displayName);
 			/* FileUtils.buildUniqueFile() */
 			String name = extractFileName(displayName);
