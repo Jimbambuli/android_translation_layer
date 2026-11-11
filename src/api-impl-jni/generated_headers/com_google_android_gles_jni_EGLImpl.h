@@ -41,6 +41,22 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGet
 
 /*
  * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglGetCurrentContext
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentContext
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglQueryString
+ * Signature: (JI)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQueryString
+  (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
  * Method:    native_eglInitialize
  * Signature: (J[I)Z
  */

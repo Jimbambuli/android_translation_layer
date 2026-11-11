@@ -159,3 +159,14 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCre
 	release_int_array_crit(env, _attrib_list, attrib_list);
 	return _INTPTR(ret);
 }
+
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentContext(JNIEnv *env, jobject this)
+{
+	return _INTPTR(eglGetCurrentContext());
+}
+
+JNIEXPORT jstring JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQueryString(JNIEnv *env, jobject this, jlong display, jint name)
+{
+	const char *ret = eglQueryString(_PTR(display), name);
+	return ret ? (*env)->NewStringUTF(env, ret) : NULL;
+}

@@ -88,6 +88,18 @@ public class EGL14 {
 		return impl.eglDestroyContext(raw_display, raw_context);
 	}
 
+	public static EGLContext eglGetCurrentContext() {
+		javax.microedition.khronos.egl.EGLContext raw_context = impl.eglGetCurrentContext();
+		if (raw_context == EGL10.EGL_NO_CONTEXT)
+			return EGL_NO_CONTEXT;
+		else
+			return new EGLContext(raw_context.native_egl_context);
+	}
+
+	public static String eglQueryString(EGLDisplay display, int name) {
+		return impl.eglQueryString(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), name);
+	}
+
 	public static boolean eglReleaseThread() {
 		return impl.eglReleaseThread();
 	}
