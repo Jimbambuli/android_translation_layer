@@ -205,7 +205,7 @@ JNIEXPORT jlong JNICALL Java_android_media_SoundPool_native_1setup(JNIEnv *env, 
 	return _INTPTR(pool);
 }
 
-/* the whole file (fd region) as 16 bit PCM in its own rate, mono or stereo: 0, or an error */
+/* the whole file (fd region) as 16 bit PCM in its own rate, mono or stereo: 0, or AOSP's UNKNOWN_ERROR */
 static int decode(struct fd_region *region, struct sample *sample)
 {
 	AVIOContext *io;
@@ -215,7 +215,7 @@ static int decode(struct fd_region *region, struct sample *sample)
 	AVPacket *packet = av_packet_alloc();
 	AVFrame *frame = av_frame_alloc();
 	GByteArray *pcm = g_byte_array_new();
-	int ret = -1;
+	int ret = INT32_MIN; /* UNKNOWN_ERROR */
 
 	if (!format)
 		goto out;
@@ -226,7 +226,8 @@ static int decode(struct fd_region *region, struct sample *sample)
 	codec = avcodec_alloc_context3(decoder);
 	if (avcodec_parameters_to_context(codec, format->streams[index]->codecpar) < 0 || avcodec_open2(codec, decoder, NULL) < 0)
 		goto out;
-	if (codec->sample_rate <= 0 || codec->ch_layout.nb_channels <= 0)
+	/* AOSP Sound::doLoad(): at most 192 kHz and 8 channels */
+	if (codec->sample_rate <= 0 || codec->sample_rate > 192000 || codec->ch_layout.nb_channels <= 0 || codec->ch_layout.nb_channels > 8)
 		goto out;
 	if (codec->ch_layout.order == AV_CHANNEL_ORDER_UNSPEC)
 		av_channel_layout_default(&codec->ch_layout, codec->ch_layout.nb_channels);
@@ -297,9 +298,10 @@ JNIEXPORT jint JNICALL Java_android_media_SoundPool_native_1decode(JNIEnv *env, 
 	struct sample *sample = g_new0(struct sample, 1);
 	sample->refs = 1;
 
-	if (decode(&region, sample) != 0) {
+	int ret = decode(&region, sample);
+	if (ret != 0) {
 		g_free(sample);
-		return -1;
+		return ret;
 	}
 	g_mutex_lock(&pool->lock);
 	g_hash_table_insert(pool->samples, GINT_TO_POINTER(sample_id), sample);
@@ -384,9 +386,10 @@ JNIEXPORT void JNICALL Java_android_media_SoundPool_native_1command(JNIEnv *env,
 					s->state = STREAM_PAUSED;
 				break;
 			case CMD_RESUME:
-				if (s->state == STREAM_PAUSED)
+				if (s->state == STREAM_PAUSED) {
 					s->state = STREAM_PLAYING;
-				s->auto_paused = FALSE;
+					s->auto_paused = FALSE;
+				}
 				break;
 			case CMD_STOP:
 				stream_free(s);

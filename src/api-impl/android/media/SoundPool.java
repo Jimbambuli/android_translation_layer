@@ -174,20 +174,24 @@ public class SoundPool {
 		return nativePool != 0 && native_unload(nativePool, soundID);
 	}
 
-	/* the range of the documentation: volume 0.0 to 1.0, rate 0.5 to 2.0; returns 0 if the sound is not
-	 * (yet) loaded or no stream is free for its priority */
+	/* returns 0 if the sound is not (yet) loaded or no stream is free for its priority; the arguments are
+	 * checked like AOSP's SoundPool::play() */
 	public final int play(int soundID, float leftVolume, float rightVolume, int priority, int loop, float rate) {
 		if (nativePool == 0)
 			return 0;
-		return native_play(nativePool, soundID, volume(leftVolume), volume(rightVolume), priority, loop, rate(rate));
+		if (!validVolume(leftVolume, rightVolume))
+			leftVolume = rightVolume = 1.f;
+		return native_play(nativePool, soundID, leftVolume, rightVolume, priority, Math.max(loop, -1), rate(rate));
 	}
 
-	private static float volume(float v) {
-		return Math.max(0.f, Math.min(1.f, v));
+	/* AOSP checkVolume(): a volume outside 0.0 to 1.0 makes both 1.0 (for backward compatibility) */
+	private static boolean validVolume(float left, float right) {
+		return left >= 0.f && left <= 1.f && right >= 0.f && right <= 1.f;
 	}
 
+	/* AOSP checkRate(): clamped to 0.125 to 8.0 */
 	private static float rate(float r) {
-		return Math.max(0.5f, Math.min(2.f, r));
+		return Math.max(0.125f, Math.min(8.f, r));
 	}
 
 	private static final int CMD_PAUSE = 0;
@@ -226,7 +230,9 @@ public class SoundPool {
 	}
 
 	public final void setVolume(int streamID, float leftVolume, float rightVolume) {
-		command(streamID, CMD_VOLUME, 0, volume(leftVolume), volume(rightVolume));
+		if (!validVolume(leftVolume, rightVolume))
+			leftVolume = rightVolume = 1.f;
+		command(streamID, CMD_VOLUME, 0, leftVolume, rightVolume);
 	}
 
 	public void setVolume(int streamID, float volume) {
@@ -238,7 +244,7 @@ public class SoundPool {
 	}
 
 	public final void setLoop(int streamID, int loop) {
-		command(streamID, CMD_LOOP, loop, 0, 0);
+		command(streamID, CMD_LOOP, Math.max(loop, -1), 0, 0);
 	}
 
 	public final void setRate(int streamID, float rate) {
