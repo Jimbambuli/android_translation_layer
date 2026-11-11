@@ -110,7 +110,13 @@ public class StaticLayout extends Layout {
 			return this;
 		}
 
-		public Builder setUseLineSpacingFromFallbacks(boolean useLineSpacingFromFallbacks) { return this; }
+		/* Pango sizes each line by all the fonts in it, fallback fonts included, so the lines always have the
+		 * spacing this asks for; the flag is kept for isFallbackLineSpacingEnabled() */
+		public Builder setUseLineSpacingFromFallbacks(boolean useLineSpacingFromFallbacks) {
+			this.useLineSpacingFromFallbacks = useLineSpacingFromFallbacks;
+			return this;
+		}
+		private boolean useLineSpacingFromFallbacks;
 
 		/* Android 15 (a @FlaggedApi in android-14.0.0_r75, which has it): the width of the layout from the bounding
 		 * boxes of the glyphs instead of their advances. The flag is kept and reported by Layout.getUseBoundsForWidth();
@@ -139,12 +145,15 @@ public class StaticLayout extends Layout {
 				layout.setHyphenation(hyphenationFrequency != 0);
 			layout.setMaxLines(maxLines, ellipsize);
 			layout.mUseBoundsForWidth = useBoundsForWidth;
+			layout.mFallbackLineSpacing = useLineSpacingFromFallbacks;
 			return layout;
 		}
 	}
 
-	/* API 33 */
+	/* API 33: what the Builder was given (setUseLineSpacingFromFallbacks()) */
+	private boolean mFallbackLineSpacing;
+
 	public boolean isFallbackLineSpacingEnabled() {
-		return false;
+		return mFallbackLineSpacing;
 	}
 }
