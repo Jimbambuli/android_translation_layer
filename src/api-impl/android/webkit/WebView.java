@@ -71,9 +71,27 @@ public class WebView extends ViewGroup {
 		return super.onGenericMotionEvent(event);
 	}
 
+	/* AOSP WebView.getSettings(): one WebSettings per WebView, whose setters reach WebKit's settings */
+	private WebSettings settings;
+
 	public WebSettings getSettings() {
-		return new WebSettings();
+		if (settings == null)
+			settings = new WebSettings(this);
+		return settings;
 	}
+
+	void setWebKitSetting(String name, boolean value) {
+		if (!isDestroyed())
+			native_setBooleanSetting(widget, name, value);
+	}
+
+	void setWebKitSetting(String name, String value) {
+		if (!isDestroyed())
+			native_setStringSetting(widget, name, value);
+	}
+
+	private native void native_setBooleanSetting(long widget, String name, boolean value);
+	private native void native_setStringSetting(long widget, String name, String value);
 
 	public void setDownloadListener(DownloadListener downloadListener) {}
 

@@ -251,6 +251,14 @@ extern "C" {
 #define android_webkit_WebView_PFLAG_PREPRESSED 33554432L
 #undef android_webkit_WebView_PFLAG_SAVE_STATE_CALLED
 #define android_webkit_WebView_PFLAG_SAVE_STATE_CALLED 131072L
+#undef android_webkit_WebView_SCROLL_CAPTURE_HINT_AUTO
+#define android_webkit_WebView_SCROLL_CAPTURE_HINT_AUTO 0L
+#undef android_webkit_WebView_SCROLL_CAPTURE_HINT_EXCLUDE
+#define android_webkit_WebView_SCROLL_CAPTURE_HINT_EXCLUDE 1L
+#undef android_webkit_WebView_SCROLL_CAPTURE_HINT_INCLUDE
+#define android_webkit_WebView_SCROLL_CAPTURE_HINT_INCLUDE 2L
+#undef android_webkit_WebView_SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS
+#define android_webkit_WebView_SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS 4L
 #undef android_webkit_WebView_LAYER_TYPE_NONE
 #define android_webkit_WebView_LAYER_TYPE_NONE 0L
 #undef android_webkit_WebView_LAYER_TYPE_SOFTWARE
@@ -363,6 +371,22 @@ extern "C" {
 #define android_webkit_WebView_LAYOUT_MODE_UNDEFINED -1L
 #undef android_webkit_WebView_LAYOUT_MODE_DEFAULT
 #define android_webkit_WebView_LAYOUT_MODE_DEFAULT 0L
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setBooleanSetting
+ * Signature: (JLjava/lang/String;Z)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBooleanSetting
+  (JNIEnv *, jobject, jlong, jstring, jboolean);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setStringSetting
+ * Signature: (JLjava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setStringSetting
+  (JNIEnv *, jobject, jlong, jstring, jstring);
+
 /*
  * Class:     android_webkit_WebView
  * Method:    native_constructor

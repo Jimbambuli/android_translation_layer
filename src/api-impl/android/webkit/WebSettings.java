@@ -2,6 +2,21 @@ package android.webkit;
 
 public class WebSettings {
 
+	/* the WebView whose WebKitSettings the setters change (null: a WebSettings without view) */
+	private final WebView webView;
+	private Boolean javaScriptEnabled;
+	private boolean allowFileAccessFromFileURLs;
+	private boolean allowUniversalAccessFromFileURLs;
+	private String serifFontFamily = "serif";
+
+	WebSettings(WebView webView) {
+		this.webView = webView;
+	}
+
+	public WebSettings() {
+		this(null);
+	}
+
 	public static enum LayoutAlgorithm {
 		NORMAL,
 		NARROW_COLUMNS,
@@ -23,7 +38,13 @@ public class WebSettings {
 
 	public void setSupportMultipleWindows(boolean supportMultipleWindows) {}
 
-	public void setJavaScriptEnabled(boolean javaScriptEnabled) {}
+	/* AOSP WebSettings.setJavaScriptEnabled(): the page's scripts (WebKit enable-javascript-markup; ATL's own
+	 * user scripts keep running). Until the app sets it, WebKit's default (on) stays, unlike AOSP's off */
+	public void setJavaScriptEnabled(boolean javaScriptEnabled) {
+		this.javaScriptEnabled = javaScriptEnabled;
+		if (webView != null)
+			webView.setWebKitSetting("enable-javascript-markup", javaScriptEnabled);
+	}
 
 	public void setSavePassword(boolean savePassword) {}
 
@@ -82,7 +103,17 @@ public class WebSettings {
 
 	public void setDatabasePath(String path) {}
 
-	public void setAllowUniversalAccessFromFileURLs(boolean allow) {}
+	/* AOSP WebSettings.setAllowUniversalAccessFromFileURLs()/setAllowFileAccessFromFileURLs(): what scripts of
+	 * file: pages may load (WebKit allow-universal-access-from-file-urls/allow-file-access-from-file-urls) */
+	public void setAllowUniversalAccessFromFileURLs(boolean allow) {
+		allowUniversalAccessFromFileURLs = allow;
+		if (webView != null)
+			webView.setWebKitSetting("allow-universal-access-from-file-urls", allow);
+	}
+
+	public boolean getAllowUniversalAccessFromFileURLs() {
+		return allowUniversalAccessFromFileURLs;
+	}
 
 	public void setGeolocationDatabasePath(String path) {}
 
@@ -90,11 +121,28 @@ public class WebSettings {
 
 	public void setAllowContentAccess(boolean allow) {}
 
-	public void setAllowFileAccessFromFileURLs(boolean allow) {}
+	public void setAllowFileAccessFromFileURLs(boolean allow) {
+		allowFileAccessFromFileURLs = allow;
+		if (webView != null)
+			webView.setWebKitSetting("allow-file-access-from-file-urls", allow);
+	}
+
+	public boolean getAllowFileAccessFromFileURLs() {
+		return allowFileAccessFromFileURLs;
+	}
 
 	public void setStandardFontFamily(String font) {}
 
-	public void setSerifFontFamily(String font) {}
+	/* AOSP WebSettings.setSerifFontFamily(): WebKit serif-font-family */
+	public void setSerifFontFamily(String font) {
+		serifFontFamily = font;
+		if (webView != null)
+			webView.setWebKitSetting("serif-font-family", font);
+	}
+
+	public String getSerifFontFamily() {
+		return serifFontFamily;
+	}
 
 	public void setSansSerifFontFamily(String font) {}
 
@@ -123,6 +171,6 @@ public class WebSettings {
 	}
 
 	public boolean getJavaScriptEnabled() {
-		return true; // JavaScript is always enabled in our WebKitWebView
+		return javaScriptEnabled != null ? javaScriptEnabled : true; // WebKit's default until set, see setJavaScriptEnabled()
 	}
 }

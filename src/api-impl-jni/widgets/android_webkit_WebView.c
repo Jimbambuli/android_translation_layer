@@ -697,3 +697,26 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1destroy(JNIEnv *env,
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), placeholder);
 	return _INTPTR(placeholder);
 }
+
+/* WebSettings: a property of the view's WebKitSettings */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setBooleanSetting(JNIEnv *env, jobject this, jlong widget_ptr, jstring name, jboolean value)
+{
+	WebKitWebView *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // destroyed, or WebViews are disabled
+		return;
+	const char *name_str = (*env)->GetStringUTFChars(env, name, NULL);
+	g_object_set(webkit_web_view_get_settings(webview), name_str, (gboolean)value, NULL);
+	(*env)->ReleaseStringUTFChars(env, name, name_str);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setStringSetting(JNIEnv *env, jobject this, jlong widget_ptr, jstring name, jstring value)
+{
+	WebKitWebView *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview) || !value)
+		return;
+	const char *name_str = (*env)->GetStringUTFChars(env, name, NULL);
+	const char *value_str = (*env)->GetStringUTFChars(env, value, NULL);
+	g_object_set(webkit_web_view_get_settings(webview), name_str, value_str, NULL);
+	(*env)->ReleaseStringUTFChars(env, value, value_str);
+	(*env)->ReleaseStringUTFChars(env, name, name_str);
+}
