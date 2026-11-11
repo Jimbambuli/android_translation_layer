@@ -388,6 +388,12 @@ public final class Bitmap implements Parcelable {
 		return hasAlpha;
 	}
 
+	/* AOSP Bitmap.asShared() (API 31): an immutable bitmap in shared memory that can go to another process
+	 * without a copy; ATL has no ashmem, an immutable bitmap stands in for it */
+	public Bitmap asShared() {
+		return isMutable() ? copy(getConfig(), false) : this;
+	}
+
 	/* AOSP: whether the decoder attached the gainmap of an Ultra HDR image; ATL's decoders never read one */
 	public boolean hasGainmap() {
 		return false;

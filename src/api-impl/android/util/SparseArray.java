@@ -420,4 +420,49 @@ public class SparseArray<E> implements Cloneable {
 		buffer.append('}');
 		return buffer.toString();
 	}
+	/**
+	 * Compares the contents of this {@link SparseArray} to the specified {@link SparseArray}.
+	 *
+	 * For backwards compatibility reasons, {@link Object#equals(Object)} cannot be implemented,
+	 * so this serves as a manually invoked alternative.
+	 */
+	public boolean contentEquals(SparseArray<?> other) {
+		if (other == null) {
+			return false;
+		}
+
+		int size = size();
+		if (size != other.size()) {
+			return false;
+		}
+
+		// size() calls above took care about gc() compaction.
+		for (int index = 0; index < size; index++) {
+			if (mKeys[index] != other.mKeys[index] || !java.util.Objects.equals(mValues[index], other.mValues[index])) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Returns a hash code value for the contents of this {@link SparseArray}, combining the
+	 * {@link Objects#hashCode(Object)} result of all its keys and values.
+	 *
+	 * For backwards compatibility, {@link Object#hashCode()} cannot be implemented, so this serves
+	 * as a manually invoked alternative.
+	 */
+	public int contentHashCode() {
+		int hash = 0;
+		int size = size();
+		// size() call above took care about gc() compaction.
+		for (int index = 0; index < size; index++) {
+			int key = mKeys[index];
+			E value = (E)mValues[index];
+			hash = 31 * hash + key;
+			hash = 31 * hash + java.util.Objects.hashCode(value);
+		}
+		return hash;
+	}
 }
