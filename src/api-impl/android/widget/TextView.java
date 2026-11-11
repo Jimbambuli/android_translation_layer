@@ -161,6 +161,18 @@ public class TextView extends View {
 				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_maxEms))
+				setMaxEms(a.getInt(com.android.internal.R.styleable.TextView_maxEms, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_maxWidth))
+				setMaxWidth(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_maxWidth, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_ems))
+				setEms(a.getInt(com.android.internal.R.styleable.TextView_ems, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_width))
+				setWidth(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_width, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minEms))
+				setMinEms(a.getInt(com.android.internal.R.styleable.TextView_minEms, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minWidth))
+				setMinWidth(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_minWidth, -1));
 			mCursorDrawableRes = a.getResourceId(com.android.internal.R.styleable.TextView_textCursorDrawable, 0);
 			int max_length = a.getInt(com.android.internal.R.styleable.TextView_maxLength, -1);
 			if (max_length >= 0)
@@ -266,9 +278,9 @@ public class TextView extends View {
 		/* as AOSP's setText(): the buffer type (or a movement method, which needs spans) decides what getText()
 		 * returns; the Editor, PrecomputedText and autoLink parts of AOSP do not apply here */
 		if (type == BufferType.EDITABLE || needEditableForNotification) {
-			text = Editable.Factory.getInstance().newEditable(text);
+			text = mEditableFactory.newEditable(text);
 		} else if (type == BufferType.SPANNABLE || mMovement != null) {
-			text = Spannable.Factory.getInstance().newSpannable(text);
+			text = mSpannableFactory.newSpannable(text);
 		} else {
 			text = TextUtils.stringOrSpannedString(text);
 		}
@@ -1036,7 +1048,19 @@ public class TextView extends View {
 	public void setSaveEnabled(boolean enabled) {}
 
 
-	public void setEditableFactory(Editable.Factory factory) {}
+	/* AOSP TextView.setEditableFactory()/setSpannableFactory(): the factories setText() makes its buffers with */
+	private Editable.Factory mEditableFactory = Editable.Factory.getInstance();
+	private Spannable.Factory mSpannableFactory = Spannable.Factory.getInstance();
+
+	public void setEditableFactory(Editable.Factory factory) {
+		mEditableFactory = factory;
+		setText(text);
+	}
+
+	public void setSpannableFactory(Spannable.Factory factory) {
+		mSpannableFactory = factory;
+		setText(text);
+	}
 
 	public int getInputType() { return mInputType; }
 
@@ -1283,6 +1307,28 @@ public class TextView extends View {
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		native_setFontPadding(widget, include_padding);
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+		/* AOSP TextView.onMeasure(): unless the width is exact, it is limited by maxWidth/maxEms and minWidth/minEms
+		 * (setWidth(), android:width ...); the height then follows from the text in that width */
+		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+		if (widthMode == MeasureSpec.EXACTLY)
+			return;
+		int width = getMeasuredWidth();
+		if (mMaxWidthMode == EMS) {
+			width = Math.min(width, mMaxWidth * getLineHeight());
+		} else {
+			width = Math.min(width, mMaxWidth);
+		}
+		if (mMinWidthMode == EMS) {
+			width = Math.max(width, mMinWidth * getLineHeight());
+		} else {
+			width = Math.max(width, mMinWidth);
+		}
+		width = Math.max(width, getSuggestedMinimumWidth());
+		if (widthMode == MeasureSpec.AT_MOST) {
+			width = Math.min(MeasureSpec.getSize(widthMeasureSpec), width);
+		}
+		if (width != getMeasuredWidth())
+			super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), heightMeasureSpec);
 	}
 	private native void native_setFontPadding(long widget, boolean include);
 
@@ -1324,7 +1370,14 @@ public class TextView extends View {
 
 	public void clearComposingText() {}
 
-	public void setWidth(int width) {}
+	/* AOSP TextView.setWidth(): exactly this wide (as minimum and maximum width) */
+	public void setWidth(int pixels) {
+		mMaxWidth = mMinWidth = pixels;
+		mMaxWidthMode = mMinWidthMode = PIXELS;
+		requestLayout();
+		invalidate();
+	}
+
 	public void setHeight(int height) {}
 
 	public void setFreezesText(boolean freezesText) {}
