@@ -93,11 +93,63 @@ public class ContentResolver {
 
 	public static final String SYNC_EXTRAS_IGNORE_SETTINGS = "ignore_settings";
 
+	/* AOSP ContentService's observers, for the process: an observer hears of changes of its URI, of the URI's
+	 * ancestors, and with notifyForDescendants of the URI's descendants (ObserverNode.collectObserversLocked()) */
+	private static final class Observation {
+		final Uri uri;
+		final boolean notifyForDescendants;
+		final ContentObserver observer;
+
+		Observation(Uri uri, boolean notifyForDescendants, ContentObserver observer) {
+			this.uri = uri;
+			this.notifyForDescendants = notifyForDescendants;
+			this.observer = observer;
+		}
+	}
+	private static final ArrayList<Observation> sObservations = new ArrayList<>();
+
 	public final void registerContentObserver(Uri uri, boolean notifyForDescendants, ContentObserver observer) {
+		if (uri == null || observer == null)
+			throw new NullPointerException("uri and observer must not be null");
+		synchronized (sObservations) {
+			sObservations.add(new Observation(uri, notifyForDescendants, observer));
+		}
 	}
 	public final void unregisterContentObserver(ContentObserver observer) {
+		if (observer == null)
+			throw new NullPointerException("observer must not be null");
+		synchronized (sObservations) {
+			sObservations.removeIf(o -> o.observer == observer);
+		}
 	}
+
+	/* the path of a URI with its authority first, as ObserverNode walks it */
+	private static List<String> observedPath(Uri uri) {
+		ArrayList<String> path = new ArrayList<>();
+		path.add(uri.getAuthority());
+		path.addAll(uri.getPathSegments());
+		return path;
+	}
+
 	public void notifyChange(Uri uri, ContentObserver observer) {
+		List<String> changed = observedPath(uri);
+		ArrayList<ContentObserver> notify = new ArrayList<>();
+		synchronized (sObservations) {
+			for (Observation o : sObservations) {
+				List<String> observed = observedPath(o.uri);
+				boolean match;
+				if (observed.size() <= changed.size())
+					// the change is at the observed URI or below it
+					match = changed.subList(0, observed.size()).equals(observed) && (observed.size() == changed.size() || o.notifyForDescendants);
+				else
+					// the change is at an ancestor of the observed URI
+					match = observed.subList(0, changed.size()).equals(changed);
+				if (match && (o.observer != observer || observer.deliverSelfNotifications()) && !notify.contains(o.observer))
+					notify.add(o.observer);
+			}
+		}
+		for (ContentObserver o : notify)
+			o.dispatchChange(o == observer, uri);
 	}
 	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
 		notifyChange(uri, observer);
@@ -106,6 +158,7 @@ public class ContentResolver {
 		return 0;
 	}
 	public final void registerContentObserver(Uri uri, boolean notifyForDescendants, ContentObserver observer, int userHandle) {
+		registerContentObserver(uri, notifyForDescendants, observer);
 	}
 
 	/* ATL: the content URI of a file the desktop handed to the app (dropped or pasted), which names the file by its
