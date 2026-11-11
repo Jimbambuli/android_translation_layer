@@ -1120,6 +1120,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1layout(JNIEnv *env, jobjec
 	if (wrapper->singular_matrix) {
 		gsk_transform_unref(transform);
 		transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(l, t));
+	} else if (wrapper->jobj && (_GET_FLOAT_FIELD(wrapper->jobj, "rotationX") != 0 || _GET_FLOAT_FIELD(wrapper->jobj, "rotationY") != 0)) {
+		/* a rotation about X or Y: the matrix of View.getMatrix(), projected by RenderNode's camera, which
+		 * holds the translation already */
+		jobject matrix = J__View__getMatrix(env, wrapper->jobj);
+		gsk_transform_unref(transform);
+		transform = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(l, t));
+		transform = gsk_transform_matrix(transform, _PTR(_GET_LONG_FIELD(matrix, "native_instance")));
+		(*env)->DeleteLocalRef(env, matrix);
 	} else if (wrapper->jobj && _GET_BOOL_FIELD(wrapper->jobj, "hasTransform")) {
 		graphene_point_t pivot = GRAPHENE_POINT_INIT(width / 2.f, height / 2.f);
 		if (_GET_BOOL_FIELD(wrapper->jobj, "pivotExplicit"))

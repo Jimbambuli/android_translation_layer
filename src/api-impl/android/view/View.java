@@ -17,6 +17,7 @@ import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
+import android.graphics.Camera;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Outline;
@@ -1001,6 +1002,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private float scaleX = 1;
 	private float scaleY = 1;
 	private float rotation = 0;
+	private float rotationX = 0;
+	private float rotationY = 0;
 	private float pivotX = 0;
 	private float pivotY = 0;
 	private boolean pivotExplicit = false;
@@ -3340,14 +3343,40 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected boolean awakenScrollBars() { return false; }
 
 	protected native boolean native_getMatrix(long widget, long matrix);
-	/* as AOSP's RenderProperties: translation, then rotation and scale about the pivot */
+	/* as AOSP's RenderProperties.updateMatrix(): translation, then rotation and scale about the pivot; with a
+	 * rotation about X or Y the camera projects the rotated view (native_layout() hands this matrix to GTK) */
+	@Export
 	public Matrix getMatrix() {
 		if (matrix == null)
 			matrix = new Matrix();
-		matrix.setTranslate(translationX, translationY);
-		matrix.preRotate(rotation, getPivotX(), getPivotY());
-		matrix.preScale(scaleX, scaleY, getPivotX(), getPivotY());
+		if (!has3dRotation()) {
+			matrix.setTranslate(translationX, translationY);
+			matrix.preRotate(rotation, getPivotX(), getPivotY());
+			matrix.preScale(scaleX, scaleY, getPivotX(), getPivotY());
+		} else {
+			if (camera == null)
+				camera = new Camera();
+			if (transform3D == null)
+				transform3D = new Matrix();
+			camera.setLocation(0, 0, cameraLocationZ);
+			matrix.reset();
+			camera.save();
+			matrix.preScale(scaleX, scaleY, getPivotX(), getPivotY());
+			camera.rotateX(rotationX);
+			camera.rotateY(rotationY);
+			camera.rotateZ(-rotation);
+			camera.getMatrix(transform3D);
+			transform3D.preTranslate(-getPivotX(), -getPivotY());
+			transform3D.postTranslate(getPivotX() + translationX, getPivotY() + translationY);
+			matrix.postConcat(transform3D);
+			camera.restore();
+		}
 		return matrix;
+	}
+
+	/* MathUtils::isZero() of RenderProperties */
+	private boolean has3dRotation() {
+		return Math.abs(rotationX) >= 0.001f || Math.abs(rotationY) >= 0.001f;
 	}
 
 	final Matrix getInverseMatrix() {
@@ -3364,7 +3393,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* GTK applies the transform when the parent allocates this view, see native_layout() */
 	private void transformChanged() {
 		boolean had = hasTransform;
-		hasTransform = scaleX != 1 || scaleY != 1 || rotation != 0;
+		hasTransform = scaleX != 1 || scaleY != 1 || rotation != 0 || rotationX != 0 || rotationY != 0;
 		if ((had || hasTransform) && parent instanceof View)
 			((View)parent).native_queueAllocate(((View)parent).widget);
 	}
@@ -4565,11 +4594,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public float getRotation() { return rotation; }
-	public void setRotationX(float deg) {}
-	public void setRotationY(float deg) {}
 
-	public float getRotationX() { return 0.f; }
-	public float getRotationY() { return 0.f; }
+	public void setRotationX(float rotationX) {
+		if (this.rotationX == rotationX)
+			return;
+		this.rotationX = rotationX;
+		transformChanged();
+	}
+
+	public void setRotationY(float rotationY) {
+		if (this.rotationY == rotationY)
+			return;
+		this.rotationY = rotationY;
+		transformChanged();
+	}
+
+	public float getRotationX() { return rotationX; }
+	public float getRotationY() { return rotationY; }
 
 	public void setScaleX(float scaleX) {
 		if (this.scaleX == scaleX)
@@ -6475,14 +6516,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return direction == 0 ? 1 /* TEXT_DIRECTION_FIRST_STRONG */ : direction;
 	}
 
-	private float mCameraDistance;
+	/* RenderNode's camera: AOSP keeps the distance as the camera's z location in inches (Sk3DView), -8 by default */
+	private float cameraLocationZ = -8;
+	private Camera camera;
+	private Matrix transform3D;
 
 	public void setCameraDistance(float distance) {
-		mCameraDistance = distance;
+		final float dpi = getResources().getDisplayMetrics().densityDpi;
+		float z = -Math.abs(distance) / dpi;
+		if (cameraLocationZ == z)
+			return;
+		cameraLocationZ = z;
+		if (has3dRotation())
+			transformChanged();
 	}
 
 	public float getCameraDistance() {
-		return mCameraDistance;
+		final float dpi = getResources().getDisplayMetrics().densityDpi;
+		return -(cameraLocationZ * dpi);
 	}
 
 	private boolean mHovered;

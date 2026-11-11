@@ -64,6 +64,22 @@ JNIEXPORT jboolean JNICALL Java_android_graphics_Matrix_native_1postConcat(JNIEn
 	return true;
 }
 
+/* the point mapped with the division by w */
+static void map_point_perspective(const graphene_matrix_t *m, const graphene_point_t *p, graphene_point_t *res)
+{
+	graphene_vec4_t vec4;
+	graphene_vec4_init(&vec4, p->x, p->y, 0.0f, 1.0f);
+	graphene_matrix_transform_vec4(m, &vec4, &vec4);
+	float w = graphene_vec4_get_w(&vec4);
+	res->x = graphene_vec4_get_x(&vec4) / w;
+	res->y = graphene_vec4_get_y(&vec4) / w;
+}
+
+static gboolean has_perspective(const graphene_matrix_t *m)
+{
+	return graphene_matrix_get_value(m, 0, 3) != 0 || graphene_matrix_get_value(m, 1, 3) != 0 || graphene_matrix_get_value(m, 3, 3) != 1;
+}
+
 JNIEXPORT jboolean JNICALL Java_android_graphics_Matrix_native_1mapRect(JNIEnv *env, jclass class, jlong matrix_ptr, jobject dest, jobject src)
 {
 	graphene_matrix_t *matrix = (graphene_matrix_t *)_PTR(matrix_ptr);
@@ -74,7 +90,19 @@ JNIEXPORT jboolean JNICALL Java_android_graphics_Matrix_native_1mapRect(JNIEnv *
 	    _GET_FLOAT_FIELD(src, "bottom") - _GET_FLOAT_FIELD(src, "top"));
 
 	graphene_quad_t dest_quad;
-	graphene_matrix_transform_rect(matrix, &src_rect, &dest_quad);
+	if (has_perspective(matrix)) {
+		graphene_point_t p[4] = {
+			GRAPHENE_POINT_INIT(src_rect.origin.x, src_rect.origin.y),
+			GRAPHENE_POINT_INIT(src_rect.origin.x + src_rect.size.width, src_rect.origin.y),
+			GRAPHENE_POINT_INIT(src_rect.origin.x + src_rect.size.width, src_rect.origin.y + src_rect.size.height),
+			GRAPHENE_POINT_INIT(src_rect.origin.x, src_rect.origin.y + src_rect.size.height),
+		};
+		for (int i = 0; i < 4; i++)
+			map_point_perspective(matrix, &p[i], &p[i]);
+		graphene_quad_init_from_points(&dest_quad, p);
+	} else {
+		graphene_matrix_transform_rect(matrix, &src_rect, &dest_quad);
+	}
 	graphene_rect_t dest_rect;
 	graphene_quad_bounds(&dest_quad, &dest_rect);
 
@@ -198,9 +226,23 @@ JNIEXPORT void JNICALL Java_android_graphics_Matrix_native_1mapPoints(JNIEnv *en
 	jfloat *dst = (*env)->GetFloatArrayElements(env, dst_ref, NULL);
 	graphene_point_t p;
 	graphene_point_t res;
+	/* a perspective matrix (View.getMatrix() with rotationX/Y) divides by w like SkMatrix's perspective
+	 * mapping; a vector is the mapped point minus the mapped origin (SkMatrix::mapVectors()) */
+	gboolean perspective = has_perspective(matrix);
+	graphene_point_t origin = GRAPHENE_POINT_INIT(0, 0);
+	if (perspective && !is_pts) {
+		matrix = (graphene_matrix_t *)_PTR(matrix_ptr);
+		map_point_perspective(matrix, &origin, &origin);
+	}
 	for (int i = 0; i < count; i++) {
 		p = GRAPHENE_POINT_INIT(src[src_idx + i * 2], src[src_idx + i * 2 + 1]);
-		graphene_matrix_transform_point(matrix, &p, &res);
+		if (perspective) {
+			map_point_perspective(matrix, &p, &res);
+			res.x -= origin.x;
+			res.y -= origin.y;
+		} else {
+			graphene_matrix_transform_point(matrix, &p, &res);
+		}
 		dst[dst_idx + i * 2] = res.x;
 		dst[dst_idx + i * 2 + 1] = res.y;
 	}
