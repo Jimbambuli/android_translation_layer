@@ -21,6 +21,7 @@ public class JobInfo {
 	JobParameters workParams; // the running job of enqueue(), which takes further work
 	long minLatencyMillis;
 	int networkType = NETWORK_TYPE_NONE;
+	private String traceTag;
 
 	public JobInfo() {}
 
@@ -38,6 +39,10 @@ public class JobInfo {
 
 	public int getId() {
 		return id;
+	}
+
+	public String getTraceTag() {
+		return traceTag;
 	}
 
 	public static long getMinPeriodMillis() {
@@ -165,6 +170,12 @@ public class JobInfo {
 		}
 
 		public Builder setPriority(int priority) {
+			return this;
+		}
+
+		/* the name of the job in system traces (API 35); kept for getTraceTag() */
+		public Builder setTraceTag(String traceTag) {
+			jobInfo.traceTag = traceTag;
 			return this;
 		}
 
