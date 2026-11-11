@@ -699,9 +699,25 @@ public class Window {
 
 	public void takeSurface(SurfaceHolder.Callback2 callback) {}
 
-	public void setStatusBarColor(int color) {}
+	/* AOSP PhoneWindow.setStatusBarColor()/setNavigationBarColor(): ATL's window has no system bars to color, the
+	 * colors are kept for the getters (initially the theme's, as PhoneWindow.generateLayout() reads them) */
+	private Integer mStatusBarColor;
+	private Integer mNavigationBarColor;
 
-	public void setNavigationBarColor(int color) {}
+	public void setStatusBarColor(int color) {
+		mStatusBarColor = color;
+	}
+
+	public void setNavigationBarColor(int color) {
+		mNavigationBarColor = color;
+	}
+
+	private int themeColor(int index, int fallback) {
+		android.content.res.TypedArray a = context.obtainStyledAttributes(com.android.internal.R.styleable.Window);
+		int color = a.getColor(index, fallback);
+		a.recycle();
+		return color;
+	}
 
 	/* API 28: the divider between the app and the navigation bar, which ATL's window has none of; the color is kept */
 	private int mNavigationBarDividerColor;
@@ -756,14 +772,20 @@ public class Window {
 	}
 
 	public int getNavigationBarColor() {
-		return 0xFF888888; // gray
+		if (mNavigationBarColor == null)
+			mNavigationBarColor = themeColor(com.android.internal.R.styleable.Window_navigationBarColor, 0xFF000000);
+		return mNavigationBarColor;
 	}
 
 	public void setBackgroundDrawableResource(int resId) {
 		setBackgroundDrawable(context.getDrawable(resId));
 	}
 
-	public int getStatusBarColor() { return 0xFFFF0000; }
+	public int getStatusBarColor() {
+		if (mStatusBarColor == null)
+			mStatusBarColor = themeColor(com.android.internal.R.styleable.Window_statusBarColor, 0xFF000000);
+		return mStatusBarColor;
+	}
 
 	public Context getContext() {
 		return context;

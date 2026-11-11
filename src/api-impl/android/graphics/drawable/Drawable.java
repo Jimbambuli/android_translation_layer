@@ -600,7 +600,12 @@ public class Drawable {
 		inflate(r, parser, attrs, null);
 	}
 
-	public void inflate(Resources r, XmlPullParser parser, AttributeSet attrs, Theme theme) throws XmlPullParserException, IOException {}
+	/* AOSP Drawable.inflate(): the base class reads android:visible */
+	public void inflate(Resources r, XmlPullParser parser, AttributeSet attrs, Theme theme) throws XmlPullParserException, IOException {
+		final TypedArray a = obtainAttributes(r, theme, attrs, com.android.internal.R.styleable.Drawable);
+		mVisible = a.getBoolean(com.android.internal.R.styleable.Drawable_visible, mVisible);
+		a.recycle();
+	}
 
 	public static Drawable createFromStream(InputStream is, String srcName) {
 		final Bitmap bm = BitmapFactory.decodeStream(is);
