@@ -13,6 +13,7 @@
 #include "../util.h"
 
 #include "../generated_headers/android_media_MediaMetadataRetriever.h"
+#include "av_input.h"
 
 /* MediaMetadataRetriever.OPTION_* */
 #define OPTION_PREVIOUS_SYNC 0
@@ -30,49 +31,6 @@
 #define METADATA_KEY_VIDEO_WIDTH 18
 #define METADATA_KEY_VIDEO_HEIGHT 19
 #define METADATA_KEY_BITRATE      20
-
-/* a region of a file descriptor, like setDataSource(FileDescriptor, long, long) */
-struct fd_region {
-	int fd;
-	int64_t offset;
-	int64_t length;
-	int64_t position;
-};
-
-static int fd_region_read(void *opaque, uint8_t *buf, int size)
-{
-	struct fd_region *region = opaque;
-	if (region->position >= region->length)
-		return AVERROR_EOF;
-	ssize_t ret = pread(region->fd, buf, MIN((int64_t)size, region->length - region->position), region->offset + region->position);
-	if (ret < 0)
-		return AVERROR(errno);
-	if (ret == 0)
-		return AVERROR_EOF;
-	region->position += ret;
-	return ret;
-}
-
-static int64_t fd_region_seek(void *opaque, int64_t offset, int whence)
-{
-	struct fd_region *region = opaque;
-	switch (whence & ~AVSEEK_FORCE) {
-		case AVSEEK_SIZE:
-			return region->length;
-		case SEEK_SET:
-			region->position = offset;
-			break;
-		case SEEK_CUR:
-			region->position += offset;
-			break;
-		case SEEK_END:
-			region->position = region->length + offset;
-			break;
-		default:
-			return AVERROR(EINVAL);
-	}
-	return region->position;
-}
 
 /* decode the first frame at or after the seek target; with OPTION_CLOSEST, the first one at or
  * after time_us, otherwise the sync frame the demuxer seeked to */
@@ -109,34 +67,6 @@ static AVFrame *decode_frame(AVFormatContext *format, int stream_index, AVCodecC
 
 /* the frame as ARGB pixels (the int[] of Bitmap.createBitmap()), or NULL if there is no video or
  * it cannot be decoded; the source is the file at path, or the fd region if path is NULL */
-/* opens the file at path, or the fd region if path is NULL; *io is the region's AVIOContext */
-static AVFormatContext *open_input(const char *path, struct fd_region *region, AVIOContext **io)
-{
-	AVFormatContext *format = avformat_alloc_context();
-
-	*io = NULL;
-	if (!path) {
-		*io = avio_alloc_context(av_malloc(32768), 32768, 0, region, fd_region_read, NULL, fd_region_seek);
-		format->pb = *io;
-	}
-	/* avformat_open_input() frees the context on failure */
-	if (avformat_open_input(&format, path, NULL, NULL) < 0)
-		return NULL;
-	if (avformat_find_stream_info(format, NULL) < 0)
-		avformat_close_input(&format);
-	return format;
-}
-
-/* format may be NULL (open failed), the region's io is freed anyway */
-static void close_input(AVFormatContext *format, AVIOContext *io)
-{
-	avformat_close_input(&format);
-	if (io) {
-		av_freep(&io->buffer);
-		avio_context_free(&io);
-	}
-}
-
 static uint32_t *extract_frame(const char *path, struct fd_region *region, int64_t time_us, int option, int dst_width, int dst_height, int *out_width, int *out_height)
 {
 	AVIOContext *io;
