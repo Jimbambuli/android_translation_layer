@@ -7,13 +7,17 @@ import android.os.Handler;
 import android.os.Looper;
 import android.system.ErrnoException;
 import android.system.Os;
+import android.view.Surface;
+import android.view.SurfaceHolder;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.util.Map;
 
-/* Plays the audio of the data source, like AOSP's NuPlayer: demuxer and decoder (libavformat,
- * libavcodec) feed the audio device on a playback thread of the player. There is no video output.
- * The listeners are called on the looper of the thread that created the player, like AOSP's. */
+/* Plays the data source like AOSP's NuPlayer: demuxer and decoders (libavformat, libavcodec) feed the
+ * audio device on a playback thread of the player, and the video frames go to the Surface on a video
+ * thread, each when the audio clock (what the device has played) reaches its time; a frame that is
+ * more than 40 ms late is dropped, like NuPlayer's renderer does. The listeners are called on the
+ * looper of the thread that created the player, like AOSP's. */
 public class MediaPlayer {
 	public static final int MEDIA_ERROR_UNKNOWN = 1;
 	public static final int MEDIA_ERROR_SERVER_DIED = 100;
@@ -24,6 +28,13 @@ public class MediaPlayer {
 
 	/* native_step() */
 	private static final int STEP_END = -1;
+	/* native_videoDecode() */
+	private static final int VIDEO_END = -1;
+	/* NuPlayer's renderer drops a video frame that is later than this (ms) */
+	private static final int VIDEO_MAX_LATE_MS = 40;
+
+	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT = 1;
+	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING = 2;
 
 	public interface OnCompletionListener {
 		void onCompletion(MediaPlayer mp);
@@ -57,6 +68,9 @@ public class MediaPlayer {
 
 	private long nativePlayer; // 0 unless prepared
 	private int duration;
+	private int videoWidth;
+	private int videoHeight;
+	private volatile Surface surface;
 	private volatile int position;
 	private int generation; // a reset/release makes pending events and asynchronous prepares stale
 
@@ -69,12 +83,16 @@ public class MediaPlayer {
 	private int seekRequest = -1;
 	private float leftVolume = 1.f;
 	private float rightVolume = 1.f;
+	private Thread videoThread;
+	private int videoSeekGeneration; // a seek of the video is due when it differs from the video thread's
+	private int videoSeekTarget;
 
 	private final Handler eventHandler;
 	private OnPreparedListener onPreparedListener;
 	private OnCompletionListener onCompletionListener;
 	private OnErrorListener onErrorListener;
 	private OnSeekCompleteListener onSeekCompleteListener;
+	private OnVideoSizeChangedListener onVideoSizeChangedListener;
 
 	public MediaPlayer() {
 		Looper looper = Looper.myLooper();
@@ -170,10 +188,17 @@ public class MediaPlayer {
 		if (player == 0)
 			throw new IOException("Prepare failed.: status=0x1");
 		prepared(player);
+		postEvent(this::videoSizeChanged);
 		postEvent(() -> {
 			if (onPreparedListener != null)
 				onPreparedListener.onPrepared(this);
 		});
+	}
+
+	/* NuPlayer reports the video size (0x0 without video) before the prepared event */
+	private void videoSizeChanged() {
+		if (onVideoSizeChangedListener != null)
+			onVideoSizeChangedListener.onVideoSizeChanged(this, videoWidth, videoHeight);
 	}
 
 	public void prepareAsync() {
@@ -191,6 +216,7 @@ public class MediaPlayer {
 					return;
 				}
 				prepared(player);
+				videoSizeChanged();
 				if (onPreparedListener != null)
 					onPreparedListener.onPrepared(this);
 			});
@@ -200,6 +226,9 @@ public class MediaPlayer {
 	private void prepared(long player) {
 		nativePlayer = player;
 		duration = native_getDuration(player);
+		int size = native_getVideoSize(player);
+		videoWidth = size >>> 16;
+		videoHeight = size & 0xffff;
 		position = 0;
 		synchronized (lock) {
 			completed = false;
@@ -223,12 +252,104 @@ public class MediaPlayer {
 			onCompletionListener.onCompletion(this);
 	}
 
+	/* guarded by lock */
 	private void ensureThread() {
 		if (thread == null) {
 			long player = nativePlayer;
 			thread = new Thread(() -> playbackLoop(player), "MediaPlayer");
 			thread.start();
 		}
+		if (videoThread == null && videoWidth > 0 && surface != null) {
+			long player = nativePlayer;
+			videoSeekTarget = position; // the video starts where the audio is
+			videoSeekGeneration++;
+			videoThread = new Thread(() -> videoLoop(player), "MediaPlayer video");
+			videoThread.start();
+		}
+	}
+
+	/* guarded by lock */
+	private void seekVideo(int msec) {
+		videoSeekTarget = msec;
+		videoSeekGeneration++;
+	}
+
+	/* NuPlayer's video renderer: each frame waits until the audio clock reaches its time; after a seek
+	 * the frame at the new position is shown at once, also while paused */
+	private void videoLoop(long player) {
+		Thread me = Thread.currentThread();
+		int generation = videoSeekGeneration - 1;
+		int loops = 0;      // the passes of setLooping() of the video, compared to the audio clock's
+		int pts = -1;       // the decoded frame that waits for its time
+		boolean ended = false;
+		while (true) {
+			int target = -1;
+			synchronized (lock) {
+				if (videoThread != me)
+					return;
+				if (generation != videoSeekGeneration) {
+					generation = videoSeekGeneration;
+					target = videoSeekTarget;
+				} else if (!playing || ended) {
+					try {
+						lock.wait();
+					} catch (InterruptedException e) {
+					}
+					continue;
+				}
+			}
+			if (target >= 0) {
+				native_videoSeek(player, target);
+				loops = 0;
+				pts = native_videoDecode(player);
+				ended = pts < 0;
+				if (pts >= 0)
+					render(player, pts);
+				pts = -1;
+				continue;
+			}
+			if (pts < 0) {
+				pts = native_videoDecode(player);
+				if (pts < 0) {
+					if (pts == VIDEO_END && isLooping()) {
+						native_videoSeek(player, 0);
+						loops++;
+					} else {
+						ended = true;
+					}
+					pts = -1;
+					continue;
+				}
+			}
+			long clock = native_clock(player);
+			int clockLoops = (int)(clock >> 32);
+			long wait = loops > clockLoops ? 10 : loops < clockLoops ? -VIDEO_MAX_LATE_MS - 1 : pts - (int)clock;
+			if (wait > 0) {
+				synchronized (lock) {
+					if (videoThread == me && generation == videoSeekGeneration && playing) {
+						try {
+							lock.wait(Math.min(wait, 10));
+						} catch (InterruptedException e) {
+						}
+					}
+				}
+				continue;
+			}
+			if (wait >= -VIDEO_MAX_LATE_MS)
+				render(player, pts);
+			pts = -1;
+		}
+	}
+
+	/* the frame decoded last into the Surface: the widget of a SurfaceView, or a SurfaceTexture */
+	private void render(long player, int pts) {
+		Surface s = surface;
+		if (s == null)
+			return;
+		if (s.widget != 0)
+			native_showTexture(s.widget, native_videoTexture(player));
+		else if (s.surfaceTexture != null)
+			s.surfaceTexture.queueBuffer(native_videoTexture(player), pts * 1000000L);
 	}
 
 	private void playbackLoop(long player) {
@@ -261,7 +382,7 @@ public class MediaPlayer {
 				loop = looping;
 			}
 			if (seek >= 0) {
-				native_seek(player, seek);
+				native_seek(player, seek, true);
 				position = seek;
 				resumeAt = -1;
 				postEvent(() -> {
@@ -272,7 +393,7 @@ public class MediaPlayer {
 			}
 			if (!running) {
 				if (resumeAt >= 0)
-					native_seek(player, resumeAt);
+					native_seek(player, resumeAt, false);
 				resumeAt = -1;
 				running = true;
 			}
@@ -308,6 +429,7 @@ public class MediaPlayer {
 			if (completed) {
 				completed = false;
 				seekRequest = 0;
+				seekVideo(0);
 			}
 			playing = true;
 			ensureThread();
@@ -333,6 +455,7 @@ public class MediaPlayer {
 			return;
 		synchronized (lock) {
 			seekRequest = Math.max(0, msec);
+			seekVideo(seekRequest);
 			completed = false;
 			ensureThread();
 			lock.notifyAll();
@@ -373,17 +496,21 @@ public class MediaPlayer {
 
 	/* the playback thread ends, the decoder goes away; prepare() again to play */
 	public void stop() {
-		Thread t;
+		Thread t, v;
 		synchronized (lock) {
 			t = thread;
 			thread = null;
+			v = videoThread;
+			videoThread = null;
 			playing = false;
 			seekRequest = -1;
 			lock.notifyAll();
 		}
-		if (t != null) {
+		for (Thread join : new Thread[] {t, v}) {
+			if (join == null)
+				continue;
 			try {
-				t.join();
+				join.join();
 			} catch (InterruptedException e) {
 			}
 		}
@@ -409,6 +536,8 @@ public class MediaPlayer {
 		onCompletionListener = null;
 		onErrorListener = null;
 		onSeekCompleteListener = null;
+		onVideoSizeChangedListener = null;
+		surface = null;
 	}
 
 	private void closeSource() {
@@ -438,9 +567,41 @@ public class MediaPlayer {
 		onSeekCompleteListener = listener;
 	}
 
+	public void setOnVideoSizeChangedListener(OnVideoSizeChangedListener listener) {
+		onVideoSizeChangedListener = listener;
+	}
+
+	/* AOSP: the video goes to the holder's Surface (null: no video output) */
+	public void setDisplay(SurfaceHolder sh) {
+		setSurface(sh != null ? sh.getSurface() : null);
+	}
+
+	public void setSurface(Surface surface) {
+		this.surface = surface;
+		synchronized (lock) {
+			if (thread != null && nativePlayer != 0)
+				ensureThread(); // the video thread starts at the current position
+		}
+	}
+
+	public int getVideoWidth() {
+		return nativePlayer != 0 ? videoWidth : 0;
+	}
+
+	public int getVideoHeight() {
+		return nativePlayer != 0 ? videoHeight : 0;
+	}
+
+	/* the frames fill the Surface (AOSP's default SCALE_TO_FIT); cropping is not done */
+	public void setVideoScalingMode(int mode) {
+		if (mode != VIDEO_SCALING_MODE_SCALE_TO_FIT && mode != VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+			throw new IllegalArgumentException("Scaling mode " + mode + " is not supported");
+	}
+
+	public void setScreenOnWhilePlaying(boolean screenOn) {}
+
 	public void setOnBufferingUpdateListener(OnBufferingUpdateListener dummy) {}
 	public void setOnInfoListener(OnInfoListener dummy) {}
-	public void setOnVideoSizeChangedListener(OnVideoSizeChangedListener dummy) {}
 	public void setAudioAttributes(AudioAttributes attributes) {}
 	public void setAudioStreamType(int dummy) {}
 
@@ -452,6 +613,12 @@ public class MediaPlayer {
 	private static native int native_getDuration(long player);
 	private static native int native_step(long player, float left, float right, boolean looping);
 	private static native void native_pause(long player);
-	private static native void native_seek(long player, int msec);
+	private static native void native_seek(long player, int msec, boolean user);
+	private static native long native_clock(long player);
+	private static native int native_getVideoSize(long player);
+	private static native int native_videoDecode(long player);
+	private static native void native_videoSeek(long player, int msec);
+	private static native long native_videoTexture(long player);
+	private static native void native_showTexture(long widget, long texture);
 	private static native void native_release(long player);
 }

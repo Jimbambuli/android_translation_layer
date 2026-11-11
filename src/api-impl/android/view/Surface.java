@@ -25,6 +25,9 @@ public class Surface implements android.os.Parcelable {
 	public static final int ROTATION_270 = 3;
 
 	public long widget;
+	/* the SurfaceTexture of Surface(SurfaceTexture): its frames go to that consumer (e.g. a TextureView) */
+	public SurfaceTexture surfaceTexture;
+	private android.graphics.Bitmap lockedBitmap;
 
 	/* AOSP Surface.writeToParcel()/readFromParcel()/CREATOR: a Surface travels as the handle of the native surface it
 	 * holds. ATL's Surface is the pointer of the GTK widget it draws into, which is valid in this process only: a
@@ -72,13 +75,17 @@ public class Surface implements android.os.Parcelable {
 
 	public Surface() {}
 
-	public Surface(SurfaceTexture surfaceTexture) {}
-
-	public boolean isValid() {
-		return widget != 0;
+	public Surface(SurfaceTexture surfaceTexture) {
+		this.surfaceTexture = surfaceTexture;
 	}
 
-	public void release() {}
+	public boolean isValid() {
+		return widget != 0 || (surfaceTexture != null && !surfaceTexture.isReleased());
+	}
+
+	public void release() {
+		surfaceTexture = null;
+	}
 
 	/* AOSP Surface.lockCanvas()/lockHardwareCanvas()/unlockCanvasAndPost(): the canvas draws into a snapshot, which
 	 * unlockCanvasAndPost() hands to the SurfaceView the surface belongs to (as SurfaceHolder.lockCanvas() does).
@@ -86,6 +93,10 @@ public class Surface implements android.os.Parcelable {
 	public android.graphics.Canvas lockCanvas(android.graphics.Rect inOutDirty) {
 		if (!isValid())
 			throw new IllegalStateException("Surface has no native object.");
+		if (widget == 0) { // a SurfaceTexture's: a buffer of its default size
+			lockedBitmap = android.graphics.Bitmap.createBitmap(surfaceTexture.getDefaultBufferWidth(), surfaceTexture.getDefaultBufferHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+			return new android.graphics.Canvas(lockedBitmap);
+		}
 		return new android.atl.GskCanvas(SurfaceView.native_createSnapshot());
 	}
 
@@ -96,6 +107,13 @@ public class Surface implements android.os.Parcelable {
 	public void unlockCanvasAndPost(android.graphics.Canvas canvas) {
 		if (canvas == null)
 			throw new IllegalArgumentException("canvas must not be null");
+		if (widget == 0 && lockedBitmap != null) {
+			if (!isValid())
+				throw new IllegalStateException("Surface has no native object.");
+			surfaceTexture.queueBitmap(lockedBitmap, System.nanoTime());
+			lockedBitmap = null;
+			return;
+		}
 		if (!(canvas instanceof android.atl.GskCanvas))
 			throw new IllegalArgumentException("canvas object must be the same instance that was previously returned by lockCanvas");
 		if (!isValid())
