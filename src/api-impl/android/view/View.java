@@ -1046,6 +1046,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* the bits of AOSP's mPrivateFlags3 that ATL keeps */
 	int mPrivateFlags3;
 	static final int PFLAG3_IS_LAID_OUT = 0x4;
+	static final int PFLAG3_APPLYING_INSETS = 0x20;
+	static final int PFLAG3_FITTING_SYSTEM_WINDOWS = 0x40;
 	private Drawable background;
 	private int backgroundTint = 0;
 
@@ -1215,6 +1217,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mNextFocusDownId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusDown, View.NO_ID);
 		mNextFocusForwardId = a.getResourceId(com.android.internal.R.styleable.View_nextFocusForward, View.NO_ID);
 		mNextClusterForwardId = a.getResourceId(com.android.internal.R.styleable.View_nextClusterForward, View.NO_ID);
+		if (a.getBoolean(com.android.internal.R.styleable.View_fitsSystemWindows, false))
+			setFitsSystemWindows(true);
 		if (a.hasValue(com.android.internal.R.styleable.View_backgroundTint))
 			backgroundTint = a.getColor(com.android.internal.R.styleable.View_backgroundTint, 0);
 		if (a.hasValue(com.android.internal.R.styleable.View_background)) {
@@ -3036,10 +3040,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public int getOverScrollMode() { return mOverScrollMode; }
 
-	public void setFitsSystemWindows(boolean fitsSystemWindows) {}
+	/* AOSP's View.setFitsSystemWindows(): the view pads itself by the system window insets it is given
+	 * (fitSystemWindowsInt()) */
+	public void setFitsSystemWindows(boolean fitSystemWindows) {
+		setFlags(fitSystemWindows ? FITS_SYSTEM_WINDOWS : 0, FITS_SYSTEM_WINDOWS);
+	}
 
-	/* hidden in AOSP, looked up by AppCompat via reflection; like setFitsSystemWindows,
-	 * the system window flags have no effect here */
+	/* hidden in AOSP, looked up by AppCompat via reflection; the optional fitting is for PhoneWindow's
+	 * content listener, which ATL's window has no counterpart for */
 	public void makeOptionalFitsSystemWindows() {}
 
 
@@ -3714,18 +3722,25 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return importantForAccessibility;
 	}
 
-	public boolean getFitsSystemWindows() { return true; }
+	public boolean getFitsSystemWindows() {
+		return (mViewFlags & FITS_SYSTEM_WINDOWS) == FITS_SYSTEM_WINDOWS;
+	}
 
 	public void setOnApplyWindowInsetsListener(View.OnApplyWindowInsetsListener l) {
 		on_apply_window_insets_listener = l;
 	}
 
-	/* AOSP, without PFLAG3_APPLYING_INSETS (ATL has no fitSystemWindows() to tell it to) */
+	/* AOSP View.dispatchApplyWindowInsets() */
 	public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
-		if (on_apply_window_insets_listener != null) {
-			return on_apply_window_insets_listener.onApplyWindowInsets(this, insets);
-		} else {
-			return onApplyWindowInsets(insets);
+		try {
+			mPrivateFlags3 |= PFLAG3_APPLYING_INSETS;
+			if (on_apply_window_insets_listener != null) {
+				return on_apply_window_insets_listener.onApplyWindowInsets(this, insets);
+			} else {
+				return onApplyWindowInsets(insets);
+			}
+		} finally {
+			mPrivateFlags3 &= ~PFLAG3_APPLYING_INSETS;
 		}
 	}
 
@@ -5777,7 +5792,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return result;
 	}
 
+	/* AOSP View.onApplyWindowInsets(), without the framework's optional fitting (PhoneWindow) */
 	public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+		if ((mPrivateFlags3 & PFLAG3_FITTING_SYSTEM_WINDOWS) == 0) {
+			// We weren't called from within a direct call to fitSystemWindows,
+			// call into it as a fallback in case we're in a class that overrides it
+			// and has logic to perform.
+			if (fitSystemWindows(insets.getSystemWindowInsetsAsRect())) {
+				return insets.consumeSystemWindowInsets();
+			}
+		} else {
+			// We were called from within a direct call to fitSystemWindows.
+			if (fitSystemWindowsInt(insets.getSystemWindowInsetsAsRect())) {
+				return insets.consumeSystemWindowInsets();
+			}
+		}
 		return insets;
 	}
 
@@ -6430,9 +6459,35 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * windows pads itself by them */
 	@Deprecated
 	protected boolean fitSystemWindows(Rect insets) {
-		if (getFitsSystemWindows()) {
+		if ((mPrivateFlags3 & PFLAG3_APPLYING_INSETS) == 0) {
+			if (insets == null) {
+				// Null insets by definition have already been consumed.
+				// This call cannot apply insets since there are none to apply,
+				// so return false.
+				return false;
+			}
+			// If we're not in the process of dispatching the newer apply insets call,
+			// that means we're not in the compatibility path. Dispatch into the newer
+			// apply insets path and take things from there.
+			try {
+				mPrivateFlags3 |= PFLAG3_FITTING_SYSTEM_WINDOWS;
+				return dispatchApplyWindowInsets(new WindowInsets(insets)).isConsumed();
+			} finally {
+				mPrivateFlags3 &= ~PFLAG3_FITTING_SYSTEM_WINDOWS;
+			}
+		} else {
+			// We're being called from the newer apply insets path.
+			// Perform the standard fallback behavior.
+			return fitSystemWindowsInt(insets);
+		}
+	}
+
+	/* AOSP View.fitSystemWindowsInt() and computeSystemWindowInsets() (not optional): the view takes all of
+	 * the system window insets as its padding (applyInsets()) */
+	private boolean fitSystemWindowsInt(Rect insets) {
+		if ((mViewFlags & FITS_SYSTEM_WINDOWS) == FITS_SYSTEM_WINDOWS) {
 			setPadding(insets.left, insets.top, insets.right, insets.bottom);
-			return true;
+			return new WindowInsets(insets).consumeSystemWindowInsets().isSystemWindowInsetsConsumed();
 		}
 		return false;
 	}

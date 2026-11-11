@@ -131,11 +131,13 @@ public class Window {
 					Window.this.callback.onWindowFocusChanged(hasWindowFocus);
 			}
 
+			/* ViewRootImpl dispatches the window insets on its first traversal (dispatchApplyInsets()) */
 			@Override
 			protected void onAttachedToWindow() {
 				super.onAttachedToWindow();
 				if (Window.this.callback != null)
 					Window.this.callback.onAttachedToWindow();
+				Window.this.requestApplyInsets();
 			}
 
 			@Override
