@@ -646,9 +646,19 @@ public abstract class Context {
 		return PackageManager.PERMISSION_GRANTED;
 	}
 
-	public void registerComponentCallbacks(ComponentCallbacks callbacks) {}
+	/* AOSP ContextImpl.registerComponentCallbacks(): the callbacks belong to the application, which calls them
+	 * (Application.onConfigurationChanged(), onLowMemory(), onTrimMemory()) */
+	public void registerComponentCallbacks(ComponentCallbacks callbacks) {
+		Context app = getApplicationContext();
+		if (app != null && app != this)
+			app.registerComponentCallbacks(callbacks);
+	}
 
-	public void unregisterComponentCallbacks(ComponentCallbacks callbacks) {}
+	public void unregisterComponentCallbacks(ComponentCallbacks callbacks) {
+		Context app = getApplicationContext();
+		if (app != null && app != this)
+			app.unregisterComponentCallbacks(callbacks);
+	}
 
 	public abstract boolean bindService(final Intent intent, final ServiceConnection serviceConnection, int flags);
 

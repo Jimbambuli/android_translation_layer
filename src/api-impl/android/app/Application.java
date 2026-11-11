@@ -5,6 +5,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
+import android.content.ComponentCallbacks;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageParser;
@@ -125,16 +126,51 @@ public class Application extends ContextWrapper {
 	 */
 	public void onTerminate() {
 	}
+	/* AOSP Application: the ComponentCallbacks registered with any context of the app hear of configuration
+	 * changes and memory pressure */
+	private final ArrayList<ComponentCallbacks> mComponentCallbacks = new ArrayList<ComponentCallbacks>();
+
+	private Object[] collectComponentCallbacks() {
+		synchronized (mComponentCallbacks) {
+			return mComponentCallbacks.isEmpty() ? null : mComponentCallbacks.toArray();
+		}
+	}
+
 	public void onConfigurationChanged(Configuration newConfig) {
+		Object[] callbacks = collectComponentCallbacks();
+		if (callbacks != null) {
+			for (Object c : callbacks)
+				((ComponentCallbacks)c).onConfigurationChanged(newConfig);
+		}
 	}
 	public void onLowMemory() {
+		Object[] callbacks = collectComponentCallbacks();
+		if (callbacks != null) {
+			for (Object c : callbacks)
+				((ComponentCallbacks)c).onLowMemory();
+		}
 	}
 	public void onTrimMemory(int level) {
+		Object[] callbacks = collectComponentCallbacks();
+		if (callbacks != null) {
+			for (Object c : callbacks) {
+				if (c instanceof android.content.ComponentCallbacks2)
+					((android.content.ComponentCallbacks2)c).onTrimMemory(level);
+			}
+		}
 	}
-	/*public void registerComponentCallbacks(ComponentCallbacks callback) {
+	@Override
+	public void registerComponentCallbacks(ComponentCallbacks callback) {
+		synchronized (mComponentCallbacks) {
+			mComponentCallbacks.add(callback);
+		}
 	}
+	@Override
 	public void unregisterComponentCallbacks(ComponentCallbacks callback) {
-	}*/
+		synchronized (mComponentCallbacks) {
+			mComponentCallbacks.remove(callback);
+		}
+	}
 	public void registerActivityLifecycleCallbacks(ActivityLifecycleCallbacks callback) {
 		synchronized (mActivityLifecycleCallbacks) {
 			mActivityLifecycleCallbacks.add(callback);
