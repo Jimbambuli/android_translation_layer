@@ -207,6 +207,13 @@ public class MediaCodec {
 		freeOutputBuffers.add(index);
 	}
 
+	/* AOSP MediaCodec.getInputFormat(): the format the codec was configured with */
+	public MediaFormat getInputFormat() {
+		if (mediaFormat == null)
+			throw new IllegalStateException();
+		return mediaFormat;
+	}
+
 	public MediaFormat getOutputFormat() {
 		return mediaFormat;
 	}

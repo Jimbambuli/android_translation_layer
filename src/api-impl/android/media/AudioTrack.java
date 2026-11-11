@@ -350,10 +350,15 @@ public class AudioTrack implements AudioRouting {
 		private int mBufferSizeInBytes;
 		private int mTransferMode;
 		private int mSessionId;
+		private boolean mOffload;
 
 		public Builder() {}
 
 		public AudioTrack build() {
+			/* AOSP Builder.build(): offload only for a format the output can take compressed, which none is here */
+			if (mOffload) {
+				throw new UnsupportedOperationException("Cannot create AudioTrack, offload format / attributes not supported");
+			}
 			if (mAttributes == null) {
 				mAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build();
 			}
@@ -389,8 +394,9 @@ public class AudioTrack implements AudioRouting {
 			return this;
 		}
 
-		/* API 29: offload is never supported (see AudioManager), so this stays off */
+		/* API 29: offload is never supported (see AudioManager), so build() refuses it as AOSP does */
 		public Builder setOffloadedPlayback(boolean offload) {
+			mOffload = offload;
 			return this;
 		}
 	}

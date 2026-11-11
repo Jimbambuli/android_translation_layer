@@ -207,8 +207,11 @@ public class AudioManager {
 	}
 	public void unloadSoundEffects() {}
 
+	/* AOSP AudioManager.generateAudioSessionId(): a new session id, > 0 (AudioSystem.newAudioSessionId()) */
+	private static final java.util.concurrent.atomic.AtomicInteger sNextAudioSessionId = new java.util.concurrent.atomic.AtomicInteger(1);
+
 	public int generateAudioSessionId() {
-		return 0;
+		return sNextAudioSessionId.getAndIncrement();
 	}
 
 	/* AOSP AudioManager.getDevices(): the audio devices of the requested direction. ATL has no audio policy, the
@@ -237,7 +240,20 @@ public class AudioManager {
 		return new java.util.ArrayList<>(java.util.Arrays.asList(getDevices(GET_DEVICES_OUTPUTS)));
 	}
 
-	public void registerAudioDeviceCallback(AudioDeviceCallback callback, Handler handler) {}
+	/* AOSP AudioManager.registerAudioDeviceCallback(): a new callback hears of the devices that are there
+	 * (onAudioDevicesAdded() on the handler's thread, else the main thread); ATL's devices never change, so
+	 * nothing follows */
+	public void registerAudioDeviceCallback(final AudioDeviceCallback callback, Handler handler) {
+		if (callback == null)
+			return;
+		final AudioDeviceInfo[] devices = getDevices(GET_DEVICES_ALL);
+		(handler != null ? handler : new Handler(android.os.Looper.getMainLooper())).post(new Runnable() {
+			@Override
+			public void run() {
+				callback.onAudioDevicesAdded(devices);
+			}
+		});
+	}
 
 	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
 
