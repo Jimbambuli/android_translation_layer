@@ -18,6 +18,7 @@ public class JobInfo {
 	long periodicMillis;
 	private int id;
 	boolean running;
+	JobParameters workParams; // the running job of enqueue(), which takes further work
 	long minLatencyMillis;
 	int networkType = NETWORK_TYPE_NONE;
 

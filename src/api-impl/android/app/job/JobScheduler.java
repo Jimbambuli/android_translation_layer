@@ -73,8 +73,70 @@ public class JobScheduler {
 		return new ArrayList<>(pendingJobs.values());
 	};
 
+	/* the services that run jobs through a JobServiceEngine (AOSP binds them; here they live on like a JobService) */
+	private static Map<String, JobServiceEngine> engines = new HashMap<>();
+
+	/* AOSP JobScheduler.enqueue(): the work goes to the job with this id that is running, else the job is started with
+	 * it; the service takes it with JobParameters.dequeueWork() */
 	public int enqueue(JobInfo job, JobWorkItem work) {
+		if (work == null) {
+			throw new NullPointerException("work is null");
+		}
+		JobInfo running = pendingJobs.get(job.getId());
+		if (running != null && running.workParams != null && running.workParams.enqueueWork(work))
+			return 1; //RESULT_SUCCESS
+		JobParameters params = new JobParameters(job, namespace);
+		params.enqueueWork(work);
+		job.workParams = params;
+		pendingJobs.put(job.getId(), job);
+		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					String className = job.getService().getClassName();
+					Class<?> cls = context.get_atl_loaded_app().loadClass(className);
+					job.running = true;
+					boolean result;
+					if (JobService.class.isAssignableFrom(cls)) {
+						result = jobService(cls.asSubclass(JobService.class)).onStartJob(params);
+					} else {
+						result = engine(cls.asSubclass(android.app.Service.class), job).onStartJob(params);
+					}
+					Slog.i(TAG, "onStartJob() returned " + result);
+				} catch (ReflectiveOperationException e) {
+					e.printStackTrace();
+				}
+			}
+		}, job.minLatencyMillis);
 		return 1; //RESULT_SUCCESS
+	}
+
+	private JobService jobService(Class<? extends JobService> cls) throws ReflectiveOperationException {
+		if (!runningServices.containsKey(cls)) {
+			JobService service = cls.getConstructor().newInstance();
+			ATLLoadedApp atlLoadedApp = context.get_atl_loaded_app();
+			service.attachBaseContext(atlLoadedApp.createContext(null, null, atlLoadedApp.pkg.applicationInfo.theme));
+			service.onCreate();
+			runningServices.put(cls, service);
+		}
+		return runningServices.get(cls);
+	}
+
+	/* the engine of a service that is no JobService: created and bound like AOSP's JobServiceContext does */
+	private JobServiceEngine engine(Class<? extends android.app.Service> cls, JobInfo job) throws ReflectiveOperationException {
+		JobServiceEngine engine = engines.get(cls.getName());
+		if (engine == null) {
+			android.app.Service service = cls.getConstructor().newInstance();
+			ATLLoadedApp atlLoadedApp = context.get_atl_loaded_app();
+			service.attachBaseContext(atlLoadedApp.createContext(null, null, atlLoadedApp.pkg.applicationInfo.theme));
+			service.onCreate();
+			android.os.IBinder binder = service.onBind(new android.content.Intent().setComponent(job.getService()));
+			if (!(binder instanceof JobServiceEngine.EngineBinder))
+				throw new IllegalArgumentException(cls.getName() + " is no job service");
+			engine = ((JobServiceEngine.EngineBinder)binder).engine;
+			engines.put(cls.getName(), engine);
+		}
+		return engine;
 	}
 
 	public int schedule(JobInfo job) {

@@ -187,6 +187,7 @@ srcs = [
 	'android/app/job/JobParameters.java',
 	'android/app/job/JobScheduler.java',
 	'android/app/job/JobService.java',
+	'android/app/job/JobServiceEngine.java',
 	'android/app/job/JobWorkItem.java',
 	'android/app/slice/Slice.java',
 	'android/app/slice/SliceItem.java',
