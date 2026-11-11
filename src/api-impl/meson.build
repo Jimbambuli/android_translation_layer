@@ -780,6 +780,8 @@ srcs = [
 	'android/telephony/PhoneNumberUtils.java',
 	'android/telephony/PhoneStateListener.java',
 	'android/telephony/SubscriptionManager.java',
+	'android/telephony/TelephonyCallback.java',
+	'android/telephony/TelephonyDisplayInfo.java',
 	'android/telephony/TelephonyManager.java',
 	'android/text/Annotation.java',
 	'android/text/AutoText.java',
