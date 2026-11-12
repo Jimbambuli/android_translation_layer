@@ -33,6 +33,12 @@ public class MediaPlayer {
 	/* NuPlayer's renderer drops a video frame that is later than this (ms) */
 	private static final int VIDEO_MAX_LATE_MS = 40;
 
+	/* AOSP's limits (NuPlayer and the audio sink's time stretch) */
+	private static final float SPEED_MIN = 0.01f;
+	private static final float SPEED_MAX = 20.0f;
+	private static final float PITCH_MIN = 0.25f;
+	private static final float PITCH_MAX = 4.0f;
+
 	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT = 1;
 	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING = 2;
 
@@ -87,6 +93,10 @@ public class MediaPlayer {
 	private Thread videoThread;
 	private int videoSeekGeneration; // a seek of the video is due when it differs from the video thread's
 	private int videoSeekTarget;
+	private boolean paused; // pause() after start(): getPlaybackParams() tells speed 0, like NuPlayer
+	/* setPlaybackParams(): the speed (not 0) and pitch */
+	private float speed = 1.f;
+	private float pitch = 1.f;
 
 	private final Handler eventHandler;
 	private OnPreparedListener onPreparedListener;
@@ -226,6 +236,7 @@ public class MediaPlayer {
 
 	private void prepared(long player) {
 		nativePlayer = player;
+		native_setPlaybackRate(player, speed, pitch);
 		duration = native_getDuration(player);
 		int size = native_getVideoSize(player);
 		videoWidth = size >>> 16;
@@ -433,6 +444,7 @@ public class MediaPlayer {
 				seekVideo(0);
 			}
 			playing = true;
+			paused = false;
 			ensureThread();
 			lock.notifyAll();
 		}
@@ -440,9 +452,55 @@ public class MediaPlayer {
 
 	public void pause() {
 		synchronized (lock) {
+			if (playing)
+				paused = true;
 			playing = false;
 			lock.notifyAll();
 		}
+	}
+
+	/* AOSP: before prepare only kept; once prepared speed 0 pauses (keeping the previous speed for start()), another
+	 * speed starts the playback. Speed 0.01 to 20 (or 0), pitch 0.25 to 4, else IllegalArgumentException. The time
+	 * stretch is libavfilter's atempo (AOSP's audio sink: Sonic). */
+	public void setPlaybackParams(PlaybackParams params) {
+		if (params == null)
+			throw new IllegalArgumentException("params must not be null");
+		if (nativePlayer == 0 && path == null && fd == null)
+			throw new IllegalStateException();
+		float newSpeed = speed, newPitch = pitch;
+		boolean speedSet = false;
+		try {
+			newSpeed = params.getSpeed();
+			speedSet = true;
+		} catch (IllegalStateException e) { // not set: unchanged
+		}
+		try {
+			newPitch = params.getPitch();
+		} catch (IllegalStateException e) {
+		}
+		if ((newSpeed != 0.f && newSpeed < SPEED_MIN) || newSpeed > SPEED_MAX || newPitch < PITCH_MIN || newPitch > PITCH_MAX)
+			throw new IllegalArgumentException("Playback params are not supported: speed " + newSpeed + ", pitch " + newPitch);
+		pitch = newPitch;
+		if (newSpeed != 0.f)
+			speed = newSpeed;
+		if (nativePlayer == 0)
+			return;
+		native_setPlaybackRate(nativePlayer, speed, pitch);
+		if (speedSet && newSpeed == 0.f)
+			pause();
+		else if (speedSet)
+			start();
+	}
+
+	/* AOSP: speed 0 while paused */
+	public PlaybackParams getPlaybackParams() {
+		if (nativePlayer == 0 && path == null && fd == null)
+			throw new IllegalStateException();
+		boolean isPaused;
+		synchronized (lock) {
+			isPaused = paused;
+		}
+		return new PlaybackParams().setSpeed(isPaused ? 0.f : speed).setPitch(pitch).setAudioFallbackMode(PlaybackParams.AUDIO_FALLBACK_MODE_DEFAULT);
 	}
 
 	public boolean isPlaying() {
@@ -519,6 +577,9 @@ public class MediaPlayer {
 			native_release(nativePlayer);
 		nativePlayer = 0;
 		position = 0;
+		synchronized (lock) {
+			paused = false;
+		}
 	}
 
 	public void reset() {
@@ -529,6 +590,7 @@ public class MediaPlayer {
 		synchronized (lock) {
 			looping = false;
 		}
+		speed = pitch = 1.f;
 	}
 
 	public void release() {
@@ -617,6 +679,7 @@ public class MediaPlayer {
 	private static native int native_getDuration(long player);
 	private static native int native_step(long player, float left, float right, boolean looping);
 	private static native void native_pause(long player);
+	private static native void native_setPlaybackRate(long player, float speed, float pitch);
 	private static native void native_seek(long player, int msec, boolean user);
 	private static native long native_clock(long player);
 	private static native int native_getVideoSize(long player);

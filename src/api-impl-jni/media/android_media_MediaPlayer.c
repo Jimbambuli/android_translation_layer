@@ -4,6 +4,9 @@
 
 #include <gtk/gtk.h>
 #include <libavcodec/avcodec.h>
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
 #include <libavutil/display.h>
 #include <libswresample/swresample.h>
@@ -64,9 +67,21 @@ struct player {
 	snd_pcm_t *pcm; /* NULL without an audio device: then the step only waits for the samples' time */
 	int16_t *buffer;
 	int buffer_frames;
-	/* the position is base + written - (what the device still holds), in output frames */
+	/* the position is base + (written - what the device still holds) * speed, in frames */
 	int64_t base;
 	int64_t written;
+	/* setPlaybackParams(): speed and pitch (requested ones under clock_lock, the playback thread applies them), and
+	 * the libavfilter graph that changes the output samples, built when needed (NULL at speed and pitch 1) */
+	float speed;
+	float pitch;
+	float requested_speed;
+	float requested_pitch;
+	AVFilterGraph *graph;
+	AVFilterContext *graph_in;
+	AVFilterContext *graph_out;
+	AVFrame *filtered;
+	int64_t graph_pts;
+	gboolean graph_flushed;
 	int64_t skip_until; /* after a seek, the decoded frames before this are dropped */
 	struct video video;
 	/* the clock: the position at the last write to the device, running on in real time while playing;
@@ -139,8 +154,16 @@ static void clock_set(struct player *p, int ms, gboolean running)
 	g_mutex_unlock(&p->clock_lock);
 }
 
+static void graph_free(struct player *p)
+{
+	avfilter_graph_free(&p->graph);
+	p->graph_flushed = FALSE;
+}
+
 static void player_free(struct player *p)
 {
+	graph_free(p);
+	av_frame_free(&p->filtered);
 	video_free(&p->video);
 	g_mutex_clear(&p->clock_lock);
 	if (p->pcm)
@@ -159,6 +182,7 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open(JNIEnv *env,
 	struct player *p = g_new0(struct player, 1);
 	const char *path = NULL;
 	g_mutex_init(&p->clock_lock);
+	p->speed = p->pitch = p->requested_speed = p->requested_pitch = 1.f;
 
 	if (path_jstr) {
 		path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
@@ -228,21 +252,111 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getDuration(JNIEnv
 	return p->format->duration / (AV_TIME_BASE / 1000);
 }
 
-/* the next decoded samples into p->buffer: their number, 0 at the end, < 0 on error */
+/* the media frames played (or being played) so far */
+static int64_t media_frames(struct player *p)
+{
+	return p->base + llround(p->written * (double)p->speed);
+}
+
+/* the graph for the speed and pitch: asetrate and aresample shift the pitch (and the speed with it), atempo sets the
+ * speed keeping the pitch (one atempo takes 0.5 to 100), aformat gives the output format back; FALSE on failure */
+static gboolean graph_build(struct player *p)
+{
+	char args[128], number[G_ASCII_DTOSTR_BUF_SIZE];
+	GString *chain = g_string_new(NULL);
+	if (p->pitch != 1.f)
+		g_string_append_printf(chain, "asetrate=%ld,aresample=%d,", lround(p->rate * (double)p->pitch), p->rate);
+	double tempo = p->speed / (double)p->pitch;
+	for (; tempo < 0.5; tempo /= 0.5)
+		g_string_append(chain, "atempo=0.5,");
+	if (tempo != 1.)
+		g_string_append_printf(chain, "atempo=%s,", g_ascii_formatd(number, sizeof(number), "%.6f", tempo));
+	g_string_append_printf(chain, "aformat=sample_fmts=s16:channel_layouts=stereo:sample_rates=%d", p->rate);
+
+	p->graph = avfilter_graph_alloc();
+	snprintf(args, sizeof(args), "sample_rate=%d:sample_fmt=s16:channel_layout=stereo:time_base=1/%d", p->rate, p->rate);
+	AVFilterInOut *outputs = avfilter_inout_alloc();
+	AVFilterInOut *inputs = avfilter_inout_alloc();
+	gboolean ok = avfilter_graph_create_filter(&p->graph_in, avfilter_get_by_name("abuffer"), "in", args, NULL, p->graph) >= 0;
+	if (ok)
+		ok = avfilter_graph_create_filter(&p->graph_out, avfilter_get_by_name("abuffersink"), "out", NULL, NULL, p->graph) >= 0;
+	if (ok) {
+		outputs->name = av_strdup("in");
+		outputs->filter_ctx = p->graph_in;
+		inputs->name = av_strdup("out");
+		inputs->filter_ctx = p->graph_out;
+		ok = avfilter_graph_parse_ptr(p->graph, chain->str, &inputs, &outputs, NULL) >= 0 && avfilter_graph_config(p->graph, NULL) >= 0;
+	}
+	avfilter_inout_free(&inputs);
+	avfilter_inout_free(&outputs);
+	if (!ok) {
+		printf("MediaPlayer: can't set up the playback speed and pitch (%s)\n", chain->str);
+		graph_free(p);
+	}
+	g_string_free(chain, TRUE);
+	if (!p->filtered)
+		p->filtered = av_frame_alloc();
+	return ok;
+}
+
+/* the frames frames in p->buffer through the graph (none: the end of the stream): the samples it gives into
+ * p->buffer, their number */
+static int graph_filter(struct player *p, int frames)
+{
+	if (!p->graph && !graph_build(p))
+		return frames;
+	if (frames > 0) {
+		AVFrame *in = av_frame_alloc();
+		in->format = AV_SAMPLE_FMT_S16;
+		av_channel_layout_copy(&in->ch_layout, &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO);
+		in->sample_rate = p->rate;
+		in->nb_samples = frames;
+		in->pts = p->graph_pts;
+		p->graph_pts += frames;
+		if (av_frame_get_buffer(in, 0) == 0) {
+			memcpy(in->data[0], p->buffer, frames * OUT_CHANNELS * sizeof(int16_t));
+			av_buffersrc_add_frame(p->graph_in, in);
+		}
+		av_frame_free(&in);
+	} else {
+		av_buffersrc_add_frame(p->graph_in, NULL);
+		p->graph_flushed = TRUE;
+	}
+	int out = 0;
+	while (av_buffersink_get_frame(p->graph_out, p->filtered) >= 0) {
+		int n = p->filtered->nb_samples;
+		if (out + n > p->buffer_frames) {
+			p->buffer = g_renew(int16_t, p->buffer, (out + n) * OUT_CHANNELS);
+			p->buffer_frames = out + n;
+		}
+		memcpy(p->buffer + out * OUT_CHANNELS, p->filtered->data[0], n * OUT_CHANNELS * sizeof(int16_t));
+		out += n;
+		av_frame_unref(p->filtered);
+	}
+	return out;
+}
+
+/* the next samples to play into p->buffer (decoded, at the speed and pitch): their number, 0 at the end, < 0 on
+ * error */
 static int decode(struct player *p)
 {
 	if (!p->codec) {
-		int64_t left = p->format->duration / (AV_TIME_BASE / 1000) - (p->base + p->written);
+		int64_t left = (p->format->duration / (AV_TIME_BASE / 1000) - media_frames(p)) / p->speed;
 		return MAX(MIN(left, 20), 0);
 	}
 	AVStream *stream = p->format->streams[p->stream_index];
 	while (TRUE) {
 		int ret = avcodec_receive_frame(p->codec, p->frame);
 		if (ret == AVERROR_EOF) {
+			if (p->graph && !p->graph_flushed) {
+				int frames = graph_filter(p, 0); /* what the graph still holds */
+				if (frames > 0)
+					return frames;
+			}
 			/* the audio ends before the video: silence until the end of the file */
 			int64_t left = 0;
 			if (p->video.format && p->format->duration != AV_NOPTS_VALUE)
-				left = av_rescale(p->format->duration, p->rate, AV_TIME_BASE) - (p->base + p->written);
+				left = (av_rescale(p->format->duration, p->rate, AV_TIME_BASE) - media_frames(p)) / p->speed;
 			if (left <= 0)
 				return 0;
 			int frames = MIN(left, p->rate / 50);
@@ -292,6 +406,11 @@ static int decode(struct player *p)
 			}
 		}
 		p->skip_until = 0;
+		if (p->speed != 1.f || p->pitch != 1.f) {
+			frames = graph_filter(p, frames);
+			if (frames == 0)
+				continue;
+		}
 		return frames;
 	}
 }
@@ -317,7 +436,8 @@ static void seek(struct player *p, int msec, gboolean drop)
 		}
 		p->written = 0;
 	}
-	p->base = p->skip_until - p->written;
+	p->base = p->skip_until - llround(p->written * (double)p->speed);
+	graph_free(p); /* its samples were from before */
 }
 
 static jint position_ms(struct player *p)
@@ -325,7 +445,7 @@ static jint position_ms(struct player *p)
 	snd_pcm_sframes_t delay = 0;
 	if (p->pcm && snd_pcm_delay(p->pcm, &delay) < 0)
 		delay = 0;
-	int64_t frames = p->base + p->written - MIN(MAX(delay, 0), p->written);
+	int64_t frames = p->base + llround((p->written - MIN(MAX(delay, 0), p->written)) * (double)p->speed);
 	return MAX(frames, 0) * 1000 / p->rate;
 }
 
@@ -335,6 +455,19 @@ static jint position_ms(struct player *p)
 JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, jclass class, jlong ptr, jfloat left, jfloat right, jboolean looping)
 {
 	struct player *p = _PTR(ptr);
+
+	/* a new speed or pitch: the position goes on from where it is (the samples in the device play at the old speed) */
+	g_mutex_lock(&p->clock_lock);
+	float speed = p->requested_speed, pitch = p->requested_pitch;
+	g_mutex_unlock(&p->clock_lock);
+	if (speed != p->speed || pitch != p->pitch) {
+		p->base += llround(p->written * (double)(p->speed - speed));
+		g_mutex_lock(&p->clock_lock);
+		p->speed = speed;
+		g_mutex_unlock(&p->clock_lock);
+		p->pitch = pitch;
+		graph_free(p);
+	}
 
 	int frames = decode(p);
 	if (frames == 0 && looping) {
@@ -384,6 +517,16 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, 
 	return ms;
 }
 
+/* setPlaybackParams(): the playback thread applies them with its next samples */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setPlaybackRate(JNIEnv *env, jclass class, jlong ptr, jfloat speed, jfloat pitch)
+{
+	struct player *p = _PTR(ptr);
+	g_mutex_lock(&p->clock_lock);
+	p->requested_speed = speed;
+	p->requested_pitch = pitch;
+	g_mutex_unlock(&p->clock_lock);
+}
+
 /* drops what the device still holds; the Java side seeks to the paused position on resume */
 JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1pause(JNIEnv *env, jclass class, jlong ptr)
 {
@@ -417,7 +560,7 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1clock(JNIEnv *env
 	g_mutex_lock(&p->clock_lock);
 	int64_t ms = p->clock_ms;
 	if (p->clock_running)
-		ms += MIN((g_get_monotonic_time() - p->clock_time) / 1000, CLOCK_MAX_EXTRAPOLATION_MS);
+		ms += MIN((g_get_monotonic_time() - p->clock_time) / 1000, CLOCK_MAX_EXTRAPOLATION_MS) * p->speed;
 	jlong clock = ((jlong)p->loops << 32) | (uint32_t)ms;
 	g_mutex_unlock(&p->clock_lock);
 	return clock;
