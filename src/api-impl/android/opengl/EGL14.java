@@ -68,6 +68,34 @@ public class EGL14 {
 			return new EGLSurface(((com.google.android.gles_jni.EGLSurfaceImpl)raw_egl_surface).mEGLSurface);
 	}
 
+	public static boolean eglBindAPI(int api) {
+		return EGLImpl.native_eglBindAPI(api);
+	}
+
+	public static int eglGetError() {
+		return EGLImpl.native_eglGetError();
+	}
+
+	/* AOSP: win is a Surface, SurfaceTexture or SurfaceHolder */
+	public static EGLSurface eglCreateWindowSurface(EGLDisplay display, EGLConfig config, Object win, int[] attrib_list, int attrib_list_offset) {
+		int[] raw_attrib_list = null;
+		if (attrib_list != null) {
+			raw_attrib_list = new int[attrib_list.length - attrib_list_offset];
+			System.arraycopy(attrib_list, attrib_list_offset, raw_attrib_list, 0, attrib_list.length - attrib_list_offset);
+		}
+		javax.microedition.khronos.egl.EGLConfig raw_config = new javax.microedition.khronos.egl.EGLConfig(config.getNativeHandle());
+		javax.microedition.khronos.egl.EGLSurface raw_egl_surface = impl.eglCreateWindowSurface(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), raw_config, win, raw_attrib_list);
+		if (raw_egl_surface == EGL10.EGL_NO_SURFACE)
+			return EGL_NO_SURFACE;
+		else
+			return new EGLSurface(((com.google.android.gles_jni.EGLSurfaceImpl)raw_egl_surface).mEGLSurface);
+	}
+
+	public static boolean eglSwapBuffers(EGLDisplay display, EGLSurface surface) {
+		javax.microedition.khronos.egl.EGLDisplay raw_display = new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle());
+		return impl.eglSwapBuffers(raw_display, new com.google.android.gles_jni.EGLSurfaceImpl(surface.getNativeHandle()));
+	}
+
 	public static boolean eglDestroySurface(EGLDisplay display, EGLSurface surface) {
 		javax.microedition.khronos.egl.EGLDisplay raw_display = new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle());
 		javax.microedition.khronos.egl.EGLSurface raw_surface = new com.google.android.gles_jni.EGLSurfaceImpl(surface.getNativeHandle());

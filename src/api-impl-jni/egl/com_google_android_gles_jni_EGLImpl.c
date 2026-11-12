@@ -170,3 +170,13 @@ JNIEXPORT jstring JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQ
 	const char *ret = eglQueryString(_PTR(display), name);
 	return ret ? (*env)->NewStringUTF(env, ret) : NULL;
 }
+
+JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglBindAPI(JNIEnv *env, jclass this, jint api)
+{
+	return eglBindAPI(api);
+}
+
+JNIEXPORT jint JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetError(JNIEnv *env, jclass this)
+{
+	return eglGetError();
+}
