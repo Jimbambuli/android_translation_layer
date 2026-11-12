@@ -218,6 +218,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',
                                                                   	'src/api-impl-jni/media/android_media_session_MediaSession.c',
                                                                   	'src/api-impl-jni/media/av_input.c',
+                                                                  	'src/api-impl-jni/media/video_rotate.c',
                                                                   	'src/api-impl-jni/net/android_net_ConnectivityManager.c',
                                                                   	'src/api-impl-jni/os/android_atl_ATLBinderConnection.c',
                                                                   	'src/api-impl-jni/os/android_atl_GVariantBuilderParcel.c',
