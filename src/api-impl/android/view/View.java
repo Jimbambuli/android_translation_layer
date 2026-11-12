@@ -4728,6 +4728,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setScrollBarStyle(int style) {}
 
+	/* AOSP keeps the size in the ScrollabilityCache and falls back to ViewConfiguration's; ATL draws
+	 * no Android scroll bars, so the size is only kept for getScrollBarSize() */
+	private int mScrollBarSize = -1;
+
+	public int getScrollBarSize() {
+		return mScrollBarSize < 0 ? ViewConfiguration.get(getContext()).getScaledScrollBarSize() : mScrollBarSize;
+	}
+
+	public void setScrollBarSize(int scrollBarSize) {
+		mScrollBarSize = scrollBarSize;
+	}
+
 	public void setVerticalScrollbarPosition(int position) {}
 
 
