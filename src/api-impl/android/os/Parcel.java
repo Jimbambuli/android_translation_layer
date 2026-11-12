@@ -986,7 +986,7 @@ public class Parcel {
 	}
 
 	public void writeStrongInterface(IInterface binder) {
-		writeInt(binder == null ? -1 : 0);
+		writeStrongBinder(binder == null ? null : binder.asBinder());
 	}
 
 	public void writeBinderArray(IBinder[] array) {
