@@ -237,8 +237,8 @@ public class SurfaceView extends View {
 
 		@Override
 		public Rect getSurfaceFrame() {
-			//		return mSurfaceFrame;
-			return new Rect(0, 0, 400, 400);
+			/* AOSP's mSurfaceFrame: the surface has the view's size (ATL ignores setFixedSize()) */
+			return new Rect(0, 0, getWidth(), getHeight());
 		}
 	};
 
@@ -248,5 +248,9 @@ public class SurfaceView extends View {
 
 	public void setZOrderMediaOverlay(boolean mediaOverlay) {
 		/* TODO */
+	}
+
+	/* AOSP: keeps the surface out of screenshots and non-secure displays; there are none to keep it from here */
+	public void setSecure(boolean isSecure) {
 	}
 }

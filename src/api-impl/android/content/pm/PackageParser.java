@@ -2029,6 +2029,11 @@ public class PackageParser {
 			}
 			ai.processName = buildProcessName(ai.packageName, null, pname,
 			                                  flags, mSeparateProcesses, outError);
+			/* AOSP's PackageManagerService.fixProcessName(): without android:process the
+			 * application (and so every component without its own) runs in the process
+			 * named after the package */
+			if (ai.processName == null)
+				ai.processName = ai.packageName;
 
 			ai.enabled = sa.getBoolean(
 			    com.android.internal.R.styleable.AndroidManifestApplication_enabled, true);

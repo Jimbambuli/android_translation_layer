@@ -25,6 +25,22 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 
 /*
  * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglBindAPI
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglBindAPI
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglGetError
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetError
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
  * Method:    native_eglCreateWindowSurface
  * Signature: (JJLandroid/view/Surface;[I)J
  */

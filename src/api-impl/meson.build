@@ -851,6 +851,7 @@ srcs = [
 	'android/text/style/ClickableSpan.java',
 	'android/text/style/DynamicDrawableSpan.java',
 	'android/text/style/ForegroundColorSpan.java',
+	'android/text/style/IconMarginSpan.java',
 	'android/text/style/ImageSpan.java',
 	'android/text/style/LeadingMarginSpan.java',
 	'android/text/style/LineBackgroundSpan.java',

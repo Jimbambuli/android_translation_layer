@@ -148,6 +148,10 @@ public class EGLImpl implements EGL10 {
 	public boolean eglWaitGL() { return false; }
 	public boolean eglWaitNative(int engine, Object bindTarget) { return false; }
 
+	/** @hide EGL14 only: EGL 1.2 */
+	public static native boolean native_eglBindAPI(int api);
+	/** @hide EGL14 only */
+	public static native int native_eglGetError();
 	private native long native_eglCreateWindowSurface(long native_egl_display, long native_egl_config, Surface surface, int[] attrib_list);
 	private native long native_eglGetDisplay(Object native_display);
 	private native long native_eglGetCurrentContext();
