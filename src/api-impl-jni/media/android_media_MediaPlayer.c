@@ -47,6 +47,8 @@ struct video {
 	int stream_index;
 	int64_t skip_until; /* ms: after a seek, the frames that end before it are dropped */
 	int rotation;       /* degrees clockwise the frames are to be turned for display (the container's display matrix) */
+	/* of the frames given to GTK as YUV, made for the first one */
+	GdkColorState *color_state;
 };
 
 struct player {
@@ -78,6 +80,8 @@ struct player {
 
 static void video_free(struct video *v)
 {
+	if (v->color_state)
+		gdk_color_state_unref(v->color_state);
 	sws_freeContext(v->sws);
 	avcodec_free_context(&v->codec);
 	av_packet_free(&v->packet);
@@ -525,11 +529,82 @@ static void rotate_plane(guchar *dst, const uint8_t *src, int src_stride, int wi
 			}
 }
 
-/* the frame decoded last as a new texture (RGB, the colors of its color space), turned for display */
+/* a plane into dst, packed and turned */
+static void copy_plane(guchar *dst, const uint8_t *src, int src_stride, int width, int height, int bpp, int degrees)
+{
+	if (degrees) {
+		rotate_plane(dst, src, src_stride, width, height, bpp, degrees);
+		return;
+	}
+	for (int y = 0; y < height; y++)
+		memcpy(dst + (size_t)y * width * bpp, src + (size_t)y * src_stride, (size_t)width * bpp);
+}
+
+#if GTK_CHECK_VERSION(4, 20, 0)
+/* 8-bit YUV 4:2:0 as it is to GTK, which converts it when drawing (no conversion per frame here) */
+static GdkTexture *yuv_texture(struct video *v, AVFrame *frame)
+{
+	if ((frame->format != AV_PIX_FMT_YUV420P && frame->format != AV_PIX_FMT_YUVJ420P) || frame->width % 2 || frame->height % 2)
+		return NULL;
+	if (!v->color_state) {
+		/* the matrix of the frame's color space (unspecified: BT.601, as libswscale's default), sRGB otherwise as
+		 * the RGB frames */
+		GdkCicpParams *params = gdk_cicp_params_new();
+		gdk_cicp_params_set_color_primaries(params, 1);
+		gdk_cicp_params_set_transfer_function(params, 13);
+		guint matrix = 6;
+		if (frame->colorspace == AVCOL_SPC_BT709)
+			matrix = 1;
+		else if (frame->colorspace == AVCOL_SPC_BT2020_NCL)
+			matrix = 9;
+		gdk_cicp_params_set_matrix_coefficients(params, matrix);
+		gdk_cicp_params_set_range(params, frame->color_range == AVCOL_RANGE_JPEG || frame->format == AV_PIX_FMT_YUVJ420P ? GDK_CICP_RANGE_FULL : GDK_CICP_RANGE_NARROW);
+		v->color_state = gdk_cicp_params_build_color_state(params, NULL);
+		g_object_unref(params);
+		if (!v->color_state)
+			return NULL;
+	}
+	int width = frame->width, height = frame->height;
+	gsize luma = (gsize)width * height, chroma = luma / 4;
+	guchar *data = g_malloc(luma + 2 * chroma);
+	copy_plane(data, frame->data[0], frame->linesize[0], width, height, 1, v->rotation);
+	copy_plane(data + luma, frame->data[1], frame->linesize[1], width / 2, height / 2, 1, v->rotation);
+	copy_plane(data + luma + chroma, frame->data[2], frame->linesize[2], width / 2, height / 2, 1, v->rotation);
+	if (v->rotation == 90 || v->rotation == 270) {
+		width = frame->height;
+		height = frame->width;
+	}
+	GBytes *bytes = g_bytes_new_take(data, luma + 2 * chroma);
+	GdkMemoryTextureBuilder *builder = gdk_memory_texture_builder_new();
+	gdk_memory_texture_builder_set_bytes(builder, bytes);
+	gdk_memory_texture_builder_set_width(builder, width);
+	gdk_memory_texture_builder_set_height(builder, height);
+	gdk_memory_texture_builder_set_format(builder, GDK_MEMORY_G8_B8_R8_420);
+	gdk_memory_texture_builder_set_color_state(builder, v->color_state);
+	gdk_memory_texture_builder_set_stride_for_plane(builder, 0, width);
+	gdk_memory_texture_builder_set_stride_for_plane(builder, 1, width / 2);
+	gdk_memory_texture_builder_set_stride_for_plane(builder, 2, width / 2);
+	gdk_memory_texture_builder_set_offset(builder, 0, 0);
+	gdk_memory_texture_builder_set_offset(builder, 1, luma);
+	gdk_memory_texture_builder_set_offset(builder, 2, luma + chroma);
+	GdkTexture *texture = gdk_memory_texture_builder_build(builder);
+	g_object_unref(builder);
+	g_bytes_unref(bytes);
+	return texture;
+}
+#endif
+
+/* the frame decoded last as a new texture, turned for display: 8-bit YUV 4:2:0 as it is (GTK 4.20), other formats
+ * converted to RGB in the colors of their color space */
 JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIEnv *env, jclass class, jlong ptr)
 {
 	struct video *v = &((struct player *)_PTR(ptr))->video;
 	AVFrame *frame = v->frame;
+#if GTK_CHECK_VERSION(4, 20, 0)
+	GdkTexture *yuv = yuv_texture(v, frame);
+	if (yuv)
+		return _INTPTR(yuv);
+#endif
 	v->sws = sws_getCachedContext(v->sws, frame->width, frame->height, frame->format, frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
 	if (!v->sws)
 		return 0;
