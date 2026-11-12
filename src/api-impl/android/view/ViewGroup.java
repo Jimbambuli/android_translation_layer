@@ -1082,6 +1082,17 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return isFocused() || getFocusedChild() != null;
 	}
 
+	/* AOSP: a group that contains the focus clears it on the focused descendant */
+	@Override
+	public void clearFocus() {
+		View focused = getFocusedChild();
+		if (focused == null) {
+			super.clearFocus();
+		} else {
+			focused.clearFocus();
+		}
+	}
+
 	/* as AOSP: the direct child that has or contains the focus */
 	public View getFocusedChild() {
 		if (!super.hasFocus()) // nothing in this tree is focused
