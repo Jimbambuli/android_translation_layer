@@ -79,6 +79,15 @@ public class ConnectivityManager {
 	private static Handler connectivityThreadHandler;
 	private static boolean lastAvailable;
 
+	/* AOSP ConnectivityManager.getRestrictBackgroundStatus() (API 24): the user's Data Saver; a desktop has none */
+	public static final int RESTRICT_BACKGROUND_STATUS_DISABLED = 1;
+	public static final int RESTRICT_BACKGROUND_STATUS_WHITELISTED = 2;
+	public static final int RESTRICT_BACKGROUND_STATUS_ENABLED = 3;
+
+	public int getRestrictBackgroundStatus() {
+		return RESTRICT_BACKGROUND_STATUS_DISABLED;
+	}
+
 	public NetworkInfo getNetworkInfo(int networkType) {
 		return new NetworkInfo(nativeGetNetworkAvailable());
 	}
