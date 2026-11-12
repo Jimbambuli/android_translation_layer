@@ -91,8 +91,9 @@ public final class ATLProcess {
 		/* the process ended (or crashed): its bindings are lost, like ActiveServices.killServicesLocked() */
 		@Override
 		public void onConnectionDied(ATLBinderConnection connection) {
+			/* a process from the app's zygote is the zygote's child, which reaps it and logs its status */
 			int status = ATLBinderConnection.nativeWaitPid(connection.peerPid);
-			Slog.i(TAG, "process " + name + " (pid " + connection.peerPid + ") has died, status " + status);
+			Slog.i(TAG, "process " + name + " (pid " + connection.peerPid + ") has died" + (status >= 0 ? ", status " + status : ""));
 			final ArrayList<Map.Entry<ServiceConnection, Intent>> lost;
 			synchronized (processes) {
 				if (processes.get(key) == this)
@@ -325,6 +326,7 @@ public final class ATLProcess {
 		int[] sv = ATLBinderConnection.nativeSocketPair();
 		if (sv == null)
 			throw new RemoteException("socketpair failed");
+		Slog.i(TAG, "starting process " + r.name);
 		int pid = ATLBinderConnection.nativeSpawn(sv[1], r.name, r.isolated);
 		closeFd(sv[1]);
 		if (pid < 0) {
