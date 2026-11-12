@@ -442,10 +442,12 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 		}
 		glBindTexture(GL_TEXTURE_2D, previousTexture);
 	}
-	if (!atl_surface->back_buffer) {
-		atl_surface->back_buffer = g_async_queue_pop(atl_surface->unused_buffers);
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer->gl_framebuffer);
+	/* the buffers come back when GTK lets go of their textures, on the main thread; a thread drawing for an app
+	 * whose main thread waits for it (GeckoView pausing its compositor) must not wait for that forever: like in
+	 * eglSwapBuffers(), without a free buffer it draws into nothing until the next swap */
+	if (!atl_surface->back_buffer)
+		atl_surface->back_buffer = g_async_queue_timeout_pop(atl_surface->unused_buffers, 100000); // 100ms
+	glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
 	return ret;
 }
 
@@ -567,5 +569,5 @@ void bionic_glBindFramebuffer(GLenum target, GLuint framebuffer)
 	if (getenv("ATL_DIRECT_EGL") || framebuffer != 0)
 		return glBindFramebuffer(target, framebuffer);
 	ATLSurface *atl_surface = g_hash_table_lookup(draw_surface_hashtable, eglGetCurrentContext());
-	return glBindFramebuffer(target, atl_surface ? atl_surface->back_buffer->gl_framebuffer : 0);
+	return glBindFramebuffer(target, atl_surface && atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
 }
