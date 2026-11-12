@@ -410,6 +410,14 @@ public final class MessageQueue {
 		}
 	}
 
+	/* AOSP MessageQueue.isIdle() (API 23): no message is due now */
+	public boolean isIdle() {
+		synchronized (this) {
+			final long now = SystemClock.uptimeMillis();
+			return mMessages == null || now < mMessages.when;
+		}
+	}
+
 	boolean isIdling() {
 		synchronized (this) {
 			return isIdlingLocked();
