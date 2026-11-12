@@ -5,6 +5,8 @@
 #include <gtk/gtk.h>
 #include <jni.h>
 
+struct atl_surface_msg;
+
 struct ANativeWindow {
 	EGLNativeWindowType egl_window;
 	GtkWidget *surface_view_widget;
@@ -15,7 +17,17 @@ struct ANativeWindow {
 	int refcount;
 	int width;
 	int height;
+	/* a Surface of another process of the app (Surface.Endpoint): the socket to its widget, else -1 */
+	int remote_fd;
+	gboolean remote_gone;
+	GMutex remote_lock;
+	void (*remote_handler)(void *data, const struct atl_surface_msg *msg);
+	void *remote_data;
 };
+
+gboolean ANativeWindow_remoteRead(struct ANativeWindow *native_window, int timeout_ms);
+void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd);
+void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data);
 
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);
 EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, struct ANativeWindow *native_window, EGLint const *attrib_list);

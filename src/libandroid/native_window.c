@@ -47,12 +47,17 @@
 
 #include <assert.h>
 #include <dlfcn.h>
+#include <errno.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 #include <jni.h>
 
 // FIXME: put the header in a common place
 #include "../api-impl-jni/defines.h"
 
+#include "../api-impl-jni/widgets/android_view_SurfaceView.h"
 #include "native_window.h"
 
 /**
@@ -117,7 +122,12 @@ void ANativeWindow_acquire(struct ANativeWindow *native_window)
 void ANativeWindow_release(struct ANativeWindow *native_window)
 {
 	native_window->refcount--;
-	if (native_window->refcount == 0) {
+	if (native_window->refcount == 0 && native_window->remote_fd >= 0) {
+		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
+		close(native_window->remote_fd);
+		g_mutex_clear(&native_window->remote_lock);
+		free(native_window);
+	} else if (native_window->refcount == 0) {
 		g_clear_signal_handler(&native_window->resize_handler, native_window->surface_view_widget);
 		if (native_window->wayland_display) {
 			wl_egl_window_destroy((struct wl_egl_window *)native_window->egl_window);
@@ -131,12 +141,100 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 
 int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window)
 {
+	if (native_window->remote_fd >= 0) {
+		ANativeWindow_remoteRead(native_window, 0);
+		return native_window->width;
+	}
 	return gtk_widget_get_width(native_window->surface_view_widget);
 }
 
 int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
 {
+	if (native_window->remote_fd >= 0) {
+		ANativeWindow_remoteRead(native_window, 0);
+		return native_window->height;
+	}
 	return gtk_widget_get_height(native_window->surface_view_widget);
+}
+
+/* the window of a Surface of another process: messages from the widget showing it (android_view_SurfaceView.h),
+ * waiting up to timeout_ms for the first one; FALSE once that process is gone */
+gboolean ANativeWindow_remoteRead(struct ANativeWindow *native_window, int timeout_ms)
+{
+	struct atl_surface_msg msg;
+	g_mutex_lock(&native_window->remote_lock);
+	while (!native_window->remote_gone && poll(&(struct pollfd){.fd = native_window->remote_fd, .events = POLLIN}, 1, timeout_ms) > 0) {
+		ssize_t len = recv(native_window->remote_fd, &msg, sizeof(msg), MSG_DONTWAIT);
+		if (len < 0 && (errno == EAGAIN || errno == EINTR))
+			continue;
+		if (len != sizeof(msg)) {
+			native_window->remote_gone = TRUE;
+			break;
+		}
+		if (msg.type == ATL_SURFACE_MSG_SIZE) {
+			native_window->width = msg.width;
+			native_window->height = msg.height;
+		} else if (native_window->remote_handler) {
+			native_window->remote_handler(native_window->remote_data, &msg);
+		}
+		timeout_ms = 0;
+	}
+	g_mutex_unlock(&native_window->remote_lock);
+	return !native_window->remote_gone;
+}
+
+void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd)
+{
+	char control[CMSG_SPACE(sizeof(int))] = {0};
+	struct iovec iov = {.iov_base = (void *)msg, .iov_len = sizeof(*msg)};
+	struct msghdr hdr = {.msg_iov = &iov, .msg_iovlen = 1};
+	if (fd >= 0) {
+		hdr.msg_control = control;
+		hdr.msg_controllen = sizeof(control);
+		struct cmsghdr *cmsg = CMSG_FIRSTHDR(&hdr);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+		memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+	}
+	if (!native_window->remote_gone && sendmsg(native_window->remote_fd, &hdr, MSG_NOSIGNAL) < 0)
+		native_window->remote_gone = TRUE;
+}
+
+void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data)
+{
+	g_mutex_lock(&native_window->remote_lock);
+	native_window->remote_handler = handler;
+	native_window->remote_data = data;
+	g_mutex_unlock(&native_window->remote_lock);
+}
+
+/* a Surface of another process (Surface.atl_endpoint): its window draws into buffers that the process showing
+ * the Surface gets over a socket (egl.c) */
+static ANativeWindow *remote_window_fromSurface(JNIEnv *env, jobject surface)
+{
+	jmethodID connect = (*env)->GetMethodID(env, (*env)->FindClass(env, "android/view/Surface"), "atl_connect", "()I");
+	int fd = (*env)->CallIntMethod(env, surface, connect);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		return NULL;
+	}
+	if (fd < 0)
+		return NULL;
+	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
+	native_window->refcount = 1;
+	native_window->remote_fd = fd;
+	g_mutex_init(&native_window->remote_lock);
+	/* like the loop below for a widget of this process: wait until it is mapped */
+	while (native_window->width == 0 && ANativeWindow_remoteRead(native_window, -1))
+		;
+	if (native_window->remote_gone) {
+		ANativeWindow_release(native_window);
+		return NULL;
+	}
+	fprintf(stderr, "ANativeWindow_fromSurface: surface of another process, %dx%d\n", native_window->width, native_window->height);
+	return native_window;
 }
 
 /**
@@ -267,6 +365,9 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 		.global_remove = wl_registry_global_remove_handler
 	};
 
+	if (!_GET_LONG_FIELD(surface, "widget") && _GET_OBJ_FIELD(surface, "atl_endpoint", "Landroid/os/IBinder;"))
+		return remote_window_fromSurface(env, surface);
+
 	GtkWidget *surface_view_widget = gtk_widget_get_first_child(_PTR(_GET_LONG_FIELD(surface, "widget")));
 	GtkWidget *window = GTK_WIDGET(gtk_widget_get_native(surface_view_widget));
 	while ((width = gtk_widget_get_width(surface_view_widget)) == 0) {
@@ -290,6 +391,7 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 
 	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
 	native_window->refcount = 1; // probably, 0 doesn't work
+	native_window->remote_fd = -1;
 	native_window->surface_view_widget = surface_view_widget;
 	native_window->width = width;
 	native_window->height = height;
@@ -402,8 +504,12 @@ static GHashTable *vk_surface_native_windows;
 
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
-	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
 	VkResult ret;
+	if (pCreateInfo->window->remote_fd >= 0) {
+		fprintf(stderr, "bionic_vkCreateAndroidSurfaceKHR: Vulkan on a surface of another process is not implemented\n");
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
 
 	if (GDK_IS_WAYLAND_DISPLAY(display)) {
 		VkWaylandSurfaceCreateInfoKHR wayland_create_info = {
