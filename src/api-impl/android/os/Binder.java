@@ -61,7 +61,8 @@ public class Binder implements IBinder {
 
 	public static int getCallingUid() { return ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.uid; }
 
-	public static int getCallingPid() { return 0; }
+	/* the process of the transaction this thread executes (ATLBinderConnection), else this one like AOSP */
+	public static int getCallingPid() { return android.atl.ATLBinderConnection.getCallingPid(); }
 
 	@Override
 	public boolean equals(Object obj) {

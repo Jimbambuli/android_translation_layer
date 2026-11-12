@@ -591,7 +591,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		activity_start(env, activity);
 		return;
 	}
-	if (uri_option && *uri_option && forward_uri_to_running_app(G_APPLICATION(app), uri_option))
+	/* a process of the app for its components with android:process, started by the main process (ATLProcess.java):
+	 * it creates the Application and then serves the main process, without a window of its own */
+	const char *atl_process_name = getenv("ATL_PROCESS_NAME");
+	if (!atl_process_name && uri_option && *uri_option && forward_uri_to_running_app(G_APPLICATION(app), uri_option))
 		exit(0);
 	char *dex_install_dir;
 	char *api_impl_jar;
@@ -828,6 +831,15 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
+	}
+
+	if (atl_process_name) {
+		J__ATLProcess__attachToMainProcess(env);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			_exit(10);
+		}
+		return; // the window stays hidden and keeps the application running
 	}
 
 	if (d->apk_instrumentation_class) {

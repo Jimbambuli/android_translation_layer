@@ -3,6 +3,7 @@ package android.content;
 import android.atl.ATLLoadedApp;
 import android.atl.ATLLoadedAppManager;
 import android.atl.ATLMediaContentProvider;
+import android.atl.ATLProcess;
 import android.atl.ATLProvider;
 import android.atl.annotation.Export;
 import android.content.pm.PackageParser;
@@ -33,7 +34,11 @@ public abstract class ContentProvider {
 		ATLLoadedApp primary = ATLLoadedApp.getPrimaryApplication();
 		for (PackageParser.Provider provider_parsed : primary.pkg.providers) {
 			String process_name = provider_parsed.info.processName;
-			if (process_name != null && process_name.contains(":")) {
+			if (ATLProcess.isSecondary()) {
+				/* like AMS.generateApplicationProvidersLocked(): a process gets the providers that run in it */
+				if (!ATLProcess.myProcessName().equals(process_name))
+					continue;
+			} else if (process_name != null && process_name.contains(":")) {
 				/* NOTE: even if it doesn't contain `:`, if it's not null we probably
 				 * need to check what it's requesting; `:` means it wants us to spawn
 				 * a new process, which we currently don't support */

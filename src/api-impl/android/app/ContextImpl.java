@@ -7,6 +7,7 @@ import android.app.SearchManager;
 import android.app.job.JobScheduler;
 import android.atl.ATLLoadedApp;
 import android.atl.ATLLoadedAppManager;
+import android.atl.ATLProcess;
 import android.bluetooth.BluetoothManager;
 import android.content.*;
 import android.content.pm.ActivityInfo;
@@ -253,6 +254,12 @@ public final class ContextImpl extends Context {
 		if (targetApp == null) {
 			return false;
 		}
+		/* a service with its own android:process runs in that process of the app */
+		if (targetApp == ATLLoadedApp.getPrimaryApplication() && intent.getComponent() != null) {
+			String processName = targetApp.serviceProcessName(intent.getComponent().getClassName());
+			if (processName != null && !processName.equals(ATLProcess.myProcessName()))
+				return ATLProcess.bindService(intent, serviceConnection, processName);
+		}
 		if (targetApp.startOrBindService(intent, serviceConnection, flags) == null)
 			return false;
 		synchronized (bound_services) {
@@ -265,6 +272,8 @@ public final class ContextImpl extends Context {
 	 * which has no service behind it) is ignored instead of AOSP's IllegalArgumentException */
 	@Override
 	public void unbindService(ServiceConnection serviceConnection) {
+		if (ATLProcess.unbindService(serviceConnection))
+			return;
 		ATLLoadedApp targetApp;
 		synchronized (bound_services) {
 			targetApp = bound_services.remove(serviceConnection);

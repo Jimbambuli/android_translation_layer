@@ -32,6 +32,7 @@ public class Parcel {
 	private int size;
 	private boolean hasFileDescriptors;
 	private ArrayList<IBinder> binders;
+	private ArrayList<FileDescriptor> fds;
 
 	protected Parcel() {
 		data = new byte[0];
@@ -942,24 +943,32 @@ public class Parcel {
 			throw e;
 	}
 
+	/* like the binders, the descriptors are kept beside the data (the data holds the index), so that they
+	 * can be passed to another process of the app (ATLBinderConnection) */
 	public void writeFileDescriptor(FileDescriptor fd) {
 		if (fd == null) {
 			writeInt(-1);
 			return;
 		}
-		writeInt(fd.getInt$());
+		if (fds == null)
+			fds = new ArrayList<>();
+		fds.add(fd);
+		writeInt(fds.size() - 1);
 		hasFileDescriptors = true;
 	}
 
+	/* AOSP android_os_Parcel_readFileDescriptor(): the reader gets its own duplicate */
 	public ParcelFileDescriptor readFileDescriptor() {
 		if (!hasFileDescriptors)
 			return null;
-		int fd = readInt();
-		if (fd == -1)
+		int index = readInt();
+		if (index < 0 || fds == null || index >= fds.size())
 			return null;
-		FileDescriptor fd_ = new FileDescriptor();
-		fd_.setInt$(fd);
-		return new ParcelFileDescriptor(fd_);
+		try {
+			return ParcelFileDescriptor.dup(fds.get(index));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	public boolean hasFileDescriptors() {
@@ -987,6 +996,23 @@ public class Parcel {
 
 	public void writeStrongInterface(IInterface binder) {
 		writeStrongBinder(binder == null ? null : binder.asBinder());
+	}
+
+	/** @hide the binders and file descriptors the data refers to by index, for ATLBinderConnection */
+	public ArrayList<IBinder> atl_getBinders() {
+		return binders;
+	}
+
+	/** @hide */
+	public ArrayList<FileDescriptor> atl_getFileDescriptors() {
+		return fds;
+	}
+
+	/** @hide */
+	public void atl_setObjects(ArrayList<IBinder> binders, ArrayList<FileDescriptor> fds) {
+		this.binders = binders;
+		this.fds = fds;
+		hasFileDescriptors = fds != null && !fds.isEmpty();
 	}
 
 	public void writeBinderArray(IBinder[] array) {
