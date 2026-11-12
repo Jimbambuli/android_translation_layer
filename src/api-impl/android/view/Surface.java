@@ -29,10 +29,15 @@ public class Surface implements android.os.Parcelable {
 	public SurfaceTexture surfaceTexture;
 	private android.graphics.Bitmap lockedBitmap;
 
-	/* AOSP Surface.writeToParcel()/readFromParcel()/CREATOR: a Surface travels as the handle of the native surface it
-	 * holds. ATL's Surface is the pointer of the GTK widget it draws into, which is valid in this process only: a
-	 * parcel read in this process (what an app does with it, e.g. an in-process Bundle) gives a Surface on the same
-	 * widget; there is no other process to read it in. */
+	/* a Surface read in another process of the app (Surface.CREATOR there): the endpoint in the process that
+	 * shows it, through which that process gets the buffers drawn here (atl_connect()) */
+	public android.os.IBinder atl_endpoint;
+	private Endpoint endpoint;
+
+	/* AOSP Surface.writeToParcel()/readFromParcel()/CREATOR: a Surface travels as the binder of its buffer queue
+	 * (IGraphicBufferProducer). Here it is the binder of an Endpoint for the widget or SurfaceTexture it draws
+	 * into: read in the same process, it gives a Surface on those again; read in another process, a Surface
+	 * whose EGL window sends its buffers to that widget (ANativeWindow_fromSurface()). */
 	public static final android.os.Parcelable.Creator<Surface> CREATOR = new android.os.Parcelable.Creator<Surface>() {
 		@Override
 		public Surface createFromParcel(android.os.Parcel source) {
@@ -56,7 +61,16 @@ public class Surface implements android.os.Parcelable {
 			throw new IllegalArgumentException("source must not be null");
 		}
 		source.readString(); // the name AOSP gives a surface of a view, none here
-		widget = source.readLong();
+		android.os.IBinder binder = source.readStrongBinder();
+		widget = 0;
+		surfaceTexture = null;
+		atl_endpoint = null;
+		if (binder instanceof Endpoint) {
+			widget = ((Endpoint)binder).widget;
+			surfaceTexture = ((Endpoint)binder).surfaceTexture;
+		} else {
+			atl_endpoint = binder;
+		}
 	}
 
 	@Override
@@ -70,7 +84,57 @@ public class Surface implements android.os.Parcelable {
 			throw new IllegalArgumentException("dest must not be null");
 		}
 		dest.writeString(null);
-		dest.writeLong(widget);
+		if (atl_endpoint != null) {
+			dest.writeStrongBinder(atl_endpoint);
+		} else if (widget != 0 || surfaceTexture != null) {
+			if (endpoint == null || endpoint.widget != widget || endpoint.surfaceTexture != surfaceTexture)
+				endpoint = new Endpoint(widget, surfaceTexture);
+			dest.writeStrongBinder(endpoint);
+		} else {
+			dest.writeStrongBinder(null);
+		}
+	}
+
+	/* the binder a Surface is parceled as: in another process, CONNECT gives the socket for the buffers of an EGL
+	 * window on the Surface (SurfaceView.native_connectRemote()) */
+	static class Endpoint extends android.os.Binder {
+		static final int CONNECT = android.os.IBinder.FIRST_CALL_TRANSACTION;
+		final long widget;
+		final SurfaceTexture surfaceTexture;
+
+		Endpoint(long widget, SurfaceTexture surfaceTexture) {
+			this.widget = widget;
+			this.surfaceTexture = surfaceTexture;
+		}
+
+		@Override
+		protected boolean onTransact(int code, android.os.Parcel data, android.os.Parcel reply, int flags) throws android.os.RemoteException {
+			if (code != CONNECT)
+				return super.onTransact(code, data, reply, flags);
+			int fd = widget != 0 ? SurfaceView.native_connectRemote(widget) : -1;
+			reply.writeInt(fd >= 0 ? 0 : -1);
+			if (fd >= 0)
+				reply.atl_writeOwnedFileDescriptor(android.os.ParcelFileDescriptor.adoptFd(fd).getFileDescriptor());
+			return true;
+		}
+	}
+
+	/* called from ANativeWindow_fromSurface() for a Surface of another process: the socket to its widget, or -1 */
+	private int atl_connect() {
+		android.os.Parcel data = android.os.Parcel.obtain();
+		android.os.Parcel reply = android.os.Parcel.obtain();
+		try {
+			if (atl_endpoint == null || !atl_endpoint.transact(Endpoint.CONNECT, data, reply, 0) || reply.readInt() != 0)
+				return -1;
+			android.os.ParcelFileDescriptor pfd = reply.readFileDescriptor();
+			return pfd != null ? pfd.detachFd() : -1;
+		} catch (android.os.RemoteException e) {
+			android.util.Log.w("Surface", "the process showing the surface is gone: " + e);
+			return -1;
+		} finally {
+			reply.recycle();
+			data.recycle();
+		}
 	}
 
 	public Surface() {}
@@ -78,6 +142,7 @@ public class Surface implements android.os.Parcelable {
 	/* AOSP Surface(SurfaceControl) (API 29): draws into the widget of the SurfaceView the layer belongs to */
 	public Surface(SurfaceControl from) {
 		widget = from.atl_widget();
+		atl_endpoint = from.atl_remoteEndpoint();
 	}
 
 	public Surface(SurfaceTexture surfaceTexture) {
@@ -85,11 +150,12 @@ public class Surface implements android.os.Parcelable {
 	}
 
 	public boolean isValid() {
-		return widget != 0 || (surfaceTexture != null && !surfaceTexture.isReleased());
+		return widget != 0 || (surfaceTexture != null && !surfaceTexture.isReleased()) || (atl_endpoint != null && atl_endpoint.isBinderAlive());
 	}
 
 	public void release() {
 		surfaceTexture = null;
+		atl_endpoint = null;
 	}
 
 	/* AOSP Surface.lockCanvas()/lockHardwareCanvas()/unlockCanvasAndPost(): the canvas draws into a snapshot, which
@@ -98,6 +164,8 @@ public class Surface implements android.os.Parcelable {
 	public android.graphics.Canvas lockCanvas(android.graphics.Rect inOutDirty) {
 		if (!isValid())
 			throw new IllegalStateException("Surface has no native object.");
+		if (atl_endpoint != null)
+			throw new UnsupportedOperationException("software drawing into a surface of another process is not implemented");
 		if (widget == 0) { // a SurfaceTexture's: a buffer of its default size
 			lockedBitmap = android.graphics.Bitmap.createBitmap(surfaceTexture.getDefaultBufferWidth(), surfaceTexture.getDefaultBufferHeight(), android.graphics.Bitmap.Config.ARGB_8888);
 			return new android.graphics.Canvas(lockedBitmap);
