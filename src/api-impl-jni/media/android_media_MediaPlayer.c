@@ -114,7 +114,7 @@ static void video_open(struct player *p, const char *path)
 	if (index < 0 || (p->format->streams[index]->disposition & AV_DISPOSITION_ATTACHED_PIC))
 		return;
 	struct video *v = &p->video;
-	v->region = (struct fd_region){.fd = p->region.fd, .offset = p->region.offset, .length = p->region.length};
+	v->region = (struct fd_region){.fd = p->region.fd, .offset = p->region.offset, .length = p->region.length, .data_source = p->region.data_source};
 	v->format = open_input(path, &v->region, &v->io);
 	if (!v->format)
 		goto fail;
@@ -164,6 +164,10 @@ static void player_free(struct player *p)
 {
 	graph_free(p);
 	av_frame_free(&p->filtered);
+	if (p->region.data_source) {
+		JNIEnv *env = get_jni_env();
+		(*env)->DeleteGlobalRef(env, p->region.data_source);
+	}
 	video_free(&p->video);
 	g_mutex_clear(&p->clock_lock);
 	if (p->pcm)
@@ -177,7 +181,7 @@ static void player_free(struct player *p)
 	g_free(p);
 }
 
-JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length)
+JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length, jobject data_source)
 {
 	struct player *p = g_new0(struct player, 1);
 	const char *path = NULL;
@@ -186,6 +190,15 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open(JNIEnv *env,
 
 	if (path_jstr) {
 		path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
+	} else if (data_source) {
+		/* the size MediaDataSource.getSize() tells, or unknown (-1) */
+		jlong size = (*env)->CallLongMethod(env, data_source, _METHOD(_CLASS(data_source), "getSize", "()J"));
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			size = -1;
+		}
+		p->region = (struct fd_region){.fd = -1, .length = size >= 0 ? size : INT64_MAX, .data_source = (*env)->NewGlobalRef(env, data_source)};
 	} else {
 		/* the region ends at the end of the file at the latest */
 		struct stat st;

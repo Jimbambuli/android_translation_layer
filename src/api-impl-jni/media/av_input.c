@@ -3,13 +3,39 @@
 
 #include <glib.h>
 
+#include "../defines.h"
+#include "../util.h"
 #include "av_input.h"
+
+/* MediaDataSource.readAt(): the bytes read, -1 at the end; an exception is an I/O error */
+static int data_source_read(struct fd_region *region, uint8_t *buf, int size)
+{
+	JNIEnv *env = get_jni_env();
+	jbyteArray array = (*env)->NewByteArray(env, size);
+	jmethodID read_at = _METHOD(_CLASS(region->data_source), "readAt", "(J[BII)I");
+	jint ret = (*env)->CallIntMethod(env, region->data_source, read_at, (jlong)region->position, array, 0, size);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		ret = AVERROR(EIO);
+	} else if (ret <= 0) {
+		ret = AVERROR_EOF;
+	} else {
+		ret = MIN(ret, size);
+		(*env)->GetByteArrayRegion(env, array, 0, ret, (jbyte *)buf);
+		region->position += ret;
+	}
+	(*env)->DeleteLocalRef(env, array);
+	return ret;
+}
 
 static int fd_region_read(void *opaque, uint8_t *buf, int size)
 {
 	struct fd_region *region = opaque;
 	if (region->position >= region->length)
 		return AVERROR_EOF;
+	if (region->data_source)
+		return data_source_read(region, buf, size);
 	ssize_t ret = pread(region->fd, buf, MIN((int64_t)size, region->length - region->position), region->offset + region->position);
 	if (ret < 0)
 		return AVERROR(errno);
@@ -24,6 +50,8 @@ static int64_t fd_region_seek(void *opaque, int64_t offset, int whence)
 	struct fd_region *region = opaque;
 	switch (whence & ~AVSEEK_FORCE) {
 		case AVSEEK_SIZE:
+			if (region->data_source && region->length == INT64_MAX)
+				return -1; /* getSize() did not know it */
 			return region->length;
 		case SEEK_SET:
 			region->position = offset;

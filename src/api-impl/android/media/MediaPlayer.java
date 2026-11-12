@@ -74,6 +74,7 @@ public class MediaPlayer {
 	private FileDescriptor fd;
 	private long fdOffset;
 	private long fdLength;
+	private MediaDataSource dataSource;
 
 	private long nativePlayer; // 0 unless prepared
 	private int duration;
@@ -196,8 +197,17 @@ public class MediaPlayer {
 		fdLength = length;
 	}
 
+	/* AOSP API 23: the data come from the app's MediaDataSource (readAt() on the player's threads); it is closed when
+	 * the player is reset or released */
+	public void setDataSource(MediaDataSource dataSource) {
+		if (dataSource == null)
+			throw new IllegalArgumentException("dataSource must not be null");
+		closeSource();
+		this.dataSource = dataSource;
+	}
+
 	private long open() {
-		return native_open(path, fd != null ? fd.getInt$() : -1, fdOffset, fdLength);
+		return native_open(path, fd != null ? fd.getInt$() : -1, fdOffset, fdLength, dataSource);
 	}
 
 	public void prepare() throws IOException {
@@ -494,7 +504,7 @@ public class MediaPlayer {
 	public void setPlaybackParams(PlaybackParams params) {
 		if (params == null)
 			throw new IllegalArgumentException("params must not be null");
-		if (nativePlayer == 0 && path == null && fd == null)
+		if (nativePlayer == 0 && path == null && fd == null && dataSource == null)
 			throw new IllegalStateException();
 		float newSpeed = speed, newPitch = pitch;
 		boolean speedSet = false;
@@ -523,7 +533,7 @@ public class MediaPlayer {
 
 	/* AOSP: speed 0 while paused */
 	public PlaybackParams getPlaybackParams() {
-		if (nativePlayer == 0 && path == null && fd == null)
+		if (nativePlayer == 0 && path == null && fd == null && dataSource == null)
 			throw new IllegalStateException();
 		boolean isPaused;
 		synchronized (lock) {
@@ -651,6 +661,13 @@ public class MediaPlayer {
 		}
 		fd = null;
 		path = null;
+		if (dataSource != null) {
+			try {
+				dataSource.close();
+			} catch (IOException e) {
+			}
+		}
+		dataSource = null;
 	}
 
 	public void setOnCompletionListener(OnCompletionListener listener) {
@@ -719,7 +736,7 @@ public class MediaPlayer {
 
 	public void setWakeMode(Context context, int mode) {}
 
-	private static native long native_open(String path, int fd, long offset, long length);
+	private static native long native_open(String path, int fd, long offset, long length, MediaDataSource dataSource);
 	private static native int native_getDuration(long player);
 	private static native int native_step(long player, float left, float right, boolean looping);
 	private static native void native_pause(long player);
