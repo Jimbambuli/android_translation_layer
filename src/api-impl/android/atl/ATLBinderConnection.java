@@ -47,7 +47,8 @@ public final class ATLBinderConnection {
 
 	private static final int TXN = 1;
 	private static final int REPLY = 2;
-	private static final int DEAD_REPLY = 3; // the target of a transaction is not known
+	private static final int DEAD_REPLY = 3; // the target of a transaction is not known or its process died
+	private static final int RELEASE = 4; // the receiver dropped its proxy of a node (handle, code = references)
 	/* object table entries: a node of the sender, or a node of the receiver that the sender holds a proxy for */
 	private static final byte SENDER_NODE = 1;
 	private static final byte RECEIVER_NODE = 2;
@@ -66,7 +67,10 @@ public final class ATLBinderConnection {
 	private final HashMap<Integer, Waiter> waiters = new HashMap<>();
 	private final IdentityHashMap<IBinder, Integer> nodeIds = new IdentityHashMap<>();
 	private final HashMap<Integer, IBinder> nodes = new HashMap<>();
-	private final HashMap<Integer, BinderProxy> proxies = new HashMap<>();
+	/* weak, so that a proxy the process no longer uses is collected and releases its node (BinderProxy.finalize) */
+	private final HashMap<Integer, java.lang.ref.WeakReference<BinderProxy>> proxies = new HashMap<>();
+	/* how often each node was sent and not yet released by the other side */
+	private final HashMap<Integer, Integer> nodeRefs = new HashMap<>();
 	private int nextNodeId = 1;
 	private final ExecutorService oneway = Executors.newSingleThreadExecutor(new BinderThreadFactory("oneway"));
 
@@ -165,26 +169,75 @@ public final class ATLBinderConnection {
 		return dead;
 	}
 
-	private synchronized BinderProxy proxyFor(int handle) {
-		BinderProxy proxy = proxies.get(handle);
+	/* the proxy of a node of the other side; received counts the reference the message brought */
+	private synchronized BinderProxy proxyFor(int handle, boolean received) {
+		java.lang.ref.WeakReference<BinderProxy> ref = proxies.get(handle);
+		BinderProxy proxy = ref != null ? ref.get() : null;
 		if (proxy == null) {
 			proxy = new BinderProxy(this, handle);
 			if (dead)
 				proxy.atl_markDead();
-			proxies.put(handle, proxy);
+			proxies.put(handle, new java.lang.ref.WeakReference<>(proxy));
 		}
+		if (received)
+			proxy.atl_acquired++;
 		return proxy;
 	}
 
+	private BinderProxy proxyFor(int handle) {
+		return proxyFor(handle, false);
+	}
+
+	/* a node of this process as sent to the other side: one more reference it holds */
 	private synchronized int nodeIdFor(IBinder binder) {
 		Integer id = nodeIds.get(binder);
 		if (id == null) {
-			/* nodes stay for the life of the connection (no reference counting yet) */
 			id = nextNodeId++;
 			nodeIds.put(binder, id);
 			nodes.put(id, binder);
 		}
+		Integer refs = nodeRefs.get(id);
+		nodeRefs.put(id, refs == null ? 1 : refs + 1);
 		return id;
+	}
+
+	/* the other side dropped its proxy and the references it had received: a node nobody holds is forgotten
+	 * (the context object stays) */
+	private synchronized void releaseNode(int id, int count) {
+		Integer refs = nodeRefs.get(id);
+		int left = (refs == null ? 0 : refs) - count;
+		if (left > 0 || id == 0) {
+			nodeRefs.put(id, Math.max(left, 0));
+			return;
+		}
+		nodeRefs.remove(id);
+		IBinder binder = nodes.remove(id);
+		if (binder != null)
+			nodeIds.remove(binder);
+	}
+
+	/** BinderProxy.finalize(): tell the other side that this process no longer holds the node */
+	public void releaseProxy(BinderProxy proxy) {
+		synchronized (this) {
+			java.lang.ref.WeakReference<BinderProxy> ref = proxies.get(proxy.atl_getHandle());
+			if (ref != null && (ref.get() == null || ref.get() == proxy))
+				proxies.remove(proxy.atl_getHandle());
+		}
+		if (dead || proxy.atl_acquired == 0)
+			return;
+		Message m = new Message();
+		m.type = RELEASE;
+		m.handle = proxy.atl_getHandle();
+		m.code = proxy.atl_acquired;
+		try {
+			send(m, null);
+		} catch (RemoteException ignored) {
+		}
+	}
+
+	/** @hide the number of nodes the other side may hold, for tests */
+	public synchronized int nodeCount() {
+		return nodes.size();
 	}
 
 	private synchronized IBinder node(int id) {
@@ -274,10 +327,9 @@ public final class ATLBinderConnection {
 				if (b instanceof BinderProxy && ((BinderProxy)b).atl_getConnection() == this) {
 					out.writeByte(RECEIVER_NODE);
 					out.writeInt(((BinderProxy)b).atl_getHandle());
-				} else if (b instanceof BinderProxy) {
-					/* a binder of a third process: not passed on yet */
-					throw new RemoteException("cannot pass a binder of another process on");
 				} else {
+					/* a binder of this process, or a proxy of a third process's binder: the other side gets a
+					 * node of this process, which forwards its transactions to that process */
 					out.writeByte(SENDER_NODE);
 					out.writeInt(nodeIdFor(b));
 				}
@@ -349,6 +401,10 @@ public final class ATLBinderConnection {
 	}
 
 	private void dispatch(final Message m) {
+		if (m.type == RELEASE) {
+			releaseNode(m.handle, m.code);
+			return;
+		}
 		if (m.type == REPLY || m.type == DEAD_REPLY) {
 			Waiter w;
 			synchronized (waiters) {
@@ -391,12 +447,16 @@ public final class ATLBinderConnection {
 		Parcel reply = Parcel.obtain();
 		ArrayDeque<Serving> stack = serving.get();
 		stack.addLast(new Serving(this, m.txnId, m.callingPid));
+		boolean targetDied = false;
 		try {
 			if (target == null) {
 				Slog.w(TAG, "transaction to unknown node " + m.handle);
 			} else {
 				try {
 					target.transact(m.code, data, reply, m.flags);
+				} catch (DeadObjectException e) {
+					/* a forwarded transaction whose process died: the caller learns it as well */
+					targetDied = true;
 				} catch (RemoteException | RuntimeException e) {
 					if (oneway) {
 						Slog.w(TAG, "uncaught exception in one-way transaction " + m.code, e);
@@ -426,7 +486,7 @@ public final class ATLBinderConnection {
 		if (oneway)
 			return;
 		Message r = new Message();
-		r.type = target == null ? DEAD_REPLY : REPLY;
+		r.type = target == null || targetDied ? DEAD_REPLY : REPLY;
 		r.txnId = m.txnId;
 		try {
 			send(r, reply);
@@ -438,7 +498,7 @@ public final class ATLBinderConnection {
 	private void toParcel(Message m, Parcel parcel) {
 		ArrayList<IBinder> binders = new ArrayList<>(m.objIds.length);
 		for (int i = 0; i < m.objIds.length; i++)
-			binders.add(m.objKinds[i] == RECEIVER_NODE ? node(m.objIds[i]) : proxyFor(m.objIds[i]));
+			binders.add(m.objKinds[i] == RECEIVER_NODE ? node(m.objIds[i]) : proxyFor(m.objIds[i], true));
 		ArrayList<FileDescriptor> fds = new ArrayList<>(m.fds.length);
 		for (FileDescriptor f : m.fds)
 			fds.add(f);
@@ -462,9 +522,13 @@ public final class ATLBinderConnection {
 			m.type = DEAD_REPLY;
 			w.inbox.add(m);
 		}
-		ArrayList<BinderProxy> dying;
+		ArrayList<BinderProxy> dying = new ArrayList<>();
 		synchronized (this) {
-			dying = new ArrayList<>(proxies.values());
+			for (java.lang.ref.WeakReference<BinderProxy> ref : proxies.values()) {
+				BinderProxy p = ref.get();
+				if (p != null)
+					dying.add(p);
+			}
 		}
 		for (BinderProxy p : dying)
 			p.atl_markDead();

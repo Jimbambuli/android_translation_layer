@@ -159,7 +159,8 @@ public final class ATLProcess {
 	/* the record of a process of the app, a new one (the process starts with its first call) if it does not run */
 	private static ProcessRecord getProcessRecord(String processName) {
 		ProcessRecord r = processes.get(processName);
-		if (r == null) {
+		/* a process that died but whose end is not handled yet is not used again */
+		if (r == null || (r.connection != null && r.connection.isDead())) {
 			r = new ProcessRecord(processName);
 			processes.put(processName, r);
 		}

@@ -13,6 +13,8 @@ public final class BinderProxy implements IBinder {
 	private final int handle;
 	private volatile boolean dead;
 	private final ArrayList<DeathRecipient> recipients = new ArrayList<>();
+	/** @hide references to the node this process received (ATLBinderConnection), released when collected */
+	public int atl_acquired;
 
 	/** @hide */
 	public BinderProxy(ATLBinderConnection connection, int handle) {
@@ -77,6 +79,15 @@ public final class BinderProxy implements IBinder {
 			if (dead)
 				throw new java.util.NoSuchElementException("death link does not exist");
 			return recipients.remove(recipient);
+		}
+	}
+
+	@Override
+	protected void finalize() throws Throwable {
+		try {
+			connection.releaseProxy(this);
+		} finally {
+			super.finalize();
 		}
 	}
 
