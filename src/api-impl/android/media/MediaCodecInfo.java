@@ -218,6 +218,13 @@ public class MediaCodecInfo {
 			return width > 0 && height > 0;
 		}
 
+		/* API 23: null, as AOSP's for a codec that published no measured frame rates (FFmpeg's here) */
+		public android.util.Range<Double> getAchievableFrameRatesFor(int width, int height) {
+			if (!isSizeSupported(width, height))
+				throw new IllegalArgumentException("unsupported size");
+			return null;
+		}
+
 		/* No codec-specific limits are published; report the full non-negative range. */
 		public android.util.Range<Integer> getBitrateRange() {
 			return new android.util.Range<Integer>(0, Integer.MAX_VALUE);
