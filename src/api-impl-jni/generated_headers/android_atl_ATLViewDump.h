@@ -10,10 +10,34 @@ extern "C" {
 /*
  * Class:     android_atl_ATLViewDump
  * Method:    native_screenshot
- * Signature: (JLjava/lang/String;)Z
+ * Signature: (JLjava/lang/String;)I
  */
-JNIEXPORT jboolean JNICALL Java_android_atl_ATLViewDump_native_1screenshot
+JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1screenshot
   (JNIEnv *, jclass, jlong, jstring);
+
+/*
+ * Class:     android_atl_ATLViewDump
+ * Method:    native_toplevel
+ * Signature: (JJ)I
+ */
+JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1toplevel
+  (JNIEnv *, jclass, jlong, jlong);
+
+/*
+ * Class:     android_atl_ATLViewDump
+ * Method:    native_surface
+ * Signature: (JI)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_atl_ATLViewDump_native_1surface
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_atl_ATLViewDump
+ * Method:    native_gtkPopups
+ * Signature: (J[J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_atl_ATLViewDump_native_1gtkPopups
+  (JNIEnv *, jclass, jlong, jlongArray);
 
 #ifdef __cplusplus
 }

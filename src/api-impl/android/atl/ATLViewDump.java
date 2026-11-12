@@ -25,9 +25,14 @@ import java.util.Iterator;
  * holds a name in its first line; the View trees of the resumed Activity, of showing Dialogs and of views added
  * through WindowManager are then written to <dir>/<name>.xml in the form of `uiautomator dump`
  * (node class/resource-id/text/content-desc/bounds), plus ATL-only attributes: real class,
- * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. <dir>/request is
- * deleted when done. Only if a further line of the request reads "shot" is the window of the app
- * also saved as <dir>/shots/<name>.png; otherwise no image is rendered. */
+ * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. Popups that GTK shows
+ * without Android views (PopupMenu, a Spinner's list) and toplevels that show GTK widgets instead of
+ * views (ATL's AlertDialog) follow as "gtk" windows of GTK widgets. Each
+ * window names the GTK toplevel whose surface its bounds are in (atl-toplevel, 0: the activity's
+ * window) and that surface's size and widget origin. <dir>/request is deleted when done. Only if a
+ * further line of the request reads "shot" are the windows of the app also saved: the activity's
+ * window as <dir>/shots/<name>.png, other toplevels (dialogs) as <dir>/shots/<name>.<toplevel>.png,
+ * each with the popups shown on it; otherwise no image is rendered. */
 public class ATLViewDump {
 	private static final String DIR = System.getenv("ATL_VIEWDUMP");
 	private static Handler handler;
@@ -88,46 +93,73 @@ public class ATLViewDump {
 		handler.postDelayed(POLL, 250);
 	}
 
-	/* the window of the app (not the screen) as <dir>/shots/<name>.png, the same name as the tree */
-	private static void shot(String name) {
+	private static long mainWindow() {
 		Activity a = activity.get();
-		long window = a != null && a.getWindow() != null ? a.getWindow().native_window : 0;
+		return a != null && a.getWindow() != null ? a.getWindow().native_window : 0;
+	}
+
+	/* the windows of the app (not the screen) as <dir>/shots/<name>.png (the activity's window) and
+	 * <name>.<toplevel>.png (further toplevels), the same name as the tree */
+	private static void shot(String name) {
+		long window = mainWindow();
 		if (window == 0) {
 			System.err.println("ATLViewDump: no window, no screenshot");
 			return;
 		}
 		File dir = new File(DIR, "shots");
 		dir.mkdirs();
-		File tmp = new File(dir, name + ".png.tmp");
-		if (native_screenshot(window, tmp.getPath())) {
-			tmp.renameTo(new File(dir, name + ".png"));
-			System.err.println("ATLViewDump: window image " + name);
-		}
+		int n = native_screenshot(window, new File(dir, name).getPath());
+		if (n > 0)
+			System.err.println("ATLViewDump: window image " + name + (n > 1 ? " (" + n + " toplevels)" : ""));
 		else
 			System.err.println("ATLViewDump: screenshot failed");
 	}
 
-	private static native boolean native_screenshot(long window, String path);
+	/* renders each toplevel with its popups to <prefix>.png / <prefix>.<toplevel>.png (written as .tmp
+	 * and renamed); returns the number of images written */
+	private static native int native_screenshot(long window, String prefix);
+	/* the index of the toplevel that holds the widget (0: window), -1 if it is in none */
+	private static native int native_toplevel(long window, long widget);
+	/* " atl-surface=..." attributes of a toplevel: surface size and the widget origin in it */
+	private static native String native_surface(long window, int toplevel);
+	/* <window> elements for the mapped GtkPopovers that are not the natives of the given widgets, and for
+	 * the further toplevels that hold none of them */
+	private static native String native_gtkPopups(long window, long[] androidRoots);
 
 	private static void dump(Writer w) throws java.io.IOException {
 		w.write("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\" atl=\"1\">\n");
+		long main = mainWindow();
+		ArrayList<Long> shown = new ArrayList<>();
 		Activity a = activity.get();
 		if (a != null)
-			window(w, "activity " + a.getClass().getName(), a.getWindow().getDecorView());
+			window(w, "activity " + a.getClass().getName(), a.getWindow().getDecorView(), main, shown, 0);
 		for (WeakReference<Object> ref : roots) {
 			Object o = ref.get();
 			if (o instanceof Dialog && ((Dialog)o).isShowing())
-				window(w, "dialog " + o.getClass().getName(), ((Dialog)o).getWindow().getDecorView());
+				window(w, "dialog " + o.getClass().getName(), ((Dialog)o).getWindow().getDecorView(), main, shown, ((Dialog)o).getWindow().native_window);
 			else if (o instanceof android.widget.PopupWindow && ((android.widget.PopupWindow)o).isShowing())
-				window(w, "popup " + o.getClass().getName(), ((android.widget.PopupWindow)o).getContentView().getRootView());
+				window(w, "popup " + o.getClass().getName(), ((android.widget.PopupWindow)o).getContentView().getRootView(), main, shown, 0);
 			else if (o instanceof View)
-				window(w, "wm " + o.getClass().getName(), (View)o);
+				window(w, "wm " + o.getClass().getName(), (View)o, main, shown, 0);
+		}
+		if (main != 0) {
+			long[] widgets = new long[shown.size()];
+			for (int i = 0; i < widgets.length; i++)
+				widgets[i] = shown.get(i);
+			w.write(native_gtkPopups(main, widgets));
 		}
 		w.write("</hierarchy>\n");
 	}
 
-	private static void window(Writer w, String what, View root) throws java.io.IOException {
-		w.write("<window atl-what=\"" + esc(what) + "\">\n");
+	/* in: a widget of the toplevel the window is shown in (0: the root's widget; a dialog names its GtkWindow,
+	 * as ATL's AlertDialog shows GTK widgets instead of its decor view) */
+	private static void window(Writer w, String what, View root, long main, ArrayList<Long> shown, long in) throws java.io.IOException {
+		if (in == 0)
+			in = root.widget;
+		int toplevel = main != 0 && in != 0 ? native_toplevel(main, in) : -1;
+		if (root.widget != 0)
+			shown.add(root.widget);
+		w.write("<window atl-what=\"" + esc(what) + "\"" + (toplevel >= 0 ? " atl-toplevel=\"" + toplevel + "\"" + native_surface(main, toplevel) : "") + ">\n");
 		node(w, root, 0, 0, 0, null, 1);
 		w.write("</window>\n");
 	}
