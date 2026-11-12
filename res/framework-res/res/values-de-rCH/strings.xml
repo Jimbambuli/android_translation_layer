@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+/* //device/apps/common/assets/res/any/strings.xml
+**
+** Copyright 2006, The Android Open Source Project
+**
+** Licensed under the Apache License, Version 2.0 (the "License");
+** you may not use this file except in compliance with the License.
+** You may obtain a copy of the License at
+**
+**     http://www.apache.org/licenses/LICENSE-2.0
+**
+** Unless required by applicable law or agreed to in writing, software
+** distributed under the License is distributed on an "AS IS" BASIS,
+** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+** See the License for the specific language governing permissions and
+** limitations under the License.
+*/
+ -->
+<!-- Swiss German: the strings of values-de that contain the sharp s (U+00DF), written with "ss" as in
+     Switzerland. -->
+<resources xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <string name="CLIRDefaultOnNextCallOn" msgid="4511621022859867988">"Anrufer-ID ist standardmässig beschränkt. Nächster Anruf: Beschränkt"</string>
+    <string name="CLIRDefaultOnNextCallOff" msgid="5036749051007098105">"Anrufer-ID ist standardmässig beschränkt. Nächster Anruf: Nicht beschränkt"</string>
+    <string name="CLIRDefaultOffNextCallOn" msgid="1022781126694885017">"Anrufer-ID ist standardmässig nicht beschränkt. Nächster Anruf: Beschränkt"</string>
+    <string name="CLIRDefaultOffNextCallOff" msgid="2491576172356463443">"Anrufer-ID ist standardmässig nicht beschränkt. Nächster Anruf: Nicht beschränkt"</string>
+    <string name="roamingText3" msgid="831690234035748988">"Ausserhalb der Netzwerkumgebung"</string>
+    <string name="roamingText4" msgid="2171252529065590728">"Ausserhalb des Gebäudes"</string>
+    <string-array name="wfcOperatorErrorAlertMessages">
+    <item msgid="468830943567116703">"Um über WLAN telefonieren und Nachrichten senden zu können, bitte zuerst deinen Mobilfunkanbieter, diesen Dienst einzurichten. Anschliessend kannst du die Option \"WLAN-Telefonie\" über die Einstellungen erneut aktivieren. (Fehlercode: <xliff:g id="CODE">%1$s</xliff:g>)"</item>
+  </string-array>
+    <string name="notification_channel_accessibility_magnification" msgid="1707913872219798098">"Vergrösserung"</string>
+    <string name="capability_desc_canRequestFilterKeyEvents" msgid="2381315802405773092">"Einschliesslich personenbezogener Daten wie Kreditkartennummern und Passwörter."</string>
+    <string name="capability_title_canControlMagnification" msgid="7701572187333415795">"Displayvergrösserung festlegen"</string>
+    <string name="permlab_killBackgroundProcesses" msgid="6559320515561928348">"Andere Apps schliessen"</string>
+    <string name="permdesc_getPackageSize" msgid="742743530909966782">"Ermöglicht der App, ihre Code-, Daten- und Cache-Grösse abzurufen"</string>
+    <string name="permdesc_writeCallLog" product="tablet" msgid="2657525794731690397">"Ermöglicht der App, die Anrufliste deines Tablets zu ändern, einschliesslich der Daten über ein- und ausgehende Anrufe. Schädliche Apps können so die Einträge in der Anrufliste löschen oder sie ändern."</string>
+    <string name="permdesc_writeCallLog" product="tv" msgid="3934939195095317432">"Ermöglicht der App, die Anrufliste deines Android TV-Geräts zu ändern, einschliesslich der Daten über ein- und ausgehende Anrufe. Du solltest wissen, dass dies von schädlichen Apps genutzt werden kann, um Einträge in der Anrufliste zu löschen oder zu ändern."</string>
+    <string name="permdesc_writeCallLog" product="default" msgid="5903033505665134802">"Ermöglicht der App, die Anrufliste deines Telefons zu ändern, einschliesslich der Daten über ein- und ausgehende Anrufe. Schädliche Apps können so die Einträge in der Anrufliste löschen oder sie ändern."</string>
+    <string name="permdesc_sim_communication" msgid="4179799296415957960">"Ermöglicht der App das Senden von Befehlen an die SIM-Karte. Dies ist äusserst risikoreich."</string>
+    <string name="permlab_setWallpaperHints" msgid="1153485176642032714">"Grösse des Hintergrundbildes anpassen"</string>
+    <string name="permdesc_setWallpaperHints" msgid="6257053376990044668">"Ermöglicht der App, die Grössenhinweise für den Systemhintergrund festzulegen"</string>
+    <string name="face_acquired_sensor_dirty" msgid="8968391891086721678">"Reinige den oberen Teil deines Bildschirms, einschliesslich der schwarzen Leiste"</string>
+    <string name="permdesc_readSyncStats" msgid="3867809926567379434">"Ermöglicht der App, die Synchronisierungsstatistiken eines Kontos zu lesen, einschliesslich des Verlaufs von Synchronisierungsereignissen und der Menge synchronisierter Daten."</string>
+    <string name="permdesc_accessNotifications" msgid="761730149268789668">"Ermöglicht der App das Abrufen, Überprüfen und Löschen von Benachrichtigungen, einschliesslich Benachrichtigungen, die von anderen Apps gepostet wurden"</string>
+    <string name="whichApplicationNamed" msgid="6969946041713975681">"Aktion mit %1$s abschliessen"</string>
+    <string name="whichApplicationLabel" msgid="7852182961472531728">"Abschliessen"</string>
+    <string name="aerr_close" msgid="3398336821267021852">"Schliessen"</string>
+    <string name="aerr_close_app" msgid="8318883106083050970">"App schliessen"</string>
+    <string name="webpage_unresponsive" msgid="7850879412195273433">"Die Seite reagiert nicht mehr.\n\nMöchtest du die Seite schliessen?"</string>
+    <string name="unsupported_display_size_message" msgid="7265211375269394699">"<xliff:g id="APP_NAME">%1$s</xliff:g> unterstützt nicht die aktuelle Einstellung für die Anzeigegrösse, sodass ein unerwartetes Verhalten auftreten kann."</string>
+    <string name="smv_application" msgid="3775183542777792638">"Die App <xliff:g id="APPLICATION">%1$s</xliff:g> (Prozess <xliff:g id="PROCESS">%2$s</xliff:g>) hat gegen deine selbsterzwungene StrictMode-Richtlinie verstossen."</string>
+    <string name="smv_process" msgid="1398801497130695446">"Der Prozess <xliff:g id="PROCESS">%1$s</xliff:g> hat gegen seine selbsterzwungene StrictMode-Richtlinie verstossen."</string>
+    <string name="dump_heap_system_text" msgid="6805155514925350849">"Für den Prozess \"<xliff:g id="PROC">%1$s</xliff:g>\" wurde das Prozessspeicherlimit von <xliff:g id="SIZE">%2$s</xliff:g> überschritten. Es gibt einen Heap-Dump, den du teilen kannst. Beachte jedoch unbedingt, dass der Heap-Dump vertrauliche personenbezogene Daten von dir enthalten kann, auf die der Prozess Zugriff hat, einschliesslich der von dir eingegebenen Informationen."</string>
+    <string name="dump_heap_ready_text" msgid="5849618132123045516">"Es gibt einen Heap-Dump des Prozesses \"<xliff:g id="PROC">%1$s</xliff:g>\", den du teilen kannst. Beachte jedoch unbedingt, dass der Heap-Dump vertrauliche personenbezogene Daten von dir enthalten kann, auf die der Prozess Zugriff hat, einschliesslich der von dir eingegebenen Informationen."</string>
+    <string name="sms_control_message" msgid="6574313876316388239">"&lt;b&gt;<xliff:g id="APP_NAME">%1$s</xliff:g>&lt;/b&gt; sendet eine grosse Anzahl SMS. Möchtest du zulassen, dass die App weiterhin Nachrichten sendet?"</string>
+    <string name="forward_intent_to_owner" msgid="4620359037192871015">"Du verwendest diese App ausserhalb deines Arbeitsprofils"</string>
+    <string name="accessibility_magnification_chooser_text" msgid="1502075582164931596">"Vergrösserung"</string>
+    <string name="floating_toolbar_close_overflow_description" msgid="3949818077708138098">"Dreipunkt-Menü schliessen"</string>
+    <string name="close_button_text" msgid="10603510034455258">"Schliessen"</string>
+    <string name="review_notification_settings_dismiss" msgid="4160916504616428294">"Schliessen"</string>
+    <string name="nas_upgrade_notification_learn_more_content" msgid="3735480566983530650">"Die adaptiven Benachrichtigungen wurden in Android 12 durch die Funktion „Erweiterte Benachrichtigungen“ ersetzt. Diese Funktion zeigt Vorschläge für Aktionen und Antworten an und sortiert Benachrichtigungen.\n\nDie Funktion hat Zugriff auf alle Benachrichtigungen, darunter auch personenbezogene Daten wie Kontaktnamen und Nachrichten. Ausserdem kann sie auf Benachrichtigungen antworten oder diese schliessen und so beispielsweise Anrufe entgegennehmen oder „Bitte nicht stören“ steuern."</string>
+    <string name="accessibility_system_action_dismiss_notification_shade" msgid="8931637495533770352">"Benachrichtigungsleiste schliessen"</string>
+    <string name="window_magnification_prompt_title" msgid="2876703640772778215">"Neue Vergrösserungseinstellungen"</string>
+    <string name="window_magnification_prompt_content" msgid="8159173903032344891">"Du kannst das Display teilweise vergrössern"</string>
+    <string name="dismiss_action" msgid="1728820550388704784">"Schliessen"</string>
+    <string name="notification_title_abusive_bg_apps" msgid="994230770856147656">"Eine App belastet den Akku übermässig"</string>
+</resources>
