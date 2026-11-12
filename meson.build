@@ -268,7 +268,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
+                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('libsecret-1'), dependency('fontconfig'), dependency('pangoft2'), dependency('libwebp'),
                                                                         libart_dep, wayland_protos_dep, upcalls_header
                                                                   ],

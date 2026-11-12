@@ -6,6 +6,7 @@ struct _SurfaceViewWidget {
 	GtkWidget parent_instance;
 	GdkTexture *texture;
 	gboolean needs_flip;
+	gboolean crop; /* the scaling mode SCALE_CROP: the texture covers the widget, keeping its aspect ratio */
 	void (*frame_callback)(SurfaceViewWidget *surface_view_widget);
 	gpointer frame_callback_data;
 };

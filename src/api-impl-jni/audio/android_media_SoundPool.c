@@ -23,6 +23,8 @@
 #define OUT_LATENCY_US 50000
 #define PERIOD_FRAMES  (OUT_RATE / 100)
 #define MAX_PCM_BYTES  (1024 * 1024)
+/* the limiter's gain comes back to 1 by this factor per period (0.5 dB per 10 ms) */
+#define LIMITER_RELEASE 1.0593f
 
 struct sample {
 	int refs; /* the pool's table and every stream playing it; guarded by the pool's lock */
@@ -132,6 +134,7 @@ static gpointer mixer_thread(gpointer data)
 	snd_pcm_t *pcm = NULL;
 	gboolean pcm_failed = FALSE;
 	gboolean running = FALSE; /* the device has our samples */
+	float gain = 1.f;         /* the limiter's */
 
 	g_mutex_lock(&pool->lock);
 	while (!pool->quit) {
@@ -149,8 +152,21 @@ static gpointer mixer_thread(gpointer data)
 		}
 		g_mutex_unlock(&pool->lock);
 
+		/* the sum of the streams can go beyond full scale. AOSP's mixer clips it on a 16-bit output (and gives float
+		 * outputs up to twice full scale to the HAL); clipped, three tones at -6 dBFS distort audibly. A limiter
+		 * scales the period down to its peak instead (at once), and its gain comes back slowly (ramped), so a sum
+		 * within full scale is not changed and a louder one is not distorted */
+		float peak = 0.f;
 		for (int i = 0; i < PERIOD_FRAMES * OUT_CHANNELS; i++)
-			out[i] = CLAMP(lrintf(acc[i]), -32768, 32767);
+			peak = MAX(peak, fabsf(acc[i]));
+		float limit = peak > 32767.f ? 32767.f / peak : 1.f;
+		float next_gain = MIN(MIN(gain * LIMITER_RELEASE, 1.f), limit);
+		float start_gain = MIN(gain, next_gain); /* falling at once, rising along the period */
+		for (int i = 0; i < PERIOD_FRAMES * OUT_CHANNELS; i++) {
+			float g = start_gain + (next_gain - start_gain) * (i / OUT_CHANNELS) / PERIOD_FRAMES;
+			out[i] = CLAMP(lrintf(acc[i] * g), -32768, 32767);
+		}
+		gain = next_gain;
 		if (!pcm && !pcm_failed) {
 			int ret = snd_pcm_open(&pcm, PCM_DEVICE, SND_PCM_STREAM_PLAYBACK, 0);
 			if (ret == 0)

@@ -1,16 +1,19 @@
 #ifndef AV_INPUT_H
 #define AV_INPUT_H
 
+#include <jni.h>
 #include <stdint.h>
 
 #include <libavformat/avformat.h>
 
-/* a region of a file descriptor, like setDataSource(FileDescriptor, long, long) */
+/* a region of a file descriptor, like setDataSource(FileDescriptor, long, long); or, if data_source is set (a
+ * global reference), a MediaDataSource, read with readAt() (fd and offset unused) */
 struct fd_region {
 	int fd;
 	int64_t offset;
 	int64_t length;
 	int64_t position;
+	jobject data_source;
 };
 
 /* opens the file at path, or the fd region if path is NULL; *io is the region's AVIOContext */

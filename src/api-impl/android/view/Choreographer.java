@@ -104,6 +104,10 @@ public final class Choreographer {
 	private static final Object FRAME_CALLBACK_TOKEN = new Object() {
 		public String toString() { return "FRAME_CALLBACK_TOKEN"; }
 	};
+	// All vsync callbacks posted by applications have this token.
+	private static final Object VSYNC_CALLBACK_TOKEN = new Object() {
+		public String toString() { return "VSYNC_CALLBACK_TOKEN"; }
+	};
 	private final Object mLock = new Object();
 	private final Looper mLooper;
 	private final FrameHandler mHandler;
@@ -355,6 +359,21 @@ public final class Choreographer {
 		}
 		removeCallbacksInternal(CALLBACK_ANIMATION, callback, FRAME_CALLBACK_TOKEN);
 	}
+	/* API 33: like postFrameCallback(), with the frame's timing as FrameData */
+	public void postVsyncCallback(VsyncCallback callback) {
+		if (callback == null) {
+			throw new IllegalArgumentException("callback must not be null");
+		}
+		postCallbackDelayedInternal(CALLBACK_ANIMATION, callback, VSYNC_CALLBACK_TOKEN, 0);
+	}
+
+	public void removeVsyncCallback(VsyncCallback callback) {
+		if (callback == null) {
+			throw new IllegalArgumentException("callback must not be null");
+		}
+		removeCallbacksInternal(CALLBACK_ANIMATION, callback, VSYNC_CALLBACK_TOKEN);
+	}
+
 	/**
 	 * Gets the time when the current frame started.
 	 * <p>
@@ -473,7 +492,7 @@ public final class Choreographer {
 				if (DEBUG) {
 					Log.d(TAG, "RunCallback: type=" + callbackType + ", action=" + c.action + ", token=" + c.token + ", latencyMillis=" + (SystemClock.uptimeMillis() - c.dueTime));
 				}
-				c.run(frameTimeNanos);
+				c.run(frameTimeNanos, mFrameIntervalNanos);
 			}
 		} finally {
 			synchronized (mLock) {
@@ -548,6 +567,61 @@ public final class Choreographer {
 		 */
 		public void doFrame(long frameTimeNanos);
 	}
+	/* API 33 */
+	public interface VsyncCallback {
+		void onVsync(FrameData data);
+	}
+
+	/* API 33: there is no display vsync here (see USE_VSYNC), so a frame has the one timeline this
+	 * choreographer can tell: presented one frame interval after the frame time, which is also its deadline */
+	public static class FrameData {
+		private final long frameTimeNanos;
+		private final FrameTimeline[] frameTimelines;
+
+		FrameData(long frameTimeNanos, long frameIntervalNanos) {
+			this.frameTimeNanos = frameTimeNanos;
+			long presentation = frameTimeNanos + frameIntervalNanos;
+			frameTimelines = new FrameTimeline[] {new FrameTimeline(0, presentation, presentation)};
+		}
+
+		public long getFrameTimeNanos() {
+			return frameTimeNanos;
+		}
+
+		public FrameTimeline[] getFrameTimelines() {
+			return frameTimelines.clone();
+		}
+
+		public FrameTimeline getPreferredFrameTimeline() {
+			return frameTimelines[0];
+		}
+	}
+
+	/* API 33 */
+	public static class FrameTimeline {
+		private final long vsyncId;
+		private final long expectedPresentationTimeNanos;
+		private final long deadlineNanos;
+
+		FrameTimeline(long vsyncId, long expectedPresentationTimeNanos, long deadlineNanos) {
+			this.vsyncId = vsyncId;
+			this.expectedPresentationTimeNanos = expectedPresentationTimeNanos;
+			this.deadlineNanos = deadlineNanos;
+		}
+
+		public long getVsyncId() {
+			return vsyncId;
+		}
+
+		public long getExpectedPresentationTimeNanos() {
+			return expectedPresentationTimeNanos;
+		}
+
+		public long getDeadlineNanos() {
+			return deadlineNanos;
+		}
+	}
+
 	private final class FrameHandler extends Handler {
 		public FrameHandler(Looper looper) {
 			super(looper);
@@ -574,9 +648,11 @@ public final class Choreographer {
 		public long dueTime;
 		public Object action; // Runnable or FrameCallback
 		public Object token;
-		public void run(long frameTimeNanos) {
+		public void run(long frameTimeNanos, long frameIntervalNanos) {
 			if (token == FRAME_CALLBACK_TOKEN) {
 				((FrameCallback)action).doFrame(frameTimeNanos);
+			} else if (token == VSYNC_CALLBACK_TOKEN) {
+				((VsyncCallback)action).onVsync(new FrameData(frameTimeNanos, frameIntervalNanos));
 			} else {
 				((Runnable)action).run();
 			}

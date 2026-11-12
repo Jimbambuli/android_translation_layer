@@ -1,9 +1,14 @@
 #include <alsa/asoundlib.h>
+#include <math.h>
 #include <sys/stat.h>
 
 #include <gtk/gtk.h>
 #include <libavcodec/avcodec.h>
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
 #include <libavformat/avformat.h>
+#include <libavutil/display.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 
@@ -44,6 +49,9 @@ struct video {
 	AVFrame *frame; /* the frame decoded last */
 	int stream_index;
 	int64_t skip_until; /* ms: after a seek, the frames that end before it are dropped */
+	int rotation;       /* degrees clockwise the frames are to be turned for display (the container's display matrix) */
+	/* of the frames given to GTK as YUV, made for the first one */
+	GdkColorState *color_state;
 };
 
 struct player {
@@ -59,9 +67,21 @@ struct player {
 	snd_pcm_t *pcm; /* NULL without an audio device: then the step only waits for the samples' time */
 	int16_t *buffer;
 	int buffer_frames;
-	/* the position is base + written - (what the device still holds), in output frames */
+	/* the position is base + (written - what the device still holds) * speed, in frames */
 	int64_t base;
 	int64_t written;
+	/* setPlaybackParams(): speed and pitch (requested ones under clock_lock, the playback thread applies them), and
+	 * the libavfilter graph that changes the output samples, built when needed (NULL at speed and pitch 1) */
+	float speed;
+	float pitch;
+	float requested_speed;
+	float requested_pitch;
+	AVFilterGraph *graph;
+	AVFilterContext *graph_in;
+	AVFilterContext *graph_out;
+	AVFrame *filtered;
+	int64_t graph_pts;
+	gboolean graph_flushed;
 	int64_t skip_until; /* after a seek, the decoded frames before this are dropped */
 	struct video video;
 	/* the clock: the position at the last write to the device, running on in real time while playing;
@@ -75,6 +95,8 @@ struct player {
 
 static void video_free(struct video *v)
 {
+	if (v->color_state)
+		gdk_color_state_unref(v->color_state);
 	sws_freeContext(v->sws);
 	avcodec_free_context(&v->codec);
 	av_packet_free(&v->packet);
@@ -92,7 +114,7 @@ static void video_open(struct player *p, const char *path)
 	if (index < 0 || (p->format->streams[index]->disposition & AV_DISPOSITION_ATTACHED_PIC))
 		return;
 	struct video *v = &p->video;
-	v->region = (struct fd_region){.fd = p->region.fd, .offset = p->region.offset, .length = p->region.length};
+	v->region = (struct fd_region){.fd = p->region.fd, .offset = p->region.offset, .length = p->region.length, .data_source = p->region.data_source};
 	v->format = open_input(path, &v->region, &v->io);
 	if (!v->format)
 		goto fail;
@@ -109,6 +131,14 @@ static void video_open(struct player *p, const char *path)
 			v->format->streams[i]->discard = AVDISCARD_ALL;
 	v->packet = av_packet_alloc();
 	v->frame = av_frame_alloc();
+	/* like NuPlayer's rotation-degrees: the display matrix turns counterclockwise, Android counts clockwise */
+	AVCodecParameters *par = v->format->streams[v->stream_index]->codecpar;
+	const AVPacketSideData *matrix = av_packet_side_data_get(par->coded_side_data, par->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
+	if (matrix && matrix->size >= 9 * sizeof(int32_t)) {
+		double degrees = -av_display_rotation_get((const int32_t *)matrix->data);
+		if (!isnan(degrees))
+			v->rotation = ((int)lround(degrees / 90) * 90 % 360 + 360) % 360;
+	}
 	return;
 fail:
 	printf("MediaPlayer: can't decode the video stream\n");
@@ -124,8 +154,20 @@ static void clock_set(struct player *p, int ms, gboolean running)
 	g_mutex_unlock(&p->clock_lock);
 }
 
+static void graph_free(struct player *p)
+{
+	avfilter_graph_free(&p->graph);
+	p->graph_flushed = FALSE;
+}
+
 static void player_free(struct player *p)
 {
+	graph_free(p);
+	av_frame_free(&p->filtered);
+	if (p->region.data_source) {
+		JNIEnv *env = get_jni_env();
+		(*env)->DeleteGlobalRef(env, p->region.data_source);
+	}
 	video_free(&p->video);
 	g_mutex_clear(&p->clock_lock);
 	if (p->pcm)
@@ -139,14 +181,24 @@ static void player_free(struct player *p)
 	g_free(p);
 }
 
-JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length)
+JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open(JNIEnv *env, jclass class, jstring path_jstr, jint fd, jlong offset, jlong length, jobject data_source)
 {
 	struct player *p = g_new0(struct player, 1);
 	const char *path = NULL;
 	g_mutex_init(&p->clock_lock);
+	p->speed = p->pitch = p->requested_speed = p->requested_pitch = 1.f;
 
 	if (path_jstr) {
 		path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
+	} else if (data_source) {
+		/* the size MediaDataSource.getSize() tells, or unknown (-1) */
+		jlong size = (*env)->CallLongMethod(env, data_source, _METHOD(_CLASS(data_source), "getSize", "()J"));
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			size = -1;
+		}
+		p->region = (struct fd_region){.fd = -1, .length = size >= 0 ? size : INT64_MAX, .data_source = (*env)->NewGlobalRef(env, data_source)};
 	} else {
 		/* the region ends at the end of the file at the latest */
 		struct stat st;
@@ -213,21 +265,111 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getDuration(JNIEnv
 	return p->format->duration / (AV_TIME_BASE / 1000);
 }
 
-/* the next decoded samples into p->buffer: their number, 0 at the end, < 0 on error */
+/* the media frames played (or being played) so far */
+static int64_t media_frames(struct player *p)
+{
+	return p->base + llround(p->written * (double)p->speed);
+}
+
+/* the graph for the speed and pitch: asetrate and aresample shift the pitch (and the speed with it), atempo sets the
+ * speed keeping the pitch (one atempo takes 0.5 to 100), aformat gives the output format back; FALSE on failure */
+static gboolean graph_build(struct player *p)
+{
+	char args[128], number[G_ASCII_DTOSTR_BUF_SIZE];
+	GString *chain = g_string_new(NULL);
+	if (p->pitch != 1.f)
+		g_string_append_printf(chain, "asetrate=%ld,aresample=%d,", lround(p->rate * (double)p->pitch), p->rate);
+	double tempo = p->speed / (double)p->pitch;
+	for (; tempo < 0.5; tempo /= 0.5)
+		g_string_append(chain, "atempo=0.5,");
+	if (tempo != 1.)
+		g_string_append_printf(chain, "atempo=%s,", g_ascii_formatd(number, sizeof(number), "%.6f", tempo));
+	g_string_append_printf(chain, "aformat=sample_fmts=s16:channel_layouts=stereo:sample_rates=%d", p->rate);
+
+	p->graph = avfilter_graph_alloc();
+	snprintf(args, sizeof(args), "sample_rate=%d:sample_fmt=s16:channel_layout=stereo:time_base=1/%d", p->rate, p->rate);
+	AVFilterInOut *outputs = avfilter_inout_alloc();
+	AVFilterInOut *inputs = avfilter_inout_alloc();
+	gboolean ok = avfilter_graph_create_filter(&p->graph_in, avfilter_get_by_name("abuffer"), "in", args, NULL, p->graph) >= 0;
+	if (ok)
+		ok = avfilter_graph_create_filter(&p->graph_out, avfilter_get_by_name("abuffersink"), "out", NULL, NULL, p->graph) >= 0;
+	if (ok) {
+		outputs->name = av_strdup("in");
+		outputs->filter_ctx = p->graph_in;
+		inputs->name = av_strdup("out");
+		inputs->filter_ctx = p->graph_out;
+		ok = avfilter_graph_parse_ptr(p->graph, chain->str, &inputs, &outputs, NULL) >= 0 && avfilter_graph_config(p->graph, NULL) >= 0;
+	}
+	avfilter_inout_free(&inputs);
+	avfilter_inout_free(&outputs);
+	if (!ok) {
+		printf("MediaPlayer: can't set up the playback speed and pitch (%s)\n", chain->str);
+		graph_free(p);
+	}
+	g_string_free(chain, TRUE);
+	if (!p->filtered)
+		p->filtered = av_frame_alloc();
+	return ok;
+}
+
+/* the frames frames in p->buffer through the graph (none: the end of the stream): the samples it gives into
+ * p->buffer, their number */
+static int graph_filter(struct player *p, int frames)
+{
+	if (!p->graph && !graph_build(p))
+		return frames;
+	if (frames > 0) {
+		AVFrame *in = av_frame_alloc();
+		in->format = AV_SAMPLE_FMT_S16;
+		av_channel_layout_copy(&in->ch_layout, &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO);
+		in->sample_rate = p->rate;
+		in->nb_samples = frames;
+		in->pts = p->graph_pts;
+		p->graph_pts += frames;
+		if (av_frame_get_buffer(in, 0) == 0) {
+			memcpy(in->data[0], p->buffer, frames * OUT_CHANNELS * sizeof(int16_t));
+			av_buffersrc_add_frame(p->graph_in, in);
+		}
+		av_frame_free(&in);
+	} else {
+		av_buffersrc_add_frame(p->graph_in, NULL);
+		p->graph_flushed = TRUE;
+	}
+	int out = 0;
+	while (av_buffersink_get_frame(p->graph_out, p->filtered) >= 0) {
+		int n = p->filtered->nb_samples;
+		if (out + n > p->buffer_frames) {
+			p->buffer = g_renew(int16_t, p->buffer, (out + n) * OUT_CHANNELS);
+			p->buffer_frames = out + n;
+		}
+		memcpy(p->buffer + out * OUT_CHANNELS, p->filtered->data[0], n * OUT_CHANNELS * sizeof(int16_t));
+		out += n;
+		av_frame_unref(p->filtered);
+	}
+	return out;
+}
+
+/* the next samples to play into p->buffer (decoded, at the speed and pitch): their number, 0 at the end, < 0 on
+ * error */
 static int decode(struct player *p)
 {
 	if (!p->codec) {
-		int64_t left = p->format->duration / (AV_TIME_BASE / 1000) - (p->base + p->written);
+		int64_t left = (p->format->duration / (AV_TIME_BASE / 1000) - media_frames(p)) / p->speed;
 		return MAX(MIN(left, 20), 0);
 	}
 	AVStream *stream = p->format->streams[p->stream_index];
 	while (TRUE) {
 		int ret = avcodec_receive_frame(p->codec, p->frame);
 		if (ret == AVERROR_EOF) {
+			if (p->graph && !p->graph_flushed) {
+				int frames = graph_filter(p, 0); /* what the graph still holds */
+				if (frames > 0)
+					return frames;
+			}
 			/* the audio ends before the video: silence until the end of the file */
 			int64_t left = 0;
 			if (p->video.format && p->format->duration != AV_NOPTS_VALUE)
-				left = av_rescale(p->format->duration, p->rate, AV_TIME_BASE) - (p->base + p->written);
+				left = (av_rescale(p->format->duration, p->rate, AV_TIME_BASE) - media_frames(p)) / p->speed;
 			if (left <= 0)
 				return 0;
 			int frames = MIN(left, p->rate / 50);
@@ -277,6 +419,11 @@ static int decode(struct player *p)
 			}
 		}
 		p->skip_until = 0;
+		if (p->speed != 1.f || p->pitch != 1.f) {
+			frames = graph_filter(p, frames);
+			if (frames == 0)
+				continue;
+		}
 		return frames;
 	}
 }
@@ -302,7 +449,8 @@ static void seek(struct player *p, int msec, gboolean drop)
 		}
 		p->written = 0;
 	}
-	p->base = p->skip_until - p->written;
+	p->base = p->skip_until - llround(p->written * (double)p->speed);
+	graph_free(p); /* its samples were from before */
 }
 
 static jint position_ms(struct player *p)
@@ -310,7 +458,7 @@ static jint position_ms(struct player *p)
 	snd_pcm_sframes_t delay = 0;
 	if (p->pcm && snd_pcm_delay(p->pcm, &delay) < 0)
 		delay = 0;
-	int64_t frames = p->base + p->written - MIN(MAX(delay, 0), p->written);
+	int64_t frames = p->base + llround((p->written - MIN(MAX(delay, 0), p->written)) * (double)p->speed);
 	return MAX(frames, 0) * 1000 / p->rate;
 }
 
@@ -320,6 +468,19 @@ static jint position_ms(struct player *p)
 JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, jclass class, jlong ptr, jfloat left, jfloat right, jboolean looping)
 {
 	struct player *p = _PTR(ptr);
+
+	/* a new speed or pitch: the position goes on from where it is (the samples in the device play at the old speed) */
+	g_mutex_lock(&p->clock_lock);
+	float speed = p->requested_speed, pitch = p->requested_pitch;
+	g_mutex_unlock(&p->clock_lock);
+	if (speed != p->speed || pitch != p->pitch) {
+		p->base += llround(p->written * (double)(p->speed - speed));
+		g_mutex_lock(&p->clock_lock);
+		p->speed = speed;
+		g_mutex_unlock(&p->clock_lock);
+		p->pitch = pitch;
+		graph_free(p);
+	}
 
 	int frames = decode(p);
 	if (frames == 0 && looping) {
@@ -333,11 +494,8 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, 
 	}
 	if (frames < 0)
 		return STEP_ERROR;
-	if (frames == 0) {
-		if (p->pcm)
-			snd_pcm_drain(p->pcm);
-		return STEP_END;
-	}
+	if (frames == 0)
+		return STEP_END; /* native_drain() waits until the device has played it all */
 	if (p->codec && (left != 1.f || right != 1.f)) {
 		for (int i = 0; i < frames; i++) {
 			p->buffer[i * 2] *= left;
@@ -367,6 +525,24 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, 
 	int ms = position_ms(p);
 	clock_set(p, ms, TRUE);
 	return ms;
+}
+
+/* after STEP_END: waits until the device has played what it holds */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1drain(JNIEnv *env, jclass class, jlong ptr)
+{
+	struct player *p = _PTR(ptr);
+	if (p->pcm)
+		snd_pcm_drain(p->pcm);
+}
+
+/* setPlaybackParams(): the playback thread applies them with its next samples */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setPlaybackRate(JNIEnv *env, jclass class, jlong ptr, jfloat speed, jfloat pitch)
+{
+	struct player *p = _PTR(ptr);
+	g_mutex_lock(&p->clock_lock);
+	p->requested_speed = speed;
+	p->requested_pitch = pitch;
+	g_mutex_unlock(&p->clock_lock);
 }
 
 /* drops what the device still holds; the Java side seeks to the paused position on resume */
@@ -402,7 +578,7 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1clock(JNIEnv *env
 	g_mutex_lock(&p->clock_lock);
 	int64_t ms = p->clock_ms;
 	if (p->clock_running)
-		ms += MIN((g_get_monotonic_time() - p->clock_time) / 1000, CLOCK_MAX_EXTRAPOLATION_MS);
+		ms += MIN((g_get_monotonic_time() - p->clock_time) / 1000, CLOCK_MAX_EXTRAPOLATION_MS) * p->speed;
 	jlong clock = ((jlong)p->loops << 32) | (uint32_t)ms;
 	g_mutex_unlock(&p->clock_lock);
 	return clock;
@@ -421,6 +597,11 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getVideoSize(JNIEn
 	AVRational sar = av_guess_sample_aspect_ratio(v->format, stream, NULL);
 	if (sar.num > 0 && sar.den > 0)
 		width = av_rescale(width, sar.num, sar.den);
+	if (v->rotation == 90 || v->rotation == 270) { /* NuPlayer reports the size as displayed */
+		int w = width;
+		width = height;
+		height = w;
+	}
 	return (MIN(width, 0xffff) << 16) | MIN(height, 0xffff);
 }
 
@@ -471,20 +652,141 @@ JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1videoSeek(JNIEnv *
 	v->skip_until = msec;
 }
 
-/* the frame decoded last as a new texture (RGB, the colors of its color space) */
+/* a plane of width x height pixels of bpp bytes, turned clockwise by degrees, into dst (the size turned, packed); in
+ * tiles of 32x32 pixels, so that reading and writing stay in the cache */
+static void rotate_plane(guchar *dst, const uint8_t *src, int src_stride, int width, int height, int bpp, int degrees)
+{
+	int dst_width = (degrees == 90 || degrees == 270) ? height : width;
+	for (int ty = 0; ty < height; ty += 32)
+		for (int tx = 0; tx < width; tx += 32)
+			for (int y = ty; y < MIN(ty + 32, height); y++) {
+				const uint8_t *row = src + (size_t)y * src_stride;
+				for (int x = tx; x < MIN(tx + 32, width); x++) {
+					int dx, dy;
+					switch (degrees) {
+						case 90:
+							dx = height - 1 - y;
+							dy = x;
+							break;
+						case 180:
+							dx = width - 1 - x;
+							dy = height - 1 - y;
+							break;
+						case 270:
+							dx = y;
+							dy = width - 1 - x;
+							break;
+						default:
+							dx = x;
+							dy = y;
+							break;
+					}
+					guchar *d = dst + ((size_t)dy * dst_width + dx) * bpp;
+					if (bpp == 1)
+						*d = row[x];
+					else
+						memcpy(d, row + (size_t)x * bpp, bpp);
+				}
+			}
+}
+
+/* a plane into dst, packed and turned */
+static void copy_plane(guchar *dst, const uint8_t *src, int src_stride, int width, int height, int bpp, int degrees)
+{
+	if (degrees) {
+		rotate_plane(dst, src, src_stride, width, height, bpp, degrees);
+		return;
+	}
+	for (int y = 0; y < height; y++)
+		memcpy(dst + (size_t)y * width * bpp, src + (size_t)y * src_stride, (size_t)width * bpp);
+}
+
+#if GTK_CHECK_VERSION(4, 20, 0)
+/* 8-bit YUV 4:2:0 as it is to GTK, which converts it when drawing (no conversion per frame here) */
+static GdkTexture *yuv_texture(struct video *v, AVFrame *frame)
+{
+	if ((frame->format != AV_PIX_FMT_YUV420P && frame->format != AV_PIX_FMT_YUVJ420P) || frame->width % 2 || frame->height % 2)
+		return NULL;
+	if (!v->color_state) {
+		/* the matrix of the frame's color space (unspecified: BT.601, as libswscale's default), sRGB otherwise as
+		 * the RGB frames */
+		GdkCicpParams *params = gdk_cicp_params_new();
+		gdk_cicp_params_set_color_primaries(params, 1);
+		gdk_cicp_params_set_transfer_function(params, 13);
+		guint matrix = 6;
+		if (frame->colorspace == AVCOL_SPC_BT709)
+			matrix = 1;
+		else if (frame->colorspace == AVCOL_SPC_BT2020_NCL)
+			matrix = 9;
+		gdk_cicp_params_set_matrix_coefficients(params, matrix);
+		gdk_cicp_params_set_range(params, frame->color_range == AVCOL_RANGE_JPEG || frame->format == AV_PIX_FMT_YUVJ420P ? GDK_CICP_RANGE_FULL : GDK_CICP_RANGE_NARROW);
+		v->color_state = gdk_cicp_params_build_color_state(params, NULL);
+		g_object_unref(params);
+		if (!v->color_state)
+			return NULL;
+	}
+	int width = frame->width, height = frame->height;
+	gsize luma = (gsize)width * height, chroma = luma / 4;
+	guchar *data = g_malloc(luma + 2 * chroma);
+	copy_plane(data, frame->data[0], frame->linesize[0], width, height, 1, v->rotation);
+	copy_plane(data + luma, frame->data[1], frame->linesize[1], width / 2, height / 2, 1, v->rotation);
+	copy_plane(data + luma + chroma, frame->data[2], frame->linesize[2], width / 2, height / 2, 1, v->rotation);
+	if (v->rotation == 90 || v->rotation == 270) {
+		width = frame->height;
+		height = frame->width;
+	}
+	GBytes *bytes = g_bytes_new_take(data, luma + 2 * chroma);
+	GdkMemoryTextureBuilder *builder = gdk_memory_texture_builder_new();
+	gdk_memory_texture_builder_set_bytes(builder, bytes);
+	gdk_memory_texture_builder_set_width(builder, width);
+	gdk_memory_texture_builder_set_height(builder, height);
+	gdk_memory_texture_builder_set_format(builder, GDK_MEMORY_G8_B8_R8_420);
+	gdk_memory_texture_builder_set_color_state(builder, v->color_state);
+	gdk_memory_texture_builder_set_stride_for_plane(builder, 0, width);
+	gdk_memory_texture_builder_set_stride_for_plane(builder, 1, width / 2);
+	gdk_memory_texture_builder_set_stride_for_plane(builder, 2, width / 2);
+	gdk_memory_texture_builder_set_offset(builder, 0, 0);
+	gdk_memory_texture_builder_set_offset(builder, 1, luma);
+	gdk_memory_texture_builder_set_offset(builder, 2, luma + chroma);
+	GdkTexture *texture = gdk_memory_texture_builder_build(builder);
+	g_object_unref(builder);
+	g_bytes_unref(bytes);
+	return texture;
+}
+#endif
+
+/* the frame decoded last as a new texture, turned for display: 8-bit YUV 4:2:0 as it is (GTK 4.20), other formats
+ * converted to RGB in the colors of their color space */
 JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIEnv *env, jclass class, jlong ptr)
 {
 	struct video *v = &((struct player *)_PTR(ptr))->video;
 	AVFrame *frame = v->frame;
+#if GTK_CHECK_VERSION(4, 20, 0)
+	GdkTexture *yuv = yuv_texture(v, frame);
+	if (yuv)
+		return _INTPTR(yuv);
+#endif
 	v->sws = sws_getCachedContext(v->sws, frame->width, frame->height, frame->format, frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
 	if (!v->sws)
 		return 0;
 	sws_setColorspaceDetails(v->sws, sws_getCoefficients(frame->colorspace), frame->color_range == AVCOL_RANGE_JPEG, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
-	int stride = frame->width * 3;
-	guchar *rgb = g_malloc(stride * frame->height);
-	sws_scale(v->sws, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
-	GBytes *bytes = g_bytes_new_take(rgb, stride * frame->height);
-	GdkTexture *texture = gdk_memory_texture_new(frame->width, frame->height, GDK_MEMORY_R8G8B8, bytes, stride);
+	int width = frame->width, height = frame->height;
+	int stride = width * 3;
+	guchar *rgb = g_malloc(stride * height);
+	sws_scale(v->sws, (const uint8_t *const *)frame->data, frame->linesize, 0, height, (uint8_t *[1]){rgb}, (int[1]){stride});
+	if (v->rotation) {
+		guchar *turned = g_malloc(stride * height);
+		rotate_plane(turned, rgb, stride, width, height, 3, v->rotation);
+		g_free(rgb);
+		rgb = turned;
+		if (v->rotation != 180) {
+			width = frame->height;
+			height = frame->width;
+			stride = width * 3;
+		}
+	}
+	GBytes *bytes = g_bytes_new_take(rgb, stride * height);
+	GdkTexture *texture = gdk_memory_texture_new(width, height, GDK_MEMORY_R8G8B8, bytes, stride);
 	g_bytes_unref(bytes);
 	return _INTPTR(texture);
 }
@@ -492,29 +794,34 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIE
 struct show_texture {
 	GtkWidget *wrapper;
 	GdkTexture *texture;
+	gboolean crop;
 };
 
 static gboolean show_texture(gpointer data)
 {
 	struct show_texture *d = data;
 	GtkWidget *child = gtk_widget_get_first_child(d->wrapper);
-	if (child && SURFACE_VIEW_IS_WIDGET(child))
+	if (child && SURFACE_VIEW_IS_WIDGET(child)) {
+		SURFACE_VIEW_WIDGET(child)->crop = d->crop;
 		surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(child), d->texture, FALSE);
-	else
+	} else {
 		g_object_unref(d->texture);
+	}
 	g_object_unref(d->wrapper);
 	g_free(d);
 	return G_SOURCE_REMOVE;
 }
 
-/* the texture (taken over) into the SurfaceView whose Surface is on the widget, on the main thread */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1showTexture(JNIEnv *env, jclass class, jlong widget, jlong texture)
+/* the texture (taken over) into the SurfaceView whose Surface is on the widget, on the main thread; crop: the scaling
+ * mode SCALE_TO_FIT_WITH_CROPPING, which the compositor applies in AOSP */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1showTexture(JNIEnv *env, jclass class, jlong widget, jlong texture, jboolean crop)
 {
 	if (!texture)
 		return;
 	struct show_texture *d = g_new(struct show_texture, 1);
 	d->wrapper = g_object_ref(_PTR(widget));
 	d->texture = _PTR(texture);
+	d->crop = crop;
 	g_idle_add_full(G_PRIORITY_HIGH_IDLE, show_texture, d, NULL);
 }
 
