@@ -69,6 +69,7 @@ public class MediaPlayer {
 	private long nativePlayer; // 0 unless prepared
 	private int duration;
 	private int videoWidth;
+	private volatile int videoScalingMode = VIDEO_SCALING_MODE_SCALE_TO_FIT;
 	private int videoHeight;
 	private volatile Surface surface;
 	private volatile int position;
@@ -347,7 +348,7 @@ public class MediaPlayer {
 		if (s == null)
 			return;
 		if (s.widget != 0)
-			native_showTexture(s.widget, native_videoTexture(player));
+			native_showTexture(s.widget, native_videoTexture(player), videoScalingMode == VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
 		else if (s.surfaceTexture != null)
 			s.surfaceTexture.queueBuffer(native_videoTexture(player), pts * 1000000L);
 	}
@@ -592,10 +593,13 @@ public class MediaPlayer {
 		return nativePlayer != 0 ? videoHeight : 0;
 	}
 
-	/* the frames fill the Surface (AOSP's default SCALE_TO_FIT); cropping is not done */
+	/* AOSP: SCALE_TO_FIT (the default) stretches the frames over the Surface, SCALE_TO_FIT_WITH_CROPPING covers it
+	 * keeping their aspect ratio; like AOSP's compositor this applies to a SurfaceView, a TextureView shows the
+	 * whole frame */
 	public void setVideoScalingMode(int mode) {
 		if (mode != VIDEO_SCALING_MODE_SCALE_TO_FIT && mode != VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
 			throw new IllegalArgumentException("Scaling mode " + mode + " is not supported");
+		videoScalingMode = mode;
 	}
 
 	public void setScreenOnWhilePlaying(boolean screenOn) {}
@@ -619,6 +623,6 @@ public class MediaPlayer {
 	private static native int native_videoDecode(long player);
 	private static native void native_videoSeek(long player, int msec);
 	private static native long native_videoTexture(long player);
-	private static native void native_showTexture(long widget, long texture);
+	private static native void native_showTexture(long widget, long texture, boolean crop);
 	private static native void native_release(long player);
 }

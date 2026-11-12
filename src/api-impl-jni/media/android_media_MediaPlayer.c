@@ -558,29 +558,34 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIE
 struct show_texture {
 	GtkWidget *wrapper;
 	GdkTexture *texture;
+	gboolean crop;
 };
 
 static gboolean show_texture(gpointer data)
 {
 	struct show_texture *d = data;
 	GtkWidget *child = gtk_widget_get_first_child(d->wrapper);
-	if (child && SURFACE_VIEW_IS_WIDGET(child))
+	if (child && SURFACE_VIEW_IS_WIDGET(child)) {
+		SURFACE_VIEW_WIDGET(child)->crop = d->crop;
 		surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(child), d->texture, FALSE);
-	else
+	} else {
 		g_object_unref(d->texture);
+	}
 	g_object_unref(d->wrapper);
 	g_free(d);
 	return G_SOURCE_REMOVE;
 }
 
-/* the texture (taken over) into the SurfaceView whose Surface is on the widget, on the main thread */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1showTexture(JNIEnv *env, jclass class, jlong widget, jlong texture)
+/* the texture (taken over) into the SurfaceView whose Surface is on the widget, on the main thread; crop: the scaling
+ * mode SCALE_TO_FIT_WITH_CROPPING, which the compositor applies in AOSP */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1showTexture(JNIEnv *env, jclass class, jlong widget, jlong texture, jboolean crop)
 {
 	if (!texture)
 		return;
 	struct show_texture *d = g_new(struct show_texture, 1);
 	d->wrapper = g_object_ref(_PTR(widget));
 	d->texture = _PTR(texture);
+	d->crop = crop;
 	g_idle_add_full(G_PRIORITY_HIGH_IDLE, show_texture, d, NULL);
 }
 

@@ -55,7 +55,17 @@ static void surface_view_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapsho
 			gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(0, gtk_widget_get_height(widget)));
 			gtk_snapshot_scale(snapshot, 1, -1);
 		}
-		gtk_snapshot_append_texture(snapshot, surface_view_widget->texture, &bounds);
+		if (surface_view_widget->crop) {
+			/* the texture's aspect ratio kept, centered, cut at the widget's bounds */
+			int width = gdk_texture_get_width(surface_view_widget->texture);
+			int height = gdk_texture_get_height(surface_view_widget->texture);
+			float scale = MAX(bounds.size.width / width, bounds.size.height / height);
+			gtk_snapshot_push_clip(snapshot, &bounds);
+			gtk_snapshot_append_texture(snapshot, surface_view_widget->texture, &GRAPHENE_RECT_INIT((bounds.size.width - width * scale) / 2, (bounds.size.height - height * scale) / 2, width * scale, height * scale));
+			gtk_snapshot_pop(snapshot);
+		} else {
+			gtk_snapshot_append_texture(snapshot, surface_view_widget->texture, &bounds);
+		}
 		if (surface_view_widget->needs_flip)
 			gtk_snapshot_restore(snapshot);
 	}
