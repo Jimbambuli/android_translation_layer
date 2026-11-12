@@ -53,6 +53,10 @@ public final class ATLBinderConnection {
 	private static final byte SENDER_NODE = 1;
 	private static final byte RECEIVER_NODE = 2;
 	private static final int MAX_FDS = 253;
+	/* a message larger than this goes in a memfd (the socket takes about 200 KiB at most), like the binder
+	 * driver's buffer the data lives in shared memory; the socket carries the mark and the memfd */
+	private static final int LARGE = 128 * 1024;
+	private static final int LARGE_MARK = 0x4c415247; // "LARG"
 
 	/** what the other side's end means for this process */
 	public interface DeathListener {
@@ -337,7 +341,7 @@ public final class ATLBinderConnection {
 			out.write(data);
 			out.flush();
 			if (fds != null && !fds.isEmpty()) {
-				if (fds.size() > MAX_FDS)
+				if (fds.size() > MAX_FDS - 1)
 					throw new RemoteException("too many file descriptors: " + fds.size());
 				fdInts = new int[fds.size()];
 				for (int i = 0; i < fdInts.length; i++)
@@ -346,7 +350,30 @@ public final class ATLBinderConnection {
 		} catch (IOException e) {
 			throw new RemoteException(e.toString());
 		}
-		int ret = nativeSend(fd, bytes.toByteArray(), fdInts);
+		byte[] message = bytes.toByteArray();
+		FileDescriptor large = null;
+		if (message.length > LARGE) {
+			try {
+				large = Os.memfd_create("atl-binder", android.system.OsConstants.MFD_CLOEXEC);
+				for (int off = 0; off < message.length;)
+					off += Os.write(large, message, off, message.length - off);
+			} catch (ErrnoException | java.io.InterruptedIOException e) {
+				throw new RemoteException("cannot put " + message.length + " bytes into a memfd: " + e);
+			}
+			int[] withLarge = new int[(fdInts != null ? fdInts.length : 0) + 1];
+			if (fdInts != null)
+				System.arraycopy(fdInts, 0, withLarge, 0, fdInts.length);
+			withLarge[withLarge.length - 1] = large.getInt$();
+			fdInts = withLarge;
+			message = new byte[] {(byte)(LARGE_MARK >>> 24), (byte)(LARGE_MARK >>> 16), (byte)(LARGE_MARK >>> 8), (byte)LARGE_MARK};
+		}
+		int ret = nativeSend(fd, message, fdInts);
+		if (large != null) {
+			try {
+				Os.close(large);
+			} catch (ErrnoException ignored) {
+			}
+		}
 		ArrayList<FileDescriptor> close = parcel != null ? parcel.atl_fileDescriptorsToClose() : null;
 		for (int i = 0; close != null && i < close.size(); i++) {
 			try {
@@ -367,6 +394,12 @@ public final class ATLBinderConnection {
 			byte[] bytes = nativeReceive(fd, fdsOut);
 			if (bytes == null)
 				break;
+			if (bytes.length == 4 && ((bytes[0] & 0xff) << 24 | (bytes[1] & 0xff) << 16 | (bytes[2] & 0xff) << 8 | (bytes[3] & 0xff)) == LARGE_MARK && fdsOut[0] > 0) {
+				bytes = readLarge(fdsOut[fdsOut[0]]);
+				fdsOut[0]--;
+				if (bytes == null)
+					break;
+			}
 			Message m = new Message();
 			try {
 				DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
@@ -398,6 +431,30 @@ public final class ATLBinderConnection {
 			dispatch(m);
 		}
 		die();
+	}
+
+	/* the message in the memfd that came with the mark */
+	private static byte[] readLarge(int memfd) {
+		FileDescriptor f = new FileDescriptor();
+		f.setInt$(memfd);
+		try {
+			byte[] bytes = new byte[(int)Os.fstat(f).st_size];
+			for (int off = 0; off < bytes.length;) {
+				int n = Os.pread(f, bytes, off, bytes.length - off, off);
+				if (n <= 0)
+					throw new IOException("short read");
+				off += n;
+			}
+			return bytes;
+		} catch (ErrnoException | IOException e) {
+			Slog.e(TAG, "cannot read a large message", e);
+			return null;
+		} finally {
+			try {
+				Os.close(f);
+			} catch (ErrnoException ignored) {
+			}
+		}
 	}
 
 	private void dispatch(final Message m) {
