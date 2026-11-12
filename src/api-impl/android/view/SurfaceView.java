@@ -60,6 +60,15 @@ public class SurfaceView extends View {
 		return mSurfaceHolder;
 	}
 
+	private SurfaceControl mSurfaceControl;
+
+	/* AOSP SurfaceView.getSurfaceControl() (API 29): the layer of this view's surface */
+	public SurfaceControl getSurfaceControl() {
+		if (mSurfaceControl == null)
+			mSurfaceControl = new SurfaceControl(this, null, "SurfaceView");
+		return mSurfaceControl;
+	}
+
 	final Surface mSurface = new Surface();
 
 	private final SurfaceHolder mSurfaceHolder = new SurfaceHolder() {

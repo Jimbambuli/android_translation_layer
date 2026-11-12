@@ -75,6 +75,11 @@ public class Surface implements android.os.Parcelable {
 
 	public Surface() {}
 
+	/* AOSP Surface(SurfaceControl) (API 29): draws into the widget of the SurfaceView the layer belongs to */
+	public Surface(SurfaceControl from) {
+		widget = from.atl_widget();
+	}
+
 	public Surface(SurfaceTexture surfaceTexture) {
 		this.surfaceTexture = surfaceTexture;
 	}
