@@ -13,12 +13,18 @@ extern "C" {
 #define android_atl_ATLBinderConnection_REPLY 2L
 #undef android_atl_ATLBinderConnection_DEAD_REPLY
 #define android_atl_ATLBinderConnection_DEAD_REPLY 3L
+#undef android_atl_ATLBinderConnection_RELEASE
+#define android_atl_ATLBinderConnection_RELEASE 4L
 #undef android_atl_ATLBinderConnection_SENDER_NODE
 #define android_atl_ATLBinderConnection_SENDER_NODE 1L
 #undef android_atl_ATLBinderConnection_RECEIVER_NODE
 #define android_atl_ATLBinderConnection_RECEIVER_NODE 2L
 #undef android_atl_ATLBinderConnection_MAX_FDS
 #define android_atl_ATLBinderConnection_MAX_FDS 253L
+#undef android_atl_ATLBinderConnection_LARGE
+#define android_atl_ATLBinderConnection_LARGE 131072L
+#undef android_atl_ATLBinderConnection_LARGE_MARK
+#define android_atl_ATLBinderConnection_LARGE_MARK 1279349319L
 /*
  * Class:     android_atl_ATLBinderConnection
  * Method:    nativeSocketPair
@@ -30,10 +36,10 @@ JNIEXPORT jintArray JNICALL Java_android_atl_ATLBinderConnection_nativeSocketPai
 /*
  * Class:     android_atl_ATLBinderConnection
  * Method:    nativeSpawn
- * Signature: (ILjava/lang/String;)I
+ * Signature: (ILjava/lang/String;Z)I
  */
 JNIEXPORT jint JNICALL Java_android_atl_ATLBinderConnection_nativeSpawn
-  (JNIEnv *, jclass, jint, jstring);
+  (JNIEnv *, jclass, jint, jstring, jboolean);
 
 /*
  * Class:     android_atl_ATLBinderConnection

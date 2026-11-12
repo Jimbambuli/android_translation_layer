@@ -675,7 +675,24 @@ public abstract class Context {
 
 	/* AOSP Context.bindService(Intent, int, Executor, ServiceConnection) (API 29): like ContextImpl's
 	 * ServiceDispatcher with an executor, the connection's callbacks run on the executor */
-	public boolean bindService(Intent service, int flags, final java.util.concurrent.Executor executor, final ServiceConnection conn) {
+	public boolean bindService(Intent service, int flags, java.util.concurrent.Executor executor, ServiceConnection conn) {
+		return bindServiceInstance(service, flags, null, executor, conn);
+	}
+
+	/* AOSP Context.bindIsolatedService() (API 29): a service with android:isolatedProcess, in a process of its own
+	 * for each instance name */
+	public boolean bindIsolatedService(Intent service, int flags, String instanceName, java.util.concurrent.Executor executor, ServiceConnection conn) {
+		if (instanceName == null)
+			throw new NullPointerException("null instanceName");
+		return bindServiceInstance(service, flags, instanceName, executor, conn);
+	}
+
+	/** @hide bindService() of the instance of an isolated service (ContextImpl) */
+	public boolean atl_bindService(Intent service, ServiceConnection conn, int flags, String instanceName) {
+		return bindService(service, conn, flags);
+	}
+
+	private boolean bindServiceInstance(Intent service, int flags, String instanceName, final java.util.concurrent.Executor executor, final ServiceConnection conn) {
 		if (executor == null)
 			throw new IllegalArgumentException("executor must not be null");
 		if (conn == null)
@@ -704,7 +721,7 @@ public abstract class Context {
 		synchronized (executor_dispatchers) {
 			executor_dispatchers.put(conn, dispatcher);
 		}
-		return bindService(service, dispatcher, flags);
+		return atl_bindService(service, dispatcher, flags, instanceName);
 	}
 
 	/* For use from native code */

@@ -602,7 +602,7 @@ public final class ATLBinderConnection {
 	}
 
 	static native int[] nativeSocketPair();
-	static native int nativeSpawn(int childFd, String processName);
+	static native int nativeSpawn(int childFd, String processName, boolean isolated);
 	private static native int nativeSend(int fd, byte[] data, int[] fds);
 	private static native byte[] nativeReceive(int fd, int[] fdsOut);
 	static native int nativeWaitPid(int pid);

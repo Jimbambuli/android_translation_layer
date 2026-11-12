@@ -33,6 +33,7 @@ public final class ATLProcess {
 
 	/* set in a process that the main process started */
 	private static final String process_name = System.getenv("ATL_PROCESS_NAME");
+	private static final boolean isolated = System.getenv("ATL_PROCESS_ISOLATED") != null;
 
 	/* AppThread transactions */
 	private static final int BIND_SERVICE = IBinder.FIRST_CALL_TRANSACTION;
@@ -49,6 +50,11 @@ public final class ATLProcess {
 		return process_name != null;
 	}
 
+	/** Process.isIsolated(): a process of an isolated service (android:isolatedProcess) */
+	public static boolean isIsolated() {
+		return isolated;
+	}
+
 	/** Application.getProcessName() */
 	public static String myProcessName() {
 		return process_name != null ? process_name : mainProcessName();
@@ -63,6 +69,9 @@ public final class ATLProcess {
 
 	private static final class ProcessRecord implements ATLBinderConnection.DeathListener {
 		final String name;
+		/* the process in the table: an isolated service gets a process of its own (per instance name) */
+		final String key;
+		final boolean isolated;
 		/* starting the process and the transactions to it, in the order of the calls */
 		final ExecutorService worker = Executors.newSingleThreadExecutor();
 		ATLBinderConnection connection;
@@ -73,8 +82,10 @@ public final class ATLProcess {
 		/* calls queued for the worker; while there are any, the process must not end */
 		int pending;
 
-		ProcessRecord(String name) {
+		ProcessRecord(String key, String name, boolean isolated) {
+			this.key = key;
 			this.name = name;
+			this.isolated = isolated;
 		}
 
 		/* the process ended (or crashed): its bindings are lost, like ActiveServices.killServicesLocked() */
@@ -84,8 +95,8 @@ public final class ATLProcess {
 			Slog.i(TAG, "process " + name + " (pid " + connection.peerPid + ") has died, status " + status);
 			final ArrayList<Map.Entry<ServiceConnection, Intent>> lost;
 			synchronized (processes) {
-				if (processes.get(name) == this)
-					processes.remove(name);
+				if (processes.get(key) == this)
+					processes.remove(key);
 				lost = new ArrayList<>(bindings.entrySet());
 				bindings.clear();
 			}
@@ -116,7 +127,7 @@ public final class ATLProcess {
 	}
 
 	/** ActiveServices.bindServiceLocked() for a service in another process of the app */
-	public static boolean bindService(final Intent intent, final ServiceConnection conn, String processName) {
+	public static boolean bindService(final Intent intent, final ServiceConnection conn, String processName, String instanceName) {
 		if (isSecondary()) {
 			/* a process the main process started does not start processes itself (yet) */
 			Slog.w(TAG, "bindService: " + intent.getComponent() + " runs in process " + processName + ", not supported from process " + process_name);
@@ -124,7 +135,7 @@ public final class ATLProcess {
 		}
 		final ProcessRecord r;
 		synchronized (processes) {
-			r = getProcessRecord(processName);
+			r = getProcessRecord(processName, intent, instanceName);
 			r.bindings.put(conn, intent);
 		}
 		submit(r, new Runnable() {
@@ -157,12 +168,14 @@ public final class ATLProcess {
 	}
 
 	/* the record of a process of the app, a new one (the process starts with its first call) if it does not run */
-	private static ProcessRecord getProcessRecord(String processName) {
-		ProcessRecord r = processes.get(processName);
+	private static ProcessRecord getProcessRecord(String processName, Intent intent, String instanceName) {
+		boolean isolated = intent != null && ATLLoadedApp.getPrimaryApplication().isIsolatedService(intent.getComponent().getClassName());
+		String key = isolated ? processName + "#" + intent.getComponent().getClassName() + "#" + (instanceName != null ? instanceName : "") : processName;
+		ProcessRecord r = processes.get(key);
 		/* a process that died but whose end is not handled yet is not used again */
 		if (r == null || (r.connection != null && r.connection.isDead())) {
-			r = new ProcessRecord(processName);
-			processes.put(processName, r);
+			r = new ProcessRecord(key, processName, isolated);
+			processes.put(key, r);
 		}
 		return r;
 	}
@@ -194,7 +207,7 @@ public final class ATLProcess {
 		}
 		final ProcessRecord r;
 		synchronized (processes) {
-			r = getProcessRecord(processName);
+			r = getProcessRecord(processName, intent, null);
 		}
 		submit(r, new Runnable() {
 			@Override
@@ -216,7 +229,12 @@ public final class ATLProcess {
 	public static boolean stopService(final Intent intent, String processName) {
 		final ProcessRecord r;
 		synchronized (processes) {
-			r = processes.get(processName);
+			ProcessRecord found = null;
+			for (ProcessRecord p : processes.values()) {
+				if (p.name.equals(processName) && (!p.isolated || p.key.startsWith(processName + "#" + intent.getComponent().getClassName() + "#")))
+					found = p;
+			}
+			r = found;
 		}
 		if (r == null)
 			return false;
@@ -250,7 +268,7 @@ public final class ATLProcess {
 			target = main_connection.getContextObject();
 		} else {
 			synchronized (processes) {
-				r = getProcessRecord(processName);
+				r = getProcessRecord(processName, null, null);
 				r.pending++;
 			}
 			try {
@@ -307,7 +325,7 @@ public final class ATLProcess {
 		int[] sv = ATLBinderConnection.nativeSocketPair();
 		if (sv == null)
 			throw new RemoteException("socketpair failed");
-		int pid = ATLBinderConnection.nativeSpawn(sv[1], r.name);
+		int pid = ATLBinderConnection.nativeSpawn(sv[1], r.name, r.isolated);
 		closeFd(sv[1]);
 		if (pid < 0) {
 			closeFd(sv[0]);
@@ -387,8 +405,8 @@ public final class ATLProcess {
 				boolean exit;
 				synchronized (processes) {
 					exit = r.pending == 0 && r.bindings.isEmpty();
-					if (exit && processes.get(r.name) == r)
-						processes.remove(r.name);
+					if (exit && processes.get(r.key) == r)
+						processes.remove(r.key);
 				}
 				reply.writeInt(exit ? 1 : 0);
 				return true;

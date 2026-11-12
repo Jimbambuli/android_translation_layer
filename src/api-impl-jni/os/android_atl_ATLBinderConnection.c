@@ -32,7 +32,7 @@ JNIEXPORT jintArray JNICALL Java_android_atl_ATLBinderConnection_nativeSocketPai
 
 /* starts this executable again with the command line of this process; ATL_PROCESS_NAME and ATL_IPC_FD make
  * it a process of the app (see main.c), which talks to us over child_fd */
-JNIEXPORT jint JNICALL Java_android_atl_ATLBinderConnection_nativeSpawn(JNIEnv *env, jclass this, jint child_fd, jstring process_name)
+JNIEXPORT jint JNICALL Java_android_atl_ATLBinderConnection_nativeSpawn(JNIEnv *env, jclass this, jint child_fd, jstring process_name, jboolean isolated)
 {
 	char *cmdline = NULL;
 	size_t len = 0;
@@ -71,10 +71,10 @@ JNIEXPORT jint JNICALL Java_android_atl_ATLBinderConnection_nativeSpawn(JNIEnv *
 	int envc = 0;
 	while (environ[envc])
 		envc++;
-	char **envp = calloc(envc + 4, sizeof(char *));
+	char **envp = calloc(envc + 5, sizeof(char *));
 	int e = 0;
 	for (int i = 0; i < envc; i++) {
-		if (!strncmp(environ[i], "ATL_PROCESS_NAME=", 17) || !strncmp(environ[i], "ATL_IPC_FD=", 11))
+		if (!strncmp(environ[i], "ATL_PROCESS_NAME=", 17) || !strncmp(environ[i], "ATL_IPC_FD=", 11) || !strncmp(environ[i], "ATL_PROCESS_ISOLATED=", 21))
 			continue;
 		envp[e++] = environ[i];
 	}
@@ -86,6 +86,9 @@ JNIEXPORT jint JNICALL Java_android_atl_ATLBinderConnection_nativeSpawn(JNIEnv *
 	envp[e++] = fd_env;
 	/* the main process already extracted the native libraries */
 	envp[e++] = "ATL_SKIP_NATIVES_EXTRACTION=1";
+	/* a process of an isolated service (android:isolatedProcess); ATL does not restrict it further */
+	if (isolated)
+		envp[e++] = "ATL_PROCESS_ISOLATED=1";
 
 	/* dup2 onto the same number clears FD_CLOEXEC, so only this end of the pair stays open in the child */
 	posix_spawn_file_actions_t actions;
