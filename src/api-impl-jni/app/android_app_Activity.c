@@ -30,16 +30,20 @@ static gboolean transition_opening = FALSE;
 static GtkWidget *pages_stack;
 static GtkWidget *pages_below;
 static GtkWidget *pages_above;
+static GtkWidget *pages_backdrop; /* what shows through a translucent activity, below everything */
 
 GtkWidget *activity_pages_new(void)
 {
 	GtkWidget *overlay = gtk_overlay_new();
+	pages_backdrop = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	pages_below = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	pages_stack = gtk_stack_new();
 	pages_above = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_stack_set_transition_type(GTK_STACK(pages_stack), GTK_STACK_TRANSITION_TYPE_NONE);
 	gtk_widget_set_can_target(pages_above, FALSE);
-	gtk_overlay_set_child(GTK_OVERLAY(overlay), pages_below);
+	gtk_widget_set_can_target(pages_backdrop, FALSE);
+	gtk_overlay_set_child(GTK_OVERLAY(overlay), pages_backdrop);
+	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_below);
 	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_stack);
 	gtk_overlay_set_measure_overlay(GTK_OVERLAY(overlay), pages_stack, TRUE);
 	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_above);
@@ -148,6 +152,37 @@ static void ghost_start(GtkWidget *page, gboolean below)
 	ghost->image = gtk_snapshot_free_to_node(snapshot);
 	gtk_box_append(GTK_BOX(below ? pages_below : pages_above), GTK_WIDGET(ghost));
 	gtk_widget_add_tick_callback(GTK_WIDGET(ghost), ghost_tick, NULL, NULL);
+}
+
+/* A translucent activity (windowIsTranslucent) lets the activities behind it show through, as AOSP keeps
+ * drawing them. Here only one page of the stack is drawn, so the page gets, when it is first shown, an
+ * image of what was visible then: the page it covers, over that page's own backdrop if it is translucent
+ * as well. Whenever a page is shown, its backdrop (if any) goes below the stack. */
+static void backdrop_show(GtkWidget *page, GtkWidget *old_page, gboolean translucent)
+{
+	GtkWidget *child;
+	while ((child = gtk_widget_get_first_child(pages_backdrop)))
+		gtk_box_remove(GTK_BOX(pages_backdrop), child);
+	g_object_set_data(G_OBJECT(page), "atl-translucent", GINT_TO_POINTER(translucent));
+	if (!translucent)
+		return;
+	GskRenderNode *image = g_object_get_data(G_OBJECT(page), "atl-backdrop");
+	if (!image && old_page && old_page != page) {
+		GtkSnapshot *snapshot = gtk_snapshot_new();
+		GskRenderNode *below = g_object_get_data(G_OBJECT(old_page), "atl-translucent") ? g_object_get_data(G_OBJECT(old_page), "atl-backdrop") : NULL;
+		if (below)
+			gtk_snapshot_append_node(snapshot, below);
+		gtk_widget_snapshot_child(gtk_widget_get_parent(old_page), old_page, snapshot);
+		image = gtk_snapshot_free_to_node(snapshot);
+		if (!image)
+			return;
+		g_object_set_data_full(G_OBJECT(page), "atl-backdrop", image, (GDestroyNotify)gsk_render_node_unref);
+	}
+	if (!image)
+		return;
+	AtlWindowGhost *ghost = g_object_new(ATL_TYPE_WINDOW_GHOST, NULL);
+	ghost->image = gsk_render_node_ref(image);
+	gtk_box_append(GTK_BOX(pages_backdrop), GTK_WIDGET(ghost));
 }
 
 static GtkWidget *get_decor_view(JNIEnv *env, jobject activity)
@@ -387,6 +422,10 @@ static void activity_focus(JNIEnv *env, jobject activity)
 			ghost_start(old_page, transition_opening);
 	}
 	transition_from = NULL;
+	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
+	gboolean translucent = window_jobj && _GET_BOOL_FIELD(window_jobj, "isTranslucent");
+	(*env)->DeleteLocalRef(env, window_jobj);
+	backdrop_show(decor_view, old_page, translucent);
 	stack_show_page(stack, decor_view);
 
 	J__Activity__performResume(env, activity);

@@ -403,6 +403,9 @@ public class Window {
 	private boolean decorInstalled;
 	private boolean hasSoftInputMode;
 	private boolean isFloating;
+	/* windowIsTranslucent of the theme, read when the decor is installed; native code shows what is behind
+	 * such an activity's page */
+	private boolean isTranslucent;
 
 	/* PhoneWindow.isFloating(): windowIsFloating of the theme, read when the decor is installed */
 	public boolean isFloating() {
@@ -419,6 +422,7 @@ public class Window {
 		TypedArray a = context.obtainStyledAttributes(com.android.internal.R.styleable.Window);
 		final boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
 		isFloating = floating;
+		isTranslucent = a.getBoolean(com.android.internal.R.styleable.Window_windowIsTranslucent, false);
 		final int flagsToUpdate = (WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR) & ~forcedWindowFlags;
 		if (floating)
 			setFlags(0, flagsToUpdate); // AOSP sets the size to WRAP_CONTENT as well; ATL's dialogs size themselves
