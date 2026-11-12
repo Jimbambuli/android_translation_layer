@@ -662,6 +662,17 @@ public abstract class Context {
 
 	public abstract boolean bindService(final Intent intent, final ServiceConnection serviceConnection, int flags);
 
+	/* the dispatchers of the connections bound with an executor (LoadedApk.mServices), which unbindService()
+	 * unbinds in place of the app's connection */
+	private static final java.util.WeakHashMap<ServiceConnection, ServiceConnection> executor_dispatchers = new java.util.WeakHashMap<>();
+
+	/** @hide */
+	public static ServiceConnection atl_takeExecutorDispatcher(ServiceConnection conn) {
+		synchronized (executor_dispatchers) {
+			return executor_dispatchers.remove(conn);
+		}
+	}
+
 	/* AOSP Context.bindService(Intent, int, Executor, ServiceConnection) (API 29): like ContextImpl's
 	 * ServiceDispatcher with an executor, the connection's callbacks run on the executor */
 	public boolean bindService(Intent service, int flags, final java.util.concurrent.Executor executor, final ServiceConnection conn) {
@@ -669,7 +680,7 @@ public abstract class Context {
 			throw new IllegalArgumentException("executor must not be null");
 		if (conn == null)
 			throw new IllegalArgumentException("connection is null");
-		return bindService(service, new ServiceConnection() {
+		ServiceConnection dispatcher = new ServiceConnection() {
 			@Override
 			public void onServiceConnected(final ComponentName name, final android.os.IBinder binder) {
 				executor.execute(new Runnable() {
@@ -689,7 +700,11 @@ public abstract class Context {
 					}
 				});
 			}
-		}, flags);
+		};
+		synchronized (executor_dispatchers) {
+			executor_dispatchers.put(conn, dispatcher);
+		}
+		return bindService(service, dispatcher, flags);
 	}
 
 	/* For use from native code */

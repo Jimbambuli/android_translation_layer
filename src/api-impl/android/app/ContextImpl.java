@@ -272,6 +272,9 @@ public final class ContextImpl extends Context {
 	 * which has no service behind it) is ignored instead of AOSP's IllegalArgumentException */
 	@Override
 	public void unbindService(ServiceConnection serviceConnection) {
+		ServiceConnection dispatcher = Context.atl_takeExecutorDispatcher(serviceConnection);
+		if (dispatcher != null)
+			serviceConnection = dispatcher;
 		if (ATLProcess.unbindService(serviceConnection))
 			return;
 		ATLLoadedApp targetApp;
