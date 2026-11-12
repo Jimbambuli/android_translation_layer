@@ -33,6 +33,9 @@ public class MediaPlayer {
 	/* NuPlayer's renderer drops a video frame that is later than this (ms) */
 	private static final int VIDEO_MAX_LATE_MS = 40;
 
+	public static final int MEDIA_INFO_STARTED_AS_NEXT = 2;
+	public static final int MEDIA_INFO_VIDEO_RENDERING_START = 3;
+
 	/* AOSP's limits (NuPlayer and the audio sink's time stretch) */
 	private static final float SPEED_MIN = 0.01f;
 	private static final float SPEED_MAX = 20.0f;
@@ -94,9 +97,11 @@ public class MediaPlayer {
 	private int videoSeekGeneration; // a seek of the video is due when it differs from the video thread's
 	private int videoSeekTarget;
 	private boolean paused; // pause() after start(): getPlaybackParams() tells speed 0, like NuPlayer
+	private boolean videoRenderingStarted;
 	/* setPlaybackParams(): the speed (not 0) and pitch */
 	private float speed = 1.f;
 	private float pitch = 1.f;
+	private MediaPlayer nextPlayer;
 
 	private final Handler eventHandler;
 	private OnPreparedListener onPreparedListener;
@@ -104,6 +109,7 @@ public class MediaPlayer {
 	private OnErrorListener onErrorListener;
 	private OnSeekCompleteListener onSeekCompleteListener;
 	private OnVideoSizeChangedListener onVideoSizeChangedListener;
+	private OnInfoListener onInfoListener;
 
 	public MediaPlayer() {
 		Looper looper = Looper.myLooper();
@@ -362,6 +368,18 @@ public class MediaPlayer {
 			native_showTexture(s.widget, native_videoTexture(player), videoScalingMode == VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
 		else if (s.surfaceTexture != null)
 			s.surfaceTexture.queueBuffer(native_videoTexture(player), pts * 1000000L);
+		else
+			return;
+		/* NuPlayer's renderer: once, with the first frame shown while playing */
+		synchronized (lock) {
+			if (videoRenderingStarted || !playing)
+				return;
+			videoRenderingStarted = true;
+		}
+		postEvent(() -> {
+			if (onInfoListener != null)
+				onInfoListener.onInfo(this, MEDIA_INFO_VIDEO_RENDERING_START, 0);
+		});
 	}
 
 	private void playbackLoop(long player) {
@@ -414,12 +432,23 @@ public class MediaPlayer {
 				position = ret;
 				continue;
 			}
+			if (ret == STEP_END)
+				native_drain(player); /* still playing: the video shows its last frames meanwhile */
 			synchronized (lock) {
 				playing = false;
 				completed = true;
 			}
 			running = false;
 			if (ret == STEP_END) {
+				/* AOSP: the next player starts when this one has played everything */
+				MediaPlayer next = nextPlayer;
+				if (next != null && !loop) {
+					next.start();
+					next.postEvent(() -> {
+						if (next.onInfoListener != null)
+							next.onInfoListener.onInfo(next, MEDIA_INFO_STARTED_AS_NEXT, 0);
+					});
+				}
 				if (duration > 0)
 					position = duration;
 				postEvent(() -> {
@@ -503,6 +532,13 @@ public class MediaPlayer {
 		return new PlaybackParams().setSpeed(isPaused ? 0.f : speed).setPitch(pitch).setAudioFallbackMode(PlaybackParams.AUDIO_FALLBACK_MODE_DEFAULT);
 	}
 
+	/* AOSP: when this player reaches the end (not looping), the next one starts, as seamlessly as possible */
+	public void setNextMediaPlayer(MediaPlayer next) {
+		if (next == this)
+			throw new IllegalArgumentException("Next player can't be self");
+		nextPlayer = next;
+	}
+
 	public boolean isPlaying() {
 		synchronized (lock) {
 			return playing;
@@ -579,6 +615,7 @@ public class MediaPlayer {
 		position = 0;
 		synchronized (lock) {
 			paused = false;
+			videoRenderingStarted = false;
 		}
 	}
 
@@ -591,6 +628,7 @@ public class MediaPlayer {
 			looping = false;
 		}
 		speed = pitch = 1.f;
+		nextPlayer = null;
 	}
 
 	public void release() {
@@ -600,6 +638,7 @@ public class MediaPlayer {
 		onErrorListener = null;
 		onSeekCompleteListener = null;
 		onVideoSizeChangedListener = null;
+		onInfoListener = null;
 		surface = null;
 	}
 
@@ -666,8 +705,13 @@ public class MediaPlayer {
 
 	public void setScreenOnWhilePlaying(boolean screenOn) {}
 
-	public void setOnBufferingUpdateListener(OnBufferingUpdateListener dummy) {}
-	public void setOnInfoListener(OnInfoListener dummy) {}
+	/* AOSP's NuPlayer reports buffering for streamed sources (its cache); there is no cache here, so there is no
+	 * buffering to report, as for local files in AOSP */
+	public void setOnBufferingUpdateListener(OnBufferingUpdateListener listener) {}
+
+	public void setOnInfoListener(OnInfoListener listener) {
+		onInfoListener = listener;
+	}
 	public void setAudioAttributes(AudioAttributes attributes) {}
 	public void setAudioStreamType(int dummy) {}
 
@@ -679,6 +723,7 @@ public class MediaPlayer {
 	private static native int native_getDuration(long player);
 	private static native int native_step(long player, float left, float right, boolean looping);
 	private static native void native_pause(long player);
+	private static native void native_drain(long player);
 	private static native void native_setPlaybackRate(long player, float speed, float pitch);
 	private static native void native_seek(long player, int msec, boolean user);
 	private static native long native_clock(long player);

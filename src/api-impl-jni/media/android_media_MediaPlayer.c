@@ -481,11 +481,8 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, 
 	}
 	if (frames < 0)
 		return STEP_ERROR;
-	if (frames == 0) {
-		if (p->pcm)
-			snd_pcm_drain(p->pcm);
-		return STEP_END;
-	}
+	if (frames == 0)
+		return STEP_END; /* native_drain() waits until the device has played it all */
 	if (p->codec && (left != 1.f || right != 1.f)) {
 		for (int i = 0; i < frames; i++) {
 			p->buffer[i * 2] *= left;
@@ -515,6 +512,14 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step(JNIEnv *env, 
 	int ms = position_ms(p);
 	clock_set(p, ms, TRUE);
 	return ms;
+}
+
+/* after STEP_END: waits until the device has played what it holds */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1drain(JNIEnv *env, jclass class, jlong ptr)
+{
+	struct player *p = _PTR(ptr);
+	if (p->pcm)
+		snd_pcm_drain(p->pcm);
 }
 
 /* setPlaybackParams(): the playback thread applies them with its next samples */
