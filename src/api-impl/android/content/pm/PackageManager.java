@@ -1821,6 +1821,15 @@ public class PackageManager {
 	 * @see #GET_SIGNATURES
 	 * @see #GET_UNINSTALLED_PACKAGES
 	 */
+	/* AOSP ApplicationPackageManager: the mainline modules of the system; ATL has none */
+	public List<ModuleInfo> getInstalledModules(int flags) {
+		return new java.util.ArrayList<ModuleInfo>();
+	}
+
+	public ModuleInfo getModuleInfo(String packageName, int flags) throws NameNotFoundException {
+		throw new NameNotFoundException("No module info for package: " + packageName);
+	}
+
 	public List<PackageInfo> getInstalledPackages(int flags) {
 		List<PackageInfo> ret = new ArrayList<PackageInfo>();
 		for (String packageName : ATLLoadedAppManager.getInstalledPackageNames()) {
