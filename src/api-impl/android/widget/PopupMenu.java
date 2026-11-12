@@ -471,6 +471,12 @@ public class PopupMenu {
 		private Intent intent;
 		private char alphabeticShortcut;
 		private char numericShortcut;
+		private int alphabeticModifiers = KeyEvent.META_CTRL_ON;
+		private int numericModifiers = KeyEvent.META_CTRL_ON;
+		private CharSequence contentDescription;
+		private CharSequence tooltipText;
+		private ColorStateList iconTintList;
+		private PorterDuff.Mode iconTintMode;
 		private boolean checkable;
 		private boolean checked;
 		boolean enabled = true;
@@ -722,26 +728,61 @@ public class PopupMenu {
 			return intent;
 		}
 
-		// the GMenu based popup shows neither icons, content descriptions nor tooltips
+		// the GMenu based popup shows neither icons, content descriptions nor tooltips; they are kept as AOSP's
+		// MenuItemImpl keeps them
 
 		@Override
 		public MenuItem setIconTintList(ColorStateList tint) {
+			iconTintList = tint;
 			return this;
+		}
+
+		@Override
+		public ColorStateList getIconTintList() {
+			return iconTintList;
 		}
 
 		@Override
 		public MenuItem setIconTintMode(PorterDuff.Mode tintMode) {
+			iconTintMode = tintMode;
 			return this;
+		}
+
+		@Override
+		public PorterDuff.Mode getIconTintMode() {
+			return iconTintMode;
 		}
 
 		@Override
 		public MenuItem setContentDescription(CharSequence contentDescription) {
+			this.contentDescription = contentDescription;
 			return this;
 		}
 
 		@Override
+		public CharSequence getContentDescription() {
+			return contentDescription;
+		}
+
+		@Override
 		public MenuItem setTooltipText(CharSequence tooltipText) {
+			this.tooltipText = tooltipText;
 			return this;
+		}
+
+		@Override
+		public CharSequence getTooltipText() {
+			return tooltipText;
+		}
+
+		@Override
+		public int getAlphabeticModifiers() {
+			return alphabeticModifiers;
+		}
+
+		@Override
+		public int getNumericModifiers() {
+			return numericModifiers;
 		}
 
 		@Override
@@ -762,12 +803,14 @@ public class PopupMenu {
 		@Override
 		public MenuItem setAlphabeticShortcut(char alphaChar, int alphaModifiers) {
 			alphabeticShortcut = alphaChar;
+			alphabeticModifiers = KeyEvent.normalizeMetaState(alphaModifiers);
 			return this;
 		}
 
 		@Override
 		public MenuItem setNumericShortcut(char numericChar, int numericModifiers) {
 			numericShortcut = numericChar;
+			numericModifiers = KeyEvent.normalizeMetaState(numericModifiers);
 			return this;
 		}
 	}
