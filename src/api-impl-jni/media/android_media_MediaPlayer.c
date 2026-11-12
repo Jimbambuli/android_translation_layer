@@ -1,9 +1,11 @@
 #include <alsa/asoundlib.h>
+#include <math.h>
 #include <sys/stat.h>
 
 #include <gtk/gtk.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/display.h>
 #include <libswresample/swresample.h>
 #include <libswscale/swscale.h>
 
@@ -44,6 +46,7 @@ struct video {
 	AVFrame *frame; /* the frame decoded last */
 	int stream_index;
 	int64_t skip_until; /* ms: after a seek, the frames that end before it are dropped */
+	int rotation;       /* degrees clockwise the frames are to be turned for display (the container's display matrix) */
 };
 
 struct player {
@@ -109,6 +112,14 @@ static void video_open(struct player *p, const char *path)
 			v->format->streams[i]->discard = AVDISCARD_ALL;
 	v->packet = av_packet_alloc();
 	v->frame = av_frame_alloc();
+	/* like NuPlayer's rotation-degrees: the display matrix turns counterclockwise, Android counts clockwise */
+	AVCodecParameters *par = v->format->streams[v->stream_index]->codecpar;
+	const AVPacketSideData *matrix = av_packet_side_data_get(par->coded_side_data, par->nb_coded_side_data, AV_PKT_DATA_DISPLAYMATRIX);
+	if (matrix && matrix->size >= 9 * sizeof(int32_t)) {
+		double degrees = -av_display_rotation_get((const int32_t *)matrix->data);
+		if (!isnan(degrees))
+			v->rotation = ((int)lround(degrees / 90) * 90 % 360 + 360) % 360;
+	}
 	return;
 fail:
 	printf("MediaPlayer: can't decode the video stream\n");
@@ -421,6 +432,11 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getVideoSize(JNIEn
 	AVRational sar = av_guess_sample_aspect_ratio(v->format, stream, NULL);
 	if (sar.num > 0 && sar.den > 0)
 		width = av_rescale(width, sar.num, sar.den);
+	if (v->rotation == 90 || v->rotation == 270) { /* NuPlayer reports the size as displayed */
+		int w = width;
+		width = height;
+		height = w;
+	}
 	return (MIN(width, 0xffff) << 16) | MIN(height, 0xffff);
 }
 
@@ -471,7 +487,45 @@ JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1videoSeek(JNIEnv *
 	v->skip_until = msec;
 }
 
-/* the frame decoded last as a new texture (RGB, the colors of its color space) */
+/* a plane of width x height pixels of bpp bytes, turned clockwise by degrees, into dst (the size turned, packed); in
+ * tiles of 32x32 pixels, so that reading and writing stay in the cache */
+static void rotate_plane(guchar *dst, const uint8_t *src, int src_stride, int width, int height, int bpp, int degrees)
+{
+	int dst_width = (degrees == 90 || degrees == 270) ? height : width;
+	for (int ty = 0; ty < height; ty += 32)
+		for (int tx = 0; tx < width; tx += 32)
+			for (int y = ty; y < MIN(ty + 32, height); y++) {
+				const uint8_t *row = src + (size_t)y * src_stride;
+				for (int x = tx; x < MIN(tx + 32, width); x++) {
+					int dx, dy;
+					switch (degrees) {
+						case 90:
+							dx = height - 1 - y;
+							dy = x;
+							break;
+						case 180:
+							dx = width - 1 - x;
+							dy = height - 1 - y;
+							break;
+						case 270:
+							dx = y;
+							dy = width - 1 - x;
+							break;
+						default:
+							dx = x;
+							dy = y;
+							break;
+					}
+					guchar *d = dst + ((size_t)dy * dst_width + dx) * bpp;
+					if (bpp == 1)
+						*d = row[x];
+					else
+						memcpy(d, row + (size_t)x * bpp, bpp);
+				}
+			}
+}
+
+/* the frame decoded last as a new texture (RGB, the colors of its color space), turned for display */
 JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIEnv *env, jclass class, jlong ptr)
 {
 	struct video *v = &((struct player *)_PTR(ptr))->video;
@@ -480,11 +534,23 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIE
 	if (!v->sws)
 		return 0;
 	sws_setColorspaceDetails(v->sws, sws_getCoefficients(frame->colorspace), frame->color_range == AVCOL_RANGE_JPEG, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
-	int stride = frame->width * 3;
-	guchar *rgb = g_malloc(stride * frame->height);
-	sws_scale(v->sws, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
-	GBytes *bytes = g_bytes_new_take(rgb, stride * frame->height);
-	GdkTexture *texture = gdk_memory_texture_new(frame->width, frame->height, GDK_MEMORY_R8G8B8, bytes, stride);
+	int width = frame->width, height = frame->height;
+	int stride = width * 3;
+	guchar *rgb = g_malloc(stride * height);
+	sws_scale(v->sws, (const uint8_t *const *)frame->data, frame->linesize, 0, height, (uint8_t *[1]){rgb}, (int[1]){stride});
+	if (v->rotation) {
+		guchar *turned = g_malloc(stride * height);
+		rotate_plane(turned, rgb, stride, width, height, 3, v->rotation);
+		g_free(rgb);
+		rgb = turned;
+		if (v->rotation != 180) {
+			width = frame->height;
+			height = frame->width;
+			stride = width * 3;
+		}
+	}
+	GBytes *bytes = g_bytes_new_take(rgb, stride * height);
+	GdkTexture *texture = gdk_memory_texture_new(width, height, GDK_MEMORY_R8G8B8, bytes, stride);
 	g_bytes_unref(bytes);
 	return _INTPTR(texture);
 }
