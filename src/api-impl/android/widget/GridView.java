@@ -1600,6 +1600,11 @@ public class GridView extends AbsListView {
 		}
 	}
 
+	/* AOSP: the number of columns of the last layout, AUTO_FIT before the first */
+	public int getNumColumns() {
+		return mNumColumns;
+	}
+
 	/**
 	 * Make sure views are touching the top or bottom edge, as appropriate for
 	 * our gravity
