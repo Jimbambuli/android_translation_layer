@@ -1821,6 +1821,15 @@ public class PackageManager {
 	 * @see #GET_SIGNATURES
 	 * @see #GET_UNINSTALLED_PACKAGES
 	 */
+	/* AOSP ApplicationPackageManager: the mainline modules of the system; ATL has none */
+	public List<ModuleInfo> getInstalledModules(int flags) {
+		return new java.util.ArrayList<ModuleInfo>();
+	}
+
+	public ModuleInfo getModuleInfo(String packageName, int flags) throws NameNotFoundException {
+		throw new NameNotFoundException("No module info for package: " + packageName);
+	}
+
 	public List<PackageInfo> getInstalledPackages(int flags) {
 		List<PackageInfo> ret = new ArrayList<PackageInfo>();
 		for (String packageName : ATLLoadedAppManager.getInstalledPackageNames()) {
@@ -3702,7 +3711,7 @@ public class PackageManager {
 	 * @param flags Optional behavior flags: {@link #DONT_KILL_APP} or 0.
 	 */
 	public void setComponentEnabledSetting(ComponentName componentName, int newState, int flags) {
-		return;
+		setEnabledState(componentName.flattenToString(), newState);
 	}
 
 	/**
@@ -3721,7 +3730,7 @@ public class PackageManager {
 	 * the manifest as found in {@link ComponentInfo}.
 	 */
 	public int getComponentEnabledSetting(ComponentName componentName) {
-		return COMPONENT_ENABLED_STATE_DEFAULT;
+		return getEnabledState(componentName.flattenToString());
 	}
 
 	/**
@@ -3743,7 +3752,7 @@ public class PackageManager {
 	 * @param flags Optional behavior flags: {@link #DONT_KILL_APP} or 0.
 	 */
 	public void setApplicationEnabledSetting(String packageName, int newState, int flags) {
-		return;
+		setEnabledState("package:" + packageName, newState);
 	}
 
 	/**
@@ -3763,7 +3772,52 @@ public class PackageManager {
 	 * @throws IllegalArgumentException if the named package does not exist.
 	 */
 	public int getApplicationEnabledSetting(String packageName) {
-		return -1;
+		try {
+			getPackageInfo(packageName, 0);
+		} catch (NameNotFoundException e) {
+			throw new IllegalArgumentException("Unknown package: " + packageName);
+		}
+		return getEnabledState("package:" + packageName);
+	}
+
+	/* AOSP's package manager keeps the enabled state an app gives its components (package-restrictions.xml), also
+	 * across restarts; ATL keeps it in a file of the app's data directory. It does not change which component an
+	 * intent resolves to. */
+	private static java.util.Properties enabledStates;
+
+	private static java.io.File enabledStatesFile() {
+		return new java.io.File(android.os.Environment.getExternalStorageDirectory(), "atl-enabled-states");
+	}
+
+	private static synchronized java.util.Properties enabledStates() {
+		if (enabledStates == null) {
+			enabledStates = new java.util.Properties();
+			try (java.io.FileInputStream in = new java.io.FileInputStream(enabledStatesFile())) {
+				enabledStates.load(in);
+			} catch (java.io.IOException e) {
+				// nothing set yet
+			}
+		}
+		return enabledStates;
+	}
+
+	private static synchronized void setEnabledState(String key, int newState) {
+		if (newState < COMPONENT_ENABLED_STATE_DEFAULT || newState > COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED)
+			throw new IllegalArgumentException("Invalid new component state: " + newState);
+		java.util.Properties states = enabledStates();
+		if (newState == COMPONENT_ENABLED_STATE_DEFAULT)
+			states.remove(key);
+		else
+			states.setProperty(key, String.valueOf(newState));
+		try (java.io.FileOutputStream out = new java.io.FileOutputStream(enabledStatesFile())) {
+			states.store(out, null);
+		} catch (java.io.IOException e) {
+			android.util.Log.w("PackageManager", "cannot keep the enabled states: " + e);
+		}
+	}
+
+	private static synchronized int getEnabledState(String key) {
+		return Integer.parseInt(enabledStates().getProperty(key, String.valueOf(COMPONENT_ENABLED_STATE_DEFAULT)));
 	}
 
 	/**

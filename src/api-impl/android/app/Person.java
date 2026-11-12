@@ -1,8 +1,10 @@
 package android.app;
 
 import android.graphics.drawable.Icon;
+import android.os.Parcel;
+import android.os.Parcelable;
 
-public class Person {
+public class Person implements Parcelable {
 
 	private CharSequence mName;
 	private Icon mIcon;
@@ -19,6 +21,50 @@ public class Person {
 		mIsBot = builder.mIsBot;
 		mIsImportant = builder.mIsImportant;
 	}
+
+	/* AOSP Person(Parcel) / writeToParcel() / CREATOR (notifications keep persons in their extras) */
+	private Person(Parcel in) {
+		mName = in.readCharSequence();
+		if (in.readInt() != 0) {
+			mIcon = Icon.CREATOR.createFromParcel(in);
+		}
+		mUri = in.readString();
+		mKey = in.readString();
+		mIsImportant = in.readBoolean();
+		mIsBot = in.readBoolean();
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeCharSequence(mName);
+		if (mIcon != null) {
+			dest.writeInt(1);
+			mIcon.writeToParcel(dest, 0);
+		} else {
+			dest.writeInt(0);
+		}
+		dest.writeString(mUri);
+		dest.writeString(mKey);
+		dest.writeBoolean(mIsImportant);
+		dest.writeBoolean(mIsBot);
+	}
+
+	public static final Creator<Person> CREATOR = new Creator<Person>() {
+		@Override
+		public Person createFromParcel(Parcel in) {
+			return new Person(in);
+		}
+
+		@Override
+		public Person[] newArray(int size) {
+			return new Person[size];
+		}
+	};
 
 	public String getUri() {
 		return mUri;

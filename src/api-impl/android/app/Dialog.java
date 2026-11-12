@@ -275,6 +275,16 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		return window.findViewById(id);
 	}
 
+	/* AOSP */
+	@SuppressWarnings("unchecked")
+	public final <T extends View> T requireViewById(int id) {
+		T view = (T)findViewById(id);
+		if (view == null) {
+			throw new IllegalArgumentException("ID does not reference a View inside this Dialog");
+		}
+		return view;
+	}
+
 	public void show() {
 		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
 		android.atl.ATLViewDump.addRoot(this);

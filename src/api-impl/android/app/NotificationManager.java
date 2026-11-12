@@ -8,7 +8,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.service.notification.StatusBarNotification;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,7 +51,7 @@ public class NotificationManager {
 
 	/* The desktop portals have no text field for a reply (RemoteInput): that button opens the app instead. */
 	static PendingIntent buttonIntent(Notification notification, Notification.Action action) {
-		return action.getRemoteInputs() == null ? action.actionIntent : notification.intent;
+		return action.getRemoteInputs() == null ? action.actionIntent : notification.contentIntent;
 	}
 
 	private static int mpris_notification_id = -1;
@@ -96,7 +95,7 @@ public class NotificationManager {
 		if (priority < 0)
 			return;
 		long builder = nativeInitBuilder();
-		for (Notification.Action action : notification.actions) {
+		for (Notification.Action action : notification.actions != null ? notification.actions : new Notification.Action[0]) {
 			int intentType = -1;
 			Intent intent = null;
 			PendingIntent pendingIntent = buttonIntent(notification, action);
@@ -108,12 +107,15 @@ public class NotificationManager {
 		}
 		int intentType = -1;
 		Intent intent = null;
-		if (notification.intent != null) {
-			intentType = notification.intent.type;
-			intent = notification.intent.intent;
+		if (notification.contentIntent != null) {
+			intentType = notification.contentIntent.type;
+			intent = notification.contentIntent.intent;
 		}
 		String iconPath = notification.iconPath == null || notification.iconPath.endsWith(".xml") ? null : notification.iconPath;
-		nativeShowNotification(builder, id, notification.title, notification.text, iconPath, notification.ongoing, priority, intentType, intent);
+		/* the desktop notification has no expanded form: the text of a style (big text, lines, latest message) */
+		CharSequence styleText = notification.style != null ? notification.style.desktopText() : null;
+		String text = styleText != null ? styleText.toString() : notification.text;
+		nativeShowNotification(builder, id, notification.title, text, iconPath, notification.ongoing, priority, intentType, intent);
 		synchronized (active) {
 			active.add(id);
 		}
@@ -177,7 +179,42 @@ public class NotificationManager {
 	protected native void nativeCancel(int id);
 	protected native void nativeCancelMPRIS();
 
-	public void createNotificationChannelGroup(NotificationChannelGroup v) {}
+	/* AOSP keeps the groups with the channels in the NotificationManagerService */
+	private static final LinkedHashMap<String, NotificationChannelGroup> groups = new LinkedHashMap<>();
+
+	public void createNotificationChannelGroup(NotificationChannelGroup group) {
+		synchronized (channels) {
+			groups.put(group.getId(), group.copyWith(new ArrayList<NotificationChannel>()));
+		}
+	}
+
+	/* AOSP: the group with the channels that belong to it */
+	public NotificationChannelGroup getNotificationChannelGroup(String channelGroupId) {
+		synchronized (channels) {
+			NotificationChannelGroup group = groups.get(channelGroupId);
+			if (group == null)
+				return null;
+			List<NotificationChannel> in = new ArrayList<>();
+			for (NotificationChannel channel : channels.values())
+				if (channelGroupId.equals(channel.getGroup()))
+					in.add(channel);
+			return group.copyWith(in);
+		}
+	}
+
+	/* AOSP: deleting a group deletes its channels */
+	public void deleteNotificationChannelGroup(String groupId) {
+		synchronized (channels) {
+			if (groups.remove(groupId) == null)
+				return;
+			channels.values().removeIf(channel -> groupId.equals(channel.getGroup()));
+		}
+	}
+
+	/* AOSP: the conversation's own channel, or its parent channel when it has none; ATL keeps no conversation channels */
+	public NotificationChannel getNotificationChannel(String channelId, String conversationId) {
+		return getNotificationChannel(channelId);
+	}
 
 	public List<NotificationChannel> getNotificationChannels() {
 		synchronized (channels) {
@@ -186,7 +223,12 @@ public class NotificationManager {
 	}
 
 	public List<NotificationChannelGroup> getNotificationChannelGroups() {
-		return Collections.emptyList();
+		synchronized (channels) {
+			List<NotificationChannelGroup> list = new ArrayList<>();
+			for (String id : groups.keySet())
+				list.add(getNotificationChannelGroup(id));
+			return list;
+		}
 	}
 
 	public boolean areNotificationsEnabled() {
@@ -199,7 +241,10 @@ public class NotificationManager {
 		}
 	}
 
-	public void createNotificationChannelGroups(List<NotificationChannelGroup> groups) {}
+	public void createNotificationChannelGroups(List<NotificationChannelGroup> groups) {
+		for (NotificationChannelGroup group : groups)
+			createNotificationChannelGroup(group);
+	}
 
 	public void createNotificationChannels(List<NotificationChannel> channels) {
 		for (NotificationChannel channel : channels)

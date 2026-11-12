@@ -7,6 +7,9 @@ import android.view.MenuItem;
 
 public interface Menu {
 
+	/* AOSP: the modifiers a shortcut can have */
+	static final int SUPPORTED_MODIFIERS_MASK = KeyEvent.META_META_ON | KeyEvent.META_CTRL_ON | KeyEvent.META_ALT_ON
+	                                            | KeyEvent.META_SHIFT_ON | KeyEvent.META_SYM_ON | KeyEvent.META_FUNCTION_ON;
 	public static final int NONE = 0;
 
 	public MenuItem add(int groupId, int itemId, int order, CharSequence title);

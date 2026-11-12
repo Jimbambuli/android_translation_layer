@@ -105,4 +105,38 @@ public interface MenuItem {
 	public MenuItem setContentDescription(CharSequence contentDescription);
 
 	public MenuItem setTooltipText(CharSequence tooltipText);
+
+	/* the API 26 defaults of AOSP's interface (an implementation that keeps the values overrides them) */
+	public default ColorStateList getIconTintList() {
+		return null;
+	}
+
+	public default PorterDuff.Mode getIconTintMode() {
+		return null;
+	}
+
+	public default MenuItem setShortcut(char numericChar, char alphaChar, int numericModifiers, int alphaModifiers) {
+		if ((alphaModifiers & Menu.SUPPORTED_MODIFIERS_MASK) == KeyEvent.META_CTRL_ON
+		    && (numericModifiers & Menu.SUPPORTED_MODIFIERS_MASK) == KeyEvent.META_CTRL_ON) {
+			return setShortcut(numericChar, alphaChar);
+		} else {
+			return this;
+		}
+	}
+
+	public default int getNumericModifiers() {
+		return KeyEvent.META_CTRL_ON;
+	}
+
+	public default int getAlphabeticModifiers() {
+		return KeyEvent.META_CTRL_ON;
+	}
+
+	public default CharSequence getContentDescription() {
+		return null;
+	}
+
+	public default CharSequence getTooltipText() {
+		return null;
+	}
 }

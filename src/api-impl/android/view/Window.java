@@ -717,6 +717,36 @@ public class Window {
 		return mFeatures;
 	}
 
+	/* AOSP */
+	@SuppressWarnings("unchecked")
+	public final <T extends View> T requireViewById(int id) {
+		T view = (T)findViewById(id);
+		if (view == null) {
+			throw new IllegalArgumentException("ID does not reference a View inside this Window");
+		}
+		return view;
+	}
+
+	/* AOSP hands the listener to the window's hardware renderer, which reports each frame; GSK reports no frame
+	 * metrics, so the listener is kept and never called (as in AOSP for a window without hardware rendering) */
+	private final java.util.ArrayList<OnFrameMetricsAvailableListener> frameMetricsListeners = new java.util.ArrayList<>();
+
+	public final void addOnFrameMetricsAvailableListener(OnFrameMetricsAvailableListener listener, android.os.Handler handler) {
+		if (getDecorView() == null) {
+			throw new IllegalStateException("can't observe a Window without an attached view");
+		}
+		if (listener == null) {
+			throw new NullPointerException("listener cannot be null");
+		}
+		frameMetricsListeners.add(listener);
+	}
+
+	public final void removeOnFrameMetricsAvailableListener(OnFrameMetricsAvailableListener listener) {
+		if (!frameMetricsListeners.remove(listener)) {
+			throw new IllegalArgumentException("attempt to remove OnFrameMetricsAvailableListener that was never added");
+		}
+	}
+
 	public View findViewById(int id) {
 		if (id == com.android.internal.R.id.action_bar)
 			return new Toolbar(context);

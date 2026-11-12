@@ -1470,6 +1470,15 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsFocused(JNIEnv *env, j
 	return gtk_widget_has_focus(widget) || gtk_widget_has_focus(wrapper);
 }
 
+/* View.clearFocus(): the window has no focus widget then (the focus-out reaches the view as for any other loss) */
+JNIEXPORT void JNICALL Java_android_view_View_nativeClearFocus(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
+	GtkRoot *root = gtk_widget_get_root(widget);
+	if (root)
+		gtk_root_set_focus(root, NULL);
+}
+
 /* the GTK focus is in the view's widget tree: the view itself, an internal GTK child or (for a
  * ViewGroup) a descendant view */
 JNIEXPORT jboolean JNICALL Java_android_view_View_nativeHasFocus(JNIEnv *env, jclass class, jlong widget_ptr)

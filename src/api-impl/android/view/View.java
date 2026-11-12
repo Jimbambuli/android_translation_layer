@@ -3481,7 +3481,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		};
 	}
 
-	public void clearFocus() {}
+	/* AOSP: a focused view gives up the focus (GTK's focus change calls onFocusChanged() and tells the parents);
+	 * outside of touch mode the root view then places the focus again (rootViewRequestFocus()) */
+	public void clearFocus() {
+		if (!isFocused())
+			return;
+		nativeClearFocus(widget);
+		if (!isInTouchMode()) {
+			getRootView().requestFocus();
+		}
+	}
+	private native void nativeClearFocus(long widget);
 
 	public static View inflate(Context context, int resource, ViewGroup root) {
 		LayoutInflater factory = LayoutInflater.from(context);
