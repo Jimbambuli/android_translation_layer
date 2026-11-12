@@ -513,6 +513,334 @@ public class Intent implements Parcelable {
 	public static final int URI_ANDROID_APP_SCHEME = 1 << 1;
 	public static final int URI_ALLOW_UNSAFE = 1 << 2;
 
+	private static final int IMMUTABLE_FLAGS = FLAG_GRANT_READ_URI_PERMISSION | FLAG_GRANT_WRITE_URI_PERMISSION
+	                                           | FLAG_GRANT_PERSISTABLE_URI_PERMISSION | FLAG_GRANT_PREFIX_URI_PERMISSION;
+
+	/* AOSP Intent.parseUri()/parseUriInternal(): the intent of a URI made by toUri() ("...#Intent;...;end",
+	 * "intent:", "android-app:"), any other URI as ACTION_VIEW of it. ATL keeps no identifier or source bounds,
+	 * so those parts are skipped. */
+	public static Intent parseUri(String uri, int flags) throws java.net.URISyntaxException {
+		int i = 0;
+		try {
+			final boolean androidApp = uri.startsWith("android-app:");
+
+			if ((flags & (URI_INTENT_SCHEME | URI_ANDROID_APP_SCHEME)) != 0) {
+				if (!uri.startsWith("intent:") && !androidApp) {
+					Intent intent = new Intent(ACTION_VIEW);
+					try {
+						intent.setData(Uri.parse(uri));
+					} catch (IllegalArgumentException e) {
+						throw new java.net.URISyntaxException(uri, e.getMessage());
+					}
+					return intent;
+				}
+			}
+
+			i = uri.lastIndexOf("#");
+			if (i == -1) {
+				if (!androidApp)
+					return new Intent(ACTION_VIEW, Uri.parse(uri));
+			} else if (!uri.startsWith("#Intent;", i)) {
+				if (!androidApp)
+					return getIntentOld(uri, flags);
+				else
+					i = -1;
+			}
+
+			Intent intent = new Intent(ACTION_VIEW);
+			Intent baseIntent = intent;
+			boolean explicitAction = false;
+			boolean inSelector = false;
+
+			String scheme = null;
+			String data;
+			if (i >= 0) {
+				data = uri.substring(0, i);
+				i += 8; // length of "#Intent;"
+			} else {
+				data = uri;
+			}
+
+			while (i >= 0 && !uri.startsWith("end", i)) {
+				int eq = uri.indexOf('=', i);
+				if (eq < 0)
+					eq = i - 1;
+				int semi = uri.indexOf(';', i);
+				String value = eq < semi ? Uri.decode(uri.substring(eq + 1, semi)) : "";
+
+				if (uri.startsWith("action=", i)) {
+					intent.setAction(value);
+					if (!inSelector)
+						explicitAction = true;
+				} else if (uri.startsWith("category=", i)) {
+					intent.addCategory(value);
+				} else if (uri.startsWith("type=", i)) {
+					intent.type = value;
+				} else if (uri.startsWith("identifier=", i)) {
+					/* not kept */
+				} else if (uri.startsWith("launchFlags=", i)) {
+					intent.flags = Integer.decode(value).intValue();
+					if ((flags & URI_ALLOW_UNSAFE) == 0)
+						intent.flags &= ~IMMUTABLE_FLAGS;
+				} else if (uri.startsWith("package=", i)) {
+					intent.packageName = value;
+				} else if (uri.startsWith("component=", i)) {
+					intent.component = ComponentName.unflattenFromString(value);
+				} else if (uri.startsWith("scheme=", i)) {
+					if (inSelector)
+						intent.data = Uri.parse(value + ":");
+					else
+						scheme = value;
+				} else if (uri.startsWith("sourceBounds=", i)) {
+					/* not kept */
+				} else if (semi == (i + 3) && uri.startsWith("SEL", i)) {
+					intent = new Intent();
+					inSelector = true;
+				} else {
+					String key = Uri.decode(uri.substring(i + 2, eq));
+					if (intent.extras == null)
+						intent.extras = new Bundle();
+					Bundle b = intent.extras;
+					if (uri.startsWith("S.", i))
+						b.putString(key, value);
+					else if (uri.startsWith("B.", i))
+						b.putBoolean(key, Boolean.parseBoolean(value));
+					else if (uri.startsWith("b.", i))
+						b.putByte(key, Byte.parseByte(value));
+					else if (uri.startsWith("c.", i))
+						b.putChar(key, value.charAt(0));
+					else if (uri.startsWith("d.", i))
+						b.putDouble(key, Double.parseDouble(value));
+					else if (uri.startsWith("f.", i))
+						b.putFloat(key, Float.parseFloat(value));
+					else if (uri.startsWith("i.", i))
+						b.putInt(key, Integer.parseInt(value));
+					else if (uri.startsWith("l.", i))
+						b.putLong(key, Long.parseLong(value));
+					else if (uri.startsWith("s.", i))
+						b.putShort(key, Short.parseShort(value));
+					else
+						throw new java.net.URISyntaxException(uri, "unknown EXTRA type", i);
+				}
+
+				i = semi + 1;
+			}
+
+			if (inSelector) {
+				if (baseIntent.packageName == null)
+					baseIntent.setSelector(intent);
+				intent = baseIntent;
+			}
+
+			if (data != null) {
+				if (data.startsWith("intent:")) {
+					data = data.substring(7);
+					if (scheme != null)
+						data = scheme + ':' + data;
+				} else if (data.startsWith("android-app:")) {
+					if (data.charAt(12) == '/' && data.charAt(13) == '/') {
+						int end = data.indexOf('/', 14);
+						if (end < 0) {
+							intent.packageName = data.substring(14);
+							if (!explicitAction)
+								intent.setAction(ACTION_MAIN);
+							data = "";
+						} else {
+							String authority = null;
+							intent.packageName = data.substring(14, end);
+							int newEnd;
+							if ((end + 1) < data.length()) {
+								if ((newEnd = data.indexOf('/', end + 1)) >= 0) {
+									scheme = data.substring(end + 1, newEnd);
+									end = newEnd;
+									if (end < data.length() && (newEnd = data.indexOf('/', end + 1)) >= 0) {
+										authority = data.substring(end + 1, newEnd);
+										end = newEnd;
+									}
+								} else {
+									scheme = data.substring(end + 1);
+								}
+							}
+							if (scheme == null) {
+								if (!explicitAction)
+									intent.setAction(ACTION_MAIN);
+								data = "";
+							} else if (authority == null) {
+								data = scheme + ":";
+							} else {
+								data = scheme + "://" + authority + data.substring(end);
+							}
+						}
+					} else {
+						data = "";
+					}
+				}
+
+				if (data.length() > 0) {
+					try {
+						intent.data = Uri.parse(data);
+					} catch (IllegalArgumentException e) {
+						throw new java.net.URISyntaxException(uri, e.getMessage());
+					}
+				}
+			}
+
+			return intent;
+		} catch (IndexOutOfBoundsException e) {
+			throw new java.net.URISyntaxException(uri, "illegal Intent URI format", i);
+		}
+	}
+
+	/* AOSP Intent.getIntentOld(): the "#action(...)categories(...)..." form of old toURI() */
+	private static Intent getIntentOld(String uri, int flags) throws java.net.URISyntaxException {
+		Intent intent;
+		int i = uri.lastIndexOf('#');
+		if (i >= 0) {
+			String action = null;
+			final int intentFragmentStart = i;
+			boolean isIntentFragment = false;
+
+			i++;
+
+			if (uri.regionMatches(i, "action(", 0, 7)) {
+				isIntentFragment = true;
+				i += 7;
+				int j = uri.indexOf(')', i);
+				action = uri.substring(i, j);
+				i = j + 1;
+			}
+
+			intent = new Intent(action);
+
+			if (uri.regionMatches(i, "categories(", 0, 11)) {
+				isIntentFragment = true;
+				i += 11;
+				int j = uri.indexOf(')', i);
+				while (i < j) {
+					int sep = uri.indexOf('!', i);
+					if (sep < 0 || sep > j)
+						sep = j;
+					if (i < sep)
+						intent.addCategory(uri.substring(i, sep));
+					i = sep + 1;
+				}
+				i = j + 1;
+			}
+
+			if (uri.regionMatches(i, "type(", 0, 5)) {
+				isIntentFragment = true;
+				i += 5;
+				int j = uri.indexOf(')', i);
+				intent.type = uri.substring(i, j);
+				i = j + 1;
+			}
+
+			if (uri.regionMatches(i, "launchFlags(", 0, 12)) {
+				isIntentFragment = true;
+				i += 12;
+				int j = uri.indexOf(')', i);
+				intent.flags = Integer.decode(uri.substring(i, j)).intValue();
+				if ((flags & URI_ALLOW_UNSAFE) == 0)
+					intent.flags &= ~IMMUTABLE_FLAGS;
+				i = j + 1;
+			}
+
+			if (uri.regionMatches(i, "component(", 0, 10)) {
+				isIntentFragment = true;
+				i += 10;
+				int j = uri.indexOf(')', i);
+				int sep = uri.indexOf('!', i);
+				if (sep >= 0 && sep < j)
+					intent.component = new ComponentName(uri.substring(i, sep), uri.substring(sep + 1, j));
+				i = j + 1;
+			}
+
+			if (uri.regionMatches(i, "extras(", 0, 7)) {
+				isIntentFragment = true;
+				i += 7;
+
+				final int closeParen = uri.indexOf(')', i);
+				if (closeParen == -1)
+					throw new java.net.URISyntaxException(uri, "EXTRA missing trailing ')'", i);
+
+				while (i < closeParen) {
+					int j = uri.indexOf('=', i);
+					if (j <= i + 1 || i >= closeParen)
+						throw new java.net.URISyntaxException(uri, "EXTRA missing '='", i);
+					char type = uri.charAt(i);
+					i++;
+					String key = uri.substring(i, j);
+					i = j + 1;
+
+					j = uri.indexOf('!', i);
+					if (j == -1 || j >= closeParen)
+						j = closeParen;
+					if (i >= j)
+						throw new java.net.URISyntaxException(uri, "EXTRA missing '!'", i);
+					String value = uri.substring(i, j);
+					i = j;
+
+					if (intent.extras == null)
+						intent.extras = new Bundle();
+
+					try {
+						switch (type) {
+							case 'S':
+								intent.extras.putString(key, Uri.decode(value));
+								break;
+							case 'B':
+								intent.extras.putBoolean(key, Boolean.parseBoolean(value));
+								break;
+							case 'b':
+								intent.extras.putByte(key, Byte.parseByte(value));
+								break;
+							case 'c':
+								intent.extras.putChar(key, Uri.decode(value).charAt(0));
+								break;
+							case 'd':
+								intent.extras.putDouble(key, Double.parseDouble(value));
+								break;
+							case 'f':
+								intent.extras.putFloat(key, Float.parseFloat(value));
+								break;
+							case 'i':
+								intent.extras.putInt(key, Integer.parseInt(value));
+								break;
+							case 'l':
+								intent.extras.putLong(key, Long.parseLong(value));
+								break;
+							case 's':
+								intent.extras.putShort(key, Short.parseShort(value));
+								break;
+							default:
+								throw new java.net.URISyntaxException(uri, "EXTRA has unknown type", i);
+						}
+					} catch (NumberFormatException e) {
+						throw new java.net.URISyntaxException(uri, "EXTRA value can't be parsed", i);
+					}
+
+					char ch = uri.charAt(i);
+					if (ch == ')')
+						break;
+					if (ch != '!')
+						throw new java.net.URISyntaxException(uri, "EXTRA missing '!'", i);
+					i++;
+				}
+			}
+
+			if (isIntentFragment)
+				intent.data = Uri.parse(uri.substring(0, intentFragmentStart));
+			else
+				intent.data = Uri.parse(uri);
+
+			if (intent.action == null)
+				intent.action = ACTION_VIEW;
+		} else {
+			intent = new Intent(ACTION_VIEW, Uri.parse(uri));
+		}
+		return intent;
+	}
+
 	/** @deprecated AOSP Intent.toURI() */
 	public String toURI() {
 		return toUri(0);
