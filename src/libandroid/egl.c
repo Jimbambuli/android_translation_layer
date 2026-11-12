@@ -139,6 +139,17 @@ EGLDisplay bionic_eglGetDisplay(EGLNativeDisplayType native_display)
 	}
 }
 
+/* The display apps get is GTK's own (see above). On Android, eglTerminate() of a display only ends it when
+ * every eglInitialize() is matched (egl_display_t::terminate() counts them). Here an app that terminates it
+ * would take GTK's contexts with it, and the window would not be drawn any more (Firefox does that at its
+ * first start). GTK keeps the display until the end, so it stays initialized. */
+EGLBoolean bionic_eglTerminate(EGLDisplay display)
+{
+	if (display == bionic_eglGetDisplay(EGL_DEFAULT_DISPLAY))
+		return EGL_TRUE;
+	return eglTerminate(display);
+}
+
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
 	GdkDisplay *gdk_display = gtk_root_get_display(GTK_ROOT(window));
