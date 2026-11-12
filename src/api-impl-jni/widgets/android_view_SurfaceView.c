@@ -109,6 +109,17 @@ void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, Gdk
 	surface_view_widget->texture = texture;
 	surface_view_widget->needs_flip = needs_flip;
 	gtk_widget_queue_draw(GTK_WIDGET(surface_view_widget));
+	/* A parent drawn from Java (Compose's AndroidViewHolder) keeps what it recorded of this widget until
+	 * the view tree tells it otherwise; on Android the surface is composited on its own instead */
+	GtkWidget *wrapper = gtk_widget_get_parent(gtk_widget_get_parent(GTK_WIDGET(surface_view_widget))); // dummy -> graphics offload -> wrapper
+	if (WRAPPER_IS_WIDGET(wrapper)) {
+		JNIEnv *env = get_jni_env();
+		jobject view = (*env)->NewLocalRef(env, WRAPPER_WIDGET(wrapper)->jobj);
+		if (view) {
+			J__View__propagateInvalidation(env, view);
+			(*env)->DeleteLocalRef(env, view);
+		}
+	}
 }
 
 // ---
