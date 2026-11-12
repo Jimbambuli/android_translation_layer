@@ -898,3 +898,17 @@ const char *atl_gtk_text(const char *msgid)
 	uselocale(previous);
 	return text;
 }
+
+/* a string of framework-res (com.android.internal.R.string.<name>) in the context's language, to be freed */
+char *atl_framework_string(JNIEnv *env, jobject context, const char *name)
+{
+	jclass r_string = (*env)->FindClass(env, "com/android/internal/R$string");
+	jint id = (*env)->GetStaticIntField(env, r_string, _STATIC_FIELD_ID(r_string, name, "I"));
+	jstring text = (*env)->CallObjectMethod(env, context, _METHOD(_CLASS(context), "getString", "(I)Ljava/lang/String;"), id);
+	const char *utf = _CSTRING(text);
+	char *result = g_strdup(utf);
+	(*env)->ReleaseStringUTFChars(env, text, utf);
+	(*env)->DeleteLocalRef(env, text);
+	(*env)->DeleteLocalRef(env, r_string);
+	return result;
+}

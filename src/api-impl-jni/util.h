@@ -53,6 +53,7 @@ int get_nio_buffer_size(JNIEnv *env, jobject buffer);
 
 void atl_remember_user_locale(void);
 const char *atl_gtk_text(const char *msgid);
+char *atl_framework_string(JNIEnv *env, jobject context, const char *name);
 
 void atl_ensure_widget_snapshotability(GtkWidget *widget);
 void atl_safe_gtk_label_set_text(GtkLabel *label, const char *str);
