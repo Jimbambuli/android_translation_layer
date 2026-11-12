@@ -597,8 +597,14 @@ public class BitmapFactory {
 		/* the 9-patch chunk of a PNG goes with the Bitmap, as AOSP's decoder does (getNinePatchChunk()) */
 		final byte[][] ninePatchChunk = new byte[1][];
 		final long texture = nativeDecodeStream(is, tempStorage, outPadding, opts, ninePatchChunk);
-		if (texture == 0)
+		if (texture == 0) {
+			/* AOSP: outWidth and outHeight are -1 after a failed decode */
+			if (opts != null) {
+				opts.outWidth = -1;
+				opts.outHeight = -1;
+			}
 			return null;
+		}
 		Bitmap decoded = new Bitmap(texture);
 		decoded.setNinePatchChunk(ninePatchChunk[0]);
 		if (opts != null) {

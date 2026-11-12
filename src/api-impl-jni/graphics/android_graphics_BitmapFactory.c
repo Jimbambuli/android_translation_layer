@@ -157,10 +157,19 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 
 	GInputStream *memory_stream = g_memory_input_stream_new_from_bytes(bytes);
 	g_bytes_unref(bytes);
-	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_stream(memory_stream, NULL, NULL);
+	GError *error = NULL;
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_stream(memory_stream, NULL, &error);
 	g_object_unref(memory_stream);
 
-	if (pixbuf && sample > 1) {
+	/* like AOSP's decoder (nullObjectReturn() in BitmapFactory.cpp): data that cannot be decoded
+	 * logs a line and gives no bitmap, so decodeStream() returns null */
+	if (!pixbuf) {
+		fprintf(stderr, "--- BitmapFactory: failed to decode image: %s\n", error ? error->message : "unknown error");
+		g_clear_error(&error);
+		return 0;
+	}
+
+	if (sample > 1) {
 		int factor = 1;
 		while (factor * 2 <= sample) // round down to the nearest power of two, as AOSP's decoder does
 			factor *= 2;
