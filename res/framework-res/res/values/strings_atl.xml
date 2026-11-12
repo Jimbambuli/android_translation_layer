@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Texts that ATL shows in place of other AOSP components than framework-res -->
+<resources>
+    <!-- PermissionController (packages/modules/Permission): the label of the background location option -->
+    <string name="app_permission_button_allow_always">Allow all the time</string>
+</resources>
