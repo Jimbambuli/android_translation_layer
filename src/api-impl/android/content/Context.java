@@ -888,6 +888,10 @@ public abstract class Context {
 
 	public void unbindService(ServiceConnection serviceConnection) {}
 
+	/* AOSP Context.updateServiceGroup() (API 29) groups the processes of bound services for the low memory
+	 * killer; ATL has no process importance, so nothing changes */
+	public void updateServiceGroup(ServiceConnection conn, int group, int importance) {}
+
 	public void unregisterReceiver(BroadcastReceiver receiver) {
 		while (receiverMap.values().remove(receiver))
 			;
