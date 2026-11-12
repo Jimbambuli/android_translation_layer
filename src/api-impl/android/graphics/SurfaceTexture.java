@@ -3,12 +3,11 @@ package android.graphics;
 import android.os.Handler;
 import android.os.Looper;
 
-/* AOSP android.graphics.SurfaceTexture. The producers here (MediaPlayer, Surface.lockCanvas() of a
+/* AOSP android.graphics.SurfaceTexture. The producers here (MediaPlayer, MediaCodec, Surface.lockCanvas() of a
  * Surface(SurfaceTexture)) queue frames as textures; onFrameAvailable() follows on the listener's handler,
- * as in AOSP. The consumer that shows them is TextureView (it latches the newest frame and draws it).
- * A GL consumer gets no images: updateTexImage() cannot put a texture into an external GL texture here, so
- * as in AOSP with an empty queue it only binds the texture; getTimestamp() is the time of the frame a
- * TextureView latched last. */
+ * as in AOSP. A consumer latches the newest frame: TextureView draws it, updateTexImage() of a GL consumer
+ * puts it into the external GL texture (through an EGLImage of a GL_TEXTURE_2D the pixels are uploaded to).
+ * getTimestamp() is the time of the frame latched last. */
 public class SurfaceTexture {
 
 	public static interface OnFrameAvailableListener {
@@ -19,6 +18,9 @@ public class SurfaceTexture {
 	/* GLConsumer's mEglDisplay/mEglContext: the EGL context of the first updateTexImage() */
 	private long eglDisplay;
 	private long eglContext;
+	/* the GL objects of updateTexImage() (native), and whether it has put a frame into the texture */
+	private long glImage;
+	private boolean glHasFrame;
 	private volatile long timestamp;
 	private volatile boolean released;
 	private volatile OnFrameAvailableListener listener;
@@ -123,8 +125,23 @@ public class SurfaceTexture {
 	public void updateTexImage() {
 		if (released)
 			throw new RuntimeException("Error during updateTexImage (see logcat for details)"); // NO_INIT: abandoned
-		if (!nativeUpdateTexImage(texName))
-			throw new IllegalStateException("Unable to update texture contents (see logcat for details)");
+		synchronized (this) {
+			boolean newFrame = latchFrame();
+			if (!nativeUpdateTexImage(texName, newFrame ? latched.getTexture() : 0))
+				throw new IllegalStateException("Unable to update texture contents (see logcat for details)");
+			glHasFrame |= newFrame;
+		}
+	}
+
+	/* AOSP GLConsumer: identity before the first frame; then the buffers here are uncropped and their first row is
+	 * the top of the image, as AOSP's, so the matrix flips the texture coordinates vertically */
+	public void getTransformMatrix(float[] mtx) {
+		if (mtx.length != 16)
+			throw new IllegalArgumentException();
+		java.util.Arrays.fill(mtx, 0);
+		mtx[0] = mtx[10] = mtx[15] = 1;
+		mtx[5] = glHasFrame ? -1 : 1;
+		mtx[13] = glHasFrame ? 1 : 0;
 	}
 
 	/* the presentation time of the latched frame in nanoseconds (no frame: 0) */
@@ -135,6 +152,7 @@ public class SurfaceTexture {
 	public void release() {
 		synchronized (this) {
 			released = true;
+			nativeRelease();
 			if (queued != null)
 				queued.recycle();
 			if (latched != null)
@@ -148,5 +166,6 @@ public class SurfaceTexture {
 		return released;
 	}
 
-	private native boolean nativeUpdateTexImage(int texName);
+	private native boolean nativeUpdateTexImage(int texName, long texture);
+	private native void nativeRelease();
 }
