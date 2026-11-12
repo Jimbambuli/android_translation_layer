@@ -151,7 +151,18 @@ public final class ContextImpl extends Context {
 		if (targetApp == null) {
 			return false;
 		}
+		String processName = otherServiceProcess(targetApp, intent);
+		if (processName != null)
+			return ATLProcess.stopService(intent, processName);
 		return targetApp.stopService(intent);
+	}
+
+	/* the process of the app a service with its own android:process runs in, null if it runs in this one */
+	private static String otherServiceProcess(ATLLoadedApp targetApp, Intent intent) {
+		if (targetApp != ATLLoadedApp.getPrimaryApplication() || intent.getComponent() == null)
+			return null;
+		String processName = targetApp.serviceProcessName(intent.getComponent().getClassName());
+		return processName != null && !processName.equals(ATLProcess.myProcessName()) ? processName : null;
 	}
 
 	@Override
@@ -212,6 +223,9 @@ public final class ContextImpl extends Context {
 				nativeStartExternalService(intent);
 			return null;
 		}
+		String processName = otherServiceProcess(targetApp, intent);
+		if (processName != null)
+			return ATLProcess.startService(intent, processName);
 		return targetApp.startOrBindService(intent, null);
 	}
 
@@ -254,12 +268,9 @@ public final class ContextImpl extends Context {
 		if (targetApp == null) {
 			return false;
 		}
-		/* a service with its own android:process runs in that process of the app */
-		if (targetApp == ATLLoadedApp.getPrimaryApplication() && intent.getComponent() != null) {
-			String processName = targetApp.serviceProcessName(intent.getComponent().getClassName());
-			if (processName != null && !processName.equals(ATLProcess.myProcessName()))
-				return ATLProcess.bindService(intent, serviceConnection, processName);
-		}
+		String processName = otherServiceProcess(targetApp, intent);
+		if (processName != null)
+			return ATLProcess.bindService(intent, serviceConnection, processName);
 		if (targetApp.startOrBindService(intent, serviceConnection, flags) == null)
 			return false;
 		synchronized (bound_services) {

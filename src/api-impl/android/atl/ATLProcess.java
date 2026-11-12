@@ -37,6 +37,10 @@ public final class ATLProcess {
 	/* AppThread transactions */
 	private static final int BIND_SERVICE = IBinder.FIRST_CALL_TRANSACTION;
 	private static final int UNBIND_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 1;
+	private static final int START_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 2;
+	private static final int STOP_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 3;
+	/* to the main process: this process has no components left and would end */
+	private static final int MAY_EXIT = IBinder.FIRST_CALL_TRANSACTION;
 
 	/** whether this is a process the main process started, not the main process */
 	public static boolean isSecondary() {
@@ -64,6 +68,8 @@ public final class ATLProcess {
 		final HashMap<ServiceConnection, Intent> bindings = new HashMap<>();
 		/* the binder each bound service returned (onBind runs once per service, like AOSP per intent) */
 		final HashMap<String, IBinder> service_binders = new HashMap<>();
+		/* calls queued for the worker; while there are any, the process must not end */
+		int pending;
 
 		ProcessRecord(String name) {
 			this.name = name;
@@ -116,15 +122,10 @@ public final class ATLProcess {
 		}
 		final ProcessRecord r;
 		synchronized (processes) {
-			ProcessRecord existing = processes.get(processName);
-			if (existing == null) {
-				existing = new ProcessRecord(processName);
-				processes.put(processName, existing);
-			}
-			r = existing;
+			r = getProcessRecord(processName);
 			r.bindings.put(conn, intent);
 		}
-		r.worker.execute(new Runnable() {
+		submit(r, new Runnable() {
 			@Override
 			public void run() {
 				final ComponentName component = intent.getComponent();
@@ -148,6 +149,87 @@ public final class ATLProcess {
 							conn.onNullBinding(component);
 					}
 				});
+			}
+		});
+		return true;
+	}
+
+	/* the record of a process of the app, a new one (the process starts with its first call) if it does not run */
+	private static ProcessRecord getProcessRecord(String processName) {
+		ProcessRecord r = processes.get(processName);
+		if (r == null) {
+			r = new ProcessRecord(processName);
+			processes.put(processName, r);
+		}
+		return r;
+	}
+
+	/* runs a call to the process on its worker; the process stays while calls are pending (see MAY_EXIT) */
+	private static void submit(final ProcessRecord r, final Runnable call) {
+		synchronized (processes) {
+			r.pending++;
+		}
+		r.worker.execute(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					call.run();
+				} finally {
+					synchronized (processes) {
+						r.pending--;
+					}
+				}
+			}
+		});
+	}
+
+	/** ActiveServices.startServiceLocked() for a service in another process of the app */
+	public static ComponentName startService(final Intent intent, String processName) {
+		if (isSecondary()) {
+			Slog.w(TAG, "startService: " + intent.getComponent() + " runs in process " + processName + ", not supported from process " + process_name);
+			return null;
+		}
+		final ProcessRecord r;
+		synchronized (processes) {
+			r = getProcessRecord(processName);
+		}
+		submit(r, new Runnable() {
+			@Override
+			public void run() {
+				try {
+					if (r.connection == null)
+						startProcess(r);
+					Parcel data = Parcel.obtain();
+					intent.writeToParcel(data, 0);
+					r.appThread.transact(START_SERVICE, data, Parcel.obtain(), 0);
+				} catch (RemoteException e) {
+					Slog.w(TAG, "startService: " + intent.getComponent() + " in process " + r.name + " failed: " + e);
+				}
+			}
+		});
+		return intent.getComponent();
+	}
+
+	/** stopService() of a service in another process of the app: false if that process does not run */
+	public static boolean stopService(final Intent intent, String processName) {
+		final ProcessRecord r;
+		synchronized (processes) {
+			r = processes.get(processName);
+		}
+		if (r == null)
+			return false;
+		submit(r, new Runnable() {
+			@Override
+			public void run() {
+				if (r.appThread == null)
+					return;
+				Parcel data = Parcel.obtain();
+				intent.writeToParcel(data, 0);
+				try {
+					r.appThread.transact(STOP_SERVICE, data, Parcel.obtain(), 0);
+				} catch (RemoteException e) {
+					Slog.w(TAG, "stopService: " + intent.getComponent() + ": " + e);
+				}
 			}
 		});
 		return true;
@@ -183,7 +265,7 @@ public final class ATLProcess {
 			throw new RemoteException("cannot start process " + r.name + ": errno " + (-pid));
 		}
 		Slog.i(TAG, "Start proc " + pid + ":" + r.name);
-		r.connection = new ATLBinderConnection(sv[0], pid, null, r);
+		r.connection = new ATLBinderConnection(sv[0], pid, new MainThread(r), r);
 		r.appThread = r.connection.getContextObject();
 	}
 
@@ -220,12 +302,9 @@ public final class ATLProcess {
 			last = !others;
 			if (last)
 				r.service_binders.remove(className);
-			/* the process ends by itself once its last service is gone; a new binding starts a new one */
-			if (r.bindings.isEmpty())
-				processes.remove(r.name);
 		}
 		if (last) {
-			r.worker.execute(new Runnable() {
+			submit(r, new Runnable() {
 				@Override
 				public void run() {
 					if (r.appThread == null)
@@ -241,6 +320,32 @@ public final class ATLProcess {
 			});
 		}
 		return true;
+	}
+
+	/* the context object of the main process for one of the other processes */
+	private static final class MainThread extends Binder {
+		private final ProcessRecord r;
+
+		MainThread(ProcessRecord r) {
+			this.r = r;
+		}
+
+		@Override
+		protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
+			if (code == MAY_EXIT) {
+				/* the process has no components left: it ends unless calls to it are on the way; a later
+				 * call starts a new process */
+				boolean exit;
+				synchronized (processes) {
+					exit = r.pending == 0 && r.bindings.isEmpty();
+					if (exit && processes.get(r.name) == r)
+						processes.remove(r.name);
+				}
+				reply.writeInt(exit ? 1 : 0);
+				return true;
+			}
+			return super.onTransact(code, data, reply, flags);
+		}
 	}
 
 	/* ---------------------------------------------------------------- secondary process */
@@ -270,6 +375,12 @@ public final class ATLProcess {
 						ATLLoadedApp.getPrimaryApplication().unbindService(conn);
 					return true;
 				}
+				case START_SERVICE:
+					ATLLoadedApp.getPrimaryApplication().startOrBindService(Intent.CREATOR.createFromParcel(data), null);
+					return true;
+				case STOP_SERVICE:
+					ATLLoadedApp.getPrimaryApplication().stopService(Intent.CREATOR.createFromParcel(data));
+					return true;
 			}
 			return super.onTransact(code, data, reply, flags);
 		}
@@ -308,6 +419,23 @@ public final class ATLProcess {
 	public static void onServicesGone() {
 		if (!isSecondary())
 			return;
+		Parcel reply = Parcel.obtain();
+		try {
+			main_connection.getContextObject().transact(MAY_EXIT, Parcel.obtain(), reply, 0);
+		} catch (RemoteException e) {
+			return; // the main process is gone, this one ends with the connection
+		}
+		if (reply.readInt() == 0) {
+			/* calls from the main process are on the way: ask again once they are done */
+			new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+				@Override
+				public void run() {
+					if (!ATLLoadedApp.getPrimaryApplication().hasRunningServices())
+						onServicesGone();
+				}
+			}, 1000);
+			return;
+		}
 		Slog.i(TAG, "process " + process_name + " has no services left, exiting");
 		Runtime.getRuntime().halt(0);
 	}

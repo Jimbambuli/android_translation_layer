@@ -333,6 +333,12 @@ public final class ATLLoadedApp {
 		}
 	}
 
+	public boolean hasRunningServices() {
+		synchronized (running_services) {
+			return !running_services.isEmpty();
+		}
+	}
+
 	/* the process a service of the app runs in (android:process); null if the app has no such service */
 	public String serviceProcessName(String className) {
 		for (PackageParser.Service s : pkg.services) {
