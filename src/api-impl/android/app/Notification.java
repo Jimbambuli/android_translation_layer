@@ -1,6 +1,7 @@
 package android.app;
 
 import android.content.Context;
+import android.content.LocusId;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Icon;
 import android.media.AudioAttributes;
@@ -12,6 +13,7 @@ import android.os.Parcelable;
 import android.text.TextUtils;
 import android.widget.RemoteViews;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Notification implements Parcelable {
@@ -71,14 +73,15 @@ public class Notification implements Parcelable {
 
 	String text;
 	String title;
-	List<Action> actions = new ArrayList<Action>();
-	PendingIntent intent;
+	/* AOSP: null without actions */
+	public Action[] actions;
+	public PendingIntent contentIntent;
 	String iconPath;
 	boolean ongoing;
 	Style style;
 
 	public String toString() {
-		return "Notification [" + title + ", " + text + ", " + actions + "]";
+		return "Notification [" + title + ", " + text + ", " + Arrays.toString(actions) + "]";
 	}
 
 	public static final int DEFAULT_ALL = ~0;
@@ -110,6 +113,35 @@ public class Notification implements Parcelable {
 	public static final int BADGE_ICON_SMALL = 1;
 	public static final int BADGE_ICON_LARGE = 2;
 
+	public static final String EXTRA_TITLE = "android.title";
+	public static final String EXTRA_TITLE_BIG = EXTRA_TITLE + ".big";
+	public static final String EXTRA_TEXT = "android.text";
+	public static final String EXTRA_SUMMARY_TEXT = "android.summaryText";
+	public static final String EXTRA_BIG_TEXT = "android.bigText";
+	public static final String EXTRA_LARGE_ICON_BIG = "android.largeIcon.big";
+	public static final String EXTRA_PICTURE = "android.picture";
+	public static final String EXTRA_PICTURE_ICON = "android.pictureIcon";
+	public static final String EXTRA_PICTURE_CONTENT_DESCRIPTION = "android.pictureContentDescription";
+	public static final String EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED = "android.showBigPictureWhenCollapsed";
+	public static final String EXTRA_TEXT_LINES = "android.textLines";
+	public static final String EXTRA_TEMPLATE = "android.template";
+	public static final String EXTRA_PEOPLE_LIST = "android.people.list";
+	public static final String EXTRA_SELF_DISPLAY_NAME = "android.selfDisplayName";
+	public static final String EXTRA_MESSAGING_PERSON = "android.messagingUser";
+	public static final String EXTRA_CONVERSATION_TITLE = "android.conversationTitle";
+	public static final String EXTRA_MESSAGES = "android.messages";
+	public static final String EXTRA_HISTORIC_MESSAGES = "android.messages.historic";
+	public static final String EXTRA_IS_GROUP_CONVERSATION = "android.isGroupConversation";
+	public static final String EXTRA_CALL_TYPE = "android.callType";
+	public static final String EXTRA_CALL_IS_VIDEO = "android.callIsVideo";
+	public static final String EXTRA_CALL_PERSON = "android.callPerson";
+	public static final String EXTRA_VERIFICATION_ICON = "android.verificationIcon";
+	public static final String EXTRA_VERIFICATION_TEXT = "android.verificationText";
+	public static final String EXTRA_ANSWER_INTENT = "android.answerIntent";
+	public static final String EXTRA_DECLINE_INTENT = "android.declineIntent";
+	public static final String EXTRA_HANG_UP_INTENT = "android.hangUpIntent";
+	public static final String EXTRA_ANSWER_COLOR = "android.answerColor";
+	public static final String EXTRA_DECLINE_COLOR = "android.declineColor";
 	public static final String EXTRA_INFO_TEXT = "android.infoText";
 	public static final String EXTRA_SUB_TEXT = "android.subText";
 
@@ -145,6 +177,11 @@ public class Notification implements Parcelable {
 	private BubbleMetadata mBubbleMetadata;
 	private boolean mAllowSystemGeneratedContextualActions = true;
 	private int mForegroundServiceBehavior;
+	private LocusId mLocusId;
+
+	public LocusId getLocusId() {
+		return mLocusId;
+	}
 
 	public String getGroup() { return mGroupKey; }
 
@@ -186,6 +223,8 @@ public class Notification implements Parcelable {
 		/* AOSP's mUserExtras and the extras the setters make, which build() puts together */
 		private Bundle mUserExtras = new Bundle();
 		private Bundle mExtras = new Bundle();
+		private final ArrayList<Action> mActions = new ArrayList<>();
+		private final ArrayList<Person> mPersonList = new ArrayList<>();
 
 		public Builder(Context context) {
 			mContext = context;
@@ -282,11 +321,13 @@ public class Notification implements Parcelable {
 
 		public Builder setContentTitle(CharSequence title) {
 			notification.title = title != null ? title.toString() : null;
+			mExtras.putCharSequence(EXTRA_TITLE, title);
 			return this;
 		}
 
 		public Builder setContentText(CharSequence text) {
 			notification.text = text != null ? text.toString() : null;
+			mExtras.putCharSequence(EXTRA_TEXT, text);
 			return this;
 		}
 
@@ -296,7 +337,7 @@ public class Notification implements Parcelable {
 		}
 
 		public Builder setContentIntent(PendingIntent intent) {
-			notification.intent = intent;
+			notification.contentIntent = intent;
 			return this;
 		}
 
@@ -406,12 +447,20 @@ public class Notification implements Parcelable {
 		}
 
 		public Builder addAction(Action action) {
-			notification.actions.add(action);
+			if (action != null) {
+				mActions.add(action);
+			}
 			return this;
 		}
 
+		/* AOSP: the style is bound to this builder, it adds its extras in build() */
 		public Builder setStyle(Style style) {
-			notification.style = style;
+			if (notification.style != style) {
+				notification.style = style;
+				if (style != null) {
+					style.setBuilder(this);
+				}
+			}
 			if (style instanceof MediaStyle) {
 				notification.ongoing = true;
 			}
@@ -537,6 +586,17 @@ public class Notification implements Parcelable {
 			return this;
 		}
 
+		/* AOSP: the persons go to the extras as EXTRA_PEOPLE_LIST */
+		public Builder addPerson(Person person) {
+			mPersonList.add(person);
+			return this;
+		}
+
+		public Builder setLocusId(LocusId locusId) {
+			notification.mLocusId = locusId;
+			return this;
+		}
+
 		public Builder setAllowSystemGeneratedContextualActions(boolean allowed) {
 			notification.mAllowSystemGeneratedContextualActions = allowed;
 			return this;
@@ -559,7 +619,14 @@ public class Notification implements Parcelable {
 			if (mUserExtras != null) {
 				extras.putAll(mUserExtras);
 			}
+			if (!mPersonList.isEmpty()) {
+				extras.putParcelableArrayList(EXTRA_PEOPLE_LIST, new ArrayList<>(mPersonList));
+			}
+			if (notification.style != null) {
+				notification.style.addExtras(extras);
+			}
 			notification.extras = extras;
+			notification.actions = mActions.isEmpty() ? null : mActions.toArray(new Action[0]);
 			if ((notification.defaults & DEFAULT_LIGHTS) != 0) {
 				notification.flags |= FLAG_SHOW_LIGHTS;
 			}
@@ -889,7 +956,58 @@ public class Notification implements Parcelable {
 		}
 	}
 
-	public static abstract class Style {}
+	/* AOSP Notification.Style: what the styles put into the extras of the notification; the desktop notification
+	 * has no expanded form, it shows the text of the style (desktopText()) instead of the content text */
+	public static abstract class Style {
+		private CharSequence mBigContentTitle;
+		CharSequence mSummaryText = null;
+		boolean mSummaryTextPresent = false;
+		protected Builder mBuilder;
+
+		protected void internalSetBigContentTitle(CharSequence title) {
+			mBigContentTitle = title;
+		}
+
+		protected void internalSetSummaryText(CharSequence cs) {
+			mSummaryText = cs;
+			mSummaryTextPresent = true;
+		}
+
+		public void setBuilder(Builder builder) {
+			if (mBuilder != builder) {
+				mBuilder = builder;
+				if (mBuilder != null) {
+					mBuilder.setStyle(this);
+				}
+			}
+		}
+
+		protected void checkBuilder() {
+			if (mBuilder == null) {
+				throw new IllegalArgumentException("Style requires a valid Builder object");
+			}
+		}
+
+		public Notification build() {
+			checkBuilder();
+			return mBuilder.build();
+		}
+
+		public void addExtras(Bundle extras) {
+			if (mSummaryTextPresent) {
+				extras.putCharSequence(EXTRA_SUMMARY_TEXT, mSummaryText);
+			}
+			if (mBigContentTitle != null) {
+				extras.putCharSequence(EXTRA_TITLE_BIG, mBigContentTitle);
+			}
+			extras.putString(EXTRA_TEMPLATE, this.getClass().getName());
+		}
+
+		/* ATL: the body of the desktop notification, null for the content text */
+		CharSequence desktopText() {
+			return null;
+		}
+	}
 
 	public static class MediaStyle extends Style {
 
@@ -899,25 +1017,461 @@ public class Notification implements Parcelable {
 	}
 
 	public static class BigTextStyle extends Style {
+		private CharSequence mBigText;
 
-		public BigTextStyle(Notification.Builder builder) {}
+		public BigTextStyle() {}
 
-		public BigTextStyle setBigContentTitle(CharSequence title) { return this; }
+		public BigTextStyle(Builder builder) {
+			setBuilder(builder);
+		}
 
-		public BigTextStyle bigText(CharSequence text) { return this; }
+		public BigTextStyle setBigContentTitle(CharSequence title) {
+			internalSetBigContentTitle(title);
+			return this;
+		}
 
-		public BigTextStyle setSummaryText(CharSequence summaryText) { return this; }
+		public BigTextStyle setSummaryText(CharSequence cs) {
+			internalSetSummaryText(cs);
+			return this;
+		}
+
+		public BigTextStyle bigText(CharSequence cs) {
+			mBigText = cs;
+			return this;
+		}
+
+		public CharSequence getBigText() {
+			return mBigText;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			extras.putCharSequence(EXTRA_BIG_TEXT, mBigText);
+		}
+
+		@Override
+		CharSequence desktopText() {
+			return mBigText;
+		}
 	}
 
 	public static class InboxStyle extends Style {
+		private ArrayList<CharSequence> mTexts = new ArrayList<>(5);
 
-		public InboxStyle(Notification.Builder builder) {}
+		public InboxStyle() {}
 
-		public InboxStyle setBigContentTitle(CharSequence title) { return this; }
+		public InboxStyle(Builder builder) {
+			setBuilder(builder);
+		}
 
-		public InboxStyle setSummaryText(CharSequence summaryText) { return this; }
+		public InboxStyle setBigContentTitle(CharSequence title) {
+			internalSetBigContentTitle(title);
+			return this;
+		}
 
-		public InboxStyle addLine(CharSequence line) { return this; }
+		public InboxStyle setSummaryText(CharSequence cs) {
+			internalSetSummaryText(cs);
+			return this;
+		}
+
+		public InboxStyle addLine(CharSequence cs) {
+			mTexts.add(cs);
+			return this;
+		}
+
+		public ArrayList<CharSequence> getLines() {
+			return mTexts;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			extras.putCharSequenceArray(EXTRA_TEXT_LINES, mTexts.toArray(new CharSequence[0]));
+		}
+
+		/* the lines one below the other, as the expanded notification lists them */
+		@Override
+		CharSequence desktopText() {
+			return mTexts.isEmpty() ? null : TextUtils.join("\n", mTexts);
+		}
+	}
+
+	public static class BigPictureStyle extends Style {
+		private Icon mPictureIcon;
+		private Icon mBigLargeIcon;
+		private boolean mBigLargeIconSet = false;
+		private CharSequence mPictureContentDescription;
+		private boolean mShowBigPictureWhenCollapsed;
+
+		public BigPictureStyle() {}
+
+		public BigPictureStyle(Builder builder) {
+			setBuilder(builder);
+		}
+
+		public BigPictureStyle setBigContentTitle(CharSequence title) {
+			internalSetBigContentTitle(title);
+			return this;
+		}
+
+		public BigPictureStyle setSummaryText(CharSequence cs) {
+			internalSetSummaryText(cs);
+			return this;
+		}
+
+		public BigPictureStyle setContentDescription(CharSequence contentDescription) {
+			mPictureContentDescription = contentDescription;
+			return this;
+		}
+
+		public Icon getBigPicture() {
+			return mPictureIcon;
+		}
+
+		public BigPictureStyle bigPicture(Bitmap b) {
+			mPictureIcon = b == null ? null : Icon.createWithBitmap(b);
+			return this;
+		}
+
+		public BigPictureStyle bigPicture(Icon icon) {
+			mPictureIcon = icon;
+			return this;
+		}
+
+		public BigPictureStyle showBigPictureWhenCollapsed(boolean show) {
+			mShowBigPictureWhenCollapsed = show;
+			return this;
+		}
+
+		public BigPictureStyle bigLargeIcon(Bitmap b) {
+			return bigLargeIcon(b != null ? Icon.createWithBitmap(b) : null);
+		}
+
+		public BigPictureStyle bigLargeIcon(Icon icon) {
+			mBigLargeIconSet = true;
+			mBigLargeIcon = icon;
+			return this;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			if (mBigLargeIconSet) {
+				extras.putParcelable(EXTRA_LARGE_ICON_BIG, mBigLargeIcon);
+			}
+			if (mPictureContentDescription != null) {
+				extras.putCharSequence(EXTRA_PICTURE_CONTENT_DESCRIPTION, mPictureContentDescription);
+			}
+			extras.putBoolean(EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED, mShowBigPictureWhenCollapsed);
+			if (mPictureIcon == null) {
+				extras.remove(EXTRA_PICTURE_ICON);
+				extras.remove(EXTRA_PICTURE);
+			} else if (mPictureIcon.getType() == Icon.TYPE_BITMAP) {
+				extras.putParcelable(EXTRA_PICTURE, mPictureIcon.getBitmap());
+				extras.remove(EXTRA_PICTURE_ICON);
+			} else {
+				extras.putParcelable(EXTRA_PICTURE_ICON, mPictureIcon);
+				extras.remove(EXTRA_PICTURE);
+			}
+		}
+	}
+
+	/* AOSP MessagingStyle; the desktop notification shows the latest message (in a group with its sender) */
+	public static class MessagingStyle extends Style {
+		public static final int MAXIMUM_RETAINED_MESSAGES = 25;
+
+		private Person mUser;
+		private CharSequence mConversationTitle;
+		private List<Message> mMessages = new ArrayList<>();
+		private List<Message> mHistoricMessages = new ArrayList<>();
+		private boolean mIsGroupConversation;
+
+		public MessagingStyle(CharSequence userDisplayName) {
+			this(new Person.Builder().setName(userDisplayName).build());
+		}
+
+		public MessagingStyle(Person user) {
+			mUser = user;
+		}
+
+		public CharSequence getUserDisplayName() {
+			return mUser.getName();
+		}
+
+		public Person getUser() {
+			return mUser;
+		}
+
+		public MessagingStyle setConversationTitle(CharSequence conversationTitle) {
+			mConversationTitle = conversationTitle;
+			return this;
+		}
+
+		public CharSequence getConversationTitle() {
+			return mConversationTitle;
+		}
+
+		public MessagingStyle addMessage(CharSequence text, long timestamp, CharSequence sender) {
+			return addMessage(text, timestamp, sender == null ? null : new Person.Builder().setName(sender).build());
+		}
+
+		public MessagingStyle addMessage(CharSequence text, long timestamp, Person sender) {
+			return addMessage(new Message(text, timestamp, sender));
+		}
+
+		public MessagingStyle addMessage(Message message) {
+			mMessages.add(message);
+			if (mMessages.size() > MAXIMUM_RETAINED_MESSAGES) {
+				mMessages.remove(0);
+			}
+			return this;
+		}
+
+		public MessagingStyle addHistoricMessage(Message message) {
+			mHistoricMessages.add(message);
+			if (mHistoricMessages.size() > MAXIMUM_RETAINED_MESSAGES) {
+				mHistoricMessages.remove(0);
+			}
+			return this;
+		}
+
+		public List<Message> getMessages() {
+			return mMessages;
+		}
+
+		public List<Message> getHistoricMessages() {
+			return mHistoricMessages;
+		}
+
+		public MessagingStyle setGroupConversation(boolean isGroupConversation) {
+			mIsGroupConversation = isGroupConversation;
+			return this;
+		}
+
+		public boolean isGroupConversation() {
+			return mIsGroupConversation;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			if (mUser != null) {
+				extras.putCharSequence(EXTRA_SELF_DISPLAY_NAME, mUser.getName());
+				extras.putParcelable(EXTRA_MESSAGING_PERSON, mUser);
+			}
+			if (mConversationTitle != null) {
+				extras.putCharSequence(EXTRA_CONVERSATION_TITLE, mConversationTitle);
+			}
+			if (!mMessages.isEmpty()) {
+				extras.putParcelableArray(EXTRA_MESSAGES, Message.getBundleArrayForMessages(mMessages));
+			}
+			if (!mHistoricMessages.isEmpty()) {
+				extras.putParcelableArray(EXTRA_HISTORIC_MESSAGES, Message.getBundleArrayForMessages(mHistoricMessages));
+			}
+			extras.putBoolean(EXTRA_IS_GROUP_CONVERSATION, mIsGroupConversation);
+		}
+
+		@Override
+		CharSequence desktopText() {
+			if (mMessages.isEmpty())
+				return null;
+			Message m = mMessages.get(mMessages.size() - 1);
+			Person sender = m.getSenderPerson();
+			if (mIsGroupConversation && sender != null && sender.getName() != null)
+				return sender.getName() + ": " + m.getText();
+			return m.getText();
+		}
+
+		public static final class Message {
+			static final String KEY_TEXT = "text";
+			static final String KEY_TIMESTAMP = "time";
+			static final String KEY_SENDER = "sender";
+			static final String KEY_SENDER_PERSON = "sender_person";
+			static final String KEY_DATA_MIME_TYPE = "type";
+			static final String KEY_DATA_URI = "uri";
+			static final String KEY_EXTRAS_BUNDLE = "extras";
+
+			private final CharSequence mText;
+			private final long mTimestamp;
+			private final Person mSender;
+			private Bundle mExtras = new Bundle();
+			private String mDataMimeType;
+			private Uri mDataUri;
+
+			public Message(CharSequence text, long timestamp, CharSequence sender) {
+				this(text, timestamp, sender == null ? null : new Person.Builder().setName(sender).build());
+			}
+
+			public Message(CharSequence text, long timestamp, Person sender) {
+				mText = text;
+				mTimestamp = timestamp;
+				mSender = sender;
+			}
+
+			public Message setData(String dataMimeType, Uri dataUri) {
+				mDataMimeType = dataMimeType;
+				mDataUri = dataUri;
+				return this;
+			}
+
+			public CharSequence getText() {
+				return mText;
+			}
+
+			public long getTimestamp() {
+				return mTimestamp;
+			}
+
+			public Bundle getExtras() {
+				return mExtras;
+			}
+
+			public CharSequence getSender() {
+				return mSender == null ? null : mSender.getName();
+			}
+
+			public Person getSenderPerson() {
+				return mSender;
+			}
+
+			public String getDataMimeType() {
+				return mDataMimeType;
+			}
+
+			public Uri getDataUri() {
+				return mDataUri;
+			}
+
+			private Bundle toBundle() {
+				Bundle bundle = new Bundle();
+				if (mText != null) {
+					bundle.putCharSequence(KEY_TEXT, mText);
+				}
+				bundle.putLong(KEY_TIMESTAMP, mTimestamp);
+				if (mSender != null) {
+					bundle.putCharSequence(KEY_SENDER, mSender.getName());
+					bundle.putParcelable(KEY_SENDER_PERSON, mSender);
+				}
+				if (mDataMimeType != null) {
+					bundle.putString(KEY_DATA_MIME_TYPE, mDataMimeType);
+				}
+				if (mDataUri != null) {
+					bundle.putParcelable(KEY_DATA_URI, mDataUri);
+				}
+				if (mExtras != null) {
+					bundle.putBundle(KEY_EXTRAS_BUNDLE, mExtras);
+				}
+				return bundle;
+			}
+
+			static Bundle[] getBundleArrayForMessages(List<Message> messages) {
+				Bundle[] bundles = new Bundle[messages.size()];
+				for (int i = 0; i < bundles.length; i++) {
+					bundles[i] = messages.get(i).toBundle();
+				}
+				return bundles;
+			}
+		}
+	}
+
+	/* AOSP DecoratedCustomViewStyle: the custom views of the builder inside the standard frame */
+	public static class DecoratedCustomViewStyle extends Style {
+		public DecoratedCustomViewStyle() {}
+	}
+
+	/* AOSP CallStyle, as kept in the extras; the desktop notification shows no answer/decline buttons of its own */
+	public static class CallStyle extends Style {
+		public static final int CALL_TYPE_UNKNOWN = 0;
+		public static final int CALL_TYPE_INCOMING = 1;
+		public static final int CALL_TYPE_ONGOING = 2;
+		public static final int CALL_TYPE_SCREENING = 3;
+
+		private int mCallType;
+		private Person mPerson;
+		private PendingIntent mAnswerIntent;
+		private PendingIntent mDeclineIntent;
+		private PendingIntent mHangUpIntent;
+		private boolean mIsVideo;
+		private Integer mAnswerButtonColor;
+		private Integer mDeclineButtonColor;
+		private Icon mVerificationIcon;
+		private CharSequence mVerificationText;
+
+		public static CallStyle forIncomingCall(Person person, PendingIntent declineIntent, PendingIntent answerIntent) {
+			return new CallStyle(CALL_TYPE_INCOMING, person, null,
+			                     java.util.Objects.requireNonNull(declineIntent, "declineIntent is required"),
+			                     java.util.Objects.requireNonNull(answerIntent, "answerIntent is required"));
+		}
+
+		public static CallStyle forOngoingCall(Person person, PendingIntent hangUpIntent) {
+			return new CallStyle(CALL_TYPE_ONGOING, person, java.util.Objects.requireNonNull(hangUpIntent, "hangUpIntent is required"),
+			                     null, null);
+		}
+
+		public static CallStyle forScreeningCall(Person person, PendingIntent hangUpIntent, PendingIntent answerIntent) {
+			return new CallStyle(CALL_TYPE_SCREENING, person, java.util.Objects.requireNonNull(hangUpIntent, "hangUpIntent is required"),
+			                     null, java.util.Objects.requireNonNull(answerIntent, "answerIntent is required"));
+		}
+
+		private CallStyle(int callType, Person person, PendingIntent hangUpIntent, PendingIntent declineIntent, PendingIntent answerIntent) {
+			if (person == null || TextUtils.isEmpty(person.getName())) {
+				throw new IllegalArgumentException("person must have a non-empty a name");
+			}
+			mCallType = callType;
+			mPerson = person;
+			mAnswerIntent = answerIntent;
+			mDeclineIntent = declineIntent;
+			mHangUpIntent = hangUpIntent;
+		}
+
+		public CallStyle setIsVideo(boolean isVideo) {
+			mIsVideo = isVideo;
+			return this;
+		}
+
+		public CallStyle setVerificationIcon(Icon verificationIcon) {
+			mVerificationIcon = verificationIcon;
+			return this;
+		}
+
+		public CallStyle setVerificationText(CharSequence verificationText) {
+			mVerificationText = verificationText;
+			return this;
+		}
+
+		public CallStyle setAnswerButtonColorHint(int color) {
+			mAnswerButtonColor = color;
+			return this;
+		}
+
+		public CallStyle setDeclineButtonColorHint(int color) {
+			mDeclineButtonColor = color;
+			return this;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			extras.putInt(EXTRA_CALL_TYPE, mCallType);
+			extras.putBoolean(EXTRA_CALL_IS_VIDEO, mIsVideo);
+			extras.putParcelable(EXTRA_CALL_PERSON, mPerson);
+			if (mVerificationIcon != null) {
+				extras.putParcelable(EXTRA_VERIFICATION_ICON, mVerificationIcon);
+			}
+			if (mVerificationText != null) {
+				extras.putCharSequence(EXTRA_VERIFICATION_TEXT, mVerificationText);
+			}
+			extras.putParcelable(EXTRA_ANSWER_INTENT, mAnswerIntent);
+			extras.putParcelable(EXTRA_DECLINE_INTENT, mDeclineIntent);
+			extras.putParcelable(EXTRA_HANG_UP_INTENT, mHangUpIntent);
+			if (mAnswerButtonColor != null) {
+				extras.putInt(EXTRA_ANSWER_COLOR, mAnswerButtonColor);
+			}
+			if (mDeclineButtonColor != null) {
+				extras.putInt(EXTRA_DECLINE_COLOR, mDeclineButtonColor);
+			}
+		}
 	}
 
 	/* API 29/30. Kept only so that apps can build it; ATL shows no bubbles. */

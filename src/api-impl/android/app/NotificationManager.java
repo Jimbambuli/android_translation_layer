@@ -52,7 +52,7 @@ public class NotificationManager {
 
 	/* The desktop portals have no text field for a reply (RemoteInput): that button opens the app instead. */
 	static PendingIntent buttonIntent(Notification notification, Notification.Action action) {
-		return action.getRemoteInputs() == null ? action.actionIntent : notification.intent;
+		return action.getRemoteInputs() == null ? action.actionIntent : notification.contentIntent;
 	}
 
 	private static int mpris_notification_id = -1;
@@ -96,7 +96,7 @@ public class NotificationManager {
 		if (priority < 0)
 			return;
 		long builder = nativeInitBuilder();
-		for (Notification.Action action : notification.actions) {
+		for (Notification.Action action : notification.actions != null ? notification.actions : new Notification.Action[0]) {
 			int intentType = -1;
 			Intent intent = null;
 			PendingIntent pendingIntent = buttonIntent(notification, action);
@@ -108,12 +108,15 @@ public class NotificationManager {
 		}
 		int intentType = -1;
 		Intent intent = null;
-		if (notification.intent != null) {
-			intentType = notification.intent.type;
-			intent = notification.intent.intent;
+		if (notification.contentIntent != null) {
+			intentType = notification.contentIntent.type;
+			intent = notification.contentIntent.intent;
 		}
 		String iconPath = notification.iconPath == null || notification.iconPath.endsWith(".xml") ? null : notification.iconPath;
-		nativeShowNotification(builder, id, notification.title, notification.text, iconPath, notification.ongoing, priority, intentType, intent);
+		/* the desktop notification has no expanded form: the text of a style (big text, lines, latest message) */
+		CharSequence styleText = notification.style != null ? notification.style.desktopText() : null;
+		String text = styleText != null ? styleText.toString() : notification.text;
+		nativeShowNotification(builder, id, notification.title, text, iconPath, notification.ongoing, priority, intentType, intent);
 		synchronized (active) {
 			active.add(id);
 		}
