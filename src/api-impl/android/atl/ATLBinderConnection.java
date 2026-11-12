@@ -295,6 +295,13 @@ public final class ATLBinderConnection {
 			throw new RemoteException(e.toString());
 		}
 		int ret = nativeSend(fd, bytes.toByteArray(), fdInts);
+		ArrayList<FileDescriptor> close = parcel != null ? parcel.atl_fileDescriptorsToClose() : null;
+		for (int i = 0; close != null && i < close.size(); i++) {
+			try {
+				Os.close(close.get(i));
+			} catch (ErrnoException ignored) {
+			}
+		}
 		if (ret < 0) {
 			if (dead)
 				throw new DeadObjectException();
@@ -407,8 +414,9 @@ public final class ATLBinderConnection {
 			}
 		} finally {
 			stack.removeLast();
-			/* like Parcel.recycle() of the driver's buffer: the received descriptors belong to the transaction */
-			for (FileDescriptor f : m.fds) {
+			/* like Parcel.recycle() of the driver's buffer: the received descriptors nobody took belong to the
+			 * transaction */
+			for (FileDescriptor f : data.atl_untakenFileDescriptors()) {
 				try {
 					Os.close(f);
 				} catch (ErrnoException ignored) {

@@ -33,6 +33,10 @@ public class Parcel {
 	private boolean hasFileDescriptors;
 	private ArrayList<IBinder> binders;
 	private ArrayList<FileDescriptor> fds;
+	/* received from another process: the parcel owns its descriptors; the first read takes one over */
+	private boolean[] fdTaken;
+	/* descriptors to close once the parcel is sent (PARCELABLE_WRITE_RETURN_VALUE) */
+	private ArrayList<FileDescriptor> fdsToClose;
 
 	protected Parcel() {
 		data = new byte[0];
@@ -964,6 +968,10 @@ public class Parcel {
 		int index = readInt();
 		if (index < 0 || fds == null || index >= fds.size())
 			return null;
+		if (fdTaken != null && !fdTaken[index]) {
+			fdTaken[index] = true;
+			return new ParcelFileDescriptor(fds.get(index));
+		}
 		try {
 			return ParcelFileDescriptor.dup(fds.get(index));
 		} catch (IOException e) {
@@ -1008,11 +1016,34 @@ public class Parcel {
 		return fds;
 	}
 
-	/** @hide */
+	/** @hide a parcel received from another process, which owns the descriptors */
 	public void atl_setObjects(ArrayList<IBinder> binders, ArrayList<FileDescriptor> fds) {
 		this.binders = binders;
 		this.fds = fds;
 		hasFileDescriptors = fds != null && !fds.isEmpty();
+		fdTaken = fds != null ? new boolean[fds.size()] : null;
+	}
+
+	/** @hide the received descriptors nobody read */
+	public ArrayList<FileDescriptor> atl_untakenFileDescriptors() {
+		ArrayList<FileDescriptor> ret = new ArrayList<>();
+		for (int i = 0; fdTaken != null && i < fdTaken.length; i++)
+			if (!fdTaken[i])
+				ret.add(fds.get(i));
+		return ret;
+	}
+
+	/** @hide writeFileDescriptor() of a descriptor the parcel closes once it is sent */
+	public void atl_writeOwnedFileDescriptor(FileDescriptor fd) {
+		writeFileDescriptor(fd);
+		if (fdsToClose == null)
+			fdsToClose = new ArrayList<>();
+		fdsToClose.add(fd);
+	}
+
+	/** @hide */
+	public ArrayList<FileDescriptor> atl_fileDescriptorsToClose() {
+		return fdsToClose;
 	}
 
 	public void writeBinderArray(IBinder[] array) {

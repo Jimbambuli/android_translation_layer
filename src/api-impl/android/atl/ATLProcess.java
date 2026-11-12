@@ -41,6 +41,8 @@ public final class ATLProcess {
 	private static final int STOP_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 3;
 	/* to the main process: this process has no components left and would end */
 	private static final int MAY_EXIT = IBinder.FIRST_CALL_TRANSACTION;
+	/* both ways: the Transport of a content provider of the called process */
+	private static final int ACQUIRE_PROVIDER = IBinder.FIRST_CALL_TRANSACTION + 10;
 
 	/** whether this is a process the main process started, not the main process */
 	public static boolean isSecondary() {
@@ -197,8 +199,7 @@ public final class ATLProcess {
 			@Override
 			public void run() {
 				try {
-					if (r.connection == null)
-						startProcess(r);
+					ensureStarted(r);
 					Parcel data = Parcel.obtain();
 					intent.writeToParcel(data, 0);
 					r.appThread.transact(START_SERVICE, data, Parcel.obtain(), 0);
@@ -235,9 +236,56 @@ public final class ATLProcess {
 		return true;
 	}
 
+	/** AMS.getContentProviderImpl(): the Transport of a provider of the app in another process, which is started
+	 * if needed; null if that process has no such provider */
+	public static IBinder acquireProvider(String processName, String authority) throws RemoteException {
+		IBinder target;
+		ProcessRecord r = null;
+		if (isSecondary()) {
+			if (!processName.equals(mainProcessName())) {
+				Slog.w(TAG, "provider " + authority + " runs in process " + processName + ", not supported from process " + process_name);
+				return null;
+			}
+			target = main_connection.getContextObject();
+		} else {
+			synchronized (processes) {
+				r = getProcessRecord(processName);
+				r.pending++;
+			}
+			try {
+				ensureStarted(r);
+			} catch (RemoteException e) {
+				synchronized (processes) {
+					r.pending--;
+				}
+				throw e;
+			}
+			target = r.appThread;
+		}
+		try {
+			Parcel data = Parcel.obtain();
+			Parcel reply = Parcel.obtain();
+			data.writeString(authority);
+			target.transact(ACQUIRE_PROVIDER, data, reply, 0);
+			return reply.readStrongBinder();
+		} finally {
+			if (r != null) {
+				synchronized (processes) {
+					r.pending--;
+				}
+			}
+		}
+	}
+
+	private static void ensureStarted(ProcessRecord r) throws RemoteException {
+		synchronized (r) {
+			if (r.connection == null)
+				startProcess(r);
+		}
+	}
+
 	private static IBinder bindInProcess(ProcessRecord r, Intent intent) throws RemoteException {
-		if (r.connection == null)
-			startProcess(r);
+		ensureStarted(r);
 		String className = intent.getComponent().getClassName();
 		synchronized (processes) {
 			if (r.service_binders.containsKey(className))
@@ -344,6 +392,10 @@ public final class ATLProcess {
 				reply.writeInt(exit ? 1 : 0);
 				return true;
 			}
+			if (code == ACQUIRE_PROVIDER) {
+				reply.writeStrongBinder(ATLRemoteContentProvider.transportFor(data.readString()));
+				return true;
+			}
 			return super.onTransact(code, data, reply, flags);
 		}
 	}
@@ -381,6 +433,9 @@ public final class ATLProcess {
 				case STOP_SERVICE:
 					ATLLoadedApp.getPrimaryApplication().stopService(Intent.CREATOR.createFromParcel(data));
 					return true;
+				case ACQUIRE_PROVIDER:
+					reply.writeStrongBinder(ATLRemoteContentProvider.transportFor(data.readString()));
+					return true;
 			}
 			return super.onTransact(code, data, reply, flags);
 		}
@@ -417,7 +472,8 @@ public final class ATLProcess {
 
 	/** the last service of this process is gone: it ends, like a process without components that AOSP kills */
 	public static void onServicesGone() {
-		if (!isSecondary())
+		/* a process whose provider another process uses stays (AOSP keeps it while the connection lasts) */
+		if (!isSecondary() || ATLRemoteContentProvider.hasTransports())
 			return;
 		Parcel reply = Parcel.obtain();
 		try {

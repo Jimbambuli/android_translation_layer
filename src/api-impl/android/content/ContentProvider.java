@@ -5,6 +5,7 @@ import android.atl.ATLLoadedAppManager;
 import android.atl.ATLMediaContentProvider;
 import android.atl.ATLProcess;
 import android.atl.ATLProvider;
+import android.atl.ATLRemoteContentProvider;
 import android.atl.annotation.Export;
 import android.content.pm.PackageParser;
 import android.content.pm.ProviderInfo;
@@ -38,11 +39,8 @@ public abstract class ContentProvider {
 				/* like AMS.generateApplicationProvidersLocked(): a process gets the providers that run in it */
 				if (!ATLProcess.myProcessName().equals(process_name))
 					continue;
-			} else if (process_name != null && process_name.contains(":")) {
-				/* NOTE: even if it doesn't contain `:`, if it's not null we probably
-				 * need to check what it's requesting; `:` means it wants us to spawn
-				 * a new process, which we currently don't support */
-				System.out.println("not creating provider " + provider_parsed.className + ", it wants to be started in a new process (" + process_name + ")");
+			} else if (process_name != null && !process_name.equals(ATLProcess.myProcessName())) {
+				/* it runs in its own process, which atl_get_content_provider() starts on first use */
 				continue;
 			}
 			atl_providers.put(provider_parsed.info.authority,
@@ -58,10 +56,36 @@ public abstract class ContentProvider {
 		});
 	}
 
+	/** @hide a provider that runs in this process, for the app's other processes */
+	public static ContentProvider atl_get_local_content_provider(String authority) {
+		ATLProvider atlProvider;
+		synchronized (atl_providers) {
+			atlProvider = atl_providers.get(authority);
+		}
+		return atlProvider == null ? null : atlProvider.getContentProvider();
+	}
+
+	/* the process an own provider of the app runs in, if that is another process */
+	private static String otherProviderProcess(String authority) {
+		for (PackageParser.Provider p : ATLLoadedApp.getPrimaryApplication().pkg.providers) {
+			if (p.info.authority == null || !java.util.Arrays.asList(p.info.authority.split(";")).contains(authority))
+				continue;
+			String process_name = p.info.processName != null ? p.info.processName : ATLProcess.mainProcessName();
+			return process_name.equals(ATLProcess.myProcessName()) ? null : process_name;
+		}
+		return null;
+	}
+
 	static ContentProvider atl_get_content_provider(String authority) {
 		ATLProvider atlProvider;
 		synchronized (atl_providers) {
 			atlProvider = atl_providers.get(authority);
+			String process_name = atlProvider == null && authority != null ? otherProviderProcess(authority) : null;
+			if (process_name != null) {
+				// a provider of the app in another of its processes
+				atlProvider = new ATLProvider(new ATLRemoteContentProvider(process_name, authority));
+				atl_providers.put(authority, atlProvider);
+			}
 			if (atlProvider == null && authority != null) {
 				// a provider of another package (Play Services), loaded into this process on first use
 				PackageParser.Provider provider = ATLLoadedAppManager.findForeignProvider(authority);
