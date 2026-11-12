@@ -208,6 +208,21 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setFontPadding(JNIEn
 	g_object_set_data_full(G_OBJECT(label), "font_padding_style_provider", css_provider, g_object_unref);
 }
 
+/* the letter spacing of the label in pixels (TextView.setLetterSpacing() in ems times the text size); the label of a
+ * Button is the one in the GtkButton's box */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLetterSpacing(JNIEnv *env, jobject this, jlong widget_ptr, jfloat spacing)
+{
+	GtkWidget *widget = _PTR(widget_ptr);
+	GtkLabel *label = box_get_label(env, GTK_IS_BUTTON(widget) ? gtk_button_get_child(GTK_BUTTON(widget)) : widget);
+	if (!label)
+		return;
+	PangoAttrList *old_attrs = gtk_label_get_attributes(label);
+	PangoAttrList *attrs = old_attrs ? pango_attr_list_copy(old_attrs) : pango_attr_list_new();
+	pango_attr_list_change(attrs, pango_attr_letter_spacing_new(spacing * PANGO_SCALE));
+	gtk_label_set_attributes(label, attrs);
+	pango_attr_list_unref(attrs);
+}
+
 /* the baseline of the first line of the label at the given width, moved by the label's vertical
  * alignment within the given height */
 JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline(JNIEnv *env, jobject this, jlong widget_ptr, jint width, jint height)
@@ -245,7 +260,7 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *en
 		GSList *old = pango_attr_list_get_attributes(old_attrs);
 		for (GSList *l = old; l; l = l->next) {
 			PangoAttribute *attr = l->data;
-			if (attr->klass->type == PANGO_ATTR_ABSOLUTE_SIZE || attr->klass->type == PANGO_ATTR_SIZE)
+			if (attr->klass->type == PANGO_ATTR_ABSOLUTE_SIZE || attr->klass->type == PANGO_ATTR_SIZE || attr->klass->type == PANGO_ATTR_LETTER_SPACING)
 				pango_attr_list_insert(pango_attrs, attr);
 			else
 				pango_attribute_destroy(attr);

@@ -161,6 +161,9 @@ public class TextView extends View {
 				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_lineSpacingExtra) || a.hasValue(com.android.internal.R.styleable.TextView_lineSpacingMultiplier))
+				setLineSpacing(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_lineSpacingExtra, 0),
+				               a.getFloat(com.android.internal.R.styleable.TextView_lineSpacingMultiplier, 1.0f));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxEms))
 				setMaxEms(a.getInt(com.android.internal.R.styleable.TextView_maxEms, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxWidth))
@@ -545,6 +548,8 @@ public class TextView extends View {
 	private void setRawTextSize(float size, boolean shouldRequestLayout) {
 		getPaint().setTextSize(size);
 		applyNativeTextSize(size);
+		if (getPaint().getLetterSpacing() != 0)
+			applyNativeLetterSpacing(); // in pixels, so it follows the size
 
 		if (shouldRequestLayout) {
 			requestLayout();
@@ -606,7 +611,18 @@ public class TextView extends View {
 		paint.setTypeface(tf);
 		native_setTypeface(widget, tf);
 	}
-	public void setLineSpacing(float add, float mult) {}
+	/* AOSP keeps the spacing for its layouts and getLineHeight(); the GtkLabel does not space its lines by it */
+	private float mSpacingMult = 1.0f;
+	private float mSpacingAdd = 0.0f;
+
+	public void setLineSpacing(float add, float mult) {
+		if (mSpacingAdd != add || mSpacingMult != mult) {
+			mSpacingAdd = add;
+			mSpacingMult = mult;
+			requestLayout();
+			invalidate();
+		}
+	}
 
 	/* API 28, as in AOSP */
 	public void setLineHeight(int lineHeight) {
@@ -1119,7 +1135,9 @@ public class TextView extends View {
 		setHint(getContext().getResources().getText(resId));
 	}
 
-	public float getLetterSpacing() { return 0.f; }
+	public float getLetterSpacing() {
+		return getPaint().getLetterSpacing();
+	}
 
 
 	public boolean isTextSelectable() { return true; }
@@ -1186,8 +1204,9 @@ public class TextView extends View {
 
 	public void setSelectAllOnFocus(boolean selectAllOnFocus) {}
 
+	/* AOSP: the font's line spacing scaled and extended by the line spacing */
 	public int getLineHeight() {
-		return 10; // FIXME
+		return Math.round(getPaint().getFontMetricsInt(null) * mSpacingMult + mSpacingAdd);
 	}
 
 	/* The configuration of uniform auto-sizing as AOSP keeps it. ATL's TextView does not resize
@@ -1332,9 +1351,13 @@ public class TextView extends View {
 	}
 	private native void native_setFontPadding(long widget, boolean include);
 
-	public float getLineSpacingExtra() { return 0.f; }
+	public float getLineSpacingExtra() {
+		return mSpacingAdd;
+	}
 
-	public float getLineSpacingMultiplier() { return 1.f; }
+	public float getLineSpacingMultiplier() {
+		return mSpacingMult;
+	}
 
 	/* AOSP TextView.getTextMetricsParams()/setTextMetricsParams(): how this view measures its text */
 	public android.text.PrecomputedText.Params getTextMetricsParams() {
@@ -1382,7 +1405,20 @@ public class TextView extends View {
 
 	public void setFreezesText(boolean freezesText) {}
 
-	public void setLetterSpacing(float letterSpacing) {}
+	/* AOSP: in ems, kept by the paint; the label gets it as a Pango letter spacing in pixels */
+	public void setLetterSpacing(float letterSpacing) {
+		if (letterSpacing != getPaint().getLetterSpacing()) {
+			getPaint().setLetterSpacing(letterSpacing);
+			applyNativeLetterSpacing();
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	private void applyNativeLetterSpacing() {
+		native_setLetterSpacing(widget, getPaint().getLetterSpacing() * getTextSize());
+	}
+	private native void native_setLetterSpacing(long widget, float spacing);
 
 	public void setMarqueeRepeatLimit(int marqueeLimit) {}
 
