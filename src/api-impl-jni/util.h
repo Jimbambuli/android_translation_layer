@@ -52,6 +52,7 @@ void release_nio_buffer(JNIEnv *env, jarray array_ref, jbyte *array);
 int get_nio_buffer_size(JNIEnv *env, jobject buffer);
 
 void atl_remember_user_locale(void);
+void atl_use_user_messages_locale(void);
 const char *atl_gtk_text(const char *msgid);
 char *atl_framework_string(JNIEnv *env, jobject context, const char *name);
 
