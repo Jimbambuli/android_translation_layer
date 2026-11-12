@@ -52,9 +52,20 @@ JNIEXPORT jint JNICALL Java_android_atl_ATLBinderConnection_nativeSpawn(JNIEnv *
 		if (cmdline[i] == '\0')
 			argc++;
 	char **argv = calloc(argc + 1, sizeof(char *));
-	for (size_t i = 0, a = 0; i < len; a++) {
-		argv[a] = cmdline + i;
-		i += strlen(cmdline + i) + 1;
+	int a = 0;
+	for (size_t i = 0; i < len;) {
+		char *arg = cmdline + i;
+		i += strlen(arg) + 1;
+		char *next = i < len ? cmdline + i : NULL;
+		/* a JVMTI agent (atl-doctor) belongs to the process it was started for: the other processes of the app
+		 * do not load it, or they would all write into its files */
+		if (!strncmp(arg, "--attach-agent=", 15) || !strncmp(arg, "--extra-jvm-option=-agent", 25))
+			continue;
+		if (next && (!strcmp(arg, "--attach-agent") || ((!strcmp(arg, "-X") || !strcmp(arg, "--extra-jvm-option")) && !strncmp(next, "-agent", 6)))) {
+			i += strlen(next) + 1;
+			continue;
+		}
+		argv[a++] = arg;
 	}
 
 	int envc = 0;
