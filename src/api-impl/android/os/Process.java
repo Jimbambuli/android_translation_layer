@@ -452,7 +452,7 @@ public class Process {
 	 * @hide
 	 */
 	public static final boolean isIsolated() {
-		return false;
+		return android.atl.ATLProcess.isIsolated();
 	}
 
 	/**

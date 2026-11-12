@@ -7,6 +7,7 @@ import android.app.SearchManager;
 import android.app.job.JobScheduler;
 import android.atl.ATLLoadedApp;
 import android.atl.ATLLoadedAppManager;
+import android.atl.ATLProcess;
 import android.bluetooth.BluetoothManager;
 import android.content.*;
 import android.content.pm.ActivityInfo;
@@ -150,7 +151,35 @@ public final class ContextImpl extends Context {
 		if (targetApp == null) {
 			return false;
 		}
+		String processName = otherServiceProcess(targetApp, intent);
+		if (processName != null)
+			return ATLProcess.stopService(intent, processName);
 		return targetApp.stopService(intent);
+	}
+
+	/* the process of the app a service with its own android:process runs in, null if it runs in this one; an
+	 * isolated service always runs in a process of its own */
+	private static String otherServiceProcess(ATLLoadedApp targetApp, Intent intent) {
+		if (targetApp != ATLLoadedApp.getPrimaryApplication() || intent.getComponent() == null)
+			return null;
+		String className = intent.getComponent().getClassName();
+		String processName = targetApp.serviceProcessName(className);
+		if (targetApp.isIsolatedService(className))
+			return processName != null ? processName : ATLProcess.mainProcessName();
+		return processName != null && !processName.equals(ATLProcess.myProcessName()) ? processName : null;
+	}
+
+	/* ContextImpl.bindIsolatedService(): the instance of an isolated service runs in a process of its own */
+	@Override
+	public boolean atl_bindService(Intent intent, ServiceConnection serviceConnection, int flags, String instanceName) {
+		if (instanceName == null)
+			return bindService(intent, serviceConnection, flags);
+		ATLLoadedApp targetApp = this.atl_get_intent_target(intent);
+		if (targetApp == null || intent.getComponent() == null)
+			return false;
+		if (!targetApp.isIsolatedService(intent.getComponent().getClassName()))
+			throw new IllegalArgumentException("Can't use instance name '" + instanceName + "' with non-isolated service '" + intent.getComponent().getClassName() + "'");
+		return ATLProcess.bindService(intent, serviceConnection, otherServiceProcess(targetApp, intent), instanceName);
 	}
 
 	@Override
@@ -211,6 +240,9 @@ public final class ContextImpl extends Context {
 				nativeStartExternalService(intent);
 			return null;
 		}
+		String processName = otherServiceProcess(targetApp, intent);
+		if (processName != null)
+			return ATLProcess.startService(intent, processName);
 		return targetApp.startOrBindService(intent, null);
 	}
 
@@ -253,6 +285,9 @@ public final class ContextImpl extends Context {
 		if (targetApp == null) {
 			return false;
 		}
+		String processName = otherServiceProcess(targetApp, intent);
+		if (processName != null)
+			return ATLProcess.bindService(intent, serviceConnection, processName, null);
 		if (targetApp.startOrBindService(intent, serviceConnection, flags) == null)
 			return false;
 		synchronized (bound_services) {
@@ -265,6 +300,11 @@ public final class ContextImpl extends Context {
 	 * which has no service behind it) is ignored instead of AOSP's IllegalArgumentException */
 	@Override
 	public void unbindService(ServiceConnection serviceConnection) {
+		ServiceConnection dispatcher = Context.atl_takeExecutorDispatcher(serviceConnection);
+		if (dispatcher != null)
+			serviceConnection = dispatcher;
+		if (ATLProcess.unbindService(serviceConnection))
+			return;
 		ATLLoadedApp targetApp;
 		synchronized (bound_services) {
 			targetApp = bound_services.remove(serviceConnection);

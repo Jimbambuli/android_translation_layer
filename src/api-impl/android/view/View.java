@@ -6645,6 +6645,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return mWillNotDraw;
 	}
 
+	/* AOSP View.setWillNotCacheDrawing()/willNotCacheDrawing() (WILL_NOT_CACHE_DRAWING): only a hint for the
+	 * drawing cache, which ATL does not keep, so it is just remembered */
+	private boolean mWillNotCacheDrawing;
+
+	public void setWillNotCacheDrawing(boolean willNotCacheDrawing) {
+		mWillNotCacheDrawing = willNotCacheDrawing;
+	}
+
+	public boolean willNotCacheDrawing() {
+		return mWillNotCacheDrawing;
+	}
+
 	private String mTransitionName;
 
 	public String getTransitionName() {

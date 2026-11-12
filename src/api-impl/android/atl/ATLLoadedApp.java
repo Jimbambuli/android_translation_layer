@@ -333,6 +333,30 @@ public final class ATLLoadedApp {
 		}
 	}
 
+	public boolean hasRunningServices() {
+		synchronized (running_services) {
+			return !running_services.isEmpty();
+		}
+	}
+
+	/* android:isolatedProcess of a service of the app */
+	public boolean isIsolatedService(String className) {
+		for (PackageParser.Service s : pkg.services) {
+			if (className.equals(s.className))
+				return (s.info.flags & ServiceInfo.FLAG_ISOLATED_PROCESS) != 0;
+		}
+		return false;
+	}
+
+	/* the process a service of the app runs in (android:process); null if the app has no such service */
+	public String serviceProcessName(String className) {
+		for (PackageParser.Service s : pkg.services) {
+			if (className.equals(s.className))
+				return s.info.processName;
+		}
+		return null;
+	}
+
 	public ComponentName startOrBindService(final Intent intent, final ServiceConnection serviceConnection) {
 		return startOrBindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 	}
@@ -430,6 +454,12 @@ public final class ATLLoadedApp {
 				}
 				Slog.i(TAG, "destroying service " + className);
 				r.service.atl_destroy();
+				boolean none;
+				synchronized (running_services) {
+					none = running_services.isEmpty();
+				}
+				if (none)
+					ATLProcess.onServicesGone();
 			}
 		});
 	}

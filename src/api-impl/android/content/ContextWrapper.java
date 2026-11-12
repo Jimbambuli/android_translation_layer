@@ -72,6 +72,12 @@ public class ContextWrapper extends Context {
 		return this.baseContext.bindService(intent, serviceConnection, flags);
 	}
 
+	/** @hide */
+	@Override
+	public boolean atl_bindService(Intent intent, ServiceConnection serviceConnection, int flags, String instanceName) {
+		return this.baseContext.atl_bindService(intent, serviceConnection, flags, instanceName);
+	}
+
 	@Override
 	public void startActivities(Intent[] intents) {
 		baseContext.startActivities(intents);

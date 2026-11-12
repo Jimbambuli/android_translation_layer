@@ -12,7 +12,6 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.Process;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -52,12 +51,6 @@ public class ActivityManager {
 			this.pid = pid;
 			this.pkgList = pkgList;
 		}
-
-		private RunningAppProcessInfo(int pid, String processName) {
-			this.pid = pid;
-			this.processName = processName;
-			this.pkgList = new String[] {processName};
-		}
 	}
 
 	public static class TaskDescription {
@@ -65,9 +58,12 @@ public class ActivityManager {
 		public TaskDescription(String name, Bitmap icon, int color) {}
 	}
 
+	/* the app's processes (android:process, see ATLProcess); a process started by the main process knows itself */
 	public List<RunningAppProcessInfo> getRunningAppProcesses() {
-		return Arrays.asList(new RunningAppProcessInfo(Process.myPid(),
-		                                               ATLLoadedApp.getPrimaryApplication().pkg.packageName));
+		ArrayList<RunningAppProcessInfo> ret = new ArrayList<>();
+		for (java.util.Map.Entry<Integer, String> p : android.atl.ATLProcess.runningProcesses().entrySet())
+			ret.add(new RunningAppProcessInfo(p.getValue(), p.getKey(), new String[] {ATLLoadedApp.getPrimaryApplication().pkg.packageName}));
+		return ret;
 	}
 
 	public boolean isLowRamDevice() { return false; }

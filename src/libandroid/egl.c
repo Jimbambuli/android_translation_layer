@@ -84,10 +84,34 @@ EGLBoolean bionic_eglPresentationTimeANDROID(EGLDisplay dpy, EGLSurface surface,
 	return EGL_TRUE;
 }
 
+EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface);
+
+/* EGL_KHR_partial_update: the damage region is a hint; a window surface of an ANativeWindow is ATL's own back
+ * buffer, which the host EGL does not know, so it is only accepted there */
+static EGLBoolean bionic_eglSetDamageRegionKHR(EGLDisplay display, EGLSurface surface, EGLint *rects, EGLint n_rects)
+{
+	if (g_hash_table_lookup(egl_surface_hashtable, surface))
+		return EGL_TRUE;
+	EGLBoolean (*host)(EGLDisplay, EGLSurface, EGLint *, EGLint) = (void *)eglGetProcAddress("eglSetDamageRegionKHR");
+	return host ? host(display, surface, rects, n_rects) : EGL_FALSE;
+}
+
+/* EGL_KHR/EXT_swap_buffers_with_damage: swaps the whole buffer, as eglSwapBuffers() (the damage is a hint) */
+static EGLBoolean bionic_eglSwapBuffersWithDamage(EGLDisplay display, EGLSurface surface, const EGLint *rects, EGLint n_rects)
+{
+	return bionic_eglSwapBuffers(display, surface);
+}
+
 void (*bionic_eglGetProcAddress(char const *procname))(void)
 {
 	if (__unlikely__(!strcmp(procname, "eglPresentationTimeANDROID")))
 		return (void (*)(void))bionic_eglPresentationTimeANDROID;
+	if (!getenv("ATL_DIRECT_EGL")) {
+		if (!strcmp(procname, "eglSetDamageRegionKHR"))
+			return (void (*)(void))bionic_eglSetDamageRegionKHR;
+		if (!strcmp(procname, "eglSwapBuffersWithDamageKHR") || !strcmp(procname, "eglSwapBuffersWithDamageEXT"))
+			return (void (*)(void))bionic_eglSwapBuffersWithDamage;
+	}
 
 	return eglGetProcAddress(procname);
 }
@@ -504,6 +528,9 @@ EGLBoolean bionic_eglQuerySurface(EGLDisplay display, EGLSurface surface, EGLint
 		*value = native_window->width;
 	} else if (attribute == EGL_HEIGHT) {
 		*value = native_window->height;
+	} else if (attribute == 0x313D /* EGL_BUFFER_AGE_EXT */) {
+		/* the back buffer's contents are not kept for the app: it redraws everything */
+		*value = 0;
 	} else {
 		printf("bionic_eglQuerySurface(%p, %p, %d, %p): attribute not implemented\n", display, surface, attribute, value);
 		return eglQuerySurface(display, surface, attribute, value);

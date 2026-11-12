@@ -669,14 +669,42 @@ public abstract class Context {
 
 	public abstract boolean bindService(final Intent intent, final ServiceConnection serviceConnection, int flags);
 
+	/* the dispatchers of the connections bound with an executor (LoadedApk.mServices), which unbindService()
+	 * unbinds in place of the app's connection */
+	private static final java.util.WeakHashMap<ServiceConnection, ServiceConnection> executor_dispatchers = new java.util.WeakHashMap<>();
+
+	/** @hide */
+	public static ServiceConnection atl_takeExecutorDispatcher(ServiceConnection conn) {
+		synchronized (executor_dispatchers) {
+			return executor_dispatchers.remove(conn);
+		}
+	}
+
 	/* AOSP Context.bindService(Intent, int, Executor, ServiceConnection) (API 29): like ContextImpl's
 	 * ServiceDispatcher with an executor, the connection's callbacks run on the executor */
-	public boolean bindService(Intent service, int flags, final java.util.concurrent.Executor executor, final ServiceConnection conn) {
+	public boolean bindService(Intent service, int flags, java.util.concurrent.Executor executor, ServiceConnection conn) {
+		return bindServiceInstance(service, flags, null, executor, conn);
+	}
+
+	/* AOSP Context.bindIsolatedService() (API 29): a service with android:isolatedProcess, in a process of its own
+	 * for each instance name */
+	public boolean bindIsolatedService(Intent service, int flags, String instanceName, java.util.concurrent.Executor executor, ServiceConnection conn) {
+		if (instanceName == null)
+			throw new NullPointerException("null instanceName");
+		return bindServiceInstance(service, flags, instanceName, executor, conn);
+	}
+
+	/** @hide bindService() of the instance of an isolated service (ContextImpl) */
+	public boolean atl_bindService(Intent service, ServiceConnection conn, int flags, String instanceName) {
+		return bindService(service, conn, flags);
+	}
+
+	private boolean bindServiceInstance(Intent service, int flags, String instanceName, final java.util.concurrent.Executor executor, final ServiceConnection conn) {
 		if (executor == null)
 			throw new IllegalArgumentException("executor must not be null");
 		if (conn == null)
 			throw new IllegalArgumentException("connection is null");
-		return bindService(service, new ServiceConnection() {
+		ServiceConnection dispatcher = new ServiceConnection() {
 			@Override
 			public void onServiceConnected(final ComponentName name, final android.os.IBinder binder) {
 				executor.execute(new Runnable() {
@@ -696,7 +724,11 @@ public abstract class Context {
 					}
 				});
 			}
-		}, flags);
+		};
+		synchronized (executor_dispatchers) {
+			executor_dispatchers.put(conn, dispatcher);
+		}
+		return atl_bindService(service, dispatcher, flags, instanceName);
 	}
 
 	/* For use from native code */
@@ -899,6 +931,10 @@ public abstract class Context {
 	public abstract boolean stopService(Intent intent);
 
 	public void unbindService(ServiceConnection serviceConnection) {}
+
+	/* AOSP Context.updateServiceGroup() (API 29) groups the processes of bound services for the low memory
+	 * killer; ATL has no process importance, so nothing changes */
+	public void updateServiceGroup(ServiceConnection conn, int group, int importance) {}
 
 	public void unregisterReceiver(BroadcastReceiver receiver) {
 		while (receiverMap.values().remove(receiver))
