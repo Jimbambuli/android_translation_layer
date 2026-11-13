@@ -3,6 +3,7 @@
 #include <gtk/gtk.h>
 
 #include "../defines.h"
+#include "../util.h"
 #include "AndroidPaint.h"
 #include "pango/pango-font.h"
 
@@ -189,12 +190,10 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1color_1filter(JN
 	paint->use_color_filter = mode != -1;
 }
 
-extern GtkWidget *window;
-
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1text_1bounds(JNIEnv *env, jclass clazz, jlong paint_ptr, jstring text_ptr, jobject bounds)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
-	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
+	PangoLayout *layout = pango_layout_new(atl_pango_context());
 	pango_layout_set_font_description(layout, paint->font);
 	android_paint_apply_letter_spacing(layout, paint);
 	const char *str = (*env)->GetStringUTFChars(env, text_ptr, NULL);
@@ -225,7 +224,7 @@ JNIEXPORT jboolean JNICALL Java_android_graphics_Paint_native_1has_1glyph(JNIEnv
 	if (!str) // unpaired surrogate
 		return false;
 	glong n_chars = g_utf8_strlen(str, -1);
-	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
+	PangoLayout *layout = pango_layout_new(atl_pango_context());
 	pango_layout_set_font_description(layout, paint->font);
 	pango_layout_set_text(layout, str, -1);
 	g_free(str);
@@ -260,7 +259,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1align(JNIE
 JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1font_1metrics(JNIEnv *env, jclass clazz, jlong paint_ptr, jobject metrics)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
-	PangoContext *context = gtk_widget_get_pango_context(window);
+	PangoContext *context = atl_pango_context();
 	PangoFontMetrics *font_metrics = pango_context_get_metrics(context, paint->font, NULL);
 	float height = (float)pango_font_metrics_get_height(font_metrics) / PANGO_SCALE;
 	if (metrics) {
@@ -279,7 +278,7 @@ JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1font_1metrics(
 JNIEXPORT jint JNICALL Java_android_graphics_Paint_native_1get_1font_1metrics_1int(JNIEnv *env, jclass clazz, jlong paint_ptr, jobject metrics)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
-	PangoContext *context = gtk_widget_get_pango_context(window);
+	PangoContext *context = atl_pango_context();
 	PangoFontMetrics *font_metrics = pango_context_get_metrics(context, paint->font, NULL);
 	int height = ceil((float)pango_font_metrics_get_height(font_metrics) / PANGO_SCALE);
 	if (metrics) {
