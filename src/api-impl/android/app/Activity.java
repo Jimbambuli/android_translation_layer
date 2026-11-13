@@ -130,7 +130,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		 * a matching filter in CATEGORY_DEFAULT (MATCH_DEFAULT_ONLY) */
 		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : new Intent();
 		/* a local file: VIEW with its type, else SEND, as from a file manager on Android */
-		if (className == null && uri != null && "file".equals(uri.getScheme())) {
+		if (className == null && uri != null && ("file".equals(uri.getScheme()) || "data".equals(uri.getScheme()))) {
 			Intent file = desktopFileIntent(uri);
 			if (file != null) {
 				intent = file;
@@ -182,6 +182,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	 * ClipData, readable (FLAG_GRANT_READ_URI_PERMISSION). Returns the intent with its activity, or null.
 	 */
 	public static Intent desktopFileIntent(Uri file) {
+		if ("data".equals(file.getScheme()))
+			return sharedTextIntent(file);
 		String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(file.toString()));
 		Intent view = new Intent(Intent.ACTION_VIEW);
 		if (type != null)
@@ -211,6 +213,24 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return null;
 	}
 
+	/**
+	 * Text another installed app shared with this one (ContextImpl.share()): it comes as a data: URI
+	 * ("data:text/plain;charset=utf-8,TEXT", percent-encoded) through --uri, and becomes what Android's
+	 * chooser sends: SEND with EXTRA_TEXT for the activity that takes text/plain. Null if none does.
+	 */
+	private static Intent sharedTextIntent(Uri data) {
+		String raw = data.getEncodedSchemeSpecificPart();
+		int comma = raw != null ? raw.indexOf(',') : -1;
+		if (comma < 0 || !raw.substring(0, comma).toLowerCase(java.util.Locale.ROOT).startsWith("text/plain"))
+			return null;
+		Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain");
+		ComponentName target = ownActivityFor(send, null);
+		if (target == null)
+			return null;
+		send.putExtra(Intent.EXTRA_TEXT, Uri.decode(raw.substring(comma + 1)));
+		return send.setComponent(target);
+	}
+
 	/* the app's activity whose filter in CATEGORY_DEFAULT matches best (MATCH_DEFAULT_ONLY), with `data` as the URI */
 	private static ComponentName ownActivityFor(Intent intent, Uri data) {
 		PackageParser.Package pkg = ATLLoadedApp.getPrimaryApplication().pkg;
@@ -222,7 +242,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			for (PackageParser.IntentInfo filter : activity.intents) {
 				if (!filter.hasCategory(Intent.CATEGORY_DEFAULT))
 					continue;
-				int score = filter.match(intent.getAction(), intent.getType(), data.getScheme(), data, intent.getCategories(), TAG);
+				int score = filter.match(intent.getAction(), intent.getType(), data != null ? data.getScheme() : null, data, intent.getCategories(), TAG);
 				if (score > best) {
 					className = activity.info.targetActivity != null ? activity.info.targetActivity : activity.className;
 					best = score;

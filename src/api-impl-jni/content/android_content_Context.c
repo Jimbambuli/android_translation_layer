@@ -306,6 +306,7 @@ enum {
 	SHARE_EMAIL,
 	SHARE_SAVE,
 	SHARE_OPEN_WITH,
+	SHARE_APP_BASE = 100, /* SHARE_APP_BASE + i: the i-th installed app (Context.runShareAppTarget()) */
 };
 
 /* runs the share target the user picked in the share sheet, after it was closed */
@@ -360,6 +361,12 @@ static void share_sheet_destroyed(GtkWindow *sheet, gpointer text_jstr)
 		g_object_unref(connection);
 	} else if (button_id == SHARE_OPEN_WITH) {
 		open_with(fd, NULL);
+	} else if (button_id >= SHARE_APP_BASE) {
+		J__Context__runShareAppTarget(env, button_id - SHARE_APP_BASE);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	} else if (button_id == SHARE_SAVE) {
 		GtkFileDialog *save_dialog = gtk_file_dialog_new();
 		gtk_file_dialog_set_title(save_dialog, atl_gtk_text("Save a File"));
@@ -404,7 +411,10 @@ static void share_sheet_add_target(GtkWidget *targets, GtkWindow *sheet, int tar
 	gtk_widget_set_size_request(button, 96, -1);
 	g_object_set_data(G_OBJECT(button), "target", GINT_TO_POINTER(target));
 	g_signal_connect(button, "clicked", G_CALLBACK(share_target_clicked), sheet);
-	gtk_box_append(GTK_BOX(targets), button);
+	if (GTK_IS_FLOW_BOX(targets))
+		gtk_flow_box_append(GTK_FLOW_BOX(targets), button);
+	else
+		gtk_box_append(GTK_BOX(targets), button);
 }
 
 static const char *jstring_or(JNIEnv *env, jobjectArray labels, int index, const char *fallback, char **to_free)
@@ -423,7 +433,8 @@ static const char *jstring_or(JNIEnv *env, jobjectArray labels, int index, const
  * composeEmail portal, or save a shared file. The labels (title, copy, save) come from the framework
  * resources, so they are in the app's language; the mail target carries the name of the mail application.
  */
-JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd, jobjectArray labels)
+JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd, jobjectArray labels,
+                                                                  jobjectArray app_labels, jobjectArray app_icons)
 {
 	char *title_free = NULL, *copy_free = NULL, *save_free = NULL, *open_with_free = NULL;
 	const char *title = jstring_or(env, labels, 0, "Share", &title_free);
@@ -495,6 +506,33 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 
 	GtkWidget *targets = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
 	GIcon *icon;
+	/* the other installed apps that take it, first, as Android's chooser lists apps before its own actions */
+	int apps = app_labels ? (*env)->GetArrayLength(env, app_labels) : 0;
+	GtkWidget *app_targets = NULL;
+	if (apps > 0) {
+		app_targets = gtk_flow_box_new();
+		gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(app_targets), GTK_SELECTION_NONE);
+		gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(app_targets), 5);
+		gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(app_targets), TRUE);
+	}
+	for (int i = 0; i < apps; i++) {
+		char *label_free = NULL, *icon_free = NULL;
+		const char *label = jstring_or(env, app_labels, i, "?", &label_free);
+		const char *icon_path = jstring_or(env, app_icons, i, NULL, &icon_free);
+		if (icon_path) {
+			GFile *file = g_file_new_for_path(icon_path);
+			icon = g_file_icon_new(file);
+			g_object_unref(file);
+		} else {
+			icon = g_themed_icon_new("application-x-executable");
+		}
+		share_sheet_add_target(app_targets, GTK_WINDOW(sheet), SHARE_APP_BASE + i, icon, label);
+		g_object_unref(icon);
+		g_free(label_free);
+		g_free(icon_free);
+	}
+	if (app_targets)
+		gtk_box_append(GTK_BOX(content), app_targets);
 	if (fd != -1) {                 /* the desktop's choice of applications for the file (OpenURI portal) */
 		icon = g_themed_icon_new("document-open");
 		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_OPEN_WITH, icon, open_with_label);
@@ -510,6 +548,14 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_EMAIL, icon, g_app_info_get_display_name(mail));
 		g_object_unref(icon);
 		g_object_unref(mail);
+	} else if (g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS)) {
+		/* in a Flatpak the host's applications are not visible, but the Email portal reaches the mail program */
+		char *mail_free = NULL;
+		const char *mail_label = labels && (*env)->GetArrayLength(env, labels) > 4 ? jstring_or(env, labels, 4, "Email", &mail_free) : "Email";
+		icon = g_themed_icon_new("mail-send");
+		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_EMAIL, icon, mail_label);
+		g_object_unref(icon);
+		g_free(mail_free);
 	}
 	if (fd != -1) {
 		icon = g_themed_icon_new("document-save");
