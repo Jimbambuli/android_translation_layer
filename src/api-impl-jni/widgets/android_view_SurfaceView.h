@@ -41,5 +41,6 @@ struct atl_surface_msg {
 	uint32_t offset;
 	uint32_t fourcc; /* the DRM format of a dmabuf, 0 for memory (memfd) with GDK_MEMORY_R8G8B8A8_PREMULTIPLIED rows */
 	uint32_t top_first; /* the rows start at the top (frames of MediaCodec), else at the bottom (GL) */
+	uint32_t crop; /* PRESENT: the scaling mode SCALE_TO_FIT_WITH_CROPPING of MediaCodec (the frame covers the widget) */
 	uint64_t modifier;
 };

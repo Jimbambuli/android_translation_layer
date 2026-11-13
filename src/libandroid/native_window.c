@@ -221,8 +221,8 @@ static void remote_memory_message(void *data, const struct atl_surface_msg *msg)
 
 /* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
  * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
- * frame is dropped (FALSE, as when that process is gone) */
-gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture)
+ * frame is dropped (FALSE, as when that process is gone); crop: the scaling mode SCALE_TO_FIT_WITH_CROPPING */
+gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
 {
 	int width = gdk_texture_get_width(texture);
 	int height = gdk_texture_get_height(texture);
@@ -263,7 +263,7 @@ gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window,
 	gdk_texture_downloader_download_into(downloader, buffer->map, width * 4);
 	gdk_texture_downloader_free(downloader);
 	buffer->busy = TRUE;
-	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i}, -1);
+	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i, .crop = crop}, -1);
 	return !native_window->remote_gone;
 }
 
