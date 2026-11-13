@@ -457,6 +457,36 @@ public class PopupMenu {
 		public SubMenu setIcon(Drawable icon) {
 			return this;
 		}
+
+		@Override
+		public SubMenu setIcon(int iconRes) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderTitle(int titleRes) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderTitle(CharSequence title) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderIcon(int iconRes) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderIcon(Drawable icon) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderView(View view) {
+			return this;
+		}
 	}
 
 	private class MenuItemImpl implements MenuItem {
