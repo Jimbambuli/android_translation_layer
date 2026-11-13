@@ -8,6 +8,7 @@ import android.atl.annotation.Export;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.LocusId;
@@ -2059,8 +2060,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return null;
 	}
 
+	/* AOSP Activity.onSearchRequested(): the search dialog for the activity's searchable (startSearch()) */
 	public boolean onSearchRequested() {
-		return false;
+		startSearch(null, false, null, false);
+		return true;
 	}
 
 	private SearchEvent mSearchEvent;
@@ -2667,9 +2670,91 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return window.getDecorView().startActionMode(callback, type);
 	}
 
-	/* AOSP Activity.startSearch(): shows the search dialog / global search. ATL has no search UI (SearchManager
-	 * has only getSearchableInfo()); onSearchRequested() answers false for the same reason */
-	public void startSearch(@Nullable String initialQuery, boolean selectInitialQuery, @Nullable Bundle appSearchData, boolean globalSearch) {
+	/* AOSP Activity.startSearch() / SearchDialog: a dialog with a text field for the searchable of this activity
+	 * (its "android.app.searchable", else the "android.app.default_searchable" of the activity or the application);
+	 * the query goes as ACTION_SEARCH with SearchManager.QUERY to the searchable activity - to this one through
+	 * onNewIntent() when it is single top, as on Android. Without a searchable nothing happens (AOSP: no dialog;
+	 * there is no global search). Suggestions are not shown. */
+	public void startSearch(@Nullable String initialQuery, boolean selectInitialQuery, @Nullable final Bundle appSearchData, boolean globalSearch) {
+		SearchManager searchManager = (SearchManager)getSystemService(Context.SEARCH_SERVICE);
+		final SearchableInfo searchable = searchableFor(searchManager);
+		if (searchable == null) {
+			Slog.i(TAG, "startSearch: no searchable for " + getComponentName());
+			return;
+		}
+		final android.widget.EditText field = new android.widget.EditText(this);
+		field.setSingleLine(true);
+		if (searchable.getHintId() != 0)
+			field.setHint(searchable.getHintId());
+		if (initialQuery != null) {
+			field.setText(initialQuery);
+			if (selectInitialQuery)
+				field.selectAll();
+		}
+		final AlertDialog[] dialog = new AlertDialog[1];
+		final Runnable submit = new Runnable() {
+			@Override
+			public void run() {
+				String query = field.getText().toString();
+				if (dialog[0] != null)
+					dialog[0].dismiss();
+				if (query.trim().isEmpty())
+					return;
+				Intent search = new Intent(Intent.ACTION_SEARCH).setComponent(searchable.getSearchActivity());
+				search.putExtra(SearchManager.QUERY, query);
+				search.putExtra(SearchManager.USER_QUERY, query);
+				if (appSearchData != null)
+					search.putExtra(SearchManager.APP_DATA, appSearchData);
+				deliverSearch(search);
+			}
+		};
+		field.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
+			@Override
+			public boolean onEditorAction(android.widget.TextView v, int actionId, KeyEvent event) {
+				submit.run();
+				return true;
+			}
+		});
+		dialog[0] = new AlertDialog.Builder(this)
+		                .setTitle(searchable.getLabelId() != 0 ? getText(searchable.getLabelId()) : getText(com.android.internal.R.string.search_go))
+		                .setView(field)
+		                .setPositiveButton(com.android.internal.R.string.search_go, new DialogInterface.OnClickListener() {
+			                @Override
+			                public void onClick(DialogInterface d, int which) {
+				                submit.run();
+			                }
+		                })
+		                .setNegativeButton(android.R.string.cancel, null)
+		                .create();
+		dialog[0].show();
+		field.requestFocus();
+	}
+
+	private SearchableInfo searchableFor(SearchManager searchManager) {
+		SearchableInfo own = searchManager.getSearchableInfo(getComponentName());
+		if (own != null)
+			return own;
+		String name = null;
+		ActivityInfo info = getActivityInfo();
+		if (info != null && info.metaData != null)
+			name = info.metaData.getString("android.app.default_searchable");
+		if (name == null && getApplicationInfo().metaData != null)
+			name = getApplicationInfo().metaData.getString("android.app.default_searchable");
+		if (name == null || name.equals("*"))
+			return null;
+		if (name.startsWith("."))
+			name = getPackageName() + name;
+		return searchManager.getSearchableInfo(new ComponentName(getPackageName(), name));
+	}
+
+	private void deliverSearch(Intent search) {
+		ActivityInfo info = getActivityInfo();
+		boolean singleTop = info != null && (info.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP || info.launchMode == ActivityInfo.LAUNCH_SINGLE_TASK
+		                                     || info.launchMode == ActivityInfo.LAUNCH_SINGLE_INSTANCE);
+		if (singleTop && getComponentName().equals(search.getComponent()))
+			performNewIntent(search);
+		else
+			startActivity(search);
 	}
 
 	/* AOSP Activity.startActivityIfNeeded(): like startActivityForResult(), except that nothing starts when the
