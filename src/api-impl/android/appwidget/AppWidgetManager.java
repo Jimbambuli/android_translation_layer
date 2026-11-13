@@ -35,5 +35,8 @@ public class AppWidgetManager {
 	/* AOSP returns early when mService == null; the desktop has no widget host */
 	public void updateAppWidget(int appWidgetId, RemoteViews views) {}
 
+	/* no widget host: there are no widgets of this provider to update */
+	public void updateAppWidget(ComponentName provider, RemoteViews views) {}
+
 	public void partiallyUpdateAppWidget(int appWidgetId, RemoteViews views) {}
 }
