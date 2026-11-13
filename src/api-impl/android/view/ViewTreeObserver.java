@@ -568,10 +568,6 @@ public final class ViewTreeObserver {
 		}
 
 		mOnPreDrawListeners.add(listener);
-
-		// FIXME haxx
-
-		listener.onPreDraw();
 	}
 
 	/**
