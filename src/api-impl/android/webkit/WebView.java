@@ -34,6 +34,9 @@ public class WebView extends ViewGroup {
 	// the page's size in CSS pixels, as in AwContents
 	private int contentWidthCss;
 	private int contentHeightCss;
+	// AwLayoutSizer: whether the last measure took the size from the parent rather than from the page
+	private boolean widthMeasurementIsFixed;
+	private boolean heightMeasurementIsFixed;
 	private boolean verticalScrollBarEnabled = true;
 	private boolean horizontalScrollBarEnabled = true;
 
@@ -162,11 +165,41 @@ public class WebView extends ViewGroup {
 	 * page, so getScrollY() and onScrollChanged() tell the app where the page is. */
 	private void internalScrollChanged(String[] parts) {
 		float scale = getScale();
+		int oldWidthCss = contentWidthCss;
+		int oldHeightCss = contentHeightCss;
 		contentWidthCss = (int)Math.ceil(Double.parseDouble(parts[4]));
 		contentHeightCss = (int)Math.ceil(Double.parseDouble(parts[5]));
 		nativeScrollX = Math.round(Float.parseFloat(parts[2]) * scale);
 		nativeScrollY = Math.round(Float.parseFloat(parts[3]) * scale);
 		scrollTo(nativeScrollX, nativeScrollY);
+		// AwLayoutSizer.onContentSizeChanged(): a size that follows the page is measured again
+		if ((contentHeightCss != oldHeightCss && !heightMeasurementIsFixed) || (contentWidthCss != oldWidthCss && !widthMeasurementIsFixed))
+			requestLayout();
+	}
+
+	/* AwLayoutSizer.onMeasure(): where the parent leaves the size open, the WebView takes the page's size,
+	 * as a wrap_content WebView in a scrolling list (UNSPECIFIED height) or one with an AT_MOST limit */
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+		int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+		int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+		int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+		int contentWidthPix = (int)(contentWidthCss * getScale());
+		int contentHeightPix = (int)(contentHeightCss * getScale());
+		int measuredWidth = contentWidthPix;
+		int measuredHeight = contentHeightPix;
+		widthMeasurementIsFixed = widthMode != MeasureSpec.UNSPECIFIED;
+		heightMeasurementIsFixed = heightMode == MeasureSpec.EXACTLY;
+		if (heightMeasurementIsFixed || (heightMode == MeasureSpec.AT_MOST && contentHeightPix > heightSize))
+			measuredHeight = heightSize;
+		if (widthMeasurementIsFixed)
+			measuredWidth = widthSize;
+		if (measuredHeight < contentHeightPix)
+			measuredHeight |= MEASURED_STATE_TOO_SMALL;
+		if (measuredWidth < contentWidthPix)
+			measuredWidth |= MEASURED_STATE_TOO_SMALL;
+		setMeasuredDimension(measuredWidth, measuredHeight);
 	}
 
 	/* like WebViewChromium.onScrollChanged() -> AwScrollOffsetManager.onContainerViewScrollChanged(): an
