@@ -574,6 +574,7 @@ srcs = [
 	'android/media/ResourceBusyException.java',
 	'android/media/Ringtone.java',
 	'android/media/RingtoneManager.java',
+	'android/media/RemoteControlClient.java',
 	'android/media/RouteDiscoveryPreference.java',
 	'android/media/RouteListingPreference.java',
 	'android/media/SoundPool.java',
