@@ -3072,8 +3072,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 				view = (View)view.parent;
 			else
 				break;
+			/* AOSP calls mParent.requestLayout(): a parent that overrides it gets the call and goes on from
+			 * there; Compose's AndroidViewsHandler remeasures the layout node of the child that asked */
+			if ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0 && overridesRequestLayout(view.getClass())) {
+				view.requestLayout();
+				break;
+			}
 		}
 	};
+
+	private static final Map<Class<?>, Boolean> requestLayoutOverridden = new HashMap<>();
+
+	private static boolean overridesRequestLayout(Class<?> viewClass) {
+		Boolean overridden = requestLayoutOverridden.get(viewClass);
+		if (overridden == null) {
+			try {
+				overridden = viewClass.getMethod("requestLayout").getDeclaringClass() != View.class;
+			} catch (NoSuchMethodException e) {
+				overridden = false;
+			}
+			requestLayoutOverridden.put(viewClass, overridden);
+		}
+		return overridden;
+	}
 
 	public void setOverScrollMode(int mode) {
 		if (mode != OVER_SCROLL_ALWAYS && mode != OVER_SCROLL_IF_CONTENT_SCROLLS && mode != OVER_SCROLL_NEVER) {
