@@ -53,9 +53,14 @@ public class ActivityManager {
 		}
 	}
 
+	/* the entry of the task in the list of recent apps; ATL has no such list, the window has its own title */
 	public static class TaskDescription {
+		public TaskDescription() {}
 		public TaskDescription(String name) {}
+		public TaskDescription(String name, Bitmap icon) {}
 		public TaskDescription(String name, Bitmap icon, int color) {}
+		public TaskDescription(String name, int iconRes) {}
+		public TaskDescription(String name, int iconRes, int colorPrimary) {}
 	}
 
 	/* the app's processes (android:process, see ATLProcess); a process started by the main process knows itself */
