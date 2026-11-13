@@ -1127,12 +1127,16 @@ static void pinned_menu_update(JNIEnv *env)
 	if (enabled_flags)
 		(*env)->ReleaseBooleanArrayElements(env, enabled, enabled_flags, JNI_ABORT);
 	GtkWidget *expand = gtk_button_new_from_icon_name("window-maximize-symbolic");
-	gtk_widget_set_tooltip_text(expand, "Expand");
+	char *text = atl_framework_string(env, pinned_activity, "expand_button_content_description_collapsed");
+	gtk_widget_set_tooltip_text(expand, text);
+	g_free(text);
 	gtk_widget_set_hexpand(expand, TRUE);
 	g_signal_connect_swapped(expand, "clicked", G_CALLBACK(on_pinned_mouse_back), NULL);
 	gtk_box_append(GTK_BOX(pinned_menu), expand);
 	GtkWidget *close = gtk_button_new_from_icon_name("window-close-symbolic");
-	gtk_widget_set_tooltip_text(close, "Close");
+	text = atl_framework_string(env, pinned_activity, "close_button_text");
+	gtk_widget_set_tooltip_text(close, text);
+	g_free(text);
 	g_signal_connect_swapped(close, "clicked", G_CALLBACK(pinned_task_dismiss), NULL);
 	gtk_box_append(GTK_BOX(pinned_menu), close);
 }

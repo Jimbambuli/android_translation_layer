@@ -1276,6 +1276,7 @@ int main(int argc, char **argv)
 	// locale on android is always either C or C.UTF-8, and some apps might unbeknownst to them depend on that
 	// for correct functionality
 	setenv("LC_ALL", "C.UTF-8", 1);
+	atl_use_user_messages_locale();
 
 	libc_bio_set_apply_path_overrides_func(apply_path_overrides);
 

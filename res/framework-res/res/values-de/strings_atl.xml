@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- PermissionController/res/values-de/strings.xml (AOSP packages/modules/Permission android14-release,
+     Apache License 2.0) -->
+<resources>
+    <string name="app_permission_button_allow_always" msgid="4573292371734011171">"Immer zulassen"</string>
+</resources>

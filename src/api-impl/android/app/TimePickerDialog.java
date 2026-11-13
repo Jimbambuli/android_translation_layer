@@ -18,7 +18,7 @@ public class TimePickerDialog extends AlertDialog implements TimePicker.OnTimeCh
 		super(context, resolveDialogTheme(context, themeResId));
 
 		time_set_listener = listener;
-		setTitle("Time Picker");
+		setTitle(R.string.time_picker_dialog_title);
 		time_picker = new TimePicker(context);
 		time_picker.setHour(hourOfDay);
 		time_picker.setMinute(minute);

@@ -31015,6 +31015,9 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Message informing user that the requested activity could not be found [CHAR LIMIT=none]
          */
 		public static final int app_not_found = 0x010407a6;
+		/**  PermissionController (packages/modules/Permission): the label of the background location option
+         */
+		public static final int app_permission_button_allow_always = 0x01040a32;
 		/**  [CHAR LIMIT=NONE] Stub notification text for an app running a service that has provided
          a bad bad notification for itself.
          */
@@ -38193,7 +38196,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
       https://developer.android.com/training/articles/security-key-attestation#certificate_status
 
          */
-		public static final int vendor_required_attestation_revocation_list_url = 0x01040a32;
+		public static final int vendor_required_attestation_revocation_list_url = 0x01040a33;
 		/**  Notification content to prompt the user that some accessibility service has view and control access. [CHAR LIMIT=none]
          */
 		public static final int view_and_control_notification_content = 0x010409ea;

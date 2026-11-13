@@ -23,13 +23,16 @@ JNIEXPORT jlong JNICALL Java_android_widget_TimePicker_native_1constructor(JNIEn
 	gtk_widget_set_margin_top(vbox, 10);
 
 	GtkWidget *time_select_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+	char *text;
 
 	// add hour input
 	GtkWidget *hour_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	GtkWidget *hours_spin_btn = gtk_spin_button_new_with_range(0.0, 24.0, 1.0);
 	gtk_orientable_set_orientation(GTK_ORIENTABLE(hours_spin_btn), GTK_ORIENTATION_VERTICAL);
 	gtk_widget_set_size_request(hour_vbox, 60, -1);
-	gtk_widget_set_tooltip_text(hours_spin_btn, "Hours");
+	text = atl_framework_string(env, context, "select_hours");
+	gtk_widget_set_tooltip_text(hours_spin_btn, text);
+	g_free(text);
 	gtk_box_append(GTK_BOX(hour_vbox), hours_spin_btn);
 	gtk_box_append(GTK_BOX(time_select_hbox), hour_vbox);
 	g_signal_connect(GTK_SPIN_BUTTON(hours_spin_btn), "output", G_CALLBACK(transform_spin_txt_cb), NULL);
@@ -43,7 +46,9 @@ JNIEXPORT jlong JNICALL Java_android_widget_TimePicker_native_1constructor(JNIEn
 	GtkWidget *minutes_spin_btn = gtk_spin_button_new_with_range(0.0, 60.0, 1.0);
 	gtk_orientable_set_orientation(GTK_ORIENTABLE(minutes_spin_btn), GTK_ORIENTATION_VERTICAL);
 	gtk_widget_set_size_request(minute_vbox, 59, -1);
-	gtk_widget_set_tooltip_text(minutes_spin_btn, "Minutes");
+	text = atl_framework_string(env, context, "select_minutes");
+	gtk_widget_set_tooltip_text(minutes_spin_btn, text);
+	g_free(text);
 	gtk_box_append(GTK_BOX(minute_vbox), minutes_spin_btn);
 	gtk_box_append(GTK_BOX(time_select_hbox), minute_vbox);
 	g_signal_connect(GTK_SPIN_BUTTON(minutes_spin_btn), "output", G_CALLBACK(transform_spin_txt_cb), NULL);
@@ -54,7 +59,9 @@ JNIEXPORT jlong JNICALL Java_android_widget_TimePicker_native_1constructor(JNIEn
 	GtkWidget *button = gtk_button_new();
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 	gtk_button_set_child(GTK_BUTTON(button), box);
-	gtk_box_append(GTK_BOX(box), gtk_label_new("Set time"));
+	text = atl_framework_string(env, context, "time_picker_dialog_title");
+	gtk_box_append(GTK_BOX(box), gtk_label_new(text));
+	g_free(text);
 
 	gtk_box_append(GTK_BOX(button_hbox), button);
 	gtk_box_append(GTK_BOX(vbox), button_hbox);
