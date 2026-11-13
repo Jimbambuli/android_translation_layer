@@ -50,8 +50,10 @@ static gboolean render(GtkWidget *toplevel, const char *path)
 	int width = gtk_widget_get_width(toplevel);
 	int height = gtk_widget_get_height(toplevel);
 	GskRenderer *renderer = gtk_native_get_renderer(GTK_NATIVE(toplevel));
-	if (!renderer || width <= 0 || height <= 0)
+	if (!renderer || width <= 0 || height <= 0) {
+		g_printerr("ATLViewDump: %s: no renderer or size %dx%d\n", path, width, height);
 		return FALSE;
+	}
 
 	GtkSnapshot *snapshot = gtk_snapshot_new();
 	paint(snapshot, toplevel, 0, 0);
@@ -67,17 +69,23 @@ static gboolean render(GtkWidget *toplevel, const char *path)
 	}
 	g_ptr_array_free(popovers, TRUE);
 	GskRenderNode *node = gtk_snapshot_free_to_node(snapshot);
-	if (!node)
+	if (!node) {
+		g_printerr("ATLViewDump: %s: nothing drawn\n", path);
 		return FALSE;
+	}
 
 	graphene_rect_t bounds = GRAPHENE_RECT_INIT(0, 0, width, height);
 	GdkTexture *texture = gsk_renderer_render_texture(renderer, node, &bounds);
 	gsk_render_node_unref(node);
-	if (!texture)
+	if (!texture) {
+		g_printerr("ATLViewDump: %s: rendering failed\n", path);
 		return FALSE;
+	}
 
 	char *tmp = g_strconcat(path, ".tmp", NULL);
 	gboolean ok = gdk_texture_save_to_png(texture, tmp) && g_rename(tmp, path) == 0;
+	if (!ok)
+		g_printerr("ATLViewDump: %s: cannot write it\n", path);
 	g_free(tmp);
 	g_object_unref(texture);
 	return ok;
