@@ -1,3 +1,5 @@
+#define _GNU_SOURCE // memfd_create()
+
 #include <gdk/wayland/gdkwayland.h>
 #include <gdk/x11/gdkx.h>
 #include <gtk/gtk.h>
@@ -9,6 +11,9 @@
 
 #include <GL/gl.h>
 #include <GLES2/gl2.h>
+
+#include <sys/mman.h>
+#include <unistd.h>
 
 // FIXME: put the header in a common place
 #include "../api-impl-jni/defines.h"
@@ -139,6 +144,17 @@ EGLDisplay bionic_eglGetDisplay(EGLNativeDisplayType native_display)
 	}
 }
 
+/* The display apps get is GTK's own (see above). On Android, eglTerminate() of a display only ends it when
+ * every eglInitialize() is matched (egl_display_t::terminate() counts them). Here an app that terminates it
+ * would take GTK's contexts with it, and the window would not be drawn any more (Firefox does that at its
+ * first start). GTK keeps the display until the end, so it stays initialized. */
+EGLBoolean bionic_eglTerminate(EGLDisplay display)
+{
+	if (display == bionic_eglGetDisplay(EGL_DEFAULT_DISPLAY))
+		return EGL_TRUE;
+	return eglTerminate(display);
+}
+
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
 	GdkDisplay *gdk_display = gtk_root_get_display(GTK_ROOT(window));
@@ -238,17 +254,36 @@ struct _ATLSurface {
 		GdkGLTextureBuilder *texture_builder;
 		uint32_t gl_texture;
 		uint32_t gl_framebuffer;
+		int fd; /* of a remote window: the dmabuf or memfd the other process shows */
+		void *map; /* of a memfd */
+		size_t size;
 	} buffers[NUM_BUFFERS];
 	struct atl_surface_buffer *back_buffer;
 	struct atl_surface_buffer *front_buffer;
 	GAsyncQueue *vsync;
 	GAsyncQueue *unused_buffers;
 	gboolean destroyed;
+	/* the window of a Surface of another process (ANativeWindow.remote_fd): the buffers go there instead of to a
+	 * widget of this process */
+	struct ANativeWindow *remote;
 };
 G_DECLARE_FINAL_TYPE(ATLSurface, atl_surface, ATL, SURFACE, GObject);
 static void atl_surface_dispose(GObject *object)
 {
 	ATLSurface *atl_surface = ATL_SURFACE(object);
+	if (atl_surface->remote) {
+		for (int i = 0; i < NUM_BUFFERS; i++) {
+			if (atl_surface->buffers[i].map)
+				munmap(atl_surface->buffers[i].map, atl_surface->buffers[i].size);
+			if (atl_surface->buffers[i].fd >= 0)
+				close(atl_surface->buffers[i].fd);
+		}
+		if (atl_surface->unused_buffers)
+			g_async_queue_unref(atl_surface->unused_buffers);
+		if (atl_surface->vsync)
+			g_async_queue_unref(atl_surface->vsync);
+		return;
+	}
 	GdkGLContext *gtk_gl_context = gdk_surface_create_gl_context(gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(atl_surface->surface_view_widget))), NULL);
 	gdk_gl_context_make_current(gtk_gl_context);
 	for (int i = 0; i < NUM_BUFFERS; i++) {
@@ -303,7 +338,12 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 		ATLSurface *atl_surface = g_object_new(atl_surface_get_type(), NULL);
 		atl_surface->width = native_window->width;
 		atl_surface->height = native_window->height;
-		atl_surface->surface_view_widget = SURFACE_VIEW_WIDGET(g_object_ref(native_window->surface_view_widget));
+		if (native_window->remote_fd >= 0) {
+			atl_surface->remote = native_window;
+			for (int i = 0; i < NUM_BUFFERS; i++)
+				atl_surface->buffers[i].fd = -1;
+		} else
+			atl_surface->surface_view_widget = SURFACE_VIEW_WIDGET(g_object_ref(native_window->surface_view_widget));
 		EGLint alpha_size = 0;
 		EGLint depth_size = 0;
 		EGLint stencil_size = 0;
@@ -356,6 +396,8 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 	} else {
 		ATLSurface *atl_surface = surface;
 		atl_surface->destroyed = TRUE;
+		if (atl_surface->remote)
+			ANativeWindow_remoteSetHandler(atl_surface->remote, NULL, NULL);
 		for (int i = 0; i < NUM_BUFFERS; i++) {
 			if (atl_surface->buffers[i].egl_image)
 				eglDestroyImage(display, atl_surface->buffers[i].egl_image);
@@ -377,6 +419,123 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 
 static GHashTable *draw_surface_hashtable = NULL;
 static GHashTable *read_surface_hashtable = NULL;
+
+/* -- the window of a Surface of another process: a BufferQueue over a socket (android_view_SurfaceView.h) -- */
+
+/* hands buffer i to the process showing the surface: as dmabuf if the driver exports one
+ * (EGL_MESA_image_dma_buf_export), else as memfd that eglSwapBuffers() copies the frame into */
+static void remote_buffer_share(ATLSurface *atl_surface, int i)
+{
+	struct atl_surface_buffer *buffer = &atl_surface->buffers[i];
+	EGLDisplay display = eglGetCurrentDisplay();
+	struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_BUFFER, .index = i, .width = atl_surface->width, .height = atl_surface->height};
+	static PFNEGLEXPORTDMABUFIMAGEQUERYMESAPROC eglExportDMABUFImageQueryMESA;
+	static PFNEGLEXPORTDMABUFIMAGEMESAPROC eglExportDMABUFImageMESA;
+	static int has_export = -1;
+	if (has_export < 0) {
+		const char *extensions = eglQueryString(display, EGL_EXTENSIONS);
+		has_export = extensions && strstr(extensions, "EGL_MESA_image_dma_buf_export");
+		eglExportDMABUFImageQueryMESA = (PFNEGLEXPORTDMABUFIMAGEQUERYMESAPROC)eglGetProcAddress("eglExportDMABUFImageQueryMESA");
+		eglExportDMABUFImageMESA = (PFNEGLEXPORTDMABUFIMAGEMESAPROC)eglGetProcAddress("eglExportDMABUFImageMESA");
+	}
+	int fourcc = 0;
+	int n_planes = 0;
+	EGLuint64KHR modifier = 0;
+	EGLint stride = 0;
+	EGLint offset = 0;
+	if (has_export > 0 && buffer->egl_image && !getenv("ATL_SURFACE_NO_DMABUF") &&
+	    eglExportDMABUFImageQueryMESA(display, buffer->egl_image, &fourcc, &n_planes, &modifier) && n_planes == 1 &&
+	    eglExportDMABUFImageMESA(display, buffer->egl_image, &buffer->fd, &stride, &offset)) {
+		msg.fourcc = fourcc;
+		msg.modifier = modifier;
+		msg.stride = stride;
+		msg.offset = offset;
+	} else {
+		msg.stride = atl_surface->width * 4;
+		buffer->size = (size_t)msg.stride * atl_surface->height;
+		buffer->fd = memfd_create("atl-surface", MFD_CLOEXEC);
+		if (buffer->fd < 0 || ftruncate(buffer->fd, buffer->size) < 0 ||
+		    (buffer->map = mmap(NULL, buffer->size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fd, 0)) == MAP_FAILED) {
+			fprintf(stderr, "eglCreateWindowSurface: no buffer for a surface of another process: %m\n");
+			buffer->map = NULL;
+			return;
+		}
+	}
+	fprintf(stderr, "EGL::: buffer %d of a surface of another process: %s, %dx%d\n", i, msg.fourcc ? "dmabuf" : "memfd", msg.width, msg.height);
+	if (buffer->egl_image)
+		eglDestroyImage(display, buffer->egl_image);
+	buffer->egl_image = NULL;
+	ANativeWindow_remoteSend(atl_surface->remote, &msg, buffer->fd);
+}
+
+/* ANativeWindow_remoteRead(), with remote_lock held */
+static void remote_message(void *data, const struct atl_surface_msg *msg)
+{
+	ATLSurface *atl_surface = data;
+	if (msg->type == ATL_SURFACE_MSG_RELEASE && msg->index < NUM_BUFFERS)
+		g_async_queue_push(atl_surface->unused_buffers, &atl_surface->buffers[msg->index]);
+	else if (msg->type == ATL_SURFACE_MSG_FRAME)
+		g_async_queue_push(atl_surface->vsync, GINT_TO_POINTER(1));
+}
+
+/* g_async_queue_timeout_pop() for the queues filled by the messages of the other process */
+static gpointer remote_pop(ATLSurface *atl_surface, GAsyncQueue *queue, int timeout_ms)
+{
+	gint64 end = g_get_monotonic_time() + timeout_ms * 1000;
+	gpointer item;
+	while (!(item = g_async_queue_try_pop(queue))) {
+		int left = (end - g_get_monotonic_time()) / 1000;
+		if (left <= 0 || !ANativeWindow_remoteRead(atl_surface->remote, left))
+			return g_async_queue_try_pop(queue);
+	}
+	return item;
+}
+
+/* eglSwapBuffers(): the back buffer goes to the other process (a memfd gets the frame copied in), like the frames
+ * of a widget of this process paced by its frame callbacks */
+static EGLBoolean remote_swap_buffers(ATLSurface *atl_surface)
+{
+	struct atl_surface_buffer *buffer = atl_surface->back_buffer;
+	if (buffer && buffer->map) {
+		/* the app's pack state must not change where the pixels go */
+		GLint pack_buffer = 0, row_length = 0, skip_rows = 0, skip_pixels = 0, alignment = 4;
+		const char *version = (const char *)glGetString(GL_VERSION);
+		gboolean es3 = version && strncmp(version, "OpenGL ES ", 10) == 0 && version[10] >= '3';
+		if (es3) {
+			glGetIntegerv(0x88ED /* GL_PIXEL_PACK_BUFFER_BINDING */, &pack_buffer);
+			glGetIntegerv(0x0D02 /* GL_PACK_ROW_LENGTH */, &row_length);
+			glGetIntegerv(0x0D03 /* GL_PACK_SKIP_ROWS */, &skip_rows);
+			glGetIntegerv(0x0D04 /* GL_PACK_SKIP_PIXELS */, &skip_pixels);
+			glBindBuffer(0x88EB /* GL_PIXEL_PACK_BUFFER */, 0);
+			glPixelStorei(0x0D02, 0);
+			glPixelStorei(0x0D03, 0);
+			glPixelStorei(0x0D04, 0);
+		}
+		glGetIntegerv(GL_PACK_ALIGNMENT, &alignment);
+		glPixelStorei(GL_PACK_ALIGNMENT, 4);
+		glBindFramebuffer(GL_FRAMEBUFFER, buffer->gl_framebuffer);
+		glReadPixels(0, 0, atl_surface->width, atl_surface->height, GL_RGBA, GL_UNSIGNED_BYTE, buffer->map);
+		glPixelStorei(GL_PACK_ALIGNMENT, alignment);
+		if (es3) {
+			glBindBuffer(0x88EB, pack_buffer);
+			glPixelStorei(0x0D02, row_length);
+			glPixelStorei(0x0D03, skip_rows);
+			glPixelStorei(0x0D04, skip_pixels);
+		}
+	} else if (buffer) {
+		glFinish(); // the dmabuf is read by the other process' GPU context: no fence crosses the processes here
+	}
+	if (buffer && buffer->fd >= 0) {
+		remote_pop(atl_surface, atl_surface->vsync, 50);
+		ANativeWindow_remoteSend(atl_surface->remote, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = buffer - atl_surface->buffers}, -1);
+		atl_surface->back_buffer = NULL;
+	}
+	/* a process that is gone gives no buffer back: draw into the same one again */
+	if (!atl_surface->back_buffer)
+		atl_surface->back_buffer = atl_surface->remote->remote_gone ? buffer : remote_pop(atl_surface, atl_surface->unused_buffers, 100);
+	glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
+	return EGL_TRUE;
+}
 
 EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface read, EGLContext context)
 {
@@ -405,7 +564,7 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 			glGetIntegerv(GL_RENDERBUFFER_BINDING, &previous_renderbuffer);
 			glGenRenderbuffers(1, &atl_surface->renderbuffer);
 			glBindRenderbuffer(GL_RENDERBUFFER, atl_surface->renderbuffer);
-			glRenderbufferStorage(GL_RENDERBUFFER, atl_surface->renderbuffer_format, native_window->width, native_window->height);
+			glRenderbufferStorage(GL_RENDERBUFFER, atl_surface->renderbuffer_format, atl_surface->width, atl_surface->height);
 			glBindRenderbuffer(GL_RENDERBUFFER, previous_renderbuffer);
 		}
 
@@ -413,7 +572,7 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 			atl_surface->buffers[i].surface = atl_surface;
 			glGenTextures(1, &atl_surface->buffers[i].gl_texture);
 			glBindTexture(GL_TEXTURE_2D, atl_surface->buffers[i].gl_texture);
-			glTexImage2D(GL_TEXTURE_2D, 0, atl_surface->framebuffer_format, native_window->width, native_window->height, 0, atl_surface->framebuffer_format, GL_UNSIGNED_BYTE, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, atl_surface->framebuffer_format, atl_surface->width, atl_surface->height, 0, atl_surface->framebuffer_format, GL_UNSIGNED_BYTE, NULL);
 
 			// Create EGLImage from texture
 			atl_surface->buffers[i].egl_image = eglCreateImage(eglGetCurrentDisplay(),
@@ -427,14 +586,22 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, atl_surface->buffers[i].gl_texture, 0);
 			if (atl_surface->renderbuffer)
 				glFramebufferRenderbuffer(GL_FRAMEBUFFER, atl_surface->renderbuffer_attachment, GL_RENDERBUFFER, atl_surface->renderbuffer);
+			if (atl_surface->remote)
+				remote_buffer_share(atl_surface, i);
 			g_async_queue_push(atl_surface->unused_buffers, &atl_surface->buffers[i]);
 		}
 		glBindTexture(GL_TEXTURE_2D, previousTexture);
+		if (atl_surface->remote)
+			ANativeWindow_remoteSetHandler(atl_surface->remote, remote_message, atl_surface);
 	}
-	if (!atl_surface->back_buffer) {
-		atl_surface->back_buffer = g_async_queue_pop(atl_surface->unused_buffers);
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer->gl_framebuffer);
+	/* the buffers come back when GTK lets go of their textures, on the main thread; a thread drawing for an app
+	 * whose main thread waits for it (GeckoView pausing its compositor) must not wait for that forever: like in
+	 * eglSwapBuffers(), without a free buffer it draws into nothing until the next swap */
+	if (!atl_surface->back_buffer && atl_surface->remote)
+		atl_surface->back_buffer = remote_pop(atl_surface, atl_surface->unused_buffers, 100);
+	else if (!atl_surface->back_buffer)
+		atl_surface->back_buffer = g_async_queue_timeout_pop(atl_surface->unused_buffers, 100000); // 100ms
+	glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
 	return ret;
 }
 
@@ -501,6 +668,9 @@ EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 	}
 	ATLSurface *atl_surface = surface;
 
+	if (atl_surface->remote)
+		return remote_swap_buffers(atl_surface);
+
 	glFlush();
 	if (atl_surface->back_buffer) {
 		g_async_queue_timeout_pop(atl_surface->vsync, 50000); // 50ms
@@ -525,9 +695,9 @@ EGLBoolean bionic_eglQuerySurface(EGLDisplay display, EGLSurface surface, EGLint
 	if (!native_window)
 		return eglQuerySurface(display, surface, attribute, value);
 	if (attribute == EGL_WIDTH) {
-		*value = native_window->width;
+		*value = ((ATLSurface *)surface)->width; // the size of its buffers, as on the window of another process
 	} else if (attribute == EGL_HEIGHT) {
-		*value = native_window->height;
+		*value = ((ATLSurface *)surface)->height;
 	} else if (attribute == 0x313D /* EGL_BUFFER_AGE_EXT */) {
 		/* the back buffer's contents are not kept for the app: it redraws everything */
 		*value = 0;
@@ -556,5 +726,5 @@ void bionic_glBindFramebuffer(GLenum target, GLuint framebuffer)
 	if (getenv("ATL_DIRECT_EGL") || framebuffer != 0)
 		return glBindFramebuffer(target, framebuffer);
 	ATLSurface *atl_surface = g_hash_table_lookup(draw_surface_hashtable, eglGetCurrentContext());
-	return glBindFramebuffer(target, atl_surface ? atl_surface->back_buffer->gl_framebuffer : 0);
+	return glBindFramebuffer(target, atl_surface && atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
 }

@@ -7,12 +7,15 @@ import java.io.Closeable;
  * SurfaceView (getSurfaceControl()) or a child of one, and a Surface made from it draws into the SurfaceView's
  * widget. The layer properties of a Transaction (visibility, buffer size, parent) are not applied: the child
  * covers its SurfaceView, as a child layer that apps like GeckoView make for their content does.
+ * Parceled, it travels as the endpoint of its SurfaceView's widget, like a Surface (Surface.Endpoint).
  */
-public final class SurfaceControl {
+public final class SurfaceControl implements android.os.Parcelable {
 	private final SurfaceView view;
 	private SurfaceControl parent;
 	private final String name;
 	private volatile boolean released;
+	/* of a SurfaceControl read from a parcel: the Surface.Endpoint it was written as, or that of another process */
+	private android.os.IBinder endpoint;
 
 	SurfaceControl(SurfaceView view, SurfaceControl parent, String name) {
 		this.view = view;
@@ -24,7 +27,45 @@ public final class SurfaceControl {
 	long atl_widget() {
 		if (view != null)
 			return view.widget;
+		if (endpoint instanceof Surface.Endpoint)
+			return ((Surface.Endpoint)endpoint).widget;
 		return parent != null ? parent.atl_widget() : 0;
+	}
+
+	/* the endpoint in another process a SurfaceControl read from a parcel draws into, or null */
+	android.os.IBinder atl_remoteEndpoint() {
+		if (view != null || endpoint instanceof Surface.Endpoint)
+			return null;
+		if (endpoint != null)
+			return endpoint;
+		return parent != null ? parent.atl_remoteEndpoint() : null;
+	}
+
+	public static final android.os.Parcelable.Creator<SurfaceControl> CREATOR = new android.os.Parcelable.Creator<SurfaceControl>() {
+		@Override
+		public SurfaceControl createFromParcel(android.os.Parcel source) {
+			SurfaceControl sc = new SurfaceControl(null, null, source.readString());
+			sc.endpoint = source.readStrongBinder();
+			return sc;
+		}
+
+		@Override
+		public SurfaceControl[] newArray(int size) {
+			return new SurfaceControl[size];
+		}
+	};
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeString(name);
+		android.os.IBinder remote = atl_remoteEndpoint();
+		long widget = atl_widget();
+		dest.writeStrongBinder(remote != null ? remote : widget != 0 ? new Surface.Endpoint(widget, null) : null);
 	}
 
 	public boolean isValid() {
