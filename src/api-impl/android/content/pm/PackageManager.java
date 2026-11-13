@@ -2350,6 +2350,9 @@ public class PackageManager {
 			/* the activity's own window on the desktop, see Activity.enterPictureInPictureMode() */
 			case FEATURE_PICTURE_IN_PICTURE:
 				return true;
+			/* WebView is WebKitGTK (apps such as Jellyfin refuse to start without the feature) */
+			case "android.software.webview":
+				return true;
 			default:
 				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
 				return false;

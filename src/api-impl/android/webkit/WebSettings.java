@@ -26,12 +26,20 @@ public class WebSettings {
 		HIGH,
 	}
 
+	/* the string of an Android System WebView, built from what ATL reports as android.os.Build. Apps read the Chrome
+	 * major version from it (Jellyfin refuses below 80); 120 is the last Chrome whose reduced user agent still names
+	 * the model. The pages themselves are rendered by WebKitGTK, whose own user agent is left alone */
+	private static String defaultUserAgent() {
+		return "Mozilla/5.0 (Linux; Android " + android.os.Build.VERSION.RELEASE + "; " + android.os.Build.MODEL + " Build/" +
+		       android.os.Build.ID + "; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36";
+	}
+
 	public static String getDefaultUserAgent(android.content.Context context) {
-		return "GDPR VIOLATION";
+		return defaultUserAgent();
 	}
 
 	public String getUserAgentString() {
-		return "GDPR VIOLATION";
+		return defaultUserAgent();
 	}
 
 	public void setUserAgentString(String userAgentString) {}
