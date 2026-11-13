@@ -169,6 +169,7 @@ srcs = [
 	'android/app/SharedPreferencesImpl.java',
 	'android/app/StatusBarManager.java',
 	'android/app/TabActivity.java',
+	'android/app/TaskStackBuilder.java',
 	'android/app/TimePickerDialog.java',
 	'android/app/UiModeManager.java',
 	'android/app/VoiceInteractor.java',
