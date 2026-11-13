@@ -40,6 +40,12 @@ public class AudioManager {
 		}
 	}
 
+	/* hidden in AOSP (@UnsupportedAppUsage), used by cubeb (Firefox): the output latency in ms; FIXME arbitrary like
+	 * the properties above (a few buffers of PROPERTY_OUTPUT_FRAMES_PER_BUFFER) */
+	public int getOutputLatency(int streamType) {
+		return 20;
+	}
+
 	public interface OnAudioFocusChangeListener {
 	}
 
