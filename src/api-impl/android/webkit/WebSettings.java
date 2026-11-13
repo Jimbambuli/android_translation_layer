@@ -8,6 +8,7 @@ public class WebSettings {
 	private boolean allowFileAccessFromFileURLs;
 	private boolean allowUniversalAccessFromFileURLs;
 	private String serifFontFamily = "serif";
+	private String userAgent; /* null: the default */
 
 	WebSettings(WebView webView) {
 		this.webView = webView;
@@ -26,15 +27,29 @@ public class WebSettings {
 		HIGH,
 	}
 
+	/* the string of an Android System WebView, built from what ATL reports as android.os.Build. Apps read the Chrome
+	 * major version from it (Jellyfin refuses below 80); 120 is the last Chrome whose reduced user agent still names
+	 * the model. WebKitGTK sends it too (WebView sets it on its WebKitSettings), so the app's pages see the user
+	 * agent the app was told about */
+	static String defaultUserAgent() {
+		return "Mozilla/5.0 (Linux; Android " + android.os.Build.VERSION.RELEASE + "; " + android.os.Build.MODEL + " Build/" +
+		       android.os.Build.ID + "; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36";
+	}
+
 	public static String getDefaultUserAgent(android.content.Context context) {
-		return "GDPR VIOLATION";
+		return defaultUserAgent();
 	}
 
 	public String getUserAgentString() {
-		return "GDPR VIOLATION";
+		return userAgent != null ? userAgent : defaultUserAgent();
 	}
 
-	public void setUserAgentString(String userAgentString) {}
+	/* AOSP: null or an empty string restores the default */
+	public void setUserAgentString(String userAgentString) {
+		userAgent = (userAgentString == null || userAgentString.isEmpty()) ? null : userAgentString;
+		if (webView != null)
+			webView.setWebKitSetting("user-agent", getUserAgentString());
+	}
 
 	public void setSupportMultipleWindows(boolean supportMultipleWindows) {}
 

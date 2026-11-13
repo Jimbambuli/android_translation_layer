@@ -159,6 +159,7 @@ wayland_protos_dep = dependency('wayland-protocols', version: '>=1.12')
 # wayland protocols for osk
 subdir('protocol')
 
+webext_dir = get_option('libdir') / 'android_translation_layer/webext'
 libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/android_app_NativeActivity.c',
                                                                   	'src/api-impl-jni/android_atl_ATLViewDump.c',
@@ -281,7 +282,14 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   ],
                                                                   c_args: [
                                                                   	'-D_LARGEFILE64_SOURCE',
+                                                                  	'-DATL_WEBEXT_DIR="' + get_option('prefix') / webext_dir + '"',
                                                                   ])
+
+# the web process extension of WebView (shouldInterceptRequest), loaded by WebKit's web process
+shared_module('atl_webext', 'src/webext/atl_webext.c',
+              dependencies: dependency('webkitgtk-web-process-extension-6.0'),
+              install: true,
+              install_dir: webext_dir)
 
 # atl.gresources.xml
 resources = gnome.compile_resources('com.gitlab.android_translation_layer.android_translation_layer', files('src/main-executable/atl.gresource.xml'))

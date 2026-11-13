@@ -41,6 +41,7 @@ public class MediaCodecInfo {
 
 	public CodecCapabilities getCapabilitiesForType(String type) {
 		CodecCapabilities caps = new CodecCapabilities();
+		caps.mimeType = type;
 		if ("video/avc".equals(type)) {
 			caps.profileLevels = new CodecProfileLevel[] {
 				new CodecProfileLevel(CodecProfileLevel.AVCProfileBaseline, CodecProfileLevel.AVCLevel61),
@@ -52,7 +53,14 @@ public class MediaCodecInfo {
 
 	public static class CodecCapabilities {
 
-		public CodecProfileLevel[] profileLevels;
+		/* AOSP: never null, empty for a codec without profiles */
+		public CodecProfileLevel[] profileLevels = new CodecProfileLevel[0];
+
+		private String mimeType;
+
+		public String getMimeType() {
+			return mimeType;
+		}
 
 		/* Public modifiable field, as in AOSP; ATL advertises no specific color formats. */
 		public int[] colorFormats = new int[0];
@@ -258,6 +266,18 @@ public class MediaCodecInfo {
 
 		public int getMaxInputChannelCount() {
 			return 2;
+		}
+
+		/* No codec-specific limits are published; report the full non-negative range. */
+		public android.util.Range<Integer> getBitrateRange() {
+			return new android.util.Range<Integer>(0, Integer.MAX_VALUE);
+		}
+
+		/* every rate is accepted (see isSampleRateSupported); the range reaches up to FFmpeg's highest audio rate */
+		public android.util.Range<Integer>[] getSupportedSampleRateRanges() {
+			@SuppressWarnings("unchecked")
+			android.util.Range<Integer>[] ranges = new android.util.Range[] {new android.util.Range<Integer>(8000, 192000)};
+			return ranges;
 		}
 	}
 }

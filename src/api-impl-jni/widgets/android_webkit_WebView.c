@@ -1,6 +1,8 @@
 #include <math.h>
 #include <string.h>
 #include <gio/gunixinputstream.h>
+#include <gio/gunixsocketaddress.h>
+#include <glib/gstdio.h>
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
 
@@ -150,6 +152,159 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishJavaBridgeCall(
 	g_idle_add(java_bridge_answer_cb, data); // the answer is given on the main thread
 }
 
+/* WebViewClient.shouldInterceptRequest(): ATL's web process extension (src/webext/atl_webext.c) asks over a socket
+ * before each subresource request; the answer is WebView.internalShouldInterceptRequest(), called on the socket's
+ * thread (Android calls shouldInterceptRequest() off the UI thread too). A response is kept until WebKit fetches
+ * it from the atl-intercept: scheme */
+#define INTERCEPT_SCHEME "atl-intercept"
+static GMutex intercept_lock;
+static GHashTable *intercept_pages;     // page id -> weak global reference to the Java WebView
+static GHashTable *intercept_responses; // response number -> GBytes, as internalShouldInterceptRequest() returned it
+static guint intercept_next;
+static char *intercept_socket_path;
+
+static void intercept_set_page(JNIEnv *env, WebKitWebView *webview, jobject this)
+{
+	g_mutex_lock(&intercept_lock);
+	jweak old = g_hash_table_lookup(intercept_pages, GUINT_TO_POINTER(webkit_web_view_get_page_id(webview)));
+	if (old)
+		(*env)->DeleteWeakGlobalRef(env, old);
+	g_hash_table_insert(intercept_pages, GUINT_TO_POINTER(webkit_web_view_get_page_id(webview)), (*env)->NewWeakGlobalRef(env, this));
+	g_mutex_unlock(&intercept_lock);
+}
+
+static gboolean intercept_connection_cb(GThreadedSocketService *service, GSocketConnection *connection, GObject *source, gpointer user_data)
+{
+	JNIEnv *env;
+	(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
+	g_autoptr(GDataInputStream) in = g_data_input_stream_new(g_io_stream_get_input_stream(G_IO_STREAM(connection)));
+	GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(connection));
+	char *line;
+	while ((line = g_data_input_stream_read_line(in, NULL, NULL, NULL))) {
+		char reply[64] = "";
+		(*env)->PushLocalFrame(env, 16); // the thread stays attached: its local references go with each request
+		char **field = g_strsplit(line, "\t", 4);
+		if (g_strv_length(field) == 4) {
+			g_mutex_lock(&intercept_lock);
+			jweak weak = g_hash_table_lookup(intercept_pages, GUINT_TO_POINTER(g_ascii_strtoull(field[0], NULL, 10)));
+			jobject this = weak ? (*env)->NewLocalRef(env, weak) : NULL;
+			g_mutex_unlock(&intercept_lock);
+			jbyteArray response = this ? J__WebView__internalShouldInterceptRequest(env, this, _JSTRING(field[2]), _JSTRING(field[1]), _JSTRING(field[3])) : NULL;
+			if ((*env)->ExceptionCheck(env)) {
+				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+				response = NULL;
+			}
+			if (response) {
+				jsize length = (*env)->GetArrayLength(env, response);
+				jbyte *bytes = (*env)->GetByteArrayElements(env, response, NULL);
+				g_mutex_lock(&intercept_lock);
+				guint number = ++intercept_next;
+				g_hash_table_insert(intercept_responses, GUINT_TO_POINTER(number), g_bytes_new(bytes, length));
+				g_mutex_unlock(&intercept_lock);
+				(*env)->ReleaseByteArrayElements(env, response, bytes, JNI_ABORT);
+				snprintf(reply, sizeof(reply), INTERCEPT_SCHEME ":///%u", number);
+			}
+		}
+		g_strfreev(field);
+		g_free(line);
+		(*env)->PopLocalFrame(env, NULL);
+		strcat(reply, "\n");
+		if (!g_output_stream_write_all(out, reply, strlen(reply), NULL, NULL, NULL))
+			break;
+	}
+	(*jvm)->DetachCurrentThread(jvm);
+	return TRUE;
+}
+
+/* the response, as WebView.internalShouldInterceptRequest() wrote it: status code, reason phrase, content type
+ * and "Name: value" header lines, an empty line, the data */
+static void intercept_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
+{
+	const char *number = strrchr(webkit_uri_scheme_request_get_uri(request), '/');
+	g_mutex_lock(&intercept_lock);
+	GBytes *bytes = number ? g_hash_table_lookup(intercept_responses, GUINT_TO_POINTER(strtoul(number + 1, NULL, 10))) : NULL;
+	if (bytes)
+		g_hash_table_steal(intercept_responses, GUINT_TO_POINTER(strtoul(number + 1, NULL, 10)));
+	g_mutex_unlock(&intercept_lock);
+	if (!bytes) {
+		g_autoptr(GError) error = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "no intercepted response");
+		webkit_uri_scheme_request_finish_error(request, error);
+		return;
+	}
+	gsize size;
+	const char *data = g_bytes_get_data(bytes, &size);
+	// the end of the head: the empty line after the three fixed lines (whose third, the type, may be empty)
+	const char *end = data;
+	for (int i = 0; i < 3 && end; i++)
+		end = memchr(end, '\n', size - (end - data)), end = end ? end + 1 : NULL;
+	end = end ? g_strstr_len(end - 1, size - (end - 1 - data), "\n\n") : NULL;
+	gsize head_length = end ? end - data : 0;
+	g_autofree char *head = g_strndup(data, head_length);
+	char **line = g_strsplit(head, "\n", -1);
+	g_autoptr(GBytes) body = g_bytes_new_from_bytes(bytes, end ? head_length + 2 : size, end ? size - head_length - 2 : 0);
+	g_bytes_unref(bytes);
+	g_autoptr(GInputStream) stream = g_memory_input_stream_new_from_bytes(body);
+	g_autoptr(WebKitURISchemeResponse) response = webkit_uri_scheme_response_new(stream, g_bytes_get_size(body));
+	if (g_strv_length(line) >= 3) {
+		webkit_uri_scheme_response_set_status(response, atoi(line[0]), line[1]);
+		if (line[2][0])
+			webkit_uri_scheme_response_set_content_type(response, line[2]);
+		SoupMessageHeaders *headers = soup_message_headers_new(SOUP_MESSAGE_HEADERS_RESPONSE);
+		for (char **header = line + 3; *header; header++) {
+			char *colon = strchr(*header, ':');
+			if (colon) {
+				*colon = '\0';
+				soup_message_headers_append(headers, *header, g_strstrip(colon + 1));
+			}
+		}
+		/* on Android the response belongs to the URL the page asked for; here the scheme is another origin, which
+		 * the page's fetch() and XMLHttpRequest may read only with this */
+		if (!soup_message_headers_get_one(headers, "Access-Control-Allow-Origin"))
+			soup_message_headers_append(headers, "Access-Control-Allow-Origin", "*");
+		webkit_uri_scheme_response_set_http_headers(response, headers);
+	}
+	g_strfreev(line);
+	webkit_uri_scheme_request_finish_with_response(request, response);
+}
+
+static void intercept_remove_socket(void)
+{
+	g_unlink(intercept_socket_path);
+	g_autofree char *dir = g_path_get_dirname(intercept_socket_path);
+	g_rmdir(dir);
+}
+
+/* before the web process starts: it loads the extension with the socket's path */
+static void intercept_setup(WebKitWebContext *web_context)
+{
+	intercept_pages = g_hash_table_new(NULL, NULL);
+	intercept_responses = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)g_bytes_unref);
+	/* in the app's own cache directory: the Flatpak portal exposes only the app's directories to the web
+	 * process's sandbox */
+	g_autofree char *dir = g_strdup_printf("%s/atl-webext-%d", g_get_user_cache_dir(), getpid());
+	g_mkdir_with_parents(dir, 0700);
+	intercept_socket_path = g_build_filename(dir, "s", NULL);
+	g_unlink(intercept_socket_path);
+	g_autoptr(GSocketAddress) address = g_unix_socket_address_new(intercept_socket_path);
+	GSocketService *service = g_threaded_socket_service_new(-1);
+	g_autoptr(GError) error = NULL;
+	if (!g_socket_listener_add_address(G_SOCKET_LISTENER(service), address, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, NULL, NULL, &error)) {
+		g_warning("WebView: no shouldInterceptRequest(): %s", error->message);
+		g_object_unref(service);
+		return;
+	}
+	atexit(intercept_remove_socket);
+	g_signal_connect(service, "run", G_CALLBACK(intercept_connection_cb), NULL);
+	g_socket_service_start(service);
+	webkit_web_context_add_path_to_sandbox(web_context, dir, FALSE);
+	webkit_web_context_set_web_process_extensions_directory(web_context, ATL_WEBEXT_DIR);
+	webkit_web_context_set_web_process_extensions_initialization_user_data(web_context, g_variant_new_string(intercept_socket_path));
+	webkit_web_context_register_uri_scheme(web_context, INTERCEPT_SCHEME, intercept_request_cb, NULL, NULL);
+	webkit_security_manager_register_uri_scheme_as_cors_enabled(webkit_web_context_get_security_manager(web_context), INTERCEPT_SCHEME);
+	webkit_security_manager_register_uri_scheme_as_secure(webkit_web_context_get_security_manager(web_context), INTERCEPT_SCHEME);
+}
+
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
@@ -157,6 +312,9 @@ static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_
 	jobject this = webview_jobject(env, wrapper);
 	if (!this)
 		return;
+	// a new web process (process swap) may have given the page another id
+	if (load_event == WEBKIT_LOAD_COMMITTED)
+		intercept_set_page(env, web_view, this);
 	J__WebView__internalLoadChanged(env, this, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
 	(*env)->DeleteLocalRef(env, this);
 }
@@ -381,6 +539,11 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	 * (wheel_script below), and WebKit's animation stays off. The setting has to be
 	 * there when the view is created: the page may set up its threaded scrolling tree right away, and
 	 * that keeps the value it saw (WebKitGTK 2.54 ThreadedScrollingTree::m_scrollAnimatorEnabled). */
+	static gboolean intercept_set_up = FALSE;
+	if (!intercept_set_up) {
+		intercept_setup(webkit_web_context_get_default());
+		intercept_set_up = TRUE;
+	}
 	WebKitSettings *settings = webkit_settings_new();
 	webkit_settings_set_enable_smooth_scrolling(settings, FALSE);
 	GtkWidget *webview = GTK_WIDGET(take_parked_web_view());
@@ -412,6 +575,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	g_signal_connect_object(gtk_settings_get_default(), "notify::gtk-xft-dpi", G_CALLBACK(undo_font_dpi_zoom), webview, 0);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
+	intercept_set_page(env, WEBKIT_WEB_VIEW(webview), this);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
 	// all WebViews share the default web context, and registering a scheme twice is an error
 	static gboolean asset_scheme_registered = FALSE;
@@ -723,4 +887,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setStringSetting(JNIE
 	g_object_set(webkit_web_view_get_settings(webview), name_str, value_str, NULL);
 	(*env)->ReleaseStringUTFChars(env, value, value_str);
 	(*env)->ReleaseStringUTFChars(env, name, name_str);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setPreferredLanguage(JNIEnv *env, jclass class, jstring language)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW")) // no WebKit, see native_constructor()
+		return;
+	const char *language_str = (*env)->GetStringUTFChars(env, language, NULL);
+	const char *languages[] = {language_str, NULL};
+	webkit_web_context_set_preferred_languages(webkit_web_context_get_default(), languages);
+	(*env)->ReleaseStringUTFChars(env, language, language_str);
 }

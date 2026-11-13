@@ -8,6 +8,7 @@ import android.util.Base64;
 import android.view.MotionEvent;
 import android.util.Log;
 import android.view.ViewGroup;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -52,7 +53,16 @@ public class WebView extends ViewGroup {
 		super(context, attrs, defStyleAttr);
 		// like Chromium's AwContents: the page shows the focus itself (focus rings, the caret)
 		setDefaultFocusHighlightEnabled(false);
+		// the pages load with the user agent that WebSettings reports, not WebKitGTK's own
+		setWebKitSetting("user-agent", WebSettings.defaultUserAgent());
+		/* navigator.language and Accept-Language follow the app's locale, as on Android; WebKit would take the
+		 * C locale that ATL sets for the process (LC_ALL=C.UTF-8, navigator.language "c") */
+		String language = java.util.Locale.getDefault().toLanguageTag();
+		if (!"und".equals(language))
+			native_setPreferredLanguage(language);
 	}
+
+	private static native void native_setPreferredLanguage(String language);
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
@@ -107,6 +117,52 @@ public class WebView extends ViewGroup {
 	// undo the android-asset:// rewrite (see loadUrl()), apps expect the URL they loaded
 	private static String internalToAppUrl(String url) {
 		return url != null ? url.replace("android-asset:///assets/", "file:///android_asset/") : null;
+	}
+
+	/* to be used by native code, on a thread of its own (as on Android): asked by the web process before each
+	 * subresource request, see intercept_connection_cb(). Returns the app's response for the native side (status
+	 * code, reason phrase, content type and header lines, an empty line, the data), or null to load from the network */
+	@Export
+	byte[] internalShouldInterceptRequest(String url, String method, String headers) throws java.io.IOException {
+		WebViewClient client = webViewClient;
+		if (client == null)
+			return null;
+		final Map<String, String> requestHeaders = new HashMap<>();
+		for (String header : headers.split("\u001f")) {
+			int colon = header.indexOf(": ");
+			if (colon > 0)
+				requestHeaders.put(header.substring(0, colon), header.substring(colon + 2));
+		}
+		final android.net.Uri uri = android.net.Uri.parse(url);
+		WebResourceResponse response = client.shouldInterceptRequest(this, new WebResourceRequest() {
+			public android.net.Uri getUrl() { return uri; }
+			public boolean isForMainFrame() { return false; } /* the main frame's document is not asked */
+			public boolean isRedirect() { return false; }
+			public boolean hasGesture() { return false; }
+			public String getMethod() { return method; }
+			public Map<String, String> getRequestHeaders() { return requestHeaders; }
+		});
+		if (response == null)
+			return null;
+		StringBuilder head = new StringBuilder();
+		String type = response.getMimeType() == null ? "" : response.getMimeType();
+		if (response.getMimeType() != null && response.getEncoding() != null)
+			type += "; charset=" + response.getEncoding();
+		head.append(response.getStatusCode()).append('\n').append(response.getReasonPhrase()).append('\n').append(type).append('\n');
+		if (response.getResponseHeaders() != null)
+			for (Map.Entry<String, String> header : response.getResponseHeaders().entrySet())
+				head.append(header.getKey()).append(": ").append(header.getValue()).append('\n');
+		head.append('\n');
+		java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+		out.write(head.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+		InputStream data = response.getData();
+		if (data != null) {
+			byte[] buffer = new byte[16384];
+			for (int n; (n = data.read(buffer)) > 0;)
+				out.write(buffer, 0, n);
+			data.close();
+		}
+		return out.toByteArray();
 	}
 
 	// to be used by native code
