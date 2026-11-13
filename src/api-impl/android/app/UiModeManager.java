@@ -16,6 +16,19 @@ public class UiModeManager {
 		return Context.sys_config.uiMode & Configuration.UI_MODE_NIGHT_MASK;
 	}
 
+	public static final int MODE_NIGHT_AUTO = 0;
+	public static final int MODE_NIGHT_NO = 1;
+	public static final int MODE_NIGHT_YES = 2;
+	public static final int MODE_NIGHT_CUSTOM = 3;
+
+	/* AOSP asks the system service, which needs MODIFY_DAY_NIGHT_MODE for the whole device; ATL follows
+	 * the night mode of the desktop and has nothing to change */
+	public void setNightMode(int mode) {}
+
+	/* AOSP stores a night mode for this app only and restarts its activities with it; ATL keeps following
+	 * the desktop (the app's own theme switch then has no effect, but it does not crash) */
+	public void setApplicationNightMode(int mode) {}
+
 	/* the contrast of the desktop (the contrast setting of the XDG settings portal): 0 for the
 	 * default, 1 for high contrast, which on Android is the highest level of the contrast setting */
 	static float sContrast = 0;
