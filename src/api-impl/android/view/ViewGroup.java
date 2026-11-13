@@ -1616,6 +1616,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			this.weight = weight;
 		}
 
+		/* as in AOSP: copies the size of the source (com.getbase FloatingActionsMenu, Omni Notes) */
+		public LayoutParams(LayoutParams source) {
+			this.width = source.width;
+			this.height = source.height;
+		}
+
 		public LayoutParams(Context context, AttributeSet attrs) {
 			TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ViewGroup_Layout);
 			setBaseAttributes(a, R.styleable.ViewGroup_Layout_layout_width, R.styleable.ViewGroup_Layout_layout_height);
