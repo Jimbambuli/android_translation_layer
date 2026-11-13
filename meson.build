@@ -296,6 +296,7 @@ executable('android-translation-layer', [
                                         	'src/main-executable/libc_bio_path_overrides.c',
                                         	'src/main-executable/navigation_bar.c',
                                         	'src/main-executable/system_theme.c',
+                                        	'src/main-executable/zygote.c',
                                         	resources
                                         ],
                                         include_directories: shared_includes_dir,
