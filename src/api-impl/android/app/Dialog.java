@@ -627,14 +627,22 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		window.setCloseOnTouchOutside(cancel);
 	}
 
-	/* A press outside of the shown dialog (GTK reports it as a click on the app's window): the window
-	 * manager's MotionEvent.ACTION_OUTSIDE for the window, which Dialog.onTouchEvent() and
-	 * Window.shouldCloseOnTouch() act on as in AOSP. Called from native code. */
+	/* A press outside of the shown dialog (GTK reports it as a click on the app's window). On AOSP the
+	 * dialog's window is touch-modal: it gets the press itself, as ACTION_DOWN and ACTION_UP at a place
+	 * outside of its bounds, which Window.shouldCloseOnTouch() (on the up) and Compose's DialogWrapper
+	 * (a down and an up outside of its content; it ignores ACTION_OUTSIDE and cancel()) close the dialog on.
+	 * Where the dialog is on screen is the compositor's, so the place is one far outside of any dialog.
+	 * Called from native code. */
+	private static final float OUTSIDE = -10000;
+
 	private void onTouchOutside() {
 		final long now = android.os.SystemClock.uptimeMillis();
-		MotionEvent event = MotionEvent.obtain(now, now, MotionEvent.ACTION_OUTSIDE, 0, 0, 0);
-		dispatchTouchEvent(event);
-		event.recycle();
+		MotionEvent down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, OUTSIDE, OUTSIDE, 0);
+		dispatchTouchEvent(down);
+		down.recycle();
+		MotionEvent up = MotionEvent.obtain(now, now, MotionEvent.ACTION_UP, OUTSIDE, OUTSIDE, 0);
+		dispatchTouchEvent(up);
+		up.recycle();
 	}
 
 	public class Builder {
@@ -701,9 +709,10 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		if (window.superDispatchKeyEvent(event)) {
 			return true;
 		}
-		View decor = window.getDecorView();
-		return event.dispatch(this, decor != null
-		    ? decor.getKeyDispatcherState() : null, this);
+		/* AOSP takes the decor view's state, which is its window's; ATL's AlertDialog shows GTK widgets
+		 * instead of its decor view, which then has no window and no state, so Escape and Back never
+		 * tracked and never cancelled it */
+		return event.dispatch(this, window.mKeyDispatchState, this);
 	}
 
 	/* AOSP's Dialog.onKeyDown() */

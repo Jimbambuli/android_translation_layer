@@ -7,13 +7,39 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_atl_ATLViewDump_SHOT_TRIES
+#define android_atl_ATLViewDump_SHOT_TRIES 40L
 /*
  * Class:     android_atl_ATLViewDump
  * Method:    native_screenshot
- * Signature: (JLjava/lang/String;)Z
+ * Signature: (JLjava/lang/String;Z)I
  */
-JNIEXPORT jboolean JNICALL Java_android_atl_ATLViewDump_native_1screenshot
-  (JNIEnv *, jclass, jlong, jstring);
+JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1screenshot
+  (JNIEnv *, jclass, jlong, jstring, jboolean);
+
+/*
+ * Class:     android_atl_ATLViewDump
+ * Method:    native_toplevel
+ * Signature: (JJ)I
+ */
+JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1toplevel
+  (JNIEnv *, jclass, jlong, jlong);
+
+/*
+ * Class:     android_atl_ATLViewDump
+ * Method:    native_surface
+ * Signature: (JI)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_atl_ATLViewDump_native_1surface
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_atl_ATLViewDump
+ * Method:    native_gtkPopups
+ * Signature: (J[J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_atl_ATLViewDump_native_1gtkPopups
+  (JNIEnv *, jclass, jlong, jlongArray);
 
 #ifdef __cplusplus
 }

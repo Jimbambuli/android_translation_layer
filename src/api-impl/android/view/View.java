@@ -2881,6 +2881,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			invalidateOutline();
 	}
 
+	/* GTK sized a native view (TextView, Button, ...) that no ViewGroup lays out: the root of a PopupWindow,
+	 * a row of a Spinner's list, a button of ATL's AlertDialog. AOSP's ViewRootImpl measures and lays out such
+	 * a root at the size of its window; here the size is GTK's, which View.layout() never hears of */
+	@Export
+	private void layoutNativeRoot(int width, int height) {
+		if (parent instanceof ViewGroup || (getWidth() == width && getHeight() == height && (mPrivateFlags3 & PFLAG3_IS_LAID_OUT) != 0))
+			return;
+		measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
+		int oldW = getWidth();
+		int oldH = getHeight();
+		boolean changed = setFrame(0, 0, width, height);
+		if (changed)
+			onSizeChanged(width, height, oldW, oldH);
+		onLayout(changed, 0, 0, width, height);
+		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
+	}
+
 	/* layout() is on the stack: it calls the OnLayoutChangeListeners itself, with the bounds from before */
 	private boolean layoutCall;
 

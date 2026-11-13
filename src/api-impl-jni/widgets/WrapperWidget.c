@@ -160,6 +160,8 @@ void wrapper_widget_measure(GtkWidget *widget, GtkOrientation orientation, int f
 		*minimum_baseline = *natural_baseline = -1;
 }
 
+extern int snapshot_in_progress;
+
 void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int baseline)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
@@ -212,6 +214,17 @@ void wrapper_widget_allocate(GtkWidget *widget, int width, int height, int basel
 		gtk_widget_measure(wrapper->child, GTK_ORIENTATION_VERTICAL, child_allocation.width, &minimum_height, NULL, NULL, NULL);
 		child_allocation.height = MAX(height, minimum_height);
 		gtk_widget_size_allocate(wrapper->child, &child_allocation, baseline);
+		/* a native view outside of a ViewGroup gets its size here only (see View.layoutNativeRoot()) */
+		GtkWidget *parent = gtk_widget_get_parent(widget);
+		if (wrapper->jobj && parent && !ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(parent)) && !snapshot_in_progress) {
+			JNIEnv *env;
+			(*wrapper->jvm)->GetEnv(wrapper->jvm, (void **)&env, JNI_VERSION_1_6);
+			J__View__layoutNativeRoot(env, wrapper->jobj, width, height);
+			if ((*env)->ExceptionCheck(env)) {
+				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+			}
+		}
 	}
 	if (wrapper->background)
 		gtk_widget_size_allocate(wrapper->background, &allocation, baseline);

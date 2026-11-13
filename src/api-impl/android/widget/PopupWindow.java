@@ -269,6 +269,7 @@ public class PopupWindow {
 	public void setFocusable(boolean focusable) {
 		this.focusable = focusable;
 		native_setFocusable(popover, focusable);
+		applyTouchModal();
 	}
 
 	public boolean isFocusable() {
@@ -335,10 +336,17 @@ public class PopupWindow {
 
 	public void setOutsideTouchable(boolean touchable) {
 		mOutsideTouchable = touchable;
-		/* FIXME: the semantics are different, this seems to specifically exist for cases
-		 * where the popup is *not* modal, so that in addition to the window behind getting
-		 * the real event, the popup gets a special MotionEvent.ACTION_OUTSIDE event */
-		native_setTouchModal(popover, touchable);
+		applyTouchModal();
+	}
+
+	/* AOSP's PopupWindow is touch-modal unless told otherwise (mTouchModal): a focusable popup takes the presses
+	 * outside of it and PopupDecorView dismisses it on such a press, and it has the keys (Back and Escape dismiss
+	 * it). A popup that is not focusable is never touch-modal; it gets the outside presses as ACTION_OUTSIDE
+	 * only if it is outside-touchable. The native touch modality stands for both. */
+	private boolean mTouchModal = true;
+
+	private void applyTouchModal() {
+		native_setTouchModal(popover, focusable ? mTouchModal || mOutsideTouchable : mOutsideTouchable);
 	}
 
 	/* the state AOSP's PopupWindow keeps for the window it would add; ATL's popover does not use it */
@@ -558,7 +566,8 @@ public class PopupWindow {
 	}
 
 	public void setTouchModal(boolean touchModal) {
-		native_setTouchModal(popover, touchModal);
+		mTouchModal = touchModal;
+		applyTouchModal();
 	}
 
 	public float getElevation() {
