@@ -44,6 +44,15 @@ JNIEXPORT void JNICALL Java_android_app_AlertDialog_nativeConstruct(JNIEnv *env,
 {
 	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
 	GtkBox *content_area = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 1));
+	/* AOSP's alert_dialog layout: the title above the message, only if there is one (Dialog.c's
+	 * nativeSetTitle() fills it) */
+	GtkWidget *title = gtk_label_new(NULL);
+	gtk_label_set_wrap(GTK_LABEL(title), TRUE);
+	gtk_label_set_max_width_chars(GTK_LABEL(title), 50);
+	gtk_widget_add_css_class(title, "heading");
+	gtk_widget_set_visible(title, FALSE);
+	gtk_box_append(content_area, title);
+	g_object_set_data_full(G_OBJECT(dialog), "title-label", g_object_ref(title), g_object_unref);
 
 	GtkLabel *label = GTK_LABEL(gtk_label_new(NULL));
 	gtk_label_set_wrap(label, TRUE);
