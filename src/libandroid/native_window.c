@@ -128,6 +128,12 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 		return;
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
+		/* a unix socket closed with unread messages (the consumer's FRAME/RELEASE) gives the other end
+		 * ECONNRESET before what it has not read yet, the DISCONNECT too, and that end then drops the last
+		 * frame as for a process that ended: stop the consumer's sending, read the rest, then close */
+		shutdown(native_window->remote_fd, SHUT_RDWR);
+		while (recv(native_window->remote_fd, &(struct atl_surface_msg){0}, sizeof(struct atl_surface_msg), MSG_DONTWAIT) > 0)
+			;
 		close(native_window->remote_fd);
 		for (int i = 0; i < G_N_ELEMENTS(native_window->remote_memory); i++) {
 			if (native_window->remote_memory[i].map)
