@@ -69,8 +69,21 @@ public class ATLViewDump {
 		}
 	}
 
+	/* a window image that waits for the next frame (see shot()): its name and how often it was tried */
+	private static String pendingShot;
+	private static int shotTries;
+	private static final int SHOT_TRIES = 40; // every 50 ms, for 2 s
+
 	private static void poll() {
 		File req = new File(DIR, "request");
+		if (pendingShot != null) { // the request is answered (deleted) when the image is there or given up
+			if (shot(pendingShot, ++shotTries >= SHOT_TRIES)) {
+				pendingShot = null;
+				req.delete();
+			}
+			handler.postDelayed(POLL, pendingShot != null ? 50 : 250);
+			return;
+		}
 		if (req.exists()) {
 			try {
 				String[] lines = new String(Files.readAllBytes(req.toPath()), StandardCharsets.UTF_8).trim().split("\\s*\\n\\s*");
@@ -83,8 +96,12 @@ public class ATLViewDump {
 					dump(w);
 				}
 				tmp.renameTo(new File(DIR, name + ".xml"));
-				if (wantShot)
-					shot(name);
+				if (wantShot && !shot(name, false)) {
+					pendingShot = name;
+					shotTries = 0;
+					handler.postDelayed(POLL, 50);
+					return;
+				}
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -100,24 +117,31 @@ public class ATLViewDump {
 
 	/* the windows of the app (not the screen) as <dir>/shots/<name>.png (the activity's window) and
 	 * <name>.<toplevel>.png (further toplevels), the same name as the tree */
-	private static void shot(String name) {
+	/* false: the image waits for the next frame (a window that is to be drawn anew has no drawing to render
+	 * until then: GTK drops a widget's render node when it queues a redraw, e.g. during an animation); with
+	 * last, it is given up instead */
+	private static boolean shot(String name, boolean last) {
 		long window = mainWindow();
 		if (window == 0) {
 			System.err.println("ATLViewDump: no window, no screenshot");
-			return;
+			return true;
 		}
 		File dir = new File(DIR, "shots");
 		dir.mkdirs();
-		int n = native_screenshot(window, new File(dir, name).getPath());
+		int n = native_screenshot(window, new File(dir, name).getPath(), last);
+		if (n < 0)
+			return false;
 		if (n > 0)
 			System.err.println("ATLViewDump: window image " + name + (n > 1 ? " (" + n + " toplevels)" : ""));
 		else
 			System.err.println("ATLViewDump: screenshot failed");
+		return true;
 	}
 
 	/* renders each toplevel with its popups to <prefix>.png / <prefix>.<toplevel>.png (written as .tmp
-	 * and renamed); returns the number of images written */
-	private static native int native_screenshot(long window, String prefix);
+	 * and renamed); returns the number of images written, or -1 if a toplevel has no drawing until its next
+	 * frame (unless last) */
+	private static native int native_screenshot(long window, String prefix, boolean last);
 	/* the index of the toplevel that holds the widget (0: window), -1 if it is in none */
 	private static native int native_toplevel(long window, long widget);
 	/* " atl-surface=..." attributes of a toplevel: surface size and the widget origin in it */

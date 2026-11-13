@@ -33,46 +33,64 @@ static void collect_popovers(GtkWidget *widget, GPtrArray *out)
 	}
 }
 
-static void paint(GtkSnapshot *snapshot, GtkWidget *widget, float x, float y)
+/* the widget's last drawing (its render node), NULL if it has none until its next frame */
+static GskRenderNode *drawing(GtkWidget *widget)
 {
 	GdkPaintable *paintable = gtk_widget_paintable_new(widget);
-	gtk_snapshot_save(snapshot);
-	gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(x, y));
+	GtkSnapshot *snapshot = gtk_snapshot_new();
 	gdk_paintable_snapshot(paintable, snapshot, gtk_widget_get_width(widget), gtk_widget_get_height(widget));
-	gtk_snapshot_restore(snapshot);
 	g_object_unref(paintable);
+	return gtk_snapshot_free_to_node(snapshot);
 }
 
 /* Renders a toplevel (only it, not the screen) and the popups shown on it to a PNG. A popup is placed where
- * its surface is on the toplevel's surface; what of it lies outside the toplevel is cut off. */
-static gboolean render(GtkWidget *toplevel, const char *path)
+ * its surface is on the toplevel's surface; what of it lies outside the toplevel is cut off. Returns 1 when
+ * written, 0 on failure, -1 if a widget has nothing drawn yet: GTK drops a widget's render node when it
+ * queues a redraw (an animation does all the time), and its paintable is empty until the next frame; with
+ * last, a toplevel without a drawing is a failure and a popup without one is left out. */
+static int render(GtkWidget *toplevel, const char *path, gboolean last)
 {
 	int width = gtk_widget_get_width(toplevel);
 	int height = gtk_widget_get_height(toplevel);
 	GskRenderer *renderer = gtk_native_get_renderer(GTK_NATIVE(toplevel));
 	if (!renderer || width <= 0 || height <= 0) {
 		g_printerr("ATLViewDump: %s: no renderer or size %dx%d\n", path, width, height);
-		return FALSE;
+		return 0;
 	}
 
-	GtkSnapshot *snapshot = gtk_snapshot_new();
-	paint(snapshot, toplevel, 0, 0);
+	GPtrArray *nodes = g_ptr_array_new_with_free_func((GDestroyNotify)gsk_render_node_unref);
+	GskRenderNode *node = drawing(toplevel);
+	gboolean missing = !node;
+	if (node)
+		g_ptr_array_add(nodes, node);
 	double tx, ty;
 	gtk_native_get_surface_transform(GTK_NATIVE(toplevel), &tx, &ty);
 	GPtrArray *popovers = g_ptr_array_new();
 	collect_popovers(toplevel, popovers);
-	for (guint i = 0; i < popovers->len; i++) {
+	for (guint i = 0; i < popovers->len && !missing; i++) {
 		GtkWidget *popover = g_ptr_array_index(popovers, i);
 		graphene_point_t origin;
-		if (atl_compute_point_in_window(popover, &GRAPHENE_POINT_INIT(0, 0), &origin))
-			paint(snapshot, popover, origin.x - tx, origin.y - ty);
+		if (!atl_compute_point_in_window(popover, &GRAPHENE_POINT_INIT(0, 0), &origin))
+			continue;
+		node = drawing(popover);
+		missing = !node && !last; // at the last try a popup without a drawing is left out
+		if (node) {
+			GskTransform *at = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(origin.x - tx, origin.y - ty));
+			g_ptr_array_add(nodes, gsk_transform_node_new(node, at));
+			gsk_transform_unref(at);
+			gsk_render_node_unref(node);
+		}
 	}
 	g_ptr_array_free(popovers, TRUE);
-	GskRenderNode *node = gtk_snapshot_free_to_node(snapshot);
-	if (!node) {
+	if (missing) {
+		g_ptr_array_free(nodes, TRUE);
+		if (!last)
+			return -1;
 		g_printerr("ATLViewDump: %s: nothing drawn\n", path);
-		return FALSE;
+		return 0;
 	}
+	node = gsk_container_node_new((GskRenderNode **)nodes->pdata, nodes->len);
+	g_ptr_array_free(nodes, TRUE);
 
 	graphene_rect_t bounds = GRAPHENE_RECT_INIT(0, 0, width, height);
 	GdkTexture *texture = gsk_renderer_render_texture(renderer, node, &bounds);
@@ -93,14 +111,15 @@ static gboolean render(GtkWidget *toplevel, const char *path)
 
 /* Renders each toplevel with its popups: the window to <prefix>.png, toplevel N to <prefix>.N.png; must run
  * on the main thread. Returns how many images were written. */
-JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1screenshot(JNIEnv *env, jclass this, jlong window, jstring prefix_jstr)
+JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1screenshot(JNIEnv *env, jclass this, jlong window, jstring prefix_jstr, jboolean last)
 {
 	const char *prefix = (*env)->GetStringUTFChars(env, prefix_jstr, NULL);
 	GPtrArray *all = toplevels(GTK_WIDGET(_PTR(window)));
 	jint written = 0;
-	for (guint i = 0; i < all->len; i++) {
+	for (guint i = 0; i < all->len && written >= 0; i++) {
 		char *path = i ? g_strdup_printf("%s.%u.png", prefix, i) : g_strconcat(prefix, ".png", NULL);
-		written += render(g_ptr_array_index(all, i), path);
+		int ret = render(g_ptr_array_index(all, i), path, last);
+		written = ret < 0 ? -1 : written + ret;
 		g_free(path);
 	}
 	g_ptr_array_free(all, TRUE);

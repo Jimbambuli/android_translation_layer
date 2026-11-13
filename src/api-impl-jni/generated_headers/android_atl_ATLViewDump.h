@@ -7,13 +7,15 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_atl_ATLViewDump_SHOT_TRIES
+#define android_atl_ATLViewDump_SHOT_TRIES 40L
 /*
  * Class:     android_atl_ATLViewDump
  * Method:    native_screenshot
- * Signature: (JLjava/lang/String;)I
+ * Signature: (JLjava/lang/String;Z)I
  */
 JNIEXPORT jint JNICALL Java_android_atl_ATLViewDump_native_1screenshot
-  (JNIEnv *, jclass, jlong, jstring);
+  (JNIEnv *, jclass, jlong, jstring, jboolean);
 
 /*
  * Class:     android_atl_ATLViewDump
