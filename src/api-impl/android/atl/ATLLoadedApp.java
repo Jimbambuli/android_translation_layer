@@ -113,7 +113,9 @@ public final class ATLLoadedApp {
 		} catch (XmlPullParserException | IOException e) {
 			throw new RuntimeException(outError[0], e);
 		}
-		packageParser.collectCertificates(pkg, PackageParser.PARSE_IS_SYSTEM);
+		/* no collectCertificates(): the framework resources come from no archive (the parser has no path), so it
+		 * always failed with a NullPointerException in JarFile, logged a warning and left an unclosed JarFile for
+		 * the finalizer; the package has no signatures either way */
 		return system_application = new ATLLoadedApp(resources,
 		                                             ATLLoadedApp.class.getClassLoader(), pkg);
 	}
