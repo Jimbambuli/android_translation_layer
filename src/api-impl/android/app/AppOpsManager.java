@@ -4,6 +4,18 @@ public class AppOpsManager {
 
 	/* AOSP's AppOpsManager modes. ATL has no AppOpsService and grants what an app asks for, as it
 	 * grants the permissions: every op is in mode MODE_ALLOWED. */
+	/* AOSP @hide: the process states that decide an op's mode (App Manager reads the fields) */
+	public static final int UID_STATE_PERSISTENT = 100;
+	public static final int UID_STATE_TOP = 200;
+	public static final int UID_STATE_FOREGROUND_SERVICE_LOCATION = 300;
+	public static final int UID_STATE_FOREGROUND_SERVICE = 400;
+	public static final int UID_STATE_FOREGROUND = 500;
+	public static final int UID_STATE_MAX_LAST_NON_RESTRICTED = UID_STATE_FOREGROUND;
+	public static final int UID_STATE_BACKGROUND = 600;
+	public static final int UID_STATE_CACHED = 700;
+	public static final int MAX_PRIORITY_UID_STATE = UID_STATE_PERSISTENT;
+	public static final int MIN_PRIORITY_UID_STATE = UID_STATE_CACHED;
+
 	public static final int MODE_ALLOWED = 0;
 	public static final int MODE_IGNORED = 1;
 	public static final int MODE_ERRORED = 2;
