@@ -687,8 +687,8 @@ void activity_ensure_configuration(void)
 }
 
 /* What Back does once the activity let it go back (Activity.onKeyUp()): the callbacks of the
- * OnBackInvokedDispatcher first, then onBackPressed(), unless the activity is the only one and has
- * Activity's own onBackPressed() (Android 12+ would move its task to the back, it stays here) */
+ * OnBackInvokedDispatcher first, then onBackPressed() (on the root activity Activity's own moves the task
+ * to the back, as on Android 12+) */
 static void activity_back_invoked(void)
 {
 	JNIEnv *env = get_jni_env();
@@ -701,23 +701,18 @@ static void activity_back_invoked(void)
 	if (handled)
 		return;
 
-	jclass current_activity_class = (*env)->GetObjectClass(env, activity_current);
-	jmethodID current_activity_on_back_pressed_method_id = (*env)->GetMethodID(env, current_activity_class, "onBackPressed", "()V");
+	J__Activity__onBackPressed(env, activity_current);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
+}
 
-	// Either a new activity was added to the backlog or the current activity's onBackPressed method was changed
-	if (g_list_length(activity_backlog) > 1 || _CACHED_METHOD(Activity__onBackPressed) != current_activity_on_back_pressed_method_id) {
-		J__Activity__onBackPressed(env, activity_current);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-	} else {
-		back_button_set_sensitive(false);
-	}
+/* Activity.moveTaskToBack(): the app's window is minimized; the shown activity stops when the window is
+ * hidden (window_set_hidden()) and resumes when the user brings the window back */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeMoveTaskToBack(JNIEnv *env, jclass class)
+{
+	gtk_window_minimize(window);
 }
 
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeBackInvoked(JNIEnv *env, jobject this)

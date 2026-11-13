@@ -179,6 +179,13 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeUpdatePictureInPicture
 
 /*
  * Class:     android_app_Activity
+ * Method:    nativeMoveTaskToBack
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeMoveTaskToBack
+  (JNIEnv *, jclass);
+/*
+ * Class:     android_app_Activity
  * Method:    nativeBackInvoked
  * Signature: ()V
  */

@@ -1011,10 +1011,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return title;
 	}
 
+	/* AOSP 12+ (Activity.onBackInvoked(), ActivityClientController.onBackPressed()): Back that nobody took
+	 * finishes the activity, but the root activity of the task moves the task to the back instead */
 	@Export
 	public void onBackPressed() {
 		System.out.println("onBackPressed() called");
-		finish();
+		if (isTaskRoot())
+			moveTaskToBack(false);
+		else
+			finish();
 	}
 
 	/* AOSP calls the exit listener only when a splash screen was shown for this launch; ATL shows none,
@@ -2109,9 +2114,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return System.identityHashCode(this.getApplicationContext());
 	}
 
+	/* AOSP: the task goes behind the others, the app keeps running; only the root activity may do it unless
+	 * nonroot. ATL has one task per app window: the window is minimized, which stops the shown activity as on
+	 * Android (see window_set_hidden() in android_app_Activity.c) */
 	public boolean moveTaskToBack(boolean nonroot) {
+		if (!nonroot && !isTaskRoot())
+			return false;
+		nativeMoveTaskToBack();
 		return true;
 	}
+
+	private static native void nativeMoveTaskToBack();
 
 	public void setFinishOnTouchOutside(boolean finish) {
 	}
@@ -2187,9 +2200,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	/* AOSP Activity.onKeyUp(): a tracked Back that was not canceled goes back. AOSP calls onBackPressed() here
 	 * (or the system hands Back to the OnBackInvokedDispatcher); ATL's back (nativeBackInvoked()) does what it
-	 * did for the back button so far: the OnBackInvokedDispatcher's callbacks first, then onBackPressed(),
-	 * unless the activity is the only one and has Activity's own onBackPressed() (its task would just move
-	 * to the back on Android 12+) */
+	 * did for the back button so far: the OnBackInvokedDispatcher's callbacks first, then onBackPressed() */
 	public boolean onKeyUp(int keyCode, KeyEvent event) {
 		int sdkVersion = getApplicationInfo().targetSdkVersion;
 		if (sdkVersion >= Build.VERSION_CODES.ECLAIR) {
