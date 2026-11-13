@@ -75,6 +75,38 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeStartActivity
 
 /*
  * Class:     android_app_Activity
+ * Method:    nativeExportWindow
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeExportWindow
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeWaitWindowHandle
+ * Signature: (I)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_app_Activity_nativeWaitWindowHandle
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeShowWindowFor
+ * Signature: (Ljava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeShowWindowFor
+  (JNIEnv *, jclass, jstring, jstring);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeActivityCount
+ * Signature: ()I
+ */
+JNIEXPORT jint JNICALL Java_android_app_Activity_nativeActivityCount
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_app_Activity
  * Method:    nativeRecreate
  * Signature: ()V
  */
@@ -87,6 +119,14 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate
  * Signature: (Landroid/content/Intent;)V
  */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativePauseCurrentActivity
+  (JNIEnv *, jclass, jobject);
+
+/*
+ * Class:     android_app_Activity
+ * Method:    nativeCoverCurrentActivity
+ * Signature: (Landroid/content/Intent;)Landroid/app/Activity;
+ */
+JNIEXPORT jobject JNICALL Java_android_app_Activity_nativeCoverCurrentActivity
   (JNIEnv *, jclass, jobject);
 
 /*

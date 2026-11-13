@@ -77,6 +77,19 @@ static void start_exit_watchdog(void)
 
 gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 {
+	/* the window of another process of the app (android:process): its activities end with it, the process
+	 * ends unless it has services (ATLProcess.onActivitiesGone()); the window hides, it is shown again for the
+	 * next activity that comes */
+	if (getenv("ATL_PROCESS_NAME")) {
+		activity_close_all();
+		gtk_widget_set_visible(GTK_WIDGET(self), FALSE);
+		J__ATLProcess__onActivitiesGone(env);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		return TRUE;
+	}
 	if (activity_window_close_request())
 		return TRUE;
 	start_exit_watchdog();
@@ -592,7 +605,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		return;
 	}
 	/* a process of the app for its components with android:process, started by the main process (ATLProcess.java):
-	 * it creates the Application and then serves the main process, without a window of its own */
+	 * it creates the Application and then serves the main process; its window shows only for its activities */
 	const char *atl_process_name = getenv("ATL_PROCESS_NAME");
 	if (!atl_process_name && uri_option && *uri_option && forward_uri_to_running_app(G_APPLICATION(app), uri_option))
 		exit(0);
@@ -833,15 +846,6 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		(*env)->ExceptionClear(env);
 	}
 
-	if (atl_process_name) {
-		J__ATLProcess__attachToMainProcess(env);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			_exit(10);
-		}
-		return; // the window stays hidden and keeps the application running
-	}
-
 	if (d->apk_instrumentation_class) {
 		if (d->apk_main_activity_class) {
 			fprintf(stderr, "error: both --instrument and --launch-activity supplied, exiting\n");
@@ -864,7 +868,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	}
 
 	// construct main Activity
-	if (!d->apk_instrumentation_class && !d->install_internal) {
+	if (!d->apk_instrumentation_class && !d->install_internal && !atl_process_name) {
 		activity_object = J__Activity__createMainActivity(env, _JSTRING(d->apk_main_activity_class),
 		                                                  _INTPTR(window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
 		if ((*env)->ExceptionCheck(env)) {
@@ -1047,7 +1051,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	GtkDropTarget *drop_target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
 	g_signal_connect(drop_target, "drop", G_CALLBACK(on_drop), NULL);
 	gtk_widget_add_controller(window, GTK_EVENT_CONTROLLER(drop_target));
-	gtk_window_present(GTK_WINDOW(window));
+	if (!atl_process_name)
+		gtk_window_present(GTK_WINDOW(window));
 
 	// set package name as application id for window icon on Wayland. Needs a {package_name}.desktop file defining the icon
 	const char *app_id = g_application_get_application_id(G_APPLICATION(app));
@@ -1056,7 +1061,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		gdk_wayland_toplevel_set_application_id(GDK_WAYLAND_TOPLEVEL(toplevel), package_name);
 	}
 
-	update_config_for_window(GTK_WINDOW(window));
+	if (!atl_process_name) // in another process, once its window shows (Activity.nativeShowWindowFor())
+		update_config_for_window(GTK_WINDOW(window));
 
 	if (!d->apk_instrumentation_class && app_icon_path) {
 		char *app_icon_path_full = malloc(strlen(app_data_dir) + 1 + strlen(app_icon_path) + 1); // +1 for /, +1 for NULL
@@ -1091,7 +1097,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		}
 	}
 
-	if (!d->apk_instrumentation_class) {
+	if (!d->apk_instrumentation_class && !atl_process_name) {
 		activity_start(env, activity_object);
 
 		g_timeout_add(10, G_SOURCE_FUNC(hacky_on_window_focus_changed_callback), env);
@@ -1106,6 +1112,15 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
 		}
+	}
+
+	if (atl_process_name) {
+		J__ATLProcess__attachToMainProcess(env);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			_exit(10);
+		}
+		return; // the window stays hidden and keeps the application running
 	}
 
 	if (strcmp(app_id, "com.example.demo_application")) {
