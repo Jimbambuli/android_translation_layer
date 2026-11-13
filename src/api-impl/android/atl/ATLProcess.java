@@ -55,6 +55,9 @@ public final class ATLProcess {
 	private static final int RESTART_MAIN = IBinder.FIRST_CALL_TRANSACTION + 14;
 	/* to the caller of START_ACTIVITY: the activity finished, with its result */
 	private static final int ACTIVITY_FINISHED = IBinder.FIRST_CALL_TRANSACTION;
+	/* to the caller of START_ACTIVITY: the activity left its task for the pinned task (picture-in-picture), or
+	 * came back on top of it */
+	private static final int ACTIVITY_COVERS = IBinder.FIRST_CALL_TRANSACTION + 1;
 
 	/** whether this is a process the main process started, not the main process */
 	public static boolean isSecondary() {
@@ -499,6 +502,9 @@ public final class ATLProcess {
 	 * result) or its process ended (RESULT_CANCELED) */
 	public interface ActivityFinished {
 		void onActivityFinished(int resultCode, Intent data);
+
+		/** the activity left the starter's task for the pinned task (false), or came back on top of it (true) */
+		void onCovering(boolean covers);
 	}
 
 	/* the starter's end of an activity in another process (AOSP: the ActivityRecord's resultTo) */
@@ -532,8 +538,31 @@ public final class ATLProcess {
 			});
 		}
 
+		void covers(final boolean covers) {
+			final ActivityFinished cb;
+			synchronized (this) {
+				cb = callback;
+			}
+			if (cb == null)
+				return;
+			new Handler(Looper.getMainLooper()).post(new Runnable() {
+				@Override
+				public void run() {
+					synchronized (ResultTarget.this) {
+						if (callback == null)
+							return; // finished meanwhile
+					}
+					cb.onCovering(covers);
+				}
+			});
+		}
+
 		@Override
 		protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
+			if (code == ACTIVITY_COVERS) {
+				covers(data.readInt() != 0);
+				return true;
+			}
 			if (code != ACTIVITY_FINISHED)
 				return super.onTransact(code, data, reply, flags);
 			int resultCode = data.readInt();
@@ -604,6 +633,24 @@ public final class ATLProcess {
 		RemoteCaller(IBinder resultTo, boolean wantsResult) {
 			this.resultTo = resultTo;
 			this.wantsResult = wantsResult;
+		}
+
+		/** the activity entered picture-in-picture as the only one of this process's window, so it no longer
+		 * covers the starter (false), or it came back from there (true) */
+		public void covers(boolean covers) {
+			IBinder to;
+			synchronized (this) {
+				to = resultTo;
+			}
+			if (to == null)
+				return;
+			Parcel p = Parcel.obtain();
+			p.writeInt(covers ? 1 : 0);
+			try {
+				to.transact(ACTIVITY_COVERS, p, Parcel.obtain(), 0);
+			} catch (RemoteException e) {
+				Slog.w(TAG, "the starter of an activity is gone: " + e);
+			}
 		}
 
 		/** Activity.finish(), or its end without one (RESULT_CANCELED); only the first call counts */

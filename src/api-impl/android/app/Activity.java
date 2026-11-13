@@ -639,17 +639,39 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
-				final Activity covered = nativeCoverCurrentActivity(intent);
-				if (covered != null)
-					covered.coveringOtherProcesses++;
 				android.atl.ATLProcess.startActivity(intent, process, caller != null && requestCode >= 0, new android.atl.ATLProcess.ActivityFinished() {
+					/* the activity of this process the started one is on top of, while it is */
+					private Activity covered = cover(intent);
+
+					private Activity cover(Intent intent) {
+						Activity activity = nativeCoverCurrentActivity(intent);
+						if (activity != null)
+							activity.coveringOtherProcesses++;
+						return activity;
+					}
+
+					private void uncover() {
+						if (covered != null)
+							covered.coveringOtherProcesses--;
+						covered = null;
+						nativeResumeCurrentActivity();
+					}
+
 					@Override
 					public void onActivityFinished(int resultCode, Intent data) {
 						if (caller != null && requestCode >= 0)
 							caller.addPendingResult(requestCode, resultCode, data);
-						if (covered != null)
-							covered.coveringOtherProcesses--;
-						nativeResumeCurrentActivity();
+						uncover();
+					}
+
+					/* like the task below the pinned task on Android: resumed while the started activity is in
+					 * picture-in-picture, paused again when it comes back */
+					@Override
+					public void onCovering(boolean covers) {
+						if (!covers)
+							uncover();
+						else if (covered == null)
+							covered = cover(null);
 					}
 				});
 			}
@@ -2079,6 +2101,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private void performUserLeaving() {
 		onUserInteraction();
 		onUserLeaveHint();
+	}
+
+	/* native code: this activity of a window that another process's activity opened entered picture-in-picture
+	 * as the only one there (false), or came back from it (true) */
+	@Export
+	private void coversStarter(boolean covers) {
+		if (remoteCaller != null)
+			remoteCaller.covers(covers);
 	}
 
 	@Export

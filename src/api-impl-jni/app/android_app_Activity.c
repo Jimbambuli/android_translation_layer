@@ -855,9 +855,10 @@ int activity_count(void)
 	return g_list_length(activity_backlog);
 }
 
+/* (with the one in the pinned task) */
 JNIEXPORT jint JNICALL Java_android_app_Activity_nativeActivityCount(JNIEnv *env, jclass class)
 {
-	return activity_count();
+	return activity_count() + (pinned_activity ? 1 : 0);
 }
 
 /* xdg-foreign: the handle of this process's window, under which the window of another process of the app
@@ -909,6 +910,21 @@ static gboolean window_ready_when_sized(gpointer user_data)
 /* an activity that another process of the app started comes up in this process's window: in the main process
  * the window comes forward; in another process its window opens, transient for and modal to the window of
  * the starter (parent_handle), like the activity on top of the starter's in its task on Android */
+static char *starter_handle = NULL;
+static char *child_app_id = NULL;
+
+/* the window of another process (starter_below()): shown transient for the starter's window */
+static void child_window_show(void)
+{
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	if (!gtk_widget_get_visible(GTK_WIDGET(window)) && starter_handle && GDK_IS_WAYLAND_TOPLEVEL(surface))
+		gdk_wayland_toplevel_set_transient_for_exported(GDK_TOPLEVEL(surface), starter_handle);
+	gtk_window_present(window);
+	/* like main.c, the package name as application ID for the window's icon (GTK sets its own when it maps) */
+	if (child_app_id && GDK_IS_WAYLAND_TOPLEVEL(surface))
+		gdk_wayland_toplevel_set_application_id(GDK_TOPLEVEL(surface), child_app_id);
+}
+
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeShowWindowFor(JNIEnv *env, jclass class, jstring parent_handle, jstring app_id)
 {
 	if (!starter_below()) {
@@ -921,13 +937,13 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeShowWindowFor(JNIEnv *env
 		update_config_for_window(window);
 		g_timeout_add(10, window_ready_when_sized, NULL);
 	}
-	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
-	if (!gtk_widget_get_visible(GTK_WIDGET(window)) && parent_handle && GDK_IS_WAYLAND_TOPLEVEL(surface))
-		gdk_wayland_toplevel_set_transient_for_exported(GDK_TOPLEVEL(surface), (char *)_CSTRING(parent_handle));
-	gtk_window_present(window);
-	/* like main.c, the package name as application ID for the window's icon (GTK sets its own when it maps) */
-	if (GDK_IS_WAYLAND_TOPLEVEL(surface))
-		gdk_wayland_toplevel_set_application_id(GDK_TOPLEVEL(surface), _CSTRING(app_id));
+	if (!gtk_widget_get_visible(GTK_WIDGET(window))) {
+		g_free(starter_handle);
+		starter_handle = parent_handle ? g_strdup(_CSTRING(parent_handle)) : NULL;
+	}
+	if (!child_app_id)
+		child_app_id = g_strdup(_CSTRING(app_id));
+	child_window_show();
 }
 
 static char *java_string(JNIEnv *env, jobject object)
@@ -1117,7 +1133,16 @@ static void pinned_task_expand(void)
 	g_object_unref(page);
 	pinned_task_changed(env, activity, 0, 0);
 	activity_backlog = g_list_prepend(activity_backlog, activity);
-	activity_window_present();
+	if (starter_below()) { // the window of another process comes back over the starter's
+		J__Activity__coversStarter(env, activity, true);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		child_window_show();
+	} else {
+		activity_window_present();
+	}
 	activity_update_current(env);
 }
 
@@ -1308,6 +1333,17 @@ static void pinned_task_entered(gpointer user_data)
 	if (!pinned_activity)
 		return;
 	pinned_task_changed(env, pinned_activity, pinned_width, pinned_height);
+	/* in the window of another process, the pinned activity was the only one: like its task on Android, which
+	 * leaves only the pinned task, the window goes and the starter's activity below it is resumed */
+	if (starter_below() && !activity_backlog) {
+		gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
+		J__Activity__coversStarter(env, pinned_activity, false);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		return;
+	}
 	if (!window_hidden) {
 		activity_update_current(env);
 	} else if (activity_current && (*env)->IsSameObject(env, activity_current, pinned_activity)) {
@@ -1433,6 +1469,9 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 	jobject removed_activity = NULL;
 	if (pinned_activity && (*env)->IsSameObject(env, this, pinned_activity)) {
 		pinned_task_finish(env);
+		/* the last activity of the window of another process: see app_exit() */
+		if (starter_below() && !activity_backlog && window)
+			g_idle_add(delayed_close_window, _PTR(window));
 		return;
 	}
 	for (l = activity_backlog; l != NULL; l = l->next) {
