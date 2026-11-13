@@ -1932,9 +1932,9 @@ public class PackageManager {
 	 * @see #PERMISSION_GRANTED
 	 * @see #PERMISSION_DENIED
 	 */
-	/* AOSP takes it from the permission controller: its label of the background location option */
+	/* AOSP takes it from the permission controller: its label of the background location option (in ATL, framework-res has it) */
 	public CharSequence getBackgroundPermissionOptionLabel() {
-		return "Allow all the time";
+		return Resources.getSystem().getText(com.android.internal.R.string.app_permission_button_allow_always);
 	}
 
 	private static java.util.Set<String> deniedByUser;
@@ -3780,19 +3780,31 @@ public class PackageManager {
 		return getEnabledState("package:" + packageName);
 	}
 
-	/* AOSP's package manager keeps the enabled state an app gives its components (package-restrictions.xml), also
-	 * across restarts; ATL keeps it in a file of the app's data directory. It does not change which component an
-	 * intent resolves to. */
+	/* AOSP's package manager keeps the enabled state an app gives its components (package-restrictions.xml, in
+	 * /data/system), also across restarts; ATL keeps it in a file beside the app's data directory, which the app
+	 * does not see (0.8.7 put it into the app's storage, where Material Files listed it). It does not change which
+	 * component an intent resolves to. */
 	private static java.util.Properties enabledStates;
 
 	private static java.io.File enabledStatesFile() {
+		/* next to the app's data directory (ATLLoadedAppManager.getDataDir()), not in it: ATL's data directory is
+		 * also the app's shared storage (Environment.getExternalStorageDirectory()), which file managers list */
+		String pkg = android.atl.ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+		return new java.io.File(android.atl.ATLPaths.app_data_dir_base, pkg + ".enabled_states");
+	}
+
+	/* where 0.8.7 kept it: moved on first use */
+	private static java.io.File oldEnabledStatesFile() {
 		return new java.io.File(android.os.Environment.getExternalStorageDirectory(), "atl-enabled-states");
 	}
 
 	private static synchronized java.util.Properties enabledStates() {
 		if (enabledStates == null) {
 			enabledStates = new java.util.Properties();
-			try (java.io.FileInputStream in = new java.io.FileInputStream(enabledStatesFile())) {
+			java.io.File file = enabledStatesFile(), old = oldEnabledStatesFile();
+			if (!file.exists() && old.isFile() && !old.renameTo(file))
+				file = old;
+			try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
 				enabledStates.load(in);
 			} catch (java.io.IOException e) {
 				// nothing set yet

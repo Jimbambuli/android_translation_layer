@@ -96,6 +96,7 @@ public abstract class Context {
 	public static final String MEDIA_ROUTER_SERVICE = "media_router";
 	public static final String POWER_SERVICE = "power";
 	public static final String VIBRATOR_SERVICE = "vibrator";
+	public static final String VIBRATOR_MANAGER_SERVICE = "vibrator_manager";
 	public static final String WINDOW_SERVICE = "window";
 	public static final String SENSOR_SERVICE = "sensor";
 	public static final String CONNECTIVITY_SERVICE = "connectivity";
@@ -225,7 +226,20 @@ public abstract class Context {
 	private static native double native_getMonitorScale();
 	protected static native void native_updateConfigFromWindow(long window, Configuration config);
 	protected static native void nativeOpenFile(int fd);
-	protected static native void nativeShareFile(String text, int fd, String[] labels);
+	/* appLabels/appIcons: other installed apps that take what is shared (ATLLoadedAppManager.shareTargets()); when
+	 * the user picks one, the sheet calls runShareAppTarget() with its index */
+	protected static native void nativeShareFile(String text, int fd, String[] labels, String[] appLabels, String[] appIcons);
+
+	/** @hide set by ContextImpl.share() */
+	public static Runnable[] shareAppTargets;
+
+	@Export
+	static void runShareAppTarget(int index) {
+		Runnable[] targets = shareAppTargets;
+		shareAppTargets = null;
+		if (targets != null && index >= 0 && index < targets.length)
+			targets[index].run();
+	}
 	/* the desktop's choice of applications (OpenURI portal with «ask») for a file (fd) or a link; false without
 	 * the portal */
 	protected static native boolean nativeOpenWith(int fd, String uri);

@@ -27,6 +27,7 @@
 #include "../../libandroid/native_window.h"
 #include "../widgets/android_view_SurfaceView.h"
 #include "jni.h"
+#include "video_rotate.h"
 
 struct ATL_codec_context {
 	AVCodecContext *codec;
@@ -39,6 +40,9 @@ struct ATL_codec_context {
 			struct SwsContext *sws; // for software decoding
 			SurfaceViewWidget *surface_view_widget;
 			jobject surface_texture; // global ref: the SurfaceTexture of a Surface(SurfaceTexture)
+			int rotation;            // degrees clockwise (the format's rotation-degrees), the frames are turned
+			gboolean crop;           // VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+			struct ANativeWindow *remote; // the window of a Surface of another process of the app
 			size_t extradata_size;
 			uint8_t *extradata;
 		} video;
@@ -152,8 +156,10 @@ struct render_frame_data {
 	GdkTexture *texture; // for software decoding
 	SurfaceViewWidget *surface_view_widget;
 	jobject surface_texture; // global ref, instead of the widget
+	struct ANativeWindow *remote; // a reference, instead of the widget
 	long release_time_ns;    // wall-clock (monotonic, ns) at which the frame should be shown; 0 = now
 	long timestamp_ns;       // the frame's timestamp for SurfaceTexture.getTimestamp()
+	gboolean crop;           // the scaling mode SCALE_TO_FIT_WITH_CROPPING, for the SurfaceView
 };
 
 /* the texture (taken over) to the consumer: the SurfaceView's widget, or the SurfaceTexture, which queues
@@ -161,26 +167,38 @@ struct render_frame_data {
  * presentation time) */
 static void deliver_texture(struct render_frame_data *d, GdkTexture *texture)
 {
-	if (d->surface_texture) {
+	if (d->remote) {
+		ANativeWindow_remotePresentTexture(d->remote, texture);
+		g_object_unref(texture);
+		ANativeWindow_release(d->remote);
+	} else if (d->surface_texture) {
 		JNIEnv *env = get_jni_env();
 		jmethodID queue_buffer = _METHOD(_CLASS(d->surface_texture), "queueBuffer", "(JJ)V");
 		(*env)->CallVoidMethod(env, d->surface_texture, queue_buffer, _INTPTR(texture), (jlong)d->timestamp_ns);
 		(*env)->DeleteGlobalRef(env, d->surface_texture);
 	} else {
+		d->surface_view_widget->crop = d->crop;
 		surface_view_widget_set_texture(d->surface_view_widget, texture, FALSE);
 	}
 }
 
-/* the Surface's consumer: a SurfaceView's widget, or the SurfaceTexture of a Surface(SurfaceTexture); none for
- * null or a released Surface */
+/* the Surface's consumer: a SurfaceView's widget, the SurfaceTexture of a Surface(SurfaceTexture), or the window of
+ * a Surface of another process (its frames go there as memory buffers); none for null or a released Surface */
 static void set_output_surface(JNIEnv *env, struct ATL_codec_context *ctx, jobject surface)
 {
 	if (ctx->video.surface_texture)
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
+	if (ctx->video.remote)
+		ANativeWindow_release(ctx->video.remote);
 	ctx->video.surface_texture = NULL;
 	ctx->video.surface_view_widget = NULL;
+	ctx->video.remote = NULL;
 	if (!surface)
 		return;
+	if (!_GET_LONG_FIELD(surface, "widget") && _GET_OBJ_FIELD(surface, "atl_endpoint", "Landroid/os/IBinder;")) {
+		ctx->video.remote = ANativeWindow_fromSurface(env, surface);
+		return;
+	}
 	GtkWidget *wrapper = _PTR(_GET_LONG_FIELD(surface, "widget"));
 	jobject surface_texture = _GET_OBJ_FIELD(surface, "surfaceTexture", "Landroid/graphics/SurfaceTexture;");
 	if (wrapper)
@@ -250,7 +268,7 @@ static GdkTexture *import_drm_frame_desc_as_texture(const AVDRMFrameDescriptor *
 	return texture;
 }
 
-JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JNIEnv *env, jobject this, jlong codec, jobject csd0, jobject csd1, jobject surface_obj)
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JNIEnv *env, jobject this, jlong codec, jobject csd0, jobject csd1, jobject surface_obj, jint rotation)
 {
 	struct ATL_codec_context *ctx = _PTR(codec);
 	AVCodecContext *codec_ctx = ctx->codec;
@@ -310,7 +328,14 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 		i++;
 	}
 
+	/* AOSP: the codec turns the frames by rotation-degrees (0, 90, 180, 270) when it renders to the Surface */
+	ctx->video.rotation = (rotation % 360 + 360) % 360 / 90 * 90;
 	set_output_surface(env, ctx, surface_obj);
+}
+
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1setVideoScalingMode(JNIEnv *env, jobject this, jlong codec, jboolean crop)
+{
+	((struct ATL_codec_context *)_PTR(codec))->video.crop = crop;
 }
 
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1setOutputSurface(JNIEnv *env, jobject this, jlong codec, jobject surface)
@@ -493,15 +518,15 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		if (!frame)
 			return;
 
-		if (!render || (!ctx->video.surface_view_widget && !ctx->video.surface_texture)) {
+		if (!render || (!ctx->video.surface_view_widget && !ctx->video.surface_texture && !ctx->video.remote)) {
 			fprintf(stderr, "skipping %dx%d frame!\n", frame->width, frame->height);
 			av_frame_free(&frame);
 			return;
 		}
 
-		/* a SurfaceTexture's consumer may read the pixels (updateTexImage()): a hardware frame is
-		 * copied to memory first */
-		if (frame->hw_frames_ctx && ctx->video.surface_texture) {
+		/* a SurfaceTexture's consumer may read the pixels (updateTexImage()), and a frame to be turned is turned
+		 * in memory: a hardware frame is copied to memory first */
+		if (frame->hw_frames_ctx && (ctx->video.surface_texture || ctx->video.rotation)) {
 			AVFrame *sw_frame = av_frame_alloc();
 			if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0 || av_frame_copy_props(sw_frame, frame) < 0) {
 				fprintf(stderr, "skipping %dx%d frame: can't copy it from the hardware\n", frame->width, frame->height);
@@ -536,14 +561,32 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 			sws_scale(ctx->video.sws, (const uint8_t *const *)frame->data, frame->linesize, 0,
 			          frame->height, (uint8_t *[1]){data_rgb}, (int[1]){stride});
 
-			GBytes *bytes = g_bytes_new_take(data_rgb, frame->height * stride);
-			GdkTexture *texture = gdk_memory_texture_new(frame->width, frame->height, gdk_mem_fmt, bytes, stride);
+			int width = frame->width, height = frame->height;
+			if (ctx->video.rotation) {
+				int bpp = stride / frame->width;
+				guchar *turned = g_malloc(frame->height * stride);
+				rotate_plane(turned, data_rgb, stride, width, height, bpp, ctx->video.rotation);
+				g_free(data_rgb);
+				data_rgb = turned;
+				if (ctx->video.rotation != 180) {
+					width = frame->height;
+					height = frame->width;
+					stride = width * bpp;
+				}
+			}
+
+			GBytes *bytes = g_bytes_new_take(data_rgb, height * stride);
+			GdkTexture *texture = gdk_memory_texture_new(width, height, gdk_mem_fmt, bytes, stride);
 			struct render_frame_data *data = malloc(sizeof(struct render_frame_data));
 			data->texture = texture;
 			data->surface_view_widget = ctx->video.surface_view_widget;
 			data->surface_texture = ctx->video.surface_texture ? (*env)->NewGlobalRef(env, ctx->video.surface_texture) : NULL;
+			data->remote = ctx->video.remote;
+			if (data->remote)
+				ANativeWindow_acquire(data->remote);
 			data->release_time_ns = presentationTimeNs;
 			data->timestamp_ns = timestamp_ns;
+			data->crop = ctx->video.crop;
 			schedule_render(render_texture, data, texture);
 			g_bytes_unref(bytes);
 			av_frame_free(&frame);
@@ -555,6 +598,10 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		data->release_time_ns = presentationTimeNs;
 		data->surface_view_widget = ctx->video.surface_view_widget;
 		data->surface_texture = NULL;
+		data->crop = ctx->video.crop;
+		data->remote = ctx->video.remote;
+		if (data->remote)
+			ANativeWindow_acquire(data->remote);
 		schedule_render(render_frame, data, NULL);
 	}
 }
@@ -573,6 +620,8 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1release(JNIEnv *env
 	}
 	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.surface_texture)
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
+	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.remote)
+		ANativeWindow_release(ctx->video.remote);
 
 	avcodec_free_context(&ctx->codec);
 	free(ctx);

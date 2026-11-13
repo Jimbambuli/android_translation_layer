@@ -55,6 +55,8 @@ public class SurfaceView extends View {
 
 	protected static native long native_createSnapshot();
 	protected static native void native_postSnapshot(long surfaceView, long snapshot);
+	/* for an EGL window on this view's surface in another process (Surface.Endpoint): the socket for its buffers */
+	static native int native_connectRemote(long surfaceView);
 
 	public SurfaceHolder getHolder() {
 		return mSurfaceHolder;

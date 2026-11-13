@@ -18,6 +18,7 @@
 #include "libc_bio_path_overrides.h"
 #include "navigation_bar.h"
 #include "system_theme.h"
+#include "zygote.h"
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -77,6 +78,19 @@ static void start_exit_watchdog(void)
 
 gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 {
+	/* the window of another process of the app (android:process): its activities end with it, the process
+	 * ends unless it has services (ATLProcess.onActivitiesGone()); the window hides, it is shown again for the
+	 * next activity that comes */
+	if (getenv("ATL_PROCESS_NAME")) {
+		activity_close_all();
+		gtk_widget_set_visible(GTK_WIDGET(self), FALSE);
+		J__ATLProcess__onActivitiesGone(env);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		return TRUE;
+	}
 	if (activity_window_close_request())
 		return TRUE;
 	start_exit_watchdog();
@@ -97,6 +111,7 @@ gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 
 // this is the equivalent of /data/data/com.example.app/
 char *app_data_dir = NULL;
+static char *app_data_dir_base;
 
 /* Android's public directories of the external storage are the user's folders on this system */
 static void link_media_dirs(void)
@@ -165,7 +180,7 @@ static void init_locale_options(void)
 	}
 }
 
-JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options)
+JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_apk, char *test_runner_jar, char *api_impl_natives_dir, char *app_lib_dir, char *sdk_int, char **extra_jvm_options, gboolean zygote)
 {
 	JavaVM *jvm;
 	JNIEnv *env;
@@ -192,6 +207,8 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	}
 	if (extra_jvm_options)
 		args.nOptions += g_strv_length(extra_jvm_options);
+	if (zygote)
+		args.nOptions += 3;
 	options = malloc(sizeof(JavaVMOption) * args.nOptions);
 
 	if (getenv("RUN_FROM_BUILDDIR")) {
@@ -228,6 +245,14 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 
 	while (extra_jvm_options && *extra_jvm_options) {
 		options[option_counter++].optionString = *(extra_jvm_options++);
+	}
+
+	/* the app's zygote (see zygote.c). Nothing marks its boot as complete, so it must not count "failed boots" and
+	 * prune the dalvik cache the app's processes share, nor compile a missing boot image (which prunes it too) */
+	if (zygote) {
+		options[option_counter++].optionString = "-Xzygote";
+		options[option_counter++].optionString = "-Xzygote-max-boot-retry=0";
+		options[option_counter++].optionString = "-Xnoimage-dex2oat";
 	}
 
 	args.options = options;
@@ -574,52 +599,15 @@ static gboolean forward_uri_to_running_app(GApplication *app, const char *uri)
 	return TRUE;
 }
 
-static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
+/* the app's paths and the runtime with ATL's JNI library, before anything of GTK: in the main process from
+ * open(), in the app's zygote from zygote_main() (whose processes inherit it all) */
+static JNIEnv *start_runtime(char *apk_classpath, char *apk_name, struct jni_callback_data *d, gboolean zygote)
 {
-	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
-		fprintf(stderr, "opening uri over DBus %p\n", files[0]);
-		char *uri = g_file_get_uri(files[0]);
-		JNIEnv *env = get_jni_env();
-		fprintf(stderr, "opening uri over DBus: %s\n", uri);
-		jobject activity = J__Activity__createMainActivity(env,
-		                                                   _JSTRING(d->apk_main_activity_class),
-		                                                   _INTPTR(window), _JSTRING(uri));
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-		activity_start(env, activity);
-		return;
-	}
-	/* a process of the app for its components with android:process, started by the main process (ATLProcess.java):
-	 * it creates the Application and then serves the main process, without a window of its own */
-	const char *atl_process_name = getenv("ATL_PROCESS_NAME");
-	if (!atl_process_name && uri_option && *uri_option && forward_uri_to_running_app(G_APPLICATION(app), uri_option))
-		exit(0);
 	char *dex_install_dir;
 	char *api_impl_jar;
 	char *test_runner_jar = NULL;
 	char *framework_res_apk = NULL;
-	const char *package_name;
 	int ret;
-	jobject activity_object;
-	jobject application_object;
-
-	char **apk_classpaths = g_new0(gchar *, nfiles + 1); // +1 for NULL terminator for g_strjoinv
-	char *apk_name = g_file_get_basename(files[0]);
-	for (int i = 0; i < nfiles; i++) {
-		apk_classpaths[i] = g_file_get_path(files[i]);
-		if (apk_classpaths[i] == NULL) {
-			fprintf(stderr, "error: the specified file path (%s) doesn't seem to be valid\n", g_file_get_uri(files[i]));
-			exit(1);
-		}
-		if (access(apk_classpaths[i], F_OK) < 0) {
-			fprintf(stderr, "error: the specified file path (%s) doesn't seem to exist (%m)\n", apk_classpaths[i]);
-			exit(1);
-		}
-	}
-	char *apk_classpath = g_strjoinv(":", apk_classpaths);
-	g_free(apk_classpaths);
 
 	Dl_info libart_so_dl_info;
 	// JNI_CreateJavaVM chosen arbitrarily, what matters is that it's a symbol exported by by libart.so
@@ -638,7 +626,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		exit(1);
 	}
 
-	char *app_data_dir_base = getenv("ANDROID_APP_DATA_DIR");
+	app_data_dir_base = getenv("ANDROID_APP_DATA_DIR");
 	if (!app_data_dir_base) {
 		const char *user_data_dir = g_get_user_data_dir();
 		if (user_data_dir) {
@@ -692,7 +680,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	dl_parse_library_path(ld_path, ":");
 	g_free(ld_path);
 
-	JNIEnv *env = create_vm(api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options);
+	JNIEnv *env = create_vm(api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options, zygote);
 
 	free(app_lib_dir);
 
@@ -709,6 +697,54 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	/* this method is private, but it seems we get away with calling it from C */
 	J__Runtime__loadLibrary(env, java_runtime, _JSTRING("translation_layer_main"), class_loader);
+
+	(*env)->GetJavaVM(env, &jvm);
+	return env;
+}
+
+static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
+{
+	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
+		fprintf(stderr, "opening uri over DBus %p\n", files[0]);
+		char *uri = g_file_get_uri(files[0]);
+		JNIEnv *env = get_jni_env();
+		fprintf(stderr, "opening uri over DBus: %s\n", uri);
+		jobject activity = J__Activity__createMainActivity(env,
+		                                                   _JSTRING(d->apk_main_activity_class),
+		                                                   _INTPTR(window), _JSTRING(uri));
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		activity_start(env, activity);
+		return;
+	}
+	/* a process of the app for its components with android:process, started by the main process (ATLProcess.java):
+	 * it creates the Application and then serves the main process; its window shows only for its activities */
+	const char *atl_process_name = getenv("ATL_PROCESS_NAME");
+	if (!atl_process_name && uri_option && *uri_option && forward_uri_to_running_app(G_APPLICATION(app), uri_option))
+		exit(0);
+	const char *package_name;
+	jobject activity_object;
+	jobject application_object;
+
+	char **apk_classpaths = g_new0(gchar *, nfiles + 1); // +1 for NULL terminator for g_strjoinv
+	char *apk_name = g_file_get_basename(files[0]);
+	for (int i = 0; i < nfiles; i++) {
+		apk_classpaths[i] = g_file_get_path(files[i]);
+		if (apk_classpaths[i] == NULL) {
+			fprintf(stderr, "error: the specified file path (%s) doesn't seem to be valid\n", g_file_get_uri(files[i]));
+			exit(1);
+		}
+		if (access(apk_classpaths[i], F_OK) < 0) {
+			fprintf(stderr, "error: the specified file path (%s) doesn't seem to exist (%m)\n", apk_classpaths[i]);
+			exit(1);
+		}
+	}
+	char *apk_classpath = g_strjoinv(":", apk_classpaths);
+	g_free(apk_classpaths);
+
+	JNIEnv *env = jvm ? get_jni_env() /* forked from the zygote, which started the runtime */ : start_runtime(apk_classpath, apk_name, d, FALSE);
 
 	/* like Android's RuntimeInit.commonInit(): process-wide setup before any app code runs */
 	J__RuntimeInit__commonInit(env);
@@ -833,15 +869,6 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		(*env)->ExceptionClear(env);
 	}
 
-	if (atl_process_name) {
-		J__ATLProcess__attachToMainProcess(env);
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			_exit(10);
-		}
-		return; // the window stays hidden and keeps the application running
-	}
-
 	if (d->apk_instrumentation_class) {
 		if (d->apk_main_activity_class) {
 			fprintf(stderr, "error: both --instrument and --launch-activity supplied, exiting\n");
@@ -864,7 +891,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	}
 
 	// construct main Activity
-	if (!d->apk_instrumentation_class && !d->install_internal) {
+	if (!d->apk_instrumentation_class && !d->install_internal && !atl_process_name) {
 		activity_object = J__Activity__createMainActivity(env, _JSTRING(d->apk_main_activity_class),
 		                                                  _INTPTR(window), (uri_option && *uri_option) ? _JSTRING(uri_option) : NULL);
 		if ((*env)->ExceptionCheck(env)) {
@@ -1047,7 +1074,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	GtkDropTarget *drop_target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
 	g_signal_connect(drop_target, "drop", G_CALLBACK(on_drop), NULL);
 	gtk_widget_add_controller(window, GTK_EVENT_CONTROLLER(drop_target));
-	gtk_window_present(GTK_WINDOW(window));
+	if (!atl_process_name)
+		gtk_window_present(GTK_WINDOW(window));
 
 	// set package name as application id for window icon on Wayland. Needs a {package_name}.desktop file defining the icon
 	const char *app_id = g_application_get_application_id(G_APPLICATION(app));
@@ -1056,7 +1084,8 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		gdk_wayland_toplevel_set_application_id(GDK_WAYLAND_TOPLEVEL(toplevel), package_name);
 	}
 
-	update_config_for_window(GTK_WINDOW(window));
+	if (!atl_process_name) // in another process, once its window shows (Activity.nativeShowWindowFor())
+		update_config_for_window(GTK_WINDOW(window));
 
 	if (!d->apk_instrumentation_class && app_icon_path) {
 		char *app_icon_path_full = malloc(strlen(app_data_dir) + 1 + strlen(app_icon_path) + 1); // +1 for /, +1 for NULL
@@ -1091,7 +1120,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		}
 	}
 
-	if (!d->apk_instrumentation_class) {
+	if (!d->apk_instrumentation_class && !atl_process_name) {
 		activity_start(env, activity_object);
 
 		g_timeout_add(10, G_SOURCE_FUNC(hacky_on_window_focus_changed_callback), env);
@@ -1106,6 +1135,15 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
 		}
+	}
+
+	if (atl_process_name) {
+		J__ATLProcess__attachToMainProcess(env);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			_exit(10);
+		}
+		return; // the window stays hidden and keeps the application running
 	}
 
 	if (strcmp(app_id, "com.example.demo_application")) {
@@ -1139,7 +1177,8 @@ static gboolean option_uri_cb(const gchar *option_name, const gchar *value, gpoi
 	return TRUE;
 }
 
-void init_cmd_parameters(GApplication *app, struct jni_callback_data *d)
+/* the command line options, for GApplication and for the zygote (zygote_main()) */
+static GOptionEntry *cmd_entries(struct jni_callback_data *d)
 {
 	const GOptionEntry cmd_params[] = {
 		/* clang-format off */
@@ -1160,7 +1199,47 @@ void init_cmd_parameters(GApplication *app, struct jni_callback_data *d)
 		/* clang-format on */
 	};
 
-	g_application_add_main_option_entries(G_APPLICATION(app), cmd_params);
+	return g_memdup2(cmd_params, sizeof(cmd_params));
+}
+
+void init_cmd_parameters(GApplication *app, struct jni_callback_data *d)
+{
+	GOptionEntry *entries = cmd_entries(d);
+	g_application_add_main_option_entries(G_APPLICATION(app), entries);
+	g_free(entries);
+}
+
+/* ATL_ZYGOTE_FD: this process is the app's zygote (zygote.c), which the main process started with its own command
+ * line. It starts the runtime like open() does, but nothing of GTK, and then forks the app's other processes; it
+ * returns only in such a process, which then goes on like a process started anew (open() keeps the runtime). */
+static void zygote_main(int argc, char **argv, struct jni_callback_data *d)
+{
+	/* GApplication's own option, which the command line may carry (an installed app's .desktop file) */
+	char *app_id = NULL;
+	const GOptionEntry gapplication_entries[] = {
+		{"gapplication-app-id", 0, 0, G_OPTION_ARG_STRING, &app_id, NULL, NULL},
+		{NULL}
+	};
+	GOptionEntry *entries = cmd_entries(d);
+	GOptionContext *context = g_option_context_new(NULL);
+	g_option_context_add_main_entries(context, entries, NULL);
+	g_option_context_add_main_entries(context, gapplication_entries, NULL);
+	/* parse a copy: main() hands argv to GApplication in the forked processes */
+	char **args = g_memdup2(argv, (argc + 1) * sizeof(char *));
+	GError *error = NULL;
+	if (!g_option_context_parse(context, &argc, &args, &error) || argc < 2) {
+		fprintf(stderr, "ATL zygote: %s\n", error ? error->message : "no apk given");
+		_exit(1);
+	}
+	/* the apks, as open() gets them from GApplication (g_file_get_path() of the command line arguments) */
+	char **apk_classpaths = g_new0(char *, argc);
+	for (int i = 1; i < argc; i++)
+		apk_classpaths[i - 1] = g_canonicalize_filename(args[i], NULL);
+	char *apk_classpath = g_strjoinv(":", apk_classpaths);
+	char *apk_name = g_path_get_basename(apk_classpaths[0]);
+
+	JNIEnv *env = start_runtime(apk_classpath, apk_name, d, TRUE);
+	zygote_run(env, atoi(getenv("ATL_ZYGOTE_FD")));
 }
 
 void init__r_debug();
@@ -1212,6 +1291,7 @@ int main(int argc, char **argv)
 	// locale on android is always either C or C.UTF-8, and some apps might unbeknownst to them depend on that
 	// for correct functionality
 	setenv("LC_ALL", "C.UTF-8", 1);
+	atl_use_user_messages_locale();
 
 	libc_bio_set_apply_path_overrides_func(apply_path_overrides);
 
@@ -1227,6 +1307,9 @@ int main(int argc, char **argv)
 	callback_data->extra_string_keys = NULL;
 	callback_data->sdk_int = NULL;
 	callback_data->attach_agent = NULL;
+
+	if (getenv("ATL_ZYGOTE_FD"))
+		zygote_main(argc, argv, callback_data);
 
 	app = gtk_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
 

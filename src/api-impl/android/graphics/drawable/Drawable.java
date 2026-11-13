@@ -86,9 +86,13 @@ public class Drawable {
 
 	public static abstract class ConstantState {
 
-		public abstract Drawable newDrawable(Resources res);
-
 		public abstract Drawable newDrawable();
+
+		/* as in AOSP not abstract: a ConstantState of an app (or of a library built against an old SDK) may
+		 * implement only newDrawable() */
+		public Drawable newDrawable(Resources res) {
+			return newDrawable();
+		}
 
 		public Drawable newDrawable(Resources res, Theme theme) {
 			return newDrawable(res);

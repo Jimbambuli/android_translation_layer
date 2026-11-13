@@ -167,10 +167,16 @@ public class PopupMenu {
 	protected native void native_dismiss(long popover);
 	protected native void native_show(long popover, long anchor, int anchorWidth, int anchorHeight, int gravity);
 
+	/* every item has a key of its own for the GMenu action: item ids need not be unique (add(title)
+	 * gives them all 0), so the id would always find the first item */
+	private int nextKey;
+	private final java.util.ArrayList<MenuItemImpl> keyed = new java.util.ArrayList<>();
+
 	// callback from native code
 	@Export
-	protected void menuItemClickCallback(final int id) {
-		menu.performIdentifierAction(id, 0);
+	protected void menuItemClickCallback(final int key) {
+		if (key >= 0 && key < keyed.size())
+			menu.invoke(keyed.get(key));
 	}
 
 	/**
@@ -426,7 +432,10 @@ public class PopupMenu {
 
 		@Override
 		public boolean performIdentifierAction(int id, int flags) {
-			MenuItemImpl item = (MenuItemImpl)findItem(id);
+			return invoke((MenuItemImpl)findItem(id));
+		}
+
+		boolean invoke(MenuItemImpl item) {
 			if (item == null || item.subMenu != null || !item.enabled)
 				return false;
 			// like AOSP's MenuItemImpl.invoke(): the item's own listener first, then the menu's
@@ -457,6 +466,36 @@ public class PopupMenu {
 		public SubMenu setIcon(Drawable icon) {
 			return this;
 		}
+
+		@Override
+		public SubMenu setIcon(int iconRes) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderTitle(int titleRes) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderTitle(CharSequence title) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderIcon(int iconRes) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderIcon(Drawable icon) {
+			return this;
+		}
+
+		@Override
+		public SubMenu setHeaderView(View view) {
+			return this;
+		}
 	}
 
 	private class MenuItemImpl implements MenuItem {
@@ -485,7 +524,10 @@ public class PopupMenu {
 		OnMenuItemClickListener clickListener;
 		private OnActionExpandListener actionExpandListener;
 
+		private final int key = nextKey++;
+
 		private MenuItemImpl(int id, int groupId, int order, MenuImpl parent, String title, SubMenuImpl subMenu) {
+			keyed.add(this);
 			this.id = id;
 			this.groupId = groupId;
 			this.order = order;
@@ -531,7 +573,7 @@ public class PopupMenu {
 				if (subMenu != null)
 					native_insertSubmenu(parent.menu, position, title, subMenu.menu);
 				else
-					native_insertItem(parent.menu, position, title, id);
+					native_insertItem(parent.menu, position, title, key);
 			}
 			return this;
 		}
@@ -576,7 +618,7 @@ public class PopupMenu {
 				if (subMenu != null)
 					native_insertSubmenu(parent.menu, position, this.title, subMenu.menu);
 				else
-					native_insertItem(parent.menu, position, this.title, id);
+					native_insertItem(parent.menu, position, this.title, key);
 			}
 			return this;
 		}

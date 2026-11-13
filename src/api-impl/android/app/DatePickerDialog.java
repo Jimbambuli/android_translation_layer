@@ -26,7 +26,7 @@ public class DatePickerDialog extends AlertDialog implements DatePicker.OnDateCh
 		super(context, resolveDialogTheme(context, themeResId));
 
 		date_set_listener = listener;
-		setTitle("Date Picker");
+		setTitle(R.string.date_picker_dialog_title);
 		date_picker = new DatePicker(context);
 		date_picker.setOnDateChangedListener(this);
 		date_picker.updateDate(year, monthOfYear, dayOfMonth);

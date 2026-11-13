@@ -54,6 +54,7 @@ import android.os.DropBoxManager;
 import android.os.PowerManager;
 import android.os.UserManager;
 import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.os.storage.StorageManager;
 import android.print.PrintManager;
 import android.telecom.TelecomManager;
@@ -180,6 +181,13 @@ public final class SystemServiceRegistry {
             @Override
             public Vibrator createService(ContextImpl ctx) {
                 return new Vibrator();
+            }});
+
+        registerService(Context.VIBRATOR_MANAGER_SERVICE, VibratorManager.class,
+                new CachedServiceFetcher<VibratorManager>() {
+            @Override
+            public VibratorManager createService(ContextImpl ctx) {
+                return new VibratorManager(ctx);
             }});
 
         registerService(Context.POWER_SERVICE, PowerManager.class,

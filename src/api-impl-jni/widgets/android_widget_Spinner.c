@@ -64,6 +64,19 @@ static void bind_listitem_cb(GtkListItemFactory *factory, GtkListItem *list_item
 	(*env)->DeleteLocalRef(env, this);
 }
 
+/* the list in the drop-down's popup */
+static GtkWidget *find_list_view(GtkWidget *widget)
+{
+	if (GTK_IS_LIST_VIEW(widget))
+		return widget;
+	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+		GtkWidget *found = find_list_view(child);
+		if (found)
+			return found;
+	}
+	return NULL;
+}
+
 JNIEXPORT jlong JNICALL Java_android_widget_Spinner_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	WrapperWidget *wrapper = g_object_ref_sink(WRAPPER_WIDGET(wrapper_widget_new()));
@@ -77,6 +90,11 @@ JNIEXPORT jlong JNICALL Java_android_widget_Spinner_native_1constructor(JNIEnv *
 	model->jobject = _WEAK_REF(this);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), dropdown);
 	gtk_widget_set_name(dropdown, "Spinner");
+	/* a row is as high as its view wants (AOSP's ListPopupWindow measures the drop-down views): with the
+	 * default GTK_SCROLL_MINIMUM the list gives each row its minimum height, which is 0 for a view */
+	GtkWidget *list_view = find_list_view(dropdown);
+	if (list_view)
+		gtk_scrollable_set_vscroll_policy(GTK_SCROLLABLE(list_view), GTK_SCROLL_NATURAL);
 	return _INTPTR(dropdown);
 }
 

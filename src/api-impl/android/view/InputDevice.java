@@ -1,5 +1,7 @@
 package android.view;
 
+import android.os.NullVibrator;
+import android.os.Vibrator;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,6 +32,11 @@ public class InputDevice {
 
 	public int getId() {
 		return 0; // might work?
+	}
+
+	/* AOSP: the vibrator of the input device (e.g. a game controller); ATL's input device has none */
+	public Vibrator getVibrator() {
+		return new NullVibrator();
 	}
 
 	public int getProductId() {

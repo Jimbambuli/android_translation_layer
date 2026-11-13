@@ -5,6 +5,7 @@
 #include "../generated_headers/android_view_WindowManagerImpl.h"
 #include "../widgets/android_widget_PopupWindow.h"
 #include "../app/android_app_Activity.h"
+#include "../widgets/WrapperWidget.h"
 #include "gdk/gdk.h"
 #include "glib-object.h"
 
@@ -61,13 +62,52 @@ static void watch_window(GtkWidget *window_widget)
 	g_object_set_data(G_OBJECT(window_widget), "watches-presses", GINT_TO_POINTER(1));
 }
 
-/* A window added with WindowManager.addView() gets Escape as KEYCODE_ESCAPE through its views,
- * which decide what it does (Compose's popups close on Back only); unlike a GtkPopover, an Android
- * window has no default action for it. So an Escape that the views did not consume stops here,
- * after them and before GtkPopover's key handler, which would pop the window down. */
+#define KEYCODE_BACK  4
+#define ACTION_DOWN   0
+#define ACTION_UP     1
+#define FLAG_FALLBACK 0x400
+
+/* KEYCODE_BACK with FLAG_FALLBACK to the window's view (its root view, as ViewRootImpl hands it on) */
+static gboolean dispatch_back(GtkEventController *controller, int action)
+{
+	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_event_controller_get_widget(controller));
+	JNIEnv *env = get_jni_env();
+	jlong now = g_get_monotonic_time() / 1000;
+	jobject event = J_new__KeyEvent(env, now, now, action, KEYCODE_BACK, 0, 0);
+	_SET_INT_FIELD(event, "mFlags", FLAG_FALLBACK);
+	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, event);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		ret = FALSE;
+	}
+	(*env)->DeleteLocalRef(env, event);
+	return ret;
+}
+
+/* A window added with WindowManager.addView() gets Escape as KEYCODE_ESCAPE through its views first.
+ * Like InputDispatcher with AOSP's Generic.kcm, an Escape that none of them consumed comes again as its
+ * fallback key BACK, which Compose's popups close on (PopupLayout.dispatchKeyEvent()). Escape stops
+ * here either way, before GtkPopover's key handler, which would pop the window down without the app. */
+static gboolean back_down;
+
 static gboolean on_window_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
 {
-	return keyval == GDK_KEY_Escape;
+	if (keyval != GDK_KEY_Escape)
+		return FALSE;
+	if (!(state & (GDK_CONTROL_MASK | GDK_ALT_MASK | GDK_META_MASK | GDK_SUPER_MASK))) {
+		dispatch_back(GTK_EVENT_CONTROLLER(controller), ACTION_DOWN);
+		back_down = TRUE;
+	}
+	return TRUE;
+}
+
+static void on_window_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, gpointer user_data)
+{
+	if (keyval == GDK_KEY_Escape && back_down) {
+		back_down = FALSE;
+		dispatch_back(GTK_EVENT_CONTROLLER(controller), ACTION_UP);
+	}
 }
 
 /* the window shows only its view, which draws its own background and shadow (Compose's menus),
@@ -112,6 +152,7 @@ JNIEXPORT void JNICALL Java_android_view_WindowManagerImpl_native_1addView(JNIEn
 	}
 	GtkEventController *key_controller = GTK_EVENT_CONTROLLER(gtk_event_controller_key_new());
 	g_signal_connect(key_controller, "key-pressed", G_CALLBACK(on_window_key_pressed), NULL);
+	g_signal_connect(key_controller, "key-released", G_CALLBACK(on_window_key_released), NULL);
 	gtk_widget_add_controller(gtk_widget_get_parent(widget), key_controller);
 	gtk_widget_insert_before(GTK_WIDGET(popover), activity_pages_stack(), NULL);
 	atl_popover_place_at_location(popover, gravity, x, y);

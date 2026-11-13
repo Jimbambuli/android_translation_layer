@@ -84,6 +84,17 @@ public abstract class BroadcastReceiver {
 		return false;
 	}
 
+	/* AOSP (API 34): the sender's package and uid only when the sender shared its identity
+	 * (BroadcastOptions.setShareIdentityEnabled()), else null and Process.INVALID_UID; ATL's broadcasts
+	 * (alarms, its own system broadcasts, the app's own) carry no such identity */
+	public final String getSentFromPackage() {
+		return null;
+	}
+
+	public final int getSentFromUid() {
+		return -1; // Process.INVALID_UID
+	}
+
 	public PendingResult goAsync() {
 		return new PendingResult();
 	}

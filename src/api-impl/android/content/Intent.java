@@ -25,6 +25,7 @@ public class Intent implements Parcelable {
 	public static final int FLAG_GRANT_PERSISTABLE_URI_PERMISSION = 0x00000040;
 	public static final int FLAG_GRANT_PREFIX_URI_PERMISSION = 0x00000080;
 	public static final int FLAG_ACTIVITY_CLEAR_TASK = 0x00008000;
+	public static final int FLAG_ACTIVITY_TASK_ON_HOME = 0x00004000;
 	public static final int FLAG_ACTIVITY_CLEAR_TOP = 1 << 26;
 	public static final int FLAG_ACTIVITY_NEW_TASK = 1 << 28;
 	public static final int FLAG_ACTIVITY_SINGLE_TOP = 0x20000000;
@@ -1493,6 +1494,11 @@ public class Intent implements Parcelable {
 
 	public long[] getLongArrayExtra(String name) {
 		return extras.getLongArray(name);
+	}
+
+	public Intent putIntegerArrayListExtra(String name, ArrayList<Integer> value) {
+		extras.putIntegerArrayList(name, value);
+		return this;
 	}
 
 	public ArrayList<Integer> getIntegerArrayListExtra(String name) {

@@ -101,11 +101,9 @@ static gboolean appearance_setting(const char *namespace, const char *key, GVari
 	return TRUE;
 }
 
-/* a setting changed while the app runs: a change of the global configuration, as on Android */
-static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gchar *key, GVariant *value, gpointer user_data)
+/* the appearance changed while the app runs: a change of the global configuration, as on Android */
+static void appearance_changed(gboolean colors)
 {
-	if (!appearance_setting(namespace, key, value))
-		return;
 	JNIEnv *env = get_jni_env();
 	J__ActivityThread__setNightMode(env, appearance_ui_mode_night(), appearance_contrast());
 	if ((*env)->ExceptionCheck(env)) {
@@ -113,7 +111,7 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gch
 		(*env)->ExceptionClear(env);
 	}
 	/* the dynamic colors depend on the contrast as well */
-	if (!strcmp(key, "accent-color") || !strcmp(key, "contrast")) {
+	if (colors) {
 		J__ATLThemeOverlay__setAccentColor(env, accent_color);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
@@ -123,15 +121,73 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gch
 	activity_ensure_configuration();
 }
 
+static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gchar *key, GVariant *value, gpointer user_data)
+{
+	if (appearance_setting(namespace, key, value))
+		appearance_changed(!strcmp(key, "accent-color") || !strcmp(key, "contrast"));
+}
+
 static XdpSettings *xdp_settings = NULL;
 
-static void appearance_read(const char *key)
+/* the reply of ReadAll(["org.freedesktop.appearance"]), (a{sa{sv}}): TRUE if it had a setting of the appearance */
+static gboolean appearance_read_all(GVariant *reply)
 {
-	GVariant *value = xdp_settings_read_value(xdp_settings, "org.freedesktop.appearance", key, NULL, NULL);
-	if (value) {
-		appearance_setting("org.freedesktop.appearance", key, value);
-		g_variant_unref(value);
+	GVariant *namespaces = g_variant_get_child_value(reply, 0);
+	GVariant *settings = g_variant_lookup_value(namespaces, "org.freedesktop.appearance", G_VARIANT_TYPE_VARDICT);
+	gboolean found = FALSE;
+	if (settings) {
+		GVariantIter iter;
+		const char *key;
+		GVariant *value;
+		g_variant_iter_init(&iter, settings);
+		while (g_variant_iter_next(&iter, "{&sv}", &key, &value)) {
+			found |= appearance_setting("org.freedesktop.appearance", key, value);
+			g_variant_unref(value);
+		}
+		g_variant_unref(settings);
 	}
+	g_variant_unref(namespaces);
+	return found;
+}
+
+/* a portal that did not answer in time answered later: as if its settings changed */
+static void appearance_read_all_late_cb(GObject *bus, GAsyncResult *result, gpointer user_data)
+{
+	GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(bus), result, NULL);
+	if (reply) {
+		if (appearance_read_all(reply))
+			appearance_changed(TRUE);
+		g_variant_unref(reply);
+	}
+}
+
+/* The appearance is read with one call that waits at most this long: an app (each of its processes) must not
+ * hang at its start on a portal that does not answer (it waited 3 x 5 s on one), and a portal that answers late
+ * still sets it, as a change. */
+#define APPEARANCE_READ_TIMEOUT_MS 1000
+
+static void appearance_read(void)
+{
+	GDBusConnection *bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+	if (!bus)
+		return;
+	GVariant *args = g_variant_new("(^as)", (const char *const[]){"org.freedesktop.appearance", NULL});
+	g_variant_ref_sink(args);
+	GError *error = NULL;
+	GVariant *reply = g_dbus_connection_call_sync(bus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+	                                              "org.freedesktop.portal.Settings", "ReadAll", args, G_VARIANT_TYPE("(a{sa{sv}})"),
+	                                              G_DBUS_CALL_FLAGS_NONE, APPEARANCE_READ_TIMEOUT_MS, NULL, &error);
+	if (reply) {
+		appearance_read_all(reply);
+		g_variant_unref(reply);
+	} else {
+		if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_TIMED_OUT))
+			g_dbus_connection_call(bus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", "org.freedesktop.portal.Settings",
+			                       "ReadAll", args, G_VARIANT_TYPE("(a{sa{sv}})"), G_DBUS_CALL_FLAGS_NONE, -1, NULL, appearance_read_all_late_cb, NULL);
+		g_error_free(error);
+	}
+	g_variant_unref(args);
+	g_object_unref(bus);
 }
 #endif
 
@@ -185,11 +241,8 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv 
 			g_error_free(error);
 		}
 	}
-	if (xdp_settings) {
-		appearance_read("color-scheme");
-		appearance_read("contrast");
-		appearance_read("accent-color");
-	}
+	if (xdp_settings)
+		appearance_read();
 #endif
 	_SET_INT_FIELD(config, "uiMode", (_GET_INT_FIELD(config, "uiMode") & ~/*UI_MODE_NIGHT_MASK*/ 0x30) | appearance_ui_mode_night());
 	jclass ui_mode_manager = (*env)->FindClass(env, "android/app/UiModeManager");
@@ -306,6 +359,7 @@ enum {
 	SHARE_EMAIL,
 	SHARE_SAVE,
 	SHARE_OPEN_WITH,
+	SHARE_APP_BASE = 100, /* SHARE_APP_BASE + i: the i-th installed app (Context.runShareAppTarget()) */
 };
 
 /* runs the share target the user picked in the share sheet, after it was closed */
@@ -360,6 +414,12 @@ static void share_sheet_destroyed(GtkWindow *sheet, gpointer text_jstr)
 		g_object_unref(connection);
 	} else if (button_id == SHARE_OPEN_WITH) {
 		open_with(fd, NULL);
+	} else if (button_id >= SHARE_APP_BASE) {
+		J__Context__runShareAppTarget(env, button_id - SHARE_APP_BASE);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 	} else if (button_id == SHARE_SAVE) {
 		GtkFileDialog *save_dialog = gtk_file_dialog_new();
 		gtk_file_dialog_set_title(save_dialog, atl_gtk_text("Save a File"));
@@ -404,7 +464,10 @@ static void share_sheet_add_target(GtkWidget *targets, GtkWindow *sheet, int tar
 	gtk_widget_set_size_request(button, 96, -1);
 	g_object_set_data(G_OBJECT(button), "target", GINT_TO_POINTER(target));
 	g_signal_connect(button, "clicked", G_CALLBACK(share_target_clicked), sheet);
-	gtk_box_append(GTK_BOX(targets), button);
+	if (GTK_IS_FLOW_BOX(targets))
+		gtk_flow_box_append(GTK_FLOW_BOX(targets), button);
+	else
+		gtk_box_append(GTK_BOX(targets), button);
 }
 
 static const char *jstring_or(JNIEnv *env, jobjectArray labels, int index, const char *fallback, char **to_free)
@@ -423,7 +486,8 @@ static const char *jstring_or(JNIEnv *env, jobjectArray labels, int index, const
  * composeEmail portal, or save a shared file. The labels (title, copy, save) come from the framework
  * resources, so they are in the app's language; the mail target carries the name of the mail application.
  */
-JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd, jobjectArray labels)
+JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env, jclass class, jstring text_jstr, jint fd, jobjectArray labels,
+                                                                  jobjectArray app_labels, jobjectArray app_icons)
 {
 	char *title_free = NULL, *copy_free = NULL, *save_free = NULL, *open_with_free = NULL;
 	const char *title = jstring_or(env, labels, 0, "Share", &title_free);
@@ -495,6 +559,33 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 
 	GtkWidget *targets = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
 	GIcon *icon;
+	/* the other installed apps that take it, first, as Android's chooser lists apps before its own actions */
+	int apps = app_labels ? (*env)->GetArrayLength(env, app_labels) : 0;
+	GtkWidget *app_targets = NULL;
+	if (apps > 0) {
+		app_targets = gtk_flow_box_new();
+		gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(app_targets), GTK_SELECTION_NONE);
+		gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(app_targets), 5);
+		gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(app_targets), TRUE);
+	}
+	for (int i = 0; i < apps; i++) {
+		char *label_free = NULL, *icon_free = NULL;
+		const char *label = jstring_or(env, app_labels, i, "?", &label_free);
+		const char *icon_path = jstring_or(env, app_icons, i, NULL, &icon_free);
+		if (icon_path) {
+			GFile *file = g_file_new_for_path(icon_path);
+			icon = g_file_icon_new(file);
+			g_object_unref(file);
+		} else {
+			icon = g_themed_icon_new("application-x-executable");
+		}
+		share_sheet_add_target(app_targets, GTK_WINDOW(sheet), SHARE_APP_BASE + i, icon, label);
+		g_object_unref(icon);
+		g_free(label_free);
+		g_free(icon_free);
+	}
+	if (app_targets)
+		gtk_box_append(GTK_BOX(content), app_targets);
 	if (fd != -1) {                 /* the desktop's choice of applications for the file (OpenURI portal) */
 		icon = g_themed_icon_new("document-open");
 		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_OPEN_WITH, icon, open_with_label);
@@ -510,6 +601,14 @@ JNIEXPORT void JNICALL Java_android_content_Context_nativeShareFile(JNIEnv *env,
 		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_EMAIL, icon, g_app_info_get_display_name(mail));
 		g_object_unref(icon);
 		g_object_unref(mail);
+	} else if (g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS)) {
+		/* in a Flatpak the host's applications are not visible, but the Email portal reaches the mail program */
+		char *mail_free = NULL;
+		const char *mail_label = labels && (*env)->GetArrayLength(env, labels) > 4 ? jstring_or(env, labels, 4, "Email", &mail_free) : "Email";
+		icon = g_themed_icon_new("mail-send");
+		share_sheet_add_target(targets, GTK_WINDOW(sheet), SHARE_EMAIL, icon, mail_label);
+		g_object_unref(icon);
+		g_free(mail_free);
 	}
 	if (fd != -1) {
 		icon = g_themed_icon_new("document-save");
