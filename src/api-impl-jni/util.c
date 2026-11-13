@@ -873,7 +873,7 @@ void atl_window_press_taken(GtkWidget *widget, GdkEvent *event)
 
 /* ATL sets LC_ALL=C.UTF-8 for the apps (main.c), so GTK's own texts are English. GTK's dialogs stand in for
  * system UI (DocumentsUI, the chooser), which on Android speaks the user's language, not the app's C locale:
- * keep the user's message (and time) locale from before the override for them, C.UTF-8 for the rest. */
+ * keep the user's message locale from before the override for them, C.UTF-8 for every other category. */
 static locale_t user_messages_locale;
 
 void atl_remember_user_locale(void)
@@ -883,7 +883,7 @@ void atl_remember_user_locale(void)
 		const char *name = getenv(variables[i]);
 		if (name && *name) {
 			locale_t base = newlocale(LC_ALL_MASK, "C.UTF-8", (locale_t)0);
-			if (base && !(user_messages_locale = newlocale(LC_MESSAGES_MASK | LC_TIME_MASK, name, base)))
+			if (base && !(user_messages_locale = newlocale(LC_MESSAGES_MASK, name, base)))
 				freelocale(base);
 			return;
 		}
@@ -891,11 +891,15 @@ void atl_remember_user_locale(void)
 }
 
 /* the same for GTK's widgets in the app's windows, such as the context menu of text fields (Android's
- * floating toolbar) and the month names of the date picker: the GTK thread takes them from the user's locale */
+ * floating toolbar): the GTK thread takes its messages from the user's locale. Numbers, time and character
+ * types stay C.UTF-8 for the app's native code; so do the C library's own messages (strerror(), which
+ * bionic has only in English): its text domain gets no catalog. */
 void atl_use_user_messages_locale(void)
 {
-	if (user_messages_locale)
-		uselocale(user_messages_locale);
+	if (!user_messages_locale)
+		return;
+	bindtextdomain("libc", "/dev/null");
+	uselocale(user_messages_locale);
 }
 
 /* GTK's translation of one of its own texts (msgid as in GTK's sources) in the user's language */
