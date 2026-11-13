@@ -45,4 +45,22 @@ public class PhoneNumberUtils {
 		}
 		return new String(out);
 	}
+
+	/* AOSP compares loosely (compareLoosely(): separators ignored, a match of the last 7 digits is enough, so a
+	 * number with and without its trunk or country prefix is the same); here the same rule, simplified to digits */
+	private static final int MIN_MATCH = 7;
+
+	public static boolean compare(String a, String b) {
+		if (a == null || b == null)
+			return a == b;
+		String x = a.replaceAll("[^0-9]", ""), y = b.replaceAll("[^0-9]", "");
+		if (x.length() < MIN_MATCH || y.length() < MIN_MATCH)
+			return x.equals(y);
+		return x.substring(x.length() - MIN_MATCH).equals(y.substring(y.length() - MIN_MATCH));
+	}
+
+	/* AOSP formats with libphonenumber for the country; ATL has no number metadata and leaves the number as it is */
+	public static String formatNumber(String phoneNumber, String defaultCountryIso) {
+		return phoneNumber;
+	}
 }
