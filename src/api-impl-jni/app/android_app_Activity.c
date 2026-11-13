@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include <gdk/wayland/gdkwayland.h>
 #include <libportal/portal.h>
 
 #include <jni.h>
@@ -9,6 +10,7 @@
 #include "../util.h"
 #include "../generated_headers/android_app_Activity.h"
 #include "../../main-executable/back_button.h"
+#include "../content/android_content_Context.h"
 #include "../widgets/WrapperWidget.h"
 #include "android_app_Activity.h"
 
@@ -16,6 +18,13 @@ extern GtkWindow *window;
 
 static GList *activity_backlog = NULL;
 static jobject activity_current = NULL;
+
+/* in another process of the app (android:process, see ATLProcess.java) every activity was started by one of
+ * another process: on Android that one is below it in the same task, so back goes to it */
+static gboolean starter_below(void)
+{
+	return getenv("ATL_PROCESS_NAME") != NULL;
+}
 
 /* the activity change that plays window animations: from which activity, and whether the new one
  * opens (otherwise one is closed, or it is recreated if transition_from is NULL) */
@@ -383,6 +392,12 @@ static void activity_focus(JNIEnv *env, jobject activity)
 {
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
+	/* an activity of another process that it started is still on top of it (in that process's window): it is
+	 * shown, but stays paused until that one finishes (Activity.startInOtherProcess()) */
+	if (_GET_INT_FIELD(activity, "coveringOtherProcesses") > 0) {
+		stack_show_page(get_stack(), get_decor_view(env, activity));
+		return;
+	}
 
 	/* like ActivityThread.handleSendResult(): the results of the activities that finished come before it
 	 * is restarted or resumed */
@@ -481,7 +496,7 @@ static void activity_update_current(JNIEnv *env)
 			(*env)->ExceptionClear(env);
 		}
 
-		if (g_list_length(activity_backlog) > 1 || _CACHED_METHOD(Activity__onBackPressed) != current_activity_on_back_pressed_method_id) {
+		if (g_list_length(activity_backlog) > 1 || starter_below() || _CACHED_METHOD(Activity__onBackPressed) != current_activity_on_back_pressed_method_id) {
 			back_button_set_sensitive(true);
 		} else {
 			back_button_set_sensitive(false);
@@ -835,6 +850,97 @@ int activity_count(void)
 	return g_list_length(activity_backlog);
 }
 
+/* (with the one in the pinned task) */
+JNIEXPORT jint JNICALL Java_android_app_Activity_nativeActivityCount(JNIEnv *env, jclass class)
+{
+	return activity_count() + (pinned_activity ? 1 : 0);
+}
+
+/* xdg-foreign: the handle of this process's window, under which the window of another process of the app
+ * opens (ATLProcess.startActivity()). It is exported once, on the main thread, and the compositor answers
+ * asynchronously; the call that starts the activity waits for it on another thread. */
+static GMutex export_lock;
+static GCond export_cond;
+static gboolean export_pending = FALSE;
+static char *exported_handle = NULL;
+
+static void on_window_exported(GdkToplevel *toplevel, const char *handle, gpointer user_data)
+{
+	g_mutex_lock(&export_lock);
+	g_free(exported_handle);
+	exported_handle = g_strdup(handle);
+	export_pending = FALSE;
+	g_cond_broadcast(&export_cond);
+	g_mutex_unlock(&export_lock);
+}
+
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeExportWindow(JNIEnv *env, jclass class)
+{
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	g_mutex_lock(&export_lock);
+	if (!exported_handle && !export_pending && surface && GDK_IS_WAYLAND_TOPLEVEL(surface))
+		export_pending = gdk_wayland_toplevel_export_handle(GDK_TOPLEVEL(surface), on_window_exported, NULL, NULL);
+	g_mutex_unlock(&export_lock);
+}
+
+JNIEXPORT jstring JNICALL Java_android_app_Activity_nativeWaitWindowHandle(JNIEnv *env, jclass class, jint timeout_ms)
+{
+	gint64 end = g_get_monotonic_time() + timeout_ms * G_TIME_SPAN_MILLISECOND;
+	g_mutex_lock(&export_lock);
+	while (export_pending && g_cond_wait_until(&export_cond, &export_lock, end))
+		;
+	jstring handle = exported_handle ? _JSTRING(exported_handle) : NULL;
+	g_mutex_unlock(&export_lock);
+	return handle;
+}
+
+static gboolean window_ready_when_sized(gpointer user_data)
+{
+	if (gtk_widget_get_width(GTK_WIDGET(window)) == 0)
+		return G_SOURCE_CONTINUE;
+	activity_window_ready();
+	return G_SOURCE_REMOVE;
+}
+
+/* an activity that another process of the app started comes up in this process's window: in the main process
+ * the window comes forward; in another process its window opens, transient for and modal to the window of
+ * the starter (parent_handle), like the activity on top of the starter's in its task on Android */
+static char *starter_handle = NULL;
+static char *child_app_id = NULL;
+
+/* the window of another process (starter_below()): shown transient for the starter's window */
+static void child_window_show(void)
+{
+	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+	if (!gtk_widget_get_visible(GTK_WIDGET(window)) && starter_handle && GDK_IS_WAYLAND_TOPLEVEL(surface))
+		gdk_wayland_toplevel_set_transient_for_exported(GDK_TOPLEVEL(surface), starter_handle);
+	gtk_window_present(window);
+	/* like main.c, the package name as application ID for the window's icon (GTK sets its own when it maps) */
+	if (child_app_id && GDK_IS_WAYLAND_TOPLEVEL(surface))
+		gdk_wayland_toplevel_set_application_id(GDK_TOPLEVEL(surface), child_app_id);
+}
+
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeShowWindowFor(JNIEnv *env, jclass class, jstring parent_handle, jstring app_id)
+{
+	if (!starter_below()) {
+		activity_window_present();
+		return;
+	}
+	if (!gtk_widget_get_realized(GTK_WIDGET(window))) {
+		gtk_window_set_modal(window, TRUE);
+		gtk_widget_realize(GTK_WIDGET(window));
+		update_config_for_window(window);
+		g_timeout_add(10, window_ready_when_sized, NULL);
+	}
+	if (!gtk_widget_get_visible(GTK_WIDGET(window))) {
+		g_free(starter_handle);
+		starter_handle = parent_handle ? g_strdup(_CSTRING(parent_handle)) : NULL;
+	}
+	if (!child_app_id)
+		child_app_id = g_strdup(_CSTRING(app_id));
+	child_window_show();
+}
+
 static char *java_string(JNIEnv *env, jobject object)
 {
 	if (!object)
@@ -1022,7 +1128,16 @@ static void pinned_task_expand(void)
 	g_object_unref(page);
 	pinned_task_changed(env, activity, 0, 0);
 	activity_backlog = g_list_prepend(activity_backlog, activity);
-	activity_window_present();
+	if (starter_below()) { // the window of another process comes back over the starter's
+		J__Activity__coversStarter(env, activity, true);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		child_window_show();
+	} else {
+		activity_window_present();
+	}
 	activity_update_current(env);
 }
 
@@ -1217,6 +1332,17 @@ static void pinned_task_entered(gpointer user_data)
 	if (!pinned_activity)
 		return;
 	pinned_task_changed(env, pinned_activity, pinned_width, pinned_height);
+	/* in the window of another process, the pinned activity was the only one: like its task on Android, which
+	 * leaves only the pinned task, the window goes and the starter's activity below it is resumed */
+	if (starter_below() && !activity_backlog) {
+		gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
+		J__Activity__coversStarter(env, pinned_activity, false);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		return;
+	}
 	if (!window_hidden) {
 		activity_update_current(env);
 	} else if (activity_current && (*env)->IsSameObject(env, activity_current, pinned_activity)) {
@@ -1342,6 +1468,9 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
 	jobject removed_activity = NULL;
 	if (pinned_activity && (*env)->IsSameObject(env, this, pinned_activity)) {
 		pinned_task_finish(env);
+		/* the last activity of the window of another process: see app_exit() */
+		if (starter_below() && !activity_backlog && window)
+			g_idle_add(delayed_close_window, _PTR(window));
 		return;
 	}
 	for (l = activity_backlog; l != NULL; l = l->next) {
@@ -1373,6 +1502,13 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativePauseCurrentActivity(JNIE
 {
 	if (activity_current)
 		activity_pause(env, activity_current, is_user_leaving(env, intent));
+}
+
+/* like nativePauseCurrentActivity(), and returns the paused activity */
+JNIEXPORT jobject JNICALL Java_android_app_Activity_nativeCoverCurrentActivity(JNIEnv *env, jclass class, jobject intent)
+{
+	Java_android_app_Activity_nativePauseCurrentActivity(env, class, intent);
+	return activity_current;
 }
 
 /* the next activity could not be created: the one that was paused for it comes back */
@@ -1739,6 +1875,9 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_isInMultiWindowMode(JNIEnv 
 
 JNIEXPORT jboolean JNICALL Java_android_app_Activity_isTaskRoot(JNIEnv *env, jobject this)
 {
+	/* in another process of the app the starter's activity is below in the same task (starter_below()) */
+	if (starter_below())
+		return JNI_FALSE;
 	jobject root_activity = activity_backlog ? g_list_last(activity_backlog)->data : NULL;
 	// NULL means that we are currently creating the root activity, so no other activity can exist yet
 	return root_activity == NULL || (*env)->IsSameObject(env, this, root_activity);

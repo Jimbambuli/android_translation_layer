@@ -463,6 +463,11 @@ public final class ContextImpl extends Context {
 			Slog.w(TAG, "startActivity: intent could not be handled.");
 			return;
 		}
+		String process = this.atl_loaded_app == ATLLoadedApp.getPrimaryApplication() ? ATLProcess.activityProcess(className) : null;
+		if (process != null) {
+			Activity.startInOtherProcess(null, new Intent(intent).setComponent(new ComponentName(this.atl_loaded_app.pkg.packageName, className)), -1, process);
+			return;
+		}
 		final String className_ = className;
 		final Intent intent_ = intent;
 		/* like AOSP (ActivityStarter), the launch modes singleTask and singleInstance reuse the activity's instance

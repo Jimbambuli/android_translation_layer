@@ -78,6 +78,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public Intent intent;
 	public ComponentName component;
 	private Activity resultActivity; // the activity that started this one with startActivityForResult()
+	private android.atl.ATLProcess.RemoteCaller remoteCaller; // the starter in another process (android:process)
+	private int coveringOtherProcesses; // the activities of other processes on top of this one (startInOtherProcess())
 	private int resultRequestCode;
 	/* like AOSP: what setResult() set, handed over by finish() */
 	private int mResultCode = RESULT_CANCELED;
@@ -254,6 +256,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	/* AOSP: the package of the activity that started this one with startActivityForResult(); null if that one
 	 * expects no result (it passed no request code, or a negative one) */
 	public String getCallingPackage() {
+		if (remoteCaller != null && remoteCaller.wantsResult)
+			return getPackageName();
 		return resultActivity == null ? null : resultActivity.getPackageName();
 	}
 
@@ -557,8 +561,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			    }
 		    }))
 			return;
+		String process;
 		if (intent.getComponent() != null && android.atl.ATLLoadedAppManager.startInstalledApp(getPackageName(), intent.getComponent().getPackageName())) {
 			return;
+		} else if (intent.getComponent() != null && (process = android.atl.ATLProcess.activityProcess(intent.getComponent().getClassName())) != null) {
+			startInOtherProcess(this, intent, requestCode, process);
 		} else if (intent.getComponent() != null) {
 			/* like on Android (and like Context.startActivity), the new activity starts after the
 			 * caller has returned: started from onCreate(), it must come up after the caller's
@@ -623,6 +630,60 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 	public void startActivityForResult(Intent intent, int requestCode) {
 		startActivityForResult(intent, requestCode, null);
+	}
+
+	/** @hide ATL: an activity of the app with android:process runs in that process, in a window of its own over
+	 * this one (ATLProcess.startActivity()). Like the activity below it in the task on Android, the shown one is
+	 * paused meanwhile and gets the result (`caller` with a request code >= 0) before it is resumed. */
+	public static void startInOtherProcess(final Activity caller, final Intent intent, final int requestCode, final String process) {
+		new Handler(Looper.getMainLooper()).post(new Runnable() {
+			@Override
+			public void run() {
+				android.atl.ATLProcess.startActivity(intent, process, caller != null && requestCode >= 0, new android.atl.ATLProcess.ActivityFinished() {
+					/* the activity of this process the started one is on top of, while it is */
+					private Activity covered = cover(intent);
+
+					private Activity cover(Intent intent) {
+						Activity activity = nativeCoverCurrentActivity(intent);
+						if (activity != null)
+							activity.coveringOtherProcesses++;
+						return activity;
+					}
+
+					private void uncover() {
+						if (covered != null)
+							covered.coveringOtherProcesses--;
+						covered = null;
+						nativeResumeCurrentActivity();
+					}
+
+					@Override
+					public void onActivityFinished(int resultCode, Intent data) {
+						if (caller != null && requestCode >= 0)
+							caller.addPendingResult(requestCode, resultCode, data);
+						uncover();
+					}
+
+					/* like the task below the pinned task on Android: resumed while the started activity is in
+					 * picture-in-picture, paused again when it comes back */
+					@Override
+					public void onCovering(boolean covers) {
+						if (!covers)
+							uncover();
+						else if (covered == null)
+							covered = cover(null);
+					}
+				});
+			}
+		});
+	}
+
+	/** @hide ATL: the activity another process of the app started (ATLProcess) comes up in this process */
+	public static void startFromOtherProcess(Intent intent, android.atl.ATLProcess.RemoteCaller caller) throws ReflectiveOperationException {
+		Activity activity = internalCreateActivity(intent.getComponent().getClassName(),
+		                                           android.atl.ATLLoadedApp.getPrimaryApplication().getNativeWindow(), intent);
+		activity.remoteCaller = caller;
+		nativeStartActivity(activity);
 	}
 
 	public final void setResult(int resultCode) {
@@ -713,6 +774,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		finishing = true;
 		if (!wasFinishing && resultActivity != null)
 			resultActivity.addPendingResult(resultRequestCode, resultCode, resultData);
+		if (!wasFinishing && remoteCaller != null)
+			remoteCaller.finished(resultCode, resultData);
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
 			public void run() {
@@ -1411,8 +1474,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	private native void nativeFinish(long native_window);
 	public static native void nativeStartActivity(Activity activity);
+	/** @hide ATL: the window of this process for another process of the app, see ATLProcess.startActivity():
+	 * export its handle (xdg-foreign) on the main thread, wait for it on another; show it for an activity that
+	 * another process started, over that process's window (parentHandle) */
+	public static native void nativeExportWindow();
+	public static native String nativeWaitWindowHandle(int timeoutMs);
+	public static native void nativeShowWindowFor(String parentHandle, String appId);
+	/** @hide ATL: the number of the activities of this process */
+	public static native int nativeActivityCount();
 	private native void nativeRecreate();
 	static native void nativePauseCurrentActivity(Intent intent);
+	private static native Activity nativeCoverCurrentActivity(Intent intent);
 	static native void nativeResumeCurrentActivity();
 	public static native boolean nativeResumeActivity(Class<? extends Activity> activityClass, Intent intent);
 	static native void nativeClearTaskMark();
@@ -2036,8 +2108,19 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		onUserLeaveHint();
 	}
 
+	/* native code: this activity of a window that another process's activity opened entered picture-in-picture
+	 * as the only one there (false), or came back from it (true) */
+	@Export
+	private void coversStarter(boolean covers) {
+		if (remoteCaller != null)
+			remoteCaller.covers(covers);
+	}
+
 	@Export
 	private void performDestroy() {
+		/* destroyed without finish() (its window closed): the starter in another process gets RESULT_CANCELED */
+		if (remoteCaller != null && !finishing)
+			remoteCaller.finished(RESULT_CANCELED, null);
 		dispatchActivityPreDestroyed();
 		mFragments.dispatchDestroy();
 		onDestroy();
