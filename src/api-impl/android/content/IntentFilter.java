@@ -234,6 +234,27 @@ public class IntentFilter {
 		return dataSchemes.get(index);
 	}
 
+	/* AOSP IntentFilter.dump(): the filter's actions, categories and data, one line each (DAVx5 writes it into its
+	 * debug info) */
+	public void dump(android.util.Printer du, String prefix) {
+		for (String action : actions)
+			du.println(prefix + "Action: \"" + action + "\"");
+		for (String category : categories)
+			du.println(prefix + "Category: \"" + category + "\"");
+		for (String scheme : dataSchemes)
+			du.println(prefix + "Scheme: \"" + scheme + "\"");
+		for (AuthorityEntry authority : dataAuthorities)
+			du.println(prefix + "Authority: \"" + authority.getHost() + "\": " + authority.getPort());
+		if (dataPaths != null)
+			for (PatternMatcher path : dataPaths)
+				du.println(prefix + "Path: \"" + path + "\"");
+		if (dataTypes != null)
+			for (String type : dataTypes)
+				du.println(prefix + "Type: \"" + type + "\"");
+		if (autoVerify)
+			du.println(prefix + "AutoVerify=true");
+	}
+
 	public final Iterator<String> actionsIterator() {
 		return actions.iterator();
 	}
