@@ -701,9 +701,10 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		if (window.superDispatchKeyEvent(event)) {
 			return true;
 		}
-		View decor = window.getDecorView();
-		return event.dispatch(this, decor != null
-		    ? decor.getKeyDispatcherState() : null, this);
+		/* AOSP takes the decor view's state, which is its window's; ATL's AlertDialog shows GTK widgets
+		 * instead of its decor view, which then has no window and no state, so Escape and Back never
+		 * tracked and never cancelled it */
+		return event.dispatch(this, window.mKeyDispatchState, this);
 	}
 
 	/* AOSP's Dialog.onKeyDown() */
