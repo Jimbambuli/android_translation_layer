@@ -547,6 +547,7 @@ srcs = [
 	'android/media/DeniedByServerException.java',
 	'android/media/DrmInitData.java',
 	'android/media/ExifInterface.java',
+	'android/media/Image.java',
 	'android/media/LoudnessCodecController.java',
 	'android/media/MediaCodec.java',
 	'android/media/MediaCodecInfo.java',
