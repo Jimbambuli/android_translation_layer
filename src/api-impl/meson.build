@@ -626,6 +626,7 @@ srcs = [
 	'android/net/nsd/NsdManager.java',
 	'android/net/nsd/NsdServiceInfo.java',
 	'android/net/ssl/SSLSockets.java',
+	'android/net/wifi/SupplicantState.java',
 	'android/net/wifi/WifiInfo.java',
 	'android/net/wifi/WifiManager.java',
 	'android/net/wifi/p2p/WifiP2pManager.java',
