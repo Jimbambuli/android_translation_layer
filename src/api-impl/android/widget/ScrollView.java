@@ -105,6 +105,17 @@ public class ScrollView extends FrameLayout {
 		return true;
 	}
 
+	/* AOSP: whether arrowScroll() scrolls smoothly; ATL keeps the setting, GTK scrolls on its own */
+	private boolean mSmoothScrollingEnabled = true;
+
+	public boolean isSmoothScrollingEnabled() {
+		return mSmoothScrollingEnabled;
+	}
+
+	public void setSmoothScrollingEnabled(boolean smoothScrollingEnabled) {
+		mSmoothScrollingEnabled = smoothScrollingEnabled;
+	}
+
 	/* AOSP: a child's pressed state is delayed, as the touch may start a scroll */
 	@Override
 	public boolean shouldDelayChildPressedState() {
