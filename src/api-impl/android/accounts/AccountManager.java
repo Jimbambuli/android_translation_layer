@@ -1,5 +1,6 @@
 package android.accounts;
 
+import android.atl.ATLSecrets;
 import android.app.Activity;
 import android.content.Context;
 import android.os.AsyncTask;
@@ -79,7 +80,7 @@ public class AccountManager {
 
 	public Account[] getAccountsByType(String type) {
 		ArrayList<Account> accounts = new ArrayList<>();
-		String[] list = nativeListAccounts().split("\n");
+		String[] list = (ATLSecrets.mayHoldSecrets() ? nativeListAccounts() : "").split("\n");
 		for (int i = 0; i + 1 < list.length; i += 2) {
 			if (type == null || type.equals(list[i]))
 				accounts.add(new Account(list[i + 1], list[i]));
@@ -113,7 +114,7 @@ public class AccountManager {
 	}
 
 	public boolean addAccountExplicitly(Account account, String password, Bundle extras) {
-		if (nativeGet(account.type, account.name, "account") != null)
+		if (keyringGet(account.type, account.name, "account") != null)
 			return false;
 		if (!nativeSet(account.type, account.name, "account", ""))
 			return false;
@@ -167,7 +168,7 @@ public class AccountManager {
 		return runAsync(new Callable<Boolean>() {
 			@Override
 			public Boolean call() {
-				return nativeRemove(account.type, account.name);
+				return ATLSecrets.mayHoldSecrets() && nativeRemove(account.type, account.name);
 			}
 		}, callback, handler);
 	}
@@ -239,7 +240,7 @@ public class AccountManager {
 	}
 
 	public String getPassword(Account account) {
-		return nativeGet(account.type, account.name, "password");
+		return keyringGet(account.type, account.name, "password");
 	}
 
 	public void setPassword(Account account, String password) {
@@ -247,7 +248,7 @@ public class AccountManager {
 	}
 
 	public String getUserData(Account account, String key) {
-		return nativeGet(account.type, account.name, "userdata:" + key);
+		return keyringGet(account.type, account.name, "userdata:" + key);
 	}
 
 	public void setUserData(Account account, String key, String value) {
@@ -255,7 +256,7 @@ public class AccountManager {
 	}
 
 	public String peekAuthToken(Account account, String authTokenType) {
-		return nativeGet(account.type, account.name, "authtoken:" + authTokenType);
+		return keyringGet(account.type, account.name, "authtoken:" + authTokenType);
 	}
 
 	public void setAuthToken(Account account, String authTokenType, String authToken) {
@@ -312,6 +313,11 @@ public class AccountManager {
 				return false;
 			}
 		}, callback, handler);
+	}
+
+	/* nothing to read before the keyring file exists (ATLSecrets), and asking would show the desktop's dialog */
+	private static String keyringGet(String type, String name, String key) {
+		return ATLSecrets.mayHoldSecrets() ? nativeGet(type, name, key) : null;
 	}
 
 	private static native String nativeGet(String type, String name, String key);

@@ -1068,6 +1068,11 @@ public class TextView extends View {
 	private Editable.Factory mEditableFactory = Editable.Factory.getInstance();
 	private Spannable.Factory mSpannableFactory = Spannable.Factory.getInstance();
 
+	/* for EditText, which makes its buffer with it too */
+	Editable.Factory getEditableFactory() {
+		return mEditableFactory;
+	}
+
 	public void setEditableFactory(Editable.Factory factory) {
 		mEditableFactory = factory;
 		setText(text);

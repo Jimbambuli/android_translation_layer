@@ -451,6 +451,46 @@ public final class Bitmap implements Parcelable {
 		buffer.position(buffer.position() + getAllocationByteCount());
 	}
 
+	/* AOSP: the pixels in the layout of the config, read from the buffer's position on, which then moves past them.
+	 * ATL turns them into colors for setPixels(); ARGB_8888 is taken as R, G, B, A bytes like copyPixelsToBuffer()
+	 * writes them (GDK_MEMORY_R8G8B8A8, not premultiplied) */
+	public void copyPixelsFromBuffer(Buffer src) {
+		final int w = getWidth(), h = getHeight(), n = w * h;
+		final int bpp = config == Config.ARGB_8888 ? 4 : config == Config.RGB_565 ? 2 : config == Config.ALPHA_8 ? 1 : 0;
+		if (bpp == 0)
+			throw new RuntimeException("copyPixelsFromBuffer: config " + config + " not supported");
+		final int[] colors = new int[n];
+		if (src instanceof java.nio.IntBuffer && bpp == 4) {
+			java.nio.IntBuffer ib = (java.nio.IntBuffer)src;
+			if (ib.remaining() < n)
+				throw new RuntimeException("Buffer not large enough for pixels");
+			for (int i = 0; i < n; i++) {
+				int v = ib.get(); // the bytes R, G, B, A in native (little endian) order
+				colors[i] = (v & 0xff000000) | ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff);
+			}
+		} else if (src instanceof java.nio.ByteBuffer) {
+			java.nio.ByteBuffer bb = (java.nio.ByteBuffer)src;
+			if (bb.remaining() < n * bpp)
+				throw new RuntimeException("Buffer not large enough for pixels");
+			for (int i = 0; i < n; i++) {
+				if (bpp == 4) {
+					int r = bb.get() & 0xff, g = bb.get() & 0xff, b = bb.get() & 0xff, a = bb.get() & 0xff;
+					colors[i] = (a << 24) | (r << 16) | (g << 8) | b;
+				} else if (bpp == 2) {
+					int lo = bb.get() & 0xff, hi = bb.get() & 0xff;
+					int v = java.nio.ByteOrder.nativeOrder() == java.nio.ByteOrder.LITTLE_ENDIAN ? (hi << 8) | lo : (lo << 8) | hi;
+					int r = (v >> 11) & 0x1f, g = (v >> 5) & 0x3f, b = v & 0x1f;
+					colors[i] = 0xff000000 | ((r << 3 | r >> 2) << 16) | ((g << 2 | g >> 4) << 8) | (b << 3 | b >> 2);
+				} else {
+					colors[i] = (bb.get() & 0xff) << 24;
+				}
+			}
+		} else {
+			throw new RuntimeException("copyPixelsFromBuffer: " + src.getClass().getName() + " not supported");
+		}
+		setPixels(colors, 0, w, 0, 0, w, h);
+	}
+
 	public int getByteCount() {
 		return getAllocationByteCount();
 	}

@@ -228,6 +228,58 @@ public final class ATLLoadedAppManager {
 	}
 
 	/**
+	 * The other installed apps that take `type` shared (SEND/SEND_MULTIPLE), for the share sheet, which is system UI
+	 * and sees every app: {package, label, icon file}. The starter keeps the types each app takes in "share_types"
+	 * of the PACKAGE.json next to its APK (from the app's filters in CATEGORY_DEFAULT); apps installed before it
+	 * did lack them and are not offered.
+	 */
+	public static List<String[]> shareTargets(String type, String ownPackageName) {
+		List<String[]> targets = new ArrayList<>();
+		String[] files = ATLPaths.installed_apks_dir.list();
+		if (files == null || type == null)
+			return targets;
+		Arrays.sort(files);
+		String wanted = type.toLowerCase(java.util.Locale.ROOT);
+		for (String file : files) {
+			if (!file.endsWith(".json"))
+				continue;
+			String packageName = file.substring(0, file.length() - ".json".length());
+			if (packageName.equals(ownPackageName) || always_visible_packages.contains(packageName)
+			    || !new File(ATLPaths.installed_apks_dir, packageName + ".apk").isFile())
+				continue;
+			try {
+				org.json.JSONObject meta = new org.json.JSONObject(new String(java.nio.file.Files.readAllBytes(
+				    new File(ATLPaths.installed_apks_dir, file).toPath()), java.nio.charset.StandardCharsets.UTF_8));
+				org.json.JSONArray types = meta.optJSONArray("share_types");
+				if (types == null)
+					continue;
+				for (int i = 0; i < types.length(); i++) {
+					if (mimeMatches(types.getString(i).toLowerCase(java.util.Locale.ROOT), wanted)) {
+						File icon = new File(ATLPaths.installed_apks_dir, packageName + ".png");
+						targets.add(new String[] {packageName, meta.optString("label", packageName),
+						                          icon.isFile() ? icon.getPath() : null});
+						break;
+					}
+				}
+			} catch (IOException | org.json.JSONException e) {
+				Slog.w(TAG, "shareTargets: cannot read " + file + ": " + e);
+			}
+		}
+		return targets;
+	}
+
+	/* a filter's type against what is shared, both possibly with a * subtype (as Intent.normalizeMimeType/IntentFilter) */
+	private static boolean mimeMatches(String filter, String type) {
+		if (filter.equals("*/*") || filter.equals("*") || filter.equals(type))
+			return true;
+		int f = filter.indexOf('/'), t = type.indexOf('/');
+		if (f < 0 || t < 0)
+			return false;
+		String fMain = filter.substring(0, f), tMain = type.substring(0, t);
+		return fMain.equals(tMain) && (filter.endsWith("/*") || type.endsWith("/*"));
+	}
+
+	/**
 	 * Find an exported content provider of another package, as AOSP's provider lookup over all
 	 * packages; ATL looks only at the packages every app may see (Play Services), the provider
 	 * then runs in the app's process like the rest of the package.

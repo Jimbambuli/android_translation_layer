@@ -46,20 +46,47 @@ public class EditText extends TextView {
 		return native_gtkEventPropagation();
 	}
 
+	/* As on AOSP the EditText has one Editable, made by the editable factory when the text is set; typing changes
+	 * it in place (sendTextChanged()), getText() returns it and the TextWatchers get it. An app that sets its own
+	 * factory (Notally: the factory hands out the note's body) so sees the typed text in its own buffer. */
+	private Editable mEditable;
+
 	public Editable getText() {
-		return new SpannableStringBuilder(native_getText(widget));
+		if (mEditable == null)
+			mEditable = getEditableFactory().newEditable(native_getText(widget));
+		return mEditable;
 	}
 
 	public Editable getEditableText() {
-		return new SpannableStringBuilder(native_getText(widget));
+		return getText();
 	}
 
 	@Override
 	public void setText(CharSequence text) {
 		text = applyFilters(text);
+		if (text == null)
+			text = "";
+		mEditable = getEditableFactory().newEditable(text);
 		programmatic_text = true;
-		native_setText(widget, text == null ? "" : text.toString());
+		native_setText(widget, mEditable.toString());
 		programmatic_text = false;
+	}
+
+	/* the typed change into the Editable: only the changed part is replaced, so spans elsewhere stay */
+	private void syncEditable(String text) {
+		Editable e = getText();
+		String old = e.toString();
+		if (old.equals(text))
+			return;
+		int start = 0, max = Math.min(old.length(), text.length());
+		while (start < max && old.charAt(start) == text.charAt(start))
+			start++;
+		int oldEnd = old.length(), newEnd = text.length();
+		while (oldEnd > start && newEnd > start && old.charAt(oldEnd - 1) == text.charAt(newEnd - 1)) {
+			oldEnd--;
+			newEnd--;
+		}
+		e.replace(start, oldEnd, text, start, newEnd);
 	}
 
 	/* as AOSP's Editor: typed or pasted text goes through the filters before it is inserted */
@@ -129,7 +156,8 @@ public class EditText extends TextView {
 			InputTrace.textChanged(this, text.length());
 		String previous = mPreviousText;
 		mPreviousText = text;
-		SpannableStringBuilder s = new SpannableStringBuilder(text);
+		syncEditable(text);
+		Editable s = getText();
 		/* AOSP TextView.sendBeforeTextChanged(), sendOnTextChanged(), onTextChanged(), sendAfterTextChanged(): the
 		 * GtkText has changed already, so the "before" call gets the text from before with the new length */
 		ArrayList<TextWatcher> watchers = listeners == null ? new ArrayList<TextWatcher>() : new ArrayList<TextWatcher>(listeners);

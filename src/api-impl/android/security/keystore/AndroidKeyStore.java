@@ -1,6 +1,7 @@
 package android.security.keystore;
 
 import android.atl.ATLLoadedApp;
+import android.atl.ATLSecrets;
 import android.util.Slog;
 import java.io.File;
 import java.io.IOException;
@@ -52,7 +53,7 @@ public class AndroidKeyStore extends KeyStoreSpi {
 				return null;
 			}
 		}
-		byte[] data = nativeGetKey(packageName(), alias);
+		byte[] data = ATLSecrets.mayHoldSecrets() ? nativeGetKey(packageName(), alias) : null;
 		if (data != null) {
 			try {
 				writeKey(alias, data);
@@ -140,7 +141,8 @@ public class AndroidKeyStore extends KeyStoreSpi {
 			throw new KeyStoreException("Failed to delete entry: " + alias, e);
 		}
 		// a key an earlier version left in the keyring would otherwise be moved back by readKey()
-		nativeDeleteKey(packageName(), alias);
+		if (ATLSecrets.mayHoldSecrets())
+			nativeDeleteKey(packageName(), alias);
 	}
 
 	@Override

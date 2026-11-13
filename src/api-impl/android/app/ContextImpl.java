@@ -368,7 +368,31 @@ public final class ContextImpl extends Context {
 		final String[] labels = {chooser_title != null ? chooser_title.toString() : getString(com.android.internal.R.string.share),
 		                         getString(com.android.internal.R.string.copy),
 		                         getString(com.android.internal.R.string.autofill_save_yes),
-		                         getString(com.android.internal.R.string.whichViewApplication)};
+		                         getString(com.android.internal.R.string.whichViewApplication),
+		                         "E-Mail"}; // the Email portal's target in a Flatpak; framework-res has no such word
+		/* the other installed apps that take this (the starter writes the types each one takes shared next to
+		 * its APK); a pick starts the app with the text as a data: URI or the file as a file: URI (--uri) */
+		final Uri stream_final = stream;
+		final String type = intent.getType() != null ? intent.getType() : stream != null ? "application/octet-stream" : "text/plain";
+		final java.util.List<String[]> apps = (stream != null && fd != null) || (stream == null && text != null)
+		    ? ATLLoadedAppManager.shareTargets(type, getPackageName()) : new java.util.ArrayList<String[]>();
+		final String[] appLabels = new String[apps.size()];
+		final String[] appIcons = new String[apps.size()];
+		Runnable[] appTargets = new Runnable[apps.size()];
+		for (int i = 0; i < apps.size(); i++) {
+			final String pkg = apps.get(i)[0];
+			appLabels[i] = apps.get(i)[1];
+			appIcons[i] = apps.get(i)[2];
+			appTargets[i] = new Runnable() {
+				@Override
+				public void run() {
+					String uri = stream_final != null ? sharedFileUri(stream_final) : "data:text/plain;charset=utf-8," + Uri.encode(text);
+					if (uri != null)
+						ATLLoadedAppManager.startInstalledApp(getPackageName(), pkg, uri);
+				}
+			};
+		}
+		Context.shareAppTargets = appTargets;
 		Runnable runnable = new Runnable() {
 			@Override
 			public void run() {
@@ -376,7 +400,7 @@ public final class ContextImpl extends Context {
 				 * choice) and «Save» (the file chooser portal writes where the user chooses, e.g. an export) */
 				boolean asked = link != null && nativeOpenWith(-1, link);
 				if (!asked)
-					nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1, labels);
+					nativeShareFile(text, fd_final != null ? fd_final.getFd() : -1, labels, appLabels, appIcons);
 				if (fd_final != null) {
 					try {
 						fd_final.close();
@@ -390,6 +414,37 @@ public final class ContextImpl extends Context {
 			runnable.run();
 		else
 			new Handler(Looper.getMainLooper()).post(runnable);
+	}
+
+	/* a file: URI another app can open: the file itself when the URI names one (file:, ATL's raw: documents), else
+	 * a copy in the cache, which every app of the starter reads (one data folder); null if it cannot be read */
+	private String sharedFileUri(Uri stream) {
+		if ("file".equals(stream.getScheme()))
+			return stream.toString();
+		java.util.List<String> segments = stream.getPathSegments();
+		if (segments.size() == 2 && segments.get(1).startsWith("raw:/"))
+			return Uri.fromFile(new java.io.File(segments.get(1).substring(4))).toString();
+		String name = stream.getLastPathSegment();
+		try (android.database.Cursor c = getContentResolver().query(stream, new String[] {"_display_name"}, null, null, null)) {
+			if (c != null && c.moveToFirst() && c.getString(0) != null)
+				name = c.getString(0);
+		} catch (RuntimeException e) {
+			Slog.w(TAG, "share: no name for " + stream + ": " + e);
+		}
+		name = new java.io.File(name != null && !name.isEmpty() ? name : "shared").getName();
+		java.io.File dir = new java.io.File(getCacheDir(), "shared");
+		dir.mkdirs();
+		java.io.File copy = new java.io.File(dir, name);
+		try (java.io.InputStream in = getContentResolver().openInputStream(stream);
+		     java.io.OutputStream out = new java.io.FileOutputStream(copy)) {
+			byte[] buf = new byte[65536];
+			for (int n; (n = in.read(buf)) > 0;)
+				out.write(buf, 0, n);
+		} catch (IOException | RuntimeException e) {
+			Slog.w(TAG, "share: cannot copy " + stream + ": " + e);
+			return null;
+		}
+		return Uri.fromFile(copy).toString();
 	}
 
 	/* one URI with a scheme and nothing else (what NewPipe or a browser shares), not prose with a link in it */
@@ -424,7 +479,7 @@ public final class ContextImpl extends Context {
 			if (Intent.ACTION_SEND.equals(intent.getAction()) || Intent.ACTION_SEND_MULTIPLE.equals(intent.getAction())) {
 				share(intent, chooser_title);
 				return;
-			} else if (intent.getData() != null && "file".equals(intent.getData().getScheme())
+			} else if (intent.getData() != null && ("file".equals(intent.getData().getScheme()) || "data".equals(intent.getData().getScheme()))
 			           && this.atl_loaded_app.pkg.packageName.equals(intent.getPackage())
 			           && Activity.desktopFileIntent(intent.getData()) != null) {
 				/* a file the desktop hands to the running app (main.c: --uri while it runs) */

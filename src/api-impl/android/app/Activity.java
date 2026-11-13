@@ -8,6 +8,7 @@ import android.atl.annotation.Export;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.LocusId;
@@ -67,7 +68,7 @@ import android.os.Parcelable;
 import java.util.List;
 import java.util.Map;
 
-public class Activity extends ContextThemeWrapper implements Window.Callback, KeyEvent.Callback, LayoutInflater.Factory2 {
+public class Activity extends ContextThemeWrapper implements Window.Callback, KeyEvent.Callback, LayoutInflater.Factory2, android.content.ComponentCallbacks2 {
 	private final static String TAG = "Activity";
 
 	public static final int RESULT_CANCELED = 0;
@@ -131,7 +132,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		 * a matching filter in CATEGORY_DEFAULT (MATCH_DEFAULT_ONLY) */
 		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : new Intent();
 		/* a local file: VIEW with its type, else SEND, as from a file manager on Android */
-		if (className == null && uri != null && "file".equals(uri.getScheme())) {
+		if (className == null && uri != null && ("file".equals(uri.getScheme()) || "data".equals(uri.getScheme()))) {
 			Intent file = desktopFileIntent(uri);
 			if (file != null) {
 				intent = file;
@@ -183,6 +184,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	 * ClipData, readable (FLAG_GRANT_READ_URI_PERMISSION). Returns the intent with its activity, or null.
 	 */
 	public static Intent desktopFileIntent(Uri file) {
+		if ("data".equals(file.getScheme()))
+			return sharedTextIntent(file);
 		String type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(MimeTypeMap.getFileExtensionFromUrl(file.toString()));
 		Intent view = new Intent(Intent.ACTION_VIEW);
 		if (type != null)
@@ -212,6 +215,24 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return null;
 	}
 
+	/**
+	 * Text another installed app shared with this one (ContextImpl.share()): it comes as a data: URI
+	 * ("data:text/plain;charset=utf-8,TEXT", percent-encoded) through --uri, and becomes what Android's
+	 * chooser sends: SEND with EXTRA_TEXT for the activity that takes text/plain. Null if none does.
+	 */
+	private static Intent sharedTextIntent(Uri data) {
+		String raw = data.getEncodedSchemeSpecificPart();
+		int comma = raw != null ? raw.indexOf(',') : -1;
+		if (comma < 0 || !raw.substring(0, comma).toLowerCase(java.util.Locale.ROOT).startsWith("text/plain"))
+			return null;
+		Intent send = new Intent(Intent.ACTION_SEND).setType("text/plain");
+		ComponentName target = ownActivityFor(send, null);
+		if (target == null)
+			return null;
+		send.putExtra(Intent.EXTRA_TEXT, Uri.decode(raw.substring(comma + 1)));
+		return send.setComponent(target);
+	}
+
 	/* the app's activity whose filter in CATEGORY_DEFAULT matches best (MATCH_DEFAULT_ONLY), with `data` as the URI */
 	private static ComponentName ownActivityFor(Intent intent, Uri data) {
 		PackageParser.Package pkg = ATLLoadedApp.getPrimaryApplication().pkg;
@@ -223,7 +244,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			for (PackageParser.IntentInfo filter : activity.intents) {
 				if (!filter.hasCategory(Intent.CATEGORY_DEFAULT))
 					continue;
-				int score = filter.match(intent.getAction(), intent.getType(), data.getScheme(), data, intent.getCategories(), TAG);
+				int score = filter.match(intent.getAction(), intent.getType(), data != null ? data.getScheme() : null, data, intent.getCategories(), TAG);
 				if (score > best) {
 					className = activity.info.targetActivity != null ? activity.info.targetActivity : activity.className;
 					best = score;
@@ -2147,8 +2168,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return null;
 	}
 
+	/* AOSP Activity.onSearchRequested(): the search dialog for the activity's searchable (startSearch()) */
 	public boolean onSearchRequested() {
-		return false;
+		startSearch(null, false, null, false);
+		return true;
 	}
 
 	private SearchEvent mSearchEvent;
@@ -2761,9 +2784,91 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return window.getDecorView().startActionMode(callback, type);
 	}
 
-	/* AOSP Activity.startSearch(): shows the search dialog / global search. ATL has no search UI (SearchManager
-	 * has only getSearchableInfo()); onSearchRequested() answers false for the same reason */
-	public void startSearch(@Nullable String initialQuery, boolean selectInitialQuery, @Nullable Bundle appSearchData, boolean globalSearch) {
+	/* AOSP Activity.startSearch() / SearchDialog: a dialog with a text field for the searchable of this activity
+	 * (its "android.app.searchable", else the "android.app.default_searchable" of the activity or the application);
+	 * the query goes as ACTION_SEARCH with SearchManager.QUERY to the searchable activity - to this one through
+	 * onNewIntent() when it is single top, as on Android. Without a searchable nothing happens (AOSP: no dialog;
+	 * there is no global search). Suggestions are not shown. */
+	public void startSearch(@Nullable String initialQuery, boolean selectInitialQuery, @Nullable final Bundle appSearchData, boolean globalSearch) {
+		SearchManager searchManager = (SearchManager)getSystemService(Context.SEARCH_SERVICE);
+		final SearchableInfo searchable = searchableFor(searchManager);
+		if (searchable == null) {
+			Slog.i(TAG, "startSearch: no searchable for " + getComponentName());
+			return;
+		}
+		final android.widget.EditText field = new android.widget.EditText(this);
+		field.setSingleLine(true);
+		if (searchable.getHintId() != 0)
+			field.setHint(searchable.getHintId());
+		if (initialQuery != null) {
+			field.setText(initialQuery);
+			if (selectInitialQuery)
+				field.selectAll();
+		}
+		final AlertDialog[] dialog = new AlertDialog[1];
+		final Runnable submit = new Runnable() {
+			@Override
+			public void run() {
+				String query = field.getText().toString();
+				if (dialog[0] != null)
+					dialog[0].dismiss();
+				if (query.trim().isEmpty())
+					return;
+				Intent search = new Intent(Intent.ACTION_SEARCH).setComponent(searchable.getSearchActivity());
+				search.putExtra(SearchManager.QUERY, query);
+				search.putExtra(SearchManager.USER_QUERY, query);
+				if (appSearchData != null)
+					search.putExtra(SearchManager.APP_DATA, appSearchData);
+				deliverSearch(search);
+			}
+		};
+		field.setOnEditorActionListener(new android.widget.TextView.OnEditorActionListener() {
+			@Override
+			public boolean onEditorAction(android.widget.TextView v, int actionId, KeyEvent event) {
+				submit.run();
+				return true;
+			}
+		});
+		dialog[0] = new AlertDialog.Builder(this)
+		                .setTitle(searchable.getLabelId() != 0 ? getText(searchable.getLabelId()) : getText(com.android.internal.R.string.search_go))
+		                .setView(field)
+		                .setPositiveButton(com.android.internal.R.string.search_go, new DialogInterface.OnClickListener() {
+			                @Override
+			                public void onClick(DialogInterface d, int which) {
+				                submit.run();
+			                }
+		                })
+		                .setNegativeButton(android.R.string.cancel, null)
+		                .create();
+		dialog[0].show();
+		field.requestFocus();
+	}
+
+	private SearchableInfo searchableFor(SearchManager searchManager) {
+		SearchableInfo own = searchManager.getSearchableInfo(getComponentName());
+		if (own != null)
+			return own;
+		String name = null;
+		ActivityInfo info = getActivityInfo();
+		if (info != null && info.metaData != null)
+			name = info.metaData.getString("android.app.default_searchable");
+		if (name == null && getApplicationInfo().metaData != null)
+			name = getApplicationInfo().metaData.getString("android.app.default_searchable");
+		if (name == null || name.equals("*"))
+			return null;
+		if (name.startsWith("."))
+			name = getPackageName() + name;
+		return searchManager.getSearchableInfo(new ComponentName(getPackageName(), name));
+	}
+
+	private void deliverSearch(Intent search) {
+		ActivityInfo info = getActivityInfo();
+		boolean singleTop = info != null && (info.launchMode == ActivityInfo.LAUNCH_SINGLE_TOP || info.launchMode == ActivityInfo.LAUNCH_SINGLE_TASK
+		                                     || info.launchMode == ActivityInfo.LAUNCH_SINGLE_INSTANCE);
+		if (singleTop && getComponentName().equals(search.getComponent()))
+			performNewIntent(search);
+		else
+			startActivity(search);
 	}
 
 	/* AOSP Activity.startActivityIfNeeded(): like startActivityForResult(), except that nothing starts when the
