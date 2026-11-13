@@ -451,3 +451,74 @@ JNIEXPORT jstring JNICALL Java_android_opengl_GLES20_glGetActiveUniform__IILjava
 	free(name);
 	return output;
 }
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGetIntegerv__ILjava_nio_IntBuffer_2(JNIEnv *env, jclass this, jint pname, jobject params_buf)
+{
+	jarray array_ref;
+	jbyte *array;
+	GLvoid *params = get_nio_buffer(env, params_buf, &array_ref, &array);
+	glGetIntegerv((GLenum)pname, (GLint *)params);
+	release_nio_buffer(env, array_ref, array);
+}
+
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES20_glGetProgramInfoLog(JNIEnv *env, jclass this, jint program)
+{
+	GLint bufSize = 0;
+	glGetProgramiv((GLuint)program, GL_INFO_LOG_LENGTH, &bufSize);
+	GLchar *infoLog = calloc(bufSize + 1, sizeof(GLchar));
+	if (bufSize > 0)
+		glGetProgramInfoLog((GLuint)program, bufSize, NULL, infoLog);
+	jstring output = _JSTRING(infoLog);
+	free(infoLog);
+	return output;
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glScissor(JNIEnv *env, jclass this, jint x, jint y, jint width, jint height)
+{
+	glScissor((GLint)x, (GLint)y, (GLsizei)width, (GLsizei)height);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glUniform1f(JNIEnv *env, jclass this, jint location, jfloat x)
+{
+	glUniform1f((GLint)location, (GLfloat)x);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glDeleteBuffers__I_3II(JNIEnv *env, jclass this, jint n, jintArray buffers_ref, jint offset)
+{
+	jint *buffers = (*env)->GetIntArrayElements(env, buffers_ref, NULL);
+	glDeleteBuffers((GLsizei)n, (GLuint *)buffers + offset);
+	(*env)->ReleaseIntArrayElements(env, buffers_ref, buffers, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glGenRenderbuffers__I_3II(JNIEnv *env, jclass this, jint n, jintArray renderbuffers_ref, jint offset)
+{
+	jint *renderbuffers = (*env)->GetIntArrayElements(env, renderbuffers_ref, NULL);
+	glGenRenderbuffers((GLsizei)n, (GLuint *)renderbuffers + offset);
+	(*env)->ReleaseIntArrayElements(env, renderbuffers_ref, renderbuffers, 0);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glDeleteRenderbuffers__I_3II(JNIEnv *env, jclass this, jint n, jintArray renderbuffers_ref, jint offset)
+{
+	jint *renderbuffers = (*env)->GetIntArrayElements(env, renderbuffers_ref, NULL);
+	glDeleteRenderbuffers((GLsizei)n, (GLuint *)renderbuffers + offset);
+	(*env)->ReleaseIntArrayElements(env, renderbuffers_ref, renderbuffers, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glRenderbufferStorage(JNIEnv *env, jclass this, jint target, jint internalformat, jint width, jint height)
+{
+	glRenderbufferStorage((GLenum)target, (GLenum)internalformat, (GLsizei)width, (GLsizei)height);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glFramebufferRenderbuffer(JNIEnv *env, jclass this, jint target, jint attachment, jint renderbuffertarget, jint renderbuffer)
+{
+	glFramebufferRenderbuffer((GLenum)target, (GLenum)attachment, (GLenum)renderbuffertarget, (GLuint)renderbuffer);
+}
+
+JNIEXPORT void JNICALL Java_android_opengl_GLES20_glCompressedTexImage2D(JNIEnv *env, jclass this, jint target, jint level, jint internalformat, jint width, jint height, jint border, jint imageSize, jobject data_buf)
+{
+	jarray array_ref;
+	jbyte *array;
+	GLvoid *data = get_nio_buffer(env, data_buf, &array_ref, &array);
+	glCompressedTexImage2D((GLenum)target, (GLint)level, (GLenum)internalformat, (GLsizei)width, (GLsizei)height, (GLint)border, (GLsizei)imageSize, data);
+	release_nio_buffer(env, array_ref, array);
+}
