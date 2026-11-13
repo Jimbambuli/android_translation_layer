@@ -1154,6 +1154,13 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setBackgroundColor(JNIEnv 
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(widget));
+	if (wrapper->have_custom_draw_method) {
+		/* View.draw() draws the background before onDraw(); as CSS background of the inner widget, the color
+		 * would come with dispatchDraw() and cover what onDraw() drew (MJ PDF: PDFView, a RelativeLayout) */
+		jobject background = _GET_OBJ_FIELD(this, "background", "Landroid/graphics/drawable/Drawable;");
+		Java_android_view_View_native_1setBackgroundDrawable(env, this, widget_ptr, background ? _GET_LONG_FIELD(background, "paintable") : 0);
+		return;
+	}
 	wrapper_widget_set_background(wrapper, NULL);
 
 	GtkStyleContext *style_context = gtk_widget_get_style_context(widget);
