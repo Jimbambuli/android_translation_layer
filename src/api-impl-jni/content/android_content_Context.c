@@ -101,11 +101,9 @@ static gboolean appearance_setting(const char *namespace, const char *key, GVari
 	return TRUE;
 }
 
-/* a setting changed while the app runs: a change of the global configuration, as on Android */
-static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gchar *key, GVariant *value, gpointer user_data)
+/* the appearance changed while the app runs: a change of the global configuration, as on Android */
+static void appearance_changed(gboolean colors)
 {
-	if (!appearance_setting(namespace, key, value))
-		return;
 	JNIEnv *env = get_jni_env();
 	J__ActivityThread__setNightMode(env, appearance_ui_mode_night(), appearance_contrast());
 	if ((*env)->ExceptionCheck(env)) {
@@ -113,7 +111,7 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gch
 		(*env)->ExceptionClear(env);
 	}
 	/* the dynamic colors depend on the contrast as well */
-	if (!strcmp(key, "accent-color") || !strcmp(key, "contrast")) {
+	if (colors) {
 		J__ATLThemeOverlay__setAccentColor(env, accent_color);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
@@ -123,15 +121,73 @@ static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gch
 	activity_ensure_configuration();
 }
 
+static void settings_changed_cb(XdpSettings *xdp_settings, gchar *namespace, gchar *key, GVariant *value, gpointer user_data)
+{
+	if (appearance_setting(namespace, key, value))
+		appearance_changed(!strcmp(key, "accent-color") || !strcmp(key, "contrast"));
+}
+
 static XdpSettings *xdp_settings = NULL;
 
-static void appearance_read(const char *key)
+/* the reply of ReadAll(["org.freedesktop.appearance"]), (a{sa{sv}}): TRUE if it had a setting of the appearance */
+static gboolean appearance_read_all(GVariant *reply)
 {
-	GVariant *value = xdp_settings_read_value(xdp_settings, "org.freedesktop.appearance", key, NULL, NULL);
-	if (value) {
-		appearance_setting("org.freedesktop.appearance", key, value);
-		g_variant_unref(value);
+	GVariant *namespaces = g_variant_get_child_value(reply, 0);
+	GVariant *settings = g_variant_lookup_value(namespaces, "org.freedesktop.appearance", G_VARIANT_TYPE_VARDICT);
+	gboolean found = FALSE;
+	if (settings) {
+		GVariantIter iter;
+		const char *key;
+		GVariant *value;
+		g_variant_iter_init(&iter, settings);
+		while (g_variant_iter_next(&iter, "{&sv}", &key, &value)) {
+			found |= appearance_setting("org.freedesktop.appearance", key, value);
+			g_variant_unref(value);
+		}
+		g_variant_unref(settings);
 	}
+	g_variant_unref(namespaces);
+	return found;
+}
+
+/* a portal that did not answer in time answered later: as if its settings changed */
+static void appearance_read_all_late_cb(GObject *bus, GAsyncResult *result, gpointer user_data)
+{
+	GVariant *reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(bus), result, NULL);
+	if (reply) {
+		if (appearance_read_all(reply))
+			appearance_changed(TRUE);
+		g_variant_unref(reply);
+	}
+}
+
+/* The appearance is read with one call that waits at most this long: an app (each of its processes) must not
+ * hang at its start on a portal that does not answer (it waited 3 x 5 s on one), and a portal that answers late
+ * still sets it, as a change. */
+#define APPEARANCE_READ_TIMEOUT_MS 1000
+
+static void appearance_read(void)
+{
+	GDBusConnection *bus = g_bus_get_sync(G_BUS_TYPE_SESSION, NULL, NULL);
+	if (!bus)
+		return;
+	GVariant *args = g_variant_new("(^as)", (const char *const[]){"org.freedesktop.appearance", NULL});
+	g_variant_ref_sink(args);
+	GError *error = NULL;
+	GVariant *reply = g_dbus_connection_call_sync(bus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+	                                              "org.freedesktop.portal.Settings", "ReadAll", args, G_VARIANT_TYPE("(a{sa{sv}})"),
+	                                              G_DBUS_CALL_FLAGS_NONE, APPEARANCE_READ_TIMEOUT_MS, NULL, &error);
+	if (reply) {
+		appearance_read_all(reply);
+		g_variant_unref(reply);
+	} else {
+		if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_TIMED_OUT))
+			g_dbus_connection_call(bus, "org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop", "org.freedesktop.portal.Settings",
+			                       "ReadAll", args, G_VARIANT_TYPE("(a{sa{sv}})"), G_DBUS_CALL_FLAGS_NONE, -1, NULL, appearance_read_all_late_cb, NULL);
+		g_error_free(error);
+	}
+	g_variant_unref(args);
+	g_object_unref(bus);
 }
 #endif
 
@@ -185,11 +241,8 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv 
 			g_error_free(error);
 		}
 	}
-	if (xdp_settings) {
-		appearance_read("color-scheme");
-		appearance_read("contrast");
-		appearance_read("accent-color");
-	}
+	if (xdp_settings)
+		appearance_read();
 #endif
 	_SET_INT_FIELD(config, "uiMode", (_GET_INT_FIELD(config, "uiMode") & ~/*UI_MODE_NIGHT_MASK*/ 0x30) | appearance_ui_mode_night());
 	jclass ui_mode_manager = (*env)->FindClass(env, "android/app/UiModeManager");
