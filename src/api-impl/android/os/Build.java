@@ -34,7 +34,45 @@ public class Build {
 	/**
 	 * Either a changelist number, or a label like "M4-rc20".
 	 */
-	public static final String ID = getString("ro.build.id");
+	public static final String ID = computeId();
+
+	/* ATL sets no ro.build.id; like RELEASE, fall back to a value matching SDK_INT: the build ID of the release's
+	 * first AOSP tag (android-<version>_r1, source.android.com/docs/setup/reference/build-numbers) */
+	static String computeId() {
+		String id = getString("ro.build.id");
+		if (!UNKNOWN.equals(id))
+			return id;
+		switch (VERSION.SDK_INT) {
+			case VERSION_CODES.N:
+				return "NRD90M";
+			case VERSION_CODES.N_MR1:
+				return "NDE63H";
+			case VERSION_CODES.O:
+				return "OPR6.170623.010";
+			case VERSION_CODES.O_MR1:
+				return "OPM1.171019.011";
+			case VERSION_CODES.P:
+				return "PPR1.180610.009";
+			case VERSION_CODES.Q:
+				return "QP1A.190711.019";
+			case VERSION_CODES.R:
+				return "RP1A.200720.009";
+			case VERSION_CODES.S:
+				return "SP1A.210812.015";
+			case VERSION_CODES.S_V2:
+				return "SP2A.220305.012";
+			case VERSION_CODES.TIRAMISU:
+				return "TP1A.220624.014";
+			case VERSION_CODES.UPSIDE_DOWN_CAKE:
+				return "UP1A.231005.007";
+			case VERSION_CODES.VANILLA_ICE_CREAM:
+				return "AP3A.240905.015.A2";
+			case VERSION_CODES.BAKLAVA:
+				return "BP2A.250605.031.A2";
+			default:
+				return UNKNOWN;
+		}
+	}
 
 	/**
 	 * A build ID string meant for displaying to the user
@@ -302,6 +340,8 @@ public class Build {
 					return "14";
 				case VERSION_CODES.VANILLA_ICE_CREAM:
 					return "15";
+				case VERSION_CODES.BAKLAVA:
+					return "16";
 				default:
 					return UNKNOWN;
 			}
@@ -1030,6 +1070,11 @@ public class Build {
 		 * Vanilla Ice Cream.
 		 */
 		public static final int VANILLA_ICE_CREAM = 35;
+
+		/**
+		 * Baklava.
+		 */
+		public static final int BAKLAVA = 36;
 	}
 
 	/**
