@@ -41,6 +41,11 @@ public class JobParameters implements Parcelable {
 		return jobInfo.getExtras();
 	}
 
+	/* JobInfo.Builder.setUserInitiated() is not kept: ATL runs every job as a regular one */
+	public boolean isUserInitiatedJob() {
+		return false;
+	}
+
 	/* ATL never stops jobs, so STOP_REASON_UNDEFINED */
 	public int getStopReason() {
 		return 0;
