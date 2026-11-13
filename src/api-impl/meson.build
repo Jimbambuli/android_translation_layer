@@ -208,6 +208,7 @@ srcs = [
 	'android/atl/ATLPaths.java',
 	'android/atl/ATLProcess.java',
 	'android/atl/ATLProvider.java',
+	'android/atl/ATLSecrets.java',
 	'android/atl/ATLRemoteContentProvider.java',
 	'android/atl/ATLStubHits.java',
 	'android/atl/ATLViewDump.java',
