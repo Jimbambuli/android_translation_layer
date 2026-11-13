@@ -24,6 +24,78 @@ public class Time {
 	// days from the closest Thursday, indexed by weekDay (AOSP sThursdayOffset)
 	private static final int[] sThursdayOffset = {-3, 3, 2, 1, 0, -1, -2};
 
+	public Time() {}
+
+	public Time(String timezoneId) {
+		if (timezoneId == null)
+			throw new NullPointerException("timezoneId is null!");
+		timezone = timezoneId;
+	}
+
+	public Time(Time other) {
+		set(other);
+	}
+
+	public void setToNow() {
+		set(System.currentTimeMillis());
+	}
+
+	public void set(Time that) {
+		timezone = that.timezone;
+		allDay = that.allDay;
+		second = that.second;
+		minute = that.minute;
+		hour = that.hour;
+		monthDay = that.monthDay;
+		month = that.month;
+		year = that.year;
+		weekDay = that.weekDay;
+		yearDay = that.yearDay;
+		isDst = that.isDst;
+		gmtoff = that.gmtoff;
+	}
+
+	public void set(int second, int minute, int hour, int monthDay, int month, int year) {
+		allDay = false;
+		this.second = second;
+		this.minute = minute;
+		this.hour = hour;
+		this.monthDay = monthDay;
+		this.month = month;
+		this.year = year;
+		weekDay = 0;
+		yearDay = 0;
+		isDst = -1;
+		gmtoff = 0;
+	}
+
+	/* AOSP: a date without a time of day (allDay) */
+	public void set(int monthDay, int month, int year) {
+		set(0, 0, 0, monthDay, month, year);
+		allDay = true;
+	}
+
+	/* AOSP: the same moment, seen in another time zone */
+	public void switchTimezone(String timezone) {
+		long millis = toMillis(true);
+		this.timezone = timezone;
+		set(millis);
+	}
+
+	public static int compare(Time a, Time b) {
+		if (a == null || b == null)
+			throw new NullPointerException("a or b is null");
+		return Long.compare(a.toMillis(true), b.toMillis(true));
+	}
+
+	public boolean after(Time that) {
+		return compare(this, that) > 0;
+	}
+
+	public boolean before(Time that) {
+		return compare(this, that) < 0;
+	}
+
 	public static String getCurrentTimezone() {
 		return TimeZone.getDefault().getID();
 	}
