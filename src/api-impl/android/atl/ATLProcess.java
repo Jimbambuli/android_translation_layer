@@ -51,6 +51,8 @@ public final class ATLProcess {
 	/* to the main process: bind and unbind one of its services for another process */
 	private static final int BIND_MAIN_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 12;
 	private static final int UNBIND_MAIN_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 13;
+	/* to the main process: Process.killProcess() of its pid from another process */
+	private static final int RESTART_MAIN = IBinder.FIRST_CALL_TRANSACTION + 14;
 	/* to the caller of START_ACTIVITY: the activity finished, with its result */
 	private static final int ACTIVITY_FINISHED = IBinder.FIRST_CALL_TRANSACTION;
 
@@ -450,6 +452,20 @@ public final class ATLProcess {
 				startHere(data);
 				return true;
 			}
+			if (code == RESTART_MAIN) {
+				boolean me = data.readInt() == Process.myPid();
+				reply.writeInt(me ? 1 : 0);
+				if (me) {
+					Slog.i(TAG, "process " + r.name + " kills the main process: the app restarts (exit " + Process.EXIT_RESTART + ")");
+					new Handler(Looper.getMainLooper()).post(new Runnable() {
+						@Override
+						public void run() {
+							System.exit(Process.EXIT_RESTART);
+						}
+					});
+				}
+				return true;
+			}
 			if (code == BIND_MAIN_SERVICE) {
 				reply.writeStrongBinder(bindHere(Intent.CREATOR.createFromParcel(data), r.bound_by_it));
 				return true;
@@ -640,6 +656,20 @@ public final class ATLProcess {
 	/* ---------------------------------------------------------------- secondary process */
 
 	private static ATLBinderConnection main_connection;
+
+	/** Process.killProcess(pid) in this process: true if pid is the main process, which then ends with
+	 * EXIT_RESTART (on Android a restart activity kills it this way and starts the app anew) */
+	public static boolean restartMainProcess(int pid) {
+		Parcel data = Parcel.obtain();
+		Parcel reply = Parcel.obtain();
+		data.writeInt(pid);
+		try {
+			main_connection.getContextObject().transact(RESTART_MAIN, data, reply, 0);
+		} catch (RemoteException e) {
+			return false;
+		}
+		return reply.readInt() == 1;
+	}
 
 	/* the calls of this process to the main process that do not wait for their answer */
 	private static final ExecutorService worker_here = Executors.newSingleThreadExecutor();
