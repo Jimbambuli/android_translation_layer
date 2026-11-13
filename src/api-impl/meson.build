@@ -582,6 +582,7 @@ srcs = [
 	'android/media/ThumbnailUtils.java',
 	'android/media/ToneGenerator.java',
 	'android/media/UnsupportedSchemeException.java',
+	'android/media/VolumeProvider.java',
 	'android/media/audiofx/AudioEffect.java',
 	'android/media/audiofx/Equalizer.java',
 	'android/media/browse/MediaBrowser.java',
