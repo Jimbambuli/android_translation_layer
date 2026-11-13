@@ -14,7 +14,10 @@ public class SurfaceTexture {
 		void onFrameAvailable(SurfaceTexture surfaceTexture);
 	}
 
-	private final int texName;
+	private int texName;
+	/* GLConsumer's mAttached; after attachToGLContext() the frame latched last goes into the new texture */
+	private boolean attached = true;
+	private boolean reupload;
 	/* GLConsumer's mEglDisplay/mEglContext: the EGL context of the first updateTexImage() */
 	private long eglDisplay;
 	private long eglContext;
@@ -126,10 +129,36 @@ public class SurfaceTexture {
 		if (released)
 			throw new RuntimeException("Error during updateTexImage (see logcat for details)"); // NO_INIT: abandoned
 		synchronized (this) {
-			boolean newFrame = latchFrame();
+			if (!attached)
+				throw new IllegalStateException("Unable to update texture contents (see logcat for details)");
+			boolean newFrame = latchFrame() || (reupload && latched != null);
 			if (!nativeUpdateTexImage(texName, newFrame ? latched.getTexture() : 0))
 				throw new IllegalStateException("Unable to update texture contents (see logcat for details)");
+			reupload = false;
 			glHasFrame |= newFrame;
+		}
+	}
+
+	/* AOSP GLConsumer::detachFromContext(): in the SurfaceTexture's EGL context (if it has one yet), the GL texture
+	 * is deleted; then the SurfaceTexture has no context until attachToGLContext() */
+	public void detachFromGLContext() {
+		synchronized (this) {
+			if (!attached || !nativeDetachFromGLContext(texName))
+				throw new RuntimeException("Error during detachFromGLContext (see logcat for details)");
+			attached = false;
+			glHasFrame = false;
+		}
+	}
+
+	/* AOSP GLConsumer::attachToContext(): the GL texture texName of the current EGL context becomes the
+	 * SurfaceTexture's, at the next updateTexImage() with the frame latched last */
+	public void attachToGLContext(int texName) {
+		synchronized (this) {
+			if (attached)
+				throw new RuntimeException("Error during attachToGLContext (see logcat for details)");
+			this.texName = texName;
+			attached = true;
+			reupload = true;
 		}
 	}
 
@@ -167,5 +196,6 @@ public class SurfaceTexture {
 	}
 
 	private native boolean nativeUpdateTexImage(int texName, long texture);
+	private native boolean nativeDetachFromGLContext(int texName);
 	private native void nativeRelease();
 }

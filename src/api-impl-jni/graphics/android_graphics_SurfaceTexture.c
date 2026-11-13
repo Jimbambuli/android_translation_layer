@@ -98,6 +98,40 @@ JNIEXPORT jboolean JNICALL Java_android_graphics_SurfaceTexture_nativeUpdateTexI
 	return true;
 }
 
+/* GLConsumer::detachFromContext(): only in the SurfaceTexture's own EGL display and context, if it has them; the
+ * GL objects of that context (the texture tex_name and the one of the EGLImage) are deleted if it is current */
+JNIEXPORT jboolean JNICALL Java_android_graphics_SurfaceTexture_nativeDetachFromGLContext(JNIEnv *env, jobject this, jint tex_name)
+{
+	EGLDisplay dpy = eglGetCurrentDisplay();
+	EGLContext ctx = eglGetCurrentContext();
+	EGLDisplay own_dpy = _PTR(_GET_LONG_FIELD(this, "eglDisplay"));
+	EGLContext own_ctx = _PTR(_GET_LONG_FIELD(this, "eglContext"));
+	if (own_dpy != EGL_NO_DISPLAY && own_dpy != dpy) {
+		fprintf(stderr, "SurfaceTexture: detachFromContext: invalid current EGLDisplay\n");
+		return false;
+	}
+	if (own_ctx != EGL_NO_CONTEXT && own_ctx != ctx) {
+		fprintf(stderr, "SurfaceTexture: detachFromContext: invalid current EGLContext\n");
+		return false;
+	}
+	gboolean current = dpy != EGL_NO_DISPLAY && ctx != EGL_NO_CONTEXT;
+	struct gl_image *gl = _PTR(_GET_LONG_FIELD(this, "glImage"));
+	if (gl) {
+		eglDestroyImage(gl->display, gl->image);
+		if (current)
+			glDeleteTextures(1, &gl->texture);
+		g_free(gl);
+		_SET_LONG_FIELD(this, "glImage", 0);
+	}
+	if (current) {
+		GLuint texture = tex_name;
+		glDeleteTextures(1, &texture);
+	}
+	_SET_LONG_FIELD(this, "eglDisplay", 0);
+	_SET_LONG_FIELD(this, "eglContext", 0);
+	return true;
+}
+
 /* the EGLImage goes with the SurfaceTexture; the GL_TEXTURE_2D belongs to the consumer's context, which is not
  * current here, and goes with that context (as AOSP leaves the GL texture to the app) */
 JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_nativeRelease(JNIEnv *env, jobject this)
