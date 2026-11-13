@@ -9,6 +9,11 @@ public class Vibrator {
 		fd = native_constructor();
 	}
 
+	/* for NullVibrator: no device behind it */
+	Vibrator(int fd) {
+		this.fd = fd;
+	}
+
 	public boolean hasVibrator() {
 		return true;
 	}
@@ -19,6 +24,11 @@ public class Vibrator {
 	 * <p>A vibrator without support for any primitive, like this one, returns false.
 	 */
 	public boolean areAllPrimitivesSupported(int... primitiveIds) {
+		return false;
+	}
+
+	/* the vibration motor is only switched on and off (native_vibrate), its strength cannot be set */
+	public boolean hasAmplitudeControl() {
 		return false;
 	}
 
@@ -49,6 +59,14 @@ public class Vibrator {
 			}
 		});
 		vibrateThread.start();
+	}
+
+	public void vibrate(VibrationEffect effect) {
+		vibrate(effect.timings, effect.repeat);
+	}
+
+	public void vibrate(VibrationEffect effect, VibrationAttributes attributes) {
+		vibrate(effect);
 	}
 
 	public void cancel() {
