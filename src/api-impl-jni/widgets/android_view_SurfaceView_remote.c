@@ -188,8 +188,10 @@ static gboolean on_message(int fd, GIOCondition condition, struct remote_consume
 	else if (buffer_fd >= 0)
 		close(buffer_fd);
 	if (msg.type == ATL_SURFACE_MSG_PRESENT) {
-		if (consumer->buffers[msg.index].fd >= 0 && (consumer->buffers[msg.index].map || consumer->buffers[msg.index].desc.fourcc))
+		if (consumer->buffers[msg.index].fd >= 0 && (consumer->buffers[msg.index].map || consumer->buffers[msg.index].desc.fourcc)) {
+			consumer->widget->crop = msg.crop;
 			present(consumer, msg.index);
+		}
 		else
 			consumer_send(consumer, ATL_SURFACE_MSG_RELEASE, msg.index, 0, 0);
 	}

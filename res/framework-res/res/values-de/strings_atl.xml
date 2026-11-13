@@ -3,4 +3,6 @@
      Apache License 2.0) -->
 <resources>
     <string name="app_permission_button_allow_always" msgid="4573292371734011171">"Immer zulassen"</string>
+    <!-- ATL's share sheet (not from AOSP) -->
+    <string name="atl_share_email">E-Mail</string>
 </resources>

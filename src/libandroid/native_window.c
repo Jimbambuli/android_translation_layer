@@ -128,6 +128,12 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 		return;
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
+		/* a unix socket closed with unread messages (the consumer's FRAME/RELEASE) gives the other end
+		 * ECONNRESET before what it has not read yet, the DISCONNECT too, and that end then drops the last
+		 * frame as for a process that ended: stop the consumer's sending, read the rest, then close */
+		shutdown(native_window->remote_fd, SHUT_RDWR);
+		while (recv(native_window->remote_fd, &(struct atl_surface_msg){0}, sizeof(struct atl_surface_msg), MSG_DONTWAIT) > 0)
+			;
 		close(native_window->remote_fd);
 		for (int i = 0; i < G_N_ELEMENTS(native_window->remote_memory); i++) {
 			if (native_window->remote_memory[i].map)
@@ -221,8 +227,8 @@ static void remote_memory_message(void *data, const struct atl_surface_msg *msg)
 
 /* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
  * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
- * frame is dropped (FALSE, as when that process is gone) */
-gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture)
+ * frame is dropped (FALSE, as when that process is gone); crop: the scaling mode SCALE_TO_FIT_WITH_CROPPING */
+gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
 {
 	int width = gdk_texture_get_width(texture);
 	int height = gdk_texture_get_height(texture);
@@ -263,7 +269,7 @@ gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window,
 	gdk_texture_downloader_download_into(downloader, buffer->map, width * 4);
 	gdk_texture_downloader_free(downloader);
 	buffer->busy = TRUE;
-	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i}, -1);
+	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i, .crop = crop}, -1);
 	return !native_window->remote_gone;
 }
 

@@ -31077,6 +31077,9 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Text to tell the user that a package has been forced by themselves in the RESTRICTED bucket. [CHAR LIMIT=NONE]
          */
 		public static final int as_app_forced_to_restricted_bucket = 0x0104094e;
+		/**  ATL's share sheet: the target that mails the text or file (the Email portal)
+         */
+		public static final int atl_share_email = 0x01040a33;
 		/**  Notification content to tell the user that auto data switch can be disabled at settings. [CHAR LIMIT=NOTIF_BODY]
          */
 		public static final int auto_data_switch_content = 0x010401b8;
@@ -38196,7 +38199,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
       https://developer.android.com/training/articles/security-key-attestation#certificate_status
 
          */
-		public static final int vendor_required_attestation_revocation_list_url = 0x01040a33;
+		public static final int vendor_required_attestation_revocation_list_url = 0x01040a34;
 		/**  Notification content to prompt the user that some accessibility service has view and control access. [CHAR LIMIT=none]
          */
 		public static final int view_and_control_notification_content = 0x010409ea;
