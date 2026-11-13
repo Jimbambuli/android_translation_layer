@@ -403,6 +403,10 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 		g_object_ref(webview);
 	}
 	g_object_unref(settings);
+	/* a WebView that follows its page (wrap_content in a scrolling list) is laid out with height 0 until the page
+	 * reports its size, and WebKitGTK (2.54) did not draw a page whose view was first allocated a height of 0, also not
+	 * after it grew; the wrapper allocates the view at least its minimum, the View keeps the size from the layout */
+	gtk_widget_set_size_request(webview, 1, 1);
 	g_object_weak_ref(G_OBJECT(wrapper), wrapper_finalized, webview);
 	undo_font_dpi_zoom(gtk_settings_get_default(), NULL, WEBKIT_WEB_VIEW(webview));
 	g_signal_connect_object(gtk_settings_get_default(), "notify::gtk-xft-dpi", G_CALLBACK(undo_font_dpi_zoom), webview, 0);
