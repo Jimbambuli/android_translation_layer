@@ -1258,6 +1258,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
 			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 		}
+		if (a.hasValue(com.android.internal.R.styleable.View_alpha))
+			setAlpha(a.getFloat(com.android.internal.R.styleable.View_alpha, 1f));
 
 		if (a.hasValue(com.android.internal.R.styleable.View_minWidth))
 			minWidth = a.getDimensionPixelSize(com.android.internal.R.styleable.View_minWidth, 0);

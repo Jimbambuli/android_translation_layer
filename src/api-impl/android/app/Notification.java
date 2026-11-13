@@ -626,6 +626,11 @@ public class Notification implements Parcelable {
 				notification.style.addExtras(extras);
 			}
 			notification.extras = extras;
+			if (notification.style instanceof CallStyle && mContext != null) { // AOSP CallStyle.buildStyled(); the host tests build without a context
+				ArrayList<Action> actions = ((CallStyle)notification.style).getActionsListWithSystemActions();
+				mActions.clear();
+				mActions.addAll(actions);
+			}
 			notification.actions = mActions.isEmpty() ? null : mActions.toArray(new Action[0]);
 			if ((notification.defaults & DEFAULT_LIGHTS) != 0) {
 				notification.flags |= FLAG_SHOW_LIGHTS;
@@ -1397,6 +1402,8 @@ public class Notification implements Parcelable {
 		private Integer mDeclineButtonColor;
 		private Icon mVerificationIcon;
 		private CharSequence mVerificationText;
+		private static final String KEY_ACTION_PRIORITY = "key_action_priority";
+		private static final int MAX_ACTION_BUTTONS = 3;
 
 		public static CallStyle forIncomingCall(Person person, PendingIntent declineIntent, PendingIntent answerIntent) {
 			return new CallStyle(CALL_TYPE_INCOMING, person, null,
@@ -1471,6 +1478,51 @@ public class Notification implements Parcelable {
 			if (mDeclineButtonColor != null) {
 				extras.putInt(EXTRA_DECLINE_COLOR, mDeclineButtonColor);
 			}
+		}
+
+		/* AOSP: the system's buttons (decline or hang up first, answer last) become actions of the notification,
+		 * so the desktop notification shows them like the app's; ATL draws neither their icons nor their colors */
+		private Action makeAction(int title, PendingIntent intent) {
+			Action action = new Action.Builder((Icon)null, mBuilder.mContext.getString(title), intent).build();
+			action.getExtras().putBoolean(KEY_ACTION_PRIORITY, true);
+			return action;
+		}
+
+		private Action makeNegativeAction() {
+			if (mDeclineIntent == null)
+				return makeAction(com.android.internal.R.string.call_notification_hang_up_action, mHangUpIntent);
+			return makeAction(com.android.internal.R.string.call_notification_decline_action, mDeclineIntent);
+		}
+
+		private Action makeAnswerAction() {
+			return mAnswerIntent == null ? null : makeAction(mIsVideo ? com.android.internal.R.string.call_notification_answer_video_action : com.android.internal.R.string.call_notification_answer_action, mAnswerIntent);
+		}
+
+		/* AOSP CallStyle.getActionsListWithSystemActions() */
+		ArrayList<Action> getActionsListWithSystemActions() {
+			final Action firstAction = makeNegativeAction();
+			final Action lastAction = makeAnswerAction();
+			int nonContextualActionSlotsRemaining = MAX_ACTION_BUTTONS;
+			ArrayList<Action> resultActions = new ArrayList<>(MAX_ACTION_BUTTONS);
+			resultActions.add(firstAction);
+			--nonContextualActionSlotsRemaining;
+			for (Action action : mBuilder.mActions) {
+				if (action.isContextual()) {
+					resultActions.add(action);
+				} else if (action.getExtras().getBoolean(KEY_ACTION_PRIORITY)) {
+					// drop the system actions of an earlier build()
+				} else {
+					resultActions.add(action);
+					--nonContextualActionSlotsRemaining;
+				}
+				if (lastAction != null && nonContextualActionSlotsRemaining == 1) {
+					resultActions.add(lastAction);
+					--nonContextualActionSlotsRemaining;
+				}
+			}
+			if (lastAction != null && nonContextualActionSlotsRemaining >= 1)
+				resultActions.add(lastAction);
+			return resultActions;
 		}
 	}
 
