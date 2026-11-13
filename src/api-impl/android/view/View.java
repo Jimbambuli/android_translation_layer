@@ -1258,6 +1258,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
 			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
 		}
+		if (a.hasValue(com.android.internal.R.styleable.View_alpha))
+			setAlpha(a.getFloat(com.android.internal.R.styleable.View_alpha, 1f));
 
 		if (a.hasValue(com.android.internal.R.styleable.View_minWidth))
 			minWidth = a.getDimensionPixelSize(com.android.internal.R.styleable.View_minWidth, 0);
@@ -2879,6 +2881,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			invalidateOutline();
 	}
 
+	/* GTK sized a native view (TextView, Button, ...) that no ViewGroup lays out: the root of a PopupWindow,
+	 * a row of a Spinner's list, a button of ATL's AlertDialog. AOSP's ViewRootImpl measures and lays out such
+	 * a root at the size of its window; here the size is GTK's, which View.layout() never hears of */
+	@Export
+	private void layoutNativeRoot(int width, int height) {
+		if (parent instanceof ViewGroup || (getWidth() == width && getHeight() == height && (mPrivateFlags3 & PFLAG3_IS_LAID_OUT) != 0))
+			return;
+		measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
+		int oldW = getWidth();
+		int oldH = getHeight();
+		boolean changed = setFrame(0, 0, width, height);
+		if (changed)
+			onSizeChanged(width, height, oldW, oldH);
+		onLayout(changed, 0, 0, width, height);
+		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
+	}
+
 	/* layout() is on the stack: it calls the OnLayoutChangeListeners itself, with the bounds from before */
 	private boolean layoutCall;
 
@@ -3070,8 +3089,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 				view = (View)view.parent;
 			else
 				break;
+			/* AOSP calls mParent.requestLayout(): a parent that overrides it gets the call and goes on from
+			 * there; Compose's AndroidViewsHandler remeasures the layout node of the child that asked */
+			if ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0 && overridesRequestLayout(view.getClass())) {
+				view.requestLayout();
+				break;
+			}
 		}
 	};
+
+	private static final Map<Class<?>, Boolean> requestLayoutOverridden = new HashMap<>();
+
+	private static boolean overridesRequestLayout(Class<?> viewClass) {
+		Boolean overridden = requestLayoutOverridden.get(viewClass);
+		if (overridden == null) {
+			try {
+				overridden = viewClass.getMethod("requestLayout").getDeclaringClass() != View.class;
+			} catch (NoSuchMethodException e) {
+				overridden = false;
+			}
+			requestLayoutOverridden.put(viewClass, overridden);
+		}
+		return overridden;
+	}
 
 	public void setOverScrollMode(int mode) {
 		if (mode != OVER_SCROLL_ALWAYS && mode != OVER_SCROLL_IF_CONTENT_SCROLLS && mode != OVER_SCROLL_NEVER) {

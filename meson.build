@@ -218,6 +218,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',
                                                                   	'src/api-impl-jni/media/android_media_session_MediaSession.c',
                                                                   	'src/api-impl-jni/media/av_input.c',
+                                                                  	'src/api-impl-jni/media/video_rotate.c',
                                                                   	'src/api-impl-jni/net/android_net_ConnectivityManager.c',
                                                                   	'src/api-impl-jni/os/android_atl_ATLBinderConnection.c',
                                                                   	'src/api-impl-jni/os/android_atl_GVariantBuilderParcel.c',
@@ -240,6 +241,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/views/android_view_WindowManagerImpl.c',
                                                                   	'src/api-impl-jni/widgets/WrapperWidget.c',
                                                                   	'src/api-impl-jni/widgets/android_view_SurfaceView.c',
+                                                                  	'src/api-impl-jni/widgets/android_view_SurfaceView_remote.c',
                                                                   	'src/api-impl-jni/widgets/android_webkit_WebView.c',
                                                                   	'src/api-impl-jni/widgets/android_widget_Button.c',
                                                                   	'src/api-impl-jni/widgets/android_widget_CheckBox.c',
@@ -295,6 +297,7 @@ executable('android-translation-layer', [
                                         	'src/main-executable/libc_bio_path_overrides.c',
                                         	'src/main-executable/navigation_bar.c',
                                         	'src/main-executable/system_theme.c',
+                                        	'src/main-executable/zygote.c',
                                         	resources
                                         ],
                                         include_directories: shared_includes_dir,

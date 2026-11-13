@@ -31,6 +31,13 @@ public class TimePicker extends FrameLayout {
 		super(context, attrs, defStyleAttr, defStyleRes);
 	}
 
+	/* GTK draws the picker (the native widget of this view), FrameLayout has no children to measure it
+	 * by: measure the GTK widget as View.onMeasure() does for a native view, or the picker gets size 0 */
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+	}
+
 	public Integer getCurrentHour() {
 		return getHour();
 	}

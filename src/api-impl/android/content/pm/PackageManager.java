@@ -1932,9 +1932,9 @@ public class PackageManager {
 	 * @see #PERMISSION_GRANTED
 	 * @see #PERMISSION_DENIED
 	 */
-	/* AOSP takes it from the permission controller: its label of the background location option */
+	/* AOSP takes it from the permission controller: its label of the background location option (in ATL, framework-res has it) */
 	public CharSequence getBackgroundPermissionOptionLabel() {
-		return "Allow all the time";
+		return Resources.getSystem().getText(com.android.internal.R.string.app_permission_button_allow_always);
 	}
 
 	private static java.util.Set<String> deniedByUser;

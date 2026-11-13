@@ -712,6 +712,10 @@ public class Process {
 			System.exit(0);
 		}
 
+		/* a restart activity in another process of the app (android:process: Gmail, OsmAnd) kills the main process
+		 * and starts the app anew: ATL ends the main process with EXIT_RESTART, as above */
+		if (android.atl.ATLProcess.isSecondary() && android.atl.ATLProcess.restartMainProcess(pid))
+			return;
 		sendSignal(pid, SIGNAL_KILL);
 	}
 

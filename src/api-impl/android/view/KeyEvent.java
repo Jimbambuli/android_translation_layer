@@ -3169,6 +3169,8 @@ public class KeyEvent extends InputEvent implements Parcelable {
 		switch (mAction) {
 			case ACTION_DOWN: {
 				mFlags &= ~FLAG_START_TRACKING;
+				if (state != null)
+					state.mUpKeyCode = 0; // a new press: the last release is over
 				if (DEBUG)
 					Log.v(TAG, "Key down to " + target + " in " + state + ": " + this);
 				boolean res = receiver.onKeyDown(mKeyCode, this);
@@ -3228,6 +3230,12 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	public static class DispatcherState {
 		int mDownKeyCode;
 		Object mDownTarget;
+		/* ATL: AOSP passes one KeyEvent through the focused views and then to the window's callback (Activity,
+		 * Dialog), so the FLAG_TRACKING that the first handleUpEvent() sets stays on it for all of them. GTK hands
+		 * the key to each view and to the window one after the other, each with its own KeyEvent: the up events of
+		 * one release get the flags of the first one, until the next down. */
+		int mUpKeyCode;
+		int mUpFlags;
 		SparseIntArray mActiveLongPresses = new SparseIntArray();
 
 		/**
@@ -3238,6 +3246,7 @@ public class KeyEvent extends InputEvent implements Parcelable {
 				Log.v(TAG, "Reset: " + this);
 			mDownKeyCode = 0;
 			mDownTarget = null;
+			mUpKeyCode = 0;
 			mActiveLongPresses.clear();
 		}
 
@@ -3302,6 +3311,11 @@ public class KeyEvent extends InputEvent implements Parcelable {
 			final int keyCode = event.getKeyCode();
 			if (DEBUG)
 				Log.v(TAG, "Handle key up " + event + ": " + this);
+			if (mUpKeyCode == keyCode && mDownKeyCode != keyCode) { // ATL: the same release once more
+				event.mFlags |= mUpFlags;
+				return;
+			}
+			final int flags = event.mFlags;
 			int index = mActiveLongPresses.indexOfKey(keyCode);
 			if (index >= 0) {
 				if (DEBUG)
@@ -3316,6 +3330,8 @@ public class KeyEvent extends InputEvent implements Parcelable {
 				mDownKeyCode = 0;
 				mDownTarget = null;
 			}
+			mUpKeyCode = keyCode;
+			mUpFlags = event.mFlags & ~flags;
 		}
 	}
 

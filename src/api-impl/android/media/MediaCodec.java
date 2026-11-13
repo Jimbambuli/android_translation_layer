@@ -64,7 +64,8 @@ public class MediaCodec {
 		if ("aac".equals(codecName) || "mp3".equals(codecName) || "opus".equals(codecName)) {
 			native_configure_audio(native_codec, format.getByteBuffer("csd-0"), format.getInteger("sample-rate"), format.getInteger("channel-count"));
 		} else if ("h264".equals(codecName) || "vp8".equals(codecName) || "vp9".equals(codecName)) {
-			native_configure_video(native_codec, format.getByteBuffer("csd-0"), format.getByteBuffer("csd-1"), surface);
+			native_configure_video(native_codec, format.getByteBuffer("csd-0"), format.getByteBuffer("csd-1"), surface,
+			                       format.getInteger("rotation-degrees", 0));
 		} else {
 			System.out.println("configure: format " + format + " not implemented");
 			Thread.dumpStack();
@@ -277,8 +278,14 @@ public class MediaCodec {
 		tryProcessInputBuffer();
 	}
 
+	/* AOSP: SCALE_TO_FIT (the default) stretches the frames over the Surface, SCALE_TO_FIT_WITH_CROPPING covers it
+	 * keeping their aspect ratio; like AOSP's compositor this applies to a SurfaceView, a TextureView shows the
+	 * whole frame */
 	public void setVideoScalingMode(int mode) {
-		System.out.println("MediaCodec.setVideoScalingMode(" + mode + "): codecName=" + codecName);
+		if (mode != MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT && mode != MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+			throw new IllegalArgumentException();
+		if (native_codec != 0)
+			native_setVideoScalingMode(native_codec, mode == MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
 	}
 
 	public void stop() {
@@ -342,7 +349,8 @@ public class MediaCodec {
 	private native long native_constructor(String codecName);
 	private native void native_setOutputSurface(long codec, Surface surface);
 	private native void native_configure_audio(long codec, ByteBuffer extradata, int sampleRate, int channelCount);
-	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface);
+	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface, int rotation);
+	private native void native_setVideoScalingMode(long codec, boolean crop);
 	private native void native_start(long codec);
 	private native int native_queueInputBuffer(long codec, ByteBuffer buffer, long presentationTimeUs);
 	private native int native_dequeueOutputBuffer(long codec, ByteBuffer buffer, BufferInfo info);

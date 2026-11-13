@@ -1540,7 +1540,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
-	protected void cleanupLayoutState(View child) {}
+	// AOSP: the child no longer counts as asking for a layout
+	protected void cleanupLayoutState(View child) {
+		child.mPrivateFlags &= ~View.PFLAG_FORCE_LAYOUT;
+	}
 
 	/**
 	 * AOSP ViewGroup.shouldDelayChildPressedState(): true unless the container never scrolls

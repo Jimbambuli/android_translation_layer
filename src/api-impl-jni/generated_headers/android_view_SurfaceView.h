@@ -347,6 +347,14 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1createSnapshot
 JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1postSnapshot
   (JNIEnv *, jobject, jlong, jlong);
 
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_connectRemote
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemote
+  (JNIEnv *, jclass, jlong);
+
 #ifdef __cplusplus
 }
 #endif
