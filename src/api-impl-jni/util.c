@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include <gtk/gtk.h>
+#include <pango/pangocairo.h>
 
 #include "src/api-impl-jni/defines.h"
 #include "util.h"
@@ -262,6 +263,29 @@ static gboolean unref_idle(gpointer object)
 void atl_unref_on_main_thread(gpointer object)
 {
 	g_idle_add(unref_idle, object);
+}
+
+extern GtkWidget *window;
+extern GThread *main_thread_id;
+
+static GPrivate thread_pango_context = G_PRIVATE_INIT(g_object_unref);
+
+/* The PangoContext for text in the current thread. Pango font maps are not thread-safe: only the main thread uses
+ * the window's context; other threads (apps drawing text into a Bitmap from worker threads) get a context of their
+ * own on the thread's own default font map, with the resolution and font options of the window's context. */
+PangoContext *atl_pango_context(void)
+{
+	if (!main_thread_id || g_thread_self() == main_thread_id)
+		return gtk_widget_get_pango_context(window);
+	PangoContext *context = g_private_get(&thread_pango_context);
+	if (!context) {
+		PangoContext *window_context = gtk_widget_get_pango_context(window);
+		context = pango_font_map_create_context(pango_cairo_font_map_get_default());
+		pango_cairo_context_set_resolution(context, pango_cairo_context_get_resolution(window_context));
+		pango_cairo_context_set_font_options(context, pango_cairo_context_get_font_options(window_context));
+		g_private_set(&thread_pango_context, context);
+	}
+	return context;
 }
 
 /* Fades the opacity of a widget from its current opacity to `to`, with the default interpolator of

@@ -489,8 +489,10 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		return measureSpec;
 	}
 
+	/* AOSP: false as soon as the dialog is dismissed (mShowing), although its window may still be
+	 * animating out; DialogFragmentNavigator pops a dialog destination only when this is false */
 	public boolean isShowing() {
-		return showPending || nativeIsShowing(nativePtr);
+		return shown && (showPending || nativeIsShowing(nativePtr));
 	}
 
 	@Export

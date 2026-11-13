@@ -6,12 +6,10 @@
 #include "../generated_headers/android_text_Layout.h"
 #include "../graphics/AndroidPaint.h"
 
-extern GtkWidget *window;
-
 JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env, jobject object, jstring text, jlong paint, jint width)
 {
 	struct AndroidPaint *android_paint = _PTR(paint);
-	PangoLayout *layout = pango_layout_new(gtk_widget_get_pango_context(window));
+	PangoLayout *layout = pango_layout_new(atl_pango_context());
 	pango_layout_set_font_description(layout, android_paint->font);
 	android_paint_apply_letter_spacing(layout, android_paint);
 	/* real UTF-8: GetStringUTFChars would give surrogate pairs of emoji as two 3-byte sequences (CESU-8), which Pango rejects */

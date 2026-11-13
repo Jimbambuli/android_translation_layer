@@ -6,7 +6,29 @@ import java.util.Map;
 
 public class MediaFormat {
 
+	public static final String KEY_MIME = "mime";
+	public static final String KEY_SAMPLE_RATE = "sample-rate";
+	public static final String KEY_CHANNEL_COUNT = "channel-count";
+	public static final String KEY_WIDTH = "width";
+	public static final String KEY_HEIGHT = "height";
+
 	private Map<String, Object> map = new HashMap<>();
+
+	public static final MediaFormat createAudioFormat(String mime, int sampleRate, int channelCount) {
+		MediaFormat format = new MediaFormat();
+		format.setString(KEY_MIME, mime);
+		format.setInteger(KEY_SAMPLE_RATE, sampleRate);
+		format.setInteger(KEY_CHANNEL_COUNT, channelCount);
+		return format;
+	}
+
+	public static final MediaFormat createVideoFormat(String mime, int width, int height) {
+		MediaFormat format = new MediaFormat();
+		format.setString(KEY_MIME, mime);
+		format.setInteger(KEY_WIDTH, width);
+		format.setInteger(KEY_HEIGHT, height);
+		return format;
+	}
 
 	public void setString(String key, String value) {
 		map.put(key, value);
