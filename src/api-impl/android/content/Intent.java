@@ -1496,6 +1496,11 @@ public class Intent implements Parcelable {
 		return extras.getLongArray(name);
 	}
 
+	public Intent putIntegerArrayListExtra(String name, ArrayList<Integer> value) {
+		extras.putIntegerArrayList(name, value);
+		return this;
+	}
+
 	public ArrayList<Integer> getIntegerArrayListExtra(String name) {
 		return extras.getIntegerArrayList(name);
 	}
