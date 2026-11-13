@@ -118,7 +118,7 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 	consumer->shown = texture;
 	consumer->widget->frame_callback_data = consumer;
 	consumer->widget->frame_callback = frame_callback;
-	surface_view_widget_set_texture(consumer->widget, texture, TRUE); // GL rows, bottom first
+	surface_view_widget_set_texture(consumer->widget, texture, !buffer->desc.top_first); // GL rows: bottom first
 }
 
 static void add_buffer(struct remote_consumer *consumer, const struct atl_surface_msg *msg, int fd)

@@ -40,5 +40,6 @@ struct atl_surface_msg {
 	int32_t stride;
 	uint32_t offset;
 	uint32_t fourcc; /* the DRM format of a dmabuf, 0 for memory (memfd) with GDK_MEMORY_R8G8B8A8_PREMULTIPLIED rows */
+	uint32_t top_first; /* the rows start at the top (frames of MediaCodec), else at the bottom (GL) */
 	uint64_t modifier;
 };

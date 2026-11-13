@@ -23,10 +23,19 @@ struct ANativeWindow {
 	GMutex remote_lock;
 	void (*remote_handler)(void *data, const struct atl_surface_msg *msg);
 	void *remote_data;
+	struct { /* ANativeWindow_remotePresentTexture() */
+		int fd;
+		void *map;
+		size_t size;
+		int width;
+		int height;
+		gboolean busy;
+	} remote_memory[3];
 };
 
 gboolean ANativeWindow_remoteRead(struct ANativeWindow *native_window, int timeout_ms);
 void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd);
+gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture);
 void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data);
 
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);

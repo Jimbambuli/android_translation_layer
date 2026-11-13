@@ -16,8 +16,11 @@
  * limitations under the License.
  */
 
+#define _GNU_SOURCE // memfd_create()
+
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 
 #include <EGL/egl.h>
 
@@ -116,18 +119,25 @@ typedef struct ANativeWindow_Buffer {
  */
 void ANativeWindow_acquire(struct ANativeWindow *native_window)
 {
-	native_window->refcount++;
+	g_atomic_int_inc(&native_window->refcount); // MediaCodec's frames hold one on the main thread
 }
 
 void ANativeWindow_release(struct ANativeWindow *native_window)
 {
-	native_window->refcount--;
-	if (native_window->refcount == 0 && native_window->remote_fd >= 0) {
+	if (!g_atomic_int_dec_and_test(&native_window->refcount))
+		return;
+	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
 		close(native_window->remote_fd);
+		for (int i = 0; i < G_N_ELEMENTS(native_window->remote_memory); i++) {
+			if (native_window->remote_memory[i].map)
+				munmap(native_window->remote_memory[i].map, native_window->remote_memory[i].size);
+			if (native_window->remote_memory[i].fd > 0)
+				close(native_window->remote_memory[i].fd);
+		}
 		g_mutex_clear(&native_window->remote_lock);
 		free(native_window);
-	} else if (native_window->refcount == 0) {
+	} else {
 		g_clear_signal_handler(&native_window->resize_handler, native_window->surface_view_widget);
 		if (native_window->wayland_display) {
 			wl_egl_window_destroy((struct wl_egl_window *)native_window->egl_window);
@@ -199,6 +209,62 @@ void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct 
 	}
 	if (!native_window->remote_gone && sendmsg(native_window->remote_fd, &hdr, MSG_NOSIGNAL) < 0)
 		native_window->remote_gone = TRUE;
+}
+
+/* ANativeWindow_remoteRead(), with remote_lock held: a buffer of ANativeWindow_remotePresentTexture() is free again */
+static void remote_memory_message(void *data, const struct atl_surface_msg *msg)
+{
+	struct ANativeWindow *native_window = data;
+	if (msg->type == ATL_SURFACE_MSG_RELEASE && msg->index < G_N_ELEMENTS(native_window->remote_memory))
+		native_window->remote_memory[msg->index].busy = FALSE;
+}
+
+/* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
+ * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
+ * frame is dropped (FALSE, as when that process is gone) */
+gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture)
+{
+	int width = gdk_texture_get_width(texture);
+	int height = gdk_texture_get_height(texture);
+	gint64 end = g_get_monotonic_time() + 100000;
+	int i = -1;
+	if (!native_window->remote_handler)
+		ANativeWindow_remoteSetHandler(native_window, remote_memory_message, native_window);
+	while (i < 0) {
+		for (int k = 0; k < G_N_ELEMENTS(native_window->remote_memory) && i < 0; k++)
+			if (!native_window->remote_memory[k].busy)
+				i = k;
+		int left = (end - g_get_monotonic_time()) / 1000;
+		if (i < 0 && (left <= 0 || !ANativeWindow_remoteRead(native_window, left)))
+			return FALSE;
+	}
+	typeof(native_window->remote_memory[0]) *buffer = &native_window->remote_memory[i];
+	if (buffer->width != width || buffer->height != height) {
+		if (buffer->map)
+			munmap(buffer->map, buffer->size);
+		if (buffer->fd > 0)
+			close(buffer->fd);
+		buffer->map = NULL;
+		buffer->size = (size_t)width * 4 * height;
+		buffer->fd = memfd_create("atl-surface", MFD_CLOEXEC);
+		if (buffer->fd < 0 || ftruncate(buffer->fd, buffer->size) < 0 ||
+		    (buffer->map = mmap(NULL, buffer->size, PROT_READ | PROT_WRITE, MAP_SHARED, buffer->fd, 0)) == MAP_FAILED) {
+			fprintf(stderr, "ANativeWindow: no buffer for a surface of another process: %m\n");
+			buffer->map = NULL;
+			buffer->width = buffer->height = 0;
+			return FALSE;
+		}
+		buffer->width = width;
+		buffer->height = height;
+		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_BUFFER, .index = i, .width = width, .height = height, .stride = width * 4, .top_first = 1}, buffer->fd);
+	}
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
+	gdk_texture_downloader_set_format(downloader, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED);
+	gdk_texture_downloader_download_into(downloader, buffer->map, width * 4);
+	gdk_texture_downloader_free(downloader);
+	buffer->busy = TRUE;
+	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i}, -1);
+	return !native_window->remote_gone;
 }
 
 void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data)

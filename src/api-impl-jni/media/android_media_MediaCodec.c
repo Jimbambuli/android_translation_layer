@@ -39,6 +39,7 @@ struct ATL_codec_context {
 			struct SwsContext *sws; // for software decoding
 			SurfaceViewWidget *surface_view_widget;
 			jobject surface_texture; // global ref: the SurfaceTexture of a Surface(SurfaceTexture)
+			struct ANativeWindow *remote; // the window of a Surface of another process of the app
 			size_t extradata_size;
 			uint8_t *extradata;
 		} video;
@@ -152,6 +153,7 @@ struct render_frame_data {
 	GdkTexture *texture; // for software decoding
 	SurfaceViewWidget *surface_view_widget;
 	jobject surface_texture; // global ref, instead of the widget
+	struct ANativeWindow *remote; // a reference, instead of the widget
 	long release_time_ns;    // wall-clock (monotonic, ns) at which the frame should be shown; 0 = now
 	long timestamp_ns;       // the frame's timestamp for SurfaceTexture.getTimestamp()
 };
@@ -161,7 +163,11 @@ struct render_frame_data {
  * presentation time) */
 static void deliver_texture(struct render_frame_data *d, GdkTexture *texture)
 {
-	if (d->surface_texture) {
+	if (d->remote) {
+		ANativeWindow_remotePresentTexture(d->remote, texture);
+		g_object_unref(texture);
+		ANativeWindow_release(d->remote);
+	} else if (d->surface_texture) {
 		JNIEnv *env = get_jni_env();
 		jmethodID queue_buffer = _METHOD(_CLASS(d->surface_texture), "queueBuffer", "(JJ)V");
 		(*env)->CallVoidMethod(env, d->surface_texture, queue_buffer, _INTPTR(texture), (jlong)d->timestamp_ns);
@@ -171,16 +177,23 @@ static void deliver_texture(struct render_frame_data *d, GdkTexture *texture)
 	}
 }
 
-/* the Surface's consumer: a SurfaceView's widget, or the SurfaceTexture of a Surface(SurfaceTexture); none for
- * null or a released Surface */
+/* the Surface's consumer: a SurfaceView's widget, the SurfaceTexture of a Surface(SurfaceTexture), or the window of
+ * a Surface of another process (its frames go there as memory buffers); none for null or a released Surface */
 static void set_output_surface(JNIEnv *env, struct ATL_codec_context *ctx, jobject surface)
 {
 	if (ctx->video.surface_texture)
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
+	if (ctx->video.remote)
+		ANativeWindow_release(ctx->video.remote);
 	ctx->video.surface_texture = NULL;
 	ctx->video.surface_view_widget = NULL;
+	ctx->video.remote = NULL;
 	if (!surface)
 		return;
+	if (!_GET_LONG_FIELD(surface, "widget") && _GET_OBJ_FIELD(surface, "atl_endpoint", "Landroid/os/IBinder;")) {
+		ctx->video.remote = ANativeWindow_fromSurface(env, surface);
+		return;
+	}
 	GtkWidget *wrapper = _PTR(_GET_LONG_FIELD(surface, "widget"));
 	jobject surface_texture = _GET_OBJ_FIELD(surface, "surfaceTexture", "Landroid/graphics/SurfaceTexture;");
 	if (wrapper)
@@ -493,7 +506,7 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		if (!frame)
 			return;
 
-		if (!render || (!ctx->video.surface_view_widget && !ctx->video.surface_texture)) {
+		if (!render || (!ctx->video.surface_view_widget && !ctx->video.surface_texture && !ctx->video.remote)) {
 			fprintf(stderr, "skipping %dx%d frame!\n", frame->width, frame->height);
 			av_frame_free(&frame);
 			return;
@@ -542,6 +555,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 			data->texture = texture;
 			data->surface_view_widget = ctx->video.surface_view_widget;
 			data->surface_texture = ctx->video.surface_texture ? (*env)->NewGlobalRef(env, ctx->video.surface_texture) : NULL;
+			data->remote = ctx->video.remote;
+			if (data->remote)
+				ANativeWindow_acquire(data->remote);
 			data->release_time_ns = presentationTimeNs;
 			data->timestamp_ns = timestamp_ns;
 			schedule_render(render_texture, data, texture);
@@ -555,6 +571,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		data->release_time_ns = presentationTimeNs;
 		data->surface_view_widget = ctx->video.surface_view_widget;
 		data->surface_texture = NULL;
+		data->remote = ctx->video.remote;
+		if (data->remote)
+			ANativeWindow_acquire(data->remote);
 		schedule_render(render_frame, data, NULL);
 	}
 }
@@ -573,6 +592,8 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1release(JNIEnv *env
 	}
 	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.surface_texture)
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
+	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.remote)
+		ANativeWindow_release(ctx->video.remote);
 
 	avcodec_free_context(&ctx->codec);
 	free(ctx);
