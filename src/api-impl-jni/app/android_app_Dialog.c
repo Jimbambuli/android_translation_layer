@@ -25,10 +25,14 @@ static gboolean on_close_request(GtkWidget *dialog, jobject jobj)
 /* Key events that no view consumed go to the dialog, like Window.Callback.dispatchKeyEvent() on
  * Android (the other keys reach the views through GTK): Escape as KEYCODE_ESCAPE, which
  * Dialog.onKeyUp() closes a cancelable dialog on, as on AOSP since P. */
-static gboolean dispatch_key(jobject jobj, int key_code, int action)
+#define FLAG_TRACKING 0x200
+
+static gboolean dispatch_key_flags(jobject jobj, int key_code, int action, int flags)
 {
 	JNIEnv *env = get_jni_env();
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, action, key_code, 0, 0);
+	if (flags)
+		_SET_INT_FIELD(key_event, "mFlags", flags);
 	jmethodID dispatch = _METHOD(_CLASS(jobj), "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z");
 	gboolean ret = (*env)->CallBooleanMethod(env, jobj, dispatch, key_event);
 	if ((*env)->ExceptionCheck(env)) {
@@ -39,14 +43,33 @@ static gboolean dispatch_key(jobject jobj, int key_code, int action)
 	return ret;
 }
 
+static gboolean dispatch_key(jobject jobj, int key_code, int action)
+{
+	return dispatch_key_flags(jobj, key_code, action, 0);
+}
+
+/* The views had the key first (GTK hands it to the focused widget), each with a KeyEvent of its own. On
+ * AOSP one KeyEvent goes through the views and then to the dialog, and the up key keeps FLAG_TRACKING when
+ * a view's dispatch (View.dispatchKeyEvent() -> DispatcherState.handleUpEvent()) has ended the tracking of
+ * the window's state: Compose's DialogWrapper.onKeyUp() closes on a tracked Escape only. So the up key of
+ * an Escape whose down key the dialog took (Dialog.onKeyDown() tracks it) comes tracked. */
+static gboolean escape_down_taken;
+
 static gboolean on_key_pressed(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, jobject jobj)
 {
-	return keyval == GDK_KEY_Escape && dispatch_key(jobj, KEYCODE_ESCAPE, ACTION_DOWN);
+	if (keyval != GDK_KEY_Escape)
+		return FALSE;
+	escape_down_taken = dispatch_key(jobj, KEYCODE_ESCAPE, ACTION_DOWN);
+	return escape_down_taken;
 }
 
 static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval, guint keycode, GdkModifierType state, jobject jobj)
 {
-	return keyval == GDK_KEY_Escape && dispatch_key(jobj, KEYCODE_ESCAPE, ACTION_UP);
+	if (keyval != GDK_KEY_Escape)
+		return FALSE;
+	gboolean tracked = escape_down_taken;
+	escape_down_taken = FALSE;
+	return dispatch_key_flags(jobj, KEYCODE_ESCAPE, ACTION_UP, tracked ? FLAG_TRACKING : 0);
 }
 
 /* the back button of a mouse is the back key (see atl_window_android_mouse_back()) */
