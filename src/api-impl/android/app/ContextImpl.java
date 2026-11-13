@@ -369,7 +369,7 @@ public final class ContextImpl extends Context {
 		                         getString(com.android.internal.R.string.copy),
 		                         getString(com.android.internal.R.string.autofill_save_yes),
 		                         getString(com.android.internal.R.string.whichViewApplication),
-		                         "E-Mail"}; // the Email portal's target in a Flatpak; framework-res has no such word
+		                         getString(com.android.internal.R.string.atl_share_email)}; // the Email portal's target in a Flatpak
 		/* the other installed apps that take this (the starter writes the types each one takes shared next to
 		 * its APK); a pick starts the app with the text as a data: URI or the file as a file: URI (--uri) */
 		final Uri stream_final = stream;

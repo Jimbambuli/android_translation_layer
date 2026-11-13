@@ -3,4 +3,6 @@
 <resources>
     <!-- PermissionController (packages/modules/Permission): the label of the background location option -->
     <string name="app_permission_button_allow_always">Allow all the time</string>
+    <!-- ATL's share sheet: the target that mails the text or file (the Email portal) -->
+    <string name="atl_share_email">Email</string>
 </resources>
