@@ -25,11 +25,25 @@ static gssize java_input_stream_read(GInputStream *gstream, void *buffer, gsize 
 
 	count = MIN(count, stream->storage_size);
 
-	count = J__InputStream__read(env, stream->is, stream->storage, 0, count);
-	if (count == -1) { // end of stream
+	jint n = J__InputStream__read(env, stream->is, stream->storage, 0, count);
+	/* like AOSP's JavaInputStreamAdaptor: an exception thrown by the stream is logged and cleared (calling any
+	 * further JNI function with it pending aborts the runtime) and the read fails, so decodeStream returns null */
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		g_set_error_literal(error, G_IO_ERROR, G_IO_ERROR_FAILED, "InputStream.read threw an exception");
+		return -1;
+	}
+	if (n < 0) { // end of stream
 		return 0;
 	}
+	count = n;
 	jbyte *storage_buf = (*env)->GetByteArrayElements(env, stream->storage, NULL);
+	if (!storage_buf) {
+		(*env)->ExceptionClear(env);
+		g_set_error_literal(error, G_IO_ERROR, G_IO_ERROR_FAILED, "no access to the decode buffer");
+		return -1;
+	}
 	memcpy(buffer, storage_buf, count);
 	(*env)->ReleaseByteArrayElements(env, stream->storage, storage_buf, 0);
 
@@ -117,8 +131,12 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 {
 	GInputStream *stream = java_input_stream_new(env, is, storage);
 	GOutputStream *memory = g_memory_output_stream_new_resizable();
-	g_output_stream_splice(memory, stream, G_OUTPUT_STREAM_SPLICE_CLOSE_SOURCE | G_OUTPUT_STREAM_SPLICE_CLOSE_TARGET, NULL, NULL);
+	gssize spliced = g_output_stream_splice(memory, stream, G_OUTPUT_STREAM_SPLICE_CLOSE_SOURCE | G_OUTPUT_STREAM_SPLICE_CLOSE_TARGET, NULL, NULL);
 	g_object_unref(stream);
+	if (spliced < 0) { // the stream failed (AOSP: the decoder fails, decodeStream returns null)
+		g_object_unref(memory);
+		return 0;
+	}
 	GBytes *bytes = g_memory_output_stream_steal_as_bytes(G_MEMORY_OUTPUT_STREAM(memory));
 	g_object_unref(memory);
 
