@@ -1275,6 +1275,28 @@ static void pregrow_stack()
 #pragma GCC diagnostic pop
 }
 
+/* a process the main process started (ATL_PROCESS_NAME): like Android's Process.setArgV0() from the zygote, the
+ * command line (/proc/self/cmdline) becomes the process name, which apps check (Gecko: its :media process), and
+ * the main thread's name its last 15 characters. The arguments move to the heap, the area they were in takes the
+ * name. */
+static void set_argv0_to_process_name(int argc, char **argv, const char *name)
+{
+	char *area = argv[0];
+	char *end = argv[0];
+	for (int i = 0; i < argc; i++) {
+		if (argv[i] != end) // not the kernel's contiguous block: leave it
+			return;
+		end = argv[i] + strlen(argv[i]) + 1;
+	}
+	for (int i = 0; i < argc; i++)
+		argv[i] = g_strdup(argv[i]);
+	size_t size = end - area;
+	memset(area, '\0', size);
+	strncpy(area, name, size - 1);
+	size_t len = strlen(name);
+	pthread_setname_np(pthread_self(), len < 15 ? name : name + len - 15);
+}
+
 int main(int argc, char **argv)
 {
 	GtkApplication *app;
@@ -1310,6 +1332,10 @@ int main(int argc, char **argv)
 
 	if (getenv("ATL_ZYGOTE_FD"))
 		zygote_main(argc, argv, callback_data);
+	if (getenv("ATL_PROCESS_NAME")) {
+		set_argv0_to_process_name(argc, argv, getenv("ATL_PROCESS_NAME"));
+		callback_data->prgname = argv[0];
+	}
 
 	app = gtk_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
 
