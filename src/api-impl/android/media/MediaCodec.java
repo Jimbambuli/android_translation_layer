@@ -71,6 +71,10 @@ public class MediaCodec {
 		if ("aac".equals(codecName) || "mp3".equals(codecName) || "opus".equals(codecName)) {
 			native_configure_audio(native_codec, format.getByteBuffer("csd-0"), format.getInteger("sample-rate"), format.getInteger("channel-count"));
 		} else if ("h264".equals(codecName) || "vp8".equals(codecName) || "vp9".equals(codecName)) {
+			/* the output format (here the configured one) names the color format, which Gecko requires; frames
+			 * go to the Surface: COLOR_FormatSurface */
+			if (surface != null && !format.containsKey("color-format"))
+				format.setInteger("color-format", 0x7F000789);
 			native_configure_video(native_codec, format.getByteBuffer("csd-0"), format.getByteBuffer("csd-1"), surface,
 			                       format.getInteger("rotation-degrees", 0));
 		} else {
