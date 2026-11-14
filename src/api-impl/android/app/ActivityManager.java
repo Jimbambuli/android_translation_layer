@@ -327,6 +327,12 @@ public class ActivityManager {
 		return Collections.emptyList();
 	}
 
+	/* AOSP (API 35) returns List<ApplicationStartInfo>; ATL keeps no start records, so the list is
+	 * always empty and the element class is not needed */
+	public List<?> getHistoricalProcessStartReasons(int maxNum) {
+		return Collections.emptyList();
+	}
+
 	/**
 	 * Set custom state data for this process. It will be included in the record of
 	 * {@link ApplicationExitInfo} on the death of the current calling process; ATL keeps

@@ -69,6 +69,14 @@ public class ClipDescription implements Parcelable {
 		return classificationStatus;
 	}
 
+	/* AOSP: scores exist only after classification; ATL has no text classifier, so a
+	 * completed status (e.g. from a parcel) reports 0 for every entity */
+	public float getConfidenceScore(String entity) {
+		if (classificationStatus != CLASSIFICATION_COMPLETE)
+			throw new IllegalStateException("Confidence scores not yet computed");
+		return 0f;
+	}
+
 	/* AOSP ClipDescription(Parcel) / writeToParcel() / CREATOR (android-14 wire format; ATL has no text
 	 * classifier, so the confidence scores are an empty Bundle) */
 	ClipDescription(Parcel in) {

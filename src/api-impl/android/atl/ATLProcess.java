@@ -48,7 +48,7 @@ public final class ATLProcess {
 	private static final int ACQUIRE_PROVIDER = IBinder.FIRST_CALL_TRANSACTION + 10;
 	/* both ways: start an activity of the called process in its window */
 	private static final int START_ACTIVITY = IBinder.FIRST_CALL_TRANSACTION + 11;
-	/* to the main process: bind and unbind one of its services for another process */
+	/* to the main process: bind and unbind one of its services, or one of a third process, for another process */
 	private static final int BIND_MAIN_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 12;
 	private static final int UNBIND_MAIN_SERVICE = IBinder.FIRST_CALL_TRANSACTION + 13;
 	/* to the main process: Process.killProcess() of its pid from another process */
@@ -133,7 +133,7 @@ public final class ATLProcess {
 				bound_by_it.clear();
 			}
 			for (ServiceConnection conn : unbind)
-				ATLLoadedApp.getPrimaryApplication().unbindService(conn);
+				unbindConnection(conn);
 			new Handler(Looper.getMainLooper()).post(new Runnable() {
 				@Override
 				public void run() {
@@ -162,10 +162,11 @@ public final class ATLProcess {
 	/** ActiveServices.bindServiceLocked() for a service in another process of the app */
 	public static boolean bindService(final Intent intent, final ServiceConnection conn, String processName, String instanceName) {
 		if (isSecondary()) {
-			if (processName.equals(mainProcessName()) && instanceName == null)
-				return bindMainService(intent, conn);
-			/* a process the main process started does not start processes itself (yet) */
-			Slog.w(TAG, "bindService: " + intent.getComponent() + " runs in process " + processName + ", not supported from process " + process_name);
+			/* a process the main process started does not start processes itself: the main process binds the
+			 * service (and starts its process) for it */
+			if (instanceName == null)
+				return bindMainService(intent, conn, processName);
+			Slog.w(TAG, "bindService: " + intent.getComponent() + " (instance " + instanceName + ") runs in process " + processName + ", not supported from process " + process_name);
 			return false;
 		}
 		final ProcessRecord r;
@@ -472,7 +473,10 @@ public final class ATLProcess {
 				return true;
 			}
 			if (code == BIND_MAIN_SERVICE) {
-				reply.writeStrongBinder(bindHere(Intent.CREATOR.createFromParcel(data), r.bound_by_it));
+				Intent intent = Intent.CREATOR.createFromParcel(data);
+				String processName = data.readString();
+				/* a service of a third process: the binder returned from there is forwarded through this process */
+				reply.writeStrongBinder(bindHere(intent, processName.equals(mainProcessName()) ? null : processName, r.bound_by_it));
 				return true;
 			}
 			if (code == UNBIND_MAIN_SERVICE) {
@@ -726,8 +730,8 @@ public final class ATLProcess {
 	/* the services of the main process this process bound */
 	private static final HashMap<ServiceConnection, Intent> main_bindings = new HashMap<>();
 
-	/* bindService() of a service of the main process: the main process binds it for this one */
-	private static boolean bindMainService(final Intent intent, final ServiceConnection conn) {
+	/* bindService() of a service of the main process or of a third process: the main process binds it for this one */
+	private static boolean bindMainService(final Intent intent, final ServiceConnection conn, final String processName) {
 		synchronized (main_bindings) {
 			main_bindings.put(conn, intent);
 		}
@@ -739,10 +743,11 @@ public final class ATLProcess {
 					Parcel data = Parcel.obtain();
 					Parcel reply = Parcel.obtain();
 					intent.writeToParcel(data, 0);
+					data.writeString(processName);
 					main_connection.getContextObject().transact(BIND_MAIN_SERVICE, data, reply, 0);
 					binder = reply.readStrongBinder();
 				} catch (RemoteException e) {
-					Slog.w(TAG, "bindService: " + intent.getComponent() + " in the main process failed: " + e);
+					Slog.w(TAG, "bindService: " + intent.getComponent() + " in process " + processName + " failed: " + e);
 					return;
 				}
 				new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -794,7 +799,7 @@ public final class ATLProcess {
 		protected boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
 			switch (code) {
 				case BIND_SERVICE:
-					reply.writeStrongBinder(bindHere(Intent.CREATOR.createFromParcel(data), bound_here));
+					reply.writeStrongBinder(bindHere(Intent.CREATOR.createFromParcel(data), null, bound_here));
 					return true;
 				case UNBIND_SERVICE:
 					unbindHere(Intent.CREATOR.createFromParcel(data), bound_here);
@@ -817,8 +822,9 @@ public final class ATLProcess {
 	}
 
 	/* ActivityThread.handleBindService(): create the service if needed and return what its onBind() returns;
-	 * `bound` keeps the connection that binds it here */
-	private static IBinder bindHere(Intent intent, HashMap<String, ServiceConnection> bound) {
+	 * `bound` keeps the connection that binds it here. With processName (main process only), the service runs in
+	 * that process and is bound there. */
+	private static IBinder bindHere(Intent intent, String processName, HashMap<String, ServiceConnection> bound) {
 		final IBinder[] result = new IBinder[1];
 		final CountDownLatch done = new CountDownLatch(1);
 		ServiceConnection conn = new ServiceConnection() {
@@ -833,7 +839,8 @@ public final class ATLProcess {
 				done.countDown();
 			}
 		};
-		if (ATLLoadedApp.getPrimaryApplication().startOrBindService(intent, conn, Context.BIND_AUTO_CREATE) == null)
+		if (processName != null ? !bindService(intent, conn, processName, null)
+		                        : ATLLoadedApp.getPrimaryApplication().startOrBindService(intent, conn, Context.BIND_AUTO_CREATE) == null)
 			return null;
 		synchronized (bound) {
 			bound.put(intent.getComponent().getClassName(), conn);
@@ -852,6 +859,12 @@ public final class ATLProcess {
 			conn = bound.remove(intent.getComponent().getClassName());
 		}
 		if (conn != null)
+			unbindConnection(conn);
+	}
+
+	/* a connection bindHere() made: to a service of another process or of this one */
+	private static void unbindConnection(ServiceConnection conn) {
+		if (!unbindService(conn))
 			ATLLoadedApp.getPrimaryApplication().unbindService(conn);
 	}
 
