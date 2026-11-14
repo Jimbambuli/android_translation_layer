@@ -108,6 +108,7 @@ public class Build {
 	 * The manufacturer of the product/hardware.
 	 */
 	public static final String SOC_MANUFACTURER = UNKNOWN; /* AOSP: ro.soc.manufacturer, "unknown" when not set */
+	public static final String SOC_MODEL = UNKNOWN; /* AOSP: ro.soc.model, "unknown" when not set */
 
 	public static final String MANUFACTURER = getString("ro.product.manufacturer");
 
