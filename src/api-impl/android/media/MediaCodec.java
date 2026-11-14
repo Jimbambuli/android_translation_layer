@@ -176,7 +176,9 @@ public class MediaCodec {
 		return inputBuffers;
 	}
 
+	/* AOSP: the input buffer comes cleared (position 0, limit = capacity) */
 	public ByteBuffer getInputBuffer(int index) {
+		inputBuffers[index].clear();
 		return inputBuffers[index];
 	}
 
@@ -285,6 +287,9 @@ public class MediaCodec {
 			return;
 		}
 		inputBufferTimestamps[index] = presentationTimeUs;
+		/* AOSP: the data is `size` bytes at `offset`, whatever the buffer's position and limit (Gecko writes into
+		 * the buffer natively, leaving both untouched) */
+		inputBuffers[index].limit(offset + size).position(offset);
 		queuedInputBuffers.add(index);
 		tryProcessInputBuffer();
 	}
