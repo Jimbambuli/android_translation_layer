@@ -38,6 +38,13 @@ public class MediaCodec {
 		return new MediaCodec(codecName);
 	}
 
+	public MediaCodecInfo getCodecInfo() {
+		for (int i = 0; i < MediaCodecList.getCodecCount(); i++)
+			if (MediaCodecList.getCodecInfoAt(i).getName().equals(codecName))
+				return MediaCodecList.getCodecInfoAt(i);
+		return null;
+	}
+
 	public void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags) {
 		System.out.println("MediaCodec.configure(" + format + ", " + surface + ", " + crypto + ", " + flags + "): codecName=" + codecName);
 		this.mediaFormat = format;
@@ -51,13 +58,13 @@ public class MediaCodec {
 		freeInputBuffers = new ArrayDeque<>(inputBuffers.length);
 		queuedInputBuffers = new ArrayDeque<>(inputBuffers.length);
 		for (int i = 0; i < inputBuffers.length; i++) {
-			inputBuffers[i] = ByteBuffer.allocate(maxInputSize).order(ByteOrder.LITTLE_ENDIAN);
+			inputBuffers[i] = ByteBuffer.allocateDirect(maxInputSize).order(ByteOrder.LITTLE_ENDIAN);
 			freeInputBuffers.add(i);
 		}
 		outputBuffers = new ByteBuffer[4];
 		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
 		for (int i = 0; i < outputBuffers.length; i++) {
-			outputBuffers[i] = ByteBuffer.allocate(16384).order(ByteOrder.LITTLE_ENDIAN);
+			outputBuffers[i] = ByteBuffer.allocateDirect(16384).order(ByteOrder.LITTLE_ENDIAN);
 			freeOutputBuffers.add(i);
 		}
 
