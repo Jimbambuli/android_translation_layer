@@ -111,7 +111,8 @@ public class Surface implements android.os.Parcelable {
 		protected boolean onTransact(int code, android.os.Parcel data, android.os.Parcel reply, int flags) throws android.os.RemoteException {
 			if (code != CONNECT)
 				return super.onTransact(code, data, reply, flags);
-			int fd = widget != 0 ? SurfaceView.native_connectRemote(widget) : -1;
+			int fd = widget != 0 ? SurfaceView.native_connectRemote(widget)
+			       : surfaceTexture != null ? SurfaceView.native_connectRemoteTexture(surfaceTexture) : -1;
 			reply.writeInt(fd >= 0 ? 0 : -1);
 			if (fd >= 0)
 				reply.atl_writeOwnedFileDescriptor(android.os.ParcelFileDescriptor.adoptFd(fd).getFileDescriptor());

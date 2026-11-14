@@ -14,6 +14,7 @@
 #include <gtk/gtk.h>
 
 #include "../defines.h"
+#include "../util.h"
 
 #include "../generated_headers/android_view_SurfaceView.h"
 #include "android_view_SurfaceView.h"
@@ -28,6 +29,7 @@ struct remote_buffer {
 struct remote_consumer {
 	gatomicrefcount ref; /* the socket and each texture in GTK's hands */
 	SurfaceViewWidget *widget;
+	jobject surface_texture; /* global ref, instead of the widget: a SurfaceTexture, its frames are queued to it */
 	int fd; /* -1 once the producer is gone */
 	gulong resize_handler;
 	GdkTexture *shown;
@@ -49,7 +51,10 @@ static void consumer_unref(struct remote_consumer *consumer)
 		if (consumer->buffers[i].fd >= 0)
 			close(consumer->buffers[i].fd);
 	}
-	g_object_unref(consumer->widget);
+	if (consumer->widget)
+		g_object_unref(consumer->widget);
+	else
+		(*get_jni_env())->DeleteGlobalRef(get_jni_env(), consumer->surface_texture);
 	g_free(consumer);
 }
 
@@ -115,6 +120,18 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 		texture = gdk_memory_texture_new(buffer->desc.width, buffer->desc.height, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, bytes, buffer->desc.stride);
 		g_bytes_unref(bytes);
 	}
+	if (consumer->surface_texture) {
+		/* SurfaceTexture.queueBuffer() takes the texture over; AOSP's queueBuffer() stamps a frame without a
+		 * timestamp of its own with the monotonic clock */
+		JNIEnv *env = get_jni_env();
+		jmethodID queue_buffer = _METHOD(_CLASS(consumer->surface_texture), "queueBuffer", "(JJ)V");
+		(*env)->CallVoidMethod(env, consumer->surface_texture, queue_buffer, _INTPTR(texture), (jlong)g_get_monotonic_time() * 1000);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		return;
+	}
 	consumer->shown = texture;
 	consumer->widget->frame_callback_data = consumer;
 	consumer->widget->frame_callback = frame_callback;
@@ -147,13 +164,15 @@ static void add_buffer(struct remote_consumer *consumer, const struct atl_surfac
 static void disconnect(struct remote_consumer *consumer, gboolean keep_frame)
 {
 	SurfaceViewWidget *widget = consumer->widget;
-	g_clear_signal_handler(&consumer->resize_handler, widget);
-	if (widget->frame_callback_data == consumer) {
-		widget->frame_callback = NULL;
-		widget->frame_callback_data = NULL;
+	if (widget) {
+		g_clear_signal_handler(&consumer->resize_handler, widget);
+		if (widget->frame_callback_data == consumer) {
+			widget->frame_callback = NULL;
+			widget->frame_callback_data = NULL;
+		}
+		if (!keep_frame && consumer->shown && widget->texture == consumer->shown)
+			surface_view_widget_set_texture(widget, NULL, FALSE);
 	}
-	if (!keep_frame && consumer->shown && widget->texture == consumer->shown)
-		surface_view_widget_set_texture(widget, NULL, FALSE);
 	consumer->shown = NULL;
 	close(consumer->fd);
 	consumer->fd = -1;
@@ -189,7 +208,8 @@ static gboolean on_message(int fd, GIOCondition condition, struct remote_consume
 		close(buffer_fd);
 	if (msg.type == ATL_SURFACE_MSG_PRESENT) {
 		if (consumer->buffers[msg.index].fd >= 0 && (consumer->buffers[msg.index].map || consumer->buffers[msg.index].desc.fourcc)) {
-			consumer->widget->crop = msg.crop;
+			if (consumer->widget)
+				consumer->widget->crop = msg.crop;
 			present(consumer, msg.index);
 		}
 		else
@@ -200,8 +220,10 @@ static gboolean on_message(int fd, GIOCondition condition, struct remote_consume
 
 static gboolean start(struct remote_consumer *consumer)
 {
-	consumer->resize_handler = g_signal_connect(consumer->widget, "resize", G_CALLBACK(on_resize), consumer);
-	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, gtk_widget_get_width(GTK_WIDGET(consumer->widget)), gtk_widget_get_height(GTK_WIDGET(consumer->widget)));
+	if (consumer->widget) {
+		consumer->resize_handler = g_signal_connect(consumer->widget, "resize", G_CALLBACK(on_resize), consumer);
+		consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, gtk_widget_get_width(GTK_WIDGET(consumer->widget)), gtk_widget_get_height(GTK_WIDGET(consumer->widget)));
+	}
 	g_unix_fd_add(consumer->fd, G_IO_IN | G_IO_HUP | G_IO_ERR, (GUnixFDSourceFunc)on_message, consumer);
 	return G_SOURCE_REMOVE;
 }
@@ -220,6 +242,27 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemote(JNIEn
 		consumer->buffers[i].fd = -1;
 	/* the producer may be waiting for its size inside a call the main thread waits for: read here, not there */
 	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, gtk_widget_get_width(GTK_WIDGET(consumer->widget)), gtk_widget_get_height(GTK_WIDGET(consumer->widget)));
+	g_main_context_invoke(NULL, G_SOURCE_FUNC(start), consumer);
+	return fds[1];
+}
+
+/* the same for a SurfaceTexture (Surface(SurfaceTexture) parceled to another process, e.g. Gecko's GeckoSurface for
+ * the video decoder of its media process): each frame is queued to it; its size is the default buffer size (AOSP:
+ * 1x1 until setDefaultBufferSize()) */
+JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemoteTexture(JNIEnv *env, jclass class, jobject surface_texture)
+{
+	int fds[2];
+	if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, fds) < 0)
+		return -1;
+	struct remote_consumer *consumer = g_new0(struct remote_consumer, 1);
+	g_atomic_ref_count_init(&consumer->ref);
+	consumer->surface_texture = (*env)->NewGlobalRef(env, surface_texture);
+	consumer->fd = fds[0];
+	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
+		consumer->buffers[i].fd = -1;
+	int width = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferWidth", "()I"));
+	int height = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferHeight", "()I"));
+	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, width > 0 ? width : 1, height > 0 ? height : 1);
 	g_main_context_invoke(NULL, G_SOURCE_FUNC(start), consumer);
 	return fds[1];
 }

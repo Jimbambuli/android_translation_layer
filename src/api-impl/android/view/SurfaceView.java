@@ -57,6 +57,8 @@ public class SurfaceView extends View {
 	protected static native void native_postSnapshot(long surfaceView, long snapshot);
 	/* for an EGL window on this view's surface in another process (Surface.Endpoint): the socket for its buffers */
 	static native int native_connectRemote(long surfaceView);
+	/* the same for a SurfaceTexture: its frames are queued to it (SurfaceTexture.queueBuffer()) */
+	static native int native_connectRemoteTexture(android.graphics.SurfaceTexture surfaceTexture);
 
 	public SurfaceHolder getHolder() {
 		return mSurfaceHolder;

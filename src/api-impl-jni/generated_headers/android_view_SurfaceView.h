@@ -355,6 +355,14 @@ JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1postSnapshot
 JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemote
   (JNIEnv *, jclass, jlong);
 
+/*
+ * Class:     android_view_SurfaceView
+ * Method:    native_connectRemoteTexture
+ * Signature: (Landroid/graphics/SurfaceTexture;)I
+ */
+JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemoteTexture
+  (JNIEnv *, jclass, jobject);
+
 #ifdef __cplusplus
 }
 #endif
