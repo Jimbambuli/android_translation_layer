@@ -43,7 +43,9 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		button.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				listener.onClick(AlertDialog.this, whichButton);
+				// AOSP AlertController: a button without a listener only dismisses the dialog
+				if (listener != null)
+					listener.onClick(AlertDialog.this, whichButton);
 				dismiss();
 			}
 		});
