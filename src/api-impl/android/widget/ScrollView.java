@@ -29,6 +29,23 @@ public class ScrollView extends FrameLayout {
 	protected native void native_addView(long widget, long child, int index, ViewGroup.LayoutParams params);
 	@Override
 	protected native void native_removeView(long widget, long child);
+	private native void native_scrollTo(long widget, int x, int y, boolean relative);
+
+	/** AOSP smoothScrollBy(): scroll by (dx, dy) within the scroll range; GTK holds the position */
+	public final void smoothScrollBy(int dx, int dy) {
+		if (getChildCount() == 0) {
+			// Nothing to do.
+			return;
+		}
+		native_scrollTo(widget, dx, dy, true);
+	}
+
+	/** AOSP smoothScrollTo() = smoothScrollBy(x - scrollX, y - scrollY), with the position taken from GTK */
+	public final void smoothScrollTo(int x, int y) {
+		if (getChildCount() == 0)
+			return;
+		native_scrollTo(widget, x, y, false);
+	}
 
 	@Override
 	public boolean onInterceptTouchEvent(MotionEvent event) {

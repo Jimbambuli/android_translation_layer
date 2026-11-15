@@ -36,3 +36,14 @@ JNIEXPORT void JNICALL Java_android_widget_ScrollView_native_1removeView(JNIEnv 
 
 	gtk_viewport_set_child(GTK_VIEWPORT(viewport), NULL);
 }
+
+/* ScrollView.smoothScrollTo()/smoothScrollBy(): the scroll position lives in the GTK adjustments, which
+ * clamp to the scroll range like AOSP's ScrollView (0..child height - viewport height) */
+JNIEXPORT void JNICALL Java_android_widget_ScrollView_native_1scrollTo(JNIEnv *env, jobject this, jlong widget_ptr, jint x, jint y, jboolean relative)
+{
+	GtkScrolledWindow *widget = _PTR(widget_ptr);
+	GtkAdjustment *h = gtk_scrolled_window_get_hadjustment(widget);
+	GtkAdjustment *v = gtk_scrolled_window_get_vadjustment(widget);
+	gtk_adjustment_set_value(h, (relative ? gtk_adjustment_get_value(h) : 0) + x);
+	gtk_adjustment_set_value(v, (relative ? gtk_adjustment_get_value(v) : 0) + y);
+}
