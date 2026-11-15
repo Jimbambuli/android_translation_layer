@@ -207,6 +207,19 @@ public class PopupWindow {
 		this(contentView, width, height, true);
 	}
 
+	/* AOSP PopupWindow(int, int) -> this(null, width, height) */
+	public PopupWindow(int width, int height) {
+		popover = native_constructor();
+		setWidth(width);
+		setHeight(height);
+		setFocusable(true);
+	}
+
+	/* AOSP PopupWindow(Context, AttributeSet) -> this(context, attrs, R.attr.popupWindowStyle) */
+	public PopupWindow(Context context, AttributeSet attrs) {
+		this(context, attrs, 0, 0);
+	}
+
 	/* AOSP PopupWindow(View) -> this(contentView, 0, 0) */
 	public PopupWindow(View contentView) {
 		this(contentView, 0, 0);
@@ -699,6 +712,24 @@ public class PopupWindow {
 		native_moveTo(popover, mLocationGravity, x, y);
 	}
 	private native void native_moveTo(long popover, int gravity, int x, int y);
+
+	/** AOSP PopupWindow.update(int, int, int, int, boolean): force only makes AOSP re-apply unchanged values, which
+	 * update(int, int, int, int) does here anyway */
+	public void update(int x, int y, int width, int height, boolean force) {
+		update(x, y, width, height);
+	}
+
+	/** AOSP PopupWindow.update(View, int, int): the size changes, the popup stays at the offsets of its last anchor */
+	public void update(View anchor, int width, int height) {
+		if (isShowing() && hasContentView())
+			update(anchor, mAnchorXoff, mAnchorYoff, width, height);
+		else {
+			if (width >= 0)
+				setWidth(width);
+			if (height >= 0)
+				setHeight(height);
+		}
+	}
 
 	/** AOSP PopupWindow.update(): a shown popup takes over changed animation, flags and gravity. ATL's setters
 	 * (setFocusable(), setTouchable(), setOutsideTouchable()) change the GtkPopover right away, so nothing is left
