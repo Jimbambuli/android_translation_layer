@@ -73,6 +73,11 @@ public class ActivityManager {
 
 	public boolean isLowRamDevice() { return false; }
 
+	/* AOSP ActivityManager.isBackgroundRestricted() asks the service whether the user restricted the
+	 * app in the background (app op RUN_ANY_IN_BACKGROUND); ATL has no such setting and its
+	 * AppOpsManager allows every op, so the app is never restricted */
+	public boolean isBackgroundRestricted() { return false; }
+
 	/* AOSP ActivityManager.getLauncherLargeIconSizeInner: app_icon_size, one density step larger from
 	 * smallestScreenWidthDp 600 on (the framework dimen is the same in the app's and the system resources) */
 	public int getLauncherLargeIconSize() {

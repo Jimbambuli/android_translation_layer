@@ -41,6 +41,32 @@ public class KeyguardManager {
 		return intent;
 	}
 
+	public static abstract class KeyguardDismissCallback {
+		public void onDismissError() {}
+
+		public void onDismissSucceeded() {}
+
+		public void onDismissCancelled() {}
+	}
+
+	public void requestDismissKeyguard(Activity activity, KeyguardDismissCallback callback) {
+		requestDismissKeyguard(activity, null, callback);
+	}
+
+	/* AOSP requestDismissKeyguard() -> PhoneWindowManager.dismissKeyguardLw(): no keyguard is
+	 * showing (isKeyguardLocked() is false), so the callback gets onDismissError(), posted on the
+	 * activity's handler unless the activity is destroyed */
+	public void requestDismissKeyguard(final Activity activity, CharSequence message, final KeyguardDismissCallback callback) {
+		if (callback != null && !activity.isDestroyed()) {
+			activity.mHandler.post(new Runnable() {
+				@Override
+				public void run() {
+					callback.onDismissError();
+				}
+			});
+		}
+	}
+
 	public class KeyguardLock {
 		public void disableKeyguard() {}
 		public void reenableKeyguard() {}
