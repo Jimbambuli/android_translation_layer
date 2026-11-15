@@ -113,6 +113,37 @@ public final class Display {
 		return 1.0f;
 	}
 
+	/* AOSP Display.isHdrSdrRatioAvailable(): DisplayInfo.hdrSdrRatio is NaN for a display without HDR */
+	public boolean isHdrSdrRatioAvailable() {
+		return false;
+	}
+
+	/* AOSP Display.getOrientation() (deprecated) */
+	public int getOrientation() {
+		return getRotation();
+	}
+
+	/* AOSP Display.getSupportedRefreshRates(): the rates of the modes of the default resolution; ATL has one mode */
+	public float[] getSupportedRefreshRates() {
+		return new float[] {getRefreshRate()};
+	}
+
+	/* AOSP Display.isWideColorGamut()/getPreferredWideGamutColorSpace(): ATL draws in sRGB, so the display has no
+	 * wide colour gamut mode and the preferred wide gamut colour space is null */
+	public boolean isWideColorGamut() {
+		return false;
+	}
+
+	public android.graphics.ColorSpace getPreferredWideGamutColorSpace() {
+		return null;
+	}
+
+	/* AOSP Display.isMinimalPostProcessingSupported(): DisplayInfo.minimalPostProcessingSupported, false unless the
+	 * display (an HDMI sink with ALLM/game content type) says so */
+	public boolean isMinimalPostProcessingSupported() {
+		return false;
+	}
+
 	public RoundedCorner getRoundedCorner(int position) {
 		return null;
 	}
@@ -210,6 +241,11 @@ public final class Display {
 
 		public int getPhysicalHeight() {
 			return window_height;
+		}
+
+		/* AOSP Display.Mode.getAlternativeRefreshRates(): the other rates of the same resolution; ATL has one mode */
+		public float[] getAlternativeRefreshRates() {
+			return new float[0];
 		}
 	}
 

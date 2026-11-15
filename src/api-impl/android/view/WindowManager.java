@@ -18,6 +18,25 @@ import java.util.Objects;
 
 public interface WindowManager {
 
+	/* AOSP WindowManager.BadTokenException / InvalidDisplayException (thrown by addView() on Android) */
+	public static class BadTokenException extends RuntimeException {
+		public BadTokenException() {
+		}
+
+		public BadTokenException(String name) {
+			super(name);
+		}
+	}
+
+	public static class InvalidDisplayException extends RuntimeException {
+		public InvalidDisplayException() {
+		}
+
+		public InvalidDisplayException(String name) {
+			super(name);
+		}
+	}
+
 	/* AOSP WindowManager.isCrossWindowBlurEnabled() and listener methods: interface defaults
 	 * (false / no-op); WindowManagerImpl overrides them like AOSP's WindowManagerImpl */
 	default boolean isCrossWindowBlurEnabled() {
