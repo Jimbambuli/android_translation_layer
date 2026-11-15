@@ -27,7 +27,7 @@ import android.text.TextUtils;
  *
  * <p>This contains information about the text and the selection relative to the text. </p>
  */
-public final class SurroundingText {
+public final class SurroundingText implements android.os.Parcelable {
 	/**
 	 * The surrounding text around the cursor.
 	 */
@@ -160,4 +160,32 @@ public final class SurroundingText {
 				&& mOffset == that.mOffset
 				&& TextUtils.equals(mText, that.mText);
 	}
+
+	/* AOSP SurroundingText.writeToParcel()/describeContents()/CREATOR */
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		TextUtils.writeToParcel(mText, out, flags);
+		out.writeInt(mSelectionStart);
+		out.writeInt(mSelectionEnd);
+		out.writeInt(mOffset);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	public static final android.os.Parcelable.Creator<SurroundingText> CREATOR = new android.os.Parcelable.Creator<SurroundingText>() {
+		public SurroundingText createFromParcel(Parcel in) {
+			final CharSequence text = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+			final int selectionHead = in.readInt();
+			final int selectionEnd = in.readInt();
+			final int offset = in.readInt();
+			return new SurroundingText(text == null ? "" : text, selectionHead, selectionEnd, offset);
+		}
+
+		public SurroundingText[] newArray(int size) {
+			return new SurroundingText[size];
+		}
+	};
 }

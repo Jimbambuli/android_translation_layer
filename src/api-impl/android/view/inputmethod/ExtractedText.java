@@ -24,7 +24,7 @@ import android.text.TextUtils;
  * This contains information about a portion of the currently edited text,
  * that the IME should display into its own interface while in extracted mode.
  */
-public class ExtractedText {
+public class ExtractedText implements android.os.Parcelable {
 	/**
 	 * The text that has been extracted.
 	 *
@@ -93,4 +93,38 @@ public class ExtractedText {
 	 */
 	public CharSequence hint;
 
+	/* AOSP ExtractedText.writeToParcel()/CREATOR/describeContents() */
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		TextUtils.writeToParcel(text, dest, flags);
+		dest.writeInt(startOffset);
+		dest.writeInt(partialStartOffset);
+		dest.writeInt(partialEndOffset);
+		dest.writeInt(selectionStart);
+		dest.writeInt(selectionEnd);
+		dest.writeInt(this.flags);
+		TextUtils.writeToParcel(hint, dest, flags);
+	}
+
+	public static final android.os.Parcelable.Creator<ExtractedText> CREATOR = new android.os.Parcelable.Creator<ExtractedText>() {
+		public ExtractedText createFromParcel(android.os.Parcel source) {
+			ExtractedText res = new ExtractedText();
+			res.text = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+			res.startOffset = source.readInt();
+			res.partialStartOffset = source.readInt();
+			res.partialEndOffset = source.readInt();
+			res.selectionStart = source.readInt();
+			res.selectionEnd = source.readInt();
+			res.flags = source.readInt();
+			res.hint = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+			return res;
+		}
+
+		public ExtractedText[] newArray(int size) {
+			return new ExtractedText[size];
+		}
+	};
+
+	public int describeContents() {
+		return 0;
+	}
 }
