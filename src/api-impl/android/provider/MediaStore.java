@@ -1,20 +1,27 @@
 package android.provider;
 
 import android.content.ContentResolver;
+import android.app.PendingIntent;
+import android.content.ClipData;
 import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.util.Size;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /* the URIs and helpers of AOSP 14's MediaStore; ATLMediaContentProvider answers them */
@@ -22,6 +29,17 @@ public class MediaStore {
 
 	public static final String AUTHORITY = "media";
 	public static final Uri AUTHORITY_URI = Uri.parse("content://" + AUTHORITY);
+
+	/** @hide AOSP MediaStore call() method names and extras of the permission requests */
+	public static final String CREATE_WRITE_REQUEST_CALL = "create_write_request";
+	/** @hide */
+	public static final String CREATE_DELETE_REQUEST_CALL = "create_delete_request";
+	/** @hide */
+	public static final String EXTRA_CLIP_DATA = "clip_data";
+	/** @hide */
+	public static final String EXTRA_CONTENT_VALUES = "content_values";
+	/** @hide */
+	public static final String EXTRA_RESULT = "result";
 
 	public static final String VOLUME_INTERNAL = "internal";
 	public static final String VOLUME_EXTERNAL = "external";
@@ -382,5 +400,34 @@ public class MediaStore {
 	 */
 	public static int getPickImagesMaxLimit() {
 		return PICK_IMAGES_MAX_LIMIT;
+	}
+
+	/* AOSP MediaStore.createRequest(): the ClipData of the Uris and the ContentValues go to the media provider's
+	 * call(); ATL has no media provider process, so ContentResolver.call() answers like on a device without it
+	 * (IllegalArgumentException "Unknown authority") unless a provider is registered for "media" */
+	private static PendingIntent createRequest(ContentResolver resolver, String method, Collection<Uri> uris, ContentValues values) {
+		Objects.requireNonNull(resolver);
+		Objects.requireNonNull(uris);
+
+		final Iterator<Uri> it = uris.iterator();
+		final ClipData clipData = ClipData.newRawUri(null, it.next());
+		while (it.hasNext()) {
+			clipData.addItem(new ClipData.Item(it.next()));
+		}
+
+		final Bundle extras = new Bundle();
+		extras.putParcelable(EXTRA_CLIP_DATA, clipData);
+		extras.putParcelable(EXTRA_CONTENT_VALUES, values);
+		return (PendingIntent)resolver.call(AUTHORITY, method, null, extras).getParcelable(EXTRA_RESULT);
+	}
+
+	/* AOSP MediaStore.createWriteRequest() */
+	public static PendingIntent createWriteRequest(ContentResolver resolver, Collection<Uri> uris) {
+		return createRequest(resolver, CREATE_WRITE_REQUEST_CALL, uris, null);
+	}
+
+	/* AOSP MediaStore.createDeleteRequest() */
+	public static PendingIntent createDeleteRequest(ContentResolver resolver, Collection<Uri> uris) {
+		return createRequest(resolver, CREATE_DELETE_REQUEST_CALL, uris, null);
 	}
 }

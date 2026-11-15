@@ -142,6 +142,46 @@ public class AccountManager {
 		}, callback, handler);
 	}
 
+	/* AOSP getAuthToken() (all three overloads): AccountManagerService asks the authenticator of the account type
+	 * for the token. ATL knows no authenticators (see addAccount), so the bind fails as for a type without one:
+	 * AuthenticatorException "bind failure" from the future. The argument checks are AOSP's. */
+	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType, final Bundle options,
+	                                                 final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (authTokenType == null)
+			throw new IllegalArgumentException("authTokenType is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
+	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType,
+	                                                 final boolean notifyAuthFailure, AccountManagerCallback<Bundle> callback, Handler handler) {
+		return getAuthToken(account, authTokenType, null, notifyAuthFailure, callback, handler);
+	}
+
+	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType, final Bundle options,
+	                                                 final boolean notifyAuthFailure, AccountManagerCallback<Bundle> callback, Handler handler) {
+		return getAuthToken(account, authTokenType, options, (Activity)null, callback, handler);
+	}
+
+	/* AOSP blockingGetAuthToken() */
+	public String blockingGetAuthToken(Account account, String authTokenType, boolean notifyAuthFailure)
+	    throws OperationCanceledException, IOException, AuthenticatorException {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (authTokenType == null)
+			throw new IllegalArgumentException("authTokenType is null");
+		Bundle bundle = getAuthToken(account, authTokenType, notifyAuthFailure, null, null).getResult();
+		if (bundle == null)
+			return null;
+		return bundle.getString(KEY_AUTHTOKEN);
+	}
+
 	/**
 	 * Removes an account from the AccountManager.  Does nothing if the account
 	 * does not exist.  Does not delete the account from the server.
