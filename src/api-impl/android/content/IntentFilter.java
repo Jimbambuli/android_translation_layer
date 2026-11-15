@@ -83,7 +83,7 @@ public class IntentFilter implements android.os.Parcelable {
 		} else {
 			dest.writeInt(0);
 		}
-		dest.writeInt(0); // mPriority
+		dest.writeInt(priority); // mPriority
 		dest.writeInt(hasPartialTypes ? 1 : 0);
 		dest.writeInt(hasPartialTypes ? 1 : 0);
 		dest.writeInt(getAutoVerify() ? 1 : 0);
@@ -132,7 +132,7 @@ public class IntentFilter implements android.os.Parcelable {
 			for (int i = 0; i < n; i++)
 				dataPaths.add(new PatternMatcher(source));
 		}
-		source.readInt(); // mPriority
+		priority = source.readInt(); // mPriority
 		hasPartialTypes = source.readInt() > 0;
 		hasPartialTypes |= source.readInt() > 0;
 		setAutoVerify(source.readInt() > 0);
@@ -174,6 +174,7 @@ public class IntentFilter implements android.os.Parcelable {
 			dataTypes = new ArrayList<>(o.dataTypes);
 		hasPartialTypes = o.hasPartialTypes;
 		autoVerify = o.autoVerify;
+		priority = o.priority;
 	}
 
 	public void addAction(String action) {
