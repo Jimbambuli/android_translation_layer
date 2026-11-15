@@ -1,11 +1,21 @@
 package android.net.wifi;
 
 import android.net.DhcpInfo;
+import android.os.Handler;
+import android.os.HandlerExecutor;
+import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.WorkSource;
+import java.net.InetAddress;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public class WifiManager {
 
@@ -393,6 +403,10 @@ public class WifiManager {
 		return false;
 	}
 
+	/* hidden constants of AOSP WifiManager.java */
+	public static final int NETWORK_SUGGESTIONS_MAX_PER_APP_LOW_RAM = 256;
+	public static final int NETWORK_SUGGESTIONS_MAX_PER_APP_HIGH_RAM = 1024;
+
 	private static final int MAX_RSSI = -55;
 
 	private static final int MIN_RSSI = -100;
@@ -474,5 +488,293 @@ public class WifiManager {
 	/* AOSP: needs FEATURE_WIFI_DIRECT, which a device without Wi-Fi hardware does not declare */
 	public boolean isP2pSupported() {
 		return false;
+	}
+
+	/* Capability queries. AOSP answers them from WifiServiceImpl.isFeatureSupported() (the feature bitset of the
+	 * Wi-Fi chip) and from the band/standard queries of the chip: a device without Wi-Fi hardware has no feature set
+	 * and no band, so everything is false (as is5GHzBandSupported() above). */
+
+	public boolean is24GHzBandSupported() {
+		return false;
+	}
+
+	public boolean is60GHzBandSupported() {
+		return false;
+	}
+
+	public boolean isAggressiveRoamingModeSupported() {
+		return false;
+	}
+
+	public boolean isBridgedApConcurrencySupported() {
+		return false;
+	}
+
+	public boolean isD2dSupportedWhenInfraStaDisabled() {
+		return false;
+	}
+
+	public boolean isDecoratedIdentitySupported() {
+		return false;
+	}
+
+	@Deprecated
+	public boolean isDeviceToApRttSupported() {
+		return false;
+	}
+
+	public boolean isDualBandSimultaneousSupported() {
+		return false;
+	}
+
+	public boolean isEasyConnectDppAkmSupported() {
+		return false;
+	}
+
+	public boolean isEasyConnectEnrolleeResponderModeSupported() {
+		return false;
+	}
+
+	public boolean isEasyConnectSupported() {
+		return false;
+	}
+
+	public boolean isEnhancedOpenSupported() {
+		return false;
+	}
+
+	public boolean isEnhancedPowerReportingSupported() {
+		return false;
+	}
+
+	public boolean isMakeBeforeBreakWifiSwitchingSupported() {
+		return false;
+	}
+
+	public boolean isPasspointTermsAndConditionsSupported() {
+		return false;
+	}
+
+	public boolean isPreferredNetworkOffloadSupported() {
+		return false;
+	}
+
+	public boolean isStaApConcurrencySupported() {
+		return false;
+	}
+
+	public boolean isStaBridgedApConcurrencySupported() {
+		return false;
+	}
+
+	public boolean isStaConcurrencyForLocalOnlyConnectionsSupported() {
+		return false;
+	}
+
+	public boolean isStaConcurrencyForMultiInternetSupported() {
+		return false;
+	}
+
+	public boolean isTdlsSupported() {
+		return false;
+	}
+
+	public boolean isTidToLinkMappingNegotiationSupported() {
+		return false;
+	}
+
+	public boolean isTlsMinimumVersionSupported() {
+		return false;
+	}
+
+	public boolean isTlsV13Supported() {
+		return false;
+	}
+
+	public boolean isTrustOnFirstUseSupported() {
+		return false;
+	}
+
+	public boolean isWapiSupported() {
+		return false;
+	}
+
+	public boolean isWepSupported() {
+		return false;
+	}
+
+	public boolean isWifiDisplayR2Supported() {
+		return false;
+	}
+
+	public boolean isWifiStandardSupported(int standard) {
+		return false;
+	}
+
+	public boolean isWpa3SaeH2eSupported() {
+		return false;
+	}
+
+	/* AOSP WifiManager.isWpa3SaePublicKeySupported(): returns false on every device */
+	public boolean isWpa3SaePublicKeySupported() {
+		return false;
+	}
+
+	public boolean isWpa3SaeSupported() {
+		return false;
+	}
+
+	public boolean isWpa3SuiteBSupported() {
+		return false;
+	}
+
+	public boolean isWpaPersonalSupported() {
+		return false;
+	}
+
+	/* AOSP WifiServiceImpl: settings of the Wi-Fi service, which is off (isWifiEnabled() == false) here */
+	@Deprecated
+	public boolean isScanAlwaysAvailable() {
+		return false;
+	}
+
+	public boolean isAutoWakeupEnabled() {
+		return false;
+	}
+
+	public boolean isWifiPasspointEnabled() {
+		return false;
+	}
+
+	/* AOSP WifiCarrierInfoManager.isCarrierNetworkOffloadEnabled(): no carrier subscription, no offload */
+	public boolean isCarrierNetworkOffloadEnabled(int subscriptionId, boolean merged) {
+		return false;
+	}
+
+	/* AOSP WifiServiceImpl.getStaConcurrencyForMultiInternetMode(): multi-internet is a STA feature */
+	public int getStaConcurrencyForMultiInternetMode() {
+		return WIFI_MULTI_INTERNET_MODE_DISABLED;
+	}
+
+	/* AOSP WifiManager.pingSupplicant(): isWifiEnabled() */
+	@Deprecated
+	public boolean pingSupplicant() {
+		return isWifiEnabled();
+	}
+
+	/* AOSP WifiServiceImpl.reassociate() / disableNetwork(): false for apps targeting Android 10 or later without
+	 * privileges (as removeNetwork() above) */
+	@Deprecated
+	public boolean reassociate() {
+		return false;
+	}
+
+	@Deprecated
+	public boolean disableNetwork(int netId) {
+		return false;
+	}
+
+	/* AOSP WifiManager.updateNetwork(): -1 for null or networkId < 0, otherwise addOrUpdateNetwork(), which is -1
+	 * for apps targeting Android 10 or later without privileges (see addNetwork()) */
+	@Deprecated
+	public int updateNetwork(WifiConfiguration config) {
+		return -1;
+	}
+
+	/* AOSP WifiManager.addNetworkPrivileged(): null is an IllegalArgumentException; WifiServiceImpl
+	 * .addOrUpdateNetworkPrivileged() throws SecurityException unless the caller is DO, PO, system or privileged */
+	public AddNetworkResult addNetworkPrivileged(WifiConfiguration config) {
+		if (config == null)
+			throw new IllegalArgumentException("config cannot be null");
+		throw new SecurityException("Caller is not a device owner, profile owner, system app, or privileged app");
+	}
+
+	/* AOSP WifiServiceImpl.getConfiguredNetworks(): empty list for apps targeting Android 10 or later without
+	 * privileges */
+	@Deprecated
+	public List<WifiConfiguration> getConfiguredNetworks() {
+		return Collections.emptyList();
+	}
+
+	/* AOSP WifiServiceImpl.getConfiguredNetworks(callerNetworksOnly = true): only DO, PO, carrier or privileged apps */
+	public List<WifiConfiguration> getCallerConfiguredNetworks() {
+		throw new SecurityException("Not a DO, PO, carrier or privileged app");
+	}
+
+	/* AOSP WifiServiceImpl.removeNonCallerConfiguredNetworks(): only for the DO/PO of an organization owned device */
+	public boolean removeNonCallerConfiguredNetworks() {
+		throw new SecurityException("Caller is not device owner or profile owner of an organization owned device");
+	}
+
+	/* Network suggestions: AOSP WifiServiceImpl.addNetworkSuggestions()/removeNetworkSuggestions() answer
+	 * STATUS_NETWORK_SUGGESTIONS_ERROR_APP_DISALLOWED when the app may not change Wi-Fi state; without any Wi-Fi
+	 * the request is not carried out in the same way. (AOSP has no "service not there" case here: not unambiguous.) */
+	public int addNetworkSuggestions(List<WifiNetworkSuggestion> networkSuggestions) {
+		return STATUS_NETWORK_SUGGESTIONS_ERROR_APP_DISALLOWED;
+	}
+
+	public int removeNetworkSuggestions(List<WifiNetworkSuggestion> networkSuggestions) {
+		return removeNetworkSuggestions(networkSuggestions, ACTION_REMOVE_SUGGESTION_DISCONNECT);
+	}
+
+	public int removeNetworkSuggestions(List<WifiNetworkSuggestion> networkSuggestions, int action) {
+		return STATUS_NETWORK_SUGGESTIONS_ERROR_APP_DISALLOWED;
+	}
+
+	/* AOSP WifiNetworkSuggestionsManager.get(): the suggestions of the calling app, none were added */
+	public List<WifiNetworkSuggestion> getNetworkSuggestions() {
+		return Collections.emptyList();
+	}
+
+	/* AOSP WifiManager.getMaxNumberOfNetworkSuggestionsPerApp(): the high-RAM value (a desktop is no low-RAM device) */
+	public int getMaxNumberOfNetworkSuggestionsPerApp() {
+		return getMaxNumberOfNetworkSuggestionsPerApp(false);
+	}
+
+	/* AOSP WifiManager.getMaxNumberOfNetworkSuggestionsPerApp(boolean) */
+	public static int getMaxNumberOfNetworkSuggestionsPerApp(boolean isLowRamDevice) {
+		return isLowRamDevice ? NETWORK_SUGGESTIONS_MAX_PER_APP_LOW_RAM : NETWORK_SUGGESTIONS_MAX_PER_APP_HIGH_RAM;
+	}
+
+	/* AOSP WifiServiceImpl.getMaxNumberOfChannelsPerRequest(): overlay config_wifiNetworkSpecifierMaxPreferredChannels,
+	 * AOSP default 5 (the resource file is not in the source tree here: from memory, not verified) */
+	public int getMaxNumberOfChannelsPerNetworkSpecifierRequest() {
+		return 5;
+	}
+
+	/* Passpoint. AOSP WifiManager.addOrUpdatePasspointConfiguration()/removePasspointConfiguration() throw
+	 * IllegalArgumentException when the service returns false (not allowed for apps targeting Android 11 or later
+	 * without privileges; no such profile to remove); WifiServiceImpl.getPasspointConfigurations() is the list of
+	 * the profiles the app may see (none); flushPasspointAnqpCache() needs DO/PO or NETWORK_SETTINGS and the like */
+	public void addOrUpdatePasspointConfiguration(PasspointConfiguration config) {
+		throw new IllegalArgumentException();
+	}
+
+	@Deprecated
+	public void removePasspointConfiguration(String fqdn) {
+		throw new IllegalArgumentException();
+	}
+
+	@Deprecated
+	public List<PasspointConfiguration> getPasspointConfigurations() {
+		return Collections.emptyList();
+	}
+
+	public void flushPasspointAnqpCache() {
+		throw new SecurityException("Caller is not a device or profile owner and holds none of NETWORK_SETTINGS, "
+				+ "NETWORK_MANAGED_PROVISIONING, NETWORK_CARRIER_PROVISIONING");
+	}
+
+	/* WPS: AOSP WifiManager.startWps()/cancelWps() report ActionListener.FAILURE_INTERNAL_ERROR (= 0), WPS is gone */
+	@Deprecated
+	public void startWps(WpsInfo config, WpsCallback listener) {
+		if (listener != null)
+			listener.onFailed(0);
+	}
+
+	@Deprecated
+	public void cancelWps(WpsCallback listener) {
+		if (listener != null)
+			listener.onFailed(0);
 	}
 }
