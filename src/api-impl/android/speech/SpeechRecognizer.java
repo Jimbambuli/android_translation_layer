@@ -114,6 +114,16 @@ public class SpeechRecognizer {
 		return createSpeechRecognizer(context);
 	}
 
+	/* AOSP SpeechRecognizerImpl.triggerModelDownload(): queued (putMessage()) until the service connection exists,
+	 * i.e. never */
+	public void triggerModelDownload(Intent recognizerIntent) {
+		java.util.Objects.requireNonNull(recognizerIntent, "intent must not be null");
+	}
+
+	public void triggerModelDownload(Intent recognizerIntent, java.util.concurrent.Executor executor, ModelDownloadListener listener) {
+		java.util.Objects.requireNonNull(recognizerIntent, "intent must not be null");
+	}
+
 	/* AOSP checkRecognitionSupport(): queued (putMessage()) until the service connection exists, i.e. never */
 	public void checkRecognitionSupport(Intent recognizerIntent, java.util.concurrent.Executor executor,
 	                                    RecognitionSupportCallback supportListener) {

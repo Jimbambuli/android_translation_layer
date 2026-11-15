@@ -1065,6 +1065,7 @@ srcs = [
 	'android/service/voice/VoiceInteractionSession.java',
 	'android/service/voice/VoiceInteractionSessionService.java',
 	'android/service/wallpaper/WallpaperService.java',
+	'android/speech/ModelDownloadListener.java',
 	'android/speech/RecognitionListener.java',
 	'android/speech/RecognitionService.java',
 	'android/speech/RecognitionSupport.java',
