@@ -999,6 +999,10 @@ public class AccessibilityNodeInfo implements Parcelable {
 	private long mParentNodeId = UNDEFINED_NODE_ID;
 	private long mLabelForId = UNDEFINED_NODE_ID;
 	private long mLabeledById = UNDEFINED_NODE_ID;
+	/* AOSP 16: all labels of the node (addLabeledBy()); mLabeledById stays the latest one */
+	private LongArray mLabeledByIds;
+	/* AOSP 16 setSelection()/getSelection() */
+	private Selection mSelection;
 	private long mTraversalBefore = UNDEFINED_NODE_ID;
 	private long mTraversalAfter = UNDEFINED_NODE_ID;
 
@@ -3705,7 +3709,86 @@ public class AccessibilityNodeInfo implements Parcelable {
 		final int rootAccessibilityViewId = (root != null)
 		                                      ? root.getAccessibilityViewId()
 		                                      : UNDEFINED_ITEM_ID;
+		/* AOSP 16 with Flags.supportMultipleLabeledby(): the list holds just this label */
+		if (mLabeledByIds == null) {
+			mLabeledByIds = new LongArray();
+		} else {
+			mLabeledByIds.clear();
+		}
 		mLabeledById = makeNodeId(rootAccessibilityViewId, virtualDescendantId);
+		mLabeledByIds.add(mLabeledById);
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.addLabeledBy(View) */
+	public void addLabeledBy(@NonNull View label) {
+		addLabeledBy(label, AccessibilityNodeProvider.HOST_VIEW_ID);
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.addLabeledBy(View, int) */
+	public void addLabeledBy(@NonNull View root, int virtualDescendantId) {
+		enforceNotSealed();
+		java.util.Objects.requireNonNull(root);
+		if (mLabeledByIds == null) {
+			mLabeledByIds = new LongArray();
+		}
+		mLabeledById = makeNodeId(root.getAccessibilityViewId(), virtualDescendantId);
+		mLabeledByIds.add(mLabeledById);
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.getLabeledByList() */
+	public @NonNull List<AccessibilityNodeInfo> getLabeledByList() {
+		enforceSealed();
+		List<AccessibilityNodeInfo> labels = new ArrayList<>();
+		if (mLabeledByIds == null) {
+			return labels;
+		}
+		for (int i = 0; i < mLabeledByIds.size(); i++) {
+			labels.add(getNodeForAccessibilityId(mConnectionId, mWindowId, mLabeledByIds.get(i)));
+		}
+		return labels;
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.removeLabeledBy(View) */
+	public boolean removeLabeledBy(@NonNull View label) {
+		return removeLabeledBy(label, AccessibilityNodeProvider.HOST_VIEW_ID);
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.removeLabeledBy(View, int) */
+	public boolean removeLabeledBy(@NonNull View root, int virtualDescendantId) {
+		enforceNotSealed();
+		final LongArray labeledByIds = mLabeledByIds;
+		if (labeledByIds == null) {
+			return false;
+		}
+		final int rootAccessibilityViewId =
+		    (root != null) ? root.getAccessibilityViewId() : UNDEFINED_ITEM_ID;
+		final long labeledById = makeNodeId(rootAccessibilityViewId, virtualDescendantId);
+		if (mLabeledById == labeledById) {
+			mLabeledById = UNDEFINED_NODE_ID;
+		}
+		final int index = labeledByIds.indexOf(labeledById);
+		if (index < 0) {
+			return false;
+		}
+		labeledByIds.remove(index);
+		return true;
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.setSelection() */
+	public void setSelection(@Nullable Selection selection) {
+		enforceNotSealed();
+		mSelection = selection;
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.getSelection(): positions resolve in this node's window */
+	public @Nullable Selection getSelection() {
+		if (mSelection != null) {
+			mSelection.getStart().setWindowId(mWindowId);
+			mSelection.getStart().setConnectionId(mConnectionId);
+			mSelection.getEnd().setWindowId(mWindowId);
+			mSelection.getEnd().setConnectionId(mConnectionId);
+		}
+		return mSelection;
 	}
 
 	/**
@@ -4674,6 +4757,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 		mParentNodeId = other.mParentNodeId;
 		mLabelForId = other.mLabelForId;
 		mLabeledById = other.mLabeledById;
+		mLabeledByIds = other.mLabeledByIds;
 		mTraversalBefore = other.mTraversalBefore;
 		mTraversalAfter = other.mTraversalAfter;
 		mMinDurationBetweenContentChanges = other.mMinDurationBetweenContentChanges;
@@ -6623,6 +6707,179 @@ public class AccessibilityNodeInfo implements Parcelable {
 	 * spans one row and two columns.
 	 * </p>
 	 */
+	/* AOSP 16 AccessibilityNodeInfo.SelectionPosition */
+	public static final class SelectionPosition implements Parcelable {
+
+		private final int mOffset;
+		private final long mSourceNodeId;
+		private int mConnectionId;
+		private int mWindowId;
+
+		public SelectionPosition(@NonNull AccessibilityNodeInfo node, int offset) {
+			this(node.mSourceNodeId, offset);
+		}
+
+		public SelectionPosition(@NonNull View view, int offset) {
+			this(makeNodeId(view.getAccessibilityViewId(), AccessibilityNodeProvider.HOST_VIEW_ID),
+			     offset);
+		}
+
+		public SelectionPosition(@NonNull View view, int virtualDescendantId, int offset) {
+			this(makeNodeId(view.getAccessibilityViewId(), virtualDescendantId), offset);
+		}
+
+		private SelectionPosition(long sourceNodeId, int offset) {
+			mOffset = offset;
+			mSourceNodeId = sourceNodeId;
+		}
+
+		private SelectionPosition(Parcel in) {
+			mOffset = in.readInt();
+			mSourceNodeId = in.readLong();
+		}
+
+		private void setWindowId(int windowId) {
+			mWindowId = windowId;
+		}
+
+		private void setConnectionId(int connectionId) {
+			mConnectionId = connectionId;
+		}
+
+		public @Nullable AccessibilityNodeInfo getNode() {
+			return getNodeForAccessibilityId(mConnectionId, mWindowId, mSourceNodeId);
+		}
+
+		public int getOffset() {
+			return mOffset;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (other == null) {
+				return false;
+			}
+			if (other == this) {
+				return true;
+			}
+			if (getClass() != other.getClass()) {
+				return false;
+			}
+			SelectionPosition rhs = (SelectionPosition)other;
+			if (getOffset() != rhs.getOffset()) {
+				return false;
+			}
+			return mSourceNodeId == rhs.mSourceNodeId;
+		}
+
+		@Override
+		public int hashCode() {
+			final long prime = 877;
+			long result = 1;
+			if (mOffset != 0) {
+				result *= mOffset;
+			}
+			if (mSourceNodeId != UNDEFINED_NODE_ID) {
+				result *= mSourceNodeId;
+			}
+			return Long.hashCode(result * prime);
+		}
+
+		@Override
+		public void writeToParcel(@NonNull Parcel dest, int flags) {
+			dest.writeInt(mOffset);
+			dest.writeLong(mSourceNodeId);
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		public static final Creator<SelectionPosition> CREATOR =
+		    new Creator<SelectionPosition>() {
+			    @Override
+			    public SelectionPosition createFromParcel(Parcel in) {
+				    return new SelectionPosition(in);
+			    }
+
+			    @Override
+			    public SelectionPosition[] newArray(int size) {
+				    return new SelectionPosition[size];
+			    }
+		    };
+	}
+
+	/* AOSP 16 AccessibilityNodeInfo.Selection */
+	public static final class Selection implements Parcelable {
+
+		private final SelectionPosition mStart;
+		private final SelectionPosition mEnd;
+
+		public Selection(@NonNull SelectionPosition start, @NonNull SelectionPosition end) {
+			this.mStart = start;
+			this.mEnd = end;
+		}
+
+		private Selection(Parcel in) {
+			mStart = SelectionPosition.CREATOR.createFromParcel(in);
+			mEnd = SelectionPosition.CREATOR.createFromParcel(in);
+		}
+
+		public @NonNull SelectionPosition getStart() {
+			return mStart;
+		}
+
+		public @NonNull SelectionPosition getEnd() {
+			return mEnd;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (obj == null) {
+				return false;
+			}
+			if (obj == this) {
+				return true;
+			}
+			if (getClass() != obj.getClass()) {
+				return false;
+			}
+			Selection rhs = (Selection)obj;
+			return getStart().equals(rhs.getStart()) && getEnd().equals(rhs.getEnd());
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 17;
+			return prime * getStart().hashCode() * getEnd().hashCode();
+		}
+
+		@Override
+		public void writeToParcel(@NonNull Parcel dest, int flags) {
+			mStart.writeToParcel(dest, flags);
+			mEnd.writeToParcel(dest, flags);
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		public static final Creator<Selection> CREATOR =
+		    new Creator<Selection>() {
+			    @Override
+			    public Selection createFromParcel(Parcel in) {
+				    return new Selection(in);
+			    }
+
+			    @Override
+			    public Selection[] newArray(int size) {
+				    return new Selection[size];
+			    }
+		    };
+	}
+
 	public static final class CollectionItemInfo {
 		/**
 		 * Instantiates a CollectionItemInfo that is a clone of another one.
@@ -6639,7 +6896,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 		public static CollectionItemInfo obtain(CollectionItemInfo other) {
 			return new CollectionItemInfo(other.mRowTitle, other.mRowIndex, other.mRowSpan,
 			                              other.mColumnTitle, other.mColumnIndex, other.mColumnSpan, other.mHeading,
-			                              other.mSelected);
+			                              other.mSelected, other.mSortDirection);
 		}
 
 		/**
@@ -6721,6 +6978,40 @@ public class AccessibilityNodeInfo implements Parcelable {
 		private boolean mSelected;
 		private String mRowTitle;
 		private String mColumnTitle;
+		/* AOSP 16 CollectionItemInfo sort direction */
+		private int mSortDirection;
+
+		public static final int SORT_DIRECTION_NONE = 0;
+		public static final int SORT_DIRECTION_ASCENDING = 1;
+		public static final int SORT_DIRECTION_DESCENDING = 2;
+		public static final int SORT_DIRECTION_OTHER = 3;
+
+		/* AOSP 16 CollectionItemInfo(String, int, int, String, int, int, boolean, boolean, int) (hidden) */
+		CollectionItemInfo(@Nullable String rowTitle, int rowIndex, int rowSpan,
+		                   @Nullable String columnTitle, int columnIndex, int columnSpan, boolean heading,
+		                   boolean selected, int sortDirection) {
+			this(rowTitle, rowIndex, rowSpan, columnTitle, columnIndex, columnSpan, heading, selected);
+			mSortDirection = sortDirection;
+		}
+
+		/* AOSP 16 CollectionItemInfo.getSortDirection() */
+		public int getSortDirection() {
+			return mSortDirection;
+		}
+
+		/* AOSP 16 CollectionItemInfo.enforceValidSortDirection() (flag a11ySortDirectionApi on) */
+		private static void enforceValidSortDirection(int sortDirection) {
+			switch (sortDirection) {
+				case SORT_DIRECTION_NONE:
+				case SORT_DIRECTION_ASCENDING:
+				case SORT_DIRECTION_DESCENDING:
+				case SORT_DIRECTION_OTHER:
+					return;
+				default:
+					throw new IllegalArgumentException(
+					    "Unknown sort direction: " + sortDirection);
+			}
+		}
 
 		private CollectionItemInfo() {
 			/* do nothing */
@@ -6876,6 +7167,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 			mSelected = false;
 			mRowTitle = null;
 			mColumnTitle = null;
+			mSortDirection = SORT_DIRECTION_NONE;
 		}
 
 		/**
@@ -6890,6 +7182,15 @@ public class AccessibilityNodeInfo implements Parcelable {
 			private boolean mSelected;
 			private String mRowTitle;
 			private String mColumnTitle;
+			private int mSortDirection;
+
+			/* AOSP 16 CollectionItemInfo.Builder.setSortDirection() */
+			@NonNull
+			public CollectionItemInfo.Builder setSortDirection(int sortDirection) {
+				enforceValidSortDirection(sortDirection);
+				mSortDirection = sortDirection;
+				return this;
+			}
 
 			/**
 			 * Creates a new Builder.
@@ -7007,6 +7308,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 				collectionItemInfo.mSelected = mSelected;
 				collectionItemInfo.mRowTitle = mRowTitle;
 				collectionItemInfo.mColumnTitle = mColumnTitle;
+				collectionItemInfo.mSortDirection = mSortDirection;
 
 				return collectionItemInfo;
 			}
