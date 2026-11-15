@@ -261,6 +261,7 @@ srcs = [
 	'android/content/EntityIterator.java',
 	'android/content/Intent.java',
 	'android/content/IntentFilter.java',
+	'android/content/ReceiverRegistry.java',
 	'android/content/IntentSender.java',
 	'android/content/Loader.java',
 	'android/content/AsyncTaskLoader.java',
