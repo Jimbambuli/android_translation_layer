@@ -1320,6 +1320,8 @@ srcs = [
 	'android/widget/ViewFlipper.java',
 	'android/widget/ViewSwitcher.java',
 	'android/widget/TwoLineListItem.java',
+	'android/widget/CalendarView.java',
+	'android/widget/AnalogClock.java',
 	'android/widget/ZoomButton.java',
 	'android/widget/ZoomButtonsController.java',
 	'android/widget/ZoomControls.java',
