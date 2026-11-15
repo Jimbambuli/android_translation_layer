@@ -1,7 +1,7 @@
 package android.net.wifi;
 
 /* AOSP packages/modules/Wifi/framework/java/android/net/wifi/WpsInfo.java (deprecated data holder) */
-public class WpsInfo {
+public class WpsInfo implements android.os.Parcelable {
 	public static final int PBC = 0;
 	public static final int DISPLAY = 1;
 	public static final int KEYPAD = 2;
@@ -16,4 +16,38 @@ public class WpsInfo {
 	public WpsInfo() {
 		setup = INVALID;
 	}
+
+	/* AOSP WpsInfo(WpsInfo) copy constructor */
+	public WpsInfo(WpsInfo source) {
+		if (source != null) {
+			setup = source.setup;
+			BSSID = source.BSSID;
+			pin = source.pin;
+		}
+	}
+
+	/* AOSP WpsInfo.describeContents()/writeToParcel()/CREATOR */
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(setup);
+		dest.writeString(BSSID);
+		dest.writeString(pin);
+	}
+
+	public static final android.os.Parcelable.Creator<WpsInfo> CREATOR = new android.os.Parcelable.Creator<WpsInfo>() {
+		public WpsInfo createFromParcel(android.os.Parcel in) {
+			WpsInfo config = new WpsInfo();
+			config.setup = in.readInt();
+			config.BSSID = in.readString();
+			config.pin = in.readString();
+			return config;
+		}
+
+		public WpsInfo[] newArray(int size) {
+			return new WpsInfo[size];
+		}
+	};
 }
