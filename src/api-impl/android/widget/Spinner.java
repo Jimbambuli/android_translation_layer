@@ -9,7 +9,7 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
 
-public class Spinner extends AbsSpinner {
+public class Spinner extends AbsSpinner implements android.content.DialogInterface.OnClickListener {
 	/** AOSP Spinner.MODE_DIALOG: the choices are shown in a dialog; ATL's GTK drop-down popup is used in both modes */
 	public static final int MODE_DIALOG = 0;
 	/** AOSP Spinner.MODE_DROPDOWN */
@@ -166,5 +166,12 @@ public class Spinner extends AbsSpinner {
 
 	public CharSequence getPrompt() {
 		return prompt;
+	}
+
+	/* AOSP Spinner.onClick(DialogInterface, int) (DialogInterface.OnClickListener): selects the item and
+	 * dismisses the dialog */
+	public void onClick(android.content.DialogInterface dialog, int which) {
+		setSelection(which);
+		dialog.dismiss();
 	}
 }

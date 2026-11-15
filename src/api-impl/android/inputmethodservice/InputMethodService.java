@@ -308,6 +308,16 @@ public class InputMethodService extends AbstractInputMethodService {
 		return false;
 	}
 
+	/* AOSP onKeyLongPress(): false */
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	/* AOSP onKeyMultiple(): doMovementKey(), false without an extract view (see above) */
+	public boolean onKeyMultiple(int keyCode, int count, KeyEvent event) {
+		return false;
+	}
+
 	/* --- */
 
 	public AbstractInputMethodImpl onCreateInputMethodInterface() {
