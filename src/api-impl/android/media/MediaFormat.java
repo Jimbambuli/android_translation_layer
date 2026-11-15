@@ -46,6 +46,14 @@ public class MediaFormat {
 		return format;
 	}
 
+	public MediaFormat() {
+	}
+
+	/* AOSP MediaFormat(MediaFormat other): a copy of the key/value map */
+	public MediaFormat(MediaFormat other) {
+		map.putAll(other.map);
+	}
+
 	public void setString(String key, String value) {
 		map.put(key, value);
 	}
@@ -152,6 +160,16 @@ public class MediaFormat {
 
 	public String getString(String name) {
 		return (String)map.get(name);
+	}
+
+	public String getString(String name, String defaultValue) {
+		String ret = getString(name);
+		return ret == null ? defaultValue : ret;
+	}
+
+	public ByteBuffer getByteBuffer(String name, ByteBuffer defaultValue) {
+		ByteBuffer ret = getByteBuffer(name);
+		return ret == null ? defaultValue : ret;
 	}
 
 	public long getLong(String name) {
