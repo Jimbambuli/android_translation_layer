@@ -152,6 +152,28 @@ public class WebView extends ViewGroup {
 		return progress;
 	}
 
+	/* AOSP WebView.set/getWebViewRenderProcessClient(): the client is kept per WebView. ATL's WebKit raises no
+	 * unresponsive/terminated events for it (nothing calls it), as for a renderer that never hangs */
+	private WebViewRenderProcessClient webViewRenderProcessClient;
+
+	public void setWebViewRenderProcessClient(java.util.concurrent.Executor executor, WebViewRenderProcessClient client) {
+		webViewRenderProcessClient = client;
+	}
+
+	public void setWebViewRenderProcessClient(WebViewRenderProcessClient client) {
+		webViewRenderProcessClient = client;
+	}
+
+	public WebViewRenderProcessClient getWebViewRenderProcessClient() {
+		return webViewRenderProcessClient;
+	}
+
+	/* AOSP WebView.postVisualStateCallback(): onComplete(requestId) once the content as of this call is drawn.
+	 * Approximated by the next main-looper turn: WebKit gives no draw-completion event to wait for */
+	public void postVisualStateCallback(long requestId, VisualStateCallback callback) {
+		new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> callback.onComplete(requestId));
+	}
+
 	/* AOSP WebViewFactory.setDataDirectorySuffix() */
 	public static void setDataDirectorySuffix(String suffix) {
 		if (providerInitialized)
