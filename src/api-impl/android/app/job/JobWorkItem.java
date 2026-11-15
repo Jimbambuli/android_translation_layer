@@ -2,7 +2,7 @@ package android.app.job;
 
 import android.content.Intent;
 
-final public class JobWorkItem {
+final public class JobWorkItem implements android.os.Parcelable {
 	private final Intent mIntent;
 	int mDeliveryCount;
 	int mWorkId;
@@ -55,4 +55,50 @@ final public class JobWorkItem {
 	public int getDeliveryCount() {
 		return mDeliveryCount;
 	}
+
+	/* AOSP JobWorkItem(Parcel)/writeToParcel()/describeContents()/CREATOR (apex/jobscheduler, android-16.0.0_r4).
+	 * ATL keeps no extras (AOSP's are set through a hidden builder): written as an empty bundle, skipped
+	 * when read */
+	JobWorkItem(android.os.Parcel in) {
+		if (in.readInt() != 0) {
+			mIntent = Intent.CREATOR.createFromParcel(in);
+		} else {
+			mIntent = null;
+		}
+		in.readPersistableBundle(); // extras
+		mNetworkDownloadBytes = in.readLong();
+		mNetworkUploadBytes = in.readLong();
+		mMinimumChunkBytes = in.readLong();
+		mDeliveryCount = in.readInt();
+		mWorkId = in.readInt();
+	}
+
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel out, int flags) {
+		if (mIntent != null) {
+			out.writeInt(1);
+			mIntent.writeToParcel(out, 0);
+		} else {
+			out.writeInt(0);
+		}
+		out.writePersistableBundle(android.os.PersistableBundle.EMPTY);
+		out.writeLong(mNetworkDownloadBytes);
+		out.writeLong(mNetworkUploadBytes);
+		out.writeLong(mMinimumChunkBytes);
+		out.writeInt(mDeliveryCount);
+		out.writeInt(mWorkId);
+	}
+
+	public static final android.os.Parcelable.Creator<JobWorkItem> CREATOR = new android.os.Parcelable.Creator<JobWorkItem>() {
+		public JobWorkItem createFromParcel(android.os.Parcel in) {
+			return new JobWorkItem(in);
+		}
+
+		public JobWorkItem[] newArray(int size) {
+			return new JobWorkItem[size];
+		}
+	};
 }
