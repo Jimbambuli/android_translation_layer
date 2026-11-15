@@ -82,7 +82,7 @@ public class TextView extends View {
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.TOP | Gravity.START;
-	/* AOSP: the height limits in lines (the pixel and ems modes are not applied here) */
+	/* AOSP: the height limits in lines or pixels (lines via GTK in updateLines(), pixels in onMeasure()) */
 	private static final int LINES = 1;
 	private static final int EMS = LINES;
 	private static final int PIXELS = 2;
@@ -155,12 +155,20 @@ public class TextView extends View {
 
 			int ellipsize = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, ELLIPSIZE_NOT_SET);
 			boolean singleLine = a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false);
-			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
-				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
-			if (a.hasValue(com.android.internal.R.styleable.TextView_minLines))
-				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
+			/* in the order of the AOSP attribute loop (styleable index): maxHeight, minHeight, maxLines, lines,
+			 * height, minLines */
+			if (a.hasValue(com.android.internal.R.styleable.TextView_maxHeight))
+				setMaxHeight(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_maxHeight, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minHeight))
+				setMinHeight(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_minHeight, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
+				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_height))
+				setHeight(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_height, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minLines))
+				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_lineSpacingExtra) || a.hasValue(com.android.internal.R.styleable.TextView_lineSpacingMultiplier))
 				setLineSpacing(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_lineSpacingExtra, 0),
 				               a.getFloat(com.android.internal.R.styleable.TextView_lineSpacingMultiplier, 1.0f));
@@ -1385,8 +1393,10 @@ public class TextView extends View {
 		/* AOSP TextView.onMeasure(): unless the width is exact, it is limited by maxWidth/maxEms and minWidth/minEms
 		 * (setWidth(), android:width ...); the height then follows from the text in that width */
 		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
-		if (widthMode == MeasureSpec.EXACTLY)
+		if (widthMode == MeasureSpec.EXACTLY) {
+			applyHeightLimits(heightMeasureSpec);
 			return;
+		}
 		int width = getMeasuredWidth();
 		if (mMaxWidthMode == EMS) {
 			width = Math.min(width, mMaxWidth * getLineHeight());
@@ -1404,6 +1414,25 @@ public class TextView extends View {
 		}
 		if (width != getMeasuredWidth())
 			super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), heightMeasureSpec);
+		applyHeightLimits(heightMeasureSpec);
+	}
+
+	/* AOSP TextView.getDesiredHeight() with onMeasure(): unless the height is exact, a maximum in pixels caps
+	 * it and a minimum in pixels raises it (the limits in lines are applied by GTK, see updateLines()) */
+	private void applyHeightLimits(int heightMeasureSpec) {
+		int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+		if (heightMode == MeasureSpec.EXACTLY)
+			return;
+		int height = getMeasuredHeight();
+		if (mMaxMode == PIXELS)
+			height = Math.min(height, mMaximum);
+		if (mMinMode == PIXELS)
+			height = Math.max(height, mMinimum);
+		height = Math.max(height, getSuggestedMinimumHeight());
+		if (heightMode == MeasureSpec.AT_MOST)
+			height = Math.min(height, MeasureSpec.getSize(heightMeasureSpec));
+		if (height != getMeasuredHeight())
+			setMeasuredDimension(getMeasuredWidth(), height);
 	}
 	private native void native_setFontPadding(long widget, boolean include);
 
@@ -1457,7 +1486,14 @@ public class TextView extends View {
 		invalidate();
 	}
 
-	public void setHeight(int height) {}
+	/** AOSP TextView.setHeight(): minimum and maximum height in pixels (replaces lines/minLines/maxLines) */
+	public void setHeight(int pixels) {
+		mMaximum = mMinimum = pixels;
+		mMaxMode = mMinMode = PIXELS;
+		updateLines();
+		requestLayout();
+		invalidate();
+	}
 
 	public void setFreezesText(boolean freezesText) {}
 
@@ -2846,8 +2882,6 @@ public class TextView extends View {
 	private int mMaxWidthMode = PIXELS;
 	private int mMinWidth = 0;
 	private int mMinWidthMode = PIXELS;
-	private int mMinHeight = 0;
-	private int mMaxHeightValue = -1;
 
 	public void setEms(int ems) {
 		mMaxWidth = mMinWidth = ems;
@@ -2900,24 +2934,29 @@ public class TextView extends View {
 		return mMaxWidthMode == PIXELS ? mMaxWidth : -1;
 	}
 
+	/* AOSP TextView.setMinHeight()/setMaxHeight(): the height limits in pixels share mMinimum/mMaximum with the
+	 * limits in lines; the getters return -1 while the limit is in lines */
 	public void setMinHeight(int minPixels) {
-		mMinHeight = minPixels;
+		mMinimum = minPixels;
+		mMinMode = PIXELS;
 		requestLayout();
 		invalidate();
 	}
 
 	public int getMinHeight() {
-		return mMinHeight;
+		return mMinMode == PIXELS ? mMinimum : -1;
 	}
 
 	public void setMaxHeight(int maxPixels) {
-		mMaxHeightValue = maxPixels;
+		mMaximum = maxPixels;
+		mMaxMode = PIXELS;
+		updateLines();
 		requestLayout();
 		invalidate();
 	}
 
 	public int getMaxHeight() {
-		return mMaxHeightValue;
+		return mMaxMode == PIXELS ? mMaximum : -1;
 	}
 
 	private KeyListener mKeyListener;
