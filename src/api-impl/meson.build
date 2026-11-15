@@ -814,6 +814,8 @@ srcs = [
 	'android/net/http/SslCertificate.java',
 	'android/net/http/SslError.java',
 	'android/net/http/X509TrustManagerExtensions.java',
+	'android/net/nsd/AdvertisingRequest.java',
+	'android/net/nsd/DiscoveryRequest.java',
 	'android/net/nsd/NsdManager.java',
 	'android/net/nsd/NsdServiceInfo.java',
 	'android/net/ssl/SSLSockets.java',

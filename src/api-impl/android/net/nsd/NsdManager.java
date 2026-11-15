@@ -18,8 +18,10 @@
 package android.net.nsd;
 
 import android.net.Network;
+import android.net.NetworkRequest;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 
@@ -112,6 +114,12 @@ public final class NsdManager {
 	}
 
 	/* nothing was registered: like AOSP for an unknown listener */
+	/* AOSP NsdManager.registerService(AdvertisingRequest, Executor, RegistrationListener): the same checks, then the
+	 * request goes to the service, which ATL does not have */
+	public void registerService(AdvertisingRequest advertisingRequest, Executor executor, RegistrationListener listener) {
+		registerService(advertisingRequest.getServiceInfo(), advertisingRequest.getProtocolType(), executor, listener);
+	}
+
 	public void unregisterService(RegistrationListener listener) {
 		Objects.requireNonNull(listener, "listener cannot be null");
 		throw new IllegalArgumentException("listener not registered");
@@ -130,6 +138,22 @@ public final class NsdManager {
 				listener.onStartDiscoveryFailed(serviceType, FAILURE_INTERNAL_ERROR);
 			}
 		});
+	}
+
+	/* AOSP NsdManager.discoverServices(DiscoveryRequest, Executor, DiscoveryListener) */
+	public void discoverServices(DiscoveryRequest discoveryRequest, Executor executor, DiscoveryListener listener) {
+		Objects.requireNonNull(discoveryRequest, "discoveryRequest cannot be null");
+		discoverServices(discoveryRequest.getServiceType(), discoveryRequest.getProtocolType(), discoveryRequest.getNetwork(), executor, listener);
+	}
+
+	/* AOSP NsdManager.discoverServices(String, int, NetworkRequest, Executor, DiscoveryListener): an empty service type
+	 * and a null NetworkRequest are refused; the discovery itself needs the service ATL does not have */
+	public void discoverServices(String serviceType, int protocolType, NetworkRequest networkRequest, Executor executor, DiscoveryListener listener) {
+		if (TextUtils.isEmpty(serviceType)) {
+			throw new IllegalArgumentException("Service type cannot be empty");
+		}
+		Objects.requireNonNull(networkRequest, "NetworkRequest cannot be null");
+		discoverServices(serviceType, protocolType, (Network)null, executor, listener);
 	}
 
 	public void stopServiceDiscovery(DiscoveryListener listener) {
