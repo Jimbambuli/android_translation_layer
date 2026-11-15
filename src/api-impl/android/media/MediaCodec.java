@@ -335,6 +335,31 @@ public class MediaCodec {
 
 	public void setParameters(Bundle parameters) {}
 
+	/* AOSP createInputSurface()/signalEndOfInputStream() are native and only valid on a video encoder;
+	 * ATL provides decoders only (createEncoderByType() fails). The call is answered as an invalid
+	 * operation, which media/jni/android_media_MediaCodec.cpp (throwExceptionAsNecessary) throws as
+	 * IllegalStateException. */
+	public final Surface createInputSurface() {
+		throw new IllegalStateException("createInputSurface: not an encoder");
+	}
+
+	public final void signalEndOfInputStream() {
+		throw new IllegalStateException("signalEndOfInputStream: not an encoder");
+	}
+
+	/* API 31. The FFmpeg codecs have no vendor parameters, so there is nothing to subscribe to. */
+	public java.util.List<String> getSupportedVendorParameters() {
+		return new java.util.ArrayList<String>();
+	}
+
+	public void subscribeToVendorParameters(java.util.List<String> names) {
+		java.util.Objects.requireNonNull(names);
+	}
+
+	public void unsubscribeFromVendorParameters(java.util.List<String> names) {
+		java.util.Objects.requireNonNull(names);
+	}
+
 	private OnFrameRenderedListener onFrameRenderedListener;
 
 	/* Stored for parity; ATL produces no rendered output frames, so the callback is never invoked. */
