@@ -175,6 +175,30 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1transform
 JNIEXPORT jboolean JNICALL Java_android_graphics_Path_native_1contains
   (JNIEnv *, jclass, jlong, jint, jboolean, jfloat, jfloat);
 
+/*
+ * Class:     android_graphics_Path
+ * Method:    native_get_segments
+ * Signature: (J)[F
+ */
+JNIEXPORT jfloatArray JNICALL Java_android_graphics_Path_native_1get_1segments
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    native_is_convex
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Path_native_1is_1convex
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Path
+ * Method:    native_set_last_point
+ * Signature: (JFF)J
+ */
+JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1set_1last_1point
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
 #ifdef __cplusplus
 }
 #endif
