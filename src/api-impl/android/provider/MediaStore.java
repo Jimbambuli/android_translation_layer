@@ -7,6 +7,7 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.util.Size;
 import java.io.FileNotFoundException;
@@ -97,6 +98,35 @@ public class MediaStore {
 		}
 	}
 
+	/* AOSP MediaStore.InternalThumbnails (packages/providers/MediaProvider) */
+	private static class InternalThumbnails {
+		private static final java.util.HashMap<Uri, CancellationSignal> sPending = new java.util.HashMap<>();
+
+		static Bitmap getThumbnail(ContentResolver cr, Uri uri, int kind, BitmapFactory.Options opts) {
+			final android.util.Size size = ThumbnailConstants.getKindSize(kind);
+
+			CancellationSignal signal = null;
+			synchronized (sPending) {
+				signal = sPending.get(uri);
+				if (signal == null) {
+					signal = new CancellationSignal();
+					sPending.put(uri, signal);
+				}
+			}
+
+			try {
+				return cr.loadThumbnail(uri, size, signal);
+			} catch (IOException e) {
+				android.util.Log.w("MediaStore", "Failed to obtain thumbnail for " + uri, e);
+				return null;
+			} finally {
+				synchronized (sPending) {
+					sPending.remove(uri);
+				}
+			}
+		}
+	}
+
 	public static class Images {
 
 		public static class Media {
@@ -138,11 +168,16 @@ public class MediaStore {
 				return null;
 			}
 
-			public static Bitmap getThumbnail(ContentResolver contentResolver, long imageId, long groupId, int kind, BitmapFactory.Options options) throws IOException {
-				Uri uri = Media.EXTERNAL_CONTENT_URI.buildUpon().appendPath(String.valueOf(imageId)).build();
-				try (ParcelFileDescriptor fd = contentResolver.openFileDescriptor(uri, "r")) {
-					return BitmapFactory.decodeFileDescriptor(fd.getFileDescriptor(), null, options);
-				}
+			/* AOSP MediaStore.Images.Thumbnails.getThumbnail: both forms go to InternalThumbnails.getThumbnail
+			 * (ContentResolver.loadThumbnail at the kind's size; null when that fails) */
+			public static Bitmap getThumbnail(ContentResolver cr, long origId, int kind, BitmapFactory.Options options) {
+				final Uri uri = ContentUris.withAppendedId(Media.EXTERNAL_CONTENT_URI, origId);
+				return InternalThumbnails.getThumbnail(cr, uri, kind, options);
+			}
+
+			public static Bitmap getThumbnail(ContentResolver cr, long origId, long groupId, int kind, BitmapFactory.Options options) {
+				return getThumbnail(cr, origId, kind, options);
+			}
 			}
 		}
 	}
