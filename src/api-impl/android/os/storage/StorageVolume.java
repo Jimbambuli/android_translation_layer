@@ -1,7 +1,11 @@
 package android.os.storage;
 
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Environment;
+import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import java.io.File;
 import java.util.UUID;
 
@@ -61,5 +65,25 @@ public class StorageVolume {
 
 	public String getState() {
 		return mState;
+	}
+
+	/* AOSP getMediaStoreVolumeName(): the primary volume is MediaStore's external_primary */
+	public String getMediaStoreVolumeName() {
+		if (isPrimary())
+			return MediaStore.VOLUME_EXTERNAL_PRIMARY;
+		return mFsUuid == null ? null : mFsUuid.toLowerCase(java.util.Locale.US);
+	}
+
+	public String getUserLabel() {
+		return mDescription;
+	}
+
+	/* AOSP createOpenDocumentTreeIntent() */
+	public Intent createOpenDocumentTreeIntent() {
+		final String rootId = isEmulated() ? DocumentsContract.EXTERNAL_STORAGE_PRIMARY_EMULATED_ROOT_ID : mFsUuid;
+		final Uri rootUri = DocumentsContract.buildRootUri(DocumentsContract.EXTERNAL_STORAGE_PROVIDER_AUTHORITY, rootId);
+		return new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+		    .putExtra(DocumentsContract.EXTRA_INITIAL_URI, rootUri)
+		    .putExtra(DocumentsContract.EXTRA_SHOW_ADVANCED, true);
 	}
 }

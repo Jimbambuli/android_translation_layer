@@ -41,6 +41,10 @@ import java.util.List;
 import java.util.Objects;
 
 public final class DocumentsContract {
+	public static final String EXTRA_SHOW_ADVANCED = "android.provider.extra.SHOW_ADVANCED";
+	public static final String EXTRA_INITIAL_URI = "android.provider.extra.INITIAL_URI";
+	public static final String EXTERNAL_STORAGE_PROVIDER_AUTHORITY = "com.android.externalstorage.documents";
+	public static final String EXTERNAL_STORAGE_PRIMARY_EMULATED_ROOT_ID = "primary";
 	public static final String EXTRA_LOADING = "loading";
 	public static final String EXTRA_INFO = "info";
 	public static final String EXTRA_ERROR = "error";
