@@ -33,6 +33,22 @@ public class StorageManager {
 	public static final int FLAG_REAL_STATE = 1 << 9;
 	public static final int FLAG_INCLUDE_INVISIBLE = 1 << 10;
 
+	/* AOSP StorageManager.convert(String): the UUID for a volume's fsUuid; FAT identifiers XXXX-YYYY become
+	 * fafafafa-fafa-5afa-8afa-fafaXXXXYYYY */
+	public static UUID convert(String uuid) {
+		if (java.util.Objects.equals(uuid, UUID_PRIVATE_INTERNAL)) {
+			return UUID_DEFAULT;
+		} else if (java.util.Objects.equals(uuid, UUID_PRIMARY_PHYSICAL)) {
+			return UUID_PRIMARY_PHYSICAL_;
+		} else if (java.util.Objects.equals(uuid, UUID_SYSTEM)) {
+			return UUID_SYSTEM_;
+		} else if (uuid.length() == 9 && uuid.charAt(4) == '-') {
+			return UUID.fromString(FAT_UUID_PREFIX + uuid.replace("-", ""));
+		} else {
+			return UUID.fromString(uuid);
+		}
+	}
+
 	/* AOSP StorageManager.convert(UUID) */
 	public static String convert(UUID storageUuid) {
 		if (UUID_DEFAULT.equals(storageUuid)) {
