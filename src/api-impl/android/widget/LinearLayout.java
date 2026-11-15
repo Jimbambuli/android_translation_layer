@@ -129,6 +129,8 @@ public class LinearLayout extends ViewGroup {
 	private int mBaselineChildTop = 0;
 	private int mOrientation;
 
+	private int mLayoutDirection = View.LAYOUT_DIRECTION_UNDEFINED;
+
 	private int mGravity = Gravity.START | Gravity.TOP;
 	private int mTotalLength;
 	private float mWeightSum;
@@ -1788,6 +1790,18 @@ public class LinearLayout extends ViewGroup {
 			super(source);
 			this.weight = source.weight;
 			this.gravity = source.gravity;
+		}
+	}
+
+	/** AOSP LinearLayout.onRtlPropertiesChanged(): a horizontal layout is laid out again when the direction changes */
+	@Override
+	public void onRtlPropertiesChanged(int layoutDirection) {
+		super.onRtlPropertiesChanged(layoutDirection);
+		if (layoutDirection != mLayoutDirection) {
+			mLayoutDirection = layoutDirection;
+			if (mOrientation == HORIZONTAL) {
+				requestLayout();
+			}
 		}
 	}
 }
