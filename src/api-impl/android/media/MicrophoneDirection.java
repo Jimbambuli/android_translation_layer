@@ -12,6 +12,4 @@ public interface MicrophoneDirection {
 	boolean setPreferredMicrophoneDirection(int direction);
 
 	boolean setPreferredMicrophoneFieldDimension(@FloatRange(from = -1.0, to = 1.0) float zoom);
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    default boolean setPreferredMicrophoneFieldDimension(float arg0) { return false; }
 }

@@ -147,7 +147,6 @@ public final class SignalingDataRequest extends BroadcastInfoRequest implements 
      */
     public static final int SIGNALING_DATA_NO_GROUP_ID = -1;
 
-    )
     @Retention(RetentionPolicy.SOURCE)
     public @interface SignalingMetadata {}
 

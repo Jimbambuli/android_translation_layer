@@ -64,6 +64,4 @@ public final class MediaTimestamp
 				+ " clockRate=" + clockRate
 				+ "}";
 	}
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    public MediaTimestamp(long arg0, long arg1, float arg2) {}
 }

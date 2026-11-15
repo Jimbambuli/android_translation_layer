@@ -46,7 +46,6 @@ public final class SignalingDataInfo implements Parcelable {
      */
     public static final String CONTENT_ENCODING_BASE64 = "Base64";
 
-    )
     @Retention(RetentionPolicy.SOURCE)
     public @interface ContentEncoding {}
 
