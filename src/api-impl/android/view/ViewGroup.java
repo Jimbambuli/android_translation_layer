@@ -81,7 +81,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public ViewGroup(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		super(context, attrs, defStyleAttr);
+		super(context, attrs, defStyleAttr, defStyleRes);
 
 		children = new ArrayList<View>();
 		detachedChildren = new ArrayList<View>();

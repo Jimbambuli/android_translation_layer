@@ -220,7 +220,7 @@ public class RelativeLayout extends ViewGroup {
 	}
 
 	public RelativeLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		super(context, attrs, defStyleAttr);
+		super(context, attrs, defStyleAttr, defStyleRes);
 		initFromAttributes(context, attrs, defStyleAttr, defStyleRes);
 		queryCompatibilityModes(context);
 	}
