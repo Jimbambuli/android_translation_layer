@@ -1,5 +1,12 @@
 package android.animation;
 
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import java.util.ArrayList;
+import java.util.List;
+
 /* After AOSP core/java/android/animation/LayoutTransition.java: the settings (transition types, animators,
  * durations, start delays) are kept as in AOSP; ATL's ViewGroup does not run the transitions */
 public class LayoutTransition {
@@ -103,7 +110,82 @@ public class LayoutTransition {
 		return valid(transitionType) ? mDurations[transitionType] : 0;
 	}
 
-	public void setInterpolator(int transitionType, TimeInterpolator interpolator) {}
+	/* AOSP: appearing/disappearing use AccelerateDecelerateInterpolator, the change animations DecelerateInterpolator */
+	private TimeInterpolator mAppearingInterpolator = new AccelerateDecelerateInterpolator();
+	private TimeInterpolator mDisappearingInterpolator = new AccelerateDecelerateInterpolator();
+	private TimeInterpolator mChangingAppearingInterpolator = new DecelerateInterpolator();
+	private TimeInterpolator mChangingDisappearingInterpolator = new DecelerateInterpolator();
+	private TimeInterpolator mChangingInterpolator = new DecelerateInterpolator();
+
+	public void setInterpolator(int transitionType, TimeInterpolator interpolator) {
+		switch (transitionType) {
+			case CHANGE_APPEARING:
+				mChangingAppearingInterpolator = interpolator;
+				break;
+			case CHANGE_DISAPPEARING:
+				mChangingDisappearingInterpolator = interpolator;
+				break;
+			case CHANGING:
+				mChangingInterpolator = interpolator;
+				break;
+			case APPEARING:
+				mAppearingInterpolator = interpolator;
+				break;
+			case DISAPPEARING:
+				mDisappearingInterpolator = interpolator;
+				break;
+		}
+	}
+
+	public TimeInterpolator getInterpolator(int transitionType) {
+		switch (transitionType) {
+			case CHANGE_APPEARING:
+				return mChangingAppearingInterpolator;
+			case CHANGE_DISAPPEARING:
+				return mChangingDisappearingInterpolator;
+			case CHANGING:
+				return mChangingInterpolator;
+			case APPEARING:
+				return mAppearingInterpolator;
+			case DISAPPEARING:
+				return mDisappearingInterpolator;
+		}
+		// shouldn't reach here
+		return null;
+	}
+
+	/* AOSP TransitionListener: ATL runs no transitions, so the listeners are kept (addTransitionListener() and friends)
+	 * but never called */
+	public interface TransitionListener {
+		public void startTransition(LayoutTransition transition, ViewGroup container, View view, int transitionType);
+
+		public void endTransition(LayoutTransition transition, ViewGroup container, View view, int transitionType);
+	}
+
+	private ArrayList<TransitionListener> mListeners;
+	private boolean mAnimateParentHierarchy = true;
+
+	public void addTransitionListener(TransitionListener listener) {
+		if (mListeners == null) {
+			mListeners = new ArrayList<TransitionListener>();
+		}
+		mListeners.add(listener);
+	}
+
+	public void removeTransitionListener(TransitionListener listener) {
+		if (mListeners == null) {
+			return;
+		}
+		mListeners.remove(listener);
+	}
+
+	public List<TransitionListener> getTransitionListeners() {
+		return mListeners;
+	}
+
+	public void setAnimateParentHierarchy(boolean animateParentHierarchy) {
+		mAnimateParentHierarchy = animateParentHierarchy;
+	}
 
 	/** AOSP isChangingLayout(): true while CHANGE_APPEARING/CHANGE_DISAPPEARING animations run; ATL runs none */
 	public boolean isChangingLayout() {

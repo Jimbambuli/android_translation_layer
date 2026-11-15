@@ -1,6 +1,7 @@
 package android.widget;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.View;
 
@@ -56,7 +57,111 @@ public class Toolbar extends View {
 		return titleMarginBottom;
 	}
 
-	public void setNavigationIcon(int resId) {}
+	/* AOSP setTitle(): stored like the subtitle, not rendered */
+	public void setTitle(int resId) {
+		setTitle(getContext().getText(resId));
+	}
+
+	public void setTitle(CharSequence title) {
+		titleText = title;
+	}
+
+	/* AOSP navigation icon, overflow icon and navigation content description: stored (there is no navigation
+	 * button or overflow menu in this Toolbar) so the getters return what was set */
+	private Drawable navigationIcon;
+	private Drawable overflowIcon;
+	private CharSequence navigationContentDescription;
+
+	public void setNavigationIcon(int resId) {
+		setNavigationIcon(resId != 0 ? getContext().getDrawable(resId) : null);
+	}
+
+	public void setNavigationIcon(Drawable icon) {
+		navigationIcon = icon;
+	}
+
+	public Drawable getNavigationIcon() {
+		return navigationIcon;
+	}
+
+	public void setOverflowIcon(Drawable icon) {
+		overflowIcon = icon;
+	}
+
+	public Drawable getOverflowIcon() {
+		return overflowIcon;
+	}
+
+	public void setNavigationContentDescription(int resId) {
+		setNavigationContentDescription(resId != 0 ? getContext().getText(resId) : null);
+	}
+
+	public void setNavigationContentDescription(CharSequence description) {
+		navigationContentDescription = description;
+	}
+
+	public CharSequence getNavigationContentDescription() {
+		return navigationContentDescription;
+	}
 
 	public void setNavigationOnClickListener(OnClickListener listener) {}
+
+	/* AOSP content insets: kept (ATL lays out no toolbar content), the getters return what was set; AOSP's
+	 * RtlSpacingHelper.UNDEFINED (Integer.MIN_VALUE) stands for "not set" and reads as 0 */
+	private int mContentInsetStart;
+	private int mContentInsetEnd;
+	private int mContentInsetStartWithNavigation;
+	private int mContentInsetEndWithActions;
+
+	public void setContentInsetsRelative(int contentInsetStart, int contentInsetEnd) {
+		mContentInsetStart = contentInsetStart;
+		mContentInsetEnd = contentInsetEnd;
+	}
+
+	public int getContentInsetStart() {
+		return mContentInsetStart;
+	}
+
+	public int getContentInsetEnd() {
+		return mContentInsetEnd;
+	}
+
+	public void setContentInsetStartWithNavigation(int insetStartWithNavigation) {
+		if (insetStartWithNavigation < 0) {
+			insetStartWithNavigation = 0;
+		}
+		mContentInsetStartWithNavigation = insetStartWithNavigation;
+	}
+
+	public int getContentInsetStartWithNavigation() {
+		return mContentInsetStartWithNavigation;
+	}
+
+	public void setContentInsetEndWithActions(int insetEndWithActions) {
+		if (insetEndWithActions < 0) {
+			insetEndWithActions = 0;
+		}
+		mContentInsetEndWithActions = insetEndWithActions;
+	}
+
+	public int getContentInsetEndWithActions() {
+		return mContentInsetEndWithActions;
+	}
+
+	/* AOSP Toolbar.LayoutParams */
+	public static class LayoutParams extends android.app.ActionBar.LayoutParams {
+		public LayoutParams(Context c, AttributeSet attrs) {
+			super(c, attrs);
+		}
+
+		public LayoutParams(int width, int height) {
+			super(width, height);
+			this.gravity = android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START;
+		}
+
+		public LayoutParams(int width, int height, int gravity) {
+			super(width, height);
+			this.gravity = gravity;
+		}
+	}
 }

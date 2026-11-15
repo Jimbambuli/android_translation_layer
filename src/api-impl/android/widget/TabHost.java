@@ -13,6 +13,10 @@ public class TabHost extends View {
 			this.tag = tag;
 		}
 
+		public String getTag() {
+			return tag;
+		}
+
 		public TabSpec setIndicator(CharSequence label) {
 			return this;
 		}
@@ -40,13 +44,59 @@ public class TabHost extends View {
 
 	public void setup() {}
 
-	public void addTab(TabSpec tabSpec) {}
+	/* AOSP TabHost keeps the spec list and the current index and notifies the listener on a change
+	 * (android-14 core/java/android/widget/TabHost.java addTab/setCurrentTab/getCurrentTabTag).
+	 * ATL has no tab widget or content frame, so nothing is shown. */
+	private final java.util.List<TabSpec> mTabSpecs = new java.util.ArrayList<TabSpec>(2);
+	private int mCurrentTab = -1;
+	private OnTabChangeListener mOnTabChangeListener;
 
-	public void setCurrentTab(int index) {}
+	public void addTab(TabSpec tabSpec) {
+		if (tabSpec == null) {
+			throw new IllegalArgumentException("tabSpec must be non-null");
+		}
+		mTabSpecs.add(tabSpec);
+		if (mCurrentTab == -1) {
+			setCurrentTab(0);
+		}
+	}
 
-	public void setCurrentTabByTag(String tag) {}
+	public void setCurrentTab(int index) {
+		if (index < 0 || index >= mTabSpecs.size()) {
+			return;
+		}
+		if (index == mCurrentTab) {
+			return;
+		}
+		mCurrentTab = index;
+		if (mOnTabChangeListener != null) {
+			mOnTabChangeListener.onTabChanged(getCurrentTabTag());
+		}
+	}
 
-	public void setOnTabChangedListener(OnTabChangeListener listener) {}
+	public void setCurrentTabByTag(String tag) {
+		for (int i = 0; i < mTabSpecs.size(); i++) {
+			if (mTabSpecs.get(i).getTag().equals(tag)) {
+				setCurrentTab(i);
+				break;
+			}
+		}
+	}
+
+	public int getCurrentTab() {
+		return mCurrentTab;
+	}
+
+	public String getCurrentTabTag() {
+		if (mCurrentTab >= 0 && mCurrentTab < mTabSpecs.size()) {
+			return mTabSpecs.get(mCurrentTab).getTag();
+		}
+		return null;
+	}
+
+	public void setOnTabChangedListener(OnTabChangeListener listener) {
+		mOnTabChangeListener = listener;
+	}
 
 	public interface OnTabChangeListener {
 		void onTabChanged(String tabId);

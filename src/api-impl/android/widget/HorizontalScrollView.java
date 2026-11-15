@@ -2,8 +2,10 @@ package android.widget;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Rect;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import com.android.internal.R;
@@ -44,6 +46,70 @@ public class HorizontalScrollView extends FrameLayout {
 
 	public boolean fullScroll(int direction) {
 		return true;
+	}
+
+	/** AOSP pageScroll(): one page (the view width) to the left or right, limited to the child; no focus change */
+	public boolean pageScroll(int direction) {
+		if (getChildCount() == 0)
+			return false;
+		final int width = getWidth();
+		final int scrollX = getScrollX();
+		final int target;
+		if (direction == View.FOCUS_RIGHT)
+			target = Math.min(scrollX + width, getChildAt(getChildCount() - 1).getRight() - width);
+		else
+			target = Math.max(scrollX - width, 0);
+		smoothScrollBy(target - scrollX, 0);
+		return getScrollX() != scrollX;
+	}
+
+	/** AOSP getMaxScrollAmount() with MAX_SCROLL_FACTOR 0.5 */
+	public int getMaxScrollAmount() {
+		return (int)(0.5f * (getRight() - getLeft()));
+	}
+
+	/** AOSP fling(): the distance of an OverScroller fling over 0..child width - viewport, from the current position;
+	 * ATL scrolls there at once instead of animated and draws no edge effects */
+	public void fling(int velocityX) {
+		if (getChildCount() > 0) {
+			final int width = getWidth() - getPaddingRight() - getPaddingLeft();
+			final int right = getChildAt(0).getRight() - getPaddingLeft();
+			OverScroller scroller = new OverScroller(getContext());
+			scroller.fling(getScrollX(), 0, velocityX, 0, 0, Math.max(0, right - width), 0, 0, 0, 0);
+			smoothScrollBy(scroller.getFinalX() - getScrollX(), 0);
+		}
+	}
+
+	/** AOSP executeKeyEvent(): keys that scroll; arrowScroll() scrolls by getMaxScrollAmount() without the focus search,
+	 * as AOSP does when no next focus is found. */
+	public boolean executeKeyEvent(KeyEvent event) {
+		if (getChildCount() == 0)
+			return false;
+		boolean handled = false;
+		if (event.getAction() == KeyEvent.ACTION_DOWN) {
+			switch (event.getKeyCode()) {
+				case KeyEvent.KEYCODE_DPAD_LEFT:
+					if (!event.isAltPressed()) {
+						smoothScrollBy(-getMaxScrollAmount(), 0);
+						handled = true;
+					} else {
+						handled = fullScroll(View.FOCUS_LEFT);
+					}
+					break;
+				case KeyEvent.KEYCODE_DPAD_RIGHT:
+					if (!event.isAltPressed()) {
+						smoothScrollBy(getMaxScrollAmount(), 0);
+						handled = true;
+					} else {
+						handled = fullScroll(View.FOCUS_RIGHT);
+					}
+					break;
+				case KeyEvent.KEYCODE_SPACE:
+					pageScroll(event.isShiftPressed() ? View.FOCUS_LEFT : View.FOCUS_RIGHT);
+					break;
+			}
+		}
+		return handled;
 	}
 
 	/* AOSP: whether arrowScroll() scrolls smoothly; ATL keeps the setting, GTK scrolls on its own */
@@ -150,5 +216,77 @@ public class HorizontalScrollView extends FrameLayout {
 	@Override
 	public boolean shouldDelayChildPressedState() {
 		return true;
+	}
+
+	/* AOSP setLeftEdgeEffectColor() and friends: the colors are kept, ATL draws no edge glow */
+	private int mEdgeGlowLeftColor = 0xff000000;
+	private int mEdgeGlowRightColor = 0xff000000;
+
+	public void setEdgeEffectColor(int color) {
+		setLeftEdgeEffectColor(color);
+		setRightEdgeEffectColor(color);
+	}
+
+	public void setRightEdgeEffectColor(int color) {
+		mEdgeGlowRightColor = color;
+		invalidate();
+	}
+
+	public void setLeftEdgeEffectColor(int color) {
+		mEdgeGlowLeftColor = color;
+		invalidate();
+	}
+
+	public int getLeftEdgeEffectColor() {
+		return mEdgeGlowLeftColor;
+	}
+
+	public int getRightEdgeEffectColor() {
+		return mEdgeGlowRightColor;
+	}
+
+	/** AOSP computeScrollDeltaToGetChildRectOnScreen(): how far to scroll to show rect (child coordinates); the fading edge
+	 * length is 0 as ATL draws no fading edges (AOSP getHorizontalFadingEdgeLength() is 0 unless one is enabled) */
+	protected int computeScrollDeltaToGetChildRectOnScreen(Rect rect) {
+		if (getChildCount() == 0)
+			return 0;
+
+		int width = getWidth();
+		int screenLeft = getScrollX();
+		int screenRight = screenLeft + width;
+
+		int scrollXDelta = 0;
+
+		if (rect.right > screenRight && rect.left > screenLeft) {
+			// need to move right to get it in view: move right just enough so that the entire rectangle is in view (or at least
+			// the first screen size chunk).
+			if (rect.width() > width) {
+				// just enough to get screen size chunk on
+				scrollXDelta += (rect.left - screenLeft);
+			} else {
+				// get entire rect at right of screen
+				scrollXDelta += (rect.right - screenRight);
+			}
+
+			// make sure we aren't scrolling beyond the end of our content
+			int right = getChildAt(0).getRight();
+			int distanceToRight = right - screenRight;
+			scrollXDelta = Math.min(scrollXDelta, distanceToRight);
+
+		} else if (rect.left < screenLeft && rect.right < screenRight) {
+			// need to move right to get it in view: move right just enough so that entire rectangle is in view (or at least the
+			// first screen size chunk of it).
+			if (rect.width() > width) {
+				// screen size chunk
+				scrollXDelta -= (screenRight - rect.right);
+			} else {
+				// entire rect at left
+				scrollXDelta -= (screenLeft - rect.left);
+			}
+
+			// make sure we aren't scrolling any further than the left our content
+			scrollXDelta = Math.max(scrollXDelta, -getScrollX());
+		}
+		return scrollXDelta;
 	}
 }

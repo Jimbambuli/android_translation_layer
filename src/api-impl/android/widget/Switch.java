@@ -74,6 +74,12 @@ public class Switch extends CompoundButton {
 		return mTextOn;
 	}
 
+	/* AOSP Switch.setSwitchTextAppearance(): only restyles the thumb text, which ATL does not draw; AOSP
+	 * requests a new layout afterwards */
+	public void setSwitchTextAppearance(Context context, int resid) {
+		requestLayout();
+	}
+
 	public void setTextOn(CharSequence textOn) {
 		mTextOn = textOn;
 		requestLayout();

@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.os.Handler;
 import android.view.View;
+import java.util.ArrayList;
 
 public class Toast {
 	private final Context mContext;
@@ -44,10 +45,16 @@ public class Toast {
 			public void run() {
 				manager.cancel(id);
 				mShownManager = null;
+				for (Callback callback : new ArrayList<Callback>(mCallbacks)) {
+					callback.onToastHidden();
+				}
 			}
 		};
 		mHandler = new Handler();
 		mHandler.postDelayed(mHide, 2000);
+		for (Callback callback : new ArrayList<Callback>(mCallbacks)) {
+			callback.onToastShown();
+		}
 	}
 
 	/* the toast as shown by show(), for cancel() */
@@ -69,6 +76,28 @@ public class Toast {
 	public int getGravity() { return mGravity; }
 	public int getXOffset() { return mX; }
 	public int getYOffset() { return mY; }
+
+	/* AOSP Toast.Callback/addCallback()/removeCallback(): told when the toast is shown and when it is hidden (after the time or by cancel()) */
+	public static class Callback {
+		public void onToastShown() {}
+		public void onToastHidden() {}
+	}
+
+	private final ArrayList<Callback> mCallbacks = new ArrayList<>();
+
+	public void addCallback(Callback callback) {
+		if (callback == null)
+			throw new NullPointerException("callback is null");
+		synchronized (mCallbacks) {
+			mCallbacks.add(callback);
+		}
+	}
+
+	public void removeCallback(Callback callback) {
+		synchronized (mCallbacks) {
+			mCallbacks.remove(callback);
+		}
+	}
 
 	/** AOSP Toast.cancel(): hides the toast if it is showing (here: removes its notification at once) */
 	public void cancel() {

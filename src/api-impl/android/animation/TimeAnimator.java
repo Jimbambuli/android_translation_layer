@@ -1,43 +1,54 @@
 package android.animation;
 
-public class TimeAnimator extends Animator {
+import android.view.animation.AnimationUtils;
 
-	public interface TimeListener {}
+/* AOSP TimeAnimator (frameworks/base/core/java/android/animation/TimeAnimator.java): a ValueAnimator that calls the
+ * TimeListener on every animation frame with the total and the delta time */
+public class TimeAnimator extends ValueAnimator {
 
-	public void setTimeListener(TimeListener listener) {}
+	private TimeListener mListener;
+	private long mPreviousTime = -1;
 
 	@Override
-	public long getStartDelay() {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'getStartDelay'");
+	public void start() {
+		mPreviousTime = -1;
+		super.start();
 	}
 
 	@Override
-	public void setStartDelay(long startDelay) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'setStartDelay'");
-	}
-
-	@Override
-	public Animator setDuration(long duration) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'setDuration'");
-	}
-
-	@Override
-	public long getDuration() {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'getDuration'");
-	}
-
-	@Override
-	public void setInterpolator(TimeInterpolator value) {
-		// TODO Auto-generated method stub
-		throw new UnsupportedOperationException("Unimplemented method 'setInterpolator'");
-	}
-
-	@Override
-	public boolean isRunning() {
+	boolean animateBasedOnTime(long currentTime) {
+		if (mListener != null) {
+			long totalTime = currentTime - mStartTime;
+			long deltaTime = (mPreviousTime < 0) ? 0 : (currentTime - mPreviousTime);
+			mPreviousTime = currentTime;
+			mListener.onTimeUpdate(this, totalTime, deltaTime);
+		}
 		return false;
+	}
+
+	@Override
+	public void setCurrentPlayTime(long playTime) {
+		long currentTime = AnimationUtils.currentAnimationTimeMillis();
+		mStartTime = Math.max(mStartTime, currentTime - playTime);
+		mStartTimeCommitted = true; // do not allow start time to be compensated for jank
+		animateBasedOnTime(currentTime);
+	}
+
+	public void setTimeListener(TimeListener listener) {
+		mListener = listener;
+	}
+
+	@Override
+	void animateValue(float fraction) {
+		// Noop
+	}
+
+	@Override
+	void initAnimation() {
+		// noop
+	}
+
+	public static interface TimeListener {
+		void onTimeUpdate(TimeAnimator animation, long totalTime, long deltaTime);
 	}
 }

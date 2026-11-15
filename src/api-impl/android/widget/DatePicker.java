@@ -93,7 +93,23 @@ public class DatePicker extends FrameLayout {
 		setOnDateChangedListener(listener);
 	}
 
-	public void setFirstDayOfWeek(int dayOfWeek) {}
+	/* AOSP DatePickerCalendarDelegate.setFirstDayOfWeek()/getFirstDayOfWeek(): 0 means the first day of the locale; an invalid day
+	 * of week is ignored. ATL's calendar does not draw the week header from it. */
+	private int mFirstDayOfWeek = 0;
+
+	public void setFirstDayOfWeek(int firstDayOfWeek) {
+		if (firstDayOfWeek != 0 && (firstDayOfWeek < Calendar.SUNDAY || firstDayOfWeek > Calendar.SATURDAY)) {
+			return;
+		}
+		mFirstDayOfWeek = firstDayOfWeek;
+	}
+
+	public int getFirstDayOfWeek() {
+		if (mFirstDayOfWeek != 0) {
+			return mFirstDayOfWeek;
+		}
+		return Calendar.getInstance(java.util.Locale.getDefault()).getFirstDayOfWeek();
+	}
 
 	public void setOnDateChangedListener(OnDateChangedListener onDateChangedListener) {
 		nativeSetOnDateChangedListener(widget);
@@ -132,4 +148,18 @@ public class DatePicker extends FrameLayout {
 	protected native int nativeGetDay(long widget);
 
 	protected native void nativeUpdateDate(long widget, int year, int month, int dayOfMonth);
+
+	/* AOSP DatePickerCalendarDelegate (the default mode of DatePicker): the spinners and the calendar view are not shown
+	 * separately, setCalendarViewShown()/setSpinnersShown() do nothing and the getters return false */
+	public void setCalendarViewShown(boolean shown) {}
+
+	public boolean getCalendarViewShown() {
+		return false;
+	}
+
+	public void setSpinnersShown(boolean shown) {}
+
+	public boolean getSpinnersShown() {
+		return false;
+	}
 }

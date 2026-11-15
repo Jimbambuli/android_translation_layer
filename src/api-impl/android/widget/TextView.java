@@ -1500,8 +1500,17 @@ public class TextView extends View {
 		return new Bundle();
 	}
 
+	/* AOSP Editor.mError: ATL shows no error popup or icon, setError() only remembers the error (a Spanned is kept as such,
+	 * TextUtils.stringOrSpannedString()) so getError() returns it */
+	private CharSequence mError;
+
 	public void setError(CharSequence error) {
-		System.out.println("ERROR: " + error);
+		mError = error == null ? null : TextUtils.stringOrSpannedString(error);
+	}
+
+	/** AOSP getError(): mEditor == null ? null : mEditor.mError (in ATL an input type stands for the Editor, see mInputType) */
+	public CharSequence getError() {
+		return mInputType == 0 ? null : mError;
 	}
 
 	public int getBreakStrategy() {
@@ -1512,7 +1521,12 @@ public class TextView extends View {
 		break_strategy = strategy;
 	}
 
-	public void clearComposingText() {}
+	/** AOSP clearComposingText(): removes the composing spans of a Spannable text */
+	public void clearComposingText() {
+		if (getText() instanceof Spannable) {
+			android.view.inputmethod.BaseInputConnection.removeComposingSpans((Spannable)getText());
+		}
+	}
 
 	/* AOSP TextView.setWidth(): exactly this wide (as minimum and maximum width) */
 	public void setWidth(int pixels) {
@@ -1531,7 +1545,17 @@ public class TextView extends View {
 		invalidate();
 	}
 
-	public void setFreezesText(boolean freezesText) {}
+	/* AOSP setFreezesText()/getFreezesText(): whether the text is part of the saved state; ATL does not save view state,
+	 * so the flag is only kept */
+	private boolean mFreezesText;
+
+	public void setFreezesText(boolean freezesText) {
+		mFreezesText = freezesText;
+	}
+
+	public boolean getFreezesText() {
+		return mFreezesText;
+	}
 
 	/* AOSP: in ems, kept by the paint; the label gets it as a Pango letter spacing in pixels */
 	public void setLetterSpacing(float letterSpacing) {
@@ -1559,8 +1583,171 @@ public class TextView extends View {
 		return mMarqueeRepeatLimit;
 	}
 
+	private int mJustificationMode = 0; // Layout.JUSTIFICATION_MODE_NONE
+
 	public int getJustificationMode() {
-		return 0; // JUSTIFICATION_MODE_NONE
+		return mJustificationMode;
+	}
+
+	/** AOSP setJustificationMode(): the mode is kept; the layout of ATL does not justify */
+	public void setJustificationMode(int justificationMode) {
+		mJustificationMode = justificationMode;
+		requestLayout();
+		invalidate();
+	}
+
+	/** AOSP setElegantTextHeight() */
+	public void setElegantTextHeight(boolean elegant) {
+		if (elegant != getPaint().isElegantTextHeight()) {
+			getPaint().setElegantTextHeight(elegant);
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	private boolean mFallbackLineSpacing;
+
+	/** AOSP setFallbackLineSpacing(): kept, requests a new layout like AOSP */
+	public void setFallbackLineSpacing(boolean enabled) {
+		if (mFallbackLineSpacing != enabled) {
+			mFallbackLineSpacing = enabled;
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	/** AOSP getFontFeatureSettings() */
+	public String getFontFeatureSettings() {
+		return getPaint().getFontFeatureSettings();
+	}
+
+	/** AOSP setFontFeatureSettings() */
+	public void setFontFeatureSettings(String fontFeatureSettings) {
+		if (fontFeatureSettings != getPaint().getFontFeatureSettings() && (fontFeatureSettings == null || !fontFeatureSettings.equals(getPaint().getFontFeatureSettings()))) {
+			getPaint().setFontFeatureSettings(fontFeatureSettings);
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	/** AOSP isSuggestionsEnabled(): false without Editor (see mInputType), else only for a text class input without
+	 * TYPE_TEXT_FLAG_NO_SUGGESTIONS and with a variation that allows suggestions */
+	public boolean isSuggestionsEnabled() {
+		if (mInputType == 0)
+			return false;
+		if ((mInputType & android.text.InputType.TYPE_MASK_CLASS) != android.text.InputType.TYPE_CLASS_TEXT) {
+			return false;
+		}
+		if ((mInputType & android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) > 0)
+			return false;
+
+		final int variation = mInputType & android.text.InputType.TYPE_MASK_VARIATION;
+		return (variation == android.text.InputType.TYPE_TEXT_VARIATION_NORMAL ||
+		        variation == android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_SUBJECT ||
+		        variation == android.text.InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE ||
+		        variation == android.text.InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE ||
+		        variation == android.text.InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT);
+	}
+
+	/** AOSP setTextKeepState(): sets the text and keeps the selection, clamped to the new length */
+	public final void setTextKeepState(CharSequence text) {
+		setTextKeepState(text, mBufferType);
+	}
+
+	public final void setTextKeepState(CharSequence text, BufferType type) {
+		int start = getSelectionStart();
+		int end = getSelectionEnd();
+		int len = text.length();
+
+		setText(text, type);
+
+		if (start >= 0 || end >= 0) {
+			if (getText() instanceof Spannable) {
+				Selection.setSelection((Spannable)getText(), Math.max(0, Math.min(start, len)), Math.max(0, Math.min(end, len)));
+			}
+		}
+	}
+
+	/** AOSP onPreDraw() (ViewTreeObserver.OnPreDrawListener): lets the drawing go on. Not reproduced: the scrolling of the
+	 * cursor into view that AOSP does for a movement method, ATL has no Editor cursor controller. */
+	public boolean onPreDraw() {
+		return true;
+	}
+
+	/** AOSP extractText() = Editor.extractText(request, outText) = extractTextInternal() for the whole text (offsets
+	 * EXTRACT_UNKNOWN): false without Editor (see mInputType), request or outText */
+	public boolean extractText(android.view.inputmethod.ExtractedTextRequest request, android.view.inputmethod.ExtractedText outText) {
+		if (mInputType == 0 || request == null || outText == null) {
+			return false;
+		}
+
+		final CharSequence content = getText();
+		if (content == null) {
+			return false;
+		}
+
+		final int N = content.length();
+		outText.partialStartOffset = outText.partialEndOffset = -1;
+		if ((request.flags & android.view.inputmethod.InputConnection.GET_TEXT_WITH_STYLES) != 0) {
+			outText.text = content.subSequence(0, N);
+		} else {
+			outText.text = TextUtils.substring(content, 0, N);
+		}
+		outText.flags = 0;
+		if (android.text.method.MetaKeyKeyListener.getMetaState(content, android.text.method.MetaKeyKeyListener.META_SELECTING) != 0) {
+			outText.flags |= android.view.inputmethod.ExtractedText.FLAG_SELECTING;
+		}
+		if (isSingleLine()) {
+			outText.flags |= android.view.inputmethod.ExtractedText.FLAG_SINGLE_LINE;
+		}
+		outText.startOffset = 0;
+		outText.selectionStart = getSelectionStart();
+		outText.selectionEnd = getSelectionEnd();
+		outText.hint = getHint();
+		return true;
+	}
+
+	/** AOSP setLocalePreferredLineHeightForMinimumUsed(): kept, requests a new layout like AOSP */
+	private boolean mUseLocalePreferredLineHeightForMinimum;
+
+	public void setLocalePreferredLineHeightForMinimumUsed(boolean flag) {
+		if (mUseLocalePreferredLineHeightForMinimum != flag) {
+			mUseLocalePreferredLineHeightForMinimum = flag;
+			requestLayout();
+			invalidate();
+		}
+	}
+
+	public boolean isLocalePreferredLineHeightForMinimumUsed() {
+		return mUseLocalePreferredLineHeightForMinimum;
+	}
+
+	/** AOSP setScroller(): the Scroller is kept (ATL scrolls through GTK, it is not driven) */
+	private Scroller mScroller;
+
+	public void setScroller(Scroller s) {
+		mScroller = s;
+	}
+
+	/** AOSP getCompoundPaddingStart()/getCompoundPaddingEnd() */
+	public int getCompoundPaddingStart() {
+		switch (getLayoutDirection()) {
+		default:
+		case LAYOUT_DIRECTION_LTR:
+			return getCompoundPaddingLeft();
+		case LAYOUT_DIRECTION_RTL:
+			return getCompoundPaddingRight();
+		}
+	}
+
+	public int getCompoundPaddingEnd() {
+		switch (getLayoutDirection()) {
+		default:
+		case LAYOUT_DIRECTION_LTR:
+			return getCompoundPaddingRight();
+		case LAYOUT_DIRECTION_RTL:
+			return getCompoundPaddingLeft();
+		}
 	}
 
 	@UnsupportedAppUsage /* androidx ACTVAutoSizeHelper seems to love this */

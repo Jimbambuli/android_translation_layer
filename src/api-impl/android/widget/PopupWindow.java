@@ -780,4 +780,19 @@ public class PopupWindow {
 	public native int native_getWidth(long widget);
 	public native int native_getHeight(long widget);
 	public native boolean native_isTouchable(long widget);
+
+	/* AOSP mSplitTouchEnabled: -1 = unset (then targetSdkVersion >= HONEYCOMB decides), 0 = off, 1 = on */
+	private int mSplitTouchEnabled = -1;
+
+	public boolean isSplitTouchEnabled() {
+		if (mSplitTouchEnabled < 0 && contentView != null) {
+			/* AOSP asks the Context the PopupWindow was made with; ATL keeps only the content view */
+			return contentView.getContext().getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.HONEYCOMB;
+		}
+		return mSplitTouchEnabled == 1;
+	}
+
+	public void setSplitTouchEnabled(boolean enabled) {
+		mSplitTouchEnabled = enabled ? 1 : 0;
+	}
 }
