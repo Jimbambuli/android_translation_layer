@@ -249,6 +249,23 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		java.util.Objects.requireNonNull(listener, "listener cannot be null");
 	}
 
+	/* AOSP 16 WindowManagerImpl.addScreenRecordingCallback() -> ScreenRecordingCallbacks: the state
+	 * comes from WindowManagerService (is a window of this uid visible in an active screen
+	 * recording). ATL has no window manager service that tracks recordings, so the state stays
+	 * SCREEN_RECORDING_STATE_NOT_VISIBLE and never changes; no callback needs to be kept. */
+	@Override
+	public int addScreenRecordingCallback(java.util.concurrent.Executor executor,
+			java.util.function.Consumer<Integer> callback) {
+		java.util.Objects.requireNonNull(executor, "executor must not be null");
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+		return SCREEN_RECORDING_STATE_NOT_VISIBLE;
+	}
+
+	@Override
+	public void removeScreenRecordingCallback(java.util.function.Consumer<Integer> callback) {
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+	}
+
 	private static native void native_addView(long widget, View view, int type, boolean touchModal, int gravity, int x, int y, int width, int height);
 	private static native void native_updateViewLayout(long widget, int gravity, int x, int y, int width, int height);
 	private static native void native_removeView(long widget);

@@ -734,6 +734,17 @@ public class Window {
 
 	public void setFeatureDrawableResource(int featureId, int resId) {}
 
+	/* AOSP 16 Window.setDesiredHdrHeadroom()/getDesiredHdrHeadroom(): stored in the LayoutParams */
+	public void setDesiredHdrHeadroom(float desiredHeadroom) {
+		final WindowManager.LayoutParams attrs = getAttributes();
+		attrs.setDesiredHdrHeadroom(desiredHeadroom);
+		dispatchWindowAttributesChanged(attrs);
+	}
+
+	public float getDesiredHdrHeadroom() {
+		return getAttributes().getDesiredHdrHeadroom();
+	}
+
 	/* AOSP */
 	@SuppressWarnings("unchecked")
 	public final <T extends View> T requireViewById(int id) {

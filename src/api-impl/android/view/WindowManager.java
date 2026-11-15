@@ -52,6 +52,19 @@ public interface WindowManager {
 
 	default void removeCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
 	}
+
+	/* AOSP 16 WindowManager screen recording state and callback defaults */
+	int SCREEN_RECORDING_STATE_NOT_VISIBLE = 0;
+	int SCREEN_RECORDING_STATE_VISIBLE = 1;
+
+	default int addScreenRecordingCallback(java.util.concurrent.Executor executor,
+			java.util.function.Consumer<Integer> callback) {
+		throw new UnsupportedOperationException();
+	}
+
+	default void removeScreenRecordingCallback(java.util.function.Consumer<Integer> callback) {
+		throw new UnsupportedOperationException();
+	}
 	public android.view.Display getDefaultDisplay();
 
 	public void addView(View view, ViewGroup.LayoutParams params);
