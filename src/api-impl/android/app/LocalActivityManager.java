@@ -9,8 +9,8 @@ import java.util.Map;
 
 /* AOSP frameworks/base/core/java/android/app/LocalActivityManager.java. ATL cannot run an Activity inside a
  * parent's window (no ActivityThread, no Window per child), so the manager keeps AOSP's records, state machine
- * and id bookkeeping, but an activity is never instantiated: startActivity() records the intent and returns null
- * (AOSP's result when the child produced no window), getActivity() and getCurrentActivity() return null. */
+ * and id bookkeeping, but an activity is never instantiated: startActivity() throws
+ * ActivityNotFoundException, so getActivity() and getCurrentActivity() find no activity, as in AOSP for an unknown id. */
 @Deprecated
 public class LocalActivityManager {
 	static final int RESTORED = 0;
@@ -70,10 +70,9 @@ public class LocalActivityManager {
 			moveToState(mResumed, STARTED);
 		}
 		r.curState = INITIALIZING;
-		if (mCurState == RESUMED) {
-			mResumed = r;
-		}
-		return null;
+		// ATL cannot instantiate an Activity inside a parent window: like AOSP for an activity it cannot start
+		// (LocalActivityManager.startActivityNow()), report it instead of returning a window
+		throw new android.content.ActivityNotFoundException("Unable to start activity " + intent + " in a LocalActivityManager");
 	}
 
 	public Window destroyActivity(String id, boolean finish) {
