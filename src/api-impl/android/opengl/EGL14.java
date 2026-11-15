@@ -177,4 +177,102 @@ public class EGL14 {
 			value[offset] = raw_value[0];
 		return ret;
 	}
+
+	/* AOSP EGL14 (android_opengl_EGL14.cpp, generated, not in the local sources): the EGL functions on the
+	 * native handles; array arguments are checked like AOSP's other EGL14 array variants */
+	public static EGLDisplay eglGetCurrentDisplay() {
+		long handle = native_eglGetCurrentDisplay();
+		return handle == 0 ? EGL_NO_DISPLAY : new EGLDisplay(handle);
+	}
+
+	public static boolean eglGetConfigs(EGLDisplay dpy, EGLConfig[] configs, int configsOffset, int config_size, int[] num_config, int num_configOffset) {
+		if (configs == null)
+			throw new IllegalArgumentException("configs == null");
+		if (configsOffset < 0)
+			throw new IllegalArgumentException("configsOffset < 0");
+		if (configs.length - configsOffset < config_size)
+			throw new IllegalArgumentException("length - configsOffset < config_size < needed");
+		if (num_config == null)
+			throw new IllegalArgumentException("num_config == null");
+		if (num_configOffset < 0)
+			throw new IllegalArgumentException("num_configOffset < 0");
+		if (num_config.length - num_configOffset < 1)
+			throw new IllegalArgumentException("length - num_configOffset < 1 < needed");
+		long[] handles = new long[Math.max(config_size, 0)];
+		int[] count = new int[1];
+		boolean ret = native_eglGetConfigs(dpy.getNativeHandle(), handles, count);
+		for (int i = 0; ret && i < count[0]; i++)
+			configs[configsOffset + i] = new EGLConfig(handles[i]);
+		num_config[num_configOffset] = count[0];
+		return ret;
+	}
+
+	public static int eglQueryAPI() {
+		return native_eglQueryAPI();
+	}
+
+	public static boolean eglWaitClient() {
+		return native_eglWaitClient();
+	}
+
+	public static boolean eglWaitGL() {
+		return native_eglWaitGL();
+	}
+
+	public static boolean eglWaitNative(int engine) {
+		return native_eglWaitNative(engine);
+	}
+
+	public static boolean eglSurfaceAttrib(EGLDisplay dpy, EGLSurface surface, int attribute, int value) {
+		return native_eglSurfaceAttrib(dpy.getNativeHandle(), surface.getNativeHandle(), attribute, value);
+	}
+
+	public static boolean eglBindTexImage(EGLDisplay dpy, EGLSurface surface, int buffer) {
+		return native_eglBindTexImage(dpy.getNativeHandle(), surface.getNativeHandle(), buffer);
+	}
+
+	public static boolean eglReleaseTexImage(EGLDisplay dpy, EGLSurface surface, int buffer) {
+		return native_eglReleaseTexImage(dpy.getNativeHandle(), surface.getNativeHandle(), buffer);
+	}
+
+	public static boolean eglSwapInterval(EGLDisplay dpy, int interval) {
+		return native_eglSwapInterval(dpy.getNativeHandle(), interval);
+	}
+
+	public static EGLSurface eglCreatePbufferFromClientBuffer(EGLDisplay dpy, int buftype, int buffer, EGLConfig config, int[] attrib_list, int offset) {
+		return eglCreatePbufferFromClientBuffer(dpy, buftype, (long)buffer, config, attrib_list, offset);
+	}
+
+	/** @hide */
+	public static EGLSurface eglCreatePbufferFromClientBuffer(EGLDisplay dpy, int buftype, long buffer, EGLConfig config, int[] attrib_list, int offset) {
+		if (attrib_list != null && offset < 0)
+			throw new IllegalArgumentException("offset < 0");
+		if (attrib_list != null && attrib_list.length - offset < 1)
+			throw new IllegalArgumentException("length - offset < 1 < needed");
+		int[] attribs = attrib_list == null ? null : java.util.Arrays.copyOfRange(attrib_list, offset, attrib_list.length);
+		long handle = native_eglCreatePbufferFromClientBuffer(dpy.getNativeHandle(), buftype, buffer, config.getNativeHandle(), attribs);
+		return handle == 0 ? EGL_NO_SURFACE : new EGLSurface(handle);
+	}
+
+	/* AOSP: Android has no native pixmaps, its JNI throws UnsupportedOperationException for both */
+	@Deprecated
+	public static EGLSurface eglCreatePixmapSurface(EGLDisplay dpy, EGLConfig config, int pixmap, int[] attrib_list, int offset) {
+		throw new UnsupportedOperationException("eglCreatePixmapSurface");
+	}
+
+	public static boolean eglCopyBuffers(EGLDisplay dpy, EGLSurface surface, int target) {
+		throw new UnsupportedOperationException("eglCopyBuffers");
+	}
+
+	private static native long native_eglGetCurrentDisplay();
+	private static native boolean native_eglGetConfigs(long dpy, long[] configs, int[] num_config);
+	private static native int native_eglQueryAPI();
+	private static native boolean native_eglWaitClient();
+	private static native boolean native_eglWaitGL();
+	private static native boolean native_eglWaitNative(int engine);
+	private static native boolean native_eglSurfaceAttrib(long dpy, long surface, int attribute, int value);
+	private static native boolean native_eglBindTexImage(long dpy, long surface, int buffer);
+	private static native boolean native_eglReleaseTexImage(long dpy, long surface, int buffer);
+	private static native boolean native_eglSwapInterval(long dpy, int interval);
+	private static native long native_eglCreatePbufferFromClientBuffer(long dpy, int buftype, long buffer, long config, int[] attrib_list);
 }

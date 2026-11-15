@@ -1,7 +1,6 @@
 package android.graphics;
 
 import android.annotation.UnsupportedAppUsage;
-import android.util.Log;
 
 /*
  * Path is implemented as a GskPath or a GskPathBuilder. It can only be one of the two at a time.
@@ -256,9 +255,15 @@ public class Path {
 
 	public void incReserve(int additionalPoints) {}
 
+	/* AOSP Path.isConvex() -> SkPath::isConvex(): computed natively from the control points like Skia */
+	@Deprecated
 	public boolean isConvex() {
-		Log.w("Path", "STUB: isConvex");
-		return false;
+		return native_is_convex(getGskPath());
+	}
+
+	/* AOSP Path.getPathIterator() */
+	public PathIterator getPathIterator() {
+		return new PathIterator(this);
 	}
 
 	public void set(Path src) {
@@ -282,8 +287,10 @@ public class Path {
 		dst.offset(dx, dy);
 	}
 
-	public void setLastPoint(float x, float y) {
-		Log.w("Path", "STUB: setLastPoint");
+	/* AOSP Path.setLastPoint() -> SkPath::setLastPt(): the last point replaced, a moveTo on an empty path */
+	public void setLastPoint(float dx, float dy) {
+		builder = native_set_last_point(getGskPath(), dx, dy);
+		path = 0;
 	}
 
 	/* AOSP SkPath::toggleInverseFillType(): flips the inverse bit of the fill type */
@@ -397,4 +404,7 @@ public class Path {
 	private static native void native_get_bounds(long path, RectF rect);
 	private static native long native_transform(long path, long matrix);
 	private static native boolean native_contains(long path, int fill_rule, boolean inverse, float x, float y);
+	static native float[] native_get_segments(long path);
+	private static native boolean native_is_convex(long path);
+	private static native long native_set_last_point(long path, float x, float y);
 }
