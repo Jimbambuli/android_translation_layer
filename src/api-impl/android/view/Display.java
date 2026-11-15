@@ -118,6 +118,12 @@ public final class Display {
 		return false;
 	}
 
+	/* AOSP 16 Display.hasArrSupport(): DisplayInfo.hasArrSupport, false for a display without adaptive refresh
+	 * rate (ATL's one mode) */
+	public boolean hasArrSupport() {
+		return false;
+	}
+
 	/* AOSP Display.getOrientation() (deprecated) */
 	public int getOrientation() {
 		return getRotation();
