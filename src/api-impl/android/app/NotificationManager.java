@@ -555,4 +555,31 @@ public class NotificationManager {
 			return channels.get(channelId);
 		}
 	}
+
+	/* AOSP NotificationManager members that ask INotificationManager; with the state of ATL (no Do Not Disturb rules,
+	 * no policy access, no bubbles, the app's own package) */
+	public static final int BUBBLE_PREFERENCE_NONE = 0;
+	public static final int BUBBLE_PREFERENCE_ALL = 1;
+	public static final int BUBBLE_PREFERENCE_SELECTED = 2;
+
+	public boolean areAutomaticZenRulesUserManaged() { return true; }
+	public boolean areBubblesEnabled() { return false; }
+	public int getBubblePreference() { return BUBBLE_PREFERENCE_NONE; }
+	public AutomaticZenRule getAutomaticZenRule(String id) { throw new SecurityException("Notification policy access denied"); }
+	public int getAutomaticZenRuleState(String id) { throw new SecurityException("Notification policy access denied"); }
+	public void setNotificationPolicy(Policy policy) { throw new SecurityException("Notification policy access denied"); }
+	public Policy getConsolidatedNotificationPolicy() { return getNotificationPolicy(); }
+	public boolean matchesCallFilter(android.net.Uri uri) { return true; }
+	public boolean shouldHideSilentStatusBarIcons() { return false; }
+	public boolean canNotifyAsPackage(String pkg) { return pkg != null && pkg.equals(ATLLoadedApp.getPrimaryApplication().getApplication().getPackageName()); }
+	public void notifyAsPackage(String targetPackage, String tag, int id, Notification notification) {
+		if (!canNotifyAsPackage(targetPackage))
+			throw new SecurityException("Not allowed to notify as package " + targetPackage);
+		notify(tag, id, notification);
+	}
+	public void cancelAsPackage(String targetPackage, String tag, int id) {
+		if (!canNotifyAsPackage(targetPackage))
+			throw new SecurityException("Not allowed to cancel as package " + targetPackage);
+		cancel(tag, id);
+	}
 }
