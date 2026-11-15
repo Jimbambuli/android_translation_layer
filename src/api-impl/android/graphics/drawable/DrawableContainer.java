@@ -17,6 +17,9 @@ public class DrawableContainer extends Drawable {
 	private DrawableContainerState state;
 	private int curIndex = -1;
 	private boolean mMutated;
+	/* AOSP DrawableContainer.mAlpha/mHasAlpha: the alpha set on the container, given to each child shown */
+	private int mAlpha = 0xFF;
+	private boolean mHasAlpha;
 
 	protected native long native_constructor();
 	protected native void native_selectChild(long container, long child);
@@ -154,6 +157,10 @@ public class DrawableContainer extends Drawable {
 				d.setTintMode(state.mTintMode);
 			}
 		}
+		// AOSP selectDrawable(): without an enter fade (ATL has none) the child gets the container's alpha
+		if (mHasAlpha) {
+			d.setAlpha(mAlpha);
+		}
 		d.setVisible(isVisible(), true);
 		d.setDither(state.mDither);
 		d.setState(getState());
@@ -161,6 +168,23 @@ public class DrawableContainer extends Drawable {
 		d.setBounds(getBounds());
 		d.setLayoutDirection(getLayoutDirection());
 		d.setAutoMirrored(state.mAutoMirrored);
+	}
+
+	/* AOSP DrawableContainer.setAlpha() without the fade animation */
+	@Override
+	public void setAlpha(int alpha) {
+		if (!mHasAlpha || mAlpha != alpha) {
+			mHasAlpha = true;
+			mAlpha = alpha;
+			if (getCurrent() != null) {
+				getCurrent().setAlpha(alpha);
+			}
+		}
+	}
+
+	@Override
+	public int getAlpha() {
+		return mAlpha;
 	}
 
 	@Override
