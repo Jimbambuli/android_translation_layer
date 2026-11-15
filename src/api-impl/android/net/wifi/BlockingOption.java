@@ -137,9 +137,10 @@ public final class BlockingOption implements Parcelable {
         if (this == obj) {
             return true;
         }
-        if (!(obj instanceof BlockingOption lhs)) {
+        if (!(obj instanceof BlockingOption)) {
             return false;
         }
+        BlockingOption lhs = (BlockingOption) obj;
         return mBSSIDOnly == lhs.mBSSIDOnly && mDisableTime == lhs.mDisableTime;
     }
 

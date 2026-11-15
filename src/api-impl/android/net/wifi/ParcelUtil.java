@@ -166,4 +166,12 @@ public class ParcelUtil {
         }
         return certs;
     }
+
+    /** Read List<OuiKeyedData> from a Parcel. */
+    @NonNull
+    public static List<OuiKeyedData> readOuiKeyedDataList(@NonNull Parcel in) {
+        List<OuiKeyedData> dataList = new ArrayList<>();
+        in.readList(dataList, OuiKeyedData.class.getClassLoader(), OuiKeyedData.class);
+        return dataList;
+    }
 }
