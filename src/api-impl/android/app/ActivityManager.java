@@ -105,16 +105,23 @@ public class ActivityManager {
 	}
 
 	public static class MemoryInfo implements Parcelable {
-		/* For now, just always report there's 10GB free RAM */
-		public long availMem = 10000;
+		public long availMem;
 
-		public long totalMem = 10000;
+		public long totalMem;
 
-		public long advertisedMem = 10000;
+		public long advertisedMem;
 
-		public long threshold = 200;
+		public long threshold;
 
-		public boolean lowMemory = false;
+		public boolean lowMemory;
+
+		public long hiddenAppThreshold;
+
+		public long secondaryServerThreshold;
+
+		public long visibleAppThreshold;
+
+		public long foregroundAppThreshold;
 
 		public int describeContents() {
 			return 0;
@@ -126,6 +133,10 @@ public class ActivityManager {
 			dest.writeLong(advertisedMem);
 			dest.writeLong(threshold);
 			dest.writeInt(lowMemory ? 1 : 0);
+			dest.writeLong(hiddenAppThreshold);
+			dest.writeLong(secondaryServerThreshold);
+			dest.writeLong(visibleAppThreshold);
+			dest.writeLong(foregroundAppThreshold);
 		}
 
 		public void readFromParcel(Parcel source) {
@@ -134,6 +145,10 @@ public class ActivityManager {
 			advertisedMem = source.readLong();
 			threshold = source.readLong();
 			lowMemory = source.readInt() != 0;
+			hiddenAppThreshold = source.readLong();
+			secondaryServerThreshold = source.readLong();
+			visibleAppThreshold = source.readLong();
+			foregroundAppThreshold = source.readLong();
 		}
 
 		public static final Parcelable.Creator<MemoryInfo> CREATOR = new Parcelable.Creator<MemoryInfo>() {
@@ -149,8 +164,47 @@ public class ActivityManager {
 		};
 	}
 
+	/* AOSP ProcessList.getMemoryInfo(): availMem = MemFree + Cached and totalMem = MemTotal of /proc/meminfo
+	 * (android_util_Process.cpp), the thresholds the low memory killer levels of ProcessList.updateOomLevels()
+	 * (max scale, 64 bit: foreground 73728 KB, visible 92160 KB, cached/home/service 221184 KB, which for a
+	 * device with less than 700 MB would need the display size too: this takes the memory scale only);
+	 * advertisedMem is totalMem here (not looked up) */
 	public void getMemoryInfo(MemoryInfo outInfo) {
-		outInfo = new MemoryInfo();
+		long free = 0, cached = 0, total = 0;
+		try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader("/proc/meminfo"))) {
+			String line;
+			while ((line = r.readLine()) != null) {
+				String[] f = line.split("\\s+");
+				if (f.length < 2)
+					continue;
+				if (f[0].equals("MemFree:"))
+					free = Long.parseLong(f[1]) * 1024;
+				else if (f[0].equals("Cached:"))
+					cached = Long.parseLong(f[1]) * 1024;
+				else if (f[0].equals("MemTotal:"))
+					total = Long.parseLong(f[1]) * 1024;
+			}
+		} catch (java.io.IOException | NumberFormatException e) {
+			/* total 0, as the native code when the file can't be read */
+		}
+		final float scaleMem = ((float)(total / (1024 * 1024) - 350)) / (700 - 350);
+		final float scale = scaleMem < 0 ? 0 : scaleMem > 1 ? 1 : scaleMem;
+		final int[] low = {12288, 18432, 24576, 36864, 43008, 49152};
+		final int[] high = {73728, 92160, 110592, 129024, 147456 * 3 / 2, 184320 * 7 / 4};
+		final long[] level = new long[6]; // foreground, visible, perceptible, perceptible low, cached min, cached lmk first
+		for (int i = 0; i < 6; i++)
+			level[i] = (long)(int)(low[i] + ((high[i] - low[i]) * scale)) * 1024;
+		final long homeAppMem = level[4]; // getMemLevel(HOME_APP_ADJ 600): the first level with adj >= 600 is 900
+		final long cachedAppMem = level[4];
+		outInfo.advertisedMem = total;
+		outInfo.availMem = free + cached;
+		outInfo.totalMem = total;
+		outInfo.threshold = homeAppMem;
+		outInfo.lowMemory = outInfo.availMem < (homeAppMem + ((cachedAppMem - homeAppMem) / 2));
+		outInfo.hiddenAppThreshold = cachedAppMem;
+		outInfo.secondaryServerThreshold = level[4];
+		outInfo.visibleAppThreshold = level[1];
+		outInfo.foregroundAppThreshold = level[0];
 	}
 
 	public ConfigurationInfo getDeviceConfigurationInfo() {
@@ -160,7 +214,19 @@ public class ActivityManager {
 	public int getMemoryClass() { return 20; }      // suggested heap size in MB
 	public int getLargeMemoryClass() { return 60; } // value chosen arbitrarily
 
-	public static void getMyMemoryState(RunningAppProcessInfo outInfo) {}
+	/* AOSP ActivityManagerService.fillInProcMemInfoLocked(): the process's own ids and its importance; ATL
+	 * does not track whether the app is visible, it counts as the top app (IMPORTANCE_FOREGROUND, state TOP) */
+	public static void getMyMemoryState(RunningAppProcessInfo outInfo) {
+		outInfo.pid = android.os.Process.myPid();
+		outInfo.uid = android.os.Process.myUid();
+		String pkg = ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+		outInfo.processName = pkg;
+		outInfo.pkgList = new String[] {pkg};
+		outInfo.lastTrimLevel = 0;
+		outInfo.importance = RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
+		outInfo.importanceReasonCode = RunningAppProcessInfo.REASON_UNKNOWN;
+		outInfo.processState = 2; // PROCESS_STATE_TOP
+	}
 
 	/* AOSP ActivityManager.getProcessMemoryInfo(): ActivityManagerService fills each MemoryInfo with
 	 * Debug.getMemoryInfo() of the process */
