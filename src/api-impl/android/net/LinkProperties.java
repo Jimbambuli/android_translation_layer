@@ -122,7 +122,7 @@ public class LinkProperties implements Parcelable {
 	}
 
 	/* AOSP LinkProperties.addLinkAddress(): an address with the same address and prefix is replaced */
-	private boolean addLinkAddress(LinkAddress address) {
+	boolean addLinkAddress(LinkAddress address) {
 		if (address == null)
 			return false;
 		int i = -1;
@@ -152,7 +152,7 @@ public class LinkProperties implements Parcelable {
 	}
 
 	/* AOSP LinkProperties.addDnsServer(): not added twice */
-	private boolean addDnsServer(InetAddress dnsServer) {
+	boolean addDnsServer(InetAddress dnsServer) {
 		if (dnsServer != null && !mDnses.contains(dnsServer)) {
 			mDnses.add(dnsServer);
 			return true;
