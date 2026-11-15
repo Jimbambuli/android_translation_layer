@@ -39,6 +39,26 @@ class ActivityActionBar extends ActionBar {
 		mTitle = activity.getTitle();
 	}
 
+	private Context mThemedContext;
+
+	/* AOSP WindowDecorActionBar.getThemedContext(): the activity, or a wrapper with the theme's
+	 * actionBarWidgetTheme when it names another theme */
+	@Override
+	public Context getThemedContext() {
+		if (mThemedContext == null) {
+			android.util.TypedValue outValue = new android.util.TypedValue();
+			android.content.res.Resources.Theme currentTheme = mActivity.getTheme();
+			currentTheme.resolveAttribute(com.android.internal.R.attr.actionBarWidgetTheme, outValue, true);
+			final int targetThemeRes = outValue.resourceId;
+			if (targetThemeRes != 0 && mActivity.getThemeResId() != targetThemeRes) {
+				mThemedContext = new android.view.ContextThemeWrapper(mActivity, targetThemeRes);
+			} else {
+				mThemedContext = mActivity;
+			}
+		}
+		return mThemedContext;
+	}
+
 	@Override
 	public void setCustomView(View view) {
 		setCustomView(view, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));

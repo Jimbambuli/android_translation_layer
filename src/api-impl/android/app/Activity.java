@@ -1516,7 +1516,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public native void nativePickImages(String[] mimeTypes, int maxItems, int requestCode);
 	public void reportFullyDrawn() {}
 	public void setVisible(boolean visible) {}
-	public Uri getReferrer() { return null; }
+	/* AOSP Activity.getReferrer(): EXTRA_REFERRER or EXTRA_REFERRER_NAME of the intent, else the
+	 * package of the caller as android-app:// URI. ATL does not track the caller of a start, so
+	 * without the extras it is null (as AOSP for a start with no known caller). */
+	public Uri getReferrer() {
+		Intent intent = getIntent();
+		if (intent != null) {
+			Uri referrer = intent.getParcelableExtra(Intent.EXTRA_REFERRER, Uri.class);
+			if (referrer != null) {
+				return referrer;
+			}
+			String referrerName = intent.getStringExtra(Intent.EXTRA_REFERRER_NAME);
+			if (referrerName != null) {
+				return Uri.parse(referrerName);
+			}
+		}
+		return null;
+	}
 	/* AOSP Activity.setDefaultKeyMode(); of the modes, ATL has DEFAULT_KEYS_DISABLE (keys the activity does not
 	 * handle are dropped) and DEFAULT_KEYS_SHORTCUT, the others type nowhere */
 	public static final int DEFAULT_KEYS_DISABLE = 0;
