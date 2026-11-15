@@ -815,6 +815,7 @@ srcs = [
 	'android/text/ClipboardManager.java',
 	'android/text/Editable.java',
 	'android/text/GetChars.java',
+	'android/text/GraphemeClusterSegmentFinder.java',
 	'android/text/Html.java',
 	'android/text/InputFilter.java',
 	'android/text/InputType.java',
