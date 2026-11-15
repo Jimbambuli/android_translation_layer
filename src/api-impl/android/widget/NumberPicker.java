@@ -54,7 +54,7 @@ public class NumberPicker extends LinearLayout {
 	}
 
 	public NumberPicker(Context context, AttributeSet attrs) {
-		this(context, attrs, 0);
+		this(context, attrs, com.android.internal.R.attr.numberPickerStyle);
 	}
 
 	public NumberPicker(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -62,7 +62,7 @@ public class NumberPicker extends LinearLayout {
 	}
 
 	public NumberPicker(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		super(context, attrs);
+		super(context, attrs, defStyleAttr, defStyleRes);
 		setOrientation(VERTICAL);
 		mIncrementButton = new Button(context);
 		mIncrementButton.setText("+");
