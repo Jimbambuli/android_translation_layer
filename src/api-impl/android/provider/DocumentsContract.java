@@ -45,6 +45,7 @@ public final class DocumentsContract {
 	public static final String EXTRA_INFO = "info";
 	public static final String EXTRA_ERROR = "error";
 	public static final String EXTRA_RESULT = "result";
+	public static final String EXTRA_ORIENTATION = "android.provider.extra.ORIENTATION";
 	public static final String METHOD_CREATE_DOCUMENT = "android:createDocument";
 	public static final String METHOD_RENAME_DOCUMENT = "android:renameDocument";
 	public static final String METHOD_DELETE_DOCUMENT = "android:deleteDocument";
