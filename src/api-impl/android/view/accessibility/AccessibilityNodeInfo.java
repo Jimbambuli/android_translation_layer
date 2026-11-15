@@ -2355,6 +2355,26 @@ public class AccessibilityNodeInfo implements Parcelable {
 	 */
 	public void setChecked(boolean checked) {
 		setBooleanProperty(BOOLEAN_PROPERTY_CHECKED, checked);
+		mChecked = checked ? CHECKED_STATE_TRUE : CHECKED_STATE_FALSE;
+	}
+
+	/* AOSP 16 (tri_state_checked): the checked state including partial; the boolean property is true only for
+	 * CHECKED_STATE_TRUE */
+	private int mChecked = CHECKED_STATE_FALSE;
+
+	/** Sets the checked state of this node (AOSP 16 setChecked(int)). */
+	public void setChecked(int checked) {
+		enforceNotSealed();
+		switch (checked) {
+			case CHECKED_STATE_FALSE:
+			case CHECKED_STATE_TRUE:
+			case CHECKED_STATE_PARTIAL:
+				mChecked = checked;
+				break;
+			default:
+				throw new IllegalArgumentException("Unknown checked argument: " + checked);
+		}
+		setBooleanProperty(BOOLEAN_PROPERTY_CHECKED, checked == CHECKED_STATE_TRUE);
 	}
 
 	/**
@@ -3492,9 +3512,12 @@ public class AccessibilityNodeInfo implements Parcelable {
 		return mStateDescription;
 	}
 
-	/** Gets the checked state of this node (AOSP 16); partial is never set, so it follows {@link #isChecked()}. */
+	/** Gets the checked state of this node (AOSP 16). ATL's copies keep only the boolean property, so a copy of a
+	 * partial node reads unchecked. */
 	public int getChecked() {
-		return isChecked() ? CHECKED_STATE_TRUE : CHECKED_STATE_FALSE;
+		if (isChecked())
+			return CHECKED_STATE_TRUE;
+		return mChecked == CHECKED_STATE_PARTIAL ? CHECKED_STATE_PARTIAL : CHECKED_STATE_FALSE;
 	}
 
 	/** Gets the expanded state of this node (AOSP 16), {@link #EXPANDED_STATE_UNDEFINED} unless set. */
@@ -5067,6 +5090,9 @@ public class AccessibilityNodeInfo implements Parcelable {
 				if (action == R.id.accessibilityActionShowTextSuggestions) {
 					return "ACTION_SHOW_TEXT_SUGGESTIONS";
 				}
+				if (action == 0x0102005f) { /* android.R.id.accessibilityActionSetExtendedSelection */
+					return "ACTION_SET_EXTENDED_SELECTION";
+				}
 				if (action == R.id.accessibilityActionScrollInDirection) {
 					return "ACTION_SCROLL_IN_DIRECTION";
 				}
@@ -6007,6 +6033,14 @@ public class AccessibilityNodeInfo implements Parcelable {
 		@NonNull
 		public static final AccessibilityAction ACTION_SHOW_TEXT_SUGGESTIONS =
 		    new AccessibilityAction(R.id.accessibilityActionShowTextSuggestions);
+
+		/**
+		 * Action to set the extended selection (AOSP 16, a11y_selection_api). The id is the public
+		 * android.R.id.accessibilityActionSetExtendedSelection (0x0102005f); ATL's internal R has no such id.
+		 */
+		public static final AccessibilityAction ACTION_SET_EXTENDED_SELECTION =
+		    new AccessibilityAction(0x0102005f);
+
 
 		private final int mActionId;
 		private final CharSequence mLabel;
