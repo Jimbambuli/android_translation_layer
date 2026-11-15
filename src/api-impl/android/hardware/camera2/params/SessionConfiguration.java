@@ -15,8 +15,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
 
-/* AOSP core/java/android/hardware/camera2/params/SessionConfiguration.java without the Parcelable and
- * color-space parts (comments and annotations removed) */
+/* AOSP core/java/android/hardware/camera2/params/SessionConfiguration.java without the Parcelable
+ * parts (comments and annotations removed) */
 public final class SessionConfiguration {
 	private static final String TAG = "SessionConfiguration";
 
@@ -73,6 +73,31 @@ public final class SessionConfiguration {
 	public int hashCode() {
 		return HashCodeHelpers.hashCode(mOutputConfigurations.hashCode(), mInputConfig.hashCode(),
 				mSessionType);
+	}
+
+	/* android-16 SessionConfiguration color space; mColorSpace starts at 0 as there */
+	private int mColorSpace;
+
+	public void setColorSpace(android.graphics.ColorSpace.Named colorSpace) {
+		mColorSpace = colorSpace.ordinal();
+		for (OutputConfiguration outputConfiguration : mOutputConfigurations) {
+			outputConfiguration.setColorSpace(colorSpace);
+		}
+	}
+
+	public void clearColorSpace() {
+		mColorSpace = ColorSpaceProfiles.UNSPECIFIED;
+		for (OutputConfiguration outputConfiguration : mOutputConfigurations) {
+			outputConfiguration.clearColorSpace();
+		}
+	}
+
+	public android.graphics.ColorSpace getColorSpace() {
+		if (mColorSpace != ColorSpaceProfiles.UNSPECIFIED) {
+			return android.graphics.ColorSpace.get(android.graphics.ColorSpace.Named.values()[mColorSpace]);
+		} else {
+			return null;
+		}
 	}
 
 	public int getSessionType() {

@@ -222,6 +222,25 @@ public final class OutputConfiguration {
 		return mMirrorMode;
 	}
 
+	/* android-16 OutputConfiguration color space (the constructors start at UNSPECIFIED) */
+	private int mColorSpace = ColorSpaceProfiles.UNSPECIFIED;
+
+	public void setColorSpace(android.graphics.ColorSpace.Named colorSpace) {
+		mColorSpace = colorSpace.ordinal();
+	}
+
+	public void clearColorSpace() {
+		mColorSpace = ColorSpaceProfiles.UNSPECIFIED;
+	}
+
+	public android.graphics.ColorSpace getColorSpace() {
+		if (mColorSpace != ColorSpaceProfiles.UNSPECIFIED) {
+			return android.graphics.ColorSpace.get(android.graphics.ColorSpace.Named.values()[mColorSpace]);
+		} else {
+			return null;
+		}
+	}
+
 	public void setReadoutTimestampEnabled(boolean on) {
 		mReadoutTimestampEnabled = on;
 	}

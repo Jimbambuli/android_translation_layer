@@ -541,6 +541,7 @@ srcs = [
 	'android/hardware/camera2/CaptureRequest.java',
 	'android/hardware/camera2/CaptureResult.java',
 	'android/hardware/camera2/TotalCaptureResult.java',
+	'android/hardware/camera2/params/ColorSpaceProfiles.java',
 	'android/hardware/camera2/params/ColorSpaceTransform.java',
 	'android/hardware/camera2/params/DynamicRangeProfiles.java',
 	'android/hardware/camera2/params/ExtensionSessionConfiguration.java',
