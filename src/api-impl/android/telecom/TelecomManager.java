@@ -7,4 +7,13 @@ public class TelecomManager {
 	public String getDefaultDialerPackage() {
 		return null;
 	}
+
+	/* the methods below are AOSP's with getTelecomService() == null: "if (service != null)" skips the call */
+	public void registerPhoneAccount(PhoneAccount account) {}
+
+	public void unregisterPhoneAccount(PhoneAccountHandle accountHandle) {}
+
+	public void addNewIncomingCall(PhoneAccountHandle phoneAccount, android.os.Bundle extras) {}
+
+	public void placeCall(android.net.Uri address, android.os.Bundle extras) {}
 }
