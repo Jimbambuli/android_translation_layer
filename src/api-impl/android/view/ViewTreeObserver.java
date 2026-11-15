@@ -50,6 +50,11 @@ public final class ViewTreeObserver {
 	// These listeners cannot be mutated during dispatch
 	private ArrayList<OnDrawListener> mOnDrawListeners;
 
+	/* AOSP: frame commit callbacks, run once after the next frame was committed */
+	private ArrayList<Runnable> mOnFrameCommitListeners;
+	private final FrameCommitTrigger mFrameCommitTrigger = new FrameCommitTrigger();
+	private boolean mFrameCommitTriggerAdded;
+
 	private boolean mAlive = true;
 
 	// accessed from native code
@@ -387,7 +392,76 @@ public final class ViewTreeObserver {
 			}
 		}
 
+		/* the other observer's frame commit trigger is bound to it; its callbacks move here (AOSP) */
+		if (observer.mFrameCommitTriggerAdded && mOnPreDrawListeners != null) {
+			observer.mFrameCommitTriggerAdded = false;
+			if (mOnPreDrawListeners.remove(observer.mFrameCommitTrigger) && mOnPreDrawListeners.size() == 0)
+				native_set_have_predraw_listeners(false);
+		}
+
+		if (observer.mOnFrameCommitListeners != null) {
+			if (mOnFrameCommitListeners != null) {
+				mOnFrameCommitListeners.addAll(observer.captureFrameCommitCallbacks());
+			} else {
+				mOnFrameCommitListeners = observer.captureFrameCommitCallbacks();
+			}
+			addFrameCommitTriggerIfNeeded();
+		}
+
 		observer.kill();
+	}
+
+	/* AOSP 16 ViewTreeObserver.registerFrameCommitCallback(), captureFrameCommitCallbacks() and
+	 * unregisterFrameCommitCallback(). In AOSP, ViewRootImpl.addFrameCommitCallbackIfNeeded() captures
+	 * the callbacks at draw time and posts them at the front of the queue once the renderer committed
+	 * the frame. ATL's pre-draw hook runs on the frame clock's paint phase after the widgets have been
+	 * drawn (see android_view_ViewTreeObserver.c), so a one-shot pre-draw listener captures the
+	 * callbacks there and posts them the same way. */
+	public void registerFrameCommitCallback(Runnable callback) {
+		checkIsAlive();
+		if (mOnFrameCommitListeners == null) {
+			mOnFrameCommitListeners = new ArrayList<>();
+		}
+		mOnFrameCommitListeners.add(callback);
+		addFrameCommitTriggerIfNeeded();
+	}
+
+	ArrayList<Runnable> captureFrameCommitCallbacks() {
+		ArrayList<Runnable> ret = mOnFrameCommitListeners;
+		mOnFrameCommitListeners = null;
+		return ret;
+	}
+
+	public boolean unregisterFrameCommitCallback(Runnable callback) {
+		checkIsAlive();
+		if (mOnFrameCommitListeners == null) {
+			return false;
+		}
+		return mOnFrameCommitListeners.remove(callback);
+	}
+
+	private void addFrameCommitTriggerIfNeeded() {
+		if (!mFrameCommitTriggerAdded) {
+			mFrameCommitTriggerAdded = true;
+			addOnPreDrawListener(mFrameCommitTrigger);
+		}
+	}
+
+	private class FrameCommitTrigger implements OnPreDrawListener {
+		@Override
+		public boolean onPreDraw() {
+			mFrameCommitTriggerAdded = false;
+			removeOnPreDrawListener(this);
+			final ArrayList<Runnable> commitCallbacks = captureFrameCommitCallbacks();
+			if (commitCallbacks != null && commitCallbacks.size() > 0) {
+				new Handler(Looper.getMainLooper()).postAtFrontOfQueue(() -> {
+					for (int i = 0; i < commitCallbacks.size(); i++) {
+						commitCallbacks.get(i).run();
+					}
+				});
+			}
+			return true;
+		}
 	}
 
 	/**
