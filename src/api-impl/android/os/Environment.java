@@ -93,8 +93,15 @@ public class Environment {
 		}
 	}
 
-	public static boolean isExternalStorageRemovable(File file) {
-		return true;
+	/* AOSP Environment.isExternalStorageRemovable(File): the volume's isRemovable, an exception when no
+	 * volume holds the path */
+	public static boolean isExternalStorageRemovable(File path) {
+		final android.os.storage.StorageVolume volume = new android.os.storage.StorageManager().getStorageVolume(path);
+		if (volume != null) {
+			return volume.isRemovable();
+		} else {
+			throw new IllegalArgumentException("Failed to find storage device at " + path);
+		}
 	}
 
 	/**
@@ -694,8 +701,9 @@ public class Environment {
 	 *
 	 * <p>See {@link #getExternalStorageDirectory()} for more information.
 	 */
+	/* AOSP: the primary external directory's volume */
 	public static boolean isExternalStorageRemovable() {
-		return false;
+		return isExternalStorageRemovable(getExternalStorageDirectory());
 	}
 
 	/**

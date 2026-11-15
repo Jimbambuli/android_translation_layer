@@ -14,7 +14,19 @@ public abstract class BroadcastReceiver {
 			return mResultCode;
 		}
 
-		public void finish() {}
+		private boolean mFinished;
+
+		/* AOSP PendingResult.finish() -> sendFinished(): reports the end to the ActivityManager once and
+		 * throws when called again. ATL has no ActivityManager waiting for the receiver, so only the guard
+		 * remains. */
+		public final void finish() {
+			synchronized (this) {
+				if (mFinished) {
+					throw new IllegalStateException("Broadcast already finished");
+				}
+				mFinished = true;
+			}
+		}
 	}
 
 	public abstract void onReceive(Context context, Intent intent);

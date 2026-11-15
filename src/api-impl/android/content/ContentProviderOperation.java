@@ -158,24 +158,18 @@ public class ContentProviderOperation implements Parcelable {
 	    throws OperationApplicationException {
 		if (mExceptionAllowed) {
 			try {
-				return applyInternal(provider);
+				return applyInternal(provider, backRefs, numBackRefs);
 			} catch (Exception e) {
 				return new ContentProviderResult(e);
 			}
 		}
-		return applyInternal(provider);
+		return applyInternal(provider, backRefs, numBackRefs);
 	}
 
-	// back references can't be created with our Builder, so the values are used as they are
-	private ContentProviderResult applyInternal(ContentProvider provider) throws OperationApplicationException {
-		ContentValues values = null;
-		if (mValues != null) {
-			values = new ContentValues();
-			for (int i = 0; i < mValues.size(); i++) {
-				values.putObject(mValues.keyAt(i), mValues.valueAt(i));
-			}
-		}
-		final String[] selectionArgs = resolveSelectionArgs();
+	private ContentProviderResult applyInternal(ContentProvider provider, ContentProviderResult[] backRefs, int numBackRefs)
+	    throws OperationApplicationException {
+		final ContentValues values = resolveValueBackReferences(backRefs, numBackRefs);
+		final String[] selectionArgs = resolveSelectionArgsBackReferences(backRefs, numBackRefs);
 		if (mType == TYPE_INSERT) {
 			final Uri newUri = provider.insert(mUri, values);
 			if (newUri == null)
@@ -195,7 +189,28 @@ public class ContentProviderOperation implements Parcelable {
 		return new ContentProviderResult(numRows);
 	}
 
-	private String[] resolveSelectionArgs() {
+	/* AOSP ContentProviderOperation.resolveValueBackReferences */
+	public ContentValues resolveValueBackReferences(ContentProviderResult[] backRefs, int numBackRefs) {
+		if (mValues != null) {
+			final ContentValues values = new ContentValues();
+			for (int i = 0; i < mValues.size(); i++) {
+				final Object value = mValues.valueAt(i);
+				final Object resolved;
+				if (value instanceof BackReference) {
+					resolved = ((BackReference) value).resolve(backRefs, numBackRefs);
+				} else {
+					resolved = value;
+				}
+				values.putObject(mValues.keyAt(i), resolved);
+			}
+			return values;
+		} else {
+			return null;
+		}
+	}
+
+	/* AOSP ContentProviderOperation.resolveSelectionArgsBackReferences */
+	public String[] resolveSelectionArgsBackReferences(ContentProviderResult[] backRefs, int numBackRefs) {
 		if (mSelectionArgs != null) {
 			int max = -1;
 			for (int i = 0; i < mSelectionArgs.size(); i++) {
@@ -204,11 +219,46 @@ public class ContentProviderOperation implements Parcelable {
 
 			final String[] selectionArgs = new String[max + 1];
 			for (int i = 0; i < mSelectionArgs.size(); i++) {
-				selectionArgs[mSelectionArgs.keyAt(i)] = String.valueOf(mSelectionArgs.valueAt(i));
+				final Object value = mSelectionArgs.valueAt(i);
+				final Object resolved;
+				if (value instanceof BackReference) {
+					resolved = ((BackReference) value).resolve(backRefs, numBackRefs);
+				} else {
+					resolved = value;
+				}
+				selectionArgs[mSelectionArgs.keyAt(i)] = String.valueOf(resolved);
 			}
 			return selectionArgs;
 		} else {
 			return null;
+		}
+	}
+
+	/* AOSP ContentProviderOperation.BackReference (without its Parcel form) */
+	public static class BackReference {
+		private final int fromIndex;
+		private final String fromKey;
+
+		private BackReference(int fromIndex, String fromKey) {
+			this.fromIndex = fromIndex;
+			this.fromKey = fromKey;
+		}
+
+		public Object resolve(ContentProviderResult[] backRefs, int numBackRefs) {
+			if (fromIndex >= numBackRefs) {
+				throw new ArrayIndexOutOfBoundsException("asked for back ref " + fromIndex
+				    + " but there are only " + numBackRefs + " back refs");
+			}
+			ContentProviderResult backRef = backRefs[fromIndex];
+			Object backRefValue;
+			if (backRef.extras != null) {
+				backRefValue = backRef.extras.get(fromKey);
+			} else if (backRef.uri != null) {
+				backRefValue = ContentUris.parseId(backRef.uri);
+			} else {
+				backRefValue = (long) backRef.count;
+			}
+			return backRefValue;
 		}
 	}
 
@@ -248,10 +298,70 @@ public class ContentProviderOperation implements Parcelable {
 			mArg = arg;
 		}
 
+		/* AOSP Builder.setValue: a back reference is not replaced by a plain value */
 		private void setValue(String key, Object value) {
 			if (mValues == null)
 				mValues = new ArrayMap<>();
-			mValues.put(key, value);
+			final boolean oldReference = mValues.get(key) instanceof BackReference;
+			final boolean newReference = value instanceof BackReference;
+			if (!oldReference || newReference) {
+				mValues.put(key, value);
+			}
+		}
+
+		private void setSelectionArg(int index, Object value) {
+			if (mSelectionArgs == null)
+				mSelectionArgs = new SparseArray<>();
+			final boolean oldReference = mSelectionArgs.get(index) instanceof BackReference;
+			final boolean newReference = value instanceof BackReference;
+			if (!oldReference || newReference) {
+				mSelectionArgs.put(index, value);
+			}
+		}
+
+		private void assertValuesAllowed() {
+			if (mType != TYPE_INSERT && mType != TYPE_UPDATE && mType != TYPE_ASSERT) {
+				throw new IllegalArgumentException("Values not supported for type " + mType);
+			}
+		}
+
+		private void assertSelectionAllowed() {
+			if (mType != TYPE_UPDATE && mType != TYPE_DELETE && mType != TYPE_ASSERT) {
+				throw new IllegalArgumentException("Selection not supported for type " + mType);
+			}
+		}
+
+		/* AOSP Builder.withValueBackReference(s) / withSelectionBackReference */
+		public Builder withValueBackReferences(ContentValues backReferences) {
+			assertValuesAllowed();
+			for (Map.Entry<String, Object> entry : backReferences.valueSet()) {
+				setValue(entry.getKey(), new BackReference(((Number) entry.getValue()).intValue(), null));
+			}
+			return this;
+		}
+
+		public Builder withValueBackReference(String key, int fromIndex) {
+			assertValuesAllowed();
+			setValue(key, new BackReference(fromIndex, null));
+			return this;
+		}
+
+		public Builder withValueBackReference(String key, int fromIndex, String fromKey) {
+			assertValuesAllowed();
+			setValue(key, new BackReference(fromIndex, fromKey));
+			return this;
+		}
+
+		public Builder withSelectionBackReference(int index, int fromIndex) {
+			assertSelectionAllowed();
+			setSelectionArg(index, new BackReference(fromIndex, null));
+			return this;
+		}
+
+		public Builder withSelectionBackReference(int index, int fromIndex, String fromKey) {
+			assertSelectionAllowed();
+			setSelectionArg(index, new BackReference(fromIndex, fromKey));
+			return this;
 		}
 
 		public Builder withValue(String key, Object value) {
@@ -281,7 +391,7 @@ public class ContentProviderOperation implements Parcelable {
 				mSelectionArgs = new SparseArray<>();
 			if (selectionArgs != null) {
 				for (int i = 0; i < selectionArgs.length; i++) {
-					mSelectionArgs.put(i, selectionArgs[i]);
+					setSelectionArg(i, selectionArgs[i]);
 				}
 			}
 			return this;

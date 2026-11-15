@@ -90,6 +90,11 @@ public final class SQLiteDatabaseConfiguration {
 	/**
 	 * The custom functions to register.
 	 */
+	/**
+	 * The statements to execute to initialize each connection (AOSP SQLiteDatabaseConfiguration.perConnectionSql).
+	 */
+	public final ArrayList<android.util.Pair<String, Object[]>> perConnectionSql = new ArrayList<>();
+
 	public final ArrayList<SQLiteCustomFunction> customFunctions =
 	    new ArrayList<SQLiteCustomFunction>();
 
@@ -150,6 +155,8 @@ public final class SQLiteDatabaseConfiguration {
 		foreignKeyConstraintsEnabled = other.foreignKeyConstraintsEnabled;
 		customFunctions.clear();
 		customFunctions.addAll(other.customFunctions);
+		perConnectionSql.clear();
+		perConnectionSql.addAll(other.perConnectionSql);
 	}
 
 	/**

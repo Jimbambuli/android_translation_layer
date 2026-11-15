@@ -34,7 +34,8 @@ public class IntentFilter {
 	}
 
 	private List<String> actions = new ArrayList<>();
-	private Set<String> categories = new HashSet<>();
+	/* insertion order like AOSP's ArrayList, so that getCategory(index) is stable */
+	private Set<String> categories = new java.util.LinkedHashSet<>();
 	private List<String> dataSchemes = new ArrayList<>();
 	private List<AuthorityEntry> dataAuthorities = new ArrayList<>();
 	/* AOSP: paths, MIME types and android:autoVerify of the filter */
@@ -62,6 +63,16 @@ public class IntentFilter {
 	public void addCategory(String category) {
 		categories.add(category);
 	}
+	/* AOSP IntentFilter.getCategory: the category at the index, in the order added */
+	public final String getCategory(int index) {
+		if (index < 0 || index >= categories.size())
+			throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + categories.size());
+		java.util.Iterator<String> it = categories.iterator();
+		for (int i = 0; i < index; i++)
+			it.next();
+		return it.next();
+	}
+
 	public int countCategories() {
 		return categories.size();
 	}

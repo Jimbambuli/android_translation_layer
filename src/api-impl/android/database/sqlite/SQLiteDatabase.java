@@ -1647,6 +1647,31 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	 * @param bindArgs only byte[], String, Long and Double are supported in bindArgs.
 	 * @throws SQLException if the SQL string is invalid
 	 */
+	/**
+	 * Execute the given SQL statement on all connections to this database.
+	 * (AOSP SQLiteDatabase.execPerConnectionSQL)
+	 */
+	public void execPerConnectionSQL(String sql, Object[] bindArgs) throws SQLException {
+		java.util.Objects.requireNonNull(sql);
+
+		// Copy arguments to ensure that the caller doesn't accidentally change
+		// the values used by future connections
+		bindArgs = DatabaseUtils.deepCopyOf(bindArgs);
+
+		synchronized (mLock) {
+			throwIfNotOpenLocked();
+
+			final int index = mConfigurationLocked.perConnectionSql.size();
+			mConfigurationLocked.perConnectionSql.add(Pair.create(sql, bindArgs));
+			try {
+				mConnectionPoolLocked.reconfigure(mConfigurationLocked);
+			} catch (RuntimeException ex) {
+				mConfigurationLocked.perConnectionSql.remove(index);
+				throw ex;
+			}
+		}
+	}
+
 	public void execSQL(String sql, Object[] bindArgs) throws SQLException {
 		if (bindArgs == null) {
 			throw new IllegalArgumentException("Empty bindArgs");

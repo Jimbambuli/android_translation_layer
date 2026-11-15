@@ -8,15 +8,22 @@ import android.content.res.Resources;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.MatrixCursor;
+import android.graphics.Bitmap;
+import android.graphics.ImageDecoder;
+import android.graphics.Matrix;
+import android.graphics.Point;
 import android.net.Uri;
 import android.os.Bundle;
+import java.util.Objects;
 import android.os.CancellationSignal;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.Size;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -286,20 +293,110 @@ public class ContentResolver {
 		return query(uri, projection, selection, selectionArgs, sortOrder);
 	}
 
-	public int delete(Uri uri, String selection, String[] selectionArgs) {
+	/* AOSP ContentResolver: the SQL-style calls go through the Bundle forms, which reach the provider's
+	 * Bundle methods (their defaults fall back to the SQL-style ones). Without a provider ATL keeps its
+	 * answer (0 / null) instead of AOSP's IllegalArgumentException("Unknown URL"). */
+	public final int delete(Uri uri, String selection, String[] selectionArgs) {
+		return delete(uri, createSqlQueryBundle(selection, selectionArgs));
+	}
+
+	public final int delete(Uri uri, Bundle extras) {
+		Objects.requireNonNull(uri, "url");
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
-			return provider.delete(uri, selection, selectionArgs);
+			return provider.delete(uri, extras);
 		else
 			return 0;
 	}
 
-	public Uri insert(Uri uri, ContentValues values) {
+	public final Uri insert(Uri uri, ContentValues values) {
+		return insert(uri, values, null);
+	}
+
+	public final Uri insert(Uri uri, ContentValues values, Bundle extras) {
+		Objects.requireNonNull(uri, "url");
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
-			return provider.insert(uri, values);
+			return provider.insert(uri, values, extras);
 		else
 			return null;
+	}
+
+	public final int bulkInsert(Uri uri, ContentValues[] values) {
+		Objects.requireNonNull(uri, "url");
+		Objects.requireNonNull(values, "values");
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		if (provider != null)
+			return provider.bulkInsert(uri, values);
+		else
+			return 0;
+	}
+
+	/* AOSP ContentResolver.loadThumbnail(Uri, Size, CancellationSignal) and the static
+	 * loadThumbnail(ContentInterface, ...) it calls (ContentInterface is this resolver here): the provider's
+	 * typed "image/*" file for EXTRA_SIZE, decoded and sampled down, then turned by EXTRA_ORIENTATION */
+	public Bitmap loadThumbnail(Uri uri, Size size, CancellationSignal signal) throws IOException {
+		Objects.requireNonNull(uri);
+		Objects.requireNonNull(size);
+
+		final Bundle opts = new Bundle();
+		opts.putParcelable(EXTRA_SIZE, new Point(size.getWidth(), size.getHeight()));
+		final int[] orientation = new int[1];
+
+		Bitmap bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(() -> {
+			final AssetFileDescriptor afd = openTypedAssetFile(uri, "image/*", opts, signal);
+			final Bundle extras = afd.getExtras();
+			orientation[0] = (extras != null) ? extras.getInt(android.provider.DocumentsContract.EXTRA_ORIENTATION, 0) : 0;
+			return afd;
+		}), (ImageDecoder decoder, ImageDecoder.ImageInfo info, ImageDecoder.Source source) -> {
+			decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
+
+			// One last-ditch check to see if we've been canceled.
+			if (signal != null) signal.throwIfCanceled();
+
+			// We requested a rough thumbnail size, but the remote size may have
+			// returned something giant, so defensively scale down as needed.
+			final int widthSample = info.getSize().getWidth() / size.getWidth();
+			final int heightSample = info.getSize().getHeight() / size.getHeight();
+			final int sample = Math.max(widthSample, heightSample);
+			if (sample > 1) {
+				decoder.setTargetSampleSize(sample);
+			}
+		});
+
+		if (orientation[0] != 0) {
+			final int width = bitmap.getWidth();
+			final int height = bitmap.getHeight();
+
+			final Matrix m = new Matrix();
+			m.setRotate(orientation[0], width / 2, height / 2);
+			bitmap = Bitmap.createBitmap(bitmap, 0, 0, width, height, m, false);
+		}
+
+		return bitmap;
+	}
+
+	/* AOSP ContentResolver.createSqlQueryBundle */
+	public static Bundle createSqlQueryBundle(String selection, String[] selectionArgs) {
+		return createSqlQueryBundle(selection, selectionArgs, null);
+	}
+
+	public static Bundle createSqlQueryBundle(String selection, String[] selectionArgs, String sortOrder) {
+		if (selection == null && selectionArgs == null && sortOrder == null) {
+			return null;
+		}
+
+		Bundle queryArgs = new Bundle();
+		if (selection != null) {
+			queryArgs.putString(QUERY_ARG_SQL_SELECTION, selection);
+		}
+		if (selectionArgs != null) {
+			queryArgs.putStringArray(QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs);
+		}
+		if (sortOrder != null) {
+			queryArgs.putString(QUERY_ARG_SQL_SORT_ORDER, sortOrder);
+		}
+		return queryArgs;
 	}
 
 	public String getType(Uri uri) {
@@ -315,10 +412,15 @@ public class ContentResolver {
 			return null;
 	}
 
-	public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+	public final int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+		return update(uri, values, createSqlQueryBundle(selection, selectionArgs));
+	}
+
+	public final int update(Uri uri, ContentValues values, Bundle extras) {
+		Objects.requireNonNull(uri, "uri");
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
-			return provider.update(uri, values, selection, selectionArgs);
+			return provider.update(uri, values, extras);
 		else
 			return 0;
 	}
@@ -400,7 +502,7 @@ public class ContentResolver {
 
 	public final ContentProviderClient acquireContentProviderClient(String name) {
 		ContentProvider provider = ContentProvider.atl_get_content_provider(name);
-		return provider != null ? new ContentProviderClient(provider) : null;
+		return provider != null ? new ContentProviderClient(provider, name) : null;
 	}
 
 	public final ContentProviderClient acquireUnstableContentProviderClient(Uri uri) {
@@ -431,7 +533,7 @@ public class ContentResolver {
 						SyncResult syncResult = new SyncResult();
 						try {
 							adapter.onPerformSync(account, extras != null ? extras : new Bundle(), authority,
-							                      provider != null ? new ContentProviderClient(provider) : null, syncResult);
+							                      provider != null ? new ContentProviderClient(provider, authority) : null, syncResult);
 							Log.i("ContentResolver", "requestSync: sync for " + authority + " finished: " + syncResult);
 						} catch (Throwable t) {
 							Log.e("ContentResolver", "requestSync: sync for " + authority + " failed", t);

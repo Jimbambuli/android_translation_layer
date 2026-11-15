@@ -77,6 +77,17 @@ public final class PowerManager {
 		return false;
 	}
 
+	/* AOSP PowerManager.isDeviceLightIdleMode asks the power manager service; ATL has none and
+	 * never enters doze, which is what the service reports for an active device. */
+	public boolean isDeviceLightIdleMode() {
+		return false;
+	}
+
+	/* AOSP PowerManager.isLowPowerStandbyEnabled: low power standby is off by default on Android. */
+	public boolean isLowPowerStandbyEnabled() {
+		return false;
+	}
+
 	public boolean isInteractive() {
 		return true;
 	}

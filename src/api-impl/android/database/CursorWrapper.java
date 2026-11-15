@@ -200,6 +200,16 @@ public class CursorWrapper implements Cursor {
 	}
 
 	@Override
+	public void setNotificationUris(ContentResolver cr, java.util.List<Uri> uris) {
+		cursor.setNotificationUris(cr, uris);
+	}
+
+	@Override
+	public java.util.List<Uri> getNotificationUris() {
+		return cursor.getNotificationUris();
+	}
+
+	@Override
 	public boolean getWantsAllOnMoveCalls() {
 		return cursor.getWantsAllOnMoveCalls();
 	}

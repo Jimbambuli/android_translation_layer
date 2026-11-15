@@ -10,12 +10,16 @@ import android.os.RemoteException;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Objects;
 
 public class ContentProviderClient implements AutoCloseable {
 	private final ContentProvider contentProvider;
+	private final String mAuthority;
 
-	ContentProviderClient(ContentProvider contentProvider) {
+	ContentProviderClient(ContentProvider contentProvider, String authority) {
 		this.contentProvider = contentProvider;
+		this.mAuthority = authority;
 	}
 
 	public ContentProvider getLocalContentProvider() {
@@ -42,16 +46,48 @@ public class ContentProviderClient implements AutoCloseable {
 		return contentProvider.getType(url);
 	}
 
+	/* AOSP ContentProviderClient: insert/update/delete use the provider's Bundle forms (as
+	 * ContentResolver does), bulkInsert and applyBatch go straight to the provider */
 	public Uri insert(Uri url, ContentValues initialValues) throws RemoteException {
-		return contentProvider.insert(url, initialValues);
+		return insert(url, initialValues, null);
+	}
+
+	public Uri insert(Uri url, ContentValues initialValues, Bundle extras) throws RemoteException {
+		Objects.requireNonNull(url, "url");
+		return contentProvider.insert(url, initialValues, extras);
+	}
+
+	public int bulkInsert(Uri url, ContentValues[] initialValues) throws RemoteException {
+		Objects.requireNonNull(url, "url");
+		Objects.requireNonNull(initialValues, "initialValues");
+		return contentProvider.bulkInsert(url, initialValues);
 	}
 
 	public int delete(Uri url, String selection, String[] selectionArgs) throws RemoteException {
-		return contentProvider.delete(url, selection, selectionArgs);
+		return delete(url, ContentResolver.createSqlQueryBundle(selection, selectionArgs));
+	}
+
+	public int delete(Uri url, Bundle extras) throws RemoteException {
+		Objects.requireNonNull(url, "url");
+		return contentProvider.delete(url, extras);
 	}
 
 	public int update(Uri url, ContentValues values, String selection, String[] selectionArgs) throws RemoteException {
-		return contentProvider.update(url, values, selection, selectionArgs);
+		return update(url, values, ContentResolver.createSqlQueryBundle(selection, selectionArgs));
+	}
+
+	public int update(Uri url, ContentValues values, Bundle extras) throws RemoteException {
+		Objects.requireNonNull(url, "url");
+		return contentProvider.update(url, values, extras);
+	}
+
+	public ContentProviderResult[] applyBatch(ArrayList<ContentProviderOperation> operations) throws RemoteException, OperationApplicationException {
+		return applyBatch(mAuthority, operations);
+	}
+
+	public ContentProviderResult[] applyBatch(String authority, ArrayList<ContentProviderOperation> operations) throws RemoteException, OperationApplicationException {
+		Objects.requireNonNull(operations, "operations");
+		return contentProvider.applyBatch(authority, operations);
 	}
 
 	public ParcelFileDescriptor openFile(Uri url, String mode) throws RemoteException, FileNotFoundException {

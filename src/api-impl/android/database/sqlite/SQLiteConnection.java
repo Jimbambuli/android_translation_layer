@@ -226,6 +226,25 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 			SQLiteCustomFunction function = mConfiguration.customFunctions.get(i);
 			nativeRegisterCustomFunction(mConnectionPtr, function);
 		}
+		executePerConnectionSqlFromConfiguration(0);
+	}
+
+	// AOSP SQLiteConnection.executePerConnectionSqlFromConfiguration
+	private void executePerConnectionSqlFromConfiguration(int startIndex) {
+		for (int i = startIndex; i < mConfiguration.perConnectionSql.size(); i++) {
+			final android.util.Pair<String, Object[]> statement = mConfiguration.perConnectionSql.get(i);
+			final int type = DatabaseUtils.getSqlStatementType(statement.first);
+			switch (type) {
+				case DatabaseUtils.STATEMENT_SELECT:
+					executeForString(statement.first, statement.second, null);
+					break;
+				case DatabaseUtils.STATEMENT_PRAGMA:
+					execute(statement.first, statement.second, null);
+					break;
+				default:
+					throw new IllegalArgumentException("Unsupported configuration statement: " + statement);
+			}
+		}
 	}
 
 	private void dispose(boolean finalized) {
@@ -426,6 +445,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 		                          & SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING)
 		                      != 0;
 		boolean localeChanged = !configuration.locale.equals(mConfiguration.locale);
+		final int oldSize = mConfiguration.perConnectionSql.size();
+		final int newSize = configuration.perConnectionSql.size();
+		boolean perConnectionSqlChanged = newSize > oldSize;
 
 		// Update configuration parameters.
 		mConfiguration.updateParametersFrom(configuration);
@@ -447,6 +469,9 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 		// Update locale.
 		if (localeChanged) {
 			setLocaleFromConfiguration();
+		}
+		if (perConnectionSqlChanged) {
+			executePerConnectionSqlFromConfiguration(oldSize);
 		}
 	}
 

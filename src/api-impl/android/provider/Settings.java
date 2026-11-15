@@ -93,6 +93,13 @@ public class Settings {
 		}
 
 		private final static String TAG = "Settings$System";
+
+		/* AOSP Settings.System.canWrite -> isCallingPackageAllowedToWriteSettings: true only once the user
+		 * granted WRITE_SETTINGS (app op). ATL has no such grant and no Settings.System.put*, so the app
+		 * sees the state of a fresh install: not allowed. */
+		public static boolean canWrite(Context context) {
+			return false;
+		}
 		public static final Uri CONTENT_URI = Uri.parse("content://settings/system");
 
 		public static final Uri DEFAULT_NOTIFICATION_URI = getUriFor("notification_sound");

@@ -504,6 +504,8 @@ public class Intent implements Parcelable {
 	private String type;
 	private String packageName;
 	private Intent selector;
+	private String mIdentifier;
+	private Rect mSourceBounds;
 
 	@Export
 	public Intent() {}
@@ -914,6 +916,15 @@ public class Intent implements Parcelable {
 		this.clipData = o.clipData;
 		if (o.mCategories != null)
 			this.mCategories = new android.util.ArraySet<String>(o.mCategories);
+		/* AOSP Intent(Intent, COPY_MODE_ALL) also copies these */
+		this.type = o.type;
+		this.mIdentifier = o.mIdentifier;
+		this.packageName = o.packageName;
+		this.flags = o.flags;
+		if (o.selector != null)
+			this.selector = new Intent(o.selector);
+		if (o.mSourceBounds != null)
+			this.mSourceBounds = new Rect(o.mSourceBounds);
 	}
 	/* AOSP Intent(Parcel) / readFromParcel() / writeToParcel() / CREATOR, wire format of android-14.
 	 * ATL keeps no identifier, extended flags, source bounds, content user hint or original intent: they
@@ -926,14 +937,16 @@ public class Intent implements Parcelable {
 		setAction(in.readString8());
 		data = Uri.CREATOR.createFromParcel(in);
 		type = in.readString8();
-		in.readString8(); /* identifier */
+		mIdentifier = in.readString8();
 		flags = in.readInt();
 		in.readInt(); /* extended flags */
 		packageName = in.readString8();
 		component = ComponentName.readFromParcel(in);
 
 		if (in.readInt() != 0) {
-			Rect.CREATOR.createFromParcel(in); /* source bounds */
+			mSourceBounds = Rect.CREATOR.createFromParcel(in);
+		} else {
+			mSourceBounds = null;
 		}
 
 		int n = in.readInt();
@@ -968,12 +981,17 @@ public class Intent implements Parcelable {
 		out.writeString8(action);
 		Uri.writeToParcel(out, data);
 		out.writeString8(type);
-		out.writeString8(null); /* identifier */
+		out.writeString8(mIdentifier);
 		out.writeInt(flags);
 		out.writeInt(0); /* extended flags */
 		out.writeString8(packageName);
 		ComponentName.writeToParcel(component, out);
-		out.writeInt(0); /* source bounds */
+		if (mSourceBounds != null) {
+			out.writeInt(1);
+			mSourceBounds.writeToParcel(out, parcelFlags);
+		} else {
+			out.writeInt(0);
+		}
 
 		if (mCategories != null) {
 			int n = mCategories.size();
@@ -1383,7 +1401,12 @@ public class Intent implements Parcelable {
 		}
 	}
 
-	public void setExtrasClassLoader(ClassLoader loader) {}
+	/* AOSP Intent.setExtrasClassLoader */
+	public void setExtrasClassLoader(ClassLoader loader) {
+		if (extras != null) {
+			extras.setClassLoader(loader);
+		}
+	}
 
 	@Export
 	public Intent setClassName(Context packageContext, String className) {
@@ -1412,8 +1435,158 @@ public class Intent implements Parcelable {
 		return this;
 	}
 
+	/* AOSP Intent.filterHashCode */
 	public int filterHashCode() {
-		return 0;
+		int code = 0;
+		if (action != null) {
+			code += action.hashCode();
+		}
+		if (data != null) {
+			code += data.hashCode();
+		}
+		if (type != null) {
+			code += type.hashCode();
+		}
+		if (mIdentifier != null) {
+			code += mIdentifier.hashCode();
+		}
+		if (packageName != null) {
+			code += packageName.hashCode();
+		}
+		if (component != null) {
+			code += component.hashCode();
+		}
+		if (mCategories != null) {
+			code += mCategories.hashCode();
+		}
+		return code;
+	}
+
+	/* AOSP Intent.getIdentifier / setIdentifier */
+	public String getIdentifier() {
+		return mIdentifier;
+	}
+
+	public Intent setIdentifier(String identifier) {
+		mIdentifier = identifier;
+		return this;
+	}
+
+	/* AOSP Intent.FILL_IN_* */
+	public static final int FILL_IN_ACTION = 1 << 0;
+	public static final int FILL_IN_DATA = 1 << 1;
+	public static final int FILL_IN_CATEGORIES = 1 << 2;
+	public static final int FILL_IN_COMPONENT = 1 << 3;
+	public static final int FILL_IN_PACKAGE = 1 << 4;
+	public static final int FILL_IN_SOURCE_BOUNDS = 1 << 5;
+	public static final int FILL_IN_SELECTOR = 1 << 6;
+	public static final int FILL_IN_CLIP_DATA = 1 << 7;
+	public static final int FILL_IN_IDENTIFIER = 1 << 8;
+
+	/* AOSP Intent.fillIn (ATL keeps no content user hint) */
+	public int fillIn(Intent other, int flags) {
+		int changes = 0;
+		if (other.action != null && (action == null || (flags & FILL_IN_ACTION) != 0)) {
+			action = other.action;
+			changes |= FILL_IN_ACTION;
+		}
+		if ((other.data != null || other.type != null) && ((data == null && type == null) || (flags & FILL_IN_DATA) != 0)) {
+			data = other.data;
+			type = other.type;
+			changes |= FILL_IN_DATA;
+		}
+		if (other.mIdentifier != null && (mIdentifier == null || (flags & FILL_IN_IDENTIFIER) != 0)) {
+			mIdentifier = other.mIdentifier;
+			changes |= FILL_IN_IDENTIFIER;
+		}
+		if (other.mCategories != null && (mCategories == null || (flags & FILL_IN_CATEGORIES) != 0)) {
+			mCategories = new android.util.ArraySet<String>(other.mCategories);
+			changes |= FILL_IN_CATEGORIES;
+		}
+		if (other.packageName != null && (packageName == null || (flags & FILL_IN_PACKAGE) != 0)) {
+			if (selector == null) {
+				packageName = other.packageName;
+				changes |= FILL_IN_PACKAGE;
+			}
+		}
+		if (other.selector != null && (flags & FILL_IN_SELECTOR) != 0) {
+			if (packageName == null) {
+				selector = new Intent(other.selector);
+				packageName = null;
+				changes |= FILL_IN_SELECTOR;
+			}
+		}
+		if (other.clipData != null && (clipData == null || (flags & FILL_IN_CLIP_DATA) != 0)) {
+			clipData = other.clipData;
+			changes |= FILL_IN_CLIP_DATA;
+		}
+		if (other.component != null && (flags & FILL_IN_COMPONENT) != 0) {
+			component = other.component;
+			changes |= FILL_IN_COMPONENT;
+		}
+		this.flags |= other.flags;
+		if (other.mSourceBounds != null && (mSourceBounds == null || (flags & FILL_IN_SOURCE_BOUNDS) != 0)) {
+			mSourceBounds = new Rect(other.mSourceBounds);
+			changes |= FILL_IN_SOURCE_BOUNDS;
+		}
+		if (extras == null) {
+			if (other.extras != null) {
+				extras = new Bundle(other.extras);
+			}
+		} else if (other.extras != null) {
+			try {
+				Bundle newb = new Bundle(other.extras);
+				newb.putAll(extras);
+				extras = newb;
+			} catch (RuntimeException e) {
+				android.util.Log.w("Intent", "Failure filling in extras", e);
+			}
+		}
+		return changes;
+	}
+
+	/* AOSP Intent.makeRestartActivityTask */
+	public static Intent makeRestartActivityTask(ComponentName mainActivity) {
+		Intent intent = makeMainActivity(mainActivity);
+		intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+		return intent;
+	}
+
+	/* AOSP Intent.makeMainSelectorActivity */
+	public static Intent makeMainSelectorActivity(String selectorAction, String selectorCategory) {
+		Intent intent = new Intent(ACTION_MAIN);
+		intent.addCategory(CATEGORY_LAUNCHER);
+		Intent selector = new Intent();
+		selector.setAction(selectorAction);
+		selector.addCategory(selectorCategory);
+		intent.setSelector(selector);
+		return intent;
+	}
+
+	/* AOSP Intent.resolveActivityInfo */
+	public android.content.pm.ActivityInfo resolveActivityInfo(PackageManager pm, int flags) {
+		android.content.pm.ActivityInfo ai = null;
+		if (component != null) {
+			try {
+				ai = pm.getActivityInfo(component, flags);
+			} catch (PackageManager.NameNotFoundException e) {
+			}
+		} else {
+			ResolveInfo info = pm.resolveActivity(this, PackageManager.MATCH_DEFAULT_ONLY | flags);
+			if (info != null) {
+				ai = info.activityInfo;
+			}
+		}
+		return ai;
+	}
+
+	/* AOSP Intent.setTypeAndNormalize / setDataAndTypeAndNormalize */
+	public Intent setTypeAndNormalize(String type) {
+		return setType(normalizeMimeType(type));
+	}
+
+	public Intent setDataAndTypeAndNormalize(Uri data, String type) {
+		return setDataAndType(data.normalizeScheme(), normalizeMimeType(type));
 	}
 
 	public static Intent parseIntent(Resources res, XmlPullParser parser, AttributeSet attrs) {
@@ -1461,10 +1634,17 @@ public class Intent implements Parcelable {
 		return null;
 	}
 
-	public void setSourceBounds(Rect sourceBounds) {}
+	/* AOSP Intent.setSourceBounds / getSourceBounds */
+	public void setSourceBounds(Rect sourceBounds) {
+		if (sourceBounds != null) {
+			mSourceBounds = new Rect(sourceBounds);
+		} else {
+			mSourceBounds = null;
+		}
+	}
 
 	public Rect getSourceBounds() {
-		return null;
+		return mSourceBounds;
 	}
 
 	public void setSelector(Intent selector) {
@@ -1489,7 +1669,10 @@ public class Intent implements Parcelable {
 		return Objects.equals(this.action, other.action)
 		    && Objects.equals(this.component, other.component)
 		    && Objects.equals(this.data, other.data)
-		    && Objects.equals(this.type, other.type);
+		    && Objects.equals(this.type, other.type)
+		    && Objects.equals(this.mIdentifier, other.mIdentifier)
+		    && Objects.equals(this.packageName, other.packageName)
+		    && Objects.equals(this.mCategories, other.mCategories);
 	}
 
 	public long[] getLongArrayExtra(String name) {
@@ -1517,8 +1700,19 @@ public class Intent implements Parcelable {
 		return getCategories().contains(category);
 	}
 
-	public static String normalizeMimeType(String mimeType) {
-		return mimeType;
+	/* AOSP Intent.normalizeMimeType */
+	public static String normalizeMimeType(String type) {
+		if (type == null) {
+			return null;
+		}
+
+		type = type.trim().toLowerCase(java.util.Locale.ROOT);
+
+		final int semicolonIndex = type.indexOf(';');
+		if (semicolonIndex != -1) {
+			type = type.substring(0, semicolonIndex);
+		}
+		return type;
 	}
 
 	public CharSequence getCharSequenceExtra(String name) {

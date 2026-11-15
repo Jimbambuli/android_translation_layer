@@ -33,7 +33,39 @@ public class ShortcutInfo implements Parcelable {
 	private int mRank;
 	private int mExcludedSurfaces;
 	private long mLastChangedTimestamp;
+	private Icon mIcon;
+	private Person[] mPersons;
+	private boolean mLongLived;
 	boolean mDynamic;
+
+	/* AOSP ShortcutInfo.validateIcon (tint check left out: ATL Icon has no hasTint) */
+	public static Icon validateIcon(Icon icon) {
+		switch (icon.getType()) {
+			case Icon.TYPE_RESOURCE:
+			case Icon.TYPE_BITMAP:
+			case Icon.TYPE_ADAPTIVE_BITMAP:
+			case Icon.TYPE_URI:
+			case Icon.TYPE_URI_ADAPTIVE_BITMAP:
+				break;
+			default:
+				throw new IllegalArgumentException("Unsupported icon type:"
+				    + " only the bitmap and resource types are supported");
+		}
+		return icon;
+	}
+
+	/* @hide in AOSP; kept for the builder fields */
+	public Icon getIcon() {
+		return mIcon;
+	}
+
+	public Person[] getPersons() {
+		return mPersons == null ? null : mPersons.clone();
+	}
+
+	public boolean isLongLived() {
+		return mLongLived;
+	}
 
 	public String getId() {
 		return mId;
@@ -147,15 +179,18 @@ public class ShortcutInfo implements Parcelable {
 		private final String mId;
 		private final String mPackageName;
 		private ComponentName mActivity;
-			private CharSequence mTitle;
+		private CharSequence mTitle;
 		private CharSequence mText;
 		private CharSequence mDisabledMessage;
 		private Intent[] mIntents;
 		private Set<String> mCategories;
 		private PersistableBundle mExtras;
 		private LocusId mLocusId;
-			private int mRank;
-			private int mExcludedSurfaces;
+		private int mRank;
+		private int mExcludedSurfaces;
+		private Icon mIcon;
+		private Person[] mPersons;
+		private boolean mIsLongLived;
 
 		public Builder(Context context, String id) {
 			if (TextUtils.isEmpty(id)) {
@@ -180,6 +215,9 @@ public class ShortcutInfo implements Parcelable {
 			info.mRank = mRank;
 			info.mExcludedSurfaces = mExcludedSurfaces;
 			info.mLastChangedTimestamp = System.currentTimeMillis();
+			info.mIcon = mIcon;
+			info.mPersons = mPersons == null ? null : mPersons.clone();
+			info.mLongLived = mIsLongLived;
 			return info;
 		}
 
@@ -209,7 +247,8 @@ public class ShortcutInfo implements Parcelable {
 		}
 
 		public Builder setIcon(Icon icon) {
-			return this; // the icon is the launcher's
+			mIcon = validateIcon(icon);
+			return this;
 		}
 
 		public Builder setIntent(Intent intent) {
@@ -246,10 +285,25 @@ public class ShortcutInfo implements Parcelable {
 		}
 
 		public Builder setLongLived(boolean longLived) {
+			mIsLongLived = longLived;
 			return this;
 		}
 
+		public Builder setPerson(Person person) {
+			return setPersons(new Person[] {person});
+		}
+
+		/* AOSP Builder.setPersons; clonePersons drops the icons via Person.toBuilder,
+		   which ATL's Person lacks, so the array is copied as is */
 		public Builder setPersons(Person[] persons) {
+			Objects.requireNonNull(persons, "persons cannot be null");
+			if (persons.length == 0) {
+				throw new IllegalArgumentException("persons cannot be empty");
+			}
+			for (Person person : persons) {
+				Objects.requireNonNull(person, "persons cannot contain null");
+			}
+			mPersons = persons.clone();
 			return this;
 		}
 

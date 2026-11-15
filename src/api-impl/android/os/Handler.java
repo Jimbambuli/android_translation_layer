@@ -233,6 +233,15 @@ public class Handler {
 		return new Handler(looper, null, true);
 	}
 
+	/* AOSP Handler.createAsync(Looper, Callback) */
+	public static Handler createAsync(Looper looper, Callback callback) {
+		if (looper == null)
+			throw new NullPointerException("looper must not be null");
+		if (callback == null)
+			throw new NullPointerException("callback must not be null");
+		return new Handler(looper, callback, true);
+	}
+
 	/**
 	 * Returns a string representing the name of the specified message.
 	 * The default implementation will either return the class name of the
