@@ -1,6 +1,11 @@
 package android.net.wifi;
 
 import android.net.DhcpInfo;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.os.WorkSource;
+import java.util.Objects;
+import java.util.Set;
 
 public class WifiManager {
 
@@ -120,6 +125,10 @@ public class WifiManager {
 				return mHeld;
 			}
 		}
+
+		/* AOSP WifiLock.setWorkSource(): only attributes the lock for battery statistics, no observable effect
+		 * without a power-saving Wi-Fi to hold */
+		public void setWorkSource(WorkSource ws) {}
 	}
 
 	/* AOSP WifiManager.MulticastLock: the same reference counting as WifiLock; ATL does not filter multicast */
@@ -152,6 +161,180 @@ public class WifiManager {
 			synchronized (this) {
 				return mHeld;
 			}
+		}
+	}
+
+	/* AOSP WifiManager.AddNetworkResult */
+	public static final class AddNetworkResult implements Parcelable {
+		public static final int STATUS_SUCCESS = 0;
+		public static final int STATUS_FAILURE_UNKNOWN = 1;
+		public static final int STATUS_NO_PERMISSION = 2;
+		public static final int STATUS_ADD_PASSPOINT_FAILURE = 3;
+		public static final int STATUS_ADD_WIFI_CONFIG_FAILURE = 4;
+		public static final int STATUS_INVALID_CONFIGURATION = 5;
+		public static final int STATUS_NO_PERMISSION_MODIFY_CONFIG = 6;
+		public static final int STATUS_NO_PERMISSION_MODIFY_PROXY_SETTING = 7;
+		public static final int STATUS_NO_PERMISSION_MODIFY_MAC_RANDOMIZATION = 8;
+		public static final int STATUS_FAILURE_UPDATE_NETWORK_KEYS = 9;
+		public static final int STATUS_INVALID_CONFIGURATION_ENTERPRISE = 10;
+
+		public final int statusCode;
+		public final int networkId;
+
+		public AddNetworkResult(int statusCode, int networkId) {
+			this.statusCode = statusCode;
+			this.networkId = networkId;
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		@Override
+		public void writeToParcel(Parcel dest, int flags) {
+			dest.writeInt(statusCode);
+			dest.writeInt(networkId);
+		}
+
+		public static final Creator<AddNetworkResult> CREATOR = new Creator<AddNetworkResult>() {
+			public AddNetworkResult createFromParcel(Parcel in) {
+				return new AddNetworkResult(in.readInt(), in.readInt());
+			}
+
+			public AddNetworkResult[] newArray(int size) {
+				return new AddNetworkResult[size];
+			}
+		};
+	}
+
+	/* AOSP WifiManager.InterfaceCreationImpact */
+	public static class InterfaceCreationImpact {
+		private final int mInterfaceType;
+		private final Set<String> mPackages;
+
+		public InterfaceCreationImpact(int interfaceType, Set<String> packages) {
+			mInterfaceType = interfaceType;
+			mPackages = packages;
+		}
+
+		public int getInterfaceType() {
+			return mInterfaceType;
+		}
+
+		public Set<String> getPackages() {
+			return mPackages;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(mInterfaceType, mPackages);
+		}
+
+		@Override
+		public boolean equals(Object that) {
+			if (this == that)
+				return true;
+			if (!(that instanceof InterfaceCreationImpact))
+				return false;
+			InterfaceCreationImpact other = (InterfaceCreationImpact) that;
+			return this.mInterfaceType == other.mInterfaceType && Objects.equals(this.mPackages, other.mPackages);
+		}
+	}
+
+	/* AOSP WifiManager.LocalOnlyConnectionFailureListener */
+	public static interface LocalOnlyConnectionFailureListener {
+		void onConnectionFailed(WifiNetworkSpecifier specifier, int failureReason);
+	}
+
+	/* AOSP WifiManager.SuggestionConnectionStatusListener */
+	public static interface SuggestionConnectionStatusListener {
+		void onConnectionStatus(WifiNetworkSuggestion wifiNetworkSuggestion, int failureReason);
+	}
+
+	/* AOSP WifiManager.SuggestionUserApprovalStatusListener */
+	public static interface SuggestionUserApprovalStatusListener {
+		void onUserApprovalStatusChange(int status);
+	}
+
+	/* AOSP WifiManager.WifiStateChangedListener */
+	public static interface WifiStateChangedListener {
+		void onWifiStateChanged();
+	}
+
+	/* AOSP WifiManager.ScanResultsCallback (the binder proxy of AOSP is left out: no scan results ever arrive) */
+	public abstract static class ScanResultsCallback {
+		public ScanResultsCallback() {}
+
+		public abstract void onScanResultsAvailable();
+	}
+
+	/* AOSP WifiManager.SubsystemRestartTrackingCallback (binder proxy left out: the subsystem never restarts) */
+	public abstract static class SubsystemRestartTrackingCallback {
+		public SubsystemRestartTrackingCallback() {}
+
+		public abstract void onSubsystemRestarting();
+
+		public abstract void onSubsystemRestarted();
+	}
+
+	/* AOSP WifiManager.WpsCallback */
+	@Deprecated
+	public abstract static class WpsCallback {
+		@Deprecated
+		public WpsCallback() {}
+
+		@Deprecated
+		public abstract void onStarted(String pin);
+
+		@Deprecated
+		public abstract void onSucceeded();
+
+		@Deprecated
+		public abstract void onFailed(int reason);
+	}
+
+	/* AOSP WifiManager.LocalOnlyHotspotCallback; REQUEST_REGISTERED is the hidden constant of AOSP */
+	public static class LocalOnlyHotspotCallback {
+		public static final int REQUEST_REGISTERED = 0;
+		public static final int ERROR_NO_CHANNEL = 1;
+		public static final int ERROR_GENERIC = 2;
+		public static final int ERROR_INCOMPATIBLE_MODE = 3;
+		public static final int ERROR_TETHERING_DISALLOWED = 4;
+
+		public LocalOnlyHotspotCallback() {}
+
+		public void onStarted(LocalOnlyHotspotReservation reservation) {}
+
+		public void onStopped() {}
+
+		public void onFailed(int reason) {}
+	}
+
+	/* AOSP WifiManager.LocalOnlyHotspotReservation: close() ends the request (stopLocalOnlyHotspot(), nothing to
+	 * stop here) */
+	public class LocalOnlyHotspotReservation implements AutoCloseable {
+		private final SoftApConfiguration mSoftApConfig;
+		private final WifiConfiguration mWifiConfig;
+		private boolean mClosed = false;
+
+		public LocalOnlyHotspotReservation(SoftApConfiguration config) {
+			mSoftApConfig = config;
+			mWifiConfig = config.toWifiConfiguration();
+		}
+
+		@Deprecated
+		public WifiConfiguration getWifiConfiguration() {
+			return mWifiConfig;
+		}
+
+		public SoftApConfiguration getSoftApConfiguration() {
+			return mSoftApConfig;
+		}
+
+		@Override
+		public void close() {
+			mClosed = true;
 		}
 	}
 
