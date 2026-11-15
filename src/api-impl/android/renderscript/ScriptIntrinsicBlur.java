@@ -36,6 +36,12 @@ public class ScriptIntrinsicBlur extends ScriptIntrinsic {
 	}
 
 	public void forEach(Allocation aout) {
+		forEach(aout, null);
+	}
+
+	/* AOSP forEach(aout, opt): only the pixels inside the launch range are written; an end of 0 is the whole
+	 * extent and an end beyond it is cut to it */
+	public void forEach(Allocation aout, Script.LaunchOptions opt) {
 		checkValid();
 		if (aout.getType().getY() == 0) {
 			throw new RSIllegalArgumentException("Output is a 1D Allocation");
@@ -70,8 +76,12 @@ public class ScriptIntrinsicBlur extends ScriptIntrinsic {
 		}
 		// the rows (OneHU4 / OneHU1)
 		final byte[] out = aout.mData;
-		for (int y = 0; y < h; y++) {
-			for (int x = 0; x < w; x++) {
+		final int xs = opt == null ? 0 : opt.getXStart();
+		final int xe = opt == null || opt.getXEnd() == 0 ? w : Math.min(opt.getXEnd(), w);
+		final int ys = opt == null ? 0 : opt.getYStart();
+		final int ye = opt == null || opt.getYEnd() == 0 ? h : Math.min(opt.getYEnd(), h);
+		for (int y = ys; y < ye; y++) {
+			for (int x = xs; x < xe; x++) {
 				for (int c = 0; c < ch; c++) {
 					float acc = 0;
 					for (int r = -iradius; r <= iradius; r++) {

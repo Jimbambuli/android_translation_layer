@@ -46,6 +46,11 @@ public class Allocation extends BaseObj {
 		return createTyped(rs, type, USAGE_SCRIPT);
 	}
 
+	/* AOSP createTyped(rs, type, mips, usage): ATL has no mipmaps (see RenderScript), mips is not used */
+	public static Allocation createTyped(RenderScript rs, Type type, MipmapControl mips, int usage) {
+		return createTyped(rs, type, usage);
+	}
+
 	public static Allocation createFromBitmap(RenderScript rs, Bitmap b, MipmapControl mips, int usage) {
 		Element e = b.getConfig() == Bitmap.Config.ALPHA_8 ? Element.U8(rs) : Element.RGBA_8888(rs);
 		Type t = new Type.Builder(rs, e).setX(b.getWidth()).setY(b.getHeight()).create();
@@ -120,5 +125,94 @@ public class Allocation extends BaseObj {
 			throw new RSIllegalArgumentException("Array too small for allocation type.");
 		}
 		System.arraycopy(mData, 0, d, 0, mData.length);
+	}
+
+	/* AOSP copyFrom(Allocation): the types must match */
+	public void copyFrom(Allocation a) {
+		checkValid();
+		if (mType.getX() != a.mType.getX() || mType.getY() != a.mType.getY()
+		    || mType.getElement().getBytesSize() != a.mType.getElement().getBytesSize()) {
+			throw new RSIllegalArgumentException("Types of allocations must match.");
+		}
+		System.arraycopy(a.mData, 0, mData, 0, mData.length);
+	}
+
+	/* The elements of ATL hold unsigned 8 bit data only (Element), so a 16, 32 bit or float array does not match the
+	 * allocation, as AOSP's validateIsInt16(), validateIsInt32(), validateIsFloat32() and validateIsObject() find
+	 * for such an Element */
+	public void copyFrom(int[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("32 bit integer source does not match allocation type UNSIGNED_8");
+	}
+
+	public void copyFrom(short[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("16 bit integer source does not match allocation type UNSIGNED_8");
+	}
+
+	public void copyFrom(float[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("32 bit float source does not match allocation type UNSIGNED_8");
+	}
+
+	public void copyFrom(BaseObj[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("Object source does not match allocation type UNSIGNED_8");
+	}
+
+	public void copyTo(int[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("32 bit integer destination does not match allocation type UNSIGNED_8");
+	}
+
+	public void copyTo(short[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("16 bit integer destination does not match allocation type UNSIGNED_8");
+	}
+
+	public void copyTo(float[] d) {
+		checkValid();
+		throw new RSIllegalArgumentException("32 bit float destination does not match allocation type UNSIGNED_8");
+	}
+
+	/* AOSP copyFrom(Object): an array of a primitive type, which is then handled as the typed variants */
+	public void copyFrom(Object array) {
+		checkValid();
+		if (array instanceof byte[]) {
+			copyFrom((byte[])array);
+		} else if (array instanceof short[]) {
+			copyFrom((short[])array);
+		} else if (array instanceof int[]) {
+			copyFrom((int[])array);
+		} else if (array instanceof float[]) {
+			copyFrom((float[])array);
+		} else {
+			validatePrimitiveArray(array);
+			throw new RSIllegalArgumentException("Array type does not match allocation type UNSIGNED_8");
+		}
+	}
+
+	/* AOSP copyTo(Object), as copyFrom(Object) */
+	public void copyTo(Object array) {
+		checkValid();
+		if (array instanceof byte[]) {
+			copyTo((byte[])array);
+		} else if (array instanceof short[]) {
+			copyTo((short[])array);
+		} else if (array instanceof int[]) {
+			copyTo((int[])array);
+		} else if (array instanceof float[]) {
+			copyTo((float[])array);
+		} else {
+			validatePrimitiveArray(array);
+			throw new RSIllegalArgumentException("Array type does not match allocation type UNSIGNED_8");
+		}
+	}
+
+	private static void validatePrimitiveArray(Object array) {
+		Class<?> c = array.getClass();
+		if (!c.isArray() || !c.getComponentType().isPrimitive()) {
+			throw new RSIllegalArgumentException("Object passed is not an array of primitives.");
+		}
 	}
 }
