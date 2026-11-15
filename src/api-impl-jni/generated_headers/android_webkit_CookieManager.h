@@ -15,6 +15,30 @@ extern "C" {
 JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_native_1getCookie
   (JNIEnv *, jobject, jstring);
 
+/*
+ * Class:     android_webkit_CookieManager
+ * Method:    native_setCookie
+ * Signature: (Ljava/lang/String;Ljava/lang/String;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1setCookie
+  (JNIEnv *, jclass, jstring, jstring);
+
+/*
+ * Class:     android_webkit_CookieManager
+ * Method:    native_removeAllCookies
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1removeAllCookies
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_webkit_CookieManager
+ * Method:    native_setAcceptPolicy
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1setAcceptPolicy
+  (JNIEnv *, jclass, jint);
+
 #ifdef __cplusplus
 }
 #endif

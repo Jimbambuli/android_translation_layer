@@ -305,6 +305,39 @@ static void intercept_setup(WebKitWebContext *web_context)
 	webkit_security_manager_register_uri_scheme_as_secure(webkit_web_context_get_security_manager(web_context), INTERCEPT_SCHEME);
 }
 
+/* The part of WebKit's back-forward list that is this WebView's history (WebView.canGoBackOrForward()): a parked
+ * WebKitWebView (park_web_view()) still has the pages of the View it served before, and WebKit can't remove entries
+ * for WebView.clearHistory(). "atl-history-floor" is the oldest entry the View may go back to (with
+ * "atl-history-floor-excl" set: the first one after it), "atl-history-ceiling" the newest one it may go forward to,
+ * NULL for no limit. */
+static void history_set_floor(WebKitWebView *web_view, WebKitBackForwardListItem *item, gboolean exclusive)
+{
+	g_object_set_data_full(G_OBJECT(web_view), "atl-history-floor", item ? g_object_ref(item) : NULL, item ? g_object_unref : NULL);
+	g_object_set_data(G_OBJECT(web_view), "atl-history-floor-excl", GINT_TO_POINTER(exclusive));
+}
+
+static void history_set_ceiling(WebKitWebView *web_view, WebKitBackForwardListItem *item)
+{
+	g_object_set_data_full(G_OBJECT(web_view), "atl-history-ceiling", item ? g_object_ref(item) : NULL, item ? g_object_unref : NULL);
+}
+
+static gboolean history_can_go(WebKitWebView *web_view, gint steps)
+{
+	WebKitBackForwardList *list = webkit_web_view_get_back_forward_list(web_view);
+	WebKitBackForwardListItem *target = webkit_back_forward_list_get_nth_item(list, steps);
+	if (!target)
+		return FALSE;
+	WebKitBackForwardListItem *limit = g_object_get_data(G_OBJECT(web_view), steps < 0 ? "atl-history-floor" : "atl-history-ceiling");
+	if (!limit)
+		return TRUE;
+	// the limit must not lie on the way to the target, the target itself may be it
+	for (gint i = 0; i != steps; i += steps < 0 ? -1 : 1) {
+		if (webkit_back_forward_list_get_nth_item(list, i) == limit)
+			return FALSE;
+	}
+	return !(steps < 0 && target == limit && g_object_get_data(G_OBJECT(web_view), "atl-history-floor-excl"));
+}
+
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
@@ -315,6 +348,10 @@ static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_
 	// a new web process (process swap) may have given the page another id
 	if (load_event == WEBKIT_LOAD_COMMITTED)
 		intercept_set_page(env, web_view, this);
+	/* a new entry replaced the forward entries that clearHistory() left in WebKit's list (NavigationController
+	 * PruneAllButLastCommitted() drops them on Android) */
+	if (load_event == WEBKIT_LOAD_COMMITTED && webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(web_view)) != g_object_get_data(G_OBJECT(web_view), "atl-history-ceiling"))
+		history_set_ceiling(web_view, NULL);
 	J__WebView__internalLoadChanged(env, this, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
 	(*env)->DeleteLocalRef(env, this);
 }
@@ -333,6 +370,59 @@ static gboolean context_menu_cb(WebKitWebView *web_view, WebKitContextMenu *cont
 	return !webkit_hit_test_result_context_is_editable(hit_test_result) && !webkit_hit_test_result_context_is_selection(hit_test_result);
 }
 
+/* WebView.getHitTestResult(): Chromium keeps the data of the last hit test (AwContents.mPossiblyStaleHitTestData),
+ * here that is the element under the pointer */
+static void mouse_target_changed_cb(WebKitWebView *web_view, WebKitHitTestResult *hit_test_result, guint modifiers, WrapperWidget *wrapper)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = webview_jobject(env, wrapper);
+	if (!this)
+		return;
+	const char *link = webkit_hit_test_result_context_is_link(hit_test_result) ? webkit_hit_test_result_get_link_uri(hit_test_result) : NULL;
+	const char *label = link ? webkit_hit_test_result_get_link_label(hit_test_result) : NULL;
+	const char *image = webkit_hit_test_result_context_is_image(hit_test_result) ? webkit_hit_test_result_get_image_uri(hit_test_result) : NULL;
+	jstring jlink = link ? _JSTRING(link) : NULL;
+	jstring jlabel = label ? _JSTRING(label) : NULL;
+	jstring jimage = image ? _JSTRING(image) : NULL;
+	J__WebView__internalHitTest(env, this, jlink, jlabel, jimage, webkit_hit_test_result_context_is_editable(hit_test_result));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	if (jlink)
+		(*env)->DeleteLocalRef(env, jlink);
+	if (jlabel)
+		(*env)->DeleteLocalRef(env, jlabel);
+	if (jimage)
+		(*env)->DeleteLocalRef(env, jimage);
+	(*env)->DeleteLocalRef(env, this);
+}
+
+// WebView.FindListener: the result of findAllAsync()/findNext()
+static void find_result(WrapperWidget *wrapper, guint match_count)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = webview_jobject(env, wrapper);
+	if (!this)
+		return;
+	J__WebView__internalFindResult(env, this, match_count);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, this);
+}
+
+static void found_text_cb(WebKitFindController *find_controller, guint match_count, WrapperWidget *wrapper)
+{
+	find_result(wrapper, match_count);
+}
+
+static void failed_to_find_text_cb(WebKitFindController *find_controller, WrapperWidget *wrapper)
+{
+	find_result(wrapper, 0);
+}
+
 static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *decision, WebKitPolicyDecisionType type, WrapperWidget *wrapper)
 {
 	if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
@@ -340,6 +430,12 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 		WebKitNavigationAction *action = webkit_navigation_policy_decision_get_navigation_action(nav);
 		WebKitURIRequest *request = webkit_navigation_action_get_request(action);
 		const gchar *uri = webkit_uri_request_get_uri(request);
+		/* goBack()/goForward() of the app: Chromium does not ask shouldOverrideUrlLoading() for history
+		 * navigations (PAGE_TRANSITION_FORWARD_BACK) */
+		if (webkit_navigation_action_get_navigation_type(action) == WEBKIT_NAVIGATION_TYPE_BACK_FORWARD) {
+			webkit_policy_decision_use(decision);
+			return TRUE;
+		}
 
 		JNIEnv *env = get_jni_env();
 		jobject this = webview_jobject(env, wrapper);
@@ -432,6 +528,10 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	g_signal_handlers_disconnect_by_func(webview, web_view_uri_changed, NULL);
 	g_signal_handlers_disconnect_by_func(webview, context_menu_cb, NULL);
 	g_signal_handlers_disconnect_by_data(webview, wrapper);
+	g_signal_handlers_disconnect_by_data(webkit_web_view_get_find_controller(webview), wrapper);
+	webkit_find_controller_search_finish(webkit_web_view_get_find_controller(webview));
+	history_set_floor(webview, NULL, FALSE);
+	history_set_ceiling(webview, NULL);
 	// own settings without the page cache, which would keep the old document
 	WebKitSettings *settings = webkit_settings_new();
 	webkit_settings_set_enable_page_cache(settings, FALSE);
@@ -551,6 +651,8 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 		// what a new WebKitWebView has: default settings and background
 		webkit_web_view_set_settings(WEBKIT_WEB_VIEW(webview), settings);
 		webkit_web_view_set_background_color(WEBKIT_WEB_VIEW(webview), &(GdkRGBA){1.f, 1.f, 1.f, 1.f});
+		// what a new WebKitWebView has: no history, the about:blank of parking is not part of it
+		history_set_floor(WEBKIT_WEB_VIEW(webview), webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview))), TRUE);
 	} else {
 		WebKitWebView *related = g_weak_ref_get(&related_view);
 		WebKitUserContentManager *own_content_manager = webkit_user_content_manager_new();
@@ -669,6 +771,10 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	g_signal_connect(G_OBJECT(webview), "notify::uri", G_CALLBACK(web_view_uri_changed), NULL);
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
 	g_signal_connect(webview, "context-menu", G_CALLBACK(context_menu_cb), NULL);
+	g_signal_connect(webview, "mouse-target-changed", G_CALLBACK(mouse_target_changed_cb), wrapper);
+	WebKitFindController *find_controller = webkit_web_view_get_find_controller(WEBKIT_WEB_VIEW(webview));
+	g_signal_connect(find_controller, "found-text", G_CALLBACK(found_text_cb), wrapper);
+	g_signal_connect(find_controller, "failed-to-find-text", G_CALLBACK(failed_to_find_text_cb), wrapper);
 	return _INTPTR(webview);
 }
 
@@ -687,6 +793,152 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload(JNIEnv *env, j
 		return;
 	WebKitWebView *webview = _PTR(widget_ptr);
 	webkit_web_view_reload(webview);
+}
+
+/* WebView.loadUrl(String, Map): the additional headers go with the request of the page */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrlWithHeaders(JNIEnv *env, jobject this, jlong widget_ptr, jstring url, jobjectArray headers)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview)) // WebViews are disabled, this is a plain View
+		return;
+	const char *uri = (*env)->GetStringUTFChars(env, url, NULL);
+	WebKitURIRequest *request = webkit_uri_request_new(uri);
+	(*env)->ReleaseStringUTFChars(env, url, uri);
+	SoupMessageHeaders *http_headers = webkit_uri_request_get_http_headers(request); // NULL if not HTTP
+	jsize count = headers ? (*env)->GetArrayLength(env, headers) : 0;
+	for (jsize i = 0; http_headers && i + 1 < count; i += 2) {
+		jstring jname = (*env)->GetObjectArrayElement(env, headers, i);
+		jstring jvalue = (*env)->GetObjectArrayElement(env, headers, i + 1);
+		if (jname && jvalue) {
+			const char *name = (*env)->GetStringUTFChars(env, jname, NULL);
+			const char *value = (*env)->GetStringUTFChars(env, jvalue, NULL);
+			soup_message_headers_replace(http_headers, name, value);
+			(*env)->ReleaseStringUTFChars(env, jname, name);
+			(*env)->ReleaseStringUTFChars(env, jvalue, value);
+		}
+		if (jname)
+			(*env)->DeleteLocalRef(env, jname);
+		if (jvalue)
+			(*env)->DeleteLocalRef(env, jvalue);
+	}
+	webkit_web_view_load_request(WEBKIT_WEB_VIEW(webview), request);
+	g_object_unref(request);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1stopLoading(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (WEBKIT_IS_WEB_VIEW(webview))
+		webkit_web_view_stop_loading(WEBKIT_WEB_VIEW(webview));
+}
+
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1canGoBackOrForward(JNIEnv *env, jobject this, jlong widget_ptr, jint steps)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	return WEBKIT_IS_WEB_VIEW(webview) && history_can_go(WEBKIT_WEB_VIEW(webview), steps);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1goBackOrForward(JNIEnv *env, jobject this, jlong widget_ptr, jint steps)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview) || !history_can_go(WEBKIT_WEB_VIEW(webview), steps))
+		return;
+	WebKitBackForwardList *list = webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview));
+	webkit_web_view_go_to_back_forward_list_item(WEBKIT_WEB_VIEW(webview), webkit_back_forward_list_get_nth_item(list, steps));
+}
+
+/* AwContents.clearHistory() keeps only the current entry (NavigationController PruneAllButLastCommitted()) */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearHistory(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return;
+	WebKitBackForwardListItem *current = webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview)));
+	if (!current)
+		return;
+	history_set_floor(WEBKIT_WEB_VIEW(webview), current, FALSE);
+	history_set_ceiling(WEBKIT_WEB_VIEW(webview), current);
+}
+
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getTitle(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	const char *title = WEBKIT_IS_WEB_VIEW(webview) ? webkit_web_view_get_title(WEBKIT_WEB_VIEW(webview)) : NULL;
+	return title ? _JSTRING(title) : NULL;
+}
+
+// the URL first asked for the current entry, before redirects
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getOriginalUrl(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return NULL;
+	WebKitBackForwardListItem *current = webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview)));
+	const char *uri = current ? webkit_back_forward_list_item_get_original_uri(current) : NULL;
+	return uri ? _JSTRING(uri) : NULL;
+}
+
+// the DER form of the page's server certificate, NULL without one (not loaded over TLS)
+JNIEXPORT jbyteArray JNICALL Java_android_webkit_WebView_native_1getCertificate(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	GTlsCertificate *certificate = NULL;
+	if (!WEBKIT_IS_WEB_VIEW(webview) || !webkit_web_view_get_tls_info(WEBKIT_WEB_VIEW(webview), &certificate, NULL) || !certificate)
+		return NULL;
+	GByteArray *der = NULL;
+	g_object_get(certificate, "certificate", &der, NULL);
+	if (!der)
+		return NULL;
+	jbyteArray result = (*env)->NewByteArray(env, der->len);
+	(*env)->SetByteArrayRegion(env, result, 0, der->len, (const jbyte *)der->data);
+	g_byte_array_unref(der);
+	return result;
+}
+
+/* findAllAsync(): Chromium's find in page is case insensitive and wraps around; the result comes to
+ * internalFindResult() */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1findAll(JNIEnv *env, jobject this, jlong widget_ptr, jstring text)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return;
+	WebKitFindController *find_controller = webkit_web_view_get_find_controller(WEBKIT_WEB_VIEW(webview));
+	const char *search_text = (*env)->GetStringUTFChars(env, text, NULL);
+	if (search_text[0])
+		webkit_find_controller_search(find_controller, search_text, WEBKIT_FIND_OPTIONS_CASE_INSENSITIVE | WEBKIT_FIND_OPTIONS_WRAP_AROUND, G_MAXUINT);
+	else
+		webkit_find_controller_search_finish(find_controller);
+	(*env)->ReleaseStringUTFChars(env, text, search_text);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1findNext(JNIEnv *env, jobject this, jlong widget_ptr, jboolean forward)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return;
+	WebKitFindController *find_controller = webkit_web_view_get_find_controller(WEBKIT_WEB_VIEW(webview));
+	if (forward)
+		webkit_find_controller_search_next(find_controller);
+	else
+		webkit_find_controller_search_previous(find_controller);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearMatches(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (WEBKIT_IS_WEB_VIEW(webview))
+		webkit_find_controller_search_finish(webkit_web_view_get_find_controller(WEBKIT_WEB_VIEW(webview)));
+}
+
+/* AwContents.clearCache(): the memory cache, and with includeDiskFiles the disk cache, of all WebViews */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearCache(JNIEnv *env, jobject this, jlong widget_ptr, jboolean include_disk_files)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return;
+	WebKitWebsiteDataManager *manager = webkit_network_session_get_website_data_manager(webkit_web_view_get_network_session(WEBKIT_WEB_VIEW(webview)));
+	WebKitWebsiteDataTypes types = WEBKIT_WEBSITE_DATA_MEMORY_CACHE | (include_disk_files ? WEBKIT_WEBSITE_DATA_DISK_CACHE : 0);
+	webkit_website_data_manager_clear(manager, types, 0, NULL, NULL, NULL);
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(JNIEnv *env, jobject this, jlong widget_ptr, jstring base_url, jstring data_jstr, jstring mime_type, jstring encoding)
@@ -746,6 +998,66 @@ JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_native_1getCookie(JN
 	jstring ret = _JSTRING(cookie_string->str);
 	g_string_free(cookie_string, TRUE);
 	return ret;
+}
+
+/* WebKit's cookie store belongs to the main thread; CookieManager may be used from any thread, so the change
+ * runs there (at once when called on it) */
+static gboolean add_cookie_on_main(gpointer cookie)
+{
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_add_cookie(cookie_manager, cookie, NULL, NULL, NULL);
+	soup_cookie_free(cookie);
+	return G_SOURCE_REMOVE;
+}
+
+/* CookieManager.setCookie(): the value is a Set-Cookie header for the URL; FALSE if it is not a valid cookie
+ * for it (e.g. a Domain the URL's host is not in) */
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1setCookie(JNIEnv *env, jclass class, jstring url, jstring value)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return JNI_FALSE;
+	const char *uri = (*env)->GetStringUTFChars(env, url, NULL);
+	GUri *origin = g_uri_parse(uri, G_URI_FLAGS_ENCODED, NULL);
+	(*env)->ReleaseStringUTFChars(env, url, uri);
+	if (!origin)
+		return JNI_FALSE;
+	const char *header = (*env)->GetStringUTFChars(env, value, NULL);
+	SoupCookie *cookie = soup_cookie_parse(header, origin);
+	(*env)->ReleaseStringUTFChars(env, value, header);
+	g_uri_unref(origin);
+	if (!cookie)
+		return JNI_FALSE;
+	g_main_context_invoke(NULL, add_cookie_on_main, cookie);
+	return JNI_TRUE;
+}
+
+static gboolean remove_all_cookies_on_main(gpointer user_data)
+{
+	WebKitWebsiteDataManager *manager = webkit_network_session_get_website_data_manager(webkit_network_session_get_default());
+	webkit_website_data_manager_clear(manager, WEBKIT_WEBSITE_DATA_COOKIES, 0, NULL, NULL, NULL);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1removeAllCookies(JNIEnv *env, jclass class)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+	g_main_context_invoke(NULL, remove_all_cookies_on_main, NULL);
+}
+
+static gboolean set_accept_policy_on_main(gpointer policy)
+{
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_set_accept_policy(cookie_manager, GPOINTER_TO_INT(policy));
+	return G_SOURCE_REMOVE;
+}
+
+// policy: 0 accept always, 1 never, 2 not from third parties (WebKitCookieAcceptPolicy)
+JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1setAcceptPolicy(JNIEnv *env, jclass class, jint policy)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+	g_main_context_invoke(NULL, set_accept_policy_on_main, GINT_TO_POINTER(policy));
 }
 
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1addJavascriptInterface(JNIEnv *env, jobject this, jlong widget_ptr, jstring name, jstring method_names)

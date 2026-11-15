@@ -141,19 +141,23 @@ public class TelephonyManager {
 		return null;
 	}
 
+	/* AOSP getSimStateIncludingLoaded(): without a SIM slot (getSlotIndex() < 0, getPhoneCount() 0 on a device
+	 * that is neither voice, SMS nor data capable) all SIMs count as absent */
 	public int getSimState() {
-		return 0; // SIM_STATE_UNKNOWN
+		return 1; // SIM_STATE_ABSENT
 	}
 
+	/* AOSP getSimOperatorNameForPhone(): the property icc_operator_alpha, "" when not set (no SIM) */
 	public String getSimOperatorName() {
-		return null;
+		return "";
 	}
 
 	public int getCallState() {
 		return 0; // CALL_STATE_IDLE
 	}
 
+	/* AOSP TelephonyManager.getDeviceId(): null when there is no ITelephony service */
 	public String getDeviceId() {
-		return "";
+		return null;
 	}
 }

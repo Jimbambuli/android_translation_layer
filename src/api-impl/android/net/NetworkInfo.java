@@ -10,7 +10,22 @@ public class NetworkInfo implements android.os.Parcelable {
 		UNKNOWN
 	}
 
-	public enum DetailedState {}
+	/* AOSP NetworkInfo.DetailedState (packages/modules/Connectivity, android16-release) */
+	public enum DetailedState {
+		IDLE,
+		SCANNING,
+		CONNECTING,
+		AUTHENTICATING,
+		OBTAINING_IPADDR,
+		CONNECTED,
+		SUSPENDED,
+		DISCONNECTING,
+		DISCONNECTED,
+		FAILED,
+		BLOCKED,
+		VERIFYING_POOR_LINK,
+		CAPTIVE_PORTAL_CHECK
+	}
 
 	private State state = State.DISCONNECTED;
 
@@ -58,8 +73,10 @@ public class NetworkInfo implements android.os.Parcelable {
 		return state == State.CONNECTED;
 	}
 
+	/* AOSP keeps the detailed state and derives getState() from it (stateMap); ATL's NetworkInfo is either
+	 * connected or disconnected, whose detailed states are CONNECTED and DISCONNECTED */
 	public DetailedState getDetailedState() {
-		return null;
+		return state == State.CONNECTED ? DetailedState.CONNECTED : DetailedState.DISCONNECTED;
 	}
 
 	public String getExtraInfo() {

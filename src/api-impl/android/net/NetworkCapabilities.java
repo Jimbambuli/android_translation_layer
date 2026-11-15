@@ -48,6 +48,7 @@ public final class NetworkCapabilities {
 	public static final int TRANSPORT_TEST = 7;
 	public static final int TRANSPORT_USB = 8;
 	public static final int TRANSPORT_THREAD = 9;
+	public static final int TRANSPORT_SATELLITE = 10;
 
 	private static final long NOT_RESTRICTED = 1L << NET_CAPABILITY_NOT_RESTRICTED;
 	private static final long TRUSTED = 1L << NET_CAPABILITY_TRUSTED;
@@ -57,7 +58,7 @@ public final class NetworkCapabilities {
 	private static final int MAX_NET_CAPABILITY = NET_CAPABILITY_PRIORITIZE_BANDWIDTH;
 
 	private static final int MIN_TRANSPORT = TRANSPORT_CELLULAR;
-	private static final int MAX_TRANSPORT = TRANSPORT_THREAD;
+	private static final int MAX_TRANSPORT = TRANSPORT_SATELLITE;
 
 	// AOSP sets these on every freshly constructed instance
 	private static final long DEFAULT_CAPABILITIES = NOT_RESTRICTED | TRUSTED | NOT_VPN;
@@ -67,6 +68,7 @@ public final class NetworkCapabilities {
 	private int mLinkUpBandwidthKbps;
 	private int mLinkDownBandwidthKbps;
 	private int mSignalStrength = SIGNAL_STRENGTH_UNSPECIFIED;
+	private NetworkSpecifier mNetworkSpecifier;
 
 	public static final int SIGNAL_STRENGTH_UNSPECIFIED = Integer.MIN_VALUE;
 
@@ -80,6 +82,7 @@ public final class NetworkCapabilities {
 			mLinkUpBandwidthKbps = nc.mLinkUpBandwidthKbps;
 			mLinkDownBandwidthKbps = nc.mLinkDownBandwidthKbps;
 			mSignalStrength = nc.mSignalStrength;
+			mNetworkSpecifier = nc.mNetworkSpecifier;
 		}
 	}
 
@@ -90,6 +93,23 @@ public final class NetworkCapabilities {
 		mLinkUpBandwidthKbps = 0;
 		mLinkDownBandwidthKbps = 0;
 		mSignalStrength = SIGNAL_STRENGTH_UNSPECIFIED;
+		mNetworkSpecifier = null;
+	}
+
+	/** @hide AOSP NetworkCapabilities.setNetworkSpecifier(): a specifier needs a single non-test transport */
+	public NetworkCapabilities setNetworkSpecifier(NetworkSpecifier networkSpecifier) {
+		if (networkSpecifier != null
+		    && mTransportTypes != (1L << TRANSPORT_TEST)
+		    && Long.bitCount(mTransportTypes & ~(1L << TRANSPORT_TEST)) != 1
+		    && (mTransportTypes & ~(1L << TRANSPORT_TEST)) != (1 << TRANSPORT_CELLULAR | 1 << TRANSPORT_SATELLITE)) {
+			throw new IllegalStateException("Must have a single non-test transport specified to use setNetworkSpecifier");
+		}
+		mNetworkSpecifier = networkSpecifier;
+		return this;
+	}
+
+	public NetworkSpecifier getNetworkSpecifier() {
+		return mNetworkSpecifier;
 	}
 
 	/* AOSP BitUtils.unpackBits() */
@@ -119,7 +139,8 @@ public final class NetworkCapabilities {
 	public boolean satisfiedByNetworkCapabilities(NetworkCapabilities nc) {
 		return nc != null
 		    && (nc.mNetworkCapabilities & mNetworkCapabilities) == mNetworkCapabilities
-		    && (mTransportTypes == 0 || (mTransportTypes & nc.mTransportTypes) != 0);
+		    && (mTransportTypes == 0 || (mTransportTypes & nc.mTransportTypes) != 0)
+		    && (mNetworkSpecifier == null || mNetworkSpecifier.canBeSatisfiedBy(nc.mNetworkSpecifier));
 	}
 
 	@Override
@@ -129,7 +150,7 @@ public final class NetworkCapabilities {
 		NetworkCapabilities that = (NetworkCapabilities)obj;
 		return mNetworkCapabilities == that.mNetworkCapabilities && mTransportTypes == that.mTransportTypes
 		    && mLinkUpBandwidthKbps == that.mLinkUpBandwidthKbps && mLinkDownBandwidthKbps == that.mLinkDownBandwidthKbps
-		    && mSignalStrength == that.mSignalStrength;
+		    && mSignalStrength == that.mSignalStrength && java.util.Objects.equals(mNetworkSpecifier, that.mNetworkSpecifier);
 	}
 
 	@Override

@@ -3,6 +3,7 @@ package android.webkit;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.MotionEvent;
@@ -24,6 +25,10 @@ import java.util.concurrent.Executors;
 
 public class WebView extends ViewGroup {
 	private static final String TAG = "WebView";
+	// AOSP WebView: URI scheme for telephone number, email address and map address
+	public static final String SCHEME_TEL = "tel:";
+	public static final String SCHEME_MAILTO = "mailto:";
+	public static final String SCHEME_GEO = "geo:0,0?q=";
 
 	private WebViewClient webViewClient;
 	private String url;
@@ -39,7 +44,23 @@ public class WebView extends ViewGroup {
 	private boolean widthMeasurementIsFixed;
 	private boolean heightMeasurementIsFixed;
 	private boolean verticalScrollBarEnabled = true;
+	// AOSP WebView.mWebViewThread: the thread the WebView was made on
+	private final Looper webViewThread = Looper.myLooper();
+	// the progress last reported to WebChromeClient.onProgressChanged(), AwContents.getMostRecentProgress()
+	private int progress = 100;
+	// whether a WebView was made in this process (WebViewFactory.sProviderInstance != null)
+	private static boolean providerInitialized;
 	private boolean horizontalScrollBarEnabled = true;
+	// AwContents.mPossiblyStaleHitTestData: what was under the pointer last, see internalHitTest()
+	private int hitTestType = HitTestResult.UNKNOWN_TYPE;
+	private String hitTestExtra;
+	private String hitTestHref;
+	private String hitTestAnchorText;
+	private String hitTestImgSrc;
+	private FindListener findListener;
+	// the zero-based ordinal of the selected match of the last findAllAsync(), moved by findNext()
+	private int findActiveMatch;
+	private int findMatchCount;
 
 	public WebView(Context context) {
 		this(context, null);
@@ -51,6 +72,7 @@ public class WebView extends ViewGroup {
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
+		providerInitialized = true;
 		// like Chromium's AwContents: the page shows the focus itself (focus rings, the caret)
 		setDefaultFocusHighlightEnabled(false);
 		// the pages load with the user agent that WebSettings reports, not WebKitGTK's own
@@ -114,6 +136,201 @@ public class WebView extends ViewGroup {
 		this.webViewClient = webViewClient;
 	}
 
+	public WebViewClient getWebViewClient() {
+		return webViewClient;
+	}
+
+	public WebChromeClient getWebChromeClient() {
+		return webChromeClient;
+	}
+
+	public Looper getWebViewLooper() {
+		return webViewThread;
+	}
+
+	public int getProgress() {
+		return progress;
+	}
+
+	/* AOSP WebViewFactory.setDataDirectorySuffix() */
+	public static void setDataDirectorySuffix(String suffix) {
+		if (providerInitialized)
+			throw new IllegalStateException("Can't set data directory suffix: WebView already initialized");
+		if (suffix.indexOf(java.io.File.separatorChar) >= 0)
+			throw new IllegalArgumentException("Suffix " + suffix + " contains a path separator");
+	}
+
+	/* AwContents.getLastHitTestResult(): the data of the last hit test, the element under the pointer */
+	public HitTestResult getHitTestResult() {
+		HitTestResult result = new HitTestResult();
+		result.setType(hitTestType);
+		result.setExtra(hitTestExtra);
+		return result;
+	}
+
+	/* AOSP WebView.requestFocusNodeHref(): the data of the last hit test go to the message as "url" (the
+	 * anchor's href), "title" (its text) and "src" (the image's src) */
+	public void requestFocusNodeHref(android.os.Message hrefMsg) {
+		if (hrefMsg == null || isDestroyed())
+			return;
+		android.os.Bundle data = hrefMsg.getData();
+		data.putString("url", hitTestHref);
+		data.putString("title", hitTestAnchorText);
+		data.putString("src", hitTestImgSrc);
+		hrefMsg.setData(data);
+		hrefMsg.sendToTarget();
+	}
+
+	/* AOSP WebView.requestImageRef(): "url" is the image's src */
+	public void requestImageRef(android.os.Message msg) {
+		if (msg == null || isDestroyed())
+			return;
+		android.os.Bundle data = msg.getData();
+		data.putString("url", hitTestImgSrc);
+		msg.setData(data);
+		msg.sendToTarget();
+	}
+
+	/* to be used by native code, for each new element under the pointer. The types as documented for
+	 * AOSP WebView.getHitTestResult(): an anchor with a non-JavaScript URL is SRC_ANCHOR_TYPE (PHONE_TYPE,
+	 * EMAIL_TYPE, GEO_TYPE for tel:, mailto: and SCHEME_GEO URLs), with an image as child SRC_IMAGE_ANCHOR_TYPE,
+	 * an image IMAGE_TYPE, a text field EDIT_TEXT_TYPE */
+	@Export
+	void internalHitTest(String link, String linkLabel, String image, boolean editable) {
+		if (link != null && link.startsWith("javascript:"))
+			link = null;
+		link = link != null ? internalToAppUrl(link) : null;
+		image = image != null ? internalToAppUrl(image) : null;
+		hitTestHref = link;
+		hitTestAnchorText = linkLabel;
+		hitTestImgSrc = image;
+		int type = HitTestResult.UNKNOWN_TYPE;
+		String extra = null;
+		if (editable) {
+			type = HitTestResult.EDIT_TEXT_TYPE;
+		} else if (link != null && image != null) {
+			type = HitTestResult.SRC_IMAGE_ANCHOR_TYPE;
+			extra = image;
+		} else if (link != null && link.startsWith(SCHEME_TEL)) {
+			type = HitTestResult.PHONE_TYPE;
+			extra = android.net.Uri.decode(link.substring(SCHEME_TEL.length()));
+		} else if (link != null && link.startsWith(SCHEME_MAILTO)) {
+			type = HitTestResult.EMAIL_TYPE;
+			extra = android.net.Uri.decode(link.substring(SCHEME_MAILTO.length()));
+		} else if (link != null && link.startsWith(SCHEME_GEO)) {
+			type = HitTestResult.GEO_TYPE;
+			extra = android.net.Uri.decode(link.substring(SCHEME_GEO.length()));
+		} else if (link != null) {
+			type = HitTestResult.SRC_ANCHOR_TYPE;
+			extra = link;
+		} else if (image != null) {
+			type = HitTestResult.IMAGE_TYPE;
+			extra = image;
+		}
+		hitTestType = type;
+		hitTestExtra = extra;
+	}
+
+	/* AOSP WebView.FindListener */
+	public interface FindListener {
+		public void onFindResultReceived(int activeMatchOrdinal, int numberOfMatches, boolean isDoneCounting);
+	}
+
+	public void setFindListener(FindListener listener) {
+		findListener = listener;
+	}
+
+	/* AOSP WebView.findAllAsync(): finds and highlights all matches, the FindListener hears of the result */
+	public void findAllAsync(String find) {
+		if (isDestroyed())
+			return;
+		boolean empty = find.isEmpty();
+		findActiveMatch = 0;
+		findMatchCount = 0;
+		native_findAll(widget, find);
+		if (empty && findListener != null)
+			findListener.onFindResultReceived(0, 0, true);
+	}
+
+	/* AOSP WebView.findNext(): selects the next match, wrapping around; nothing before findAllAsync() */
+	public void findNext(boolean forward) {
+		if (isDestroyed() || findMatchCount == 0)
+			return;
+		findActiveMatch = (findActiveMatch + (forward ? 1 : findMatchCount - 1)) % findMatchCount;
+		native_findNext(widget, forward);
+	}
+
+	public void clearMatches() {
+		if (isDestroyed())
+			return;
+		findMatchCount = 0;
+		native_clearMatches(widget);
+	}
+
+	// to be used by native code: the number of matches of the last search
+	@Export
+	void internalFindResult(int matchCount) {
+		findMatchCount = matchCount;
+		if (findActiveMatch >= matchCount)
+			findActiveMatch = 0;
+		if (findListener != null)
+			findListener.onFindResultReceived(findActiveMatch, matchCount, true);
+	}
+
+	public class WebViewTransport {
+		private WebView mWebview;
+
+		public synchronized void setWebView(WebView webview) {
+			mWebview = webview;
+		}
+
+		public synchronized WebView getWebView() {
+			return mWebview;
+		}
+	}
+
+	public static abstract class VisualStateCallback {
+		public abstract void onComplete(long requestId);
+	}
+
+	public static class HitTestResult {
+		public static final int UNKNOWN_TYPE = 0;
+		@Deprecated
+		public static final int ANCHOR_TYPE = 1;
+		public static final int PHONE_TYPE = 2;
+		public static final int GEO_TYPE = 3;
+		public static final int EMAIL_TYPE = 4;
+		public static final int IMAGE_TYPE = 5;
+		@Deprecated
+		public static final int IMAGE_ANCHOR_TYPE = 6;
+		public static final int SRC_ANCHOR_TYPE = 7;
+		public static final int SRC_IMAGE_ANCHOR_TYPE = 8;
+		public static final int EDIT_TEXT_TYPE = 9;
+
+		private int mType;
+		private String mExtra;
+
+		public HitTestResult() {
+			mType = UNKNOWN_TYPE;
+		}
+
+		public void setType(int type) {
+			mType = type;
+		}
+
+		public void setExtra(String extra) {
+			mExtra = extra;
+		}
+
+		public int getType() {
+			return mType;
+		}
+
+		public String getExtra() {
+			return mExtra;
+		}
+	}
+
 	// undo the android-asset:// rewrite (see loadUrl()), apps expect the URL they loaded
 	private static String internalToAppUrl(String url) {
 		return url != null ? url.replace("android-asset:///assets/", "file:///android_asset/") : null;
@@ -173,9 +390,11 @@ public class WebView extends ViewGroup {
 		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0) {
 			if (webViewClient != null)
 				webViewClient.onPageStarted(this, url, null);
+			progress = 10;
 			if (webChromeClient != null)
 				webChromeClient.onProgressChanged(this, 10);
 		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3) {
+			progress = 100;
 			if (webChromeClient != null)
 				webChromeClient.onProgressChanged(this, 100);
 			if (webViewClient != null)
@@ -186,10 +405,19 @@ public class WebView extends ViewGroup {
 	@Export
 	boolean internalShouldOverrideUrlLoading(String url) {
 		url = internalToAppUrl(url);
-		if (webViewClient != null)
-			return webViewClient.shouldOverrideUrlLoading(this, url);
-		else
+		if (webViewClient == null)
 			return false;
+		/* as WebViewContentsClientAdapter.shouldOverrideUrlLoading(): the client gets the WebResourceRequest
+		 * form, whose default calls the String form; asked for navigations of the main frame only */
+		final android.net.Uri uri = android.net.Uri.parse(url);
+		return webViewClient.shouldOverrideUrlLoading(this, new WebResourceRequest() {
+			public android.net.Uri getUrl() { return uri; }
+			public boolean isForMainFrame() { return true; }
+			public boolean isRedirect() { return false; }
+			public boolean hasGesture() { return false; }
+			public String getMethod() { return "GET"; }
+			public Map<String, String> getRequestHeaders() { return new HashMap<>(); }
+		});
 	}
 
 	/* Android's WebView draws no vertical scrollbar when the app turns it off; WebKit draws its own, which
@@ -514,11 +742,93 @@ public class WebView extends ViewGroup {
 		native_loadUrl(widget, url);
 	}
 
+	/* AOSP WebView.loadUrl(String, Map): as loadUrl(String), the headers go with the request */
+	public void loadUrl(String url, Map<String, String> additionalHttpHeaders) {
+		if (additionalHttpHeaders == null || additionalHttpHeaders.isEmpty() || url.startsWith("javascript:")) {
+			loadUrl(url);
+			return;
+		}
+		if (isDestroyed())
+			return;
+		url = url.replace("file:///android_asset/", "android-asset:///assets/");
+		String[] headers = new String[additionalHttpHeaders.size() * 2];
+		int i = 0;
+		for (Map.Entry<String, String> header : additionalHttpHeaders.entrySet()) {
+			headers[i++] = header.getKey();
+			headers[i++] = header.getValue();
+		}
+		native_loadUrlWithHeaders(widget, url, headers);
+	}
+
 	public String getUrl() {
 		return url;
 	}
 
-	public void stopLoading() {}
+	/* AOSP WebView.getOriginalUrl(): the URL asked for the current page, before redirects */
+	public String getOriginalUrl() {
+		if (isDestroyed())
+			return null;
+		String originalUrl = native_getOriginalUrl(widget);
+		return originalUrl != null ? internalToAppUrl(originalUrl) : null;
+	}
+
+	/* AOSP WebView.getTitle(): null if no page has been loaded */
+	public String getTitle() {
+		if (isDestroyed())
+			return null;
+		return native_getTitle(widget);
+	}
+
+	/* AOSP WebView.getCertificate(): the SSL certificate of the main top-level page, null if there is none */
+	public android.net.http.SslCertificate getCertificate() {
+		if (isDestroyed())
+			return null;
+		byte[] der = native_getCertificate(widget);
+		if (der == null)
+			return null;
+		try {
+			java.security.cert.CertificateFactory factory = java.security.cert.CertificateFactory.getInstance("X.509");
+			return new android.net.http.SslCertificate((java.security.cert.X509Certificate)factory.generateCertificate(new java.io.ByteArrayInputStream(der)));
+		} catch (java.security.cert.CertificateException e) {
+			return null;
+		}
+	}
+
+	public boolean canGoBack() {
+		return canGoBackOrForward(-1);
+	}
+
+	public void goBack() {
+		goBackOrForward(-1);
+	}
+
+	public boolean canGoForward() {
+		return canGoBackOrForward(1);
+	}
+
+	public void goForward() {
+		goBackOrForward(1);
+	}
+
+	/* AOSP WebView.canGoBackOrForward(): whether the history has an entry steps away from the current one */
+	public boolean canGoBackOrForward(int steps) {
+		if (isDestroyed())
+			return false;
+		return native_canGoBackOrForward(widget, steps);
+	}
+
+	/* AOSP WebView.goBackOrForward(): nothing if the entry is not there */
+	public void goBackOrForward(int steps) {
+		if (isDestroyed())
+			return;
+		native_goBackOrForward(widget, steps);
+	}
+
+	public void stopLoading() {
+		if (isDestroyed())
+			return;
+		native_stopLoading(widget);
+	}
 
 	public void reload() {
 		native_reload(widget);
@@ -537,6 +847,10 @@ public class WebView extends ViewGroup {
 	public boolean isPaused() {
 		return false;
 	}
+
+	/* AOSP WebView.pauseTimers()/resumeTimers(): pause JavaScript timers of all WebViews; WebKitGTK has no
+	 * such switch, the timers keep running */
+	public void pauseTimers() {}
 
 	public void resumeTimers() {}
 
@@ -572,13 +886,22 @@ public class WebView extends ViewGroup {
 
 	public void clearFormData() {}
 
-	public void clearHistory() {}
-
-	public void clearMatches() {}
+	/* AOSP WebView.clearHistory(): the back/forward list keeps only the current entry */
+	public void clearHistory() {
+		if (isDestroyed())
+			return;
+		native_clearHistory(widget);
+	}
 
 	public void clearSslPreferences() {}
 
-	public void clearCache(boolean includeDiskFiles) {}
+	/* AOSP WebView.clearCache(): the resource cache, which all WebViews of the app share; the disk cache only
+	 * with includeDiskFiles */
+	public void clearCache(boolean includeDiskFiles) {
+		if (isDestroyed())
+			return;
+		native_clearCache(widget, includeDiskFiles);
+	}
 
 	// directly accessed by androidx WebViewGlueCommunicator to get ClassLoader
 	private static Object getFactory() {
@@ -613,6 +936,18 @@ public class WebView extends ViewGroup {
 	private native void native_scrollTo(long widget, float x, float y);
 	private native void native_setVerticalScrollBarEnabled(long widget, boolean enabled);
 	private native long native_destroy(long widget);
+	private native void native_loadUrlWithHeaders(long widget, String url, String[] headers);
+	private native void native_stopLoading(long widget);
+	private native boolean native_canGoBackOrForward(long widget, int steps);
+	private native void native_goBackOrForward(long widget, int steps);
+	private native void native_clearHistory(long widget);
+	private native String native_getTitle(long widget);
+	private native String native_getOriginalUrl(long widget);
+	private native byte[] native_getCertificate(long widget);
+	private native void native_findAll(long widget, String find);
+	private native void native_findNext(long widget, boolean forward);
+	private native void native_clearMatches(long widget);
+	private native void native_clearCache(long widget, boolean includeDiskFiles);
 	/* the page is drawn by WebKit, a CSS background of the widget would stay hidden behind it */
 	@Override
 	protected native void native_setBackgroundColor(long widget, int color);
