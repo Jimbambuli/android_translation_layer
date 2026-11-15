@@ -19,4 +19,12 @@ public class WebStorage {
 	}
 
 	public void deleteAllData() {}
+
+	/* AOSP WebStorage: the base class does nothing (the Chromium adapter keeps no WebSQL/AppCache origins) */
+	public void getOrigins(ValueCallback<java.util.Map> callback) {}
+	public void getUsageForOrigin(String origin, ValueCallback<Long> callback) {}
+	public void getQuotaForOrigin(String origin, ValueCallback<Long> callback) {}
+	@Deprecated
+	public void setQuotaForOrigin(String origin, long quota) {}
+	public void deleteOrigin(String origin) {}
 }

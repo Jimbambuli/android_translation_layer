@@ -118,4 +118,81 @@ public class SubscriptionManager {
 	public boolean isNetworkRoaming(int subId) {
 		return false;
 	}
+
+	/* AOSP SubscriptionManager members with TelephonyManager.getSubscriptionService() == null (no ISub on the desktop):
+	 * the null branch of each AOSP method (count/default value, IllegalStateException, or nothing) */
+	public interface OnOpportunisticSubscriptionsChangedListener {
+		void onOpportunisticSubscriptionsChanged();
+	}
+	public static final int PHONE_NUMBER_SOURCE_UICC = 1;
+	public static final int PHONE_NUMBER_SOURCE_CARRIER = 2;
+	public static final int PHONE_NUMBER_SOURCE_IMS = 3;
+
+	public static boolean isValidSlotIndex(int slotIndex) {
+		return slotIndex >= 0 && slotIndex < TelephonyManager.getDefault().getActiveModemCount();
+	}
+	public SubscriptionManager createForAllUserProfiles() { return this; }
+	public void addOnOpportunisticSubscriptionsChangedListener(java.util.concurrent.Executor executor, OnOpportunisticSubscriptionsChangedListener listener) {}
+	public void removeOnOpportunisticSubscriptionsChangedListener(OnOpportunisticSubscriptionsChangedListener listener) {
+		if (listener == null)
+			throw new NullPointerException("listener cannot be null");
+	}
+	public int getActiveSubscriptionInfoCount() { return 0; }
+	public int getActiveSubscriptionInfoCountMax() { return 0; }
+	public SubscriptionInfo getActiveSubscriptionInfoForSimSlotIndex(int slotIndex) { return null; }
+	public java.util.List<SubscriptionInfo> getAllSubscriptionInfoList() { return java.util.Collections.emptyList(); }
+	public java.util.List<SubscriptionInfo> getOpportunisticSubscriptions() { return new java.util.ArrayList<>(); }
+	public java.util.List<SubscriptionInfo> getSubscriptionsInGroup(android.os.ParcelUuid groupUuid) {
+		if (groupUuid == null)
+			throw new NullPointerException("groupUuid can't be null");
+		throw new IllegalStateException("telephony service is null.");
+	}
+	public android.os.ParcelUuid createSubscriptionGroup(java.util.List<Integer> subIdList) {
+		if (subIdList == null)
+			throw new NullPointerException("can't create group for null subId list");
+		throw new IllegalStateException("telephony service is null.");
+	}
+	public void addSubscriptionsIntoGroup(java.util.List<Integer> subIdList, android.os.ParcelUuid groupUuid) {
+		if (subIdList == null)
+			throw new NullPointerException("subIdList can't be null.");
+		if (groupUuid == null)
+			throw new NullPointerException("groupUuid can't be null.");
+		throw new IllegalStateException("telephony service is null.");
+	}
+	public void removeSubscriptionsFromGroup(java.util.List<Integer> subIdList, android.os.ParcelUuid groupUuid) {
+		if (subIdList == null)
+			throw new NullPointerException("subIdList can't be null.");
+		if (groupUuid == null)
+			throw new NullPointerException("groupUuid can't be null.");
+		throw new IllegalStateException("telephony service is null.");
+	}
+	public static int getDefaultSmsSubscriptionId() { return INVALID_SUBSCRIPTION_ID; }
+	public static int getDefaultVoiceSubscriptionId() { return INVALID_SUBSCRIPTION_ID; }
+	public static int getSubscriptionId(int slotIndex) {
+		if (!isValidSlotIndex(slotIndex))
+			return INVALID_SUBSCRIPTION_ID;
+		return INVALID_SUBSCRIPTION_ID;
+	}
+	public int[] getSubscriptionIds(int slotIndex) {
+		if (!isValidSlotIndex(slotIndex))
+			return null;
+		return new int[] {getSubscriptionId(slotIndex)};
+	}
+	public boolean isActiveSubscriptionId(int subscriptionId) { return false; }
+	public boolean isSubscriptionAssociatedWithUser(int subscriptionId, android.os.UserHandle userHandle) {
+		if (!isValidSubscriptionId(subscriptionId))
+			throw new IllegalArgumentException("[isSubscriptionAssociatedWithUser]: Invalid subscriptionId: " + subscriptionId);
+		return false;
+	}
+	public String getPhoneNumber(int subscriptionId, int source) {
+		if (source != PHONE_NUMBER_SOURCE_UICC && source != PHONE_NUMBER_SOURCE_CARRIER && source != PHONE_NUMBER_SOURCE_IMS)
+			throw new IllegalArgumentException("invalid source " + source);
+		throw new IllegalStateException("subscription service unavailable.");
+	}
+	public void setCarrierPhoneNumber(int subscriptionId, String number) {
+		if (number == null)
+			throw new NullPointerException("invalid number null");
+		throw new IllegalStateException("subscription service unavailable.");
+	}
+	public java.util.List<android.net.Uri> getDeviceToDeviceStatusSharingContacts(int subscriptionId) { return new java.util.ArrayList<>(); }
 }

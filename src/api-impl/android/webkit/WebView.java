@@ -1247,4 +1247,23 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	/* the page is drawn by WebKit, a CSS background of the widget would stay hidden behind it */
 	@Override
 	protected native void native_setBackgroundColor(long widget, int color);
+
+	/* Chromium's WebView provider (not part of the AOSP tree): saveWebArchive() reports failure with a null result
+	 * when the page cannot be saved as MHTML (ATL's engine does not write web archives); no passwords are saved */
+	public void saveWebArchive(String filename) {
+		saveWebArchive(filename, false, null);
+	}
+
+	public void saveWebArchive(String basename, boolean autoname, ValueCallback<String> callback) {
+		if (callback != null)
+			new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> callback.onReceiveValue(null));
+	}
+
+	@Deprecated
+	public boolean isPrivateBrowsingEnabled() {
+		return false;
+	}
+
+	@Deprecated
+	public void savePassword(String host, String username, String password) {}
 }

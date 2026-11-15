@@ -100,4 +100,9 @@ public class CookieManager {
 	private static native boolean native_setCookie(String url, String value);
 	private static native void native_removeAllCookies();
 	private static native void native_setAcceptPolicy(int policy);
+
+	/* AOSP CookieManager.allowFileSchemeCookies(): file scheme cookies are off by default */
+	public static boolean allowFileSchemeCookies() {
+		return false;
+	}
 }

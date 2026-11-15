@@ -120,7 +120,7 @@ public class WebSettings {
 			webView.setWebKitSetting("enable-javascript-markup", javaScriptEnabled);
 	}
 
-	public void setSavePassword(boolean savePassword) {}
+	public void setSavePassword(boolean savePassword) { mSavePassword = savePassword; }
 
 	public void setGeolocationEnabled(boolean enabled) {}
 
@@ -132,13 +132,13 @@ public class WebSettings {
 		return cacheMode;
 	}
 
-	public void setLayoutAlgorithm(LayoutAlgorithm layoutAlgorithm) {}
+	public void setLayoutAlgorithm(LayoutAlgorithm layoutAlgorithm) { mLayoutAlgorithm = layoutAlgorithm; }
 
-	public void setAllowFileAccess(boolean allowFileAccess) {}
+	public void setAllowFileAccess(boolean allowFileAccess) { mAllowFileAccess = allowFileAccess; }
 
-	public void setBuiltInZoomControls(boolean builtInZoomControls) {}
+	public void setBuiltInZoomControls(boolean builtInZoomControls) { mBuiltInZoomControls = builtInZoomControls; }
 
-	public void setDisplayZoomControls(boolean displayZoomControls) {}
+	public void setDisplayZoomControls(boolean displayZoomControls) { mDisplayZoomControls = displayZoomControls; }
 
 	/* AOSP WebSettings.setLoadsImagesAutomatically(): WebKit auto-load-images */
 	public void setLoadsImagesAutomatically(boolean loadsImagesAutomatically) {
@@ -151,7 +151,7 @@ public class WebSettings {
 		return loadsImagesAutomatically != null ? loadsImagesAutomatically : true; // WebKit's default until set
 	}
 
-	public void setSupportZoom(boolean supportZoom) {}
+	public void setSupportZoom(boolean supportZoom) { mSupportZoom = supportZoom; }
 
 	public void setUseWideViewPort(boolean useWideViewPort) {
 		this.useWideViewPort = useWideViewPort;
@@ -161,7 +161,7 @@ public class WebSettings {
 		return useWideViewPort;
 	}
 
-	public void setTextZoom(int textZoom) {}
+	public void setTextZoom(int textZoom) { mTextZoom = textZoom; }
 
 	/* ContentSettingsAdapter: the text size is a text zoom of the enum's percentage */
 	@Deprecated
@@ -171,7 +171,7 @@ public class WebSettings {
 
 	/* plugins no longer exist; the Chromium adapter ignores the call */
 	@Deprecated
-	public void setPluginState(PluginState state) {}
+	public void setPluginState(PluginState state) { mPluginState = state; }
 
 	public void setAppCacheEnabled(boolean enabled) {}
 
@@ -190,9 +190,9 @@ public class WebSettings {
 	public void setNeedInitialFocus(boolean flag) {}
 	public void setRenderPriority(RenderPriority priority) {}
 
-	public void setBlockNetworkLoads(boolean block) {}
+	public void setBlockNetworkLoads(boolean block) { mBlockNetworkLoads = block; }
 
-	public void setMixedContentMode(int mode) {}
+	public void setMixedContentMode(int mode) { mMixedContentMode = mode; }
 
 	public void setBlockNetworkImage(boolean block) {
 		blockNetworkImage = block;
@@ -237,7 +237,7 @@ public class WebSettings {
 
 	public void setAppCacheMaxSize(long size) {}
 
-	public void setDatabaseEnabled(boolean enabled) {}
+	public void setDatabaseEnabled(boolean enabled) { mDatabaseEnabled = enabled; }
 
 	public void setDatabasePath(String path) {}
 
@@ -255,9 +255,9 @@ public class WebSettings {
 
 	public void setGeolocationDatabasePath(String path) {}
 
-	public void setSaveFormData(boolean save) {}
+	public void setSaveFormData(boolean save) { mSaveFormData = save; }
 
-	public void setAllowContentAccess(boolean allow) {}
+	public void setAllowContentAccess(boolean allow) { mAllowContentAccess = allow; }
 
 	public void setAllowFileAccessFromFileURLs(boolean allow) {
 		allowFileAccessFromFileURLs = allow;
@@ -335,11 +335,11 @@ public class WebSettings {
 		return fantasyFontFamily;
 	}
 
-	public void setDefaultFontSize(int size) {}
+	public void setDefaultFontSize(int size) { mDefaultFontSize = Math.max(1, Math.min(72, size)); }
 
-	public void setDefaultFixedFontSize(int size) {}
+	public void setDefaultFixedFontSize(int size) { mDefaultFixedFontSize = Math.max(1, Math.min(72, size)); }
 
-	public void setMinimumFontSize(int size) {}
+	public void setMinimumFontSize(int size) { mMinimumFontSize = Math.max(1, Math.min(72, size)); }
 
 	public void setOffscreenPreRaster(boolean enabled) {
 		offscreenPreRaster = enabled;
@@ -384,13 +384,83 @@ public class WebSettings {
 		return defaultTextEncodingName != null ? defaultTextEncodingName : "iso-8859-1"; // WebKit's default until set
 	}
 
-	public void setAlgorithmicDarkeningAllowed(boolean allow) {}
+	public void setAlgorithmicDarkeningAllowed(boolean allow) { mAlgorithmicDarkeningAllowed = allow; }
+
+	private int mTextZoom = 100;
 
 	public int getTextZoom() {
-		return 100;
+		return mTextZoom;
 	}
 
 	public boolean getJavaScriptEnabled() {
 		return javaScriptEnabled != null ? javaScriptEnabled : true; // WebKit's default until set, see setJavaScriptEnabled()
+	}
+
+	/* Chromium's AwSettings defaults (the WebView of Android 16) for what the setters keep */
+	private boolean mSavePassword = true;
+	private boolean mSaveFormData = true;
+	private LayoutAlgorithm mLayoutAlgorithm = LayoutAlgorithm.NARROW_COLUMNS;
+	private boolean mAllowFileAccess = true;
+	private boolean mAllowContentAccess = true;
+	private boolean mBuiltInZoomControls = false;
+	private boolean mDisplayZoomControls = true;
+	private boolean mSupportZoom = true;
+	private PluginState mPluginState = PluginState.OFF;
+	private boolean mBlockNetworkLoads = false;
+	private int mMixedContentMode = 1;
+	private boolean mDatabaseEnabled = false;
+	private int mDefaultFontSize = 16;
+	private int mDefaultFixedFontSize = 13;
+	private int mMinimumFontSize = 8;
+	private int mMinimumLogicalFontSize = 8;
+	private boolean mAlgorithmicDarkeningAllowed = false;
+	private boolean mLightTouchEnabled = false;
+	private boolean mEnableSmoothTransition = false;
+	private ZoomDensity mDefaultZoom = ZoomDensity.MEDIUM;
+
+	public enum ZoomDensity {
+		FAR(150), MEDIUM(100), CLOSE(75);
+		ZoomDensity(int size) { value = size; }
+		final int value;
+	}
+
+	public boolean getSavePassword() { return mSavePassword; }
+	public boolean getSaveFormData() { return mSaveFormData; }
+	public LayoutAlgorithm getLayoutAlgorithm() { return mLayoutAlgorithm; }
+	public boolean getAllowFileAccess() { return mAllowFileAccess; }
+	public boolean getAllowContentAccess() { return mAllowContentAccess; }
+	public boolean getBuiltInZoomControls() { return mBuiltInZoomControls; }
+	public boolean getDisplayZoomControls() { return mDisplayZoomControls; }
+	public boolean supportZoom() { return mSupportZoom; }
+	public PluginState getPluginState() { return mPluginState; }
+	public boolean getBlockNetworkLoads() { return mBlockNetworkLoads; }
+	public int getMixedContentMode() { return mMixedContentMode; }
+	public boolean getDatabaseEnabled() { return mDatabaseEnabled; }
+	public String getDatabasePath() { return ""; }
+	public int getDefaultFontSize() { return mDefaultFontSize; }
+	public int getDefaultFixedFontSize() { return mDefaultFixedFontSize; }
+	public int getMinimumFontSize() { return mMinimumFontSize; }
+	public int getMinimumLogicalFontSize() { return mMinimumLogicalFontSize; }
+	public void setMinimumLogicalFontSize(int size) { mMinimumLogicalFontSize = Math.max(1, Math.min(72, size)); }
+	public boolean isAlgorithmicDarkeningAllowed() { return mAlgorithmicDarkeningAllowed; }
+	public boolean getLightTouchEnabled() { return mLightTouchEnabled; }
+	public void setLightTouchEnabled(boolean enabled) { mLightTouchEnabled = enabled; }
+	public void setEnableSmoothTransition(boolean enable) { mEnableSmoothTransition = enable; }
+	public boolean enableSmoothTransition() { return mEnableSmoothTransition; }
+	public ZoomDensity getDefaultZoom() { return mDefaultZoom; }
+	public void setDefaultZoom(ZoomDensity zoom) { mDefaultZoom = zoom; }
+	public TextSize getTextSize() {
+		int closestValue = Integer.MAX_VALUE;
+		TextSize closestSize = null;
+		for (TextSize ts : TextSize.values()) {
+			int diff = Math.abs(ts.value - getTextZoom());
+			if (diff == 0)
+				return ts;
+			if (diff < closestValue) {
+				closestValue = diff;
+				closestSize = ts;
+			}
+		}
+		return closestSize;
 	}
 }
