@@ -49,4 +49,34 @@ public final class ExtensionSessionConfiguration {
 	public Executor getExecutor() {
 		return mExecutor;
 	}
+
+	/* AOSP ExtensionSessionConfiguration colour space; mColorSpace starts at 0 as there */
+	private int mColorSpace;
+
+	public void setColorSpace(android.graphics.ColorSpace.Named colorSpace) {
+		mColorSpace = colorSpace.ordinal();
+		for (OutputConfiguration outputConfiguration : mOutputs) {
+			outputConfiguration.setColorSpace(colorSpace);
+		}
+		if (mPostviewOutput != null) {
+			mPostviewOutput.setColorSpace(colorSpace);
+		}
+	}
+
+	public void clearColorSpace() {
+		mColorSpace = ColorSpaceProfiles.UNSPECIFIED;
+		for (OutputConfiguration outputConfiguration : mOutputs) {
+			outputConfiguration.clearColorSpace();
+		}
+		if (mPostviewOutput != null) {
+			mPostviewOutput.clearColorSpace();
+		}
+	}
+
+	public android.graphics.ColorSpace getColorSpace() {
+		if (mColorSpace != ColorSpaceProfiles.UNSPECIFIED) {
+			return android.graphics.ColorSpace.get(android.graphics.ColorSpace.Named.values()[mColorSpace]);
+		}
+		return null;
+	}
 }
