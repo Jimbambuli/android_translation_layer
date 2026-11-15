@@ -5019,9 +5019,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/**
 	 * Handles drag events sent by the system following a call to startDragAndDrop() or, in ATL, a drag of files
-	 * from the desktop. AOSP accepts drag events by default if there is an OnReceiveContentListener; ATL has none.
+	 * from the desktop. As AOSP: accepted by default if there is an OnReceiveContentListener, a drop goes to
+	 * performReceiveContent().
 	 */
 	public boolean onDragEvent(DragEvent event) {
+		if (mOnReceiveContentListener == null) {
+			return false;
+		}
+		// Accept drag events by default if there's an OnReceiveContentListener set.
+		if (event.getAction() == DragEvent.ACTION_DRAG_STARTED) {
+			return true;
+		}
+		if (event.getAction() == DragEvent.ACTION_DROP) {
+			final DragAndDropPermissions permissions = DragAndDropPermissions.obtain(event);
+			if (permissions != null) {
+				permissions.takeTransient();
+			}
+			final ContentInfo payload = new ContentInfo.Builder(event.getClipData(), ContentInfo.SOURCE_DRAG_AND_DROP)
+				.setDragAndDropPermissions(permissions)
+				.build();
+			ContentInfo remainingPayload = performReceiveContent(payload);
+			// Return true unless none of the payload was consumed.
+			return remainingPayload != payload;
+		}
 		return false;
 	}
 
