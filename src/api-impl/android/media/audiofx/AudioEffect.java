@@ -48,6 +48,36 @@ public class AudioEffect {
 			this.name = name;
 			this.implementor = implementor;
 		}
+
+		public Descriptor(android.os.Parcel in) {
+			type = UUID.fromString(in.readString());
+			uuid = UUID.fromString(in.readString());
+			connectMode = in.readString();
+			name = in.readString();
+			implementor = in.readString();
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Objects.hash(type, uuid, connectMode, name, implementor);
+		}
+
+		public void writeToParcel(android.os.Parcel dest) {
+			dest.writeString(type.toString());
+			dest.writeString(uuid.toString());
+			dest.writeString(connectMode);
+			dest.writeString(name);
+			dest.writeString(implementor);
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (!(o instanceof Descriptor)) return false;
+			Descriptor that = (Descriptor)o;
+			return (type.equals(that.type) && uuid.equals(that.uuid) && connectMode.equals(that.connectMode)
+			        && name.equals(that.name) && implementor.equals(that.implementor));
+		}
 	}
 
 	AudioEffect() {

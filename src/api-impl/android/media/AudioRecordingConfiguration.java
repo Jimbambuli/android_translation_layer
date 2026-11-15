@@ -9,7 +9,7 @@ import java.util.List;
  * configurations describe the app's own active AudioRecords (AudioRecord.activeRecordingConfigurations()),
  * which is what AudioService reports to an unprivileged app (anonymized, uid -1, no package name). The
  * device is ATL's one input (AudioManager.getDevices()). */
-public final class AudioRecordingConfiguration {
+public final class AudioRecordingConfiguration implements android.os.Parcelable {
 	private final int mClientUid;
 	private final int mClientSessionId;
 	private final int mClientSource;
@@ -103,4 +103,63 @@ public final class AudioRecordingConfiguration {
     public int describeContents() { return 0; }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(mClientSessionId);
+		dest.writeInt(mClientSource);
+		mClientFormat.writeToParcel(dest, 0);
+		mDeviceFormat.writeToParcel(dest, 0);
+		dest.writeInt(mPatchHandle);
+		dest.writeString(mClientPackageName);
+		dest.writeInt(mClientUid);
+		dest.writeInt(mClientPortId);
+		dest.writeBoolean(mClientSilenced);
+		dest.writeInt(mDeviceSource);
+		dest.writeInt(mClientEffects.length);
+		for (int i = 0; i < mClientEffects.length; i++) {
+			mClientEffects[i].writeToParcel(dest);
+		}
+		dest.writeInt(mDeviceEffects.length);
+		for (int i = 0; i < mDeviceEffects.length; i++) {
+			mDeviceEffects[i].writeToParcel(dest);
+		}
+	}
+
+	private AudioRecordingConfiguration(android.os.Parcel in) {
+		mClientSessionId = in.readInt();
+		mClientSource = in.readInt();
+		mClientFormat = AudioFormat.CREATOR.createFromParcel(in);
+		mDeviceFormat = AudioFormat.CREATOR.createFromParcel(in);
+		mPatchHandle = in.readInt();
+		mClientPackageName = in.readString();
+		mClientUid = in.readInt();
+		mClientPortId = in.readInt();
+		mClientSilenced = in.readBoolean();
+		mDeviceSource = in.readInt();
+		mClientEffects = new AudioEffect.Descriptor[in.readInt()];
+		for (int i = 0; i < mClientEffects.length; i++) {
+			mClientEffects[i] = new AudioEffect.Descriptor(in);
+		}
+		mDeviceEffects = new AudioEffect.Descriptor[in.readInt()];
+		for (int i = 0; i < mDeviceEffects.length; i++) {
+			mDeviceEffects[i] = new AudioEffect.Descriptor(in);
+		}
+	}
+
+	public static final android.os.Parcelable.Creator<AudioRecordingConfiguration> CREATOR =
+	    new android.os.Parcelable.Creator<AudioRecordingConfiguration>() {
+		    public AudioRecordingConfiguration createFromParcel(android.os.Parcel p) {
+			    return new AudioRecordingConfiguration(p);
+		    }
+
+		    public AudioRecordingConfiguration[] newArray(int size) {
+			    return new AudioRecordingConfiguration[size];
+		    }
+	    };
 }

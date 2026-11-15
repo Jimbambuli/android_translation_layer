@@ -400,6 +400,10 @@ public class TelephonyManager {
 	public java.util.Map<Integer, java.util.List<android.telephony.emergency.EmergencyNumber>> getEmergencyNumberList() {
 		throw new IllegalStateException("telephony service is null.");
 	}
+	/* AOSP getEmergencyNumberList(int): no telephony service, as for the no-argument variant */
+	public java.util.Map<Integer, java.util.List<android.telephony.emergency.EmergencyNumber>> getEmergencyNumberList(int categories) {
+		throw new IllegalStateException("telephony service is null.");
+	}
 	public boolean isEmergencyNumber(String number) { throw new IllegalStateException("telephony service is null."); }
 	public java.util.List<String> getEquivalentHomePlmns() { return java.util.Collections.emptyList(); }
 	public String[] getForbiddenPlmns() { return null; }

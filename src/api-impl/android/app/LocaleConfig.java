@@ -20,7 +20,7 @@ import org.xmlpull.v1.XmlPullParserException;
 
 /* AOSP LocaleConfig without the Parcelable part: the locales of the app's android:localeConfig XML resource.
  * AOSP first asks LocaleManager for an override set by the installer (setOverrideLocaleConfig); ATL has none */
-public class LocaleConfig {
+public class LocaleConfig implements android.os.Parcelable {
 	private static final String TAG = "LocaleConfig";
 	public static final String TAG_LOCALE_CONFIG = "locale-config";
 	public static final String TAG_LOCALE = "locale";
@@ -119,4 +119,32 @@ public class LocaleConfig {
 		}
 		return false;
 	}
+
+	private LocaleConfig(android.os.Parcel in) {
+		mStatus = in.readInt();
+		mLocales = in.readTypedObject(LocaleList.CREATOR);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(mStatus);
+		dest.writeTypedObject(mLocales, flags);
+	}
+
+	public static final android.os.Parcelable.Creator<LocaleConfig> CREATOR = new android.os.Parcelable.Creator<LocaleConfig>() {
+		@Override
+		public LocaleConfig createFromParcel(android.os.Parcel source) {
+			return new LocaleConfig(source);
+		}
+
+		@Override
+		public LocaleConfig[] newArray(int size) {
+			return new LocaleConfig[size];
+		}
+	};
 }

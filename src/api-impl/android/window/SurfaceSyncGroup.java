@@ -96,6 +96,15 @@ public final class SurfaceSyncGroup {
 		return surfaceSyncGroup.setParent(this);
 	}
 
+	/* AOSP add(AttachedSurfaceControl, Runnable): the control's own sync group; AttachedSurfaceControl.getOrCreateSurfaceSyncGroup()
+	 * returns null by default and ATL's controls have none, so there is nothing to wait for */
+	public boolean add(@Nullable android.view.AttachedSurfaceControl attachedSurfaceControl, @Nullable Runnable runnable) {
+		if (attachedSurfaceControl == null) {
+			return false;
+		}
+		return false;
+	}
+
 	private boolean setParent(SurfaceSyncGroup parent) {
 		Runnable listener;
 		synchronized (mLock) {

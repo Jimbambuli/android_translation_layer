@@ -2,10 +2,11 @@ package android.app;
 
 import android.content.ComponentName;
 import android.net.Uri;
+import android.service.notification.ZenDeviceEffects;
+import android.service.notification.ZenPolicy;
 
-/* AOSP AutomaticZenRule (android-16.0.0_r4, AutomaticZenRule.java), the fields that do not need ZenPolicy or
- * ZenDeviceEffects (ATL has neither): a rule's name, owner, condition, interruption filter and state. Parcelable
- * without the ZenPolicy and ZenDeviceEffects fields; without Builder. */
+/* AOSP AutomaticZenRule (android-16.0.0_r4, AutomaticZenRule.java): a rule's name, owner, condition, interruption filter,
+ * state, ZenPolicy and ZenDeviceEffects, Parcelable, with Builder. */
 public final class AutomaticZenRule implements android.os.Parcelable {
 	public static final int TYPE_UNKNOWN = -1;
 	public static final int TYPE_OTHER = 0;
@@ -36,6 +37,8 @@ public final class AutomaticZenRule implements android.os.Parcelable {
 	private int mIconResId;
 	private String mTriggerDescription;
 	private boolean mAllowManualInvocation;
+	private ZenPolicy mZenPolicy;
+	private ZenDeviceEffects mDeviceEffects;
 
 	public AutomaticZenRule(String name, ComponentName owner, Uri conditionId, int interruptionFilter, boolean enabled) {
 		this(name, owner, null, conditionId, interruptionFilter, enabled);
@@ -49,6 +52,28 @@ public final class AutomaticZenRule implements android.os.Parcelable {
 		this.conditionId = getTrimmedUri(conditionId);
 		this.interruptionFilter = interruptionFilter;
 		this.enabled = enabled;
+	}
+
+	public AutomaticZenRule(String name, ComponentName owner, ComponentName configurationActivity, Uri conditionId,
+	                        ZenPolicy policy, int interruptionFilter, boolean enabled) {
+		this(name, owner, configurationActivity, conditionId, interruptionFilter, enabled);
+		this.mZenPolicy = policy;
+	}
+
+	public ZenPolicy getZenPolicy() {
+		return mZenPolicy == null ? null : mZenPolicy.copy();
+	}
+
+	public void setZenPolicy(ZenPolicy zenPolicy) {
+		this.mZenPolicy = (zenPolicy == null ? null : zenPolicy.copy());
+	}
+
+	public ZenDeviceEffects getDeviceEffects() {
+		return mDeviceEffects;
+	}
+
+	public void setDeviceEffects(ZenDeviceEffects deviceEffects) {
+		mDeviceEffects = deviceEffects;
 	}
 
 	public ComponentName getOwner() {
@@ -186,9 +211,9 @@ public final class AutomaticZenRule implements android.os.Parcelable {
 		owner = getTrimmedComponentName(source.readParcelable(null, ComponentName.class));
 		configurationActivity = getTrimmedComponentName(source.readParcelable(null, ComponentName.class));
 		creationTime = source.readLong();
-		source.readParcelable(null); // zen policy
+		mZenPolicy = source.readParcelable(null, ZenPolicy.class);
 		mPkg = source.readString8();
-		source.readParcelable(null); // device effects
+		mDeviceEffects = source.readParcelable(null, ZenDeviceEffects.class);
 		mAllowManualInvocation = source.readBoolean();
 		mIconResId = source.readInt();
 		mTriggerDescription = getTrimmedString(source.readString8(), MAX_DESC_LENGTH);
@@ -214,9 +239,9 @@ public final class AutomaticZenRule implements android.os.Parcelable {
 		dest.writeParcelable(owner, 0);
 		dest.writeParcelable(configurationActivity, 0);
 		dest.writeLong(creationTime);
-		dest.writeParcelable(null, 0); // mZenPolicy
+		dest.writeParcelable(mZenPolicy, 0);
 		dest.writeString8(mPkg);
-		dest.writeParcelable(null, 0); // mDeviceEffects
+		dest.writeParcelable(mDeviceEffects, 0);
 		dest.writeBoolean(mAllowManualInvocation);
 		dest.writeInt(mIconResId);
 		dest.writeString8(mTriggerDescription);
@@ -234,4 +259,71 @@ public final class AutomaticZenRule implements android.os.Parcelable {
 			return new AutomaticZenRule[size];
 		}
 	};
+
+	public static final class Builder {
+		private String mName;
+		private ComponentName mOwner;
+		private Uri mConditionId;
+		private int mInterruptionFilter = 2; // NotificationManager.INTERRUPTION_FILTER_PRIORITY
+		private boolean mEnabled = true;
+		private ComponentName mConfigurationActivity = null;
+		private ZenPolicy mPolicy = null;
+		private ZenDeviceEffects mDeviceEffects = null;
+		private int mType = TYPE_UNKNOWN;
+		private String mDescription;
+		private int mIconResId;
+		private boolean mAllowManualInvocation;
+		private long mCreationTime;
+		private String mPkg;
+
+		public Builder(AutomaticZenRule rule) {
+			mName = rule.getName();
+			mOwner = rule.getOwner();
+			mConditionId = rule.getConditionId();
+			mInterruptionFilter = rule.getInterruptionFilter();
+			mEnabled = rule.isEnabled();
+			mConfigurationActivity = rule.getConfigurationActivity();
+			mPolicy = rule.getZenPolicy();
+			mDeviceEffects = rule.getDeviceEffects();
+			mType = rule.getType();
+			mDescription = rule.getTriggerDescription();
+			mIconResId = rule.getIconResId();
+			mAllowManualInvocation = rule.isManualInvocationAllowed();
+			mCreationTime = rule.getCreationTime();
+			mPkg = rule.getPackageName();
+		}
+
+		public Builder(String name, Uri conditionId) {
+			mName = java.util.Objects.requireNonNull(name);
+			mConditionId = java.util.Objects.requireNonNull(conditionId);
+		}
+
+		public Builder setName(String name) { mName = name; return this; }
+		public Builder setOwner(ComponentName owner) { mOwner = owner; return this; }
+		public Builder setConditionId(Uri conditionId) { mConditionId = conditionId; return this; }
+		public Builder setInterruptionFilter(int interruptionFilter) { mInterruptionFilter = interruptionFilter; return this; }
+		public Builder setEnabled(boolean enabled) { mEnabled = enabled; return this; }
+		public Builder setConfigurationActivity(ComponentName configurationActivity) { mConfigurationActivity = configurationActivity; return this; }
+		public Builder setZenPolicy(ZenPolicy policy) { mPolicy = policy; return this; }
+		public Builder setDeviceEffects(ZenDeviceEffects deviceEffects) { mDeviceEffects = deviceEffects; return this; }
+		public Builder setType(int type) { mType = checkValidType(type); return this; }
+		public Builder setTriggerDescription(String description) { mDescription = description; return this; }
+		public Builder setIconResId(int iconResId) { mIconResId = iconResId; return this; }
+		public Builder setManualInvocationAllowed(boolean allowManualInvocation) { mAllowManualInvocation = allowManualInvocation; return this; }
+		public Builder setCreationTime(long creationTime) { mCreationTime = creationTime; return this; }
+		public Builder setPackage(String pkg) { mPkg = pkg; return this; }
+
+		public AutomaticZenRule build() {
+			AutomaticZenRule rule = new AutomaticZenRule(mName, mOwner, mConfigurationActivity, mConditionId, mPolicy,
+					mInterruptionFilter, mEnabled);
+			rule.mDeviceEffects = mDeviceEffects;
+			rule.creationTime = mCreationTime;
+			rule.mType = mType;
+			rule.mTriggerDescription = mDescription;
+			rule.mIconResId = mIconResId;
+			rule.mAllowManualInvocation = mAllowManualInvocation;
+			rule.setPackageName(mPkg);
+			return rule;
+		}
+	}
 }

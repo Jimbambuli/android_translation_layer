@@ -137,6 +137,8 @@ public class SubscriptionManager {
 		if (listener == null)
 			throw new NullPointerException("listener cannot be null");
 	}
+	/* AOSP isSubscriptionAssociatedWithUser(): needs SubscriptionManagerService; ATL has no SIM, so no subscription exists */
+	public boolean isSubscriptionAssociatedWithUser(int subscriptionId) { return false; }
 	public int getActiveSubscriptionInfoCount() { return 0; }
 	public int getActiveSubscriptionInfoCountMax() { return 0; }
 	public SubscriptionInfo getActiveSubscriptionInfoForSimSlotIndex(int slotIndex) { return null; }

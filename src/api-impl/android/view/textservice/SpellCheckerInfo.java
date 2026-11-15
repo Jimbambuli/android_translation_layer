@@ -12,15 +12,50 @@ import android.graphics.drawable.Drawable;
  *
  * Describes a spell checker service. ATL has no spell checker services, so
  * TextServicesManager never hands one out. The service's spell checker meta-data
- * (label, settings activity, subtypes) is not parsed and it is not Parcelable
- * (ATL's ResolveInfo is not).
+ * (label, settings activity, subtypes) is not parsed; the Parcel is AOSP's, with
+ * the subtype list always empty (ATL has no SpellCheckerSubtype).
  */
-public final class SpellCheckerInfo {
+public final class SpellCheckerInfo implements android.os.Parcelable {
 
 	private final ResolveInfo mService;
 	private final String mId;
 	private final int mLabel;
 	private final String mSettingsActivityName;
+
+	/* AOSP SpellCheckerInfo(Parcel) */
+	public SpellCheckerInfo(android.os.Parcel source) {
+		mLabel = source.readInt();
+		mId = source.readString();
+		mSettingsActivityName = source.readString();
+		mService = ResolveInfo.CREATOR.createFromParcel(source);
+		source.readInt(); // the subtypes: none in ATL, an AOSP parcel of a spell checker with subtypes is not read
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(mLabel);
+		dest.writeString(mId);
+		dest.writeString(mSettingsActivityName);
+		mService.writeToParcel(dest, flags);
+		dest.writeInt(0); // writeTypedList(no subtypes)
+	}
+
+	public static final android.os.Parcelable.Creator<SpellCheckerInfo> CREATOR = new android.os.Parcelable.Creator<SpellCheckerInfo>() {
+		@Override
+		public SpellCheckerInfo createFromParcel(android.os.Parcel source) {
+			return new SpellCheckerInfo(source);
+		}
+
+		@Override
+		public SpellCheckerInfo[] newArray(int size) {
+			return new SpellCheckerInfo[size];
+		}
+	};
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
 
 	/* AOSP SpellCheckerInfo(Context, ResolveInfo) without the meta-data parsing */
 	public SpellCheckerInfo(Context context, ResolveInfo service) {

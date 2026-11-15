@@ -33,6 +33,22 @@ public class StorageManager {
 	public static final int FLAG_REAL_STATE = 1 << 9;
 	public static final int FLAG_INCLUDE_INVISIBLE = 1 << 10;
 
+	/* AOSP StorageManager.convert(String): the UUID for a volume's fsUuid; FAT identifiers XXXX-YYYY become
+	 * fafafafa-fafa-5afa-8afa-fafaXXXXYYYY */
+	public static UUID convert(String uuid) {
+		if (java.util.Objects.equals(uuid, UUID_PRIVATE_INTERNAL)) {
+			return UUID_DEFAULT;
+		} else if (java.util.Objects.equals(uuid, UUID_PRIMARY_PHYSICAL)) {
+			return UUID_PRIMARY_PHYSICAL_;
+		} else if (java.util.Objects.equals(uuid, UUID_SYSTEM)) {
+			return UUID_SYSTEM_;
+		} else if (uuid.length() == 9 && uuid.charAt(4) == '-') {
+			return UUID.fromString(FAT_UUID_PREFIX + uuid.replace("-", ""));
+		} else {
+			return UUID.fromString(uuid);
+		}
+	}
+
 	/* AOSP StorageManager.convert(UUID) */
 	public static String convert(UUID storageUuid) {
 		if (UUID_DEFAULT.equals(storageUuid)) {
@@ -101,6 +117,24 @@ public class StorageManager {
 		return null;
 	}
 
+	/* AOSP getStorageVolume(Uri): the volume of a MediaStore item; ATL has one volume, MediaStore's external_primary
+	 * (a synthetic "external" name resolves to it), any other name finds no volume as in AOSP's loop */
+	public StorageVolume getStorageVolume(android.net.Uri uri) {
+		String volumeName = android.provider.MediaStore.getVolumeName(uri);
+		if (android.provider.MediaStore.VOLUME_EXTERNAL.equals(volumeName)) {
+			volumeName = android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY;
+		}
+		if (android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY.equals(volumeName)) {
+			return getPrimaryStorageVolume();
+		}
+		for (StorageVolume vol : getStorageVolumes()) {
+			if (java.util.Objects.equals(vol.getMediaStoreVolumeName(), volumeName)) {
+				return vol;
+			}
+		}
+		throw new IllegalStateException("Unknown volume for " + uri);
+	}
+
 	/* AOSP StorageManager.getStorageVolumes() */
 	public List<StorageVolume> getStorageVolumes() {
 		final ArrayList<StorageVolume> res = new ArrayList<>();
@@ -122,6 +156,18 @@ public class StorageManager {
 	 * clears no caches of other apps, so it is the free space of the single volume */
 	public long getAllocatableBytes(UUID storageUuid) throws IOException {
 		return new StatFs(Environment.getDataDirectory().getPath()).getAvailableBytes();
+	}
+
+	/* AOSP allocateBytes(FileDescriptor, long): AOSP asks for the missing space, then posix_fallocate()s and falls back
+	 * to ftruncate(); ATL has no libcore Os, so the file is only grown to the size (the ftruncate() fallback) */
+	public void allocateBytes(java.io.FileDescriptor fd, long bytes) throws IOException {
+		java.nio.channels.FileChannel channel = new java.io.FileOutputStream(fd).getChannel();
+		long have = channel.size();
+		long need = bytes - have;
+		if (need > 0) {
+			allocateBytes(UUID_DEFAULT, need);
+			channel.write(java.nio.ByteBuffer.allocate(1), bytes - 1);
+		}
 	}
 
 	/* AOSP StorageManager.allocateBytes(UUID, long): makes room by clearing caches, or throws IOException */
