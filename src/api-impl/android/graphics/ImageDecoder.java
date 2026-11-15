@@ -358,6 +358,56 @@ public final class ImageDecoder implements AutoCloseable {
 	 * Specify the desired {@link ColorSpace} for the output. Kept like AOSP's mDesiredColorSpace;
 	 * ATL's decoders convert every image to sRGB, so it is not applied.
 	 */
+	/* AOSP ImageDecoder.setMutableRequired()/isMutableRequired(): the result is a mutable Bitmap */
+	public void setMutableRequired(boolean mutable) {
+		mMutable = mutable;
+	}
+
+	public boolean isMutableRequired() {
+		return mMutable;
+	}
+
+	/* AOSP ImageDecoder.setCrop()/getCrop(): cut out of the (scaled) output, checked against its size by checkSubset() */
+	public void setCrop(Rect subset) {
+		mCropRect = subset;
+	}
+
+	public Rect getCrop() {
+		return mCropRect;
+	}
+
+	/* AOSP ImageDecoder.isMimeTypeSupported(): the formats AOSP decodes in software and ATL decodes as well (PNG,
+	 * JPEG, WebP, GIF, BMP, ICO). Not decoded by ATL, so false: WBMP, the RAW formats, and HEIF/HEIC/AVIF (AOSP
+	 * answers those by the device's HEVC/AV1 decoder, which a device without one reports as unsupported) */
+	public static boolean isMimeTypeSupported(String mimeType) {
+		if (mimeType == null)
+			throw new NullPointerException();
+		switch (mimeType.toLowerCase(java.util.Locale.US)) {
+			case "image/png":
+			case "image/jpeg":
+			case "image/webp":
+			case "image/gif":
+			case "image/bmp":
+			case "image/x-ico":
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	private boolean mMutable = false;
+	private Rect mCropRect;
+
+	private static void checkSubset(int width, int height, Rect r) {
+		if (r == null)
+			return;
+		if (r.width() <= 0 || r.height() <= 0)
+			throw new IllegalStateException("Subset " + r + " is empty/unsorted");
+		if (r.left < 0 || r.top < 0 || r.right > width || r.bottom > height)
+			throw new IllegalStateException("Subset " + r + " not contained by scaled image bounds: ("
+			                                + width + " x " + height + ")");
+	}
+
 	public void setTargetColorSpace(ColorSpace colorSpace) {
 		mDesiredColorSpace = colorSpace;
 	}
@@ -449,8 +499,14 @@ public final class ImageDecoder implements AutoCloseable {
 			decoded = Bitmap.createScaledBitmap(decoded, decoder.mDesiredWidth, decoder.mDesiredHeight, true);
 		}
 		/* AOSP ImageDecoder.checkState() */
+		checkSubset(decoder.mDesiredWidth, decoder.mDesiredHeight, decoder.mCropRect);
 		if (decoder.mPostProcessor != null && decoder.mUnpremultipliedRequired)
 			throw new IllegalStateException("Cannot draw to unpremultiplied pixels!");
+		if (decoder.mCropRect != null)
+			decoded = Bitmap.createBitmap(decoded, decoder.mCropRect.left, decoder.mCropRect.top,
+			                              decoder.mCropRect.width(), decoder.mCropRect.height());
+		if (decoder.mMutable && !decoded.isMutable())
+			decoded = decoded.copy(decoded.getConfig(), true);
 		if (decoder.mUnpremultipliedRequired)
 			decoded.setPremultiplied(false);
 		if (decoder.mPostProcessor != null) {
