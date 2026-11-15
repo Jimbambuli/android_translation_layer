@@ -3,10 +3,19 @@ package android.widget;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.util.AttributeSet;
+import java.util.Calendar;
 
 public class DatePicker extends FrameLayout {
 
 	private OnDateChangedListener on_date_changed_listener = null;
+
+	/* AOSP DatePickerCalendarDelegate: DEFAULT_START_YEAR 1900-01-01 .. DEFAULT_END_YEAR 2100-12-31 */
+	private final Calendar mMinDate = Calendar.getInstance();
+	private final Calendar mMaxDate = Calendar.getInstance();
+	{
+		mMinDate.set(1900, Calendar.JANUARY, 1);
+		mMaxDate.set(2100, Calendar.DECEMBER, 31);
+	}
 
 	public interface OnDateChangedListener {
 		void onDateChanged(DatePicker view, int year, int monthOfYear, int dayOfMonth);
@@ -35,9 +44,49 @@ public class DatePicker extends FrameLayout {
 		native_measure(widget, widthMeasureSpec, heightMeasureSpec);
 	}
 
-	public void setMinDate(long minDate) {}
+	private Calendar currentDate() {
+		Calendar c = Calendar.getInstance();
+		c.set(getYear(), getMonth(), getDayOfMonth());
+		return c;
+	}
 
-	public void setMaxDate(long maxDate) {}
+	private static boolean sameDay(Calendar a, Calendar b) {
+		return a.get(Calendar.YEAR) == b.get(Calendar.YEAR) && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR);
+	}
+
+	/* AOSP DatePickerCalendarDelegate.setMinDate(): a current date before the new minimum moves to it
+	 * (AOSP also tells the listener; here that is left to updateDate() as for any other update); the GTK
+	 * calendar itself has no range, so earlier days stay selectable */
+	public void setMinDate(long minDate) {
+		Calendar temp = Calendar.getInstance();
+		temp.setTimeInMillis(minDate);
+		if (sameDay(temp, mMinDate))
+			return;
+		if (currentDate().before(temp)) {
+			updateDate(temp.get(Calendar.YEAR), temp.get(Calendar.MONTH), temp.get(Calendar.DAY_OF_MONTH));
+		}
+		mMinDate.setTimeInMillis(minDate);
+	}
+
+	public long getMinDate() {
+		return mMinDate.getTimeInMillis();
+	}
+
+	/* AOSP DatePickerCalendarDelegate.setMaxDate(), as setMinDate() */
+	public void setMaxDate(long maxDate) {
+		Calendar temp = Calendar.getInstance();
+		temp.setTimeInMillis(maxDate);
+		if (sameDay(temp, mMaxDate))
+			return;
+		if (currentDate().after(temp)) {
+			updateDate(temp.get(Calendar.YEAR), temp.get(Calendar.MONTH), temp.get(Calendar.DAY_OF_MONTH));
+		}
+		mMaxDate.setTimeInMillis(maxDate);
+	}
+
+	public long getMaxDate() {
+		return mMaxDate.getTimeInMillis();
+	}
 
 	public void init(int year, int monthOfYear, int dayOfMonth, OnDateChangedListener listener) {
 		updateDate(year, monthOfYear, dayOfMonth);
