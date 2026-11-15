@@ -118,6 +118,11 @@ public final class Display {
 		return false;
 	}
 
+	/* AOSP 16 Display.getHighestHdrSdrRatio(): 1 when isHdrSdrRatioAvailable() is false */
+	public float getHighestHdrSdrRatio() {
+		return 1.0f;
+	}
+
 	/* AOSP 16 Display.hasArrSupport(): DisplayInfo.hasArrSupport, false for a display without adaptive refresh
 	 * rate (ATL's one mode) */
 	public boolean hasArrSupport() {

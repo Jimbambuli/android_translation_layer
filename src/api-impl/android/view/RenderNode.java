@@ -431,4 +431,11 @@ public class RenderNode {
 		matrix.preRotate(rotation, pivotX, pivotY);
 		matrix.preScale(scaleX, scaleY, pivotX, pivotY);
 	}
+
+	/* AOSP RenderNode.getInverseMatrix(): getMatrix() inverted, as android.graphics.RenderNode does here */
+	public void getInverseMatrix(Matrix outMatrix) {
+		Matrix matrix = new Matrix();
+		getMatrix(matrix);
+		matrix.invert(outMatrix);
+	}
 }

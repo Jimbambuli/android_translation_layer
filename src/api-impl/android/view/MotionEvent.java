@@ -2350,8 +2350,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see #AXIS_ORIENTATION
 	 */
 	public final float getOrientation(int pointerIndex) {
-		return 0; // arbitrary
-			  //		return nativeGetAxisValue(mNativePtr, AXIS_ORIENTATION, pointerIndex, HISTORY_CURRENT);
+		return nativeGetAxisValue(mNativePtr, AXIS_ORIENTATION, pointerIndex, HISTORY_CURRENT);
 	}
 
 	/**
