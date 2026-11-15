@@ -197,4 +197,15 @@ public class DynamicLayout extends Layout {
 			                         mJustificationMode, Integer.MAX_VALUE, mEllipsize, mEllipsizedWidth);
 		}
 	}
+
+	/* AOSP DynamicLayout.getLineCount()/getLineStart(): the lines of the current layout */
+	@Override
+	public int getLineCount() {
+		return super.getLineCount();
+	}
+
+	@Override
+	public int getLineStart(int line) {
+		return super.getLineStart(line);
+	}
 }

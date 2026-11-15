@@ -526,6 +526,16 @@ public class PackageInstaller {
 		return null;
 	}
 
+	/* AOSP requestUnarchive(): PackageInstallerService checks the package: unknown -> NameNotFoundException (as
+	 * ParcelableException), installed but not archived -> IOException; ATL has no archived packages */
+	public void requestUnarchive(String packageName, IntentSender statusReceiver)
+			throws java.io.IOException, PackageManager.NameNotFoundException {
+		java.util.Objects.requireNonNull(packageName);
+		java.util.Objects.requireNonNull(statusReceiver);
+		appContext().getPackageManager().getPackageInfo(packageName, 0);
+		throw new java.io.IOException("Package " + packageName + " is not archived");
+	}
+
 	public static class Session implements java.io.Closeable {
 		private final SessionState mState;
 
