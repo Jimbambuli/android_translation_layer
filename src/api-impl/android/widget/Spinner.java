@@ -7,6 +7,7 @@ import android.database.DataSetObserver;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.ViewGroup;
 
 public class Spinner extends AbsSpinner {
 	private Observer observer;
@@ -33,6 +34,7 @@ public class Spinner extends AbsSpinner {
 
 		TypedArray a = context.obtainStyledAttributes(attributeSet, R.styleable.Spinner, defStyle, 0);
 		popupBackground = a.getDrawable(R.styleable.Spinner_popupBackground);
+		mDropDownWidth = a.getLayoutDimension(R.styleable.Spinner_dropDownWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
 		a.recycle();
 	}
 
@@ -83,14 +85,18 @@ public class Spinner extends AbsSpinner {
 	@Override
 	void layout(int delta, boolean animate) {}
 
-	public int getDropDownWidth() { return 100; }
+	/* AOSP Spinner: mDropDownWidth from the dropDownWidth attribute, default WRAP_CONTENT; the GTK drop-down
+	 * sizes its popup itself, so the value is only kept for the getter */
+	private int mDropDownWidth = ViewGroup.LayoutParams.WRAP_CONTENT;
+
+	public int getDropDownWidth() { return mDropDownWidth; }
 
 	/* the GTK drop-down places and sizes its popup itself; the values are only kept for the getters */
 	private int dropDownHorizontalOffset;
 	private int dropDownVerticalOffset;
 	private CharSequence prompt;
 
-	public void setDropDownWidth(int pixels) {}
+	public void setDropDownWidth(int pixels) { mDropDownWidth = pixels; }
 
 	public void setDropDownHorizontalOffset(int pixels) {
 		dropDownHorizontalOffset = pixels;
