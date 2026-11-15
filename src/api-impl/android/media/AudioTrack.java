@@ -312,6 +312,21 @@ public class AudioTrack implements AudioRouting {
 		return bufferSizeInFrames;
 	}
 
+	/* AOSP AudioTrack.setBufferSizeInFrames(): AudioTrack::setBufferSizeInFrames() answers with the size
+	 * actually in use; ATL cannot resize the opened ALSA buffer, so that stays the ALSA buffer's */
+	public int setBufferSizeInFrames(int bufferSizeInFrames) {
+		if (mode == /*MODE_STATIC*/ 0 || getState() == STATE_UNINITIALIZED)
+			return ERROR_INVALID_OPERATION;
+		if (bufferSizeInFrames < 0)
+			return ERROR_BAD_VALUE;
+		return this.bufferSizeInFrames;
+	}
+
+	/* AOSP AudioTrack.getPlaybackRate(): the rate the output plays at, the sample rate ATL opened it with */
+	public int getPlaybackRate() {
+		return sampleRateInHz;
+	}
+
 	/* AOSP AudioTrack.getBufferCapacityInFrames(): the largest buffer the track can use, the ALSA buffer */
 	public int getBufferCapacityInFrames() {
 		return bufferSizeInFrames;

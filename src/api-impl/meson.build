@@ -563,6 +563,7 @@ srcs = [
 	'android/media/AudioManager.java',
 	'android/media/AudioProfile.java',
 	'android/media/AudioRecord.java',
+	'android/media/AudioRecordingConfiguration.java',
 	'android/media/AudioRouting.java',
 	'android/media/AudioTimestamp.java',
 	'android/media/AudioTrack.java',

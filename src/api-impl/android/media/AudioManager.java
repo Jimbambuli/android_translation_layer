@@ -281,6 +281,17 @@ public class AudioManager {
 
 	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
 
+	/* AOSP AudioManager.AudioRecordingCallback */
+	public static abstract class AudioRecordingCallback {
+		public void onRecordingConfigChanged(java.util.List<AudioRecordingConfiguration> configs) {}
+	}
+
+	/* AOSP AudioManager.getActiveRecordingConfigurations(): AudioService's list of active recordings as an
+	 * unprivileged app sees it; ATL knows the app's own AudioRecords */
+	public java.util.List<AudioRecordingConfiguration> getActiveRecordingConfigurations() {
+		return AudioRecord.activeRecordingConfigurations();
+	}
+
 	/* AOSP AudioManager.FX_KEY_CLICK: the standard key click sound */
 	public static final int FX_KEY_CLICK = 0;
 

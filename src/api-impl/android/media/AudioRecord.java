@@ -32,8 +32,16 @@ public class AudioRecord {
 	private int mChannelMask;
 	private final int mSessionId = new AudioManager().generateAudioSessionId();
 
+	private int mBufferSizeInBytes;
+	private AudioDeviceInfo mPreferredDevice;
+	private final java.util.LinkedList<RecordingCallbackInfo> mRecordCallbackList = new java.util.LinkedList<>();
+
+	/* AudioRecords that are recording: ATL's stand-in for AudioService's recording monitor */
+	private static final java.util.ArrayList<AudioRecord> sActiveRecords = new java.util.ArrayList<>();
+
 	public AudioRecord(int streamType, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes) {
 		this.sampleRateInHz = sampleRateInHz;
+		mBufferSizeInBytes = bufferSizeInBytes;
 		mRecordSource = streamType;
 		mAudioFormat = audioFormat == AudioFormat.ENCODING_DEFAULT ? AudioFormat.ENCODING_PCM_16BIT : audioFormat;
 		switch (channelConfig) {
@@ -105,6 +113,135 @@ public class AudioRecord {
 			throw new IllegalStateException("startRecording() called on an uninitialized AudioRecord.");
 		native_record(pcm_handle);
 		recordingState = RECORDSTATE_RECORDING;
+		synchronized (sActiveRecords) {
+			if (!sActiveRecords.contains(this))
+				sActiveRecords.add(this);
+		}
+		dispatchRecordingConfigChange();
+	}
+
+	/* AOSP AudioRecordingMonitorImpl, MSG_RECORDING_CONFIG_CHANGE: the callbacks hear of this record's
+	 * configuration when AudioService reports one for its session, i.e. once the recording is active */
+	private void dispatchRecordingConfigChange() {
+		final AudioRecordingConfiguration config = getActiveRecordingConfiguration();
+		if (config == null)
+			return;
+		final java.util.List<AudioRecordingConfiguration> configList = new java.util.ArrayList<>(1);
+		configList.add(config);
+		synchronized (mRecordCallbackList) {
+			for (final RecordingCallbackInfo arci : mRecordCallbackList) {
+				arci.mExecutor.execute(new Runnable() {
+					@Override
+					public void run() {
+						arci.mCb.onRecordingConfigChanged(configList);
+					}
+				});
+			}
+		}
+	}
+
+	private static class RecordingCallbackInfo {
+		final java.util.concurrent.Executor mExecutor;
+		final AudioManager.AudioRecordingCallback mCb;
+
+		RecordingCallbackInfo(java.util.concurrent.Executor e, AudioManager.AudioRecordingCallback cb) {
+			mExecutor = e;
+			mCb = cb;
+		}
+	}
+
+	/* AOSP AudioRecord.registerAudioRecordingCallback() -> AudioRecordingMonitorImpl */
+	public void registerAudioRecordingCallback(java.util.concurrent.Executor executor, AudioManager.AudioRecordingCallback cb) {
+		if (cb == null)
+			throw new IllegalArgumentException("Illegal null AudioRecordingCallback");
+		if (executor == null)
+			throw new IllegalArgumentException("Illegal null Executor");
+		synchronized (mRecordCallbackList) {
+			for (RecordingCallbackInfo arci : mRecordCallbackList) {
+				if (arci.mCb == cb)
+					throw new IllegalArgumentException("AudioRecordingCallback already registered");
+			}
+			mRecordCallbackList.add(new RecordingCallbackInfo(executor, cb));
+		}
+	}
+
+	public void unregisterAudioRecordingCallback(AudioManager.AudioRecordingCallback cb) {
+		if (cb == null)
+			throw new IllegalArgumentException("Illegal null AudioRecordingCallback argument");
+		synchronized (mRecordCallbackList) {
+			for (RecordingCallbackInfo arci : mRecordCallbackList) {
+				if (arci.mCb == cb) {
+					mRecordCallbackList.remove(arci);
+					return;
+				}
+			}
+			throw new IllegalArgumentException("AudioRecordingCallback was not registered");
+		}
+	}
+
+	/* AOSP AudioRecordingMonitorImpl.getActiveRecordingConfiguration(): the configuration AudioService
+	 * reports for this record's session (anonymized as for an unprivileged app), null when not recording */
+	public AudioRecordingConfiguration getActiveRecordingConfiguration() {
+		synchronized (sActiveRecords) {
+			if (!sActiveRecords.contains(this))
+				return null;
+		}
+		AudioFormat format = getFormat();
+		return new AudioRecordingConfiguration(-1, mSessionId, mRecordSource, format, format, 0, "", 0, false,
+		                                       mRecordSource, new android.media.audiofx.AudioEffect.Descriptor[0],
+		                                       new android.media.audiofx.AudioEffect.Descriptor[0]);
+	}
+
+	/* AudioManager.getActiveRecordingConfigurations(): those of all active records of the app */
+	static java.util.List<AudioRecordingConfiguration> activeRecordingConfigurations() {
+		java.util.ArrayList<AudioRecord> records;
+		synchronized (sActiveRecords) {
+			records = new java.util.ArrayList<>(sActiveRecords);
+		}
+		java.util.ArrayList<AudioRecordingConfiguration> configs = new java.util.ArrayList<>();
+		for (AudioRecord record : records) {
+			AudioRecordingConfiguration config = record.getActiveRecordingConfiguration();
+			if (config != null)
+				configs.add(config);
+		}
+		return configs;
+	}
+
+	/* AOSP setPreferredDevice(): an input device or null; native_setInputDevice() succeeds, ATL records
+	 * from its one input either way */
+	public boolean setPreferredDevice(AudioDeviceInfo deviceInfo) {
+		if (deviceInfo != null && !deviceInfo.isSource())
+			return false;
+		synchronized (this) {
+			mPreferredDevice = deviceInfo;
+		}
+		return true;
+	}
+
+	public AudioDeviceInfo getPreferredDevice() {
+		synchronized (this) {
+			return mPreferredDevice;
+		}
+	}
+
+	/* AOSP getRoutedDevice(): native_getRoutedDeviceId() is 0 (null) unless the record is active, then
+	 * the input it records from, ATL's one input */
+	public AudioDeviceInfo getRoutedDevice() {
+		if (recordingState != RECORDSTATE_RECORDING)
+			return null;
+		AudioDeviceInfo[] inputs = new AudioManager().getDevices(AudioManager.GET_DEVICES_INPUTS);
+		return inputs.length > 0 ? inputs[0] : null;
+	}
+
+	/* AOSP getBufferSizeInFrames(): native_setup() sizes the buffer as bufferSizeInBytes / frame size */
+	public int getBufferSizeInFrames() {
+		int bytesPerSample;
+		switch (mAudioFormat) {
+			case AudioFormat.ENCODING_PCM_8BIT: bytesPerSample = 1; break;
+			case AudioFormat.ENCODING_PCM_FLOAT: bytesPerSample = 4; break;
+			default: bytesPerSample = 2; break;
+		}
+		return mBufferSizeInBytes / (getChannelCount() * bytesPerSample);
 	}
 
 	/* API 24, AOSP AudioRecord.getTimestamp(): argument check as AOSP; ATL's capture path reports no
@@ -136,12 +273,18 @@ public class AudioRecord {
 		if (pcm_handle != 0)
 			native_stop(pcm_handle);
 		recordingState = RECORDSTATE_STOPPED;
+		synchronized (sActiveRecords) {
+			sActiveRecords.remove(this);
+		}
 	}
 
 	public void release() {
 		if (pcm_handle != 0)
 			native_release(pcm_handle);
 		pcm_handle = 0;
+		synchronized (sActiveRecords) {
+			sActiveRecords.remove(this);
+		}
 	}
 
 	public static class Builder {
