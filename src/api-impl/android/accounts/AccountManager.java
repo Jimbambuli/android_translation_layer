@@ -186,6 +186,74 @@ public class AccountManager {
 		return getAuthToken(account, authTokenType, options, (Activity)null, callback, handler);
 	}
 
+	/* AOSP GetAuthTokenByTypeAndFeaturesTask: the accounts of the type with the features; none -> addAccount(), one ->
+	 * getAuthToken() of it, several -> a result with the intent of the account chooser (KEY_INTENT) */
+	public AccountManagerFuture<Bundle> getAuthTokenByFeatures(final String accountType, final String authTokenType,
+	                                                           final String[] features, final Activity activity,
+	                                                           final Bundle addAccountOptions, final Bundle getAuthTokenOptions,
+	                                                           AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (accountType == null)
+			throw new IllegalArgumentException("account type is null");
+		if (authTokenType == null)
+			throw new IllegalArgumentException("authTokenType is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				Account[] accounts = getAccountsByTypeAndFeatures(accountType, features, null, null).getResult();
+				if (accounts.length == 0)
+					return addAccount(accountType, authTokenType, features, addAccountOptions, activity, null, null).getResult();
+				if (accounts.length == 1)
+					return getAuthToken(accounts[0], authTokenType, getAuthTokenOptions, activity, null, null).getResult();
+				Bundle result = new Bundle();
+				result.putParcelable(KEY_INTENT, newChooseAccountIntent(null, new ArrayList<Account>(Arrays.asList(accounts)), null, null,
+				                                                        null, null, null));
+				return result;
+			}
+		}, callback, handler);
+	}
+
+	/* AOSP AccountManager.notifyAccountAuthenticated() (deprecated): the service records the time of the last
+	 * authentication and returns whether the account exists */
+	public boolean notifyAccountAuthenticated(Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return keyringGet(account.type, account.name, "account") != null;
+	}
+
+	/* AOSP renameAccount(): AccountManagerService moves the account (password, user data, auth tokens) to the new name
+	 * of the same type; the result is the new Account, the old name stays when the new one is taken. User data and
+	 * auth tokens are found by the key indexes setUserData()/setAuthToken() keep, as the keyring cannot be enumerated */
+	public AccountManagerFuture<Account> renameAccount(final Account account, final String newName,
+	                                                   AccountManagerCallback<Account> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (newName == null || newName.isEmpty())
+			throw new IllegalArgumentException("newName is empty or null");
+		return runAsync(new Callable<Account>() {
+			@Override
+			public Account call() {
+				if (!ATLSecrets.mayHoldSecrets() || keyringGet(account.type, account.name, "account") == null)
+					return account;
+				Account renamed = new Account(newName, account.type);
+				if (newName.equals(account.name) || keyringGet(renamed.type, renamed.name, "account") != null)
+					return account;
+				if (!nativeSet(renamed.type, renamed.name, "account", ""))
+					return account;
+				setPassword(renamed, getPassword(account));
+				String keys = keyringGet(account.type, account.name, "userdatakeys");
+				if (keys != null && !keys.isEmpty())
+					for (String key : keys.split("\n"))
+						setUserData(renamed, key, getUserData(account, key));
+				String types = keyringGet(account.type, account.name, "authtokentypes");
+				if (types != null && !types.isEmpty())
+					for (String type : types.split("\n"))
+						setAuthToken(renamed, type, peekAuthToken(account, type));
+				nativeRemove(account.type, account.name);
+				return renamed;
+			}
+		}, callback, handler);
+	}
+
 	/* AOSP blockingGetAuthToken() */
 	public String blockingGetAuthToken(Account account, String authTokenType, boolean notifyAuthFailure)
 	    throws OperationCanceledException, IOException, AuthenticatorException {
@@ -359,6 +427,10 @@ public class AccountManager {
 
 	public void setUserData(Account account, String key, String value) {
 		nativeSet(account.type, account.name, "userdata:" + key, value);
+		/* index of the user data keys, for renameAccount() */
+		String keys = keyringGet(account.type, account.name, "userdatakeys");
+		if (value != null && (keys == null || !("\n" + keys + "\n").contains("\n" + key + "\n")))
+			nativeSet(account.type, account.name, "userdatakeys", keys == null || keys.isEmpty() ? key : keys + "\n" + key);
 	}
 
 	public String peekAuthToken(Account account, String authTokenType) {
