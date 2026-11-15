@@ -155,6 +155,12 @@ public final class NotificationChannel {
 	/**
 	 * Sets whether notification posted to this channel should vibrate.
 	 */
+	/* AOSP NotificationChannel.hasUserSetSound(): (mUserLockedFields & USER_LOCKED_SOUND) != 0; the field is set by the
+	 * notification service when the user changes the sound, ATL has no such settings UI */
+	public boolean hasUserSetSound() {
+		return false;
+	}
+
 	public void enableVibration(boolean vibration) {
 		this.mVibrationEnabled = vibration;
 	}
