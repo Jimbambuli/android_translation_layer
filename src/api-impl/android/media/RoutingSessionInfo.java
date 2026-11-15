@@ -31,6 +31,11 @@ public final class RoutingSessionInfo implements Parcelable {
 
 	private static final String TAG = "RoutingSessionInfo";
 
+	/* android-16 RoutingSessionInfo transfer reason (the transfer initiator fields are left out) */
+	public static final int TRANSFER_REASON_FALLBACK = 0;
+	public static final int TRANSFER_REASON_SYSTEM_REQUEST = 1;
+	public static final int TRANSFER_REASON_APP = 2;
+
 	private static final String KEY_GROUP_ROUTE = "androidx.mediarouter.media.KEY_GROUP_ROUTE";
 	private static final String KEY_VOLUME_HANDLING = "volumeHandling";
 
@@ -50,6 +55,7 @@ public final class RoutingSessionInfo implements Parcelable {
 
 	final Bundle mControlHints;
 	final boolean mIsSystemSession;
+	final int mTransferReason;
 
 	RoutingSessionInfo(Builder builder) {
 		Objects.requireNonNull(builder, "builder must not be null.");
@@ -73,6 +79,7 @@ public final class RoutingSessionInfo implements Parcelable {
 		mVolume = builder.mVolume;
 
 		mIsSystemSession = builder.mIsSystemSession;
+		mTransferReason = builder.mTransferReason;
 
 		boolean volumeAdjustmentForRemoteGroupSessions = Resources.getSystem().getBoolean(
 				com.android.internal.R.bool.config_volumeAdjustmentForRemoteGroupSessions);
@@ -104,6 +111,7 @@ public final class RoutingSessionInfo implements Parcelable {
 
 		mControlHints = src.readBundle();
 		mIsSystemSession = src.readBoolean();
+		mTransferReason = src.readInt();
 	}
 
 	private static Bundle updateVolumeHandlingInHints(Bundle controlHints, int volumeHandling) {
@@ -206,6 +214,10 @@ public final class RoutingSessionInfo implements Parcelable {
 		return mIsSystemSession;
 	}
 
+	public int getTransferReason() {
+		return mTransferReason;
+	}
+
 	@Override
 	public int describeContents() {
 		return 0;
@@ -227,6 +239,7 @@ public final class RoutingSessionInfo implements Parcelable {
 		dest.writeInt(mVolume);
 		dest.writeBundle(mControlHints);
 		dest.writeBoolean(mIsSystemSession);
+		dest.writeInt(mTransferReason);
 	}
 
 	public void dump(PrintWriter pw, String prefix) {
@@ -248,6 +261,7 @@ public final class RoutingSessionInfo implements Parcelable {
 		pw.println(indent + "mVolume=" + mVolume);
 		pw.println(indent + "mControlHints=" + mControlHints);
 		pw.println(indent + "mIsSystemSession=" + mIsSystemSession);
+		pw.println(indent + "mTransferReason=" + mTransferReason);
 	}
 
 	@Override
@@ -271,14 +285,15 @@ public final class RoutingSessionInfo implements Parcelable {
 				&& Objects.equals(mTransferableRoutes, other.mTransferableRoutes)
 				&& (mVolumeHandling == other.mVolumeHandling)
 				&& (mVolumeMax == other.mVolumeMax)
-				&& (mVolume == other.mVolume);
+				&& (mVolume == other.mVolume)
+				&& (mTransferReason == other.mTransferReason);
 	}
 
 	@Override
 	public int hashCode() {
 		return Objects.hash(mId, mName, mOwnerPackageName, mClientPackageName, mProviderId,
 				mSelectedRoutes, mSelectableRoutes, mDeselectableRoutes, mTransferableRoutes,
-				mVolumeMax, mVolumeHandling, mVolume);
+				mVolumeMax, mVolumeHandling, mVolume, mTransferReason);
 	}
 
 	@Override
@@ -335,6 +350,7 @@ public final class RoutingSessionInfo implements Parcelable {
 		int mVolume;
 		Bundle mControlHints;
 		boolean mIsSystemSession;
+		int mTransferReason = TRANSFER_REASON_FALLBACK;
 
 		public Builder(String id, String clientPackageName) {
 			if (TextUtils.isEmpty(id)) {
@@ -376,6 +392,7 @@ public final class RoutingSessionInfo implements Parcelable {
 
 			mControlHints = sessionInfo.mControlHints;
 			mIsSystemSession = sessionInfo.mIsSystemSession;
+			mTransferReason = sessionInfo.mTransferReason;
 		}
 
 		public Builder setName(CharSequence name) {
@@ -508,6 +525,11 @@ public final class RoutingSessionInfo implements Parcelable {
 
 		public Builder setSystemSession(boolean isSystemSession) {
 			mIsSystemSession = isSystemSession;
+			return this;
+		}
+
+		public Builder setTransferReason(int transferReason) {
+			mTransferReason = transferReason;
 			return this;
 		}
 

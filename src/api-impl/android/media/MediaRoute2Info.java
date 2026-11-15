@@ -89,6 +89,11 @@ public final class MediaRoute2Info implements Parcelable {
 
 	public static final int TYPE_GROUP = 2000;
 
+	/* android-16 MediaRoute2Info suitability status */
+	public static final int SUITABILITY_STATUS_SUITABLE_FOR_DEFAULT_TRANSFER = 0;
+	public static final int SUITABILITY_STATUS_SUITABLE_FOR_MANUAL_TRANSFER = 1;
+	public static final int SUITABILITY_STATUS_NOT_SUITABLE_FOR_TRANSFER = 2;
+
 	public static final String FEATURE_LIVE_AUDIO = "android.media.route.feature.LIVE_AUDIO";
 
 	public static final String FEATURE_LIVE_VIDEO = "android.media.route.feature.LIVE_VIDEO";
@@ -127,6 +132,7 @@ public final class MediaRoute2Info implements Parcelable {
 	final String mProviderId;
 	final boolean mIsVisibilityRestricted;
 	final Set<String> mAllowedPackages;
+	final int mSuitabilityStatus;
 
 	MediaRoute2Info(Builder builder) {
 		mId = builder.mId;
@@ -148,6 +154,7 @@ public final class MediaRoute2Info implements Parcelable {
 		mProviderId = builder.mProviderId;
 		mIsVisibilityRestricted = builder.mIsVisibilityRestricted;
 		mAllowedPackages = builder.mAllowedPackages;
+		mSuitabilityStatus = builder.mSuitabilityStatus;
 	}
 
 	MediaRoute2Info(Parcel in) {
@@ -171,6 +178,7 @@ public final class MediaRoute2Info implements Parcelable {
 		mProviderId = in.readString();
 		mIsVisibilityRestricted = in.readBoolean();
 		mAllowedPackages = Set.of(in.createString8Array());
+		mSuitabilityStatus = in.readInt();
 	}
 
 	public String getId() {
@@ -306,6 +314,7 @@ public final class MediaRoute2Info implements Parcelable {
 		pw.println(indent + "mProviderId=" + mProviderId);
 		pw.println(indent + "mIsVisibilityRestricted=" + mIsVisibilityRestricted);
 		pw.println(indent + "mAllowedPackages=" + mAllowedPackages);
+		pw.println(indent + "mSuitabilityStatus=" + mSuitabilityStatus);
 	}
 
 	private void dumpVolume(PrintWriter pw, String prefix) {
@@ -356,7 +365,12 @@ public final class MediaRoute2Info implements Parcelable {
 				&& Objects.equals(mDeduplicationIds, other.mDeduplicationIds)
 				&& Objects.equals(mProviderId, other.mProviderId)
 				&& (mIsVisibilityRestricted == other.mIsVisibilityRestricted)
-				&& Objects.equals(mAllowedPackages, other.mAllowedPackages);
+				&& Objects.equals(mAllowedPackages, other.mAllowedPackages)
+				&& mSuitabilityStatus == other.mSuitabilityStatus;
+	}
+
+	public int getSuitabilityStatus() {
+		return mSuitabilityStatus;
 	}
 
 	@Override
@@ -364,7 +378,7 @@ public final class MediaRoute2Info implements Parcelable {
 		return Objects.hash(mId, mName, mFeatures, mType, mIsSystem, mIconUri, mDescription,
 				mConnectionState, mClientPackageName, mPackageName, mVolumeHandling, mVolumeMax,
 				mVolume, mAddress, mDeduplicationIds, mProviderId, mIsVisibilityRestricted,
-				mAllowedPackages);
+				mAllowedPackages, mSuitabilityStatus);
 	}
 
 	@Override
@@ -415,6 +429,7 @@ public final class MediaRoute2Info implements Parcelable {
 		dest.writeString(mProviderId);
 		dest.writeBoolean(mIsVisibilityRestricted);
 		dest.writeString8Array(mAllowedPackages.toArray(new String[0]));
+		dest.writeInt(mSuitabilityStatus);
 	}
 
 	private static String getDeviceTypeString(int deviceType) {
@@ -488,6 +503,7 @@ public final class MediaRoute2Info implements Parcelable {
 		String mProviderId;
 		boolean mIsVisibilityRestricted;
 		Set<String> mAllowedPackages;
+		int mSuitabilityStatus;
 
 		public Builder(String id, CharSequence name) {
 			if (TextUtils.isEmpty(id)) {
@@ -501,6 +517,7 @@ public final class MediaRoute2Info implements Parcelable {
 			mFeatures = new ArrayList<>();
 			mDeduplicationIds = Set.of();
 			mAllowedPackages = Set.of();
+			mSuitabilityStatus = SUITABILITY_STATUS_SUITABLE_FOR_DEFAULT_TRANSFER;
 		}
 
 		public Builder(MediaRoute2Info routeInfo) {
@@ -534,6 +551,7 @@ public final class MediaRoute2Info implements Parcelable {
 			mProviderId = routeInfo.mProviderId;
 			mIsVisibilityRestricted = routeInfo.mIsVisibilityRestricted;
 			mAllowedPackages = routeInfo.mAllowedPackages;
+			mSuitabilityStatus = routeInfo.mSuitabilityStatus;
 		}
 
 		public Builder addFeature(String feature) {
@@ -643,6 +661,11 @@ public final class MediaRoute2Info implements Parcelable {
 		public Builder setVisibilityRestricted(Set<String> allowedPackages) {
 			mIsVisibilityRestricted = true;
 			mAllowedPackages = Set.copyOf(allowedPackages);
+			return this;
+		}
+
+		public Builder setSuitabilityStatus(int suitabilityStatus) {
+			mSuitabilityStatus = suitabilityStatus;
 			return this;
 		}
 
