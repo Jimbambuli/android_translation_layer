@@ -89,8 +89,8 @@ import java.util.Objects;
  *   });
  * }</pre>
  */
-/* ATL (from AOSP android-16.0.0_r4): not Parcelable, because ATL's RemoteAction is not; the Request still is */
-public final class TextClassification {
+/* ATL (from AOSP android-16.0.0_r4) */
+public final class TextClassification implements Parcelable {
 
     /**
      *      */
@@ -688,4 +688,62 @@ public final class TextClassification {
                 };
     }
 
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeString(mText);
+        // NOTE: legacy fields are not parcelled.
+        dest.writeTypedList(mActions);
+        mEntityConfidence.writeToParcel(dest, flags);
+        dest.writeString(mId);
+        dest.writeBundle(mExtras);
+    }
+
+    public static final Parcelable.Creator<TextClassification> CREATOR =
+            new Parcelable.Creator<TextClassification>() {
+                @Override
+                public TextClassification createFromParcel(Parcel in) {
+                    return new TextClassification(in);
+                }
+
+                @Override
+                public TextClassification[] newArray(int size) {
+                    return new TextClassification[size];
+                }
+            };
+
+    private TextClassification(Parcel in) {
+        mText = in.readString();
+        mActions = in.createTypedArrayList(RemoteAction.CREATOR);
+        if (!mActions.isEmpty()) {
+            final RemoteAction action = mActions.get(0);
+            mLegacyIcon = maybeLoadDrawable(action.getIcon());
+            mLegacyLabel = action.getTitle().toString();
+            mLegacyOnClickListener = createIntentOnClickListener(mActions.get(0).getActionIntent());
+        } else {
+            mLegacyIcon = null;
+            mLegacyLabel = null;
+            mLegacyOnClickListener = null;
+        }
+        mLegacyIntent = null; // mLegacyIntent is not parcelled.
+        mEntityConfidence = EntityConfidence.CREATOR.createFromParcel(in);
+        mId = in.readString();
+        mExtras = in.readBundle();
+    }
+
+    // Best effort attempt to try to load a drawable from the provided icon.
+    private static Drawable maybeLoadDrawable(android.graphics.drawable.Icon icon) {
+        if (icon == null) {
+            return null;
+        }
+        switch (icon.getType()) {
+            case android.graphics.drawable.Icon.TYPE_BITMAP:
+                return new android.graphics.drawable.BitmapDrawable(android.content.res.Resources.getSystem(), icon.getBitmap());
+        }
+        return null;
+    }
 }

@@ -33,8 +33,8 @@ import java.util.Objects;
 /**
  * Information about where text selection should be.
  */
-/* ATL (from AOSP android-16.0.0_r4): not Parcelable, as TextClassification is not; the Request still is */
-public final class TextSelection {
+/* ATL (from AOSP android-16.0.0_r4) */
+public final class TextSelection implements Parcelable {
 
     private final int mStartIndex;
     private final int mEndIndex;
@@ -475,5 +475,42 @@ public final class TextSelection {
                         return new Request[size];
                     }
                 };
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeInt(mStartIndex);
+        dest.writeInt(mEndIndex);
+        mEntityConfidence.writeToParcel(dest, flags);
+        dest.writeString(mId);
+        dest.writeBundle(mExtras);
+        dest.writeParcelable(mTextClassification, flags);
+    }
+
+    public static final Parcelable.Creator<TextSelection> CREATOR =
+            new Parcelable.Creator<TextSelection>() {
+                @Override
+                public TextSelection createFromParcel(Parcel in) {
+                    return new TextSelection(in);
+                }
+
+                @Override
+                public TextSelection[] newArray(int size) {
+                    return new TextSelection[size];
+                }
+            };
+
+    private TextSelection(Parcel in) {
+        mStartIndex = in.readInt();
+        mEndIndex = in.readInt();
+        mEntityConfidence = EntityConfidence.CREATOR.createFromParcel(in);
+        mId = in.readString();
+        mExtras = in.readBundle();
+        mTextClassification = in.readParcelable(TextClassification.class.getClassLoader(), TextClassification.class);
     }
 }
