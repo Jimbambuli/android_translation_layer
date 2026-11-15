@@ -49,4 +49,16 @@ public class SubscriptionInfo {
 	public String getMncString() {
 		return mMnc_String;
 	}
+
+	/* AOSP SubscriptionInfo fields before any value is read from ISub */
+	private CharSequence mCarrierName;
+	private String mIccId;
+
+	public CharSequence getCarrierName() {
+		return mCarrierName;
+	}
+
+	public String getIccId() {
+		return mIccId;
+	}
 }

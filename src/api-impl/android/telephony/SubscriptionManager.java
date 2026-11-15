@@ -38,4 +38,47 @@ public class SubscriptionManager {
 	public List<SubscriptionInfo> getCompleteActiveSubscriptionInfoList() {
 		return Collections.emptyList();
 	}
+
+	/* AOSP SubscriptionManager.OnSubscriptionsChangedListener: constructor checks and default bodies as in AOSP
+	 * (the Compatibility change LAZY_INITIALIZE_SUBSCRIPTIONS_CHANGED_HANDLER is taken as enabled, targetSdk > Q) */
+	public static class OnSubscriptionsChangedListener {
+		private final android.os.Looper mCreatorLooper;
+
+		public android.os.Looper getCreatorLooper() {
+			return mCreatorLooper;
+		}
+
+		public OnSubscriptionsChangedListener() {
+			mCreatorLooper = android.os.Looper.myLooper();
+		}
+
+		public OnSubscriptionsChangedListener(android.os.Looper looper) {
+			java.util.Objects.requireNonNull(looper);
+			mCreatorLooper = looper;
+		}
+
+		public void onSubscriptionsChanged() {}
+
+		public void onAddListenerFailed() {}
+	}
+
+	/* AOSP: with the TelephonyRegistry service (ATL has none) the listener is registered; without it the caller is
+	 * told through onAddListenerFailed() on its executor. */
+	public void addOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {
+		if (listener == null)
+			return;
+		android.os.Looper looper = listener.getCreatorLooper();
+		if (looper == null)
+			throw new RuntimeException("Can't create handler inside thread " + Thread.currentThread()
+			                           + " that has not called Looper.prepare()");
+		android.os.Handler handler = new android.os.Handler(looper);
+		addOnSubscriptionsChangedListener(handler::post, listener);
+	}
+
+	public void addOnSubscriptionsChangedListener(java.util.concurrent.Executor executor,
+	                                              OnSubscriptionsChangedListener listener) {
+		executor.execute(() -> listener.onAddListenerFailed());
+	}
+
+	public void removeOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {}
 }

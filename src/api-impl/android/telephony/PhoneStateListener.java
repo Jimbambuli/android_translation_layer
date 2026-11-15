@@ -25,4 +25,9 @@ public class PhoneStateListener {
 	public void onUserMobileDataStateChanged(boolean enabled) {}
 
 	public void onActiveDataSubscriptionIdChanged(int subId) {}
+
+	/* AOSP PhoneStateListener: empty default bodies */
+	public void onSignalStrengthsChanged(SignalStrength signalStrength) {}
+
+	public void onCellInfoChanged(java.util.List<CellInfo> cellInfo) {}
 }
