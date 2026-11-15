@@ -6,6 +6,7 @@ public class AudioRecord {
 	public static final int RECORDSTATE_RECORDING = 3;
 
 	public static final int ERROR_BAD_VALUE = -2;
+	public static final int ERROR_INVALID_OPERATION = -3;
 
 	private long pcm_handle;
 	private int channels; // set by native constructor
@@ -106,6 +107,17 @@ public class AudioRecord {
 		recordingState = RECORDSTATE_RECORDING;
 	}
 
+	/* API 24, AOSP AudioRecord.getTimestamp(): argument check as AOSP; ATL's capture path reports no
+	 * timestamps, which AOSP's native_get_timestamp() returns as ERROR_INVALID_OPERATION */
+	public int getTimestamp(AudioTimestamp outTimestamp, int timebase) {
+		if (outTimestamp == null ||
+		    (timebase != AudioTimestamp.TIMEBASE_BOOTTIME
+		     && timebase != AudioTimestamp.TIMEBASE_MONOTONIC)) {
+			throw new IllegalArgumentException();
+		}
+		return ERROR_INVALID_OPERATION;
+	}
+
 	public int read(short[] audioData, int offsetInShorts, int sizeInShorts) {
 		/* sanity check the parameters before calling native_write */
 		if ((audioData == null)
@@ -136,6 +148,23 @@ public class AudioRecord {
 
 		private int audioSource;
 		private AudioFormat audioFormat;
+		private int mBufferSizeInBytes;
+		private android.content.Context mContext;
+
+		/* AOSP AudioRecord.Builder.setBufferSizeInBytes() */
+		public Builder setBufferSizeInBytes(int bufferSizeInBytes) throws IllegalArgumentException {
+			if (bufferSizeInBytes <= 0) {
+				throw new IllegalArgumentException("Invalid buffer size " + bufferSizeInBytes);
+			}
+			mBufferSizeInBytes = bufferSizeInBytes;
+			return this;
+		}
+
+		/* API 31, AOSP AudioRecord.Builder.setContext(): the context only supplies attribution data */
+		public Builder setContext(android.content.Context context) {
+			mContext = java.util.Objects.requireNonNull(context);
+			return this;
+		}
 
 		public Builder setAudioSource(int audioSource) {
 			this.audioSource = audioSource;
@@ -148,7 +177,8 @@ public class AudioRecord {
 		}
 
 		public AudioRecord build() {
-			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding, 32768);
+			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding,
+			                       mBufferSizeInBytes != 0 ? mBufferSizeInBytes : 32768);
 		}
 	}
 }

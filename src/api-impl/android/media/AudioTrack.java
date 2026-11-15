@@ -366,6 +366,7 @@ public class AudioTrack implements AudioRouting {
 		private int mTransferMode;
 		private int mSessionId;
 		private boolean mOffload;
+		private android.content.Context mContext;
 
 		public Builder() {}
 
@@ -378,6 +379,12 @@ public class AudioTrack implements AudioRouting {
 				mAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build();
 			}
 			return new AudioTrack(mAttributes, mFormat, mBufferSizeInBytes, mTransferMode, mSessionId);
+		}
+
+		/* API 31, AOSP AudioTrack.Builder.setContext(): the context only supplies attribution data */
+		public Builder setContext(android.content.Context context) {
+			mContext = java.util.Objects.requireNonNull(context);
+			return this;
 		}
 
 		public Builder setSessionId(int sessionId) {
