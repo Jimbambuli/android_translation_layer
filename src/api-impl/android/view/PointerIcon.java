@@ -15,7 +15,7 @@ import com.android.internal.util.XmlUtils;
  * known by its type; ATL does not draw custom icons, the desktop's cursor of that type stands for it. Custom icons
  * (create(), load()) keep their bitmap and hot spot as in AOSP android-16.0.0_r4 PointerIcon.
  */
-public final class PointerIcon {
+public final class PointerIcon implements android.os.Parcelable {
 	public static final int TYPE_CUSTOM = -1;
 	public static final int TYPE_NOT_SPECIFIED = 1;
 	public static final int TYPE_NULL = 0;
@@ -46,6 +46,7 @@ public final class PointerIcon {
 	private Bitmap mBitmap;
 	private float mHotSpotX;
 	private float mHotSpotY;
+	private boolean mDrawNativeDropShadow;
 
 	private PointerIcon(int type) {
 		mType = type;
@@ -161,5 +162,59 @@ public final class PointerIcon {
 	@Override
 	public int hashCode() {
 		return mType;
+	}
+
+	public static final android.os.Parcelable.Creator<PointerIcon> CREATOR = new android.os.Parcelable.Creator<PointerIcon>() {
+		@Override
+		public PointerIcon createFromParcel(android.os.Parcel in) {
+			final int type = in.readInt();
+			if (type != TYPE_CUSTOM) {
+				return new PointerIcon(type);
+			}
+			final PointerIcon icon = PointerIcon.create(Bitmap.CREATOR.createFromParcel(in), in.readFloat(), in.readFloat());
+			icon.mDrawNativeDropShadow = in.readBoolean();
+			return icon;
+		}
+
+		@Override
+		public PointerIcon[] newArray(int size) {
+			return new PointerIcon[size];
+		}
+	};
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel out, int flags) {
+		out.writeInt(mType);
+		if (mType != TYPE_CUSTOM) {
+			// a non-custom icon is loaded again from its type after un-parceling
+			return;
+		}
+		if (mBitmap == null) {
+			throw new IllegalStateException("Custom icon should be loaded upon creation");
+		}
+		mBitmap.writeToParcel(out, flags);
+		out.writeFloat(mHotSpotX);
+		out.writeFloat(mHotSpotY);
+		out.writeBoolean(mDrawNativeDropShadow);
+	}
+
+	@Override
+	public boolean equals(Object other) {
+		if (this == other) {
+			return true;
+		}
+		if (!(other instanceof PointerIcon)) {
+			return false;
+		}
+		PointerIcon otherIcon = (PointerIcon)other;
+		if (mType != otherIcon.mType) {
+			return false;
+		}
+		return mBitmap == otherIcon.mBitmap && mHotSpotX == otherIcon.mHotSpotX && mHotSpotY == otherIcon.mHotSpotY;
 	}
 }
