@@ -588,6 +588,42 @@ public class ApplicationInfo extends PackageItemInfo {
 		private PackageManager mPM;
 	}
 
+	/* AOSP ApplicationInfo (android-14): fields that the package parser fills; ATL leaves the values the parser
+	 * leaves for a package without them (null, 0, CATEGORY_UNDEFINED) */
+	public java.util.UUID storageUuid;
+	public String[] splitNames;
+	public String seInfo;
+	public String seInfoUser;
+	public String deviceProtectedDataDir;
+	public int compileSdkVersion;
+	public String compileSdkVersionCodename;
+	public String zygotePreloadName;
+
+	public static final int CATEGORY_UNDEFINED = -1;
+	public static final int CATEGORY_GAME = 0;
+	public static final int CATEGORY_AUDIO = 1;
+	public static final int CATEGORY_VIDEO = 2;
+	public static final int CATEGORY_IMAGE = 3;
+	public static final int CATEGORY_SOCIAL = 4;
+	public static final int CATEGORY_NEWS = 5;
+	public static final int CATEGORY_MAPS = 6;
+	public static final int CATEGORY_PRODUCTIVITY = 7;
+	public static final int CATEGORY_ACCESSIBILITY = 8;
+	public int category = CATEGORY_UNDEFINED;
+
+	public static final int HIDDEN_API_ENFORCEMENT_DEFAULT = -1;
+	public static final int HIDDEN_API_ENFORCEMENT_DISABLED = 0;
+	public static final int HIDDEN_API_ENFORCEMENT_ENABLED = 2;
+	private int mHiddenApiPolicy = HIDDEN_API_ENFORCEMENT_DEFAULT;
+
+	/* AOSP getHiddenApiEnforcementPolicy(): an app that is neither signed with the platform key nor a system app
+	 * is never allowed to use hidden APIs, so the policy is the one set, else ENABLED */
+	public int getHiddenApiEnforcementPolicy() {
+		if (mHiddenApiPolicy != HIDDEN_API_ENFORCEMENT_DEFAULT)
+			return mHiddenApiPolicy;
+		return HIDDEN_API_ENFORCEMENT_ENABLED;
+	}
+
 	public ApplicationInfo() {
 		if (System.getProperty("os.arch").equals("aarch64")) {
 			primaryCpuAbi = "arm64-v8a";
@@ -627,6 +663,16 @@ public class ApplicationInfo extends PackageItemInfo {
 		descriptionRes = orig.descriptionRes;
 		uiOptions = orig.uiOptions;
 		backupAgentName = orig.backupAgentName;
+		storageUuid = orig.storageUuid;
+		splitNames = orig.splitNames;
+		seInfo = orig.seInfo;
+		seInfoUser = orig.seInfoUser;
+		deviceProtectedDataDir = orig.deviceProtectedDataDir;
+		compileSdkVersion = orig.compileSdkVersion;
+		compileSdkVersionCodename = orig.compileSdkVersionCodename;
+		zygotePreloadName = orig.zygotePreloadName;
+		category = orig.category;
+		mHiddenApiPolicy = orig.mHiddenApiPolicy;
 	}
 
 	public String toString() {

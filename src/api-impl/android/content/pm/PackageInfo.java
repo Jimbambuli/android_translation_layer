@@ -258,4 +258,19 @@ public class PackageInfo implements Parcelable {
 	}
 
 	public SigningInfo signingInfo = new SigningInfo();
+
+	/* AOSP PackageInfo overlay fields (android-14): an app of ATL is never an overlay package, so they stay empty */
+	public String overlayTarget;
+	public String targetOverlayableName;
+	public String overlayCategory;
+	public int overlayPriority;
+	public boolean mOverlayIsStatic;
+
+	public boolean isOverlayPackage() {
+		return overlayTarget != null;
+	}
+
+	public boolean isStaticOverlayPackage() {
+		return overlayTarget != null && mOverlayIsStatic;
+	}
 }
