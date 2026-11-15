@@ -202,19 +202,4 @@ public final class PointerIcon implements android.os.Parcelable {
 		out.writeFloat(mHotSpotY);
 		out.writeBoolean(mDrawNativeDropShadow);
 	}
-
-	@Override
-	public boolean equals(Object other) {
-		if (this == other) {
-			return true;
-		}
-		if (!(other instanceof PointerIcon)) {
-			return false;
-		}
-		PointerIcon otherIcon = (PointerIcon)other;
-		if (mType != otherIcon.mType) {
-			return false;
-		}
-		return mBitmap == otherIcon.mBitmap && mHotSpotX == otherIcon.mHotSpotX && mHotSpotY == otherIcon.mHotSpotY;
-	}
 }
