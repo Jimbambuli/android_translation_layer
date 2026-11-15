@@ -94,6 +94,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (a.getBoolean(com.android.internal.R.styleable.ViewGroup_touchscreenBlocksFocus, false))
 			setTouchscreenBlocksFocus(true);
 		setClipChildren(a.getBoolean(com.android.internal.R.styleable.ViewGroup_clipChildren, true));
+		/* AOSP ViewGroup.initFromAttributes(): android:layoutAnimation */
+		int layoutAnimationId = a.getResourceId(com.android.internal.R.styleable.ViewGroup_layoutAnimation, -1);
+		if (layoutAnimationId > 0)
+			setLayoutAnimation(android.view.animation.AnimationUtils.loadLayoutAnimation(context, layoutAnimationId));
 		a.recycle();
 	}
 
