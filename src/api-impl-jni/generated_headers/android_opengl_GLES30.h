@@ -7,43 +7,820 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#undef android_opengl_GLES30_GL_MAX_SERVER_WAIT_TIMEOUT
-#define android_opengl_GLES30_GL_MAX_SERVER_WAIT_TIMEOUT 37137L
-#undef android_opengl_GLES30_GL_OBJECT_TYPE
-#define android_opengl_GLES30_GL_OBJECT_TYPE 37138L
-#undef android_opengl_GLES30_GL_SYNC_CONDITION
-#define android_opengl_GLES30_GL_SYNC_CONDITION 37139L
-#undef android_opengl_GLES30_GL_SYNC_STATUS
-#define android_opengl_GLES30_GL_SYNC_STATUS 37140L
-#undef android_opengl_GLES30_GL_SYNC_FLAGS
-#define android_opengl_GLES30_GL_SYNC_FLAGS 37141L
-#undef android_opengl_GLES30_GL_SYNC_FENCE
-#define android_opengl_GLES30_GL_SYNC_FENCE 37142L
-#undef android_opengl_GLES30_GL_SYNC_GPU_COMMANDS_COMPLETE
-#define android_opengl_GLES30_GL_SYNC_GPU_COMMANDS_COMPLETE 37143L
-#undef android_opengl_GLES30_GL_UNSIGNALED
-#define android_opengl_GLES30_GL_UNSIGNALED 37144L
-#undef android_opengl_GLES30_GL_SIGNALED
-#define android_opengl_GLES30_GL_SIGNALED 37145L
-#undef android_opengl_GLES30_GL_ALREADY_SIGNALED
-#define android_opengl_GLES30_GL_ALREADY_SIGNALED 37146L
-#undef android_opengl_GLES30_GL_TIMEOUT_EXPIRED
-#define android_opengl_GLES30_GL_TIMEOUT_EXPIRED 37147L
-#undef android_opengl_GLES30_GL_CONDITION_SATISFIED
-#define android_opengl_GLES30_GL_CONDITION_SATISFIED 37148L
-#undef android_opengl_GLES30_GL_WAIT_FAILED
-#define android_opengl_GLES30_GL_WAIT_FAILED 37149L
-#undef android_opengl_GLES30_GL_SYNC_FLUSH_COMMANDS_BIT
-#define android_opengl_GLES30_GL_SYNC_FLUSH_COMMANDS_BIT 1L
-#undef android_opengl_GLES30_GL_TIMEOUT_IGNORED
-#define android_opengl_GLES30_GL_TIMEOUT_IGNORED -1LL
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glReadBuffer
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glReadBuffer__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawRangeElements
+ * Signature: (IIIIILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawRangeElements__IIIIILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawRangeElements
+ * Signature: (IIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawRangeElements__IIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTexImage3D
+ * Signature: (IIIIIIIIILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexImage3D__IIIIIIIIILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTexImage3D
+ * Signature: (IIIIIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexImage3D__IIIIIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTexSubImage3D
+ * Signature: (IIIIIIIIIILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexSubImage3D__IIIIIIIIIILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTexSubImage3D
+ * Signature: (IIIIIIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexSubImage3D__IIIIIIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glCopyTexSubImage3D
+ * Signature: (IIIIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glCopyTexSubImage3D__IIIIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glCompressedTexImage3D
+ * Signature: (IIIIIIIILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glCompressedTexImage3D__IIIIIIIILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glCompressedTexImage3D
+ * Signature: (IIIIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glCompressedTexImage3D__IIIIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glCompressedTexSubImage3D
+ * Signature: (IIIIIIIIIILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glCompressedTexSubImage3D__IIIIIIIIIILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glCompressedTexSubImage3D
+ * Signature: (IIIIIIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glCompressedTexSubImage3D__IIIIIIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenQueries
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenQueries__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenQueries
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenQueries__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteQueries
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteQueries__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteQueries
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteQueries__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glIsQuery
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsQuery__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBeginQuery
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBeginQuery__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glEndQuery
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glEndQuery__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetQueryiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetQueryiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetQueryiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetQueryiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetQueryObjectuiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetQueryObjectuiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetQueryObjectuiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetQueryObjectuiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUnmapBuffer
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glUnmapBuffer__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawBuffers
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawBuffers__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawBuffers
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawBuffers__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix2x3fv
+ * Signature: (IIZ[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix2x3fv__IIZ_3FI
+  (JNIEnv *, jclass, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix2x3fv
+ * Signature: (IIZLjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix2x3fv__IIZLjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jboolean, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix3x2fv
+ * Signature: (IIZ[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix3x2fv__IIZ_3FI
+  (JNIEnv *, jclass, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix3x2fv
+ * Signature: (IIZLjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix3x2fv__IIZLjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jboolean, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix2x4fv
+ * Signature: (IIZ[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix2x4fv__IIZ_3FI
+  (JNIEnv *, jclass, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix2x4fv
+ * Signature: (IIZLjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix2x4fv__IIZLjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jboolean, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix4x2fv
+ * Signature: (IIZ[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix4x2fv__IIZ_3FI
+  (JNIEnv *, jclass, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix4x2fv
+ * Signature: (IIZLjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix4x2fv__IIZLjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jboolean, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix3x4fv
+ * Signature: (IIZ[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix3x4fv__IIZ_3FI
+  (JNIEnv *, jclass, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix3x4fv
+ * Signature: (IIZLjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix3x4fv__IIZLjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jboolean, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix4x3fv
+ * Signature: (IIZ[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix4x3fv__IIZ_3FI
+  (JNIEnv *, jclass, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformMatrix4x3fv
+ * Signature: (IIZLjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformMatrix4x3fv__IIZLjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jboolean, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBlitFramebuffer
+ * Signature: (IIIIIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBlitFramebuffer__IIIIIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glRenderbufferStorageMultisample
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glRenderbufferStorageMultisample__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glFramebufferTextureLayer
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glFramebufferTextureLayer__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glFlushMappedBufferRange
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glFlushMappedBufferRange__III
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBindVertexArray
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBindVertexArray__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteVertexArrays
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteVertexArrays__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteVertexArrays
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteVertexArrays__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenVertexArrays
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenVertexArrays__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenVertexArrays
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenVertexArrays__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glIsVertexArray
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsVertexArray__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetIntegeri_v
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetIntegeri_1v__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetIntegeri_v
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetIntegeri_1v__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBeginTransformFeedback
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBeginTransformFeedback__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glEndTransformFeedback
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glEndTransformFeedback__
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBindBufferRange
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBindBufferRange__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBindBufferBase
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBindBufferBase__III
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetTransformFeedbackVarying
+ * Signature: (III[II[II[II[BI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetTransformFeedbackVarying__III_3II_3II_3II_3BI
+  (JNIEnv *, jclass, jint, jint, jint, jintArray, jint, jintArray, jint, jintArray, jint, jbyteArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetTransformFeedbackVarying
+ * Signature: (IIILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/ByteBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetTransformFeedbackVarying__IIILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_ByteBuffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jobject, jobject, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribIPointerBounds
+ * Signature: (IIIILjava/nio/Buffer;I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribIPointerBounds__IIIILjava_nio_Buffer_2I
+  (JNIEnv *, jclass, jint, jint, jint, jint, jobject, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribIPointer
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribIPointer__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetVertexAttribIiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetVertexAttribIiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetVertexAttribIiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetVertexAttribIiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetVertexAttribIuiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetVertexAttribIuiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetVertexAttribIuiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetVertexAttribIuiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribI4i
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribI4i__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribI4ui
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribI4ui__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribI4iv
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribI4iv__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribI4iv
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribI4iv__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribI4uiv
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribI4uiv__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribI4uiv
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribI4uiv__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetUniformuiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetUniformuiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetUniformuiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetUniformuiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetFragDataLocation
+ * Signature: (ILjava/lang/String;)I
+ */
+JNIEXPORT jint JNICALL Java_android_opengl_GLES30_glGetFragDataLocation__ILjava_lang_String_2
+  (JNIEnv *, jclass, jint, jstring);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform1ui
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform1ui__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform2ui
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform2ui__III
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform3ui
+ * Signature: (IIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform3ui__IIII
+  (JNIEnv *, jclass, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform4ui
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform4ui__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform1uiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform1uiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform1uiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform1uiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform2uiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform2uiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform2uiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform2uiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform3uiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform3uiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform3uiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform3uiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform4uiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform4uiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniform4uiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniform4uiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferuiv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferuiv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferuiv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferuiv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferfv
+ * Signature: (II[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferfv__II_3FI
+  (JNIEnv *, jclass, jint, jint, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferfv
+ * Signature: (IILjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferfv__IILjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glClearBufferfi
+ * Signature: (IIFI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glClearBufferfi__IIFI
+  (JNIEnv *, jclass, jint, jint, jfloat, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glCopyBufferSubData
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glCopyBufferSubData__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformsiv
+ * Signature: (II[III[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetActiveUniformsiv__II_3III_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformsiv
+ * Signature: (IILjava/nio/IntBuffer;ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetActiveUniformsiv__IILjava_nio_IntBuffer_2ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetUniformBlockIndex
+ * Signature: (ILjava/lang/String;)I
+ */
+JNIEXPORT jint JNICALL Java_android_opengl_GLES30_glGetUniformBlockIndex__ILjava_lang_String_2
+  (JNIEnv *, jclass, jint, jstring);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformBlockiv
+ * Signature: (III[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetActiveUniformBlockiv__III_3II
+  (JNIEnv *, jclass, jint, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformBlockiv
+ * Signature: (IIILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetActiveUniformBlockiv__IIILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformBlockName
+ * Signature: (III[II[BI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetActiveUniformBlockName__III_3II_3BI
+  (JNIEnv *, jclass, jint, jint, jint, jintArray, jint, jbyteArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glUniformBlockBinding
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glUniformBlockBinding__III
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawArraysInstanced
+ * Signature: (IIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawArraysInstanced__IIII
+  (JNIEnv *, jclass, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawElementsInstanced
+ * Signature: (IIILjava/nio/Buffer;I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawElementsInstanced__IIILjava_nio_Buffer_2I
+  (JNIEnv *, jclass, jint, jint, jint, jobject, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDrawElementsInstanced
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDrawElementsInstanced__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
 
 /*
  * Class:     android_opengl_GLES30
  * Method:    glFenceSync
  * Signature: (II)J
  */
-JNIEXPORT jlong JNICALL Java_android_opengl_GLES30_glFenceSync
+JNIEXPORT jlong JNICALL Java_android_opengl_GLES30_glFenceSync__II
   (JNIEnv *, jclass, jint, jint);
 
 /*
@@ -51,7 +828,7 @@ JNIEXPORT jlong JNICALL Java_android_opengl_GLES30_glFenceSync
  * Method:    glIsSync
  * Signature: (J)Z
  */
-JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsSync
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsSync__J
   (JNIEnv *, jclass, jlong);
 
 /*
@@ -59,7 +836,7 @@ JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsSync
  * Method:    glDeleteSync
  * Signature: (J)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteSync
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteSync__J
   (JNIEnv *, jclass, jlong);
 
 /*
@@ -67,7 +844,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteSync
  * Method:    glClientWaitSync
  * Signature: (JIJ)I
  */
-JNIEXPORT jint JNICALL Java_android_opengl_GLES30_glClientWaitSync
+JNIEXPORT jint JNICALL Java_android_opengl_GLES30_glClientWaitSync__JIJ
   (JNIEnv *, jclass, jlong, jint, jlong);
 
 /*
@@ -75,8 +852,464 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLES30_glClientWaitSync
  * Method:    glWaitSync
  * Signature: (JIJ)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES30_glWaitSync
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glWaitSync__JIJ
   (JNIEnv *, jclass, jlong, jint, jlong);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetInteger64v
+ * Signature: (I[JI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetInteger64v__I_3JI
+  (JNIEnv *, jclass, jint, jlongArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetInteger64v
+ * Signature: (ILjava/nio/LongBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetInteger64v__ILjava_nio_LongBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetSynciv
+ * Signature: (JII[II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetSynciv__JII_3II_3II
+  (JNIEnv *, jclass, jlong, jint, jint, jintArray, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetSynciv
+ * Signature: (JIILjava/nio/IntBuffer;Ljava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetSynciv__JIILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jlong, jint, jint, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetInteger64i_v
+ * Signature: (II[JI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetInteger64i_1v__II_3JI
+  (JNIEnv *, jclass, jint, jint, jlongArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetInteger64i_v
+ * Signature: (IILjava/nio/LongBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetInteger64i_1v__IILjava_nio_LongBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetBufferParameteri64v
+ * Signature: (II[JI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetBufferParameteri64v__II_3JI
+  (JNIEnv *, jclass, jint, jint, jlongArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetBufferParameteri64v
+ * Signature: (IILjava/nio/LongBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetBufferParameteri64v__IILjava_nio_LongBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenSamplers
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenSamplers__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenSamplers
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenSamplers__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteSamplers
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteSamplers__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteSamplers
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteSamplers__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glIsSampler
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsSampler__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBindSampler
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBindSampler__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glSamplerParameteri
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glSamplerParameteri__III
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glSamplerParameteriv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glSamplerParameteriv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glSamplerParameteriv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glSamplerParameteriv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glSamplerParameterf
+ * Signature: (IIF)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glSamplerParameterf__IIF
+  (JNIEnv *, jclass, jint, jint, jfloat);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glSamplerParameterfv
+ * Signature: (II[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glSamplerParameterfv__II_3FI
+  (JNIEnv *, jclass, jint, jint, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glSamplerParameterfv
+ * Signature: (IILjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glSamplerParameterfv__IILjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetSamplerParameteriv
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetSamplerParameteriv__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetSamplerParameteriv
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetSamplerParameteriv__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetSamplerParameterfv
+ * Signature: (II[FI)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetSamplerParameterfv__II_3FI
+  (JNIEnv *, jclass, jint, jint, jfloatArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetSamplerParameterfv
+ * Signature: (IILjava/nio/FloatBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetSamplerParameterfv__IILjava_nio_FloatBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glVertexAttribDivisor
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glVertexAttribDivisor__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glBindTransformFeedback
+ * Signature: (II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glBindTransformFeedback__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteTransformFeedbacks
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteTransformFeedbacks__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glDeleteTransformFeedbacks
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glDeleteTransformFeedbacks__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenTransformFeedbacks
+ * Signature: (I[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenTransformFeedbacks__I_3II
+  (JNIEnv *, jclass, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGenTransformFeedbacks
+ * Signature: (ILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGenTransformFeedbacks__ILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glIsTransformFeedback
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES30_glIsTransformFeedback__I
+  (JNIEnv *, jclass, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glPauseTransformFeedback
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glPauseTransformFeedback__
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glResumeTransformFeedback
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glResumeTransformFeedback__
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetProgramBinary
+ * Signature: (II[II[IILjava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetProgramBinary__II_3II_3IILjava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jintArray, jint, jintArray, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetProgramBinary
+ * Signature: (IILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetProgramBinary__IILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jobject, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glProgramBinary
+ * Signature: (IILjava/nio/Buffer;I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glProgramBinary__IILjava_nio_Buffer_2I
+  (JNIEnv *, jclass, jint, jint, jobject, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glProgramParameteri
+ * Signature: (III)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glProgramParameteri__III
+  (JNIEnv *, jclass, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glInvalidateFramebuffer
+ * Signature: (II[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glInvalidateFramebuffer__II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glInvalidateFramebuffer
+ * Signature: (IILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glInvalidateFramebuffer__IILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glInvalidateSubFramebuffer
+ * Signature: (II[IIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glInvalidateSubFramebuffer__II_3IIIIII
+  (JNIEnv *, jclass, jint, jint, jintArray, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glInvalidateSubFramebuffer
+ * Signature: (IILjava/nio/IntBuffer;IIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glInvalidateSubFramebuffer__IILjava_nio_IntBuffer_2IIII
+  (JNIEnv *, jclass, jint, jint, jobject, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTexStorage2D
+ * Signature: (IIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexStorage2D__IIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTexStorage3D
+ * Signature: (IIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTexStorage3D__IIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetInternalformativ
+ * Signature: (IIII[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetInternalformativ__IIII_3II
+  (JNIEnv *, jclass, jint, jint, jint, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetInternalformativ
+ * Signature: (IIIILjava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetInternalformativ__IIIILjava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jint, jint, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glReadPixels
+ * Signature: (IIIIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glReadPixels__IIIIIII
+  (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetBufferPointerv
+ * Signature: (II)Ljava/nio/Buffer;
+ */
+JNIEXPORT jobject JNICALL Java_android_opengl_GLES30_glGetBufferPointerv__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glMapBufferRange
+ * Signature: (IIII)Ljava/nio/Buffer;
+ */
+JNIEXPORT jobject JNICALL Java_android_opengl_GLES30_glMapBufferRange__IIII
+  (JNIEnv *, jclass, jint, jint, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glTransformFeedbackVaryings
+ * Signature: (I[Ljava/lang/String;I)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glTransformFeedbackVaryings__I_3Ljava_lang_String_2I
+  (JNIEnv *, jclass, jint, jobjectArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetTransformFeedbackVarying
+ * Signature: (IIILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;B)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetTransformFeedbackVarying__IIILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2B
+  (JNIEnv *, jclass, jint, jint, jint, jobject, jobject, jobject, jbyte);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetTransformFeedbackVarying
+ * Signature: (II[II[II)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES30_glGetTransformFeedbackVarying__II_3II_3II
+  (JNIEnv *, jclass, jint, jint, jintArray, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetTransformFeedbackVarying
+ * Signature: (IILjava/nio/IntBuffer;Ljava/nio/IntBuffer;)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES30_glGetTransformFeedbackVarying__IILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jint, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetStringi
+ * Signature: (II)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES30_glGetStringi__II
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetUniformIndices
+ * Signature: (I[Ljava/lang/String;[II)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetUniformIndices__I_3Ljava_lang_String_2_3II
+  (JNIEnv *, jclass, jint, jobjectArray, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetUniformIndices
+ * Signature: (I[Ljava/lang/String;Ljava/nio/IntBuffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetUniformIndices__I_3Ljava_lang_String_2Ljava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobjectArray, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformBlockName
+ * Signature: (IILjava/nio/Buffer;Ljava/nio/Buffer;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES30_glGetActiveUniformBlockName__IILjava_nio_Buffer_2Ljava_nio_Buffer_2
+  (JNIEnv *, jclass, jint, jint, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES30
+ * Method:    glGetActiveUniformBlockName
+ * Signature: (II)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES30_glGetActiveUniformBlockName__II
+  (JNIEnv *, jclass, jint, jint);
 
 #ifdef __cplusplus
 }
