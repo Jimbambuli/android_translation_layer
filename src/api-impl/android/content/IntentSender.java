@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.AndroidException;
+import java.util.concurrent.Executor;
 
 /* AOSP core/java/android/content/IntentSender.java: a PendingIntent's sender. ATL keeps the PendingIntent itself
  * (AOSP: an IIntentSender in the system server). */
@@ -39,6 +40,10 @@ public class IntentSender implements Parcelable {
 	}
 
 	public void sendIntent(Context context, int code, Intent intent, OnFinished onFinished, Handler handler, String requiredPermission) throws SendIntentException {
+		sendIntent(context, code, intent, requiredPermission, null, handler == null ? null : handler::post, onFinished);
+	}
+
+	public void sendIntent(Context context, int code, Intent intent, String requiredPermission, Bundle options, Executor executor, OnFinished onFinished) throws SendIntentException {
 		if (mPendingIntent == null)
 			throw new SendIntentException("no PendingIntent");
 		try {
