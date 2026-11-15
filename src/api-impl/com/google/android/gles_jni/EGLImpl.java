@@ -136,10 +136,26 @@ public class EGLImpl implements EGL10 {
 	public EGLSurface eglCreatePixmapSurface(EGLDisplay display, EGLConfig config, Object native_pixmap, int[] attrib_list) { return null; }
 	public boolean eglGetConfigs(EGLDisplay display, EGLConfig[] configs, int config_size, int[] num_config) { return false; }
 	public EGLDisplay eglGetCurrentDisplay() { return null; }
-	public EGLSurface eglGetCurrentSurface(int readdraw) { return null; }
 	public int eglGetError() { return EGL_SUCCESS; } // don't let yourself get fooled, this is also a stub :P
-	public boolean eglQueryContext(EGLDisplay display, EGLContext context, int attribute, int[] value) { return false; }
-	public boolean eglQuerySurface(EGLDisplay display, EGLSurface surface, int attribute, int[] value) { return false; }
+
+	/* AOSP EGLImpl.eglGetCurrentSurface()/eglQueryContext()/eglQuerySurface() (com_google_android_gles_jni_EGLImpl.cpp):
+	 * straight to the EGL functions */
+	public EGLSurface eglGetCurrentSurface(int readdraw) {
+		long native_egl_surface = native_eglGetCurrentSurface(readdraw);
+		return native_egl_surface == 0 ? EGL10.EGL_NO_SURFACE : new EGLSurfaceImpl(native_egl_surface);
+	}
+
+	public boolean eglQueryContext(EGLDisplay display, EGLContext context, int attribute, int[] value) {
+		if (display == null || context == null || value == null || value.length < 1)
+			throw new IllegalArgumentException();
+		return native_eglQueryContext(display.native_egl_display, context.native_egl_context, attribute, value);
+	}
+
+	public boolean eglQuerySurface(EGLDisplay display, EGLSurface surface, int attribute, int[] value) {
+		if (display == null || surface == null || value == null || value.length < 1)
+			throw new IllegalArgumentException();
+		return native_eglQuerySurface(display.native_egl_display, ((EGLSurfaceImpl)surface).mEGLSurface, attribute, value);
+	}
 	/**
 	 * @hide *
 	 */
@@ -155,6 +171,9 @@ public class EGLImpl implements EGL10 {
 	private native long native_eglCreateWindowSurface(long native_egl_display, long native_egl_config, Surface surface, int[] attrib_list);
 	private native long native_eglGetDisplay(Object native_display);
 	private native long native_eglGetCurrentContext();
+	private native long native_eglGetCurrentSurface(int readdraw);
+	private native boolean native_eglQueryContext(long native_egl_display, long native_egl_context, int attribute, int[] value);
+	private native boolean native_eglQuerySurface(long native_egl_display, long native_egl_surface, int attribute, int[] value);
 	private native String native_eglQueryString(long native_egl_display, int name);
 	private native boolean native_eglInitialize(long native_egl_display, int[] major_minor);
 	private native boolean native_eglGetConfigAttrib(long native_egl_display, long native_edl_config, int attribute, int[] value);

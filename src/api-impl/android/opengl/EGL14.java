@@ -124,6 +124,39 @@ public class EGL14 {
 			return new EGLContext(raw_context.native_egl_context);
 	}
 
+	/* AOSP EGL14.eglGetCurrentSurface()/eglQueryContext()/eglQuerySurface() (android_opengl_EGL14.cpp): the EGL
+	 * functions; the array variants check value and offset (IllegalArgumentException) and write value[offset] */
+	public static EGLSurface eglGetCurrentSurface(int readdraw) {
+		javax.microedition.khronos.egl.EGLSurface raw_surface = impl.eglGetCurrentSurface(readdraw);
+		long handle = ((com.google.android.gles_jni.EGLSurfaceImpl)raw_surface).mEGLSurface;
+		return handle == 0 ? EGL_NO_SURFACE : new EGLSurface(handle);
+	}
+
+	public static boolean eglQueryContext(EGLDisplay display, EGLContext context, int attribute, int[] value, int offset) {
+		checkValueArray(value, offset);
+		int[] raw_value = new int[1];
+		boolean ret = impl.eglQueryContext(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), new javax.microedition.khronos.egl.EGLContext(context.getNativeHandle()), attribute, raw_value);
+		value[offset] = raw_value[0];
+		return ret;
+	}
+
+	public static boolean eglQuerySurface(EGLDisplay display, EGLSurface surface, int attribute, int[] value, int offset) {
+		checkValueArray(value, offset);
+		int[] raw_value = new int[1];
+		boolean ret = impl.eglQuerySurface(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), new com.google.android.gles_jni.EGLSurfaceImpl(surface.getNativeHandle()), attribute, raw_value);
+		value[offset] = raw_value[0];
+		return ret;
+	}
+
+	private static void checkValueArray(int[] value, int offset) {
+		if (value == null)
+			throw new IllegalArgumentException("value == null");
+		if (offset < 0)
+			throw new IllegalArgumentException("offset < 0");
+		if (value.length - offset < 1)
+			throw new IllegalArgumentException("length - offset < 1 < needed");
+	}
+
 	public static String eglQueryString(EGLDisplay display, int name) {
 		return impl.eglQueryString(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), name);
 	}
