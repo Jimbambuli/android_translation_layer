@@ -16,6 +16,7 @@
 
 package android.os;
 
+import java.io.File;
 import java.io.FileDescriptor;
 
 /**
@@ -36,5 +37,21 @@ public final class FileUtils {
 	 */
 	public static ParcelFileDescriptor convertToModernFd(FileDescriptor fd) {
 		return null;
+	}
+
+	/* AOSP FileUtils.contains: file lies in dir or is dir; both resolved by the caller */
+	public static boolean contains(File dir, File file) {
+		if (dir == null || file == null) return false;
+		return contains(dir.getAbsolutePath(), file.getAbsolutePath());
+	}
+
+	public static boolean contains(String dirPath, String filePath) {
+		if (dirPath.equals(filePath)) {
+			return true;
+		}
+		if (!dirPath.endsWith("/")) {
+			dirPath += "/";
+		}
+		return filePath.startsWith(dirPath);
 	}
 }

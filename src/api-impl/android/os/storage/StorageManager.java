@@ -18,7 +18,34 @@ public class StorageManager {
 		return sVolumes;
 	}
 
-	public StorageVolume getStorageVolume(File file) { return null; }
+	/* AOSP StorageManager.getStorageVolume(File) -> getStorageVolume(StorageVolume[], File): the volume whose
+	 * directory holds the file (canonical paths); the deprecated /data path branch is left out */
+	public StorageVolume getStorageVolume(File file) {
+		return getStorageVolume(getVolumeList(), file);
+	}
+
+	private static StorageVolume getStorageVolume(StorageVolume[] volumes, File file) {
+		if (file == null) {
+			return null;
+		}
+		try {
+			file = file.getCanonicalFile();
+		} catch (IOException ignored) {
+			return null;
+		}
+		for (StorageVolume volume : volumes) {
+			File volumeFile = volume.getPathFile();
+			try {
+				volumeFile = volumeFile.getCanonicalFile();
+			} catch (IOException ignored) {
+				continue;
+			}
+			if (android.os.FileUtils.contains(volumeFile, file)) {
+				return volume;
+			}
+		}
+		return null;
+	}
 
 	/* AOSP StorageManager.getStorageVolumes() */
 	public List<StorageVolume> getStorageVolumes() {
