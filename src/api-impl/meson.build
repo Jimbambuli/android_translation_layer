@@ -79,6 +79,7 @@ srcs = [
 	'android/net/WebAddress.java',
 	'android/net/wifi/ParcelUtil.java',
 	'android/net/wifi/WifiEnterpriseConfig.java',
+	'android/nfc/AvailableNfcAntenna.java',
 	'android/nfc/FormatException.java',
 	'android/nfc/NdefMessage.java',
 	'android/nfc/NdefRecord.java',
