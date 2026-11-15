@@ -134,4 +134,20 @@ public class PhoneNumberUtils {
 	public static String formatNumber(String phoneNumber, String defaultCountryIso) {
 		return phoneNumber;
 	}
+
+	/* PhoneNumberUtils.isWellFormedSmsAddress() */
+	public static boolean isWellFormedSmsAddress(String address) {
+		String networkPortion = PhoneNumberUtils.extractNetworkPortion(address);
+		return (!(networkPortion.equals("+") || android.text.TextUtils.isEmpty(networkPortion))) && isDialable(networkPortion);
+	}
+
+	/* PhoneNumberUtils.isDialable(String): every character is dialable */
+	public static boolean isDialable(String address) {
+		for (int i = 0, count = address.length(); i < count; i++) {
+			if (!isDialable(address.charAt(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
 }
