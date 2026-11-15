@@ -83,4 +83,7 @@ public class SearchManager {
 		Context context = ATLLoadedApp.getPrimaryApplication().getApplication();
 		return context.getContentResolver().query(uri, null, selection, selArgs, null);
 	}
+
+	/* AOSP SearchManager.launchAssist(): returns when the search service (mService) is missing, as it is here */
+	public void launchAssist(android.os.Bundle args) {}
 }

@@ -552,6 +552,12 @@ public class DevicePolicyManager {
     public void wipeData(int flags) { throw new SecurityException("No active admin owned by uid"); }
 
     public boolean getCameraDisabled(ComponentName admin) { return false; }
+    /* AOSP DevicePolicyManager with mService == null (no device policy service): these calls do nothing */
+    public void lockNow() { lockNow(0); }
+    public void lockNow(int flags) {}
+    public void clearDeviceOwnerApp(String packageName) {}
+    public String[] getAccountTypesWithManagementDisabled() { return null; }
+    public String[] getAccountTypesWithManagementDisabledAsUser(int userId) { return null; }
     public void setCameraDisabled(ComponentName admin, boolean disabled) { throw noAdmin(admin); }
     public int getKeyguardDisabledFeatures(ComponentName admin) { return KEYGUARD_DISABLE_FEATURES_NONE; }
     public void setKeyguardDisabledFeatures(ComponentName admin, int which) { throw noAdmin(admin); }
