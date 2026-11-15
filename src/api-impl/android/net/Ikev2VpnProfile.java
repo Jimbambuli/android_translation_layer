@@ -2,11 +2,11 @@ package android.net;
 
 /* AOSP frameworks/base/net/Ikev2VpnProfile.java (public API surface; no backing network service in ATL, bodies follow the AOSP no-service path) */
 public final class Ikev2VpnProfile extends android.net.PlatformVpnProfile {
-    public java.util.List<java.lang.String> getAllowedAlgorithms() { return null; }
+    public java.util.List<java.lang.String> getAllowedAlgorithms() { return new java.util.ArrayList<>(); }
     public android.net.ipsec.ike.IkeTunnelConnectionParams getIkeTunnelConnectionParams() { return null; }
     public int getMaxMtu() { return 0; }
     public String getPassword() { return null; }
-    public byte[] getPresharedKey() { return null; }
+    public byte[] getPresharedKey() { return new byte[0]; }
     public android.net.ProxyInfo getProxyInfo() { return null; }
     public java.security.PrivateKey getRsaPrivateKey() { return null; }
     public String getServerAddr() { return null; }
