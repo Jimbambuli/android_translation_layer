@@ -43,6 +43,36 @@ public class AppOpsManager {
 		return MODE_ALLOWED;
 	}
 
+	/* AOSP AppOpsManager.noteOp/noteOpNoThrow/noteProxyOp (string forms): the op is noted with the AppOpsService and
+	 * its mode answered, noteOp/noteProxyOp throw SecurityException on MODE_ERRORED. Every op is MODE_ALLOWED in ATL,
+	 * so they answer that and never throw. */
+	@Deprecated
+	public int noteOp(String op, int uid, String packageName) {
+		return noteOp(op, uid, packageName, null, null);
+	}
+
+	public int noteOp(String op, int uid, String packageName, String attributionTag, String message) {
+		return MODE_ALLOWED;
+	}
+
+	@Deprecated
+	public int noteOpNoThrow(String op, int uid, String packageName) {
+		return noteOpNoThrow(op, uid, packageName, null, null);
+	}
+
+	public int noteOpNoThrow(String op, int uid, String packageName, String attributionTag, String message) {
+		return MODE_ALLOWED;
+	}
+
+	@Deprecated
+	public int noteProxyOp(String op, String proxiedPackageName) {
+		return noteProxyOp(op, proxiedPackageName, android.os.Binder.getCallingUid(), null, null);
+	}
+
+	public int noteProxyOp(String op, String proxiedPackageName, int proxiedUid, String proxiedAttributionTag, String message) {
+		return MODE_ALLOWED;
+	}
+
 	@Deprecated
 	public int checkOpNoThrow(String op, int uid, String packageName) {
 		return unsafeCheckOpNoThrow(op, uid, packageName);

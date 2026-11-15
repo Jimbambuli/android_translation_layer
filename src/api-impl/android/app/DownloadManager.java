@@ -10,7 +10,21 @@ public class DownloadManager {
 
 	public static class Request {
 
+		private String mMimeType;
+		private boolean mScannable = false;
+
 		public Request(Uri uri) {}
+
+		/* AOSP: deprecated, ignored from Q on; only kept */
+		@Deprecated
+		public void allowScanningByMediaScanner() {
+			mScannable = true;
+		}
+
+		public Request setMimeType(String mimeType) {
+			mMimeType = mimeType;
+			return this;
+		}
 
 		public Request setAllowedNetworkTypes(int allowedNetworkTypes) { return this; }
 
@@ -57,6 +71,14 @@ public class DownloadManager {
 
 	public static Long getMaxBytesOverMobile(Context context) {
 		return null;
+	}
+
+	/* AOSP remove() -> markRowDeleted(): no download is ever registered, so no row is deleted */
+	public int remove(long... ids) {
+		if (ids == null || ids.length == 0) {
+			throw new IllegalArgumentException("input param 'ids' can't be null");
+		}
+		return 0;
 	}
 
 	public Uri getUriForDownloadedFile(long id) {

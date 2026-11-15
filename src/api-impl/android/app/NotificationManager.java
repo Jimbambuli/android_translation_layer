@@ -57,6 +57,9 @@ public class NotificationManager {
 	private static int mpris_notification_id = -1;
 
 	public void cancelAll() {
+		synchronized (posted) {
+			posted.clear();
+		}
 		Integer[] ids;
 		synchronized (active) {
 			ids = active.toArray(new Integer[0]);
@@ -81,6 +84,8 @@ public class NotificationManager {
 		if (android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS")
 		    && !(notification.style instanceof MediaStyle))
 			return;
+		if (desktopPriority(notification) >= 0 || notification.style instanceof MediaStyle)
+			post(tag, id, notification);
 		if (notification.style instanceof MediaStyle) { // MPRIS content is handled by MediaSession implementation
 			if (mpris_notification_id == -1) {
 				Application application = ATLLoadedApp.getPrimaryApplication().getApplication();
@@ -123,11 +128,33 @@ public class NotificationManager {
 
 	private static final Set<Integer> active = new HashSet<>();
 
+	/* AOSP NotificationManagerService keeps the posted notifications of the app for
+	 * getActiveNotifications() until the app cancels them. ATL does not learn when the user closes
+	 * one on the desktop, so those stay until the app cancels them. */
+	private static final LinkedHashMap<String, StatusBarNotification> posted = new LinkedHashMap<>();
+
+	private static String postedKey(String tag, int id) {
+		return id + "|" + tag;
+	}
+
+	private static void post(String tag, int id, Notification notification) {
+		Application application = ATLLoadedApp.getPrimaryApplication().getApplication();
+		String pkg = application.getPackageName();
+		StatusBarNotification sbn = new StatusBarNotification(pkg, pkg, id, tag, android.os.Process.myUid(), android.os.Process.myPid(), notification, android.os.Process.myUserHandle(), null, System.currentTimeMillis());
+		synchronized (posted) {
+			posted.remove(postedKey(tag, id)); // an update goes to the end, as the newest
+			posted.put(postedKey(tag, id), sbn);
+		}
+	}
+
 	public void notify(int id, Notification notification) {
 		notify(null, id, notification);
 	}
 
 	public void cancel(String tag, final int id) {
+		synchronized (posted) {
+			posted.remove(postedKey(tag, id));
+		}
 		// remove_notification doesn't work reliably when sent directly after add_notification in GNOME session.
 		// So we give some extra delay here.
 		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -231,6 +258,34 @@ public class NotificationManager {
 		}
 	}
 
+	/* AOSP getImportance asks NotificationManagerService.getPackageImportance: IMPORTANCE_DEFAULT while the app
+	 * holds POST_NOTIFICATIONS, else IMPORTANCE_NONE (same test as areNotificationsEnabled here) */
+	public int getImportance() {
+		return areNotificationsEnabled() ? IMPORTANCE_DEFAULT : IMPORTANCE_NONE;
+	}
+
+	public static final int INTERRUPTION_FILTER_UNKNOWN = 0;
+	public static final int INTERRUPTION_FILTER_ALL = 1;
+	public static final int INTERRUPTION_FILTER_PRIORITY = 2;
+	public static final int INTERRUPTION_FILTER_NONE = 3;
+	public static final int INTERRUPTION_FILTER_ALARMS = 4;
+
+	/* AOSP: zenModeToInterruptionFilter(getZenMode()); ATL has no Do Not Disturb, the zen mode is off */
+	public final int getCurrentInterruptionFilter() {
+		return INTERRUPTION_FILTER_ALL;
+	}
+
+	/* AOSP: Do Not Disturb access is granted by the user in the settings, which ATL does not have */
+	public boolean isNotificationPolicyAccessGranted() {
+		return false;
+	}
+
+	/* AOSP: the service allows full screen intents below target SDK 34, above with USE_FULL_SCREEN_INTENT,
+	 * which ATL grants like every permission */
+	public boolean canUseFullScreenIntent() {
+		return true;
+	}
+
 	public boolean areNotificationsEnabled() {
 		return !android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS");
 	}
@@ -251,8 +306,11 @@ public class NotificationManager {
 			createNotificationChannel(channel);
 	}
 
+	/* AOSP: the notifications the app posted and has not canceled */
 	public StatusBarNotification[] getActiveNotifications() {
-		return new StatusBarNotification[0];
+		synchronized (posted) {
+			return posted.values().toArray(new StatusBarNotification[0]);
+		}
 	}
 
 	public NotificationChannel getNotificationChannel(String channelId) {

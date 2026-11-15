@@ -25,6 +25,122 @@ public class Notification implements Parcelable {
 
 	public long when;
 
+	/* AOSP: the legacy large icon; Builder.build() turns it into mLargeIcon when none is set */
+	@Deprecated
+	public Bitmap largeIcon;
+
+	public Notification() {}
+
+	/* AOSP Notification(Parcel) / readFromParcelImpl and writeToParcel: the public fields and those the
+	 * getters answer. Not parcelled: the RemoteViews (contentView, bigContentView, headsUpContentView) and
+	 * the Style object, which AOSP does not parcel either (Builder.recoverBuilder rebuilds it from extras). */
+	public Notification(Parcel parcel) {
+		when = parcel.readLong();
+		icon = parcel.readInt();
+		mSmallIcon = parcel.readTypedObject(Icon.CREATOR);
+		number = parcel.readInt();
+		contentIntent = parcel.readTypedObject(PendingIntent.CREATOR);
+		deleteIntent = parcel.readTypedObject(PendingIntent.CREATOR);
+		fullScreenIntent = parcel.readTypedObject(PendingIntent.CREATOR);
+		tickerText = parcel.readCharSequence();
+		iconLevel = parcel.readInt();
+		mLargeIcon = parcel.readTypedObject(Icon.CREATOR);
+		largeIcon = parcel.readTypedObject(Bitmap.CREATOR);
+		defaults = parcel.readInt();
+		flags = parcel.readInt();
+		sound = parcel.readTypedObject(Uri.CREATOR);
+		audioStreamType = parcel.readInt();
+		audioAttributes = parcel.readTypedObject(AudioAttributes.CREATOR);
+		vibrate = parcel.createLongArray();
+		ledARGB = parcel.readInt();
+		ledOnMS = parcel.readInt();
+		ledOffMS = parcel.readInt();
+		priority = parcel.readInt();
+		category = parcel.readString8();
+		mGroupKey = parcel.readString8();
+		mSortKey = parcel.readString8();
+		extras = parcel.readBundle();
+		actions = parcel.createTypedArray(Action.CREATOR);
+		publicVersion = parcel.readTypedObject(CREATOR);
+		visibility = parcel.readInt();
+		color = parcel.readInt();
+		channelId = parcel.readString8();
+		mTimeout = parcel.readLong();
+		mShortcutId = parcel.readString8();
+		String locusId = parcel.readString8();
+		mLocusId = locusId != null ? new LocusId(locusId) : null;
+		mBadgeIcon = parcel.readInt();
+		mSettingsText = parcel.readCharSequence();
+		mGroupAlertBehavior = parcel.readInt();
+		mBubbleMetadata = parcel.readTypedObject(BubbleMetadata.CREATOR);
+		mAllowSystemGeneratedContextualActions = parcel.readInt() != 0;
+		mForegroundServiceBehavior = parcel.readInt();
+		/* ATL's own fields for the desktop notification */
+		title = parcel.readString8();
+		text = parcel.readString8();
+		iconPath = parcel.readString8();
+		ongoing = parcel.readInt() != 0;
+	}
+
+	@Override
+	public void writeToParcel(Parcel parcel, int flags) {
+		parcel.writeLong(when);
+		parcel.writeInt(icon);
+		parcel.writeTypedObject(mSmallIcon, 0);
+		parcel.writeInt(number);
+		parcel.writeTypedObject(contentIntent, 0);
+		parcel.writeTypedObject(deleteIntent, 0);
+		parcel.writeTypedObject(fullScreenIntent, 0);
+		parcel.writeCharSequence(tickerText);
+		parcel.writeInt(iconLevel);
+		parcel.writeTypedObject(mLargeIcon, 0);
+		parcel.writeTypedObject(largeIcon, 0);
+		parcel.writeInt(defaults);
+		parcel.writeInt(this.flags);
+		parcel.writeTypedObject(sound, 0);
+		parcel.writeInt(audioStreamType);
+		parcel.writeTypedObject(audioAttributes, 0);
+		parcel.writeLongArray(vibrate);
+		parcel.writeInt(ledARGB);
+		parcel.writeInt(ledOnMS);
+		parcel.writeInt(ledOffMS);
+		parcel.writeInt(priority);
+		parcel.writeString8(category);
+		parcel.writeString8(mGroupKey);
+		parcel.writeString8(mSortKey);
+		parcel.writeBundle(extras);
+		parcel.writeTypedArray(actions, 0);
+		parcel.writeTypedObject(publicVersion, 0);
+		parcel.writeInt(visibility);
+		parcel.writeInt(color);
+		parcel.writeString8(channelId);
+		parcel.writeLong(mTimeout);
+		parcel.writeString8(mShortcutId);
+		parcel.writeString8(mLocusId != null ? mLocusId.getId() : null);
+		parcel.writeInt(mBadgeIcon);
+		parcel.writeCharSequence(mSettingsText);
+		parcel.writeInt(mGroupAlertBehavior);
+		parcel.writeTypedObject(mBubbleMetadata, 0);
+		parcel.writeInt(mAllowSystemGeneratedContextualActions ? 1 : 0);
+		parcel.writeInt(mForegroundServiceBehavior);
+		parcel.writeString8(title);
+		parcel.writeString8(text);
+		parcel.writeString8(iconPath);
+		parcel.writeInt(ongoing ? 1 : 0);
+	}
+
+	public static final Parcelable.Creator<Notification> CREATOR = new Parcelable.Creator<Notification>() {
+		@Override
+		public Notification createFromParcel(Parcel parcel) {
+			return new Notification(parcel);
+		}
+
+		@Override
+		public Notification[] newArray(int size) {
+			return new Notification[size];
+		}
+	};
+
 	public int audioStreamType;
 
 	public int icon;
@@ -125,6 +241,12 @@ public class Notification implements Parcelable {
 	public static final String EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED = "android.showBigPictureWhenCollapsed";
 	public static final String EXTRA_TEXT_LINES = "android.textLines";
 	public static final String EXTRA_TEMPLATE = "android.template";
+	public static final String EXTRA_MEDIA_SESSION = "android.mediaSession";
+	public static final String EXTRA_MEDIA_REMOTE_DEVICE = "android.mediaRemoteDevice";
+	public static final String EXTRA_MEDIA_REMOTE_ICON = "android.mediaRemoteIcon";
+	public static final String EXTRA_MEDIA_REMOTE_INTENT = "android.mediaRemoteIntent";
+	public static final String EXTRA_COMPACT_ACTIONS = "android.compactActions";
+	public static final String CATEGORY_TRANSPORT = "transport";
 	public static final String EXTRA_PEOPLE_LIST = "android.people.list";
 	public static final String EXTRA_SELF_DISPLAY_NAME = "android.selfDisplayName";
 	public static final String EXTRA_MESSAGING_PERSON = "android.messagingUser";
@@ -521,6 +643,19 @@ public class Notification implements Parcelable {
 			return this;
 		}
 
+		/* AOSP: deprecated, the stream type is kept as given */
+		public Builder setSound(Uri sound, int streamType) {
+			notification.sound = sound;
+			notification.audioStreamType = streamType;
+			return this;
+		}
+
+		/* AOSP: deprecated, the same as build() */
+		@Deprecated
+		public Notification getNotification() {
+			return build();
+		}
+
 		public Builder setSound(Uri sound) {
 			notification.sound = sound;
 			notification.audioAttributes = AUDIO_ATTRIBUTES_DEFAULT;
@@ -626,6 +761,12 @@ public class Notification implements Parcelable {
 				notification.style.addExtras(extras);
 			}
 			notification.extras = extras;
+			if (notification.mLargeIcon == null && notification.largeIcon != null) { // AOSP Builder.build()
+				notification.mLargeIcon = Icon.createWithBitmap(notification.largeIcon);
+			}
+			if (notification.style instanceof MediaStyle && notification.category == null) { // AOSP MediaStyle.buildStyled()
+				notification.category = CATEGORY_TRANSPORT;
+			}
 			if (notification.style instanceof CallStyle && mContext != null) { // AOSP CallStyle.buildStyled(); the host tests build without a context
 				ArrayList<Action> actions = ((CallStyle)notification.style).getActionsListWithSystemActions();
 				mActions.clear();
@@ -1014,11 +1155,60 @@ public class Notification implements Parcelable {
 		}
 	}
 
+	/* AOSP MediaStyle: the settings go into the extras; ATL's MediaSession.Token is not
+	 * Parcelable, so EXTRA_MEDIA_SESSION stays out */
 	public static class MediaStyle extends Style {
+		private int[] mActionsToShowInCompact = null;
+		private MediaSession.Token mToken;
+		private CharSequence mDeviceName;
+		private int mDeviceIcon;
+		private PendingIntent mDeviceIntent;
 
-		public MediaStyle setShowActionsInCompactView(int... viewActions) { return this; }
+		public MediaStyle() {}
 
-		public MediaStyle setMediaSession(MediaSession.Token token) { return this; }
+		@Deprecated
+		public MediaStyle(Builder builder) {
+			setBuilder(builder);
+		}
+
+		public MediaStyle setShowActionsInCompactView(int... actions) {
+			mActionsToShowInCompact = actions;
+			return this;
+		}
+
+		public MediaStyle setMediaSession(MediaSession.Token token) {
+			mToken = token;
+			return this;
+		}
+
+		public MediaStyle setRemotePlaybackInfo(CharSequence deviceName, int iconResource, PendingIntent chipIntent) {
+			mDeviceName = deviceName;
+			mDeviceIcon = iconResource;
+			mDeviceIntent = chipIntent;
+			return this;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			if (mActionsToShowInCompact != null) {
+				extras.putIntArray(EXTRA_COMPACT_ACTIONS, mActionsToShowInCompact);
+			}
+			if (mDeviceName != null) {
+				extras.putCharSequence(EXTRA_MEDIA_REMOTE_DEVICE, mDeviceName);
+			}
+			if (mDeviceIcon > 0) {
+				extras.putInt(EXTRA_MEDIA_REMOTE_ICON, mDeviceIcon);
+			}
+			if (mDeviceIntent != null) {
+				extras.putParcelable(EXTRA_MEDIA_REMOTE_INTENT, mDeviceIntent);
+			}
+		}
+	}
+
+	/* AOSP DecoratedMediaCustomViewStyle: the custom views inside the media frame */
+	public static class DecoratedMediaCustomViewStyle extends MediaStyle {
+		public DecoratedMediaCustomViewStyle() {}
 	}
 
 	public static class BigTextStyle extends Style {
@@ -1526,26 +1716,183 @@ public class Notification implements Parcelable {
 		}
 	}
 
-	/* API 29/30. Kept only so that apps can build it; ATL shows no bubbles. */
-	public static final class BubbleMetadata {
-		private BubbleMetadata() {}
+	/* AOSP Notification.BubbleMetadata (android-16): the values are kept and parcelled; ATL shows no bubbles */
+	public static final class BubbleMetadata implements Parcelable {
+		public static final int FLAG_AUTO_EXPAND_BUBBLE = 0x00000001;
+		public static final int FLAG_SUPPRESS_NOTIFICATION = 0x00000002;
+		public static final int FLAG_SUPPRESSABLE_BUBBLE = 0x00000004;
+		public static final int FLAG_SUPPRESS_BUBBLE = 0x00000008;
+
+		private PendingIntent mPendingIntent;
+		private PendingIntent mDeleteIntent;
+		private Icon mIcon;
+		private int mDesiredHeight;
+		private int mDesiredHeightResId;
+		private int mFlags;
+		private String mShortcutId;
+
+		private BubbleMetadata(PendingIntent expandIntent, PendingIntent deleteIntent, Icon icon, int height, int heightResId, String shortcutId) {
+			mPendingIntent = expandIntent;
+			mIcon = icon;
+			mDesiredHeight = height;
+			mDesiredHeightResId = heightResId;
+			mDeleteIntent = deleteIntent;
+			mShortcutId = shortcutId;
+		}
+
+		private BubbleMetadata(Parcel in) {
+			if (in.readInt() != 0)
+				mPendingIntent = PendingIntent.CREATOR.createFromParcel(in);
+			if (in.readInt() != 0)
+				mIcon = Icon.CREATOR.createFromParcel(in);
+			mDesiredHeight = in.readInt();
+			mFlags = in.readInt();
+			if (in.readInt() != 0)
+				mDeleteIntent = PendingIntent.CREATOR.createFromParcel(in);
+			mDesiredHeightResId = in.readInt();
+			if (in.readInt() != 0)
+				mShortcutId = in.readString8();
+		}
+
+		public String getShortcutId() { return mShortcutId; }
+		public PendingIntent getIntent() { return mPendingIntent; }
+		public PendingIntent getBubbleIntent() { return mPendingIntent; }
+		public PendingIntent getDeleteIntent() { return mDeleteIntent; }
+		public Icon getIcon() { return mIcon; }
+		public Icon getBubbleIcon() { return mIcon; }
+		public int getDesiredHeight() { return mDesiredHeight; }
+		public int getDesiredHeightResId() { return mDesiredHeightResId; }
+		public boolean getAutoExpandBubble() { return (mFlags & FLAG_AUTO_EXPAND_BUBBLE) != 0; }
+		public boolean isNotificationSuppressed() { return (mFlags & FLAG_SUPPRESS_NOTIFICATION) != 0; }
+		public boolean isBubbleSuppressable() { return (mFlags & FLAG_SUPPRESSABLE_BUBBLE) != 0; }
+		public boolean isBubbleSuppressed() { return (mFlags & FLAG_SUPPRESS_BUBBLE) != 0; }
+		public int getFlags() { return mFlags; }
+		public void setFlags(int flags) { mFlags = flags; }
+
+		public static final Parcelable.Creator<BubbleMetadata> CREATOR = new Parcelable.Creator<BubbleMetadata>() {
+			@Override
+			public BubbleMetadata createFromParcel(Parcel source) {
+				return new BubbleMetadata(source);
+			}
+
+			@Override
+			public BubbleMetadata[] newArray(int size) {
+				return new BubbleMetadata[size];
+			}
+		};
+
+		@Override
+		public void writeToParcel(Parcel out, int flags) {
+			out.writeInt(mPendingIntent != null ? 1 : 0);
+			if (mPendingIntent != null)
+				mPendingIntent.writeToParcel(out, 0);
+			out.writeInt(mIcon != null ? 1 : 0);
+			if (mIcon != null)
+				mIcon.writeToParcel(out, 0);
+			out.writeInt(mDesiredHeight);
+			out.writeInt(mFlags);
+			out.writeInt(mDeleteIntent != null ? 1 : 0);
+			if (mDeleteIntent != null)
+				mDeleteIntent.writeToParcel(out, 0);
+			out.writeInt(mDesiredHeightResId);
+			out.writeInt(TextUtils.isEmpty(mShortcutId) ? 0 : 1);
+			if (!TextUtils.isEmpty(mShortcutId))
+				out.writeString8(mShortcutId);
+		}
 
 		public static final class Builder {
-			public Builder() {}
-			public Builder(String shortcutId) {}
-			public Builder(PendingIntent intent, android.graphics.drawable.Icon icon) {}
+			private PendingIntent mPendingIntent;
+			private Icon mIcon;
+			private int mDesiredHeight;
+			private int mDesiredHeightResId;
+			private int mFlags;
+			private PendingIntent mDeleteIntent;
+			private String mShortcutId;
 
-			public Builder setIntent(PendingIntent intent) { return this; }
-			public Builder setIcon(android.graphics.drawable.Icon icon) { return this; }
-			public Builder setDesiredHeight(int height) { return this; }
-			public Builder setDesiredHeightResId(int heightResId) { return this; }
-			public Builder setAutoExpandBubble(boolean shouldExpand) { return this; }
-			public Builder setSuppressNotification(boolean shouldSuppressNotif) { return this; }
-			public Builder setSuppressableBubble(boolean suppressBubble) { return this; }
-			public Builder setDeleteIntent(PendingIntent deleteIntent) { return this; }
+			@Deprecated
+			public Builder() {}
+
+			public Builder(String shortcutId) {
+				if (TextUtils.isEmpty(shortcutId))
+					throw new NullPointerException("Bubble requires a non-null shortcut id");
+				mShortcutId = shortcutId;
+			}
+
+			public Builder(PendingIntent intent, Icon icon) {
+				if (intent == null)
+					throw new NullPointerException("Bubble requires non-null pending intent");
+				if (icon == null)
+					throw new NullPointerException("Bubbles require non-null icon");
+				mPendingIntent = intent;
+				mIcon = icon;
+			}
+
+			public Builder setIntent(PendingIntent intent) {
+				if (mShortcutId != null)
+					throw new IllegalStateException("Created as a shortcut bubble, cannot set a PendingIntent. Consider using BubbleMetadata.Builder(PendingIntent,Icon) instead.");
+				if (intent == null)
+					throw new NullPointerException("Bubble requires non-null pending intent");
+				mPendingIntent = intent;
+				return this;
+			}
+
+			public Builder setIcon(Icon icon) {
+				if (mShortcutId != null)
+					throw new IllegalStateException("Created as a shortcut bubble, cannot set an Icon. Consider using BubbleMetadata.Builder(PendingIntent,Icon) instead.");
+				if (icon == null)
+					throw new NullPointerException("Bubbles require non-null icon");
+				mIcon = icon;
+				return this;
+			}
+
+			public Builder setDesiredHeight(int height) {
+				mDesiredHeight = Math.max(height, 0);
+				mDesiredHeightResId = 0;
+				return this;
+			}
+
+			public Builder setDesiredHeightResId(int heightResId) {
+				mDesiredHeightResId = heightResId;
+				mDesiredHeight = 0;
+				return this;
+			}
+
+			public Builder setAutoExpandBubble(boolean shouldExpand) {
+				setFlag(FLAG_AUTO_EXPAND_BUBBLE, shouldExpand);
+				return this;
+			}
+
+			public Builder setSuppressNotification(boolean shouldSuppressNotif) {
+				setFlag(FLAG_SUPPRESS_NOTIFICATION, shouldSuppressNotif);
+				return this;
+			}
+
+			public Builder setSuppressableBubble(boolean suppressBubble) {
+				setFlag(FLAG_SUPPRESSABLE_BUBBLE, suppressBubble);
+				return this;
+			}
+
+			public Builder setDeleteIntent(PendingIntent deleteIntent) {
+				mDeleteIntent = deleteIntent;
+				return this;
+			}
 
 			public BubbleMetadata build() {
-				return new BubbleMetadata();
+				if (mShortcutId == null && mPendingIntent == null)
+					throw new NullPointerException("Must supply pending intent or shortcut to bubble");
+				if (mShortcutId == null && mIcon == null)
+					throw new NullPointerException("Must supply an icon or shortcut for the bubble");
+				BubbleMetadata data = new BubbleMetadata(mPendingIntent, mDeleteIntent, mIcon, mDesiredHeight, mDesiredHeightResId, mShortcutId);
+				data.setFlags(mFlags);
+				return data;
+			}
+
+			public Builder setFlag(int mask, boolean value) {
+				if (value)
+					mFlags |= mask;
+				else
+					mFlags &= ~mask;
+				return this;
 			}
 		}
 	}

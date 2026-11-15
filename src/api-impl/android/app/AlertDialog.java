@@ -4,7 +4,12 @@ import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListAdapter;
+import android.widget.ListView;
 
 public class AlertDialog extends Dialog implements DialogInterface {
 
@@ -16,6 +21,7 @@ public class AlertDialog extends Dialog implements DialogInterface {
 	private native void nativeSetView(long ptr);
 
 	private boolean hasView;
+	private ListView listView;
 
 	public AlertDialog(Context context) {
 		this(context, 0);
@@ -66,9 +72,54 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		}
 	}
 
+	/* AOSP AlertDialog.getListView(): the list from setAdapter(), setSingleChoiceItems() or
+	 * setMultiChoiceItems(), null without one. A list from setItems() is the native one here, so
+	 * there is no ListView for it. */
+	public ListView getListView() {
+		return listView;
+	}
+
+	/* AOSP AlertController.AlertParams.createListView() and AlertController.setupView(): a
+	 * ListView with the adapter, the choice mode and the checked item. It takes the place of a
+	 * view set with setView() (AOSP shows the list above the custom view). */
+	private ListView createListView() {
+		listView = new ListView(getContext());
+		return listView;
+	}
+
+	private void showListView(ListAdapter adapter, int choiceMode, int checkedItem) {
+		listView.setAdapter(adapter);
+		listView.setChoiceMode(choiceMode);
+		if (checkedItem > -1) {
+			listView.setItemChecked(checkedItem, true);
+			listView.setSelection(checkedItem);
+		}
+		setView(listView);
+	}
+
+	/* AOSP AlertController.CheckedItemAdapter */
+	private static class CheckedItemAdapter extends ArrayAdapter<CharSequence> {
+		public CheckedItemAdapter(Context context, int resource, int textViewResourceId, CharSequence[] objects) {
+			super(context, resource, textViewResourceId, objects);
+		}
+
+		@Override
+		public boolean hasStableIds() {
+			return true;
+		}
+
+		@Override
+		public long getItemId(int position) {
+			return position;
+		}
+	}
+
 	public static class Builder {
 		private AlertDialog dialog;
 		private Context context;
+		private boolean cancelable = true;
+		private OnCancelListener onCancelListener;
+		private DialogInterface.OnKeyListener onKeyListener;
 
 		public Builder(Context context) {
 			System.out.println("making an AlertDialog$Builder as we speak, my word!");
@@ -115,7 +166,10 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return setNeutralButton(dialog.getContext().getText(textId), listener);
 		}
 
+		/* AOSP AlertDialog.Builder.create(): the dialog takes the builder's cancelable flag (true by
+		 * default) and then also cancels on a touch outside */
 		public AlertDialog.Builder setCancelable(boolean cancelable) {
+			this.cancelable = cancelable;
 			return this;
 		}
 
@@ -153,7 +207,17 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			for (int i = 0; i < items.length; i++) {
 				stringItems[i] = String.valueOf(items[i]);
 			}
-			dialog.nativeSetItems(dialog.nativePtr, stringItems, listener);
+			/* AOSP AlertController.AlertParams.createListView(): a click on an item of a plain
+			 * list calls the listener and dismisses the dialog; without a listener nothing happens */
+			dialog.nativeSetItems(dialog.nativePtr, stringItems, new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface d, int which) {
+					if (listener != null) {
+						listener.onClick(d, which);
+						dialog.dismiss();
+					}
+				}
+			});
 			return this;
 		}
 
@@ -161,7 +225,84 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return setItems(dialog.getContext().getResources().getTextArray(itemsId), listener);
 		}
 
+		/* AOSP AlertController.AlertParams.createListView(): the adapter's own views; a click calls
+		 * the listener and dismisses the dialog */
+		public AlertDialog.Builder setAdapter(ListAdapter adapter, final DialogInterface.OnClickListener listener) {
+			ListView listView = dialog.createListView();
+			if (listener != null) {
+				listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+					@Override
+					public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
+						listener.onClick(dialog, position);
+						dialog.dismiss();
+					}
+				});
+			}
+			dialog.showListView(adapter, ListView.CHOICE_MODE_NONE, -1);
+			return this;
+		}
+
+		/* AOSP: CHOICE_MODE_SINGLE, a click calls the listener but leaves the dialog open */
+		public AlertDialog.Builder setSingleChoiceItems(ListAdapter adapter, int checkedItem, final DialogInterface.OnClickListener listener) {
+			ListView listView = dialog.createListView();
+			if (listener != null) {
+				listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+					@Override
+					public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
+						listener.onClick(dialog, position);
+					}
+				});
+			}
+			dialog.showListView(adapter, ListView.CHOICE_MODE_SINGLE, checkedItem);
+			return this;
+		}
+
+		public AlertDialog.Builder setSingleChoiceItems(CharSequence[] items, int checkedItem, final DialogInterface.OnClickListener listener) {
+			Context context = dialog.getContext();
+			return setSingleChoiceItems(new CheckedItemAdapter(context, com.android.internal.R.layout.select_dialog_singlechoice_material, android.R.id.text1, items), checkedItem, listener);
+		}
+
+		public AlertDialog.Builder setSingleChoiceItems(int itemsId, int checkedItem, final DialogInterface.OnClickListener listener) {
+			return setSingleChoiceItems(dialog.getContext().getResources().getTextArray(itemsId), checkedItem, listener);
+		}
+
+		/* AOSP: CHOICE_MODE_MULTIPLE; checkedItems is the caller's array and follows the clicks */
+		public AlertDialog.Builder setMultiChoiceItems(CharSequence[] items, final boolean[] checkedItems, final DialogInterface.OnMultiChoiceClickListener listener) {
+			final ListView listView = dialog.createListView();
+			ListAdapter adapter = new ArrayAdapter<CharSequence>(dialog.getContext(), com.android.internal.R.layout.select_dialog_multichoice_material, android.R.id.text1, items) {
+				@Override
+				public View getView(int position, View convertView, ViewGroup parent) {
+					View view = super.getView(position, convertView, parent);
+					if (checkedItems != null && checkedItems[position])
+						listView.setItemChecked(position, true);
+					return view;
+				}
+			};
+			if (listener != null) {
+				listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+					@Override
+					public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
+						if (checkedItems != null)
+							checkedItems[position] = listView.isItemChecked(position);
+						listener.onClick(dialog, position, listView.isItemChecked(position));
+					}
+				});
+			}
+			dialog.showListView(adapter, ListView.CHOICE_MODE_MULTIPLE, -1);
+			return this;
+		}
+
+		public AlertDialog.Builder setMultiChoiceItems(int itemsId, boolean[] checkedItems, DialogInterface.OnMultiChoiceClickListener listener) {
+			return setMultiChoiceItems(dialog.getContext().getResources().getTextArray(itemsId), checkedItems, listener);
+		}
+
 		public Builder setOnCancelListener(OnCancelListener onCancelListener) {
+			this.onCancelListener = onCancelListener;
+			return this;
+		}
+
+		public Builder setOnKeyListener(DialogInterface.OnKeyListener onKeyListener) {
+			this.onKeyListener = onKeyListener;
 			return this;
 		}
 
@@ -171,10 +312,20 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		}
 
 		public AlertDialog create() {
+			dialog.setCancelable(cancelable);
+			if (cancelable) {
+				dialog.setCanceledOnTouchOutside(true);
+			}
+			dialog.setOnCancelListener(onCancelListener);
+			if (onKeyListener != null) {
+				dialog.setOnKeyListener(onKeyListener);
+			}
 			return dialog;
 		}
 
+		/* AOSP: create() and show() */
 		public AlertDialog show() {
+			create();
 			dialog.show();
 			return dialog;
 		}

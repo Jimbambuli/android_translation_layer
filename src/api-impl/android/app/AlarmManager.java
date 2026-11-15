@@ -6,6 +6,7 @@ import android.os.Parcelable;
 import android.os.SystemClock;
 import android.text.format.DateUtils;
 import android.util.Slog;
+import java.util.HashMap;
 
 public class AlarmManager {
 	private static final String TAG = "AlarmManager";
@@ -15,13 +16,46 @@ public class AlarmManager {
 	public static final int ELAPSED_REALTIME = 3;
 	public static final int ELAPSED_REALTIME_WAKEUP = 2;
 
+	/* the alarms set with a PendingIntent; AOSP's AlarmManagerService keeps one alarm per
+	 * PendingIntent (PendingIntent.get*() gives the same object for the same arguments) */
+	private static final Handler sHandler = new Handler(Looper.getMainLooper());
+	private static final HashMap<PendingIntent, Runnable> sAlarms = new HashMap<>();
+
+	/* AOSP: "If there is already an alarm scheduled for the same IntentSender, that previous alarm
+	 * will first be canceled." */
+	private static void schedule(PendingIntent operation, Runnable r, long delay) {
+		synchronized (sAlarms) {
+			Runnable old = sAlarms.put(operation, r);
+			if (old != null)
+				sHandler.removeCallbacks(old);
+		}
+		sHandler.postDelayed(r, delay);
+	}
+
+	/* a one-shot alarm is gone once it went off */
+	private static void delivered(PendingIntent operation, Runnable r) {
+		synchronized (sAlarms) {
+			if (sAlarms.get(operation) == r)
+				sAlarms.remove(operation);
+		}
+	}
+
 	public void setRepeating(int type, long triggerTime, long interval, PendingIntent operation) {
 		Slog.i(TAG, "setRepeating(" + type + ", " + triggerTime + ", " + interval + ", " + operation + ") called");
 		setInexactRepeating(type, triggerTime, interval, operation);
 	}
 
+	/* AOSP AlarmManager.cancel(): a null PendingIntent throws (target SDK N and later), else the
+	 * alarm of that PendingIntent is removed */
 	public void cancel(PendingIntent operation) {
 		Slog.i(TAG, "cancel(" + operation + ") called");
+		if (operation == null)
+			throw new NullPointerException("cancel() called with a null PendingIntent");
+		synchronized (sAlarms) {
+			Runnable old = sAlarms.remove(operation);
+			if (old != null)
+				sHandler.removeCallbacks(old);
+		}
 	}
 
 	public void cancel(OnAlarmListener listener) {
@@ -32,13 +66,12 @@ public class AlarmManager {
 		Slog.i(TAG, "setInexactRepeating(" + type + ", " + triggerTime + ", " + interval + ", " + operation + ") called");
 		long delay = triggerTime - ((type == 2 || type == 3) ? SystemClock.elapsedRealtime() : System.currentTimeMillis());
 		Slog.i(TAG, "setInexactRepeating() delay: " + DateUtils.formatElapsedTime(delay) + " interval: " + DateUtils.formatElapsedTime(interval));
-		Handler handler = new Handler(Looper.getMainLooper());
-		handler.postDelayed(new Runnable() {
+		schedule(operation, new Runnable() {
 			@Override
 			public void run() {
 				Slog.i(TAG, "delivering repeating alarm: " + operation);
 				operation.send();
-				handler.postDelayed(this, interval);
+				sHandler.postDelayed(this, interval);
 			}
 		}, delay);
 	}
@@ -47,9 +80,10 @@ public class AlarmManager {
 		Slog.i(TAG, "setExact(" + type + ", " + triggerTime + ", " + operation + ") called");
 		long delay = triggerTime - ((type == 2 || type == 3) ? SystemClock.elapsedRealtime() : System.currentTimeMillis());
 		Slog.i(TAG, "setExact() delay: " + DateUtils.formatElapsedTime(delay));
-		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+		schedule(operation, new Runnable() {
 			@Override
 			public void run() {
+				delivered(operation, this);
 				Slog.i(TAG, "delivering alarm: " + operation);
 				operation.send();
 			}

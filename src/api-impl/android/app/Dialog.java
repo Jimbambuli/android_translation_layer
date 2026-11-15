@@ -118,8 +118,9 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		mCancelMessage = cancelCallback;
 	}
 
+	/* AOSP: getWindow().requestFeature(), which throws once content is set */
 	public final boolean requestWindowFeature(int featureId) {
-		return false;
+		return getWindow().requestFeature(featureId);
 	}
 
 	public LayoutInflater getLayoutInflater() {
