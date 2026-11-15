@@ -216,6 +216,21 @@ public class WebView extends ViewGroup {
 		return null;
 	}
 
+	/* AOSP WebView.zoomBy(): range check, then the provider zooms the page. ATL's WebKit page zoom is not
+	 * driven from here: checked, not applied. */
+	public void zoomBy(float zoomFactor) {
+		if (zoomFactor < 0.01)
+			throw new IllegalArgumentException("zoomFactor must be greater than 0.01.");
+		if (zoomFactor > 100.0)
+			throw new IllegalArgumentException("zoomFactor must be less than 100.");
+	}
+
+	/* AOSP: sets the page's online state (navigator.onLine); WebKit follows the host's network state, so nothing
+	 * to set. enableSlowWholeDocumentDraw(): Chromium-only drawing mode, WebKit always paints the whole page. */
+	public void setNetworkAvailable(boolean networkUp) {}
+
+	public static void enableSlowWholeDocumentDraw() {}
+
 	/* AOSP WebView.postVisualStateCallback(): onComplete(requestId) once the content as of this call is drawn.
 	 * Approximated by the next main-looper turn: WebKit gives no draw-completion event to wait for */
 	public void postVisualStateCallback(long requestId, VisualStateCallback callback) {
