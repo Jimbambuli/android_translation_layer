@@ -25,6 +25,32 @@ public final class Font {
 		this.familyName = familyName;
 	}
 
+	/** @hide
+	 * A font Pango shaped text with (TextRunShaper): known to fontconfig already, so it is not registered again */
+	public static Font forShapedText(String familyName, int weight, int slant, int ttcIndex, String path) {
+		return new Font(new FontStyle(weight, slant), ttcIndex, null, familyName, path != null ? new File(path) : null);
+	}
+
+	/* AOSP Font.equals(): same parameters (style, ttc index, axes) and the same source; the source here is the
+	 * file and the family name fontconfig knows the font by */
+	@Override
+	public boolean equals(Object o) {
+		if (o == this)
+			return true;
+		if (!(o instanceof Font))
+			return false;
+		Font f = (Font)o;
+		return style.getWeight() == f.style.getWeight() && style.getSlant() == f.style.getSlant()
+		    && ttcIndex == f.ttcIndex && java.util.Arrays.equals(axes, f.axes)
+		    && java.util.Objects.equals(familyName, f.familyName) && java.util.Objects.equals(file, f.file);
+	}
+
+	/* AOSP Font.hashCode(): style, ttc index, axes (and the locale list, which ATL's fonts don't have) */
+	@Override
+	public int hashCode() {
+		return java.util.Objects.hash(style.getWeight(), style.getSlant(), ttcIndex, java.util.Arrays.hashCode(axes));
+	}
+
 	/** @hide */
 	public String getFamilyName() {
 		return familyName;
