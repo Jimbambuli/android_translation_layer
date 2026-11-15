@@ -3214,4 +3214,56 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public void setExitSharedElementCallback(SharedElementCallback callback) {}
 
 	public void setEnterSharedElementCallback(SharedElementCallback callback) {}
+
+	/* AOSP Activity members whose work is done by ActivityClient/ActivityTaskManager (no such service on the desktop):
+	 * what ActivityClient returns without a system server, and the state ActivityRecord would keep */
+	private boolean mImmersive;
+	private boolean mShouldDockBigOverlays;
+
+	public boolean isImmersive() { return mImmersive; }
+	public void setImmersive(boolean i) { mImmersive = i; }
+	public final boolean isHandoffEnabled() { return false; }
+	public final boolean isHandoffFullTaskRecreationAllowed() { return false; }
+	public final void setHandoffEnabled(boolean handoffEnabled, boolean allowFullTaskRecreation) {}
+	public boolean isLocalVoiceInteractionSupported() { return false; }
+	public boolean isVoiceInteraction() { return false; }
+	public boolean isVoiceInteractionRoot() { return false; }
+	public void startLocalVoiceInteraction(Bundle privateOptions) {}
+	public void stopLocalVoiceInteraction() {}
+	public void onLocalVoiceInteractionStarted() {}
+	public void onLocalVoiceInteractionStopped() {}
+	public void requestOpenInBrowserEducation() {}
+	public void setAllowCrossUidActivitySwitchFromBelow(boolean allowed) {}
+	public void setInheritShowWhenLocked(boolean inheritShowWhenLocked) {}
+	public void setShouldDockBigOverlays(boolean shouldDockBigOverlays) { mShouldDockBigOverlays = shouldDockBigOverlays; }
+	public boolean shouldDockBigOverlays() { return mShouldDockBigOverlays; }
+	public boolean showAssist(Bundle args) { return false; }
+	public void showLockTaskEscapeMessage() {}
+	public void startLockTask() {}
+	public void stopLockTask() {}
+	public boolean releaseInstance() { return false; }
+	public boolean isActivityTransitionRunning() { return false; }
+	public void onStateNotSaved() {}
+	public void onProvideAssistData(Bundle data) {}
+	public Uri onProvideReferrer() { return null; }
+	public CharSequence onCreateDescription() { return null; }
+	public boolean onCreateThumbnail(android.graphics.Bitmap outBitmap, android.graphics.Canvas canvas) { return false; }
+	public void onGetDirectActions(android.os.CancellationSignal cancellationSignal,
+	                               java.util.function.Consumer<java.util.List<DirectAction>> callback) {
+		callback.accept(java.util.Collections.emptyList());
+	}
+	public void onPerformDirectAction(String actionId, Bundle arguments, android.os.CancellationSignal cancellationSignal,
+	                                  java.util.function.Consumer<Bundle> resultListener) {}
+	public void onCreateNavigateUpTaskStack(TaskStackBuilder builder) { builder.addParentStack(this); }
+	public void onPrepareNavigateUpTaskStack(TaskStackBuilder builder) {}
+	public boolean navigateUpToFromChild(Activity child, Intent upIntent) { return navigateUpTo(upIntent); }
+	protected void onChildTitleChanged(Activity childActivity, CharSequence title) {}
+	public void finishFromChild(Activity child) { finish(); }
+	public void finishActivityFromChild(Activity child, int requestCode) { child.finishActivity(requestCode); }
+	public void startActivityFromChild(Activity child, Intent intent, int requestCode) {
+		startActivityFromChild(child, intent, requestCode, null);
+	}
+	public void startActivityFromChild(Activity child, Intent intent, int requestCode, Bundle options) {
+		child.startActivityForResult(intent, requestCode, options);
+	}
 }
