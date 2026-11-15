@@ -34,6 +34,31 @@ public final class ScanResult {
 	public static final int WIFI_STANDARD_11BE = 8;
 
 	public static class InformationElement {
+		public static final int EID_SSID = 0;
+		public static final int EID_SUPPORTED_RATES = 1;
+		public static final int EID_TIM = 5;
+		public static final int EID_COUNTRY = 7;
+		public static final int EID_BSS_LOAD = 11;
+		public static final int EID_ERP = 42;
+		public static final int EID_HT_CAPABILITIES = 45;
+		public static final int EID_RSN = 48;
+		public static final int EID_RSN_EXTENSION = 244;
+		public static final int EID_EXTENDED_SUPPORTED_RATES = 50;
+		public static final int EID_HT_OPERATION = 61;
+		public static final int EID_INTERWORKING = 107;
+		public static final int EID_ROAMING_CONSORTIUM = 111;
+		public static final int EID_EXTENDED_CAPS = 127;
+		public static final int EID_VHT_CAPABILITIES = 191;
+		public static final int EID_VHT_OPERATION = 192;
+		public static final int EID_RNR = 201;
+		public static final int EID_VSA = 221;
+		public static final int EID_EXTENSION_PRESENT = 255;
+		public static final int EID_EXT_HE_CAPABILITIES = 35;
+		public static final int EID_EXT_HE_OPERATION = 36;
+		public static final int EID_EXT_EHT_OPERATION = 106;
+		public static final int EID_EXT_MULTI_LINK = 107;
+		public static final int EID_FRAGMENT_SUB_ELEMENT_MULTI_LINK = 254;
+		public static final int EID_EXT_EHT_CAPABILITIES = 108;
 		public int id;
 		public int idExt;
 		public byte[] bytes;
@@ -63,11 +88,50 @@ public final class ScanResult {
 		public ByteBuffer getBytes() {
 			return ByteBuffer.wrap(bytes).asReadOnlyBuffer();
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+}
 
 	public InformationElement[] informationElements;
 
 	public List<InformationElement> getInformationElements() {
 		return Collections.unmodifiableList(Arrays.asList(informationElements));
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int[] getSecurityTypes() { return new int[0]; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiSsid getWifiSsid() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getWifiStandard() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean is80211mcResponder() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public ScanResult(android.net.wifi.ScanResult arg0) {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static int convertChannelToFrequencyMhzIfSupported(int arg0, int arg1) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static int convertFrequencyMhzToChannelIfSupported(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.net.wifi.MloLink> getAffiliatedMloLinks() { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.MacAddress getApMldMacAddress() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getApMloLinkId() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean is80211azNtbResponder() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isPasspointNetwork() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isRangingFrameProtectionRequired() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isSecureHeLtfSupported() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isTwtResponder() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
 }

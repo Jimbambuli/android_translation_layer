@@ -18,7 +18,10 @@ package android.net;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
+import android.os.Parcel;
+import android.os.Parcelable;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Objects;
 
 /**
@@ -27,7 +30,7 @@ import java.util.Objects;
  * The public API of AOSP (android-14, packages/modules/Connectivity); ATL fills the flags and
  * scope as AOSP does for an address without kernel flags.
  */
-public class LinkAddress implements android.os.Parcelable {
+public class LinkAddress implements Parcelable {
 	/* IFA_F_* and RT_SCOPE_* of linux/if_addr.h and linux/rtnetlink.h */
 	private static final int RT_SCOPE_UNIVERSE = 0;
 	private static final int RT_SCOPE_LINK = 253;
@@ -159,36 +162,34 @@ public class LinkAddress implements android.os.Parcelable {
 		return address instanceof Inet6Address;
 	}
 
-	/* AOSP LinkAddress.describeContents()/writeToParcel()/CREATOR (Connectivity framework). ATL keeps no
-	 * deprecation/expiration time: written as LIFETIME_UNKNOWN (-1), ignored when read */
+	/* AOSP LinkAddress: describeContents(), writeToParcel(), CREATOR. ATL keeps no lifetimes, which AOSP
+	 * leaves at LIFETIME_UNKNOWN (-1) for an address built without them */
 	public int describeContents() {
 		return 0;
 	}
 
-	public void writeToParcel(android.os.Parcel dest, int flags) {
+	public void writeToParcel(Parcel dest, int flags) {
 		dest.writeByteArray(address.getAddress());
 		dest.writeInt(prefixLength);
 		dest.writeInt(this.flags);
 		dest.writeInt(scope);
-		dest.writeLong(-1 /* deprecationTime: LIFETIME_UNKNOWN */);
-		dest.writeLong(-1 /* expirationTime: LIFETIME_UNKNOWN */);
+		dest.writeLong(-1L);
+		dest.writeLong(-1L);
 	}
 
-	public static final android.os.Parcelable.Creator<LinkAddress> CREATOR = new android.os.Parcelable.Creator<LinkAddress>() {
-		public LinkAddress createFromParcel(android.os.Parcel in) {
+	public static final Creator<LinkAddress> CREATOR = new Creator<LinkAddress>() {
+		public LinkAddress createFromParcel(Parcel in) {
 			InetAddress address = null;
 			try {
 				address = InetAddress.getByAddress(in.createByteArray());
-			} catch (java.net.UnknownHostException e) {
-				// Nothing we can do here. When we call the constructor, we'll throw an
-				// IllegalArgumentException, because a LinkAddress can't have a null
-				// InetAddress.
+			} catch (UnknownHostException e) {
+				// the constructor then throws IllegalArgumentException, as in AOSP
 			}
 			int prefixLength = in.readInt();
 			int flags = in.readInt();
 			int scope = in.readInt();
-			in.readLong(); // deprecationTime
-			in.readLong(); // expirationTime
+			in.readLong();
+			in.readLong();
 			return new LinkAddress(address, prefixLength, flags, scope);
 		}
 

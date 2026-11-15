@@ -322,4 +322,10 @@ public final class NetworkCapabilities implements android.os.Parcelable {
 			return new NetworkCapabilities[size];
 		}
 	};
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int[] getEnterpriseIds() { return new int[0]; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.Set<java.lang.Integer> getSubscriptionIds() { return new java.util.HashSet<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean hasEnterpriseId(int arg0) { return false; }
 }

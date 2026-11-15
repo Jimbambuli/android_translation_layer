@@ -60,7 +60,12 @@ public class NetworkRequest implements android.os.Parcelable {
 		public Builder setIncludeOtherUidNetworks(boolean include) {
 			return this;
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.NetworkRequest.Builder setNetworkSpecifier(String arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.NetworkRequest.Builder setSubscriptionIds(java.util.Set<java.lang.Integer> arg0) { return null; }
+}
 
 	public NetworkSpecifier getNetworkSpecifier() {
 		return networkCapabilities.getNetworkSpecifier();
@@ -130,4 +135,6 @@ public class NetworkRequest implements android.os.Parcelable {
 			return new NetworkRequest[size];
 		}
 	};
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.Set<java.lang.Integer> getSubscriptionIds() { return new java.util.HashSet<>(); }
 }
