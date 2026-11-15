@@ -58,6 +58,11 @@ public class StorageStatsManager {
 		}
 	}
 
+	/* AOSP queryStatsForUser(): the sum over the packages of the user; ATL's only package is the app's own */
+	public StorageStats queryStatsForUser(UUID storageUuid, UserHandle user) throws IOException {
+		return queryStatsForUid(storageUuid, android.os.Process.myUid());
+	}
+
 	private static long sizeOf(String path) {
 		return path != null ? sizeOf(new File(path)) : 0;
 	}
