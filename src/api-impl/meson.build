@@ -759,6 +759,7 @@ srcs = [
 	'android/print/PrintJob.java',
 	'android/print/PrintManager.java',
 	'android/provider/BaseColumns.java',
+	'android/provider/CallLog.java',
 	'android/provider/BlockedNumberContract.java',
 	'android/provider/CalendarContract.java',
 	'android/provider/Contacts.java',
