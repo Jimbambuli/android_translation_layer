@@ -142,6 +142,9 @@ public class Typeface {
 	public static final Typeface MONOSPACE = create("monospace", 0);
 
 	// Style
+	/* AOSP Typeface.RESOLVE_BY_FONT_TABLE: weight or italic as the font file says */
+	public static final int RESOLVE_BY_FONT_TABLE = -1;
+
 	public static final int NORMAL = 0;
 	public static final int BOLD = 1;
 	public static final int ITALIC = 2;
@@ -299,6 +302,109 @@ public class Typeface {
 	}
 
 	/* the typeface uses the family of the first font; Pango does the fallback for missing glyphs */
+	/* AOSP Typeface.createFromResources() (android-14) for Resources.getFont(): a file based font-family
+	 * becomes a FontFamily of its fonts with the best match for normal style; for a provider based one AOSP
+	 * asks FontsContract and returns DEFAULT when the font is not there, ATL has no font provider, so
+	 * it is the system family named by the entry if there is one, else DEFAULT */
+	private static final java.util.HashMap<String, Typeface> sDynamicTypefaceCache = new java.util.HashMap<>();
+
+	/** @hide */
+	public static Typeface createFromResources(android.content.res.FontResourcesParser.FamilyResourceEntry entry,
+	                                          AssetManager mgr, String path) {
+		if (entry instanceof android.content.res.FontResourcesParser.ProviderResourceEntry) {
+			final android.content.res.FontResourcesParser.ProviderResourceEntry providerEntry =
+			    (android.content.res.FontResourcesParser.ProviderResourceEntry)entry;
+			String systemFontFamilyName = providerEntry.getSystemFontFamilyName();
+			if (systemFontFamilyName != null && sSystemFontMap.containsKey(systemFontFamilyName)) {
+				return Typeface.create(systemFontFamilyName, NORMAL);
+			}
+			return DEFAULT;
+		}
+
+		synchronized (sDynamicTypefaceCache) {
+			Typeface typeface = sDynamicTypefaceCache.get(path);
+			if (typeface != null)
+				return typeface;
+		}
+
+		final android.content.res.FontResourcesParser.FontFamilyFilesResourceEntry filesEntry =
+		    (android.content.res.FontResourcesParser.FontFamilyFilesResourceEntry)entry;
+		Typeface typeface;
+		try {
+			android.graphics.fonts.FontFamily.Builder familyBuilder = null;
+			for (final android.content.res.FontResourcesParser.FontFileResourceEntry fontFile : filesEntry.getEntries()) {
+				final android.graphics.fonts.Font.Builder fontBuilder = new android.graphics.fonts.Font.Builder(
+				    copyToFontFile(mgr.openNonAsset(fontFile.getFileName())))
+				        .setTtcIndex(fontFile.getTtcIndex())
+				        .setFontVariationSettings(fontFile.getVariationSettings());
+				if (fontFile.getWeight() != RESOLVE_BY_FONT_TABLE) {
+					fontBuilder.setWeight(fontFile.getWeight());
+				}
+				if (fontFile.getItalic() != RESOLVE_BY_FONT_TABLE) {
+					fontBuilder.setSlant(fontFile.getItalic() == android.content.res.FontResourcesParser.FontFileResourceEntry.ITALIC
+					                         ? android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC
+					                         : android.graphics.fonts.FontStyle.FONT_SLANT_UPRIGHT);
+				}
+
+				if (familyBuilder == null) {
+					familyBuilder = new android.graphics.fonts.FontFamily.Builder(fontBuilder.build());
+				} else {
+					familyBuilder.addFont(fontBuilder.build());
+				}
+			}
+			if (familyBuilder == null) {
+				return Typeface.DEFAULT;
+			}
+			final android.graphics.fonts.FontFamily family = familyBuilder.build();
+			// AOSP FontStyle.getMatchScore() against normal weight and upright
+			android.graphics.fonts.Font bestFont = family.getFont(0);
+			int bestScore = matchScoreToNormal(bestFont.getStyle());
+			for (int i = 1; i < family.getSize(); ++i) {
+				final android.graphics.fonts.Font candidate = family.getFont(i);
+				final int score = matchScoreToNormal(candidate.getStyle());
+				if (score < bestScore) {
+					bestFont = candidate;
+					bestScore = score;
+				}
+			}
+			typeface = new Typeface.CustomFallbackBuilder(family)
+			               .setStyle(bestFont.getStyle())
+			               .build();
+		} catch (IllegalArgumentException e) {
+			// To be a compatible behavior with API28 or before, catch IllegalArgumentExcetpion
+			// thrown by native code and returns null.
+			return null;
+		} catch (java.io.IOException e) {
+			typeface = Typeface.DEFAULT;
+		}
+		synchronized (sDynamicTypefaceCache) {
+			sDynamicTypefaceCache.put(path, typeface);
+		}
+		return typeface;
+	}
+
+	/* AOSP FontStyle.getMatchScore(): normal.getMatchScore(style) */
+	private static int matchScoreToNormal(android.graphics.fonts.FontStyle style) {
+		return Math.abs(android.graphics.fonts.FontStyle.FONT_WEIGHT_NORMAL - style.getWeight()) / 100
+		    + (style.getSlant() == android.graphics.fonts.FontStyle.FONT_SLANT_UPRIGHT ? 0 : 2);
+	}
+
+	/** @hide for Resources.getFont(): a font file of the resources */
+	public static Typeface createFromResourceFile(AssetManager mgr, String path) throws java.io.IOException {
+		synchronized (sDynamicTypefaceCache) {
+			Typeface typeface = sDynamicTypefaceCache.get(path);
+			if (typeface != null)
+				return typeface;
+		}
+		Typeface typeface = registerFont(copyToFontFile(mgr.openNonAsset(path)), new int[2]);
+		if (typeface != null) {
+			synchronized (sDynamicTypefaceCache) {
+				sDynamicTypefaceCache.put(path, typeface);
+			}
+		}
+		return typeface;
+	}
+
 	/* AOSP Typeface.CustomFallbackBuilder. minikin makes a font collection of the families, then the
 	 * system fallback; here it is the Pango family list "first,second,...,system" (Pango tries the
 	 * families in order for each character, as the collection does) */

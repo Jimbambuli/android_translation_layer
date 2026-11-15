@@ -321,6 +321,7 @@ srcs = [
 	'android/content/res/CompatibilityInfo.java',
 	'android/content/res/ComplexColor.java',
 	'android/content/res/Configuration.java',
+	'android/content/res/FontResourcesParser.java',
 	'android/content/res/ConfigurationBoundResourceCache.java',
 	'android/content/res/ConstantState.java',
 	'android/content/res/GradientColor.java',

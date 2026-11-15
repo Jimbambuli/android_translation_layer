@@ -1118,6 +1118,47 @@ public class Resources {
 	 *
 	 * @throws NotFoundException Throws NotFoundException if the given ID does not exist.
 	 */
+	/* AOSP Resources.getFont() with ResourcesImpl.loadFont() (android-14): a font file of the resources, or a
+	 * font-family XML parsed by FontResourcesParser */
+	public android.graphics.Typeface getFont(int id) throws NotFoundException {
+		final TypedValue value = new TypedValue();
+		getValue(id, value, true);
+		android.graphics.Typeface typeface = loadFont(value, id);
+		if (typeface != null) {
+			return typeface;
+		}
+		throw new NotFoundException("Font resource ID #0x" + Integer.toHexString(id));
+	}
+
+	private android.graphics.Typeface loadFont(TypedValue value, int id) {
+		if (value.string == null) {
+			throw new NotFoundException("Resource \"" + getResourceName(id) + "\" ("
+			                            + Integer.toHexString(id) + ") is not a Font: " + value);
+		}
+
+		final String file = value.string.toString();
+		if (!file.startsWith("res/")) {
+			return null;
+		}
+
+		try {
+			if (file.endsWith("xml")) {
+				final XmlResourceParser rp = getXml(id);
+				final FontResourcesParser.FamilyResourceEntry familyEntry = FontResourcesParser.parse(rp, this);
+				if (familyEntry == null) {
+					return null;
+				}
+				return android.graphics.Typeface.createFromResources(familyEntry, mAssets, file);
+			}
+			return android.graphics.Typeface.createFromResourceFile(mAssets, file);
+		} catch (org.xmlpull.v1.XmlPullParserException e) {
+			android.util.Log.e("Resources", "Failed to parse xml resource " + file, e);
+		} catch (java.io.IOException e) {
+			android.util.Log.e("Resources", "Failed to read xml resource " + file, e);
+		}
+		return null;
+	}
+
 	public InputStream openRawResource(int id, TypedValue value) throws NotFoundException {
 		getValue(id, value, true);
 
