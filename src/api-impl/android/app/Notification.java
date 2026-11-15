@@ -31,6 +31,16 @@ public class Notification implements Parcelable {
 
 	public Notification() {}
 
+	/* AOSP deprecated Notification(int icon, CharSequence tickerText, long when) */
+	@Deprecated
+	public Notification(int icon, CharSequence tickerText, long when) {
+		this.icon = icon;
+		this.tickerText = tickerText;
+		this.when = when;
+		extras = new Bundle();
+		extras.putBoolean(EXTRA_SHOW_WHEN, true);
+	}
+
 	/* AOSP Notification.clone() -> cloneInto(that, true): a heavy copy; extras, actions, vibrate, the RemoteViews
 	 * and publicVersion are copied, PendingIntents, icons and the immutable values are shared */
 	@Override

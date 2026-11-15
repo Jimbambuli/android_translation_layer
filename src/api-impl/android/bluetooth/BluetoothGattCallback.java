@@ -267,6 +267,8 @@ public abstract class BluetoothGattCallback {
      *     successfully.
      * @hide
      */
+    public void onSubrateChange(BluetoothGatt gatt, int subrateMode, int status) {}
+
     public void onSubrateChange(
             BluetoothGatt gatt,
             int subrateFactor,

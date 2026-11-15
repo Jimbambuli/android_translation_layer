@@ -45,6 +45,33 @@ public final class SmsManager {
 		throw new UnsupportedOperationException("Sms is not supported");
 	}
 
+	/* AOSP sendTextMessage(..., long messageId) -> sendTextMessageInternal: same checks, same missing ISms */
+	public void sendTextMessage(String destinationAddress, String scAddress, String text, PendingIntent sentIntent, PendingIntent deliveryIntent, long messageId) {
+		sendTextMessage(destinationAddress, scAddress, text, sentIntent, deliveryIntent);
+	}
+
+	/* AOSP sendMultipartTextMessage(List variants) -> sendMultipartTextMessageInternal */
+	public void sendMultipartTextMessage(String destinationAddress, String scAddress, java.util.List<String> parts, java.util.List<PendingIntent> sentIntents, java.util.List<PendingIntent> deliveryIntents, long messageId) {
+		if (TextUtils.isEmpty(destinationAddress))
+			throw new IllegalArgumentException("Invalid destinationAddress");
+		if (parts == null || parts.size() < 1)
+			throw new IllegalArgumentException("Invalid message body");
+		throw new UnsupportedOperationException("Sms is not supported");
+	}
+
+	public void sendMultipartTextMessage(String destinationAddress, String scAddress, java.util.List<String> parts, java.util.List<PendingIntent> sentIntents, java.util.List<PendingIntent> deliveryIntents, String packageName, String attributionTag) {
+		sendMultipartTextMessage(destinationAddress, scAddress, parts, sentIntents, deliveryIntents, 0L);
+	}
+
+	/* AOSP sendDataMessage(): address and data are checked before the (missing) ISms is asked */
+	public void sendDataMessage(String destinationAddress, String scAddress, short destinationPort, byte[] data, PendingIntent sentIntent, PendingIntent deliveryIntent) {
+		if (TextUtils.isEmpty(destinationAddress))
+			throw new IllegalArgumentException("Invalid destinationAddress");
+		if (data == null || data.length == 0)
+			throw new IllegalArgumentException("Invalid message data");
+		throw new UnsupportedOperationException("Sms is not supported");
+	}
+
 	public void sendMultipartTextMessage(String destinationAddress, String scAddress, java.util.ArrayList<String> parts, java.util.ArrayList<PendingIntent> sentIntents, java.util.ArrayList<PendingIntent> deliveryIntents) {
 		if (TextUtils.isEmpty(destinationAddress))
 			throw new IllegalArgumentException("Invalid destinationAddress");

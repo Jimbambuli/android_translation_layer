@@ -101,6 +101,24 @@ public class StorageManager {
 		return null;
 	}
 
+	/* AOSP getStorageVolume(Uri): the volume of a MediaStore item; ATL has one volume, MediaStore's external_primary
+	 * (a synthetic "external" name resolves to it), any other name finds no volume as in AOSP's loop */
+	public StorageVolume getStorageVolume(android.net.Uri uri) {
+		String volumeName = android.provider.MediaStore.getVolumeName(uri);
+		if (android.provider.MediaStore.VOLUME_EXTERNAL.equals(volumeName)) {
+			volumeName = android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY;
+		}
+		if (android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY.equals(volumeName)) {
+			return getPrimaryStorageVolume();
+		}
+		for (StorageVolume vol : getStorageVolumes()) {
+			if (java.util.Objects.equals(vol.getMediaStoreVolumeName(), volumeName)) {
+				return vol;
+			}
+		}
+		throw new IllegalStateException("Unknown volume for " + uri);
+	}
+
 	/* AOSP StorageManager.getStorageVolumes() */
 	public List<StorageVolume> getStorageVolumes() {
 		final ArrayList<StorageVolume> res = new ArrayList<>();
@@ -122,6 +140,18 @@ public class StorageManager {
 	 * clears no caches of other apps, so it is the free space of the single volume */
 	public long getAllocatableBytes(UUID storageUuid) throws IOException {
 		return new StatFs(Environment.getDataDirectory().getPath()).getAvailableBytes();
+	}
+
+	/* AOSP allocateBytes(FileDescriptor, long): AOSP asks for the missing space, then posix_fallocate()s and falls back
+	 * to ftruncate(); ATL has no libcore Os, so the file is only grown to the size (the ftruncate() fallback) */
+	public void allocateBytes(java.io.FileDescriptor fd, long bytes) throws IOException {
+		java.nio.channels.FileChannel channel = new java.io.FileOutputStream(fd).getChannel();
+		long have = channel.size();
+		long need = bytes - have;
+		if (need > 0) {
+			allocateBytes(UUID_DEFAULT, need);
+			channel.write(java.nio.ByteBuffer.allocate(1), bytes - 1);
+		}
 	}
 
 	/* AOSP StorageManager.allocateBytes(UUID, long): makes room by clearing caches, or throws IOException */

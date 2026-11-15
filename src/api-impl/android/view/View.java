@@ -5380,7 +5380,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/* AOSP View.requestRectangleOnScreen(): the parents, from the closest, are asked to make the rectangle (in the
 	 * view's coordinates) visible, e.g. by scrolling; true if any of them moved */
+	public static final int RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED = 0x00000000;
+	public static final int RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY = 0x00000001;
+	public static final int RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR = 0x00000002;
+	public static final int RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS = 0x00000003;
+
 	public boolean requestRectangleOnScreen(Rect rectangle, boolean immediate) {
+		return requestRectangleOnScreen(rectangle, immediate, RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED);
+	}
+
+	/* AOSP requestRectangleOnScreen(Rect, boolean, int): the source tells the parents what asked (ViewParent default delegates) */
+	public boolean requestRectangleOnScreen(Rect rectangle, boolean immediate, int source) {
 		if (parent == null) {
 			return false;
 		}
@@ -5391,7 +5401,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		boolean scrolled = false;
 		while (p != null) {
 			rectangle.set((int)position.left, (int)position.top, (int)position.right, (int)position.bottom);
-			scrolled |= p.requestChildRectangleOnScreen(child, rectangle, immediate);
+			scrolled |= p.requestChildRectangleOnScreen(child, rectangle, immediate, source);
 			position.offset(child.getLeft(), child.getTop());
 			if (!(p instanceof View)) {
 				break;

@@ -270,6 +270,7 @@ srcs = [
 	'android/app/VoiceInteractor.java',
 	'android/app/WallpaperColors.java',
 	'android/app/WallpaperManager.java',
+	'android/app/wallpaper/WallpaperDescription.java',
 	'android/app/FragmentBreadCrumbs.java',
 	'android/app/GrammaticalInflectionManager.java',
 	'android/app/LocalActivityManager.java',

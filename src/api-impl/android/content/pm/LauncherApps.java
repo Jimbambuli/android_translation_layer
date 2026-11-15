@@ -195,6 +195,10 @@ public class LauncherApps {
         public abstract void onPackagesAvailable(String[] packageNames, UserHandle user, boolean replacing);
         public abstract void onPackagesUnavailable(String[] packageNames, UserHandle user, boolean replacing);
         public void onPackagesSuspended(String[] packageNames, UserHandle user) {}
+        @Deprecated
+        public void onPackagesSuspended(String[] packageNames, UserHandle user, @Nullable android.os.Bundle launcherExtras) {
+            onPackagesSuspended(packageNames, user);
+        }
         public void onPackagesUnsuspended(String[] packageNames, UserHandle user) {}
         public void onShortcutsChanged(@NonNull String packageName, @NonNull List<ShortcutInfo> shortcuts, @NonNull UserHandle user) {}
         public void onPackageLoadingProgressChanged(@NonNull String packageName, @NonNull UserHandle user, float progress) {}

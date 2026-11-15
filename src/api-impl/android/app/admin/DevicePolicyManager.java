@@ -553,6 +553,7 @@ public class DevicePolicyManager {
     /* AOSP bindDeviceAdminServiceAsUser(): only a device or profile owner may bind (DevicePolicyManagerService);
      * there is none, so as for the other owner-only calls */
     public boolean bindDeviceAdminServiceAsUser(ComponentName admin, android.content.Intent serviceIntent, android.content.ServiceConnection conn, int flags, android.os.UserHandle targetUser) { throw noAdmin(admin); }
+    public boolean bindDeviceAdminServiceAsUser(ComponentName admin, android.content.Intent serviceIntent, android.content.ServiceConnection conn, android.content.Context.BindServiceFlags flags, android.os.UserHandle targetUser) { throw noAdmin(admin); }
 
     public boolean getCameraDisabled(ComponentName admin) { return false; }
     /* AOSP DevicePolicyManager with mService == null (no device policy service): these calls do nothing */
