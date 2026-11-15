@@ -66,4 +66,6 @@ public class DiscoverySessionCallback {
 
 	public void onBootstrappingFailed(@NonNull PeerHandle peerHandle) {
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public DiscoverySessionCallback() {}
 }

@@ -29,4 +29,6 @@ public abstract class UrlResponseInfo {
 	public abstract String getNegotiatedProtocol();
 
 	public abstract long getReceivedByteCount();
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public UrlResponseInfo() {}
 }

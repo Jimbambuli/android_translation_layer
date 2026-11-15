@@ -28,4 +28,9 @@ public final class AwarePairingConfig implements android.os.Parcelable {
         public android.net.wifi.aware.AwarePairingConfig.Builder setPairingVerificationEnabled(boolean arg0) { return this; }
         public android.net.wifi.aware.AwarePairingConfig.Builder setSupportedCipherSuites(int arg0) { return this; }
     }
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.wifi.aware.AwarePairingConfig> CREATOR = new android.os.Parcelable.Creator<android.net.wifi.aware.AwarePairingConfig>() {
+        public android.net.wifi.aware.AwarePairingConfig createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.wifi.aware.AwarePairingConfig[] newArray(int size) { return new android.net.wifi.aware.AwarePairingConfig[size]; }
+    };
 }

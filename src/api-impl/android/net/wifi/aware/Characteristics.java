@@ -23,4 +23,9 @@ public final class Characteristics implements android.os.Parcelable {
     public static final int WIFI_AWARE_CIPHER_SUITE_NCS_SK_128 = 1; // 0x1;
     public static final int WIFI_AWARE_CIPHER_SUITE_NCS_SK_256 = 2; // 0x2;
     public static final int WIFI_AWARE_CIPHER_SUITE_NONE = 0; // 0x0;
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.wifi.aware.Characteristics> CREATOR = new android.os.Parcelable.Creator<android.net.wifi.aware.Characteristics>() {
+        public android.net.wifi.aware.Characteristics createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.wifi.aware.Characteristics[] newArray(int size) { return new android.net.wifi.aware.Characteristics[size]; }
+    };
 }

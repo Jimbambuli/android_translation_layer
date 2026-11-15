@@ -10,4 +10,6 @@ public class AttachCallback {
 
 	public void onAwareSessionTerminated() {
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public AttachCallback() {}
 }

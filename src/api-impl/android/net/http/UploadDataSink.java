@@ -11,4 +11,6 @@ public abstract class UploadDataSink {
 	public abstract void onRewindSucceeded();
 
 	public abstract void onRewindError(@NonNull Exception exception);
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public UploadDataSink() {}
 }

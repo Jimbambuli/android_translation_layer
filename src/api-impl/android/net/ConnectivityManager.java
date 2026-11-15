@@ -466,4 +466,6 @@ public class ConnectivityManager {
 	public boolean isDefaultNetworkActive() {
 		return true;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.SocketKeepalive createSocketKeepalive(android.net.Network arg0, android.net.IpSecManager.UdpEncapsulationSocket arg1, java.net.InetAddress arg2, java.net.InetAddress arg3, java.util.concurrent.Executor arg4, android.net.SocketKeepalive.Callback arg5) { return null; }
 }

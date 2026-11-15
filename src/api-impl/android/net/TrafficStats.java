@@ -51,4 +51,26 @@ public class TrafficStats {
 	/* SocketTagger.get().tag()/untag(): libcore's default tagger does nothing */
 	public static void tagDatagramSocket(java.net.DatagramSocket socket) throws java.net.SocketException {}
 	public static void untagDatagramSocket(java.net.DatagramSocket socket) throws java.net.SocketException {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static int getAndSetThreadStatsTag(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getRxBytes(String arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getRxPackets(String arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getTxBytes(String arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getTxPackets(String arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getUidTcpRxSegments(int arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getUidTcpTxSegments(int arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getUidUdpRxPackets(int arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static long getUidUdpTxPackets(int arg0) { return 0L; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static void tagFileDescriptor(java.io.FileDescriptor arg0) throws java.io.IOException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static void untagFileDescriptor(java.io.FileDescriptor arg0) throws java.io.IOException {  }
 }

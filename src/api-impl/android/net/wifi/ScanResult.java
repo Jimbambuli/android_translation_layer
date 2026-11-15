@@ -63,11 +63,50 @@ public final class ScanResult {
 		public ByteBuffer getBytes() {
 			return ByteBuffer.wrap(bytes).asReadOnlyBuffer();
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+}
 
 	public InformationElement[] informationElements;
 
 	public List<InformationElement> getInformationElements() {
 		return Collections.unmodifiableList(Arrays.asList(informationElements));
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int[] getSecurityTypes() { return new int[0]; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiSsid getWifiSsid() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getWifiStandard() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean is80211mcResponder() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public ScanResult(android.net.wifi.ScanResult arg0) {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static int convertChannelToFrequencyMhzIfSupported(int arg0, int arg1) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static int convertFrequencyMhzToChannelIfSupported(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.net.wifi.MloLink> getAffiliatedMloLinks() { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.MacAddress getApMldMacAddress() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getApMloLinkId() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean is80211azNtbResponder() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isPasspointNetwork() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isRangingFrameProtectionRequired() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isSecureHeLtfSupported() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isTwtResponder() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
 }

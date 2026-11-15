@@ -15,4 +15,9 @@ public final class MacAddress implements android.os.Parcelable {
     public static final int TYPE_BROADCAST = 3; // 0x3;
     public static final int TYPE_MULTICAST = 2; // 0x2;
     public static final int TYPE_UNICAST = 1; // 0x1;
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.MacAddress> CREATOR = new android.os.Parcelable.Creator<android.net.MacAddress>() {
+        public android.net.MacAddress createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.MacAddress[] newArray(int size) { return new android.net.MacAddress[size]; }
+    };
 }

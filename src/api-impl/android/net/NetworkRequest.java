@@ -60,7 +60,12 @@ public class NetworkRequest {
 		public Builder setIncludeOtherUidNetworks(boolean include) {
 			return this;
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.NetworkRequest.Builder setNetworkSpecifier(String arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.NetworkRequest.Builder setSubscriptionIds(java.util.Set<java.lang.Integer> arg0) { return null; }
+}
 
 	public NetworkSpecifier getNetworkSpecifier() {
 		return networkCapabilities.getNetworkSpecifier();
@@ -102,4 +107,10 @@ public class NetworkRequest {
 	public String toString() {
 		return "NetworkRequest [ " + networkCapabilities + " ]";
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.Set<java.lang.Integer> getSubscriptionIds() { return new java.util.HashSet<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
 }

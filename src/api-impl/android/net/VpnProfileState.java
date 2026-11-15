@@ -13,4 +13,9 @@ public final class VpnProfileState implements android.os.Parcelable {
     public static final int STATE_CONNECTING = 1; // 0x1;
     public static final int STATE_DISCONNECTED = 0; // 0x0;
     public static final int STATE_FAILED = 3; // 0x3;
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.VpnProfileState> CREATOR = new android.os.Parcelable.Creator<android.net.VpnProfileState>() {
+        public android.net.VpnProfileState createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.VpnProfileState[] newArray(int size) { return new android.net.VpnProfileState[size]; }
+    };
 }

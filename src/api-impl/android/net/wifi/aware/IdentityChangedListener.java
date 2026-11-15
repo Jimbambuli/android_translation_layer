@@ -13,4 +13,6 @@ public class IdentityChangedListener {
 
 	public void onClusterIdChanged(int clusterEventType, @NonNull MacAddress clusterId) {
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public IdentityChangedListener() {}
 }

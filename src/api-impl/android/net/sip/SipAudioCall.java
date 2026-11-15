@@ -45,7 +45,8 @@ public class SipAudioCall {
 
 		public void onChanged(SipAudioCall call) {
 		}
-	}
+	
+}
 
 	private final SipProfile mLocalProfile;
 	private Listener mListener;

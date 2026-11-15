@@ -18,4 +18,6 @@ public abstract class UploadDataProvider implements Closeable {
 
 	@Override
 	public void close() throws IOException {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public UploadDataProvider() {}
 }

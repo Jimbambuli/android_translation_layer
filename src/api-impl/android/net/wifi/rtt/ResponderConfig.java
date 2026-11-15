@@ -35,4 +35,9 @@ public final class ResponderConfig implements android.os.Parcelable {
         public android.net.wifi.rtt.ResponderConfig.Builder setResponderType(int arg0) { return this; }
         public android.net.wifi.rtt.ResponderConfig.Builder setSecureRangingConfig(android.net.wifi.rtt.SecureRangingConfig arg0) { return this; }
     }
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.wifi.rtt.ResponderConfig> CREATOR = new android.os.Parcelable.Creator<android.net.wifi.rtt.ResponderConfig>() {
+        public android.net.wifi.rtt.ResponderConfig createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.wifi.rtt.ResponderConfig[] newArray(int size) { return new android.net.wifi.rtt.ResponderConfig[size]; }
+    };
 }

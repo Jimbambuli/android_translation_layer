@@ -104,4 +104,8 @@ public class NetworkInfo implements android.os.Parcelable {
 			return new NetworkInfo[size];
 		}
 	};
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public NetworkInfo(int arg0, int arg1, String arg2, String arg3) {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setDetailedState(android.net.NetworkInfo.DetailedState arg0, String arg1, String arg2) {  }
 }

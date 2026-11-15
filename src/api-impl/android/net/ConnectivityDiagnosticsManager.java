@@ -327,7 +327,12 @@ public class ConnectivityDiagnosticsManager {
         /** {@inheritDoc} */
         // Parcelable support (describeContents, writeToParcel, CREATOR) is not part of ATL: Network, LinkProperties
         // and NetworkCapabilities are not Parcelable here.
-    }
+    
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+}
 
     /** Class that includes information for a suspected data stall on a specific Network */
     public static final class DataStallReport {
@@ -535,7 +540,12 @@ public class ConnectivityDiagnosticsManager {
         /** {@inheritDoc} */
         // Parcelable support (describeContents, writeToParcel, CREATOR) is not part of ATL: Network, LinkProperties
         // and NetworkCapabilities are not Parcelable here.
-    }
+    
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+}
 
     /**
      * Abstract base class for Connectivity Diagnostics callbacks. Used for notifications about

@@ -24,4 +24,9 @@ public final class L2capNetworkSpecifier extends android.net.NetworkSpecifier im
         public android.net.L2capNetworkSpecifier.Builder setRemoteAddress(android.net.MacAddress arg0) { return this; }
         public android.net.L2capNetworkSpecifier.Builder setRole(int arg0) { return this; }
     }
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.L2capNetworkSpecifier> CREATOR = new android.os.Parcelable.Creator<android.net.L2capNetworkSpecifier>() {
+        public android.net.L2capNetworkSpecifier createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.L2capNetworkSpecifier[] newArray(int size) { return new android.net.L2capNetworkSpecifier[size]; }
+    };
 }

@@ -73,7 +73,8 @@ public final class SipSession {
 
 		public void onRegistrationTimeout(SipSession session) {
 		}
-	}
+	
+}
 
 	private final SipProfile mLocalProfile;
 	private Listener mListener;

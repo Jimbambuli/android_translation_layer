@@ -19,4 +19,9 @@ public final class WifiAwareNetworkSpecifier extends android.net.NetworkSpecifie
         public android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder setPskPassphrase(String arg0) { return this; }
         public android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder setTransportProtocol(int arg0) { return this; }
     }
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.wifi.aware.WifiAwareNetworkSpecifier> CREATOR = new android.os.Parcelable.Creator<android.net.wifi.aware.WifiAwareNetworkSpecifier>() {
+        public android.net.wifi.aware.WifiAwareNetworkSpecifier createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.wifi.aware.WifiAwareNetworkSpecifier[] newArray(int size) { return new android.net.wifi.aware.WifiAwareNetworkSpecifier[size]; }
+    };
 }

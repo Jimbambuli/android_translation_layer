@@ -16,4 +16,10 @@ public class WpsInfo {
 	public WpsInfo() {
 		setup = INVALID;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public WpsInfo(android.net.wifi.WpsInfo arg0) {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
 }

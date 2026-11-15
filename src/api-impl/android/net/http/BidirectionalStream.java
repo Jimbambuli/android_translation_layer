@@ -59,7 +59,8 @@ public abstract class BidirectionalStream {
 
 		@NonNull
 		public abstract BidirectionalStream build();
-	}
+	
+}
 
 	public interface Callback {
 
@@ -114,4 +115,6 @@ public abstract class BidirectionalStream {
 	public abstract void cancel();
 
 	public abstract boolean isDone();
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public BidirectionalStream() {}
 }

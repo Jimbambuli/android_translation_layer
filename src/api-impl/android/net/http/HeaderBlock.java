@@ -13,4 +13,6 @@ public abstract class HeaderBlock {
 
 	@NonNull
 	public abstract Map<String, List<String>> getAsMap();
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public HeaderBlock() {}
 }

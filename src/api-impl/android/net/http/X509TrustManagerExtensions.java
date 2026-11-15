@@ -52,4 +52,8 @@ public class X509TrustManagerExtensions {
 			throw new CertificateException("checkServerTrusted failed", e.getCause());
 		}
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isSameTrustConfiguration(String arg0, String arg1) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isUserAddedCertificate(java.security.cert.X509Certificate arg0) { return false; }
 }

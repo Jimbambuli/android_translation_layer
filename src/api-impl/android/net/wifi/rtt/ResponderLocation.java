@@ -38,4 +38,9 @@ public final class ResponderLocation implements android.os.Parcelable {
     public static final int LOCATION_MOVEMENT_UNKNOWN = 2; // 0x2;
     public static final int LOCATION_RESERVED = 3; // 0x3;
     public static final int LOCATION_VARIABLE = 1; // 0x1;
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.wifi.rtt.ResponderLocation> CREATOR = new android.os.Parcelable.Creator<android.net.wifi.rtt.ResponderLocation>() {
+        public android.net.wifi.rtt.ResponderLocation createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.wifi.rtt.ResponderLocation[] newArray(int size) { return new android.net.wifi.rtt.ResponderLocation[size]; }
+    };
 }

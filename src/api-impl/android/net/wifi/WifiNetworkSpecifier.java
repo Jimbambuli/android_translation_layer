@@ -47,5 +47,38 @@ public final class WifiNetworkSpecifier extends NetworkSpecifier {
 			}
 			return new WifiNetworkSpecifier(mSsidPatternMatcher, mWpa2PskPassphrase);
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setBand(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setBssid(android.net.MacAddress arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setBssidPattern(android.net.MacAddress arg0, android.net.MacAddress arg1) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setIsEnhancedOpen(boolean arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setIsHiddenSsid(boolean arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setPreferredChannelsFrequenciesMhz(int[] arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setSsidPattern(android.os.PatternMatcher arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setWpa2EnterpriseConfig(android.net.wifi.WifiEnterpriseConfig arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setWpa3Enterprise192BitModeConfig(android.net.wifi.WifiEnterpriseConfig arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setWpa3EnterpriseConfig(android.net.wifi.WifiEnterpriseConfig arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setWpa3EnterpriseStandardModeConfig(android.net.wifi.WifiEnterpriseConfig arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.net.wifi.WifiNetworkSpecifier.Builder setWpa3Passphrase(String arg0) { return null; }
+}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getBand() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int[] getPreferredChannelFrequenciesMhz() { return new int[0]; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
 }

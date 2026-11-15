@@ -11,4 +11,9 @@ public final class TelephonyNetworkSpecifier extends android.net.NetworkSpecifie
         public android.net.TelephonyNetworkSpecifier build() { return null; }
         public android.net.TelephonyNetworkSpecifier.Builder setSubscriptionId(int arg0) { return this; }
     }
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.TelephonyNetworkSpecifier> CREATOR = new android.os.Parcelable.Creator<android.net.TelephonyNetworkSpecifier>() {
+        public android.net.TelephonyNetworkSpecifier createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.TelephonyNetworkSpecifier[] newArray(int size) { return new android.net.TelephonyNetworkSpecifier[size]; }
+    };
 }

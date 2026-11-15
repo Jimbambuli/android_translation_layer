@@ -24,4 +24,9 @@ public final class SubscribeConfig implements android.os.Parcelable {
         public android.net.wifi.aware.SubscribeConfig.Builder setTerminateNotificationEnabled(boolean arg0) { return this; }
         public android.net.wifi.aware.SubscribeConfig.Builder setTtlSec(int arg0) { return this; }
     }
+    /* AOSP Parcelable.Creator; no service hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.net.wifi.aware.SubscribeConfig> CREATOR = new android.os.Parcelable.Creator<android.net.wifi.aware.SubscribeConfig>() {
+        public android.net.wifi.aware.SubscribeConfig createFromParcel(android.os.Parcel source) { return null; }
+        public android.net.wifi.aware.SubscribeConfig[] newArray(int size) { return new android.net.wifi.aware.SubscribeConfig[size]; }
+    };
 }
