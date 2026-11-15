@@ -286,6 +286,8 @@ srcs = [
 	'android/content/SyncStatusObserver.java',
 	'android/content/UriMatcher.java',
 	'android/content/UriPermission.java',
+	'android/content/om/OverlayIdentifier.java',
+	'android/content/om/OverlayInfo.java',
 	'android/content/pm/ActivityInfo.java',
 	'android/content/pm/ApplicationInfo.java',
 	'android/content/pm/ComponentInfo.java',
