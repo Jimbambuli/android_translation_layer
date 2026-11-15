@@ -19,6 +19,7 @@ package android.service.textservice;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.view.textservice.SentenceSuggestionsInfo;
 import android.view.textservice.SuggestionsInfo;
 import android.view.textservice.TextInfo;
 
@@ -57,6 +58,17 @@ public abstract class SpellCheckerService extends android.app.Service {
 						textInfos[i].getCookie(), textInfos[i].getSequence());
 			}
 			return retval;
+		}
+
+		/* AOSP onGetSentenceSuggestionsMultiple(): no texts, or no locale of the session (getLocale() is null here, no
+		 * binder attaches the session) -> SentenceLevelAdapter.EMPTY_SENTENCE_SUGGESTIONS_INFOS, which is an empty array */
+		public SentenceSuggestionsInfo[] onGetSentenceSuggestionsMultiple(TextInfo[] textInfos, int suggestionsLimit) {
+			return new SentenceSuggestionsInfo[0];
+		}
+
+		/* AOSP: mInternalSession.getSupportedAttributes(), the attributes the session was created with: none here */
+		public int getSupportedAttributes() {
+			return 0;
 		}
 
 		public void onCancel() {}
