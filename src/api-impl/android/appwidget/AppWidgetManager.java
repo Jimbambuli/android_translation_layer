@@ -70,6 +70,8 @@ public class AppWidgetManager {
 	/* no widget host: there are no widgets of this provider to update */
 	public void updateAppWidget(ComponentName provider, RemoteViews views) {}
 
+	public void partiallyUpdateAppWidget(int[] appWidgetIds, RemoteViews views) {}
+
 	public void partiallyUpdateAppWidget(int appWidgetId, RemoteViews views) {}
 
 	/* AOSP AppWidgetManager.setWidgetPreview(): hands the preview to AppWidgetServiceImpl, which stores it and
