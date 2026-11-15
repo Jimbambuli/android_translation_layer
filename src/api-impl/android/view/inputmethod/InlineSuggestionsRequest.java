@@ -14,8 +14,7 @@ import java.util.Objects;
 /**
  * android-16 frameworks/base core/java/android/view/inputmethod/InlineSuggestionsRequest.java (codegen data class
  * with Builder). Builder defaults as in AOSP; the default supported locales are the empty list
- * (IME_AUTOFILL_DEFAULT_SUPPORTED_LOCALES_IS_EMPTY is enabled for target SDK >= S). The host input token is not
- * parcelled (no binders in ATL).
+ * (IME_AUTOFILL_DEFAULT_SUPPORTED_LOCALES_IS_EMPTY is enabled for target SDK >= S)..
  */
 public final class InlineSuggestionsRequest implements Parcelable {
 
@@ -117,6 +116,7 @@ public final class InlineSuggestionsRequest implements Parcelable {
 		dest.writeString(mHostPackageName);
 		dest.writeTypedObject(mSupportedLocales, flags);
 		dest.writeBundle(mExtras);
+		dest.writeStrongBinder(mHostInputToken);
 		dest.writeInt(mHostDisplayId);
 		dest.writeTypedObject(mInlineTooltipPresentationSpec, flags);
 	}
@@ -139,9 +139,10 @@ public final class InlineSuggestionsRequest implements Parcelable {
 			String host = in.readString();
 			LocaleList locales = in.readTypedObject(LocaleList.CREATOR);
 			Bundle extras = in.readBundle();
+			IBinder token = in.readStrongBinder();
 			int displayId = in.readInt();
 			InlinePresentationSpec tooltip = in.readTypedObject(InlinePresentationSpec.CREATOR);
-			return new InlineSuggestionsRequest(max, specs, host, locales, extras, null, displayId, tooltip);
+			return new InlineSuggestionsRequest(max, specs, host, locales, extras, token, displayId, tooltip);
 		}
 	};
 
