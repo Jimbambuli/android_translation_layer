@@ -94,26 +94,52 @@ public class InputDevice {
 	}
 
 	public MotionRange getMotionRange(int axis, int source) {
-		return new MotionRange(axis);
+		return new MotionRange(axis, source);
 	}
 
 	public MotionRange getMotionRange(int axis) {
 		return new MotionRange(axis);
 	}
 
+	/* AOSP InputDevice.MotionRange; ATL reports no real ranges, so min == max == 0 */
 	public class MotionRange {
 		int axis;
+		int source;
+		float min;
+		float max;
 
 		public MotionRange(int axis) {
+			this(axis, getSources());
+		}
+
+		MotionRange(int axis, int source) {
 			this.axis = axis;
+			this.source = source;
 		}
 
 		public int getAxis() {
 			return this.axis;
 		}
 
+		public int getSource() {
+			return source;
+		}
+
+		/* AOSP MotionRange.isFromSource() */
+		public boolean isFromSource(int source) {
+			return (getSource() & source) == source;
+		}
+
+		public float getMin() {
+			return min;
+		}
+
+		public float getMax() {
+			return max;
+		}
+
 		public float getRange() {
-			return 0.0f;
+			return max - min;
 		}
 	};
 }
