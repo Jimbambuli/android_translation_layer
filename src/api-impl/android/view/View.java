@@ -4580,8 +4580,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	/* the view's own opacity isn't tracked, so never claim to be opaque */
+	/* AOSP View.isOpaque() with computeOpaqueFlags(): an opaque background, no scroll bars or overlay scroll bars,
+	 * and full alpha (getFinalAlpha() = alpha * transition alpha) */
 	public boolean isOpaque() {
-		return false;
+		final boolean opaqueBackground = background != null && background.getOpacity() == android.graphics.PixelFormat.OPAQUE;
+		final int flags = mViewFlags;
+		final boolean opaqueScrollbars = ((flags & SCROLLBARS_VERTICAL) == 0 && (flags & SCROLLBARS_HORIZONTAL) == 0)
+			|| (flags & SCROLLBARS_STYLE_MASK) == SCROLLBARS_INSIDE_OVERLAY
+			|| (flags & SCROLLBARS_STYLE_MASK) == SCROLLBARS_OUTSIDE_OVERLAY;
+		return opaqueBackground && opaqueScrollbars && getAlpha() * getTransitionAlpha() >= 1.0f;
 	}
 
 	public boolean hasOverlappingRendering() {
