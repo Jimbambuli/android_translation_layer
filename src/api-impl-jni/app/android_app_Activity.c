@@ -611,10 +611,10 @@ static void on_frame_clock_after_paint(GdkFrameClock *clock, GdkSurface *surface
 	}
 }
 
-/* The user closed the app's window. Like leaving an Android app whose foreground service runs on (its
- * process keeps running, e.g. for the music it plays, see Service.startForeground()), the window only hides
- * then and the shown activity is stopped as with the Home button; the window comes back with
- * activity_window_present() (MPRIS Raise), and the app ends once no foreground service is left. */
+/* The user closed the app's window. Like removing the task of an Android app whose foreground service runs on
+ * (its process keeps running, e.g. for the music it plays, see Service.startForeground()), the window hides and
+ * the task's activities are destroyed; the window comes back with activity_window_present() (MPRIS Raise), and
+ * the app ends once no foreground service is left. */
 gboolean activity_window_close_request(void)
 {
 	if (app_quitting || foreground_services <= 0)
@@ -624,11 +624,16 @@ gboolean activity_window_close_request(void)
 	window_set_hidden(TRUE);
 	task_removing = FALSE;
 	gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
-	/* The user removed the task (ActivityTaskSupervisor.removeTask() -> cleanUpRemovedTask()): its services get
-	 * onTaskRemoved() with the task's base intent, android:stopWithTask services stop. Not when the
-	 * last activity finished (Task.removeIfPossible() does not clean up services). */
+	/* The user removed the task (ActivityTaskSupervisor.removeTask()): its activities finish and are destroyed
+	 * (Task.removeActivities(); e.g. Firefox stops its media in onDestroy() when finishing), then
+	 * cleanUpRemovedTask(): its started services get onTaskRemoved() with the task's base intent,
+	 * android:stopWithTask services stop. Not when the last activity finished (Task.removeIfPossible() does
+	 * not clean up services). The process stays while a foreground service runs. */
 	if (activity_backlog) {
 		JNIEnv *env = get_jni_env();
+		for (GList *l = activity_backlog; l != NULL; l = l->next)
+			_SET_BOOL_FIELD(l->data, "finishing", JNI_TRUE);
+		activity_close_all();
 		J__ATLLoadedApp__cleanUpServices(env);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
@@ -644,6 +649,19 @@ void activity_window_present(void)
 	if (window_closed) {
 		window_closed = FALSE;
 		window_set_hidden(FALSE);
+		/* the task was removed with its activities (see activity_window_close_request()): like the app's
+		 * launcher icon, this starts its main activity again */
+		if (!activity_backlog) {
+			JNIEnv *env = get_jni_env();
+			jobject activity = J__Activity__createMainActivity(env, NULL, _INTPTR(window), NULL);
+			if ((*env)->ExceptionCheck(env)) {
+				(*env)->ExceptionDescribe(env);
+				(*env)->ExceptionClear(env);
+				activity = NULL;
+			}
+			if (activity)
+				activity_start(env, activity);
+		}
 	}
 }
 
