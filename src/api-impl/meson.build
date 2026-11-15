@@ -59,6 +59,7 @@ srcs = [
 	'android/gesture/OrientedBoundingBox.java',
 	'android/gesture/Prediction.java',
 	'android/Manifest.java',
+	'android/media/AudioPlaybackCaptureConfiguration.java',
 	'android/net/ConnectivityDiagnosticsManager.java',
 	'android/net/DnsResolver.java',
 	'android/net/IpPrefix.java',

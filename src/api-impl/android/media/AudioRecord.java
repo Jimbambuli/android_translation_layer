@@ -255,6 +255,80 @@ public class AudioRecord {
 		return ERROR_INVALID_OPERATION;
 	}
 
+	public static final int READ_BLOCKING = 0;
+	public static final int READ_NON_BLOCKING = 1;
+
+	/* AOSP AudioRecord.read(byte[], int, int) -> read(..., READ_BLOCKING) */
+	public int read(byte[] audioData, int offsetInBytes, int sizeInBytes) {
+		return read(audioData, offsetInBytes, sizeInBytes, READ_BLOCKING);
+	}
+
+	/* AOSP AudioRecord.read(byte[], int, int, int): the checks as in AOSP, then native_read_in_byte_array(). ATL
+	 * captures 16-bit samples (S16_LE): PCM_16BIT is handed over in native (little) endian, PCM_8BIT as unsigned
+	 * 8-bit like the AOSP native conversion. ATL's capture always blocks. */
+	public int read(byte[] audioData, int offsetInBytes, int sizeInBytes, int readMode) {
+		if (pcm_handle == 0 || mAudioFormat == AudioFormat.ENCODING_PCM_FLOAT) {
+			return ERROR_INVALID_OPERATION;
+		}
+		if ((readMode != READ_BLOCKING) && (readMode != READ_NON_BLOCKING)) {
+			android.util.Log.e("AudioRecord", "AudioRecord.read() called with invalid blocking mode");
+			return ERROR_BAD_VALUE;
+		}
+		if ((audioData == null) || (offsetInBytes < 0) || (sizeInBytes < 0)
+		    || (offsetInBytes + sizeInBytes < 0) // detect integer overflow
+		    || (offsetInBytes + sizeInBytes > audioData.length)) {
+			return ERROR_BAD_VALUE;
+		}
+		return readBytes(audioData, offsetInBytes, sizeInBytes);
+	}
+
+	/* AOSP AudioRecord.read(ByteBuffer, int) -> read(..., READ_BLOCKING) */
+	public int read(java.nio.ByteBuffer audioBuffer, int sizeInBytes) {
+		return read(audioBuffer, sizeInBytes, READ_BLOCKING);
+	}
+
+	/* AOSP AudioRecord.read(ByteBuffer, int, int): native_read_in_direct_buffer() writes to the beginning of a
+	 * direct buffer, ignoring position and limit (which stay unchanged); a buffer that is not direct gets 0 */
+	public int read(java.nio.ByteBuffer audioBuffer, int sizeInBytes, int readMode) {
+		if (pcm_handle == 0) {
+			return ERROR_INVALID_OPERATION;
+		}
+		if ((readMode != READ_BLOCKING) && (readMode != READ_NON_BLOCKING)) {
+			android.util.Log.e("AudioRecord", "AudioRecord.read() called with invalid blocking mode");
+			return ERROR_BAD_VALUE;
+		}
+		if ((audioBuffer == null) || (sizeInBytes < 0)) {
+			return ERROR_BAD_VALUE;
+		}
+		if (!audioBuffer.isDirect())
+			return 0;
+		byte[] bytes = new byte[Math.min(sizeInBytes, audioBuffer.capacity())];
+		int read = readBytes(bytes, 0, bytes.length);
+		for (int i = 0; i < read; i++)
+			audioBuffer.put(i, bytes[i]);
+		return read;
+	}
+
+	/* reads whole frames of 16-bit samples and stores them in the record's encoding */
+	private int readBytes(byte[] audioData, int offsetInBytes, int sizeInBytes) {
+		final boolean eightBit = mAudioFormat == AudioFormat.ENCODING_PCM_8BIT;
+		final int bytesPerSample = eightBit ? 1 : 2;
+		final int samples = sizeInBytes / (bytesPerSample * channels) * channels;
+		short[] buffer = new short[samples];
+		int read = read(buffer, 0, samples);
+		if (read <= 0)
+			return read;
+		for (int i = 0; i < read; i++) {
+			if (eightBit) {
+				audioData[offsetInBytes + i] = (byte)((buffer[i] >> 8) + 128);
+			} else {
+				audioData[offsetInBytes + 2 * i] = (byte)buffer[i];
+				audioData[offsetInBytes + 2 * i + 1] = (byte)(buffer[i] >> 8);
+			}
+		}
+		return read * bytesPerSample;
+	}
+
 	public int read(short[] audioData, int offsetInShorts, int sizeInShorts) {
 		/* sanity check the parameters before calling native_write */
 		if ((audioData == null)
@@ -319,7 +393,17 @@ public class AudioRecord {
 			return this;
 		}
 
+		/* AOSP AudioRecord.Builder.setAudioPlaybackCaptureConfig() */
+		private AudioPlaybackCaptureConfiguration mAudioPlaybackCaptureConfiguration;
+
+		public Builder setAudioPlaybackCaptureConfig(AudioPlaybackCaptureConfiguration config) {
+			mAudioPlaybackCaptureConfiguration = java.util.Objects.requireNonNull(config, "Illegal null AudioPlaybackCaptureConfiguration argument");
+			return this;
+		}
+
 		public AudioRecord build() {
+			if (mAudioPlaybackCaptureConfiguration != null) // AOSP buildAudioPlaybackCaptureRecord(): an audio policy of the projection; none exists on ATL
+				throw new UnsupportedOperationException("audio playback capture is not provided");
 			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding,
 			                       mBufferSizeInBytes != 0 ? mBufferSizeInBytes : 32768);
 		}
