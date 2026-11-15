@@ -2543,6 +2543,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		performHapticFeedback(feedbackConstant, flags);
 	}
 
+	/* AOSP View.performHapticFeedback(HapticFeedbackRequest): a usage that is set must be of the feedback class
+	 * (USAGE_CLASS_MASK 0xF, USAGE_CLASS_FEEDBACK 0x2), else no feedback; the rest as the int/int variant */
+	public boolean performHapticFeedback(android.os.vibrator.HapticFeedbackRequest request) {
+		int usage = request.getUsage();
+		if (usage != 0 /* USAGE_UNKNOWN */ && (usage & 0xF) != 0x2)
+			return false;
+		return performHapticFeedback(request.getFeedbackConstant(), request.getFlags());
+	}
+
 	public boolean performHapticFeedback(int feedbackConstant, int flags) {
 		/* AOSP View.performHapticFeedback(): nothing if the view turned it off, unless FLAG_IGNORE_VIEW_SETTING */
 		if ((flags & 0x0001 /* HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING, no ATL class */) == 0 && !isHapticFeedbackEnabled())
