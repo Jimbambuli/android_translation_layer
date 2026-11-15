@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import android.os.Parcel;
 import android.os.PatternMatcher;
 
 /**
@@ -32,6 +33,29 @@ public class PathPermission extends PatternMatcher {
 		mReadPermission = readPermission;
 		mWritePermission = writePermission;
 	}
+
+	public PathPermission(Parcel src) {
+		super(src);
+		mReadPermission = src.readString();
+		mWritePermission = src.readString();
+	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		super.writeToParcel(dest, flags);
+		dest.writeString(mReadPermission);
+		dest.writeString(mWritePermission);
+	}
+
+	public static final Creator<PathPermission> CREATOR = new Creator<PathPermission>() {
+		public PathPermission createFromParcel(Parcel source) {
+			return new PathPermission(source);
+		}
+
+		public PathPermission[] newArray(int size) {
+			return new PathPermission[size];
+		}
+	};
 
 	public String getReadPermission() {
 		return mReadPermission;
