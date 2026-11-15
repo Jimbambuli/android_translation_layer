@@ -868,6 +868,7 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		compatScreenHeightDp = o.compatScreenHeightDp;
 		compatSmallestScreenWidthDp = o.compatSmallestScreenWidthDp;
 		seq = o.seq;
+		mGrammaticalGender = o.mGrammaticalGender;
 	}
 
 	public String toString() {
@@ -1160,6 +1161,7 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		smallestScreenWidthDp = compatSmallestScreenWidthDp = SMALLEST_SCREEN_WIDTH_DP_UNDEFINED;
 		densityDpi = DENSITY_DPI_UNDEFINED;
 		assetsSeq = ASSETS_SEQ_UNDEFINED;
+		mGrammaticalGender = GRAMMATICAL_GENDER_NOT_SPECIFIED;
 		seq = 0;
 	}
 
@@ -1298,6 +1300,10 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		if (delta.compatSmallestScreenWidthDp != SMALLEST_SCREEN_WIDTH_DP_UNDEFINED) {
 			compatSmallestScreenWidthDp = delta.compatSmallestScreenWidthDp;
 		}
+		if (delta.mGrammaticalGender != mGrammaticalGender) {
+			changed |= ActivityInfo.CONFIG_GRAMMATICAL_GENDER;
+			mGrammaticalGender = delta.mGrammaticalGender;
+		}
 		if (delta.seq != 0) {
 			seq = delta.seq;
 		}
@@ -1398,6 +1404,9 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		}
 		if (delta.assetsSeq != ASSETS_SEQ_UNDEFINED && assetsSeq != delta.assetsSeq) {
 			changed |= ActivityInfo.CONFIG_ASSETS_PATHS;
+		}
+		if (mGrammaticalGender != delta.mGrammaticalGender) {
+			changed |= ActivityInfo.CONFIG_GRAMMATICAL_GENDER;
 		}
 
 		return changed;
@@ -1524,6 +1533,9 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		if (n != 0)
 			return n;
 		n = this.assetsSeq - that.assetsSeq;
+		if (n != 0)
+			return n;
+		n = this.mGrammaticalGender - that.mGrammaticalGender;
 		return n;
 	}
 
@@ -1563,6 +1575,7 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		result = 31 * result + smallestScreenWidthDp;
 		result = 31 * result + densityDpi;
 		result = 31 * result + assetsSeq;
+		result = 31 * result + mGrammaticalGender;
 		return result;
 	}
 
@@ -1654,6 +1667,22 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 
 	public int fontWeightAdjustment;
 
+	/* AOSP Configuration.mGrammaticalGender and accessors (core/java/android/content/res/Configuration.java) */
+	public static final int GRAMMATICAL_GENDER_NOT_SPECIFIED = 0;
+	public static final int GRAMMATICAL_GENDER_NEUTRAL = 1;
+	public static final int GRAMMATICAL_GENDER_FEMININE = 2;
+	public static final int GRAMMATICAL_GENDER_MASCULINE = 3;
+
+	private int mGrammaticalGender;
+
+	public int getGrammaticalGender() {
+		return mGrammaticalGender;
+	}
+
+	public void setGrammaticalGender(int grammaticalGender) {
+		mGrammaticalGender = grammaticalGender;
+	}
+
 	public boolean isScreenRound() {
 		// HACK: return true when hardware is identifying as a watch
 		return System.getenv("ATL_IS_WATCH") != null;
@@ -1661,7 +1690,7 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 
 	/* AOSP Configuration.writeToParcel()/readFromParcel() (core/java/android/content/res/Configuration.java,
 	 * android-14) in the same order, without the fields ATL's Configuration does not have
-	 * (windowConfiguration, mGrammaticalGender) */
+	 * (windowConfiguration) */
 	@Override
 	public void writeToParcel(Parcel dest, int flags) {
 		dest.writeFloat(fontScale);
@@ -1696,6 +1725,7 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		dest.writeInt(assetsSeq);
 		dest.writeInt(seq);
 		dest.writeInt(fontWeightAdjustment);
+		dest.writeInt(mGrammaticalGender);
 	}
 
 	public void readFromParcel(Parcel source) {
@@ -1727,6 +1757,7 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		assetsSeq = source.readInt();
 		seq = source.readInt();
 		fontWeightAdjustment = source.readInt();
+		mGrammaticalGender = source.readInt();
 	}
 
 	public static final Parcelable.Creator<Configuration> CREATOR = new Parcelable.Creator<Configuration>() {
