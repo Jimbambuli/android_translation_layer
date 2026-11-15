@@ -315,6 +315,29 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pushOpacity(JNIEnv *en
 	gtk_snapshot_push_opacity(snapshot, opacity);
 }
 
+/* AOSP saveLayer() draws into a transparent offscreen; GSK isolates the group from the background */
+JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1pushIsolation(JNIEnv *env, jclass this_class, jlong snapshot_ptr)
+{
+#if GTK_CHECK_VERSION(4, 22, 0)
+	gtk_snapshot_push_isolation(GTK_SNAPSHOT(_PTR(snapshot_ptr)), GSK_ISOLATION_BACKGROUND);
+	return JNI_TRUE;
+#else
+	return JNI_FALSE;
+#endif
+}
+
+/* Porter-Duff composite of the drawing onto the background; the caller records the mask, pops, records the
+ * drawing and pops again. op is a GskPorterDuff value */
+JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1pushComposite(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jint op)
+{
+#if GTK_CHECK_VERSION(4, 22, 0)
+	gtk_snapshot_push_composite(GTK_SNAPSHOT(_PTR(snapshot_ptr)), (GskPorterDuff)op);
+	return JNI_TRUE;
+#else
+	return JNI_FALSE;
+#endif
+}
+
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pop(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jint count)
 {
 	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));

@@ -5,6 +5,7 @@ import android.graphics.*;
 import android.view.DisplayListCanvas;
 import android.view.RenderNode;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Stack;
 
 /**
@@ -15,6 +16,10 @@ public class GskCanvas extends DisplayListCanvas {
 	public long snapshot;
 	private int[] push_history = null;
 	private Stack<Matrix> state_stack = new Stack<>();
+	/* the save levels that saveLayer() opened as an isolated GSK layer, and how many are open */
+	private BitSet layer_levels = new BitSet();
+	private int layers = 0;
+	private boolean compositing = false;
 
 	private static Paint default_paint = new Paint();
 
@@ -42,12 +47,17 @@ public class GskCanvas extends DisplayListCanvas {
 			native_pop(snapshot, push_history[save_count]);
 			push_history[save_count] = 0;
 		}
+		if (layer_levels.get(save_count)) {
+			layer_levels.clear(save_count);
+			layers--;
+		}
 		state_stack.pop();
 		native_restore(snapshot);
 	}
 
 	/* AOSP saveLayer(): what is drawn until restore() is composed as a group, clipped to the bounds, with the
-	 * paint's alpha (ATL has no blend modes or color filters for a layer) */
+	 * paint's alpha (ATL has no blend modes or color filters for a layer). Like the offscreen of AOSP, the group
+	 * starts transparent (GSK isolation, GTK >= 4.22), so a Porter-Duff mode inside sees only the layer */
 	private int saveLayerOf(float left, float top, float right, float bottom, boolean clip, Paint paint) {
 		int count = save();
 		if (clip)
@@ -62,7 +72,68 @@ public class GskCanvas extends DisplayListCanvas {
 				push_history = Arrays.copyOf(push_history, save_count + 1);
 			push_history[save_count]++;
 		}
+		if (native_pushIsolation(snapshot)) {
+			int save_count = getSaveCount();
+			if (push_history == null)
+				push_history = new int[save_count + 1];
+			else if (push_history.length <= save_count)
+				push_history = Arrays.copyOf(push_history, save_count + 1);
+			push_history[save_count]++;
+			layer_levels.set(save_count);
+			layers++;
+		}
 		return count;
+	}
+
+	private interface Drawing {
+		void draw(Paint paint);
+	}
+
+	/* GskPorterDuff of the paint's Porter-Duff mode, -1 for SRC_OVER, no mode or a separable blend mode */
+	private static int porterDuffOf(Paint paint) {
+		BlendMode mode = paint != null ? paint.getBlendMode() : null;
+		if (mode == null)
+			return -1;
+		switch (mode) {
+			case SRC: return 0;
+			case DST: return 1;
+			case DST_OVER: return 3;
+			case SRC_IN: return 4;
+			case DST_IN: return 5;
+			case SRC_OUT: return 6;
+			case DST_OUT: return 7;
+			case SRC_ATOP: return 8;
+			case DST_ATOP: return 9;
+			case XOR: return 10;
+			case CLEAR: return 11;
+			default: return -1;
+		}
+	}
+
+	/* AOSP Paint.setXfermode(): the Porter-Duff mode combines the drawing with what the layer holds, and like
+	 * Skia only where the drawing covers (for a bitmap its destination rectangle). GSK composite node: mask =
+	 * the coverage, drawn opaque, child = the drawing. Only inside saveLayer(); outside a layer the GSK
+	 * background is the whole window, not the surface of the view, and the drawing stays SRC_OVER as before.
+	 * The separable blend modes (MULTIPLY, SCREEN, ...) stay SRC_OVER as well. */
+	private boolean drawComposited(Paint paint, Drawing coverage, Drawing drawing) {
+		int op;
+		if (compositing || layers == 0 || (op = porterDuffOf(paint)) < 0 || !native_pushComposite(snapshot, op))
+			return false;
+		Paint coverage_paint = new Paint(paint);
+		coverage_paint.setShader(null);
+		coverage_paint.setColorFilter(null);
+		coverage_paint.setXfermode(null);
+		coverage_paint.setColor(Color.WHITE);
+		compositing = true;
+		try {
+			coverage.draw(coverage_paint);
+			native_pop(snapshot, 1);
+			drawing.draw(paint);
+			native_pop(snapshot, 1);
+		} finally {
+			compositing = false;
+		}
+		return true;
 	}
 
 	@Override
@@ -148,6 +219,8 @@ public class GskCanvas extends DisplayListCanvas {
 		 * bitmaps it has recycled internally) */
 		if (!bitmap.isPremultiplied() && bitmap.getConfig() == Bitmap.Config.ARGB_8888 && bitmap.hasAlpha())
 			throw new RuntimeException("Canvas: trying to use a non-premultiplied bitmap " + bitmap);
+		if (drawComposited(paint, p -> native_drawRect(snapshot, dst.left, dst.top, dst.right, dst.bottom, p.paint), p -> drawBitmap(bitmap, src, dst, p)))
+			return;
 		if (src == null)
 			native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
 		else
@@ -185,6 +258,8 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public void drawPath(Path path, Paint paint) {
+		if (path != null && drawComposited(paint, p -> drawPath(path, p), p -> drawPath(path, p)))
+			return;
 		if (path != null && paint != null && paint.getShader() != null) {
 			RectF bounds = new RectF();
 			path.computeBounds(bounds, true);
@@ -201,8 +276,10 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public void drawRect(float left, float top, float right, float bottom, Paint paint) {
-		// TODO: implement xfermode using gtk_snapshot_push_composite in GTK >= 4.22
-		if (paint != null && paint.getXfermode() != null && paint.getBlendMode() != BlendMode.SRC_OVER)
+		if (drawComposited(paint, p -> drawRect(left, top, right, bottom, p), p -> drawRect(left, top, right, bottom, p)))
+			return;
+		/* without a layer (or GTK < 4.22) a Porter-Duff mode is left out, see drawComposited() */
+		if (!compositing && paint != null && paint.getXfermode() != null && paint.getBlendMode() != BlendMode.SRC_OVER)
 			return;
 		if (fillWithShader(left, top, right, bottom, paint))
 			return;
@@ -222,17 +299,23 @@ public class GskCanvas extends DisplayListCanvas {
 			new Exception("drawText: text is null; stack trace:").printStackTrace();
 			return;
 		}
+		if (drawComposited(paint, p -> drawText(text, x, y, p), p -> drawText(text, x, y, p)))
+			return;
 		native_drawText(snapshot, text, x, y, paint != null ? paint.paint : default_paint.paint);
 	}
 
 	@Override
 	public void drawGlyphs(int[] glyphIds, int glyphIdOffset, float[] positions, int positionOffset, int glyphCount, android.graphics.fonts.Font font, Paint paint) {
 		checkGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, paint);
+		if (drawComposited(paint, p -> drawGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, p), p -> drawGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, p)))
+			return;
 		native_drawGlyphs(snapshot, glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font.getFamilyName(), font.getStyle().getWeight(), font.getStyle().getSlant(), paint.paint);
 	}
 
 	@Override
 	public void drawLine(float startX, float startY, float stopX, float stopY, Paint paint) {
+		if (drawComposited(paint, p -> drawLine(startX, startY, stopX, stopY, p), p -> drawLine(startX, startY, stopX, stopY, p)))
+			return;
 		native_drawLine(snapshot, startX, startY, stopX, stopY, paint != null ? paint.paint : default_paint.paint);
 	}
 
@@ -240,11 +323,15 @@ public class GskCanvas extends DisplayListCanvas {
 	public void drawLines(float[] points, int offset, int count, Paint paint) {
 		if (offset + count < 0 /* overflow */ || offset + count > points.length)
 			throw new ArrayIndexOutOfBoundsException();
+		if (drawComposited(paint, p -> drawLines(points, offset, count, p), p -> drawLines(points, offset, count, p)))
+			return;
 		native_drawLines(snapshot, points, offset, count, paint != null ? paint.paint : default_paint.paint);
 	}
 
 	@Override
 	public void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, Paint paint) {
+		if (drawComposited(paint, p -> drawRoundRect(left, top, right, bottom, rx, ry, p), p -> drawRoundRect(left, top, right, bottom, rx, ry, p)))
+			return;
 		/* the native rounded rectangle has no dashed outline */
 		if (paint != null && (paint.getShader() != null || (paint.getPathEffect() instanceof DashPathEffect && paint.getStyle() != Paint.Style.FILL))) {
 			Path path = new Path();
@@ -363,5 +450,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_pop(long snapshot, int pop_count);
 
 	protected native void native_pushOpacity(long snapshot, float opacity);
+	protected native boolean native_pushIsolation(long snapshot);
+	protected native boolean native_pushComposite(long snapshot, int op);
 	protected native void native_drawRenderNode(long snapshot, long render_node);
 }
