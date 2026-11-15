@@ -1,6 +1,7 @@
 package android.net.wifi;
 
 import android.net.DhcpInfo;
+import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.Looper;
@@ -776,5 +777,247 @@ public class WifiManager {
 	public void cancelWps(WpsCallback listener) {
 		if (listener != null)
 			listener.onFailed(0);
+	}
+
+	/* Listener registration. AOSP checks the arguments (exception types as there) and hands the listener to the Wi-Fi
+	 * service, which never reports anything without Wi-Fi: nothing to remember here, nothing to call */
+	public void addLocalOnlyConnectionFailureListener(Executor executor, LocalOnlyConnectionFailureListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Listener cannot be null");
+		if (executor == null)
+			throw new IllegalArgumentException("Executor cannot be null");
+	}
+
+	public void removeLocalOnlyConnectionFailureListener(LocalOnlyConnectionFailureListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Listener cannot be null");
+	}
+
+	public void addSuggestionConnectionStatusListener(Executor executor, SuggestionConnectionStatusListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Listener cannot be null");
+		if (executor == null)
+			throw new IllegalArgumentException("Executor cannot be null");
+	}
+
+	public void removeSuggestionConnectionStatusListener(SuggestionConnectionStatusListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Listener cannot be null");
+	}
+
+	/* AOSP throws NullPointerException here, not IllegalArgumentException */
+	public void addSuggestionUserApprovalStatusListener(Executor executor,
+			SuggestionUserApprovalStatusListener listener) {
+		if (listener == null)
+			throw new NullPointerException("Listener cannot be null");
+		if (executor == null)
+			throw new NullPointerException("Executor cannot be null");
+	}
+
+	public void removeSuggestionUserApprovalStatusListener(SuggestionUserApprovalStatusListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Listener cannot be null");
+	}
+
+	public void addWifiStateChangedListener(Executor executor, WifiStateChangedListener listener) {
+		Objects.requireNonNull(executor);
+		Objects.requireNonNull(listener);
+	}
+
+	public void removeWifiStateChangedListener(WifiStateChangedListener listener) {
+		Objects.requireNonNull(listener);
+	}
+
+	public void registerScanResultsCallback(Executor executor, ScanResultsCallback callback) {
+		if (executor == null)
+			throw new IllegalArgumentException("executor cannot be null");
+		if (callback == null)
+			throw new IllegalArgumentException("callback cannot be null");
+	}
+
+	public void unregisterScanResultsCallback(ScanResultsCallback callback) {
+		if (callback == null)
+			throw new IllegalArgumentException("callback cannot be null");
+	}
+
+	public void registerSubsystemRestartTrackingCallback(Executor executor, SubsystemRestartTrackingCallback callback) {
+		if (executor == null)
+			throw new IllegalArgumentException("executor must not be null");
+		if (callback == null)
+			throw new IllegalArgumentException("callback must not be null");
+	}
+
+	public void unregisterSubsystemRestartTrackingCallback(SubsystemRestartTrackingCallback callback) {
+		if (callback == null)
+			throw new IllegalArgumentException("callback must not be null");
+	}
+
+	/* TDLS. AOSP WifiServiceImpl.enableTdls*(): IllegalArgumentException (NullPointerException in the callback
+	 * variants) for a missing address, otherwise the request goes to the primary STA, which does not exist: the
+	 * callback variants report false, the others do nothing. WifiManager.setTdlsEnabled(InetAddress, boolean)
+	 * dereferences the address itself (NullPointerException) */
+	public void setTdlsEnabled(InetAddress remoteIPAddress, boolean enable) {
+		remoteIPAddress.getHostAddress();
+	}
+
+	public void setTdlsEnabled(InetAddress remoteIPAddress, boolean enable, Executor executor,
+			Consumer<Boolean> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		Objects.requireNonNull(remoteIPAddress, "remote IP address cannot be null");
+		executor.execute(() -> resultsCallback.accept(false));
+	}
+
+	public void setTdlsEnabledWithMacAddress(String remoteMacAddress, boolean enable) {
+		if (remoteMacAddress == null)
+			throw new IllegalArgumentException("remoteMacAddress cannot be null");
+	}
+
+	public void setTdlsEnabledWithMacAddress(String remoteMacAddress, boolean enable, Executor executor,
+			Consumer<Boolean> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		Objects.requireNonNull(remoteMacAddress, "remote Mac address cannot be null");
+		executor.execute(() -> resultsCallback.accept(false));
+	}
+
+	/* AOSP ClientModeImpl.isTdlsOperationCurrentlyAvailable(): needs the TDLS feature and a connection */
+	public void isTdlsOperationCurrentlyAvailable(Executor executor, Consumer<Boolean> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		executor.execute(() -> resultsCallback.accept(false));
+	}
+
+	/* AOSP WifiVendorHal.getMaxSupportedConcurrentTdlsSessions(): -1 "if error or not available" */
+	public void getMaxSupportedConcurrentTdlsSessions(Executor executor, Consumer<Integer> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		executor.execute(() -> resultsCallback.accept(-1));
+	}
+
+	/* AOSP ClientModeImpl.getNumberOfEnabledTdlsSessions(): the number of enabled peers */
+	public void getNumberOfEnabledTdlsSessions(Executor executor, Consumer<Integer> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		executor.execute(() -> resultsCallback.accept(0));
+	}
+
+	/* AOSP WifiServiceImpl.allowAutojoinGlobal()/queryAutojoinGlobal(): SecurityException unless NETWORK_SETTINGS,
+	 * MANAGE_WIFI_NETWORK_SELECTION or device admin */
+	public void allowAutojoinGlobal(boolean allowAutojoin) {
+		throw new SecurityException("Uid is not allowed to set wifi global autojoin");
+	}
+
+	public void queryAutojoinGlobal(Executor executor, Consumer<Boolean> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		throw new SecurityException("Uid is not allowed to get wifi global autojoin");
+	}
+
+	/* AOSP WifiServiceImpl.disallowCurrentSuggestedNetwork(): returns when Wi-Fi is not enabled */
+	public void disallowCurrentSuggestedNetwork(BlockingOption blockingOption) {
+		Objects.requireNonNull(blockingOption, "blockingOption cannot be null");
+	}
+
+	/* AOSP WifiManager.validateSoftApConfiguration() asks WifiApConfigStore.validateApWifiConfiguration(), which
+	 * checks the config against the soft-AP capability of the chip; without a chip no config is usable. (Not
+	 * unambiguous in AOSP: there is no "service not there" case.) */
+	public boolean validateSoftApConfiguration(SoftApConfiguration config) {
+		if (config == null)
+			throw new IllegalArgumentException("WifiManager: config can not be null");
+		return false;
+	}
+
+	/* AOSP WifiServiceImpl.getUsableChannels() throws UnsupportedOperationException when the driver (WifiNative)
+	 * has no channel list. The permission checks before that (SecurityException for apps without
+	 * NEARBY_WIFI_DEVICES) are not reproduced. (Not unambiguous in AOSP.) */
+	public List<WifiAvailableChannel> getAllowedChannels(int band, int mode) {
+		throw new UnsupportedOperationException();
+	}
+
+	public List<WifiAvailableChannel> getUsableChannels(int band, int mode) {
+		throw new UnsupportedOperationException();
+	}
+
+	/* AOSP WifiServiceImpl.getChannelDataInternal(): one bundle per channel with scan results, none here. The
+	 * NEARBY_WIFI_DEVICES check (SecurityException) is not reproduced. (Not unambiguous in AOSP.) */
+	public void getChannelData(Executor executor, Consumer<List<android.os.Bundle>> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		executor.execute(() -> resultsCallback.accept(Collections.<android.os.Bundle>emptyList()));
+	}
+
+	/* Roaming mode per SSID. AOSP WifiManager checks the mode range and null arguments (IllegalArgumentException,
+	 * NullPointerException); WifiServiceImpl then throws UnsupportedOperationException for the aggressive mode when
+	 * isAggressiveRoamingModeSupported() is false, and SecurityException unless the caller is the DO/PO of an
+	 * organization owned device or holds NETWORK_SETTINGS / MANAGE_WIFI_NETWORK_SELECTION */
+	public void setPerSsidRoamingMode(WifiSsid ssid, int roamingMode) {
+		if (roamingMode < ROAMING_MODE_NONE || roamingMode > ROAMING_MODE_AGGRESSIVE)
+			throw new IllegalArgumentException("invalid roaming mode: " + roamingMode);
+		Objects.requireNonNull(ssid, "ssid cannot be null");
+		if (roamingMode == ROAMING_MODE_AGGRESSIVE && !isAggressiveRoamingModeSupported())
+			throw new UnsupportedOperationException("Aggressive roaming mode not supported");
+		throw new SecurityException("Uid is not allowed to add roaming policies");
+	}
+
+	public void removePerSsidRoamingMode(WifiSsid ssid) {
+		Objects.requireNonNull(ssid, "ssid cannot be null");
+		throw new SecurityException("Uid is not allowed to remove roaming policies");
+	}
+
+	public void getPerSsidRoamingModes(Executor executor, Consumer<java.util.Map<String, Integer>> resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		throw new SecurityException("Uid is not allowed to get roaming policies");
+	}
+
+	/* DHCP hostname restriction. AOSP WifiServiceImpl: IllegalArgumentException for unknown flags, then
+	 * SecurityException unless the caller is Settings/SetupWizard or the device owner */
+	public void setSendDhcpHostnameRestriction(int restriction) {
+		if ((restriction & ~FLAG_SEND_DHCP_HOSTNAME_RESTRICTION_OPEN & ~FLAG_SEND_DHCP_HOSTNAME_RESTRICTION_SECURE) != 0)
+			throw new IllegalArgumentException("Unknown dhcp hostname restriction flags: " + restriction);
+		throw new SecurityException("Uid is not allowed to query the global dhcp hostname restriction");
+	}
+
+	public void querySendDhcpHostnameRestriction(Executor executor, IntConsumer resultsCallback) {
+		Objects.requireNonNull(executor, "executor cannot be null");
+		Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+		throw new SecurityException("Uid is not allowed to query the global dhcp hostname restriction");
+	}
+
+	/* AOSP WifiServiceImpl.reportCreateInterfaceImpact(): IllegalArgumentException for an invalid interface type,
+	 * SecurityException for callers without MANAGE_WIFI_INTERFACES */
+	public void reportCreateInterfaceImpact(int interfaceType, boolean requireNewInterface, Executor executor,
+			BiConsumer<Boolean, Set<InterfaceCreationImpact>> resultCallback) {
+		Objects.requireNonNull(executor, "Non-null executor required");
+		Objects.requireNonNull(resultCallback, "Non-null resultCallback required");
+		if (interfaceType != WIFI_INTERFACE_TYPE_STA && interfaceType != WIFI_INTERFACE_TYPE_AP
+				&& interfaceType != WIFI_INTERFACE_TYPE_AWARE && interfaceType != WIFI_INTERFACE_TYPE_DIRECT)
+			throw new IllegalArgumentException("Invalid interfaceType");
+		throw new SecurityException("Missing MANAGE_WIFI_INTERFACES permission");
+	}
+
+	/* Local-only hotspot. AOSP WifiManager.startLocalOnlyHotspotInternal() runs the callback on the given executor
+	 * (the main executor without one) and, when WifiServiceImpl.startLocalOnlyHotspot() does not register the
+	 * request, calls onFailed(returnCode); the "not carried out" code of that method is ERROR_GENERIC. There is no
+	 * soft AP to start here. (Not unambiguous in AOSP: there is no "service not there" case.) */
+	public void startLocalOnlyHotspot(LocalOnlyHotspotCallback callback, Handler handler) {
+		startLocalOnlyHotspotInternal(handler == null ? null : new HandlerExecutor(handler), callback);
+	}
+
+	public void startLocalOnlyHotspotWithConfiguration(SoftApConfiguration config, Executor executor,
+			LocalOnlyHotspotCallback callback) {
+		Objects.requireNonNull(config);
+		Objects.requireNonNull(executor);
+		Objects.requireNonNull(callback);
+		startLocalOnlyHotspotInternal(executor, callback);
+	}
+
+	private void startLocalOnlyHotspotInternal(Executor executor, LocalOnlyHotspotCallback callback) {
+		if (executor == null)
+			executor = new HandlerExecutor(new Handler(Looper.getMainLooper()));
+		if (callback == null)
+			return;
+		executor.execute(() -> callback.onFailed(LocalOnlyHotspotCallback.ERROR_GENERIC));
 	}
 }
