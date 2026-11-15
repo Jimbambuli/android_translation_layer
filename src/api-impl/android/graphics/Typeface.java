@@ -379,9 +379,18 @@ public class Typeface {
 			this.path = path;
 		}
 
-		public Builder setFontVariationSettings(String settings) {
+		/* AOSP Typeface.Builder keeps the axes (mAxes) for the font it builds; ATL's Typeface is a Pango
+		 * family, weight and slant without variation axes, so they are parsed and kept, not applied */
+		public Builder setFontVariationSettings(String variationSettings) {
+			mAxes = android.graphics.fonts.FontVariationAxis.fromFontVariationSettings(variationSettings);
 			return this;
 		}
+
+		public Builder setFontVariationSettings(android.graphics.fonts.FontVariationAxis[] axes) {
+			mAxes = axes == null ? null : axes.clone();
+			return this;
+		}
+		private android.graphics.fonts.FontVariationAxis[] mAxes;
 
 		/* as in AOSP: -1 and null leave weight and slant to what the font file says */
 		private int mWeight = -1;
