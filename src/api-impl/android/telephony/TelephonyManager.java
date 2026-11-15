@@ -98,6 +98,30 @@ public class TelephonyManager {
 		return 0; // DATA_DISCONNECTED
 	}
 
+	/* AOSP with getITelephony() == null */
+	public SignalStrength getSignalStrength() {
+		return null;
+	}
+
+	public List<CellInfo> getAllCellInfo() {
+		return null;
+	}
+
+	public abstract static class CellInfoCallback {
+		public static final int ERROR_TIMEOUT = 1;
+		public static final int ERROR_MODEM_ERROR = 2;
+
+		public abstract void onCellInfo(List<CellInfo> cellInfo);
+
+		public void onError(int errorCode, Throwable detail) {}
+	}
+
+	/* AOSP: with telephony null, ISE for apps targeting after R (NULL_TELEPHONY_THROW_NO_CB), silent return
+	 * before. ATL does not keep the caller's target SDK here, so the modern behaviour is used. */
+	public void requestCellInfoUpdate(java.util.concurrent.Executor executor, CellInfoCallback callback) {
+		throw new IllegalStateException("Telephony is null");
+	}
+
 	public String getMmsUserAgent() {
 		return null;
 	}
