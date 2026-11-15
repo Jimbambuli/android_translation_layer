@@ -11,8 +11,21 @@ public class WallpaperManager {
 		return new WallpaperManager();
 	}
 
-	public void setBitmap(Bitmap bitmap) {
-		set_bitmap(bitmap.getTexture());
+	public void setBitmap(Bitmap bitmap) throws java.io.IOException {
+		setBitmap(bitmap, null, true);
+	}
+
+	public int setBitmap(Bitmap fullImage, android.graphics.Rect visibleCropHint, boolean allowBackup) throws java.io.IOException {
+		return setBitmap(fullImage, visibleCropHint, allowBackup, FLAG_SYSTEM | FLAG_LOCK);
+	}
+
+	/* AOSP returns the id of the new wallpaper (0 on failure); ATL has the one wallpaper of the desktop and no lock
+	 * screen, so which is not looked at, and the crop hint is not applied by the native side */
+	public int setBitmap(Bitmap fullImage, android.graphics.Rect visibleCropHint, boolean allowBackup, int which) throws java.io.IOException {
+		if (fullImage == null)
+			throw new IllegalArgumentException("Bitmap cannot be null");
+		set_bitmap(fullImage.getTexture());
+		return 1;
 	}
 
 	/**
@@ -44,6 +57,10 @@ public class WallpaperManager {
 	 * nothing can be read back, desired size is -1, clear() does nothing. Unlike DisabledWallpaperManager,
 	 * isWallpaperSupported()/isSetWallpaperAllowed() say true because ATL's setBitmap() does set the wallpaper. */
 	public android.graphics.drawable.Drawable getDrawable() {
+		return getDrawable(FLAG_SYSTEM);
+	}
+
+	public android.graphics.drawable.Drawable getDrawable(int which) {
 		return null;
 	}
 
@@ -66,6 +83,15 @@ public class WallpaperManager {
 	public void clear() throws java.io.IOException {}
 
 	public void clear(int which) throws java.io.IOException {}
+
+	public void setStream(java.io.InputStream bitmapData) throws java.io.IOException {
+		setStream(bitmapData, null, true);
+	}
+
+	public int setStream(java.io.InputStream bitmapData, android.graphics.Rect visibleCropHint, boolean allowBackup)
+	    throws java.io.IOException {
+		return setStream(bitmapData, visibleCropHint, allowBackup, FLAG_SYSTEM | FLAG_LOCK);
+	}
 
 	/* DisabledWallpaperManager.setStream(): unsupported(), returns 0 */
 	public int setStream(java.io.InputStream bitmapData, android.graphics.Rect visibleCropHint, boolean allowBackup, int which)

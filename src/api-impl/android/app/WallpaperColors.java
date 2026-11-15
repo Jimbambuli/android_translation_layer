@@ -39,6 +39,20 @@ public final class WallpaperColors {
 		mColorHints = colorHints;
 	}
 
+	/* AOSP WallpaperColors(Parcel): the main colors, the populations of all colors (ATL keeps none) and the hints */
+	public WallpaperColors(android.os.Parcel parcel) {
+		int count = parcel.readInt();
+		for (int i = 0; i < count; i++) {
+			mMainColors.add(Color.valueOf(parcel.readInt()));
+		}
+		count = parcel.readInt();
+		for (int i = 0; i < count; i++) {
+			parcel.readInt();
+			parcel.readInt();
+		}
+		mColorHints = parcel.readInt();
+	}
+
 	public Color getPrimaryColor() {
 		return mMainColors.get(0);
 	}
