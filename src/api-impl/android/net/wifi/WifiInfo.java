@@ -26,6 +26,27 @@ public class WifiInfo {
 		return -1;
 	}
 
+	public static final int INVALID_RSSI = -127;
+	public static final int UNKNOWN_FREQUENCY = -1;
+	public static final int LINK_SPEED_UNKNOWN = -1;
+
+	/* the fields after WifiInfo.reset(): INVALID_RSSI, frequency -1, link speeds LINK_SPEED_UNKNOWN */
+	public int getRssi() {
+		return INVALID_RSSI;
+	}
+
+	public int getFrequency() {
+		return UNKNOWN_FREQUENCY;
+	}
+
+	public int getTxLinkSpeedMbps() {
+		return LINK_SPEED_UNKNOWN;
+	}
+
+	public int getRxLinkSpeedMbps() {
+		return LINK_SPEED_UNKNOWN;
+	}
+
 	public SupplicantState getSupplicantState() {
 		return SupplicantState.DISCONNECTED;
 	}

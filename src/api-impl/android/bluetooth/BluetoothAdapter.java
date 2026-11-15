@@ -64,4 +64,124 @@ public class BluetoothAdapter {
 		}
 		return true;
 	}
+
+	public static final int SCAN_MODE_NONE = 20;
+	public static final int SCAN_MODE_CONNECTABLE = 21;
+	public static final int SCAN_MODE_CONNECTABLE_DISCOVERABLE = 23;
+
+	/* the branches of the AOSP methods for getState() != STATE_ON */
+	public boolean startDiscovery() {
+		return false;
+	}
+
+	public boolean cancelDiscovery() {
+		return false;
+	}
+
+	public boolean isDiscovering() {
+		return false;
+	}
+
+	public boolean setName(String name) {
+		return false;
+	}
+
+	public int getScanMode() {
+		return SCAN_MODE_NONE;
+	}
+
+	public int getProfileConnectionState(int profile) {
+		return BluetoothProfile.STATE_DISCONNECTED;
+	}
+
+	/* getLeAccess() is false with the adapter off */
+	public android.bluetooth.le.BluetoothLeScanner getBluetoothLeScanner() {
+		return null;
+	}
+
+	public android.bluetooth.le.BluetoothLeAdvertiser getBluetoothLeAdvertiser() {
+		return null;
+	}
+
+	public boolean isOffloadedFilteringSupported() {
+		return false;
+	}
+
+	public boolean isOffloadedScanBatchingSupported() {
+		return false;
+	}
+
+	public interface LeScanCallback {
+		void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord);
+	}
+
+	/* getBluetoothLeScanner() == null -> false (null callback -> false first) */
+	@Deprecated
+	public boolean startLeScan(LeScanCallback callback) {
+		return false;
+	}
+
+	@Deprecated
+	public boolean startLeScan(java.util.UUID[] serviceUuids, LeScanCallback callback) {
+		return false;
+	}
+
+	@Deprecated
+	public void stopLeScan(LeScanCallback callback) {}
+
+	/* with the service down the proxy is created but never connected: true for a profile in AOSP's
+	 * PROFILE_CONSTRUCTORS (HEALTH, an unknown profile and an unsupported hearing aid give false) */
+	public boolean getProfileProxy(android.content.Context context, BluetoothProfile.ServiceListener listener, int profile) {
+		if (context == null || listener == null) {
+			return false;
+		}
+		switch (profile) {
+			case BluetoothProfile.HEADSET:
+			case BluetoothProfile.A2DP:
+			case BluetoothProfile.A2DP_SINK:
+			case BluetoothProfile.AVRCP_CONTROLLER:
+			case BluetoothProfile.HID_HOST:
+			case BluetoothProfile.PAN:
+			case BluetoothProfile.PBAP:
+			case BluetoothProfile.MAP:
+			case BluetoothProfile.HEADSET_CLIENT:
+			case BluetoothProfile.SAP:
+			case BluetoothProfile.PBAP_CLIENT:
+			case BluetoothProfile.MAP_CLIENT:
+			case BluetoothProfile.HID_DEVICE:
+			case BluetoothProfile.HAP_CLIENT:
+			case BluetoothProfile.LE_AUDIO:
+			case BluetoothProfile.LE_AUDIO_BROADCAST:
+			case BluetoothProfile.VOLUME_CONTROL:
+			case BluetoothProfile.CSIP_SET_COORDINATOR:
+			case BluetoothProfile.LE_CALL_CONTROL:
+			case BluetoothProfile.LE_AUDIO_BROADCAST_ASSISTANT:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	public void closeProfileProxy(int unusedProfile, BluetoothProfile proxy) {
+		if (proxy == null) {
+			return;
+		}
+		closeProfileProxy(proxy);
+	}
+
+	public void closeProfileProxy(BluetoothProfile proxy) {
+		if (proxy instanceof BluetoothGatt) {
+			((BluetoothGatt) proxy).close();
+		}
+	}
+
+	/* bindListen() fails with -1 while the Bluetooth service is off */
+	public BluetoothServerSocket listenUsingRfcommWithServiceRecord(String name, java.util.UUID uuid) throws java.io.IOException {
+		throw new java.io.IOException("Error: -1");
+	}
+
+	public BluetoothServerSocket listenUsingInsecureRfcommWithServiceRecord(String name, java.util.UUID uuid)
+	    throws java.io.IOException {
+		throw new java.io.IOException("Error: -1");
+	}
 }

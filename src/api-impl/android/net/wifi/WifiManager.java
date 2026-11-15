@@ -133,4 +133,36 @@ public class WifiManager {
 	public boolean isScanThrottleEnabled() {
 		return false;
 	}
+
+	private static final int MAX_RSSI = -55;
+
+	/* AOSP WifiManager.calculateSignalLevel(int, int); MIN_RSSI is WifiInfo.MIN_RSSI = -126 there */
+	@Deprecated
+	public static int calculateSignalLevel(int rssi, int numLevels) {
+		if (rssi <= -126) {
+			return 0;
+		} else if (rssi >= MAX_RSSI) {
+			return numLevels - 1;
+		} else {
+			float inputRange = (MAX_RSSI - (-126));
+			float outputRange = (numLevels - 1);
+			return (int) ((float) (rssi - (-126)) * outputRange / inputRange);
+		}
+	}
+
+	/* no Wi-Fi control from inside the sandbox (see setWifiEnabled): the request is not carried out */
+	@Deprecated
+	public boolean enableNetwork(int netId, boolean attemptConnect) {
+		return false;
+	}
+
+	@Deprecated
+	public boolean disconnect() {
+		return false;
+	}
+
+	@Deprecated
+	public boolean reconnect() {
+		return false;
+	}
 }
