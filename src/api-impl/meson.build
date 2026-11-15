@@ -1027,6 +1027,8 @@ srcs = [
 	'android/util/SparseIntArray.java',
 	'android/util/SparseLongArray.java',
 	'android/util/StateSet.java',
+	'android/util/StatsEvent.java',
+	'android/util/StatsLog.java',
 	'android/util/StringBuilderPrinter.java',
 	'android/util/TimingLogger.java',
 	'android/util/TypedValue.java',
