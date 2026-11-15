@@ -6800,6 +6800,36 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		postInvalidate(left, top, right, bottom);
 	}
 
+	/* AOSP View.postInvalidateDelayed(long, int, int, int, int): invalidate the rect after the delay */
+	public void postInvalidateDelayed(long delayMilliseconds, final int left, final int top, final int right, final int bottom) {
+		postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				invalidate(left, top, right, bottom);
+			}
+		}, delayMilliseconds);
+	}
+
+	/* AOSP View.requestUnbufferedDispatch(): asks ViewRootImpl not to batch input to the frame.
+	 * ATL dispatches each input event as it arrives, so there is nothing to switch off. */
+	public final void requestUnbufferedDispatch(MotionEvent event) {
+	}
+
+	public final void requestUnbufferedDispatch(int source) {
+	}
+
+	/* AOSP View: PFLAG4_AUTO_HANDWRITING_ENABLED, set in the constructor. Only the flag is kept;
+	 * ATL has no stylus handwriting (InputMethodManager.isStylusHandwritingAvailable() is false). */
+	private boolean mAutoHandwritingEnabled = true;
+
+	public void setAutoHandwritingEnabled(boolean enabled) {
+		mAutoHandwritingEnabled = enabled;
+	}
+
+	public boolean isAutoHandwritingEnabled() {
+		return mAutoHandwritingEnabled;
+	}
+
 	/* AOSP View.onCreateContextMenu(ContextMenu): empty hook; ATL never shows context menus */
 	protected void onCreateContextMenu(ContextMenu menu) {}
 

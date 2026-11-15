@@ -147,6 +147,17 @@ public class InputMethodManager {
 
 	public void startStylusHandwriting(View view) {}
 
+	/* AOSP InputMethodManager.isStylusHandwritingAvailable(): true only if the current IME
+	 * supports stylus handwriting; ATL has no Android IME, so none does */
+	public boolean isStylusHandwritingAvailable() {
+		return false;
+	}
+
+	/* AOSP InputMethodManager.sendAppPrivateCommand(): forwarded to the IME session and
+	 * dropped when there is none (!isImeSessionAvailableLocked()); ATL never has one */
+	public void sendAppPrivateCommand(View view, String action, android.os.Bundle data) {
+	}
+
 	public void dispatchKeyEventFromInputMethod(View targetView, KeyEvent event) {
 		if (targetView != null)
 			targetView.dispatchKeyEvent(event);
