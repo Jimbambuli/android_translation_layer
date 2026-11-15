@@ -1,5 +1,6 @@
 srcs = [
 	'android/accessibilityservice/AccessibilityService.java',
+	'android/accessibilityservice/InputMethod.java',
 	'android/accessibilityservice/GestureDescription.java',
 	'android/app/backup/BackupDataInput.java',
 	'android/app/backup/BackupDataInputStream.java',

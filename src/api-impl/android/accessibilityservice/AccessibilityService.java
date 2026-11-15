@@ -10,6 +10,9 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import android.graphics.ColorSpace;
+import android.hardware.HardwareBuffer;
 
 /* AOSP AccessibilityService (core/java/android/accessibilityservice/AccessibilityService.java) as it behaves while
  * the system has not connected it: mConnectionId is unset, so AccessibilityInteractionClient finds no connection.
@@ -95,5 +98,70 @@ public abstract class AccessibilityService extends Service {
 		public void onCompleted(GestureDescription gestureDescription) {}
 
 		public void onCancelled(GestureDescription gestureDescription) {}
+	}
+
+	public static final int ERROR_TAKE_SCREENSHOT_INTERNAL_ERROR = 1;
+	public static final int ERROR_TAKE_SCREENSHOT_NO_ACCESSIBILITY_ACCESS = 2;
+	public static final int ERROR_TAKE_SCREENSHOT_INTERVAL_TIME_SHORT = 3;
+	public static final int ERROR_TAKE_SCREENSHOT_INVALID_DISPLAY = 4;
+	public static final int ERROR_TAKE_SCREENSHOT_INVALID_WINDOW = 5;
+	public static final int ERROR_TAKE_SCREENSHOT_SECURE_WINDOW = 6;
+
+	private InputMethod mInputMethod;
+
+	/* AOSP onCreateInputMethod() */
+	public InputMethod onCreateInputMethod() {
+		return new InputMethod(this);
+	}
+
+	/* AOSP getInputMethod(): set when the system connected the service with the input-method flag, else null */
+	public final InputMethod getInputMethod() {
+		return mInputMethod;
+	}
+
+	/* AOSP takeScreenshot(): the service connection takes it; ATL never connects an accessibility service to a system
+	 * server, so (connection == null) the failure is reported on the executor */
+	public void takeScreenshot(int displayId, Executor executor, TakeScreenshotCallback callback) {
+		java.util.Objects.requireNonNull(executor, "executor cannot be null");
+		java.util.Objects.requireNonNull(callback, "callback cannot be null");
+		executor.execute(() -> callback.onFailure(ERROR_TAKE_SCREENSHOT_INTERNAL_ERROR));
+	}
+
+	/* AOSP takeScreenshotOfWindow(): the interaction client without a connection fails the same way */
+	public void takeScreenshotOfWindow(int accessibilityWindowId, Executor executor, TakeScreenshotCallback callback) {
+		java.util.Objects.requireNonNull(executor, "executor cannot be null");
+		java.util.Objects.requireNonNull(callback, "callback cannot be null");
+		executor.execute(() -> callback.onFailure(ERROR_TAKE_SCREENSHOT_INTERNAL_ERROR));
+	}
+
+	public interface TakeScreenshotCallback {
+		void onSuccess(ScreenshotResult screenshot);
+		void onFailure(int errorCode);
+	}
+
+	public static final class ScreenshotResult {
+		private final HardwareBuffer mHardwareBuffer;
+		private final ColorSpace mColorSpace;
+		private final long mTimestamp;
+
+		public ScreenshotResult(HardwareBuffer hardwareBuffer, ColorSpace colorSpace, long timestamp) {
+			java.util.Objects.requireNonNull(hardwareBuffer, "hardwareBuffer cannot be null");
+			java.util.Objects.requireNonNull(colorSpace, "colorSpace cannot be null");
+			mHardwareBuffer = hardwareBuffer;
+			mColorSpace = colorSpace;
+			mTimestamp = timestamp;
+		}
+
+		public ColorSpace getColorSpace() {
+			return mColorSpace;
+		}
+
+		public HardwareBuffer getHardwareBuffer() {
+			return mHardwareBuffer;
+		}
+
+		public long getTimestamp() {
+			return mTimestamp;
+		}
 	}
 }
