@@ -302,8 +302,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return finishing;
 	}
 
+	/* AOSP: getWindow().requestFeature(), which throws once content is set */
 	public final boolean requestWindowFeature(int featureId) {
-		return false; // whatever feature it is, it's probably not supported
+		return getWindow().requestFeature(featureId);
 	}
 
 	public final void setVolumeControlStream(int streamType) {}
