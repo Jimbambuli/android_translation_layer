@@ -196,6 +196,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/database/android_database_SQLiteCommon.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteConnection.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteGlobal.c',
+                                                                  	'src/api-impl-jni/database/android_database_SQLiteRawStatement.c',
                                                                   	'src/api-impl-jni/egl/com_google_android_gles_jni_EGLImpl.c',
                                                                   	'src/api-impl-jni/egl/android_opengl_EGLExt.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',

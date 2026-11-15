@@ -159,7 +159,7 @@ static void sqliteProfileCallback(void *data, const char *sql, sqlite3_uint64 tm
 }
 
 JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeOpen(JNIEnv *env, jclass clazz, jstring pathStr, jint openFlags,
-                                                                                 jstring labelStr, jboolean enableTrace, jboolean enableProfile)
+                                                                                 jstring labelStr, jboolean enableTrace, jboolean enableProfile, jint lookasideSlotSize, jint lookasideSlotCount)
 {
 	int sqliteFlags;
 	if (openFlags & CREATE_IF_NECESSARY) {
@@ -183,6 +183,15 @@ JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeOpen
 	if (err != SQLITE_OK) {
 		throw_sqlite3_exception_errcode(env, err, "Could not open database");
 		return 0;
+	}
+	// Set the lookaside configuration (android_database_SQLiteConnection.cpp: nativeOpen, SQLiteDatabase.OpenParams)
+	if (lookasideSlotSize >= 0 && lookasideSlotCount >= 0) {
+		err = sqlite3_db_config(db, SQLITE_DBCONFIG_LOOKASIDE, NULL, lookasideSlotSize, lookasideSlotCount);
+		if (err != SQLITE_OK) {
+			throw_sqlite3_exception_handle_message(env, db, "Cannot set lookaside");
+			sqlite3_close(db);
+			return 0;
+		}
 	}
 	err = register_android_functions(db);
 	if (err != SQLITE_OK) {
@@ -321,6 +330,130 @@ JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegis
 		throw_sqlite3_exception_handle(env, connection->db);
 		return;
 	}
+}
+
+/* android_database_SQLiteConnection.cpp: custom scalar/aggregate functions of SQLiteDatabase.setCustomScalarFunction()
+ * and setCustomAggregateFunction(): java.util.function.UnaryOperator<String> / BinaryOperator<String> on text arguments */
+static void sqliteCustomScalarFunctionCallback(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+	JNIEnv *env = get_jni_env();
+	jobject functionObjGlobal = sqlite3_user_data(context);
+	jobject functionObj = (*env)->NewLocalRef(env, functionObjGlobal);
+
+	jstring argString = (*env)->NewStringUTF(env, (const char *)sqlite3_value_text(argv[0]));
+	jclass operatorClass = (*env)->FindClass(env, "java/util/function/UnaryOperator");
+	jstring res = (jstring)(*env)->CallObjectMethod(env, functionObj, _METHOD(operatorClass, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;"), argString);
+	if ((*env)->ExceptionCheck(env)) {
+		fprintf(stderr, "Exception thrown by custom scalar function\n");
+		sqlite3_result_error(context, "Exception thrown by custom scalar function", -1);
+		(*env)->ExceptionClear(env);
+	} else if (res != NULL) {
+		const char *resChars = (*env)->GetStringUTFChars(env, res, NULL);
+		sqlite3_result_text(context, resChars, -1, SQLITE_TRANSIENT);
+		(*env)->ReleaseStringUTFChars(env, res, resChars);
+	}
+	(*env)->DeleteLocalRef(env, res);
+	(*env)->DeleteLocalRef(env, argString);
+	(*env)->DeleteLocalRef(env, functionObj);
+}
+
+static void sqliteCustomAggregateFunctionStep(sqlite3_context *context, int argc, sqlite3_value **argv)
+{
+	const unsigned char *arg = sqlite3_value_text(argv[0]);
+	if (arg == NULL) {
+		return; // NULL values are skipped
+	}
+	char **agg = sqlite3_aggregate_context(context, sizeof(char *));
+	if (agg == NULL) {
+		sqlite3_result_error_nomem(context);
+		return;
+	}
+	if (*agg == NULL) {
+		*agg = strdup((const char *)arg);
+		return;
+	}
+
+	JNIEnv *env = get_jni_env();
+	jobject functionObjGlobal = sqlite3_user_data(context);
+	jobject functionObj = (*env)->NewLocalRef(env, functionObjGlobal);
+	jstring aggString = (*env)->NewStringUTF(env, *agg);
+	jstring argString = (*env)->NewStringUTF(env, (const char *)arg);
+	jclass operatorClass = (*env)->FindClass(env, "java/util/function/BinaryOperator");
+	jstring res = (jstring)(*env)->CallObjectMethod(env, functionObj, _METHOD(operatorClass, "apply", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"), aggString, argString);
+	if ((*env)->ExceptionCheck(env)) {
+		fprintf(stderr, "Exception thrown by custom aggregate function\n");
+		sqlite3_result_error(context, "Exception thrown by custom aggregate function", -1);
+		(*env)->ExceptionClear(env);
+		free(*agg);
+		*agg = NULL;
+	} else if (res != NULL) {
+		const char *resChars = (*env)->GetStringUTFChars(env, res, NULL);
+		free(*agg);
+		*agg = strdup(resChars);
+		(*env)->ReleaseStringUTFChars(env, res, resChars);
+	}
+	(*env)->DeleteLocalRef(env, res);
+	(*env)->DeleteLocalRef(env, argString);
+	(*env)->DeleteLocalRef(env, aggString);
+	(*env)->DeleteLocalRef(env, functionObj);
+}
+
+static void sqliteCustomAggregateFunctionFinal(sqlite3_context *context)
+{
+	char **agg = sqlite3_aggregate_context(context, 0);
+	if (agg == NULL || *agg == NULL) {
+		sqlite3_result_null(context);
+		return;
+	}
+	sqlite3_result_text(context, *agg, -1, SQLITE_TRANSIENT);
+	free(*agg);
+	*agg = NULL;
+}
+
+JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterCustomScalarFunction(JNIEnv *env, jclass clazz, jlong connectionPtr, jstring name, jobject function)
+{
+	struct SQLiteConnection *connection = _PTR(connectionPtr);
+	jobject functionObjGlobal = (*env)->NewGlobalRef(env, function);
+	const char *nameChars = (*env)->GetStringUTFChars(env, name, NULL);
+	int err = sqlite3_create_function_v2(connection->db, nameChars, 1, SQLITE_UTF8, functionObjGlobal,
+	                                     &sqliteCustomScalarFunctionCallback, NULL, NULL, &sqliteCustomFunctionDestructor);
+	(*env)->ReleaseStringUTFChars(env, name, nameChars);
+	if (err != SQLITE_OK) {
+		/* SQLite has called the destructor already, which deleted functionObjGlobal */
+		throw_sqlite3_exception_handle(env, connection->db);
+	}
+}
+
+JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterCustomAggregateFunction(JNIEnv *env, jclass clazz, jlong connectionPtr, jstring name, jobject function)
+{
+	struct SQLiteConnection *connection = _PTR(connectionPtr);
+	jobject functionObjGlobal = (*env)->NewGlobalRef(env, function);
+	const char *nameChars = (*env)->GetStringUTFChars(env, name, NULL);
+	int err = sqlite3_create_function_v2(connection->db, nameChars, 1, SQLITE_UTF8, functionObjGlobal,
+	                                     NULL, &sqliteCustomAggregateFunctionStep, &sqliteCustomAggregateFunctionFinal,
+	                                     &sqliteCustomFunctionDestructor);
+	(*env)->ReleaseStringUTFChars(env, name, nameChars);
+	if (err != SQLITE_OK) {
+		throw_sqlite3_exception_handle(env, connection->db);
+	}
+}
+
+JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeLastInsertRowId(JNIEnv *env, jclass clazz, jlong connectionPtr)
+{
+	struct SQLiteConnection *connection = _PTR(connectionPtr);
+	return sqlite3_last_insert_rowid(connection->db);
+}
+
+JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeChanges(JNIEnv *env, jclass clazz, jlong connectionPtr)
+{
+	struct SQLiteConnection *connection = _PTR(connectionPtr);
+	return sqlite3_changes(connection->db);
+}
+
+JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeTotalChanges(JNIEnv *env, jclass clazz, jlong connectionPtr)
+{
+	struct SQLiteConnection *connection = _PTR(connectionPtr);
+	return sqlite3_total_changes(connection->db);
 }
 
 JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterLocalizedCollators(JNIEnv *env, jclass clazz, jlong connectionPtr, jstring localeStr)

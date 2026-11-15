@@ -1466,4 +1466,51 @@ public class DatabaseUtils {
 		prog.bindAllArgsAsStrings(selectionArgs);
 		return prog.simpleQueryForBlobFileDescriptor();
 	}
+
+	/* AOSP DatabaseUtils.executeInsert()/executeUpdateDelete() (@hide, used by SQLiteQueryBuilder) */
+	public static long executeInsert(SQLiteDatabase db, String sql, Object[] bindArgs) throws SQLException {
+		try (SQLiteStatement st = db.compileStatement(sql)) {
+			bindArgs(st, bindArgs);
+			return st.executeInsert();
+		}
+	}
+
+	public static int executeUpdateDelete(SQLiteDatabase db, String sql, Object[] bindArgs) throws SQLException {
+		try (SQLiteStatement st = db.compileStatement(sql)) {
+			bindArgs(st, bindArgs);
+			return st.executeUpdateDelete();
+		}
+	}
+
+	private static void bindArgs(SQLiteStatement st, Object[] bindArgs) {
+		if (bindArgs == null)
+			return;
+
+		for (int i = 0; i < bindArgs.length; i++) {
+			final Object bindArg = bindArgs[i];
+			switch (getTypeOfObject(bindArg)) {
+				case Cursor.FIELD_TYPE_NULL:
+					st.bindNull(i + 1);
+					break;
+				case Cursor.FIELD_TYPE_INTEGER:
+					st.bindLong(i + 1, ((Number)bindArg).longValue());
+					break;
+				case Cursor.FIELD_TYPE_FLOAT:
+					st.bindDouble(i + 1, ((Number)bindArg).doubleValue());
+					break;
+				case Cursor.FIELD_TYPE_BLOB:
+					st.bindBlob(i + 1, (byte[])bindArg);
+					break;
+				case Cursor.FIELD_TYPE_STRING:
+				default:
+					if (bindArg instanceof Boolean) {
+						// Provide compatibility with legacy applications which may pass Boolean values in bind args.
+						st.bindLong(i + 1, ((Boolean)bindArg).booleanValue() ? 1 : 0);
+					} else {
+						st.bindString(i + 1, bindArg.toString());
+					}
+					break;
+			}
+		}
+	}
 }
