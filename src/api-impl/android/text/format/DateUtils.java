@@ -71,20 +71,40 @@ public class DateUtils {
 		return d1.getYear() == d2.getYear() && d1.getMonth() == d2.getMonth() && d1.getDate() == d2.getDate();
 	}
 
+	/* AOSP DateUtils.formatElapsedTime(): MM:SS below an hour, H:MM:SS from an hour (no days; the strings
+	 * elapsed_time_short_format_mm_ss / _h_mm_ss of AOSP's values/strings.xml) */
 	public static String formatElapsedTime(long elapsedSeconds) {
-		final long days = elapsedSeconds / (24 * 60 * 60L);
-		final long hours = elapsedSeconds / (60 * 60L) % 24L;
-		final long minutes = elapsedSeconds / (60L) % 60L;
-		final long seconds = elapsedSeconds % 60L;
+		return formatElapsedTime(null, elapsedSeconds);
+	}
 
-		if (elapsedSeconds < 0) {
-			return "0:00";
-		} else if (days > 0) {
-			return String.format("%d:%02d:%02d:%02d", days, hours, minutes, seconds);
-		} else if (hours > 0) {
-			return String.format("%d:%02d:%02d", hours, minutes, seconds);
+	public static String formatElapsedTime(StringBuilder recycle, long elapsedSeconds) {
+		// Break the elapsed seconds into hours, minutes, and seconds.
+		long hours = 0;
+		long minutes = 0;
+		long seconds = 0;
+		if (elapsedSeconds >= 3600) {
+			hours = elapsedSeconds / 3600;
+			elapsedSeconds -= hours * 3600;
+		}
+		if (elapsedSeconds >= 60) {
+			minutes = elapsedSeconds / 60;
+			elapsedSeconds -= minutes * 60;
+		}
+		seconds = elapsedSeconds;
+
+		// Create a StringBuilder if we weren't given one to recycle.
+		StringBuilder sb = recycle;
+		if (sb == null) {
+			sb = new StringBuilder(8);
 		} else {
-			return String.format("%d:%02d", minutes, seconds);
+			sb.setLength(0);
+		}
+
+		Formatter f = new Formatter(sb, Locale.getDefault());
+		if (hours > 0) {
+			return f.format("%1$d:%2$02d:%3$02d", hours, minutes, seconds).toString();
+		} else {
+			return f.format("%1$02d:%2$02d", minutes, seconds).toString();
 		}
 	}
 
@@ -102,6 +122,12 @@ public class DateUtils {
 	public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis, long endMillis, int flags) {
 		formatter.format("%s", formatDateRange(context, startMillis, endMillis, flags));
 		return formatter;
+	}
+
+	/* AOSP's formatDateRange(..., String timeZone) formats in that zone; ATL's formatDateRange() above is the plain
+	 * formatDateTime() form, which has no zone parameter */
+	public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis, long endMillis, int flags, String timeZone) {
+		return formatDateRange(context, formatter, startMillis, endMillis, flags);
 	}
 
 	/* AOSP DateUtils.getRelativeTimeSpanString(long) */

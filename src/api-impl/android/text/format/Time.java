@@ -102,6 +102,25 @@ public class Time {
 	}
 
 	/* AOSP delegates to a ZoneInfo-based calculator; java.util.GregorianCalendar gives the same result */
+	/* AOSP Time.clear(): all fields 0, isDst unknown, the given zone */
+	public void clear(String timezoneId) {
+		if (timezoneId == null) {
+			throw new NullPointerException("timezone is null!");
+		}
+		this.timezone = timezoneId;
+		this.allDay = false;
+		this.second = 0;
+		this.minute = 0;
+		this.hour = 0;
+		this.monthDay = 0;
+		this.month = 0;
+		this.year = 0;
+		this.weekDay = 0;
+		this.yearDay = 0;
+		this.gmtoff = 0;
+		this.isDst = -1;
+	}
+
 	public void set(long millis) {
 		GregorianCalendar c = new GregorianCalendar(TimeZone.getTimeZone(timezone));
 		c.setTimeInMillis(millis);

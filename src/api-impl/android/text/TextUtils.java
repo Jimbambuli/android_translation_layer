@@ -358,7 +358,126 @@ public class TextUtils {
 	 * copy with ellipsis character added at the specified edge or center.
 	 */
 	public static CharSequence ellipsize(CharSequence text, TextPaint p, float avail, TruncateAt where) {
-		return text;
+		return ellipsize(text, p, avail, where, false, null);
+	}
+
+	/* AOSP TextUtils.ellipsize(): the text itself when it fits, else the part that fits with the ellipsis at the
+	 * edge or in the middle. AOSP measures with MeasuredParagraph (breakText() over the glyph widths); here the
+	 * widths are those of Layout.getDesiredWidth() (Pango) and the cut is found by bisection over them. */
+	public static final String ELLIPSIS_NORMAL = "\u2026"; // this is "..."
+	public static final String ELLIPSIS_TWO_DOTS = "\u2025"; // this is ".."
+	private static final char ELLIPSIS_FILLER = '\uFEFF'; // ZERO WIDTH NO-BREAK SPACE
+
+	public interface EllipsizeCallback {
+		void ellipsized(int start, int end);
+	}
+
+	public static String getEllipsisString(TruncateAt method) {
+		return (method == TruncateAt.END_SMALL) ? ELLIPSIS_TWO_DOTS : ELLIPSIS_NORMAL;
+	}
+
+	public static CharSequence ellipsize(CharSequence text, TextPaint paint, float avail, TruncateAt where,
+	                                     boolean preserveLength, EllipsizeCallback callback) {
+		return ellipsize(text, paint, avail, where, preserveLength, callback,
+		                 TextDirectionHeuristics.FIRSTSTRONG_LTR, getEllipsisString(where));
+	}
+
+	public static CharSequence ellipsize(CharSequence text, TextPaint paint, float avail, TruncateAt where,
+	                                     boolean preserveLength, EllipsizeCallback callback,
+	                                     TextDirectionHeuristic textDir, String ellipsis) {
+		int len = text.length();
+		float width = ellipsizeMeasure(text, 0, len, paint);
+
+		if (width <= avail) {
+			if (callback != null) {
+				callback.ellipsized(0, 0);
+			}
+			return text;
+		}
+
+		float ellipsiswid = ellipsizeMeasure(ellipsis, 0, ellipsis.length(), paint);
+		avail -= ellipsiswid;
+
+		int left = 0;
+		int right = len;
+		if (avail < 0) {
+			// it all goes
+		} else if (where == TruncateAt.START) {
+			right = len - ellipsizeBreak(text, 0, len, false, avail, paint);
+		} else if (where == TruncateAt.END || where == TruncateAt.END_SMALL) {
+			left = ellipsizeBreak(text, 0, len, true, avail, paint);
+		} else {
+			right = len - ellipsizeBreak(text, 0, len, false, avail / 2, paint);
+			avail -= ellipsizeMeasure(text, right, len, paint);
+			left = ellipsizeBreak(text, 0, right, true, avail, paint);
+		}
+
+		if (callback != null) {
+			callback.ellipsized(left, right);
+		}
+
+		final char[] buf = new char[len];
+		getChars(text, 0, len, buf, 0);
+		Spanned sp = text instanceof Spanned ? (Spanned)text : null;
+
+		final int removed = right - left;
+		final int remaining = len - removed;
+		if (preserveLength) {
+			if (remaining > 0 && removed >= ellipsis.length()) {
+				ellipsis.getChars(0, ellipsis.length(), buf, left);
+				left += ellipsis.length();
+			} // else skip the ellipsis
+			for (int i = left; i < right; i++) {
+				buf[i] = ELLIPSIS_FILLER;
+			}
+			String str = new String(buf, 0, len);
+			if (sp == null) {
+				return str;
+			}
+			SpannableString ss = new SpannableString(str);
+			copySpansFrom(sp, 0, len, Object.class, ss, 0);
+			return ss;
+		}
+
+		if (remaining == 0) {
+			return "";
+		}
+
+		if (sp == null) {
+			StringBuilder sb = new StringBuilder(remaining + ellipsis.length());
+			sb.append(buf, 0, left);
+			sb.append(ellipsis);
+			sb.append(buf, right, len - right);
+			return sb.toString();
+		}
+
+		SpannableStringBuilder ssb = new SpannableStringBuilder();
+		ssb.append(text, 0, left);
+		ssb.append(ellipsis);
+		ssb.append(text, right, len);
+		return ssb;
+	}
+
+	private static float ellipsizeMeasure(CharSequence text, int start, int end, TextPaint paint) {
+		return start >= end ? 0 : Layout.getDesiredWidth(text, start, end, paint);
+	}
+
+	/* MeasuredParagraph.breakText(limit, forwards, width): the number of characters from the start (forwards) or from
+	 * the end of [start, limit) whose width is at most width */
+	private static int ellipsizeBreak(CharSequence text, int start, int limit, boolean forwards, float width,
+	                                  TextPaint paint) {
+		int lo = 0;
+		int hi = limit - start;
+		while (lo < hi) {
+			int mid = (lo + hi + 1) >>> 1;
+			float w = forwards ? ellipsizeMeasure(text, start, start + mid, paint)
+			                   : ellipsizeMeasure(text, limit - mid, limit, paint);
+			if (w <= width)
+				lo = mid;
+			else
+				hi = mid - 1;
+		}
+		return lo;
 	}
 
 	public static void getChars(CharSequence s, int start, int end, char[] dest, int destoff) {

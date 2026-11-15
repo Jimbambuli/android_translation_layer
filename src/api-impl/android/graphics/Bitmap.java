@@ -643,8 +643,26 @@ public final class Bitmap implements Parcelable {
 		return requestPremultiplied && config != Config.RGB_565 && hasAlpha;
 	}
 
+	/* AOSP Bitmap.extractAlpha(): a mutable ALPHA_8 bitmap of the alpha channel. A paint's MaskFilter (the blur
+	 * that makes the offset non-zero) is not applied in ATL, so offsetXY is 0, 0 */
 	public Bitmap extractAlpha() {
-		return this.copy(config, mutable);
+		return extractAlpha(null, null);
+	}
+
+	public Bitmap extractAlpha(Paint paint, int[] offsetXY) {
+		final int w = getWidth(), h = getHeight();
+		final int[] colors = new int[w * h];
+		getPixels(colors, 0, w, 0, 0, w, h);
+		for (int i = 0; i < colors.length; i++)
+			colors[i] &= 0xff000000;
+		Bitmap bm = createBitmap(w, h, Config.ALPHA_8);
+		bm.setPixels(colors, 0, w, 0, 0, w, h);
+		bm.setDensity(getDensity());
+		if (offsetXY != null) {
+			offsetXY[0] = 0;
+			offsetXY[1] = 0;
+		}
+		return bm;
 	}
 
 	@SuppressWarnings("deprecation")

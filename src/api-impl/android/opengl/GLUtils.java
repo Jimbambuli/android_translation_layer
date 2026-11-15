@@ -4,6 +4,13 @@ import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGL11;
 
 public class GLUtils {
+	/* AOSP GLUtils.texImage2D(target, level, internalformat, bitmap, type, border) */
+	public static void texImage2D(int target, int level, int internalformat, Bitmap bitmap, int type, int border) {
+		if (native_texImage2D(target, level, internalformat, bitmap, type, border) != 0) {
+			throw new IllegalArgumentException("invalid Bitmap format");
+		}
+	}
+
 	public static void texImage2D(int target, int level, Bitmap bitmap, int border) {
 		if (native_texImage2D(target, level, -1, bitmap, -1, border) != 0) {
 			throw new IllegalArgumentException("invalid Bitmap format");

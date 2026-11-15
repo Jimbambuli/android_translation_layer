@@ -431,6 +431,15 @@ public class Paint {
 		shadow_layer_color = shadowColor;
 	}
 
+	/* AOSP Paint.getShadowLayerColor() (int) and getShadowLayerColorLong() */
+	public int getShadowLayerColor() {
+		return Color.toArgb(shadow_layer_color);
+	}
+
+	public long getShadowLayerColorLong() {
+		return shadow_layer_color;
+	}
+
 	public float getShadowLayerRadius() {
 		return shadow_layer_radius;
 	}
