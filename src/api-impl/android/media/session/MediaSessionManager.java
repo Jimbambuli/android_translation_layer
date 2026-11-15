@@ -36,6 +36,13 @@ public class MediaSessionManager {
 		return sessionToken.session.dispatchMediaKeyEvent(keyEvent);
 	}
 
+	/* AOSP isTrustedForMediaControl(): the trust decision is MediaSessionService.isTrusted() (not in the
+	 * local sources); without that service the call ends in AOSP's RemoteException path, false */
+	public boolean isTrustedForMediaControl(@NonNull RemoteUserInfo userInfo) {
+		Objects.requireNonNull(userInfo, "userInfo shouldn't be null");
+		return false;
+	}
+
 	private void dispatchMediaKeyEventInternal(KeyEvent keyEvent, boolean asSystemService, boolean needWakeLock) {
 		Objects.requireNonNull(keyEvent, "keyEvent shouldn't be null");
 		MediaSession session = MediaSession.getMediaButtonSession();
