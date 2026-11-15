@@ -194,6 +194,11 @@ public class SparseArray<E> implements Cloneable {
 	 * replacing the previous mapping from the specified key if there
 	 * was one.
 	 */
+	/* AOSP SparseArray.set(): the same as put(), for Kotlin's indexed access */
+	public void set(int key, E value) {
+		put(key, value);
+	}
+
 	public void put(int key, E value) {
 		int i = ContainerHelpers.binarySearch(mKeys, mSize, key);
 

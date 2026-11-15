@@ -306,6 +306,25 @@ public final class StatsLog {
         statsEvent.release();
     }
 
+    /* AOSP logStart()/logStop()/logEvent()/logBinaryPushStateChanged() write a StatsdStatsLog atom and always
+     * answer true; without statsd the atom goes nowhere (see write()). */
+    public static boolean logStart(int label) {
+        return true;
+    }
+
+    public static boolean logStop(int label) {
+        return true;
+    }
+
+    public static boolean logEvent(int label) {
+        return true;
+    }
+
+    public static boolean logBinaryPushStateChanged(@NonNull String trainName, long trainVersionCode, int options,
+            int state, @NonNull long[] experimentIds) {
+        return true;
+    }
+
     /** Deprecated raw write to statsd; nothing is listening (see write()). */
     @Deprecated
     @SystemApi
