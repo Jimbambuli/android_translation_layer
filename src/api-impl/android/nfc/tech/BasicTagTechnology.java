@@ -7,6 +7,7 @@ import java.io.IOException;
  * AOSP, here there is no such member). */
 abstract class BasicTagTechnology implements TagTechnology {
 	final Tag mTag;
+	boolean mIsConnected;
 	int mSelectedTechnology;
 
 	BasicTagTechnology(Tag tag, int tech) {
@@ -52,5 +53,16 @@ abstract class BasicTagTechnology implements TagTechnology {
 	@Override
 	public boolean isConnected() {
 		return false;
+	}
+
+	/* AOSP getMaxTransceiveLengthInternal(): mTag.getTagService() is null on a mock tag (NullPointerException) */
+	int getMaxTransceiveLengthInternal() {
+		throw new NullPointerException();
+	}
+
+	/* AOSP transceive(data, raw): checkConnected() first, then the null service of a mock tag */
+	byte[] transceive(byte[] data, boolean raw) throws IOException {
+		checkConnected();
+		throw new NullPointerException();
 	}
 }

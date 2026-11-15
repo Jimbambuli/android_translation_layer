@@ -24,4 +24,10 @@ public final class NdefFormatable extends BasicTagTechnology {
 		checkConnected();
 		throw new IOException();
 	}
+
+	/* AOSP formatReadOnly(firstMessage) -> format(firstMessage, true) */
+	public void formatReadOnly(NdefMessage firstMessage) throws IOException, FormatException {
+		checkConnected();
+		throw new IOException();
+	}
 }

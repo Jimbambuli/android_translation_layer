@@ -196,4 +196,53 @@ public class LayoutTransition {
 	public boolean isRunning() {
 		return false;
 	}
+
+	/* AOSP: the stagger of the change animations (CHANGE_APPEARING, CHANGE_DISAPPEARING, CHANGING), default 0 */
+	private long mChangingAppearingStagger = 0;
+	private long mChangingDisappearingStagger = 0;
+	private long mChangingStagger = 0;
+
+	public void setStagger(int transitionType, long duration) {
+		switch (transitionType) {
+			case CHANGE_APPEARING:
+				mChangingAppearingStagger = duration;
+				break;
+			case CHANGE_DISAPPEARING:
+				mChangingDisappearingStagger = duration;
+				break;
+			case CHANGING:
+				mChangingStagger = duration;
+				break;
+			// noop other cases
+		}
+	}
+
+	public long getStagger(int transitionType) {
+		switch (transitionType) {
+			case CHANGE_APPEARING:
+				return mChangingAppearingStagger;
+			case CHANGE_DISAPPEARING:
+				return mChangingDisappearingStagger;
+			case CHANGING:
+				return mChangingStagger;
+		}
+		// shouldn't reach here
+		return 0;
+	}
+
+	/* AOSP addChild()/showChild()/removeChild()/hideChild() only start the transition animations for a child that the
+	 * caller has already added/removed/shown/hidden; ATL runs no transitions, so there is nothing to start */
+	public void addChild(ViewGroup parent, View child) {}
+
+	@Deprecated
+	public void showChild(ViewGroup parent, View child) {}
+
+	public void showChild(ViewGroup parent, View child, int oldVisibility) {}
+
+	public void removeChild(ViewGroup parent, View child) {}
+
+	@Deprecated
+	public void hideChild(ViewGroup parent, View child) {}
+
+	public void hideChild(ViewGroup parent, View child, int newVisibility) {}
 }

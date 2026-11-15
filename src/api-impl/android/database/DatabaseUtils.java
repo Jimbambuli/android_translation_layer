@@ -24,7 +24,10 @@ import android.database.sqlite.SQLiteProgram;
 import android.database.sqlite.SQLiteStatement;
 import android.text.TextUtils;
 import android.util.Log;
+import android.os.Parcel;
+import android.os.ParcelFileDescriptor;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.text.Collator;
 import java.util.HashMap;
@@ -1341,5 +1344,173 @@ public class DatabaseUtils {
 			}
 		}
 		return res;
+	}
+
+	/* AOSP DatabaseUtils.writeExceptionToParcel()/readException*FromParcel(): the reply header of a ContentProvider
+	 * call (exception code, message). ATL's Parcel has no readExceptionCode()/strict mode header, so the code is the
+	 * plain int; codes outside the list go through Parcel.writeException()/readException(int, String) as in AOSP. */
+	public static final void writeExceptionToParcel(Parcel reply, Exception e) {
+		int code = 0;
+		boolean logException = true;
+		if (e instanceof FileNotFoundException) {
+			code = 1;
+			logException = false;
+		} else if (e instanceof IllegalArgumentException) {
+			code = 2;
+		} else if (e instanceof UnsupportedOperationException) {
+			code = 3;
+		} else if (e instanceof android.database.sqlite.SQLiteAbortException) {
+			code = 4;
+		} else if (e instanceof android.database.sqlite.SQLiteConstraintException) {
+			code = 5;
+		} else if (e instanceof android.database.sqlite.SQLiteDatabaseCorruptException) {
+			code = 6;
+		} else if (e instanceof android.database.sqlite.SQLiteFullException) {
+			code = 7;
+		} else if (e instanceof android.database.sqlite.SQLiteDiskIOException) {
+			code = 8;
+		} else if (e instanceof SQLiteException) {
+			code = 9;
+		} else if (e instanceof android.content.OperationApplicationException) {
+			code = 10;
+		} else if (e instanceof android.os.OperationCanceledException) {
+			code = 11;
+			logException = false;
+		} else {
+			try {
+				reply.writeException(e);
+			} catch (Exception ex) {
+				if (ex instanceof RuntimeException)
+					throw (RuntimeException)ex;
+				throw new RuntimeException(ex);
+			}
+			Log.e(TAG, "Writing exception to parcel", e);
+			return;
+		}
+		reply.writeInt(code);
+		reply.writeString(e.getMessage());
+
+		if (logException) {
+			Log.e(TAG, "Writing exception to parcel", e);
+		}
+	}
+
+	public static final void readExceptionFromParcel(Parcel reply) {
+		int code = reply.readInt();
+		if (code == 0)
+			return;
+		String msg = reply.readString();
+		DatabaseUtils.readExceptionFromParcel(reply, msg, code);
+	}
+
+	public static void readExceptionWithFileNotFoundExceptionFromParcel(Parcel reply) throws FileNotFoundException {
+		int code = reply.readInt();
+		if (code == 0)
+			return;
+		String msg = reply.readString();
+		if (code == 1) {
+			throw new FileNotFoundException(msg);
+		} else {
+			DatabaseUtils.readExceptionFromParcel(reply, msg, code);
+		}
+	}
+
+	public static void readExceptionWithOperationApplicationExceptionFromParcel(Parcel reply)
+	    throws android.content.OperationApplicationException {
+		int code = reply.readInt();
+		if (code == 0)
+			return;
+		String msg = reply.readString();
+		if (code == 10) {
+			throw new android.content.OperationApplicationException(msg);
+		} else {
+			DatabaseUtils.readExceptionFromParcel(reply, msg, code);
+		}
+	}
+
+	private static final void readExceptionFromParcel(Parcel reply, String msg, int code) {
+		switch (code) {
+			case 2:
+				throw new IllegalArgumentException(msg);
+			case 3:
+				throw new UnsupportedOperationException(msg);
+			case 4:
+				throw new android.database.sqlite.SQLiteAbortException(msg);
+			case 5:
+				throw new android.database.sqlite.SQLiteConstraintException(msg);
+			case 6:
+				throw new android.database.sqlite.SQLiteDatabaseCorruptException(msg);
+			case 7:
+				throw new android.database.sqlite.SQLiteFullException(msg);
+			case 8:
+				throw new android.database.sqlite.SQLiteDiskIOException(msg);
+			case 9:
+				throw new SQLiteException(msg);
+			case 11:
+				throw new android.os.OperationCanceledException(msg);
+			default:
+				reply.readException(code, msg);
+		}
+	}
+
+	public static ParcelFileDescriptor blobFileDescriptorForQuery(SQLiteDatabase db, String query, String[] selectionArgs) {
+		SQLiteStatement prog = db.compileStatement(query);
+		try {
+			return blobFileDescriptorForQuery(prog, selectionArgs);
+		} finally {
+			prog.close();
+		}
+	}
+
+	public static ParcelFileDescriptor blobFileDescriptorForQuery(SQLiteStatement prog, String[] selectionArgs) {
+		prog.bindAllArgsAsStrings(selectionArgs);
+		return prog.simpleQueryForBlobFileDescriptor();
+	}
+
+	/* AOSP DatabaseUtils.executeInsert()/executeUpdateDelete() (@hide, used by SQLiteQueryBuilder) */
+	public static long executeInsert(SQLiteDatabase db, String sql, Object[] bindArgs) throws SQLException {
+		try (SQLiteStatement st = db.compileStatement(sql)) {
+			bindArgs(st, bindArgs);
+			return st.executeInsert();
+		}
+	}
+
+	public static int executeUpdateDelete(SQLiteDatabase db, String sql, Object[] bindArgs) throws SQLException {
+		try (SQLiteStatement st = db.compileStatement(sql)) {
+			bindArgs(st, bindArgs);
+			return st.executeUpdateDelete();
+		}
+	}
+
+	private static void bindArgs(SQLiteStatement st, Object[] bindArgs) {
+		if (bindArgs == null)
+			return;
+
+		for (int i = 0; i < bindArgs.length; i++) {
+			final Object bindArg = bindArgs[i];
+			switch (getTypeOfObject(bindArg)) {
+				case Cursor.FIELD_TYPE_NULL:
+					st.bindNull(i + 1);
+					break;
+				case Cursor.FIELD_TYPE_INTEGER:
+					st.bindLong(i + 1, ((Number)bindArg).longValue());
+					break;
+				case Cursor.FIELD_TYPE_FLOAT:
+					st.bindDouble(i + 1, ((Number)bindArg).doubleValue());
+					break;
+				case Cursor.FIELD_TYPE_BLOB:
+					st.bindBlob(i + 1, (byte[])bindArg);
+					break;
+				case Cursor.FIELD_TYPE_STRING:
+				default:
+					if (bindArg instanceof Boolean) {
+						// Provide compatibility with legacy applications which may pass Boolean values in bind args.
+						st.bindLong(i + 1, ((Boolean)bindArg).booleanValue() ? 1 : 0);
+					} else {
+						st.bindString(i + 1, bindArg.toString());
+					}
+					break;
+			}
+		}
 	}
 }

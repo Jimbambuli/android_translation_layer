@@ -141,6 +141,56 @@ public abstract class SQLiteOpenHelper implements AutoCloseable {
 		mMinimumSupportedVersion = Math.max(0, minimumSupportedVersion);
 	}
 
+	/* AOSP SQLiteOpenHelper(Context, String, int, OpenParams): the open parameters replace factory and error handler;
+	 * set only when the app uses OpenParams, setLookasideConfig() or setIdleConnectionTimeout() */
+	private SQLiteDatabase.OpenParams.Builder mOpenParamsBuilder;
+
+	public SQLiteOpenHelper(Context context, String name, int version, SQLiteDatabase.OpenParams openParams) {
+		this(context, name, null, version, 0, null);
+		mOpenParamsBuilder = openParams.toBuilder().addOpenFlags(SQLiteDatabase.CREATE_IF_NECESSARY);
+	}
+
+	private SQLiteDatabase.OpenParams.Builder openParamsBuilder() {
+		if (mOpenParamsBuilder == null) {
+			mOpenParamsBuilder = new SQLiteDatabase.OpenParams.Builder();
+			mOpenParamsBuilder.setCursorFactory(mFactory);
+			mOpenParamsBuilder.setErrorHandler(mErrorHandler);
+			mOpenParamsBuilder.addOpenFlags(SQLiteDatabase.CREATE_IF_NECESSARY);
+		}
+		return mOpenParamsBuilder;
+	}
+
+	/* AOSP SQLiteOpenHelper.setLookasideConfig() */
+	public void setLookasideConfig(final int slotSize, final int slotCount) {
+		synchronized (this) {
+			if (mDatabase != null && mDatabase.isOpen()) {
+				throw new IllegalStateException("Lookaside memory config cannot be changed after opening the database");
+			}
+			openParamsBuilder().setLookasideConfig(slotSize, slotCount);
+		}
+	}
+
+	/* AOSP SQLiteOpenHelper.setOpenParams() */
+	public void setOpenParams(SQLiteDatabase.OpenParams openParams) {
+		java.util.Objects.requireNonNull(openParams);
+		synchronized (this) {
+			if (mDatabase != null && mDatabase.isOpen()) {
+				throw new IllegalStateException("OpenParams cannot be set after opening the database");
+			}
+			mOpenParamsBuilder = new SQLiteDatabase.OpenParams.Builder(openParams).addOpenFlags(SQLiteDatabase.CREATE_IF_NECESSARY);
+		}
+	}
+
+	@Deprecated
+	public void setIdleConnectionTimeout(final long idleConnectionTimeoutMs) {
+		synchronized (this) {
+			if (mDatabase != null && mDatabase.isOpen()) {
+				throw new IllegalStateException("Connection timeout setting cannot be changed after opening the database");
+			}
+			openParamsBuilder().setIdleConnectionTimeout(idleConnectionTimeoutMs);
+		}
+	}
+
 	/**
 	 * Return the name of the SQLite database being opened, as given to
 	 * the constructor.
@@ -247,8 +297,28 @@ public abstract class SQLiteOpenHelper implements AutoCloseable {
 				if (writable && db.isReadOnly()) {
 					db.reopenReadWrite();
 				}
+			} else if (mName == null && mOpenParamsBuilder != null) {
+				db = SQLiteDatabase.createInMemory(mOpenParamsBuilder.build());
 			} else if (mName == null) {
 				db = SQLiteDatabase.create(null);
+			} else if (mOpenParamsBuilder != null) {
+				String path = mName;
+				if (!path.startsWith("file:")) {
+					path = mContext.getDatabasePath(path).getPath();
+				}
+				SQLiteDatabase.OpenParams.Builder builder = mOpenParamsBuilder;
+				if (mEnableWriteAheadLogging)
+					builder.addOpenFlags(SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING);
+				SQLiteDatabase.OpenParams params = builder.build();
+				try {
+					db = SQLiteDatabase.openDatabase(new java.io.File(path), params);
+				} catch (SQLiteException ex) {
+					if (writable) {
+						throw ex;
+					}
+					Log.e(TAG, "Couldn't open " + mName + " for writing (will try read-only):", ex);
+					db = SQLiteDatabase.openDatabase(new java.io.File(path), params.toBuilder().addOpenFlags(SQLiteDatabase.OPEN_READONLY).build());
+				}
 			} else {
 				String path = mName;
 				if (!path.startsWith("file:")) {

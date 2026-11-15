@@ -1,6 +1,6 @@
 package android.os;
 
-public class VibrationEffect {
+public class VibrationEffect implements Parcelable {
 
 	/* AOSP keeps a list of segments; ATL's vibrator only switches on and off, so the timings are enough:
 	 * alternating off and on durations in milliseconds (starting with off) and the index to repeat from */
@@ -47,6 +47,147 @@ public class VibrationEffect {
 				throw new IllegalArgumentException("Unknown prebaked effect type (value=" + effectId + ")");
 		}
 		return new VibrationEffect(new long[] {0}, -1);
+	}
+
+	/* AOSP VibrationEffect is Parcelable: ATL's effect is the timings and the repeat index */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeLongArray(timings);
+		out.writeInt(repeat);
+	}
+
+	public static final Parcelable.Creator<VibrationEffect> CREATOR = new Parcelable.Creator<VibrationEffect>() {
+		public VibrationEffect createFromParcel(Parcel in) {
+			long[] timings = in.createLongArray();
+			return new VibrationEffect(timings, in.readInt());
+		}
+
+		public VibrationEffect[] newArray(int size) {
+			return new VibrationEffect[size];
+		}
+	};
+
+	/* AOSP createRepeatingEffect(effect): startComposition().repeatEffectIndefinitely(effect).compose(); the whole
+	 * effect repeats, so the repeat index is the start */
+	public static VibrationEffect createRepeatingEffect(VibrationEffect effect) {
+		com.android.internal.util.Preconditions.checkArgument(effect.repeat < 0,
+		    "Can't repeat an indefinitely repeating effect. Consider addEffect instead.");
+		return new VibrationEffect(effect.timings, 0);
+	}
+
+	/* AOSP createRepeatingEffect(preamble, repeatingEffect): addEffect(preamble).repeatEffectIndefinitely(repeating).
+	 * Even slots of the timings are off, odd ones on: a preamble that ends with an off step gets a zero-length on
+	 * step, so the repeated effect starts with an off step again (as in createWaveform(long[], int[], int)) */
+	public static VibrationEffect createRepeatingEffect(VibrationEffect preamble, VibrationEffect repeatingEffect) {
+		com.android.internal.util.Preconditions.checkArgument(preamble.repeat < 0,
+		    "Can't repeat an indefinitely repeating effect.");
+		com.android.internal.util.Preconditions.checkArgument(repeatingEffect.repeat < 0,
+		    "Can't repeat an indefinitely repeating effect. Consider addEffect instead.");
+		int pad = preamble.timings.length % 2 == 1 ? 1 : 0;
+		long[] timings = new long[preamble.timings.length + pad + repeatingEffect.timings.length];
+		System.arraycopy(preamble.timings, 0, timings, 0, preamble.timings.length);
+		System.arraycopy(repeatingEffect.timings, 0, timings, preamble.timings.length + pad,
+		    repeatingEffect.timings.length);
+		return new VibrationEffect(timings, preamble.timings.length + pad);
+	}
+
+	/**
+	 * AOSP WaveformEnvelopeBuilder: control points of amplitude and frequency (PWLE). ATL's vibrator has no envelope
+	 * control (Vibrator.areEnvelopeEffectsSupported() is false), so the built effect is the one that vibrates for no
+	 * time, as for a composition; the checks of AOSP's PwleSegment.validate() are made.
+	 */
+	public static final class WaveformEnvelopeBuilder {
+		private final java.util.ArrayList<float[]> mSegments = new java.util.ArrayList<>(); // startA, endA, startF, endF, duration
+		private float mLastAmplitude = 0f;
+		private float mLastFrequencyHz = Float.NaN;
+
+		public WaveformEnvelopeBuilder() {}
+
+		public WaveformEnvelopeBuilder setInitialFrequencyHz(float initialFrequencyHz) {
+			if (mSegments.isEmpty()) {
+				mLastFrequencyHz = initialFrequencyHz;
+			} else {
+				mSegments.get(0)[2] = initialFrequencyHz;
+			}
+			return this;
+		}
+
+		public WaveformEnvelopeBuilder addControlPoint(float amplitude, float frequencyHz, long durationMillis) {
+			if (Float.isNaN(mLastFrequencyHz)) {
+				mLastFrequencyHz = frequencyHz;
+			}
+			mSegments.add(new float[] {mLastAmplitude, amplitude, mLastFrequencyHz, frequencyHz, durationMillis});
+			mLastAmplitude = amplitude;
+			mLastFrequencyHz = frequencyHz;
+			return this;
+		}
+
+		public VibrationEffect build() {
+			if (mSegments.isEmpty()) {
+				throw new IllegalStateException("WaveformEnvelopeBuilder must have at least one control point to build.");
+			}
+			for (float[] s : mSegments) {
+				com.android.internal.util.Preconditions.checkArgumentPositive(s[2], "Start frequency must be greater than zero.");
+				com.android.internal.util.Preconditions.checkArgumentPositive(s[3], "End frequency must be greater than zero.");
+				com.android.internal.util.Preconditions.checkArgumentPositive(s[4], "Time must be greater than zero.");
+				com.android.internal.util.Preconditions.checkArgumentInRange(s[0], 0f, 1f, "startAmplitude");
+				com.android.internal.util.Preconditions.checkArgumentInRange(s[1], 0f, 1f, "endAmplitude");
+			}
+			return new VibrationEffect(new long[] {0}, -1);
+		}
+	}
+
+	/**
+	 * AOSP BasicEnvelopeBuilder: control points of intensity and sharpness; no envelope control in ATL, see
+	 * WaveformEnvelopeBuilder. AOSP's BasicPwleSegment.validate() and the zero-intensity end are checked.
+	 */
+	public static final class BasicEnvelopeBuilder {
+		private final java.util.ArrayList<float[]> mSegments = new java.util.ArrayList<>(); // startI, endI, startS, endS, duration
+		private float mLastIntensity = 0f;
+		private float mLastSharpness = Float.NaN;
+
+		public BasicEnvelopeBuilder() {}
+
+		public BasicEnvelopeBuilder setInitialSharpness(float initialSharpness) {
+			if (mSegments.isEmpty()) {
+				mLastSharpness = initialSharpness;
+			} else {
+				mSegments.get(0)[2] = initialSharpness;
+			}
+			return this;
+		}
+
+		public BasicEnvelopeBuilder addControlPoint(float intensity, float sharpness, long durationMillis) {
+			if (Float.isNaN(mLastSharpness)) {
+				mLastSharpness = sharpness;
+			}
+			mSegments.add(new float[] {mLastIntensity, intensity, mLastSharpness, sharpness, durationMillis});
+			mLastIntensity = intensity;
+			mLastSharpness = sharpness;
+			return this;
+		}
+
+		public VibrationEffect build() {
+			if (mSegments.isEmpty()) {
+				throw new IllegalStateException("BasicEnvelopeBuilder must have at least one control point to build.");
+			}
+			if (mSegments.get(mSegments.size() - 1)[1] != 0) {
+				throw new IllegalStateException("Basic envelope effects must end at a zero intensity control point.");
+			}
+			for (float[] s : mSegments) {
+				com.android.internal.util.Preconditions.checkArgumentInRange(s[2], 0f, 1f, "startSharpness");
+				com.android.internal.util.Preconditions.checkArgumentInRange(s[3], 0f, 1f, "endSharpness");
+				com.android.internal.util.Preconditions.checkArgumentInRange(s[0], 0f, 1f, "startIntensity");
+				com.android.internal.util.Preconditions.checkArgumentInRange(s[1], 0f, 1f, "endIntensity");
+				com.android.internal.util.Preconditions.checkArgumentPositive(s[4], "Time must be greater than zero.");
+			}
+			return new VibrationEffect(new long[] {0}, -1);
+		}
 	}
 
 	public static final int DEFAULT_AMPLITUDE = -1;

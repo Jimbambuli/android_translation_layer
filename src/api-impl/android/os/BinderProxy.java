@@ -111,4 +111,25 @@ public final class BinderProxy implements IBinder {
 			}
 		}
 	}
+
+	/* AOSP BinderProxy keeps the wrapped callbacks and hands them to the binder driver, which reports when the
+	 * process behind the proxy is frozen. ATL's processes are never frozen, so the callbacks are only kept and
+	 * never called. */
+	private final java.util.Map<FrozenStateChangeCallback, FrozenStateChangeCallback> mFrozenStateChangeCallbacks =
+	    java.util.Collections.synchronizedMap(new java.util.HashMap<>());
+
+	public void addFrozenStateChangeCallback(java.util.concurrent.Executor executor, FrozenStateChangeCallback callback)
+	    throws RemoteException {
+		FrozenStateChangeCallback wrappedCallback =
+		    (who, state) -> executor.execute(() -> callback.onFrozenStateChanged(who, state));
+		mFrozenStateChangeCallbacks.put(callback, wrappedCallback);
+	}
+
+	public boolean removeFrozenStateChangeCallback(FrozenStateChangeCallback callback) throws IllegalArgumentException {
+		FrozenStateChangeCallback wrappedCallback = mFrozenStateChangeCallbacks.remove(callback);
+		if (wrappedCallback == null) {
+			throw new IllegalArgumentException("callback not found");
+		}
+		return true;
+	}
 }

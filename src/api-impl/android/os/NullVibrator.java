@@ -12,6 +12,12 @@ public class NullVibrator extends Vibrator {
 		return false;
 	}
 
+	/* AOSP: VibratorInfo.EMPTY_VIBRATOR_INFO has id -1, "this service is not attached to any physical vibrator" */
+	@Override
+	public int getId() {
+		return -1;
+	}
+
 	@Override
 	public void vibrate(long millis) {}
 

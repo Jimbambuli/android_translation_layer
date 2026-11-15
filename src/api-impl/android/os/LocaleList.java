@@ -116,10 +116,10 @@ public final class LocaleList implements Parcelable {
 	public int describeContents() {
 		return 0;
 	}
-	/*@Override
-	    public void writeToParcel(Parcel dest, int parcelableFlags) {
-		    dest.writeString8(mStringRepresentation);
-	    }*/
+	/* AOSP LocaleList.writeToParcel() */
+	public void writeToParcel(Parcel dest, int parcelableFlags) {
+		dest.writeString8(mStringRepresentation);
+	}
 	/**
 	 * Retrieves a String representation of the language tags in this list.
 	 */
@@ -227,8 +227,7 @@ public final class LocaleList implements Parcelable {
 	public static final Parcelable.Creator<LocaleList> CREATOR = new Parcelable.Creator<LocaleList>() {
 		//@Override
 		public LocaleList createFromParcel(Parcel source) {
-			return null;
-			// return LocaleList.forLanguageTags(source.readString8());
+			return LocaleList.forLanguageTags(source.readString8());
 		}
 		//@Override
 		public LocaleList[] newArray(int size) {

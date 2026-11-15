@@ -95,6 +95,20 @@ public final class SQLiteDatabaseConfiguration {
 	 */
 	public final ArrayList<android.util.Pair<String, Object[]>> perConnectionSql = new ArrayList<>();
 
+	/* AOSP: SQLite lookaside buffer slot size and count, -1 keeps SQLite's defaults */
+	/* AOSP: requested journal and synchronous mode (null = platform default), see SQLiteDatabase.OpenParams */
+	public String journalMode;
+	public String syncMode;
+
+	public int lookasideSlotSize = -1;
+	public int lookasideSlotCount = -1;
+
+	/* AOSP: idle connection timeout in ms, Long.MAX_VALUE = never */
+	public long idleConnectionTimeoutMs = Long.MAX_VALUE;
+
+	public final java.util.HashMap<String, java.util.function.UnaryOperator<String>> customScalarFunctions = new java.util.HashMap<>();
+	public final java.util.HashMap<String, java.util.function.BinaryOperator<String>> customAggregateFunctions = new java.util.HashMap<>();
+
 	public final ArrayList<SQLiteCustomFunction> customFunctions =
 	    new ArrayList<SQLiteCustomFunction>();
 
@@ -153,6 +167,15 @@ public final class SQLiteDatabaseConfiguration {
 		maxSqlCacheSize = other.maxSqlCacheSize;
 		locale = other.locale;
 		foreignKeyConstraintsEnabled = other.foreignKeyConstraintsEnabled;
+		journalMode = other.journalMode;
+		syncMode = other.syncMode;
+		lookasideSlotSize = other.lookasideSlotSize;
+		lookasideSlotCount = other.lookasideSlotCount;
+		idleConnectionTimeoutMs = other.idleConnectionTimeoutMs;
+		customScalarFunctions.clear();
+		customScalarFunctions.putAll(other.customScalarFunctions);
+		customAggregateFunctions.clear();
+		customAggregateFunctions.putAll(other.customAggregateFunctions);
 		customFunctions.clear();
 		customFunctions.addAll(other.customFunctions);
 		perConnectionSql.clear();

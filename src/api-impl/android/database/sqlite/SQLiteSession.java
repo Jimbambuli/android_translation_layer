@@ -376,6 +376,56 @@ public final class SQLiteSession {
 		throwIfTransactionMarkedSuccessful();
 
 		mTransactionStack.mMarkedSuccessful = true;
+		// AOSP: close open dependents (raw statements), since the transaction ends next
+		closeOpenDependents();
+	}
+
+	/* AOSP SQLiteSession: persistent statements of SQLiteRawStatement, closed when the transaction ends */
+	private final java.util.ArrayDeque<java.io.Closeable> mOpenDependents = new java.util.ArrayDeque<>();
+
+	SQLiteConnection.PreparedStatement acquirePersistentStatement(String query, java.io.Closeable dependent) {
+		throwIfNoTransaction();
+		throwIfTransactionMarkedSuccessful();
+		mOpenDependents.addFirst(dependent);
+		try {
+			return mConnection.acquirePersistentStatement(query);
+		} catch (Throwable e) {
+			mOpenDependents.remove(dependent);
+			throw e;
+		}
+	}
+
+	void releasePersistentStatement(SQLiteConnection.PreparedStatement statement, java.io.Closeable dependent) {
+		mConnection.releasePreparedStatement(statement);
+		mOpenDependents.remove(dependent);
+	}
+
+	void closeOpenDependents() {
+		while (mOpenDependents.size() > 0) {
+			final java.io.Closeable dependent = mOpenDependents.pollFirst();
+			if (dependent != null) {
+				try {
+					dependent.close();
+				} catch (java.io.IOException e) {
+					// Swallow the exception.
+				}
+			}
+		}
+	}
+
+	long getLastInsertRowId() {
+		throwIfNoTransaction();
+		return mConnection.getLastInsertRowId();
+	}
+
+	long getLastChangedRowCount() {
+		throwIfNoTransaction();
+		return mConnection.getLastChangedRowCount();
+	}
+
+	long getTotalChangedRowCount() {
+		throwIfNoTransaction();
+		return mConnection.getTotalChangedRowCount();
 	}
 
 	/**
@@ -412,6 +462,8 @@ public final class SQLiteSession {
 
 		final Transaction top = mTransactionStack;
 		boolean successful = (top.mMarkedSuccessful || yielding) && !top.mChildFailed;
+		// AOSP: close all dependents before anything that might throw (insurance, no-op when already closed)
+		closeOpenDependents();
 
 		RuntimeException listenerException = null;
 		final SQLiteTransactionListener listener = top.mListener;
@@ -914,7 +966,7 @@ public final class SQLiteSession {
 		}
 	}
 
-	private void throwIfNoTransaction() {
+	void throwIfNoTransaction() {
 		if (mTransactionStack == null) {
 			throw new IllegalStateException("Cannot perform this operation because "
 			                                + "there is no current transaction.");

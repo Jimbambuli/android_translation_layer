@@ -137,6 +137,53 @@ public class RemoteViews implements Parcelable, Cloneable {
 		initializeFrom(src);
 	}
 
+	private boolean mHasDrawInstructions;
+	private DrawInstructions mDrawInstructions;
+
+	/** AOSP RemoteViews(DrawInstructions): the instructions are kept; ATL has no RemoteCompose player to apply them */
+	public RemoteViews(DrawInstructions drawInstructions) {
+		java.util.Objects.requireNonNull(drawInstructions);
+		mHasDrawInstructions = true;
+		mDrawInstructions = drawInstructions;
+	}
+
+	/** AOSP RemoteViews.hasDrawInstructions() */
+	public boolean hasDrawInstructions() {
+		return mHasDrawInstructions;
+	}
+
+	/** AOSP RemoteViews.DrawInstructions (CoreDocument.DOCUMENT_API_LEVEL = 8 in Android 16) */
+	public static final class DrawInstructions {
+		final java.util.List<byte[]> mInstructions;
+
+		private DrawInstructions() {
+			throw new UnsupportedOperationException("DrawInstructions cannot be instantiate without instructions");
+		}
+
+		private DrawInstructions(java.util.List<byte[]> instructions) {
+			mInstructions = new java.util.ArrayList<>(instructions.size());
+			for (byte[] instruction : instructions) {
+				mInstructions.add(instruction.clone());
+			}
+		}
+
+		public static long getSupportedVersion() {
+			return 8L;
+		}
+
+		public static final class Builder {
+			private final java.util.List<byte[]> mInstructions;
+
+			public Builder(final java.util.List<byte[]> instructions) {
+				mInstructions = new java.util.ArrayList<>(instructions);
+			}
+
+			public DrawInstructions build() {
+				return new DrawInstructions(mInstructions);
+			}
+		}
+	}
+
 	/** AOSP RemoteViews(Parcel) */
 	public RemoteViews(Parcel parcel) {
 		int mode = parcel.readInt();

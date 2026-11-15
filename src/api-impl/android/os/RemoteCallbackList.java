@@ -21,6 +21,7 @@ import android.util.ArrayMap;
 import android.util.Slog;
 
 import java.io.PrintWriter;
+import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -62,6 +63,97 @@ public class RemoteCallbackList<E extends IInterface> {
     private int mBroadcastCount = -1;
     private boolean mKilled = false;
     private StringBuilder mRecentCallers;
+
+    /* AOSP RemoteCallbackList frozen-callee policy: ATL's IBinder has no frozen-state callbacks, so a callee is
+     * never frozen; this is AOSP's path when the kernel does not support frozen notifications (every callback
+     * is invoked immediately), the policy is only kept for the getters */
+    public static final int FROZEN_CALLEE_POLICY_UNSET = 0;
+    public static final int FROZEN_CALLEE_POLICY_ENQUEUE_ALL = 1;
+    public static final int FROZEN_CALLEE_POLICY_ENQUEUE_MOST_RECENT = 2;
+    public static final int FROZEN_CALLEE_POLICY_DROP = 3;
+
+    private static final int DEFAULT_MAX_QUEUE_SIZE = 1000;
+
+    private final int mFrozenCalleePolicy;
+    private final int mMaxQueueSize;
+    private final Executor mExecutor;
+
+    /* AOSP RemoteCallbackList(): FROZEN_CALLEE_POLICY_UNSET */
+    public RemoteCallbackList() {
+        this(FROZEN_CALLEE_POLICY_UNSET, DEFAULT_MAX_QUEUE_SIZE, null);
+    }
+
+    private RemoteCallbackList(int frozenCalleePolicy, int maxQueueSize, Executor executor) {
+        mFrozenCalleePolicy = frozenCalleePolicy;
+        mMaxQueueSize = maxQueueSize;
+        mExecutor = executor;
+    }
+
+    /* AOSP RemoteCallbackList.Builder */
+    public static final class Builder<E extends IInterface> {
+        private int mFrozenCalleePolicy;
+        private int mMaxQueueSize = DEFAULT_MAX_QUEUE_SIZE;
+        private InterfaceDiedCallback<E> mInterfaceDiedCallback;
+        private Executor mExecutor;
+
+        public Builder(int frozenCalleePolicy) {
+            mFrozenCalleePolicy = frozenCalleePolicy;
+        }
+
+        public Builder<E> setMaxQueueSize(int maxQueueSize) {
+            if (maxQueueSize <= 0) {
+                throw new IllegalArgumentException("maxQueueSize must be positive");
+            }
+            if (mFrozenCalleePolicy != FROZEN_CALLEE_POLICY_ENQUEUE_ALL) {
+                throw new UnsupportedOperationException(
+                        "setMaxQueueSize can only be called for FROZEN_CALLEE_POLICY_ENQUEUE_ALL");
+            }
+            mMaxQueueSize = maxQueueSize;
+            return this;
+        }
+
+        public Builder<E> setInterfaceDiedCallback(InterfaceDiedCallback<E> callback) {
+            mInterfaceDiedCallback = callback;
+            return this;
+        }
+
+        public Builder<E> setExecutor(Executor executor) {
+            mExecutor = executor;
+            return this;
+        }
+
+        public interface InterfaceDiedCallback<E extends IInterface> {
+            void onInterfaceDied(RemoteCallbackList<E> remoteCallbackList, E deadInterface, Object cookie);
+        }
+
+        public RemoteCallbackList<E> build() {
+            Executor executor = mExecutor;
+            if (executor == null && mFrozenCalleePolicy != FROZEN_CALLEE_POLICY_UNSET) {
+                executor = new HandlerExecutor(new Handler(Looper.getMainLooper()));
+            }
+            if (mInterfaceDiedCallback != null) {
+                return new RemoteCallbackList<E>(mFrozenCalleePolicy, mMaxQueueSize, executor) {
+                    @Override
+                    public void onCallbackDied(E deadInterface, Object cookie) {
+                        mInterfaceDiedCallback.onInterfaceDied(this, deadInterface, cookie);
+                    }
+                };
+            }
+            return new RemoteCallbackList<E>(mFrozenCalleePolicy, mMaxQueueSize, executor);
+        }
+    }
+
+    public int getFrozenCalleePolicy() {
+        return mFrozenCalleePolicy;
+    }
+
+    public int getMaxQueueSize() {
+        return mMaxQueueSize;
+    }
+
+    public Executor getExecutor() {
+        return mExecutor;
+    }
 
     private final class Callback implements IBinder.DeathRecipient {
         final E mCallback;

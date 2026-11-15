@@ -892,9 +892,126 @@ public final class Debug {
 	public static void waitForDebugger() {
 	}
 
+	/* AOSP Debug.InstructionCount: all methods are stubs in AOSP too */
 	public static class InstructionCount {
 		public InstructionCount() {
 		}
+
+		public boolean resetAndStart() {
+			return false;
+		}
+
+		public boolean collect() {
+			return false;
+		}
+
+		public int globalTotal() {
+			return 0;
+		}
+
+		public int globalMethodInvocations() {
+			return 0;
+		}
+	}
+
+	/* AOSP Debug.changeDebugPort(): empty */
+	public static void changeDebugPort(int port) {}
+
+	/* AOSP Debug.enableEmulatorTraceOutput() */
+	public static void enableEmulatorTraceOutput() {
+		android.util.Log.w("Debug", "Unimplemented");
+	}
+
+	/* AOSP counts class initialisations in the runtime (VMDebug); ATL's runtime does not, so they stay 0 */
+	public static int getGlobalClassInitCount() {
+		return 0;
+	}
+
+	public static void resetGlobalClassInitCount() {}
+
+	public static int getGlobalClassInitTime() {
+		return 0;
+	}
+
+	public static void resetGlobalClassInitTime() {}
+
+	/* AOSP Debug.setAllocationLimit()/setGlobalAllocationLimit(): not implemented, -1 */
+	public static int setAllocationLimit(int limit) {
+		return -1;
+	}
+
+	public static int setGlobalAllocationLimit(int limit) {
+		return -1;
+	}
+
+	/* AOSP counts live instances by walking the ART heap (VMDebug.countInstancesOfClass); the JVM has no such call,
+	 * so the count is 0 */
+	public static long getInstanceCount(Class cls) {
+		return getInstanceCount(cls, true);
+	}
+
+	public static long getInstanceCount(Class cls, boolean includeAssignable) {
+		return 0;
+	}
+
+	public static long[] getInstanceCounts(java.util.List<Class> classes) {
+		return getInstanceCounts(classes, true);
+	}
+
+	public static long[] getInstanceCounts(java.util.List<Class> classes, boolean includeAssignable) {
+		return new long[classes.size()];
+	}
+
+	/* AOSP Debug.dumpService(): false if there is no such service */
+	public static boolean dumpService(String name, java.io.FileDescriptor fd, String[] args) {
+		IBinder service = ServiceManager.getService(name);
+		if (service == null) {
+			android.util.Log.e("Debug", "Can't find service to dump: " + name);
+			return false;
+		}
+		try {
+			service.dump(fd, args);
+			return true;
+		} catch (RemoteException e) {
+			android.util.Log.e("Debug", "Can't dump service: " + name, e);
+			return false;
+		}
+	}
+
+	/* AOSP Debug.attachJvmtiAgent(): checks the arguments, then VMDebug.attachAgent() throws IOException when the
+	 * runtime cannot attach the agent; ATL's runtime has no JVMTI agent loading */
+	public static void attachJvmtiAgent(String library, String options, ClassLoader classLoader) throws IOException {
+		if (library == null) {
+			throw new NullPointerException();
+		}
+		if (library.contains("=")) {
+			throw new IllegalArgumentException();
+		}
+		throw new IOException("JVMTI agents cannot be attached");
+	}
+
+	/* AOSP Debug.getPss()/getRss() (native): proportional / resident set size of this process in kB, here from
+	 * /proc/self/smaps_rollup */
+	public static long getPss() {
+		return readSmapsRollup("Pss:");
+	}
+
+	public static long getRss() {
+		return readSmapsRollup("Rss:");
+	}
+
+	private static long readSmapsRollup(String key) {
+		try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader("/proc/self/smaps_rollup"))) {
+			String line;
+			while ((line = r.readLine()) != null) {
+				if (line.startsWith(key)) {
+					String[] f = line.trim().split("\\s+");
+					return Long.parseLong(f[1]);
+				}
+			}
+		} catch (IOException | RuntimeException e) {
+		}
+		return 0;
 	}
 
 	public static boolean isDebuggerConnected() {

@@ -18,8 +18,26 @@ public final class Ndef extends BasicTagTechnology {
 	public static final String EXTRA_NDEF_CARDSTATE = "ndefcardstate";
 	public static final String EXTRA_NDEF_TYPE = "ndeftype";
 
+	public static final int TYPE_OTHER = -1;
+	public static final int TYPE_1 = 1;
+	public static final int TYPE_2 = 2;
+	public static final int TYPE_3 = 3;
+	public static final int TYPE_4 = 4;
+	public static final int TYPE_MIFARE_CLASSIC = 101;
+	public static final int TYPE_ICODE_SLI = 102;
+
+	public static final String UNKNOWN = "android.ndef.unknown";
+	public static final String NFC_FORUM_TYPE_1 = "org.nfcforum.ndef.type1";
+	public static final String NFC_FORUM_TYPE_2 = "org.nfcforum.ndef.type2";
+	public static final String NFC_FORUM_TYPE_3 = "org.nfcforum.ndef.type3";
+	public static final String NFC_FORUM_TYPE_4 = "org.nfcforum.ndef.type4";
+	public static final String MIFARE_CLASSIC = "com.nxp.ndef.mifareclassic";
+	public static final String ICODE_SLI = "com.nxp.ndef.icodesli";
+
 	private final int mMaxNdefSize;
 	private final int mCardState;
+	private final NdefMessage mNdefMsg;
+	private final int mNdefType;
 
 	/* AOSP Ndef.get(): null if the tag lacks the NDEF technology */
 	public static Ndef get(Tag tag) {
@@ -35,8 +53,33 @@ public final class Ndef extends BasicTagTechnology {
 		if (extras != null) {
 			mMaxNdefSize = extras.getInt(EXTRA_NDEF_MAXLENGTH);
 			mCardState = extras.getInt(EXTRA_NDEF_CARDSTATE);
+			mNdefMsg = extras.getParcelable(EXTRA_NDEF_MSG, NdefMessage.class);
+			mNdefType = extras.getInt(EXTRA_NDEF_TYPE);
 		} else {
 			throw new NullPointerException("NDEF tech extras are null.");
+		}
+	}
+
+	public NdefMessage getCachedNdefMessage() {
+		return mNdefMsg;
+	}
+
+	public String getType() {
+		switch (mNdefType) {
+			case TYPE_1:
+				return NFC_FORUM_TYPE_1;
+			case TYPE_2:
+				return NFC_FORUM_TYPE_2;
+			case TYPE_3:
+				return NFC_FORUM_TYPE_3;
+			case TYPE_4:
+				return NFC_FORUM_TYPE_4;
+			case TYPE_MIFARE_CLASSIC:
+				return MIFARE_CLASSIC;
+			case TYPE_ICODE_SLI:
+				return ICODE_SLI;
+			default:
+				return UNKNOWN;
 		}
 	}
 
@@ -53,5 +96,22 @@ public final class Ndef extends BasicTagTechnology {
 	public void writeNdefMessage(NdefMessage msg) throws IOException, FormatException {
 		checkConnected();
 		throw new IOException("Mock tags don't support this operation.");
+	}
+
+	/* AOSP getNdefMessage(): checkConnected() first, a mock tag has no service */
+	public NdefMessage getNdefMessage() throws IOException, FormatException {
+		checkConnected();
+		throw new IOException("Mock tags don't support this operation.");
+	}
+
+	/* AOSP canMakeReadOnly(): false without a tag service */
+	public boolean canMakeReadOnly() {
+		return false;
+	}
+
+	/* AOSP makeReadOnly(): checkConnected() first, then false without a tag service */
+	public boolean makeReadOnly() throws IOException {
+		checkConnected();
+		return false;
 	}
 }

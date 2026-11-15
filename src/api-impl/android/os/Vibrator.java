@@ -86,6 +86,62 @@ public class Vibrator {
 		return supported;
 	}
 
+	/* AOSP areAllEffectsSupported(): NO if one effect is, UNKNOWN if one is unknown, else YES */
+	public final int areAllEffectsSupported(int... effectIds) {
+		int allSupported = VIBRATION_EFFECT_SUPPORT_YES;
+		for (int support : areEffectsSupported(effectIds)) {
+			switch (support) {
+				case VIBRATION_EFFECT_SUPPORT_NO:
+					return VIBRATION_EFFECT_SUPPORT_NO;
+				case VIBRATION_EFFECT_SUPPORT_YES:
+					continue;
+				default:
+					allSupported = VIBRATION_EFFECT_SUPPORT_UNKNOWN;
+					break;
+			}
+		}
+		return allSupported;
+	}
+
+	/* AOSP arePrimitivesSupported(): VibratorInfo.isPrimitiveSupported(), false for all as in areAllPrimitivesSupported() */
+	public boolean[] arePrimitivesSupported(int... primitiveIds) {
+		return new boolean[primitiveIds.length];
+	}
+
+	/* AOSP getPrimitiveDurations(): VibratorInfo.getPrimitiveDuration() is 0 for a primitive that is not supported */
+	public int[] getPrimitiveDurations(int... primitiveIds) {
+		return new int[primitiveIds.length];
+	}
+
+	/* AOSP areEnvelopeEffectsSupported(): the motor has no envelope (PWLE) control */
+	public boolean areEnvelopeEffectsSupported() {
+		return false;
+	}
+
+	/* AOSP getEnvelopeEffectInfo(): the limits of VibratorInfo without envelope support are all 0 */
+	public android.os.vibrator.VibratorEnvelopeEffectInfo getEnvelopeEffectInfo() {
+		return new android.os.vibrator.VibratorEnvelopeEffectInfo(0, 0, 0);
+	}
+
+	/* AOSP getFrequencyProfile(): null "if the vibrator does not have frequency control" */
+	public android.os.vibrator.VibratorFrequencyProfile getFrequencyProfile() {
+		return null;
+	}
+
+	/* AOSP getId(): the id of the vibrator behind this object, as VibratorManager.getVibratorIds() lists it */
+	public int getId() {
+		return 0;
+	}
+
+	/* AOSP getResonantFrequency()/getQFactor(): NaN "if it's unknown, not applicable" */
+	public float getResonantFrequency() {
+		return Float.NaN;
+	}
+
+	public float getQFactor() {
+		return Float.NaN;
+	}
+
 	/* AOSP vibrate(long, AudioAttributes): errors of the one-shot effect are only logged (pre-O behaviour) */
 	public void vibrate(long milliseconds, android.media.AudioAttributes attributes) {
 		try {

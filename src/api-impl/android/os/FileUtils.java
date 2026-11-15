@@ -110,4 +110,13 @@ public final class FileUtils {
 	                        ProgressListener listener) throws IOException {
 		return copy(new FileInputStream(in), new FileOutputStream(out), signal, executor, listener);
 	}
+
+	/* AOSP FileUtils.closeQuietly(): both just call libcore.io.IoUtils */
+	public static void closeQuietly(AutoCloseable closeable) {
+		libcore.io.IoUtils.closeQuietly(closeable);
+	}
+
+	public static void closeQuietly(FileDescriptor fd) {
+		libcore.io.IoUtils.closeQuietly(fd);
+	}
 }
