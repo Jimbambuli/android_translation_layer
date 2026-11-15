@@ -2,9 +2,10 @@ package android.view;
 
 import android.graphics.Canvas;
 
-public class DisplayListCanvas extends Canvas {
+/* AOSP DisplayListCanvas: every canvas ATL records into is a GskCanvas, which draws the node */
+public abstract class DisplayListCanvas extends Canvas {
 
-	public void drawRenderNode(RenderNode node) {}
+	public abstract void drawRenderNode(RenderNode node);
 
 	@Override
 	public boolean isHardwareAccelerated() {

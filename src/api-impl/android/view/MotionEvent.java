@@ -2350,8 +2350,7 @@ public final class MotionEvent extends InputEvent {
 	 * @see #AXIS_ORIENTATION
 	 */
 	public final float getOrientation(int pointerIndex) {
-		return 0; // arbitrary
-			  //		return nativeGetAxisValue(mNativePtr, AXIS_ORIENTATION, pointerIndex, HISTORY_CURRENT);
+		return nativeGetAxisValue(mNativePtr, AXIS_ORIENTATION, pointerIndex, HISTORY_CURRENT);
 	}
 
 	/**
@@ -2434,6 +2433,13 @@ public final class MotionEvent extends InputEvent {
 	 * @see #BUTTON_FORWARD
 	 * @see #BUTTON_BACK
 	 */
+	/* AOSP MotionEvent.isButtonPressed() */
+	public final boolean isButtonPressed(int button) {
+		if (button == 0)
+			return false;
+		return (getButtonState() & button) == button;
+	}
+
 	public final int getButtonState() {
 		// return nativeGetButtonState(mNativePtr);
 		if (getToolType(0) == TOOL_TYPE_MOUSE)

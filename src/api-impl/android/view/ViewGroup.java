@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -39,6 +40,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	private static final int FLAG_ADD_STATES_FROM_CHILDREN = 0x2000;
 	private static final int FLAG_MASK_FOCUSABILITY  = (3 << 17);
 	public static final int FOCUS_BEFORE_DESCENDANTS = (1 << 17);
+
+	/* AOSP ViewGroup.PERSISTENT_* (setPersistentDrawingCache()) */
+	public static final int PERSISTENT_NO_CACHE = 0x0;
+	public static final int PERSISTENT_ANIMATION_CACHE = 0x1;
+	public static final int PERSISTENT_SCROLLING_CACHE = 0x2;
+	public static final int PERSISTENT_ALL_CACHES = 0x3;
 	public static final int FOCUS_AFTER_DESCENDANTS  = (2 << 17);
 	public static final int FOCUS_BLOCK_DESCENDANTS  = (3 << 17);
 	@UnsupportedAppUsage
@@ -87,6 +94,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (a.getBoolean(com.android.internal.R.styleable.ViewGroup_touchscreenBlocksFocus, false))
 			setTouchscreenBlocksFocus(true);
 		setClipChildren(a.getBoolean(com.android.internal.R.styleable.ViewGroup_clipChildren, true));
+		/* AOSP ViewGroup.initFromAttributes(): android:layoutAnimation */
+		int layoutAnimationId = a.getResourceId(com.android.internal.R.styleable.ViewGroup_layoutAnimation, -1);
+		if (layoutAnimationId > 0)
+			setLayoutAnimation(android.view.animation.AnimationUtils.loadLayoutAnimation(context, layoutAnimationId));
 		a.recycle();
 	}
 
@@ -616,7 +627,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (child.hasTransientState()) {
 			childHasTransientStateChanged(child, false);
 		}
-		child.parent = null;
+		// AOSP ViewGroup.removeFromArray(): a transitioning view keeps its parent until endViewTransition()
+		if (!(mTransitioningViews != null && mTransitioningViews.contains(child))) {
+			child.parent = null;
+		}
 		children.remove(index);
 		native_removeView(widget, child.widget);
 	}
@@ -661,8 +675,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	private void removeViewInternal(int index, View view) {
-		// like AOSP's mAttachInfo != null: dispatchDetachedFromWindow() does nothing for a detached view
-		view.dispatchDetachedFromWindow();
+		/* AOSP ViewGroup.removeViewInternal(): a transitioning view stays attached until endViewTransition()
+		 * (the view animation half of that check is not taken over; ATL detaches animated views at once) */
+		if (mTransitioningViews != null && mTransitioningViews.contains(view)) {
+			addDisappearingView(view);
+		} else {
+			// like AOSP's mAttachInfo != null: dispatchDetachedFromWindow() does nothing for a detached view
+			view.dispatchDetachedFromWindow();
+		}
 
 		removeFromArray(index);
 
@@ -679,7 +699,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		for (int i = start; i < end; i++) {
 			final View view = children.get(i);
 
-			view.dispatchDetachedFromWindow();
+			if (mTransitioningViews != null && mTransitioningViews.contains(view)) {
+				addDisappearingView(view);
+			} else {
+				view.dispatchDetachedFromWindow();
+			}
 
 			dispatchViewRemoved(view);
 		}
@@ -704,7 +728,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		for (int i = count - 1; i >= 0; i--) {
 			final View view = children.get(i);
 
-			view.dispatchDetachedFromWindow();
+			if (mTransitioningViews != null && mTransitioningViews.contains(view)) {
+				addDisappearingView(view);
+			} else {
+				view.dispatchDetachedFromWindow();
+			}
 
 			dispatchViewRemoved(view);
 
@@ -890,7 +918,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return children.size();
 	}
 
-	public void setMotionEventSplittingEnabled(boolean enabled) {}
+	/* AOSP ViewGroup.setMotionEventSplittingEnabled()/isMotionEventSplittingEnabled(): FLAG_SPLIT_MOTION_EVENTS,
+	 * on by default (targetSdk >= HONEYCOMB); ATL's touch dispatch does not split pointers, so it is only kept */
+	private boolean mSplitMotionEvents = true;
+	public void setMotionEventSplittingEnabled(boolean enabled) {
+		mSplitMotionEvents = enabled;
+	}
+	public boolean isMotionEventSplittingEnabled() {
+		return mSplitMotionEvents;
+	}
 
 	public void setOnHierarchyChangeListener(OnHierarchyChangeListener listener) {
 		this.onHierarchyChangeListener = listener;
@@ -1403,8 +1439,44 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
-	public void startViewTransition(View view) {}
-	public void endViewTransition(View view) {}
+	private ArrayList<View> mTransitioningViews;
+	/* AOSP keeps the disappearing views drawn; ATL removes the GTK widget at once in removeFromArray(), so this
+	 * list only carries the attach/parent state from removal until endViewTransition() */
+	private ArrayList<View> mDisappearingChildren;
+
+	private void addDisappearingView(View v) {
+		if (mDisappearingChildren == null) {
+			mDisappearingChildren = new ArrayList<View>();
+		}
+		mDisappearingChildren.add(v);
+	}
+
+	// AOSP ViewGroup.startViewTransition()
+	public void startViewTransition(View view) {
+		if (view.parent == this) {
+			if (mTransitioningViews == null) {
+				mTransitioningViews = new ArrayList<View>();
+			}
+			mTransitioningViews.add(view);
+		}
+	}
+
+	/* AOSP ViewGroup.endViewTransition(); mVisibilityChangingChildren (LayoutTransition.hideChild) is not
+	 * taken over, ATL's onChildVisibilityChanged() does not add to the disappearing views */
+	public void endViewTransition(View view) {
+		if (mTransitioningViews != null) {
+			mTransitioningViews.remove(view);
+			final ArrayList<View> disappearingChildren = mDisappearingChildren;
+			if (disappearingChildren != null && disappearingChildren.contains(view)) {
+				disappearingChildren.remove(view);
+				view.dispatchDetachedFromWindow();
+				if (view.parent != null) {
+					view.parent = null;
+				}
+				invalidate();
+			}
+		}
+	}
 
 	protected LayoutParams generateDefaultLayoutParams() {
 		return new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -1433,8 +1505,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
+	/* AOSP ViewGroup.onNestedPreFling(): re-dispatch up the tree by default */
 	@Override
 	public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+		return dispatchNestedPreFling(velocityX, velocityY);
+	}
+
+	/* AOSP ViewGroup.dispatchGenericFocusedEvent(): to the focused child, or to this group if it has the focus
+	 * (PFLAG_HAS_BOUNDS as isLaidOut()) */
+	@Override
+	protected boolean dispatchGenericFocusedEvent(MotionEvent event) {
+		if (isFocused() && isLaidOut())
+			return super.dispatchGenericFocusedEvent(event);
+		final View focused = getFocusedChild();
+		if (focused != null && focused.isLaidOut())
+			return focused.dispatchGenericMotionEvent(event);
 		return false;
 	}
 
@@ -1464,6 +1549,44 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				return result;
 		}
 		return null;
+	}
+
+	/* AOSP ViewGroup.setAnimationCacheEnabled()/isAnimationCacheEnabled(),
+	 * setAlwaysDrawnWithCacheEnabled()/isAlwaysDrawnWithCacheEnabled(), setPersistentDrawingCache()/
+	 * getPersistentDrawingCache(): deprecated drawing cache hints, on (SCROLLING) by default as in initViewGroup();
+	 * ATL draws without these caches, so they are only kept */
+	private boolean mAnimationCache = true;
+	private boolean mAlwaysDrawnWithCache = true;
+	private int mPersistentDrawingCache = PERSISTENT_SCROLLING_CACHE;
+
+	public void setAnimationCacheEnabled(boolean enabled) {
+		mAnimationCache = enabled;
+	}
+
+	public boolean isAnimationCacheEnabled() {
+		return mAnimationCache;
+	}
+
+	public void setAlwaysDrawnWithCacheEnabled(boolean always) {
+		mAlwaysDrawnWithCache = always;
+	}
+
+	public boolean isAlwaysDrawnWithCacheEnabled() {
+		return mAlwaysDrawnWithCache;
+	}
+
+	public void setPersistentDrawingCache(int drawingCacheToKeep) {
+		mPersistentDrawingCache = drawingCacheToKeep & PERSISTENT_ALL_CACHES;
+	}
+
+	public int getPersistentDrawingCache() {
+		return mPersistentDrawingCache;
+	}
+
+	/* AOSP ViewGroup.detachAllViewsFromParent(): every child, last first */
+	protected void detachAllViewsFromParent() {
+		for (int i = getChildCount() - 1; i >= 0; i--)
+			detachViewFromParent(getChildAt(i));
 	}
 
 	public void detachViewFromParent(View view) {
@@ -1833,6 +1956,65 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {}
 
+	/* AOSP ViewGroup.getChildVisibleRect(View, Rect, Point, false): the rectangle of the child mapped into this
+	 * group, clipped like the group draws, and on up to the root */
+	public boolean getChildVisibleRect(View child, Rect r, android.graphics.Point offset) {
+		final RectF rect = new RectF();
+		rect.set(r);
+
+		if (!child.hasIdentityMatrix()) {
+			child.getMatrix().mapRect(rect);
+		}
+
+		final int dx = child.getLeft() - getScrollX();
+		final int dy = child.getTop() - getScrollY();
+
+		rect.offset(dx, dy);
+
+		if (offset != null) {
+			if (!child.hasIdentityMatrix()) {
+				float[] position = new float[2];
+				position[0] = offset.x;
+				position[1] = offset.y;
+				child.getMatrix().mapPoints(position);
+				offset.x = Math.round(position[0]);
+				offset.y = Math.round(position[1]);
+			}
+			offset.x += dx;
+			offset.y += dy;
+		}
+
+		final int width = getRight() - getLeft();
+		final int height = getBottom() - getTop();
+
+		boolean rectIsVisible = true;
+		if (parent == null ||
+				(parent instanceof ViewGroup && ((ViewGroup)parent).getClipChildren())) {
+			// Clip to bounds.
+			rectIsVisible = rect.intersect(0, 0, width, height);
+		}
+
+		if (rectIsVisible && getClipToPadding()) {
+			// Clip to padding.
+			rectIsVisible = rect.intersect(getPaddingLeft(), getPaddingTop(),
+					width - getPaddingRight(), height - getPaddingBottom());
+		}
+
+		final Rect clipBounds = getClipBounds();
+		if (rectIsVisible && clipBounds != null) {
+			// Clip to clipBounds.
+			rectIsVisible = rect.intersect(clipBounds.left, clipBounds.top, clipBounds.right,
+					clipBounds.bottom);
+		}
+		r.set((int)Math.floor(rect.left), (int)Math.floor(rect.top),
+				(int)Math.ceil(rect.right), (int)Math.ceil(rect.bottom));
+
+		if (rectIsVisible && parent != null) {
+			rectIsVisible = parent.getChildVisibleRect(this, r, offset);
+		}
+		return rectIsVisible;
+	}
+
 	public boolean getClipChildren() {
 		return clipChildren;
 	}
@@ -2040,6 +2222,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
+	/* AOSP ViewGroup.dispatchSystemUiVisibilityChanged() */
+	@Override
+	public void dispatchSystemUiVisibilityChanged(int visible) {
+		super.dispatchSystemUiVisibilityChanged(visible);
+		for (View child : children) {
+			child.dispatchSystemUiVisibilityChanged(visible);
+		}
+	}
+
 	@Override
 	public void dispatchWindowSystemUiVisiblityChanged(int visible) {
 		super.dispatchWindowSystemUiVisiblityChanged(visible);
@@ -2115,6 +2306,25 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	public CharSequence getAccessibilityClassName() {
 		return ViewGroup.class.getName();
+	}
+
+	/* AOSP ViewGroup.addChildrenForAccessibility(): the visible children in the accessibility tree, and of the
+	 * others their children; in child order, as ATL's other accessibility traversals (AOSP's
+	 * ChildListForAccessibility sorts by position on screen) */
+	@Override
+	public void addChildrenForAccessibility(ArrayList<View> outChildren) {
+		if (getAccessibilityNodeProvider() != null) {
+			return;
+		}
+		for (View child : children) {
+			if (child.getVisibility() == VISIBLE) {
+				if (child.includeForAccessibility()) {
+					outChildren.add(child);
+				} else {
+					child.addChildrenForAccessibility(outChildren);
+				}
+			}
+		}
 	}
 
 	/* AOSP ViewGroup accessibility: a group that is in the tree lets its own view populate the event first, then

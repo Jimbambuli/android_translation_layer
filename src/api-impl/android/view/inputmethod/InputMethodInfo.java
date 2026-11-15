@@ -20,6 +20,28 @@ public final class InputMethodInfo {
 		mSettingsActivity = settingsActivity;
 	}
 
+	/* AOSP InputMethodInfo.loadLabel(): the service's label; the test constructor gives it as the
+	 * ResolveInfo's nonLocalizedLabel */
+	public CharSequence loadLabel(android.content.pm.PackageManager pm) {
+		return mLabel;
+	}
+
+	/* AOSP InputMethodInfo.getServiceInfo(): the ServiceInfo that buildFakeResolveInfo() makes for the test
+	 * constructor (enabled, exported, labelled; its ApplicationInfo only knows the package) */
+	public android.content.pm.ServiceInfo getServiceInfo() {
+		android.content.pm.ServiceInfo si = new android.content.pm.ServiceInfo();
+		android.content.pm.ApplicationInfo ai = new android.content.pm.ApplicationInfo();
+		ai.packageName = mPackageName;
+		ai.enabled = true;
+		si.applicationInfo = ai;
+		si.enabled = true;
+		si.packageName = mPackageName;
+		si.name = mServiceName;
+		si.exported = true;
+		si.nonLocalizedLabel = mLabel;
+		return si;
+	}
+
 	/** The unique id of the input method: the flattened component name of its service */
 	public String getId() {
 		return new ComponentName(mPackageName, mServiceName).flattenToShortString();

@@ -679,9 +679,8 @@ public class KeyCharacterMap {
 	 * at the same index in the key codes array.
 	 */
 	public static boolean[] deviceHasKeys(int[] keyCodes) {
-		//return InputManager.getInstance().deviceHasKeys(keyCodes);
-		System.out.println("deviceHasKeys: FIXME");
-		return null;
+		/* AOSP: one answer per key code (InputManager.deviceHasKeys()); like deviceHasKey(), none here */
+		return new boolean[keyCodes.length];
 	}
 
 	/**

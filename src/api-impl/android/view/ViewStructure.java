@@ -42,6 +42,9 @@ import java.util.List;
  */
 public abstract class ViewStructure {
 
+	/* AOSP 16 ViewStructure.clearCredentialManagerRequest(): empty default */
+	public void clearCredentialManagerRequest() {}
+
 	/**
 	 * Key used for writing active child view information to the content capture bundle.
 	 *

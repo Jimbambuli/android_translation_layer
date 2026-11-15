@@ -23,6 +23,7 @@ import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.BlendMode;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -1079,7 +1080,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* AOSP's mViewFlags for the flags ATL has: ENABLED_MASK, FOCUSABLE_MASK, FOCUSABLE_IN_TOUCH_MODE, CLICKABLE and
 	 * LONG_CLICKABLE (the visibility stays in the visibility field). Unlike AOSP the view starts out FOCUSABLE as well as
 	 * FOCUSABLE_AUTO: GTK decides what a native widget can focus, so isFocusable() stays true until the app says otherwise. */
-	int mViewFlags = ENABLED | FOCUSABLE | FOCUSABLE_AUTO;
+	int mViewFlags = ENABLED | FOCUSABLE | FOCUSABLE_AUTO | HAPTIC_FEEDBACK_ENABLED; /* AOSP View(Context): haptic feedback on */
 
 	private Handler handler;
 	private Animation currentAnimation;
@@ -1094,6 +1095,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		OnGenericMotionListener mOnGenericMotionListener;
 		OnHoverListener mOnHoverListener;
 		OnDragListener mOnDragListener;
+		OnCreateContextMenuListener mOnCreateContextMenuListener;
+		OnSystemUiVisibilityChangeListener mOnSystemUiVisibilityChangeListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -1175,6 +1178,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		@Override
 		public void set(View view, Float value) {
 			view.setAlpha(value);
+		}
+	};
+
+	/* AOSP View.ROTATION_X / ROTATION_Y */
+	public static final Property<View, Float> ROTATION_X = new FloatProperty<View>("rotationX") {
+		@Override
+		public void setValue(View object, float value) {
+			object.setRotationX(value);
+		}
+		@Override
+		public Float get(View object) {
+			return object.getRotationX();
+		}
+	};
+
+	public static final Property<View, Float> ROTATION_Y = new FloatProperty<View>("rotationY") {
+		@Override
+		public void setValue(View object, float value) {
+			object.setRotationY(value);
+		}
+		@Override
+		public Float get(View object) {
+			return object.getRotationY();
 		}
 	};
 
@@ -2004,7 +2030,25 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		on_scroll_change_listener = l;
 	}
 
-	public /*native*/ void setOnSystemUiVisibilityChangeListener(OnSystemUiVisibilityChangeListener l) {}
+	/* AOSP View.PUBLIC_STATUS_BAR_VISIBILITY_MASK, SYSTEM_UI_CLEARABLE_FLAGS */
+	public static final int PUBLIC_STATUS_BAR_VISIBILITY_MASK = 0x00003FF7;
+	public static final int SYSTEM_UI_CLEARABLE_FLAGS = SYSTEM_UI_FLAG_LOW_PROFILE | SYSTEM_UI_FLAG_HIDE_NAVIGATION | SYSTEM_UI_FLAG_FULLSCREEN;
+
+	/* AOSP View.setOnSystemUiVisibilityChangeListener()/dispatchSystemUiVisibilityChanged() */
+	public void setOnSystemUiVisibilityChangeListener(OnSystemUiVisibilityChangeListener l) {
+		getListenerInfo().mOnSystemUiVisibilityChangeListener = l;
+	}
+
+	public void dispatchSystemUiVisibilityChanged(int visibility) {
+		ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnSystemUiVisibilityChangeListener != null) {
+			li.mOnSystemUiVisibilityChangeListener.onSystemUiVisibilityChange(visibility & PUBLIC_STATUS_BAR_VISIBILITY_MASK);
+		}
+	}
+
+	/* AOSP ViewRootImpl.handleDispatchSystemUiVisibilityChanged(): the window's views hear the clearable flags in
+	 * effect, from the main loop and only when they changed; here the flags are in effect as soon as they are set */
+	private int mDispatchedSystemUiVisibility;
 	public final int getWidth() {
 		return right - left;
 	}
@@ -2174,6 +2218,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		   Such a mode doesn't exist on desktop Linux, so we just use normal fullscreen for both modes. */
 		nativeSetFullscreen(widget, (visibility & (View.SYSTEM_UI_FLAG_FULLSCREEN | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)) != 0);
 		system_ui_visibility = visibility;
+		final View root = getRootView();
+		final int clearable = visibility & SYSTEM_UI_CLEARABLE_FLAGS;
+		if (isAttachedToWindow() && root.mDispatchedSystemUiVisibility != clearable) {
+			root.mDispatchedSystemUiVisibility = clearable;
+			root.post(new Runnable() {
+				@Override
+				public void run() {
+					root.dispatchSystemUiVisibilityChanged(clearable);
+				}
+			});
+		}
 	}
 	public int getSystemUiVisibility() {
 		return system_ui_visibility;
@@ -2470,6 +2525,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public boolean performHapticFeedback(int feedbackConstant, int flags) {
+		/* AOSP View.performHapticFeedback(): nothing if the view turned it off, unless FLAG_IGNORE_VIEW_SETTING */
+		if ((flags & 0x0001 /* HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING, no ATL class */) == 0 && !isHapticFeedbackEnabled())
+			return false;
 		// arbitrary; TODO: better mimic what AOSP does
 		Vibrator vibrator = (Vibrator)getContext().getSystemService("vibrator");
 		vibrator.vibrate(10);
@@ -3080,7 +3138,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void makeOptionalFitsSystemWindows() {}
 
 
-	public void setScrollContainer(boolean isScrollContainer) {}
+	/* AOSP View.setScrollContainer()/isScrollContainer(): PFLAG_SCROLL_CONTAINER, counted (PFLAG_SCROLL_CONTAINER_ADDED)
+	 * only while the view is attached; ATL has no AttachInfo list of scroll containers to resize */
+	private boolean mScrollContainer;
+	public void setScrollContainer(boolean isScrollContainer) {
+		mScrollContainer = isScrollContainer;
+	}
+	public boolean isScrollContainer() {
+		return mScrollContainer && isAttachedToWindow();
+	}
 
 	public boolean removeCallbacks(Runnable action) {
 		getHandler().removeCallbacks(action);
@@ -3699,7 +3765,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 
-	public void setOnCreateContextMenuListener(View.OnCreateContextMenuListener l) {}
+	/* AOSP View.setOnCreateContextMenuListener(): makes the view long-clickable and keeps the listener
+	 * (ATL shows no context menus, see showContextMenu()) */
+	public void setOnCreateContextMenuListener(View.OnCreateContextMenuListener l) {
+		if (!isLongClickable())
+			setLongClickable(true);
+		getListenerInfo().mOnCreateContextMenuListener = l;
+	}
 
 	protected void onAnimationStart() {}
 
@@ -4157,9 +4229,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return userPaddingStart != UNDEFINED_PADDING || userPaddingEnd != UNDEFINED_PADDING;
 	}
 
-	/* AOSP's ForegroundInfo, without the tint */
+	/* AOSP's ForegroundInfo, the tint as AOSP's TintInfo fields */
 	private static class ForegroundInfo {
 		private Drawable mDrawable;
+		private ColorStateList mTintList;
+		private BlendMode mBlendMode;
+		private boolean mHasTintList;
+		private boolean mHasTintMode;
 		private int mGravity = Gravity.FILL;
 		private boolean mInsidePadding = true;
 		private final Rect mSelfBounds = new Rect();
@@ -4194,6 +4270,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mForegroundInfo.mDrawable = foreground;
 		if (foreground != null) {
 			native_drawThroughJava(widget);
+			applyForegroundTint();
+			foreground = mForegroundInfo.mDrawable;
 			foreground.setLayoutDirection(getLayoutDirection());
 			if (foreground.isStateful()) {
 				foreground.setState(getDrawableState());
@@ -4206,6 +4284,68 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		requestLayout();
 		invalidate();
+	}
+
+	/* AOSP View.setForegroundTintList()/getForegroundTintList(), setForegroundTintMode()/getForegroundTintMode(),
+	 * setForegroundTintBlendMode()/getForegroundTintBlendMode(), applyForegroundTint() */
+	public void setForegroundTintList(ColorStateList tint) {
+		if (mForegroundInfo == null)
+			mForegroundInfo = new ForegroundInfo();
+		mForegroundInfo.mTintList = tint;
+		mForegroundInfo.mHasTintList = true;
+		applyForegroundTint();
+	}
+
+	public ColorStateList getForegroundTintList() {
+		return mForegroundInfo != null ? mForegroundInfo.mTintList : null;
+	}
+
+	public void setForegroundTintMode(PorterDuff.Mode tintMode) {
+		BlendMode mode = null;
+		if (tintMode != null)
+			mode = BlendMode.fromValue(tintMode.nativeInt);
+		setForegroundTintBlendMode(mode);
+	}
+
+	public void setForegroundTintBlendMode(BlendMode blendMode) {
+		if (mForegroundInfo == null)
+			mForegroundInfo = new ForegroundInfo();
+		mForegroundInfo.mBlendMode = blendMode;
+		mForegroundInfo.mHasTintMode = true;
+		applyForegroundTint();
+	}
+
+	public PorterDuff.Mode getForegroundTintMode() {
+		BlendMode blendMode = mForegroundInfo != null ? mForegroundInfo.mBlendMode : null;
+		return blendMode != null ? BlendMode.blendModeToPorterDuffMode(blendMode) : null;
+	}
+
+	public BlendMode getForegroundTintBlendMode() {
+		return mForegroundInfo != null ? mForegroundInfo.mBlendMode : null;
+	}
+
+	private void applyForegroundTint() {
+		if (mForegroundInfo != null && mForegroundInfo.mDrawable != null
+				&& (mForegroundInfo.mHasTintList || mForegroundInfo.mHasTintMode)) {
+			mForegroundInfo.mDrawable = mForegroundInfo.mDrawable.mutate();
+			if (mForegroundInfo.mHasTintList)
+				mForegroundInfo.mDrawable.setTintList(mForegroundInfo.mTintList);
+			if (mForegroundInfo.mHasTintMode)
+				mForegroundInfo.mDrawable.setTintBlendMode(mForegroundInfo.mBlendMode);
+			// The drawable (or one of its children) may not have been stateful before applying the tint
+			if (mForegroundInfo.mDrawable.isStateful())
+				mForegroundInfo.mDrawable.setState(getDrawableState());
+		}
+	}
+
+	/* AOSP View.setRevealOnFocusHint()/getRevealOnFocusHint() (PFLAG3_NO_REVEAL_ON_FOCUS); final in AOSP, not
+	 * here because ATL's TextView still declares its own final copy */
+	private boolean mNoRevealOnFocus;
+	public void setRevealOnFocusHint(boolean revealOnFocus) {
+		mNoRevealOnFocus = !revealOnFocus;
+	}
+	public boolean getRevealOnFocusHint() {
+		return !mNoRevealOnFocus;
 	}
 
 	public boolean isForegroundInsidePadding() {
@@ -4440,8 +4580,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	/* the view's own opacity isn't tracked, so never claim to be opaque */
+	/* AOSP View.isOpaque() with computeOpaqueFlags(): an opaque background, no scroll bars or overlay scroll bars,
+	 * and full alpha (getFinalAlpha() = alpha * transition alpha) */
 	public boolean isOpaque() {
-		return false;
+		final boolean opaqueBackground = background != null && background.getOpacity() == android.graphics.PixelFormat.OPAQUE;
+		final int flags = mViewFlags;
+		final boolean opaqueScrollbars = ((flags & SCROLLBARS_VERTICAL) == 0 && (flags & SCROLLBARS_HORIZONTAL) == 0)
+			|| (flags & SCROLLBARS_STYLE_MASK) == SCROLLBARS_INSIDE_OVERLAY
+			|| (flags & SCROLLBARS_STYLE_MASK) == SCROLLBARS_OUTSIDE_OVERLAY;
+		return opaqueBackground && opaqueScrollbars && getAlpha() * getTransitionAlpha() >= 1.0f;
 	}
 
 	public boolean hasOverlappingRendering() {
@@ -4658,11 +4805,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	}
 
-	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {}
+	/* AOSP View.setHapticFeedbackEnabled()/isHapticFeedbackEnabled() */
+	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {
+		setFlags(hapticFeedbackEnabled ? HAPTIC_FEEDBACK_ENABLED : 0, HAPTIC_FEEDBACK_ENABLED);
+	}
+	public boolean isHapticFeedbackEnabled() {
+		return HAPTIC_FEEDBACK_ENABLED == (mViewFlags & HAPTIC_FEEDBACK_ENABLED);
+	}
 
 	public StateListAnimator getStateListAnimator() { return state_list_animator; }
 
-	public void requestFitSystemWindows() {}
+	/* AOSP View.requestFitSystemWindows(): up to ViewRootImpl, which applies the insets again; ATL's window does
+	 * that in requestApplyInsets() (AOSP's requestApplyInsets() is requestFitSystemWindows()) */
+	public void requestFitSystemWindows() {
+		requestApplyInsets();
+	}
 
 	public boolean isPressed() {
 		return (mPrivateFlags & PFLAG_PRESSED) == PFLAG_PRESSED;
@@ -4781,9 +4938,40 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
 	}
 
-	public void setScrollbarFadingEnabled(boolean fadeEnabled) {}
+	/* AOSP View.setScrollbarFadingEnabled()/isScrollbarFadingEnabled(): kept in the ScrollabilityCache, false
+	 * while there is none; ATL draws no Android scroll bars, so it is only kept */
+	private boolean mFadeScrollBars;
+	public void setScrollbarFadingEnabled(boolean fadeEnabled) {
+		mFadeScrollBars = fadeEnabled;
+	}
+	public boolean isScrollbarFadingEnabled() {
+		return mFadeScrollBars;
+	}
 
-	public void setScrollBarStyle(int style) {}
+	/* AOSP View.set/getScrollBarDefaultDelayBeforeFade(), set/getScrollBarFadeDuration(): kept in the
+	 * ScrollabilityCache, ViewConfiguration's defaults while there is none */
+	private int mScrollBarDefaultDelayBeforeFade = -1;
+	private int mScrollBarFadeDuration = -1;
+	public int getScrollBarDefaultDelayBeforeFade() {
+		return mScrollBarDefaultDelayBeforeFade < 0 ? ViewConfiguration.getScrollDefaultDelay() : mScrollBarDefaultDelayBeforeFade;
+	}
+	public void setScrollBarDefaultDelayBeforeFade(int scrollBarDefaultDelayBeforeFade) {
+		mScrollBarDefaultDelayBeforeFade = scrollBarDefaultDelayBeforeFade;
+	}
+	public int getScrollBarFadeDuration() {
+		return mScrollBarFadeDuration < 0 ? ViewConfiguration.getScrollBarFadeDuration() : mScrollBarFadeDuration;
+	}
+	public void setScrollBarFadeDuration(int scrollBarFadeDuration) {
+		mScrollBarFadeDuration = scrollBarFadeDuration;
+	}
+
+	/* AOSP View.setScrollBarStyle()/getScrollBarStyle(): bits of mViewFlags (no scroll bars to inset here) */
+	public void setScrollBarStyle(int style) {
+		mViewFlags = (mViewFlags & ~SCROLLBARS_STYLE_MASK) | (style & SCROLLBARS_STYLE_MASK);
+	}
+	public int getScrollBarStyle() {
+		return mViewFlags & SCROLLBARS_STYLE_MASK;
+	}
 
 	/* AOSP keeps the size in the ScrollabilityCache and falls back to ViewConfiguration's; ATL draws
 	 * no Android scroll bars, so the size is only kept for getScrollBarSize() */
@@ -4797,7 +4985,31 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mScrollBarSize = scrollBarSize;
 	}
 
-	public void setVerticalScrollbarPosition(int position) {}
+	/* AOSP View.getAttributeSourceResourceMap(): empty unless the developer option "view attribute inspection"
+	 * (sDebugViewAttributes) recorded the sources, which ATL does not have */
+	public Map<Integer, Integer> getAttributeSourceResourceMap() {
+		return new HashMap<>();
+	}
+
+	/* AOSP View.setVerticalScrollbarThumbDrawable()/getVerticalScrollbarThumbDrawable(): kept for the getter, ATL
+	 * draws no Android scroll bars */
+	private Drawable mVerticalScrollbarThumbDrawable;
+	public void setVerticalScrollbarThumbDrawable(Drawable drawable) {
+		mVerticalScrollbarThumbDrawable = drawable;
+	}
+	public Drawable getVerticalScrollbarThumbDrawable() {
+		return mVerticalScrollbarThumbDrawable;
+	}
+
+	/* AOSP View.setVerticalScrollbarPosition()/getVerticalScrollbarPosition(): kept (ATL draws no Android scroll
+	 * bars, so nothing moves) */
+	private int mVerticalScrollbarPosition;
+	public void setVerticalScrollbarPosition(int position) {
+		mVerticalScrollbarPosition = position;
+	}
+	public int getVerticalScrollbarPosition() {
+		return mVerticalScrollbarPosition;
+	}
 
 
 	/* AOSP View.setTouchDelegate(). The delegate is asked in onTouchEvent(), which GTK calls for a view with a touch
@@ -4817,9 +5029,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/**
 	 * Handles drag events sent by the system following a call to startDragAndDrop() or, in ATL, a drag of files
-	 * from the desktop. AOSP accepts drag events by default if there is an OnReceiveContentListener; ATL has none.
+	 * from the desktop. As AOSP: accepted by default if there is an OnReceiveContentListener, a drop goes to
+	 * performReceiveContent().
 	 */
 	public boolean onDragEvent(DragEvent event) {
+		if (mOnReceiveContentListener == null) {
+			return false;
+		}
+		// Accept drag events by default if there's an OnReceiveContentListener set.
+		if (event.getAction() == DragEvent.ACTION_DRAG_STARTED) {
+			return true;
+		}
+		if (event.getAction() == DragEvent.ACTION_DROP) {
+			final DragAndDropPermissions permissions = DragAndDropPermissions.obtain(event);
+			if (permissions != null) {
+				permissions.takeTransient();
+			}
+			final ContentInfo payload = new ContentInfo.Builder(event.getClipData(), ContentInfo.SOURCE_DRAG_AND_DROP)
+				.setDragAndDropPermissions(permissions)
+				.build();
+			ContentInfo remainingPayload = performReceiveContent(payload);
+			// Return true unless none of the payload was consumed.
+			return remainingPayload != payload;
+		}
 		return false;
 	}
 
@@ -5560,7 +5792,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 
 
-	public void setDrawingCacheQuality(int quality) {}
+	/* AOSP View.setDrawingCacheQuality()/getDrawingCacheQuality() */
+	public void setDrawingCacheQuality(int quality) {
+		setFlags(quality, DRAWING_CACHE_QUALITY_MASK);
+	}
+	public int getDrawingCacheQuality() {
+		return mViewFlags & DRAWING_CACHE_QUALITY_MASK;
+	}
 
 	/* AOSP View.buildDrawingCache()/getDrawingCache(): the view drawn into a bitmap of its size, as the software
 	 * drawing cache (rebuilt on each getDrawingCache() while the cache is enabled) */
@@ -5715,14 +5953,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			nativeSetOnHoverListener(widget);
 	}
 
-	public ActionMode startActionMode(ActionMode.Callback callback, int type) { return null; }
+	/* AOSP View.startActionMode(): the parents are asked (startActionModeForChild) */
+	public ActionMode startActionMode(ActionMode.Callback callback, int type) {
+		ViewParent parent = getParent();
+		if (parent == null)
+			return null;
+		return parent.startActionModeForChild(this, callback, type);
+	}
 
 	public InputConnection onCreateInputConnection(EditorInfo outAttrs) { return null; }
 
 	/* AOSP View.checkInputConnectionProxy(): whether another view may talk to the input method for this one */
 	public boolean checkInputConnectionProxy(View view) { return false; }
 
-	public ActionMode startActionMode(ActionMode.Callback callback) { return null; }
+	public ActionMode startActionMode(ActionMode.Callback callback) {
+		return startActionMode(callback, ActionMode.TYPE_PRIMARY);
+	}
 
 	/* AOSP: the whole view; a text view gives the cursor */
 	public void getFocusedRect(Rect r) { getDrawingRect(r); }
@@ -5787,7 +6033,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			                                + "attribute defined on view " + mHostView.getClass() + idText);
 		}
 	}
-	public void setForceDarkAllowed(boolean forceDark) {}
+	/* AOSP View.setForceDarkAllowed()/isForceDarkAllowed() (RenderNode, allowed by default); ATL has no force dark,
+	 * so it is only kept */
+	private boolean mForceDarkAllowed = true;
+	public void setForceDarkAllowed(boolean forceDark) {
+		mForceDarkAllowed = forceDark;
+	}
+	public boolean isForceDarkAllowed() {
+		return mForceDarkAllowed;
+	}
 	public void setWindowInsetsAnimationCallback(WindowInsetsAnimation.Callback callback) {}
 	public void setViewTranslationCallback(ViewTranslationCallback callback) {}
 	public void clearViewTranslationCallback() {}
@@ -5814,8 +6068,30 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (!hasIdentityMatrix())
 			matrix.postConcat(getInverseMatrix());
 	}
-	public void setAnimationMatrix(Matrix matrix) {}
-	public Matrix getAnimationMatrix() { return null; }
+	/* AOSP View.requestPointerCapture()/releasePointerCapture()/hasPointerCapture(): through ViewRootImpl to the
+	 * input system; ATL has no pointer capture (no GTK pointer lock), so a request is never granted */
+	public void requestPointerCapture() {}
+
+	public void releasePointerCapture() {}
+
+	public boolean hasPointerCapture() {
+		return false;
+	}
+
+	/* AOSP View.setAnimationMatrix()/getAnimationMatrix(): RenderNode keeps a copy, applied outside the view's own
+	 * transform (RenderNodeDrawable::setViewProperties()); native_layout() hands it to GTK. As in AOSP, getMatrix()
+	 * and so the touch mapping ignore it (GTK's picking does follow it) */
+	private Matrix animationMatrix;
+
+	public void setAnimationMatrix(Matrix matrix) {
+		animationMatrix = (matrix != null) ? new Matrix(matrix) : null;
+		if (parent instanceof View)
+			((View)parent).native_queueAllocate(((View)parent).widget);
+	}
+
+	public Matrix getAnimationMatrix() {
+		return (animationMatrix != null) ? new Matrix(animationMatrix) : null;
+	}
 
 	private static long nextUniqueDrawingId = 1;
 	private long uniqueDrawingId;
@@ -5830,7 +6106,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private int importantForContentCapture = 0; // IMPORTANT_FOR_CONTENT_CAPTURE_AUTO
 	public void setImportantForContentCapture(int mode) { importantForContentCapture = mode; }
 	public int getImportantForContentCapture() { return importantForContentCapture; }
-	public boolean isImportantForContentCapture() { return false; }
+	/* AOSP View.IMPORTANT_FOR_CONTENT_CAPTURE_* and isImportantForContentCapture()
+	 * (calculateIsImportantForContentCapture(), without the cache) */
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_AUTO = 0x0;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES = 0x1;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO = 0x2;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS = 0x4;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS = 0x8;
+
+	public boolean isImportantForContentCapture() {
+		ViewParent parent = getParent();
+		while (parent instanceof View) {
+			final int parentImportance = ((View)parent).getImportantForContentCapture();
+			if (parentImportance == IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+			    || parentImportance == IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS)
+				return false;
+			parent = parent.getParent();
+		}
+		final int importance = getImportantForContentCapture();
+		if (importance == IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS || importance == IMPORTANT_FOR_CONTENT_CAPTURE_YES)
+			return true;
+		if (importance != IMPORTANT_FOR_CONTENT_CAPTURE_AUTO)
+			return false;
+		// a view group is important if at least one child is
+		if (this instanceof ViewGroup) {
+			final ViewGroup group = (ViewGroup)this;
+			for (int i = 0; i < group.getChildCount(); i++) {
+				if (group.getChildAt(i).isImportantForContentCapture())
+					return true;
+			}
+		}
+		// explicit autofill hints make it important
+		return getAutofillHints() != null;
+	}
 
 	private int outlineAmbientShadowColor = 0xff000000;
 	private int outlineSpotShadowColor = 0xff000000;
@@ -5915,7 +6223,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return mTouchDelegate;
 	}
 
-	public void setZ(float z) {}
+	/* AOSP View.setZ() */
+	public void setZ(float z) {
+		setTranslationZ(z - getElevation());
+	}
 
 	/* ---- AOSP View, accessibility. ATL has no accessibility service, so nothing asks for these, but an app's
 	 * views and delegates call and override them and expect what AOSP returns and calls. The events and nodes
@@ -6109,6 +6420,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		return true;
 	}
+
+	/* AOSP View.addChildrenForAccessibility(): a view has no children to add */
+	public void addChildrenForAccessibility(ArrayList<View> outChildren) {}
 
 	public AccessibilityNodeProvider getAccessibilityNodeProvider() {
 		if (mAccessibilityDelegate != null) {
@@ -6512,9 +6826,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		onFinishTemporaryDetach();
 	}
 
-	/* AOSP: the view is cleaned up for the time it is detached (a list view recycling it): its pending click and
-	 * pressed state go; ATL keeps neither as view state, so nothing is left to clear */
+	/* AOSP View.onStartTemporaryDetach(): the view is cleaned up for the time it is detached (a list view
+	 * recycling it): its pending unpress goes (ATL has no PFLAG_CANCEL_NEXT_UP_EVENT) */
 	public void onStartTemporaryDetach() {
+		removeUnsetPressCallback();
 	}
 
 	public void onFinishTemporaryDetach() {
@@ -6596,7 +6911,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		onWindowVisibilityChanged(visibility);
 	}
 
+	/* AOSP View.onVisibilityAggregated(): the background, default focus highlight and foreground drawables follow
+	 * the visibility (animated drawables stop while hidden); no scroll bars, autofill or accessibility panes here */
 	public void onVisibilityAggregated(boolean isVisible) {
+		final Drawable dr = background;
+		if (dr != null && isVisible != dr.isVisible()) {
+			dr.setVisible(isVisible, false);
+		}
+		final Drawable hl = mDefaultFocusHighlight;
+		if (hl != null && isVisible != hl.isVisible()) {
+			hl.setVisible(isVisible, false);
+		}
+		final Drawable fg = mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
+		if (fg != null && isVisible != fg.isVisible()) {
+			fg.setVisible(isVisible, false);
+		}
 	}
 
 	/* AOSP: tells onVisibilityAggregated() whether the view and all its ancestors are visible */

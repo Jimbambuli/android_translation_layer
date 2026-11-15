@@ -42,6 +42,8 @@ public interface ViewParent {
 
 	public boolean requestChildRectangleOnScreen(View child, android.graphics.Rect rectangle, boolean immediate);
 
+	public boolean getChildVisibleRect(View child, android.graphics.Rect r, android.graphics.Point offset);
+
 	public boolean showContextMenuForChild(View originalView);
 
 	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback, int type);

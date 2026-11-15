@@ -113,6 +113,48 @@ public final class Display {
 		return 1.0f;
 	}
 
+	/* AOSP Display.isHdrSdrRatioAvailable(): DisplayInfo.hdrSdrRatio is NaN for a display without HDR */
+	public boolean isHdrSdrRatioAvailable() {
+		return false;
+	}
+
+	/* AOSP 16 Display.getHighestHdrSdrRatio(): 1 when isHdrSdrRatioAvailable() is false */
+	public float getHighestHdrSdrRatio() {
+		return 1.0f;
+	}
+
+	/* AOSP 16 Display.hasArrSupport(): DisplayInfo.hasArrSupport, false for a display without adaptive refresh
+	 * rate (ATL's one mode) */
+	public boolean hasArrSupport() {
+		return false;
+	}
+
+	/* AOSP Display.getOrientation() (deprecated) */
+	public int getOrientation() {
+		return getRotation();
+	}
+
+	/* AOSP Display.getSupportedRefreshRates(): the rates of the modes of the default resolution; ATL has one mode */
+	public float[] getSupportedRefreshRates() {
+		return new float[] {getRefreshRate()};
+	}
+
+	/* AOSP Display.isWideColorGamut()/getPreferredWideGamutColorSpace(): ATL draws in sRGB, so the display has no
+	 * wide colour gamut mode and the preferred wide gamut colour space is null */
+	public boolean isWideColorGamut() {
+		return false;
+	}
+
+	public android.graphics.ColorSpace getPreferredWideGamutColorSpace() {
+		return null;
+	}
+
+	/* AOSP Display.isMinimalPostProcessingSupported(): DisplayInfo.minimalPostProcessingSupported, false unless the
+	 * display (an HDMI sink with ALLM/game content type) says so */
+	public boolean isMinimalPostProcessingSupported() {
+		return false;
+	}
+
 	public RoundedCorner getRoundedCorner(int position) {
 		return null;
 	}
@@ -210,6 +252,17 @@ public final class Display {
 
 		public int getPhysicalHeight() {
 			return window_height;
+		}
+
+		/* AOSP Display.Mode.getAlternativeRefreshRates(): the other rates of the same resolution; ATL has one mode */
+		public float[] getAlternativeRefreshRates() {
+			return new float[0];
+		}
+
+		/* AOSP 16 Display.Mode.getSupportedHdrTypes(): a copy of mSupportedHdrTypes; ATL's display has no
+		 * HDR (getHdrCapabilities() is null, isHdr() false), so the mode supports none */
+		public int[] getSupportedHdrTypes() {
+			return new int[0];
 		}
 	}
 

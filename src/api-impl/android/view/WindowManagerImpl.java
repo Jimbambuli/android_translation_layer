@@ -16,6 +16,13 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	 * touch events or to take part in nested scrolling. */
 	private static class WindowViewParent implements ViewParent {
 
+		/* AOSP ViewRootImpl.getChildVisibleRect(): the window clips, without its scroll offset; the window is
+		 * as large as its one child */
+		@Override
+		public boolean getChildVisibleRect(View child, android.graphics.Rect r, android.graphics.Point offset) {
+			return r.intersect(0, 0, child.getWidth(), child.getHeight());
+		}
+
 		/* AOSP ViewRootImpl.bringChildToFront(): the root has one child */
 		@Override
 		public void bringChildToFront(View child) {}
@@ -240,6 +247,23 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	@Override
 	public void removeCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
 		java.util.Objects.requireNonNull(listener, "listener cannot be null");
+	}
+
+	/* AOSP 16 WindowManagerImpl.addScreenRecordingCallback() -> ScreenRecordingCallbacks: the state
+	 * comes from WindowManagerService (is a window of this uid visible in an active screen
+	 * recording). ATL has no window manager service that tracks recordings, so the state stays
+	 * SCREEN_RECORDING_STATE_NOT_VISIBLE and never changes; no callback needs to be kept. */
+	@Override
+	public int addScreenRecordingCallback(java.util.concurrent.Executor executor,
+			java.util.function.Consumer<Integer> callback) {
+		java.util.Objects.requireNonNull(executor, "executor must not be null");
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+		return SCREEN_RECORDING_STATE_NOT_VISIBLE;
+	}
+
+	@Override
+	public void removeScreenRecordingCallback(java.util.function.Consumer<Integer> callback) {
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
 	}
 
 	private static native void native_addView(long widget, View view, int type, boolean touchModal, int gravity, int x, int y, int width, int height);

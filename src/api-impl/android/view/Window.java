@@ -96,7 +96,7 @@ public class Window {
 
 		public void onActionModeFinished(ActionMode mode);
 
-		default public void onProvideKeyboardShortcuts(java.util.List<?> data, Menu menu, int deviceId) {}
+		default public void onProvideKeyboardShortcuts(java.util.List<KeyboardShortcutGroup> data, Menu menu, int deviceId) {}
 
 		default public void onPointerCaptureChanged(boolean hasCapture) {}
 	}
@@ -453,6 +453,9 @@ public class Window {
 			params.softInputMode = a.getInt(com.android.internal.R.styleable.Window_windowSoftInputMode, params.softInputMode);
 		a.getValue(com.android.internal.R.styleable.Window_windowMinWidthMajor, mMinWidthMajor);
 		a.getValue(com.android.internal.R.styleable.Window_windowMinWidthMinor, mMinWidthMinor);
+		/* AOSP PhoneWindow.generateLayout() */
+		mEnsureStatusBarContrastWhenTransparent = a.getBoolean(com.android.internal.R.styleable.Window_enforceStatusBarContrast, false);
+		mEnsureNavigationBarContrastWhenTransparent = a.getBoolean(com.android.internal.R.styleable.Window_enforceNavigationBarContrast, true);
 		a.recycle();
 	}
 
@@ -724,6 +727,24 @@ public class Window {
 		return mFeatures;
 	}
 
+	/* AOSP PhoneWindow.setFeatureInt() -> onIntChanged() and setFeatureDrawableResource() -> onDrawableChanged()
+	 * change the progress bars, custom title container and icons of the title bar layout (screen_title*.xml);
+	 * ATL's decor has no such title bar, so there is no view to update */
+	public void setFeatureInt(int featureId, int value) {}
+
+	public void setFeatureDrawableResource(int featureId, int resId) {}
+
+	/* AOSP 16 Window.setDesiredHdrHeadroom()/getDesiredHdrHeadroom(): stored in the LayoutParams */
+	public void setDesiredHdrHeadroom(float desiredHeadroom) {
+		final WindowManager.LayoutParams attrs = getAttributes();
+		attrs.setDesiredHdrHeadroom(desiredHeadroom);
+		dispatchWindowAttributesChanged(attrs);
+	}
+
+	public float getDesiredHdrHeadroom() {
+		return getAttributes().getDesiredHdrHeadroom();
+	}
+
 	/* AOSP */
 	@SuppressWarnings("unchecked")
 	public final <T extends View> T requireViewById(int id) {
@@ -946,10 +967,6 @@ public class Window {
 		return new android.transition.TransitionSet();
 	}
 
-	public void setReturnTransition(Transition transition) {}
-
-	public void setEnterTransition(Transition transition) {}
-
 	/* AOSP stores the transition in the Window; ATL plays no window transitions */
 	private Transition mExitTransition;
 
@@ -1011,14 +1028,120 @@ public class Window {
 		});
 	}
 
-	public void setStatusBarContrastEnforced(boolean enforced) {}
+	/* AOSP PhoneWindow.set/isStatusBarContrastEnforced(), set/isNavigationBarContrastEnforced(): defaults from the
+	 * theme (generateLayout()); a desktop window has no system bars to scrim, so they are only kept */
+	private boolean mEnsureStatusBarContrastWhenTransparent;
+	private boolean mEnsureNavigationBarContrastWhenTransparent = true;
 
-	public void setNavigationBarContrastEnforced(boolean enforced) {}
+	public void setStatusBarContrastEnforced(boolean enforced) {
+		mEnsureStatusBarContrastWhenTransparent = enforced;
+	}
+
+	public boolean isStatusBarContrastEnforced() {
+		return mEnsureStatusBarContrastWhenTransparent;
+	}
+
+	public void setNavigationBarContrastEnforced(boolean enforced) {
+		mEnsureNavigationBarContrastWhenTransparent = enforced;
+	}
+
+	public boolean isNavigationBarContrastEnforced() {
+		return mEnsureNavigationBarContrastWhenTransparent;
+	}
 
 	public void setSharedElementEnterTransition(Transition transition) {}
 
+	/* AOSP PhoneWindow: enter/return/reenter transitions and the overlap flags; return and reenter default
+	 * (USE_DEFAULT_TRANSITION) to the enter and exit transition. Stored only, ATL plays no window transitions */
+	private Transition mEnterTransition;
+	private Transition mReturnTransition;
+	private boolean mReturnTransitionSet;
+	private Transition mReenterTransition;
+	private boolean mReenterTransitionSet;
+	private Boolean mAllowEnterTransitionOverlap;
+	private Boolean mAllowReturnTransitionOverlap;
+
+	public void setEnterTransition(Transition transition) {
+		mEnterTransition = transition;
+	}
+
 	public Transition getEnterTransition() {
-		return null;
+		return mEnterTransition;
+	}
+
+	public void setReturnTransition(Transition transition) {
+		mReturnTransition = transition;
+		mReturnTransitionSet = true;
+	}
+
+	public Transition getReturnTransition() {
+		return mReturnTransitionSet ? mReturnTransition : getEnterTransition();
+	}
+
+	public void setReenterTransition(Transition transition) {
+		mReenterTransition = transition;
+		mReenterTransitionSet = true;
+	}
+
+	public Transition getReenterTransition() {
+		return mReenterTransitionSet ? mReenterTransition : getExitTransition();
+	}
+
+	public void setAllowEnterTransitionOverlap(boolean allow) {
+		mAllowEnterTransitionOverlap = allow;
+	}
+
+	public boolean getAllowEnterTransitionOverlap() {
+		return (mAllowEnterTransitionOverlap == null) ? true : mAllowEnterTransitionOverlap;
+	}
+
+	public void setAllowReturnTransitionOverlap(boolean allowExitTransitionOverlap) {
+		mAllowReturnTransitionOverlap = allowExitTransitionOverlap;
+	}
+
+	public boolean getAllowReturnTransitionOverlap() {
+		return (mAllowReturnTransitionOverlap == null) ? true : mAllowReturnTransitionOverlap;
+	}
+
+	/* AOSP PhoneWindow.setElevation()/getElevation(): the decor's elevation casts the window's shadow; ATL's
+	 * window frame is GTK's, so it is only kept */
+	private float mElevation;
+
+	public void setElevation(float elevation) {
+		mElevation = elevation;
+	}
+
+	public float getElevation() {
+		return mElevation;
+	}
+
+	/* AOSP PhoneWindow.setBackgroundBlurRadius(): the decor blurs behind it only with cross-window blur, which
+	 * WindowManager.isCrossWindowBlurEnabled() reports off here */
+	public void setBackgroundBlurRadius(int blurRadius) {}
+
+	/* AOSP Window.getColorMode() */
+	public int getColorMode() {
+		return getAttributes().getColorMode();
+	}
+
+	/* AOSP Window.setHideOverlayWindows(): needs HIDE_(NON_SYSTEM_)OVERLAY_WINDOWS, then a private flag */
+	public final void setHideOverlayWindows(boolean hide) {
+		if (context.checkSelfPermission("android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS") != android.content.pm.PackageManager.PERMISSION_GRANTED
+		    && context.checkSelfPermission("android.permission.HIDE_OVERLAY_WINDOWS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+			throw new SecurityException("Permission denial: setHideOverlayWindows: HIDE_OVERLAY_WINDOWS");
+		}
+		final WindowManager.LayoutParams attrs = getAttributes();
+		final int mask = WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
+		attrs.privateFlags = (attrs.privateFlags & ~mask) | ((hide ? mask : 0) & mask);
+		dispatchWindowAttributesChanged(attrs);
+	}
+
+	/* AOSP Window.setSustainedPerformanceMode() (setPrivateFlags()) */
+	public void setSustainedPerformanceMode(boolean enable) {
+		final WindowManager.LayoutParams attrs = getAttributes();
+		final int mask = WindowManager.LayoutParams.PRIVATE_FLAG_SUSTAINED_PERFORMANCE_MODE;
+		attrs.privateFlags = (attrs.privateFlags & ~mask) | ((enable ? mask : 0) & mask);
+		dispatchWindowAttributesChanged(attrs);
 	}
 
 	public void setWindowAnimations(int resId) {

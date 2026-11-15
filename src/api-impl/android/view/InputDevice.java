@@ -63,6 +63,12 @@ public class InputDevice {
 		return false;
 	}
 
+	/* AOSP 16 InputDevice.isExternal(): mIsExternal. ATL's single device presents itself as the
+	 * built-in touchscreen (getSources(), isVirtual() false), which is not external */
+	public boolean isExternal() {
+		return false;
+	}
+
 	public int getSources() {
 		return 2 | 4098 /* SOURCE_CLASS_POINTER | SOURCE_TOUCHSCREEN */; // FIXME
 	}
@@ -140,6 +146,15 @@ public class InputDevice {
 
 		public float getRange() {
 			return max - min;
+		}
+
+		/* AOSP MotionRange.getFlat()/getFuzz(): like min and max, ATL's ranges have none */
+		public float getFlat() {
+			return 0;
+		}
+
+		public float getFuzz() {
+			return 0;
 		}
 	};
 }

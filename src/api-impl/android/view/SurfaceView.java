@@ -259,12 +259,24 @@ public class SurfaceView extends View {
 		mRequestedSurfaceLifecycleStrategy = lifecycleStrategy;
 	}
 
+	/* AOSP SurfaceView sublayer (WindowManagerPolicyConstants): below the window by default, above it on top.
+	 * ATL draws the surface as a GTK widget in view order, so the requested sublayer is kept only */
+	private static final int APPLICATION_MEDIA_SUBLAYER = -2;
+	private static final int APPLICATION_MEDIA_OVERLAY_SUBLAYER = -1;
+	private static final int APPLICATION_PANEL_SUBLAYER = 1;
+
+	private int mRequestedSubLayer = APPLICATION_MEDIA_SUBLAYER;
+
 	public void setZOrderOnTop(boolean onTop) {
-		/* TODO */
+		mRequestedSubLayer = onTop ? APPLICATION_PANEL_SUBLAYER : APPLICATION_MEDIA_SUBLAYER;
+	}
+
+	public boolean isZOrderedOnTop() {
+		return mRequestedSubLayer > 0;
 	}
 
 	public void setZOrderMediaOverlay(boolean mediaOverlay) {
-		/* TODO */
+		mRequestedSubLayer = mediaOverlay ? APPLICATION_MEDIA_OVERLAY_SUBLAYER : APPLICATION_MEDIA_SUBLAYER;
 	}
 
 	/* AOSP: keeps the surface out of screenshots and non-secure displays; there are none to keep it from here */

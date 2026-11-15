@@ -192,7 +192,58 @@ public class AnimationUtils {
 
 	}
 
-	/* ATL: loadLayoutAnimation() is left out, there is no LayoutAnimationController */
+	/* AOSP 16 AnimationUtils.loadLayoutAnimation() and createLayoutAnimationFromXml() */
+	public static LayoutAnimationController loadLayoutAnimation(Context context, int id)
+			throws NotFoundException {
+
+		XmlResourceParser parser = null;
+		try {
+			parser = context.getResources().getAnimation(id);
+			return createLayoutAnimationFromXml(context, parser);
+		} catch (XmlPullParserException | IOException | InflateException ex) {
+			throw new NotFoundException(
+					"Can't load animation resource ID #0x" + Integer.toHexString(id), ex);
+		} finally {
+			if (parser != null) parser.close();
+		}
+	}
+
+	private static LayoutAnimationController createLayoutAnimationFromXml(
+			Context c, XmlPullParser parser)
+			throws XmlPullParserException, IOException, InflateException {
+
+		return createLayoutAnimationFromXml(c, parser, Xml.asAttributeSet(parser));
+	}
+
+	private static LayoutAnimationController createLayoutAnimationFromXml(
+			Context c, XmlPullParser parser, AttributeSet attrs)
+			throws XmlPullParserException, IOException, InflateException {
+
+		LayoutAnimationController controller = null;
+
+		int type;
+		int depth = parser.getDepth();
+
+		while (((type = parser.next()) != XmlPullParser.END_TAG || parser.getDepth() > depth)
+				&& type != XmlPullParser.END_DOCUMENT) {
+
+			if (type != XmlPullParser.START_TAG) {
+				continue;
+			}
+
+			String name = parser.getName();
+
+			if ("layoutAnimation".equals(name)) {
+				controller = new LayoutAnimationController(c, attrs);
+			} else if ("gridLayoutAnimation".equals(name)) {
+				controller = new GridLayoutAnimationController(c, attrs);
+			} else {
+				throw new InflateException("Unknown layout animation name: " + name);
+			}
+		}
+
+		return controller;
+	}
 
 	/**
 	 * Make an animation for objects becoming visible. Uses a slide and fade

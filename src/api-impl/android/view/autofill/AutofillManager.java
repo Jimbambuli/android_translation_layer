@@ -51,6 +51,14 @@ public class AutofillManager {
 		return false;
 	}
 
+	/* AOSP AutofillManager.disableAutofillServices(): nothing without the autofill feature */
+	public void disableAutofillServices() {}
+
+	/* AOSP AutofillManager.getAutofillServiceComponentName(): null without the autofill service */
+	public android.content.ComponentName getAutofillServiceComponentName() {
+		return null;
+	}
+
 	public boolean isAutofillSupported() {
 		return false;
 	}

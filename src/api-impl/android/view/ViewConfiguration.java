@@ -601,6 +601,22 @@ public class ViewConfiguration {
     /**
      * @return Default delay before the scrollbars fade in milliseconds
      */
+    /* AOSP 16 ViewConfiguration.DEFAULT/MIN/NO_BLINK_TEXT_CURSOR_BLINK_INTERVAL_MS and
+     * getTextCursorBlinkIntervalMillis(): the accessibility setting is unset and ATL's framework resources have no
+     * def_accessibility_text_cursor_blink_interval_ms, so the default applies (clamped as in AOSP) */
+    public static final int DEFAULT_TEXT_CURSOR_BLINK_INTERVAL_MS = 500;
+    public static final int MIN_TEXT_CURSOR_BLINK_INTERVAL_MS = 333;
+    public static final int NO_BLINK_TEXT_CURSOR_BLINK_INTERVAL_MS = 0;
+
+    public int getTextCursorBlinkIntervalMillis() {
+        int value = DEFAULT_TEXT_CURSOR_BLINK_INTERVAL_MS;
+        if (value <= NO_BLINK_TEXT_CURSOR_BLINK_INTERVAL_MS)
+            return NO_BLINK_TEXT_CURSOR_BLINK_INTERVAL_MS;
+        else if (value <= MIN_TEXT_CURSOR_BLINK_INTERVAL_MS)
+            return MIN_TEXT_CURSOR_BLINK_INTERVAL_MS;
+        return value;
+    }
+
     public static int getScrollDefaultDelay() {
         return SCROLL_BAR_DEFAULT_DELAY;
     }

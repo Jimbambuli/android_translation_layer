@@ -54,6 +54,41 @@ public class InputMethodManager {
 			hideSoftInputFromWindow(null, hideFlags);
 	}
 
+	/* AOSP InputMethodManager.toggleSoftInputFromWindow(): only for the window of the served view */
+	@Deprecated
+	public void toggleSoftInputFromWindow(IBinder windowToken, int showFlags, int hideFlags) {
+		if (activeView == null || activeView.getWindowToken() != windowToken)
+			return;
+		toggleSoftInput(showFlags, hideFlags);
+	}
+
+	/* AOSP: the IME-only calls go through InputMethodPrivilegedOperationsRegistry.get(imeToken); an app is no
+	 * input method, so its token is unknown and the registry's empty operations do nothing / answer false */
+	public boolean switchToLastInputMethod(IBinder imeToken) {
+		return false;
+	}
+
+	public boolean switchToNextInputMethod(IBinder imeToken, boolean onlyCurrentIme) {
+		return false;
+	}
+
+	public boolean shouldOfferSwitchingToNextInputMethod(IBinder imeToken) {
+		return false;
+	}
+
+	public void setInputMethodAndSubtype(IBinder token, String id, InputMethodSubtype subtype) {}
+
+	/* AOSP InputMethodManager.getLastInputMethodSubtype(): none was used before (no Android IMEs) */
+	public InputMethodSubtype getLastInputMethodSubtype() {
+		return null;
+	}
+
+	/* AOSP InputMethodManager.getShortcutInputMethodsAndSubtypes(): the first voice subtype of the enabled
+	 * input methods; the list of enabled input methods is empty here */
+	public java.util.Map<InputMethodInfo, List<InputMethodSubtype>> getShortcutInputMethodsAndSubtypes() {
+		return java.util.Collections.emptyMap();
+	}
+
 	/* AOSP InputMethodManager.isActive(): some view has an input connection with the input method */
 	public boolean isActive() {
 		return activeView != null;

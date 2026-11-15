@@ -264,8 +264,16 @@ public class RenderNode {
 		discardDisplayList();
 	}
 
+	/* AOSP RenderNode.setLayerType()/setLayerPaint() (hwui LayerProperties setType()/setFromPaint()): the node's
+	 * layer; kept and reported as changed like there, but ATL does not render the node into a layer (as
+	 * android.graphics.RenderNode.setUseCompositingLayer()) */
+	private int layerType;
+	private Paint layerPaint;
+
 	public boolean setLayerType(int layerType) {
-		return false;
+		boolean changed = this.layerType != layerType;
+		this.layerType = layerType;
+		return changed;
 	}
 
 	/* AOSP RenderNode: whether the node's content overlaps (then a layer is needed for a translucent alpha). The
@@ -305,7 +313,9 @@ public class RenderNode {
 	}
 
 	public boolean setLayerPaint(Paint paint) {
-		return false;
+		boolean changed = layerPaint != paint;
+		layerPaint = paint;
+		return changed;
 	}
 
 	public boolean setOutline(Outline outline) {
@@ -420,5 +430,12 @@ public class RenderNode {
 		matrix.setTranslate(translationX, translationY);
 		matrix.preRotate(rotation, pivotX, pivotY);
 		matrix.preScale(scaleX, scaleY, pivotX, pivotY);
+	}
+
+	/* AOSP RenderNode.getInverseMatrix(): getMatrix() inverted, as android.graphics.RenderNode does here */
+	public void getInverseMatrix(Matrix outMatrix) {
+		Matrix matrix = new Matrix();
+		getMatrix(matrix);
+		matrix.invert(outMatrix);
 	}
 }

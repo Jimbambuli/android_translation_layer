@@ -18,6 +18,25 @@ import java.util.Objects;
 
 public interface WindowManager {
 
+	/* AOSP WindowManager.BadTokenException / InvalidDisplayException (thrown by addView() on Android) */
+	public static class BadTokenException extends RuntimeException {
+		public BadTokenException() {
+		}
+
+		public BadTokenException(String name) {
+			super(name);
+		}
+	}
+
+	public static class InvalidDisplayException extends RuntimeException {
+		public InvalidDisplayException() {
+		}
+
+		public InvalidDisplayException(String name) {
+			super(name);
+		}
+	}
+
 	/* AOSP WindowManager.isCrossWindowBlurEnabled() and listener methods: interface defaults
 	 * (false / no-op); WindowManagerImpl overrides them like AOSP's WindowManagerImpl */
 	default boolean isCrossWindowBlurEnabled() {
@@ -32,6 +51,19 @@ public interface WindowManager {
 	}
 
 	default void removeCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
+	}
+
+	/* AOSP 16 WindowManager screen recording state and callback defaults */
+	int SCREEN_RECORDING_STATE_NOT_VISIBLE = 0;
+	int SCREEN_RECORDING_STATE_VISIBLE = 1;
+
+	default int addScreenRecordingCallback(java.util.concurrent.Executor executor,
+			java.util.function.Consumer<Integer> callback) {
+		throw new UnsupportedOperationException();
+	}
+
+	default void removeScreenRecordingCallback(java.util.function.Consumer<Integer> callback) {
+		throw new UnsupportedOperationException();
 	}
 	public android.view.Display getDefaultDisplay();
 
