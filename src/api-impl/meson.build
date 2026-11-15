@@ -727,6 +727,7 @@ srcs = [
 	'android/os/ParcelUuid.java',
 	'android/os/PatternMatcher.java',
 	'android/os/PersistableBundle.java',
+	'android/os/PerformanceHintManager.java',
 	'android/os/PooledStringReader.java',
 	'android/os/PooledStringWriter.java',
 	'android/os/PowerManager.java',
