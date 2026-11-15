@@ -38,7 +38,7 @@ import android.view.accessibility.AccessibilityEvent;
  * through IDreamService.attach(), which creates the window and calls onAttachedToWindow() and
  * onDreamingStarted(); ATL has no dream manager, so the service stays unattached, as AOSP's before
  * attach(): no window (getWindow() null), no dream token. Dozing, overlay and activity based parts are
- * not ported, nor setContentView(int) and setContentView(View, LayoutParams) (ATL Window has no such method).
+ * not ported. setContentView(int) and setContentView(View, LayoutParams) are done here, ATL Window has no such method.
  */
 public class DreamService extends Service implements Window.Callback {
 
@@ -202,7 +202,19 @@ public class DreamService extends Service implements Window.Callback {
 		return mWindow;
 	}
 
+	/* AOSP setContentView(int): ATL's Window has no such method, so the layout is inflated here and set as the
+	 * content (null parent, as Activity.setContentView(int) of ATL) */
+	public void setContentView(int layoutResID) {
+		getWindow().setContentView(android.view.LayoutInflater.from(this).inflate(layoutResID, null, false));
+	}
+
 	public void setContentView(View view) {
+		getWindow().setContentView(view);
+	}
+
+	/* AOSP setContentView(View, LayoutParams): the content is replaced, the view keeps the given parameters */
+	public void setContentView(View view, ViewGroup.LayoutParams params) {
+		view.setLayoutParams(params);
 		getWindow().setContentView(view);
 	}
 
