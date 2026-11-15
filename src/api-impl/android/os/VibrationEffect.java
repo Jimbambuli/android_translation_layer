@@ -114,6 +114,9 @@ public class VibrationEffect {
 		public static final int PRIMITIVE_TICK = 7;
 		public static final int PRIMITIVE_LOW_TICK = 8;
 
+		public static final int DELAY_TYPE_PAUSE = 0;
+		public static final int DELAY_TYPE_RELATIVE_START_OFFSET = 1;
+
 		private int mSegments;
 
 		Composition() {}
@@ -128,10 +131,17 @@ public class VibrationEffect {
 
 		/* AOSP PrimitiveSegment.validate(): the primitive id, scale and delay are in range */
 		public Composition addPrimitive(int primitiveId, float scale, int delay) {
+			return addPrimitive(primitiveId, scale, delay, DELAY_TYPE_PAUSE);
+		}
+
+		/* AOSP addPrimitive(id, scale, delay, delayType): PrimitiveSegment.validate() also checks the delay type */
+		public Composition addPrimitive(int primitiveId, float scale, int delay, int delayType) {
 			com.android.internal.util.Preconditions.checkArgumentInRange(primitiveId, PRIMITIVE_NOOP, PRIMITIVE_LOW_TICK, "primitiveId");
 			com.android.internal.util.Preconditions.checkArgumentInRange(scale, 0f, 1f, "scale");
 			if (delay < 0)
 				throw new IllegalArgumentException("delay must be >= 0");
+			if (delayType != DELAY_TYPE_PAUSE && delayType != DELAY_TYPE_RELATIVE_START_OFFSET)
+				throw new IllegalArgumentException("delayType");
 			mSegments++;
 			return this;
 		}

@@ -86,6 +86,15 @@ public class Vibrator {
 		return supported;
 	}
 
+	/* AOSP vibrate(long, AudioAttributes): errors of the one-shot effect are only logged (pre-O behaviour) */
+	public void vibrate(long milliseconds, android.media.AudioAttributes attributes) {
+		try {
+			vibrate(VibrationEffect.createOneShot(milliseconds, VibrationEffect.DEFAULT_AMPLITUDE), attributes);
+		} catch (IllegalArgumentException iae) {
+			Slog.e("Vibrator", "Failed to create VibrationEffect", iae);
+		}
+	}
+
 	/* AOSP vibrate(long[], int, AudioAttributes) */
 	public void vibrate(long[] pattern, int repeat, android.media.AudioAttributes attributes) {
 		if (repeat < -1 || repeat >= pattern.length)
