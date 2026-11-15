@@ -206,6 +206,7 @@ srcs = [
 	'android/app/usage/UsageEvents.java',
 	'android/app/usage/UsageStats.java',
 	'android/app/usage/UsageStatsManager.java',
+	'android/appwidget/AppWidgetHostView.java',
 	'android/appwidget/AppWidgetManager.java',
 	'android/appwidget/AppWidgetProvider.java',
 	'android/appwidget/AppWidgetProviderInfo.java',
