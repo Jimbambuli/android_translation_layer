@@ -2288,6 +2288,11 @@ public class PackageManager {
 		return false;
 	}
 
+	/* AOSP PackageManager.isDeviceUpgrading() */
+	public boolean isDeviceUpgrading() {
+		return false;
+	}
+
 	/**
 	 * Gets whether the given package is an instant app.
 	 *

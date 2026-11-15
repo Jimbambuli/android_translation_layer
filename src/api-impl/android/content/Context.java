@@ -690,6 +690,11 @@ public abstract class Context {
 
 	public abstract boolean bindService(final Intent intent, final ServiceConnection serviceConnection, int flags);
 
+	/* AOSP ContextImpl.bindServiceAsUser: ATL has the one user only */
+	public boolean bindServiceAsUser(Intent service, ServiceConnection conn, int flags, UserHandle user) {
+		return bindService(service, conn, flags);
+	}
+
 	/* the dispatchers of the connections bound with an executor (LoadedApk.mServices), which unbindService()
 	 * unbinds in place of the app's connection */
 	private static final java.util.WeakHashMap<ServiceConnection, ServiceConnection> executor_dispatchers = new java.util.WeakHashMap<>();

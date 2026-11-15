@@ -202,6 +202,7 @@ public final class ATLLoadedAppManager {
 		pkg.applicationInfo.sourceDir = apk.getPath();
 		pkg.applicationInfo.publicSourceDir = apk.getPath();
 		pkg.applicationInfo.dataDir = getDataDir(pkg.packageName).getPath();
+		pkg.applicationInfo.deviceProtectedDataDir = pkg.applicationInfo.dataDir;
 		pkg.applicationInfo.nativeLibraryDir = new File(getDataDir(pkg.packageName), "lib").getPath();
 	}
 

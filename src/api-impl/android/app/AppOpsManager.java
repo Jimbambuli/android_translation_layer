@@ -90,4 +90,8 @@ public class AppOpsManager {
 	public int unsafeCheckOp(String op, int uid, String packageName) {
 		return MODE_ALLOWED;
 	}
+
+	/* AOSP AppOpsManager.checkPackage(): the service answers MODE_ALLOWED for ATL's one package (as checkOp()) */
+	public void checkPackage(int uid, String packageName) {
+	}
 }

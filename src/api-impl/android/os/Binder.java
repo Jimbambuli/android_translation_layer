@@ -62,6 +62,9 @@ public class Binder implements IBinder {
 	public static int getCallingUid() { return ATLLoadedApp.getPrimaryApplication().pkg.applicationInfo.uid; }
 
 	/* the process of the transaction this thread executes (ATLBinderConnection), else this one like AOSP */
+	/* AOSP Binder.getCallingUidOrThrow(): ATL does not track transactions, every caller counts as handling one */
+	public static final int getCallingUidOrThrow() { return getCallingUid(); }
+
 	public static int getCallingPid() { return android.atl.ATLBinderConnection.getCallingPid(); }
 
 	@Override

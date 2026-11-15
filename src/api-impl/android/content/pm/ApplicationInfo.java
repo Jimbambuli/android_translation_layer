@@ -445,6 +445,9 @@ public class ApplicationInfo extends PackageItemInfo {
 	 */
 	public String dataDir;
 
+	/* AOSP: the device-protected (direct boot) counterpart of dataDir; ATL has the one storage */
+	public String deviceProtectedDataDir;
+
 	/**
 	 * Full path to the directory where native JNI libraries are stored.
 	 */
@@ -615,6 +618,7 @@ public class ApplicationInfo extends PackageItemInfo {
 		seinfo = orig.seinfo;
 		sharedLibraryFiles = orig.sharedLibraryFiles;
 		dataDir = orig.dataDir;
+		deviceProtectedDataDir = orig.deviceProtectedDataDir;
 		primaryCpuAbi = orig.primaryCpuAbi;
 		secondaryCpuAbi = orig.secondaryCpuAbi;
 		uid = orig.uid;
