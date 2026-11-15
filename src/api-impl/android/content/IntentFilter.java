@@ -212,7 +212,15 @@ public class IntentFilter implements android.os.Parcelable {
 		return actions.get(index);
 	}
 
-	public void setPriority(int priority) {}
+	private int priority;
+
+	public final void setPriority(int priority) {
+		this.priority = priority;
+	}
+
+	public final int getPriority() {
+		return priority;
+	}
 
 	public void addDataScheme(String dataScheme) {
 		dataSchemes.add(dataScheme);
@@ -495,6 +503,35 @@ public class IntentFilter implements android.os.Parcelable {
 
 	public final Iterator<String> schemesIterator() {
 		return dataSchemes.iterator();
+	}
+
+	public final Iterator<String> categoriesIterator() {
+		return categories.iterator();
+	}
+
+	public final Iterator<String> typesIterator() {
+		return dataTypes != null ? dataTypes.iterator() : null;
+	}
+
+	public final Iterator<PatternMatcher> pathsIterator() {
+		return dataPaths != null ? dataPaths.iterator() : null;
+	}
+
+	/* AOSP IntentFilter.hasDataAuthority(Uri) = matchDataAuthority(data) >= 0: an authority entry of the filter matches */
+	public final boolean hasDataAuthority(Uri data) {
+		for (AuthorityEntry auth : dataAuthorities)
+			if (auth.match(data) >= 0)
+				return true;
+		return false;
+	}
+
+	/* AOSP IntentFilter.create(): a filter with the action and the data type, a malformed type is a RuntimeException */
+	public static IntentFilter create(String action, String dataType) {
+		try {
+			return new IntentFilter(action, dataType);
+		} catch (MalformedMimeTypeException e) {
+			throw new RuntimeException("Bad MIME type", e);
+		}
 	}
 
 	public final Iterator<AuthorityEntry> authoritiesIterator() {
