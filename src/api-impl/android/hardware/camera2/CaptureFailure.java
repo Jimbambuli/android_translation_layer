@@ -33,7 +33,6 @@ public class CaptureFailure {
 		return mFrameNumber;
 	}
 
-	@FailureReason
 	public int getReason() {
 		return mReason;
 	}
