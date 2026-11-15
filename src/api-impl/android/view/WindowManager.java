@@ -16,7 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-public interface WindowManager {
+public interface WindowManager extends ViewManager {
 
 	/* AOSP WindowManager.BadTokenException / InvalidDisplayException (thrown by addView() on Android) */
 	public static class BadTokenException extends RuntimeException {

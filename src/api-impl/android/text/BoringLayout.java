@@ -8,7 +8,7 @@ import android.text.style.ParagraphStyle;
  * left-to-right characters. As AOSP's, it knows its width from isBoring() and makes a Layout from the Metrics.
  * ATL's Layout (Pango) does the drawing; AOSP's own lays out the single line with TextLine.
  */
-public class BoringLayout extends Layout {
+public class BoringLayout extends Layout implements TextUtils.EllipsizeCallback {
 	private static final char FIRST_RIGHT_TO_LEFT = '֐';
 
 	private boolean mUseFallbackLineSpacing;
@@ -59,6 +59,16 @@ public class BoringLayout extends Layout {
 	public BoringLayout(CharSequence source, TextPaint paint, int outerWidth, Layout.Alignment align, float spacingMult, float spacingAdd, BoringLayout.Metrics metrics, boolean includePad, TextUtils.TruncateAt ellipsize, int ellipsizedWidth, boolean useFallbackLineSpacing) {
 		this(source, paint, outerWidth, align, spacingMult, spacingAdd, metrics, includePad, ellipsize, ellipsizedWidth);
 		mUseFallbackLineSpacing = useFallbackLineSpacing;
+	}
+
+	/* AOSP BoringLayout.ellipsized(int, int): TextUtils.EllipsizeCallback, stores the ellipsized range
+	 * (ATL's getEllipsisStart()/getEllipsisCount() come from the Pango layout of Layout) */
+	private int mEllipsizedStart;
+	private int mEllipsizedCount;
+
+	public void ellipsized(int start, int end) {
+		mEllipsizedStart = start;
+		mEllipsizedCount = end - start;
 	}
 
 	@Override

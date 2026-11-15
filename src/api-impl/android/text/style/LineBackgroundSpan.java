@@ -1,4 +1,4 @@
 package android.text.style;
 
-public interface LineBackgroundSpan {
+public interface LineBackgroundSpan extends ParagraphStyle {
 }

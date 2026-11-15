@@ -6,6 +6,7 @@ import android.annotation.Nullable;
 import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
 import android.content.ComponentCallbacks;
+import android.content.ComponentCallbacks2;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageParser;
@@ -13,7 +14,7 @@ import android.content.res.Configuration;
 import android.os.Bundle;
 import java.util.ArrayList;
 
-public class Application extends ContextWrapper {
+public class Application extends ContextWrapper implements ComponentCallbacks2 {
 	public long native_window;
 
 	@Export
