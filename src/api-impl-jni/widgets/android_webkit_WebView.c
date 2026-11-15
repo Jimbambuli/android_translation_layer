@@ -1000,6 +1000,66 @@ JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_native_1getCookie(JN
 	return ret;
 }
 
+/* WebKit's cookie store belongs to the main thread; CookieManager may be used from any thread, so the change
+ * runs there (at once when called on it) */
+static gboolean add_cookie_on_main(gpointer cookie)
+{
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_add_cookie(cookie_manager, cookie, NULL, NULL, NULL);
+	soup_cookie_free(cookie);
+	return G_SOURCE_REMOVE;
+}
+
+/* CookieManager.setCookie(): the value is a Set-Cookie header for the URL; FALSE if it is not a valid cookie
+ * for it (e.g. a Domain the URL's host is not in) */
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1setCookie(JNIEnv *env, jclass class, jstring url, jstring value)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return JNI_FALSE;
+	const char *uri = (*env)->GetStringUTFChars(env, url, NULL);
+	GUri *origin = g_uri_parse(uri, G_URI_FLAGS_ENCODED, NULL);
+	(*env)->ReleaseStringUTFChars(env, url, uri);
+	if (!origin)
+		return JNI_FALSE;
+	const char *header = (*env)->GetStringUTFChars(env, value, NULL);
+	SoupCookie *cookie = soup_cookie_parse(header, origin);
+	(*env)->ReleaseStringUTFChars(env, value, header);
+	g_uri_unref(origin);
+	if (!cookie)
+		return JNI_FALSE;
+	g_main_context_invoke(NULL, add_cookie_on_main, cookie);
+	return JNI_TRUE;
+}
+
+static gboolean remove_all_cookies_on_main(gpointer user_data)
+{
+	WebKitWebsiteDataManager *manager = webkit_network_session_get_website_data_manager(webkit_network_session_get_default());
+	webkit_website_data_manager_clear(manager, WEBKIT_WEBSITE_DATA_COOKIES, 0, NULL, NULL, NULL);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1removeAllCookies(JNIEnv *env, jclass class)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+	g_main_context_invoke(NULL, remove_all_cookies_on_main, NULL);
+}
+
+static gboolean set_accept_policy_on_main(gpointer policy)
+{
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_set_accept_policy(cookie_manager, GPOINTER_TO_INT(policy));
+	return G_SOURCE_REMOVE;
+}
+
+// policy: 0 accept always, 1 never, 2 not from third parties (WebKitCookieAcceptPolicy)
+JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1setAcceptPolicy(JNIEnv *env, jclass class, jint policy)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+	g_main_context_invoke(NULL, set_accept_policy_on_main, GINT_TO_POINTER(policy));
+}
+
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1addJavascriptInterface(JNIEnv *env, jobject this, jlong widget_ptr, jstring name, jstring method_names)
 {
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
