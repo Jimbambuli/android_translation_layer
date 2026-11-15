@@ -141,6 +141,23 @@ public class TypedArray implements AutoCloseable {
 		return mResources;
 	}
 
+	/* AOSP TypedArray.getFont(): the font resource of the attribute, null when it is unset */
+	public android.graphics.Typeface getFont(int index) {
+		if (mRecycled) {
+			throw new RuntimeException("Cannot make calls to a recycled instance!");
+		}
+
+		final TypedValue value = mValue;
+		if (getValueAt(index * AssetManager.STYLE_NUM_ENTRIES, value)) {
+			if (value.type == TypedValue.TYPE_ATTRIBUTE) {
+				throw new UnsupportedOperationException(
+				    "Failed to resolve attribute at index " + index + ": " + value);
+			}
+			return mResources.getFont(value, value.resourceId);
+		}
+		return null;
+	}
+
 	/**
 	 * Retrieves the styled string value for the attribute at <var>index</var>.
 	 * <p>

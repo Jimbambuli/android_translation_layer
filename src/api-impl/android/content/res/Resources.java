@@ -1130,6 +1130,15 @@ public class Resources {
 		throw new NotFoundException("Font resource ID #0x" + Integer.toHexString(id));
 	}
 
+	/* AOSP Resources.getFont(TypedValue, int) (hidden, used by TypedArray.getFont()) */
+	android.graphics.Typeface getFont(TypedValue value, int id) throws NotFoundException {
+		android.graphics.Typeface typeface = loadFont(value, id);
+		if (typeface != null) {
+			return typeface;
+		}
+		throw new NotFoundException("Font resource ID #0x" + Integer.toHexString(id));
+	}
+
 	private android.graphics.Typeface loadFont(TypedValue value, int id) {
 		if (value.string == null) {
 			throw new NotFoundException("Resource \"" + getResourceName(id) + "\" ("

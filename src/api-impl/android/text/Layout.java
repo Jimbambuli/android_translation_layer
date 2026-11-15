@@ -313,6 +313,13 @@ public class Layout {
 		return native_get_line_bottom(layout, line);
 	}
 
+	/* AOSP Layout.getLineMax(): the width of the line without trailing whitespace plus the paragraph's leading
+	 * margin. ATL's lines have no leading margins and count trailing whitespace as visible (getLineVisibleEnd() ==
+	 * getLineEnd()), so this is the Pango line width */
+	public float getLineMax(int line) {
+		return getLineWidth(line);
+	}
+
 	public float getLineLeft(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
