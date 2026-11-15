@@ -68,6 +68,21 @@ public class MediaStore {
 
 	public static final String UNKNOWN_STRING = "<unknown>";
 
+	/* AOSP MediaStore.getVolumeName(File): only /storage/<volume> is a volume of its own, every other path is
+	 * internal; "emulated" is the primary external volume */
+	private static final java.util.regex.Pattern PATTERN_VOLUME_NAME = java.util.regex.Pattern.compile("(?i)^/storage/([^/]+)");
+
+	public static String getVolumeName(java.io.File path) {
+		final java.util.regex.Matcher matcher = PATTERN_VOLUME_NAME.matcher(path.getAbsolutePath());
+		if (matcher.find()) {
+			final String volumeName = matcher.group(1);
+			if (volumeName.equals("emulated"))
+				return VOLUME_EXTERNAL_PRIMARY;
+			return volumeName.toLowerCase(java.util.Locale.ROOT);
+		}
+		return VOLUME_INTERNAL;
+	}
+
 	public static boolean getIncludePending(Uri uri) {
 		return uri.getBooleanQueryParameter(PARAM_INCLUDE_PENDING, false);
 	}
@@ -176,6 +191,65 @@ public class MediaStore {
 			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
 			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/image";
+
+			/* AOSP Images.Media.DEFAULT_SORT_ORDER = ImageColumns.BUCKET_DISPLAY_NAME */
+			public static final String DEFAULT_SORT_ORDER = "bucket_display_name";
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
+				return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
+			}
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection, String where, String orderBy) {
+				return cr.query(uri, projection, where, null, orderBy == null ? DEFAULT_SORT_ORDER : orderBy);
+			}
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection, String selection,
+			                                 String[] selectionArgs, String orderBy) {
+				return cr.query(uri, projection, selection, selectionArgs, orderBy == null ? DEFAULT_SORT_ORDER : orderBy);
+			}
+
+			/* AOSP Images.Media.insertImage(ContentResolver, String, String, String) */
+			public static final String insertImage(ContentResolver cr, String imagePath, String name, String description)
+			    throws FileNotFoundException {
+				final Bitmap source;
+				try {
+					source = android.graphics.ImageDecoder.decodeBitmap(
+					    android.graphics.ImageDecoder.createSource(new java.io.File(imagePath)));
+				} catch (IOException e) {
+					throw new FileNotFoundException(e.getMessage());
+				}
+				return insertImage(cr, source, name, description);
+			}
+
+			/* AOSP Images.Media.insertImage(ContentResolver, Bitmap, String, String): a pending row, the JPEG, then
+			 * publish (MediaColumns.IS_PENDING is "is_pending" and so on) */
+			public static final String insertImage(ContentResolver cr, Bitmap source, String title, String description) {
+				if (android.text.TextUtils.isEmpty(title))
+					title = "Image";
+				final long now = System.currentTimeMillis();
+				final ContentValues values = new ContentValues();
+				values.put("_display_name", title);
+				values.put("mime_type", "image/jpeg");
+				values.put("date_added", now / 1000);
+				values.put("date_modified", now / 1000);
+				values.put("is_pending", 1);
+
+				final Uri uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+				try {
+					try (java.io.OutputStream out = cr.openOutputStream(uri)) {
+						source.compress(Bitmap.CompressFormat.JPEG, 90, out);
+					}
+					// everything went well above, publish it
+					values.clear();
+					values.put("is_pending", 0);
+					cr.update(uri, values, null, null);
+					return uri.toString();
+				} catch (Exception e) {
+					android.util.Log.w("MediaStore", "Failed to insert image", e);
+					cr.delete(uri, null, null);
+					return null;
+				}
+			}
 		}
 
 		public static class Thumbnails {
@@ -195,6 +269,17 @@ public class MediaStore {
 				return null;
 			}
 
+			/* AOSP Images.Thumbnails.DEFAULT_SORT_ORDER, query(), queryMiniThumbnails() */
+			public static final String DEFAULT_SORT_ORDER = "image_id ASC";
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
+				return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
+			}
+
+			public static final Cursor queryMiniThumbnails(ContentResolver cr, Uri uri, int kind, String[] projection) {
+				return cr.query(uri, projection, "kind = " + kind, null, DEFAULT_SORT_ORDER);
+			}
+
 			/* AOSP MediaStore.Images.Thumbnails.getThumbnail: both forms go to InternalThumbnails.getThumbnail
 			 * (ContentResolver.loadThumbnail at the kind's size; null when that fails) */
 			public static Bitmap getThumbnail(ContentResolver cr, long origId, int kind, BitmapFactory.Options options) {
@@ -209,6 +294,13 @@ public class MediaStore {
 	}
 
 	public static class Video {
+
+		/* AOSP Video.DEFAULT_SORT_ORDER = MediaColumns.DISPLAY_NAME, Video.query() */
+		public static final String DEFAULT_SORT_ORDER = "_display_name";
+
+		public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
+			return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
+		}
 
 		public static class Media {
 
@@ -253,6 +345,11 @@ public class MediaStore {
 
 			public static Uri getContentUri(String volumeName) {
 				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("media").build();
+			}
+
+			/* AOSP Audio.Media.getContentUriForPath(): the volume of the path (see getVolumeName(File)) */
+			public static Uri getContentUriForPath(String path) {
+				return getContentUri(getVolumeName(new java.io.File(path)));
 			}
 
 			public static Uri getContentUri(String volumeName, long id) {
