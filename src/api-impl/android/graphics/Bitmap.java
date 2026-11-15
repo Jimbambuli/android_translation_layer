@@ -328,9 +328,11 @@ public final class Bitmap implements Parcelable {
 		generationId = nextGenerationId.getAndIncrement();
 	}
 
+	/* AOSP: the size of the pixel memory, which reconfigure() keeps when the bitmap gets smaller */
 	public int getAllocationByteCount() {
-		return height * getRowBytes();
+		return allocationByteCount > 0 ? allocationByteCount : height * getRowBytes();
 	}
+	private int allocationByteCount;
 
 	public void prepareToDraw() {
 		getTexture();
@@ -466,7 +468,7 @@ public final class Bitmap implements Parcelable {
 			System.exit(1);
 		}
 		native_copy_to_buffer(getTexture(), buffer, config.gdk_memory_format, getRowBytes());
-		buffer.position(buffer.position() + getAllocationByteCount());
+		buffer.position(buffer.position() + getByteCount());
 	}
 
 	/* AOSP: the pixels in the layout of the config, read from the buffer's position on, which then moves past them.
@@ -510,7 +512,7 @@ public final class Bitmap implements Parcelable {
 	}
 
 	public int getByteCount() {
-		return getAllocationByteCount();
+		return height * getRowBytes();
 	}
 
 	public boolean isMutable() {
@@ -588,9 +590,58 @@ public final class Bitmap implements Parcelable {
 		native_set_pixels(getSnapshot(), pixels, 0, 1, x, y, 1, 1);
 	}
 
-	public void reconfigure(int width, int height, Bitmap.Config config) {}
+	/* AOSP Bitmap.reconfigure() with the size check of the native Bitmap::reconfigure() (android_graphics_Bitmap.cpp).
+	 * AOSP keeps the pixel memory and reinterprets its bytes (contents undefined per the API); the
+	 * GdkTexture here cannot change its size or format, so the bitmap gets fresh transparent pixels */
+	public void reconfigure(int width, int height, Bitmap.Config config) {
+		if (recycled)
+			throw new IllegalStateException("Can't call reconfigure() on a recycled bitmap");
+		if (width <= 0 || height <= 0)
+			throw new IllegalArgumentException("width and height must be > 0");
+		if (!isMutable())
+			throw new IllegalStateException("only mutable bitmaps may be reconfigured");
+		int allocation = getAllocationByteCount();
+		int stride = (width * config.bytes_per_pixel + 3) & ~3;
+		if (height * stride > allocation)
+			throw new IllegalArgumentException("Bitmap not large enough to support new configuration");
+		synchronized (this) {
+			native_recycle(texture, snapshot);
+			texture = 0;
+			snapshot = 0;
+		}
+		this.allocationByteCount = allocation;
+		this.width = width;
+		this.height = height;
+		this.config = config;
+		this.stride = stride;
+		notifyPixelsChanged();
+	}
 
-	public void setPremultiplied(boolean premultiplied) {}
+	public void setWidth(int width) {
+		reconfigure(width, getHeight(), getConfig());
+	}
+
+	public void setHeight(int height) {
+		reconfigure(getWidth(), height, getConfig());
+	}
+
+	public void setConfig(Bitmap.Config config) {
+		reconfigure(getWidth(), getHeight(), config);
+	}
+
+	/* AOSP Bitmap.setPremultiplied()/isPremultiplied(): the flag of the native bitmap's alpha type. ATL
+	 * keeps the flag only, the GdkTexture's pixels are converted as before. isPremultiplied() follows
+	 * Skia's alpha type: opaque (RGB_565, setHasAlpha(false)) is never premultiplied */
+	public void setPremultiplied(boolean premultiplied) {
+		if (recycled)
+			throw new IllegalStateException("setPremultiplied called on a recycled bitmap");
+		requestPremultiplied = premultiplied;
+	}
+	private boolean requestPremultiplied = true;
+
+	public boolean isPremultiplied() {
+		return requestPremultiplied && config != Config.RGB_565 && hasAlpha;
+	}
 
 	public Bitmap extractAlpha() {
 		return this.copy(config, mutable);
