@@ -453,6 +453,7 @@ srcs = [
 	'android/graphics/SweepGradient.java',
 	'android/graphics/Typeface.java',
 	'android/graphics/Xfermode.java',
+	'android/graphics/YuvImage.java',
 	'android/graphics/drawable/AdaptiveIconDrawable.java',
 	'android/graphics/drawable/Animatable.java',
 	'android/graphics/drawable/Animatable2.java',
