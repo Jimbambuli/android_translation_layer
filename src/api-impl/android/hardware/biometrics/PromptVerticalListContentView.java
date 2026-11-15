@@ -56,7 +56,7 @@ public final class PromptVerticalListContentView implements PromptContentViewPar
 	}
 
 	@Override
-	public void writeToParcel(@androidx.annotation.NonNull Parcel dest, int flags) {
+	public void writeToParcel(Parcel dest, int flags) {
 		dest.writeList(mContentList);
 		dest.writeString(mDescription);
 	}
