@@ -119,4 +119,47 @@ public class URLUtil {
 		}
 		return webAddress.toString();
 	}
+
+	/* AOSP URLUtil */
+	public static String stripAnchor(String url) {
+		int anchorIndex = url.indexOf('#');
+		if (anchorIndex != -1) {
+			return url.substring(0, anchorIndex);
+		}
+		return url;
+	}
+
+	public static boolean isCookielessProxyUrl(String url) {
+		return (null != url) && url.startsWith(PROXY_BASE);
+	}
+
+	public static byte[] decode(byte[] url) throws IllegalArgumentException {
+		if (url.length == 0) {
+			return new byte[0];
+		}
+		byte[] tempData = new byte[url.length];
+		int tempCount = 0;
+		for (int i = 0; i < url.length; i++) {
+			byte b = url[i];
+			if (b == '%') {
+				if (url.length - i > 2) {
+					b = (byte) (parseHex(url[i + 1]) * 16 + parseHex(url[i + 2]));
+					i += 2;
+				} else {
+					throw new IllegalArgumentException("Invalid format");
+				}
+			}
+			tempData[tempCount++] = b;
+		}
+		byte[] retData = new byte[tempCount];
+		System.arraycopy(tempData, 0, retData, 0, tempCount);
+		return retData;
+	}
+
+	private static int parseHex(byte b) {
+		if (b >= '0' && b <= '9') return (b - '0');
+		if (b >= 'A' && b <= 'F') return (b - 'A' + 10);
+		if (b >= 'a' && b <= 'f') return (b - 'a' + 10);
+		throw new IllegalArgumentException("Invalid hex char '" + b + "'");
+	}
 }

@@ -1553,6 +1553,7 @@ srcs = [
 	'android/webkit/ConsoleMessage.java',
 	'android/webkit/CookieManager.java',
 	'android/webkit/CookieSyncManager.java',
+	'android/webkit/WebSyncManager.java',
 	'android/webkit/ClientCertRequest.java',
 	'android/webkit/DownloadListener.java',
 	'android/webkit/FindAddress.java',
