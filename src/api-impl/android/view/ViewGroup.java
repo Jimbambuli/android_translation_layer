@@ -39,6 +39,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	private static final int FLAG_ADD_STATES_FROM_CHILDREN = 0x2000;
 	private static final int FLAG_MASK_FOCUSABILITY  = (3 << 17);
 	public static final int FOCUS_BEFORE_DESCENDANTS = (1 << 17);
+
+	/* AOSP ViewGroup.PERSISTENT_* (setPersistentDrawingCache()) */
+	public static final int PERSISTENT_NO_CACHE = 0x0;
+	public static final int PERSISTENT_ANIMATION_CACHE = 0x1;
+	public static final int PERSISTENT_SCROLLING_CACHE = 0x2;
+	public static final int PERSISTENT_ALL_CACHES = 0x3;
 	public static final int FOCUS_AFTER_DESCENDANTS  = (2 << 17);
 	public static final int FOCUS_BLOCK_DESCENDANTS  = (3 << 17);
 	@UnsupportedAppUsage
@@ -1472,6 +1478,44 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				return result;
 		}
 		return null;
+	}
+
+	/* AOSP ViewGroup.setAnimationCacheEnabled()/isAnimationCacheEnabled(),
+	 * setAlwaysDrawnWithCacheEnabled()/isAlwaysDrawnWithCacheEnabled(), setPersistentDrawingCache()/
+	 * getPersistentDrawingCache(): deprecated drawing cache hints, on (SCROLLING) by default as in initViewGroup();
+	 * ATL draws without these caches, so they are only kept */
+	private boolean mAnimationCache = true;
+	private boolean mAlwaysDrawnWithCache = true;
+	private int mPersistentDrawingCache = PERSISTENT_SCROLLING_CACHE;
+
+	public void setAnimationCacheEnabled(boolean enabled) {
+		mAnimationCache = enabled;
+	}
+
+	public boolean isAnimationCacheEnabled() {
+		return mAnimationCache;
+	}
+
+	public void setAlwaysDrawnWithCacheEnabled(boolean always) {
+		mAlwaysDrawnWithCache = always;
+	}
+
+	public boolean isAlwaysDrawnWithCacheEnabled() {
+		return mAlwaysDrawnWithCache;
+	}
+
+	public void setPersistentDrawingCache(int drawingCacheToKeep) {
+		mPersistentDrawingCache = drawingCacheToKeep & PERSISTENT_ALL_CACHES;
+	}
+
+	public int getPersistentDrawingCache() {
+		return mPersistentDrawingCache;
+	}
+
+	/* AOSP ViewGroup.detachAllViewsFromParent(): every child, last first */
+	protected void detachAllViewsFromParent() {
+		for (int i = getChildCount() - 1; i >= 0; i--)
+			detachViewFromParent(getChildAt(i));
 	}
 
 	public void detachViewFromParent(View view) {

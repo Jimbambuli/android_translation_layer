@@ -2434,6 +2434,13 @@ public final class MotionEvent extends InputEvent {
 	 * @see #BUTTON_FORWARD
 	 * @see #BUTTON_BACK
 	 */
+	/* AOSP MotionEvent.isButtonPressed() */
+	public final boolean isButtonPressed(int button) {
+		if (button == 0)
+			return false;
+		return (getButtonState() & button) == button;
+	}
+
 	public final int getButtonState() {
 		// return nativeGetButtonState(mNativePtr);
 		if (getToolType(0) == TOOL_TYPE_MOUSE)

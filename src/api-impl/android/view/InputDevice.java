@@ -141,5 +141,14 @@ public class InputDevice {
 		public float getRange() {
 			return max - min;
 		}
+
+		/* AOSP MotionRange.getFlat()/getFuzz(): like min and max, ATL's ranges have none */
+		public float getFlat() {
+			return 0;
+		}
+
+		public float getFuzz() {
+			return 0;
+		}
 	};
 }

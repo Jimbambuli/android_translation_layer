@@ -5979,6 +5979,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (!hasIdentityMatrix())
 			matrix.postConcat(getInverseMatrix());
 	}
+	/* AOSP View.requestPointerCapture()/releasePointerCapture()/hasPointerCapture(): through ViewRootImpl to the
+	 * input system; ATL has no pointer capture (no GTK pointer lock), so a request is never granted */
+	public void requestPointerCapture() {}
+
+	public void releasePointerCapture() {}
+
+	public boolean hasPointerCapture() {
+		return false;
+	}
+
 	public void setAnimationMatrix(Matrix matrix) {}
 	public Matrix getAnimationMatrix() { return null; }
 
