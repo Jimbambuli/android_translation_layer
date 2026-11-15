@@ -2164,6 +2164,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return parent != null && parent.showContextMenuForChild(originalView);
 	}
 
+	/* AOSP ViewGroup.showContextMenuForChild(View, float, float) without the coordinates flag (ATL has no context menu position) */
+	@Override
+	public boolean showContextMenuForChild(View originalView, float x, float y) {
+		if (showContextMenuForChild(originalView)) {
+			return true;
+		}
+		return parent != null && parent.showContextMenuForChild(originalView, x, y);
+	}
+
+	/* AOSP ViewGroup.startActionModeForChild(View, ActionMode.Callback): the typed call with TYPE_PRIMARY */
+	@Override
+	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback) {
+		return startActionModeForChild(originalView, callback, ActionMode.TYPE_PRIMARY);
+	}
+
 	@Override
 	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback, int type) {
 		return parent != null ? parent.startActionModeForChild(originalView, callback, type) : null;

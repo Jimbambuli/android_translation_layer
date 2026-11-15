@@ -46,5 +46,16 @@ public interface ViewParent {
 
 	public boolean showContextMenuForChild(View originalView);
 
+	/* AOSP ViewParent.showContextMenuForChild(View, float, float): the same with the position of the press in the child */
+	public boolean showContextMenuForChild(View originalView, float x, float y);
+
+	/* AOSP ViewParent.startActionModeForChild(View, ActionMode.Callback): the primary type */
+	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback);
+
+	/* AOSP default method: the source is not used by the parents that do not know it */
+	default boolean requestChildRectangleOnScreen(View child, android.graphics.Rect rectangle, boolean immediate, int source) {
+		return requestChildRectangleOnScreen(child, rectangle, immediate);
+	}
+
 	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback, int type);
 }
