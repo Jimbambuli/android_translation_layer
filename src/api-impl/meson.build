@@ -814,6 +814,8 @@ srcs = [
 	'android/security/keystore/AndroidKeyStoreSecretKey.java',
 	'android/security/keystore/KeyGenerator.java',
 	'android/security/keystore/KeyGenParameterSpec.java',
+	'android/security/keystore/KeyInfo.java',
+	'android/security/keystore/KeyProtection.java',
 	'android/security/keystore/KeyPermanentlyInvalidatedException.java',
 	'android/security/keystore/UserNotAuthenticatedException.java',
 	'android/service/chooser/ChooserAction.java',
