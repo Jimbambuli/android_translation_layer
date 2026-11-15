@@ -4991,6 +4991,16 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return new HashMap<>();
 	}
 
+	/* AOSP View.setVerticalScrollbarThumbDrawable()/getVerticalScrollbarThumbDrawable(): kept for the getter, ATL
+	 * draws no Android scroll bars */
+	private Drawable mVerticalScrollbarThumbDrawable;
+	public void setVerticalScrollbarThumbDrawable(Drawable drawable) {
+		mVerticalScrollbarThumbDrawable = drawable;
+	}
+	public Drawable getVerticalScrollbarThumbDrawable() {
+		return mVerticalScrollbarThumbDrawable;
+	}
+
 	/* AOSP View.setVerticalScrollbarPosition()/getVerticalScrollbarPosition(): kept (ATL draws no Android scroll
 	 * bars, so nothing moves) */
 	private int mVerticalScrollbarPosition;

@@ -1447,8 +1447,21 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
+	/* AOSP ViewGroup.onNestedPreFling(): re-dispatch up the tree by default */
 	@Override
 	public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+		return dispatchNestedPreFling(velocityX, velocityY);
+	}
+
+	/* AOSP ViewGroup.dispatchGenericFocusedEvent(): to the focused child, or to this group if it has the focus
+	 * (PFLAG_HAS_BOUNDS as isLaidOut()) */
+	@Override
+	protected boolean dispatchGenericFocusedEvent(MotionEvent event) {
+		if (isFocused() && isLaidOut())
+			return super.dispatchGenericFocusedEvent(event);
+		final View focused = getFocusedChild();
+		if (focused != null && focused.isLaidOut())
+			return focused.dispatchGenericMotionEvent(event);
 		return false;
 	}
 
