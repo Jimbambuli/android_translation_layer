@@ -6078,8 +6078,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
-	public void setAnimationMatrix(Matrix matrix) {}
-	public Matrix getAnimationMatrix() { return null; }
+	/* AOSP View.setAnimationMatrix()/getAnimationMatrix(): RenderNode keeps a copy, applied outside the view's own
+	 * transform (RenderNodeDrawable::setViewProperties()); native_layout() hands it to GTK. As in AOSP, getMatrix()
+	 * and so the touch mapping ignore it (GTK's picking does follow it) */
+	private Matrix animationMatrix;
+
+	public void setAnimationMatrix(Matrix matrix) {
+		animationMatrix = (matrix != null) ? new Matrix(matrix) : null;
+		if (parent instanceof View)
+			((View)parent).native_queueAllocate(((View)parent).widget);
+	}
+
+	public Matrix getAnimationMatrix() {
+		return (animationMatrix != null) ? new Matrix(animationMatrix) : null;
+	}
 
 	private static long nextUniqueDrawingId = 1;
 	private long uniqueDrawingId;

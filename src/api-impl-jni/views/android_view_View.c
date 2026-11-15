@@ -1145,6 +1145,18 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1layout(JNIEnv *env, jobjec
 		transform = gsk_transform_scale(transform, _GET_FLOAT_FIELD(wrapper->jobj, "scaleX"), _GET_FLOAT_FIELD(wrapper->jobj, "scaleY"));
 		transform = gsk_transform_translate(transform, &GRAPHENE_POINT_INIT(-pivot.x, -pivot.y));
 	}
+	/* View.setAnimationMatrix(): AOSP's RenderNodeDrawable::setViewProperties() concats it after left/top and
+	 * before the view's own transform; the transform above starts with translate(l, t) */
+	jobject animation_matrix = wrapper->jobj ? _GET_OBJ_FIELD(wrapper->jobj, "animationMatrix", "Landroid/graphics/Matrix;") : NULL;
+	if (animation_matrix) {
+		GskTransform *outer = gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(l, t));
+		outer = gsk_transform_matrix(outer, _PTR(_GET_LONG_FIELD(animation_matrix, "native_instance")));
+		outer = gsk_transform_translate(outer, &GRAPHENE_POINT_INIT(-l, -t));
+		outer = gsk_transform_transform(outer, transform);
+		gsk_transform_unref(transform);
+		transform = outer;
+		(*env)->DeleteLocalRef(env, animation_matrix);
+	}
 	gtk_widget_allocate(widget, allocation.width, allocation.height, -1, transform);
 }
 
