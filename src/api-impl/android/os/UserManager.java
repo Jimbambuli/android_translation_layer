@@ -27,6 +27,20 @@ public class UserManager {
 	public static final String EXTRA_USER_ACCOUNT_TYPE = "android.os.extra.USER_ACCOUNT_TYPE";
 	public static final String EXTRA_USER_ACCOUNT_OPTIONS = "android.os.extra.USER_ACCOUNT_OPTIONS";
 
+	/* AOSP UserManager.UserOperationException: the failure of a user operation (the system's add/remove user calls) */
+	public static class UserOperationException extends RuntimeException {
+		private final int mUserOperationResult;
+
+		public UserOperationException(String message, int userOperationResult) {
+			super(message);
+			mUserOperationResult = userOperationResult;
+		}
+
+		public int getUserOperationResult() {
+			return mUserOperationResult;
+		}
+	}
+
 	public boolean isUserUnlocked() {
 		return true;
 	}

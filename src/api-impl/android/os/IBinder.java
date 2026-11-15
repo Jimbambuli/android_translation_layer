@@ -53,4 +53,27 @@ public interface IBinder {
 	public boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException;
 
 	public String getInterfaceDescriptor();
+
+	/* AOSP IBinder.FrozenStateChangeCallback */
+	interface FrozenStateChangeCallback {
+		int STATE_FROZEN = 0;
+
+		int STATE_UNFROZEN = 1;
+
+		void onFrozenStateChanged(IBinder who, int state);
+	}
+
+	/* AOSP IBinder defaults: a local Binder does not support it */
+	default void addFrozenStateChangeCallback(java.util.concurrent.Executor executor, FrozenStateChangeCallback callback)
+	    throws RemoteException {
+		throw new UnsupportedOperationException();
+	}
+
+	default void addFrozenStateChangeCallback(FrozenStateChangeCallback callback) throws RemoteException {
+		addFrozenStateChangeCallback(Runnable::run, callback);
+	}
+
+	default boolean removeFrozenStateChangeCallback(FrozenStateChangeCallback callback) {
+		throw new UnsupportedOperationException();
+	}
 }

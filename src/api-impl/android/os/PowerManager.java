@@ -60,6 +60,23 @@ public final class PowerManager {
 				mWorkSource = ws == null ? null : new WorkSource(ws);
 			}
 		}
+
+		/* AOSP WakeLock.setStateListener(): the listener is told when the system disables or enables the
+		 * lock (power allowlist, quota, cached app); ATL has no such service, a lock is never disabled, so the
+		 * listener is kept and never called */
+		private WakeLockStateListener mListener;
+
+		public void setStateListener(java.util.concurrent.Executor executor, WakeLockStateListener listener) {
+			java.util.Objects.requireNonNull(executor, "executor cannot be null");
+			synchronized (this) {
+				mListener = listener;
+			}
+		}
+	}
+
+	/* AOSP PowerManager.WakeLockStateListener */
+	public interface WakeLockStateListener {
+		void onStateChanged(boolean enabled);
 	}
 
 	public WakeLock newWakeLock(int levelAndFlags, String tag) {
@@ -172,5 +189,88 @@ public final class PowerManager {
 
 	public boolean isWakeLockLevelSupported(int level) {
 		return false;
+	}
+
+	/* AOSP PowerManager.OnThermalHeadroomChangedListener; like the thermal status listeners the listeners are kept
+	 * and never called (no ThermalManagerService, never throttled) */
+	public interface OnThermalHeadroomChangedListener {
+		void onThermalHeadroomChanged(float headroom, float forecastHeadroom, int forecastSeconds,
+		                              java.util.Map<Integer, Float> thresholds);
+	}
+
+	private final java.util.Map<OnThermalHeadroomChangedListener, java.util.concurrent.Executor> mThermalHeadroomListeners =
+	    new java.util.HashMap<>();
+
+	public void addThermalHeadroomListener(OnThermalHeadroomChangedListener listener) {
+		java.util.Objects.requireNonNull(listener, "Thermal headroom listener cannot be null");
+		addThermalHeadroomListener(Runnable::run, listener);
+	}
+
+	public void addThermalHeadroomListener(java.util.concurrent.Executor executor, OnThermalHeadroomChangedListener listener) {
+		java.util.Objects.requireNonNull(listener, "Thermal headroom listener cannot be null");
+		java.util.Objects.requireNonNull(executor, "Executor cannot be null");
+		synchronized (mThermalHeadroomListeners) {
+			if (mThermalHeadroomListeners.containsKey(listener))
+				throw new IllegalArgumentException("Thermal headroom listener already registered: " + listener);
+			mThermalHeadroomListeners.put(listener, executor);
+		}
+	}
+
+	public void removeThermalHeadroomListener(OnThermalHeadroomChangedListener listener) {
+		java.util.Objects.requireNonNull(listener, "Thermal headroom listener cannot be null");
+		synchronized (mThermalHeadroomListeners) {
+			if (mThermalHeadroomListeners.remove(listener) == null)
+				throw new IllegalArgumentException("Thermal headroom listener was not added");
+		}
+	}
+
+	/* AOSP getThermalHeadroomThresholds(): the map holds a status only if the manufacturer defined a threshold
+	 * for it (convertThresholdsToMap() drops NaN); without sensors there is none */
+	public java.util.Map<Integer, Float> getThermalHeadroomThresholds() {
+		return new android.util.ArrayMap<>();
+	}
+
+	/* AOSP getBatteryDischargePrediction(): null "if the device is powered, charging, or an error was
+	 * encountered"; a device without battery is powered */
+	public java.time.Duration getBatteryDischargePrediction() {
+		return null;
+	}
+
+	public boolean isBatteryDischargePredictionPersonalized() {
+		return false;
+	}
+
+	/* AOSP isExemptFromLowPowerStandby()/isAllowedInLowPowerStandby(): true "if Low Power Standby is disabled",
+	 * which is the default (see isLowPowerStandbyEnabled()) */
+	public boolean isExemptFromLowPowerStandby() {
+		return true;
+	}
+
+	public boolean isAllowedInLowPowerStandby(int reason) {
+		return true;
+	}
+
+	public boolean isAllowedInLowPowerStandby(String feature) {
+		return true;
+	}
+
+	/* AOSP PowerManager.isRebootingUserspaceSupportedImpl() is false */
+	public static boolean isRebootingUserspaceSupportedImpl() {
+		return false;
+	}
+
+	public boolean isRebootingUserspaceSupported() {
+		return isRebootingUserspaceSupportedImpl();
+	}
+
+	public static final String REBOOT_USERSPACE = "userspace";
+
+	/* AOSP reboot(): the userspace check, then PowerManagerService.reboot() needs the REBOOT permission, which a
+	 * normal application does not hold (SecurityException, as for goToSleep() above) */
+	public void reboot(String reason) {
+		if (REBOOT_USERSPACE.equals(reason) && !isRebootingUserspaceSupported()) {
+			throw new UnsupportedOperationException("Attempted userspace reboot on a device that doesn't support it");
+		}
+		throw new SecurityException();
 	}
 }
