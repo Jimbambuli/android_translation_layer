@@ -9,16 +9,25 @@ import android.system.ErrnoException;
 import android.system.Os;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import android.os.Parcel;
+import android.os.Parcelable;
+import android.os.PersistableBundle;
 import java.io.FileDescriptor;
 import java.io.IOException;
+import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.HttpCookie;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /* Plays the data source like AOSP's NuPlayer: demuxer and decoders (libavformat, libavcodec) feed the
  * audio device on a playback thread of the player, and the video frames go to the Surface on a video
  * thread, each when the audio clock (what the device has played) reaches its time; a frame that is
  * more than 40 ms late is dropped, like NuPlayer's renderer does. The listeners are called on the
  * looper of the thread that created the player, like AOSP's. */
-public class MediaPlayer {
+public class MediaPlayer implements AudioRouting {
 	public static final int MEDIA_ERROR_UNKNOWN = 1;
 	public static final int MEDIA_ERROR_SERVER_DIED = 100;
 	public static final int MEDIA_ERROR_IO = -1004;
@@ -117,12 +126,38 @@ public class MediaPlayer {
 		eventHandler = new Handler(looper != null ? looper : Looper.getMainLooper());
 	}
 
+	/* AOSP MediaPlayer(Context): the context only provides the attribution source, which ATL does not have */
+	public MediaPlayer(Context context) {
+		this();
+		if (context == null)
+			throw new NullPointerException();
+	}
+
+	/* AOSP MediaPlayer(Context, int): the session id of the player (AudioSystem.AUDIO_SESSION_ALLOCATE is 0) */
+	private MediaPlayer(Context context, int sessionId) {
+		this(context);
+		if (sessionId != 0)
+			mAudioSessionId = sessionId;
+	}
+
+	/* AOSP MediaPlayer.finalize(): releases the player */
+	@Override
+	protected void finalize() {
+		release();
+	}
+
 	public static MediaPlayer create(Context context, int resid) {
+		return create(context, resid, null, 0);
+	}
+
+	/* AOSP MediaPlayer.create(Context, int, AudioAttributes, int) */
+	public static MediaPlayer create(Context context, int resid, AudioAttributes audioAttributes, int audioSessionId) {
 		try {
 			AssetFileDescriptor afd = context.getResources().openRawResourceFd(resid);
 			if (afd == null)
 				return null;
-			MediaPlayer mp = new MediaPlayer();
+			MediaPlayer mp = new MediaPlayer(context, audioSessionId);
+			mp.setAudioAttributes(audioAttributes != null ? audioAttributes : new AudioAttributes.Builder().build());
 			mp.setDataSource(afd);
 			afd.close();
 			mp.prepare();
@@ -134,9 +169,21 @@ public class MediaPlayer {
 	}
 
 	public static MediaPlayer create(Context context, Uri uri) {
+		return create(context, uri, null);
+	}
+
+	public static MediaPlayer create(Context context, Uri uri, SurfaceHolder holder) {
+		return create(context, uri, holder, null, 0);
+	}
+
+	/* AOSP MediaPlayer.create(Context, Uri, SurfaceHolder, AudioAttributes, int) */
+	public static MediaPlayer create(Context context, Uri uri, SurfaceHolder holder, AudioAttributes audioAttributes, int audioSessionId) {
 		try {
-			MediaPlayer mp = new MediaPlayer();
+			MediaPlayer mp = new MediaPlayer(context, audioSessionId);
+			mp.setAudioAttributes(audioAttributes != null ? audioAttributes : new AudioAttributes.Builder().build());
 			mp.setDataSource(context, uri);
+			if (holder != null)
+				mp.setDisplay(holder);
 			mp.prepare();
 			return mp;
 		} catch (IOException | RuntimeException e) {
@@ -172,6 +219,21 @@ public class MediaPlayer {
 
 	/* request headers are not supported */
 	public void setDataSource(Context context, Uri uri, Map<String, String> headers) throws IOException {
+		setDataSource(context, uri, headers, null);
+	}
+
+	/* AOSP MediaPlayer.setDataSource(Context, Uri, Map, List): cookies need a CookieManager as the default handler;
+	 * headers and cookies are not supported */
+	public void setDataSource(Context context, Uri uri, Map<String, String> headers, List<HttpCookie> cookies) throws IOException {
+		if (context == null)
+			throw new NullPointerException("context param can not be null.");
+		if (uri == null)
+			throw new NullPointerException("uri param can not be null.");
+		if (cookies != null) {
+			CookieHandler cookieHandler = CookieHandler.getDefault();
+			if (cookieHandler != null && !(cookieHandler instanceof CookieManager))
+				throw new IllegalArgumentException("The cookie handler has to be of CookieManager type when cookies are provided.");
+		}
 		setDataSource(context, uri);
 	}
 
@@ -743,6 +805,409 @@ public class MediaPlayer {
 	public int getAudioSessionId() { return mAudioSessionId; }
 
 	public void setWakeMode(Context context, int mode) {}
+
+	/* AOSP MediaPlayer.TrackInfo: ATL lists the tracks of the data source with MediaExtractor (the inband tracks) */
+	public static class TrackInfo implements Parcelable {
+		public static final int MEDIA_TRACK_TYPE_UNKNOWN = 0;
+		public static final int MEDIA_TRACK_TYPE_VIDEO = 1;
+		public static final int MEDIA_TRACK_TYPE_AUDIO = 2;
+		public static final int MEDIA_TRACK_TYPE_TIMEDTEXT = 3;
+		public static final int MEDIA_TRACK_TYPE_SUBTITLE = 4;
+		public static final int MEDIA_TRACK_TYPE_METADATA = 5;
+
+		final int mTrackType;
+		final MediaFormat mFormat;
+
+		TrackInfo(Parcel in) {
+			mTrackType = in.readInt();
+			mFormat = new MediaFormat();
+			mFormat.setString(MediaFormat.KEY_MIME, in.readString());
+			mFormat.setString("language", in.readString());
+			if (mTrackType == MEDIA_TRACK_TYPE_SUBTITLE) {
+				mFormat.setInteger("is-autoselect", in.readInt());
+				mFormat.setInteger("is-default", in.readInt());
+				mFormat.setInteger("is-forced-subtitle", in.readInt());
+			} else if (mTrackType == MEDIA_TRACK_TYPE_AUDIO) {
+				if (in.readBoolean())
+					mFormat.setInteger("haptic-channel-count", in.readInt());
+			}
+		}
+
+		TrackInfo(int type, MediaFormat format) {
+			mTrackType = type;
+			mFormat = format;
+		}
+
+		public int getTrackType() {
+			return mTrackType;
+		}
+
+		public String getLanguage() {
+			String language = mFormat.getString("language");
+			return language == null ? "und" : language;
+		}
+
+		public boolean hasHapticChannels() {
+			return mFormat != null && mFormat.containsKey("haptic-channel-count") && mFormat.getInteger("haptic-channel-count") > 0;
+		}
+
+		/* the format is not exposed for audio and video because it is incomplete */
+		public MediaFormat getFormat() {
+			if (mTrackType == MEDIA_TRACK_TYPE_TIMEDTEXT || mTrackType == MEDIA_TRACK_TYPE_SUBTITLE)
+				return mFormat;
+			return null;
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		@Override
+		public void writeToParcel(Parcel dest, int flags) {
+			dest.writeInt(mTrackType);
+			dest.writeString(mFormat.getString(MediaFormat.KEY_MIME));
+			dest.writeString(getLanguage());
+			if (mTrackType == MEDIA_TRACK_TYPE_SUBTITLE) {
+				dest.writeInt(mFormat.getInteger("is-autoselect"));
+				dest.writeInt(mFormat.getInteger("is-default"));
+				dest.writeInt(mFormat.getInteger("is-forced-subtitle"));
+			} else if (mTrackType == MEDIA_TRACK_TYPE_AUDIO) {
+				boolean hasHapticChannels = mFormat.containsKey("haptic-channel-count");
+				dest.writeBoolean(hasHapticChannels);
+				if (hasHapticChannels)
+					dest.writeInt(mFormat.getInteger("haptic-channel-count"));
+			}
+		}
+
+		@Override
+		public String toString() {
+			StringBuilder out = new StringBuilder(128);
+			out.append(getClass().getName());
+			out.append('{');
+			switch (mTrackType) {
+			case MEDIA_TRACK_TYPE_VIDEO:
+				out.append("VIDEO");
+				break;
+			case MEDIA_TRACK_TYPE_AUDIO:
+				out.append("AUDIO");
+				break;
+			case MEDIA_TRACK_TYPE_TIMEDTEXT:
+				out.append("TIMEDTEXT");
+				break;
+			case MEDIA_TRACK_TYPE_SUBTITLE:
+				out.append("SUBTITLE");
+				break;
+			default:
+				out.append("UNKNOWN");
+				break;
+			}
+			out.append(", " + mFormat.toString());
+			out.append("}");
+			return out.toString();
+		}
+
+		static final Parcelable.Creator<TrackInfo> CREATOR = new Parcelable.Creator<TrackInfo>() {
+			@Override
+			public TrackInfo createFromParcel(Parcel in) {
+				return new TrackInfo(in);
+			}
+
+			@Override
+			public TrackInfo[] newArray(int size) {
+				return new TrackInfo[size];
+			}
+		};
+	}
+
+	/* AOSP MediaPlayer.getTrackInfo(): IllegalStateException when there is no data source (AOSP: native invoke fails
+	 * before setDataSource); the tracks are those the demuxer finds (the inband tracks) */
+	public TrackInfo[] getTrackInfo() {
+		if (nativePlayer == 0)
+			throw new IllegalStateException();
+		MediaExtractor extractor = new MediaExtractor();
+		try {
+			if (path != null)
+				extractor.setDataSource(path);
+			else if (fd != null)
+				extractor.setDataSource(fd, fdOffset, fdLength);
+			else if (dataSource != null)
+				extractor.setDataSource(dataSource);
+			else
+				throw new IllegalStateException();
+			TrackInfo[] tracks = new TrackInfo[extractor.getTrackCount()];
+			for (int i = 0; i < tracks.length; i++) {
+				MediaFormat format = extractor.getTrackFormat(i);
+				String mime = format.getString(MediaFormat.KEY_MIME);
+				int type = TrackInfo.MEDIA_TRACK_TYPE_UNKNOWN;
+				if (mime != null) {
+					if (mime.startsWith("video/"))
+						type = TrackInfo.MEDIA_TRACK_TYPE_VIDEO;
+					else if (mime.startsWith("audio/"))
+						type = TrackInfo.MEDIA_TRACK_TYPE_AUDIO;
+					else if (mime.startsWith("text/") || mime.equals("application/x-subrip"))
+						type = TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE;
+				}
+				tracks[i] = new TrackInfo(type, format);
+			}
+			return tracks;
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
+		} finally {
+			extractor.release();
+		}
+	}
+
+	/* AOSP getSelectedTrack(): NuPlayer plays the first audio and the first video track; no subtitle or timed text
+	 * track is selected (they cannot be selected, see selectTrack()); -1 for none */
+	public int getSelectedTrack(int trackType) {
+		TrackInfo[] tracks = getTrackInfo();
+		if (trackType != TrackInfo.MEDIA_TRACK_TYPE_VIDEO && trackType != TrackInfo.MEDIA_TRACK_TYPE_AUDIO)
+			return -1;
+		for (int i = 0; i < tracks.length; i++)
+			if (tracks[i].getTrackType() == trackType)
+				return i;
+		return -1;
+	}
+
+	/* AOSP MediaPlayer.OnTimedTextListener etc.: ATL has neither timed text nor subtitle tracks to select, so these
+	 * listeners are kept and never called */
+	public interface OnTimedTextListener {
+		void onTimedText(MediaPlayer mp, TimedText text);
+	}
+
+	public interface OnTimedMetaDataAvailableListener {
+		void onTimedMetaDataAvailable(MediaPlayer mp, TimedMetaData data);
+	}
+
+	public interface OnSubtitleDataListener {
+		void onSubtitleData(MediaPlayer mp, SubtitleData data);
+	}
+
+	public interface OnMediaTimeDiscontinuityListener {
+		void onMediaTimeDiscontinuity(MediaPlayer mp, MediaTimestamp mts);
+	}
+
+	public interface OnDrmConfigHelper {
+		void onDrmConfig(MediaPlayer mp);
+	}
+
+	public interface OnDrmInfoListener {
+		void onDrmInfo(MediaPlayer mp, DrmInfo drmInfo);
+	}
+
+	public interface OnDrmPreparedListener {
+		void onDrmPrepared(MediaPlayer mp, int status);
+	}
+
+	public static final int PREPARE_DRM_STATUS_SUCCESS = 0;
+	public static final int PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR = 1;
+	public static final int PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR = 2;
+	public static final int PREPARE_DRM_STATUS_PREPARATION_ERROR = 3;
+
+	private OnTimedTextListener onTimedTextListener;
+	private OnTimedMetaDataAvailableListener onTimedMetaDataAvailableListener;
+	private OnSubtitleDataListener onSubtitleDataListener;
+	private OnMediaTimeDiscontinuityListener onMediaTimeDiscontinuityListener;
+	private OnDrmConfigHelper onDrmConfigHelper;
+	private OnDrmInfoListener onDrmInfoListener;
+	private OnDrmPreparedListener onDrmPreparedListener;
+
+	public void setOnTimedTextListener(OnTimedTextListener listener) {
+		onTimedTextListener = listener;
+	}
+
+	public void setOnTimedMetaDataAvailableListener(OnTimedMetaDataAvailableListener listener) {
+		onTimedMetaDataAvailableListener = listener;
+	}
+
+	public void setOnSubtitleDataListener(OnSubtitleDataListener listener, Handler handler) {
+		if (listener == null)
+			throw new IllegalArgumentException("Illegal null listener");
+		if (handler == null)
+			throw new IllegalArgumentException("Illegal null handler");
+		onSubtitleDataListener = listener;
+	}
+
+	public void setOnSubtitleDataListener(OnSubtitleDataListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Illegal null listener");
+		onSubtitleDataListener = listener;
+	}
+
+	public void clearOnSubtitleDataListener() {
+		onSubtitleDataListener = null;
+	}
+
+	public void setOnMediaTimeDiscontinuityListener(OnMediaTimeDiscontinuityListener listener, Handler handler) {
+		if (listener == null)
+			throw new IllegalArgumentException("Illegal null listener");
+		if (handler == null)
+			throw new IllegalArgumentException("Illegal null handler");
+		onMediaTimeDiscontinuityListener = listener;
+	}
+
+	public void setOnMediaTimeDiscontinuityListener(OnMediaTimeDiscontinuityListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("Illegal null listener");
+		onMediaTimeDiscontinuityListener = listener;
+	}
+
+	public void clearOnMediaTimeDiscontinuityListener() {
+		onMediaTimeDiscontinuityListener = null;
+	}
+
+	public void setOnDrmConfigHelper(OnDrmConfigHelper listener) {
+		onDrmConfigHelper = listener;
+	}
+
+	public void setOnDrmInfoListener(OnDrmInfoListener listener) {
+		onDrmInfoListener = listener;
+	}
+
+	public void setOnDrmInfoListener(OnDrmInfoListener listener, Handler handler) {
+		onDrmInfoListener = listener;
+	}
+
+	public void setOnDrmPreparedListener(OnDrmPreparedListener listener) {
+		onDrmPreparedListener = listener;
+	}
+
+	public void setOnDrmPreparedListener(OnDrmPreparedListener listener, Handler handler) {
+		onDrmPreparedListener = listener;
+	}
+
+	/* AOSP MediaPlayer.DrmInfo: ATL's demuxer reports no DRM scheme, so no instance is ever handed out */
+	public static final class DrmInfo {
+		private final Map<UUID, byte[]> mapPssh;
+		private final UUID[] supportedSchemes;
+
+		private DrmInfo(Map<UUID, byte[]> pssh, UUID[] supportedSchemes) {
+			mapPssh = pssh;
+			this.supportedSchemes = supportedSchemes;
+		}
+
+		public Map<UUID, byte[]> getPssh() {
+			return mapPssh;
+		}
+
+		public UUID[] getSupportedSchemes() {
+			return supportedSchemes;
+		}
+	}
+
+	public static final class NoDrmSchemeException extends MediaDrmException {
+		public NoDrmSchemeException(String detailMessage) {
+			super(detailMessage);
+		}
+	}
+
+	public static final class ProvisioningNetworkErrorException extends MediaDrmException {
+		public ProvisioningNetworkErrorException(String detailMessage) {
+			super(detailMessage);
+		}
+	}
+
+	public static final class ProvisioningServerErrorException extends MediaDrmException {
+		public ProvisioningServerErrorException(String detailMessage) {
+			super(detailMessage);
+		}
+	}
+
+	public static final class MetricsConstants {
+		private MetricsConstants() {}
+
+		public static final String MIME_TYPE_VIDEO = "android.media.mediaplayer.video.mime";
+		public static final String CODEC_VIDEO = "android.media.mediaplayer.video.codec";
+		public static final String WIDTH = "android.media.mediaplayer.width";
+		public static final String HEIGHT = "android.media.mediaplayer.height";
+		public static final String FRAMES = "android.media.mediaplayer.frames";
+		public static final String FRAMES_DROPPED = "android.media.mediaplayer.dropped";
+		public static final String MIME_TYPE_AUDIO = "android.media.mediaplayer.audio.mime";
+		public static final String CODEC_AUDIO = "android.media.mediaplayer.audio.codec";
+		public static final String DURATION = "android.media.mediaplayer.durationMs";
+		public static final String PLAYING = "android.media.mediaplayer.playingMs";
+		public static final String ERRORS = "android.media.mediaplayer.err";
+		public static final String ERROR_CODE = "android.media.mediaplayer.errcode";
+	}
+
+	/* AOSP MediaPlayer DRM methods with no DRM scheme active (mActiveDrmScheme false, mDrmInfo null): the player has
+	 * to be prepared for getDrmInfo(), which then returns null for unprotected media */
+	public DrmInfo getDrmInfo() {
+		if (nativePlayer == 0)
+			throw new IllegalStateException("The Player has not been prepared yet");
+		return null;
+	}
+
+	public void prepareDrm(UUID uuid) throws UnsupportedSchemeException, ResourceBusyException, ProvisioningNetworkErrorException, ProvisioningServerErrorException {
+		throw new IllegalStateException("prepareDrm(): Wrong usage: The player must be prepared and DRM info be retrieved before this call.");
+	}
+
+	public void releaseDrm() throws NoDrmSchemeException {
+		throw new NoDrmSchemeException("releaseDrm: No active DRM scheme to release.");
+	}
+
+	public MediaDrm.KeyRequest getKeyRequest(byte[] keySetId, byte[] initData, String mimeType, int keyType, Map<String, String> optionalParameters) throws NoDrmSchemeException {
+		throw new NoDrmSchemeException("getKeyRequest: Has to set a DRM scheme first.");
+	}
+
+	public byte[] provideKeyResponse(byte[] keySetId, byte[] response) throws NoDrmSchemeException, DeniedByServerException {
+		throw new NoDrmSchemeException("getKeyRequest: Has to set a DRM scheme first.");
+	}
+
+	public void restoreKeys(byte[] keySetId) throws NoDrmSchemeException {
+		throw new NoDrmSchemeException("restoreKeys: Has to set a DRM scheme first.");
+	}
+
+	public String getDrmPropertyString(String propertyName) throws NoDrmSchemeException {
+		throw new NoDrmSchemeException("getDrmPropertyString: Has to prepareDrm() first.");
+	}
+
+	public void setDrmPropertyString(String propertyName, String value) throws NoDrmSchemeException {
+		throw new NoDrmSchemeException("setDrmPropertyString: Has to prepareDrm() first.");
+	}
+
+	/* AOSP MediaPlayer.getTimestamp() */
+	public MediaTimestamp getTimestamp() {
+		try {
+			return new MediaTimestamp(getCurrentPosition() * 1000L, System.nanoTime(), isPlaying() ? getPlaybackParams().getSpeed() : 0.f);
+		} catch (IllegalStateException e) {
+			return null;
+		}
+	}
+
+	/* AOSP MediaPlayer explicit routing: ATL has no AudioService, so there is no device list; with no device
+	 * the native setOutputDevice(0) (default routing) succeeds, any other id fails, nothing is ever routed and no
+	 * routing change is ever reported */
+	private AudioDeviceInfo mPreferredDevice;
+
+	@Override
+	public boolean setPreferredDevice(AudioDeviceInfo deviceInfo) {
+		if (deviceInfo != null)
+			return false;
+		mPreferredDevice = null;
+		return true;
+	}
+
+	@Override
+	public AudioDeviceInfo getPreferredDevice() {
+		return mPreferredDevice;
+	}
+
+	@Override
+	public AudioDeviceInfo getRoutedDevice() {
+		return null;
+	}
+
+	public List<AudioDeviceInfo> getRoutedDevices() {
+		return new ArrayList<AudioDeviceInfo>();
+	}
+
+	@Override
+	public void addOnRoutingChangedListener(AudioRouting.OnRoutingChangedListener listener, Handler handler) {}
+
+	@Override
+	public void removeOnRoutingChangedListener(AudioRouting.OnRoutingChangedListener listener) {}
 
 	private static native long native_open(String path, int fd, long offset, long length, MediaDataSource dataSource);
 	private static native int native_getDuration(long player);
