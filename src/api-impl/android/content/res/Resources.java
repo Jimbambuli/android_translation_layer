@@ -2232,6 +2232,44 @@ public class Resources {
 		atl_loadersChanged();
 	}
 
+	/* AOSP Resources.registerResourcePaths() -> ResourcesManager.registerResourcePaths(): a uniqueId counts once;
+	 * the paths of appInfo (SharedLibraryAssets: sourceDir, splitSourceDirs, sharedLibraryFiles, then resourceDirs),
+	 * without those the running app already has, are added to all existing and future Resources of the app */
+	private static final java.util.HashSet<String> sRegisteredResourcePaths = new java.util.HashSet<>();
+
+	public static void registerResourcePaths(String uniqueId, android.content.pm.ApplicationInfo appInfo) {
+		synchronized (sRegisteredResourcePaths) {
+			if (!sRegisteredResourcePaths.add(uniqueId)) {
+				Slog.v(TAG, "Package resources' paths for uniqueId: " + uniqueId + " has already been registered, this is a no-op.");
+				return;
+			}
+		}
+		android.atl.ATLLoadedApp app = android.atl.ATLLoadedApp.getPrimaryApplication();
+		android.content.pm.ApplicationInfo base = app != null ? app.pkg.applicationInfo : null;
+		java.util.LinkedHashSet<String> known = new java.util.LinkedHashSet<>();
+		if (base != null && base.sourceDir != null && !base.sourceDir.equals(appInfo.sourceDir)) {
+			known.add(base.sourceDir);
+			if (base.splitSourceDirs != null)
+				known.addAll(java.util.Arrays.asList(base.splitSourceDirs));
+			if (base.resourceDirs != null)
+				known.addAll(java.util.Arrays.asList(base.resourceDirs));
+		}
+		java.util.ArrayList<String> paths = new java.util.ArrayList<>();
+		java.util.ArrayList<String> all = new java.util.ArrayList<>();
+		all.add(appInfo.sourceDir);
+		if (appInfo.splitSourceDirs != null)
+			all.addAll(java.util.Arrays.asList(appInfo.splitSourceDirs));
+		if (appInfo.sharedLibraryFiles != null)
+			all.addAll(java.util.Arrays.asList(appInfo.sharedLibraryFiles));
+		if (appInfo.resourceDirs != null)
+			all.addAll(java.util.Arrays.asList(appInfo.resourceDirs));
+		for (String path : all)
+			if (path != null && known.add(path))
+				paths.add(path);
+		if (app != null && !paths.isEmpty())
+			app.atl_addResourcePaths(paths);
+	}
+
 	/** @hide */
 	public static void atl_loadersChanged() {
 		Map<Integer, Integer> colors = new java.util.LinkedHashMap<>();

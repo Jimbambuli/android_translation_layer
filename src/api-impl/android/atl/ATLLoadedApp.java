@@ -53,6 +53,19 @@ public final class ATLLoadedApp {
 	private Resources.Theme default_theme;
 	/* the AssetManagers for the override configurations, see createResources() */
 	private final HashMap<Configuration, AssetManager> override_assets = new HashMap<>();
+
+	/* ResourcesManager.appendLibAssetsLocked() for Resources.registerResourcePaths(): the paths go into the assets of
+	 * every Resources of this app; later override assets copy them from default_resources */
+	public void atl_addResourcePaths(java.util.List<String> paths) {
+		AssetManager base = default_resources.getAssets();
+		for (String path : paths)
+			base.addAssetPath(path);
+		synchronized (override_assets) {
+			for (AssetManager assets : override_assets.values())
+				for (String path : paths)
+					assets.addAssetPath(path);
+		}
+	}
 	/* ResourcesManager.mResourceReferences: the Resources made here, with their override configuration
 	 * (null for none), which follow a change of the system configuration */
 	private static final WeakHashMap<Resources, Configuration> resource_references = new WeakHashMap<>();
