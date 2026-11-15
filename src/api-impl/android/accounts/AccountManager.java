@@ -2,7 +2,10 @@ package android.accounts;
 
 import android.atl.ATLSecrets;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.res.Resources;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -10,6 +13,7 @@ import android.os.Looper;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -350,6 +354,69 @@ public class AccountManager {
 
 	public void setAuthToken(Account account, String authTokenType, String authToken) {
 		nativeSet(account.type, account.name, "authtoken:" + authTokenType, authToken);
+		/* index of the token types set for the account: the keyring cannot be enumerated by key, but
+		 * invalidateAuthToken() has to find the entries by token value */
+		String types = keyringGet(account.type, account.name, "authtokentypes");
+		if (authToken != null && (types == null || !("\n" + types + "\n").contains("\n" + authTokenType + "\n")))
+			nativeSet(account.type, account.name, "authtokentypes", types == null || types.isEmpty() ? authTokenType : types + "\n" + authTokenType);
+	}
+
+	/* AOSP AccountManager.invalidateAuthToken(): the argument checks; the cache removal happens in
+	 * AccountManagerService (source not available): the cached token is removed for the accounts of the type */
+	public void invalidateAuthToken(final String accountType, final String authToken) {
+		if (accountType == null)
+			throw new IllegalArgumentException("accountType is null");
+		if (authToken == null)
+			return;
+		for (Account account : getAccountsByType(accountType)) {
+			String types = keyringGet(account.type, account.name, "authtokentypes");
+			if (types == null)
+				continue;
+			for (String authTokenType : types.split("\n")) {
+				if (authToken.equals(keyringGet(account.type, account.name, "authtoken:" + authTokenType)))
+					nativeSet(account.type, account.name, "authtoken:" + authTokenType, null);
+			}
+		}
+	}
+
+	/* The extras of ChooseTypeAndAccountActivity (frameworks/base accounts/ChooseTypeAndAccountActivity.java) */
+	private static final String EXTRA_ALLOWABLE_ACCOUNTS_ARRAYLIST = "allowableAccounts";
+	private static final String EXTRA_ALLOWABLE_ACCOUNT_TYPES_STRING_ARRAY = "allowableAccountTypes";
+	private static final String EXTRA_ADD_ACCOUNT_OPTIONS_BUNDLE = "addAccountOptions";
+	private static final String EXTRA_ADD_ACCOUNT_REQUIRED_FEATURES_STRING_ARRAY = "addAccountRequiredFeatures";
+	private static final String EXTRA_ADD_ACCOUNT_AUTH_TOKEN_TYPE_STRING = "authTokenType";
+	private static final String EXTRA_SELECTED_ACCOUNT = "selectedAccount";
+	private static final String EXTRA_DESCRIPTION_TEXT_OVERRIDE = "descriptionTextOverride";
+
+	/** AOSP: the deprecated overload drops alwaysPromptForAccount. */
+	@Deprecated
+	public static Intent newChooseAccountIntent(Account selectedAccount, ArrayList<Account> allowableAccounts,
+	                                            String[] allowableAccountTypes, boolean alwaysPromptForAccount,
+	                                            String descriptionOverrideText, String addAccountAuthTokenType,
+	                                            String[] addAccountRequiredFeatures, Bundle addAccountOptions) {
+		return newChooseAccountIntent(selectedAccount, allowableAccounts, allowableAccountTypes, descriptionOverrideText,
+		                              addAccountAuthTokenType, addAccountRequiredFeatures, addAccountOptions);
+	}
+
+	/* AOSP: only builds the Intent for the system activity named by config_chooseTypeAndAccountActivity; ATL has no
+	 * such activity, so starting it fails like on a device without it */
+	public static Intent newChooseAccountIntent(Account selectedAccount, List<Account> allowableAccounts,
+	                                            String[] allowableAccountTypes, String descriptionOverrideText,
+	                                            String addAccountAuthTokenType, String[] addAccountRequiredFeatures,
+	                                            Bundle addAccountOptions) {
+		Intent intent = new Intent();
+		ComponentName componentName = ComponentName.unflattenFromString(
+		        Resources.getSystem().getString(com.android.internal.R.string.config_chooseTypeAndAccountActivity));
+		intent.setClassName(componentName.getPackageName(), componentName.getClassName());
+		intent.putExtra(EXTRA_ALLOWABLE_ACCOUNTS_ARRAYLIST,
+		                allowableAccounts == null ? null : new ArrayList<Account>(allowableAccounts));
+		intent.putExtra(EXTRA_ALLOWABLE_ACCOUNT_TYPES_STRING_ARRAY, allowableAccountTypes);
+		intent.putExtra(EXTRA_ADD_ACCOUNT_OPTIONS_BUNDLE, addAccountOptions);
+		intent.putExtra(EXTRA_SELECTED_ACCOUNT, selectedAccount);
+		intent.putExtra(EXTRA_DESCRIPTION_TEXT_OVERRIDE, descriptionOverrideText);
+		intent.putExtra(EXTRA_ADD_ACCOUNT_AUTH_TOKEN_TYPE_STRING, addAccountAuthTokenType);
+		intent.putExtra(EXTRA_ADD_ACCOUNT_REQUIRED_FEATURES_STRING_ARRAY, addAccountRequiredFeatures);
+		return intent;
 	}
 
 	public boolean setAccountVisibility(Account account, String packageName, int visibility) {
