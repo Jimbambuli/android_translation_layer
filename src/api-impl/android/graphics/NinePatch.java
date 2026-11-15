@@ -49,6 +49,11 @@ public class NinePatch {
 		return mPaint;
 	}
 
+	/** @hide AOSP keeps the chunk native; NinePatchDrawable(NinePatch) reads it from here */
+	public byte[] getChunk() {
+		return mChunk;
+	}
+
 	public Bitmap getBitmap() {
 		return mBitmap;
 	}

@@ -7,6 +7,7 @@ import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.ColorFilter;
+import android.graphics.NinePatch;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
@@ -37,6 +38,15 @@ public class NinePatchDrawable extends Drawable {
 	/* AOSP's deprecated constructor without Resources: the bitmap's own density is what is shown */
 	public NinePatchDrawable(Bitmap bitmap, byte[] chunk, Rect padding, String srcName) {
 		this((Resources)null, bitmap, chunk, padding, srcName);
+	}
+
+	/* AOSP NinePatchDrawable(NinePatch), deprecated: no Resources, an empty padding */
+	public NinePatchDrawable(NinePatch patch) {
+		this((Resources)null, patch);
+	}
+
+	public NinePatchDrawable(Resources res, NinePatch patch) {
+		this(res, patch.getBitmap(), patch.getChunk(), new Rect(), null);
 	}
 
 	NinePatchDrawable(String path) {
