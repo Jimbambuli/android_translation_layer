@@ -1358,6 +1358,7 @@ srcs = [
 	'android/view/MotionEvent.java',
 	'android/view/OnReceiveContentListener.java',
 	'android/view/OrientationEventListener.java',
+	'android/view/PixelCopy.java',
 	'android/view/PointerIcon.java',
 	'android/view/PrivacyIndicatorBounds.java',
 	'android/view/RenderNode.java',
