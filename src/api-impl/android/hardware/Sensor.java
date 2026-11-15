@@ -423,4 +423,140 @@ public final class Sensor {
 	public String toString() {
 		return "{Sensor name=\"" + mName + "\", vendor=\"" + mVendor + "\", version=" + mVersion + ", type=" + mType + ", maxRange=" + mMaxRange + ", resolution=" + mResolution + ", power=" + mPower + ", minDelay=" + mMinDelay + "}";
 	}
+
+	/* AOSP Sensor.TYPE_* missing above */
+	static final int TYPE_GLANCE_GESTURE = 24;
+	public static final int TYPE_HEART_RATE = 21;
+	static final int TYPE_PICK_UP_GESTURE = 25;
+	static final int TYPE_WAKE_GESTURE = 23;
+	static final int TYPE_DEVICE_ORIENTATION = 27;
+	static final int TYPE_DYNAMIC_SENSOR_META = 32;
+	public static final int TYPE_LOW_LATENCY_OFFBODY_DETECT = 34;
+	public static final int TYPE_ACCELEROMETER_UNCALIBRATED = 35;
+	public static final int TYPE_HINGE_ANGLE = 36;
+	public static final int TYPE_HEAD_TRACKER = 37;
+	public static final int TYPE_ACCELEROMETER_LIMITED_AXES = 38;
+	public static final int TYPE_GYROSCOPE_LIMITED_AXES = 39;
+	public static final int TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED = 40;
+	public static final int TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED = 41;
+	public static final int TYPE_HEADING = 42;
+
+	/* AOSP Sensor.STRING_TYPE_* and getStringType(); mStringType is set by AOSP's setType() for the platform
+	 * sensor types (the switch below), ATL's Sensor only has the type */
+	public static final String STRING_TYPE_ACCELEROMETER = "android.sensor.accelerometer";
+	public static final String STRING_TYPE_MAGNETIC_FIELD = "android.sensor.magnetic_field";
+	public static final String STRING_TYPE_ORIENTATION = "android.sensor.orientation";
+	public static final String STRING_TYPE_GYROSCOPE = "android.sensor.gyroscope";
+	public static final String STRING_TYPE_LIGHT = "android.sensor.light";
+	public static final String STRING_TYPE_PRESSURE = "android.sensor.pressure";
+	public static final String STRING_TYPE_TEMPERATURE = "android.sensor.temperature";
+	public static final String STRING_TYPE_PROXIMITY = "android.sensor.proximity";
+	public static final String STRING_TYPE_GRAVITY = "android.sensor.gravity";
+	public static final String STRING_TYPE_LINEAR_ACCELERATION = "android.sensor.linear_acceleration";
+	public static final String STRING_TYPE_ROTATION_VECTOR = "android.sensor.rotation_vector";
+	public static final String STRING_TYPE_RELATIVE_HUMIDITY = "android.sensor.relative_humidity";
+	public static final String STRING_TYPE_AMBIENT_TEMPERATURE = "android.sensor.ambient_temperature";
+	public static final String STRING_TYPE_MAGNETIC_FIELD_UNCALIBRATED = "android.sensor.magnetic_field_uncalibrated";
+	public static final String STRING_TYPE_GAME_ROTATION_VECTOR = "android.sensor.game_rotation_vector";
+	public static final String STRING_TYPE_GYROSCOPE_UNCALIBRATED = "android.sensor.gyroscope_uncalibrated";
+	public static final String STRING_TYPE_SIGNIFICANT_MOTION = "android.sensor.significant_motion";
+	public static final String STRING_TYPE_STEP_DETECTOR = "android.sensor.step_detector";
+	public static final String STRING_TYPE_STEP_COUNTER = "android.sensor.step_counter";
+	public static final String STRING_TYPE_GEOMAGNETIC_ROTATION_VECTOR = "android.sensor.geomagnetic_rotation_vector";
+	public static final String STRING_TYPE_HEART_RATE = "android.sensor.heart_rate";
+	static final String STRING_TYPE_WAKE_GESTURE = "android.sensor.wake_gesture";
+	static final String STRING_TYPE_GLANCE_GESTURE = "android.sensor.glance_gesture";
+	static final String STRING_TYPE_PICK_UP_GESTURE = "android.sensor.pick_up_gesture";
+	static final String STRING_TYPE_DEVICE_ORIENTATION = "android.sensor.device_orientation";
+	public static final String STRING_TYPE_POSE_6DOF = "android.sensor.pose_6dof";
+	public static final String STRING_TYPE_STATIONARY_DETECT = "android.sensor.stationary_detect";
+	public static final String STRING_TYPE_MOTION_DETECT = "android.sensor.motion_detect";
+	public static final String STRING_TYPE_HEART_BEAT = "android.sensor.heart_beat";
+	static final String STRING_TYPE_DYNAMIC_SENSOR_META = "android.sensor.dynamic_sensor_meta";
+	public static final String STRING_TYPE_LOW_LATENCY_OFFBODY_DETECT = "android.sensor.low_latency_offbody_detect";
+	public static final String STRING_TYPE_ACCELEROMETER_UNCALIBRATED = "android.sensor.accelerometer_uncalibrated";
+	public static final String STRING_TYPE_HINGE_ANGLE = "android.sensor.hinge_angle";
+	public static final String STRING_TYPE_HEAD_TRACKER = "android.sensor.head_tracker";
+	public static final String STRING_TYPE_ACCELEROMETER_LIMITED_AXES = "android.sensor.accelerometer_limited_axes";
+	public static final String STRING_TYPE_GYROSCOPE_LIMITED_AXES = "android.sensor.gyroscope_limited_axes";
+	public static final String STRING_TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED = "android.sensor.accelerometer_limited_axes_uncalibrated";
+	public static final String STRING_TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED = "android.sensor.gyroscope_limited_axes_uncalibrated";
+	public static final String STRING_TYPE_HEADING = "android.sensor.heading";
+
+	public String getStringType() {
+		switch (mType) {
+		case TYPE_ACCELEROMETER:
+			return STRING_TYPE_ACCELEROMETER;
+		case TYPE_AMBIENT_TEMPERATURE:
+			return STRING_TYPE_AMBIENT_TEMPERATURE;
+		case TYPE_GAME_ROTATION_VECTOR:
+			return STRING_TYPE_GAME_ROTATION_VECTOR;
+		case TYPE_GEOMAGNETIC_ROTATION_VECTOR:
+			return STRING_TYPE_GEOMAGNETIC_ROTATION_VECTOR;
+		case TYPE_GLANCE_GESTURE:
+			return STRING_TYPE_GLANCE_GESTURE;
+		case TYPE_GRAVITY:
+			return STRING_TYPE_GRAVITY;
+		case TYPE_GYROSCOPE:
+			return STRING_TYPE_GYROSCOPE;
+		case TYPE_GYROSCOPE_UNCALIBRATED:
+			return STRING_TYPE_GYROSCOPE_UNCALIBRATED;
+		case TYPE_HEART_RATE:
+			return STRING_TYPE_HEART_RATE;
+		case TYPE_LIGHT:
+			return STRING_TYPE_LIGHT;
+		case TYPE_LINEAR_ACCELERATION:
+			return STRING_TYPE_LINEAR_ACCELERATION;
+		case TYPE_MAGNETIC_FIELD:
+			return STRING_TYPE_MAGNETIC_FIELD;
+		case TYPE_MAGNETIC_FIELD_UNCALIBRATED:
+			return STRING_TYPE_MAGNETIC_FIELD_UNCALIBRATED;
+		case TYPE_PICK_UP_GESTURE:
+			return STRING_TYPE_PICK_UP_GESTURE;
+		case TYPE_PRESSURE:
+			return STRING_TYPE_PRESSURE;
+		case TYPE_PROXIMITY:
+			return STRING_TYPE_PROXIMITY;
+		case TYPE_RELATIVE_HUMIDITY:
+			return STRING_TYPE_RELATIVE_HUMIDITY;
+		case TYPE_ROTATION_VECTOR:
+			return STRING_TYPE_ROTATION_VECTOR;
+		case TYPE_SIGNIFICANT_MOTION:
+			return STRING_TYPE_SIGNIFICANT_MOTION;
+		case TYPE_STEP_COUNTER:
+			return STRING_TYPE_STEP_COUNTER;
+		case TYPE_STEP_DETECTOR:
+			return STRING_TYPE_STEP_DETECTOR;
+		case TYPE_WAKE_GESTURE:
+			return STRING_TYPE_WAKE_GESTURE;
+		case TYPE_ORIENTATION:
+			return STRING_TYPE_ORIENTATION;
+		case TYPE_TEMPERATURE:
+			return STRING_TYPE_TEMPERATURE;
+		case TYPE_DEVICE_ORIENTATION:
+			return STRING_TYPE_DEVICE_ORIENTATION;
+		case TYPE_DYNAMIC_SENSOR_META:
+			return STRING_TYPE_DYNAMIC_SENSOR_META;
+		case TYPE_LOW_LATENCY_OFFBODY_DETECT:
+			return STRING_TYPE_LOW_LATENCY_OFFBODY_DETECT;
+		case TYPE_ACCELEROMETER_UNCALIBRATED:
+			return STRING_TYPE_ACCELEROMETER_UNCALIBRATED;
+		case TYPE_HINGE_ANGLE:
+			return STRING_TYPE_HINGE_ANGLE;
+		case TYPE_HEAD_TRACKER:
+			return STRING_TYPE_HEAD_TRACKER;
+		case TYPE_ACCELEROMETER_LIMITED_AXES:
+			return STRING_TYPE_ACCELEROMETER_LIMITED_AXES;
+		case TYPE_GYROSCOPE_LIMITED_AXES:
+			return STRING_TYPE_GYROSCOPE_LIMITED_AXES;
+		case TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED:
+			return STRING_TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED;
+		case TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED:
+			return STRING_TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED;
+		case TYPE_HEADING:
+			return STRING_TYPE_HEADING;
+		default:
+			return null;
+		}
+	}
 }

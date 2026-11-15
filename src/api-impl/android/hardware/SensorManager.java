@@ -313,4 +313,22 @@ public class SensorManager {
 			R[15] = 1.0f;
 		}
 	}
+
+	/* AOSP SensorManager.requestTriggerSensor() -> SystemSensorManager.requestTriggerSensorImpl(): only one-shot
+	 * sensors; enabling the sensor (TriggerEventQueue.addSensor()) fails because ATL has no one-shot sensor
+	 * source, which returns false as in AOSP when the sensor cannot be enabled */
+	public boolean requestTriggerSensor(TriggerEventListener listener, Sensor sensor) {
+		if (sensor == null) throw new IllegalArgumentException("sensor cannot be null");
+		if (listener == null) throw new IllegalArgumentException("listener cannot be null");
+		if (Sensor.getReportingMode(sensor) != Sensor.REPORTING_MODE_ONE_SHOT) return false;
+		return false;
+	}
+
+	/* AOSP cancelTriggerSensorImpl(): no listener was ever registered (requestTriggerSensor()), so false */
+	public boolean cancelTriggerSensor(TriggerEventListener listener, Sensor sensor) {
+		if (sensor != null && Sensor.getReportingMode(sensor) != Sensor.REPORTING_MODE_ONE_SHOT) {
+			return false;
+		}
+		return false;
+	}
 }
