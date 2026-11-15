@@ -530,4 +530,10 @@ public class MediaCodec {
 	}
 
 	public static interface OnFrameRenderedListener {}
+
+	/* AOSP MediaCodec.getCanonicalName(): the name of the underlying codec component; ATL's codecs are no aliases
+	 * (MediaCodecInfo.isAlias()), so it is the name the codec was created with */
+	public final String getCanonicalName() {
+		return codecName;
+	}
 }

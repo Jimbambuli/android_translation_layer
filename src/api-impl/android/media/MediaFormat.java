@@ -130,6 +130,13 @@ public class MediaFormat {
 		return map.containsKey(name);
 	}
 
+	/* AOSP MediaFormat.removeKey(): feature mappings ("feature-" keys) are excluded */
+	public final void removeKey(String name) {
+		if (!name.startsWith(KEY_FEATURE_PREFIX)) {
+			map.remove(name);
+		}
+	}
+
 	public String toString() {
 		return map.toString();
 	}

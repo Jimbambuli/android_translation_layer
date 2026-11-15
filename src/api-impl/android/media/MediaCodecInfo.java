@@ -14,6 +14,12 @@ public class MediaCodecInfo {
 		return name;
 	}
 
+	/* AOSP MediaCodecInfo.getCanonicalName(): the name of the underlying codec; ATL's codecs are no aliases
+	 * (isAlias()), so it is the name */
+	public final String getCanonicalName() {
+		return name;
+	}
+
 	public boolean isEncoder() {
 		return false;
 	}

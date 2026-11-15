@@ -142,6 +142,13 @@ public class Camera {
 
 	public final void stopPreview() { throw notConnected(); }
 
+	/* AOSP enableShutterSound(): false if the sound is forced (AudioService.isCameraSoundForced(), see
+	 * MediaActionSound.mustPlayShutterSound(): false), else native _enableShutterSound() of a camera without a
+	 * context */
+	public final boolean enableShutterSound(boolean enabled) {
+		throw notConnected();
+	}
+
 	public final void setPreviewCallback(PreviewCallback cb) { throw notConnected(); }
 
 	public final void setOneShotPreviewCallback(PreviewCallback cb) { throw notConnected(); }

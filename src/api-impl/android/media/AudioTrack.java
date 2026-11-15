@@ -458,4 +458,10 @@ public class AudioTrack implements AudioRouting {
 	public void unregisterStreamEventCallback(StreamEventCallback eventCallback) {}
 
 	public void setLogSessionId(android.media.metrics.LogSessionId logSessionId) {}
+
+	/* AOSP AudioTrack.getAudioFormat(): mAudioFormat, where audioParamCheck() turned ENCODING_DEFAULT into
+	 * ENCODING_PCM_16BIT */
+	public int getAudioFormat() {
+		return audioFormat == AudioFormat.ENCODING_DEFAULT ? AudioFormat.ENCODING_PCM_16BIT : audioFormat;
+	}
 }
