@@ -279,6 +279,41 @@ public class AccountManager {
 		return future;
 	}
 
+	/* AOSP removeAccountExplicitly(): the service removes the account without asking its authenticator */
+	public boolean removeAccountExplicitly(Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return ATLSecrets.mayHoldSecrets() && nativeRemove(account.type, account.name);
+	}
+
+	/* AOSP clearPassword(): the service sets the password to null (nativeSet clears the entry for null);
+	 * without a keyring there is nothing to clear */
+	public void clearPassword(Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (ATLSecrets.mayHoldSecrets())
+			setPassword(account, null);
+	}
+
+	/* AOSP getAuthenticatorTypes(): the authenticators the AccountManagerService knows; ATL registers none
+	 * (see getAccountsByTypeAndFeatures) */
+	public AuthenticatorDescription[] getAuthenticatorTypes() {
+		return new AuthenticatorDescription[0];
+	}
+
+	/* AOSP updateCredentials(): asks the authenticator of the account type; none is bound here (see addAccount) */
+	public AccountManagerFuture<Bundle> updateCredentials(final Account account, final String authTokenType, final Bundle options,
+	                                                      final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
 	public String getPassword(Account account) {
 		return keyringGet(account.type, account.name, "password");
 	}
