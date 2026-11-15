@@ -25,4 +25,29 @@ public class BluetoothManager {
 		}
 		return BluetoothProfile.STATE_DISCONNECTED;
 	}
+
+	/* BluetoothManager.openGattServer(): argument check, then BluetoothAdapter.getBluetoothGatt() == null (no Bluetooth
+	 * service) -> "Fail to get GATT Server connection", null */
+	public BluetoothGattServer openGattServer(android.content.Context context, BluetoothGattServerCallback callback) {
+		return openGattServer(context, callback, BluetoothDevice.TRANSPORT_AUTO);
+	}
+
+	public BluetoothGattServer openGattServer(android.content.Context context, BluetoothGattServerCallback callback,
+	                                          boolean eattSupport) {
+		return openGattServer(context, callback, BluetoothDevice.TRANSPORT_AUTO, eattSupport);
+	}
+
+	public BluetoothGattServer openGattServer(android.content.Context context, BluetoothGattServerCallback callback,
+	                                          int transport) {
+		return openGattServer(context, callback, transport, false);
+	}
+
+	public BluetoothGattServer openGattServer(android.content.Context context, BluetoothGattServerCallback callback,
+	                                          int transport, boolean eattSupport) {
+		if (context == null || callback == null) {
+			throw new IllegalArgumentException("null parameter: " + context + " " + callback);
+		}
+		android.util.Log.e("BluetoothManager", "Fail to get GATT Server connection");
+		return null;
+	}
 }
