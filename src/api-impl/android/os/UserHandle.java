@@ -21,7 +21,7 @@ import java.io.PrintWriter;
 /**
  * Representation of a user on the device.
  */
-public final class UserHandle {
+public final class UserHandle implements Parcelable {
 	/**
 	 * @hide Range of uids allocated for a user.
 	 */
@@ -255,6 +255,17 @@ public final class UserHandle {
 			out.writeInt(USER_NULL);
 		}
 	}
+
+	/* AOSP UserHandle.CREATOR: UserHandle.of() the written id */
+	public static final Parcelable.Creator<UserHandle> CREATOR = new Parcelable.Creator<UserHandle>() {
+		public UserHandle createFromParcel(Parcel in) {
+			return new UserHandle(in);
+		}
+
+		public UserHandle[] newArray(int size) {
+			return new UserHandle[size];
+		}
+	};
 
 	/* AOSP UserHandle.readFromParcel(Parcel): null if USER_NULL was written */
 	public static UserHandle readFromParcel(Parcel in) {
