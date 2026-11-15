@@ -35,7 +35,10 @@ public class RemoteControlClient {
 
 	public void setOnGetPlaybackPositionListener(OnGetPlaybackPositionListener l) {}
 
-	public class MetadataEditor {
+	/* AOSP RemoteControlClient.MetadataEditor extends MediaMetadataEditor */
+	public class MetadataEditor extends MediaMetadataEditor {
+		public final static int BITMAP_KEY_ARTWORK = 100;
+
 		public MetadataEditor putString(int key, String value) {
 			return this;
 		}
