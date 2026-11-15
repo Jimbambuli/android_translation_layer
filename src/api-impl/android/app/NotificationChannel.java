@@ -63,6 +63,7 @@ public final class NotificationChannel {
 	private int mLightColor = 0;
 	private long[] mVibration;
 	private boolean mVibrationEnabled;
+	private android.os.VibrationEffect mVibrationEffect;
 	private boolean mShowBadge = DEFAULT_SHOW_BADGE;
 	private String mGroup;
 	private AudioAttributes mAudioAttributes;
@@ -172,6 +173,24 @@ public final class NotificationChannel {
 	public void setVibrationPattern(long[] vibrationPattern) {
 		this.mVibrationEnabled = vibrationPattern != null && vibrationPattern.length > 0;
 		this.mVibration = vibrationPattern;
+		try {
+			this.mVibrationEffect = android.os.VibrationEffect.createWaveform(vibrationPattern, -1);
+		} catch (IllegalArgumentException | NullPointerException e) {
+			this.mVibrationEffect = null;
+		}
+	}
+
+	/* AOSP NotificationChannel.setVibrationEffect(): vibration is on exactly when an effect is given. ATL's
+	 * VibrationEffect cannot be converted back to an off/on pattern (computeCreateWaveformOffOnTimingsOrNull), so
+	 * the pattern is cleared, as AOSP does for an effect that is not a plain waveform. */
+	public void setVibrationEffect(android.os.VibrationEffect effect) {
+		this.mVibrationEnabled = effect != null;
+		this.mVibrationEffect = effect;
+		this.mVibration = null;
+	}
+
+	public android.os.VibrationEffect getVibrationEffect() {
+		return mVibrationEffect;
 	}
 
 	/**
