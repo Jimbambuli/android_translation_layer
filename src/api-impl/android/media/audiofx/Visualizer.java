@@ -91,7 +91,8 @@ public class Visualizer {
 	public static final class MeasurementPeakRms {
 		public int mPeak;
 		public int mRms;
-	}
+	
+}
 
 	/* AOSP getMeasurementPeakRms(): null check first, then the state check */
 	public int getMeasurementPeakRms(MeasurementPeakRms measurement) {

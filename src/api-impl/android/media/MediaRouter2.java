@@ -388,7 +388,8 @@ public final class MediaRouter2 {
 		public void onRoutesChanged(@NonNull List<MediaRoute2Info> routes) {}
 
 		public void onRoutesUpdated(@NonNull List<MediaRoute2Info> routes) {}
-	}
+	
+}
 
 	/** Callback for receiving events on route transfer. */
 	public abstract static class TransferCallback {
@@ -397,12 +398,14 @@ public final class MediaRouter2 {
 		public void onTransferFailure(@NonNull MediaRoute2Info requestedRoute) {}
 
 		public void onStop(@NonNull RoutingController controller) {}
-	}
+	
+}
 
 	/** Callback for receiving events about {@link RoutingController} changes. */
 	public abstract static class ControllerCallback {
 		public void onControllerUpdated(@NonNull RoutingController controller) {}
-	}
+	
+}
 
 	/** A listener interface to send optional app-specific hints when creating a RoutingController. */
 	public interface OnGetControllerHintsListener {

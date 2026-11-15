@@ -227,4 +227,18 @@ public final class MediaExtractor {
     public android.media.MediaExtractor.CasInfo getCasInfo(int arg0) { return null; }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void setMediaCas(android.media.MediaCas arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class CasInfo {
+        public byte[] getPrivateData() { return null; }
+        public android.media.MediaCas.Session getSession() { return null; }
+        public int getSystemId() { return 0; }
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class MetricsConstants {
+        public static final String FORMAT = "android.media.mediaextractor.fmt";
+        public static final String MIME_TYPE = "android.media.mediaextractor.mime";
+        public static final String TRACKS = "android.media.mediaextractor.ntrk";
+    }
 }

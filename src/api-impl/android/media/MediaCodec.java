@@ -720,7 +720,7 @@ public class MediaCodec {
     /* AOSP 16 API; no backing hardware/service in ATL */
     public android.media.Image getOutputImage(int arg0) { return null; }
     /* AOSP 16 API; no backing hardware/service in ATL */
-    public android.media.MediaCodec.QueueRequest getQueueRequest(int arg0) { return null; }
+    public android.media.MediaCodec.QueueRequest getQueueRequest(int arg0) { return this; }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public static android.media.Image mapHardwareBuffer(android.hardware.HardwareBuffer arg0) { return null; }
     /* AOSP 16 API; no backing hardware/service in ATL */
@@ -729,4 +729,42 @@ public class MediaCodec {
     public void queueSecureInputBuffers(int arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1, java.util.ArrayDeque<android.media.MediaCodec.CryptoInfo> arg2) {  }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void setAudioPresentation(android.media.AudioPresentation arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class LinearBlock {
+        protected void finalize() {  }
+        public static boolean isCodecCopyFreeCompatible(String[] arg0) { return false; }
+        public boolean isMappable() { return false; }
+        public java.nio.ByteBuffer map() { return null; }
+        public static android.media.MediaCodec.LinearBlock obtain(int arg0, String[] arg1) { return null; }
+        public void recycle() {  }
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class OutputFrame {
+        public java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> getBufferInfos() { return null; }
+        public java.util.Set<java.lang.String> getChangedKeys() { return null; }
+        public int getFlags() { return 0; }
+        public android.media.MediaFormat getFormat() { return null; }
+        public android.hardware.HardwareBuffer getHardwareBuffer() { return null; }
+        public android.media.MediaCodec.LinearBlock getLinearBlock() { return null; }
+        public long getPresentationTimeUs() { return 0L; }
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public final class QueueRequest {
+        public void queue() {  }
+        public android.media.MediaCodec.QueueRequest setByteBufferParameter(String arg0, java.nio.ByteBuffer arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setEncryptedLinearBlock(android.media.MediaCodec.LinearBlock arg0, int arg1, int arg2, android.media.MediaCodec.CryptoInfo arg3) { return this; }
+        public android.media.MediaCodec.QueueRequest setFlags(int arg0) { return this; }
+        public android.media.MediaCodec.QueueRequest setFloatParameter(String arg0, float arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setHardwareBuffer(android.hardware.HardwareBuffer arg0) { return this; }
+        public android.media.MediaCodec.QueueRequest setIntegerParameter(String arg0, int arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setLinearBlock(android.media.MediaCodec.LinearBlock arg0, int arg1, int arg2) { return this; }
+        public android.media.MediaCodec.QueueRequest setLongParameter(String arg0, long arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setMultiFrameEncryptedLinearBlock(android.media.MediaCodec.LinearBlock arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1, java.util.ArrayDeque<android.media.MediaCodec.CryptoInfo> arg2) { return this; }
+        public android.media.MediaCodec.QueueRequest setMultiFrameLinearBlock(android.media.MediaCodec.LinearBlock arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setPresentationTimeUs(long arg0) { return this; }
+        public android.media.MediaCodec.QueueRequest setStringParameter(String arg0, String arg1) { return this; }
+    }
 }

@@ -677,4 +677,9 @@ public class AudioManager {
     public boolean shouldVibrate(int arg0) { return false; }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void unregisterRemoteController(android.media.RemoteController arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnPreferredMixerAttributesChangedListener {
+        void onPreferredMixerAttributesChanged(android.media.AudioAttributes arg0, android.media.AudioDeviceInfo arg1, android.media.AudioMixerAttributes arg2);
+    }
 }

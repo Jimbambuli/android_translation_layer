@@ -48,4 +48,9 @@ public class Spatializer {
     public boolean isHeadTrackerAvailable() { return false; }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void removeOnHeadTrackerAvailableListener(android.media.Spatializer.OnHeadTrackerAvailableListener arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnHeadTrackerAvailableListener {
+        void onHeadTrackerAvailableChanged(android.media.Spatializer arg0, boolean arg1);
+    }
 }

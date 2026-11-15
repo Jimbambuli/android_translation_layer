@@ -150,4 +150,14 @@ public final class MediaProjectionConfig implements Parcelable {
     public boolean isOwnAppContentProvided() { return false; }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public boolean isSourceEnabled(int arg0) { return false; }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class Builder {
+        public Builder()  {}
+        public android.media.projection.MediaProjectionConfig build() { return null; }
+        public android.media.projection.MediaProjectionConfig.Builder setInitiallySelectedSource(int arg0) { return null; }
+        public android.media.projection.MediaProjectionConfig.Builder setOwnAppContentProvided(android.content.Context arg0, boolean arg1) { return null; }
+        public android.media.projection.MediaProjectionConfig.Builder setRequesterHint(String arg0) { return null; }
+        public android.media.projection.MediaProjectionConfig.Builder setSourceEnabled(int arg0, boolean arg1) { return null; }
+    }
 }

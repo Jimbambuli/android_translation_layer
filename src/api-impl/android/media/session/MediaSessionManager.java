@@ -151,4 +151,14 @@ public class MediaSessionManager {
     public void removeOnMediaKeyEventSessionChangedListener(android.media.session.MediaSessionManager.OnMediaKeyEventSessionChangedListener arg0) {  }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void removeOnSession2TokensChangedListener(android.media.session.MediaSessionManager.OnSession2TokensChangedListener arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnMediaKeyEventSessionChangedListener {
+        void onMediaKeyEventSessionChanged(String arg0, android.media.session.MediaSession.Token arg1);
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnSession2TokensChangedListener {
+        void onSession2TokensChanged(java.util.List<android.media.Session2Token> arg0);
+    }
 }

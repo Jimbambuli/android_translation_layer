@@ -43,4 +43,6 @@ public abstract class MidiUmpDeviceService extends Service {
 	public IBinder onBind(Intent intent) {
 		return null;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public MidiUmpDeviceService() {}
 }

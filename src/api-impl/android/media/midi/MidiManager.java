@@ -33,7 +33,8 @@ public final class MidiManager {
 
 		public void onDeviceStatusChanged(MidiDeviceStatus status) {
 		}
-	}
+	
+}
 
 	public interface OnDeviceOpenedListener {
 		abstract public void onDeviceOpened(MidiDevice device);

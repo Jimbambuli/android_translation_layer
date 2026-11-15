@@ -16,4 +16,6 @@ abstract public class MidiSender {
 	}
 	abstract public void onConnect(MidiReceiver receiver);
 	abstract public void onDisconnect(MidiReceiver receiver);
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public MidiSender() {}
 }

@@ -115,5 +115,6 @@ public final class SyncParams {
 		}
 		return mFrameRate;
 	}
-
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public SyncParams() {}
 }
