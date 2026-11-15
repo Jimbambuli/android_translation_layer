@@ -179,6 +179,23 @@ public final class SystemClock {
 	 */
 	public static native long currentTimeMicro();
 
+	/* AOSP SystemClock.currentNetworkTimeMillis(): the latest network time the time detector put into
+	 * ApplicationSharedMemory plus elapsedRealtime(); without one (INVALID_NETWORK_TIME) DateTimeException. ATL has
+	 * no time detector service, so no network time was ever suggested. */
+	public static long currentNetworkTimeMillis() {
+		throw new java.time.DateTimeException("No network time available");
+	}
+
+	/* AOSP SystemClock.currentNetworkTimeClock(): a UTC clock of currentNetworkTimeMillis() */
+	public static java.time.Clock currentNetworkTimeClock() {
+		return new SimpleClock(java.time.ZoneOffset.UTC) {
+			@Override
+			public long millis() {
+				return SystemClock.currentNetworkTimeMillis();
+			}
+		};
+	}
+
 	/**
 	 * AOSP SystemClock.currentGnssTimeClock(): the time of the GNSS receiver through the LocationManager's
 	 * getGnssTimeMillis(). ATL has no GNSS receiver, which is the answer of a device without one: no time, so

@@ -92,6 +92,18 @@ public final class Bundle extends BaseBundle implements Cloneable, Parcelable {
 	 *
 	 * @param b a Bundle to be copied.
 	 */
+	/* AOSP Bundle(Bundle, boolean deep) and deepCopy(): nested Bundles, PersistableBundles and lists copied too */
+	Bundle(Bundle from, boolean deep) {
+		super(from, deep);
+		mHasFds = from.mHasFds;
+		mFdsKnown = from.mFdsKnown;
+		mClassLoader = from.mClassLoader;
+	}
+
+	public Bundle deepCopy() {
+		return new Bundle(this, /* deep */ true);
+	}
+
 	public Bundle(Bundle b) {
 
 		mMap = new ArrayMap<String, Object>(b.mMap);

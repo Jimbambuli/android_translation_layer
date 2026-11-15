@@ -1109,6 +1109,75 @@ public class Build {
 	}
 
 	// The following properties only make sense for internal engineering builds.
+	/* AOSP Build.Partition and getFingerprintedPartitions() (android-16.0.0_r4): the partitions with a
+	 * ro.<name>.build.fingerprint property */
+	public static class Partition {
+		public static final String PARTITION_NAME_SYSTEM = "system";
+		public static final String PARTITION_NAME_BOOTIMAGE = "bootimage";
+		public static final String PARTITION_NAME_ODM = "odm";
+		public static final String PARTITION_NAME_OEM = "oem";
+		public static final String PARTITION_NAME_PRODUCT = "product";
+		public static final String PARTITION_NAME_SYSTEM_EXT = "system_ext";
+		public static final String PARTITION_NAME_VENDOR = "vendor";
+
+		private final String mName;
+		private final String mFingerprint;
+		private final long mTimeMs;
+
+		private Partition(String name, String fingerprint, long timeMs) {
+			mName = name;
+			mFingerprint = fingerprint;
+			mTimeMs = timeMs;
+		}
+
+		public String getName() {
+			return mName;
+		}
+
+		public String getFingerprint() {
+			return mFingerprint;
+		}
+
+		public long getBuildTimeMillis() {
+			return mTimeMs;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (!(o instanceof Partition)) {
+				return false;
+			}
+			Partition op = (Partition)o;
+			return mName.equals(op.mName) && mFingerprint.equals(op.mFingerprint) && mTimeMs == op.mTimeMs;
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Objects.hash(mName, mFingerprint, mTimeMs);
+		}
+	}
+
+	public static java.util.List<Partition> getFingerprintedPartitions() {
+		java.util.ArrayList<Partition> partitions = new java.util.ArrayList<>();
+		String[] names = new String[] {
+			Partition.PARTITION_NAME_BOOTIMAGE,
+			Partition.PARTITION_NAME_ODM,
+			Partition.PARTITION_NAME_PRODUCT,
+			Partition.PARTITION_NAME_SYSTEM_EXT,
+			Partition.PARTITION_NAME_SYSTEM,
+			Partition.PARTITION_NAME_VENDOR
+		};
+		for (String name : names) {
+			String fingerprint = SystemProperties.get("ro." + name + ".build.fingerprint");
+			if (android.text.TextUtils.isEmpty(fingerprint)) {
+				continue;
+			}
+			long time = getLong("ro." + name + ".build.date.utc") * 1000;
+			partitions.add(new Partition(name, fingerprint, time));
+		}
+		return partitions;
+	}
+
 	public static final long TIME = getLong("ro.build.date.utc") * 1000;
 	public static final String USER = getString("ro.build.user");
 	public static final String HOST = getString("ro.build.host");

@@ -46,6 +46,20 @@ public final class PowerManager {
 		public void release(int flags) {
 			release();
 		}
+
+		/* AOSP WakeLock.setWorkSource(): an empty source counts as none; the lock keeps a copy, which a held lock
+		 * reports to the PowerManagerService (updateWakeLockWorkSource). ATL has no such service; whether it
+		 * would check a permission there is not in the local sources (services/) and is not checked. */
+		private WorkSource mWorkSource;
+
+		public void setWorkSource(WorkSource ws) {
+			synchronized (this) {
+				if (ws != null && ws.isEmpty()) {
+					ws = null;
+				}
+				mWorkSource = ws == null ? null : new WorkSource(ws);
+			}
+		}
 	}
 
 	public WakeLock newWakeLock(int levelAndFlags, String tag) {
