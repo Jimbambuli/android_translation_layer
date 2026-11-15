@@ -18,6 +18,10 @@ package android.os;
 
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.concurrent.Executor;
 
 /**
  * Utility methods useful for working with files.
@@ -53,5 +57,45 @@ public final class FileUtils {
 			dirPath += "/";
 		}
 		return filePath.startsWith(dirPath);
+	}
+
+	/* AOSP FileUtils.ProgressListener */
+	public interface ProgressListener {
+		void onProgress(long progress);
+	}
+
+	private static final long COPY_CHECKPOINT_BYTES = 524288;
+
+	public static long copy(InputStream in, OutputStream out) throws IOException {
+		return copy(in, out, null, null, null);
+	}
+
+	/* AOSP FileUtils.copy(...) -> copyInternalUserspace(): the kernel shortcuts (copy_file_range, sendfile) are
+	 * only speed-ups, the result is the same */
+	public static long copy(InputStream in, OutputStream out, CancellationSignal signal, Executor executor,
+	                        ProgressListener listener) throws IOException {
+		long progress = 0;
+		long checkpoint = 0;
+		byte[] buffer = new byte[8192];
+		int t;
+		while ((t = in.read(buffer)) != -1) {
+			out.write(buffer, 0, t);
+			progress += t;
+			checkpoint += t;
+			if (checkpoint >= COPY_CHECKPOINT_BYTES) {
+				if (signal != null)
+					signal.throwIfCanceled();
+				if (executor != null && listener != null) {
+					final long progressSnapshot = progress;
+					executor.execute(() -> listener.onProgress(progressSnapshot));
+				}
+				checkpoint = 0;
+			}
+		}
+		if (executor != null && listener != null) {
+			final long progressSnapshot = progress;
+			executor.execute(() -> listener.onProgress(progressSnapshot));
+		}
+		return progress;
 	}
 }
