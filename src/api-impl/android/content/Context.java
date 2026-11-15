@@ -319,11 +319,13 @@ public abstract class Context {
 
 	private Intent registerReceiverInternal(final BroadcastReceiver receiver, IntentFilter filter, final Handler registeredWith) {
 		final Handler scheduler = registeredWith != null ? registeredWith : receiver != null ? new Handler(Looper.getMainLooper()) : null;
+		/* AOSP ContextImpl.registerReceiverInternal(): the ReceiverDispatcher keeps getOuterContext(), and
+		 * LoadedApk.ReceiverDispatcher.Args.getRunnable() calls onReceive(mContext, intent) with it */
+		final Context context = receiverOwner(this);
 		if (receiver != null)
-			receiverRegistrations.add(receiverOwner(this), receiver, filter, registeredWith);
+			receiverRegistrations.add(context, receiver, filter, registeredWith);
 		java.util.List<Intent> stickies = stickyIntentsFor(filter);
 		if (receiver != null) {
-			final Context context = this;
 			for (final Intent sticky : stickies) {
 				scheduler.post(new Runnable() {
 					public void run() {
@@ -881,11 +883,13 @@ public abstract class Context {
 		}
 		for (ReceiverRegistry.Registration registration : receiverRegistrations) {
 			if (registration.filter.matchAction(intent.getAction())) {
+				/* the Context it was registered with (LoadedApk.ReceiverDispatcher.mContext), not the sender's */
 				BroadcastReceiver receiver = registration.receiver;
+				Context context = (Context)registration.owner;
 				if (registration.scheduler != null)
-					registration.scheduler.post(() -> receiver.onReceive(this, intent));
+					registration.scheduler.post(() -> receiver.onReceive(context, intent));
 				else
-					receiver.onReceive(this, intent);
+					receiver.onReceive(context, intent);
 			}
 		}
 		// a broadcast for another package goes to that package's receivers (loaded into this process)
@@ -901,7 +905,7 @@ public abstract class Context {
 			if (e.filter.matchAction(intent.getAction())) {
 				(e.scheduler != null ? e.scheduler : new Handler(Looper.getMainLooper())).post(new Runnable() {
 					public void run() {
-						e.receiver.onReceive(android.app.ActivityThread.currentApplication(), intent);
+						e.receiver.onReceive((Context)e.owner, intent);
 					}
 				});
 			}

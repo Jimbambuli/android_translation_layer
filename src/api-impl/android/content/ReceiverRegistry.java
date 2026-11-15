@@ -11,7 +11,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * entries of one receiver. As LoadedApk.mReceivers the bookkeeping is per Context (owner, compared by identity):
  * the same receiver registered with two Contexts is two dispatchers, and unregistering it with one of them leaves
  * the other registered. Delivery goes to every registration, whatever its owner (ActivityManagerService is
- * system wide). scheduler is the Handler the receiver was registered with (null: none given). */
+ * system wide); onReceive() gets the owner, as LoadedApk.ReceiverDispatcher keeps the registering Context
+ * (mContext) and not the sender's. scheduler is the Handler the receiver was registered with (null: none given). */
 class ReceiverRegistry implements Iterable<ReceiverRegistry.Registration> {
 	static class Registration {
 		final Object owner;

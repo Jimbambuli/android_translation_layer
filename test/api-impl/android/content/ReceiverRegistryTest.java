@@ -76,4 +76,26 @@ public class ReceiverRegistryTest extends TestCase {
 		assertFalse(registry.removeAll(new Object(), r));
 		assertEquals(1, count(registry, r));
 	}
+
+	/* LoadedApk.ReceiverDispatcher.mContext: each registration carries the Context it was registered with,
+	 * which onReceive() gets, whoever sends the broadcast */
+	public void testEachRegistrationCarriesItsOwnContext() {
+		ReceiverRegistry registry = new ReceiverRegistry();
+		Object activity = new Object(), application = new Object();
+		BroadcastReceiver r = receiver();
+		registry.add(activity, r, new IntentFilter("a.b.ACTION"), null);
+		registry.add(application, r, new IntentFilter("a.b.ACTION"), null);
+		int seenActivity = 0, seenApplication = 0;
+		for (ReceiverRegistry.Registration reg : registry) {
+			if (reg.owner == activity)
+				seenActivity++;
+			else if (reg.owner == application)
+				seenApplication++;
+		}
+		assertEquals(1, seenActivity);
+		assertEquals(1, seenApplication);
+		assertTrue(registry.removeAll(activity, r));
+		for (ReceiverRegistry.Registration reg : registry)
+			assertSame("the remaining registration keeps its own Context", application, reg.owner);
+	}
 }
