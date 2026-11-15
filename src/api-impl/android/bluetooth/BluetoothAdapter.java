@@ -206,4 +206,15 @@ public class BluetoothAdapter {
 	    throws java.io.IOException {
 		throw new java.io.IOException("Error: -1");
 	}
+
+	/* BluetoothAdapter.isAddressRandomStatic() */
+	public static boolean isAddressRandomStatic(String address) {
+		java.util.Objects.requireNonNull(address);
+		return checkBluetoothAddress(address) && (Integer.parseInt(address.split(":")[0], 16) & 0xC0) == 0xC0;
+	}
+
+	/* BluetoothAdapter.getOffloadedTransportDiscoveryDataScanSupported(): !getLeAccess() -> ERROR_BLUETOOTH_NOT_ENABLED */
+	public int getOffloadedTransportDiscoveryDataScanSupported() {
+		return BluetoothStatusCodes.ERROR_BLUETOOTH_NOT_ENABLED;
+	}
 }
