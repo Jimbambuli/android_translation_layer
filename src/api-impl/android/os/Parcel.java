@@ -58,6 +58,27 @@ public class Parcel {
 		return new Parcel();
 	}
 
+	/* AOSP Parcel.obtain(IBinder) marks the parcel as belonging to the binder, for the leak tracking of the
+	 * transaction; ATL's parcels are plain objects */
+	public static Parcel obtain(IBinder binder) {
+		return obtain();
+	}
+
+	public static final Parcelable.Creator<String> STRING_CREATOR = new Parcelable.Creator<String>() {
+		public String createFromParcel(Parcel source) {
+			return source.readString();
+		}
+
+		public String[] newArray(int size) {
+			return new String[size];
+		}
+	};
+
+	/* AOSP Parcel.writeParcelableCreator(): the name of the class, from which readParcelableCreator() finds CREATOR */
+	public final void writeParcelableCreator(Parcelable p) {
+		writeString(p.getClass().getName());
+	}
+
 	public void recycle() {}
 
 	public void writeByte(byte value) {
