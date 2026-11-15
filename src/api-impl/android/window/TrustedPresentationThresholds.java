@@ -1,0 +1,119 @@
+/*
+ * Copyright (C) 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package android.window;
+
+import android.annotation.FloatRange;
+import android.annotation.IntRange;
+import android.annotation.NonNull;
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import java.util.Objects;
+
+/* AOSP android16 frameworks/base/core/java/android/window/TrustedPresentationThresholds.java */
+public final class TrustedPresentationThresholds implements Parcelable {
+	@FloatRange(from = 0f, fromInclusive = false, to = 1f)
+	private final float mMinAlpha;
+
+	@FloatRange(from = 0f, fromInclusive = false, to = 1f)
+	private final float mMinFractionRendered;
+
+	@IntRange(from = 1)
+	private final int mStabilityRequirementMs;
+
+	public @FloatRange(from = 0f, fromInclusive = false, to = 1f) float getMinAlpha() {
+		return mMinAlpha;
+	}
+
+	public @FloatRange(from = 0f, fromInclusive = false, to = 1f) float getMinFractionRendered() {
+		return mMinFractionRendered;
+	}
+
+	public @IntRange(from = 1) int getStabilityRequirementMillis() {
+		return mStabilityRequirementMs;
+	}
+
+	private void checkValid() {
+		if (mMinAlpha <= 0 || mMinFractionRendered <= 0 || mStabilityRequirementMs < 1) {
+			throw new IllegalArgumentException("TrustedPresentationThresholds values are invalid");
+		}
+	}
+
+	public TrustedPresentationThresholds(@FloatRange(from = 0f, fromInclusive = false, to = 1f) float minAlpha,
+			@FloatRange(from = 0f, fromInclusive = false, to = 1f) float minFractionRendered,
+			@IntRange(from = 1) int stabilityRequirementMs) {
+		this.mMinAlpha = minAlpha;
+		this.mMinFractionRendered = minFractionRendered;
+		this.mStabilityRequirementMs = stabilityRequirementMs;
+		checkValid();
+	}
+
+	@Override
+	public String toString() {
+		return "TrustedPresentationThresholds { " + "minAlpha = " + mMinAlpha + ", " + "minFractionRendered = "
+				+ mMinFractionRendered + ", " + "stabilityRequirementMs = " + mStabilityRequirementMs + " }";
+	}
+
+	@Override
+	public void writeToParcel(@NonNull Parcel dest, int flags) {
+		dest.writeFloat(mMinAlpha);
+		dest.writeFloat(mMinFractionRendered);
+		dest.writeInt(mStabilityRequirementMs);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(mMinAlpha, mMinFractionRendered, mStabilityRequirementMs);
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) {
+			return true;
+		}
+		if (!(o instanceof TrustedPresentationThresholds that)) {
+			return false;
+		}
+		return mMinAlpha == that.mMinAlpha && mMinFractionRendered == that.mMinFractionRendered
+				&& mStabilityRequirementMs == that.mStabilityRequirementMs;
+	}
+
+	TrustedPresentationThresholds(@NonNull Parcel in) {
+		mMinAlpha = in.readFloat();
+		mMinFractionRendered = in.readFloat();
+		mStabilityRequirementMs = in.readInt();
+
+		checkValid();
+	}
+
+	public static final @NonNull Creator<TrustedPresentationThresholds> CREATOR = new Creator<TrustedPresentationThresholds>() {
+		@Override
+		public TrustedPresentationThresholds[] newArray(int size) {
+			return new TrustedPresentationThresholds[size];
+		}
+
+		@Override
+		public TrustedPresentationThresholds createFromParcel(@NonNull Parcel in) {
+			return new TrustedPresentationThresholds(in);
+		}
+	};
+}
