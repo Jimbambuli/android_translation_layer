@@ -3,6 +3,7 @@ package android.webkit;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.AssetManager;
+import android.os.Looper;
 import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.MotionEvent;
@@ -39,6 +40,12 @@ public class WebView extends ViewGroup {
 	private boolean widthMeasurementIsFixed;
 	private boolean heightMeasurementIsFixed;
 	private boolean verticalScrollBarEnabled = true;
+	// AOSP WebView.mWebViewThread: the thread the WebView was made on
+	private final Looper webViewThread = Looper.myLooper();
+	// the progress last reported to WebChromeClient.onProgressChanged(), AwContents.getMostRecentProgress()
+	private int progress = 100;
+	// whether a WebView was made in this process (WebViewFactory.sProviderInstance != null)
+	private static boolean providerInitialized;
 	private boolean horizontalScrollBarEnabled = true;
 
 	public WebView(Context context) {
@@ -51,6 +58,7 @@ public class WebView extends ViewGroup {
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
+		providerInitialized = true;
 		// like Chromium's AwContents: the page shows the focus itself (focus rings, the caret)
 		setDefaultFocusHighlightEnabled(false);
 		// the pages load with the user agent that WebSettings reports, not WebKitGTK's own
@@ -114,6 +122,90 @@ public class WebView extends ViewGroup {
 		this.webViewClient = webViewClient;
 	}
 
+	public WebViewClient getWebViewClient() {
+		return webViewClient;
+	}
+
+	public WebChromeClient getWebChromeClient() {
+		return webChromeClient;
+	}
+
+	public Looper getWebViewLooper() {
+		return webViewThread;
+	}
+
+	public int getProgress() {
+		return progress;
+	}
+
+	/* AOSP WebViewFactory.setDataDirectorySuffix() */
+	public static void setDataDirectorySuffix(String suffix) {
+		if (providerInitialized)
+			throw new IllegalStateException("Can't set data directory suffix: WebView already initialized");
+		if (suffix.indexOf(java.io.File.separatorChar) >= 0)
+			throw new IllegalArgumentException("Suffix " + suffix + " contains a path separator");
+	}
+
+	/* AwContents.getLastHitTestResult(): WebKit's hit test data is not handed to the Java side, so the result is
+	 * the one for a point without a link, image or text field */
+	public HitTestResult getHitTestResult() {
+		return new HitTestResult();
+	}
+
+	public class WebViewTransport {
+		private WebView mWebview;
+
+		public synchronized void setWebView(WebView webview) {
+			mWebview = webview;
+		}
+
+		public synchronized WebView getWebView() {
+			return mWebview;
+		}
+	}
+
+	public static abstract class VisualStateCallback {
+		public abstract void onComplete(long requestId);
+	}
+
+	public static class HitTestResult {
+		public static final int UNKNOWN_TYPE = 0;
+		@Deprecated
+		public static final int ANCHOR_TYPE = 1;
+		public static final int PHONE_TYPE = 2;
+		public static final int GEO_TYPE = 3;
+		public static final int EMAIL_TYPE = 4;
+		public static final int IMAGE_TYPE = 5;
+		@Deprecated
+		public static final int IMAGE_ANCHOR_TYPE = 6;
+		public static final int SRC_ANCHOR_TYPE = 7;
+		public static final int SRC_IMAGE_ANCHOR_TYPE = 8;
+		public static final int EDIT_TEXT_TYPE = 9;
+
+		private int mType;
+		private String mExtra;
+
+		public HitTestResult() {
+			mType = UNKNOWN_TYPE;
+		}
+
+		public void setType(int type) {
+			mType = type;
+		}
+
+		public void setExtra(String extra) {
+			mExtra = extra;
+		}
+
+		public int getType() {
+			return mType;
+		}
+
+		public String getExtra() {
+			return mExtra;
+		}
+	}
+
 	// undo the android-asset:// rewrite (see loadUrl()), apps expect the URL they loaded
 	private static String internalToAppUrl(String url) {
 		return url != null ? url.replace("android-asset:///assets/", "file:///android_asset/") : null;
@@ -173,9 +265,11 @@ public class WebView extends ViewGroup {
 		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0) {
 			if (webViewClient != null)
 				webViewClient.onPageStarted(this, url, null);
+			progress = 10;
 			if (webChromeClient != null)
 				webChromeClient.onProgressChanged(this, 10);
 		} else if (loadState == /*WEBKIT_LOAD_FINISHED*/ 3) {
+			progress = 100;
 			if (webChromeClient != null)
 				webChromeClient.onProgressChanged(this, 100);
 			if (webViewClient != null)
@@ -186,10 +280,19 @@ public class WebView extends ViewGroup {
 	@Export
 	boolean internalShouldOverrideUrlLoading(String url) {
 		url = internalToAppUrl(url);
-		if (webViewClient != null)
-			return webViewClient.shouldOverrideUrlLoading(this, url);
-		else
+		if (webViewClient == null)
 			return false;
+		/* as WebViewContentsClientAdapter.shouldOverrideUrlLoading(): the client gets the WebResourceRequest
+		 * form, whose default calls the String form; asked for navigations of the main frame only */
+		final android.net.Uri uri = android.net.Uri.parse(url);
+		return webViewClient.shouldOverrideUrlLoading(this, new WebResourceRequest() {
+			public android.net.Uri getUrl() { return uri; }
+			public boolean isForMainFrame() { return true; }
+			public boolean isRedirect() { return false; }
+			public boolean hasGesture() { return false; }
+			public String getMethod() { return "GET"; }
+			public Map<String, String> getRequestHeaders() { return new HashMap<>(); }
+		});
 	}
 
 	/* Android's WebView draws no vertical scrollbar when the app turns it off; WebKit draws its own, which
