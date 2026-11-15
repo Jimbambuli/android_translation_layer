@@ -896,6 +896,13 @@ public final class ViewTreeObserver {
 		}
 	}
 
+	/* AOSP ViewTreeObserver.registerFrameCommitCallback(): the callback runs once the next frame is committed.
+	 * ATL's frame clock is only hooked when draw listeners exist, so it runs on the next pass of the main loop */
+	public void registerFrameCommitCallback(Runnable callback) {
+		checkIsAlive();
+		new android.os.Handler(android.os.Looper.getMainLooper()).post(callback);
+	}
+
 	/**
 	 * Notifies registered listeners that the touch mode has changed.
 	 *

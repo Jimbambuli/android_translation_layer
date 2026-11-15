@@ -124,6 +124,22 @@ public class MediaFormat {
 
 	private static final String KEY_FEATURE_PREFIX = "feature-";
 
+	/* AOSP MediaFormat.getFeatureEnabled()/removeKey() */
+	public boolean getFeatureEnabled(String feature) {
+		Integer enabled = (Integer)map.get(KEY_FEATURE_PREFIX + feature);
+		if (enabled == null) {
+			throw new IllegalArgumentException("feature is not specified");
+		}
+		return enabled != 0;
+	}
+
+	public final void removeKey(String name) {
+		// exclude feature mappings
+		if (!name.startsWith(KEY_FEATURE_PREFIX)) {
+			map.remove(name);
+		}
+	}
+
 	public boolean containsKey(String name) {
 		return map.containsKey(name);
 	}
