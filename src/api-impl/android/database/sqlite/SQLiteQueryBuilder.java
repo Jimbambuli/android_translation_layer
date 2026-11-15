@@ -1064,7 +1064,7 @@ public class SQLiteQueryBuilder {
 
     /** @hide */
     public @Nullable String[] computeProjection(@Nullable String[] projectionIn) {
-        if (!(projectionIn != null && projectionIn.length > 0)) {
+        if (projectionIn != null && projectionIn.length > 0) { /* AOSP: !ArrayUtils.isEmpty(projectionIn) */
             String[] projectionOut = new String[projectionIn.length];
             for (int i = 0; i < projectionIn.length; i++) {
                 projectionOut[i] = computeSingleProjectionOrThrow(projectionIn[i]);
