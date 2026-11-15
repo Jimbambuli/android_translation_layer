@@ -109,6 +109,17 @@ public class LinkProperties {
 		return mHttpProxy;
 	}
 
+	/* AOSP LinkProperties: a plain field, null until set */
+	private java.net.Inet4Address mDhcpServerAddress;
+
+	public void setDhcpServerAddress(java.net.Inet4Address serverAddress) {
+		mDhcpServerAddress = serverAddress;
+	}
+
+	public java.net.Inet4Address getDhcpServerAddress() {
+		return mDhcpServerAddress;
+	}
+
 	@Override
 	public String toString() {
 		return "{InterfaceName: " + mIfaceName + " LinkAddresses: " + mLinkAddresses + " MTU: " + mMtu + "}";

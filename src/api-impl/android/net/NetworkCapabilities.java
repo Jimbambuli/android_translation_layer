@@ -237,4 +237,14 @@ public final class NetworkCapabilities {
 		if (!isValidTransport(transportType))
 			throw new IllegalArgumentException("Invalid TransportType " + transportType);
 	}
+
+	/* mTransportInfo / mOwnerUid at their AOSP defaults: ATL's networks carry no transport info and no owner
+	 * (Process.INVALID_UID is -1) */
+	public TransportInfo getTransportInfo() {
+		return null;
+	}
+
+	public int getOwnerUid() {
+		return -1;
+	}
 }
