@@ -23,12 +23,15 @@ public class Camera {
 		throw new RuntimeException("Fail to get camera info");
 	}
 
+	/* AOSP open(): the first back-facing camera, null when there is none */
 	public static Camera open() {
 		return null;
 	}
 
+	/* AOSP open(int) is new Camera(cameraId): without a camera service Camera::connect() returns NULL,
+	 * native_setup() reports -EACCES (core/jni/android_hardware_Camera.cpp) and the constructor throws */
 	public static Camera open(int cameraId) {
-		return null;
+		throw new RuntimeException("Fail to connect to camera service");
 	}
 
 	public void setErrorCallback(ErrorCallback callback) {}

@@ -46,7 +46,9 @@ public class AudioManager {
 		return 20;
 	}
 
+	/* AOSP AudioManager.OnAudioFocusChangeListener */
 	public interface OnAudioFocusChangeListener {
+		public void onAudioFocusChange(int focusChange);
 	}
 
 	public static final int AUDIOFOCUS_NONE = 0;
@@ -198,6 +200,22 @@ public class AudioManager {
 
 	public void stopBluetoothSco() {}
 
+	/* AOSP AudioManager.isBluetoothScoAvailableOffCall(): the resource config_bluetooth_sco_off_call, true in AOSP's
+	 * core/res/res/values/config.xml */
+	public boolean isBluetoothScoAvailableOffCall() {
+		return true;
+	}
+
+	/* AOSP AudioManager.dispatchMediaKeyEvent() -> MediaSessionLegacyHelper.sendMediaButtonEvent(keyEvent, false)
+	 * -> MediaSessionManager.dispatchMediaKeyEvent(keyEvent, false): to the media button session */
+	public void dispatchMediaKeyEvent(android.view.KeyEvent keyEvent) {
+		if (keyEvent == null) {
+			android.util.Log.w("MediaSessionHelper", "Tried to send a null key event. Ignoring.");
+			return;
+		}
+		new android.media.session.MediaSessionManager().dispatchMediaKeyEvent(keyEvent, false);
+	}
+
 	public void setMode(int mode) {}
 
 	public int getMode() {
@@ -268,6 +286,11 @@ public class AudioManager {
 
 	public void playSoundEffect(int effectType) {}
 
+	/* AOSP AudioManager.playSoundEffect(int, float): like playSoundEffect(int), with a volume */
+	public void playSoundEffect(int effectType, float volume) {
+		playSoundEffect(effectType);
+	}
+
 	/* API 32 */
 	public Spatializer getSpatializer() {
 		return new Spatializer();
@@ -292,6 +315,13 @@ public class AudioManager {
 		java.util.Objects.requireNonNull(format);
 		java.util.Objects.requireNonNull(attributes);
 		return DIRECT_PLAYBACK_NOT_SUPPORTED;
+	}
+
+	/* AOSP AudioManager.getDirectProfilesForAttributes() (API 33): AudioSystem lists the direct output profiles of the
+	 * audio policy; ATL's PulseAudio output has none (see getDirectPlaybackSupport()), so the list is empty */
+	public @android.annotation.NonNull java.util.List<AudioProfile> getDirectProfilesForAttributes(@android.annotation.NonNull AudioAttributes attributes) {
+		java.util.Objects.requireNonNull(attributes);
+		return new java.util.ArrayList<>();
 	}
 
 	/* API 28 */

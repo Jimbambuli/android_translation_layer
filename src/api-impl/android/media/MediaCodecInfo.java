@@ -79,6 +79,11 @@ public class MediaCodecInfo {
 			return new AudioCapabilities();
 		}
 
+		/* AOSP: mEncoderCaps, null for a decoder; all ATL codecs are decoders */
+		public EncoderCapabilities getEncoderCapabilities() {
+			return null;
+		}
+
 		public VideoCapabilities getVideoCapabilities() {
 			return new VideoCapabilities();
 		}
@@ -208,7 +213,41 @@ public class MediaCodecInfo {
 		public static final int AACObjectXHE = 42;
 	}
 
+	/* AOSP MediaCodecInfo.EncoderCapabilities; never handed out, as ATL has no encoders */
+	public static final class EncoderCapabilities {
+		public static final int BITRATE_MODE_CQ = 0;
+		public static final int BITRATE_MODE_VBR = 1;
+		public static final int BITRATE_MODE_CBR = 2;
+		public static final int BITRATE_MODE_CBR_FD = 3;
+
+		private EncoderCapabilities() {}
+	}
+
 	public static class VideoCapabilities {
+		/* AOSP initWithPlatformLimits(): LazyHolder.SIZE_RANGE of a 64-bit process, as no limits are published */
+		private static final android.util.Range<Integer> SIZE_RANGE = new android.util.Range<Integer>(1, 32768);
+
+		public android.util.Range<Integer> getSupportedWidths() {
+			return SIZE_RANGE;
+		}
+
+		public android.util.Range<Integer> getSupportedHeights() {
+			return SIZE_RANGE;
+		}
+
+		/* AOSP getSupportedWidthsFor(): with the platform limits' full aspect-ratio and block ranges and
+		 * this alignment of 1 the result is the plain size range */
+		public android.util.Range<Integer> getSupportedWidthsFor(int height) {
+			if (!SIZE_RANGE.contains(height) || (height % getHeightAlignment()) != 0)
+				throw new IllegalArgumentException("unsupported height");
+			return SIZE_RANGE;
+		}
+
+		public android.util.Range<Integer> getSupportedHeightsFor(int width) {
+			if (!SIZE_RANGE.contains(width) || (width % getWidthAlignment()) != 0)
+				throw new IllegalArgumentException("unsupported width");
+			return SIZE_RANGE;
+		}
 
 		public int getWidthAlignment() {
 			return 1;
@@ -259,6 +298,11 @@ public class MediaCodecInfo {
 	}
 
 	public static class AudioCapabilities {
+
+		/* AOSP: null when the rates are given as ranges (mSampleRates == null), as here */
+		public int[] getSupportedSampleRates() {
+			return null;
+		}
 
 		public boolean isSampleRateSupported(int sampleRate) {
 			return true;

@@ -312,6 +312,21 @@ public class AudioTrack implements AudioRouting {
 		return bufferSizeInFrames;
 	}
 
+	/* AOSP AudioTrack.getBufferCapacityInFrames(): the largest buffer the track can use, the ALSA buffer */
+	public int getBufferCapacityInFrames() {
+		return bufferSizeInFrames;
+	}
+
+	/* AOSP AudioTrack.getChannelCount() */
+	public int getChannelCount() {
+		return channels;
+	}
+
+	/* AOSP AudioTrack.getMaxVolume(): GAIN_MAX */
+	static public float getMaxVolume() {
+		return 1.0f;
+	}
+
 	/* AOSP AudioTrack.getUnderrunCount(): how often the buffer ran empty while playing */
 	public int getUnderrunCount() {
 		return underrunCount;
@@ -351,6 +366,7 @@ public class AudioTrack implements AudioRouting {
 		private int mTransferMode;
 		private int mSessionId;
 		private boolean mOffload;
+		private android.content.Context mContext;
 
 		public Builder() {}
 
@@ -363,6 +379,12 @@ public class AudioTrack implements AudioRouting {
 				mAttributes = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build();
 			}
 			return new AudioTrack(mAttributes, mFormat, mBufferSizeInBytes, mTransferMode, mSessionId);
+		}
+
+		/* API 31, AOSP AudioTrack.Builder.setContext(): the context only supplies attribution data */
+		public Builder setContext(android.content.Context context) {
+			mContext = java.util.Objects.requireNonNull(context);
+			return this;
 		}
 
 		public Builder setSessionId(int sessionId) {

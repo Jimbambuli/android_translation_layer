@@ -69,6 +69,8 @@ public class MediaRecorder {
 		public static final int VP8 = 4;
 		public static final int HEVC = 5;
 		public static final int VP9 = 6;
+		public static final int DOLBY_VISION = 7;
+		public static final int AV1 = 8;
 	}
 
 	public class MetricsConstants {}

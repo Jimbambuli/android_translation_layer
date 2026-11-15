@@ -6,6 +6,7 @@ public class AudioRecord {
 	public static final int RECORDSTATE_RECORDING = 3;
 
 	public static final int ERROR_BAD_VALUE = -2;
+	public static final int ERROR_INVALID_OPERATION = -3;
 
 	private long pcm_handle;
 	private int channels; // set by native constructor
@@ -25,8 +26,30 @@ public class AudioRecord {
 		return System.getenv("ATL_UGLY_ENABLE_MICROPHONE") != null || new java.io.File("/.flatpak-info").exists();
 	}
 
+	/* AOSP AudioRecord fields set by audioParamCheck()/getChannelMaskFromLegacyConfig() and native_setup() */
+	private int mRecordSource;
+	private int mAudioFormat;
+	private int mChannelMask;
+	private final int mSessionId = new AudioManager().generateAudioSessionId();
+
 	public AudioRecord(int streamType, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes) {
 		this.sampleRateInHz = sampleRateInHz;
+		mRecordSource = streamType;
+		mAudioFormat = audioFormat == AudioFormat.ENCODING_DEFAULT ? AudioFormat.ENCODING_PCM_16BIT : audioFormat;
+		switch (channelConfig) {
+			case 1: // AudioFormat.CHANNEL_IN_DEFAULT
+			case 0x10: // AudioFormat.CHANNEL_IN_MONO
+			case 2: // AudioFormat.CHANNEL_CONFIGURATION_MONO
+				mChannelMask = 0x10;
+				break;
+			case 0xc: // AudioFormat.CHANNEL_IN_STEREO
+			case 3: // AudioFormat.CHANNEL_CONFIGURATION_STEREO
+				mChannelMask = 0xc;
+				break;
+			default:
+				mChannelMask = channelConfig;
+				break;
+		}
 		/* AOSP: without RECORD_AUDIO the native setup fails and the AudioRecord stays uninitialized */
 		if (!android.content.pm.PackageManager.deniedByUser("android.permission.RECORD_AUDIO"))
 			pcm_handle = native_constructor(streamType, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
@@ -36,6 +59,37 @@ public class AudioRecord {
 
 	public int getSampleRate() {
 		return sampleRateInHz;
+	}
+
+	/* AOSP AudioRecord.getAudioSource() */
+	public int getAudioSource() {
+		return mRecordSource;
+	}
+
+	/* AOSP AudioRecord.getAudioFormat(): the encoding */
+	public int getAudioFormat() {
+		return mAudioFormat;
+	}
+
+	/* AOSP AudioRecord.getChannelCount(): AudioFormat.channelCountFromInChannelMask(mChannelMask) */
+	public int getChannelCount() {
+		return AudioFormat.channelCountFromInChannelMask(mChannelMask);
+	}
+
+	/* AOSP AudioRecord.getFormat() */
+	public AudioFormat getFormat() {
+		AudioFormat.Builder builder = new AudioFormat.Builder()
+		    .setSampleRate(sampleRateInHz)
+		    .setEncoding(mAudioFormat);
+		if (mChannelMask != AudioFormat.CHANNEL_INVALID) {
+			builder.setChannelMask(mChannelMask);
+		}
+		return builder.build();
+	}
+
+	/* AOSP AudioRecord.getAudioSessionId(): native_setup() allocates a new session (AUDIO_SESSION_ALLOCATE) */
+	public int getAudioSessionId() {
+		return mSessionId;
 	}
 
 	public int getState() {
@@ -51,6 +105,17 @@ public class AudioRecord {
 			throw new IllegalStateException("startRecording() called on an uninitialized AudioRecord.");
 		native_record(pcm_handle);
 		recordingState = RECORDSTATE_RECORDING;
+	}
+
+	/* API 24, AOSP AudioRecord.getTimestamp(): argument check as AOSP; ATL's capture path reports no
+	 * timestamps, which AOSP's native_get_timestamp() returns as ERROR_INVALID_OPERATION */
+	public int getTimestamp(AudioTimestamp outTimestamp, int timebase) {
+		if (outTimestamp == null ||
+		    (timebase != AudioTimestamp.TIMEBASE_BOOTTIME
+		     && timebase != AudioTimestamp.TIMEBASE_MONOTONIC)) {
+			throw new IllegalArgumentException();
+		}
+		return ERROR_INVALID_OPERATION;
 	}
 
 	public int read(short[] audioData, int offsetInShorts, int sizeInShorts) {
@@ -83,6 +148,23 @@ public class AudioRecord {
 
 		private int audioSource;
 		private AudioFormat audioFormat;
+		private int mBufferSizeInBytes;
+		private android.content.Context mContext;
+
+		/* AOSP AudioRecord.Builder.setBufferSizeInBytes() */
+		public Builder setBufferSizeInBytes(int bufferSizeInBytes) throws IllegalArgumentException {
+			if (bufferSizeInBytes <= 0) {
+				throw new IllegalArgumentException("Invalid buffer size " + bufferSizeInBytes);
+			}
+			mBufferSizeInBytes = bufferSizeInBytes;
+			return this;
+		}
+
+		/* API 31, AOSP AudioRecord.Builder.setContext(): the context only supplies attribution data */
+		public Builder setContext(android.content.Context context) {
+			mContext = java.util.Objects.requireNonNull(context);
+			return this;
+		}
 
 		public Builder setAudioSource(int audioSource) {
 			this.audioSource = audioSource;
@@ -95,7 +177,8 @@ public class AudioRecord {
 		}
 
 		public AudioRecord build() {
-			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding, 32768);
+			return new AudioRecord(audioSource, audioFormat.sampleRate, audioFormat.channelMask, audioFormat.encoding,
+			                       mBufferSizeInBytes != 0 ? mBufferSizeInBytes : 32768);
 		}
 	}
 }

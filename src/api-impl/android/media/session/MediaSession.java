@@ -32,6 +32,17 @@ public class MediaSession {
 	private CallbackMessageHandler mCallback;
 	private final Token token = new Token(this);
 	private boolean mActive;
+	/* AOSP MediaSession fields; the values MediaSessionRecord keeps for the controllers */
+	private Context mContext;
+	private Bundle mSessionInfo;
+	private MediaController mController;
+	private int mFlags;
+	private int mRatingType;
+	private PendingIntent mSessionActivity;
+	private PendingIntent mMediaButtonReceiver;
+	private Bundle mExtras;
+	private AudioAttributes mAudioAttrs;
+	private android.media.VolumeProvider mVolumeProvider;
 
 	/* the controller behind the transport controls and media keys: the desktop's media controls (MPRIS)
 	 * and keys stand in for SystemUI and the system (MediaSessionService) */
@@ -72,18 +83,38 @@ public class MediaSession {
 		}
 	}
 
-	public MediaSession(Context context, String tag) {}
+	public MediaSession(Context context, String tag) {
+		this(context, tag, null);
+	}
 
 	/* API 29 */
+	/* AOSP MediaSession(Context, String, Bundle): the session and its own controller (MediaSessionManager.createSession
+	 * and the binder are the session itself here) */
 	public MediaSession(Context context, String tag, android.os.Bundle sessionInfo) {
-		this(context, tag);
+		if (context == null) {
+			throw new IllegalArgumentException("context cannot be null.");
+		}
+		if (android.text.TextUtils.isEmpty(tag)) {
+			throw new IllegalArgumentException("tag cannot be null or empty");
+		}
+		mContext = context;
+		mSessionInfo = sessionInfo;
+		mController = new MediaController(context, token);
+	}
+
+	/* AOSP MediaSession.getController() */
+	public @NonNull MediaController getController() {
+		return mController;
 	}
 
 	public Token getSessionToken() {
 		return token;
 	}
 
-	public void setFlags(int flags) {}
+	/* AOSP MediaSession.setFlags() -> MediaSessionRecord.setFlags(): kept for MediaController.getFlags() */
+	public void setFlags(int flags) {
+		mFlags = flags;
+	}
 
 	public void setCallback(Callback callback) {
 		setCallback(callback, null);
@@ -184,7 +215,11 @@ public class MediaSession {
 		}
 	}
 
-	public void setMediaButtonReceiver(PendingIntent pendingIntent) {}
+	/* AOSP MediaSession.setMediaButtonReceiver(): kept like MediaSessionRecord.setMediaButtonReceiver(); ATL routes
+	 * no media buttons to inactive sessions (MPRIS handles the keys) */
+	public void setMediaButtonReceiver(PendingIntent pendingIntent) {
+		mMediaButtonReceiver = pendingIntent;
+	}
 
 	/* API 31: the receiver that gets the media buttons while the session is inactive; ATL has no media button routing
 	 * to apps (MPRIS handles the keys), so it is only kept */
@@ -218,6 +253,8 @@ public class MediaSession {
 	private static final int MSG_CONTROLLER_QUEUE_TITLE = 4;
 	private static final int MSG_CONTROLLER_EXTRAS = 5;
 	private static final int MSG_CONTROLLER_DESTROYED = 6;
+	private static final int MSG_CONTROLLER_EVENT = 7;
+	private static final int MSG_CONTROLLER_AUDIO_INFO = 8;
 
 	void addControllerCallback(MediaController.Callback callback, Handler handler) {
 		synchronized (controllerCallbacks) {
@@ -256,6 +293,8 @@ public class MediaSession {
 						case MSG_CONTROLLER_QUEUE_TITLE: p.first.onQueueTitleChanged((CharSequence)arg); break;
 						case MSG_CONTROLLER_EXTRAS: p.first.onExtrasChanged((Bundle)arg); break;
 						case MSG_CONTROLLER_DESTROYED: p.first.onSessionDestroyed(); break;
+						case MSG_CONTROLLER_EVENT: p.first.onSessionEvent(((Pair<String, Bundle>)arg).first, ((Pair<String, Bundle>)arg).second); break;
+						case MSG_CONTROLLER_AUDIO_INFO: p.first.onAudioInfoChanged((MediaController.PlaybackInfo)arg); break;
 					}
 				}
 			});
@@ -339,19 +378,57 @@ public class MediaSession {
 		}
 	}
 
-	public void setPlaybackToLocal(AudioAttributes audioAttributes) {}
+	/* AOSP MediaSession.setPlaybackToLocal() -> MediaSessionRecord.setPlaybackToLocal(): local volume handling with
+	 * these attributes; the controllers hear onAudioInfoChanged() */
+	public void setPlaybackToLocal(AudioAttributes audioAttributes) {
+		if (audioAttributes == null) {
+			throw new IllegalArgumentException("Attributes cannot be null for local playback.");
+		}
+		synchronized (this) {
+			mAudioAttrs = audioAttributes;
+			mVolumeProvider = null;
+		}
+		notifyControllers(MSG_CONTROLLER_AUDIO_INFO, getPlaybackInfo());
+	}
+
+	/* AOSP MediaSession.setPlaybackToRemote() -> MediaSessionRecord.setPlaybackToRemote(): the volume belongs to
+	 * the provider; volume changes from controllers go to it (onSetVolumeTo/onAdjustVolume) */
+	public void setPlaybackToRemote(@NonNull android.media.VolumeProvider volumeProvider) {
+		if (volumeProvider == null) {
+			throw new IllegalArgumentException("volumeProvider may not be null!");
+		}
+		synchronized (this) {
+			mVolumeProvider = volumeProvider;
+		}
+		notifyControllers(MSG_CONTROLLER_AUDIO_INFO, getPlaybackInfo());
+	}
+
+	/* AOSP MediaSession.sendSessionEvent() -> MediaSessionRecord.pushEvent(): to all controllers' onSessionEvent() */
+	public void sendSessionEvent(@NonNull String event, @Nullable Bundle extras) {
+		if (android.text.TextUtils.isEmpty(event)) {
+			throw new IllegalArgumentException("event cannot be null or empty");
+		}
+		notifyControllers(MSG_CONTROLLER_EVENT, new Pair<String, Bundle>(event, extras));
+	}
 
 	public void setExtras(Bundle extras) {
+		mExtras = extras;
 		notifyControllers(MSG_CONTROLLER_EXTRAS, extras);
 	}
 
-	public void setSessionActivity(PendingIntent pendingIntent) {}
+	/* AOSP MediaSession.setSessionActivity(): kept for MediaController.getSessionActivity() */
+	public void setSessionActivity(PendingIntent pendingIntent) {
+		mSessionActivity = pendingIntent;
+	}
 
 	public boolean isActive() {
 		return mActive;
 	}
 
-	public void setRatingType(int ratingType) {}
+	/* AOSP MediaSession.setRatingType(): kept for MediaController.getRatingType() */
+	public void setRatingType(int ratingType) {
+		mRatingType = ratingType;
+	}
 
 	public void setQueueTitle(CharSequence title) {
 		queue_title = title;
@@ -373,6 +450,95 @@ public class MediaSession {
 	PlaybackState getPlaybackState() {
 		return playback_state;
 	}
+
+	/* the session's side of AOSP ISessionController (MediaSessionRecord.ControllerStub) */
+	String getPackageName() {
+		return mContext != null ? mContext.getPackageName() : null;
+	}
+
+	Bundle getSessionInfo() {
+		return mSessionInfo;
+	}
+
+	Bundle getExtras() {
+		return mExtras;
+	}
+
+	long getFlags() {
+		return mFlags;
+	}
+
+	int getRatingType() {
+		return mRatingType;
+	}
+
+	PendingIntent getSessionActivity() {
+		return mSessionActivity;
+	}
+
+	/* MediaSessionRecord.getVolumeAttributes(): remote playback reports the provider, local playback the stream
+	 * volume of the attributes (AudioManager.getStreamVolume/getStreamMaxVolume) */
+	MediaController.PlaybackInfo getPlaybackInfo() {
+		android.media.VolumeProvider vp;
+		AudioAttributes attrs;
+		synchronized (this) {
+			vp = mVolumeProvider;
+			attrs = mAudioAttrs != null ? mAudioAttrs : new AudioAttributes.Builder().build();
+		}
+		if (vp != null) {
+			return new MediaController.PlaybackInfo(MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE, vp.getVolumeControl(),
+			                                        vp.getMaxVolume(), vp.getCurrentVolume(), attrs, vp.getVolumeControlId());
+		}
+		int stream = AudioAttributes.toLegacyStreamType(attrs);
+		android.media.AudioManager am = getAudioManager();
+		int max = am != null ? am.getStreamMaxVolume(stream) : 100;
+		int current = am != null ? am.getStreamVolume(stream) : 100;
+		return new MediaController.PlaybackInfo(MediaController.PlaybackInfo.PLAYBACK_TYPE_LOCAL,
+		                                        2 /* VolumeProvider.VOLUME_CONTROL_ABSOLUTE */, max, current, attrs, null);
+	}
+
+	private android.media.AudioManager getAudioManager() {
+		return mContext != null ? (android.media.AudioManager)mContext.getSystemService(Context.AUDIO_SERVICE) : null;
+	}
+
+	/* MediaSessionRecord.setVolumeTo(): remote -> VolumeProvider.onSetVolumeTo() (unless fixed), local -> the stream */
+	void setVolumeTo(int value, int flags) {
+		android.media.VolumeProvider vp;
+		AudioAttributes attrs;
+		synchronized (this) {
+			vp = mVolumeProvider;
+			attrs = mAudioAttrs != null ? mAudioAttrs : new AudioAttributes.Builder().build();
+		}
+		if (vp != null) {
+			if (vp.getVolumeControl() != android.media.VolumeProvider.VOLUME_CONTROL_ABSOLUTE)
+				return;
+			value = Math.max(0, Math.min(value, vp.getMaxVolume()));
+			vp.onSetVolumeTo(value);
+			return;
+		}
+		android.media.AudioManager am = getAudioManager();
+		if (am != null)
+			am.setStreamVolume(AudioAttributes.toLegacyStreamType(attrs), value, flags);
+	}
+
+	/* MediaSessionRecord.adjustVolume(): remote -> VolumeProvider.onAdjustVolume() (unless fixed), local -> the stream */
+	void adjustVolume(int direction, int flags) {
+		android.media.VolumeProvider vp;
+		AudioAttributes attrs;
+		synchronized (this) {
+			vp = mVolumeProvider;
+			attrs = mAudioAttrs != null ? mAudioAttrs : new AudioAttributes.Builder().build();
+		}
+		if (vp != null) {
+			if (vp.getVolumeControl() == android.media.VolumeProvider.VOLUME_CONTROL_FIXED)
+				return;
+			vp.onAdjustVolume(direction);
+			return;
+		}
+		android.media.AudioManager am = getAudioManager();
+		if (am != null)
+			am.adjustStreamVolume(AudioAttributes.toLegacyStreamType(attrs), direction, flags);
+	}
 	private static final int MPRIS_STOPPED = 0;
 	private static final int MPRIS_PAUSED = 1;
 	private static final int MPRIS_PLAYING = 2;
@@ -384,6 +550,7 @@ public class MediaSession {
 	/* AOSP MediaSession.CallbackMessageHandler, with the transport controls the MPRIS bridge sends and
 	 * the media buttons */
 	class CallbackMessageHandler extends Handler {
+		static final int MSG_COMMAND = 1;
 		static final int MSG_MEDIA_BUTTON = 2;
 		static final int MSG_PREPARE = 3;
 		static final int MSG_PREPARE_MEDIA_ID = 4;
@@ -435,6 +602,10 @@ public class MediaSession {
 			Object obj = ((Pair<RemoteUserInfo, Object>)msg.obj).second;
 
 			switch (msg.what) {
+				case MSG_COMMAND:
+					Command cmd = (Command)obj;
+					mCallback.onCommand(cmd.command, cmd.extras, cmd.stub);
+					break;
 				case MSG_MEDIA_BUTTON:
 					mCallback.onMediaButtonEvent((Intent)obj);
 					break;
@@ -501,6 +672,24 @@ public class MediaSession {
 			}
 			mCurrentControllerInfo = null;
 		}
+	}
+
+	/* AOSP MediaSession.Command */
+	static final class Command {
+		final String command;
+		final Bundle extras;
+		final ResultReceiver stub;
+
+		Command(String command, Bundle extras, ResultReceiver stub) {
+			this.command = command;
+			this.extras = extras;
+			this.stub = stub;
+		}
+	}
+
+	/* AOSP MediaSession.dispatchCommand() (CallbackStub.onCommand) */
+	void dispatchCommand(RemoteUserInfo caller, String command, Bundle args, ResultReceiver resultCb) {
+		postToCallback(caller, CallbackMessageHandler.MSG_COMMAND, new Command(command, args, resultCb), 0);
 	}
 
 	public abstract static class Callback {

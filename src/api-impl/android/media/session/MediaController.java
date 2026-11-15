@@ -64,12 +64,75 @@ public class MediaController {
 		return session != null ? session.getQueue() : null;
 	}
 
-	/* MediaSession.Callback has no onCommand() yet, so commands are dropped */
-	public void sendCommand(String command, Bundle args, ResultReceiver cb) {}
+	/* AOSP MediaController.sendCommand(): to the session's Callback.onCommand() */
+	public void sendCommand(String command, Bundle args, ResultReceiver cb) {
+		if (TextUtils.isEmpty(command)) {
+			throw new IllegalArgumentException("command cannot be null or empty");
+		}
+		if (session != null)
+			session.dispatchCommand(controllerInfo(), command, args, cb);
+	}
 
-	/* AOSP MediaController.getPlaybackInfo(): a session of this process plays locally */
+	private RemoteUserInfo controllerInfo() {
+		return new RemoteUserInfo(mContext.getPackageName(), Process.myPid(), Process.myUid());
+	}
+
+	/* AOSP MediaController.getPlaybackInfo() (MediaSessionRecord.getVolumeAttributes()) */
 	public PlaybackInfo getPlaybackInfo() {
+		if (session != null)
+			return session.getPlaybackInfo();
 		return new PlaybackInfo(PlaybackInfo.PLAYBACK_TYPE_LOCAL, 2 /* VOLUME_CONTROL_ABSOLUTE */, 100, 100, new AudioAttributes.Builder().build(), null);
+	}
+
+	/* AOSP MediaController.getPackageName(): the package that owns the session */
+	public String getPackageName() {
+		if (mPackageName == null && session != null)
+			mPackageName = session.getPackageName();
+		return mPackageName;
+	}
+
+	private String mPackageName;
+	private Bundle mSessionInfo;
+
+	/* AOSP MediaController.getSessionInfo(): a copy, empty when the session has none */
+	public Bundle getSessionInfo() {
+		if (mSessionInfo == null) {
+			Bundle info = session != null ? session.getSessionInfo() : null;
+			mSessionInfo = info != null ? info : Bundle.EMPTY;
+		}
+		return new Bundle(mSessionInfo);
+	}
+
+	/* AOSP MediaController.getExtras() */
+	public Bundle getExtras() {
+		return session != null ? session.getExtras() : null;
+	}
+
+	/* AOSP MediaController.getFlags() */
+	public long getFlags() {
+		return session != null ? session.getFlags() : 0;
+	}
+
+	/* AOSP MediaController.getRatingType() */
+	public int getRatingType() {
+		return session != null ? session.getRatingType() : Rating.RATING_NONE;
+	}
+
+	/* AOSP MediaController.getSessionActivity() */
+	public android.app.PendingIntent getSessionActivity() {
+		return session != null ? session.getSessionActivity() : null;
+	}
+
+	/* AOSP MediaController.setVolumeTo() -> MediaSessionRecord.setVolumeTo() */
+	public void setVolumeTo(int value, int flags) {
+		if (session != null)
+			session.setVolumeTo(value, flags);
+	}
+
+	/* AOSP MediaController.adjustVolume() -> MediaSessionRecord.adjustVolume() */
+	public void adjustVolume(int direction, int flags) {
+		if (session != null)
+			session.adjustVolume(direction, flags);
 	}
 
 	/* AOSP MediaController.registerCallback(): the session tells the callback about its changes on the
