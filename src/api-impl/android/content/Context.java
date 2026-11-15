@@ -320,7 +320,7 @@ public abstract class Context {
 	private Intent registerReceiverInternal(final BroadcastReceiver receiver, IntentFilter filter, final Handler registeredWith) {
 		final Handler scheduler = registeredWith != null ? registeredWith : receiver != null ? new Handler(Looper.getMainLooper()) : null;
 		if (receiver != null)
-			receiverRegistrations.add(receiver, filter, registeredWith);
+			receiverRegistrations.add(receiverOwner(this), receiver, filter, registeredWith);
 		java.util.List<Intent> stickies = stickyIntentsFor(filter);
 		if (receiver != null) {
 			final Context context = this;
@@ -951,8 +951,17 @@ public abstract class Context {
 	 * the dispatcher holds every filter the receiver was registered with and ActivityManagerService
 	 * .unregisterReceiver() removes the whole ReceiverList; a receiver that is not registered, null included,
 	 * is an IllegalArgumentException("Receiver not registered: " + r) that apps catch */
+	/* AOSP keys LoadedApk.mReceivers on ContextImpl.getOuterContext(): a ContextWrapper hands registerReceiver()
+	 * down to its base, so the key is the innermost wrapper (the Activity, Service or Application that holds
+	 * the ContextImpl), not a wrapper an app put around it */
+	private static Context receiverOwner(Context context) {
+		while (context instanceof ContextWrapper && ((ContextWrapper)context).getBaseContext() instanceof ContextWrapper)
+			context = ((ContextWrapper)context).getBaseContext();
+		return context;
+	}
+
 	public void unregisterReceiver(BroadcastReceiver receiver) {
-		boolean registered = receiverRegistrations.removeAll(receiver);
+		boolean registered = receiverRegistrations.removeAll(receiverOwner(this), receiver);
 		if (!registered) {
 			Slog.w(TAG, "unregisterReceiver: receiver not registered: " + receiver);
 			throw new IllegalArgumentException("Receiver not registered: " + receiver);
