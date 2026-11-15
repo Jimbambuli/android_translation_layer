@@ -152,8 +152,6 @@ public final class ChooserSession {
         // AOSP forwards the intent to the registered IChooserController; none can register without
         // the system chooser binder, so there is no controller (AOSP: controller == null, nothing to do).
     }
-        }
-    }
 
     /**
      * Sets the minimized state of the Chooser UI.

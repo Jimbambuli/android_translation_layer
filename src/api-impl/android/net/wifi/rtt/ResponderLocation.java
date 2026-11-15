@@ -994,7 +994,7 @@ public final class ResponderLocation implements Parcelable {
      * <p>
      * Only valid if {@link #isLciSubelementValid()} returns true, or will throw an exception.
      */
-    @AltitudeType
+    
     public int getAltitudeType() {
         if (!mIsLciValid) {
             throw new IllegalStateException(
@@ -1036,7 +1036,7 @@ public final class ResponderLocation implements Parcelable {
      * <p>
      * Only valid if {@link #isLciSubelementValid()} returns true, or will throw an exception.
      */
-    @DatumType
+    
     public int getDatum() {
         if (!mIsLciValid) {
             throw new IllegalStateException(
@@ -1112,7 +1112,7 @@ public final class ResponderLocation implements Parcelable {
      * <p>
      * Only valid if {@link #isZaxisSubelementValid()} returns true, or will throw an exception.
      */
-    @ExpectedToMoveType
+    
     public int getExpectedToMove() {
         if (!mIsZValid) {
             throw new IllegalStateException(

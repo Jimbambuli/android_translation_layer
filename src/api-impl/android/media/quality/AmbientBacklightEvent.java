@@ -46,7 +46,7 @@ public final class AmbientBacklightEvent implements Parcelable {
     /**
      * Constructs AmbientBacklightEvent.
      */
-    public AmbientBacklightEvent(@Type int eventType,
+    public AmbientBacklightEvent(int eventType,
             @Nullable AmbientBacklightMetadata metadata) {
         mEventType = eventType;
         mMetadata = metadata;
@@ -61,7 +61,7 @@ public final class AmbientBacklightEvent implements Parcelable {
     /**
      * Gets event type.
      */
-    @Type
+    
     public int getEventType() {
         return mEventType;
     }

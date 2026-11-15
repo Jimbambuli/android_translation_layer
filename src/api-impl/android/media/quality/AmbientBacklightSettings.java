@@ -76,9 +76,9 @@ public final class AmbientBacklightSettings implements Parcelable {
      * Constructs AmbientBacklightSettings.
      */
     public AmbientBacklightSettings(
-            @Source int source,
+            int source,
             int maxFps,
-            @PixelFormat.Format int colorFormat,
+            int colorFormat,
             int horizontalZonesNumber,
             int verticalZonesNumber,
             boolean isLetterboxOmitted,
@@ -105,7 +105,7 @@ public final class AmbientBacklightSettings implements Parcelable {
     /**
      * Gets source of ambient backlight detection.
      */
-    @Source
+    
     public int getSource() {
         return mSource;
     }
@@ -121,7 +121,7 @@ public final class AmbientBacklightSettings implements Parcelable {
     /**
      * Gets color format.
      */
-    @PixelFormat.Format
+    
     public int getColorFormat() {
         return mColorFormat;
     }

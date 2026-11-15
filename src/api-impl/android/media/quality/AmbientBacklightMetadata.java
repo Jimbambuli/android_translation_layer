@@ -47,9 +47,9 @@ public final class AmbientBacklightMetadata implements Parcelable {
      */
     public AmbientBacklightMetadata(
             @NonNull String packageName,
-            @CompressionAlgorithm int compressAlgorithm,
-            @AmbientBacklightSettings.Source int source,
-            @PixelFormat.Format int colorFormat,
+            int compressAlgorithm,
+            int source,
+            int colorFormat,
             int horizontalZonesNumber,
             int verticalZonesNumber,
             @NonNull int[] zonesColors) {
@@ -83,7 +83,7 @@ public final class AmbientBacklightMetadata implements Parcelable {
     /**
      * Gets compress algorithm.
      */
-    @CompressionAlgorithm
+    
     public int getCompressionAlgorithm() {
         return mCompressAlgorithm;
     }
@@ -91,7 +91,7 @@ public final class AmbientBacklightMetadata implements Parcelable {
     /**
      * Gets source of ambient backlight detection.
      */
-    @AmbientBacklightSettings.Source
+    
     public int getSource() {
         return mSource;
     }
@@ -99,7 +99,7 @@ public final class AmbientBacklightMetadata implements Parcelable {
     /**
      * Gets color format.
      */
-    @PixelFormat.Format
+    
     public int getColorFormat() {
         return mColorFormat;
     }

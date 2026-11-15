@@ -481,7 +481,7 @@ public class TvInteractiveAppView extends ViewGroup {
      */
     public void prepareInteractiveApp(
             @NonNull String iAppServiceId,
-            @TvInteractiveAppServiceInfo.InteractiveAppType int type) {
+            int type) {
         // TODO: document and handle the cases that this method is called multiple times.
         if (DEBUG) {
             Log.d(TAG, "prepareInteractiveApp");
@@ -636,7 +636,7 @@ public class TvInteractiveAppView extends ViewGroup {
      * {@link TvInputManager#TIME_SHIFT_MODE_NETWORK},
      * {@link TvInputManager#TIME_SHIFT_MODE_AUTO}.
      */
-    public void sendTimeShiftMode(@android.media.tv.TvInputManager.TimeShiftMode int mode) {
+    public void sendTimeShiftMode(int mode) {
         if (DEBUG) {
             Log.d(TAG, "sendTimeShiftMode");
         }
@@ -839,7 +839,7 @@ public class TvInteractiveAppView extends ViewGroup {
      *               </ul>
      */
     public void notifyTimeShiftStatusChanged(
-            @NonNull String inputId, @TvInputManager.TimeShiftStatus int status) {
+            @NonNull String inputId, int status) {
         if (DEBUG) {
             Log.d(TAG,
                     "notifyTimeShiftStatusChanged inputId=" + inputId + "; status=" + status);
@@ -927,7 +927,7 @@ public class TvInteractiveAppView extends ViewGroup {
      *             See {@link TvInputManager#TV_MESSAGE_KEY_SUBTYPE} for more information on
      *             how to parse this data.
      */
-    public void notifyTvMessage(@NonNull @TvInputManager.TvMessageType int type,
+    public void notifyTvMessage(@NonNull int type,
             @NonNull Bundle data) {
         if (DEBUG) {
             Log.d(TAG, "notifyTvMessage type=" + type
@@ -1053,7 +1053,7 @@ public class TvInteractiveAppView extends ViewGroup {
          */
         public void onPlaybackCommandRequest(
                 @NonNull String iAppServiceId,
-                @NonNull @TvInteractiveAppService.PlaybackCommandType String cmdType,
+                @NonNull String cmdType,
                 @NonNull Bundle parameters) {
         }
 
@@ -1067,7 +1067,7 @@ public class TvInteractiveAppView extends ViewGroup {
          */
         public void onTimeShiftCommandRequest(
                 @NonNull String iAppServiceId,
-                @NonNull @TvInteractiveAppService.TimeShiftCommandType String cmdType,
+                @NonNull String cmdType,
                 @NonNull Bundle parameters) {
         }
 
@@ -1082,8 +1082,8 @@ public class TvInteractiveAppView extends ViewGroup {
          */
         public void onStateChanged(
                 @NonNull String iAppServiceId,
-                @TvInteractiveAppManager.InteractiveAppState int state,
-                @TvInteractiveAppManager.ErrorCode int err) {
+                int state,
+                int err) {
         }
 
         /**
@@ -1110,7 +1110,7 @@ public class TvInteractiveAppView extends ViewGroup {
          */
         public void onTeletextAppStateChanged(
                 @NonNull String iAppServiceId,
-                @TvInteractiveAppManager.TeletextAppState int state) {
+                int state) {
         }
 
         /**
@@ -1378,7 +1378,7 @@ public class TvInteractiveAppView extends ViewGroup {
          */
         public void onRequestTvRecordingInfoList(
                 @NonNull String iAppServiceId,
-                @TvRecordingInfo.TvRecordingListType int type) {
+                int type) {
         }
     }
 
@@ -1476,7 +1476,7 @@ public class TvInteractiveAppView extends ViewGroup {
         @Override
         public void onCommandRequest(
                 Session session,
-                @TvInteractiveAppService.PlaybackCommandType String cmdType,
+                String cmdType,
                 Bundle parameters) {
             if (DEBUG) {
                 Log.d(TAG, "onCommandRequest (cmdType=" + cmdType + ", parameters="
@@ -1503,7 +1503,7 @@ public class TvInteractiveAppView extends ViewGroup {
         @Override
         public void onTimeShiftCommandRequest(
                 Session session,
-                @TvInteractiveAppService.TimeShiftCommandType String cmdType,
+                String cmdType,
                 Bundle parameters) {
             if (DEBUG) {
                 Log.d(TAG, "onTimeShiftCommandRequest (cmdType=" + cmdType + ", parameters="
@@ -1530,8 +1530,8 @@ public class TvInteractiveAppView extends ViewGroup {
         @Override
         public void onSessionStateChanged(
                 Session session,
-                @TvInteractiveAppManager.InteractiveAppState int state,
-                @TvInteractiveAppManager.ErrorCode int err) {
+                int state,
+                int err) {
             if (DEBUG) {
                 Log.d(TAG, "onSessionStateChanged (state=" + state + "; err=" + err + ")");
             }

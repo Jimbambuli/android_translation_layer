@@ -45,4 +45,10 @@ public final class AppContentRequest {
         return mThumbnailSize;
     }
 
+    /* AOSP android/media/projection/AppContentRequest.java: public AppContentRequest( */
+    public AppContentRequest(@NonNull Size thumbnailSize,
+            @NonNull Consumer<MediaProjectionAppContent[]> contentConsumer) {
+        mThumbnailSize = Objects.requireNonNull(thumbnailSize);
+        mContentConsumer = Objects.requireNonNull(contentConsumer);
+    }
 }

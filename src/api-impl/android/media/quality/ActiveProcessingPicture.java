@@ -65,4 +65,11 @@ public final class ActiveProcessingPicture implements Parcelable {
         dest.writeString(mProfileId);
         dest.writeBoolean(mForGlobal);
     }
+
+    /* AOSP android/media/quality/ActiveProcessingPicture.java: ActiveProcessingPicture(Parcel in) */
+    ActiveProcessingPicture(Parcel in) {
+        mId = in.readInt();
+        mProfileId = in.readString();
+        mForGlobal = in.readBoolean();
+    }
 }

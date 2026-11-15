@@ -147,7 +147,7 @@ public final class RangingRequest implements Parcelable {
      *
      * @return security mode for the ranging request
      */
-    public @SecurityMode int getSecurityMode() {
+    public int getSecurityMode() {
         return mSecurityMode;
     }
 
@@ -187,7 +187,7 @@ public final class RangingRequest implements Parcelable {
         private List<ResponderConfig> mRttPeers = new ArrayList<>();
         private int mRttBurstSize = DEFAULT_RTT_BURST_SIZE;
         private @NonNull List<OuiKeyedData> mVendorData = Collections.emptyList();
-        private @SecurityMode int mSecurityMode = SECURITY_MODE_OPPORTUNISTIC;
+        private int mSecurityMode = SECURITY_MODE_OPPORTUNISTIC;
 
         /**
          * Set the RTT Burst size for the ranging request.
@@ -479,7 +479,7 @@ public final class RangingRequest implements Parcelable {
          * @return The builder, to facilitate chaining {@code builder.setXXX(..).setXXX(..)}.
          */
         @NonNull
-        public Builder setSecurityMode(@SecurityMode int securityMode) {
+        public Builder setSecurityMode(int securityMode) {
             mSecurityMode = securityMode;
             return this;
         }

@@ -214,7 +214,7 @@ public final class CharSequenceTransformation extends InternalTransformation imp
         @Override
         public CharSequenceTransformation createFromParcel(Parcel parcel) {
             final AutofillId[] ids = parcel.readParcelableArray(null, AutofillId.class);
-            final Pattern[] regexs = (Pattern[]) parcel.readSerializable();
+            final Pattern[] regexs = parcel.readSerializable(null, Pattern[].class); // ATL: readSerializable() declares a checked exception
             final String[] substs = parcel.createStringArray();
 
             // Always go through the builder to ensure the data ingested by

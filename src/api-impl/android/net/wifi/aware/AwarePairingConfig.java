@@ -97,7 +97,7 @@ public final class AwarePairingConfig implements Parcelable {
      * Get the supported bootstrapping methods in this config. Set of the
      * PAIRING_BOOTSTRAPPING_ values.
      */
-    @BootstrappingMethod
+    
     public int getBootstrappingMethods() {
         return mBootstrappingMethods;
     }
@@ -105,7 +105,7 @@ public final class AwarePairingConfig implements Parcelable {
     /**
      * Get the supported cipher suites in this config.
      */
-    @Characteristics.WifiAwarePairingCipherSuites
+    
     public int getSupportedCipherSuites() {
         return mCipherSuites;
     }
@@ -203,7 +203,7 @@ public final class AwarePairingConfig implements Parcelable {
          * @param methods methods supported, set of PAIRING_BOOTSTRAPPING_ values
          * @return the current {@link Builder} builder, enabling chaining of builder methods.
          */
-        @NonNull public Builder setBootstrappingMethods(@BootstrappingMethod int methods) {
+        @NonNull public Builder setBootstrappingMethods(int methods) {
             mBootStrappingMethods = methods;
             return this;
         }
@@ -215,7 +215,7 @@ public final class AwarePairingConfig implements Parcelable {
          * @return the current {@link Builder} builder, enabling chaining of builder methods.
          */
         @NonNull public Builder setSupportedCipherSuites(
-                @Characteristics.WifiAwarePairingCipherSuites int cipherSuites) {
+                int cipherSuites) {
             mCipherSuites = cipherSuites;
             return this;
         }

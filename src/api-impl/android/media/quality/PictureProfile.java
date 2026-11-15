@@ -160,7 +160,7 @@ public final class PictureProfile implements Parcelable {
     /**
      * Gets profile type.
      */
-    @ProfileType
+    
     public int getProfileType() {
         return mType;
     }
@@ -285,5 +285,28 @@ public final class PictureProfile implements Parcelable {
                     mHandle);
             return o;
         }
+    }
+
+    /* AOSP android/media/quality/PictureProfile.java: public PictureProfile( */
+    public PictureProfile(
+            @Nullable String id,
+            int type,
+            @NonNull String name,
+            @Nullable String inputId,
+            @NonNull String packageName,
+            @NonNull PersistableBundle params,
+            @NonNull PictureProfileHandle handle) {
+        this.mId = id;
+        this.mType = type;
+        this.mName = name;
+        this.mInputId = inputId;
+        this.mPackageName = packageName;
+        this.mParams = params;
+        this.mHandle = handle;
+    }
+
+    /* AOSP android/media/quality/PictureProfile.java: public PictureProfileHandle getHandle() */
+    public PictureProfileHandle getHandle() {
+        return mHandle;
     }
 }

@@ -57,7 +57,7 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
     public static final int ROLE_SERVER = 2;
 
         /** Role used to distinguish client from server networks. */
-    @Role
+    
     private final int mRole;
 
     /**
@@ -73,7 +73,7 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
     public static final int HEADER_COMPRESSION_6LOWPAN = 2;
 
         /** Header compression mechanism used on this network. */
-    @HeaderCompression
+    
     private final int mHeaderCompression;
 
     /** The MAC address of the remote. */
@@ -94,19 +94,19 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
     private L2capNetworkSpecifier(Parcel in) {
         mRole = in.readInt();
         mHeaderCompression = in.readInt();
-        mRemoteAddress = in.readParcelable(getClass().getClassLoader());
+        mRemoteAddress = (MacAddress) in.readParcelable(getClass().getClassLoader());
         mPsm = in.readInt();
     }
 
     
     /** Returns the role to be used for this network. */
-    @Role
+    
     public int getRole() {
         return mRole;
     }
 
     /** Returns the compression mechanism for this network. */
-    @HeaderCompression
+    
     public int getHeaderCompression() {
         return mHeaderCompression;
     }
@@ -132,9 +132,9 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
     
     /** A builder class for L2capNetworkSpecifier. */
     public static final class Builder {
-        @Role
+        
         private int mRole = ROLE_ANY;
-        @HeaderCompression
+        
         private int mHeaderCompression = HEADER_COMPRESSION_ANY;
         @Nullable
         private MacAddress mRemoteAddress;
@@ -148,7 +148,7 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
          * @param role the role to use.
          */
         @NonNull
-        public Builder setRole(@Role int role) {
+        public Builder setRole(int role) {
             mRole = role;
             return this;
         }
@@ -163,7 +163,7 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
          * @param headerCompression the header compression mechanism to use.
          */
         @NonNull
-        public Builder setHeaderCompression(@HeaderCompression int headerCompression) {
+        public Builder setHeaderCompression(int headerCompression) {
             mHeaderCompression = headerCompression;
             return this;
         }
@@ -237,4 +237,13 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
             return new L2capNetworkSpecifier[size];
         }
     };
+
+    /* AOSP android/net/L2capNetworkSpecifier.java: public L2capNetworkSpecifier(@Role int role */
+    public L2capNetworkSpecifier(int role, int headerCompression,
+            MacAddress remoteAddress, int psm) {
+        mRole = role;
+        mHeaderCompression = headerCompression;
+        mRemoteAddress = remoteAddress;
+        mPsm = psm;
+    }
 }

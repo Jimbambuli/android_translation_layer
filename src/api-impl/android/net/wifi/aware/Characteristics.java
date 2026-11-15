@@ -200,7 +200,7 @@ public final class Characteristics implements Parcelable {
      * {@link #WIFI_AWARE_CIPHER_SUITE_NCS_SK_256}, {@link #WIFI_AWARE_CIPHER_SUITE_NCS_PK_128},
      * or {@link #WIFI_AWARE_CIPHER_SUITE_NCS_PK_256}
      */
-    public @WifiAwareDataPathCipherSuites int getSupportedCipherSuites() {
+    public int getSupportedCipherSuites() {
         return mCharacteristics.getInt(KEY_SUPPORTED_DATA_PATH_CIPHER_SUITES);
     }
 
@@ -210,7 +210,7 @@ public final class Characteristics implements Parcelable {
      * @return A set of flags from {@link #WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_256},
      * or {@link #WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_256}
      */
-    public @WifiAwarePairingCipherSuites int getSupportedPairingCipherSuites() {
+    public int getSupportedPairingCipherSuites() {
         return mCharacteristics.getInt(KEY_SUPPORTED_PAIRING_CIPHER_SUITES);
     }
 

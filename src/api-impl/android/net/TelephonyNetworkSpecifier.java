@@ -116,4 +116,9 @@ public final class TelephonyNetworkSpecifier extends NetworkSpecifier implements
             return new TelephonyNetworkSpecifier(mSubId);
         }
     }
+
+    /* AOSP android/net/TelephonyNetworkSpecifier.java: public TelephonyNetworkSpecifier(int subId) */
+    public TelephonyNetworkSpecifier(int subId) {
+        this.mSubId = subId;
+    }
 }

@@ -25,12 +25,12 @@ public final class VpnProfileState implements Parcelable {
     /** A non-recoverable error has occurred, and will not be retried. */
     public static final int STATE_FAILED = 3;
     
-    @State private final int mState;
+    private final int mState;
     private final String mSessionKey;
     private final boolean mAlwaysOn;
     private final boolean mLockdown;
 
-    public VpnProfileState(@State int state, @Nullable String sessionKey, boolean alwaysOn,
+    public VpnProfileState(int state, @Nullable String sessionKey, boolean alwaysOn,
             boolean lockdown) {
         mState = state;
         mSessionKey = sessionKey;
@@ -44,7 +44,7 @@ public final class VpnProfileState implements Parcelable {
      * <p>This state represents the internal connection state of the VPN. This state may diverge
      * from the VPN Network's state during error and recovery handling.
      */
-    @State public int getState() {
+    public int getState() {
         return mState;
     }
 
@@ -129,7 +129,7 @@ public final class VpnProfileState implements Parcelable {
         mLockdown = in.readBoolean();
     }
 
-    private String convertStateToString(@State int state) {
+    private String convertStateToString(int state) {
         switch (state) {
             case STATE_CONNECTED:
                 return "CONNECTED";

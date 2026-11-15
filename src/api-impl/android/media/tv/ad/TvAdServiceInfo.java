@@ -16,7 +16,7 @@ import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Xml;
 
-import androidx.annotation.NonNull;
+import android.annotation.NonNull;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -44,7 +44,7 @@ public final class TvAdServiceInfo implements Parcelable {
      * @param context the application context
      * @param component the component name of the TvAdService
      */
-    public TvAdServiceInfo(@NonNull Context context, @NonNull ComponentName component) {
+    public TvAdServiceInfo(Context context, ComponentName component) {
         if (context == null) {
             throw new IllegalArgumentException("context cannot be null.");
         }
@@ -73,13 +73,13 @@ public final class TvAdServiceInfo implements Parcelable {
         mTypes.addAll(types);
     }
 
-    private TvAdServiceInfo(@NonNull Parcel in) {
+    private TvAdServiceInfo(Parcel in) {
         mService = ResolveInfo.CREATOR.createFromParcel(in);
         mId = in.readString();
         in.readStringList(mTypes);
     }
 
-    @NonNull
+    
     public static final Creator<TvAdServiceInfo> CREATOR = new Creator<TvAdServiceInfo>() {
         @Override
         public TvAdServiceInfo createFromParcel(Parcel in) {
@@ -96,7 +96,7 @@ public final class TvAdServiceInfo implements Parcelable {
      * Returns a unique ID for this TV AD service. The ID is generated from the package and class
      * name implementing the TV AD service.
      */
-    @NonNull
+    
     public String getId() {
         return mId;
     }
@@ -113,7 +113,7 @@ public final class TvAdServiceInfo implements Parcelable {
     /**
      * Gets supported TV AD types.
      */
-    @NonNull
+    
     public List<String> getSupportedTypes() {
         return mTypes;
     }
@@ -163,6 +163,12 @@ public final class TvAdServiceInfo implements Parcelable {
                     "Failed reading meta-data for " + serviceInfo.packageName, e);
         } catch (PackageManager.NameNotFoundException e) {
             throw new IllegalStateException("No resources found for " + serviceInfo.packageName, e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            /* ATL: PackageItemInfo.loadXmlMetaData() declares Exception (AOSP: none) */
+            throw new IllegalStateException(
+                    "Failed reading meta-data for " + serviceInfo.packageName, e);
         }
     }
 
@@ -172,7 +178,7 @@ public final class TvAdServiceInfo implements Parcelable {
     }
 
     @Override
-    public void writeToParcel(@NonNull Parcel dest, int flags) {
+    public void writeToParcel(Parcel dest, int flags) {
         mService.writeToParcel(dest, flags);
         dest.writeString(mId);
         dest.writeStringList(mTypes);

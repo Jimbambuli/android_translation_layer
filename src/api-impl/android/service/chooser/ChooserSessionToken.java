@@ -52,7 +52,7 @@ public final class ChooserSessionToken implements Parcelable {
 
     @Override
     public boolean equals(Object obj) {
-        return (obj instanceof ChooserSessionToken token) && mBinder.equals(token.mBinder);
+        return (obj instanceof ChooserSessionToken) && mBinder.equals(((ChooserSessionToken) obj).mBinder);
     }
 
     @Override

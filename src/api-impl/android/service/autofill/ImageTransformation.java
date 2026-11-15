@@ -249,7 +249,7 @@ public final class ImageTransformation extends InternalTransformation implements
         public ImageTransformation createFromParcel(Parcel parcel) {
             final AutofillId id = parcel.readParcelable(null, android.view.autofill.AutofillId.class);
 
-            final Pattern[] regexs = (Pattern[]) parcel.readSerializable();
+            final Pattern[] regexs = parcel.readSerializable(null, Pattern[].class); // ATL: readSerializable() declares a checked exception
             final int[] resIds = parcel.createIntArray();
             final CharSequence[] contentDescriptions = parcel.readCharSequenceArray();
 

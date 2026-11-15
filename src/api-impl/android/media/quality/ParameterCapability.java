@@ -67,7 +67,7 @@ public final class ParameterCapability implements Parcelable {
     @NonNull
     private final String mName;
     private final boolean mIsSupported;
-    @ParameterType
+    
     private final int mType;
     @NonNull
     private final Bundle mCaps;
@@ -120,7 +120,7 @@ public final class ParameterCapability implements Parcelable {
      *
      * <p>It's {@link #TYPE_NONE} if {@link #isSupported()} is {@code false}.
      */
-    @ParameterType
+    
     public int getParameterType() {
         return mType;
     }
@@ -132,5 +132,25 @@ public final class ParameterCapability implements Parcelable {
     @NonNull
     public Bundle getCapabilities() {
         return new Bundle(mCaps);
+    }
+
+    /* AOSP android/media/quality/ParameterCapability.java: protected ParameterCapability(Parcel in) */
+    protected ParameterCapability(Parcel in) {
+        mName = in.readString();
+        mIsSupported = in.readBoolean();
+        mType = in.readInt();
+        mCaps = in.readBundle();
+    }
+
+    /* AOSP android/media/quality/ParameterCapability.java: public ParameterCapability( */
+    public ParameterCapability(
+            @NonNull String name,
+            boolean isSupported,
+            int type,
+            @NonNull Bundle caps) {
+        this.mName = name;
+        this.mIsSupported = isSupported;
+        this.mType = type;
+        this.mCaps = caps;
     }
 }

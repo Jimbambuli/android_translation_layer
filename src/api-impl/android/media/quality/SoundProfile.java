@@ -139,7 +139,7 @@ public final class SoundProfile implements Parcelable {
     /**
      * Gets profile type.
      */
-    @ProfileType
+    
     public int getProfileType() {
         return mType;
     }
@@ -262,5 +262,28 @@ public final class SoundProfile implements Parcelable {
                     mHandle);
             return o;
         }
+    }
+
+    /* AOSP android/media/quality/SoundProfile.java: public SoundProfile( */
+    public SoundProfile(
+            @Nullable String id,
+            int type,
+            @NonNull String name,
+            @Nullable String inputId,
+            @NonNull String packageName,
+            @NonNull PersistableBundle params,
+            @NonNull SoundProfileHandle handle) {
+        this.mId = id;
+        this.mType = type;
+        this.mName = name;
+        this.mInputId = inputId;
+        this.mPackageName = packageName;
+        this.mParams = params;
+        this.mHandle = handle;
+    }
+
+    /* AOSP android/media/quality/SoundProfile.java: public SoundProfileHandle getHandle() */
+    public SoundProfileHandle getHandle() {
+        return mHandle;
     }
 }

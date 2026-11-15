@@ -286,7 +286,7 @@ public final class SubscribeConfig implements Parcelable {
      * @return If instant communication mode is not enabled will return {@link
      *     ScanResult#WIFI_BAND_24_GHZ} as default.
      */
-    @WifiAwareManager.InstantModeBand
+    
     public int getInstantCommunicationBand() {
         return mBand;
     }
@@ -414,7 +414,7 @@ public final class SubscribeConfig implements Parcelable {
          * @return The builder to facilitate chaining
          *         {@code builder.setXXX(..).setXXX(..)}.
          */
-        public Builder setSubscribeType(@SubscribeTypes int subscribeType) {
+        public Builder setSubscribeType(int subscribeType) {
             if (subscribeType < SUBSCRIBE_TYPE_PASSIVE || subscribeType > SUBSCRIBE_TYPE_ACTIVE) {
                 throw new IllegalArgumentException("Invalid subscribeType - " + subscribeType);
             }
@@ -557,7 +557,7 @@ public final class SubscribeConfig implements Parcelable {
          */
         @NonNull
         public Builder setInstantCommunicationModeEnabled(
-                boolean enabled, @WifiAwareManager.InstantModeBand int band) {
+                boolean enabled, int band) {
             if (!true) {
                 throw new UnsupportedOperationException();
             }

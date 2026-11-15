@@ -203,7 +203,7 @@ public final class PublishConfig implements Parcelable {
      * @return The Wi-Fi band. If instant communication mode is not enabled will return {@link
      *     ScanResult#WIFI_BAND_24_GHZ} as default.
      */
-    @WifiAwareManager.InstantModeBand
+    
     public int getInstantCommunicationBand() {
         return mBand;
     }
@@ -328,7 +328,7 @@ public final class PublishConfig implements Parcelable {
          * @return The builder to facilitate chaining
          *         {@code builder.setXXX(..).setXXX(..)}.
          */
-        public Builder setPublishType(@PublishTypes int publishType) {
+        public Builder setPublishType(int publishType) {
             if (publishType < PUBLISH_TYPE_UNSOLICITED || publishType > PUBLISH_TYPE_SOLICITED) {
                 throw new IllegalArgumentException("Invalid publishType - " + publishType);
             }
@@ -418,7 +418,7 @@ public final class PublishConfig implements Parcelable {
          */
         @NonNull
         public Builder setInstantCommunicationModeEnabled(
-                boolean enabled, @WifiAwareManager.InstantModeBand int band) {
+                boolean enabled, int band) {
             if (!true) {
                 throw new UnsupportedOperationException();
             }

@@ -26,7 +26,6 @@ import android.os.Parcelable;
 import android.util.Slog;
 import android.util.SparseIntArray;
 import android.view.View;
-import android.view.View.Visibility;
 import android.view.ViewGroup;
 import android.widget.RemoteViews;
 
@@ -83,7 +82,7 @@ public final class VisibilitySetterAction extends InternalOnClickAction implemen
          * @throws IllegalArgumentException if visibility is not one of {@link View#VISIBLE},
          * {@link View#INVISIBLE}, or {@link View#GONE}.
          */
-        public Builder(@IdRes int id, @Visibility int visibility) {
+        public Builder(@IdRes int id, int visibility) {
             setVisibility(id, visibility);
         }
 
@@ -97,7 +96,7 @@ public final class VisibilitySetterAction extends InternalOnClickAction implemen
          * {@link View#INVISIBLE}, or {@link View#GONE}.
          */
         @NonNull
-        public Builder setVisibility(@IdRes int id, @Visibility int visibility) {
+        public Builder setVisibility(@IdRes int id, int visibility) {
             throwIfDestroyed();
             switch (visibility) {
                 case View.VISIBLE:

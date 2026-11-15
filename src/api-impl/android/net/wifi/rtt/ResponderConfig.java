@@ -190,7 +190,7 @@ public final class ResponderConfig implements Parcelable {
 
     
     
-    private static boolean isResponderTypeSupported(@ResponderType int responderType) {
+    private static boolean isResponderTypeSupported(int responderType) {
         switch (responderType) {
             case RESPONDER_AP:
             case RESPONDER_STA:
@@ -308,7 +308,7 @@ public final class ResponderConfig implements Parcelable {
      * @see Builder#setResponderType(int)
      * @return The type of this responder
      */
-    public @ResponderType int getResponderType() {
+    public int getResponderType() {
         return responderType;
     }
 
@@ -330,14 +330,14 @@ public final class ResponderConfig implements Parcelable {
     public static final class Builder {
         private MacAddress mMacAddress;
         private PeerHandle mPeerHandle;
-        private @ResponderType int mResponderType = RESPONDER_AP;
+        private int mResponderType = RESPONDER_AP;
         private boolean mSupports80211Mc = true;
         private boolean mSupports80211azNtb = false;
-        private @ChannelWidth int mChannelWidth = CHANNEL_WIDTH_20MHZ;
+        private int mChannelWidth = CHANNEL_WIDTH_20MHZ;
         private int mFrequency = 0;
         private int mCenterFreq0 = 0;
         private int mCenterFreq1 = 0;
-        private @PreambleType int mPreamble = PREAMBLE_LEGACY;
+        private int mPreamble = PREAMBLE_LEGACY;
         private long mNtbMinMeasurementTime = DEFAULT_NTB_MIN_TIME_BETWEEN_MEASUREMENTS_MICROS;
         private long mNtbMaxMeasurementTime = DEFAULT_NTB_MAX_TIME_BETWEEN_MEASUREMENTS_MICROS;
         private SecureRangingConfig mSecureRangingConfig = null;
@@ -543,7 +543,7 @@ public final class ResponderConfig implements Parcelable {
          * @return the builder to facilitate chaining {@code builder.setXXX(..).setXXX(..)}.
          */
         @NonNull
-        public Builder setResponderType(@ResponderType int responderType) {
+        public Builder setResponderType(int responderType) {
             if (!isResponderTypeSupported(responderType)) {
                 throw new IllegalArgumentException("invalid responder type " + responderType);
             }

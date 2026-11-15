@@ -90,7 +90,15 @@ public final class PowerManager {
 
 	public void userActivity(long dummy, boolean dummy2) {}
 
+	/* AOSP PowerManager wake lock levels and flags (public API values) */
+	public static final int PARTIAL_WAKE_LOCK = 0x00000001;
+	public static final int SCREEN_DIM_WAKE_LOCK = 0x00000006;
+	public static final int SCREEN_BRIGHT_WAKE_LOCK = 0x0000000a;
 	public static final int FULL_WAKE_LOCK = 0x1a;
+	public static final int PROXIMITY_SCREEN_OFF_WAKE_LOCK = 0x00000020;
+	public static final int ACQUIRE_CAUSES_WAKEUP = 0x10000000;
+	public static final int ON_AFTER_RELEASE = 0x20000000;
+	public static final int RELEASE_FLAG_WAIT_FOR_NO_PROXIMITY = 1 << 0;
 
 	/* AOSP PowerManager thermal API (THERMAL_STATUS_* = Temperature.THROTTLING_*). ATL has no ThermalManagerService:
 	 * the status is NONE (a device that is not throttled), the headroom is NaN as documented for a device without

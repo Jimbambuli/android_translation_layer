@@ -38,7 +38,7 @@ public abstract class RangingResultCallback {
      *
      * @param code A status code indicating the type of failure.
      */
-    public abstract void onRangingFailure(@RangingOperationStatus int code);
+    public abstract void onRangingFailure(int code);
 
     /**
      * Called when a ranging operation was executed. The list of results corresponds to devices

@@ -209,7 +209,7 @@ public class WifiAwareSession implements AutoCloseable {
      */
     @Deprecated
     public NetworkSpecifier createNetworkSpecifierOpen(
-            @WifiAwareManager.DataPathRole int role, @NonNull byte[] peer) {
+            int role, @NonNull byte[] peer) {
         WifiAwareManager mgr = mMgr.get();
         if (mgr == null) {
             Log.e(TAG, "createNetworkSpecifierOpen: called post GC on WifiAwareManager");
@@ -256,7 +256,7 @@ public class WifiAwareSession implements AutoCloseable {
      */
     @Deprecated
     public NetworkSpecifier createNetworkSpecifierPassphrase(
-            @WifiAwareManager.DataPathRole int role, @NonNull byte[] peer,
+            int role, @NonNull byte[] peer,
             @NonNull String passphrase) {
         WifiAwareManager mgr = mMgr.get();
         if (mgr == null) {

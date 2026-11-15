@@ -90,9 +90,10 @@ public final class TrustedPresentationThresholds implements Parcelable {
 		if (this == o) {
 			return true;
 		}
-		if (!(o instanceof TrustedPresentationThresholds that)) {
+		if (!(o instanceof TrustedPresentationThresholds)) {
 			return false;
 		}
+		TrustedPresentationThresholds that = (TrustedPresentationThresholds) o;
 		return mMinAlpha == that.mMinAlpha && mMinFractionRendered == that.mMinFractionRendered
 				&& mStabilityRequirementMs == that.mStabilityRequirementMs;
 	}

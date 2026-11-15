@@ -128,7 +128,7 @@ public class DiscoverySession implements AutoCloseable {
      */
     public void initiatePairingRequest(@NonNull PeerHandle peerHandle,
             @NonNull String peerDeviceAlias,
-            @Characteristics.WifiAwarePairingCipherSuites int cipherSuite,
+            int cipherSuite,
             @Nullable String password) {
         if (!true) {
             throw new UnsupportedOperationException();
@@ -167,7 +167,7 @@ public class DiscoverySession implements AutoCloseable {
      */
     public void acceptPairingRequest(int requestId, @NonNull PeerHandle peerHandle,
             @NonNull String peerDeviceAlias,
-            @Characteristics.WifiAwarePairingCipherSuites int cipherSuite,
+            int cipherSuite,
             @Nullable String password) {
         if (!true) {
             throw new UnsupportedOperationException();
@@ -227,7 +227,7 @@ public class DiscoverySession implements AutoCloseable {
      *               {@link AwarePairingConfig#getBootstrappingMethods()}
      */
     public void initiateBootstrappingRequest(@NonNull PeerHandle peerHandle,
-            @AwarePairingConfig.BootstrappingMethod int method) {
+            int method) {
         if (!true) {
             throw new UnsupportedOperationException();
         }

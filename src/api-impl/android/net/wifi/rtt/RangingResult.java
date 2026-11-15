@@ -69,7 +69,7 @@ public final class RangingResult implements Parcelable {
      */
     public static final int UNSPECIFIED = -1;
 
-    private final @RangeResultStatus int mStatus;
+    private final int mStatus;
     private final MacAddress mMac;
     private final PeerHandle mPeerHandle;
     private final int mDistanceMm;
@@ -103,7 +103,7 @@ public final class RangingResult implements Parcelable {
      * Builder class used to construct {@link RangingResult} objects.
      */
     public static final class Builder {
-        private @RangeResultStatus int mStatus = STATUS_FAIL;
+        private int mStatus = STATUS_FAIL;
         private MacAddress mMac = null;
         private PeerHandle mPeerHandle = null;
         private int mDistanceMm = 0;
@@ -147,7 +147,7 @@ public final class RangingResult implements Parcelable {
          * @return The builder to facilitate chaining.
          */
         @NonNull
-        public Builder setStatus(@RangeResultStatus int status) {
+        public Builder setStatus(int status) {
             mStatus = status;
             return this;
         }
@@ -551,7 +551,7 @@ public final class RangingResult implements Parcelable {
      * @return The status of ranging measurement: {@link #STATUS_SUCCESS} in case of success, and
      * {@link #STATUS_FAIL} in case of failure.
      */
-    @RangeResultStatus
+    
     public int getStatus() {
         return mStatus;
     }
