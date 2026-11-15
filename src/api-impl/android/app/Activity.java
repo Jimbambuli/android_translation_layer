@@ -3040,6 +3040,51 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			startActivity(search);
 	}
 
+	/* AOSP Activity.requestShowKeyboardShortcuts(): a broadcast ACTION_SHOW_KEYBOARD_SHORTCUTS to the package of
+	 * SystemUI (config_systemUIServiceComponent). ATL has no SystemUI, nobody receives the broadcast. */
+	public final void requestShowKeyboardShortcuts() {
+	}
+
+	/* AOSP Activity.onProvideKeyboardShortcuts(): one group, named with the label of the application, with the
+	 * menu items that have a title and an alphabetic shortcut */
+	@Override
+	public void onProvideKeyboardShortcuts(java.util.List<android.view.KeyboardShortcutGroup> data, Menu menu, int deviceId) {
+		if (menu == null) {
+			return;
+		}
+		android.view.KeyboardShortcutGroup group = null;
+		int menuSize = menu.size();
+		for (int i = 0; i < menuSize; ++i) {
+			final MenuItem item = menu.getItem(i);
+			final CharSequence title = item.getTitle();
+			final char alphaShortcut = item.getAlphabeticShortcut();
+			final int alphaModifiers = item.getAlphabeticModifiers();
+			if (title != null && alphaShortcut != Character.MIN_VALUE) {
+				if (group == null) {
+					final int resource = getApplicationInfo().labelRes;
+					group = new android.view.KeyboardShortcutGroup(resource != 0 ? getString(resource) : null);
+				}
+				group.addItem(new android.view.KeyboardShortcutInfo(title, alphaShortcut, alphaModifiers));
+			}
+		}
+		if (group != null) {
+			data.add(group);
+		}
+	}
+
+	/* AOSP Activity.startNextMatchingActivity(): ActivityTaskManagerService looks for the next activity that
+	 * matches the intent after this one in the resolution order; ATL runs one app, so there is none and the answer
+	 * is false. A child activity throws. */
+	public boolean startNextMatchingActivity(@NonNull Intent intent) {
+		return startNextMatchingActivity(intent, null);
+	}
+
+	public boolean startNextMatchingActivity(@NonNull Intent intent, @Nullable Bundle options) {
+		if (getParent() == null)
+			return false;
+		throw new UnsupportedOperationException("startNextMatchingActivity can only be called from a top-level activity");
+	}
+
 	/* AOSP Activity.startActivityIfNeeded(): like startActivityForResult(), except that nothing starts when the
 	 * activity for the intent is this one and it is single top (the flag, launchMode singleTop, singleTask or
 	 * singleInstance) - then false is returned and the intent is not delivered, as for START_RETURN_INTENT_TO_CALLER */
