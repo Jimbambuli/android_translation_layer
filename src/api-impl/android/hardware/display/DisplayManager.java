@@ -41,6 +41,22 @@ public final class DisplayManager {
 		}
 	}
 
+	/* AOSP DisplayManager.registerDisplayListener(Executor, long, DisplayListener): kept like the Handler variant;
+	 * ATL sends no display events, so the event filter and the executor are not needed */
+	public void registerDisplayListener(java.util.concurrent.Executor executor, long eventFilter, DisplayListener listener) {
+		registerDisplayListener(listener, null);
+	}
+
+	/* AOSP DisplayManager.getDisplays(String): the categories select from the displays; ATL's only display is
+	 * the default one and has no presentation or rear role */
+	public Display[] getDisplays(String category) {
+		if (category == null || "android.hardware.display.category.ALL_INCLUDING_DISABLED".equals(category)
+				|| "android.hardware.display.category.BUILT_IN_DISPLAYS".equals(category)) {
+			return getDisplays();
+		}
+		return new Display[0];
+	}
+
 	/* AOSP DisplayManager.getDisplays(): all logical displays; ATL has the default display only */
 	public Display[] getDisplays() {
 		return new Display[] {getDisplay(Display.DEFAULT_DISPLAY)};
