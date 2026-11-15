@@ -531,6 +531,7 @@ srcs = [
 	'android/graphics/LinearGradient.java',
 	'android/graphics/MaskFilter.java',
 	'android/graphics/Matrix.java',
+	'android/graphics/Matrix44.java',
 	'android/graphics/Movie.java',
 	'android/graphics/Outline.java',
 	'android/graphics/NinePatch.java',
