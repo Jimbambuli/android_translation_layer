@@ -349,3 +349,13 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables
 		gtk_widget_insert_before(picture, box, NULL);
 	}
 }
+
+/* TextView.setTextIsSelectable(): the GtkLabel lets the user select (and copy) its text */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setSelectable(JNIEnv *env, jobject this, jlong widget_ptr, jboolean selectable)
+{
+	GtkWidget *widget = _PTR(widget_ptr);
+	GtkLabel *label = box_get_label(env, GTK_IS_BUTTON(widget) ? gtk_button_get_child(GTK_BUTTON(widget)) : widget);
+	if (!label)
+		return;
+	gtk_label_set_selectable(label, selectable);
+}

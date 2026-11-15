@@ -51,6 +51,13 @@ public class EditText extends TextView {
 	 * factory (Notally: the factory hands out the note's body) so sees the typed text in its own buffer. */
 	private Editable mEditable;
 
+	/** AOSP TextView.onCheckIsTextEditor() for an EditText: it always has an Editor, with TYPE_CLASS_TEXT unless the
+	 * app sets another type; ATL cannot tell an explicit TYPE_NULL from "not set" (0), so only that case differs */
+	@Override
+	public boolean onCheckIsTextEditor() {
+		return true;
+	}
+
 	public Editable getText() {
 		if (mEditable == null)
 			mEditable = getEditableFactory().newEditable(native_getText(widget));

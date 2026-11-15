@@ -991,7 +991,24 @@ public class TextView extends View {
 
 	public void endBatchEdit() {}
 
-	public void setPrivateImeOptions(String type) {}
+	/* AOSP keeps it in Editor.mInputContentType and hands it to the IME in onCreateInputConnection(); ATL keeps it
+	 * for the getter (the GTK input method gets no private options) */
+	private String mPrivateImeOptions;
+
+	public void setPrivateImeOptions(String type) {
+		mPrivateImeOptions = type;
+	}
+
+	public String getPrivateImeOptions() {
+		return mPrivateImeOptions;
+	}
+
+	/** AOSP onCheckIsTextEditor(): mEditor != null && mEditor.mInputType != TYPE_NULL; in ATL an input type
+	 * other than 0 stands for the Editor (see mInputType) */
+	@Override
+	public boolean onCheckIsTextEditor() {
+		return mInputType != 0;
+	}
 
 	public Typeface getTypeface() { return typeface; }
 
@@ -1117,7 +1134,21 @@ public class TextView extends View {
 		}
 	}
 
-	public void setTextIsSelectable(boolean selectable) {}
+	private boolean mTextIsSelectable;
+
+	/** AOSP TextView.setTextIsSelectable(): focusable in touch mode, clickable and long-clickable as selectable;
+	 * the selection itself is made by the GtkLabel */
+	public void setTextIsSelectable(boolean selectable) {
+		if (mTextIsSelectable == selectable)
+			return;
+		mTextIsSelectable = selectable;
+		setFocusableInTouchMode(selectable);
+		setFocusable(FOCUSABLE_AUTO);
+		setClickable(selectable);
+		setLongClickable(selectable);
+		native_setSelectable(widget, selectable);
+	}
+	private native void native_setSelectable(long widget, boolean selectable);
 
 	/* AOSP setTextSelectHandle*()/getTextSelectHandle*(): kept for the getters; ATL draws no selection handles
 	 * (GTK draws its own), so AOSP's mEditor.loadHandleDrawables() has nothing to update */
@@ -1204,7 +1235,8 @@ public class TextView extends View {
 	}
 
 
-	public boolean isTextSelectable() { return true; }
+	/** AOSP isTextSelectable(): false unless set (mEditor == null or mTextIsSelectable false) */
+	public boolean isTextSelectable() { return mTextIsSelectable; }
 
 
 	public void setTextAppearance(int resId) {
