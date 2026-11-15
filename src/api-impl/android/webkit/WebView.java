@@ -98,6 +98,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
 		providerInitialized = true;
+		// AOSP WebView constructor: a WebView allows CookieSyncManager.getInstance()
+		CookieSyncManager.setGetInstanceIsAllowed();
 		// like Chromium's AwContents: the page shows the focus itself (focus rings, the caret)
 		setDefaultFocusHighlightEnabled(false);
 		// the pages load with the user agent that WebSettings reports, not WebKitGTK's own

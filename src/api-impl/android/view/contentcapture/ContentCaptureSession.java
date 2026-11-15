@@ -11,7 +11,7 @@ import java.util.Objects;
  * capture service, so View.getContentCaptureSession() is null unless an app set one, and a session an app derives
  * itself is disabled: AOSP's notify*() methods do nothing while content capture is disabled, and so do these.
  */
-public abstract class ContentCaptureSession {
+public abstract class ContentCaptureSession implements AutoCloseable {
 	private static final int NO_SESSION_ID = 0;
 
 	private int mId = NO_SESSION_ID;
@@ -21,6 +21,25 @@ public abstract class ContentCaptureSession {
 	/** AOSP: the id of the session (hidden getId()); ATL's sessions have none until an app gives one */
 	public int getId() {
 		return mId;
+	}
+
+	private boolean mDestroyed;
+
+	/* AOSP destroy(): marks the session destroyed once (ATL's sessions have no child sessions and no
+	 * service to tell) */
+	public final void destroy() {
+		synchronized (this) {
+			if (mDestroyed) {
+				return;
+			}
+			mDestroyed = true;
+		}
+	}
+
+	/* AOSP close() (AutoCloseable): destroy() */
+	@Override
+	public void close() {
+		destroy();
 	}
 
 	/** AOSP: whether the content is reported; no service here, so never */
