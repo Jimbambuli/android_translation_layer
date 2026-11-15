@@ -10,17 +10,30 @@ import android.view.MotionEvent;
 import android.view.ViewGroup;
 
 public class Spinner extends AbsSpinner {
+	/** AOSP Spinner.MODE_DIALOG: the choices are shown in a dialog; ATL's GTK drop-down popup is used in both modes */
+	public static final int MODE_DIALOG = 0;
+	/** AOSP Spinner.MODE_DROPDOWN */
+	public static final int MODE_DROPDOWN = 1;
+	/* AOSP: take the mode from the spinnerMode attribute */
+	private static final int MODE_THEME = -1;
+
 	private Observer observer;
 	private Drawable popupBackground;
+	private Context mPopupContext;
 
-	/** AOSP getPopupContext(): ATL has no android:popupTheme, so the popup uses the spinner's context */
+	/** AOSP getPopupContext(): the context of the popup theme (constructor argument), else the spinner's context */
 	public Context getPopupContext() {
-		return getContext();
+		return mPopupContext;
 	}
 
 	public Spinner(Context context) {
 		this(context, null, 0);
 		haveCustomMeasure = false;
+	}
+
+	/** AOSP Spinner(Context, int mode): the mode is not used, the GTK drop-down is the only popup */
+	public Spinner(Context context, int mode) {
+		this(context, null, R.attr.spinnerStyle, mode);
 	}
 
 	public Spinner(Context context, AttributeSet attributeSet) {
@@ -29,10 +42,27 @@ public class Spinner extends AbsSpinner {
 	}
 
 	public Spinner(Context context, AttributeSet attributeSet, int defStyle) {
-		super(context, attributeSet, defStyle);
+		this(context, attributeSet, defStyle, 0, MODE_THEME);
+	}
+
+	public Spinner(Context context, AttributeSet attrs, int defStyleAttr, int mode) {
+		this(context, attrs, defStyleAttr, 0, mode);
+	}
+
+	public Spinner(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes, int mode) {
+		this(context, attrs, defStyleAttr, defStyleRes, mode, null);
+	}
+
+	/** AOSP Spinner: the popup context wraps the popup theme; the mode only selects AOSP's dialog or drop-down popup,
+	 * which ATL does not have (the GTK drop-down is used for both) */
+	public Spinner(Context context, AttributeSet attributeSet, int defStyle, int defStyleRes, int mode,
+	               android.content.res.Resources.Theme popupTheme) {
+		super(context, attributeSet, defStyle, defStyleRes);
 		haveCustomMeasure = false;
 
-		TypedArray a = context.obtainStyledAttributes(attributeSet, R.styleable.Spinner, defStyle, 0);
+		TypedArray a = context.obtainStyledAttributes(attributeSet, R.styleable.Spinner, defStyle, defStyleRes);
+		/* the android:popupTheme attribute is not in ATL's android.R.styleable.Spinner, only the argument counts */
+		mPopupContext = popupTheme != null ? new android.view.ContextThemeWrapper(context, popupTheme) : context;
 		popupBackground = a.getDrawable(R.styleable.Spinner_popupBackground);
 		mDropDownWidth = a.getLayoutDimension(R.styleable.Spinner_dropDownWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
 		a.recycle();
