@@ -915,7 +915,8 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		this.onKeyListener = onKeyListener;
 	}
 
+	/* AOSP Dialog.getCurrentFocus(): mWindow.getCurrentFocus() */
 	public View getCurrentFocus() {
-		return null;
+		return window != null ? window.getCurrentFocus() : null;
 	}
 }

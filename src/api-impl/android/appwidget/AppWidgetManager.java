@@ -32,6 +32,14 @@ public class AppWidgetManager {
 		return android.os.Bundle.EMPTY;
 	}
 
+	/* AOSP AppWidgetServiceImpl.updateAppWidgetOptions(): an id the host service does not know is ignored */
+	public void updateAppWidgetOptions(int appWidgetId, android.os.Bundle options) {}
+
+	/* AOSP: the providers of the package that the service knows; ATL has no widget host and none registered */
+	public java.util.List<AppWidgetProviderInfo> getInstalledProvidersForPackage(String packageName, android.os.UserHandle profile) {
+		return new java.util.ArrayList<>();
+	}
+
 	public void updateAppWidget(int[] appWidgetIds, RemoteViews views) {}
 
 	public int[] getAppWidgetIds(ComponentName provider) {
