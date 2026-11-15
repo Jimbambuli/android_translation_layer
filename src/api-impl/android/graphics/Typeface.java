@@ -299,32 +299,58 @@ public class Typeface {
 	}
 
 	/* the typeface uses the family of the first font; Pango does the fallback for missing glyphs */
+	/* AOSP Typeface.CustomFallbackBuilder. minikin makes a font collection of the families, then the
+	 * system fallback; here it is the Pango family list "first,second,...,system" (Pango tries the
+	 * families in order for each character, as the collection does) */
 	public static final class CustomFallbackBuilder {
-		private android.graphics.fonts.FontStyle style;
-		private final android.graphics.fonts.FontFamily fontFamily;
+		private static final int MAX_CUSTOM_FALLBACK = 64;
+		private final java.util.ArrayList<android.graphics.fonts.FontFamily> mFamilies = new java.util.ArrayList<>();
+		private String mFallbackName = null;
+		private android.graphics.fonts.FontStyle mStyle;
+
+		public static int getMaxCustomFallbackCount() {
+			return MAX_CUSTOM_FALLBACK;
+		}
 
 		public CustomFallbackBuilder(android.graphics.fonts.FontFamily family) {
-			fontFamily = family;
+			java.util.Objects.requireNonNull(family);
+			mFamilies.add(family);
 		}
 
 		public CustomFallbackBuilder setSystemFallback(String familyName) {
+			java.util.Objects.requireNonNull(familyName);
+			mFallbackName = familyName;
 			return this;
 		}
 
 		public CustomFallbackBuilder setStyle(android.graphics.fonts.FontStyle style) {
-			this.style = style;
+			mStyle = style;
 			return this;
 		}
 
 		public CustomFallbackBuilder addCustomFallback(android.graphics.fonts.FontFamily family) {
+			java.util.Objects.requireNonNull(family);
+			if (mFamilies.size() >= getMaxCustomFallbackCount())
+				throw new IllegalArgumentException(String.format("Custom fallback limit exceeded(%d)", getMaxCustomFallbackCount()));
+			mFamilies.add(family);
 			return this;
 		}
 
 		public Typeface build() {
-			android.graphics.fonts.FontStyle s = style;
-			if (s == null)
-				s = fontFamily.getFont(0).getStyle();
-			return createAbsolute(fontFamily.getFont(0).getFamilyName(), s.getWeight(), s.getSlant() == android.graphics.fonts.FontStyle.FONT_SLANT_ITALIC);
+			final Typeface fallbackTypeface = getSystemDefaultTypeface(mFallbackName);
+			java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+			for (android.graphics.fonts.FontFamily family : mFamilies) {
+				for (int i = 0; i < family.getSize(); i++) {
+					String name = family.getFont(i).getFamilyName();
+					if (name != null)
+						names.add(name);
+				}
+			}
+			if (fallbackTypeface.family != null)
+				names.add(fallbackTypeface.family);
+			final int weight = mStyle == null ? 400 : mStyle.getWeight();
+			final boolean italic = mStyle != null && mStyle.getSlant() != android.graphics.fonts.FontStyle.FONT_SLANT_UPRIGHT;
+			return createAbsolute(names.isEmpty() ? null : String.join(",", names), weight, italic);
 		}
 	}
 
