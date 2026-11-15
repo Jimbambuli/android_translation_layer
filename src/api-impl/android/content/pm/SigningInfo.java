@@ -54,6 +54,20 @@ public final class SigningInfo implements Parcelable {
 		this.signatures = null;
 	}
 
+	/* AOSP SigningInfo(int, Collection, Collection, Collection): UNKNOWN details without a scheme version or signers;
+	 * ATL keeps neither the public keys nor the past signing certificates, so those two are not stored */
+	public SigningInfo(int schemeVersion, java.util.Collection<Signature> apkContentsSigners, java.util.Collection<java.security.PublicKey> publicKeys,
+	                   java.util.Collection<Signature> signingCertificateHistory) {
+		if (schemeVersion <= 0 || apkContentsSigners == null || apkContentsSigners.isEmpty())
+			this.signatures = null;
+		else
+			this.signatures = apkContentsSigners.toArray(new Signature[apkContentsSigners.size()]);
+	}
+
+	public SigningInfo(SigningInfo orig) {
+		this.signatures = orig.signatures == null ? null : orig.signatures.clone();
+	}
+
 	/** @hide */
 	public SigningInfo(Signature[] signatures) {
 		this.signatures = signatures;
