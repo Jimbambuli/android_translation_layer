@@ -174,8 +174,8 @@ public final class Display {
 		return null;
 	}
 
-	/* AOSP 14 Display.HdrCapabilities without the Parcelable part */
-	public static final class HdrCapabilities {
+	/* AOSP Display.HdrCapabilities */
+	public static final class HdrCapabilities implements android.os.Parcelable {
 		public static final float INVALID_LUMINANCE = -1;
 		public static final int HDR_TYPE_INVALID = -1;
 		public static final int HDR_TYPE_DOLBY_VISION = 1;
@@ -213,6 +213,68 @@ public final class Display {
 
 		public float getDesiredMinLuminance() {
 			return mMinLuminance;
+		}
+
+		@Override
+		public boolean equals(Object other) {
+			if (this == other) {
+				return true;
+			}
+			if (!(other instanceof HdrCapabilities)) {
+				return false;
+			}
+			HdrCapabilities that = (HdrCapabilities)other;
+			return java.util.Arrays.equals(mSupportedHdrTypes, that.mSupportedHdrTypes) && mMaxLuminance == that.mMaxLuminance
+			    && mMaxAverageLuminance == that.mMaxAverageLuminance && mMinLuminance == that.mMinLuminance;
+		}
+
+		@Override
+		public int hashCode() {
+			int hash = 23;
+			hash = hash * 17 + java.util.Arrays.hashCode(mSupportedHdrTypes);
+			hash = hash * 17 + Float.floatToIntBits(mMaxLuminance);
+			hash = hash * 17 + Float.floatToIntBits(mMaxAverageLuminance);
+			hash = hash * 17 + Float.floatToIntBits(mMinLuminance);
+			return hash;
+		}
+
+		public static final android.os.Parcelable.Creator<HdrCapabilities> CREATOR = new android.os.Parcelable.Creator<HdrCapabilities>() {
+			@Override
+			public HdrCapabilities createFromParcel(android.os.Parcel source) {
+				return new HdrCapabilities(source);
+			}
+
+			@Override
+			public HdrCapabilities[] newArray(int size) {
+				return new HdrCapabilities[size];
+			}
+		};
+
+		private HdrCapabilities(android.os.Parcel source) {
+			int types = source.readInt();
+			mSupportedHdrTypes = new int[types];
+			for (int i = 0; i < types; ++i) {
+				mSupportedHdrTypes[i] = source.readInt();
+			}
+			mMaxLuminance = source.readFloat();
+			mMaxAverageLuminance = source.readFloat();
+			mMinLuminance = source.readFloat();
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		@Override
+		public void writeToParcel(android.os.Parcel dest, int flags) {
+			dest.writeInt(mSupportedHdrTypes.length);
+			for (int i = 0; i < mSupportedHdrTypes.length; ++i) {
+				dest.writeInt(mSupportedHdrTypes[i]);
+			}
+			dest.writeFloat(mMaxLuminance);
+			dest.writeFloat(mMaxAverageLuminance);
+			dest.writeFloat(mMinLuminance);
 		}
 	}
 
