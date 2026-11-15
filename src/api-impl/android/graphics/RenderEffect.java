@@ -48,6 +48,16 @@ public final class RenderEffect {
 		return new RenderEffect(OTHER, 0, 0, renderEffect, null);
 	}
 
+	/* AOSP RenderEffect.createShaderEffect()/createRuntimeShaderEffect(): the shader replaces the content;
+	 * ATL draws no shaders per effect, so the content stays as it is (like the other effects) */
+	public static RenderEffect createShaderEffect(Shader shader) {
+		return new RenderEffect(OTHER, 0, 0, null, null);
+	}
+
+	public static RenderEffect createRuntimeShaderEffect(RuntimeShader shader, String uniformShaderName) {
+		return new RenderEffect(OTHER, 0, 0, null, null);
+	}
+
 	public static RenderEffect createBlendModeEffect(RenderEffect dst, RenderEffect src, BlendMode blendMode) {
 		return new RenderEffect(OTHER, 0, 0, dst, src);
 	}
