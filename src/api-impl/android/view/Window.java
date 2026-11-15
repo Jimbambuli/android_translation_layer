@@ -96,7 +96,7 @@ public class Window {
 
 		public void onActionModeFinished(ActionMode mode);
 
-		default public void onProvideKeyboardShortcuts(java.util.List<?> data, Menu menu, int deviceId) {}
+		default public void onProvideKeyboardShortcuts(java.util.List<KeyboardShortcutGroup> data, Menu menu, int deviceId) {}
 
 		default public void onPointerCaptureChanged(boolean hasCapture) {}
 	}
