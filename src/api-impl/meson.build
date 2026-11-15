@@ -682,6 +682,8 @@ srcs = [
 	'android/hardware/usb/UsbManager.java',
 	'android/inputmethodservice/AbstractInputMethodService.java',
 	'android/inputmethodservice/InputMethodService.java',
+	'android/inputmethodservice/Keyboard.java',
+	'android/inputmethodservice/KeyboardView.java',
 	'android/location/Address.java',
 	'android/location/CorrelationVector.java',
 	'android/location/Criteria.java',
