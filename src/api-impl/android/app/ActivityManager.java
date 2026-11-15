@@ -197,6 +197,11 @@ public class ActivityManager {
 	}
 
 	public boolean isLowRamDevice() { return false; }
+
+	/* AOSP ActivityManager.isLowRamDeviceStatic(): ro.config.low_ram, not set on a desktop */
+	public static boolean isLowRamDeviceStatic() {
+		return false;
+	}
 	/* AOSP ActivityManager.LOCK_TASK_MODE_* and getLockTaskModeState(): no task is ever locked */
 	public static final int LOCK_TASK_MODE_NONE = 0;
 	public static final int LOCK_TASK_MODE_LOCKED = 1;

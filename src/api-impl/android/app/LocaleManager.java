@@ -30,8 +30,8 @@ import java.util.Objects;
  * ATL: AOSP keeps the locales per package in the system's locale service and the system applies them as
  * a configuration change of the app. ATL runs one app: its application locales are held in the process (they
  * are not kept for the next start of the app) and applied the way ATL applies a change of the dark mode: the
- * default Locale and the configuration change, with ActivityThread.handleConfigurationChanged(). The locale
- * overrides of LocaleConfig (setOverrideLocaleConfig) are not here, ATL has no LocaleConfig.
+ * default Locale and the configuration change, with ActivityThread.handleConfigurationChanged(). The override
+ * LocaleConfig is kept in the process as well.
  */
 public class LocaleManager {
 	private static LocaleList sSystemLocales;
@@ -110,6 +110,23 @@ public class LocaleManager {
 	public LocaleList getSystemLocales() {
 		synchronized (LocaleManager.class) {
 			return sSystemLocales;
+		}
+	}
+
+	private static LocaleConfig sOverrideLocaleConfig;
+
+	/* AOSP setOverrideLocaleConfig(): the service stores it per package (and tells the system to reload the
+	 * supported locales); null removes the override. ATL runs one app and keeps it in the process. */
+	public void setOverrideLocaleConfig(LocaleConfig localeConfig) {
+		synchronized (LocaleManager.class) {
+			sOverrideLocaleConfig = localeConfig;
+		}
+	}
+
+	/* AOSP getOverrideLocaleConfig(): the override, null if there is none */
+	public LocaleConfig getOverrideLocaleConfig() {
+		synchronized (LocaleManager.class) {
+			return sOverrideLocaleConfig;
 		}
 	}
 }

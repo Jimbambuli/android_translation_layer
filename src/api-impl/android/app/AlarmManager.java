@@ -86,10 +86,16 @@ public class AlarmManager {
 	private static final class ListenerAlarm implements Runnable {
 		final OnAlarmListener listener;
 		final Handler handler;
+		final java.util.concurrent.Executor executor;
 
 		ListenerAlarm(OnAlarmListener listener, Handler handler) {
+			this(listener, handler, null);
+		}
+
+		ListenerAlarm(OnAlarmListener listener, Handler handler, java.util.concurrent.Executor executor) {
 			this.listener = listener;
 			this.handler = handler;
+			this.executor = executor;
 		}
 
 		@Override
@@ -99,17 +105,24 @@ public class AlarmManager {
 					return;
 				sListenerAlarms.remove(listener);
 			}
-			listener.onAlarm();
+			if (executor != null)
+				executor.execute(listener::onAlarm);
+			else
+				listener.onAlarm();
 		}
 	}
 
 	private static void scheduleListener(int type, long triggerTime, OnAlarmListener listener, Handler targetHandler) {
+		scheduleListener(type, triggerTime, listener, targetHandler, null);
+	}
+
+	private static void scheduleListener(int type, long triggerTime, OnAlarmListener listener, Handler targetHandler, java.util.concurrent.Executor executor) {
 		if (listener == null) { // AlarmManagerService.setImpl() (services/, not in the local sources) logs and drops it
 			Slog.w(TAG, "Alarms must either supply a PendingIntent or an AlarmReceiver");
 			return;
 		}
 		long delay = triggerTime - ((type == 2 || type == 3) ? SystemClock.elapsedRealtime() : System.currentTimeMillis());
-		ListenerAlarm alarm = new ListenerAlarm(listener, targetHandler != null ? targetHandler : sHandler);
+		ListenerAlarm alarm = new ListenerAlarm(listener, targetHandler != null ? targetHandler : sHandler, executor);
 		synchronized (sAlarms) {
 			ListenerAlarm old = sListenerAlarms.put(listener, alarm);
 			if (old != null)
@@ -135,6 +148,15 @@ public class AlarmManager {
 	public void setWindow(int type, long windowStartMillis, long windowLengthMillis, String tag, OnAlarmListener listener, Handler targetHandler) {
 		Slog.i(TAG, "setWindow(" + type + ", " + windowStartMillis + ", " + windowLengthMillis + ", " + tag + ", " + listener + ") called");
 		scheduleListener(type, windowStartMillis, listener, targetHandler);
+	}
+
+	/* AOSP setWindow(int, long, long, String, Executor, OnAlarmListener): like the Handler variant, onAlarm() runs
+	 * on the executor (AOSP: a null executor throws, setImpl() wraps it in a ListenerWrapper) */
+	public void setWindow(int type, long windowStartMillis, long windowLengthMillis, String tag, java.util.concurrent.Executor executor, OnAlarmListener listener) {
+		if (executor == null)
+			throw new NullPointerException("executor cannot be null");
+		Slog.i(TAG, "setWindow(" + type + ", " + windowStartMillis + ", " + windowLengthMillis + ", " + tag + ", " + listener + ") called");
+		scheduleListener(type, windowStartMillis, listener, null, executor);
 	}
 
 	/* AOSP AlarmManager.setTime(): AlarmManagerService.setTime() enforces android.permission.SET_TIME
