@@ -58,7 +58,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES20_glEnable(JNIEnv *env, jclass, 
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glFrontFace(JNIEnv *env, jclass, jint mode)
 {
-	glEnable((GLenum)mode);
+	glFrontFace((GLenum)mode);
 }
 
 JNIEXPORT void JNICALL Java_android_opengl_GLES20_glViewport(JNIEnv *env, jclass, jint x, jint y, jint width, jint height)
