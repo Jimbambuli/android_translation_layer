@@ -477,6 +477,102 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1destroy
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_loadUrlWithHeaders
+ * Signature: (JLjava/lang/String;[Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrlWithHeaders
+  (JNIEnv *, jobject, jlong, jstring, jobjectArray);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_stopLoading
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1stopLoading
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_canGoBackOrForward
+ * Signature: (JI)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1canGoBackOrForward
+  (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_goBackOrForward
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1goBackOrForward
+  (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_clearHistory
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearHistory
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_getTitle
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getTitle
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_getOriginalUrl
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getOriginalUrl
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_getCertificate
+ * Signature: (J)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_android_webkit_WebView_native_1getCertificate
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_findAll
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1findAll
+  (JNIEnv *, jobject, jlong, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_findNext
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1findNext
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_clearMatches
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearMatches
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_clearCache
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearCache
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_setBackgroundColor
  * Signature: (JI)V
  */
