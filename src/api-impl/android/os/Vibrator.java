@@ -74,6 +74,29 @@ public class Vibrator {
 		vibrate(effect);
 	}
 
+	public static final int VIBRATION_EFFECT_SUPPORT_UNKNOWN = 0;
+	public static final int VIBRATION_EFFECT_SUPPORT_YES = 1;
+	public static final int VIBRATION_EFFECT_SUPPORT_NO = 2;
+
+	/* AOSP areEffectsSupported() asks VibratorInfo.isEffectSupported(); the vibrator of ATL (a motor that is only
+	 * switched on and off) reports no predefined effect, like areAllPrimitivesSupported() no primitive */
+	public int[] areEffectsSupported(int... effectIds) {
+		int[] supported = new int[effectIds.length];
+		java.util.Arrays.fill(supported, VIBRATION_EFFECT_SUPPORT_NO);
+		return supported;
+	}
+
+	/* AOSP vibrate(long[], int, AudioAttributes) */
+	public void vibrate(long[] pattern, int repeat, android.media.AudioAttributes attributes) {
+		if (repeat < -1 || repeat >= pattern.length)
+			throw new ArrayIndexOutOfBoundsException();
+		try {
+			vibrate(VibrationEffect.createWaveform(pattern, repeat), attributes);
+		} catch (IllegalArgumentException iae) {
+			Slog.e("Vibrator", "Failed to create VibrationEffect", iae);
+		}
+	}
+
 	public void cancel() {
 		if (vibrateThread != null) {
 			vibrateThread.interrupt();
