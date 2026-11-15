@@ -103,4 +103,10 @@ public final class KeyChain {
 		if (looper != null && looper == context.getMainLooper())
 			throw new IllegalStateException("calling this from your main thread can lead to deadlock");
 	}
+
+	/* AOSP KeyChain.isBoundKeyAlgorithm(): "All supported algorithms are hardware backed. Individual keys may not be." */
+	@Deprecated
+	public static boolean isBoundKeyAlgorithm(String algorithm) {
+		return true;
+	}
 }

@@ -53,4 +53,38 @@ public final class SmsManager {
 			throw new IllegalArgumentException("Invalid message body");
 		throw new UnsupportedOperationException("Sms is not supported");
 	}
+
+	/* AOSP SmsManager MMS entry points: argument checks, then Context.getSystemService(MMS_SERVICE) ("mms"); ATL has
+	 * no MmsManager, so the service is null and nothing is sent or downloaded. */
+	public void sendMultimediaMessage(android.content.Context context, android.net.Uri contentUri, String locationUrl,
+	                                  android.os.Bundle configOverrides, PendingIntent sentIntent) {
+		sendMultimediaMessage(context, contentUri, locationUrl, configOverrides, sentIntent, 0L);
+	}
+
+	public void sendMultimediaMessage(android.content.Context context, android.net.Uri contentUri, String locationUrl,
+	                                  android.os.Bundle configOverrides, PendingIntent sentIntent, long messageId) {
+		if (contentUri == null) {
+			throw new IllegalArgumentException("Uri contentUri null");
+		}
+	}
+
+	public void downloadMultimediaMessage(android.content.Context context, String locationUrl, android.net.Uri contentUri,
+	                                      android.os.Bundle configOverrides, PendingIntent downloadedIntent) {
+		downloadMultimediaMessage(context, locationUrl, contentUri, configOverrides, downloadedIntent, 0L);
+	}
+
+	public void downloadMultimediaMessage(android.content.Context context, String locationUrl, android.net.Uri contentUri,
+	                                      android.os.Bundle configOverrides, PendingIntent downloadedIntent, long messageId) {
+		if (TextUtils.isEmpty(locationUrl)) {
+			throw new IllegalArgumentException("Empty MMS location URL");
+		}
+		if (contentUri == null) {
+			throw new IllegalArgumentException("Uri contentUri null");
+		}
+	}
+
+	/* getISmsService() == null */
+	public android.os.Bundle getCarrierConfigValues() {
+		return new android.os.Bundle();
+	}
 }
