@@ -1,7 +1,11 @@
 package android.view.accessibility;
 
+import android.accessibilityservice.AccessibilityServiceInfo;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 public class AccessibilityManager {
 
@@ -41,6 +45,37 @@ public class AccessibilityManager {
 	 * changes and they are never called */
 	private final ArrayList<AccessibilityStateChangeListener> mAccessibilityStateChangeListeners = new ArrayList<>();
 	private final ArrayList<TouchExplorationStateChangeListener> mTouchExplorationStateChangeListeners = new ArrayList<>();
+
+	/** AOSP: listener for changes of the enabled accessibility services */
+	public interface AccessibilityServicesStateChangeListener {
+		void onAccessibilityServicesStateChanged(AccessibilityManager manager);
+	}
+
+	/* AOSP keeps these with their executor; no service is ever enabled here, so they are never called */
+	private final HashMap<AccessibilityServicesStateChangeListener, Executor> mServicesStateChangeListeners = new HashMap<>();
+
+	public void addAccessibilityServicesStateChangeListener(Executor executor, AccessibilityServicesStateChangeListener listener) {
+		synchronized (mServicesStateChangeListeners) {
+			mServicesStateChangeListeners.put(listener, executor);
+		}
+	}
+
+	/* AOSP: the listener runs on the manager's handler, the main looper's */
+	public void addAccessibilityServicesStateChangeListener(AccessibilityServicesStateChangeListener listener) {
+		addAccessibilityServicesStateChangeListener(new android.os.HandlerExecutor(new android.os.Handler(android.os.Looper.getMainLooper())), listener);
+	}
+
+	public boolean removeAccessibilityServicesStateChangeListener(AccessibilityServicesStateChangeListener listener) {
+		synchronized (mServicesStateChangeListeners) {
+			return mServicesStateChangeListeners.remove(listener) != null;
+		}
+	}
+
+	/* AOSP AccessibilityManager.getInstalledAccessibilityServiceList(): without the accessibility system service
+	 * the list is empty; ATL has no accessibility services */
+	public List<AccessibilityServiceInfo> getInstalledAccessibilityServiceList() {
+		return Collections.emptyList();
+	}
 
 	public boolean addAccessibilityStateChangeListener(AccessibilityStateChangeListener listener) {
 		synchronized (mAccessibilityStateChangeListeners) {

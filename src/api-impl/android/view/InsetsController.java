@@ -1,6 +1,8 @@
 package android.view;
 
+import android.os.CancellationSignal;
 import android.view.WindowInsets.Type.InsetsType;
+import android.view.animation.Interpolator;
 
 /* there are no system bars to hide on the desktop; the controller keeps their requested visibility
  * so that the window's insets report it, and dispatches the insets again when it changes, as AOSP does */
@@ -35,6 +37,14 @@ public class InsetsController implements WindowInsetsController {
 
 	public void hide(@InsetsType int types) {
 		window.setInsetsVisible(types, false);
+	}
+
+	/* AOSP InsetsController.controlWindowInsetsAnimation(): uncontrollable types (and no types) cancel the request
+	 * with a null controller; on the desktop no type is controllable (see below) */
+	@Override
+	public void controlWindowInsetsAnimation(@InsetsType int types, long durationMillis, Interpolator interpolator,
+	                                         CancellationSignal cancellationSignal, WindowInsetsAnimationControlListener listener) {
+		listener.onCancelled(null);
 	}
 
 	/* like AOSP, the listener learns the controllable types at once; a desktop window has no

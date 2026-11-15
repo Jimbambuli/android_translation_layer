@@ -24,16 +24,30 @@ import java.util.Objects;
 /**
  * Interface to the text classification service.
  *
- * ATL: AOSP's manager hands out the system's or the on-device TextClassifier. ATL has neither and
- * no result classes (TextSelection, TextLinks, ...), so, as on a device without a classification
- * service, the manager answers TextClassifier.NO_OP until an app sets its own with
- * setTextClassifier().
+ * ATL: AOSP's manager hands out the system's or the on-device TextClassifier. ATL has neither, so,
+ * as on a device without a classification service, the manager answers TextClassifier.NO_OP until
+ * an app sets its own with setTextClassifier(). Sessions are AOSP's (android-16.0.0_r4) default
+ * factory: a TextClassificationSession around getTextClassifier().
  */
 public final class TextClassificationManager {
 	private final Object mLock = new Object();
 
 	private final Context mContext;
 	private TextClassifier mCustomTextClassifier;
+
+	/** AOSP: a session-aware classifier around the current one */
+	public TextClassifier createTextClassificationSession(TextClassificationContext classificationContext) {
+		Objects.requireNonNull(classificationContext);
+		return new TextClassificationSession(classificationContext, getTextClassifier());
+	}
+
+	/** @hide */
+	public TextClassifier createTextClassificationSession(TextClassificationContext classificationContext,
+	                                                      TextClassifier textClassifier) {
+		Objects.requireNonNull(classificationContext);
+		Objects.requireNonNull(textClassifier);
+		return new TextClassificationSession(classificationContext, textClassifier);
+	}
 
 	/** @hide */
 	public TextClassificationManager(Context context) {

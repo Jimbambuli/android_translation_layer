@@ -1,11 +1,18 @@
 package android.view.textclassifier;
 
+import android.os.LocaleList;
+import android.os.Looper;
+import android.util.Log;
+import com.android.internal.util.Preconditions;
+import java.util.Objects;
+
 /**
  * Interface for providing text classification related features (AOSP android.view.textclassifier.TextClassifier).
  *
- * ATL has no TextClassificationManager and no text classification service, so this interface has the constants
- * and the part of AOSP's methods that need none of its result classes (TextSelection, TextClassification,
- * TextLinks, ...: they are not in ATL). NO_OP is AOSP's TextClassifier whose methods all keep their defaults.
+ * ATL has no text classification service, so this interface has the constants and AOSP's (android-16.0.0_r4)
+ * default methods for selection and classification; the result classes of the other features (TextLinks,
+ * TextLanguage, ConversationActions, SelectionEvent) are not in ATL. NO_OP is AOSP's TextClassifier whose methods
+ * all keep their defaults.
  */
 public interface TextClassifier {
 	String LOG_TAG = "androidtc";
@@ -46,6 +53,35 @@ public interface TextClassifier {
 		}
 	};
 
+	/** AOSP default: the selection stays as requested */
+	default TextSelection suggestSelection(TextSelection.Request request) {
+		Objects.requireNonNull(request);
+		Utils.checkMainThread();
+		return new TextSelection.Builder(request.getStartIndex(), request.getEndIndex()).build();
+	}
+
+	default TextSelection suggestSelection(CharSequence text, int selectionStartIndex, int selectionEndIndex,
+	                                       LocaleList defaultLocales) {
+		final TextSelection.Request request = new TextSelection.Request.Builder(text, selectionStartIndex, selectionEndIndex)
+		                                          .setDefaultLocales(defaultLocales)
+		                                          .build();
+		return suggestSelection(request);
+	}
+
+	/** AOSP default: no classification */
+	default TextClassification classifyText(TextClassification.Request request) {
+		Objects.requireNonNull(request);
+		Utils.checkMainThread();
+		return TextClassification.EMPTY;
+	}
+
+	default TextClassification classifyText(CharSequence text, int startIndex, int endIndex, LocaleList defaultLocales) {
+		final TextClassification.Request request = new TextClassification.Request.Builder(text, startIndex, endIndex)
+		                                               .setDefaultLocales(defaultLocales)
+		                                               .build();
+		return classifyText(request);
+	}
+
 	/** AOSP default: the maximum length of text that can be processed by generateLinks(); none here */
 	default int getMaxGenerateLinksTextLength() {
 		return 0;
@@ -58,4 +94,25 @@ public interface TextClassifier {
 
 	/** AOSP default: nothing to release */
 	default void destroy() {}
+
+	/** Utility functions for TextClassifier methods (AOSP TextClassifier.Utils, the part ATL needs). @hide */
+	final class Utils {
+		static void checkArgument(CharSequence text, int startIndex, int endIndex) {
+			Preconditions.checkArgument(text != null);
+			Preconditions.checkArgument(startIndex >= 0);
+			Preconditions.checkArgument(endIndex <= text.length());
+			Preconditions.checkArgument(endIndex > startIndex);
+		}
+
+		static boolean checkTextLength(CharSequence text, int maxLength) {
+			int textLength = text.length();
+			return textLength >= 0 && textLength <= maxLength;
+		}
+
+		static void checkMainThread() {
+			if (Looper.myLooper() == Looper.getMainLooper()) {
+				Log.w(LOG_TAG, "TextClassifier called on main thread");
+			}
+		}
+	}
 }

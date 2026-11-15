@@ -246,6 +246,19 @@ public class SurfaceView extends View {
 		}
 	};
 
+	/* AOSP SurfaceView.SURFACE_LIFECYCLE_* and setSurfaceLifecycle(): AOSP applies the requested
+	 * strategy at the next updateSurface(). ATL's surface is the GTK widget's and follows its
+	 * realization, so the request is stored only. */
+	public static final int SURFACE_LIFECYCLE_DEFAULT = 0;
+	public static final int SURFACE_LIFECYCLE_FOLLOWS_VISIBILITY = 1;
+	public static final int SURFACE_LIFECYCLE_FOLLOWS_ATTACHMENT = 2;
+
+	private int mRequestedSurfaceLifecycleStrategy = SURFACE_LIFECYCLE_DEFAULT;
+
+	public void setSurfaceLifecycle(int lifecycleStrategy) {
+		mRequestedSurfaceLifecycleStrategy = lifecycleStrategy;
+	}
+
 	public void setZOrderOnTop(boolean onTop) {
 		/* TODO */
 	}

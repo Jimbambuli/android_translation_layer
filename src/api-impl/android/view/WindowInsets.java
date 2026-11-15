@@ -185,6 +185,29 @@ public final class WindowInsets {
                 src.mDisplayShape,
                 src.mCompatInsetsTypes,
                 src.mCompatIgnoreVisibility);
+        setBoundingRects(src.mTypeBoundingRectsMap, src.mTypeMaxBoundingRectsMap,
+                src.mFrameWidth, src.mFrameHeight);
+    }
+
+    /* AOSP 16 WindowInsets: per-type bounding rects and the frame they are relative to. ATL's
+     * constructor predates them, so they are set right after construction via
+     * setBoundingRects(); dropped (empty) when the matching insets are consumed, as AOSP does. */
+    private Rect[][] mTypeBoundingRectsMap = new Rect[SIZE][];
+    private Rect[][] mTypeMaxBoundingRectsMap = new Rect[SIZE][];
+    private int mFrameWidth;
+    private int mFrameHeight;
+
+    private WindowInsets setBoundingRects(Rect[][] typeBoundingRectsMap,
+            Rect[][] typeMaxBoundingRectsMap, int frameWidth, int frameHeight) {
+        mTypeBoundingRectsMap = (mSystemWindowInsetsConsumed || typeBoundingRectsMap == null)
+                ? new Rect[SIZE][]
+                : typeBoundingRectsMap.clone();
+        mTypeMaxBoundingRectsMap = (mStableInsetsConsumed || typeMaxBoundingRectsMap == null)
+                ? new Rect[SIZE][]
+                : typeMaxBoundingRectsMap.clone();
+        mFrameWidth = frameWidth;
+        mFrameHeight = frameHeight;
+        return this;
     }
 
     private static DisplayCutout displayCutoutCopyConstructorArgument(WindowInsets w) {
@@ -418,9 +441,109 @@ public final class WindowInsets {
         return getSystemWindowInsets().top;
     }
 
-    /* ATL does not track per-type bounding rects; there are none to report */
+    /* AOSP 16 WindowInsets.getBoundingRects(). ATL's own window insets carry none (the
+     * desktop window has no caption bar or cutout the system reports); only insets an app
+     * builds with Builder.setBoundingRects() have some. */
     public java.util.List<Rect> getBoundingRects(int typeMask) {
-        return java.util.Collections.emptyList();
+        return getBoundingRects(mTypeBoundingRectsMap, typeMask);
+    }
+
+    /* AOSP 16 WindowInsets.getBoundingRectsIgnoringVisibility() */
+    public java.util.List<Rect> getBoundingRectsIgnoringVisibility(int typeMask) {
+        if ((typeMask & Type.IME) != 0) {
+            throw new IllegalArgumentException("Unable to query the bounding rects for IME");
+        }
+        return getBoundingRects(mTypeMaxBoundingRectsMap, typeMask);
+    }
+
+    /* AOSP 16 WindowInsets.getBoundingRects(Rect[][], int) */
+    private static java.util.List<Rect> getBoundingRects(Rect[][] typeBoundingRectsMap,
+            int typeMask) {
+        Rect[] allRects = null;
+        for (int i = 0; i < SIZE; i++) {
+            final int type = 1 << i;
+            if ((typeMask & type) == 0) {
+                continue;
+            }
+            final Rect[] rects = typeBoundingRectsMap[indexOf(type)];
+            if (rects == null) {
+                continue;
+            }
+            if (allRects == null) {
+                allRects = rects;
+            } else {
+                final Rect[] concat = new Rect[allRects.length + rects.length];
+                System.arraycopy(allRects, 0, concat, 0, allRects.length);
+                System.arraycopy(rects, 0, concat, allRects.length, rects.length);
+                allRects = concat;
+            }
+        }
+        if (allRects == null) {
+            return java.util.Collections.emptyList();
+        }
+        return Arrays.asList(allRects);
+    }
+
+    /* AOSP 16 WindowInsets.getFrame(): the frame the bounding rects are relative to */
+    public android.util.Size getFrame() {
+        return new android.util.Size(mFrameWidth, mFrameHeight);
+    }
+
+    /* AOSP 16 WindowInsets.insetBoundingRects(Rect[][], ...) */
+    static Rect[][] insetBoundingRects(Rect[][] typeBoundingRectsMap,
+            int insetLeft, int insetTop, int insetRight, int insetBottom, int frameWidth,
+            int frameHeight) {
+        if (insetLeft == 0 && insetTop == 0 && insetRight == 0 && insetBottom == 0) {
+            return typeBoundingRectsMap;
+        }
+        boolean cloned = false;
+        for (int index = 0; index < SIZE; index++) {
+            final Rect[] boundingRects = typeBoundingRectsMap[index];
+            if (boundingRects == null) {
+                continue;
+            }
+            final Rect[] insetBoundingRects = insetBoundingRects(boundingRects,
+                    insetLeft, insetTop, insetRight, insetBottom, frameWidth, frameHeight);
+            if (!Arrays.equals(insetBoundingRects, boundingRects)) {
+                if (!cloned) {
+                    typeBoundingRectsMap = typeBoundingRectsMap.clone();
+                    cloned = true;
+                }
+                typeBoundingRectsMap[index] = insetBoundingRects;
+            }
+        }
+        return typeBoundingRectsMap;
+    }
+
+    /* AOSP 16 WindowInsets.insetBoundingRects(Rect[], ...) */
+    static Rect[] insetBoundingRects(Rect[] boundingRects,
+            int left, int top, int right, int bottom, int frameWidth, int frameHeight) {
+        final java.util.List<Rect> insetBoundingRectsList = new java.util.ArrayList<>();
+        for (int i = 0; i < boundingRects.length; i++) {
+            final Rect insetRect = insetRect(boundingRects[i], left, top, right, bottom,
+                    frameWidth, frameHeight);
+            if (insetRect != null) {
+                insetBoundingRectsList.add(insetRect);
+            }
+        }
+        return insetBoundingRectsList.toArray(new Rect[0]);
+    }
+
+    /* AOSP 16 WindowInsets.insetRect() */
+    private static Rect insetRect(Rect orig, int insetLeft, int insetTop, int insetRight,
+            int insetBottom, int frameWidth, int frameHeight) {
+        if (orig == null) {
+            return null;
+        }
+        final Rect insetFrame = new Rect(insetLeft, insetTop, frameWidth - insetRight,
+                frameHeight - insetBottom);
+        final Rect insetRect = new Rect();
+        if (insetRect.setIntersect(insetFrame, orig)) {
+            insetRect.offset(-insetLeft, -insetTop);
+            return insetRect;
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -563,7 +686,9 @@ public final class WindowInsets {
                 mTypeVisibilityMap,
                 mIsRound, mAlwaysConsumeSystemBars, mSuppressScrimTypes,
                 null /* displayCutout */, mRoundedCorners, mPrivacyIndicatorBounds, mDisplayShape,
-                mCompatInsetsTypes, mCompatIgnoreVisibility);
+                mCompatInsetsTypes, mCompatIgnoreVisibility)
+                .setBoundingRects(mTypeBoundingRectsMap, mTypeMaxBoundingRectsMap,
+                        mFrameWidth, mFrameHeight);
     }
 
 
@@ -618,7 +743,8 @@ public final class WindowInsets {
                 (mCompatInsetsTypes & displayCutout()) != 0
                         ? null : displayCutoutCopyConstructorArgument(this),
                 mRoundedCorners, mPrivacyIndicatorBounds, mDisplayShape, mCompatInsetsTypes,
-                mCompatIgnoreVisibility);
+                mCompatIgnoreVisibility)
+                .setBoundingRects(null, null, mFrameWidth, mFrameHeight);
     }
 
     // TODO(b/119190588): replace @code with @link below
@@ -1045,7 +1171,16 @@ public final class WindowInsets {
                         ? null
                         : mPrivacyIndicatorBounds.inset(left, top, right, bottom),
                 mDisplayShape,
-                mCompatInsetsTypes, mCompatIgnoreVisibility);
+                mCompatInsetsTypes, mCompatIgnoreVisibility)
+                .setBoundingRects(
+                        mSystemWindowInsetsConsumed ? null
+                                : insetBoundingRects(mTypeBoundingRectsMap, left, top, right,
+                                        bottom, mFrameWidth, mFrameHeight),
+                        mStableInsetsConsumed ? null
+                                : insetBoundingRects(mTypeMaxBoundingRectsMap, left, top, right,
+                                        bottom, mFrameWidth, mFrameHeight),
+                        Math.max(0, mFrameWidth - left - right),
+                        Math.max(0, mFrameHeight - top - bottom));
     }
 
     @Override
@@ -1144,6 +1279,11 @@ public final class WindowInsets {
 
         private PrivacyIndicatorBounds mPrivacyIndicatorBounds = new PrivacyIndicatorBounds();
 
+        private final Rect[][] mTypeBoundingRectsMap;
+        private final Rect[][] mTypeMaxBoundingRectsMap;
+        private int mFrameWidth;
+        private int mFrameHeight;
+
         /**
          * Creates a builder where all insets are initially consumed.
          */
@@ -1151,6 +1291,8 @@ public final class WindowInsets {
             mTypeInsetsMap = new Insets[SIZE];
             mTypeMaxInsetsMap = new Insets[SIZE];
             mTypeVisibilityMap = new boolean[SIZE];
+            mTypeBoundingRectsMap = new Rect[SIZE][];
+            mTypeMaxBoundingRectsMap = new Rect[SIZE][];
         }
 
         /**
@@ -1171,6 +1313,50 @@ public final class WindowInsets {
             mSuppressScrimTypes = insets.mSuppressScrimTypes;
             mPrivacyIndicatorBounds = insets.mPrivacyIndicatorBounds;
             mDisplayShape = insets.mDisplayShape;
+            mTypeBoundingRectsMap = insets.mTypeBoundingRectsMap.clone();
+            mTypeMaxBoundingRectsMap = insets.mTypeMaxBoundingRectsMap.clone();
+            mFrameWidth = insets.mFrameWidth;
+            mFrameHeight = insets.mFrameHeight;
+        }
+
+        /* AOSP 16 WindowInsets.Builder.setBoundingRects() */
+        @NonNull
+        public Builder setBoundingRects(@InsetsType int typeMask, @NonNull java.util.List<Rect> rects) {
+            for (int i = 0; i < SIZE; i++) {
+                final int type = 1 << i;
+                if ((typeMask & type) == 0) {
+                    continue;
+                }
+                mTypeBoundingRectsMap[indexOf(type)] = rects.toArray(new Rect[0]);
+            }
+            mSystemInsetsConsumed = false;
+            return this;
+        }
+
+        /* AOSP 16 WindowInsets.Builder.setBoundingRectsIgnoringVisibility() */
+        @NonNull
+        public Builder setBoundingRectsIgnoringVisibility(@InsetsType int typeMask,
+                @NonNull java.util.List<Rect> rects) {
+            if (typeMask == IME) {
+                throw new IllegalArgumentException("Maximum bounding rects not available for IME");
+            }
+            for (int i = 0; i < SIZE; i++) {
+                final int type = 1 << i;
+                if ((typeMask & type) == 0) {
+                    continue;
+                }
+                mTypeMaxBoundingRectsMap[indexOf(type)] = rects.toArray(new Rect[0]);
+            }
+            mStableInsetsConsumed = false;
+            return this;
+        }
+
+        /* AOSP 16 WindowInsets.Builder.setFrame() */
+        @NonNull
+        public Builder setFrame(int width, int height) {
+            mFrameWidth = width;
+            mFrameHeight = height;
+            return this;
         }
 
         /**
@@ -1460,7 +1646,10 @@ public final class WindowInsets {
                     mStableInsetsConsumed ? null : mTypeMaxInsetsMap, mTypeVisibilityMap,
                     mIsRound, mAlwaysConsumeSystemBars, mSuppressScrimTypes, mDisplayCutout,
                     mRoundedCorners, mPrivacyIndicatorBounds, mDisplayShape, systemBars(),
-                    false /* compatIgnoreVisibility */);
+                    false /* compatIgnoreVisibility */)
+                    .setBoundingRects(mSystemInsetsConsumed ? null : mTypeBoundingRectsMap,
+                            mStableInsetsConsumed ? null : mTypeMaxBoundingRectsMap,
+                            mFrameWidth, mFrameHeight);
         }
     }
 

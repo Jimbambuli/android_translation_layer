@@ -1,6 +1,8 @@
 package android.view;
 
+import android.os.CancellationSignal;
 import android.view.WindowInsets.Type.InsetsType;
+import android.view.animation.Interpolator;
 
 public interface WindowInsetsController {
 	public static final int BEHAVIOR_DEFAULT = 1;
@@ -16,6 +18,10 @@ public interface WindowInsetsController {
 	/**
 	 * Adds a {@link OnControllableInsetsChangedListener} to the window insets controller.
 	 */
+	/** AOSP: lets the app animate the given insets types itself */
+	void controlWindowInsetsAnimation(@InsetsType int types, long durationMillis, Interpolator interpolator,
+	                                  CancellationSignal cancellationSignal, WindowInsetsAnimationControlListener listener);
+
 	void addOnControllableInsetsChangedListener(OnControllableInsetsChangedListener listener);
 
 	/**

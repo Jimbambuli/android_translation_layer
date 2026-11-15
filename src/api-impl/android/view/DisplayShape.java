@@ -71,6 +71,42 @@ public final class DisplayShape {
     }
 
     /**
+     * AOSP DisplayShape.createDefaultDisplayShape(): used by the display adapter when the
+     * device has no display shape spec (ATL has none). Without AOSP's spec cache.
+     * @hide
+     */
+    @NonNull
+    public static DisplayShape createDefaultDisplayShape(
+            int displayWidth, int displayHeight, boolean isScreenRound) {
+        return new DisplayShape(createDefaultSpecString(displayWidth, displayHeight, isScreenRound),
+                displayWidth, displayHeight, 1f, ROTATION_0);
+    }
+
+    /* AOSP DisplayShape.createDefaultSpecString() */
+    private static String createDefaultSpecString(int displayWidth, int displayHeight,
+            boolean isCircular) {
+        final String spec;
+        if (isCircular) {
+            final float xRadius = displayWidth / 2f;
+            final float yRadius = displayHeight / 2f;
+            // Draw a circular display shape.
+            spec = "M0," + yRadius
+                    // Draw upper half circle with arcTo command.
+                    + " A" + xRadius + "," + yRadius + " 0 1,1 " + displayWidth + "," + yRadius
+                    // Draw lower half circle with arcTo command.
+                    + " A" + xRadius + "," + yRadius + " 0 1,1 0," + yRadius + " Z";
+        } else {
+            // Draw a rectangular display shape.
+            spec = "M0,0"
+                    + " L" + displayWidth + ",0"
+                    + " L" + displayWidth + "," + displayHeight
+                    + " L0," + displayHeight
+                    + " Z";
+        }
+        return spec;
+    }
+
+    /**
      * @hide
      */
     public DisplayShape setRotation(int rotation) {

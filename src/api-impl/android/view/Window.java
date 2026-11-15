@@ -101,7 +101,10 @@ public class Window {
 		default public void onPointerCaptureChanged(boolean hasCapture) {}
 	}
 
-	public static interface OnFrameMetricsAvailableListener {}
+	/* AOSP Window.OnFrameMetricsAvailableListener */
+	public static interface OnFrameMetricsAvailableListener {
+		void onFrameMetricsAvailable(Window window, FrameMetrics frameMetrics, int dropCountSinceLastInvocation);
+	}
 
 	public long native_window;
 	private ViewGroup decorView;
@@ -892,7 +895,46 @@ public class Window {
 
 	public void setSharedElementReenterTransition(Transition transition) {}
 
-	public void setSharedElementReturnTransition(Transition transition) {}
+	/* AOSP PhoneWindow: the return transition defaults to USE_DEFAULT_TRANSITION, which
+	 * getSharedElementReturnTransition() resolves to the enter transition */
+	private Transition mSharedElementReturnTransition;
+	private boolean mSharedElementReturnTransitionSet;
+
+	public void setSharedElementReturnTransition(Transition transition) {
+		mSharedElementReturnTransition = transition;
+		mSharedElementReturnTransitionSet = true;
+	}
+
+	public Transition getSharedElementReturnTransition() {
+		return mSharedElementReturnTransitionSet ? mSharedElementReturnTransition : getSharedElementEnterTransition();
+	}
+
+	/* AOSP PhoneWindow.setTransitionBackgroundFadeDuration()/getTransitionBackgroundFadeDuration();
+	 * stored only, ATL plays no window transitions */
+	private long mBackgroundFadeDurationMillis = -1;
+
+	public void setTransitionBackgroundFadeDuration(long fadeDurationMillis) {
+		if (fadeDurationMillis < 0) {
+			throw new IllegalArgumentException("negative durations are not allowed");
+		}
+		mBackgroundFadeDurationMillis = fadeDurationMillis;
+	}
+
+	public long getTransitionBackgroundFadeDuration() {
+		return (mBackgroundFadeDurationMillis < 0) ? 300 /* DEFAULT_BACKGROUND_FADE_DURATION_MS */ : mBackgroundFadeDurationMillis;
+	}
+
+	/* AOSP PhoneWindow.setVolumeControlStream()/getVolumeControlStream(): stored; ATL's volume
+	 * keys do not pick a stream */
+	private int mVolumeControlStreamType = Integer.MIN_VALUE; /* AudioManager.USE_DEFAULT_STREAM_TYPE */
+
+	public void setVolumeControlStream(int streamType) {
+		mVolumeControlStreamType = streamType;
+	}
+
+	public int getVolumeControlStream() {
+		return mVolumeControlStreamType;
+	}
 
 	/* AOSP's Transition is abstract; an empty TransitionSet is the transition that does nothing (no shared elements) */
 	public Transition getSharedElementExitTransition() {

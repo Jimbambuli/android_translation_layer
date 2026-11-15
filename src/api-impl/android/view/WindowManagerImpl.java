@@ -214,6 +214,34 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		removeView(view);
 	}
 
+	/* AOSP WindowManagerImpl -> CrossWindowBlurListeners: the compositor's blur state, and each
+	 * new listener is told the current state once on its executor (notifyListener()). ATL's
+	 * windows are plain toplevels without cross-window blur, so the state is always false and
+	 * never changes; no listener needs to be kept. */
+	@Override
+	public boolean isCrossWindowBlurEnabled() {
+		return false;
+	}
+
+	@Override
+	public void addCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
+		final Handler handler = new Handler(Looper.getMainLooper());
+		addCrossWindowBlurEnabledListener(handler::post, listener);
+	}
+
+	@Override
+	public void addCrossWindowBlurEnabledListener(java.util.concurrent.Executor executor,
+			java.util.function.Consumer<Boolean> listener) {
+		java.util.Objects.requireNonNull(listener, "listener cannot be null");
+		java.util.Objects.requireNonNull(executor, "executor cannot be null");
+		executor.execute(() -> listener.accept(false));
+	}
+
+	@Override
+	public void removeCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
+		java.util.Objects.requireNonNull(listener, "listener cannot be null");
+	}
+
 	private static native void native_addView(long widget, View view, int type, boolean touchModal, int gravity, int x, int y, int width, int height);
 	private static native void native_updateViewLayout(long widget, int gravity, int x, int y, int width, int height);
 	private static native void native_removeView(long widget);

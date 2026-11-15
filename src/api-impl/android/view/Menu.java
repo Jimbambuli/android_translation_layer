@@ -59,4 +59,8 @@ public interface Menu {
 	public void setGroupEnabled(int group, boolean enabled);
 
 	public void setQwertyMode(boolean isQwerty);
+
+	/* AOSP Menu.setGroupDividerEnabled(): default method with empty body */
+	default void setGroupDividerEnabled(boolean groupDividerEnabled) {
+	}
 }
