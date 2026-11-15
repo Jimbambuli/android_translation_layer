@@ -622,7 +622,7 @@ public class DevicePolicyManager {
 	public java.util.List<android.os.UserHandle> getBindDeviceAdminTargetUsers(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
 	public boolean getBluetoothContactSharingDisabled(android.content.ComponentName p0) { return true; }
 	public String getCertInstallerPackage(android.content.ComponentName p0) throws java.lang.SecurityException { return null; }
-	public int getContentProtectionPolicy(android.content.ComponentName p0) { return 0; }
+	public int getContentProtectionPolicy(android.content.ComponentName p0) { return 1; }
 	public java.util.Set<java.lang.String> getCrossProfileCalendarPackages(android.content.ComponentName p0) { return java.util.Collections.emptySet(); }
 	public boolean getCrossProfileCallerIdDisabled(android.content.ComponentName p0) { return false; }
 	public boolean getCrossProfileContactsSearchDisabled(android.content.ComponentName p0) { return false; }
