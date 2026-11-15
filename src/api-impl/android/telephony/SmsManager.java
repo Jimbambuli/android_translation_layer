@@ -5,8 +5,7 @@ import android.text.TextUtils;
 
 /* AOSP SmsManager on a device without FEATURE_TELEPHONY_MESSAGING: TelephonyManager.getSmsService() is null, so
  * every use of ISms goes through getISmsServiceOrThrow() = UnsupportedOperationException("Sms is not supported").
- * Argument checks that come before that are kept. divideMessage() (SmsMessage.fragmentText, GSM alphabet tables)
- * is not provided. */
+ * Argument checks that come before that are kept. */
 public final class SmsManager {
 	private static final SmsManager DEFAULT_INSTANCE = new SmsManager(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID);
 
@@ -81,6 +80,16 @@ public final class SmsManager {
 		if (contentUri == null) {
 			throw new IllegalArgumentException("Uri contentUri null");
 		}
+	}
+
+	/* AOSP SmsManager.divideMessage(): null check, then SmsMessage.fragmentText(text, getSubscriptionId()). For the
+	 * default instance getSubscriptionId() already throws "Sms is not supported" (no ISms); for an explicit
+	 * subscription the GSM/CDMA fragmenting is not provided and fails the same way. */
+	public java.util.ArrayList<String> divideMessage(String text) {
+		if (null == text)
+			throw new IllegalArgumentException("text is null");
+		getSubscriptionId();
+		throw new UnsupportedOperationException("Sms is not supported");
 	}
 
 	/* getISmsService() == null */
