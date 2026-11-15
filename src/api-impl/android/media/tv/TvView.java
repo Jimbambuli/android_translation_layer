@@ -32,7 +32,7 @@ public class TvView extends android.view.ViewGroup {
     }
     public java.util.List<android.media.AudioPresentation> getAudioPresentations() { return new java.util.ArrayList<android.media.AudioPresentation>(); }
     public String getSelectedTrack(int arg0) { return null; }
-    public java.util.List<android.media.tv.TvTrackInfo> getTracks(int arg0) { return null; }
+    public java.util.List<android.media.tv.TvTrackInfo> getTracks(int arg0) { return new java.util.ArrayList<>(); }
     protected void onLayout(boolean arg0, int arg1, int arg2, int arg3, int arg4) {  }
     public boolean onUnhandledInputEvent(android.view.InputEvent arg0) { return false; }
     public void overrideTvAppAttributionSource(android.content.AttributionSource arg0) {  }

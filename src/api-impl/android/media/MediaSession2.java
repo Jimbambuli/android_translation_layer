@@ -5,7 +5,7 @@ public class MediaSession2 implements java.lang.AutoCloseable {
     @Deprecated public void broadcastSessionCommand(android.media.Session2Command arg0, android.os.Bundle arg1) {  }
     @Deprecated public void cancelSessionCommand(android.media.MediaSession2.ControllerInfo arg0, Object arg1) {  }
     @Deprecated public void close() {  }
-    @Deprecated public java.util.List<android.media.MediaSession2.ControllerInfo> getConnectedControllers() { return null; }
+    @Deprecated public java.util.List<android.media.MediaSession2.ControllerInfo> getConnectedControllers() { return new java.util.ArrayList<>(); }
     @Deprecated public String getId() { return null; }
     @Deprecated public android.media.Session2Token getToken() { return null; }
     @Deprecated public boolean isPlaybackActive() { return false; }

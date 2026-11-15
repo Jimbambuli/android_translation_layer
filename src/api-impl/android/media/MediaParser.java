@@ -7,7 +7,7 @@ public final class MediaParser {
     public static android.media.MediaParser createByName(String arg0, android.media.MediaParser.OutputConsumer arg1) { return null; }
     public android.media.metrics.LogSessionId getLogSessionId() { return null; }
     public String getParserName() { return null; }
-    public static java.util.List<java.lang.String> getParserNames(android.media.MediaFormat arg0) { return null; }
+    public static java.util.List<java.lang.String> getParserNames(android.media.MediaFormat arg0) { return new java.util.ArrayList<>(); }
     public void release() {  }
     public void seek(android.media.MediaParser.SeekPoint arg0) {  }
     public void setLogSessionId(android.media.metrics.LogSessionId arg0) {  }

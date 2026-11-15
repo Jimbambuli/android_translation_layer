@@ -2,7 +2,7 @@ package android.media.tv.ad;
 
 /* AOSP frameworks/base/media/java/android/media/tv/ad/TvAdManager.java (public API surface; no backing service in ATL, bodies follow the AOSP no-service path) */
 public final class TvAdManager {
-    public java.util.List<android.media.tv.ad.TvAdServiceInfo> getTvAdServiceList() { return null; }
+    public java.util.List<android.media.tv.ad.TvAdServiceInfo> getTvAdServiceList() { return new java.util.ArrayList<>(); }
     public void registerCallback(java.util.concurrent.Executor arg0, android.media.tv.ad.TvAdManager.TvAdServiceCallback arg1) {  }
     public void sendAppLinkCommand(String arg0, android.os.Bundle arg1) {  }
     public void unregisterCallback(android.media.tv.ad.TvAdManager.TvAdServiceCallback arg0) {  }

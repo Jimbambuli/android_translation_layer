@@ -5,9 +5,9 @@ public final class MediaQualityManager {
     public void addActiveProcessingPictureListener(java.util.concurrent.Executor arg0, java.util.function.Consumer<java.util.List<android.media.quality.ActiveProcessingPicture>> arg1) {  }
     public void createPictureProfile(android.media.quality.PictureProfile arg0) {  }
     public void createSoundProfile(android.media.quality.SoundProfile arg0) {  }
-    public java.util.List<android.media.quality.PictureProfile> getAvailablePictureProfiles(android.media.quality.MediaQualityManager.ProfileQueryParams arg0) { return null; }
-    public java.util.List<android.media.quality.SoundProfile> getAvailableSoundProfiles(android.media.quality.MediaQualityManager.ProfileQueryParams arg0) { return null; }
-    public java.util.List<android.media.quality.ParameterCapability> getParameterCapabilities(java.util.List<java.lang.String> arg0) { return null; }
+    public java.util.List<android.media.quality.PictureProfile> getAvailablePictureProfiles(android.media.quality.MediaQualityManager.ProfileQueryParams arg0) { return new java.util.ArrayList<>(); }
+    public java.util.List<android.media.quality.SoundProfile> getAvailableSoundProfiles(android.media.quality.MediaQualityManager.ProfileQueryParams arg0) { return new java.util.ArrayList<>(); }
+    public java.util.List<android.media.quality.ParameterCapability> getParameterCapabilities(java.util.List<java.lang.String> arg0) { return new java.util.ArrayList<>(); }
     public android.media.quality.PictureProfile getPictureProfile(int arg0, String arg1, android.media.quality.MediaQualityManager.ProfileQueryParams arg2) { return null; }
     public android.media.quality.SoundProfile getSoundProfile(int arg0, String arg1, android.media.quality.MediaQualityManager.ProfileQueryParams arg2) { return null; }
     public boolean isAmbientBacklightEnabled() { return false; }

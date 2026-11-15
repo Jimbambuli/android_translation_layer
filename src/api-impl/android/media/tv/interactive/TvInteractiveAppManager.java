@@ -2,8 +2,8 @@ package android.media.tv.interactive;
 
 /* AOSP frameworks/base/media/java/android/media/tv/interactive/TvInteractiveAppManager.java (public API surface; no backing service in ATL, bodies follow the AOSP no-service path) */
 public final class TvInteractiveAppManager {
-    public java.util.List<android.media.tv.interactive.AppLinkInfo> getAppLinkInfoList() { return null; }
-    public java.util.List<android.media.tv.interactive.TvInteractiveAppServiceInfo> getTvInteractiveAppServiceList() { return null; }
+    public java.util.List<android.media.tv.interactive.AppLinkInfo> getAppLinkInfoList() { return new java.util.ArrayList<>(); }
+    public java.util.List<android.media.tv.interactive.TvInteractiveAppServiceInfo> getTvInteractiveAppServiceList() { return new java.util.ArrayList<>(); }
     public void registerAppLinkInfo(String arg0, android.media.tv.interactive.AppLinkInfo arg1) {  }
     public void registerCallback(java.util.concurrent.Executor arg0, android.media.tv.interactive.TvInteractiveAppManager.TvInteractiveAppCallback arg1) {  }
     public void sendAppLinkCommand(String arg0, android.os.Bundle arg1) {  }
