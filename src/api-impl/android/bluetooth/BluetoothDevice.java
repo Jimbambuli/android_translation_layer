@@ -166,4 +166,64 @@ public final class BluetoothDevice implements Parcelable {
 		Log.w(TAG, "BT not enabled, createBond failed");
 		return false;
 	}
+
+	/* the adapter is off (BluetoothAdapter.getState() == STATE_OFF), so the AOSP "BT not enabled" branches apply */
+	public android.os.ParcelUuid[] getUuids() {
+		Log.e(TAG, "BT not enabled. Cannot get remote device Uuids");
+		return null;
+	}
+
+	public boolean fetchUuidsWithSdp() {
+		Log.e(TAG, "BT not enabled. Cannot fetchUuidsWithSdp");
+		return false;
+	}
+
+	public BluetoothClass getBluetoothClass() {
+		Log.e(TAG, "BT not enabled. Cannot get Bluetooth Class");
+		return null;
+	}
+
+	public boolean setPin(byte[] pin) {
+		Log.e(TAG, "BT not enabled. Cannot set Remote Device pin");
+		return false;
+	}
+
+	public BluetoothSocket createRfcommSocketToServiceRecord(java.util.UUID uuid) throws java.io.IOException {
+		Log.e(TAG, "Bluetooth is not enabled");
+		throw new java.io.IOException();
+	}
+
+	public BluetoothSocket createInsecureRfcommSocketToServiceRecord(java.util.UUID uuid) throws java.io.IOException {
+		Log.e(TAG, "Bluetooth is not enabled");
+		throw new java.io.IOException();
+	}
+
+	/* AOSP: callback null -> NullPointerException; then the adapter's IBluetoothGatt is null ("BLE is not
+	 * supported") and the result is null */
+	public BluetoothGatt connectGatt(android.content.Context context, boolean autoConnect, BluetoothGattCallback callback) {
+		return connectGatt(context, autoConnect, callback, TRANSPORT_AUTO);
+	}
+
+	public BluetoothGatt connectGatt(android.content.Context context, boolean autoConnect, BluetoothGattCallback callback,
+	                                 int transport) {
+		return connectGatt(context, autoConnect, callback, transport, PHY_LE_1M_MASK);
+	}
+
+	public BluetoothGatt connectGatt(android.content.Context context, boolean autoConnect, BluetoothGattCallback callback,
+	                                 int transport, int phy) {
+		return connectGatt(context, autoConnect, callback, transport, phy, null);
+	}
+
+	public BluetoothGatt connectGatt(android.content.Context context, boolean autoConnect, BluetoothGattCallback callback,
+	                                 int transport, int phy, android.os.Handler handler) {
+		return connectGatt(context, autoConnect, callback, transport, false, phy, handler);
+	}
+
+	public BluetoothGatt connectGatt(android.content.Context context, boolean autoConnect, BluetoothGattCallback callback,
+	                                 int transport, boolean opportunistic, int phy, android.os.Handler handler) {
+		if (callback == null) {
+			throw new NullPointerException("callback is null");
+		}
+		return null;
+	}
 }

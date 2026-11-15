@@ -271,4 +271,27 @@ public class ConnectivityManager {
 	public LinkProperties getLinkProperties(Network network) {
 		return network != null ? LinkProperties.forHost() : null;
 	}
+
+	/* bindProcessToNetwork() with ATL's single network: binding changes nothing and succeeds, as
+	 * setProcessDefaultNetwork() does for a network that exists */
+	public boolean bindProcessToNetwork(Network network) {
+		return true;
+	}
+
+	/* the connectivity service evaluates the report; nothing to do without one */
+	public void reportNetworkConnectivity(Network network, boolean hasConnectivity) {}
+
+	/* AOSP: "assume that background data is allowed" */
+	@Deprecated
+	public boolean getBackgroundDataSetting() {
+		return true;
+	}
+
+	@Deprecated
+	public void setBackgroundDataSetting(boolean allowBackgroundData) {}
+
+	/* ConnectivityService looks the socket up in the kernel; no owner found is Process.INVALID_UID */
+	public int getConnectionOwnerUid(int protocol, java.net.InetSocketAddress local, java.net.InetSocketAddress remote) {
+		return -1;
+	}
 }

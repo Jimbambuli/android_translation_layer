@@ -120,6 +120,75 @@ public abstract class Connection extends Conferenceable {
 	 */
 	public Connection() {}
 
+	/* AOSP Connection extras and audio-mode state. ATL has no Telecom listeners, so the changes are only kept
+	 * (getExtras()/getAudioModeIsVoip() answer them); nothing is forwarded. */
+	public static final int PROPERTY_SELF_MANAGED = 1 << 7;
+
+	private boolean mAudioModeIsVoip;
+	private android.os.Bundle mExtras;
+	private final Object mExtrasLock = new Object();
+	private java.util.Set<String> mPreviousExtraKeys;
+
+	public final boolean getAudioModeIsVoip() {
+		return mAudioModeIsVoip;
+	}
+
+	public final void setAudioModeIsVoip(boolean isVoip) {
+		if (!isVoip && (mConnectionProperties & PROPERTY_SELF_MANAGED) == PROPERTY_SELF_MANAGED)
+			return; // AOSP ignores this for a self-managed connection
+		checkImmutable();
+		mAudioModeIsVoip = isVoip;
+	}
+
+	public final android.os.Bundle getExtras() {
+		synchronized (mExtrasLock) {
+			return mExtras != null ? new android.os.Bundle(mExtras) : null;
+		}
+	}
+
+	public final void putExtras(@NonNull android.os.Bundle extras) {
+		checkImmutable();
+		if (extras == null)
+			return;
+		synchronized (mExtrasLock) {
+			if (mExtras == null)
+				mExtras = new android.os.Bundle();
+			mExtras.putAll(extras);
+		}
+	}
+
+	public final void removeExtras(List<String> keys) {
+		synchronized (mExtrasLock) {
+			if (mExtras != null) {
+				for (String key : keys)
+					mExtras.remove(key);
+			}
+		}
+	}
+
+	public final void removeExtras(String... keys) {
+		removeExtras(java.util.Arrays.asList(keys));
+	}
+
+	public final void setExtras(android.os.Bundle extras) {
+		checkImmutable();
+		putExtras(extras);
+		if (mPreviousExtraKeys != null) {
+			List<String> toRemove = new java.util.ArrayList<String>();
+			for (String oldKey : mPreviousExtraKeys) {
+				if (extras == null || !extras.containsKey(oldKey))
+					toRemove.add(oldKey);
+			}
+			if (!toRemove.isEmpty())
+				removeExtras(toRemove);
+		}
+		if (mPreviousExtraKeys == null)
+			mPreviousExtraKeys = new android.util.ArraySet<String>();
+		mPreviousExtraKeys.clear();
+		if (extras != null)
+			mPreviousExtraKeys.addAll(extras.keySet());
+	}
+
 	/**
 	 * @return The address (e.g., phone number) to which this Connection is currently communicating.
 	 */

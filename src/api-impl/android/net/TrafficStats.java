@@ -34,10 +34,21 @@ public class TrafficStats {
 	public static long getMobileRxBytes() { return UNSUPPORTED; }
 	public static long getMobileTxPackets() { return UNSUPPORTED; }
 	public static long getMobileRxPackets() { return UNSUPPORTED; }
-	public static void setThreadStatsUid(int uid) {}
-	public static void clearThreadStatsUid() {}
+	/* AOSP: per-thread uid for accounting, -1 (unset) by default; ATL does not account, the value is only kept */
+	private static final ThreadLocal<Integer> sThreadUid = new ThreadLocal<Integer>() {
+		@Override
+		protected Integer initialValue() {
+			return -1;
+		}
+	};
+	public static void setThreadStatsUid(int uid) { sThreadUid.set(uid); }
+	public static int getThreadStatsUid() { return sThreadUid.get(); }
+	public static void clearThreadStatsUid() { sThreadUid.set(-1); }
 	public static void incrementOperationCount(int operationCount) {}
 	public static void incrementOperationCount(int tag, int operationCount) {}
 	public static void tagSocket(java.net.Socket socket) throws java.net.SocketException {}
 	public static void untagSocket(java.net.Socket socket) throws java.net.SocketException {}
+	/* SocketTagger.get().tag()/untag(): libcore's default tagger does nothing */
+	public static void tagDatagramSocket(java.net.DatagramSocket socket) throws java.net.SocketException {}
+	public static void untagDatagramSocket(java.net.DatagramSocket socket) throws java.net.SocketException {}
 }

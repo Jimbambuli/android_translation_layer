@@ -26,6 +26,9 @@ public class WebSettings {
 	private int forceDark = FORCE_DARK_AUTO;
 	private int disabledActionModeMenuItems = MENU_ITEM_NONE;
 	private boolean offscreenPreRaster;
+	private int cacheMode = -1; // LOAD_DEFAULT, the documented default
+	private boolean useWideViewPort; // documented default false
+	private boolean blockNetworkImage; // documented default false
 
 	public static final int FORCE_DARK_OFF = 0;
 	public static final int FORCE_DARK_AUTO = 1;
@@ -43,9 +46,34 @@ public class WebSettings {
 		this(null);
 	}
 
+	/* AOSP WebSettings.LayoutAlgorithm */
 	public static enum LayoutAlgorithm {
 		NORMAL,
+		@Deprecated
+		SINGLE_COLUMN,
+		@Deprecated
 		NARROW_COLUMNS,
+		TEXT_AUTOSIZING
+	}
+
+	public enum TextSize {
+		SMALLEST(50),
+		SMALLER(75),
+		NORMAL(100),
+		LARGER(150),
+		LARGEST(200);
+
+		TextSize(int size) {
+			value = size;
+		}
+
+		int value;
+	}
+
+	public enum PluginState {
+		ON,
+		ON_DEMAND,
+		OFF
 	}
 
 	public static enum RenderPriority {
@@ -96,7 +124,13 @@ public class WebSettings {
 
 	public void setGeolocationEnabled(boolean enabled) {}
 
-	public void setCacheMode(int dummy) {}
+	public void setCacheMode(int mode) {
+		cacheMode = mode;
+	}
+
+	public int getCacheMode() {
+		return cacheMode;
+	}
 
 	public void setLayoutAlgorithm(LayoutAlgorithm layoutAlgorithm) {}
 
@@ -108,7 +142,7 @@ public class WebSettings {
 
 	/* AOSP WebSettings.setLoadsImagesAutomatically(): WebKit auto-load-images */
 	public void setLoadsImagesAutomatically(boolean loadsImagesAutomatically) {
-		loadsImagesAutomatically = loadsImagesAutomatically;
+		this.loadsImagesAutomatically = loadsImagesAutomatically;
 		if (webView != null)
 			webView.setWebKitSetting("auto-load-images", loadsImagesAutomatically);
 	}
@@ -119,9 +153,25 @@ public class WebSettings {
 
 	public void setSupportZoom(boolean supportZoom) {}
 
-	public void setUseWideViewPort(boolean useWideViewPort) {}
+	public void setUseWideViewPort(boolean useWideViewPort) {
+		this.useWideViewPort = useWideViewPort;
+	}
+
+	public boolean getUseWideViewPort() {
+		return useWideViewPort;
+	}
 
 	public void setTextZoom(int textZoom) {}
+
+	/* ContentSettingsAdapter: the text size is a text zoom of the enum's percentage */
+	@Deprecated
+	public void setTextSize(TextSize t) {
+		setTextZoom(t.value);
+	}
+
+	/* plugins no longer exist; the Chromium adapter ignores the call */
+	@Deprecated
+	public void setPluginState(PluginState state) {}
 
 	public void setAppCacheEnabled(boolean enabled) {}
 
@@ -144,7 +194,13 @@ public class WebSettings {
 
 	public void setMixedContentMode(int mode) {}
 
-	public void setBlockNetworkImage(boolean block) {}
+	public void setBlockNetworkImage(boolean block) {
+		blockNetworkImage = block;
+	}
+
+	public boolean getBlockNetworkImage() {
+		return blockNetworkImage;
+	}
 
 	/* AOSP WebSettings.setDomStorageEnabled(): WebKit enable-html5-local-storage */
 	public void setDomStorageEnabled(boolean flag) {

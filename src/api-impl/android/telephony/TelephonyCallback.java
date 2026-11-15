@@ -49,4 +49,12 @@ public class TelephonyCallback {
 	public interface CarrierNetworkListener {
 		void onCarrierNetworkChange(boolean active);
 	}
+
+	public interface SignalStrengthsListener {
+		void onSignalStrengthsChanged(SignalStrength signalStrength);
+	}
+
+	public interface CellInfoListener {
+		void onCellInfoChanged(java.util.List<CellInfo> cellInfo);
+	}
 }

@@ -152,6 +152,258 @@ public class WebView extends ViewGroup {
 		return progress;
 	}
 
+	/* AOSP WebView.set/getWebViewRenderProcessClient(): the client is kept per WebView. ATL's WebKit raises no
+	 * unresponsive/terminated events for it (nothing calls it), as for a renderer that never hangs */
+	private WebViewRenderProcessClient webViewRenderProcessClient;
+
+	public void setWebViewRenderProcessClient(java.util.concurrent.Executor executor, WebViewRenderProcessClient client) {
+		webViewRenderProcessClient = client;
+	}
+
+	public void setWebViewRenderProcessClient(WebViewRenderProcessClient client) {
+		webViewRenderProcessClient = client;
+	}
+
+	public WebViewRenderProcessClient getWebViewRenderProcessClient() {
+		return webViewRenderProcessClient;
+	}
+
+	/* AOSP WebView.saveState(): null when the state cannot be saved, restoreState(): null when nothing is
+	 * restored. ATL's WebKit session state is not reachable from Java, so both report "failed" and leave the
+	 * Bundle untouched (as for a WebView without history). */
+	public WebBackForwardList saveState(android.os.Bundle outState) {
+		return null;
+	}
+
+	public WebBackForwardList restoreState(android.os.Bundle inState) {
+		return null;
+	}
+
+	/* AOSP WebView.copyBackForwardList(): never null; an empty list (size 0, index -1, no items) as for a
+	 * WebView without history. The WebKit history is not read here: approximation. */
+	public WebBackForwardList copyBackForwardList() {
+		return new WebBackForwardList() {
+			@Override
+			public WebHistoryItem getCurrentItem() {
+				return null;
+			}
+
+			@Override
+			public int getCurrentIndex() {
+				return -1;
+			}
+
+			@Override
+			public WebHistoryItem getItemAtIndex(int index) {
+				return null;
+			}
+
+			@Override
+			public int getSize() {
+				return 0;
+			}
+
+			@Override
+			protected WebBackForwardList clone() {
+				return this;
+			}
+		};
+	}
+
+	/* AOSP WebView.getWebViewRenderProcess(): null when the WebView does not run its renderer in a separate
+	 * process; ATL's WebKit exposes no render process handle. */
+	public WebViewRenderProcess getWebViewRenderProcess() {
+		return null;
+	}
+
+	/* AOSP WebView.zoomBy(): range check, then the provider zooms the page. ATL's WebKit page zoom is not
+	 * driven from here: checked, not applied. */
+	public void zoomBy(float zoomFactor) {
+		if (zoomFactor < 0.01)
+			throw new IllegalArgumentException("zoomFactor must be greater than 0.01.");
+		if (zoomFactor > 100.0)
+			throw new IllegalArgumentException("zoomFactor must be less than 100.");
+	}
+
+	/* AOSP: sets the page's online state (navigator.onLine); WebKit follows the host's network state, so nothing
+	 * to set. enableSlowWholeDocumentDraw(): Chromium-only drawing mode, WebKit always paints the whole page. */
+	public void setNetworkAvailable(boolean networkUp) {}
+
+	public static void enableSlowWholeDocumentDraw() {}
+
+	/* AOSP WebView.postVisualStateCallback(): onComplete(requestId) once the content as of this call is drawn.
+	 * Approximated by the next main-looper turn: WebKit gives no draw-completion event to wait for */
+	public void postVisualStateCallback(long requestId, VisualStateCallback callback) {
+		new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> callback.onComplete(requestId));
+	}
+
+	/* AOSP WebView.zoomIn()/zoomOut(): the provider returns whether the page could be zoomed (AwContents.canZoomIn/
+	 * canZoomOut). ATL's WebKit page zoom is not driven from here (see zoomBy()), so no zoom is possible. */
+	public boolean zoomIn() {
+		return false;
+	}
+
+	public boolean zoomOut() {
+		return false;
+	}
+
+	/* AOSP WebView.getFavicon() is the provider's page icon, null until one was received; ATL does not deliver
+	 * page icons. */
+	public android.graphics.Bitmap getFavicon() {
+		return null;
+	}
+
+	/* AOSP WebView.setRendererPriorityPolicy(): only stored by the provider; ATL has no renderer process to
+	 * rank, getRendererRequestedPriority()/getRendererPriorityWaivedWhenNotVisible() are not implemented. */
+	public void setRendererPriorityPolicy(int rendererRequestedPriority, boolean waivedWhenNotVisible) {}
+
+	/* AOSP WebView.clearClientCertPreferences(): clears the remembered client certificate choices, then runs the
+	 * callback on the UI thread. ATL keeps none (no ClientCertRequest persistence), so only the callback. */
+	public static void clearClientCertPreferences(Runnable onCleared) {
+		if (onCleared != null)
+			new android.os.Handler(Looper.getMainLooper()).post(onCleared);
+	}
+
+	/* AOSP WebView.startSafeBrowsing()/setSafeBrowsingWhitelist() hand over to the provider's statics. WebKit has
+	 * no Safe Browsing: a provider without it reports false (not enabled / list not applied). */
+	public static void startSafeBrowsing(Context context, ValueCallback<Boolean> callback) {
+		if (callback != null)
+			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
+	}
+
+	public static void setSafeBrowsingWhitelist(List<String> hosts, ValueCallback<Boolean> callback) {
+		if (callback != null)
+			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
+	}
+
+	/* AOSP WebView.createPrintDocumentAdapter(): always an adapter (the provider's AwPrintDocumentAdapter). WebKitGTK prints only
+	 * through GtkPrintOperation, which cannot produce the PDF stream onWrite() has to write: layout and write report a failure,
+	 * as the provider's adapter does when it cannot print. (PrintManager.print() has no print spooler here anyway.) */
+	@Deprecated
+	public android.print.PrintDocumentAdapter createPrintDocumentAdapter() {
+		return createPrintDocumentAdapter("default");
+	}
+
+	public android.print.PrintDocumentAdapter createPrintDocumentAdapter(String documentName) {
+		return new android.print.PrintDocumentAdapter() {
+			@Override
+			public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
+			                     android.os.CancellationSignal cancellationSignal, LayoutResultCallback callback,
+			                     android.os.Bundle extras) {
+				callback.onLayoutFailed(null);
+			}
+
+			@Override
+			public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
+			                    android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
+				callback.onWriteFailed(null);
+			}
+		};
+	}
+
+	/* ---- WebMessage channels (see AtlWebMessagePort): text messages through evaluateJavascript() and a JavascriptInterface ---- */
+	private final Map<Integer, AtlWebMessagePort> messagePorts = new HashMap<>();
+	private int nextMessagePortId = 1;
+	private boolean messageBridgeAdded;
+
+	public class AtlWebMessageBridge {
+		@JavascriptInterface
+		public void onMessage(int pageEndId, String data) {
+			AtlWebMessagePort pageEnd;
+			synchronized (messagePorts) {
+				pageEnd = messagePorts.get(pageEndId);
+			}
+			if (pageEnd != null && pageEnd.mPeer != null)
+				pageEnd.mPeer.fromPage(data);
+		}
+	}
+
+	private static String jsString(String s) {
+		StringBuilder sb = new StringBuilder("\"");
+		for (int i = 0; i < s.length(); i++) {
+			char c = s.charAt(i);
+			switch (c) {
+			case '\\': sb.append("\\\\"); break;
+			case '"': sb.append("\\\""); break;
+			case '\n': sb.append("\\n"); break;
+			case '\r': sb.append("\\r"); break;
+			case '\u2028': sb.append("\\u2028"); break;
+			case '\u2029': sb.append("\\u2029"); break;
+			default:
+				if (c < 0x20)
+					sb.append(String.format("\\u%04x", (int) c));
+				else
+					sb.append(c);
+			}
+		}
+		return sb.append('"').toString();
+	}
+
+	/* AOSP WebView.createWebMessageChannel(): the two ends of a new channel */
+	public WebMessagePort[] createWebMessageChannel() {
+		if (!messageBridgeAdded) {
+			messageBridgeAdded = true;
+			addJavascriptInterface(new AtlWebMessageBridge(), "__atlWebMessage");
+		}
+		AtlWebMessagePort a, b;
+		synchronized (messagePorts) {
+			a = new AtlWebMessagePort(this, nextMessagePortId++);
+			b = new AtlWebMessagePort(this, nextMessagePortId++);
+			a.mPeer = b;
+			b.mPeer = a;
+			messagePorts.put(a.mId, a);
+			messagePorts.put(b.mId, b);
+		}
+		return new WebMessagePort[] {a, b};
+	}
+
+	/* AOSP WebView.postWebMessage(): a MessageEvent in the main frame, delivered if targetOrigin is "*" or the page's origin */
+	public void postWebMessage(WebMessage message, android.net.Uri targetOrigin) {
+		if (isDestroyed())
+			return;
+		WebMessagePort[] ports = message.getPorts();
+		List<AtlWebMessagePort> handed = new ArrayList<>();
+		if (ports != null) {
+			for (WebMessagePort p : ports) {
+				if (!(p instanceof AtlWebMessagePort) || ((AtlWebMessagePort) p).mClosed || ((AtlWebMessagePort) p).mTransferred
+				    || ((AtlWebMessagePort) p).mPeer == null)
+					throw new IllegalStateException("Port is already started, closed or transferred");
+				handed.add((AtlWebMessagePort) p);
+			}
+		}
+		StringBuilder js = new StringBuilder();
+		js.append("(function(){var t=").append(jsString(targetOrigin.toString())).append(";");
+		js.append("if(t!=='*'&&t!==window.location.origin)return;");
+		js.append("window.__atlPorts=window.__atlPorts||{};var ports=[];");
+		for (AtlWebMessagePort p : handed) {
+			js.append("(function(id){var mc=new MessageChannel();window.__atlPorts[id]=mc.port2;")
+			    .append("mc.port2.onmessage=function(e){__atlWebMessage.onMessage(id,String(e.data));};ports.push(mc.port1);})(")
+			    .append(p.mId).append(");");
+		}
+		js.append("window.dispatchEvent(new MessageEvent('message',{data:").append(jsString(message.getData()))
+		    .append(",origin:'',ports:ports}));})();");
+		evaluateJavascript(js.toString(), null);
+		for (AtlWebMessagePort p : handed)
+			p.handedToPage();
+	}
+
+	void postToPagePort(int pageEndId, String data) {
+		evaluateJavascript("(function(){var p=window.__atlPorts&&window.__atlPorts[" + pageEndId + "];if(p)p.postMessage("
+		                       + jsString(data) + ");})();",
+		                   null);
+	}
+
+	void closePagePort(int pageEndId) {
+		evaluateJavascript("(function(){var p=window.__atlPorts&&window.__atlPorts[" + pageEndId
+		                       + "];if(p){p.close();delete window.__atlPorts[" + pageEndId + "];}})();",
+		                   null);
+	}
+
+	/* ViewGroup members (deprecated drawing caches), not present on ATL's ViewGroup: no effect, as on Android 16 */
+	public void setAlwaysDrawnWithCacheEnabled(boolean enabled) {}
+
+	public void setAnimationCacheEnabled(boolean enabled) {}
+
 	/* AOSP WebViewFactory.setDataDirectorySuffix() */
 	public static void setDataDirectorySuffix(String suffix) {
 		if (providerInitialized)
@@ -865,6 +1117,15 @@ public class WebView extends ViewGroup {
 	}
 
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
+
+	/* AOSP WebView.findAddress(): the address finder is plain Java (android.webkit.FindAddress) */
+	@Deprecated
+	public static String findAddress(String addr) {
+		if (addr == null) {
+			throw new NullPointerException("addr is null");
+		}
+		return FindAddress.findAddress(addr);
+	}
 
 	/* AOSP WebView.getCurrentWebViewPackage(): the package of the WebView implementation; ATL's is WebKitGTK,
 	 * which is part of the runtime and not a package, so it is described as one */

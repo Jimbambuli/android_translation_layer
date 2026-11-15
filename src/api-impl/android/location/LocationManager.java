@@ -300,6 +300,43 @@ public class LocationManager {
 	public void unregisterGnssStatusCallback(GnssStatus.Callback callback) {
 	}
 
+	/* AOSP registers the listener and returns true; without a GNSS HAL nothing ever calls onGnssMeasurementsReceived
+	 * or onStatusChanged (GnssNative: no measurement provider, status only set by the HAL) */
+	public boolean registerGnssMeasurementsCallback(GnssMeasurementsEvent.Callback callback) {
+		return true;
+	}
+
+	public boolean registerGnssMeasurementsCallback(GnssMeasurementsEvent.Callback callback, Handler handler) {
+		return true;
+	}
+
+	public boolean registerGnssMeasurementsCallback(Executor executor, GnssMeasurementsEvent.Callback callback) {
+		return true;
+	}
+
+	public void unregisterGnssMeasurementsCallback(GnssMeasurementsEvent.Callback callback) {}
+
+	/* LocationManagerService.getGnssYearOfHardware/getGnssHardwareModelName: GnssNative defaults 0 / null */
+	public int getGnssYearOfHardware() {
+		return 0;
+	}
+
+	public String getGnssHardwareModelName() {
+		return null;
+	}
+
+	/* the geofence manager stores the fence; without a location source it never fires */
+	public void addProximityAlert(double latitude, double longitude, float radius, long expiration,
+	                              android.app.PendingIntent pendingIntent) {
+		if (pendingIntent == null)
+			throw new IllegalArgumentException("invalid null pending intent");
+	}
+
+	public void removeProximityAlert(android.app.PendingIntent intent) {
+		if (intent == null)
+			throw new IllegalArgumentException("invalid null pending intent");
+	}
+
 	/* the desktop's position comes without satellites: the listener is accepted and never called */
 	public boolean addGpsStatusListener(GpsStatus.Listener listener) {
 		return true;

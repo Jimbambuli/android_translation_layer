@@ -2,8 +2,79 @@ package android.telephony;
 
 public class PhoneNumberUtils {
 
+	/* the dial-string helpers below are the bodies of AOSP PhoneNumberUtils.java */
+	public static final char PAUSE = ',';
+	public static final char WAIT = ';';
+	public static final char WILD = 'N';
+	private static final String CLIR_ON = "*31#";
+	private static final String CLIR_OFF = "#31#";
+
+	public static boolean isDialable(char c) {
+		return (c >= '0' && c <= '9') || c == '*' || c == '#' || c == '+' || c == WILD;
+	}
+
 	public static boolean isNonSeparator(char c) {
-		return c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != '-';
+		return (c >= '0' && c <= '9') || c == '*' || c == '#' || c == '+' || c == WILD || c == WAIT || c == PAUSE;
+	}
+
+	public static boolean isStartsPostDial(char c) {
+		return c == PAUSE || c == WAIT;
+	}
+
+	public static String extractNetworkPortion(String phoneNumber) {
+		if (phoneNumber == null) {
+			return null;
+		}
+		int len = phoneNumber.length();
+		StringBuilder ret = new StringBuilder(len);
+		for (int i = 0; i < len; i++) {
+			char c = phoneNumber.charAt(i);
+			int digit = Character.digit(c, 10);
+			if (digit != -1) {
+				ret.append(digit);
+			} else if (c == '+') {
+				String prefix = ret.toString();
+				if (prefix.length() == 0 || prefix.equals(CLIR_ON) || prefix.equals(CLIR_OFF)) {
+					ret.append(c);
+				}
+			} else if (isDialable(c)) {
+				ret.append(c);
+			} else if (isStartsPostDial(c)) {
+				break;
+			}
+		}
+		return ret.toString();
+	}
+
+	private static int minPositive(int a, int b) {
+		if (a >= 0 && b >= 0) {
+			return (a < b) ? a : b;
+		} else if (a >= 0) {
+			return a;
+		} else if (b >= 0) {
+			return b;
+		} else {
+			return -1;
+		}
+	}
+
+	private static int indexOfLastNetworkChar(String a) {
+		int trimIndex = minPositive(a.indexOf(PAUSE), a.indexOf(WAIT));
+		return trimIndex < 0 ? a.length() - 1 : trimIndex - 1;
+	}
+
+	public static String extractPostDialPortion(String phoneNumber) {
+		if (phoneNumber == null)
+			return null;
+		StringBuilder ret = new StringBuilder();
+		int trimIndex = indexOfLastNetworkChar(phoneNumber);
+		for (int i = trimIndex + 1, s = phoneNumber.length(); i < s; i++) {
+			char c = phoneNumber.charAt(i);
+			if (isNonSeparator(c)) {
+				ret.append(c);
+			}
+		}
+		return ret.toString();
 	}
 
 	public static boolean isGlobalPhoneNumber(String phoneNumber) {
@@ -62,5 +133,21 @@ public class PhoneNumberUtils {
 	/* AOSP formats with libphonenumber for the country; ATL has no number metadata and leaves the number as it is */
 	public static String formatNumber(String phoneNumber, String defaultCountryIso) {
 		return phoneNumber;
+	}
+
+	/* PhoneNumberUtils.isWellFormedSmsAddress() */
+	public static boolean isWellFormedSmsAddress(String address) {
+		String networkPortion = PhoneNumberUtils.extractNetworkPortion(address);
+		return (!(networkPortion.equals("+") || android.text.TextUtils.isEmpty(networkPortion))) && isDialable(networkPortion);
+	}
+
+	/* PhoneNumberUtils.isDialable(String) (private in AOSP): every character is dialable */
+	private static boolean isDialable(String address) {
+		for (int i = 0, count = address.length(); i < count; i++) {
+			if (!isDialable(address.charAt(i))) {
+				return false;
+			}
+		}
+		return true;
 	}
 }

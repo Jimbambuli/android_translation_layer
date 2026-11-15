@@ -80,6 +80,87 @@ public class TelephonyManager {
 		return new TelephonyManager();
 	}
 
+	/* PhoneConstants.State.X.toString() */
+	public static final String EXTRA_STATE_IDLE = "IDLE";
+	public static final String EXTRA_STATE_RINGING = "RINGING";
+	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
+
+	/* AOSP TelephonyManager with getITelephony() == null (a device without telephony service) */
+	private int mSubId = SubscriptionManager.DEFAULT_SUBSCRIPTION_ID;
+
+	public TelephonyManager createForSubscriptionId(int subId) {
+		TelephonyManager tm = new TelephonyManager();
+		tm.mSubId = subId;
+		return tm;
+	}
+
+	/* AOSP getSubscriptionId() / getSubId() */
+	public int getSubscriptionId() {
+		if (SubscriptionManager.isUsableSubIdValue(mSubId)) {
+			return mSubId;
+		}
+		return SubscriptionManager.getDefaultSubscriptionId();
+	}
+
+	public static final int DATA_ACTIVITY_NONE = 0x00000000;
+	public static final int DATA_ACTIVITY_IN = 0x00000001;
+	public static final int DATA_ACTIVITY_OUT = 0x00000002;
+	public static final int DATA_ACTIVITY_INOUT = 0x00000003;
+	public static final int DATA_ACTIVITY_DORMANT = 0x00000004;
+
+	/* getITelephony() == null: DATA_ACTIVITY_NONE */
+	public int getDataActivity() {
+		return DATA_ACTIVITY_NONE;
+	}
+
+	/* getITelephony() == null: returns without doing anything */
+	public void sendDialerSpecialCode(String inputCode) {}
+
+	/* getImei(getSlotIndex()): no ITelephony, null */
+	public String getImei() {
+		return null;
+	}
+
+	public int getCallStateForSubscription() {
+		return 0; // getCallState(subId): CALL_STATE_IDLE
+	}
+
+	public int getDataState() {
+		return 0; // DATA_DISCONNECTED
+	}
+
+	/* AOSP with getITelephony() == null */
+	public SignalStrength getSignalStrength() {
+		return null;
+	}
+
+	public List<CellInfo> getAllCellInfo() {
+		return null;
+	}
+
+	public abstract static class CellInfoCallback {
+		public static final int ERROR_TIMEOUT = 1;
+		public static final int ERROR_MODEM_ERROR = 2;
+
+		public abstract void onCellInfo(List<CellInfo> cellInfo);
+
+		public void onError(int errorCode, Throwable detail) {}
+	}
+
+	/* AOSP: with telephony null, ISE for apps targeting after R (NULL_TELEPHONY_THROW_NO_CB), silent return
+	 * before. ATL does not keep the caller's target SDK here, so the modern behaviour is used. */
+	public void requestCellInfoUpdate(java.util.concurrent.Executor executor, CellInfoCallback callback) {
+		throw new IllegalStateException("Telephony is null");
+	}
+
+	public String getMmsUserAgent() {
+		return null;
+	}
+
+	public String getMmsUAProfUrl() {
+		return null;
+	}
+
 	// FIXME: can we return null instead of ""?
 	public String getNetworkOperator() {
 		return "";
@@ -97,6 +178,21 @@ public class TelephonyManager {
 		return "";
 	}
 
+	/* TelephonyManager.java: PhoneConstants values; getCurrentPhoneType() is always GSM on Android 16 */
+	public static final int PHONE_TYPE_NONE = 0;
+	public static final int PHONE_TYPE_GSM = 1;
+	public static final int PHONE_TYPE_CDMA = 2;
+	public static final int PHONE_TYPE_SIP = 3;
+	public static final int PHONE_TYPE_IMS = 4;
+
+	public int getCurrentPhoneType() {
+		return PHONE_TYPE_GSM;
+	}
+
+	public int getCurrentPhoneType(int subId) {
+		return PHONE_TYPE_GSM;
+	}
+
 	public int getPhoneType() {
 		return 0; // PHONE_TYPE_NONE
 	}
@@ -109,7 +205,7 @@ public class TelephonyManager {
 	}
 
 	public CellLocation getCellLocation() {
-		return new CellLocation();
+		return null; // getITelephony() == null: AOSP returns null
 	}
 
 	public boolean isNetworkRoaming() {

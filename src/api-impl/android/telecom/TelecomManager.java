@@ -7,4 +7,45 @@ public class TelecomManager {
 	public String getDefaultDialerPackage() {
 		return null;
 	}
+
+	/* the methods below are AOSP's with getTelecomService() == null: "if (service != null)" skips the call */
+	public void registerPhoneAccount(PhoneAccount account) {}
+
+	public void unregisterPhoneAccount(PhoneAccountHandle accountHandle) {}
+
+	public void addNewIncomingCall(PhoneAccountHandle phoneAccount, android.os.Bundle extras) {}
+
+	public void placeCall(android.net.Uri address, android.os.Bundle extras) {}
+
+	/* public extras keys of android.telecom.TelecomManager (values as in the SDK documentation) */
+	public static final String EXTRA_INCOMING_CALL_ADDRESS = "android.telecom.extra.INCOMING_CALL_ADDRESS";
+	public static final String EXTRA_UNKNOWN_CALL_HANDLE = "android.telecom.extra.UNKNOWN_CALL_HANDLE";
+
+	/* more methods with getTelecomService() == null (defaults written from knowledge of AOSP TelecomManager: the
+	 * Telecom sources are not in the local AOSP copy): isInCall/endCall false, no accounts, nothing to cancel */
+	public boolean isInCall() {
+		return false;
+	}
+
+	public boolean endCall() {
+		return false;
+	}
+
+	public PhoneAccount getPhoneAccount(PhoneAccountHandle account) {
+		return null;
+	}
+
+	public java.util.List<PhoneAccountHandle> getCallCapablePhoneAccounts() {
+		return new java.util.ArrayList<PhoneAccountHandle>();
+	}
+
+	public java.util.List<PhoneAccountHandle> getOwnSelfManagedPhoneAccounts() {
+		return new java.util.ArrayList<PhoneAccountHandle>();
+	}
+
+	public PhoneAccountHandle getDefaultOutgoingPhoneAccount(String uriScheme) {
+		return null;
+	}
+
+	public void cancelMissedCallsNotification() {}
 }
