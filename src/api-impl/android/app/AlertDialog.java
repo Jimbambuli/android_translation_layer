@@ -3,13 +3,20 @@ package android.app;
 import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.database.Cursor;
+import android.os.Message;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckedTextView;
+import android.widget.CursorAdapter;
+import android.widget.FrameLayout;
 import android.widget.ListAdapter;
 import android.widget.ListView;
+import android.widget.SimpleCursorAdapter;
 
 public class AlertDialog extends Dialog implements DialogInterface {
 
@@ -25,6 +32,13 @@ public class AlertDialog extends Dialog implements DialogInterface {
 
 	public AlertDialog(Context context) {
 		this(context, 0);
+	}
+
+	/* AOSP AlertDialog(Context, boolean, OnCancelListener) */
+	public AlertDialog(Context context, boolean cancelable, OnCancelListener cancelListener) {
+		this(context, 0);
+		setCancelable(cancelable);
+		setOnCancelListener(cancelListener);
 	}
 
 	public AlertDialog(Context context, int themeResId) {
@@ -44,6 +58,26 @@ public class AlertDialog extends Dialog implements DialogInterface {
 	}
 
 	public void setButton(int whichButton, CharSequence text, OnClickListener listener) {
+		setButton(whichButton, text, listener, null);
+	}
+
+	/* AOSP AlertDialog.setButton(int, CharSequence, Message): a click sends a copy of the message */
+	public void setButton(int whichButton, CharSequence text, Message msg) {
+		setButton(whichButton, text, null, msg);
+	}
+
+	/* AOSP deprecated setButton(CharSequence, ...): the positive button */
+	@Deprecated
+	public void setButton(CharSequence text, Message msg) {
+		setButton(BUTTON_POSITIVE, text, msg);
+	}
+
+	@Deprecated
+	public void setButton(CharSequence text, final OnClickListener listener) {
+		setButton(BUTTON_POSITIVE, text, listener);
+	}
+
+	private void setButton(int whichButton, CharSequence text, OnClickListener listener, Message msg) {
 		Button button = getButton(whichButton);
 		button.setText(text);
 		button.setOnClickListener(new View.OnClickListener() {
@@ -52,6 +86,8 @@ public class AlertDialog extends Dialog implements DialogInterface {
 				// AOSP AlertController: a button without a listener only dismisses the dialog
 				if (listener != null)
 					listener.onClick(AlertDialog.this, whichButton);
+				else if (msg != null)
+					Message.obtain(msg).sendToTarget();
 				dismiss();
 			}
 		});
@@ -70,6 +106,14 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			hasView = true;
 			nativeSetView(nativePtr);
 		}
+	}
+
+	/* AOSP AlertDialog.setView(View, int, int, int, int): the spacing is the padding of the custom panel around the view */
+	public void setView(View view, int viewSpacingLeft, int viewSpacingTop, int viewSpacingRight, int viewSpacingBottom) {
+		FrameLayout panel = new FrameLayout(getContext());
+		panel.setPadding(viewSpacingLeft, viewSpacingTop, viewSpacingRight, viewSpacingBottom);
+		panel.addView(view);
+		setView(panel);
 	}
 
 	/* AOSP AlertDialog.getListView(): the list from setAdapter(), setSingleChoiceItems() or
@@ -213,6 +257,11 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return this;
 		}
 
+		/* AOSP: the layout is inflated into the custom panel */
+		public AlertDialog.Builder setView(int layoutResId) {
+			return setView(LayoutInflater.from(dialog.getContext()).inflate(layoutResId, null));
+		}
+
 		public AlertDialog.Builder setItems(CharSequence[] items, final DialogInterface.OnClickListener listener) {
 			String[] stringItems = new String[items.length];
 			for (int i = 0; i < items.length; i++) {
@@ -268,6 +317,11 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return this;
 		}
 
+		/* AOSP: a SimpleCursorAdapter on the label column, otherwise as the single choice list */
+		public AlertDialog.Builder setSingleChoiceItems(Cursor cursor, int checkedItem, String labelColumn, final DialogInterface.OnClickListener listener) {
+			return setSingleChoiceItems(new SimpleCursorAdapter(dialog.getContext(), com.android.internal.R.layout.select_dialog_singlechoice_material, cursor, new String[] {labelColumn}, new int[] {android.R.id.text1}), checkedItem, listener);
+		}
+
 		public AlertDialog.Builder setSingleChoiceItems(CharSequence[] items, int checkedItem, final DialogInterface.OnClickListener listener) {
 			Context context = dialog.getContext();
 			return setSingleChoiceItems(new CheckedItemAdapter(context, com.android.internal.R.layout.select_dialog_singlechoice_material, android.R.id.text1, items), checkedItem, listener);
@@ -295,6 +349,38 @@ public class AlertDialog extends Dialog implements DialogInterface {
 					public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
 						if (checkedItems != null)
 							checkedItems[position] = listView.isItemChecked(position);
+						listener.onClick(dialog, position, listView.isItemChecked(position));
+					}
+				});
+			}
+			dialog.showListView(adapter, ListView.CHOICE_MODE_MULTIPLE, -1);
+			return this;
+		}
+
+		/* AOSP: a CursorAdapter whose bindView() sets the label and checks the item when the column is 1 */
+		public AlertDialog.Builder setMultiChoiceItems(Cursor cursor, final String isCheckedColumn, final String labelColumn, final DialogInterface.OnMultiChoiceClickListener listener) {
+			final ListView listView = dialog.createListView();
+			final LayoutInflater inflater = LayoutInflater.from(dialog.getContext());
+			ListAdapter adapter = new CursorAdapter(dialog.getContext(), cursor, false) {
+				private final int mLabelIndex = getCursor().getColumnIndexOrThrow(labelColumn);
+				private final int mIsCheckedIndex = getCursor().getColumnIndexOrThrow(isCheckedColumn);
+
+				@Override
+				public void bindView(View view, Context context, Cursor cursor) {
+					CheckedTextView text = (CheckedTextView) view.findViewById(android.R.id.text1);
+					text.setText(cursor.getString(mLabelIndex));
+					listView.setItemChecked(cursor.getPosition(), cursor.getInt(mIsCheckedIndex) == 1);
+				}
+
+				@Override
+				public View newView(Context context, Cursor cursor, ViewGroup parent) {
+					return inflater.inflate(com.android.internal.R.layout.select_dialog_multichoice_material, parent, false);
+				}
+			};
+			if (listener != null) {
+				listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+					@Override
+					public void onItemClick(AdapterView<?> parent, View v, int position, long id) {
 						listener.onClick(dialog, position, listView.isItemChecked(position));
 					}
 				});
