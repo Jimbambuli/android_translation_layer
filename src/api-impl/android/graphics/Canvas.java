@@ -812,13 +812,12 @@ public class Canvas {
 		return clipPath(path);
 	}
 
-	/* as clipRect() with DIFFERENCE: an even-odd path of a very large rectangle with the path cut out */
+	/* AOSP clipOutPath() = DIFFERENCE: what the path does not fill, i.e. the path with the inverse bit of its
+	 * fill type flipped (keeps WINDING/EVEN_ODD and an already inverse path) */
 	public boolean clipOutPath(Path path) {
-		Path outer = new Path();
-		outer.setFillType(Path.FillType.EVEN_ODD);
-		outer.addRect(-CLIP_OUT_EXTENT, -CLIP_OUT_EXTENT, CLIP_OUT_EXTENT, CLIP_OUT_EXTENT, Path.Direction.CW);
-		outer.addPath(path);
-		return clipPath(outer);
+		Path outside = new Path(path);
+		outside.toggleInverseFillType();
+		return clipPath(outside);
 	}
 
 	public boolean isHardwareAccelerated() {

@@ -111,18 +111,35 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLinearGradient(JNI
 	g_free(stops);
 }
 
-JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong path_ptr, jint fill_rule, jlong paint_ptr)
+/* extent of an inverse fill, as Canvas.drawPaint() */
+#define INVERSE_FILL_EXTENT 100000.f
+
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong path_ptr, jint fill_rule, jboolean inverse, jlong paint_ptr)
 {
 	GtkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
 	GskPath *path = _PTR(path_ptr);
 	struct AndroidPaint *paint = _PTR(paint_ptr);
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
-	if (paint->is_stroke) {
-		gtk_snapshot_append_stroke(snapshot, path, paint->gsk_stroke, &paint->color);
-	}
-	if (paint->is_fill) {
-		gtk_snapshot_append_fill(snapshot, path, fill_rule, &paint->color);
+	if (inverse) {
+		/* Skia: an inverse fill type covers everything outside the path; a stroke keeps the inverse bit
+		 * (SkStroke), so it covers everything outside the stroke */
+		const GdkRGBA opaque = {1, 1, 1, 1};
+		gtk_snapshot_push_mask(snapshot, GSK_MASK_MODE_INVERTED_ALPHA);
+		if (paint->is_stroke)
+			gtk_snapshot_append_stroke(snapshot, path, paint->gsk_stroke, &opaque);
+		if (paint->is_fill)
+			gtk_snapshot_append_fill(snapshot, path, fill_rule, &opaque);
+		gtk_snapshot_pop(snapshot);
+		gtk_snapshot_append_color(snapshot, &paint->color, &GRAPHENE_RECT_INIT(-INVERSE_FILL_EXTENT, -INVERSE_FILL_EXTENT, 2 * INVERSE_FILL_EXTENT, 2 * INVERSE_FILL_EXTENT));
+		gtk_snapshot_pop(snapshot);
+	} else {
+		if (paint->is_stroke) {
+			gtk_snapshot_append_stroke(snapshot, path, paint->gsk_stroke, &paint->color);
+		}
+		if (paint->is_fill) {
+			gtk_snapshot_append_fill(snapshot, path, fill_rule, &paint->color);
+		}
 	}
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
@@ -352,11 +369,12 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRenderNode(JNIEnv 
 	gtk_snapshot_append_node(snapshot, node);
 }
 
-JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipPath(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong path_ptr, jint fill_rule)
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipPath(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong path_ptr, jint fill_rule, jboolean inverse)
 {
 	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
 	GskPath *path = _PTR(path_ptr);
-	gtk_snapshot_push_mask(snapshot, GSK_MASK_MODE_ALPHA);
+	/* an inverse fill type clips to everything outside the path */
+	gtk_snapshot_push_mask(snapshot, inverse ? GSK_MASK_MODE_INVERTED_ALPHA : GSK_MASK_MODE_ALPHA);
 	gtk_snapshot_append_fill(snapshot, path, fill_rule, &(GdkRGBA){1, 1, 1, 1});
 	gtk_snapshot_pop(snapshot);
 }

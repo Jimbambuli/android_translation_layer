@@ -50,10 +50,10 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRect
 /*
  * Class:     android_atl_GskCanvas
  * Method:    native_drawPath
- * Signature: (JJIJ)V
+ * Signature: (JJIZJ)V
  */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath
-  (JNIEnv *, jobject, jlong, jlong, jint, jlong);
+  (JNIEnv *, jobject, jlong, jlong, jint, jboolean, jlong);
 
 /*
  * Class:     android_atl_GskCanvas
@@ -154,10 +154,10 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipRect
 /*
  * Class:     android_atl_GskCanvas
  * Method:    native_clipPath
- * Signature: (JJI)V
+ * Signature: (JJIZ)V
  */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1clipPath
-  (JNIEnv *, jobject, jlong, jlong, jint);
+  (JNIEnv *, jobject, jlong, jlong, jint, jboolean);
 
 /*
  * Class:     android_atl_GskCanvas
@@ -174,6 +174,22 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pop
  */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pushOpacity
   (JNIEnv *, jobject, jlong, jfloat);
+
+/*
+ * Class:     android_atl_GskCanvas
+ * Method:    native_pushIsolation
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1pushIsolation
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_atl_GskCanvas
+ * Method:    native_pushComposite
+ * Signature: (JI)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1pushComposite
+  (JNIEnv *, jobject, jlong, jint);
 
 /*
  * Class:     android_atl_GskCanvas

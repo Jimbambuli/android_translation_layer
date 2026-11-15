@@ -201,7 +201,7 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public boolean clipPath(Path path) {
-		native_clipPath(snapshot, path.getGskPath(), path.getFillType().fill_rule);
+		native_clipPath(snapshot, path.getGskPath(), path.getFillType().fill_rule, path.isInverseFillType());
 		int save_count = getSaveCount();
 		if (push_history == null)
 			push_history = new int[save_count + 1];
@@ -210,7 +210,7 @@ public class GskCanvas extends DisplayListCanvas {
 		push_history[save_count]++;
 		RectF bounds = new RectF();
 		path.computeBounds(bounds, true);
-		return !bounds.isEmpty();
+		return path.isInverseFillType() || !bounds.isEmpty();
 	}
 
 	@Override
@@ -263,6 +263,9 @@ public class GskCanvas extends DisplayListCanvas {
 		if (path != null && paint != null && paint.getShader() != null) {
 			RectF bounds = new RectF();
 			path.computeBounds(bounds, true);
+			/* an inverse fill covers everything outside the path (same extent as Canvas.drawPaint()) */
+			if (path.isInverseFillType())
+				bounds.set(-100000, -100000, 100000, 100000);
 			save();
 			clipPath(path);
 			boolean drawn = fillWithShader(bounds.left, bounds.top, bounds.right, bounds.bottom, paint);
@@ -271,7 +274,7 @@ public class GskCanvas extends DisplayListCanvas {
 				return;
 		}
 		if (path != null)
-			native_drawPath(snapshot, path.getGskPath(), path.getFillType().fill_rule, paint != null ? paint.paint : default_paint.paint);
+			native_drawPath(snapshot, path.getGskPath(), path.getFillType().fill_rule, path.isInverseFillType(), paint != null ? paint.paint : default_paint.paint);
 	}
 
 	@Override
@@ -432,7 +435,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_drawBitmap(long snapshot, long texture, int x, int y, int width, int height, long paint);
 	protected native void native_drawBitmap(long snapshot, long texture, int x, int y, int width, int height, int src_x, int src_y, int src_width, int src_height, long paint);
 	protected native void native_drawRect(long snapshot, float left, float top, float right, float bottom, long paint);
-	protected native void native_drawPath(long snapshot, long path, int fill_rule, long paint);
+	protected native void native_drawPath(long snapshot, long path, int fill_rule, boolean inverse, long paint);
 	protected native void native_drawLinearGradient(long snapshot, float left, float top, float right, float bottom, float x0, float y0, float x1, float y1, int[] colors, float[] positions, boolean repeat, long paint);
 	protected native void native_translate(long snapshot, float dx, float dy);
 	protected native void native_rotate(long snapshot, float degrees);
@@ -446,7 +449,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_scale(long snapshot, float sx, float sy);
 	protected native void native_concat(long snapshot, long matrix);
 	protected native void native_clipRect(long snapshot, float left, float top, float right, float bottom);
-	protected native void native_clipPath(long snapshot, long path, int fill_rule);
+	protected native void native_clipPath(long snapshot, long path, int fill_rule, boolean inverse);
 	protected native void native_pop(long snapshot, int pop_count);
 
 	protected native void native_pushOpacity(long snapshot, float opacity);
