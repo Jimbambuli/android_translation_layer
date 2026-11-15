@@ -890,7 +890,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return children.size();
 	}
 
-	public void setMotionEventSplittingEnabled(boolean enabled) {}
+	/* AOSP ViewGroup.setMotionEventSplittingEnabled()/isMotionEventSplittingEnabled(): FLAG_SPLIT_MOTION_EVENTS,
+	 * on by default (targetSdk >= HONEYCOMB); ATL's touch dispatch does not split pointers, so it is only kept */
+	private boolean mSplitMotionEvents = true;
+	public void setMotionEventSplittingEnabled(boolean enabled) {
+		mSplitMotionEvents = enabled;
+	}
+	public boolean isMotionEventSplittingEnabled() {
+		return mSplitMotionEvents;
+	}
 
 	public void setOnHierarchyChangeListener(OnHierarchyChangeListener listener) {
 		this.onHierarchyChangeListener = listener;

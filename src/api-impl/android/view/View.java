@@ -1079,7 +1079,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* AOSP's mViewFlags for the flags ATL has: ENABLED_MASK, FOCUSABLE_MASK, FOCUSABLE_IN_TOUCH_MODE, CLICKABLE and
 	 * LONG_CLICKABLE (the visibility stays in the visibility field). Unlike AOSP the view starts out FOCUSABLE as well as
 	 * FOCUSABLE_AUTO: GTK decides what a native widget can focus, so isFocusable() stays true until the app says otherwise. */
-	int mViewFlags = ENABLED | FOCUSABLE | FOCUSABLE_AUTO;
+	int mViewFlags = ENABLED | FOCUSABLE | FOCUSABLE_AUTO | HAPTIC_FEEDBACK_ENABLED; /* AOSP View(Context): haptic feedback on */
 
 	private Handler handler;
 	private Animation currentAnimation;
@@ -1094,6 +1094,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		OnGenericMotionListener mOnGenericMotionListener;
 		OnHoverListener mOnHoverListener;
 		OnDragListener mOnDragListener;
+		OnCreateContextMenuListener mOnCreateContextMenuListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -2470,6 +2471,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public boolean performHapticFeedback(int feedbackConstant, int flags) {
+		/* AOSP View.performHapticFeedback(): nothing if the view turned it off, unless FLAG_IGNORE_VIEW_SETTING */
+		if ((flags & 0x0001 /* HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING, no ATL class */) == 0 && !isHapticFeedbackEnabled())
+			return false;
 		// arbitrary; TODO: better mimic what AOSP does
 		Vibrator vibrator = (Vibrator)getContext().getSystemService("vibrator");
 		vibrator.vibrate(10);
@@ -3080,7 +3084,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void makeOptionalFitsSystemWindows() {}
 
 
-	public void setScrollContainer(boolean isScrollContainer) {}
+	/* AOSP View.setScrollContainer()/isScrollContainer(): PFLAG_SCROLL_CONTAINER, counted (PFLAG_SCROLL_CONTAINER_ADDED)
+	 * only while the view is attached; ATL has no AttachInfo list of scroll containers to resize */
+	private boolean mScrollContainer;
+	public void setScrollContainer(boolean isScrollContainer) {
+		mScrollContainer = isScrollContainer;
+	}
+	public boolean isScrollContainer() {
+		return mScrollContainer && isAttachedToWindow();
+	}
 
 	public boolean removeCallbacks(Runnable action) {
 		getHandler().removeCallbacks(action);
@@ -3699,7 +3711,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 
-	public void setOnCreateContextMenuListener(View.OnCreateContextMenuListener l) {}
+	/* AOSP View.setOnCreateContextMenuListener(): makes the view long-clickable and keeps the listener
+	 * (ATL shows no context menus, see showContextMenu()) */
+	public void setOnCreateContextMenuListener(View.OnCreateContextMenuListener l) {
+		if (!isLongClickable())
+			setLongClickable(true);
+		getListenerInfo().mOnCreateContextMenuListener = l;
+	}
 
 	protected void onAnimationStart() {}
 
@@ -4658,11 +4676,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 	}
 
-	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {}
+	/* AOSP View.setHapticFeedbackEnabled()/isHapticFeedbackEnabled() */
+	public void setHapticFeedbackEnabled(boolean hapticFeedbackEnabled) {
+		setFlags(hapticFeedbackEnabled ? HAPTIC_FEEDBACK_ENABLED : 0, HAPTIC_FEEDBACK_ENABLED);
+	}
+	public boolean isHapticFeedbackEnabled() {
+		return HAPTIC_FEEDBACK_ENABLED == (mViewFlags & HAPTIC_FEEDBACK_ENABLED);
+	}
 
 	public StateListAnimator getStateListAnimator() { return state_list_animator; }
 
-	public void requestFitSystemWindows() {}
+	/* AOSP View.requestFitSystemWindows(): up to ViewRootImpl, which applies the insets again; ATL's window does
+	 * that in requestApplyInsets() (AOSP's requestApplyInsets() is requestFitSystemWindows()) */
+	public void requestFitSystemWindows() {
+		requestApplyInsets();
+	}
 
 	public boolean isPressed() {
 		return (mPrivateFlags & PFLAG_PRESSED) == PFLAG_PRESSED;
@@ -4781,9 +4809,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
 	}
 
-	public void setScrollbarFadingEnabled(boolean fadeEnabled) {}
+	/* AOSP View.setScrollbarFadingEnabled()/isScrollbarFadingEnabled(): kept in the ScrollabilityCache, false
+	 * while there is none; ATL draws no Android scroll bars, so it is only kept */
+	private boolean mFadeScrollBars;
+	public void setScrollbarFadingEnabled(boolean fadeEnabled) {
+		mFadeScrollBars = fadeEnabled;
+	}
+	public boolean isScrollbarFadingEnabled() {
+		return mFadeScrollBars;
+	}
 
-	public void setScrollBarStyle(int style) {}
+	/* AOSP View.setScrollBarStyle()/getScrollBarStyle(): bits of mViewFlags (no scroll bars to inset here) */
+	public void setScrollBarStyle(int style) {
+		mViewFlags = (mViewFlags & ~SCROLLBARS_STYLE_MASK) | (style & SCROLLBARS_STYLE_MASK);
+	}
+	public int getScrollBarStyle() {
+		return mViewFlags & SCROLLBARS_STYLE_MASK;
+	}
 
 	/* AOSP keeps the size in the ScrollabilityCache and falls back to ViewConfiguration's; ATL draws
 	 * no Android scroll bars, so the size is only kept for getScrollBarSize() */
@@ -5560,7 +5602,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 
 
-	public void setDrawingCacheQuality(int quality) {}
+	/* AOSP View.setDrawingCacheQuality()/getDrawingCacheQuality() */
+	public void setDrawingCacheQuality(int quality) {
+		setFlags(quality, DRAWING_CACHE_QUALITY_MASK);
+	}
+	public int getDrawingCacheQuality() {
+		return mViewFlags & DRAWING_CACHE_QUALITY_MASK;
+	}
 
 	/* AOSP View.buildDrawingCache()/getDrawingCache(): the view drawn into a bitmap of its size, as the software
 	 * drawing cache (rebuilt on each getDrawingCache() while the cache is enabled) */
@@ -5715,14 +5763,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			nativeSetOnHoverListener(widget);
 	}
 
-	public ActionMode startActionMode(ActionMode.Callback callback, int type) { return null; }
+	/* AOSP View.startActionMode(): the parents are asked (startActionModeForChild) */
+	public ActionMode startActionMode(ActionMode.Callback callback, int type) {
+		ViewParent parent = getParent();
+		if (parent == null)
+			return null;
+		return parent.startActionModeForChild(this, callback, type);
+	}
 
 	public InputConnection onCreateInputConnection(EditorInfo outAttrs) { return null; }
 
 	/* AOSP View.checkInputConnectionProxy(): whether another view may talk to the input method for this one */
 	public boolean checkInputConnectionProxy(View view) { return false; }
 
-	public ActionMode startActionMode(ActionMode.Callback callback) { return null; }
+	public ActionMode startActionMode(ActionMode.Callback callback) {
+		return startActionMode(callback, ActionMode.TYPE_PRIMARY);
+	}
 
 	/* AOSP: the whole view; a text view gives the cursor */
 	public void getFocusedRect(Rect r) { getDrawingRect(r); }
@@ -5915,7 +5971,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return mTouchDelegate;
 	}
 
-	public void setZ(float z) {}
+	/* AOSP View.setZ() */
+	public void setZ(float z) {
+		setTranslationZ(z - getElevation());
+	}
 
 	/* ---- AOSP View, accessibility. ATL has no accessibility service, so nothing asks for these, but an app's
 	 * views and delegates call and override them and expect what AOSP returns and calls. The events and nodes
@@ -6512,9 +6571,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		onFinishTemporaryDetach();
 	}
 
-	/* AOSP: the view is cleaned up for the time it is detached (a list view recycling it): its pending click and
-	 * pressed state go; ATL keeps neither as view state, so nothing is left to clear */
+	/* AOSP View.onStartTemporaryDetach(): the view is cleaned up for the time it is detached (a list view
+	 * recycling it): its pending unpress goes (ATL has no PFLAG_CANCEL_NEXT_UP_EVENT) */
 	public void onStartTemporaryDetach() {
+		removeUnsetPressCallback();
 	}
 
 	public void onFinishTemporaryDetach() {
