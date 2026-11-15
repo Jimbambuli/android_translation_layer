@@ -11,7 +11,7 @@ import java.util.Set;
 /* AOSP core/java/android/hardware/camera2/CameraDevice.java. ATL has no camera service, so
  * CameraManager.openCamera() never hands out an instance; the abstract class and its StateCallback
  * exist so apps can link and subclass them. The members are
- * declared from AOSP (the hidden createCustomCaptureSession() and the extension session are left out). */
+ * declared from AOSP (the hidden createCustomCaptureSession() is left out). */
 public abstract class CameraDevice implements AutoCloseable {
 
 	public static final int TEMPLATE_PREVIEW = 1;
@@ -61,6 +61,12 @@ public abstract class CameraDevice implements AutoCloseable {
 			CameraCaptureSession.StateCallback callback,
 			Handler handler)
 			throws CameraAccessException;
+
+	public void createExtensionSession(
+			android.hardware.camera2.params.ExtensionSessionConfiguration extensionConfiguration)
+			throws CameraAccessException {
+		throw new UnsupportedOperationException("No default implementation");
+	}
 
 	public void createCaptureSession(
 			SessionConfiguration config) throws CameraAccessException {
