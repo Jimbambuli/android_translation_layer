@@ -28,12 +28,46 @@ public class ResolveInfo {
 		return icon;
 	}
 
+	/* AOSP ResolveInfo.getComponentInfo. ATL always allocates activityInfo and serviceInfo, so the
+	 * one that was filled in (has a name) is taken, in AOSP's order. */
+	public ComponentInfo getComponentInfo() {
+		if (activityInfo != null && activityInfo.name != null)
+			return activityInfo;
+		if (serviceInfo != null && serviceInfo.name != null)
+			return serviceInfo;
+		if (providerInfo != null)
+			return providerInfo;
+		if (activityInfo != null)
+			return activityInfo;
+		throw new IllegalStateException("Missing ComponentInfo!");
+	}
+
+	/* AOSP ResolveInfo.loadLabel */
 	public CharSequence loadLabel(PackageManager pm) {
-		CharSequence label = activityInfo.loadLabel(pm);
-		if (label == null) {
-			label = "fixme ResolveInfo.loadLabel";
+		if (nonLocalizedLabel != null) {
+			return nonLocalizedLabel;
 		}
-		return label;
+		CharSequence label;
+		if (resolvePackageName != null && labelRes != 0) {
+			label = pm.getText(resolvePackageName, labelRes, null);
+			if (label != null) {
+				return label.toString().trim();
+			}
+		}
+		ComponentInfo ci = getComponentInfo();
+		ApplicationInfo ai = ci.applicationInfo;
+		if (labelRes != 0) {
+			label = pm.getText(ci.packageName, labelRes, ai);
+			if (label != null) {
+				return label.toString().trim();
+			}
+		}
+
+		CharSequence data = ci.loadLabel(pm);
+		// Make the data safe
+		if (data != null)
+			data = data.toString().trim();
+		return data;
 	}
 
 	public static class DisplayNameComparator {
