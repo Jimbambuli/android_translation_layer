@@ -226,7 +226,7 @@ public final class CredentialOption implements Parcelable {
     }
 
     @NonNull
-    public static final Parcelable.Creator<CredentialOption> CREATOR = new Parcelable.Creator<>() {
+    public static final Parcelable.Creator<CredentialOption> CREATOR = new Parcelable.Creator<CredentialOption>() {
         @Override
         public CredentialOption[] newArray(int size) {
             return new CredentialOption[size];

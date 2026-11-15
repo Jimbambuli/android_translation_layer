@@ -156,7 +156,7 @@ public final class GetCredentialRequest implements Parcelable {
     }
 
     @NonNull public static final Parcelable.Creator<GetCredentialRequest> CREATOR =
-            new Parcelable.Creator<>() {
+            new Parcelable.Creator<GetCredentialRequest>() {
                 @Override
                 public GetCredentialRequest[] newArray(int size) {
                     return new GetCredentialRequest[size];
