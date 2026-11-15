@@ -4948,6 +4948,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mScrollBarSize = scrollBarSize;
 	}
 
+	/* AOSP View.getAttributeSourceResourceMap(): empty unless the developer option "view attribute inspection"
+	 * (sDebugViewAttributes) recorded the sources, which ATL does not have */
+	public Map<Integer, Integer> getAttributeSourceResourceMap() {
+		return new HashMap<>();
+	}
+
 	/* AOSP View.setVerticalScrollbarPosition()/getVerticalScrollbarPosition(): kept (ATL draws no Android scroll
 	 * bars, so nothing moves) */
 	private int mVerticalScrollbarPosition;
