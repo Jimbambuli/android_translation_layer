@@ -510,6 +510,10 @@ static void activity_update_current(JNIEnv *env)
  * (PictureInPictureParams.isAutoEnterEnabled(); TaskFragment.startPausing() with shouldAutoPip). When the
  * window comes back, the activity on top of the back stack is resumed. */
 static gboolean window_hidden = FALSE;
+/* The window hides because the user closed it (the task is removed, see activity_window_close_request()):
+ * not the Home button, so no onUserLeaveHint() and no picture-in-picture, which would open a new window
+ * (e.g. Firefox with a fullscreen video) for an app the user just closed */
+static gboolean task_removing = FALSE;
 
 static void window_set_hidden(gboolean hidden)
 {
@@ -519,14 +523,14 @@ static void window_set_hidden(gboolean hidden)
 	window_hidden = hidden;
 	if (hidden && activity_current) {
 		jobject activity = activity_current;
-		gboolean auto_pip = J__Activity__autoEnterPictureInPicture(env, activity);
+		gboolean auto_pip = !task_removing && J__Activity__autoEnterPictureInPicture(env, activity);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
 			auto_pip = FALSE;
 		}
 		if (!auto_pip) {
-			activity_pause(env, activity, true);
+			activity_pause(env, activity, !task_removing);
 			activity_stop(env, activity, true);
 		}
 	} else if (!hidden) {
@@ -616,7 +620,9 @@ gboolean activity_window_close_request(void)
 	if (app_quitting || foreground_services <= 0)
 		return FALSE;
 	window_closed = TRUE;
+	task_removing = TRUE;
 	window_set_hidden(TRUE);
+	task_removing = FALSE;
 	gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
 	/* The user removed the task (ActivityTaskSupervisor.removeTask() -> cleanUpRemovedTask()): its services get
 	 * onTaskRemoved() with the task's base intent, android:stopWithTask services stop. Not when the

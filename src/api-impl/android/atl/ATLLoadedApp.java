@@ -559,6 +559,7 @@ public final class ATLLoadedApp {
 				app.bringDownServiceIfNeeded(entry.getKey(), r);
 			} else {
 				final Intent rootIntent = new Intent(baseIntent);
+				Slog.i(TAG, "remove task: onTaskRemoved() for service " + entry.getKey());
 				new Handler(Looper.getMainLooper()).post(new Runnable() {
 					@Override
 					public void run() {
