@@ -1,8 +1,14 @@
 package android.media;
 
+import android.graphics.Rect;
 import java.nio.ByteBuffer;
+import java.util.AbstractSet;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class MediaFormat {
 
@@ -174,5 +180,181 @@ public class MediaFormat {
 
 	public long getLong(String name) {
 		return (long)map.get(name);
+	}
+
+	/* AOSP MediaFormat (frameworks/base/media/java/android/media/MediaFormat.java): feature and key views, getNumber,
+	 * createSubtitleFormat, QpOffsetRect */
+	public final boolean containsFeature(String name) {
+		return map.containsKey(KEY_FEATURE_PREFIX + name);
+	}
+
+	public final void removeFeature(String name) {
+		map.remove(KEY_FEATURE_PREFIX + name);
+	}
+
+	public final Number getNumber(String name) {
+		return (Number) map.get(name);
+	}
+
+	public final Number getNumber(String name, Number defaultValue) {
+		Number ret = getNumber(name);
+		return ret == null ? defaultValue : ret;
+	}
+
+	public final Set<String> getKeys() {
+		return new UnprefixedKeySet(KEY_FEATURE_PREFIX);
+	}
+
+	public final Set<String> getFeatures() {
+		return new PrefixedKeySetWithPrefixRemoved(KEY_FEATURE_PREFIX);
+	}
+
+	public static final MediaFormat createSubtitleFormat(String mime, String language) {
+		MediaFormat format = new MediaFormat();
+		format.setString(KEY_MIME, mime);
+		format.setString("language", language);
+		return format;
+	}
+
+	private abstract class FilteredMappedKeySet extends AbstractSet<String> {
+		private Set<String> mKeys;
+
+		abstract protected boolean keepKey(String key);
+
+		abstract protected String mapKeyToItem(String key);
+
+		abstract protected String mapItemToKey(String item);
+
+		public FilteredMappedKeySet() {
+			mKeys = map.keySet();
+		}
+
+		@Override
+		public boolean contains(Object o) {
+			if (o instanceof String) {
+				String key = mapItemToKey((String) o);
+				return keepKey(key) && mKeys.contains(key);
+			}
+			return false;
+		}
+
+		@Override
+		public boolean remove(Object o) {
+			if (o instanceof String) {
+				String key = mapItemToKey((String) o);
+				if (keepKey(key) && mKeys.remove(key)) {
+					map.remove(key);
+					return true;
+				}
+			}
+			return false;
+		}
+
+		private class KeyIterator implements Iterator<String> {
+			Iterator<String> mIterator;
+			String mLast;
+
+			public KeyIterator() {
+				mIterator = mKeys.stream().filter(k -> keepKey(k)).collect(Collectors.toList()).iterator();
+			}
+
+			@Override
+			public boolean hasNext() {
+				return mIterator.hasNext();
+			}
+
+			@Override
+			public String next() {
+				mLast = mIterator.next();
+				return mapKeyToItem(mLast);
+			}
+
+			@Override
+			public void remove() {
+				mIterator.remove();
+				map.remove(mLast);
+			}
+		}
+
+		@Override
+		public Iterator<String> iterator() {
+			return new KeyIterator();
+		}
+
+		@Override
+		public int size() {
+			return (int) mKeys.stream().filter(this::keepKey).count();
+		}
+	}
+
+	private class UnprefixedKeySet extends FilteredMappedKeySet {
+		private String mPrefix;
+
+		public UnprefixedKeySet(String prefix) {
+			super();
+			mPrefix = prefix;
+		}
+
+		protected boolean keepKey(String key) {
+			return !key.startsWith(mPrefix);
+		}
+
+		protected String mapKeyToItem(String key) {
+			return key;
+		}
+
+		protected String mapItemToKey(String item) {
+			return item;
+		}
+	}
+
+	private class PrefixedKeySetWithPrefixRemoved extends FilteredMappedKeySet {
+		private String mPrefix;
+		private int mPrefixLength;
+
+		public PrefixedKeySetWithPrefixRemoved(String prefix) {
+			super();
+			mPrefix = prefix;
+			mPrefixLength = prefix.length();
+		}
+
+		protected boolean keepKey(String key) {
+			return key.startsWith(mPrefix);
+		}
+
+		protected String mapKeyToItem(String key) {
+			return key.substring(mPrefixLength);
+		}
+
+		protected String mapItemToKey(String item) {
+			return mPrefix + item;
+		}
+	}
+
+	public static final class QpOffsetRect {
+		private Rect mContour;
+		private int mQpOffset;
+
+		public QpOffsetRect(Rect contour, int qpOffset) {
+			mContour = contour;
+			mQpOffset = qpOffset;
+		}
+
+		public void set(Rect contour, int qpOffset) {
+			mContour = contour;
+			mQpOffset = qpOffset;
+		}
+
+		public String flattenToString() {
+			return mContour.top + "," + mContour.left + "-" + mContour.bottom + "," + mContour.right + "=" + mQpOffset + ";";
+		}
+
+		public static String flattenToString(List<QpOffsetRect> qpOffsetRects) {
+			StringBuilder builder = new StringBuilder();
+			for (QpOffsetRect qpOffsetRect : qpOffsetRects) {
+				builder.append(qpOffsetRect.flattenToString());
+			}
+			return builder.toString();
+		}
 	}
 }
