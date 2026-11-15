@@ -672,13 +672,9 @@ public class ApplicationInfo extends PackageItemInfo {
 	 */
 	@Override
 	protected Drawable loadDefaultIcon(PackageManager pm) {
-		/*        if ((flags & FLAG_EXTERNAL_STORAGE) != 0
-				&& isPackageUnavailable(pm)) {
-			    return Resources.getSystem().getDrawable(
-				    com.android.internal.R.drawable.sym_app_on_sd_unavailable_icon);
-			}
-			return pm.getDefaultActivityIcon();*/
-		return null;
+		/* AOSP ApplicationInfo.loadDefaultIcon(): the sd-card branch (FLAG_EXTERNAL_STORAGE) never applies,
+		 * ATL installs no package there */
+		return pm.getDefaultActivityIcon();
 	}
 
 	private boolean isPackageUnavailable(PackageManager pm) {

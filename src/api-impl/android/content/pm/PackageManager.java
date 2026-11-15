@@ -2904,7 +2904,7 @@ public class PackageManager {
 	 * @see #getActivityIcon(Intent)
 	 */
 	public Drawable getActivityIcon(ComponentName activityName) throws NameNotFoundException {
-		return null;
+		return getActivityInfo(activityName, 0).loadIcon(this); // AOSP ApplicationPackageManager.getActivityIcon()
 	}
 
 	/**
@@ -2925,7 +2925,15 @@ public class PackageManager {
 	 * @see #getActivityIcon(ComponentName)
 	 */
 	public Drawable getActivityIcon(Intent intent) throws NameNotFoundException {
-		return null;
+		// AOSP ApplicationPackageManager.getActivityIcon(Intent)
+		if (intent.getComponent() != null) {
+			return getActivityIcon(intent.getComponent());
+		}
+		ResolveInfo info = resolveActivity(intent, MATCH_DEFAULT_ONLY);
+		if (info != null) {
+			return info.activityInfo.loadIcon(this);
+		}
+		throw new NameNotFoundException(intent.toUri(0));
 	}
 
 	/**
@@ -2935,7 +2943,8 @@ public class PackageManager {
 	 * @return Drawable Image of the icon.
 	 */
 	public Drawable getDefaultActivityIcon() {
-		return null;
+		// AOSP ApplicationPackageManager.getDefaultActivityIcon(): sym_def_app_icon of the framework resources
+		return android.content.res.Resources.getSystem().getDrawable(com.android.internal.R.drawable.sym_def_app_icon);
 	}
 
 	/**

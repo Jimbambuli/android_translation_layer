@@ -146,6 +146,12 @@ public class PackageItemInfo {
 		return loadDefaultIcon(pm);
 	}
 
+	/* AOSP PackageItemInfo.loadUnbadgedIcon() = pm.loadUnbadgedItemIcon(): the icon without the work-profile badge;
+	 * ATL has no profiles, so nothing is badged and loadIcon() gives the same drawable */
+	public Drawable loadUnbadgedIcon(PackageManager pm) {
+		return loadIcon(pm);
+	}
+
 	/**
 	 * Retrieve the default graphical icon associated with this item.
 	 *
