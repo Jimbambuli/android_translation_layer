@@ -93,7 +93,23 @@ public class DatePicker extends FrameLayout {
 		setOnDateChangedListener(listener);
 	}
 
-	public void setFirstDayOfWeek(int dayOfWeek) {}
+	/* AOSP DatePickerCalendarDelegate.setFirstDayOfWeek()/getFirstDayOfWeek(): 0 means the first day of the locale; an invalid day
+	 * of week is ignored. ATL's calendar does not draw the week header from it. */
+	private int mFirstDayOfWeek = 0;
+
+	public void setFirstDayOfWeek(int firstDayOfWeek) {
+		if (firstDayOfWeek != 0 && (firstDayOfWeek < Calendar.SUNDAY || firstDayOfWeek > Calendar.SATURDAY)) {
+			return;
+		}
+		mFirstDayOfWeek = firstDayOfWeek;
+	}
+
+	public int getFirstDayOfWeek() {
+		if (mFirstDayOfWeek != 0) {
+			return mFirstDayOfWeek;
+		}
+		return Calendar.getInstance(java.util.Locale.getDefault()).getFirstDayOfWeek();
+	}
 
 	public void setOnDateChangedListener(OnDateChangedListener onDateChangedListener) {
 		nativeSetOnDateChangedListener(widget);

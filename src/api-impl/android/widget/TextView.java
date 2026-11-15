@@ -1521,7 +1521,12 @@ public class TextView extends View {
 		break_strategy = strategy;
 	}
 
-	public void clearComposingText() {}
+	/** AOSP clearComposingText(): removes the composing spans of a Spannable text */
+	public void clearComposingText() {
+		if (getText() instanceof Spannable) {
+			android.view.inputmethod.BaseInputConnection.removeComposingSpans((Spannable)getText());
+		}
+	}
 
 	/* AOSP TextView.setWidth(): exactly this wide (as minimum and maximum width) */
 	public void setWidth(int pixels) {
@@ -1540,7 +1545,17 @@ public class TextView extends View {
 		invalidate();
 	}
 
-	public void setFreezesText(boolean freezesText) {}
+	/* AOSP setFreezesText()/getFreezesText(): whether the text is part of the saved state; ATL does not save view state,
+	 * so the flag is only kept */
+	private boolean mFreezesText;
+
+	public void setFreezesText(boolean freezesText) {
+		mFreezesText = freezesText;
+	}
+
+	public boolean getFreezesText() {
+		return mFreezesText;
+	}
 
 	/* AOSP: in ems, kept by the paint; the label gets it as a Pango letter spacing in pixels */
 	public void setLetterSpacing(float letterSpacing) {
