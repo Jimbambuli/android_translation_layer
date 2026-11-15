@@ -223,6 +223,12 @@ public class TelephonyManager {
 		}
 	}
 
+	/* AOSP TelephonyManager.registerTelephonyCallback(int, Executor, TelephonyCallback) (API 33): same as above,
+	 * includeLocationData only selects which location fields a modem would report */
+	public void registerTelephonyCallback(int includeLocationData, java.util.concurrent.Executor executor, TelephonyCallback callback) {
+		registerTelephonyCallback(executor, callback);
+	}
+
 	public void unregisterTelephonyCallback(TelephonyCallback callback) {}
 
 	public int getNetworkType() {
