@@ -193,6 +193,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawText(JNIEnv *env, 
 	const char *str = (*env)->GetStringUTFChars(env, text, NULL);
 	pango_layout_set_text(layout, str, -1);
 	(*env)->ReleaseStringUTFChars(env, text, str);
+	android_paint_apply_text_decoration(layout, paint);
 	PangoRectangle rect;
 	pango_layout_get_pixel_extents(layout, NULL, &rect);
 	y -= (float)pango_layout_get_baseline(layout) / PANGO_SCALE;
@@ -203,7 +204,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawText(JNIEnv *env, 
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
 	gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(x, y));
-	gtk_snapshot_append_layout(snapshot, layout, &paint->color);
+	android_paint_append_layout(snapshot, layout, paint);
 	gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(-x, -y));
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
@@ -234,6 +235,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawGlyphs(JNIEnv *env
 	jfloat *pos = (*env)->GetFloatArrayElements(env, pos_arr, NULL);
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	bool shadow = android_paint_push_text_shadow(snapshot, paint);
 	PangoGlyphString *glyphs = pango_glyph_string_new();
 	pango_glyph_string_set_size(glyphs, 1);
 	for (jint i = 0; i < count; i++) {
@@ -245,13 +247,11 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawGlyphs(JNIEnv *env
 		glyphs->glyphs[0].geometry.y_offset = 0;
 		glyphs->glyphs[0].attr.is_cluster_start = 1;
 		glyphs->log_clusters[0] = 0;
-		GskRenderNode *node = gsk_text_node_new(font, glyphs, &paint->color, &GRAPHENE_POINT_INIT(pos[pos_offset + i * 2], pos[pos_offset + i * 2 + 1]));
-		if (node) {
-			gtk_snapshot_append_node(snapshot, node);
-			gsk_render_node_unref(node);
-		}
+		android_paint_append_glyphs(snapshot, font, glyphs, &GRAPHENE_POINT_INIT(pos[pos_offset + i * 2], pos[pos_offset + i * 2 + 1]), paint);
 	}
 	pango_glyph_string_free(glyphs);
+	if (shadow)
+		gtk_snapshot_pop(snapshot);
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
 	(*env)->ReleaseIntArrayElements(env, ids_arr, ids, JNI_ABORT);

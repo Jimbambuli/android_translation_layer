@@ -33,8 +33,7 @@ public class Paint {
 	/* as set by the app: GSK can't stroke with width 0 (hairline), so the native stroke is 1 then */
 	private float stroke_width = 0;
 	private PathEffect path_effect;
-	/* AOSP keeps these in Java fields too (mShadowLayer*); the native side draws the shadow,
-	 * which ATL does not. Skew is native in AOSP, ATL only stores it. */
+	/* AOSP keeps these in Java fields too (mShadowLayer*); the native paint has them for drawing text */
 	private float shadow_layer_radius;
 	private float shadow_layer_dx;
 	private float shadow_layer_dy;
@@ -86,6 +85,7 @@ public class Paint {
 
 	private void setFlag(int flag, boolean on) {
 		flags = on ? flags | flag : flags & ~flag;
+		native_set_text_flags(paint, flags);
 	}
 
 	public void setColor(int color) {
@@ -165,8 +165,6 @@ public class Paint {
 
 	private void applyTypeface() {
 		int weight = typeface != null ? typeface.getWeight() : 400;
-		if (isFakeBoldText() && weight < 700)
-			weight = 700;
 		native_set_typeface(paint, typeface != null ? typeface.family : null, weight, typeface != null && typeface.isItalic());
 	}
 	public void getTextBounds(String text, int start, int end, Rect bounds) {
@@ -233,10 +231,8 @@ public class Paint {
 	}
 
 	public void setFlags(int flags) {
-		boolean fakeBoldChanged = ((this.flags ^ flags) & FAKE_BOLD_TEXT_FLAG) != 0;
 		this.flags = flags;
-		if (fakeBoldChanged)
-			applyTypeface();
+		native_set_text_flags(paint, flags);
 	}
 
 	public void setStyle(Style style) {
@@ -355,8 +351,8 @@ public class Paint {
 		return (flags & DITHER_FLAG) != 0;
 	}
 
-	/* AOSP sets these flag bits natively; ATL keeps them for getFlags() and the getters,
-	 * GSK/Pango draw text without underline/strike-through decoration */
+	/* AOSP sets these flag bits natively; ATL keeps them for getFlags() and the getters, the native paint
+	 * gets the ones that change how text is drawn (underline, strike-through, fake bold) */
 	public void setLinearText(boolean linearText) {
 		setFlag(LINEAR_TEXT_FLAG, linearText);
 	}
@@ -381,10 +377,9 @@ public class Paint {
 	public final boolean isStrikeThruText() {
 		return (flags & STRIKE_THRU_TEXT_FLAG) != 0;
 	}
-	/* Pango has no synthetic emboldening of its own, so fake bold asks for a bold weight */
+	/* like Skia, fake bold strokes the glyph outlines of the same font (natively), it does not pick a bold font */
 	public void setFakeBoldText(boolean fakeBoldText) {
-		flags = fakeBoldText ? (flags | FAKE_BOLD_TEXT_FLAG) : (flags & ~FAKE_BOLD_TEXT_FLAG);
-		applyTypeface();
+		setFlag(FAKE_BOLD_TEXT_FLAG, fakeBoldText);
 	}
 
 	public float getStrokeWidth() {
@@ -400,7 +395,10 @@ public class Paint {
 	public float getTextScaleX() { return text_scale_x; }
 	public void setTextScaleX(float scaleX) { text_scale_x = scaleX; }
 	public float getTextSkewX() { return text_skew_x; }
-	public void setTextSkewX(float skewX) { text_skew_x = skewX; }
+	public void setTextSkewX(float skewX) {
+		text_skew_x = skewX;
+		native_set_text_skew_x(paint, skewX);
+	}
 
 	/* AOSP Paint.getUnderlinePosition()/getUnderlineThickness() -> hwui jni/Paint.cpp (not in the local sources):
 	 * the font's post table values when Skia has them, else Paint::kStdUnderline_Top (1/9 - 1/36) and
@@ -484,6 +482,7 @@ public class Paint {
 		shadow_layer_dx = dx;
 		shadow_layer_dy = dy;
 		shadow_layer_color = shadowColor;
+		native_set_shadow_layer(paint, radius, dx, dy, Color.toArgb(shadowColor));
 	}
 
 	/* AOSP Paint.getShadowLayerColor() (int) and getShadowLayerColorLong() */
@@ -763,6 +762,7 @@ public class Paint {
 		shadow_layer_dy = 0;
 		shadow_layer_color = 0;
 		text_skew_x = 0;
+		native_set_text_flags(paint, flags);
 	}
 
 	private static native long native_create();
@@ -791,6 +791,9 @@ public class Paint {
 	private static native void native_set_text_align(long paint, int align);
 	private static native float native_get_font_metrics(long paint, FontMetrics metrics);
 	private static native int native_get_font_metrics_int(long paint, FontMetricsInt metrics);
+	private static native void native_set_text_flags(long paint, int flags);
+	private static native void native_set_text_skew_x(long paint, float skewX);
+	private static native void native_set_shadow_layer(long paint, float radius, float dx, float dy, int color);
 
 	/** Option for getTextRunCursor: the next cursor position after the offset */
 	public static final int CURSOR_AFTER = 0;

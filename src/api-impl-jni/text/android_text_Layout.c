@@ -18,6 +18,7 @@ JNIEXPORT jlong JNICALL Java_android_text_Layout_native_1constructor(JNIEnv *env
 	(*env)->ReleaseStringChars(env, text, chars);
 	pango_layout_set_text(layout, str ? str : "", -1);
 	g_free(str);
+	android_paint_apply_text_decoration(layout, android_paint);
 	pango_layout_set_width(layout, width == -1 ? -1 : width * PANGO_SCALE);
 	return _INTPTR(layout);
 }
@@ -296,7 +297,7 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw(JNIEnv *env, jobjec
 	GtkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
 	struct AndroidPaint *android_paint = _PTR(paint_ptr);
 
-	gtk_snapshot_append_layout(snapshot, pango_layout, &android_paint->color);
+	android_paint_append_layout(snapshot, pango_layout, android_paint);
 }
 
 JNIEXPORT void JNICALL Java_android_text_Layout_native_1draw_1custom_1canvas(JNIEnv *env, jobject object, jlong layout, jobject canvas, jobject paint)
