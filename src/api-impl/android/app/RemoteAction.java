@@ -28,7 +28,7 @@ import java.util.Objects;
  * associated visualization including metadata like an icon or title.
  */
 /* ATL: AOSP android-14 RemoteAction without parceling (it carries a PendingIntent, which needs a binder) */
-public final class RemoteAction {
+public final class RemoteAction implements android.os.Parcelable {
 
     private static final String TAG = "RemoteAction";
 
@@ -146,4 +146,39 @@ public final class RemoteAction {
         pw.print(" shouldShowIcon=" + mShouldShowIcon);
         pw.println();
     }
+
+    /* AOSP RemoteAction(Parcel)/writeToParcel()/describeContents()/CREATOR */
+    RemoteAction(android.os.Parcel in) {
+        mIcon = Icon.CREATOR.createFromParcel(in);
+        mTitle = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+        mContentDescription = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+        mActionIntent = PendingIntent.CREATOR.createFromParcel(in);
+        mEnabled = in.readBoolean();
+        mShouldShowIcon = in.readBoolean();
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(android.os.Parcel out, int flags) {
+        mIcon.writeToParcel(out, 0);
+        TextUtils.writeToParcel(mTitle, out, flags);
+        TextUtils.writeToParcel(mContentDescription, out, flags);
+        mActionIntent.writeToParcel(out, flags);
+        out.writeBoolean(mEnabled);
+        out.writeBoolean(mShouldShowIcon);
+    }
+
+    public static final android.os.Parcelable.Creator<RemoteAction> CREATOR = new android.os.Parcelable.Creator<RemoteAction>() {
+        public RemoteAction createFromParcel(android.os.Parcel in) {
+            return new RemoteAction(in);
+        }
+
+        public RemoteAction[] newArray(int size) {
+            return new RemoteAction[size];
+        }
+    };
 }
