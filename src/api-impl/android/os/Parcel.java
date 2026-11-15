@@ -750,7 +750,8 @@ public class Parcel {
 		}
 	}
 
-	public void readTypedArray(Object[] array, Parcelable.Creator<Parcelable> creator) throws ReflectiveOperationException {
+	/* AOSP Parcel.readTypedArray(T[], Parcelable.Creator<T>): generic, no checked exception */
+	public final <T> void readTypedArray(T[] array, Parcelable.Creator<T> creator) {
 		int size = readInt();
 		if (array.length != size)
 			throw new RuntimeException("array length mismatch");

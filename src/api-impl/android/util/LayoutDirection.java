@@ -26,6 +26,9 @@ public final class LayoutDirection {
 	// No instantiation
 	private LayoutDirection() {}
 
+	/* AOSP LayoutDirection.UNDEFINED (@hide) */
+	public static final int UNDEFINED = -1;
+
 	/**
 	 * Horizontal layout direction is from Left to Right.
 	 */

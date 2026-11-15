@@ -178,7 +178,6 @@ public class MediaStore {
 			public static Bitmap getThumbnail(ContentResolver cr, long origId, long groupId, int kind, BitmapFactory.Options options) {
 				return getThumbnail(cr, origId, kind, options);
 			}
-			}
 		}
 	}
 

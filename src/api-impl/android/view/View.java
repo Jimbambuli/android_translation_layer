@@ -540,6 +540,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * Horizontal layout direction of this view is from Left to Right.
 	 * Use with {@link #setLayoutDirection}.
 	 */
+	/* AOSP View.LAYOUT_DIRECTION_UNDEFINED (@hide) */
+	public static final int LAYOUT_DIRECTION_UNDEFINED = LayoutDirection.UNDEFINED;
 	public static final int LAYOUT_DIRECTION_LTR = LayoutDirection.LTR;
 
 	/**

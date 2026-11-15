@@ -6,6 +6,20 @@ import java.util.Map;
 
 public class MediaFormat {
 
+	/* AOSP MediaFormat MIMETYPE_* (used by EncoderProfiles) */
+	public static final String MIMETYPE_VIDEO_VP8 = "video/x-vnd.on2.vp8";
+	public static final String MIMETYPE_VIDEO_VP9 = "video/x-vnd.on2.vp9";
+	public static final String MIMETYPE_VIDEO_AV1 = "video/av01";
+	public static final String MIMETYPE_VIDEO_AVC = "video/avc";
+	public static final String MIMETYPE_VIDEO_HEVC = "video/hevc";
+	public static final String MIMETYPE_VIDEO_MPEG4 = "video/mp4v-es";
+	public static final String MIMETYPE_VIDEO_H263 = "video/3gpp";
+	public static final String MIMETYPE_VIDEO_DOLBY_VISION = "video/dolby-vision";
+	public static final String MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
+	public static final String MIMETYPE_AUDIO_AMR_WB = "audio/amr-wb";
+	public static final String MIMETYPE_AUDIO_AAC = "audio/mp4a-latm";
+	public static final String MIMETYPE_AUDIO_VORBIS = "audio/vorbis";
+	public static final String MIMETYPE_AUDIO_OPUS = "audio/opus";
 	public static final String KEY_MIME = "mime";
 	public static final String KEY_SAMPLE_RATE = "sample-rate";
 	public static final String KEY_CHANNEL_COUNT = "channel-count";
