@@ -449,6 +449,17 @@ public class PackageInstaller {
 		});
 	}
 
+	/* AOSP uninstall(VersionedPackage, ...): ATL has a single version of an installed package, so the version code is
+	 * not compared and the flags (delete flags of the package manager) are not used */
+	public void uninstall(VersionedPackage versionedPackage, int flags, IntentSender statusReceiver) {
+		java.util.Objects.requireNonNull(versionedPackage, "versionedPackage cannot be null");
+		uninstall(versionedPackage.getPackageName(), statusReceiver);
+	}
+
+	public void uninstall(VersionedPackage versionedPackage, IntentSender statusReceiver) {
+		uninstall(versionedPackage, 0 /*flags*/, statusReceiver);
+	}
+
 	/* package:<name> and market: intents (AOSP: the system's UninstallerActivity and Settings' app info; the store
 	 * app that has a filter for market:). None of them goes to the desktop's «Open with». Returns false for other
 	 * intents; `result` (may be null) gets an activity result: RESULT_OK, RESULT_CANCELED, or 1
