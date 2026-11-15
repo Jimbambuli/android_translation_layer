@@ -249,34 +249,106 @@ public final class Display {
 		return new Display.Mode();
 	}
 
-	public static final class Mode {
+	public static final class Mode implements android.os.Parcelable {
+
+		/* AOSP keeps these as fields; ATL's own mode reads the window live, a mode un-parceled from AOSP's format is a snapshot */
+		private boolean mFixed;
+		private int mModeId;
+		private int mParentModeId = -1; // AOSP INVALID_MODE_ID
+		private int mFlags;
+		private int mWidth;
+		private int mHeight;
+		private float mPeakRefreshRate;
+		private float mVsyncRate;
+		private float[] mAlternativeRefreshRates = new float[0];
+		private int[] mSupportedHdrTypes = new int[0];
+
+		Mode() {}
+
+		private Mode(int modeId, int parentModeId, int flags, int width, int height, float refreshRate, float vsyncRate,
+		             float[] alternativeRefreshRates, int[] supportedHdrTypes) {
+			mFixed = true;
+			mModeId = modeId;
+			mParentModeId = parentModeId;
+			mFlags = flags;
+			mWidth = width;
+			mHeight = height;
+			mPeakRefreshRate = refreshRate;
+			mVsyncRate = vsyncRate;
+			mAlternativeRefreshRates = java.util.Arrays.copyOf(alternativeRefreshRates, alternativeRefreshRates.length);
+			java.util.Arrays.sort(mAlternativeRefreshRates);
+			mSupportedHdrTypes = java.util.Arrays.copyOf(supportedHdrTypes, supportedHdrTypes.length);
+			java.util.Arrays.sort(mSupportedHdrTypes);
+		}
+
+		private Mode(android.os.Parcel in) {
+			this(in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readFloat(), in.readFloat(),
+			     in.createFloatArray(), in.createIntArray());
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		/* AOSP Display.Mode.writeToParcel() */
+		@Override
+		public void writeToParcel(android.os.Parcel out, int parcelableFlags) {
+			out.writeInt(getModeId());
+			out.writeInt(mParentModeId);
+			out.writeInt(mFlags);
+			out.writeInt(getPhysicalWidth());
+			out.writeInt(getPhysicalHeight());
+			out.writeFloat(getRefreshRate());
+			out.writeFloat(mFixed ? mVsyncRate : getRefreshRate());
+			out.writeFloatArray(getAlternativeRefreshRates());
+			out.writeIntArray(getSupportedHdrTypes());
+		}
+
+		public static final android.os.Parcelable.Creator<Mode> CREATOR = new android.os.Parcelable.Creator<Mode>() {
+			@Override
+			public Mode createFromParcel(android.os.Parcel in) {
+				return new Mode(in);
+			}
+
+			@Override
+			public Mode[] newArray(int size) {
+				return new Mode[size];
+			}
+		};
 
 		/* AOSP Display.Mode.getModeId(); ATL has a single valid mode (AOSP INVALID_MODE_ID is -1) */
 		public int getModeId() {
+			if (mFixed) return mModeId;
 			return 1;
 		}
 
 		/* AOSP Display.Mode.getRefreshRate(); the same rate Display.getRefreshRate() reports */
 		public float getRefreshRate() {
+			if (mFixed) return mPeakRefreshRate;
 			return 60;
 		}
 
 		public int getPhysicalWidth() {
+			if (mFixed) return mWidth;
 			return window_width;
 		}
 
 		public int getPhysicalHeight() {
+			if (mFixed) return mHeight;
 			return window_height;
 		}
 
 		/* AOSP Display.Mode.getAlternativeRefreshRates(): the other rates of the same resolution; ATL has one mode */
 		public float[] getAlternativeRefreshRates() {
+			if (mFixed) return java.util.Arrays.copyOf(mAlternativeRefreshRates, mAlternativeRefreshRates.length);
 			return new float[0];
 		}
 
 		/* AOSP 16 Display.Mode.getSupportedHdrTypes(): a copy of mSupportedHdrTypes; ATL's display has no
 		 * HDR (getHdrCapabilities() is null, isHdr() false), so the mode supports none */
 		public int[] getSupportedHdrTypes() {
+			if (mFixed) return java.util.Arrays.copyOf(mSupportedHdrTypes, mSupportedHdrTypes.length);
 			return new int[0];
 		}
 	}
