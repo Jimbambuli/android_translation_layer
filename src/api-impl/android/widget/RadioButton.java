@@ -13,6 +13,14 @@ public class RadioButton extends CompoundButton {
 		super(context, attributeSet);
 	}
 
+	public RadioButton(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+	}
+
+	public RadioButton(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	@Override
 	protected native long native_constructor(Context context, AttributeSet attrs);
 

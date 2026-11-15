@@ -15,8 +15,16 @@ public class ScrollView extends FrameLayout {
 	private boolean mFillViewport;
 
 	public ScrollView(Context context, AttributeSet attrs) {
-		super(context, attrs);
-		final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ScrollView, R.attr.scrollViewStyle, 0);
+		this(context, attrs, R.attr.scrollViewStyle);
+	}
+
+	public ScrollView(Context context, AttributeSet attrs, int defStyleAttr) {
+		this(context, attrs, defStyleAttr, 0);
+	}
+
+	public ScrollView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+		final TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.ScrollView, defStyleAttr, defStyleRes);
 		setFillViewport(a.getBoolean(R.styleable.ScrollView_fillViewport, false));
 		a.recycle();
 	}
