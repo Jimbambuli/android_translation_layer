@@ -79,7 +79,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	public WebView(Context context, AttributeSet attrs) {
-		this(context, attrs, 0);
+		this(context, attrs, com.android.internal.R.attr.webViewStyle);
 	}
 
 	/* AOSP WebView(Context, AttributeSet, int, boolean) (deprecated): the provider's init(privateBrowsing);
@@ -96,7 +96,11 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
+		this(context, attrs, defStyleAttr, 0);
+	}
+
+	public WebView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
 		providerInitialized = true;
 		// AOSP WebView constructor: a WebView allows CookieSyncManager.getInstance()
 		CookieSyncManager.setGetInstanceIsAllowed();
