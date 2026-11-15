@@ -16,6 +16,7 @@
 
 package android.content.pm;
 
+import android.content.Context;
 import android.annotation.UnsupportedAppUsage;
 import android.content.pm.PackageManager.NameNotFoundException;
 // import android.content.res.Resources;
@@ -751,4 +752,20 @@ public class ApplicationInfo extends PackageItemInfo {
 	}
 
 	public String[] splitPublicSourceDirs = new String[0];
+
+	/* AOSP ApplicationInfo.getCategoryTitle(): the localized name of the category, null for an unknown one */
+	public static CharSequence getCategoryTitle(Context context, int category) {
+		switch (category) {
+		case CATEGORY_GAME: return context.getText(com.android.internal.R.string.app_category_game);
+		case CATEGORY_AUDIO: return context.getText(com.android.internal.R.string.app_category_audio);
+		case CATEGORY_VIDEO: return context.getText(com.android.internal.R.string.app_category_video);
+		case CATEGORY_IMAGE: return context.getText(com.android.internal.R.string.app_category_image);
+		case CATEGORY_SOCIAL: return context.getText(com.android.internal.R.string.app_category_social);
+		case CATEGORY_NEWS: return context.getText(com.android.internal.R.string.app_category_news);
+		case CATEGORY_MAPS: return context.getText(com.android.internal.R.string.app_category_maps);
+		case CATEGORY_PRODUCTIVITY: return context.getText(com.android.internal.R.string.app_category_productivity);
+		case CATEGORY_ACCESSIBILITY: return context.getText(com.android.internal.R.string.app_category_accessibility);
+		default: return null;
+		}
+	}
 }
