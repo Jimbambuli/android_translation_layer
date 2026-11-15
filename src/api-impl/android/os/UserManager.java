@@ -55,6 +55,7 @@ public class UserManager {
 	public boolean isUserForeground() { return true; }
 	public boolean hasUserRestriction(String restrictionKey) { return false; }
 	public Bundle getUserRestrictions() { return new Bundle(); }
+	public Bundle getUserRestrictions(UserHandle userHandle) { return getUserRestrictions(); }
 	public String getUserName() { return "Owner"; }
 	public int getUserCount() { return 1; }
 	public List<UserHandle> getUserProfiles() {
