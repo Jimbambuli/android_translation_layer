@@ -301,6 +301,24 @@ public class RemoteViews implements Parcelable, Cloneable {
 		setCharSequence(viewId, "setText", text);
 	}
 
+	/* AOSP setTextViewCompoundDrawables(): the drawables are resource ids (0 = none), set at apply time with intrinsic bounds */
+	public void setTextViewCompoundDrawables(int viewId, int left, int top, int right, int bottom) {
+		addAction(new TextViewDrawableAction(viewId, false, left, top, right, bottom));
+	}
+
+	public void setTextViewCompoundDrawablesRelative(int viewId, int start, int top, int end, int bottom) {
+		addAction(new TextViewDrawableAction(viewId, true, start, top, end, bottom));
+	}
+
+	/* AOSP showNext()/showPrevious(): ViewContentNavigation, calls showNext()/showPrevious() of the view (ViewAnimator) */
+	public void showNext(int viewId) {
+		addAction(new ViewContentNavigation(viewId, true));
+	}
+
+	public void showPrevious(int viewId) {
+		addAction(new ViewContentNavigation(viewId, false));
+	}
+
 	public void setTextViewTextSize(int viewId, int units, float size) {
 		addAction(new TextViewSizeAction(viewId, units, size));
 	}
@@ -637,6 +655,14 @@ public class RemoteViews implements Parcelable, Cloneable {
 				return new ComplexUnitDimensionReflectionAction(viewId, p);
 			case TextViewSizeAction.TAG:
 				return new TextViewSizeAction(viewId, p.readInt(), p.readFloat());
+			case TextViewDrawableAction.TAG: {
+				boolean relative = p.readInt() != 0;
+				if (p.readInt() != 0)
+					throw new ActionException("TextViewDrawableAction with icons is not supported");
+				return new TextViewDrawableAction(viewId, relative, p.readInt(), p.readInt(), p.readInt(), p.readInt());
+			}
+			case ViewContentNavigation.TAG:
+				return new ViewContentNavigation(viewId, p.readInt() != 0);
 			case ViewPaddingAction.TAG:
 				return new ViewPaddingAction(viewId, p.readInt(), p.readInt(), p.readInt(), p.readInt());
 			case LayoutParamAction.TAG:
@@ -1010,6 +1036,75 @@ public class RemoteViews implements Parcelable, Cloneable {
 		void write(Parcel dest, int flags) {
 			dest.writeInt(units);
 			dest.writeFloat(size);
+		}
+	}
+
+	/* AOSP TextViewDrawableAction (the variant with resource ids) */
+	private static final class TextViewDrawableAction extends Action {
+		static final int TAG = 11;
+		final boolean isRelative;
+		final int d1, d2, d3, d4;
+
+		TextViewDrawableAction(int viewId, boolean isRelative, int d1, int d2, int d3, int d4) {
+			this.viewId = viewId;
+			this.isRelative = isRelative;
+			this.d1 = d1;
+			this.d2 = d2;
+			this.d3 = d3;
+			this.d4 = d4;
+		}
+
+		void apply(View root, ViewGroup rootParent) {
+			final View target = root.findViewById(viewId);
+			if (!(target instanceof TextView))
+				return;
+			if (isRelative) {
+				((TextView)target).setCompoundDrawablesRelativeWithIntrinsicBounds(d1, d2, d3, d4);
+			} else {
+				((TextView)target).setCompoundDrawablesWithIntrinsicBounds(d1, d2, d3, d4);
+			}
+		}
+
+		int tag() { return TAG; }
+
+		void write(Parcel dest, int flags) {
+			dest.writeInt(isRelative ? 1 : 0);
+			dest.writeInt(0); // useIcons
+			dest.writeInt(d1);
+			dest.writeInt(d2);
+			dest.writeInt(d3);
+			dest.writeInt(d4);
+		}
+	}
+
+	/* AOSP ViewContentNavigation */
+	private static final class ViewContentNavigation extends Action {
+		static final int TAG = 5;
+		final boolean mNext;
+
+		ViewContentNavigation(int viewId, boolean next) {
+			this.viewId = viewId;
+			this.mNext = next;
+		}
+
+		void apply(View root, ViewGroup rootParent) {
+			final View view = root.findViewById(viewId);
+			if (view == null)
+				return;
+			String methodName = mNext ? "showNext" : "showPrevious";
+			try {
+				view.getClass().getMethod(methodName).invoke(view);
+			} catch (NoSuchMethodException e) {
+				throw new ActionException("view: " + view.getClass().getName() + " doesn't have method: " + methodName + "()");
+			} catch (Throwable t) {
+				throw new ActionException(t);
+			}
+		}
+
+		int tag() { return TAG; }
+
+		void write(Parcel dest, int flags) {
+			dest.writeInt(mNext ? 1 : 0);
 		}
 	}
 

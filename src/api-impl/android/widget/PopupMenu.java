@@ -190,6 +190,13 @@ public class PopupMenu {
 		getMenuInflater().inflate(menuRes, getMenu());
 	}
 
+	/* AOSP setForceShowIcon() (MenuPopupHelper): kept; ATL's menu popup shows the icons of its items whatever the setting */
+	private boolean mForceShowIcon;
+
+	public void setForceShowIcon(boolean forceShowIcon) {
+		mForceShowIcon = forceShowIcon;
+	}
+
 	/**
 	* Show the menu popup anchored to the view specified during construction.
 	*

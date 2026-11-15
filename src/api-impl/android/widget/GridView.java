@@ -1761,6 +1761,23 @@ public class GridView extends AbsListView {
 		return mNumColumns;
 	}
 
+	/** AOSP getHorizontalSpacing(), getVerticalSpacing(), getColumnWidth(), getRequestedColumnWidth() */
+	public int getHorizontalSpacing() {
+		return mHorizontalSpacing;
+	}
+
+	public int getVerticalSpacing() {
+		return mVerticalSpacing;
+	}
+
+	public int getColumnWidth() {
+		return mColumnWidth;
+	}
+
+	public int getRequestedColumnWidth() {
+		return mRequestedColumnWidth;
+	}
+
 	/**
 	 * Make sure views are touching the top or bottom edge, as appropriate for
 	 * our gravity

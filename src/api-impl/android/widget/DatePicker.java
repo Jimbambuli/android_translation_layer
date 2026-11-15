@@ -132,4 +132,18 @@ public class DatePicker extends FrameLayout {
 	protected native int nativeGetDay(long widget);
 
 	protected native void nativeUpdateDate(long widget, int year, int month, int dayOfMonth);
+
+	/* AOSP DatePickerCalendarDelegate (the default mode of DatePicker): the spinners and the calendar view are not shown
+	 * separately, setCalendarViewShown()/setSpinnersShown() do nothing and the getters return false */
+	public void setCalendarViewShown(boolean shown) {}
+
+	public boolean getCalendarViewShown() {
+		return false;
+	}
+
+	public void setSpinnersShown(boolean shown) {}
+
+	public boolean getSpinnersShown() {
+		return false;
+	}
 }
