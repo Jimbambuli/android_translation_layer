@@ -178,6 +178,22 @@ public abstract class CompoundButton extends Button implements Checkable {
 		applyButtonTint();
 	}
 
+	/* AOSP CompoundButton.setButtonDrawable(int): resource 0 clears the drawable; the same resource is not reloaded */
+	private int mButtonResource;
+
+	public void setButtonDrawable(int resId) {
+		final int resource = resId != 0 ? resId : 0;
+		if (resource != 0 && resource == mButtonResource) {
+			return;
+		}
+		mButtonResource = resource;
+		Drawable d = null;
+		if (mButtonResource != 0) {
+			d = getContext().getDrawable(mButtonResource);
+		}
+		setButtonDrawable(d);
+	}
+
 	public Drawable getButtonDrawable() {
 		return button_drawable;
 	}
