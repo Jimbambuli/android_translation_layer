@@ -181,8 +181,6 @@ public final class ConnectionRequest implements Parcelable {
     private final boolean mShouldShowIncomingCallUi;
     private final ParcelFileDescriptor mRttPipeToInCall;
     private final ParcelFileDescriptor mRttPipeFromInCall;
-    // Cached return value of getRttTextStream -- we don't want to wrap it more than once.
-    private Connection.RttTextStream mRttTextStream;
     private List<Uri> mParticipants;
     private final boolean mIsAdhocConference;
 
@@ -381,27 +379,8 @@ public final class ConnectionRequest implements Parcelable {
         return mRttPipeFromInCall;
     }
 
-    /**
-     * Gets the {@link android.telecom.Connection.RttTextStream} object that should be used to
-     * send and receive RTT text to/from the in-call app.
-     * @return An instance of {@link android.telecom.Connection.RttTextStream}, or {@code null}
-     * if this connection request is not requesting an RTT session upon connection establishment.
-     */
-    public Connection.RttTextStream getRttTextStream() {
-        if (isRequestingRtt()) {
-            if (mRttTextStream == null) {
-                mRttTextStream = new Connection.RttTextStream(mRttPipeToInCall, mRttPipeFromInCall);
-            }
-            return mRttTextStream;
-        } else {
-            return null;
-        }
-    }
+    // getRttTextStream() (Connection.RttTextStream) is not part of ATL
 
-    /**
-     * Convenience method for determining whether the ConnectionRequest is requesting an RTT session
-     * @return {@code true} if RTT is requested, {@code false} otherwise.
-     */
     public boolean isRequestingRtt() {
         return mRttPipeFromInCall != null && mRttPipeToInCall != null;
     }
@@ -411,7 +390,7 @@ public final class ConnectionRequest implements Parcelable {
         return String.format("ConnectionRequest %s %s isAdhocConf: %s",
                 mAddress == null
                         ? Uri.EMPTY
-                        : Connection.toLogSafePhoneNumber(mAddress.toString()),
+                        : toLogSafePhoneNumber(mAddress.toString()),
                 bundleToString(mExtras),
                 isAdhocConferenceCall() ? "Y" : "N");
     }
@@ -472,5 +451,23 @@ public final class ConnectionRequest implements Parcelable {
         destination.writeParcelable(mRttPipeToInCall, 0);
         destination.writeList(mParticipants);
         destination.writeInt(mIsAdhocConference ? 1 : 0);
+    }
+
+    /* android.telecom.Connection.toLogSafePhoneNumber(): digits replaced by 'x' ('-', '@' and '.' kept), "" for null.
+     * (Telecom sources are not in the local AOSP copy; PII debug logging is off.) */
+    private static String toLogSafePhoneNumber(String number) {
+        if (number == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < number.length(); i++) {
+            char c = number.charAt(i);
+            if (c == '-' || c == '@' || c == '.') {
+                builder.append(c);
+            } else {
+                builder.append('x');
+            }
+        }
+        return builder.toString();
     }
 }

@@ -16,4 +16,8 @@ public class TelecomManager {
 	public void addNewIncomingCall(PhoneAccountHandle phoneAccount, android.os.Bundle extras) {}
 
 	public void placeCall(android.net.Uri address, android.os.Bundle extras) {}
+
+	/* public extras keys of android.telecom.TelecomManager (values as in the SDK documentation) */
+	public static final String EXTRA_INCOMING_CALL_ADDRESS = "android.telecom.extra.INCOMING_CALL_ADDRESS";
+	public static final String EXTRA_UNKNOWN_CALL_HANDLE = "android.telecom.extra.UNKNOWN_CALL_HANDLE";
 }
