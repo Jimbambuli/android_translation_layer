@@ -744,7 +744,12 @@ public abstract class ColorSpace {
 		 *     <tr><td>Range</td><td colspan="4">\([0..1]\)</td></tr>
 		 * </table>
 		 */
-		BT2020_PQ
+		BT2020_PQ,
+		/**
+		 * <p>{@link ColorSpace.Lab Lab} color space OkLab standardized as
+		 * OkLab</p>
+		 */
+		OK_LAB
 		// Update the initialization block next to #get(Named) when adding new values
 	}
 
@@ -1691,6 +1696,9 @@ public abstract class ColorSpace {
 		    BT2020_PQ_TRANSFER_PARAMETERS,
 		    Named.BT2020_PQ.ordinal());
 		sDataToColorSpaces.put(DataSpace.DATASPACE_BT2020_PQ, Named.BT2020_PQ.ordinal());
+		sNamedColorSpaces[Named.OK_LAB.ordinal()] = new ColorSpace.OkLab(
+		    "Oklab",
+		    Named.OK_LAB.ordinal());
 	}
 
 	private static double transferHLGOETF(Rgb.TransferParameters params, double x) {
@@ -2070,6 +2078,81 @@ public abstract class ColorSpace {
 			return x < -2.0f ? -2.0f : x > 2.0f ? 2.0f
 			                                    : x;
 		}
+	}
+
+	/**
+	 * Implementation of the Oklab color space. Oklab uses a D65 white point.
+	 */
+	@AnyThread
+	private static final class OkLab extends ColorSpace {
+		private OkLab(@NonNull String name, @IntRange(from = MIN_ID, to = MAX_ID) int id) {
+			super(name, Model.LAB, id);
+		}
+
+		@Override
+		public boolean isWideGamut() {
+			return true;
+		}
+
+		@Override
+		public float getMinValue(@IntRange(from = 0, to = 3) int component) {
+			return component == 0 ? 0.0f : -0.5f;
+		}
+
+		@Override
+		public float getMaxValue(@IntRange(from = 0, to = 3) int component) {
+			return component == 0 ? 1.0f : 0.5f;
+		}
+
+		@Override
+		public float[] toXyz(@NonNull @Size(min = 3) float[] v) {
+			v[0] = clamp(v[0], 0.0f, 1.0f);
+			v[1] = clamp(v[1], -0.5f, 0.5f);
+			v[2] = clamp(v[2], -0.5f, 0.5f);
+
+			mul3x3Float3(INVERSE_M2, v);
+			v[0] = v[0] * v[0] * v[0];
+			v[1] = v[1] * v[1] * v[1];
+			v[2] = v[2] * v[2] * v[2];
+
+			mul3x3Float3(INVERSE_M1, v);
+
+			return v;
+		}
+
+		@Override
+		public float[] fromXyz(@NonNull @Size(min = 3) float[] v) {
+			mul3x3Float3(M1, v);
+
+			v[0] = (float)Math.cbrt(v[0]);
+			v[1] = (float)Math.cbrt(v[1]);
+			v[2] = (float)Math.cbrt(v[2]);
+
+			mul3x3Float3(M2, v);
+			return v;
+		}
+
+		private static float clamp(float x, float min, float max) {
+			return x < min ? min : x > max ? max : x;
+		}
+
+		private static final float[] M1TMP = {
+		    0.8189330101f, 0.0329845436f, 0.0482003018f,
+		    0.3618667424f, 0.9293118715f, 0.2643662691f,
+		    -0.1288597137f, 0.0361456387f, 0.6338517070f};
+
+		private static final float[] M1 = mul3x3(
+		    M1TMP,
+		    chromaticAdaptation(Adaptation.BRADFORD, ILLUMINANT_D50, ILLUMINANT_D65));
+
+		private static final float[] M2 = {
+		    0.2104542553f, 1.9779984951f, 0.0259040371f,
+		    0.7936177850f, -2.4285922050f, 0.7827717662f,
+		    -0.0040720468f, 0.4505937099f, -0.8086757660f};
+
+		private static final float[] INVERSE_M1 = inverse3x3(M1);
+
+		private static final float[] INVERSE_M2 = inverse3x3(M2);
 	}
 
 	/**
