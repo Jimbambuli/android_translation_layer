@@ -20,6 +20,16 @@ public class GskCanvas extends DisplayListCanvas {
 	private BitSet layer_levels = new BitSet();
 	private int layers = 0;
 	private boolean compositing = false;
+	/* the snapshot is drawn into a bitmap (android.graphics.Canvas): it starts transparent, like a layer */
+	public boolean offscreen = false;
+	private static Boolean can_composite;
+
+	/* GTK >= 4.22: Porter-Duff modes are drawn with GSK composite nodes */
+	public static boolean canComposite() {
+		if (can_composite == null)
+			can_composite = native_canComposite();
+		return can_composite;
+	}
 
 	private static Paint default_paint = new Paint();
 
@@ -112,12 +122,12 @@ public class GskCanvas extends DisplayListCanvas {
 
 	/* AOSP Paint.setXfermode(): the Porter-Duff mode combines the drawing with what the layer holds, and like
 	 * Skia only where the drawing covers (for a bitmap its destination rectangle). GSK composite node: mask =
-	 * the coverage, drawn opaque, child = the drawing. Only inside saveLayer(); outside a layer the GSK
+	 * the coverage, drawn opaque, child = the drawing. Only inside saveLayer() or a bitmap; elsewhere the GSK
 	 * background is the whole window, not the surface of the view, and the drawing stays SRC_OVER as before.
 	 * The separable blend modes (MULTIPLY, SCREEN, ...) stay SRC_OVER as well. */
 	private boolean drawComposited(Paint paint, Drawing coverage, Drawing drawing) {
 		int op;
-		if (compositing || layers == 0 || (op = porterDuffOf(paint)) < 0 || !native_pushComposite(snapshot, op))
+		if (compositing || (layers == 0 && !offscreen) || (op = porterDuffOf(paint)) < 0 || !native_pushComposite(snapshot, op))
 			return false;
 		Paint coverage_paint = new Paint(paint);
 		coverage_paint.setShader(null);
@@ -454,6 +464,7 @@ public class GskCanvas extends DisplayListCanvas {
 
 	protected native void native_pushOpacity(long snapshot, float opacity);
 	protected native boolean native_pushIsolation(long snapshot);
+	private static native boolean native_canComposite();
 	protected native boolean native_pushComposite(long snapshot, int op);
 	protected native void native_drawRenderNode(long snapshot, long render_node);
 }

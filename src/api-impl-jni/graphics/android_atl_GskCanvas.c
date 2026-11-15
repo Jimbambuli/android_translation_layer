@@ -332,6 +332,11 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1pushOpacity(JNIEnv *en
 	gtk_snapshot_push_opacity(snapshot, opacity);
 }
 
+JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1canComposite(JNIEnv *env, jclass this_class)
+{
+	return GTK_CHECK_VERSION(4, 22, 0) ? JNI_TRUE : JNI_FALSE;
+}
+
 /* AOSP saveLayer() draws into a transparent offscreen; GSK isolates the group from the background */
 JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1pushIsolation(JNIEnv *env, jclass this_class, jlong snapshot_ptr)
 {

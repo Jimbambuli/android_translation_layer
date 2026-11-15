@@ -21,12 +21,14 @@ public class Canvas {
 	public Canvas() {
 		if (!(this instanceof GskCanvas)) {
 			gsk_canvas = new GskCanvas(0);
+			gsk_canvas.offscreen = true;
 		}
 	}
 
 	public Canvas(Bitmap bmp) {
 		this.bitmap = bmp;
 		gsk_canvas = new GskCanvas(bmp.getSnapshot());
+		gsk_canvas.offscreen = true;
 		density = bmp.getDensity();
 	}
 
@@ -99,7 +101,8 @@ public class Canvas {
 	 */
 	public void drawRect(float left, float top, float right, float bottom, Paint paint) {
 		synchronized (bitmap) {
-			if (paint != null && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
+			/* without GSK composite nodes (GTK < 4.22) CLEAR erases the whole bitmap */
+			if (!GskCanvas.canComposite() && paint != null && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
 				int oldSaveCount = gsk_canvas.getSaveCount();
 				gsk_canvas.restoreToCount(1);
 				bitmap.eraseColor(0);
@@ -620,7 +623,7 @@ public class Canvas {
 				} else {
 					drawBitmap(shader.bitmap, 0, 0, paint);
 				}
-			} else if (paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
+			} else if (!GskCanvas.canComposite() && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
 				int oldSaveCount = gsk_canvas.getSaveCount();
 				gsk_canvas.restoreToCount(1);
 				bitmap.eraseColor(0);
@@ -731,16 +734,23 @@ public class Canvas {
 	public static final int CLIP_TO_LAYER_SAVE_FLAG = 0x10;
 	public static final int ALL_SAVE_FLAG = 0x1F;
 
+	/* AOSP: a layer of its own (GskCanvas.saveLayer()), also when drawing into a bitmap */
 	public int saveLayer(RectF bounds, Paint paint, int flags) {
-		return save();
+		synchronized (bitmap) {
+			gsk_canvas.snapshot = bitmap.getSnapshot();
+			return gsk_canvas.saveLayer(bounds, paint, flags);
+		}
 	}
 
 	public int saveLayer(RectF bounds, Paint paint) {
-		return save();
+		return saveLayer(bounds, paint, ALL_SAVE_FLAG);
 	}
 
 	public int saveLayer(float left, float top, float right, float bottom, Paint paint) {
-		return save();
+		synchronized (bitmap) {
+			gsk_canvas.snapshot = bitmap.getSnapshot();
+			return gsk_canvas.saveLayer(left, top, right, bottom, paint);
+		}
 	}
 
 	public int saveLayer(float left, float top, float right, float bottom, Paint paint, int flags) {

@@ -185,6 +185,14 @@ JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1pushIsolation
 
 /*
  * Class:     android_atl_GskCanvas
+ * Method:    native_canComposite
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_atl_GskCanvas_native_1canComposite
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_atl_GskCanvas
  * Method:    native_pushComposite
  * Signature: (JI)Z
  */
