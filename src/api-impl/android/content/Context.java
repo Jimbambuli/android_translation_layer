@@ -115,6 +115,7 @@ public abstract class Context {
 	public static final String APP_OPS_SERVICE = "appops";
 	public static final String USER_SERVICE = "user";
 	public static final String CROSS_PROFILE_APPS_SERVICE = "crossprofileapps";
+	public static final String LAUNCHER_APPS_SERVICE = "launcherapps";
 	public static final String CAPTIONING_SERVICE = "captioning";
 	public static final String STATUS_BAR_SERVICE = "statusbar";
 	public static final String CAMERA_SERVICE = "camera";
@@ -1015,6 +1016,293 @@ public abstract class Context {
 	/* AOSP Context.bindService() flags */
 	public static final int BIND_AUTO_CREATE = 0x0001;
 	public static final int BIND_INCLUDE_CAPABILITIES = 0x000001000;
+
+	/* AOSP Context.BindServiceFlags : the bind flags as a 64 bit value */
+	public final static class BindServiceFlags {
+		private final long mValue;
+
+		private BindServiceFlags(long value) {
+			mValue = value;
+		}
+
+		public long getValue() {
+			return mValue;
+		}
+
+		public static BindServiceFlags of(long value) {
+			if ((value & Integer.toUnsignedLong(0x80000000)) != 0) {
+				throw new IllegalArgumentException("BIND_EXTERNAL_SERVICE is deprecated. Use BIND_EXTERNAL_SERVICE_LONG instead");
+			}
+			return new BindServiceFlags(value);
+		}
+	}
+
+	/* AOSP Context.UpdateBindingParams: one update (unbind or rebind) of updateServiceBindings() */
+	public static final class UpdateBindingParams {
+		private ServiceConnection mConnection;
+		private boolean mUnbind;
+		private BindServiceFlags mFlags;
+
+		private UpdateBindingParams(Builder builder) {
+			mConnection = builder.mConnection;
+			mUnbind = builder.mUnbind;
+			mFlags = builder.mFlags;
+		}
+
+		public void setUnbind() {
+			mUnbind = true;
+			mFlags = null;
+		}
+
+		public void setRebind(BindServiceFlags flags) {
+			mUnbind = false;
+			mFlags = java.util.Objects.requireNonNull(flags);
+		}
+
+		public ServiceConnection getConnection() {
+			return mConnection;
+		}
+
+		public boolean isUnbind() {
+			return mUnbind;
+		}
+
+		public boolean isRebind() {
+			return !mUnbind;
+		}
+
+		public BindServiceFlags getFlags() {
+			return mFlags;
+		}
+
+		public static final class Builder {
+			private final ServiceConnection mConnection;
+			private boolean mUnbind;
+			private BindServiceFlags mFlags;
+
+			public Builder(ServiceConnection connection) {
+				mConnection = java.util.Objects.requireNonNull(connection);
+				mUnbind = true;
+				mFlags = null;
+			}
+
+			public Builder(ServiceConnection connection, BindServiceFlags flags) {
+				mConnection = java.util.Objects.requireNonNull(connection);
+				mUnbind = false;
+				mFlags = java.util.Objects.requireNonNull(flags);
+			}
+
+			public UpdateBindingParams build() {
+				return new UpdateBindingParams(this);
+			}
+		}
+	}
+
+	/* AOSP Context.getUpdateableFlags(): BIND_UPDATEABLE_FLAGS = BIND_NOT_FOREGROUND | BIND_ALLOW_OOM_MANAGEMENT
+	 * | BIND_WAIVE_PRIORITY | BIND_IMPORTANT | BIND_ADJUST_WITH_ACTIVITY | BIND_NOT_PERCEPTIBLE */
+	public BindServiceFlags getUpdateableFlags() {
+		return BindServiceFlags.of(0x4 | 0x10 | 0x20 | 0x40 | 0x80 | 0x100);
+	}
+
+	/* AOSP ContextImpl.bindService(Intent, ServiceConnection, BindServiceFlags): bindServiceCommon() with the
+	 * flags as long; ATL's int flags carry the bits the process scheduler of a desktop does not use anyway */
+	public boolean bindService(Intent service, ServiceConnection conn, BindServiceFlags flags) {
+		return bindService(service, conn, (int)flags.getValue());
+	}
+
+	public boolean bindService(Intent service, BindServiceFlags flags, java.util.concurrent.Executor executor, ServiceConnection conn) {
+		return bindService(service, (int)flags.getValue(), executor, conn);
+	}
+
+	public boolean bindIsolatedService(Intent service, BindServiceFlags flags, String instanceName, java.util.concurrent.Executor executor, ServiceConnection conn) {
+		return bindIsolatedService(service, (int)flags.getValue(), instanceName, executor, conn);
+	}
+
+	public boolean bindServiceAsUser(Intent service, ServiceConnection conn, BindServiceFlags flags, UserHandle user) {
+		return bindServiceAsUser(service, conn, (int)flags.getValue(), user);
+	}
+
+	/* AOSP ContextImpl.updateServiceBindings(): unbinds or rebinds the given connections. A rebind changes
+	 * the scheduling flags of the binding (BIND_NOT_FOREGROUND etc.), which ATL does not have */
+	public void updateServiceBindings(java.util.List<UpdateBindingParams> params) {
+		for (UpdateBindingParams p : params) {
+			if (p.isUnbind())
+				unbindService(p.getConnection());
+		}
+	}
+
+	public void rebindService(ServiceConnection conn, BindServiceFlags flags) {
+		java.util.Objects.requireNonNull(conn);
+		java.util.Objects.requireNonNull(flags);
+	}
+
+	/* AOSP ContextImpl.checkUriPermission(Uri, String, String, int, int, int) */
+	public int checkUriPermission(Uri uri, String readPermission, String writePermission, int pid, int uid, int modeFlags) {
+		if ((modeFlags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
+			if (readPermission == null || checkPermission(readPermission, pid, uid) == PackageManager.PERMISSION_GRANTED)
+				return PackageManager.PERMISSION_GRANTED;
+		}
+		if ((modeFlags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0) {
+			if (writePermission == null || checkPermission(writePermission, pid, uid) == PackageManager.PERMISSION_GRANTED)
+				return PackageManager.PERMISSION_GRANTED;
+		}
+		return uri != null ? checkUriPermission(uri, pid, uid, modeFlags) : PackageManager.PERMISSION_DENIED;
+	}
+
+	/* AOSP ContextImpl.checkCallingUriPermissions(): outside of a binder call there is no calling process, all denied */
+	public int[] checkCallingUriPermissions(java.util.List<Uri> uris, int modeFlags) {
+		int[] res = new int[uris.size()];
+		java.util.Arrays.fill(res, PackageManager.PERMISSION_DENIED);
+		return res;
+	}
+
+	/* AOSP ContextImpl.checkCallingOrSelfUriPermissions() */
+	public int[] checkCallingOrSelfUriPermissions(java.util.List<Uri> uris, int modeFlags) {
+		return checkUriPermissions(uris, android.os.Process.myPid(), android.os.Process.myUid(), modeFlags);
+	}
+
+	/* AOSP ContextImpl.checkContentUriPermissionFull(): the ActivityManager's grants of pid/uid, as checkUriPermission() */
+	public int checkContentUriPermissionFull(Uri uri, int pid, int uid, int modeFlags) {
+		return checkUriPermission(uri, pid, uid, modeFlags);
+	}
+
+	/* AOSP ContextImpl.enforce() */
+	private void atl_enforce(String permission, int resultOfCheck, boolean selfToo, int uid, String message) {
+		if (resultOfCheck != PackageManager.PERMISSION_GRANTED) {
+			throw new SecurityException((message != null ? (message + ": ") : "") + (selfToo ? "Neither user " + uid + " nor current process has " : "uid " + uid + " does not have ") + permission + ".");
+		}
+	}
+
+	public void enforcePermission(String permission, int pid, int uid, String message) {
+		atl_enforce(permission, checkPermission(permission, pid, uid), false, uid, message);
+	}
+
+	public void enforceCallingOrSelfPermission(String permission, String message) {
+		atl_enforce(permission, checkCallingOrSelfPermission(permission), true, android.os.Process.myUid(), message);
+	}
+
+	/* AOSP ContextImpl.uriModeFlagToString() / enforceForUri() */
+	private void atl_enforceForUri(int modeFlags, int resultOfCheck, boolean selfToo, int uid, Uri uri, String message) {
+		if (resultOfCheck != PackageManager.PERMISSION_GRANTED) {
+			StringBuilder builder = new StringBuilder();
+			if ((modeFlags & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0)
+				builder.append("read and ");
+			if ((modeFlags & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0)
+				builder.append("write and ");
+			if ((modeFlags & Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0)
+				builder.append("persistable and ");
+			if ((modeFlags & Intent.FLAG_GRANT_PREFIX_URI_PERMISSION) != 0)
+				builder.append("prefix and ");
+			if (builder.length() <= 5)
+				throw new IllegalArgumentException("Unknown permission mode flags: " + modeFlags);
+			builder.setLength(builder.length() - 5);
+			throw new SecurityException((message != null ? (message + ": ") : "") + (selfToo ? "Neither user " + uid + " nor current process has " : "User " + uid + " does not have ") + builder + " permission on " + uri + ".");
+		}
+	}
+
+	public void enforceUriPermission(Uri uri, int pid, int uid, int modeFlags, String message) {
+		atl_enforceForUri(modeFlags, checkUriPermission(uri, pid, uid, modeFlags), false, uid, uri, message);
+	}
+
+	public void enforceCallingUriPermission(Uri uri, int modeFlags, String message) {
+		atl_enforceForUri(modeFlags, checkCallingUriPermission(uri, modeFlags), false, android.os.Process.myUid(), uri, message);
+	}
+
+	public void enforceCallingOrSelfUriPermission(Uri uri, int modeFlags, String message) {
+		atl_enforceForUri(modeFlags, checkCallingOrSelfUriPermission(uri, modeFlags), true, android.os.Process.myUid(), uri, message);
+	}
+
+	public void enforceUriPermission(Uri uri, String readPermission, String writePermission, int pid, int uid, int modeFlags, String message) {
+		atl_enforceForUri(modeFlags, checkUriPermission(uri, readPermission, writePermission, pid, uid, modeFlags), false, uid, uri, message);
+	}
+
+	/* AOSP ContextImpl.getWallpaperManager() */
+	private android.app.WallpaperManager atl_wallpaperManager() {
+		return android.app.WallpaperManager.getInstance(this);
+	}
+
+	/* AOSP ContextImpl.peekWallpaper(): WallpaperManager.peekDrawable(), null when no wallpaper is set (ATL has none) */
+	@Deprecated
+	public Drawable peekWallpaper() {
+		return null;
+	}
+
+	@Deprecated
+	public void setWallpaper(android.graphics.Bitmap bitmap) throws java.io.IOException {
+		atl_wallpaperManager().setBitmap(bitmap);
+	}
+
+	@Deprecated
+	public void setWallpaper(java.io.InputStream data) throws java.io.IOException {
+		atl_wallpaperManager().setStream(data);
+	}
+
+	@Deprecated
+	public void clearWallpaper() throws java.io.IOException {
+		atl_wallpaperManager().clear();
+	}
+
+	/* AOSP ContextImpl.moveDatabaseFrom() -> moveFiles(): the database file and its -journal/-wal/-shm companions
+	 * (all files of the databases directory that start with the name) move to this context's databases directory */
+	public boolean moveDatabaseFrom(Context sourceContext, String name) {
+		synchronized (Context.class) {
+			File source = sourceContext.getDatabasePath(name);
+			File target = getDatabasePath(name);
+			File sourceDir = source.getParentFile();
+			File targetDir = target.getParentFile();
+			File[] files = sourceDir.listFiles((dir, n) -> n.startsWith(source.getName()));
+			int res = 0;
+			if (files != null) {
+				for (File f : files) {
+					File to = new File(targetDir, f.getName());
+					targetDir.mkdirs();
+					if (f.renameTo(to))
+						res++;
+					else {
+						res = -1;
+						break;
+					}
+				}
+			}
+			return res != -1;
+		}
+	}
+
+	/* AOSP ContextImpl.startInstrumentation(): ActivityManager.startInstrumentation() finds no <instrumentation>
+	 * of the class on a device that has none and returns false */
+	public boolean startInstrumentation(ComponentName className, String profileFile, Bundle arguments) {
+		return false;
+	}
+
+	/* AOSP ContextImpl.startIntentSender(): sends the IntentSender (the activity it stands for is started) */
+	public void startIntentSender(IntentSender intent, Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags) throws IntentSender.SendIntentException {
+		startIntentSender(intent, fillInIntent, flagsMask, flagsValues, extraFlags, null);
+	}
+
+	public void startIntentSender(IntentSender intent, Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags, Bundle options) throws IntentSender.SendIntentException {
+		if (intent == null)
+			throw new IntentSender.SendIntentException("null IntentSender");
+		intent.sendIntent(this, 0, fillInIntent, null, null);
+	}
+
+	/* AOSP ContextImpl.sendBroadcastWithMultiplePermissions(): the permissions restrict the receivers, ATL has no other app */
+	public void sendBroadcastWithMultiplePermissions(Intent intent, String[] receiverPermissions) {
+		sendBroadcast(intent);
+	}
+
+	/* AOSP ContextImpl.sendOrderedBroadcastAsUser(): ATL has the one user only */
+	public void sendOrderedBroadcastAsUser(Intent intent, UserHandle user, String receiverPermission, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+		sendOrderedBroadcast(intent, receiverPermission, resultReceiver, scheduler, initialCode, initialData, initialExtras);
+	}
+
+	public void sendStickyOrderedBroadcastAsUser(Intent intent, UserHandle user, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+		sendStickyOrderedBroadcast(intent, resultReceiver, scheduler, initialCode, initialData, initialExtras);
+	}
+
+	/* AOSP Context.getParams(): null unless the context was created by createContext(ContextParams) */
+	public ContextParams getParams() {
+		return null;
+	}
 
 	public abstract Context createPackageContext(String packageName, int flags);
 

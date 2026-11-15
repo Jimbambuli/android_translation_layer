@@ -589,6 +589,25 @@ public class ContentResolver {
 	public static void cancelSync(Account account, String authority) {
 	}
 
+	/* AOSP ContentService.cancelRequest(): a periodic request is removed, a one-off request cancels the sync of the
+	 * account/authority */
+	public static void cancelSync(SyncRequest request) {
+		if (request == null)
+			throw new IllegalArgumentException("request cannot be null");
+		if (request.isPeriodic())
+			removePeriodicSync(request.getAccount(), request.getProvider(), request.getBundle());
+		else
+			cancelSync(request.getAccount(), request.getProvider());
+	}
+
+	/* AOSP ContentService.sync(SyncRequest): a periodic request is added as periodic sync, others are requested once */
+	public static void requestSync(SyncRequest request) {
+		if (request.isPeriodic())
+			addPeriodicSync(request.getAccount(), request.getProvider(), request.getBundle(), request.getSyncRunTime());
+		else
+			requestSync(request.getAccount(), request.getProvider(), request.getBundle());
+	}
+
 	public void cancelSync(Uri uri) {
 		cancelSync(null /* all accounts */, uri != null ? uri.getAuthority() : null);
 	}

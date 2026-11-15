@@ -455,4 +455,77 @@ public class Time {
 		isDst = c.getTimeZone().inDaylightTime(c.getTime()) ? 1 : 0;
 		gmtoff = (c.get(Calendar.ZONE_OFFSET) + c.get(Calendar.DST_OFFSET)) / 1000;
 	}
+
+	/* AOSP Time.format(String) -> TimeFormatter.format(): strftime with the locale's names; the field values are
+	 * those of this Time (normalize() is not called) */
+	public String format(String format) {
+		java.util.Locale locale = java.util.Locale.getDefault();
+		java.text.DateFormatSymbols sym = java.text.DateFormatSymbols.getInstance(locale);
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < format.length(); i++) {
+			char c = format.charAt(i);
+			if (c != '%' || i + 1 >= format.length()) {
+				sb.append(c);
+				continue;
+			}
+			char f = format.charAt(++i);
+			if ((f == 'E' || f == 'O' || f == '_' || f == '-' || f == '0' || f == '^' || f == '#') && i + 1 < format.length()) {
+				if (f == 'E' || f == 'O')
+					f = format.charAt(++i);
+			}
+			sb.append(formatField(f, sym));
+		}
+		return sb.toString();
+	}
+
+	private String formatField(char f, java.text.DateFormatSymbols sym) {
+		int h12 = hour % 12 == 0 ? 12 : hour % 12;
+		java.util.Locale us = java.util.Locale.US;
+		switch (f) {
+		case 'A': return sym.getWeekdays()[weekDay + 1];
+		case 'a': return sym.getShortWeekdays()[weekDay + 1];
+		case 'B': return sym.getMonths()[month];
+		case 'b': case 'h': return sym.getShortMonths()[month];
+		case 'C': return String.format(us, "%02d", year / 100);
+		case 'c': return format("%a %b %e %H:%M:%S %Y");
+		case 'D': return format("%m/%d/%y");
+		case 'd': return String.format(us, "%02d", monthDay);
+		case 'e': return String.format(us, "%2d", monthDay);
+		case 'F': return format("%Y-%m-%d");
+		case 'H': return String.format(us, "%02d", hour);
+		case 'I': return String.format(us, "%02d", h12);
+		case 'j': return String.format(us, "%03d", yearDay + 1);
+		case 'k': return String.format(us, "%2d", hour);
+		case 'l': return String.format(us, "%2d", h12);
+		case 'M': return String.format(us, "%02d", minute);
+		case 'm': return String.format(us, "%02d", month + 1);
+		case 'n': return "\n";
+		case 'p': return hour >= 12 ? sym.getAmPmStrings()[1] : sym.getAmPmStrings()[0];
+		case 'P': return (hour >= 12 ? sym.getAmPmStrings()[1] : sym.getAmPmStrings()[0]).toLowerCase(java.util.Locale.getDefault());
+		case 'R': return format("%H:%M");
+		case 'r': return format("%I:%M:%S %p");
+		case 'S': return String.format(us, "%02d", second);
+		case 's': return Long.toString(toMillis(false) / 1000);
+		case 'T': case 'X': return format("%H:%M:%S");
+		case 't': return "\t";
+		case 'u': return Integer.toString(weekDay == 0 ? 7 : weekDay);
+		case 'w': return Integer.toString(weekDay);
+		case 'x': return format("%m/%d/%y");
+		case 'U': return String.format(us, "%02d", (yearDay + 7 - weekDay) / 7);
+		case 'W': return String.format(us, "%02d", (yearDay + 7 - (weekDay + 6) % 7) / 7);
+		case 'V': return String.format(us, "%02d", java.time.LocalDate.of(year, month + 1, monthDay).get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR));
+		case 'G': return Integer.toString(java.time.LocalDate.of(year, month + 1, monthDay).get(java.time.temporal.IsoFields.WEEK_BASED_YEAR));
+		case 'g': return String.format(us, "%02d", java.time.LocalDate.of(year, month + 1, monthDay).get(java.time.temporal.IsoFields.WEEK_BASED_YEAR) % 100);
+		case 'y': return String.format(us, "%02d", year % 100);
+		case 'Y': return Integer.toString(year);
+		case 'Z': return isDst > 0 ? java.util.TimeZone.getTimeZone(timezone).getDisplayName(true, java.util.TimeZone.SHORT) : java.util.TimeZone.getTimeZone(timezone).getDisplayName(false, java.util.TimeZone.SHORT);
+		case 'z': {
+			long off = gmtoff / 60;
+			return String.format(us, "%c%02d%02d", off < 0 ? '-' : '+', Math.abs(off) / 60, Math.abs(off) % 60);
+		}
+		case '+': return format("%a %b %e %H:%M:%S %Z %Y");
+		case '%': return "%";
+		default: return "%" + f;
+		}
+	}
 }

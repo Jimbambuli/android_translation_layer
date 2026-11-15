@@ -698,6 +698,11 @@ public class Intent implements Parcelable {
 		}
 	}
 
+	/* AOSP Intent.getIntent(String), deprecated: parseUri(uri, 0) */
+	public static Intent getIntent(String uri) throws java.net.URISyntaxException {
+		return parseUri(uri, 0);
+	}
+
 	public static Intent getIntentOld(String uri) throws java.net.URISyntaxException {
 		return getIntentOld(uri, 0);
 	}
@@ -1446,6 +1451,38 @@ public class Intent implements Parcelable {
 
 	public ArrayList<String> getStringArrayListExtra(String name) {
 		return extras.getStringArrayList(name);
+	}
+
+	public boolean[] getBooleanArrayExtra(String name) {
+		return extras == null ? null : extras.getBooleanArray(name);
+	}
+
+	public short[] getShortArrayExtra(String name) {
+		return extras == null ? null : extras.getShortArray(name);
+	}
+
+	public float[] getFloatArrayExtra(String name) {
+		return extras == null ? null : extras.getFloatArray(name);
+	}
+
+	public CharSequence[] getCharSequenceArrayExtra(String name) {
+		return extras == null ? null : extras.getCharSequenceArray(name);
+	}
+
+	public Intent putCharSequenceArrayListExtra(String name, ArrayList<CharSequence> value) {
+		extras.putCharSequenceArrayList(name, value);
+		return this;
+	}
+
+	/* AOSP Intent.clone() = new Intent(this) */
+	@Override
+	public Object clone() {
+		return new Intent(this);
+	}
+
+	/* AOSP Intent.hasFileDescriptors(): whether the extras hold a file descriptor */
+	public boolean hasFileDescriptors() {
+		return extras != null && extras.hasFileDescriptors();
 	}
 
 	/* AOSP Intent.getCharSequenceArrayListExtra() */

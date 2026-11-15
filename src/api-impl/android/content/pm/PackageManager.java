@@ -1723,6 +1723,63 @@ public class PackageManager {
 		return intent;
 	}
 
+	/* AOSP ApplicationPackageManager.getProperty(String, ComponentName) -> getPropertyAsUser(name, package, className):
+	 * ATL parses only the <property> elements of <application> (PackageParser.parseProperty), so a component's
+	 * property is never found and the lookup ends in NameNotFoundException, as for an undeclared one. */
+	public Property getProperty(String propertyName, ComponentName component) throws NameNotFoundException {
+		Objects.requireNonNull(component);
+		Objects.requireNonNull(propertyName);
+		throw new NameNotFoundException();
+	}
+
+	/* AOSP ApplicationPackageManager.getPackageInfo(VersionedPackage, int) -> getPackageInfoVersioned(): the package's
+	 * info if its version code is the requested one (VERSION_CODE_HIGHEST: any), else NameNotFoundException */
+	public PackageInfo getPackageInfo(VersionedPackage versionedPackage, int flags) throws NameNotFoundException {
+		PackageInfo info = getPackageInfo(versionedPackage.getPackageName(), flags);
+		long wanted = versionedPackage.getLongVersionCode();
+		if (wanted != VERSION_CODE_HIGHEST && info.getLongVersionCode() != wanted)
+			throw new NameNotFoundException(versionedPackage.getPackageName() + " version " + wanted);
+		return info;
+	}
+
+	public PackageInfo getPackageInfo(VersionedPackage versionedPackage, PackageInfoFlags flags) throws NameNotFoundException {
+		return getPackageInfo(versionedPackage, (int)flags.getValue());
+	}
+
+	/* AOSP PackageManager.getArchivedPackage: archived package info of an installed package, else null.
+	 * PackageManagerService builds it from the installed package: signing info and its launcher activities. */
+	public ArchivedPackageInfo getArchivedPackage(String packageName) {
+		Objects.requireNonNull(packageName);
+		PackageInfo info;
+		try {
+			info = getPackageInfo(packageName, GET_SIGNING_CERTIFICATES);
+		} catch (NameNotFoundException e) {
+			return null;
+		}
+		java.util.List<ArchivedActivityInfo> activities = new java.util.ArrayList<>();
+		Intent launch = getLaunchIntentForPackage(packageName);
+		if (launch != null && launch.getComponent() != null) {
+			CharSequence label = info.applicationInfo != null ? info.applicationInfo.loadLabel(this) : packageName;
+			activities.add(new ArchivedActivityInfo(label, launch.getComponent()));
+		}
+		return new ArchivedPackageInfo(packageName, info.signingInfo, activities);
+	}
+
+	/* AOSP ApplicationPackageManager.getLaunchIntentSenderForPackage: PackageManagerService resolves the launcher
+	 * activity and returns an IntentSender (activity PendingIntent) for it; no launcher activity -> IllegalArgumentException */
+	public IntentSender getLaunchIntentSenderForPackage(String packageName) {
+		Intent launch = getLaunchIntentForPackage(packageName);
+		if (launch == null)
+			throw new IllegalArgumentException("No launcher activity found for " + packageName);
+		launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		return android.app.PendingIntent.getActivity(null, 0, launch, android.app.PendingIntent.FLAG_IMMUTABLE).getIntentSender();
+	}
+
+	/* AOSP PackageManager.isAutoRevokeWhitelisted(String) returns false */
+	public boolean isAutoRevokeWhitelisted(String packageName) {
+		return false;
+	}
+
 	/* AOSP ApplicationPackageManager.isAutoRevokeWhitelisted asks the permission manager whether the
 	 * user or installer exempted the app from permission auto-revoke; no exemption is the default. */
 	public boolean isAutoRevokeWhitelisted() {
@@ -3417,6 +3474,20 @@ public class PackageManager {
 	 *
 	 * @see #getResourcesForApplication(ApplicationInfo)
 	 */
+	/* AOSP getResourcesForApplication(ApplicationInfo, Configuration): the app's resources with the override
+	 * configuration (null: the app's own) */
+	public Resources getResourcesForApplication(ApplicationInfo app, android.content.res.Configuration configuration) throws NameNotFoundException {
+		Resources res = getResourcesForApplication(app);
+		if (configuration == null)
+			return res;
+		return new Resources(res.getAssets(), res.getDisplayMetrics(), new android.content.res.Configuration(configuration));
+	}
+
+	/* AOSP getPackageGids(String, int) -> getPackageGids(String, PackageInfoFlags.of(flags)) */
+	public int[] getPackageGids(String packageName, int flags) throws NameNotFoundException {
+		return getPackageGids(packageName, PackageInfoFlags.of(flags));
+	}
+
 	public Resources getResourcesForApplication(String appPackageName) throws NameNotFoundException {
 		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(appPackageName);
 		if (app == null)

@@ -83,7 +83,7 @@ public class IntentFilter implements android.os.Parcelable {
 		} else {
 			dest.writeInt(0);
 		}
-		dest.writeInt(0); // mPriority
+		dest.writeInt(priority); // mPriority
 		dest.writeInt(hasPartialTypes ? 1 : 0);
 		dest.writeInt(hasPartialTypes ? 1 : 0);
 		dest.writeInt(getAutoVerify() ? 1 : 0);
@@ -132,7 +132,7 @@ public class IntentFilter implements android.os.Parcelable {
 			for (int i = 0; i < n; i++)
 				dataPaths.add(new PatternMatcher(source));
 		}
-		source.readInt(); // mPriority
+		priority = source.readInt(); // mPriority
 		hasPartialTypes = source.readInt() > 0;
 		hasPartialTypes |= source.readInt() > 0;
 		setAutoVerify(source.readInt() > 0);
@@ -154,6 +154,27 @@ public class IntentFilter implements android.os.Parcelable {
 	};
 	public IntentFilter(String action) {
 		addAction(action);
+	}
+
+	/* AOSP IntentFilter(String, String): the action and the data type */
+	public IntentFilter(String action, String dataType) throws MalformedMimeTypeException {
+		addAction(action);
+		addDataType(dataType);
+	}
+
+	/* AOSP IntentFilter(IntentFilter): copies the lists of the filter (the fields ATL keeps) */
+	public IntentFilter(IntentFilter o) {
+		actions = new ArrayList<>(o.actions);
+		categories = new java.util.LinkedHashSet<>(o.categories);
+		dataSchemes = new ArrayList<>(o.dataSchemes);
+		dataAuthorities = new ArrayList<>(o.dataAuthorities);
+		if (o.dataPaths != null)
+			dataPaths = new ArrayList<>(o.dataPaths);
+		if (o.dataTypes != null)
+			dataTypes = new ArrayList<>(o.dataTypes);
+		hasPartialTypes = o.hasPartialTypes;
+		autoVerify = o.autoVerify;
+		priority = o.priority;
 	}
 
 	public void addAction(String action) {
@@ -192,7 +213,15 @@ public class IntentFilter implements android.os.Parcelable {
 		return actions.get(index);
 	}
 
-	public void setPriority(int priority) {}
+	private int priority;
+
+	public final void setPriority(int priority) {
+		this.priority = priority;
+	}
+
+	public final int getPriority() {
+		return priority;
+	}
 
 	public void addDataScheme(String dataScheme) {
 		dataSchemes.add(dataScheme);
@@ -475,6 +504,35 @@ public class IntentFilter implements android.os.Parcelable {
 
 	public final Iterator<String> schemesIterator() {
 		return dataSchemes.iterator();
+	}
+
+	public final Iterator<String> categoriesIterator() {
+		return categories.iterator();
+	}
+
+	public final Iterator<String> typesIterator() {
+		return dataTypes != null ? dataTypes.iterator() : null;
+	}
+
+	public final Iterator<PatternMatcher> pathsIterator() {
+		return dataPaths != null ? dataPaths.iterator() : null;
+	}
+
+	/* AOSP IntentFilter.hasDataAuthority(Uri) = matchDataAuthority(data) >= 0: an authority entry of the filter matches */
+	public final boolean hasDataAuthority(Uri data) {
+		for (AuthorityEntry auth : dataAuthorities)
+			if (auth.match(data) >= 0)
+				return true;
+		return false;
+	}
+
+	/* AOSP IntentFilter.create(): a filter with the action and the data type, a malformed type is a RuntimeException */
+	public static IntentFilter create(String action, String dataType) {
+		try {
+			return new IntentFilter(action, dataType);
+		} catch (MalformedMimeTypeException e) {
+			throw new RuntimeException("Bad MIME type", e);
+		}
 	}
 
 	public final Iterator<AuthorityEntry> authoritiesIterator() {
