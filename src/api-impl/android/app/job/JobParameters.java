@@ -104,11 +104,13 @@ public class JobParameters implements Parcelable {
 		JobScheduler.pendingJobs(namespace).remove(jobInfo.getId());
 	}
 
+	/* AOSP JobParameters: null when no content change triggered the job; ATL's scheduler does not
+	 * watch content URIs, so it is always null (an empty array read as "triggered by content") */
 	public Uri[] getTriggeredContentUris() {
-		return new Uri[0];
+		return null;
 	}
 
 	public String[] getTriggeredContentAuthorities() {
-		return new String[0];
+		return null;
 	}
 }
