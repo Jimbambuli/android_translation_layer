@@ -1122,6 +1122,27 @@ public abstract class Context {
 		return null;
 	}
 
+	/* AOSP ContextImpl: WallpaperManager.getDesiredMinimumWidth() asks the wallpaper service, which ATL does not have;
+	 * "if the returned value is <= 0, the caller should use the width of the default display" */
+	@Deprecated
+	public int getWallpaperDesiredMinimumWidth() {
+		return 0;
+	}
+
+	@Deprecated
+	public int getWallpaperDesiredMinimumHeight() {
+		return 0;
+	}
+
+	/* AOSP ContextImpl: PermissionControllerManager.revokeSelfPermissionsOnKill(); nothing is granted by a permission
+	 * controller in ATL ("a permission that is not currently granted is ignored") */
+	public void revokeSelfPermissionsOnKill(java.util.Collection<String> permissions) {
+	}
+
+	public void revokeSelfPermissionOnKill(String permName) {
+		revokeSelfPermissionsOnKill(java.util.Collections.singletonList(permName));
+	}
+
 	public String[] databaseList() {
 		return listOrEmpty(getDatabasesDir());
 	}

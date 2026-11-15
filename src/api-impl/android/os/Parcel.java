@@ -1007,6 +1007,75 @@ public class Parcel {
 		writeSerializable(null);
 	}
 
+	/* Parcel.readException(int, String) of AOSP: the exception for the code of the reply header (the codes of
+	 * Parcel.EX_*), thrown without a throws clause. ATL's own reply format is read by readException(). */
+	public final void readException(int code, String msg) {
+		String remoteStackTrace = null;
+		final int remoteStackPayloadSize = readInt();
+		if (remoteStackPayloadSize > 0) {
+			remoteStackTrace = readString();
+		}
+		Exception e = createException(code, msg);
+		// Attach remote stack trace if available (AOSP ExceptionUtils.appendCause)
+		if (remoteStackTrace != null) {
+			RemoteException cause = new RemoteException("Remote stack trace:\n" + remoteStackTrace);
+			Throwable last = e;
+			while (last.getCause() != null && last.getCause() != last)
+				last = last.getCause();
+			last.initCause(cause);
+		}
+		Parcel.<RuntimeException>sneakyThrow(e);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <E extends Throwable> void sneakyThrow(Throwable e) throws E {
+		throw (E)e;
+	}
+
+	private static final int EX_SECURITY = -1;
+	private static final int EX_BAD_PARCELABLE = -2;
+	private static final int EX_ILLEGAL_ARGUMENT = -3;
+	private static final int EX_NULL_POINTER = -4;
+	private static final int EX_ILLEGAL_STATE = -5;
+	private static final int EX_NETWORK_MAIN_THREAD = -6;
+	private static final int EX_UNSUPPORTED_OPERATION = -7;
+	private static final int EX_SERVICE_SPECIFIC = -8;
+	private static final int EX_PARCELABLE = -9;
+
+	private Exception createException(int code, String msg) {
+		Exception exception = createExceptionOrNull(code, msg);
+		return exception != null ? exception : new RuntimeException("Unknown exception code: " + code + " msg " + msg);
+	}
+
+	/** @hide */
+	public Exception createExceptionOrNull(int code, String msg) {
+		switch (code) {
+		case EX_PARCELABLE:
+			if (readInt() > 0)
+				return (Exception)readParcelable(Parcelable.class.getClassLoader(), java.lang.Exception.class);
+			else
+				return new RuntimeException(msg + " [missing Parcelable]");
+		case EX_SECURITY:
+			return new SecurityException(msg);
+		case EX_BAD_PARCELABLE:
+			return new BadParcelableException(msg);
+		case EX_ILLEGAL_ARGUMENT:
+			return new IllegalArgumentException(msg);
+		case EX_NULL_POINTER:
+			return new NullPointerException(msg);
+		case EX_ILLEGAL_STATE:
+			return new IllegalStateException(msg);
+		case EX_NETWORK_MAIN_THREAD:
+			return new NetworkOnMainThreadException();
+		case EX_UNSUPPORTED_OPERATION:
+			return new UnsupportedOperationException(msg);
+		case EX_SERVICE_SPECIFIC:
+			return new ServiceSpecificException(readInt(), msg);
+		default:
+			return null;
+		}
+	}
+
 	public void readException() {
 		if (pos >= size)
 			return;
