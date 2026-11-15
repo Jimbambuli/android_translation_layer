@@ -609,7 +609,7 @@ public class DevicePolicyManager {
 	public int enableSystemApp(android.content.ComponentName p0, android.content.Intent p1) { return 0; }
 	public void enableSystemApp(android.content.ComponentName p0, String p1) { }
 	public java.util.Set<java.lang.String> getAffiliationIds(android.content.ComponentName p0) { return java.util.Collections.emptySet(); }
-	public java.util.Set<java.lang.String> getAlwaysOnVpnLockdownWhitelist(android.content.ComponentName p0) { return java.util.Collections.emptySet(); }
+	public java.util.Set<java.lang.String> getAlwaysOnVpnLockdownWhitelist(android.content.ComponentName p0) { return null; }
 	public String getAlwaysOnVpnPackage(android.content.ComponentName p0) { return null; }
 	public int getAppFunctionsPolicy() { return 0; }
 	public android.os.Bundle getApplicationRestrictions(android.content.ComponentName p0, String p1) { return null; }
@@ -620,7 +620,7 @@ public class DevicePolicyManager {
 	public boolean getAutoTimeZoneEnabled(android.content.ComponentName p0) { return false; }
 	public int getAutoTimeZonePolicy() { return 0; }
 	public java.util.List<android.os.UserHandle> getBindDeviceAdminTargetUsers(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
-	public boolean getBluetoothContactSharingDisabled(android.content.ComponentName p0) { return false; }
+	public boolean getBluetoothContactSharingDisabled(android.content.ComponentName p0) { return true; }
 	public String getCertInstallerPackage(android.content.ComponentName p0) throws java.lang.SecurityException { return null; }
 	public int getContentProtectionPolicy(android.content.ComponentName p0) { return 0; }
 	public java.util.Set<java.lang.String> getCrossProfileCalendarPackages(android.content.ComponentName p0) { return java.util.Collections.emptySet(); }
@@ -638,26 +638,26 @@ public class DevicePolicyManager {
 	public String getGlobalPrivateDnsHost(android.content.ComponentName p0) { return null; }
 	public int getGlobalPrivateDnsMode(android.content.ComponentName p0) { return 0; }
 	public java.util.List<byte[]> getInstalledCaCerts(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
-	public java.util.List<java.lang.String> getKeepUninstalledPackages(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
-	public java.util.Map<java.lang.Integer,java.util.Set<java.lang.String>> getKeyPairGrants(String p0) { return java.util.Collections.emptyMap(); }
+	public java.util.List<java.lang.String> getKeepUninstalledPackages(android.content.ComponentName p0) { return null; }
+	public java.util.Map<java.lang.Integer,java.util.Set<java.lang.String>> getKeyPairGrants(String p0) { return null; }
 	public int getLockTaskFeatures(android.content.ComponentName p0) { return 0; }
-	public String[] getLockTaskPackages(android.content.ComponentName p0) { return null; }
+	public String[] getLockTaskPackages(android.content.ComponentName p0) { return new String[0]; }
 	public CharSequence getLongSupportMessage(android.content.ComponentName p0) { return null; }
 	public long getManagedProfileMaximumTimeOff(android.content.ComponentName p0) { return 0; }
-	public java.util.List<java.lang.String> getMeteredDataDisabledPackages(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
+	public java.util.List<java.lang.String> getMeteredDataDisabledPackages(android.content.ComponentName p0) { return new java.util.ArrayList<>(); }
 	public int getMinimumRequiredWifiSecurityLevel() { return 0; }
-	public int getMtePolicy() { return 0; }
+	public int getMtePolicy() { return MTE_NOT_CONTROLLED_BY_POLICY; }
 	public int getNearbyAppStreamingPolicy() { return 0; }
 	public int getNearbyNotificationStreamingPolicy() { return 0; }
 	public int getOrganizationColor(android.content.ComponentName p0) { return 0; }
 	public CharSequence getOrganizationName(android.content.ComponentName p0) { return null; }
 	public android.app.admin.DevicePolicyManager getParentProfileInstance(android.content.ComponentName p0) { return null; }
-	public int getPasswordMaximumLength(int p0) { return 0; }
+	public int getPasswordMaximumLength(int p0) { return MAX_PASSWORD_LENGTH; }
 	public int getPermissionGrantState(android.content.ComponentName p0, String p1, String p2) { return 0; }
 	public int getPermissionPolicy(android.content.ComponentName p0) { return 0; }
-	public java.util.List<java.lang.String> getPermittedAccessibilityServices(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
-	public java.util.List<java.lang.String> getPermittedCrossProfileNotificationListeners(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
-	public java.util.List<java.lang.String> getPermittedInputMethods(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
+	public java.util.List<java.lang.String> getPermittedAccessibilityServices(android.content.ComponentName p0) { return null; }
+	public java.util.List<java.lang.String> getPermittedCrossProfileNotificationListeners(android.content.ComponentName p0) { return null; }
+	public java.util.List<java.lang.String> getPermittedInputMethods(android.content.ComponentName p0) { return null; }
 	public int getPersonalAppsSuspendedReasons(android.content.ComponentName p0) { return 0; }
 	public int getRequiredPasswordComplexity() { return 0; }
 	public long getRequiredStrongAuthTimeout(android.content.ComponentName p0) { return 0; }
@@ -666,7 +666,7 @@ public class DevicePolicyManager {
 	public CharSequence getShortSupportMessage(android.content.ComponentName p0) { return null; }
 	public CharSequence getStartUserSessionMessage(android.content.ComponentName p0) { return null; }
 	public boolean getStorageEncryption(android.content.ComponentName p0) { return false; }
-	public java.util.Set<java.lang.Integer> getSubscriptionIds() { return java.util.Collections.emptySet(); }
+	public java.util.Set<java.lang.Integer> getSubscriptionIds() { return new java.util.HashSet<>(); }
 	public android.os.PersistableBundle getTransferOwnershipBundle() { return null; }
 	public java.util.List<android.os.PersistableBundle> getTrustAgentConfiguration(android.content.ComponentName p0, android.content.ComponentName p1) { return java.util.Collections.emptyList(); }
 	public java.util.List<java.lang.String> getUserControlDisabledPackages(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
@@ -712,8 +712,8 @@ public class DevicePolicyManager {
 	public boolean isStatusBarDisabled() { return false; }
 	public boolean isUninstallBlocked(android.content.ComponentName p0, String p1) { return false; }
 	public boolean isUniqueDeviceAttestationSupported() { return false; }
-	public boolean isUsbDataSignalingEnabled() { return false; }
-	public boolean isUsingUnifiedPassword(android.content.ComponentName p0) { return false; }
+	public boolean isUsbDataSignalingEnabled() { return true; }
+	public boolean isUsingUnifiedPassword(android.content.ComponentName p0) { return true; }
 	public java.util.List<android.os.UserHandle> listForegroundAffiliatedUsers() { return java.util.Collections.emptyList(); }
 	public int logoutUser(android.content.ComponentName p0) { return 0; }
 	public void reboot(android.content.ComponentName p0) { }
