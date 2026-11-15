@@ -291,6 +291,13 @@ public class IntentFilter {
 		return dataMatch;
 	}
 
+	/* AOSP IntentFilter.match(ContentResolver, Intent, boolean, String); the extras only matter to wildcards,
+	 * which match() above does not do */
+	public final int match(ContentResolver resolver, Intent intent, boolean resolve, String logTag) {
+		String type = resolve ? intent.resolveTypeIfNeeded(resolver) : intent.getType();
+		return match(intent.getAction(), type, intent.getScheme(), intent.getData(), intent.getCategories(), logTag);
+	}
+
 	/* AOSP IntentFilter.matchCategories(Set) */
 	public final String matchCategories(Set<String> categories) {
 		if (categories == null)

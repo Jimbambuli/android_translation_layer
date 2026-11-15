@@ -71,6 +71,9 @@ public class PackageItemInfo {
 	 */
 	public int logo;
 
+	/* AOSP PackageItemInfo.banner: the leanback banner; ATL does not read it from the manifest, so it stays 0 */
+	public int banner;
+
 	/**
 	 * Additional meta-data associated with this component.  This field
 	 * will only be filled in if you set the
@@ -94,6 +97,7 @@ public class PackageItemInfo {
 			nonLocalizedLabel = nonLocalizedLabel.toString().trim();
 		icon = orig.icon;
 		logo = orig.logo;
+		banner = orig.banner;
 		metaData = orig.metaData;
 	}
 
@@ -178,6 +182,20 @@ public class PackageItemInfo {
 	 * @return Returns a Drawable containing the item's logo. If the item
 	 * does not have a logo, this method will return null.
 	 */
+	/* AOSP PackageItemInfo.loadBanner() / loadDefaultBanner() */
+	public Drawable loadBanner(PackageManager pm) {
+		if (banner != 0) {
+			Drawable dr = pm.getDrawable(packageName, banner, getApplicationInfo());
+			if (dr != null)
+				return dr;
+		}
+		return loadDefaultBanner(pm);
+	}
+
+	protected Drawable loadDefaultBanner(PackageManager pm) {
+		return null;
+	}
+
 	public Drawable loadLogo(PackageManager pm) {
 		if (logo != 0) {
 			Drawable d = pm.getDrawable(packageName, logo, getApplicationInfo());
