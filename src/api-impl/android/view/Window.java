@@ -727,6 +727,13 @@ public class Window {
 		return mFeatures;
 	}
 
+	/* AOSP PhoneWindow.setFeatureInt() -> onIntChanged() and setFeatureDrawableResource() -> onDrawableChanged()
+	 * change the progress bars, custom title container and icons of the title bar layout (screen_title*.xml);
+	 * ATL's decor has no such title bar, so there is no view to update */
+	public void setFeatureInt(int featureId, int value) {}
+
+	public void setFeatureDrawableResource(int featureId, int resId) {}
+
 	/* AOSP */
 	@SuppressWarnings("unchecked")
 	public final <T extends View> T requireViewById(int id) {
