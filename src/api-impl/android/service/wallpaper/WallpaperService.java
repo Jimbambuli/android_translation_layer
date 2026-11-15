@@ -107,6 +107,11 @@ public abstract class WallpaperService extends Service {
 
 	public abstract Engine onCreateEngine();
 
+	/* AOSP WallpaperService.onCreateEngine(WallpaperDescription): the default ignores the description */
+	public Engine onCreateEngine(android.app.wallpaper.WallpaperDescription description) {
+		return onCreateEngine();
+	}
+
 	@Override
 	public final IBinder onBind(Intent intent) {
 		/* kein IWallpaperService-Stub, niemand bindet */
