@@ -759,6 +759,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public interface OnLongClickListener {
 		public boolean onLongClick(View v);
+
+		/* AOSP OnLongClickListener.onLongClickUseDefaultHapticFeedback(); ATL has no haptic feedback to skip */
+		default boolean onLongClickUseDefaultHapticFeedback(View v) {
+			return true;
+		}
 	}
 
 	public interface OnHoverListener {
@@ -1701,6 +1706,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private OnTouchListener on_touch_listener = null;
 	private TouchDelegate mTouchDelegate = null;
 
+	/* AOSP View.setAllowClickWhenDisabled() (PFLAG4_ALLOW_CLICK_WHEN_DISABLED) */
+	private boolean mAllowClickWhenDisabled;
+
+	public void setAllowClickWhenDisabled(boolean clickableWhenDisabled) {
+		mAllowClickWhenDisabled = clickableWhenDisabled;
+	}
+
 	@Export
 	public boolean onTouchEventInternal(MotionEvent event, boolean handle_gestures) {
 		boolean handled = false;
@@ -1755,7 +1767,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			}
 		}
 
-		if (!isEnabled()) {
+		if (!isEnabled() && !mAllowClickWhenDisabled) {
 			// A disabled view that is clickable still consumes the touch events, it just doesn't respond to them.
 			if (action == MotionEvent.ACTION_UP && (mPrivateFlags & PFLAG_PRESSED) != 0) {
 				setPressed(false);

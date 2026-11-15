@@ -1435,6 +1435,11 @@ public class Intent implements Parcelable {
 		return extras.getStringArrayList(name);
 	}
 
+	/* AOSP Intent.getCharSequenceArrayListExtra() */
+	public ArrayList<CharSequence> getCharSequenceArrayListExtra(String name) {
+		return extras == null ? null : extras.getCharSequenceArrayList(name);
+	}
+
 	public ClipData getClipData() {
 		return clipData;
 	}

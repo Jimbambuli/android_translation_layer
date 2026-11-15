@@ -914,6 +914,9 @@ public class Window {
 
 	public void setSharedElementExitTransition(Transition transition) {}
 
+	/* AOSP Window.setSharedElementsUseOverlay(): a no-op in AOSP's Window too (PhoneWindow handles it) */
+	public void setSharedElementsUseOverlay(boolean sharedElementsUseOverlay) {}
+
 	public void setSharedElementReenterTransition(Transition transition) {}
 
 	/* AOSP PhoneWindow: the return transition defaults to USE_DEFAULT_TRANSITION, which

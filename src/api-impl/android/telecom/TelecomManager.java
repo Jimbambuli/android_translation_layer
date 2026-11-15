@@ -1,7 +1,11 @@
 package android.telecom;
 
-/* AOSP telecomm/java/android/telecom/TelecomManager.java: ATL has no telecom service, the answers are those of
- * the branch where getTelecomService() returns null */
+import android.os.OutcomeReceiver;
+import java.util.Objects;
+import java.util.concurrent.Executor;
+
+/* AOSP telecomm/framework/java/android/telecom/TelecomManager.java: ATL has no telecom service, the answers are
+ * those of the branch where getTelecomService() returns null */
 public class TelecomManager {
 	/* AOSP: null without ITelecomService */
 	public String getDefaultDialerPackage() {
@@ -48,4 +52,21 @@ public class TelecomManager {
 	}
 
 	public void cancelMissedCallsNotification() {}
+	public boolean isIncomingCallPermitted(PhoneAccountHandle phoneAccountHandle) {
+		return false;
+	}
+
+	public boolean isOutgoingCallPermitted(PhoneAccountHandle phoneAccountHandle) {
+		return false;
+	}
+
+	/* AOSP: null checks, then IllegalStateException when getTelecomService() is null */
+	public void addCall(CallAttributes callAttributes, Executor executor, OutcomeReceiver<CallControl, CallException> pendingControl, CallControlCallback handshakes, CallEventCallback events) {
+		Objects.requireNonNull(callAttributes);
+		Objects.requireNonNull(executor);
+		Objects.requireNonNull(pendingControl);
+		Objects.requireNonNull(handshakes);
+		Objects.requireNonNull(events);
+		throw new IllegalStateException("Telecom service is not present");
+	}
 }

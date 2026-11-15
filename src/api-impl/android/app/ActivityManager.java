@@ -190,6 +190,17 @@ public class ActivityManager {
 	}
 
 	public boolean isLowRamDevice() { return false; }
+	/* AOSP ActivityManager.LOCK_TASK_MODE_* and getLockTaskModeState(): no task is ever locked */
+	public static final int LOCK_TASK_MODE_NONE = 0;
+	public static final int LOCK_TASK_MODE_LOCKED = 1;
+	public static final int LOCK_TASK_MODE_PINNED = 2;
+
+	public int getLockTaskModeState() { return LOCK_TASK_MODE_NONE; }
+
+	public static boolean isLowMemoryKillReportSupported() {
+		return android.os.SystemProperties.getBoolean("persist.sys.lmk.reportkills", false);
+	}
+
 
 	/* AOSP ActivityManager.isBackgroundRestricted() asks the service whether the user restricted the
 	 * app in the background (app op RUN_ANY_IN_BACKGROUND); ATL has no such setting and its

@@ -113,6 +113,13 @@ public class KeyGenParameterSpec {
 			return this;
 		}
 
+		/* AOSP Builder.setKeyValidityEnd(): both the origination and the consumption end */
+		public Builder setKeyValidityEnd(Date endDate) {
+			setKeyValidityForOriginationEnd(endDate);
+			setKeyValidityForConsumptionEnd(endDate);
+			return this;
+		}
+
 		public Builder setKeyValidityForConsumptionEnd(Date keyValidityForConsumptionEnd) {
 			spec.keyValidityForConsumptionEnd = keyValidityForConsumptionEnd;
 			return this;

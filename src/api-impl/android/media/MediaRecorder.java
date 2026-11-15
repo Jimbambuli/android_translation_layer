@@ -108,6 +108,13 @@ public class MediaRecorder {
 		this.audioSource = audioSource;
 	}
 
+	private android.view.Surface previewSurface;
+
+	/* AOSP MediaRecorder.setPreviewDisplay(): only keeps the surface for prepare() */
+	public void setPreviewDisplay(android.view.Surface sv) {
+		previewSurface = sv;
+	}
+
 	public void setVideoSource(int videoSource) {
 		this.videoSource = videoSource;
 	}

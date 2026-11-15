@@ -1261,4 +1261,8 @@ public class AppOpsManager {
 			return null;
 		}
 	}
+
+	/* AOSP AppOpsManager.checkPackage(): the service answers MODE_ALLOWED for ATL's one package (as checkOp()) */
+	public void checkPackage(int uid, String packageName) {
+	}
 }

@@ -499,15 +499,31 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
 	private void beginTransaction(SQLiteTransactionListener transactionListener,
 	                              boolean exclusive) {
+		beginTransaction(transactionListener,
+		    exclusive ? SQLiteSession.TRANSACTION_MODE_EXCLUSIVE : SQLiteSession.TRANSACTION_MODE_IMMEDIATE);
+	}
+
+	/* AOSP SQLiteDatabase.beginTransaction(listener, mode): DEFERRED transactions are read-only, which allows
+	 * concurrent read-only transactions; the others are read/write */
+	private void beginTransaction(SQLiteTransactionListener listener, int mode) {
 		acquireReference();
 		try {
-			getThreadSession().beginTransaction(
-			    exclusive ? SQLiteSession.TRANSACTION_MODE_EXCLUSIVE : SQLiteSession.TRANSACTION_MODE_IMMEDIATE,
-			    transactionListener,
-			    getThreadDefaultConnectionFlags(false /*readOnly*/), null);
+			boolean readOnly = (mode == SQLiteSession.TRANSACTION_MODE_DEFERRED);
+			getThreadSession().beginTransaction(mode, listener, getThreadDefaultConnectionFlags(readOnly), null);
 		} finally {
 			releaseReference();
 		}
+	}
+
+	/**
+	 * Begins a transaction in DEFERRED mode, for read-only use (AOSP beginTransactionReadOnly()).
+	 */
+	public void beginTransactionReadOnly() {
+		beginTransactionWithListenerReadOnly(null);
+	}
+
+	public void beginTransactionWithListenerReadOnly(SQLiteTransactionListener transactionListener) {
+		beginTransaction(transactionListener, SQLiteSession.TRANSACTION_MODE_DEFERRED);
 	}
 
 	/**

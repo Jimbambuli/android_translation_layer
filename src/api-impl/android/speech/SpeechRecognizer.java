@@ -15,6 +15,20 @@ import java.util.List;
 public class SpeechRecognizer {
 	public static final String RESULTS_RECOGNITION = "results_recognition";
 	public static final String CONFIDENCE_SCORES = "confidence_scores";
+	public static final String RESULTS_ALTERNATIVES = "results_alternatives";
+	public static final String RECOGNITION_PARTS = "recognition_parts";
+	public static final String DETECTED_LANGUAGE = "detected_language";
+	public static final String LANGUAGE_DETECTION_CONFIDENCE_LEVEL = "language_detection_confidence_level";
+	public static final int LANGUAGE_DETECTION_CONFIDENCE_LEVEL_UNKNOWN = 0;
+	public static final int LANGUAGE_DETECTION_CONFIDENCE_LEVEL_NOT_CONFIDENT = 1;
+	public static final int LANGUAGE_DETECTION_CONFIDENCE_LEVEL_CONFIDENT = 2;
+	public static final int LANGUAGE_DETECTION_CONFIDENCE_LEVEL_HIGHLY_CONFIDENT = 3;
+	public static final String TOP_LOCALE_ALTERNATIVES = "top_locale_alternatives";
+	public static final String LANGUAGE_SWITCH_RESULT = "language_switch_result";
+	public static final int LANGUAGE_SWITCH_RESULT_NOT_ATTEMPTED = 0;
+	public static final int LANGUAGE_SWITCH_RESULT_SUCCEEDED = 1;
+	public static final int LANGUAGE_SWITCH_RESULT_FAILED = 2;
+	public static final int LANGUAGE_SWITCH_RESULT_SKIPPED_NO_MODEL = 3;
 
 	public static final int ERROR_NETWORK_TIMEOUT = 1;
 	public static final int ERROR_NETWORK = 2;

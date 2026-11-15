@@ -436,6 +436,8 @@ public class ActivityInfo extends ComponentInfo {
 	 * range. Set from the {@link android.R.attr#configChanges} attribute.
 	 */
 	public static final int CONFIG_COLOR_MODE = 0x4000;
+	/** Bit in {@link #configChanges}: the activity handles changes to the grammatical gender (AOSP ActivityInfo) */
+	public static final int CONFIG_GRAMMATICAL_GENDER = 0x8000;
 	/**
 	 * Bit in {@link #configChanges} that indicates that the activity
 	 * can itself handle changes to the font scaling factor.  Set from the

@@ -229,7 +229,7 @@ public final class PhoneAccountHandle implements Parcelable {
     private PhoneAccountHandle(Parcel in) {
         this(ComponentName.CREATOR.createFromParcel(in),
                 in.readString(),
-                new UserHandle(in.readInt()));
+                UserHandle.CREATOR.createFromParcel(in));
     }
 
     /**

@@ -155,6 +155,15 @@ public final class Display {
 		return false;
 	}
 
+	public void registerHdrSdrRatioChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<Display> listener) {
+		if (!isHdrSdrRatioAvailable()) {
+			throw new IllegalStateException("HDR/SDR ratio changed not available");
+		}
+	}
+
+	public void unregisterHdrSdrRatioChangedListener(java.util.function.Consumer<Display> listener) {
+	}
+
 	public RoundedCorner getRoundedCorner(int position) {
 		return null;
 	}

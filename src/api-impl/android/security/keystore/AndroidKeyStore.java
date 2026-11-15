@@ -120,6 +120,26 @@ public class AndroidKeyStore extends KeyStoreSpi {
 		}
 	}
 
+	/* AOSP AndroidKeyStoreSpi.engineSetEntry(): KeyProtection (or none) is the protection for secret and private key
+	 * entries. ATL stores the key as engineSetKeyEntry() does and does not evaluate the KeyProtection settings. */
+	@Override
+	public void engineSetEntry(String alias, java.security.KeyStore.Entry entry, java.security.KeyStore.ProtectionParameter param) throws KeyStoreException {
+		if (entry == null) {
+			throw new KeyStoreException("entry == null");
+		}
+		if (param != null && !(param instanceof KeyProtection)) {
+			throw new KeyStoreException("Unsupported protection parameter class: " + param.getClass().getName() + ". Supported: " + KeyProtection.class.getName());
+		}
+		if (entry instanceof java.security.KeyStore.PrivateKeyEntry) {
+			java.security.KeyStore.PrivateKeyEntry e = (java.security.KeyStore.PrivateKeyEntry) entry;
+			engineSetKeyEntry(alias, e.getPrivateKey(), null, e.getCertificateChain());
+		} else if (entry instanceof java.security.KeyStore.SecretKeyEntry) {
+			engineSetKeyEntry(alias, ((java.security.KeyStore.SecretKeyEntry) entry).getSecretKey(), null, null);
+		} else {
+			throw new KeyStoreException("Entry must be a PrivateKeyEntry, SecretKeyEntry or TrustedCertificateEntry; was " + entry);
+		}
+	}
+
 	@Override
 	public void engineSetKeyEntry(String alias, byte[] key, Certificate[] chain) throws KeyStoreException {
 		// TODO Auto-generated method stub

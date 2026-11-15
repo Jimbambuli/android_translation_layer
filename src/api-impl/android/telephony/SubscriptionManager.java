@@ -1,6 +1,10 @@
 package android.telephony;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.HandlerExecutor;
+import android.os.Looper;
+import java.util.concurrent.Executor;
 import java.util.Collections;
 import java.util.List;
 
@@ -78,21 +82,33 @@ public class SubscriptionManager {
 		public void onAddListenerFailed() {}
 	}
 
-	/* AOSP: with the TelephonyRegistry service (ATL has none) the listener is registered; without it the caller is
-	 * told through onAddListenerFailed() on its executor. */
-	public void addOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {
-		if (listener == null)
-			return;
-		android.os.Looper looper = listener.getCreatorLooper();
-		if (looper == null)
-			throw new RuntimeException("Can't create handler inside thread " + Thread.currentThread()
-			                           + " that has not called Looper.prepare()");
-		android.os.Handler handler = new android.os.Handler(looper);
-		addOnSubscriptionsChangedListener(handler::post, listener);
+	/* AOSP: the cache query returns the default INVALID_SUBSCRIPTION_ID when ISub is not available */
+	public static int getDefaultDataSubscriptionId() {
+		return INVALID_SUBSCRIPTION_ID;
 	}
 
-	public void addOnSubscriptionsChangedListener(java.util.concurrent.Executor executor,
-	                                              OnSubscriptionsChangedListener listener) {
+	public static int getActiveDataSubscriptionId() {
+		return INVALID_SUBSCRIPTION_ID;
+	}
+
+	/* AOSP: throws when getSubscriptionService() is null */
+	public String getPhoneNumber(int subscriptionId) {
+		throw new IllegalStateException("subscription service unavailable.");
+	}
+
+	public void addOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {
+		if (listener == null) {
+			return;
+		}
+		Looper looper = listener.getCreatorLooper();
+		if (looper == null) {
+			throw new RuntimeException("Can't create handler inside thread " + Thread.currentThread() + " that has not called Looper.prepare()");
+		}
+		addOnSubscriptionsChangedListener(new HandlerExecutor(new Handler(looper)), listener);
+	}
+
+	/* AOSP: without TELEPHONY_REGISTRY_SERVICE the caller is told on its listener that registering failed */
+	public void addOnSubscriptionsChangedListener(Executor executor, OnSubscriptionsChangedListener listener) {
 		executor.execute(() -> listener.onAddListenerFailed());
 	}
 

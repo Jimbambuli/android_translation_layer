@@ -198,6 +198,10 @@ public class AudioManager {
 		return false;
 	}
 
+	/* AOSP AudioManager.startBluetoothSco(): ATL has no Bluetooth, the audio service finds no SCO device and the
+	 * connection is not made (isBluetoothScoOn() stays false) */
+	public void startBluetoothSco() {}
+
 	public void stopBluetoothSco() {}
 
 	/* AOSP AudioManager.isBluetoothScoAvailableOffCall(): the resource config_bluetooth_sco_off_call, true in AOSP's
@@ -290,6 +294,104 @@ public class AudioManager {
 	 * unprivileged app sees it; ATL knows the app's own AudioRecords */
 	public java.util.List<AudioRecordingConfiguration> getActiveRecordingConfigurations() {
 		return AudioRecord.activeRecordingConfigurations();
+	}
+
+	/* AOSP AudioManager.getAvailableCommunicationDevices()/getCommunicationDevice()/setCommunicationDevice():
+	 * the devices usable for calls among the audio service's outputs (ATL: the speaker), the one in use (the
+	 * speaker until another is chosen) and its change. The OnCommunicationDeviceChangedListeners are told of a
+	 * change on their executor. */
+	public interface OnCommunicationDeviceChangedListener {
+		void onCommunicationDeviceChanged(AudioDeviceInfo device);
+	}
+
+	private AudioDeviceInfo mCommunicationDevice;
+	private final java.util.Map<OnCommunicationDeviceChangedListener, java.util.concurrent.Executor> mCommunicationListeners = new java.util.LinkedHashMap<>();
+
+	public java.util.List<AudioDeviceInfo> getAvailableCommunicationDevices() {
+		return new java.util.ArrayList<>(java.util.Arrays.asList(getDevices(GET_DEVICES_OUTPUTS)));
+	}
+
+	public synchronized AudioDeviceInfo getCommunicationDevice() {
+		return mCommunicationDevice != null ? mCommunicationDevice : getAvailableCommunicationDevices().get(0);
+	}
+
+	public boolean setCommunicationDevice(AudioDeviceInfo device) {
+		java.util.Objects.requireNonNull(device);
+		if (device.getId() == 0) {
+			return false;
+		}
+		boolean available = false;
+		for (AudioDeviceInfo d : getAvailableCommunicationDevices()) {
+			available |= d.getId() == device.getId();
+		}
+		if (!available) {
+			return false;
+		}
+		final AudioDeviceInfo chosen = device;
+		java.util.Map<OnCommunicationDeviceChangedListener, java.util.concurrent.Executor> listeners;
+		synchronized (this) {
+			if (getCommunicationDevice().getId() == chosen.getId()) {
+				mCommunicationDevice = chosen;
+				return true;
+			}
+			mCommunicationDevice = chosen;
+			listeners = new java.util.LinkedHashMap<>(mCommunicationListeners);
+		}
+		for (final java.util.Map.Entry<OnCommunicationDeviceChangedListener, java.util.concurrent.Executor> e : listeners.entrySet()) {
+			e.getValue().execute(() -> e.getKey().onCommunicationDeviceChanged(chosen));
+		}
+		return true;
+	}
+
+	public void clearCommunicationDevice() {
+		synchronized (this) {
+			mCommunicationDevice = null;
+		}
+	}
+
+	public synchronized void addOnCommunicationDeviceChangedListener(java.util.concurrent.Executor executor, OnCommunicationDeviceChangedListener listener) {
+		java.util.Objects.requireNonNull(executor);
+		java.util.Objects.requireNonNull(listener);
+		if (mCommunicationListeners.containsKey(listener)) {
+			throw new IllegalArgumentException("attempt to call addOnCommunicationDeviceChangedListener() on a previously registered listener");
+		}
+		mCommunicationListeners.put(listener, executor);
+	}
+
+	public synchronized void removeOnCommunicationDeviceChangedListener(OnCommunicationDeviceChangedListener listener) {
+		java.util.Objects.requireNonNull(listener);
+		mCommunicationListeners.remove(listener);
+	}
+
+	/* AOSP AudioManager.AudioPlaybackCallback/AudioRecordingCallback and their (un)registration: the callbacks hear
+	 * of changes in the audio service's playback/recording configurations, ATL has no such service and never
+	 * calls them (a registration alone triggers nothing in AOSP either) */
+	public static abstract class AudioPlaybackCallback {
+		public void onPlaybackConfigChanged(java.util.List<?> configs) {}
+	}
+
+	public void registerAudioPlaybackCallback(AudioPlaybackCallback cb, Handler handler) {
+		if (cb == null) {
+			throw new IllegalArgumentException("Illegal null AudioPlaybackCallback argument");
+		}
+	}
+
+	public void unregisterAudioPlaybackCallback(AudioPlaybackCallback cb) {
+		if (cb == null) {
+			throw new IllegalArgumentException("Illegal null AudioPlaybackCallback argument");
+		}
+	}
+
+	public void registerAudioRecordingCallback(AudioRecordingCallback cb, Handler handler) {
+		if (cb == null) {
+			throw new IllegalArgumentException("Illegal null AudioRecordingCallback argument");
+		}
+	}
+
+	public void unregisterAudioRecordingCallback(AudioRecordingCallback cb) {
+		if (cb == null) {
+			throw new IllegalArgumentException("Illegal null AudioRecordingCallback argument");
+		}
 	}
 
 	/* AOSP AudioManager.FX_KEY_CLICK: the standard key click sound */
