@@ -42,6 +42,37 @@ public class MediaFormat {
 		map.put(key, value);
 	}
 
+	/* AOSP MediaFormat.setLong() */
+	public final void setLong(String name, long value) {
+		map.put(name, value);
+	}
+
+	/* AOSP MediaFormat value types and getValueTypeForKey() (API 29) */
+	public static final int TYPE_NULL = 0;
+	public static final int TYPE_INTEGER = 1;
+	public static final int TYPE_LONG = 2;
+	public static final int TYPE_FLOAT = 3;
+	public static final int TYPE_STRING = 4;
+	public static final int TYPE_BYTE_BUFFER = 5;
+
+	public final int getValueTypeForKey(String name) {
+		Object value = map.get(name);
+		if (value == null) {
+			return TYPE_NULL;
+		} else if (value instanceof Integer) {
+			return TYPE_INTEGER;
+		} else if (value instanceof Long) {
+			return TYPE_LONG;
+		} else if (value instanceof Float) {
+			return TYPE_FLOAT;
+		} else if (value instanceof String) {
+			return TYPE_STRING;
+		} else if (value instanceof ByteBuffer) {
+			return TYPE_BYTE_BUFFER;
+		}
+		throw new RuntimeException("invalid value for key");
+	}
+
 	public void setFloat(String key, float value) {
 		map.put(key, value);
 	}
