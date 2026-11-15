@@ -57,6 +57,225 @@ class IPackageMoveObserver {}
  */
 public class PackageManager {
 
+	/* AOSP PackageManager.Property (android-16.0.0_r4) */
+	public static final class Property implements android.os.Parcelable {
+		private static final int TYPE_BOOLEAN = 1;
+		private static final int TYPE_FLOAT = 2;
+		private static final int TYPE_INTEGER = 3;
+		private static final int TYPE_RESOURCE = 4;
+		private static final int TYPE_STRING = 5;
+		private final String mName;
+		private final int mType;
+		private final String mClassName;
+		private final String mPackageName;
+		private boolean mBooleanValue;
+		private float mFloatValue;
+		private int mIntegerValue;
+		private String mStringValue;
+
+		public Property(String name, int type, String packageName, String className) {
+			if (type < TYPE_BOOLEAN || type > TYPE_STRING) {
+				throw new IllegalArgumentException("Invalid type");
+			}
+			this.mName = Objects.requireNonNull(name);
+			this.mType = type;
+			this.mPackageName = Objects.requireNonNull(packageName);
+			this.mClassName = className;
+		}
+
+		public Property(String name, boolean value, String packageName, String className) {
+			this(name, TYPE_BOOLEAN, packageName, className);
+			mBooleanValue = value;
+		}
+
+		public Property(String name, float value, String packageName, String className) {
+			this(name, TYPE_FLOAT, packageName, className);
+			mFloatValue = value;
+		}
+
+		public Property(String name, int value, boolean isResource, String packageName, String className) {
+			this(name, isResource ? TYPE_RESOURCE : TYPE_INTEGER, packageName, className);
+			mIntegerValue = value;
+		}
+
+		public Property(String name, String value, String packageName, String className) {
+			this(name, TYPE_STRING, packageName, className);
+			mStringValue = value;
+		}
+
+		public int getType() {
+			return mType;
+		}
+
+		public String getName() {
+			return mName;
+		}
+
+		public String getPackageName() {
+			return mPackageName;
+		}
+
+		public String getClassName() {
+			return mClassName;
+		}
+
+		public boolean getBoolean() {
+			return mBooleanValue;
+		}
+
+		public boolean isBoolean() {
+			return mType == TYPE_BOOLEAN;
+		}
+
+		public float getFloat() {
+			return mFloatValue;
+		}
+
+		public boolean isFloat() {
+			return mType == TYPE_FLOAT;
+		}
+
+		public int getInteger() {
+			return mType == TYPE_INTEGER ? mIntegerValue : 0;
+		}
+
+		public boolean isInteger() {
+			return mType == TYPE_INTEGER;
+		}
+
+		public int getResourceId() {
+			return mType == TYPE_RESOURCE ? mIntegerValue : 0;
+		}
+
+		public boolean isResourceId() {
+			return mType == TYPE_RESOURCE;
+		}
+
+		public String getString() {
+			return mStringValue;
+		}
+
+		public boolean isString() {
+			return mType == TYPE_STRING;
+		}
+
+		public android.os.Bundle toBundle(android.os.Bundle outBundle) {
+			final android.os.Bundle b = outBundle == null || outBundle == android.os.Bundle.EMPTY ? new android.os.Bundle() : outBundle;
+			if (mType == TYPE_BOOLEAN) {
+				b.putBoolean(mName, mBooleanValue);
+			} else if (mType == TYPE_FLOAT) {
+				b.putFloat(mName, mFloatValue);
+			} else if (mType == TYPE_INTEGER) {
+				b.putInt(mName, mIntegerValue);
+			} else if (mType == TYPE_RESOURCE) {
+				b.putInt(mName, mIntegerValue);
+			} else if (mType == TYPE_STRING) {
+				b.putString(mName, mStringValue);
+			}
+			return b;
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		@Override
+		public void writeToParcel(android.os.Parcel dest, int flags) {
+			dest.writeString(mName);
+			dest.writeInt(mType);
+			dest.writeString(mPackageName);
+			dest.writeString(mClassName);
+			if (mType == TYPE_BOOLEAN) {
+				dest.writeBoolean(mBooleanValue);
+			} else if (mType == TYPE_FLOAT) {
+				dest.writeFloat(mFloatValue);
+			} else if (mType == TYPE_INTEGER) {
+				dest.writeInt(mIntegerValue);
+			} else if (mType == TYPE_RESOURCE) {
+				dest.writeInt(mIntegerValue);
+			} else if (mType == TYPE_STRING) {
+				dest.writeString(mStringValue);
+			}
+		}
+
+		public static final android.os.Parcelable.Creator<Property> CREATOR = new android.os.Parcelable.Creator<Property>() {
+			@Override
+			public Property createFromParcel(android.os.Parcel source) {
+				final String name = source.readString();
+				final int type = source.readInt();
+				final String packageName = source.readString();
+				final String className = source.readString();
+				if (type == TYPE_BOOLEAN) {
+					return new Property(name, source.readBoolean(), packageName, className);
+				} else if (type == TYPE_FLOAT) {
+					return new Property(name, source.readFloat(), packageName, className);
+				} else if (type == TYPE_INTEGER) {
+					return new Property(name, source.readInt(), false, packageName, className);
+				} else if (type == TYPE_RESOURCE) {
+					return new Property(name, source.readInt(), true, packageName, className);
+				} else if (type == TYPE_STRING) {
+					return new Property(name, source.readString(), packageName, className);
+				}
+				return null;
+			}
+
+			@Override
+			public Property[] newArray(int size) {
+				return new Property[size];
+			}
+		};
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof Property)) {
+				return false;
+			}
+			final Property property = (Property)obj;
+			return mType == property.mType &&
+			    Objects.equals(mName, property.mName) &&
+			    Objects.equals(mClassName, property.mClassName) &&
+			    Objects.equals(mPackageName, property.mPackageName) &&
+			    (mType == TYPE_BOOLEAN ? mBooleanValue == property.mBooleanValue :
+			     mType == TYPE_FLOAT ? Float.compare(mFloatValue, property.mFloatValue) == 0 :
+			     mType == TYPE_INTEGER ? mIntegerValue == property.mIntegerValue :
+			     mType == TYPE_RESOURCE ? mIntegerValue == property.mIntegerValue :
+			     mStringValue.equals(property.mStringValue));
+		}
+
+		@Override
+		public int hashCode() {
+			int result = Objects.hash(mName, mType, mClassName, mPackageName);
+			if (mType == TYPE_BOOLEAN) {
+				result = 31 * result + (mBooleanValue ? 1 : 0);
+			} else if (mType == TYPE_FLOAT) {
+				result = 31 * result + Float.floatToIntBits(mFloatValue);
+			} else if (mType == TYPE_INTEGER) {
+				result = 31 * result + mIntegerValue;
+			} else if (mType == TYPE_RESOURCE) {
+				result = 31 * result + mIntegerValue;
+			} else if (mType == TYPE_STRING) {
+				result = 31 * result + mStringValue.hashCode();
+			}
+			return result;
+		}
+	}
+
+	/* AOSP ApplicationPackageManager.getProperty(String, String) -> PackageManagerService.getPropertyAsUser(): the
+	 * <property> of the package's <application> with that name, else NameNotFoundException */
+	public Property getProperty(String propertyName, String packageName) throws NameNotFoundException {
+		Objects.requireNonNull(packageName);
+		Objects.requireNonNull(propertyName);
+		PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
+		if (pkg == null && package_info.packageName.equals(packageName))
+			pkg = ATLLoadedApp.getPrimaryApplication().pkg;
+		Property property = pkg != null ? pkg.mProperties.get(propertyName) : null;
+		if (property == null)
+			throw new NameNotFoundException();
+		return property;
+	}
+
+
 	private final static String TAG = "PackageManager";
 
 	/**
