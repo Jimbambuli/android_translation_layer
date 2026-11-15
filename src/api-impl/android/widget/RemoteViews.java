@@ -464,6 +464,11 @@ public class RemoteViews implements Parcelable, Cloneable {
 
 	/* ---- reflection setters ---- */
 
+	/** AOSP RemoteViews.setContentDescription(): setCharSequence(viewId, "setContentDescription", ...) */
+	public void setContentDescription(int viewId, CharSequence contentDescription) {
+		setCharSequence(viewId, "setContentDescription", contentDescription);
+	}
+
 	public void setBoolean(int viewId, String methodName, boolean value) {
 		addAction(new ReflectionAction(viewId, methodName, T_BOOLEAN, value));
 	}

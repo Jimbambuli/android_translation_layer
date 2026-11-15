@@ -1322,6 +1322,7 @@ srcs = [
 	'android/widget/TwoLineListItem.java',
 	'android/widget/ZoomButton.java',
 	'android/widget/ZoomButtonsController.java',
+	'android/widget/ZoomControls.java',
 	'android/widget/inline/InlineContentView.java',
 	'android/widget/inline/InlinePresentationSpec.java',
 	'android/window/BackEvent.java',
