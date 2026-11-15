@@ -1,12 +1,13 @@
 package android.media;
 
 import android.graphics.Rect;
+import android.hardware.DataSpace;
 import android.hardware.HardwareBuffer;
 import android.hardware.SyncFence;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-/* AOSP android.media.Image without the DataSpace part (getHardwareBuffer/getFence/setFence: android-16 Image.java).
+/* AOSP android.media.Image (getHardwareBuffer/getFence/setFence: android-16 Image.java).
  * ATL has no ImageReader or ImageWriter that would hand out images; the class is needed because the Flutter
  * engine looks it up (and its close()) when it starts and aborts if it is missing. */
 public abstract class Image implements AutoCloseable {
@@ -51,6 +52,19 @@ public abstract class Image implements AutoCloseable {
 
 	public void setFence(SyncFence fence) throws IOException {
 		throwISEIfImageIsInvalid();
+	}
+
+	private int mDataSpace = DataSpace.DATASPACE_UNKNOWN;
+
+	/* AOSP android.media.Image.getDataSpace() / setDataSpace(int) */
+	public int getDataSpace() {
+		throwISEIfImageIsInvalid();
+		return mDataSpace;
+	}
+
+	public void setDataSpace(int dataSpace) {
+		throwISEIfImageIsInvalid();
+		mDataSpace = dataSpace;
 	}
 
 	private Rect mCropRect;
