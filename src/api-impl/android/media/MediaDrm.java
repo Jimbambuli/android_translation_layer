@@ -13,7 +13,7 @@ import java.util.UUID;
  * exactly as a device without the requested scheme would. A player (ExoPlayer) catches that and
  * falls back to non-DRM playback instead of hitting a NoClassDefFoundError. The remaining methods
  * exist only so references to them link; no instance is ever created, so they are never run. */
-public final class MediaDrm {
+public final class MediaDrm implements AutoCloseable {
 
 	public MediaDrm(UUID uuid) throws UnsupportedSchemeException {
 		throw new UnsupportedSchemeException("no DRM scheme is supported");
@@ -142,6 +142,12 @@ public final class MediaDrm {
 	public void release() {
 	}
 
+	/* AOSP MediaDrm.close() (AutoCloseable): release() */
+	@Override
+	public void close() {
+		release();
+	}
+
 	public interface OnEventListener {
 		void onEvent(MediaDrm md, byte[] sessionId, int event, int extra, byte[] data);
 	}
@@ -207,13 +213,60 @@ public final class MediaDrm {
 		}
 	}
 
-	public static final class MediaDrmStateException extends IllegalStateException {
+	/* AOSP MediaDrm.MediaDrmStateException implements MediaDrmThrowable: error code, vendor/OEM error and
+	 * context, isTransient() and the diagnostic info built from the error code. ATL's own
+	 * (String) constructor stands for ErrorCodes.ERROR_UNKNOWN (0). */
+	public static final class MediaDrmStateException extends IllegalStateException implements MediaDrmThrowable {
+		private final int mErrorCode, mVendorError, mOemError, mErrorContext;
+		private final String mDiagnosticInfo;
+
 		public MediaDrmStateException(String detailMessage) {
+			this(detailMessage, 0, 0, 0, 0);
+		}
+
+		/** @hide */
+		public MediaDrmStateException(int errorCode, String detailMessage) {
+			this(detailMessage, errorCode, 0, 0, 0);
+		}
+
+		/** @hide */
+		public MediaDrmStateException(String detailMessage, int errorCode, int vendorError, int oemError, int errorContext) {
 			super(detailMessage);
+			mErrorCode = errorCode;
+			mVendorError = vendorError;
+			mOemError = oemError;
+			mErrorContext = errorContext;
+
+			final String sign = errorCode < 0 ? "neg_" : "";
+			mDiagnosticInfo = "android.media.MediaDrm.error_" + sign + Math.abs(errorCode);
+		}
+
+		public int getErrorCode() {
+			return mErrorCode;
+		}
+
+		@Override
+		public int getVendorError() {
+			return mVendorError;
+		}
+
+		@Override
+		public int getOemError() {
+			return mOemError;
+		}
+
+		@Override
+		public int getErrorContext() {
+			return mErrorContext;
+		}
+
+		/* AOSP: ErrorCodes.ERROR_PROVISIONING_RETRY (28) or ERROR_RESOURCE_CONTENTION (29) */
+		public boolean isTransient() {
+			return mErrorCode == 28 || mErrorCode == 29;
 		}
 
 		public String getDiagnosticInfo() {
-			return "";
+			return mDiagnosticInfo;
 		}
 	}
 }

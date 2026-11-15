@@ -6,7 +6,7 @@ import android.os.UserHandle;
 
 /* AOSP StatusBarNotification (android-16): a posted notification with its package, id, tag,
  * user and post time. Without parceling, cloning and the logging helpers. */
-public class StatusBarNotification {
+public class StatusBarNotification implements android.os.Parcelable {
 	private final String pkg;
 	private final int id;
 	private final String tag;
@@ -68,6 +68,46 @@ public class StatusBarNotification {
 		this.key = key();
 		this.groupKey = groupKey();
 	}
+
+	/* AOSP StatusBarNotification.writeToParcel()/describeContents()/CREATOR; ATL has no log instance id, so
+	 * its marker is always 0 */
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeString(this.pkg);
+		out.writeString(this.opPkg);
+		out.writeInt(this.id);
+		if (this.tag != null) {
+			out.writeInt(1);
+			out.writeString(this.tag);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeInt(this.uid);
+		out.writeInt(this.initialPid);
+		this.notification.writeToParcel(out, flags);
+		user.writeToParcel(out, flags);
+		out.writeLong(this.postTime);
+		if (this.overrideGroupKey != null) {
+			out.writeInt(1);
+			out.writeString(this.overrideGroupKey);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeInt(0);
+	}
+
+	public int describeContents() {
+		return 0;
+	}
+
+	public static final android.os.Parcelable.Creator<StatusBarNotification> CREATOR = new android.os.Parcelable.Creator<StatusBarNotification>() {
+		public StatusBarNotification createFromParcel(Parcel parcel) {
+			return new StatusBarNotification(parcel);
+		}
+
+		public StatusBarNotification[] newArray(int size) {
+			return new StatusBarNotification[size];
+		}
+	};
 
 	private String key() {
 		String sbnKey = user.getIdentifier() + "|" + pkg + "|" + id + "|" + tag + "|" + uid;

@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.util.Date;
 import javax.security.auth.x500.X500Principal;
 
-public class KeyGenParameterSpec {
+public final class KeyGenParameterSpec implements java.security.spec.AlgorithmParameterSpec {
 
 	private String keystoreAlias;
 	private int purposes;

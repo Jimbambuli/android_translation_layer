@@ -1,6 +1,72 @@
 package android.net;
 
-public class Network {
+public class Network implements android.os.Parcelable {
+	/* AOSP Network.netId (@hide) and the private DNS bypass flag. ATL has one network; it gets netId 100,
+	 * the first id AOSP's NetIdManager hands out (MIN_NET_ID) */
+	public final int netId;
+	private final boolean mPrivateDnsBypass;
+
+	/** @hide ATL's one network */
+	public Network() {
+		this(100);
+	}
+
+	/** @hide */
+	public Network(int netId) {
+		this(netId, false);
+	}
+
+	/** @hide */
+	public Network(int netId, boolean privateDnsBypass) {
+		this.netId = netId;
+		this.mPrivateDnsBypass = privateDnsBypass;
+	}
+
+	/** @hide */
+	public Network(Network that) {
+		this(that.netId, that.mPrivateDnsBypass);
+	}
+
+	/* AOSP describeContents()/writeToParcel()/CREATOR: netId and the bypass flag (Android 16 writes it) */
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(netId);
+		dest.writeBoolean(mPrivateDnsBypass);
+	}
+
+	public static final android.os.Parcelable.Creator<Network> CREATOR = new android.os.Parcelable.Creator<Network>() {
+		public Network createFromParcel(android.os.Parcel in) {
+			final int netId = in.readInt();
+			final boolean bypass = in.readBoolean();
+			return new Network(netId, bypass);
+		}
+
+		public Network[] newArray(int size) {
+			return new Network[size];
+		}
+	};
+
+	/* AOSP equals()/hashCode()/toString(): by netId */
+	@Override
+	public boolean equals(Object obj) {
+		if (!(obj instanceof Network))
+			return false;
+		return this.netId == ((Network)obj).netId;
+	}
+
+	@Override
+	public int hashCode() {
+		return netId;
+	}
+
+	@Override
+	public String toString() {
+		return Integer.toString(netId);
+	}
+
 	public long getNetworkHandle() {
 		return 1L;
 	}

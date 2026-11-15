@@ -9,7 +9,7 @@ import android.view.View;
  * ATL keeps the container and the child lookup; the selection state and the strip drawing are not done (TabHost has no
  * widget connection either).
  */
-public class TabWidget extends LinearLayout {
+public class TabWidget extends LinearLayout implements android.view.View.OnFocusChangeListener {
 	public TabWidget(Context context) {
 		this(context, null);
 	}
@@ -46,4 +46,10 @@ public class TabWidget extends LinearLayout {
 	}
 
 	public void setStripEnabled(boolean stripEnabled) {}
+
+	/* AOSP TabWidget.onFocusChange() (View.OnFocusChangeListener): "No-op. Tab selection is separate from
+	 * keyboard focus." */
+	@Override
+	public void onFocusChange(View v, boolean hasFocus) {
+	}
 }

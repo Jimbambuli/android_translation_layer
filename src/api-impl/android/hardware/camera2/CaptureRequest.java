@@ -14,7 +14,7 @@ import java.util.Map;
  * CameraMetadataNative does. The public keys keep AOSP's names and value types (types still missing in
  * ATL are typed Object); Key follows AOSP Key/CameraMetadataNative.Key. */
 @SuppressWarnings("unchecked")
-public final class CaptureRequest {
+public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> {
 
 	public static final class Key<T> {
 		private final String mName;

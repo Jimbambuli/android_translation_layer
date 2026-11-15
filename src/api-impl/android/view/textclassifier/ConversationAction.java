@@ -29,7 +29,7 @@ import java.util.Objects;
 
 /** Represents the action suggested by a {@link TextClassifier} on a given conversation. */
 /* ATL: AOSP android-14 ConversationAction without parceling, as ATL's RemoteAction has none */
-public final class ConversationAction {
+public final class ConversationAction implements android.os.Parcelable {
 
 	/** @hide */
 	@Retention(SOURCE)
@@ -241,4 +241,39 @@ public final class ConversationAction {
 					mExtras == null ? Bundle.EMPTY : mExtras);
 		}
 	}
+
+	/* AOSP ConversationAction(Parcel)/writeToParcel()/describeContents()/CREATOR */
+	private ConversationAction(android.os.Parcel in) {
+		mType = in.readString();
+		mAction = in.readParcelable(null, RemoteAction.class);
+		mTextReply = in.readCharSequence();
+		mScore = in.readFloat();
+		mExtras = in.readBundle();
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel parcel, int flags) {
+		parcel.writeString(mType);
+		parcel.writeParcelable(mAction, flags);
+		parcel.writeCharSequence(mTextReply);
+		parcel.writeFloat(mScore);
+		parcel.writeBundle(mExtras);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	public static final android.os.Parcelable.Creator<ConversationAction> CREATOR = new android.os.Parcelable.Creator<ConversationAction>() {
+		@Override
+		public ConversationAction createFromParcel(android.os.Parcel in) {
+			return new ConversationAction(in);
+		}
+
+		@Override
+		public ConversationAction[] newArray(int size) {
+			return new ConversationAction[size];
+		}
+	};
 }

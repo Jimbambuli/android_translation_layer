@@ -8,7 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 
-public class JobInfo {
+public class JobInfo implements android.os.Parcelable {
 	public static final int NETWORK_TYPE_NONE = 0;
 	public static final int NETWORK_TYPE_ANY = 1;
 
@@ -66,6 +66,136 @@ public class JobInfo {
 	private int priority = PRIORITY_DEFAULT;
 
 	public JobInfo() {}
+
+	/* AOSP JobInfo(Parcel)/writeToParcel()/describeContents()/CREATOR (frameworks/base apex/jobscheduler
+	 * framework/java/android/app/job/JobInfo.java, android-16.0.0_r4). ATL keeps the constraints as
+	 * booleans (AOSP constraintFlags: CHARGING 1, BATTERY_NOT_LOW 2, DEVICE_IDLE 4, STORAGE_NOT_LOW 8),
+	 * the interval as periodicMillis (AOSP isPeriodic is intervalMillis != 0 here) and the network type
+	 * apart from the request (derived from the request when read, as AOSP getNetworkType()). ATL has no
+	 * bias (written as BIAS_DEFAULT 0) and no debug tags (written as none). */
+	private JobInfo(android.os.Parcel in) {
+		id = in.readInt();
+		final PersistableBundle persistableExtras = in.readPersistableBundle();
+		extras = persistableExtras != null ? persistableExtras : PersistableBundle.EMPTY;
+		transientExtras = in.readBundle();
+		if (in.readInt() != 0) {
+			clipData = ClipData.CREATOR.createFromParcel(in);
+			clipGrantFlags = in.readInt();
+		} else {
+			clipData = null;
+			clipGrantFlags = 0;
+		}
+		service = (ComponentName)in.readParcelable(null);
+		final int constraintFlags = in.readInt();
+		requireCharging = (constraintFlags & 1) != 0;
+		requireBatteryNotLow = (constraintFlags & 2) != 0;
+		requireDeviceIdle = (constraintFlags & 4) != 0;
+		requireStorageNotLow = (constraintFlags & 8) != 0;
+		triggerContentUris = in.createTypedArray(TriggerContentUri.CREATOR);
+		triggerContentUpdateDelay = in.readLong();
+		triggerContentMaxDelay = in.readLong();
+		if (in.readInt() != 0) {
+			networkRequest = NetworkRequest.CREATOR.createFromParcel(in);
+		} else {
+			networkRequest = null;
+		}
+		if (networkRequest == null) {
+			networkType = NETWORK_TYPE_NONE;
+		} else if (networkRequest.networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
+			networkType = NETWORK_TYPE_UNMETERED;
+		} else if (networkRequest.networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_ROAMING)) {
+			networkType = NETWORK_TYPE_NOT_ROAMING;
+		} else if (networkRequest.networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) {
+			networkType = NETWORK_TYPE_CELLULAR;
+		} else {
+			networkType = NETWORK_TYPE_ANY;
+		}
+		networkDownloadBytes = in.readLong();
+		networkUploadBytes = in.readLong();
+		minimumNetworkChunkBytes = in.readLong();
+		minLatencyMillis = in.readLong();
+		maxExecutionDelayMillis = in.readLong();
+		in.readInt(); // isPeriodic: periodicMillis != 0
+		isPersisted = in.readInt() == 1;
+		periodicMillis = in.readLong();
+		flexMillis = in.readLong();
+		initialBackoffMillis = in.readLong();
+		backoffPolicy = in.readInt();
+		hasEarlyConstraint = in.readInt() == 1;
+		hasLateConstraint = in.readInt() == 1;
+		in.readInt(); // bias
+		priority = in.readInt();
+		flags = in.readInt();
+		final int numDebugTags = in.readInt();
+		for (int i = 0; i < numDebugTags; ++i) {
+			if (in.readString() == null) {
+				throw new IllegalStateException("malformed parcel");
+			}
+		}
+		final String traceTag = in.readString();
+		this.traceTag = traceTag == null ? null : traceTag.intern();
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel out, int flags) {
+		out.writeInt(id);
+		out.writePersistableBundle(extras);
+		out.writeBundle(transientExtras);
+		if (clipData != null) {
+			out.writeInt(1);
+			clipData.writeToParcel(out, flags);
+			out.writeInt(clipGrantFlags);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeParcelable(service, flags);
+		out.writeInt((requireCharging ? 1 : 0) | (requireBatteryNotLow ? 2 : 0)
+			     | (requireDeviceIdle ? 4 : 0) | (requireStorageNotLow ? 8 : 0));
+		out.writeTypedArray(triggerContentUris, flags);
+		out.writeLong(triggerContentUpdateDelay);
+		out.writeLong(triggerContentMaxDelay);
+		if (networkRequest != null) {
+			out.writeInt(1);
+			networkRequest.writeToParcel(out, flags);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeLong(networkDownloadBytes);
+		out.writeLong(networkUploadBytes);
+		out.writeLong(minimumNetworkChunkBytes);
+		out.writeLong(minLatencyMillis);
+		out.writeLong(maxExecutionDelayMillis);
+		out.writeInt(isPeriodic() ? 1 : 0);
+		out.writeInt(isPersisted ? 1 : 0);
+		out.writeLong(periodicMillis);
+		out.writeLong(flexMillis);
+		out.writeLong(initialBackoffMillis);
+		out.writeInt(backoffPolicy);
+		out.writeInt(hasEarlyConstraint ? 1 : 0);
+		out.writeInt(hasLateConstraint ? 1 : 0);
+		out.writeInt(0); // mBias: BIAS_DEFAULT
+		out.writeInt(priority);
+		out.writeInt(this.flags);
+		out.writeInt(0); // no debug tags
+		out.writeString(traceTag);
+	}
+
+	public static final android.os.Parcelable.Creator<JobInfo> CREATOR = new android.os.Parcelable.Creator<JobInfo>() {
+		@Override
+		public JobInfo createFromParcel(android.os.Parcel in) {
+			return new JobInfo(in);
+		}
+
+		@Override
+		public JobInfo[] newArray(int size) {
+			return new JobInfo[size];
+		}
+	};
 
 	public long getMinLatencyMillis() {
 		return minLatencyMillis;
@@ -468,7 +598,7 @@ public class JobInfo {
 	}
 
 	/* AOSP JobInfo.TriggerContentUri */
-	public static final class TriggerContentUri {
+	public static final class TriggerContentUri implements android.os.Parcelable {
 		public static final int FLAG_NOTIFY_FOR_DESCENDANTS = 1 << 0;
 		private final Uri mUri;
 		private final int mFlags;
@@ -485,6 +615,35 @@ public class JobInfo {
 		public int getFlags() {
 			return mFlags;
 		}
+
+		/* AOSP JobInfo.TriggerContentUri(Parcel)/describeContents()/writeToParcel()/CREATOR */
+		private TriggerContentUri(android.os.Parcel in) {
+			mUri = Uri.CREATOR.createFromParcel(in);
+			mFlags = in.readInt();
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		@Override
+		public void writeToParcel(android.os.Parcel out, int flags) {
+			mUri.writeToParcel(out, flags);
+			out.writeInt(mFlags);
+		}
+
+		public static final android.os.Parcelable.Creator<TriggerContentUri> CREATOR = new android.os.Parcelable.Creator<TriggerContentUri>() {
+			@Override
+			public TriggerContentUri createFromParcel(android.os.Parcel in) {
+				return new TriggerContentUri(in);
+			}
+
+			@Override
+			public TriggerContentUri[] newArray(int size) {
+				return new TriggerContentUri[size];
+			}
+		};
 
 		@Override
 		public boolean equals(Object o) {

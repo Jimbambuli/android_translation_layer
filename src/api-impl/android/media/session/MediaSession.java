@@ -69,7 +69,7 @@ public class MediaSession {
 		}
 	}
 
-	public static class QueueItem {
+	public static class QueueItem implements android.os.Parcelable {
 		public static final int UNKNOWN_ID = -1;
 		long id;
 		MediaDescription description;
@@ -78,6 +78,35 @@ public class MediaSession {
 			this.description = description;
 			this.id = id;
 		}
+
+		/* AOSP MediaSession.QueueItem(Parcel)/writeToParcel()/describeContents()/CREATOR */
+		private QueueItem(android.os.Parcel in) {
+			description = MediaDescription.CREATOR.createFromParcel(in);
+			id = in.readLong();
+		}
+
+		@Override
+		public void writeToParcel(android.os.Parcel dest, int flags) {
+			description.writeToParcel(dest, flags);
+			dest.writeLong(id);
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		public static final android.os.Parcelable.Creator<QueueItem> CREATOR = new android.os.Parcelable.Creator<QueueItem>() {
+			@Override
+			public QueueItem createFromParcel(android.os.Parcel p) {
+				return new QueueItem(p);
+			}
+
+			@Override
+			public QueueItem[] newArray(int size) {
+				return new QueueItem[size];
+			}
+		};
 
 		public MediaDescription getDescription() {
 			return description;

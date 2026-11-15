@@ -41,7 +41,7 @@ import java.util.Objects;
  * @see TextClassifier#suggestConversationActions(Request)
  */
 /* ATL: AOSP android-14 ConversationActions; the result itself is not parceled (its ConversationAction is not) */
-public final class ConversationActions {
+public final class ConversationActions implements Parcelable {
 
 	private final List<ConversationAction> mConversationActions;
 	private final String mId;
@@ -491,4 +491,33 @@ public final class ConversationActions {
 			}
 		}
 	}
+
+	/* AOSP ConversationActions(Parcel)/writeToParcel()/describeContents()/CREATOR */
+	private ConversationActions(Parcel in) {
+		mConversationActions = Collections.unmodifiableList(in.createTypedArrayList(ConversationAction.CREATOR));
+		mId = in.readString();
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(Parcel parcel, int flags) {
+		parcel.writeTypedList(mConversationActions);
+		parcel.writeString(mId);
+	}
+
+	public static final Parcelable.Creator<ConversationActions> CREATOR = new Parcelable.Creator<ConversationActions>() {
+		@Override
+		public ConversationActions createFromParcel(Parcel in) {
+			return new ConversationActions(in);
+		}
+
+		@Override
+		public ConversationActions[] newArray(int size) {
+			return new ConversationActions[size];
+		}
+	};
 }

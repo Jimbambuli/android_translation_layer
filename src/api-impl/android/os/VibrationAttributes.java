@@ -2,7 +2,7 @@ package android.os;
 
 /* AOSP android.os.VibrationAttributes (API 30): what a vibration is for. ATL's vibrator treats every
  * vibration the same, so only the usage is kept */
-public final class VibrationAttributes {
+public final class VibrationAttributes implements android.os.Parcelable {
 	public static final int USAGE_UNKNOWN = 0;
 	public static final int USAGE_ALARM = 0x11;
 	public static final int USAGE_RINGTONE = 0x21;
@@ -86,4 +86,29 @@ public final class VibrationAttributes {
 			return new VibrationAttributes(mUsage);
 		}
 	}
+
+	/* AOSP VibrationAttributes.writeToParcel()/VibrationAttributes(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): mOriginalAudioUsage, mFlags */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(mUsage);
+	}
+
+	private VibrationAttributes(android.os.Parcel src) {
+		mUsage = src.readInt();
+	}
+
+	public static final android.os.Parcelable.Creator<VibrationAttributes> CREATOR = new android.os.Parcelable.Creator<VibrationAttributes>() {
+		public VibrationAttributes createFromParcel(android.os.Parcel source) {
+			return new VibrationAttributes(source);
+		}
+
+		public VibrationAttributes[] newArray(int size) {
+			return new VibrationAttributes[size];
+		}
+	};
 }

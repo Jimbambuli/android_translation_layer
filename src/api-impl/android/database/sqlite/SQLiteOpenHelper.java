@@ -44,7 +44,7 @@ import java.io.File;
  * <p class="note"><strong>Note:</strong> this class assumes
  * monotonically increasing version numbers for upgrades.</p>
  */
-public abstract class SQLiteOpenHelper {
+public abstract class SQLiteOpenHelper implements AutoCloseable {
 	private static final String TAG = SQLiteOpenHelper.class.getSimpleName();
 
 	// When true, getReadableDatabase returns a read-only database if it is just being opened.

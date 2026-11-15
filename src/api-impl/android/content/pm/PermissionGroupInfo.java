@@ -23,7 +23,7 @@ package android.content.pm;
  * group known to the system.  This corresponds to information collected from the
  * AndroidManifest.xml's &lt;permission-group&gt; tags.
  */
-public class PermissionGroupInfo extends PackageItemInfo {
+public class PermissionGroupInfo extends PackageItemInfo implements android.os.Parcelable {
 	/**
 	 * A string resource identifier (in the package's resources) of this
 	 * permission's description.  From the "description" attribute or,
@@ -98,4 +98,37 @@ public class PermissionGroupInfo extends PackageItemInfo {
 	public int describeContents() {
 		return 0;
 	}
+
+	/* AOSP PermissionGroupInfo.writeToParcel()/PermissionGroupInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): requestRes, requestDetailResourceId, backgroundRequestResourceId, backgroundRequestDetailResourceId */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		dest.writeInt(descriptionRes);
+		TextUtils.writeToParcel(nonLocalizedDescription, dest, parcelableFlags);
+		dest.writeInt(flags);
+		dest.writeInt(priority);
+	}
+
+	private PermissionGroupInfo(android.os.Parcel source) {
+		super(source);
+		descriptionRes = source.readInt();
+		nonLocalizedDescription = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+		flags = source.readInt();
+		priority = source.readInt();
+	}
+
+	public static final android.os.Parcelable.Creator<PermissionGroupInfo> CREATOR = new android.os.Parcelable.Creator<PermissionGroupInfo>() {
+		public PermissionGroupInfo createFromParcel(android.os.Parcel source) {
+			return new PermissionGroupInfo(source);
+		}
+
+		public PermissionGroupInfo[] newArray(int size) {
+			return new PermissionGroupInfo[size];
+		}
+	};
 }

@@ -71,7 +71,7 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.TreeSet;
 
-public class TextView extends View {
+public class TextView extends View implements android.view.ViewTreeObserver.OnPreDrawListener {
 	/* AOSP: opaque black until a color is set; the color for the current drawable state is mCurTextColor */
 	private ColorStateList colors = ColorStateList.valueOf(0xFF000000);
 	private int mCurTextColor = 0xFF000000;

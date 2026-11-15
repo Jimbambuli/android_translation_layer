@@ -2,7 +2,7 @@ package android.widget;
 
 import android.view.View;
 
-public class ZoomButtonsController {
+public class ZoomButtonsController implements android.view.View.OnTouchListener {
 	/* AOSP ZoomButtonsController shows a ZoomControls container in its own window over the owner view
 	 * (android-14 core/java/android/widget/ZoomButtonsController.java). ATL has no such window, so
 	 * visibility is only kept as state, like a device that never gets to show it. */

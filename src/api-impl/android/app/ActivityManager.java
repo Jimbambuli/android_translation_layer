@@ -440,34 +440,50 @@ public class ActivityManager {
 		return new ArrayList<>();
 	}
 
-	public static class RecentTaskInfo implements Parcelable {
+	/* AOSP ActivityManager.RecentTaskInfo/RunningTaskInfo (Android 16): extend TaskInfo, which holds
+	 * baseIntent, baseActivity, topActivity, origActivity, numActivities and userId; parcelled like AOSP
+	 * readFromParcel()/writeToParcel() (own fields, then TaskInfo.read/writeTaskToParcel()) */
+	public static class RecentTaskInfo extends TaskInfo implements Parcelable {
+		@Deprecated
 		public int id;
-		public int persistentId;
-		public android.content.Intent baseIntent;
-		public android.content.ComponentName origActivity;
-		public CharSequence description;
-		public int userId;
-		public int numActivities;
 
+		@Deprecated
+		public int persistentId;
+
+		@Deprecated
+		public CharSequence description;
+
+		@Deprecated
+		public int affiliatedTaskId;
+
+		public RecentTaskInfo() {
+		}
+
+		private RecentTaskInfo(Parcel source) {
+			readFromParcel(source);
+		}
+
+		@Override
 		public int describeContents() {
 			return 0;
 		}
 
-		public void writeToParcel(Parcel dest, int flags) {
-			dest.writeInt(id);
-			dest.writeLong(persistentId);
-		}
-
 		public void readFromParcel(Parcel source) {
 			id = source.readInt();
-			persistentId = (int)source.readLong();
+			persistentId = source.readInt();
+			super.readTaskFromParcel(source);
+		}
+
+		@Override
+		public void writeToParcel(Parcel dest, int flags) {
+			dest.writeInt(id);
+			dest.writeInt(persistentId);
+			super.writeTaskToParcel(dest, flags);
 		}
 
 		public static final Parcelable.Creator<RecentTaskInfo> CREATOR = new Parcelable.Creator<RecentTaskInfo>() {
-			public RecentTaskInfo createFromParcel(Parcel in) {
-				RecentTaskInfo info = new RecentTaskInfo();
-				info.readFromParcel(in);
-				return info;
+			public RecentTaskInfo createFromParcel(Parcel source) {
+				return new RecentTaskInfo(source);
 			}
 
 			public RecentTaskInfo[] newArray(int size) {
@@ -476,36 +492,45 @@ public class ActivityManager {
 		};
 	}
 
-	public static class RunningTaskInfo implements Parcelable {
+	public static class RunningTaskInfo extends TaskInfo implements Parcelable {
+		@Deprecated
 		public int id;
-		public android.content.ComponentName baseActivity;
-		public android.content.ComponentName topActivity;
-		public int numActivities;
-		public int numRunning;
+
+		@Deprecated
 		public android.graphics.Bitmap thumbnail;
+
+		@Deprecated
 		public CharSequence description;
 
+		@Deprecated
+		public int numRunning;
+
+		public RunningTaskInfo() {
+		}
+
+		private RunningTaskInfo(Parcel source) {
+			readFromParcel(source);
+		}
+
+		@Override
 		public int describeContents() {
 			return 0;
 		}
 
-		public void writeToParcel(Parcel dest, int flags) {
-			dest.writeInt(id);
-			dest.writeInt(numActivities);
-			dest.writeInt(numRunning);
-		}
-
 		public void readFromParcel(Parcel source) {
 			id = source.readInt();
-			numActivities = source.readInt();
-			numRunning = source.readInt();
+			super.readTaskFromParcel(source);
+		}
+
+		@Override
+		public void writeToParcel(Parcel dest, int flags) {
+			dest.writeInt(id);
+			super.writeTaskToParcel(dest, flags);
 		}
 
 		public static final Parcelable.Creator<RunningTaskInfo> CREATOR = new Parcelable.Creator<RunningTaskInfo>() {
-			public RunningTaskInfo createFromParcel(Parcel in) {
-				RunningTaskInfo info = new RunningTaskInfo();
-				info.readFromParcel(in);
-				return info;
+			public RunningTaskInfo createFromParcel(Parcel source) {
+				return new RunningTaskInfo(source);
 			}
 
 			public RunningTaskInfo[] newArray(int size) {

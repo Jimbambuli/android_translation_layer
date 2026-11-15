@@ -21,7 +21,7 @@ package android.content.pm;
  * declared by an application. This corresponds to information collected from the
  * AndroidManifest.xml's &lt;uses-configuration&gt; and &lt;uses-feature&gt; tags.
  */
-public class ConfigurationInfo {
+public class ConfigurationInfo implements android.os.Parcelable {
 	/**
 	 * The kind of touch screen attached to the device.
 	 * One of: {@link android.content.res.Configuration#TOUCHSCREEN_NOTOUCH},
@@ -95,6 +95,33 @@ public class ConfigurationInfo {
 
 	public int describeContents() {
 		return 0;
+	}
+
+	/* AOSP ConfigurationInfo.writeToParcel()/CREATOR/ConfigurationInfo(Parcel) */
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		dest.writeInt(reqTouchScreen);
+		dest.writeInt(reqKeyboardType);
+		dest.writeInt(reqNavigation);
+		dest.writeInt(reqInputFeatures);
+		dest.writeInt(reqGlEsVersion);
+	}
+
+	public static final android.os.Parcelable.Creator<ConfigurationInfo> CREATOR = new android.os.Parcelable.Creator<ConfigurationInfo>() {
+		public ConfigurationInfo createFromParcel(android.os.Parcel source) {
+			return new ConfigurationInfo(source);
+		}
+
+		public ConfigurationInfo[] newArray(int size) {
+			return new ConfigurationInfo[size];
+		}
+	};
+
+	private ConfigurationInfo(android.os.Parcel source) {
+		reqTouchScreen = source.readInt();
+		reqKeyboardType = source.readInt();
+		reqNavigation = source.readInt();
+		reqInputFeatures = source.readInt();
+		reqGlEsVersion = source.readInt();
 	}
 
 	/**

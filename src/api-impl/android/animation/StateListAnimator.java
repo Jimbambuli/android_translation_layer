@@ -25,21 +25,54 @@ import java.util.ArrayList;
  * Lets you define a number of Animators that will run on the attached View depending on the View's
  * drawable state (shortened from AOSP, without the constant state cache).
  */
-public class StateListAnimator {
+public class StateListAnimator implements Cloneable {
 
-	private final ArrayList<Tuple> mTuples = new ArrayList<Tuple>();
+	private ArrayList<Tuple> mTuples = new ArrayList<Tuple>();
 	private Tuple mLastMatch = null;
 	private Animator mRunningAnimator = null;
 	private WeakReference<View> mViewRef;
 
-	private final AnimatorListenerAdapter mAnimatorListener = new AnimatorListenerAdapter() {
-		@Override
-		public void onAnimationEnd(Animator animation) {
-			animation.setTarget(null);
-			if (mRunningAnimator == animation)
-				mRunningAnimator = null;
+	private AnimatorListenerAdapter mAnimatorListener;
+
+	public StateListAnimator() {
+		initAnimatorListener();
+	}
+
+	private void initAnimatorListener() {
+		mAnimatorListener = new AnimatorListenerAdapter() {
+			@Override
+			public void onAnimationEnd(Animator animation) {
+				animation.setTarget(null);
+				if (mRunningAnimator == animation)
+					mRunningAnimator = null;
+			}
+		};
+	}
+
+	/* AOSP StateListAnimator.clone() (Cloneable): clones every state's animator; ATL keeps no changing
+	 * configurations for it */
+	@Override
+	public StateListAnimator clone() {
+		try {
+			StateListAnimator clone = (StateListAnimator)super.clone();
+			clone.mTuples = new ArrayList<Tuple>(mTuples.size());
+			clone.mLastMatch = null;
+			clone.mRunningAnimator = null;
+			clone.mViewRef = null;
+			clone.mAnimatorListener = null;
+			clone.initAnimatorListener();
+			final int tupleSize = mTuples.size();
+			for (int i = 0; i < tupleSize; i++) {
+				final Tuple tuple = mTuples.get(i);
+				final Animator animatorClone = tuple.mAnimator.clone();
+				animatorClone.removeListener(mAnimatorListener);
+				clone.addState(tuple.mSpecs, animatorClone);
+			}
+			return clone;
+		} catch (CloneNotSupportedException e) {
+			throw new AssertionError("cannot clone state list animator", e);
 		}
-	};
+	}
 
 	/**
 	 * Associates the given animator with the provided drawable state specs so that it will be run

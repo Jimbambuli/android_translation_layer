@@ -23,7 +23,7 @@ import android.util.Printer;
  * service. This corresponds to information collected from the
  * AndroidManifest.xml's &lt;service&gt; tags.
  */
-public class ServiceInfo extends ComponentInfo {
+public class ServiceInfo extends ComponentInfo implements android.os.Parcelable {
 	/**
 	 * Optional name of a permission required to be able to access this
 	 * Service.  From the "permission" attribute.
@@ -83,4 +83,33 @@ public class ServiceInfo extends ComponentInfo {
 	public int describeContents() {
 		return 0;
 	}
+
+	/* AOSP ServiceInfo.writeToParcel()/ServiceInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): mForegroundServiceType */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		dest.writeString8(permission);
+		dest.writeInt(flags);
+	}
+
+	private ServiceInfo(android.os.Parcel source) {
+		super(source);
+		permission = source.readString8();
+		flags = source.readInt();
+	}
+
+	public static final android.os.Parcelable.Creator<ServiceInfo> CREATOR = new android.os.Parcelable.Creator<ServiceInfo>() {
+		public ServiceInfo createFromParcel(android.os.Parcel source) {
+			return new ServiceInfo(source);
+		}
+
+		public ServiceInfo[] newArray(int size) {
+			return new ServiceInfo[size];
+		}
+	};
 }

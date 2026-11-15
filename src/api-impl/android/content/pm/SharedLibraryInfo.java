@@ -5,7 +5,7 @@ import java.util.List;
 
 /* AOSP core/java/android/content/pm/SharedLibraryInfo.java (android14-release), the getters apps use. ATL has
  * no shared library packages, so PackageManager.getSharedLibraries() lists none. */
-public final class SharedLibraryInfo {
+public final class SharedLibraryInfo implements android.os.Parcelable {
 	public static final int TYPE_BUILTIN = 0;
 	public static final int TYPE_DYNAMIC = 1;
 	public static final int TYPE_STATIC = 2;
@@ -85,4 +85,39 @@ public final class SharedLibraryInfo {
 	private String mLongVersionString() {
 		return Long.toString(mVersion);
 	}
+
+	/* AOSP SharedLibraryInfo.writeToParcel()/SharedLibraryInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): if (mCodePaths != null) { parcel.writ..., mDeclaringPackage, mDependentPackages, mDependencies, mOptionalDependentPackages, mCertDigests */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel parcel, int flags) {
+		parcel.writeString8(mPath);
+		parcel.writeString8(mPackageName);
+		parcel.writeString8(mName);
+		parcel.writeLong(mVersion);
+		parcel.writeInt(mType);
+		parcel.writeBoolean(mIsNative);
+	}
+
+	private SharedLibraryInfo(android.os.Parcel parcel) {
+		mPath = parcel.readString8();
+		mPackageName = parcel.readString8();
+		mName = parcel.readString8();
+		mVersion = parcel.readLong();
+		mType = parcel.readInt();
+		mIsNative = parcel.readBoolean();
+	}
+
+	public static final android.os.Parcelable.Creator<SharedLibraryInfo> CREATOR = new android.os.Parcelable.Creator<SharedLibraryInfo>() {
+		public SharedLibraryInfo createFromParcel(android.os.Parcel source) {
+			return new SharedLibraryInfo(source);
+		}
+
+		public SharedLibraryInfo[] newArray(int size) {
+			return new SharedLibraryInfo[size];
+		}
+	};
 }

@@ -1457,10 +1457,43 @@ public class Intent implements Parcelable {
 		return clipData;
 	}
 
-	public static class ShortcutIconResource {
+	/* AOSP Intent.ShortcutIconResource: package and resource name of the icon, Parcelable */
+	public static class ShortcutIconResource implements Parcelable {
+		public String packageName;
+		public String resourceName;
 
-		public static ShortcutIconResource fromContext(Context context, int id) {
-			return new ShortcutIconResource();
+		public static ShortcutIconResource fromContext(Context context, int resourceId) {
+			ShortcutIconResource icon = new ShortcutIconResource();
+			icon.packageName = context.getPackageName();
+			icon.resourceName = context.getResources().getResourceName(resourceId);
+			return icon;
+		}
+
+		public static final Parcelable.Creator<ShortcutIconResource> CREATOR = new Parcelable.Creator<ShortcutIconResource>() {
+			public ShortcutIconResource createFromParcel(Parcel source) {
+				ShortcutIconResource icon = new ShortcutIconResource();
+				icon.packageName = source.readString8();
+				icon.resourceName = source.readString8();
+				return icon;
+			}
+
+			public ShortcutIconResource[] newArray(int size) {
+				return new ShortcutIconResource[size];
+			}
+		};
+
+		public int describeContents() {
+			return 0;
+		}
+
+		public void writeToParcel(Parcel dest, int flags) {
+			dest.writeString8(packageName);
+			dest.writeString8(resourceName);
+		}
+
+		@Override
+		public String toString() {
+			return resourceName;
 		}
 	}
 

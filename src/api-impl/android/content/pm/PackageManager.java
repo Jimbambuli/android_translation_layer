@@ -2730,14 +2730,16 @@ public class PackageManager {
 			ri.filter.addCategory("android.intent.category.BROWSABLE");
 			ri.filter.addDataScheme("http");
 			ri.filter.addDataScheme("https");
-			return Arrays.asList(ri);
+			return new ArrayList<ResolveInfo>(Arrays.asList(ri));
 		}
+		/* AOSP ApplicationPackageManager.queryIntentActivities() returns ParceledListSlice.getList(), which the app
+		 * process unparcels into a new ArrayList (BaseParceledListSlice); apps cast to ArrayList and modify it */
 		/* FIXME - we may need to return more than one */
 		ResolveInfo info = resolveActivity(intent, flags);
+		List<ResolveInfo> list = new ArrayList<ResolveInfo>(1);
 		if (info != null)
-			return Arrays.asList(info);
-		else
-			return Collections.emptyList();
+			list.add(info);
+		return list;
 	}
 
 	/**
@@ -2842,7 +2844,8 @@ public class PackageManager {
 		if ("org.unifiedpush.android.distributor.REGISTER".equals(intent.getAction())) {
 			ResolveInfo ri = new ResolveInfo();
 			ri.activityInfo.exported = true;
-			return Arrays.asList(ri);
+			/* a modifiable ArrayList as AOSP's ParceledListSlice.getList(), like queryIntentActivities() */
+			return new ArrayList<ResolveInfo>(Arrays.asList(ri));
 		}
 		/* like queryIntentServices(): the receivers of the component's, the intent's or every visible package */
 		List<ResolveInfo> list = new ArrayList<ResolveInfo>();
@@ -2982,7 +2985,8 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentContentProvidersAsUser(
 	    Intent intent, int flags, int userId) {
-		return Collections.emptyList();
+		/* AOSP: ParceledListSlice.getList(), unparceled into an ArrayList (here no provider declares intent filters) */
+		return new ArrayList<ResolveInfo>();
 	}
 
 	/**
@@ -3046,7 +3050,22 @@ public class PackageManager {
 	 */
 	public List<ProviderInfo> queryContentProviders(
 	    String processName, int uid, int flags) {
-		return null;
+		/* AOSP ApplicationPackageManager.queryContentProviders() never returns null since API 33 (empty list instead);
+		 * like ComputerEngine.queryContentProviders(): the providers of the known packages, with a process name
+		 * only those running in that process under that uid, as a modifiable ArrayList (ParceledListSlice.getList()) */
+		List<ProviderInfo> list = new ArrayList<ProviderInfo>();
+		for (String name : ATLLoadedAppManager.getInstalledPackageNames()) {
+			PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(name);
+			if (pkg == null)
+				continue;
+			for (PackageParser.Provider p : pkg.providers) {
+				if (processName != null && (!processName.equals(p.info.processName)
+				                            || p.info.applicationInfo == null || p.info.applicationInfo.uid != uid))
+					continue;
+				list.add(p.info);
+			}
+		}
+		return list;
 	}
 
 	/**
@@ -3085,7 +3104,9 @@ public class PackageManager {
 	 */
 	public List<InstrumentationInfo> queryInstrumentation(
 	    String targetPackage, int flags) {
-		return null;
+		/* AOSP ApplicationPackageManager.queryInstrumentation(): ParceledListSlice.getList(), an empty ArrayList when
+		 * no package declares an instrumentation (ATL installs none) */
+		return new ArrayList<InstrumentationInfo>();
 	}
 
 	/**

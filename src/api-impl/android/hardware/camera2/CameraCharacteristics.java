@@ -20,7 +20,7 @@ import java.util.Set;
  * names and value types (keys whose value type is still missing in ATL are typed Object); Key follows
  * AOSP Key/CameraMetadataNative.Key (equality by name and type). */
 @SuppressWarnings("unchecked")
-public final class CameraCharacteristics {
+public final class CameraCharacteristics extends CameraMetadata<CameraCharacteristics.Key<?>> {
 
 	public static final class Key<T> {
 		private final String mName;

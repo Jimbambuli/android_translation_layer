@@ -11,7 +11,7 @@ import android.util.DisplayMetrics;
 import android.util.LayoutDirection;
 import android.util.SparseArray;
 
-public class DrawableContainer extends Drawable {
+public class DrawableContainer extends Drawable implements Drawable.Callback {
 
 	private static final boolean DEFAULT_DITHER = true;
 	private DrawableContainerState state;
@@ -168,6 +168,34 @@ public class DrawableContainer extends Drawable {
 		d.setBounds(getBounds());
 		d.setLayoutDirection(getLayoutDirection());
 		d.setAutoMirrored(state.mAutoMirrored);
+	}
+
+	/* AOSP DrawableContainer.invalidateDrawable/scheduleDrawable/unscheduleDrawable (Drawable.Callback):
+	 * forwarded to the container's own callback when they come from the current child (ATL keeps no
+	 * cached statefulness/opacity to invalidate) */
+	private Drawable currentDrawable() {
+		return (state != null && curIndex >= 0 && curIndex < state.childCount) ? state.getChild(curIndex) : null;
+	}
+
+	@Override
+	public void invalidateDrawable(Drawable who) {
+		if (who == currentDrawable() && getCallback() != null) {
+			getCallback().invalidateDrawable(this);
+		}
+	}
+
+	@Override
+	public void scheduleDrawable(Drawable who, Runnable what, long when) {
+		if (who == currentDrawable() && getCallback() != null) {
+			getCallback().scheduleDrawable(this, what, when);
+		}
+	}
+
+	@Override
+	public void unscheduleDrawable(Drawable who, Runnable what) {
+		if (who == currentDrawable() && getCallback() != null) {
+			getCallback().unscheduleDrawable(this, what);
+		}
 	}
 
 	/* AOSP DrawableContainer.setAlpha() without the fade animation */

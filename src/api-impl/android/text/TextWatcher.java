@@ -1,6 +1,6 @@
 package android.text;
 
-public interface TextWatcher {
+public interface TextWatcher extends NoCopySpan {
 
 	public void beforeTextChanged(CharSequence s, int start, int count, int after);
 

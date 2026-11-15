@@ -21,7 +21,7 @@ package android.content.pm;
  * known to the system.  This corresponds to information collected from the
  * AndroidManifest.xml's &lt;permission&gt; tags.
  */
-public class PermissionInfo extends PackageItemInfo {
+public class PermissionInfo extends PackageItemInfo implements android.os.Parcelable {
 	/**
 	 * A normal application value for {@link #protectionLevel}, corresponding
 	 * to the <code>normal</code> value of
@@ -208,4 +208,39 @@ public class PermissionInfo extends PackageItemInfo {
 	public int getProtectionFlags() {
 		return protectionLevel & ~PROTECTION_MASK_BASE;
 	}
+
+	/* AOSP PermissionInfo.writeToParcel()/PermissionInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): backgroundPermission, requestRes, sForStringSet.parcel(knownCerts, dest..., requiresPurpose, requiresPurposeTargetSdkVersion, writeValidPurposes(dest); */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		dest.writeInt(protectionLevel);
+		dest.writeInt(flags);
+		dest.writeString8(group);
+		dest.writeInt(descriptionRes);
+		TextUtils.writeToParcel(nonLocalizedDescription, dest, parcelableFlags);
+	}
+
+	private PermissionInfo(android.os.Parcel source) {
+		super(source);
+		protectionLevel = source.readInt();
+		flags = source.readInt();
+		group = source.readString8();
+		descriptionRes = source.readInt();
+		nonLocalizedDescription = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+	}
+
+	public static final android.os.Parcelable.Creator<PermissionInfo> CREATOR = new android.os.Parcelable.Creator<PermissionInfo>() {
+		public PermissionInfo createFromParcel(android.os.Parcel source) {
+			return new PermissionInfo(source);
+		}
+
+		public PermissionInfo[] newArray(int size) {
+			return new PermissionInfo[size];
+		}
+	};
 }

@@ -1862,6 +1862,20 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		private int layoutDirection = LAYOUT_DIRECTION_LTR;
 		private boolean needResolution;
 
+		/* AOSP MarginLayoutParams.copyMarginsFrom() (@hide, used by Toolbar.LayoutParams); ATL keeps
+		 * layoutDirection/needResolution where AOSP keeps mMarginFlags */
+		public final void copyMarginsFrom(MarginLayoutParams source) {
+			this.leftMargin = source.leftMargin;
+			this.topMargin = source.topMargin;
+			this.rightMargin = source.rightMargin;
+			this.bottomMargin = source.bottomMargin;
+			this.startMargin = source.startMargin;
+			this.endMargin = source.endMargin;
+
+			this.layoutDirection = source.layoutDirection;
+			this.needResolution = source.needResolution;
+		}
+
 		public void setMargins(int left, int top, int right, int bottom) {
 			leftMargin = left;
 			topMargin = top;

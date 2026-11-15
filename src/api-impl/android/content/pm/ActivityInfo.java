@@ -25,7 +25,7 @@ import android.util.Printer;
  * from the AndroidManifest.xml's &lt;activity&gt; and
  * &lt;receiver&gt; tags.
  */
-public class ActivityInfo extends ComponentInfo {
+public class ActivityInfo extends ComponentInfo implements android.os.Parcelable {
 	/** Marks an int as a CONFIG_* bit mask (annotation only, as in AOSP's ActivityInfo). */
 	@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.SOURCE)
 	public @interface Config {}
@@ -608,4 +608,51 @@ public class ActivityInfo extends ComponentInfo {
 	public int describeContents() {
 		return 0;
 	}
+
+	/* AOSP ActivityInfo.writeToParcel()/ActivityInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): documentLaunchMode, launchToken, privateFlags, persistableMode, maxRecents, lockTaskLaunchMode, if (windowLayout != null) { dest.writ..., resizeMode, requestedVrComponent, rotationAnimation, colorMode, mMaxAspectRatio, mMinAspectRatio, supportsSizeChanges, sForStringSet.parcel(mKnownActivityEm..., requiredDisplayCategory, requireContentUriPermissionFromCaller */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		dest.writeInt(theme);
+		dest.writeInt(launchMode);
+		dest.writeString8(permission);
+		dest.writeString8(taskAffinity);
+		dest.writeString8(targetActivity);
+		dest.writeInt(flags);
+		dest.writeInt(screenOrientation);
+		dest.writeInt(configChanges);
+		dest.writeInt(softInputMode);
+		dest.writeInt(uiOptions);
+		dest.writeString8(parentActivityName);
+	}
+
+	private ActivityInfo(android.os.Parcel source) {
+		super(source);
+		theme = source.readInt();
+		launchMode = source.readInt();
+		permission = source.readString8();
+		taskAffinity = source.readString8();
+		targetActivity = source.readString8();
+		flags = source.readInt();
+		screenOrientation = source.readInt();
+		configChanges = source.readInt();
+		softInputMode = source.readInt();
+		uiOptions = source.readInt();
+		parentActivityName = source.readString8();
+	}
+
+	public static final android.os.Parcelable.Creator<ActivityInfo> CREATOR = new android.os.Parcelable.Creator<ActivityInfo>() {
+		public ActivityInfo createFromParcel(android.os.Parcel source) {
+			return new ActivityInfo(source);
+		}
+
+		public ActivityInfo[] newArray(int size) {
+			return new ActivityInfo[size];
+		}
+	};
 }

@@ -6,7 +6,7 @@ import android.net.Uri;
 /* AOSP AutomaticZenRule (android-16.0.0_r4, AutomaticZenRule.java), the fields that do not need ZenPolicy or
  * ZenDeviceEffects (ATL has neither): a rule's name, owner, condition, interruption filter and state. Without
  * Parcelable and Builder. */
-public final class AutomaticZenRule {
+public final class AutomaticZenRule implements android.os.Parcelable {
 	public static final int TYPE_UNKNOWN = -1;
 	public static final int TYPE_OTHER = 0;
 	public static final int TYPE_SCHEDULE_TIME = 1;
@@ -173,4 +173,65 @@ public final class AutomaticZenRule {
 		}
 		return input;
 	}
+
+	/* AOSP AutomaticZenRule(Parcel)/writeToParcel()/describeContents()/CREATOR (Android 16). ATL has no
+	 * ZenPolicy or ZenDeviceEffects: written as null, skipped when read. ENABLED is 1, DISABLED 0 */
+	public AutomaticZenRule(android.os.Parcel source) {
+		enabled = source.readInt() == 1;
+		if (source.readInt() == 1) {
+			name = getTrimmedString(source.readString8());
+		}
+		interruptionFilter = source.readInt();
+		conditionId = getTrimmedUri(source.readParcelable(null, Uri.class));
+		owner = getTrimmedComponentName(source.readParcelable(null, ComponentName.class));
+		configurationActivity = getTrimmedComponentName(source.readParcelable(null, ComponentName.class));
+		creationTime = source.readLong();
+		source.readParcelable(null); // zen policy
+		mPkg = source.readString8();
+		source.readParcelable(null); // device effects
+		mAllowManualInvocation = source.readBoolean();
+		mIconResId = source.readInt();
+		mTriggerDescription = getTrimmedString(source.readString8(), MAX_DESC_LENGTH);
+		mType = source.readInt();
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(enabled ? 1 : 0);
+		if (name != null) {
+			dest.writeInt(1);
+			dest.writeString8(name);
+		} else {
+			dest.writeInt(0);
+		}
+		dest.writeInt(interruptionFilter);
+		dest.writeParcelable(conditionId, 0);
+		dest.writeParcelable(owner, 0);
+		dest.writeParcelable(configurationActivity, 0);
+		dest.writeLong(creationTime);
+		dest.writeParcelable(null, 0); // mZenPolicy
+		dest.writeString8(mPkg);
+		dest.writeParcelable(null, 0); // mDeviceEffects
+		dest.writeBoolean(mAllowManualInvocation);
+		dest.writeInt(mIconResId);
+		dest.writeString8(mTriggerDescription);
+		dest.writeInt(mType);
+	}
+
+	public static final android.os.Parcelable.Creator<AutomaticZenRule> CREATOR = new android.os.Parcelable.Creator<AutomaticZenRule>() {
+		@Override
+		public AutomaticZenRule createFromParcel(android.os.Parcel source) {
+			return new AutomaticZenRule(source);
+		}
+
+		@Override
+		public AutomaticZenRule[] newArray(int size) {
+			return new AutomaticZenRule[size];
+		}
+	};
 }

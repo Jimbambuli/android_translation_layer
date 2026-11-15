@@ -27,7 +27,7 @@ import java.util.Objects;
  * The public API of AOSP (android-14) without Parcel/XML: ATL keeps the channels of the app in
  * NotificationManager and shows notifications on the desktop the same way for every channel.
  */
-public final class NotificationChannel {
+public final class NotificationChannel implements android.os.Parcelable {
 	/**
 	 * The id of the default channel for an app.
 	 */
@@ -426,4 +426,135 @@ public final class NotificationChannel {
 	public String toString() {
 		return "NotificationChannel{mId='" + mId + "', mName=" + mName + ", mImportance=" + mImportance + "}";
 	}
+
+	/* AOSP NotificationChannel.writeToParcel()/NotificationChannel(Parcel)/CREATOR (Android 16). The AOSP
+	 * fields ATL does not keep (user locked fields, task shown, deleted, original importance, demoted,
+	 * deleted time, importance locked) are written with their AOSP defaults and skipped when read; ATL's
+	 * VibrationEffect is not Parcelable, so the effect is written as absent */
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		if (mId != null) {
+			dest.writeByte((byte)1);
+			dest.writeString(mId);
+		} else {
+			dest.writeByte((byte)0);
+		}
+		if (mName != null) {
+			dest.writeByte((byte)1);
+			dest.writeString(mName);
+		} else {
+			dest.writeByte((byte)0);
+		}
+		if (mDesc != null) {
+			dest.writeByte((byte)1);
+			dest.writeString(mDesc);
+		} else {
+			dest.writeByte((byte)0);
+		}
+		dest.writeInt(mImportance);
+		dest.writeByte(mBypassDnd ? (byte)1 : (byte)0);
+		dest.writeInt(mLockscreenVisibility);
+		if (mSound != null) {
+			dest.writeByte((byte)1);
+			mSound.writeToParcel(dest, 0);
+		} else {
+			dest.writeByte((byte)0);
+		}
+		dest.writeByte(mLights ? (byte)1 : (byte)0);
+		dest.writeInt(0 /* mUserLockedFields */);
+		dest.writeByte((byte)0 /* mUserVisibleTaskShown */);
+		dest.writeByte(mVibrationEnabled ? (byte)1 : (byte)0);
+		dest.writeByte(mShowBadge ? (byte)1 : (byte)0);
+		dest.writeByte((byte)0 /* mDeleted */);
+		if (mGroup != null) {
+			dest.writeByte((byte)1);
+			dest.writeString(mGroup);
+		} else {
+			dest.writeByte((byte)0);
+		}
+		if (mAudioAttributes != null) {
+			dest.writeInt(1);
+			mAudioAttributes.writeToParcel(dest, 0);
+		} else {
+			dest.writeInt(0);
+		}
+		dest.writeInt(mLightColor);
+		dest.writeBoolean(mBlockableSystem);
+		dest.writeInt(mAllowBubbles);
+		dest.writeInt(DEFAULT_IMPORTANCE /* mOriginalImportance */);
+		dest.writeString(mParentId);
+		dest.writeString(mConversationId);
+		dest.writeBoolean(false /* mDemoted */);
+		dest.writeBoolean(mImportantConvo);
+		dest.writeLong(-1 /* mDeletedTime: DEFAULT_DELETION_TIME_MS */);
+		dest.writeBoolean(false /* mImportanceLockedDefaultApp */);
+		dest.writeLongArray(mVibration);
+		dest.writeInt(0 /* mVibrationEffect */);
+	}
+
+	private NotificationChannel(android.os.Parcel in) {
+		if (in.readByte() != 0) {
+			mId = getTrimmedString(in.readString());
+		} else {
+			mId = null;
+		}
+		if (in.readByte() != 0) {
+			mName = getTrimmedString(in.readString());
+		} else {
+			mName = null;
+		}
+		if (in.readByte() != 0) {
+			mDesc = getTrimmedString(in.readString());
+		} else {
+			mDesc = null;
+		}
+		mImportance = in.readInt();
+		mBypassDnd = in.readByte() != 0;
+		mLockscreenVisibility = in.readInt();
+		if (in.readByte() != 0) {
+			mSound = Uri.CREATOR.createFromParcel(in);
+			mSound = Uri.parse(getTrimmedString(mSound.toString()));
+		} else {
+			mSound = null;
+		}
+		mLights = in.readByte() != 0;
+		in.readInt(); // mUserLockedFields
+		in.readByte(); // mUserVisibleTaskShown
+		mVibrationEnabled = in.readByte() != 0;
+		mShowBadge = in.readByte() != 0;
+		in.readByte(); // mDeleted
+		if (in.readByte() != 0) {
+			mGroup = getTrimmedString(in.readString());
+		} else {
+			mGroup = null;
+		}
+		mAudioAttributes = in.readInt() > 0 ? AudioAttributes.CREATOR.createFromParcel(in) : null;
+		mLightColor = in.readInt();
+		mBlockableSystem = in.readBoolean();
+		mAllowBubbles = in.readInt();
+		in.readInt(); // mOriginalImportance
+		mParentId = getTrimmedString(in.readString());
+		mConversationId = getTrimmedString(in.readString());
+		in.readBoolean(); // mDemoted
+		mImportantConvo = in.readBoolean();
+		in.readLong(); // mDeletedTime
+		in.readBoolean(); // mImportanceLockedDefaultApp
+		mVibration = in.createLongArray();
+		in.readInt(); // mVibrationEffect: not Parcelable in ATL, always written as absent
+	}
+
+	public static final android.os.Parcelable.Creator<NotificationChannel> CREATOR = new android.os.Parcelable.Creator<NotificationChannel>() {
+		@Override
+		public NotificationChannel createFromParcel(android.os.Parcel in) {
+			return new NotificationChannel(in);
+		}
+
+		@Override
+		public NotificationChannel[] newArray(int size) {
+			return new NotificationChannel[size];
+		}
+	};
 }

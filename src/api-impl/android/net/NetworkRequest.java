@@ -3,7 +3,7 @@ package android.net;
 /* AOSP packages/modules/Connectivity/framework/src/android/net/NetworkRequest.java (android14-release): the
  * capabilities and transports a request asks for (WorkManager builds its network constraint from one).
  * Without legacy type, uid ranges and string specifiers. */
-public class NetworkRequest {
+public class NetworkRequest implements android.os.Parcelable {
 	public final NetworkCapabilities networkCapabilities;
 
 	private NetworkRequest(NetworkCapabilities nc) {
@@ -102,4 +102,32 @@ public class NetworkRequest {
 	public String toString() {
 		return "NetworkRequest [ " + networkCapabilities + " ]";
 	}
+
+	/* AOSP NetworkRequest.describeContents()/writeToParcel()/CREATOR: the capabilities, then legacy type,
+	 * request id and type, which ATL does not keep (written as a built request has them: TYPE_NONE -1,
+	 * REQUEST_ID_UNSET 0, Type.NONE; skipped when read) */
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		networkCapabilities.writeToParcel(dest, flags);
+		dest.writeInt(-1); // legacyType: ConnectivityManager.TYPE_NONE
+		dest.writeInt(0); // requestId: ConnectivityManager.REQUEST_ID_UNSET
+		dest.writeString("NONE"); // type: Type.NONE
+	}
+
+	public static final android.os.Parcelable.Creator<NetworkRequest> CREATOR = new android.os.Parcelable.Creator<NetworkRequest>() {
+		public NetworkRequest createFromParcel(android.os.Parcel in) {
+			NetworkRequest request = new NetworkRequest(NetworkCapabilities.CREATOR.createFromParcel(in));
+			in.readInt(); // legacyType
+			in.readInt(); // requestId
+			in.readString(); // type
+			return request;
+		}
+
+		public NetworkRequest[] newArray(int size) {
+			return new NetworkRequest[size];
+		}
+	};
 }

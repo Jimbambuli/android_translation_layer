@@ -49,7 +49,7 @@ import java.util.zip.ZipEntry;
  * files that have been bundled with the application as a simple stream of
  * bytes.
  */
-public final class AssetManager {
+public final class AssetManager implements AutoCloseable {
 	static {
 		if (Build.VERSION.RESOURCES_SDK_INT == 0) {
 			// If we reach there, continuing execution will only result in a corrupted state
