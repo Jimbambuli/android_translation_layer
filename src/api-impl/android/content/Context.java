@@ -950,10 +950,19 @@ public abstract class Context {
 	 * killer; ATL has no process importance, so nothing changes */
 	public void updateServiceGroup(ServiceConnection conn, int group, int importance) {}
 
+	/* AOSP (LoadedApk.forgetReceiverDispatcher) throws IllegalArgumentException for a receiver that is not
+	 * registered, null included; apps catch that one. ConcurrentHashMap.remove(null) threw a
+	 * NullPointerException instead */
 	public void unregisterReceiver(BroadcastReceiver receiver) {
+		boolean registered = false;
 		while (receiverMap.values().remove(receiver))
-			;
-		receiverSchedulers.remove(receiver);
+			registered = true;
+		if (receiver != null && receiverSchedulers.remove(receiver) != null)
+			registered = true;
+		if (!registered) {
+			Slog.w(TAG, "unregisterReceiver: receiver not registered: " + receiver);
+			throw new IllegalArgumentException("Receiver not registered: " + receiver);
+		}
 	}
 
 	public static final int CONTEXT_INCLUDE_CODE = 0x00000001;
