@@ -70,6 +70,7 @@ public class Paint {
 		font_feature_settings = paint.font_feature_settings;
 		font_variation_settings = paint.font_variation_settings;
 		elegant_text_height = paint.elegant_text_height;
+		mWordSpacing = paint.mWordSpacing;
 		typeface = paint.typeface;
 		text_scale_x = paint.text_scale_x;
 		stroke_miter = paint.stroke_miter;
@@ -637,6 +638,18 @@ public class Paint {
 		elegant_text_height = elegant;
 	}
 
+	/* AOSP Paint.setWordSpacing()/getWordSpacing(): extra advance added at each space; kept, not applied by
+	 * the Pango text path */
+	private float mWordSpacing;
+
+	public void setWordSpacing(float wordSpacing) {
+		mWordSpacing = wordSpacing;
+	}
+
+	public float getWordSpacing() {
+		return mWordSpacing;
+	}
+
 	public float getLetterSpacing() {
 		return native_get_letter_spacing(paint);
 	}
@@ -688,6 +701,7 @@ public class Paint {
 		color_filter = null;
 		stroke_width = 0;
 		path_effect = null;
+		mWordSpacing = 0;
 		shadow_layer_radius = 0;
 		shadow_layer_dx = 0;
 		shadow_layer_dy = 0;

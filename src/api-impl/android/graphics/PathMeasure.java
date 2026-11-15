@@ -81,6 +81,25 @@ public class PathMeasure {
 		return native_pos_tan(mContours[mIndex], mMeasure, distance, pos, tan);
 	}
 
+	public static final int POSITION_MATRIX_FLAG = 0x01;
+	public static final int TANGENT_MATRIX_FLAG = 0x02;
+
+	/* AOSP PathMeasure.getMatrix() -> SkContourMeasure::getMatrix(): rotation from the tangent (if asked),
+	 * then translation to the position (if asked); built here on getPosTan() */
+	public boolean getMatrix(float distance, Matrix matrix, int flags) {
+		float[] pos = new float[2];
+		float[] tan = new float[2];
+		if (!getPosTan(distance, pos, tan))
+			return false;
+		if ((flags & TANGENT_MATRIX_FLAG) != 0)
+			matrix.setSinCos(tan[1], tan[0], 0, 0);
+		else
+			matrix.reset();
+		if ((flags & POSITION_MATRIX_FLAG) != 0)
+			matrix.postTranslate(pos[0], pos[1]);
+		return true;
+	}
+
 	/**
 	 * Given a start and stop distance, return in dst the intervening
 	 * segment(s). If the segment is zero-length, return false, else return
