@@ -328,7 +328,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<StatusBarManager>() {
             @Override
             public StatusBarManager createService(ContextImpl ctx) {
-                return new StatusBarManager();
+                return new StatusBarManager(ctx);
             }});
 
         registerService(Context.CAMERA_SERVICE, CameraManager.class,
