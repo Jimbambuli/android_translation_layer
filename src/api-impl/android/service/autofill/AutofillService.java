@@ -52,4 +52,15 @@ public abstract class AutofillService extends Service {
 
 	public void onDisconnected() {
 	}
+
+	/* AOSP AutofillService.onSessionDestroyed(): called when a session ends, with its history; nothing by default */
+	public void onSessionDestroyed(FillEventHistory history) {}
+
+	/* AOSP AutofillService.getFillEventHistory() asks the system's AutofillManagerService, which answers only the
+	 * autofill service that is selected; ATL has no such system service, so the answer is the one for a caller that is
+	 * not that service: no history */
+	@Deprecated
+	public final FillEventHistory getFillEventHistory() {
+		return null;
+	}
 }
