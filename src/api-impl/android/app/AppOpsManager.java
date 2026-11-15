@@ -1047,6 +1047,45 @@ public class AppOpsManager {
 		return new java.util.ArrayList<>();
 	}
 
+	/* AOSP AppOpsManager.OnOpNotedCallback: told about ops noted for the app. ATL has no AppOpsService noting them,
+	 * so none of the callbacks is ever called. */
+	public abstract static class OnOpNotedCallback {
+		private java.util.concurrent.Executor mAsyncExecutor;
+
+		protected java.util.concurrent.Executor getAsyncNotedExecutor() {
+			return mAsyncExecutor;
+		}
+
+		public abstract void onNoted(SyncNotedAppOp op);
+
+		public abstract void onSelfNoted(SyncNotedAppOp op);
+
+		public abstract void onAsyncNoted(AsyncNotedAppOp asyncOp);
+	}
+
+	private static OnOpNotedCallback sOnOpNotedCallback;
+
+	/* AOSP AppOpsManager.setOnOpNotedCallback(): the state checks; the registration with the service is left out */
+	public void setOnOpNotedCallback(java.util.concurrent.Executor asyncExecutor, OnOpNotedCallback callback) {
+		if ((callback == null) != (asyncExecutor == null)) {
+			throw new IllegalStateException();
+		}
+		synchronized (AppOpsManager.class) {
+			if (callback == null) {
+				if (sOnOpNotedCallback == null) {
+					throw new IllegalStateException("No callback is currently registered");
+				}
+				sOnOpNotedCallback = null;
+			} else {
+				if (sOnOpNotedCallback != null) {
+					throw new IllegalStateException("Another callback is already registered");
+				}
+				callback.mAsyncExecutor = asyncExecutor;
+				sOnOpNotedCallback = callback;
+			}
+		}
+	}
+
 	public static final class PackageOps {
 		private final String mPackageName;
 		private final int mUid;
