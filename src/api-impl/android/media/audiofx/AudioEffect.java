@@ -119,6 +119,169 @@ public class AudioEffect {
 		return getParameter(p, value);
 	}
 
+	/* AOSP AudioEffect get/setParameter() overloads over int/short arrays; they end in the byte[] ones */
+	public int setParameter(int[] param, int[] value)
+			throws IllegalStateException {
+		if (param.length > 2 || value.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param[0]);
+		if (param.length > 1) {
+			byte[] p2 = intToByteArray(param[1]);
+			p = concatArrays(p, p2);
+		}
+		byte[] v = intToByteArray(value[0]);
+		if (value.length > 1) {
+			byte[] v2 = intToByteArray(value[1]);
+			v = concatArrays(v, v2);
+		}
+		return setParameter(p, v);
+	}
+
+	public int setParameter(int[] param, short[] value)
+			throws IllegalStateException {
+		if (param.length > 2 || value.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param[0]);
+		if (param.length > 1) {
+			byte[] p2 = intToByteArray(param[1]);
+			p = concatArrays(p, p2);
+		}
+
+		byte[] v = shortToByteArray(value[0]);
+		if (value.length > 1) {
+			byte[] v2 = shortToByteArray(value[1]);
+			v = concatArrays(v, v2);
+		}
+		return setParameter(p, v);
+	}
+
+	public int setParameter(int[] param, byte[] value)
+			throws IllegalStateException {
+		if (param.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param[0]);
+		if (param.length > 1) {
+			byte[] p2 = intToByteArray(param[1]);
+			p = concatArrays(p, p2);
+		}
+		return setParameter(p, value);
+	}
+
+	public int getParameter(int param, int[] value)
+			throws IllegalStateException {
+		if (value.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param);
+
+		byte[] v = new byte[value.length * 4];
+
+		int status = getParameter(p, v);
+
+		if (status == 4 || status == 8) {
+			value[0] = byteArrayToInt(v);
+			if (status == 8) {
+				value[1] = byteArrayToInt(v, 4);
+			}
+			status /= 4;
+		} else {
+			status = ERROR;
+		}
+		return status;
+	}
+
+	public int getParameter(int param, short[] value)
+			throws IllegalStateException {
+		if (value.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param);
+
+		byte[] v = new byte[value.length * 2];
+
+		int status = getParameter(p, v);
+
+		if (status == 2 || status == 4) {
+			value[0] = byteArrayToShort(v);
+			if (status == 4) {
+				value[1] = byteArrayToShort(v, 2);
+			}
+			status /= 2;
+		} else {
+			status = ERROR;
+		}
+		return status;
+	}
+
+	public int getParameter(int[] param, int[] value)
+			throws IllegalStateException {
+		if (param.length > 2 || value.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param[0]);
+		if (param.length > 1) {
+			byte[] p2 = intToByteArray(param[1]);
+			p = concatArrays(p, p2);
+		}
+		byte[] v = new byte[value.length * 4];
+
+		int status = getParameter(p, v);
+
+		if (status == 4 || status == 8) {
+			value[0] = byteArrayToInt(v);
+			if (status == 8) {
+				value[1] = byteArrayToInt(v, 4);
+			}
+			status /= 4;
+		} else {
+			status = ERROR;
+		}
+		return status;
+	}
+
+	public int getParameter(int[] param, short[] value)
+			throws IllegalStateException {
+		if (param.length > 2 || value.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param[0]);
+		if (param.length > 1) {
+			byte[] p2 = intToByteArray(param[1]);
+			p = concatArrays(p, p2);
+		}
+		byte[] v = new byte[value.length * 2];
+
+		int status = getParameter(p, v);
+
+		if (status == 2 || status == 4) {
+			value[0] = byteArrayToShort(v);
+			if (status == 4) {
+				value[1] = byteArrayToShort(v, 2);
+			}
+			status /= 2;
+		} else {
+			status = ERROR;
+		}
+		return status;
+	}
+
+	public int getParameter(int[] param, byte[] value)
+			throws IllegalStateException {
+		if (param.length > 2) {
+			return ERROR_BAD_VALUE;
+		}
+		byte[] p = intToByteArray(param[0]);
+		if (param.length > 1) {
+			byte[] p2 = intToByteArray(param[1]);
+			p = concatArrays(p, p2);
+		}
+
+		return getParameter(p, value);
+	}
+
 	public int getId() throws IllegalStateException {
 		checkState("getId()");
 		return 0;
