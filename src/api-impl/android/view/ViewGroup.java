@@ -622,7 +622,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (child.hasTransientState()) {
 			childHasTransientStateChanged(child, false);
 		}
-		child.parent = null;
+		// AOSP ViewGroup.removeFromArray(): a transitioning view keeps its parent until endViewTransition()
+		if (!(mTransitioningViews != null && mTransitioningViews.contains(child))) {
+			child.parent = null;
+		}
 		children.remove(index);
 		native_removeView(widget, child.widget);
 	}
@@ -667,8 +670,14 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	private void removeViewInternal(int index, View view) {
-		// like AOSP's mAttachInfo != null: dispatchDetachedFromWindow() does nothing for a detached view
-		view.dispatchDetachedFromWindow();
+		/* AOSP ViewGroup.removeViewInternal(): a transitioning view stays attached until endViewTransition()
+		 * (the view animation half of that check is not taken over; ATL detaches animated views at once) */
+		if (mTransitioningViews != null && mTransitioningViews.contains(view)) {
+			addDisappearingView(view);
+		} else {
+			// like AOSP's mAttachInfo != null: dispatchDetachedFromWindow() does nothing for a detached view
+			view.dispatchDetachedFromWindow();
+		}
 
 		removeFromArray(index);
 
@@ -685,7 +694,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		for (int i = start; i < end; i++) {
 			final View view = children.get(i);
 
-			view.dispatchDetachedFromWindow();
+			if (mTransitioningViews != null && mTransitioningViews.contains(view)) {
+				addDisappearingView(view);
+			} else {
+				view.dispatchDetachedFromWindow();
+			}
 
 			dispatchViewRemoved(view);
 		}
@@ -710,7 +723,11 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		for (int i = count - 1; i >= 0; i--) {
 			final View view = children.get(i);
 
-			view.dispatchDetachedFromWindow();
+			if (mTransitioningViews != null && mTransitioningViews.contains(view)) {
+				addDisappearingView(view);
+			} else {
+				view.dispatchDetachedFromWindow();
+			}
 
 			dispatchViewRemoved(view);
 
@@ -1417,8 +1434,44 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return false;
 	}
 
-	public void startViewTransition(View view) {}
-	public void endViewTransition(View view) {}
+	private ArrayList<View> mTransitioningViews;
+	/* AOSP keeps the disappearing views drawn; ATL removes the GTK widget at once in removeFromArray(), so this
+	 * list only carries the attach/parent state from removal until endViewTransition() */
+	private ArrayList<View> mDisappearingChildren;
+
+	private void addDisappearingView(View v) {
+		if (mDisappearingChildren == null) {
+			mDisappearingChildren = new ArrayList<View>();
+		}
+		mDisappearingChildren.add(v);
+	}
+
+	// AOSP ViewGroup.startViewTransition()
+	public void startViewTransition(View view) {
+		if (view.parent == this) {
+			if (mTransitioningViews == null) {
+				mTransitioningViews = new ArrayList<View>();
+			}
+			mTransitioningViews.add(view);
+		}
+	}
+
+	/* AOSP ViewGroup.endViewTransition(); mVisibilityChangingChildren (LayoutTransition.hideChild) is not
+	 * taken over, ATL's onChildVisibilityChanged() does not add to the disappearing views */
+	public void endViewTransition(View view) {
+		if (mTransitioningViews != null) {
+			mTransitioningViews.remove(view);
+			final ArrayList<View> disappearingChildren = mDisappearingChildren;
+			if (disappearingChildren != null && disappearingChildren.contains(view)) {
+				disappearingChildren.remove(view);
+				view.dispatchDetachedFromWindow();
+				if (view.parent != null) {
+					view.parent = null;
+				}
+				invalidate();
+			}
+		}
+	}
 
 	protected LayoutParams generateDefaultLayoutParams() {
 		return new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
