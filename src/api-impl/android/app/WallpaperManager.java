@@ -100,4 +100,30 @@ public class WallpaperManager {
 	}
 
 	private static native void set_bitmap(long texture);
+
+	/* AOSP DisabledWallpaperManager (no wallpaper service): unsupported() does nothing and returns null/false/-1/0 */
+	public android.graphics.drawable.Drawable getBuiltInDrawable() { return null; }
+	public android.graphics.drawable.Drawable getBuiltInDrawable(int which) { return null; }
+	public android.graphics.drawable.Drawable getBuiltInDrawable(int outWidth, int outHeight, boolean scaleToFit, float horizontalAlignment, float verticalAlignment) { return null; }
+	public android.graphics.drawable.Drawable getBuiltInDrawable(int outWidth, int outHeight, boolean scaleToFit, float horizontalAlignment, float verticalAlignment, int which) { return null; }
+	public android.graphics.drawable.Drawable peekDrawable() { return null; }
+	public android.graphics.drawable.Drawable peekDrawable(int which) { return null; }
+	public android.graphics.drawable.Drawable getFastDrawable() { return null; }
+	public android.graphics.drawable.Drawable getFastDrawable(int which) { return null; }
+	public android.graphics.drawable.Drawable peekFastDrawable() { return null; }
+	public android.graphics.drawable.Drawable peekFastDrawable(int which) { return null; }
+	public android.os.ParcelFileDescriptor getWallpaperFile(int which) { return null; }
+	public int getWallpaperId(int which) { return -1; }
+	public android.content.Intent getCropAndSetWallpaperIntent(android.net.Uri imageUri) { return null; }
+	public boolean hasResourceWallpaper(int resid) { return false; }
+	public void forgetLoadedWallpaper() {}
+	public void clearWallpaper() {}
+	public void setResource(int resid) throws java.io.IOException {}
+	public int setResource(int resid, int which) throws java.io.IOException { return 0; }
+	public void suggestDesiredDimensions(int minimumWidth, int minimumHeight) {}
+	public void setDisplayPadding(android.graphics.Rect padding) {}
+	public void setWallpaperOffsets(android.os.IBinder windowToken, float xOffset, float yOffset) {}
+	public void setWallpaperOffsetSteps(float xStep, float yStep) {}
+	public void clearWallpaperOffsets(android.os.IBinder windowToken) {}
+	public void sendWallpaperCommand(android.os.IBinder windowToken, String action, int x, int y, int z, android.os.Bundle extras) {}
 }
