@@ -117,6 +117,9 @@ public class AlertDialog extends Dialog implements DialogInterface {
 	public static class Builder {
 		private AlertDialog dialog;
 		private Context context;
+		private boolean cancelable = true;
+		private OnCancelListener onCancelListener;
+		private DialogInterface.OnKeyListener onKeyListener;
 
 		public Builder(Context context) {
 			System.out.println("making an AlertDialog$Builder as we speak, my word!");
@@ -163,7 +166,10 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return setNeutralButton(dialog.getContext().getText(textId), listener);
 		}
 
+		/* AOSP AlertDialog.Builder.create(): the dialog takes the builder's cancelable flag (true by
+		 * default) and then also cancels on a touch outside */
 		public AlertDialog.Builder setCancelable(boolean cancelable) {
+			this.cancelable = cancelable;
 			return this;
 		}
 
@@ -291,6 +297,12 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		}
 
 		public Builder setOnCancelListener(OnCancelListener onCancelListener) {
+			this.onCancelListener = onCancelListener;
+			return this;
+		}
+
+		public Builder setOnKeyListener(DialogInterface.OnKeyListener onKeyListener) {
+			this.onKeyListener = onKeyListener;
 			return this;
 		}
 
@@ -300,10 +312,20 @@ public class AlertDialog extends Dialog implements DialogInterface {
 		}
 
 		public AlertDialog create() {
+			dialog.setCancelable(cancelable);
+			if (cancelable) {
+				dialog.setCanceledOnTouchOutside(true);
+			}
+			dialog.setOnCancelListener(onCancelListener);
+			if (onKeyListener != null) {
+				dialog.setOnKeyListener(onKeyListener);
+			}
 			return dialog;
 		}
 
+		/* AOSP: create() and show() */
 		public AlertDialog show() {
+			create();
 			dialog.show();
 			return dialog;
 		}
