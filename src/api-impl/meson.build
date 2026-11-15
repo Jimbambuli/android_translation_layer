@@ -508,6 +508,8 @@ srcs = [
 	'android/hardware/biometrics/BiometricPrompt.java',
 	'android/hardware/biometrics/CryptoObject.java',
 	'android/hardware/camera2/CameraAccessException.java',
+	'android/hardware/camera2/CameraCharacteristics.java',
+	'android/hardware/camera2/CameraDevice.java',
 	'android/hardware/camera2/CameraManager.java',
 	'android/hardware/camera2/params/InputConfiguration.java',
 	'android/hardware/camera2/params/MultiResolutionStreamInfo.java',
