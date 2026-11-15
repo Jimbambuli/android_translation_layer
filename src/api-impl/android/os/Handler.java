@@ -715,6 +715,7 @@ public class Handler {
 
 	private final class MessengerImpl implements IMessenger {
 		public void send(Message msg) {
+			msg.sendingUid = Binder.getCallingUid(); /* AOSP Handler.MessengerImpl.send() */
 			Handler.this.sendMessage(msg);
 		}
 	}

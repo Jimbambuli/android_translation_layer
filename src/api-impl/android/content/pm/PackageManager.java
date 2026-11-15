@@ -3886,6 +3886,40 @@ public class PackageManager {
 		return false;
 	}
 
+	/* AOSP ApplicationPackageManager.isPackageSuspended(String): PackageManagerService answers false for an installed
+	 * package nobody suspended (ATL has no suspend API); an unknown package is a NameNotFoundException */
+	public boolean isPackageSuspended(String packageName) throws NameNotFoundException {
+		getPackageInfo(packageName, 0);
+		return false;
+	}
+
+	/* AOSP ApplicationPackageManager.isPackageSuspended(): the calling package, never suspended here */
+	public boolean isPackageSuspended() {
+		return false;
+	}
+
+	/* AOSP ApplicationPackageManager.getUserBadgedIcon(): hasUserBadge() is false for the only (owner) user, so the
+	 * icon comes back as it is; getUserBadgedLabel() = UserManager.getBadgedLabelForUser(): no managed profile, no label change */
+	public Drawable getUserBadgedIcon(Drawable icon, UserHandle user) {
+		return icon;
+	}
+
+	public CharSequence getUserBadgedLabel(CharSequence label, UserHandle user) {
+		return label;
+	}
+
+	/* AOSP ApplicationPackageManager.isPermissionRevokedByPolicy(): no device policy, no permission revoked by it */
+	public boolean isPermissionRevokedByPolicy(String permName, String pkgName) {
+		return false;
+	}
+
+	/* AOSP PackageManager.isDefaultApplicationIcon(): the icon is the AdaptiveIconDrawable made from sym_def_app_icon */
+	public boolean isDefaultApplicationIcon(Drawable drawable) {
+		int resId = drawable instanceof android.graphics.drawable.AdaptiveIconDrawable
+		    ? ((android.graphics.drawable.AdaptiveIconDrawable)drawable).getSourceDrawableResId() : Resources.ID_NULL;
+		return resId == com.android.internal.R.drawable.sym_def_app_icon;
+	}
+
 	/**
 	 * Return whether the device has been booted into safe mode.
 	 */

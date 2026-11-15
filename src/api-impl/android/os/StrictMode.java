@@ -110,6 +110,12 @@ public final class StrictMode {
 		return old;
 	}
 
+	/* AOSP StrictMode.enableDefaults() */
+	public static void enableDefaults() {
+		setThreadPolicy(new StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build());
+		setVmPolicy(new StrictMode.VmPolicy.Builder().detectAll().penaltyLog().build());
+	}
+
 	/* AOSP StrictMode.setVmPolicy (without the CloseGuard/instance-count checkers) */
 	public static void setVmPolicy(final VmPolicy policy) {
 		synchronized (StrictMode.class) {

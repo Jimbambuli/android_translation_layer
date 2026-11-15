@@ -108,6 +108,7 @@ public class Build {
 	 * The manufacturer of the product/hardware.
 	 */
 	public static final String SOC_MANUFACTURER = UNKNOWN; /* AOSP: ro.soc.manufacturer, "unknown" when not set */
+	public static final String SKU = UNKNOWN; /* AOSP: ro.boot.hardware.sku, "unknown" when not set */
 	public static final String SOC_MODEL = UNKNOWN; /* AOSP: ro.soc.model, "unknown" when not set */
 
 	public static final String MANUFACTURER = getString("ro.product.manufacturer");
@@ -227,6 +228,12 @@ public class Build {
 		 * The SDK version including the minor version: SDK_INT * 100000 + minor.
 		 */
 		public static final int SDK_INT_FULL;
+
+		/**
+		 * The media performance class of the device (AOSP DeviceProperties.media_performance_class().orElse(0)):
+		 * 0 when the device declares none.
+		 */
+		public static final int MEDIA_PERFORMANCE_CLASS = 0;
 
 		/**
 		 * The user-visible SDK version of the framework in its raw String
