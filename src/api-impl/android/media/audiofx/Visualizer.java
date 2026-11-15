@@ -4,6 +4,9 @@ package android.media.audiofx;
  * visualizer effect and the constructor throws as AOSP's does for a failed setup (error ERROR_BAD_VALUE, the
  * code AudioEffect reports for an unknown type); no instance exists. */
 public class Visualizer {
+	private static final String TAG = "Visualizer-JAVA";
+	private OnServerDiedListener mServerDiedListener = null;
+
 	public static final int STATE_UNINITIALIZED = 0;
 	public static final int STATE_INITIALIZED = 1;
 	public static final int STATE_ENABLED = 2;
@@ -39,6 +42,74 @@ public class Visualizer {
 	 * 20000 as remembered, not in the checked-out tree, unverified here */
 	public static int getMaxCaptureRate() {
 		return 20000;
+	}
+
+	/* AOSP finalize(): native_finalize(); none exists */
+	@Override
+	protected void finalize() {}
+
+	/* AOSP getEnabled(): state is STATE_UNINITIALIZED */
+	public boolean getEnabled() {
+		throw new IllegalStateException("getEnabled() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	/* AOSP getCaptureSize()/setScalingMode()/getScalingMode()/setMeasurementMode()/getMeasurementMode()/
+	 * getSamplingRate(): state is STATE_UNINITIALIZED */
+	public int getCaptureSize() throws IllegalStateException {
+		throw new IllegalStateException("getCaptureSize() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public int setScalingMode(int mode) throws IllegalStateException {
+		throw new IllegalStateException("setScalingMode() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public int getScalingMode() throws IllegalStateException {
+		throw new IllegalStateException("getScalingMode() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public int setMeasurementMode(int mode) throws IllegalStateException {
+		throw new IllegalStateException("setMeasurementMode() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public int getMeasurementMode() throws IllegalStateException {
+		throw new IllegalStateException("getMeasurementMode() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public int getSamplingRate() throws IllegalStateException {
+		throw new IllegalStateException("getSamplingRate() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	/* AOSP getWaveForm()/getFft(): state is not STATE_ENABLED */
+	public int getWaveForm(byte[] waveform) throws IllegalStateException {
+		throw new IllegalStateException("getWaveForm() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public int getFft(byte[] fft) throws IllegalStateException {
+		throw new IllegalStateException("getFft() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public static final class MeasurementPeakRms {
+		public int mPeak;
+		public int mRms;
+	}
+
+	/* AOSP getMeasurementPeakRms(): null check first, then the state check */
+	public int getMeasurementPeakRms(MeasurementPeakRms measurement) {
+		if (measurement == null) {
+			android.util.Log.e(TAG, "Cannot store measurements in a null object");
+			return ERROR_BAD_VALUE;
+		}
+		throw new IllegalStateException("getMeasurementPeakRms() called in wrong state: " + STATE_UNINITIALIZED);
+	}
+
+	public interface OnServerDiedListener {
+		void onServerDied();
+	}
+
+	/* AOSP setServerDiedListener(): stores the listener, returns SUCCESS */
+	public int setServerDiedListener(OnServerDiedListener listener) {
+		mServerDiedListener = listener;
+		return SUCCESS;
 	}
 
 	/* AOSP release(): frees the native engine; none exists */
