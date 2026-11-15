@@ -286,6 +286,44 @@ public class NotificationManager {
 		throw new SecurityException("Notification policy access denied");
 	}
 
+	/* AOSP NotificationManager addAutomaticZenRule/updateAutomaticZenRule/removeAutomaticZenRule/
+	 * getAutomaticZenRules/setAutomaticZenRuleState: the service enforces the policy access of the user
+	 * (enforcePolicyAccess) first, which ATL never has (isNotificationPolicyAccessGranted()), so all of them
+	 * throw the SecurityException like setInterruptionFilter(). */
+	public String addAutomaticZenRule(AutomaticZenRule automaticZenRule) {
+		throw new SecurityException("Notification policy access denied");
+	}
+
+	public boolean updateAutomaticZenRule(String id, AutomaticZenRule automaticZenRule) {
+		throw new SecurityException("Notification policy access denied");
+	}
+
+	public boolean removeAutomaticZenRule(String id) {
+		throw new SecurityException("Notification policy access denied");
+	}
+
+	public java.util.Map<String, AutomaticZenRule> getAutomaticZenRules() {
+		throw new SecurityException("Notification policy access denied");
+	}
+
+	public void setAutomaticZenRuleState(String id, android.service.notification.Condition condition) {
+		throw new SecurityException("Notification policy access denied");
+	}
+
+	/* AOSP deprecated areBubblesAllowed(): the service's per-app bubble preference of this package equals
+	 * BUBBLE_PREFERENCE_ALL; an app nobody has configured has BUBBLE_PREFERENCE_NONE. (The service source is not
+	 * in the AOSP tree used here: the default is not verified against it.) */
+	@Deprecated
+	public boolean areBubblesAllowed() {
+		return false;
+	}
+
+	/* AOSP canPostPromotedNotifications(): the service's per-app promotion permission of this package; the
+	 * default of an app nobody has changed is allowed. (Service source not in the tree, default not verified.) */
+	public boolean canPostPromotedNotifications() {
+		return true;
+	}
+
 	/* AOSP NotificationManager.getNotificationPolicy(): the Do Not Disturb policy of the manual rule
 	 * (ZenModeConfig.toNotificationPolicy()); nobody changes it on ATL, so it is the one built from the
 	 * ZenModeConfig DEFAULT_* values: alarms, media, calls and messages from starred contacts, repeat callers,
@@ -516,5 +554,32 @@ public class NotificationManager {
 		synchronized (channels) {
 			return channels.get(channelId);
 		}
+	}
+
+	/* AOSP NotificationManager members that ask INotificationManager; with the state of ATL (no Do Not Disturb rules,
+	 * no policy access, no bubbles, the app's own package) */
+	public static final int BUBBLE_PREFERENCE_NONE = 0;
+	public static final int BUBBLE_PREFERENCE_ALL = 1;
+	public static final int BUBBLE_PREFERENCE_SELECTED = 2;
+
+	public boolean areAutomaticZenRulesUserManaged() { return true; }
+	public boolean areBubblesEnabled() { return false; }
+	public int getBubblePreference() { return BUBBLE_PREFERENCE_NONE; }
+	public AutomaticZenRule getAutomaticZenRule(String id) { throw new SecurityException("Notification policy access denied"); }
+	public int getAutomaticZenRuleState(String id) { throw new SecurityException("Notification policy access denied"); }
+	public void setNotificationPolicy(Policy policy) { throw new SecurityException("Notification policy access denied"); }
+	public Policy getConsolidatedNotificationPolicy() { return getNotificationPolicy(); }
+	public boolean matchesCallFilter(android.net.Uri uri) { return true; }
+	public boolean shouldHideSilentStatusBarIcons() { return false; }
+	public boolean canNotifyAsPackage(String pkg) { return pkg != null && pkg.equals(ATLLoadedApp.getPrimaryApplication().getApplication().getPackageName()); }
+	public void notifyAsPackage(String targetPackage, String tag, int id, Notification notification) {
+		if (!canNotifyAsPackage(targetPackage))
+			throw new SecurityException("Not allowed to notify as package " + targetPackage);
+		notify(tag, id, notification);
+	}
+	public void cancelAsPackage(String targetPackage, String tag, int id) {
+		if (!canNotifyAsPackage(targetPackage))
+			throw new SecurityException("Not allowed to cancel as package " + targetPackage);
+		cancel(tag, id);
 	}
 }

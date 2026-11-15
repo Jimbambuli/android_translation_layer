@@ -1,6 +1,9 @@
 srcs = [
 	'android/accessibilityservice/AccessibilityService.java',
 	'android/accessibilityservice/GestureDescription.java',
+	'android/app/appfunctions/AppFunctionAttribution.java',
+	'android/app/appfunctions/AppFunctionException.java',
+	'android/app/appfunctions/AppFunctionUriGrant.java',
 	'android/app/backup/BackupDataInput.java',
 	'android/app/backup/BackupDataInputStream.java',
 	'android/app/backup/BackupDataOutput.java',

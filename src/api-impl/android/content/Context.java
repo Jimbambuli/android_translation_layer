@@ -142,6 +142,7 @@ public abstract class Context {
 	public static final String AUTOFILL_MANAGER_SERVICE = "autofill";
 	public static final String TEXT_CLASSIFICATION_SERVICE = "textclassification";
 	public static final String LOCALE_SERVICE = "locale";
+	public static final String GRAMMATICAL_INFLECTION_SERVICE = "grammatical_inflection";
 	public static final String TRANSLATION_MANAGER_SERVICE = "translation";
 	public static final String UI_TRANSLATION_SERVICE = "ui_translation";
 	public static final String TELEPHONY_SUBSCRIPTION_SERVICE = "telephony_subscription_service";

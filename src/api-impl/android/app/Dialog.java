@@ -939,4 +939,17 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	public boolean onContextItemSelected(android.view.MenuItem item) {
 		return false;
 	}
+
+	/* AOSP Dialog members: the window of ATL has no options panel/action bar of its own, so the dialog has none
+	 * (mActionBar, mSearchEvent stay null); the volume control stream is the one PhoneWindow keeps */
+
+	public android.app.ActionBar getActionBar() { return null; }
+	public final android.view.SearchEvent getSearchEvent() { return null; }
+	public final int getVolumeControlStream() { return getWindow().getVolumeControlStream(); }
+	public final void setVolumeControlStream(int streamType) { getWindow().setVolumeControlStream(streamType); }
+	public void onContextMenuClosed(android.view.Menu menu) {}
+	public boolean onGenericMotionEvent(android.view.MotionEvent event) { return false; }
+	public boolean onKeyShortcut(int keyCode, android.view.KeyEvent event) { return false; }
+	public void onOptionsMenuClosed(android.view.Menu menu) {}
+	public boolean onTrackballEvent(android.view.MotionEvent event) { return false; }
 }

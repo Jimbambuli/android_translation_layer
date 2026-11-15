@@ -3,6 +3,7 @@ package android.app;
 import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageParser;
@@ -406,4 +407,72 @@ public class Instrumentation {
 		// replace
 		setFieldObject(pathList.getClass(), pathList, "dexElements", DexElements_new);
 	}
+
+	/* AOSP Instrumentation.callActivityOn*(): the lifecycle callbacks of the Activity (performXxx() of ATL's Activity are
+	 * these on* methods), callApplicationOnCreate() */
+	public void callActivityOnDestroy(Activity activity) { activity.onDestroy(); }
+	public void callActivityOnNewIntent(Activity activity, Intent intent) {
+		callActivityOnNewIntent(activity, intent, new ComponentCaller(null, null, activity.getPackageName(), android.system.Os.getuid()));
+	}
+	public void callActivityOnNewIntent(Activity activity, Intent intent, ComponentCaller caller) { activity.onNewIntent(intent, caller); }
+	public void callActivityOnPause(Activity activity) { activity.onPause(); }
+	public void callActivityOnPictureInPictureRequested(Activity activity) { activity.onPictureInPictureRequested(); }
+	public void callActivityOnPostCreate(Activity activity, Bundle savedInstanceState) { activity.onPostCreate(savedInstanceState); }
+	public void callActivityOnPostCreate(Activity activity, Bundle savedInstanceState, PersistableBundle persistentState) {
+		activity.onPostCreate(savedInstanceState, persistentState);
+	}
+	public void callActivityOnRestart(Activity activity) { activity.onRestart(); }
+	public void callActivityOnRestoreInstanceState(Activity activity, Bundle savedInstanceState) {
+		activity.onRestoreInstanceState(savedInstanceState);
+	}
+	public void callActivityOnRestoreInstanceState(Activity activity, Bundle savedInstanceState, PersistableBundle persistentState) {
+		activity.onRestoreInstanceState(savedInstanceState, persistentState);
+	}
+	public void callActivityOnResume(Activity activity) { activity.onResume(); }
+	public void callActivityOnSaveInstanceState(Activity activity, Bundle outState) { activity.onSaveInstanceState(outState); }
+	public void callActivityOnSaveInstanceState(Activity activity, Bundle outState, PersistableBundle outPersistentState) {
+		activity.onSaveInstanceState(outState, outPersistentState);
+	}
+	public void callActivityOnStart(Activity activity) { activity.onStart(); }
+	public void callActivityOnStop(Activity activity) { activity.onStop(); }
+	public void callActivityOnUserLeaving(Activity activity) { activity.onUserLeaveHint(); }
+	public void callApplicationOnCreate(Application app) { app.onCreate(); }
+
+	/* AOSP Instrumentation without a profiler or allocation counting (mThread.isProfiling() is false, Debug counts are 0) */
+	public boolean isProfiling() { return false; }
+	public void startProfiling() {}
+	public void stopProfiling() {}
+	public void startAllocCounting() {}
+	public void stopAllocCounting() {}
+	public void startPerformanceSnapshot() {}
+	public void endPerformanceSnapshot() {}
+	public Bundle getAllocCounts() {
+		Bundle results = new Bundle();
+		results.putLong("global_alloc_count", android.os.Debug.getGlobalAllocCount());
+		results.putLong("global_alloc_size", android.os.Debug.getGlobalAllocSize());
+		results.putLong("global_freed_count", android.os.Debug.getGlobalFreedCount());
+		results.putLong("global_freed_size", android.os.Debug.getGlobalFreedSize());
+		results.putLong("gc_invocation_count", android.os.Debug.getGlobalGcInvocationCount());
+		return results;
+	}
+	public Bundle getBinderCounts() {
+		Bundle results = new Bundle();
+		results.putLong("sent_transactions", android.os.Debug.getBinderSentTransactions());
+		results.putLong("received_transactions", android.os.Debug.getBinderReceivedTransactions());
+		return results;
+	}
+	public String getProcessName() { return Application.getProcessName(); }
+	public void sendCharacterSync(int keyCode) { sendKeyDownUpSync(keyCode); }
+	public void sendStringSync(String text) {
+		if (text == null)
+			return;
+		KeyEvent[] events = android.view.KeyCharacterMap.load(android.view.KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(text.toCharArray());
+		if (events != null) {
+			for (int i = 0; i < events.length; i++)
+				sendKeySync(KeyEvent.changeTimeRepeat(events[i], android.os.SystemClock.uptimeMillis(), 0));
+		}
+	}
+	public void resetInTouchMode() { setInTouchMode(true); }
+	public void onDestroy() {}
+	public ComponentName getComponentName() { return null; }
 }

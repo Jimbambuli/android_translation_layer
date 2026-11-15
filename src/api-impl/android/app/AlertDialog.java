@@ -238,6 +238,30 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return this;
 		}
 
+		/* AOSP Builder.setCustomTitle(): the view takes the place of the title in the top panel (AlertController
+		 * setupTitle()). The native dialog has a title text but no slot for a view there, so the dialog's title
+		 * becomes the text of the first TextView in the view (the usual content of such a view), none if it has no
+		 * TextView. null removes the custom title. */
+		public AlertDialog.Builder setCustomTitle(View customTitleView) {
+			CharSequence text = customTitleView == null ? null : firstText(customTitleView);
+			dialog.setTitle(text == null ? "" : text);
+			return this;
+		}
+
+		private static CharSequence firstText(View v) {
+			if (v instanceof android.widget.TextView)
+				return ((android.widget.TextView) v).getText();
+			if (v instanceof android.view.ViewGroup) {
+				android.view.ViewGroup g = (android.view.ViewGroup) v;
+				for (int i = 0; i < g.getChildCount(); i++) {
+					CharSequence t = firstText(g.getChildAt(i));
+					if (t != null)
+						return t;
+				}
+			}
+			return null;
+		}
+
 		public AlertDialog.Builder setTitle(int title) {
 			return setTitle(dialog.getContext().getText(title));
 		}

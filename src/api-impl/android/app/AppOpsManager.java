@@ -1305,4 +1305,29 @@ public class AppOpsManager {
 	/* AOSP AppOpsManager.checkPackage(): the service answers MODE_ALLOWED for ATL's one package (as checkOp()) */
 	public void checkPackage(int uid, String packageName) {
 	}
+
+	/* AOSP AppOpsManager startOp/finishOp/startProxyOp/finishProxyOp/isOpActive/startWatchingActive: ATL keeps no op
+	 * state (noteOp() is MODE_ALLOWED), so starting an op is allowed, nothing is ever active, nothing to watch */
+	public interface OnOpActiveChangedListener {
+		void onOpActiveChanged(String op, int uid, String packageName, boolean active);
+		default void onOpActiveChanged(String op, int uid, String packageName, String attributionTag, int virtualDeviceId, boolean active, int attributionFlags, int attributionChainId) {
+			onOpActiveChanged(op, uid, packageName, active);
+		}
+	}
+	@Deprecated
+	public int startOp(String op, int uid, String packageName) { return startOp(op, uid, packageName, null, null); }
+	public int startOp(String op, int uid, String packageName, String attributionTag, String message) { return MODE_ALLOWED; }
+	@Deprecated
+	public int startOpNoThrow(String op, int uid, String packageName) { return startOpNoThrow(op, uid, packageName, null, null); }
+	public int startOpNoThrow(String op, int uid, String packageName, String attributionTag, String message) { return MODE_ALLOWED; }
+	@Deprecated
+	public void finishOp(String op, int uid, String packageName) { finishOp(op, uid, packageName, null); }
+	public void finishOp(String op, int uid, String packageName, String attributionTag) {}
+	public int startProxyOp(String op, int proxiedUid, String proxiedPackageName, String proxiedAttributionTag, String message) { return MODE_ALLOWED; }
+	public int startProxyOpNoThrow(String op, int proxiedUid, String proxiedPackageName, String proxiedAttributionTag, String message) { return MODE_ALLOWED; }
+	public void finishProxyOp(String op, int proxiedUid, String proxiedPackageName, String proxiedAttributionTag) {}
+	public boolean isOpActive(String op, int uid, String packageName) { return false; }
+	public void startWatchingActive(String[] ops, java.util.concurrent.Executor executor, OnOpActiveChangedListener callback) {}
+	public void stopWatchingActive(OnOpActiveChangedListener callback) {}
+	public int unsafeCheckOpRaw(String op, int uid, String packageName) { return MODE_ALLOWED; }
 }

@@ -127,6 +127,13 @@ public final class SystemServiceRegistry {
                 return new LocaleManager(ctx);
             }});
 
+        registerService(Context.GRAMMATICAL_INFLECTION_SERVICE, GrammaticalInflectionManager.class,
+                new CachedServiceFetcher<GrammaticalInflectionManager>() {
+            @Override
+            public GrammaticalInflectionManager createService(ContextImpl ctx) {
+                return new GrammaticalInflectionManager(ctx);
+            }});
+
         registerService(Context.SENSOR_SERVICE, SensorManager.class,
                 new CachedServiceFetcher<SensorManager>() {
             @Override

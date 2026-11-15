@@ -449,6 +449,29 @@ public class Notification implements Parcelable {
 			return b;
 		}
 
+		/* AOSP Builder.createContentView(): the app's custom content view when it set one (useExistingRemoteView()).
+		 * The standard templates of the system (applyStandardTemplate) and the decoration around a custom view
+		 * (minimallyDecoratedContentView) are layouts of the platform that ATL does not have, so there is no
+		 * view built from the builder's texts: null then. */
+		@Deprecated
+		public RemoteViews createContentView() {
+			return notification.contentView;
+		}
+
+		/* AOSP Builder.createBigContentView(): the custom big content view when set, otherwise the expanded
+		 * template of the system (not available, see createContentView()): null */
+		@Deprecated
+		public RemoteViews createBigContentView() {
+			return notification.bigContentView;
+		}
+
+		/* AOSP Builder.createHeadsUpContentView(): the custom heads-up view when set; without one and without
+		 * actions AOSP answers null as well, with actions it builds the heads-up template (not available): null */
+		@Deprecated
+		public RemoteViews createHeadsUpContentView() {
+			return notification.headsUpContentView;
+		}
+
 		private void setFlag(int mask, boolean value) {
 			if (value) {
 				notification.flags |= mask;

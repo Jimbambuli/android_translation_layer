@@ -197,6 +197,11 @@ public class ActivityManager {
 	}
 
 	public boolean isLowRamDevice() { return false; }
+
+	/* AOSP ActivityManager.isLowRamDeviceStatic(): ro.config.low_ram, not set on a desktop */
+	public static boolean isLowRamDeviceStatic() {
+		return false;
+	}
 	/* AOSP ActivityManager.LOCK_TASK_MODE_* and getLockTaskModeState(): no task is ever locked */
 	public static final int LOCK_TASK_MODE_NONE = 0;
 	public static final int LOCK_TASK_MODE_LOCKED = 1;
@@ -634,4 +639,17 @@ public class ActivityManager {
 
 	public void moveTaskToFront(int taskId, int flags, Bundle options) {
 	}
+
+	/* AOSP ActivityManager members that call ActivityManagerService/ActivityTaskManagerService: without them there is no
+	 * lock task, no other process to kill (killBackgroundProcesses() only kills background processes of other apps),
+	 * no control panel of a service, no heap watch, no app-not-responding report */
+	public boolean isInLockTaskMode() { return getLockTaskModeState() != LOCK_TASK_MODE_NONE; }
+	public void killBackgroundProcesses(String packageName) {}
+	public void restartPackage(String packageName) { killBackgroundProcesses(packageName); }
+	public PendingIntent getRunningServiceControlPanel(android.content.ComponentName service) { return null; }
+	public void appNotResponding(String reason) {}
+	public void clearWatchHeapLimit() {}
+	public void setWatchHeapLimit(long pssSize) {}
+	public static void setVrThread(int tid) {}
+	public void dumpPackageState(java.io.FileDescriptor fd, String packageName) {}
 }

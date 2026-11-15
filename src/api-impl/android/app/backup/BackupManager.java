@@ -13,4 +13,15 @@ public class BackupManager {
 
 
 	public void cancelBackups() {}
+
+	/* AOSP BackupManager.requestRestore(): without the backup service (checkServiceBinder() leaves sService null)
+	 * -1, the restore was not started */
+	public int requestRestore(RestoreObserver observer) {
+		return -1;
+	}
+
+	/* AOSP BackupManager.getUserForAncestralSerialNumber(): without the backup service null */
+	public android.os.UserHandle getUserForAncestralSerialNumber(long ancestralSerialNumber) {
+		return null;
+	}
 }

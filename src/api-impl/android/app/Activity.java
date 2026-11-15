@@ -3040,6 +3040,51 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			startActivity(search);
 	}
 
+	/* AOSP Activity.requestShowKeyboardShortcuts(): a broadcast ACTION_SHOW_KEYBOARD_SHORTCUTS to the package of
+	 * SystemUI (config_systemUIServiceComponent). ATL has no SystemUI, nobody receives the broadcast. */
+	public final void requestShowKeyboardShortcuts() {
+	}
+
+	/* AOSP Activity.onProvideKeyboardShortcuts(): one group, named with the label of the application, with the
+	 * menu items that have a title and an alphabetic shortcut */
+	@Override
+	public void onProvideKeyboardShortcuts(java.util.List<android.view.KeyboardShortcutGroup> data, Menu menu, int deviceId) {
+		if (menu == null) {
+			return;
+		}
+		android.view.KeyboardShortcutGroup group = null;
+		int menuSize = menu.size();
+		for (int i = 0; i < menuSize; ++i) {
+			final MenuItem item = menu.getItem(i);
+			final CharSequence title = item.getTitle();
+			final char alphaShortcut = item.getAlphabeticShortcut();
+			final int alphaModifiers = item.getAlphabeticModifiers();
+			if (title != null && alphaShortcut != Character.MIN_VALUE) {
+				if (group == null) {
+					final int resource = getApplicationInfo().labelRes;
+					group = new android.view.KeyboardShortcutGroup(resource != 0 ? getString(resource) : null);
+				}
+				group.addItem(new android.view.KeyboardShortcutInfo(title, alphaShortcut, alphaModifiers));
+			}
+		}
+		if (group != null) {
+			data.add(group);
+		}
+	}
+
+	/* AOSP Activity.startNextMatchingActivity(): ActivityTaskManagerService looks for the next activity that
+	 * matches the intent after this one in the resolution order; ATL runs one app, so there is none and the answer
+	 * is false. A child activity throws. */
+	public boolean startNextMatchingActivity(@NonNull Intent intent) {
+		return startNextMatchingActivity(intent, null);
+	}
+
+	public boolean startNextMatchingActivity(@NonNull Intent intent, @Nullable Bundle options) {
+		if (getParent() == null)
+			return false;
+		throw new UnsupportedOperationException("startNextMatchingActivity can only be called from a top-level activity");
+	}
+
 	/* AOSP Activity.startActivityIfNeeded(): like startActivityForResult(), except that nothing starts when the
 	 * activity for the intent is this one and it is single top (the flag, launchMode singleTop, singleTask or
 	 * singleInstance) - then false is returned and the intent is not delivered, as for START_RETURN_INTENT_TO_CALLER */
@@ -3169,4 +3214,56 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public void setExitSharedElementCallback(SharedElementCallback callback) {}
 
 	public void setEnterSharedElementCallback(SharedElementCallback callback) {}
+
+	/* AOSP Activity members whose work is done by ActivityClient/ActivityTaskManager (no such service on the desktop):
+	 * what ActivityClient returns without a system server, and the state ActivityRecord would keep */
+	private boolean mImmersive;
+	private boolean mShouldDockBigOverlays;
+
+	public boolean isImmersive() { return mImmersive; }
+	public void setImmersive(boolean i) { mImmersive = i; }
+	public final boolean isHandoffEnabled() { return false; }
+	public final boolean isHandoffFullTaskRecreationAllowed() { return false; }
+	public final void setHandoffEnabled(boolean handoffEnabled, boolean allowFullTaskRecreation) {}
+	public boolean isLocalVoiceInteractionSupported() { return false; }
+	public boolean isVoiceInteraction() { return false; }
+	public boolean isVoiceInteractionRoot() { return false; }
+	public void startLocalVoiceInteraction(Bundle privateOptions) {}
+	public void stopLocalVoiceInteraction() {}
+	public void onLocalVoiceInteractionStarted() {}
+	public void onLocalVoiceInteractionStopped() {}
+	public void requestOpenInBrowserEducation() {}
+	public void setAllowCrossUidActivitySwitchFromBelow(boolean allowed) {}
+	public void setInheritShowWhenLocked(boolean inheritShowWhenLocked) {}
+	public void setShouldDockBigOverlays(boolean shouldDockBigOverlays) { mShouldDockBigOverlays = shouldDockBigOverlays; }
+	public boolean shouldDockBigOverlays() { return mShouldDockBigOverlays; }
+	public boolean showAssist(Bundle args) { return false; }
+	public void showLockTaskEscapeMessage() {}
+	public void startLockTask() {}
+	public void stopLockTask() {}
+	public boolean releaseInstance() { return false; }
+	public boolean isActivityTransitionRunning() { return false; }
+	public void onStateNotSaved() {}
+	public void onProvideAssistData(Bundle data) {}
+	public Uri onProvideReferrer() { return null; }
+	public CharSequence onCreateDescription() { return null; }
+	public boolean onCreateThumbnail(android.graphics.Bitmap outBitmap, android.graphics.Canvas canvas) { return false; }
+	public void onGetDirectActions(android.os.CancellationSignal cancellationSignal,
+	                               java.util.function.Consumer<java.util.List<DirectAction>> callback) {
+		callback.accept(java.util.Collections.emptyList());
+	}
+	public void onPerformDirectAction(String actionId, Bundle arguments, android.os.CancellationSignal cancellationSignal,
+	                                  java.util.function.Consumer<Bundle> resultListener) {}
+	public void onCreateNavigateUpTaskStack(TaskStackBuilder builder) { builder.addParentStack(this); }
+	public void onPrepareNavigateUpTaskStack(TaskStackBuilder builder) {}
+	public boolean navigateUpToFromChild(Activity child, Intent upIntent) { return navigateUpTo(upIntent); }
+	protected void onChildTitleChanged(Activity childActivity, CharSequence title) {}
+	public void finishFromChild(Activity child) { finish(); }
+	public void finishActivityFromChild(Activity child, int requestCode) { child.finishActivity(requestCode); }
+	public void startActivityFromChild(Activity child, Intent intent, int requestCode) {
+		startActivityFromChild(child, intent, requestCode, null);
+	}
+	public void startActivityFromChild(Activity child, Intent intent, int requestCode, Bundle options) {
+		child.startActivityForResult(intent, requestCode, options);
+	}
 }
