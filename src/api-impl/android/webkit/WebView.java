@@ -168,6 +168,54 @@ public class WebView extends ViewGroup {
 		return webViewRenderProcessClient;
 	}
 
+	/* AOSP WebView.saveState(): null when the state cannot be saved, restoreState(): null when nothing is
+	 * restored. ATL's WebKit session state is not reachable from Java, so both report "failed" and leave the
+	 * Bundle untouched (as for a WebView without history). */
+	public WebBackForwardList saveState(android.os.Bundle outState) {
+		return null;
+	}
+
+	public WebBackForwardList restoreState(android.os.Bundle inState) {
+		return null;
+	}
+
+	/* AOSP WebView.copyBackForwardList(): never null; an empty list (size 0, index -1, no items) as for a
+	 * WebView without history. The WebKit history is not read here: approximation. */
+	public WebBackForwardList copyBackForwardList() {
+		return new WebBackForwardList() {
+			@Override
+			public WebHistoryItem getCurrentItem() {
+				return null;
+			}
+
+			@Override
+			public int getCurrentIndex() {
+				return -1;
+			}
+
+			@Override
+			public WebHistoryItem getItemAtIndex(int index) {
+				return null;
+			}
+
+			@Override
+			public int getSize() {
+				return 0;
+			}
+
+			@Override
+			protected WebBackForwardList clone() {
+				return this;
+			}
+		};
+	}
+
+	/* AOSP WebView.getWebViewRenderProcess(): null when the WebView does not run its renderer in a separate
+	 * process; ATL's WebKit exposes no render process handle. */
+	public WebViewRenderProcess getWebViewRenderProcess() {
+		return null;
+	}
+
 	/* AOSP WebView.postVisualStateCallback(): onComplete(requestId) once the content as of this call is drawn.
 	 * Approximated by the next main-looper turn: WebKit gives no draw-completion event to wait for */
 	public void postVisualStateCallback(long requestId, VisualStateCallback callback) {
