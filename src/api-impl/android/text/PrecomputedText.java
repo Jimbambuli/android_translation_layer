@@ -81,6 +81,8 @@ public class PrecomputedText implements Spannable {
 
 	private final SpannableString mText;
 	private final Params mParams;
+	/* AOSP ParagraphInfo.paragraphEnd of each paragraph */
+	private final int[] mParagraphEnds;
 
 	public static PrecomputedText create(CharSequence text, Params params) {
 		return new PrecomputedText(text, params);
@@ -89,12 +91,48 @@ public class PrecomputedText implements Spannable {
 	private PrecomputedText(CharSequence text, Params params) {
 		mText = new SpannableString(text);
 		mParams = params;
+		mParagraphEnds = paragraphEnds(mText);
+	}
+
+	/* AOSP PrecomputedText.createMeasuredParagraphs(): a paragraph ends after each LINE_FEED or at the
+	 * end of the text; an empty text has no paragraph */
+	private static int[] paragraphEnds(CharSequence text) {
+		final int end = text.length();
+		int count = 0;
+		for (int paraStart = 0, paraEnd; paraStart < end; paraStart = paraEnd, count++) {
+			paraEnd = TextUtils.indexOf(text, '\n', paraStart, end);
+			paraEnd = paraEnd < 0 ? end : paraEnd + 1;
+		}
+		int[] ends = new int[count];
+		int i = 0;
+		for (int paraStart = 0, paraEnd; paraStart < end; paraStart = paraEnd) {
+			paraEnd = TextUtils.indexOf(text, '\n', paraStart, end);
+			paraEnd = paraEnd < 0 ? end : paraEnd + 1;
+			ends[i++] = paraEnd;
+		}
+		return ends;
+	}
+
+	/* AOSP Preconditions.checkArgumentInRange(paraIndex, 0, getParagraphCount(), "paraIndex") */
+	private void checkParaIndex(int paraIndex) {
+		if (paraIndex < 0 || paraIndex > mParagraphEnds.length)
+			throw new IllegalArgumentException(String.format(java.util.Locale.US,
+			    "%s is out of range of [%d, %d] (too %s)", "paraIndex", 0, mParagraphEnds.length,
+			    paraIndex < 0 ? "low" : "high"));
 	}
 
 	public Params getParams() { return mParams; }
-	public int getParagraphCount() { return 1; }
-	public int getParagraphStart(int paraIndex) { return 0; }
-	public int getParagraphEnd(int paraIndex) { return mText.length(); }
+	public int getParagraphCount() { return mParagraphEnds.length; }
+
+	public int getParagraphStart(int paraIndex) {
+		checkParaIndex(paraIndex);
+		return paraIndex == 0 ? 0 : getParagraphEnd(paraIndex - 1);
+	}
+
+	public int getParagraphEnd(int paraIndex) {
+		checkParaIndex(paraIndex);
+		return mParagraphEnds[paraIndex];
+	}
 
 	public int getSpanStart(Object tag) { return mText.getSpanStart(tag); }
 	public int getSpanEnd(Object tag) { return mText.getSpanEnd(tag); }
