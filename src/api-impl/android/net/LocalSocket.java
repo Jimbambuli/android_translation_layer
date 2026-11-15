@@ -1,262 +1,352 @@
+/*
+ * Copyright (C) 2007 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package android.net;
+
+
+import android.annotation.NonNull;
+import android.system.ErrnoException;
+import android.system.Os;
 
 import java.io.Closeable;
 import java.io.FileDescriptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.SocketAddress;
 import java.net.SocketOptions;
-import java.net.StandardSocketOptions;
-import java.net.UnixDomainSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
-/* Public surface and state handling follow AOSP frameworks/base core/java/android/net/LocalSocket.java
- * (including its UnsupportedOperationException members). AOSP's LocalSocketImpl is a JNI wrapper around
- * an AF_UNIX fd; here the JDK's AF_UNIX SocketChannel does the work, so no fd is exposed. Differences:
- * only SOCKET_STREAM, no abstract namespace (emulated by files in a private directory), no fd passing,
- * no SO_PEERCRED, SO_TIMEOUT is stored only. */
+/**
+ * Creates a (non-server) socket in the UNIX-domain namespace. The interface
+ * here is not entirely unlike that of java.net.Socket. This class and the streams
+ * returned from it may be used from multiple threads.
+ */
 public class LocalSocket implements Closeable {
 
-	public static final int SOCKET_DGRAM = 1;
-	public static final int SOCKET_STREAM = 2;
-	public static final int SOCKET_SEQPACKET = 3;
+    private final LocalSocketImpl impl;
+    /** false if impl.create() needs to be called */
+    private volatile boolean implCreated;
+    private LocalSocketAddress localAddress;
+    private boolean isBound;
+    private boolean isConnected;
+    private final int sockType;
 
-	private final int sockType;
-	private SocketChannel channel;
-	private LocalSocketAddress localAddress;
-	private boolean isBound;
-	private boolean isConnected;
-	private boolean closed;
-	private int soTimeout;
-	private int rcvBuf = -1;
-	private int sndBuf = -1;
-	private Path abstractFile;
+    /** unknown socket type (used for constructor with existing file descriptor) */
+    /* package */ static final int SOCKET_UNKNOWN = 0;
+    /** Datagram socket type */
+    public static final int SOCKET_DGRAM = 1;
+    /** Stream socket type */
+    public static final int SOCKET_STREAM = 2;
+    /** Sequential packet socket type */
+    public static final int SOCKET_SEQPACKET = 3;
 
-	public LocalSocket() {
-		this(SOCKET_STREAM);
-	}
+    /**
+     * Creates a AF_LOCAL/UNIX domain stream socket.
+     */
+    public LocalSocket() {
+        this(SOCKET_STREAM);
+    }
 
-	public LocalSocket(int sockType) {
-		this.sockType = sockType;
-	}
+    /**
+     * Creates a AF_LOCAL/UNIX domain socket with the given socket type.
+     *
+     * @param sockType either {@link #SOCKET_DGRAM}, {@link #SOCKET_STREAM}
+     * or {@link #SOCKET_SEQPACKET}
+     */
+    public LocalSocket(int sockType) {
+        this(new LocalSocketImpl(), sockType);
+    }
 
-	LocalSocket(SocketChannel accepted) {
-		this.sockType = SOCKET_STREAM;
-		this.channel = accepted;
-		this.isBound = true;
-		this.isConnected = true;
-	}
+    private LocalSocket(LocalSocketImpl impl, int sockType) {
+        this.impl = impl;
+        this.sockType = sockType;
+        this.isConnected = false;
+        this.isBound = false;
+    }
 
-	/* Maps an address to a filesystem path: RESERVED is /dev/socket/<name> as in AOSP's
-	 * socket_local_client; ABSTRACT has no JDK equivalent. */
-	static Path pathFor(LocalSocketAddress a, boolean create) throws IOException {
-		switch (a.getNamespace()) {
-		case FILESYSTEM:
-			return Paths.get(a.getName());
-		case RESERVED:
-			return Paths.get("/dev/socket", a.getName());
-		default:
-			String base = System.getenv("XDG_RUNTIME_DIR");
-			Path dir = Paths.get(base != null ? base : "/tmp", "atl-local-abstract-" + System.getProperty("user.name"));
-			if (create)
-				Files.createDirectories(dir);
-			return dir.resolve(java.net.URLEncoder.encode(a.getName(), "UTF-8"));
-		}
-	}
+    private void checkConnected() {
+        try {
+            Os.getpeername(impl.getFileDescriptor());
+        } catch (ErrnoException e) {
+            throw new IllegalArgumentException("Not a connected socket", e);
+        }
+        isConnected = true;
+        isBound = true;
+        implCreated = true;
+    }
 
-	private synchronized void implCreateIfNeeded() throws IOException {
-		if (channel == null) {
-			if (sockType != SOCKET_STREAM)
-				throw new IOException("Protocol not supported");
-			channel = SocketChannel.open(java.net.StandardProtocolFamily.UNIX);
-			if (rcvBuf > 0)
-				channel.setOption(StandardSocketOptions.SO_RCVBUF, rcvBuf);
-			if (sndBuf > 0)
-				channel.setOption(StandardSocketOptions.SO_SNDBUF, sndBuf);
-		}
-	}
+    /**
+     * Creates a LocalSocket instance using the {@link FileDescriptor} for an already-connected
+     * AF_LOCAL/UNIX domain stream socket. The passed-in FileDescriptor is not managed by this class
+     * and must be closed by the caller. Calling {@link #close()} on a socket created by this
+     * method has no effect.
+     *
+     * @param fd the filedescriptor to adopt
+     *
+     * @hide
+     */
+    public LocalSocket(@NonNull FileDescriptor fd) {
+        this(new LocalSocketImpl(fd), SOCKET_UNKNOWN);
+        checkConnected();
+    }
 
-	@Override
-	public String toString() {
-		return super.toString() + " channel:" + channel;
-	}
+    /**
+     * for use with LocalServerSocket.accept()
+     */
+    static LocalSocket createLocalSocketForAccept(LocalSocketImpl impl) {
+        LocalSocket socket = new LocalSocket(impl, SOCKET_UNKNOWN);
+        socket.checkConnected();
+        return socket;
+    }
 
-	public void connect(LocalSocketAddress endpoint) throws IOException {
-		synchronized (this) {
-			if (isConnected) {
-				throw new IOException("already connected");
-			}
-			implCreateIfNeeded();
-			try {
-				channel.connect(UnixDomainSocketAddress.of(pathFor(endpoint, false)));
-			} catch (java.net.SocketException e) {
-				throw new java.net.ConnectException(e.getMessage());
-			}
-			isConnected = true;
-			isBound = true;
-		}
-	}
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return super.toString() + " impl:" + impl;
+    }
 
-	public void bind(LocalSocketAddress bindpoint) throws IOException {
-		implCreateIfNeeded();
-		synchronized (this) {
-			if (isBound) {
-				throw new IOException("already bound");
-			}
-			localAddress = bindpoint;
-			Path p = pathFor(bindpoint, true);
-			channel.bind(UnixDomainSocketAddress.of(p));
-			if (bindpoint.getNamespace() == LocalSocketAddress.Namespace.ABSTRACT)
-				abstractFile = p;
-			isBound = true;
-		}
-	}
+    /**
+     * It's difficult to discern from the spec when impl.create() should be
+     * called, but it seems like a reasonable rule is "as soon as possible,
+     * but not in a context where IOException cannot be thrown"
+     *
+     * @throws IOException from SocketImpl.create()
+     */
+    private void implCreateIfNeeded() throws IOException {
+        if (!implCreated) {
+            synchronized (this) {
+                if (!implCreated) {
+                    try {
+                        impl.create(sockType);
+                    } finally {
+                        implCreated = true;
+                    }
+                }
+            }
+        }
+    }
 
-	public LocalSocketAddress getLocalSocketAddress() {
-		return localAddress;
-	}
+    /**
+     * Connects this socket to an endpoint. May only be called on an instance
+     * that has not yet been connected.
+     *
+     * @param endpoint endpoint address
+     * @throws IOException if socket is in invalid state or the address does
+     * not exist.
+     */
+    public void connect(LocalSocketAddress endpoint) throws IOException {
+        synchronized (this) {
+            if (isConnected) {
+                throw new IOException("already connected");
+            }
 
-	public InputStream getInputStream() throws IOException {
-		implCreateIfNeeded();
-		final SocketChannel ch = channel;
-		return new InputStream() {
-			@Override
-			public int read() throws IOException {
-				byte[] b = new byte[1];
-				int n = read(b, 0, 1);
-				return n < 0 ? -1 : b[0] & 0xff;
-			}
+            implCreateIfNeeded();
+            impl.connect(endpoint, 0);
+            isConnected = true;
+            isBound = true;
+        }
+    }
 
-			@Override
-			public int read(byte[] b, int off, int len) throws IOException {
-				if (len == 0)
-					return 0;
-				return ch.read(ByteBuffer.wrap(b, off, len));
-			}
+    /**
+     * Binds this socket to an endpoint name. May only be called on an instance
+     * that has not yet been bound.
+     *
+     * @param bindpoint endpoint address
+     * @throws IOException
+     */
+    public void bind(LocalSocketAddress bindpoint) throws IOException {
+        implCreateIfNeeded();
 
-			@Override
-			public void close() throws IOException {
-				LocalSocket.this.close();
-			}
-		};
-	}
+        synchronized (this) {
+            if (isBound) {
+                throw new IOException("already bound");
+            }
 
-	public OutputStream getOutputStream() throws IOException {
-		implCreateIfNeeded();
-		final SocketChannel ch = channel;
-		return new OutputStream() {
-			@Override
-			public void write(int b) throws IOException {
-				write(new byte[] {(byte) b}, 0, 1);
-			}
+            localAddress = bindpoint;
+            impl.bind(localAddress);
+            isBound = true;
+        }
+    }
 
-			@Override
-			public void write(byte[] b, int off, int len) throws IOException {
-				ByteBuffer bb = ByteBuffer.wrap(b, off, len);
-				while (bb.hasRemaining())
-					ch.write(bb);
-			}
+    /**
+     * Retrieves the name that this socket is bound to, if any.
+     *
+     * @return Local address or null if anonymous
+     */
+    public LocalSocketAddress getLocalSocketAddress() {
+        return localAddress;
+    }
 
-			@Override
-			public void close() throws IOException {
-				LocalSocket.this.close();
-			}
-		};
-	}
+    /**
+     * Retrieves the input stream for this instance. Closing this stream is equivalent to closing
+     * the entire socket and its associated streams using {@link #close()}.
+     *
+     * @return input stream
+     * @throws IOException if socket has been closed or cannot be created.
+     */
+    public InputStream getInputStream() throws IOException {
+        implCreateIfNeeded();
+        return impl.getInputStream();
+    }
 
-	@Override
-	public void close() throws IOException {
-		implCreateIfNeeded();
-		synchronized (this) {
-			closed = true;
-			channel.close();
-			if (abstractFile != null)
-				Files.deleteIfExists(abstractFile);
-		}
-	}
+    /**
+     * Retrieves the output stream for this instance. Closing this stream is equivalent to closing
+     * the entire socket and its associated streams using {@link #close()}.
+     *
+     * @return output stream
+     * @throws IOException if socket has been closed or cannot be created.
+     */
+    public OutputStream getOutputStream() throws IOException {
+        implCreateIfNeeded();
+        return impl.getOutputStream();
+    }
 
-	public void shutdownInput() throws IOException {
-		implCreateIfNeeded();
-		channel.shutdownInput();
-	}
+    /**
+     * Closes the socket.
+     *
+     * @throws IOException
+     */
+    @Override
+    public void close() throws IOException {
+        implCreateIfNeeded();
+        impl.close();
+    }
 
-	public void shutdownOutput() throws IOException {
-		implCreateIfNeeded();
-		channel.shutdownOutput();
-	}
+    /**
+     * Shuts down the input side of the socket.
+     *
+     * @throws IOException
+     */
+    public void shutdownInput() throws IOException {
+        implCreateIfNeeded();
+        impl.shutdownInput();
+    }
 
-	public void setReceiveBufferSize(int size) throws IOException {
-		rcvBuf = size;
-		if (channel != null)
-			channel.setOption(StandardSocketOptions.SO_RCVBUF, size);
-	}
+    /**
+     * Shuts down the output side of the socket.
+     *
+     * @throws IOException
+     */
+    public void shutdownOutput() throws IOException {
+        implCreateIfNeeded();
+        impl.shutdownOutput();
+    }
 
-	public int getReceiveBufferSize() throws IOException {
-		implCreateIfNeeded();
-		return channel.getOption(StandardSocketOptions.SO_RCVBUF);
-	}
+    public void setReceiveBufferSize(int size) throws IOException {
+        impl.setOption(SocketOptions.SO_RCVBUF, Integer.valueOf(size));
+    }
 
-	public void setSoTimeout(int n) throws IOException {
-		soTimeout = n;
-	}
+    public int getReceiveBufferSize() throws IOException {
+        return ((Integer) impl.getOption(SocketOptions.SO_RCVBUF)).intValue();
+    }
 
-	public int getSoTimeout() throws IOException {
-		return soTimeout;
-	}
+    public void setSoTimeout(int n) throws IOException {
+        impl.setOption(SocketOptions.SO_TIMEOUT, Integer.valueOf(n));
+    }
 
-	public void setSendBufferSize(int n) throws IOException {
-		sndBuf = n;
-		if (channel != null)
-			channel.setOption(StandardSocketOptions.SO_SNDBUF, n);
-	}
+    public int getSoTimeout() throws IOException {
+        return ((Integer) impl.getOption(SocketOptions.SO_TIMEOUT)).intValue();
+    }
 
-	public int getSendBufferSize() throws IOException {
-		implCreateIfNeeded();
-		return channel.getOption(StandardSocketOptions.SO_SNDBUF);
-	}
+    public void setSendBufferSize(int n) throws IOException {
+        impl.setOption(SocketOptions.SO_SNDBUF, Integer.valueOf(n));
+    }
 
-	public LocalSocketAddress getRemoteSocketAddress() {
-		throw new UnsupportedOperationException();
-	}
+    public int getSendBufferSize() throws IOException {
+        return ((Integer) impl.getOption(SocketOptions.SO_SNDBUF)).intValue();
+    }
 
-	public synchronized boolean isConnected() {
-		return isConnected;
-	}
+    //???SEC
+    public LocalSocketAddress getRemoteSocketAddress() {
+        throw new UnsupportedOperationException();
+    }
 
-	public boolean isClosed() {
-		throw new UnsupportedOperationException();
-	}
+    //???SEC
+    public synchronized boolean isConnected() {
+        return isConnected;
+    }
 
-	public synchronized boolean isBound() {
-		return isBound;
-	}
+    //???SEC
+    public boolean isClosed() {
+        throw new UnsupportedOperationException();
+    }
 
-	public boolean isOutputShutdown() {
-		throw new UnsupportedOperationException();
-	}
+    //???SEC
+    public synchronized boolean isBound() {
+        return isBound;
+    }
 
-	public boolean isInputShutdown() {
-		throw new UnsupportedOperationException();
-	}
+    //???SEC
+    public boolean isOutputShutdown() {
+        throw new UnsupportedOperationException();
+    }
 
-	public void connect(LocalSocketAddress endpoint, int timeout) throws IOException {
-		throw new UnsupportedOperationException();
-	}
+    //???SEC
+    public boolean isInputShutdown() {
+        throw new UnsupportedOperationException();
+    }
 
-	/* File descriptors cannot be passed through the JDK channel API. */
-	public void setFileDescriptorsForSend(FileDescriptor[] fds) {
-	}
+    //???SEC
+    public void connect(LocalSocketAddress endpoint, int timeout)
+            throws IOException {
+        throw new UnsupportedOperationException();
+    }
 
-	public FileDescriptor[] getAncillaryFileDescriptors() throws IOException {
-		return null;
-	}
+    /**
+     * Enqueues a set of file descriptors to send to the peer. The queue
+     * is one deep. The file descriptors will be sent with the next write
+     * of normal data, and will be delivered in a single ancillary message.
+     * See "man 7 unix" SCM_RIGHTS on a desktop Linux machine.
+     *
+     * @param fds non-null; file descriptors to send.
+     */
+    public void setFileDescriptorsForSend(FileDescriptor[] fds) {
+        impl.setFileDescriptorsForSend(fds);
+    }
 
-	public FileDescriptor getFileDescriptor() {
-		return null;
-	}
+    /**
+     * Retrieves a set of file descriptors that a peer has sent through
+     * an ancillary message. This method retrieves the most recent set sent,
+     * and then returns null until a new set arrives.
+     * File descriptors may only be passed along with regular data, so this
+     * method can only return a non-null after a read operation.
+     *
+     * @return null or file descriptor array
+     * @throws IOException
+     */
+    public FileDescriptor[] getAncillaryFileDescriptors() throws IOException {
+        return impl.getAncillaryFileDescriptors();
+    }
+
+    /**
+     * Retrieves the credentials of this socket's peer. Only valid on
+     * connected sockets.
+     *
+     * @return non-null; peer credentials
+     * @throws IOException
+     */
+    public Credentials getPeerCredentials() throws IOException {
+        return impl.getPeerCredentials();
+    }
+
+    /**
+     * Returns file descriptor or null if not yet open/already closed
+     *
+     * @return fd or null
+     */
+    public FileDescriptor getFileDescriptor() {
+        return impl.getFileDescriptor();
+    }
 }

@@ -634,6 +634,7 @@ srcs = [
 	'android/net/LinkProperties.java',
 	'android/net/Credentials.java',
 	'android/net/LocalServerSocket.java',
+	'android/net/LocalSocketImpl.java',
 	'android/net/LocalSocketAddress.java',
 	'android/net/LocalSocket.java',
 	'android/net/Network.java',
