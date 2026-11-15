@@ -326,6 +326,16 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags, null);
 	}
 
+	/* AOSP Activity.startIntentSenderFromChild() with options: startIntentSenderForResultInner() of this activity */
+	public void startIntentSenderFromChild(Activity child, IntentSender intent, int requestCode, Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags, @Nullable Bundle options) throws IntentSender.SendIntentException {
+		startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags, options);
+	}
+
+	/* AOSP Activity.onPostCreate(Bundle, PersistableBundle): onPostCreate(Bundle) */
+	public void onPostCreate(@Nullable Bundle savedInstanceState, @Nullable PersistableBundle persistentState) {
+		onPostCreate(savedInstanceState);
+	}
+
 	protected void onCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onCreate - yay!");
 
@@ -905,6 +915,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public void onAttachFragment(Fragment fragment) {
 	}
 
+	public void startActivityFromFragment(Fragment fragment, Intent intent, int requestCode) {
+		startActivityFromFragment(fragment, intent, requestCode, null);
+	}
+
 	void startActivityFromFragment(Fragment fragment, Intent intent, int requestCode, Bundle options) {
 		if (requestCode >= 0)
 			mFragmentResultWho.put(requestCode, fragment.mWho);
@@ -1349,6 +1363,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return outState;
 	}
 
+	/* AOSP Activity.onSaveInstanceState(Bundle, PersistableBundle): onSaveInstanceState(Bundle) */
+	public void onSaveInstanceState(Bundle outState, PersistableBundle outPersistentState) {
+		onSaveInstanceState(outState);
+	}
+
+	/* AOSP Activity.onRestoreInstanceState(Bundle, PersistableBundle): onRestoreInstanceState(Bundle) if there is state */
+	public void onRestoreInstanceState(@Nullable Bundle savedInstanceState, @Nullable PersistableBundle persistentState) {
+		if (savedInstanceState != null)
+			onRestoreInstanceState(savedInstanceState);
+	}
+
 	protected void onRestoreInstanceState(Bundle savedInstanceState) {
 		Bundle windowState = savedInstanceState.getBundle(WINDOW_HIERARCHY_TAG);
 		if (windowState != null)
@@ -1409,6 +1434,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private static boolean pendingTransitionSet;
 	private static int pendingEnterAnim;
 	private static int pendingExitAnim;
+
+	/* AOSP: the background colour of the transition is for the window manager; ATL animates the views only */
+	public void overridePendingTransition(int enterAnim, int exitAnim, int backgroundColor) {
+		overridePendingTransition(enterAnim, exitAnim);
+	}
 
 	public void overridePendingTransition(int enterAnim, int exitAnim) {
 		pendingTransitionSet = true;
@@ -2649,7 +2679,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return null;
 	}
 
-	public void requestPermissions(String[] permissions, final int requestCode) {
+	public void requestPermissions(String[] permissions, int requestCode) {
+		requestPermissions(permissions, requestCode, getDeviceId());
+	}
+
+	/* AOSP Activity.requestPermissions(String[], int, int): the result goes to the variant with the device id */
+	public void requestPermissions(String[] permissions, final int requestCode, final int deviceId) {
 		if (requestCode < 0)
 			throw new IllegalArgumentException("requestCode should be >= 0");
 		// ATL has no permission dialog: like AOSP, the answer always arrives later on the main thread,
@@ -2660,15 +2695,25 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			results[i] = checkSelfPermission(requested[i]);
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			public void run() {
-				onRequestPermissionsResult(requestCode, requested, results);
+				onRequestPermissionsResult(requestCode, requested, results, deviceId);
 			}
 		});
 	}
 
 	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {}
 
+	/* AOSP Activity.onRequestPermissionsResult(int, String[], int[], int): the variant without device id */
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults, int deviceId) {
+		onRequestPermissionsResult(requestCode, permissions, grantResults);
+	}
+
 	public boolean shouldShowRequestPermissionRationale(String permission) {
 		return true;
+	}
+
+	/* AOSP asks the package manager of the device; ATL has the one device */
+	public boolean shouldShowRequestPermissionRationale(String permission, int deviceId) {
+		return shouldShowRequestPermissionRationale(permission);
 	}
 
 	/* AOSP Activity.getActionBar()/initWindowDecorActionBar(): there is an action bar when the window has the feature
