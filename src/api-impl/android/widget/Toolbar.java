@@ -105,4 +105,63 @@ public class Toolbar extends View {
 	}
 
 	public void setNavigationOnClickListener(OnClickListener listener) {}
+
+	/* AOSP content insets: kept (ATL lays out no toolbar content), the getters return what was set; AOSP's
+	 * RtlSpacingHelper.UNDEFINED (Integer.MIN_VALUE) stands for "not set" and reads as 0 */
+	private int mContentInsetStart;
+	private int mContentInsetEnd;
+	private int mContentInsetStartWithNavigation;
+	private int mContentInsetEndWithActions;
+
+	public void setContentInsetsRelative(int contentInsetStart, int contentInsetEnd) {
+		mContentInsetStart = contentInsetStart;
+		mContentInsetEnd = contentInsetEnd;
+	}
+
+	public int getContentInsetStart() {
+		return mContentInsetStart;
+	}
+
+	public int getContentInsetEnd() {
+		return mContentInsetEnd;
+	}
+
+	public void setContentInsetStartWithNavigation(int insetStartWithNavigation) {
+		if (insetStartWithNavigation < 0) {
+			insetStartWithNavigation = 0;
+		}
+		mContentInsetStartWithNavigation = insetStartWithNavigation;
+	}
+
+	public int getContentInsetStartWithNavigation() {
+		return mContentInsetStartWithNavigation;
+	}
+
+	public void setContentInsetEndWithActions(int insetEndWithActions) {
+		if (insetEndWithActions < 0) {
+			insetEndWithActions = 0;
+		}
+		mContentInsetEndWithActions = insetEndWithActions;
+	}
+
+	public int getContentInsetEndWithActions() {
+		return mContentInsetEndWithActions;
+	}
+
+	/* AOSP Toolbar.LayoutParams */
+	public static class LayoutParams extends android.app.ActionBar.LayoutParams {
+		public LayoutParams(Context c, AttributeSet attrs) {
+			super(c, attrs);
+		}
+
+		public LayoutParams(int width, int height) {
+			super(width, height);
+			this.gravity = android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START;
+		}
+
+		public LayoutParams(int width, int height, int gravity) {
+			super(width, height);
+			this.gravity = gravity;
+		}
+	}
 }
