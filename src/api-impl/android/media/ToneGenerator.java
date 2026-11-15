@@ -21,4 +21,8 @@ public class ToneGenerator {
 	public void stopTone() {}
 
 	public void release() {}
+
+	/* AOSP ToneGenerator.finalize(): native_finalize() frees the native tone generator, which ATL has none of */
+	@Override
+	protected void finalize() {}
 }
