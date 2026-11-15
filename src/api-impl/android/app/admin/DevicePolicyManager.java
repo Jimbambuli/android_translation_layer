@@ -651,7 +651,6 @@ public class DevicePolicyManager {
 	public int getNearbyNotificationStreamingPolicy() { return 0; }
 	public int getOrganizationColor(android.content.ComponentName p0) { return 0; }
 	public CharSequence getOrganizationName(android.content.ComponentName p0) { return null; }
-	public java.util.List<android.telephony.data.ApnSetting> getOverrideApns(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
 	public android.app.admin.DevicePolicyManager getParentProfileInstance(android.content.ComponentName p0) { return null; }
 	public int getPasswordMaximumLength(int p0) { return 0; }
 	public int getPermissionGrantState(android.content.ComponentName p0, String p1, String p2) { return 0; }
@@ -660,7 +659,6 @@ public class DevicePolicyManager {
 	public java.util.List<java.lang.String> getPermittedCrossProfileNotificationListeners(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
 	public java.util.List<java.lang.String> getPermittedInputMethods(android.content.ComponentName p0) { return java.util.Collections.emptyList(); }
 	public int getPersonalAppsSuspendedReasons(android.content.ComponentName p0) { return 0; }
-	public java.util.List<android.app.admin.PreferentialNetworkServiceConfig> getPreferentialNetworkServiceConfigs() { return java.util.Collections.emptyList(); }
 	public int getRequiredPasswordComplexity() { return 0; }
 	public long getRequiredStrongAuthTimeout(android.content.ComponentName p0) { return 0; }
 	public boolean getScreenCaptureDisabled(android.content.ComponentName p0) { return false; }
@@ -726,7 +724,6 @@ public class DevicePolicyManager {
 	public boolean requestBugreport(android.content.ComponentName p0) { return false; }
 	public boolean resetPassword(String p0, int p1) { return false; }
 	public boolean resetPasswordWithToken(android.content.ComponentName p0, String p1, byte[] p2, int p3) { return false; }
-	public java.util.List<android.app.admin.NetworkEvent> retrieveNetworkLogs(android.content.ComponentName p0, long p1) { return java.util.Collections.emptyList(); }
 	public boolean revokeKeyPairFromApp(android.content.ComponentName p0, String p1, String p2) { return false; }
 	public boolean revokeKeyPairFromWifiAuth(String p0) { return false; }
 	public void setAccountManagementDisabled(android.content.ComponentName p0, String p1, boolean p2) { }
@@ -788,7 +785,6 @@ public class DevicePolicyManager {
 	public boolean setPermittedCrossProfileNotificationListeners(android.content.ComponentName p0, java.util.List<java.lang.String> p1) { return false; }
 	public boolean setPermittedInputMethods(android.content.ComponentName p0, java.util.List<java.lang.String> p1) { return false; }
 	public void setPersonalAppsSuspended(android.content.ComponentName p0, boolean p1) { }
-	public void setPreferentialNetworkServiceConfigs(java.util.List<android.app.admin.PreferentialNetworkServiceConfig> p0) { }
 	public void setPreferentialNetworkServiceEnabled(boolean p0) { }
 	public void setProfileEnabled(android.content.ComponentName p0) { }
 	public void setProfileName(android.content.ComponentName p0, String p1) { }
