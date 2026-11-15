@@ -2,7 +2,7 @@ package android.net;
 
 /* AOSP packages/modules/Connectivity/framework/src/android/net/NetworkRequest.java (android14-release): the
  * capabilities and transports a request asks for (WorkManager builds its network constraint from one).
- * Without legacy type, uid ranges and specifiers. */
+ * Without legacy type, uid ranges and string specifiers. */
 public class NetworkRequest {
 	public final NetworkCapabilities networkCapabilities;
 
@@ -51,9 +51,19 @@ public class NetworkRequest {
 			return this;
 		}
 
+		/* AOSP NetworkRequest.Builder.setNetworkSpecifier(NetworkSpecifier) */
+		public Builder setNetworkSpecifier(NetworkSpecifier networkSpecifier) {
+			mNetworkCapabilities.setNetworkSpecifier(networkSpecifier);
+			return this;
+		}
+
 		public Builder setIncludeOtherUidNetworks(boolean include) {
 			return this;
 		}
+	}
+
+	public NetworkSpecifier getNetworkSpecifier() {
+		return networkCapabilities.getNetworkSpecifier();
 	}
 
 	public boolean hasCapability(int capability) {
