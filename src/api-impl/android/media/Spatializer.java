@@ -1,5 +1,7 @@
 package android.media;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 /* API 32. There is no spatial audio, so the spatializer is never available nor enabled. */
@@ -29,6 +31,12 @@ public class Spatializer {
 
 	public boolean canBeSpatialized(AudioAttributes attributes, AudioFormat format) {
 		return false;
+	}
+
+	/* AOSP Spatializer.getSpatializedChannelMasks() asks AudioService; without a spatializer effect
+	 * nothing is spatialized (AudioService side not in the local sources) */
+	public List<Integer> getSpatializedChannelMasks() {
+		return Collections.emptyList();
 	}
 
 	public void addOnSpatializerStateChangedListener(Executor executor, OnSpatializerStateChangedListener listener) {}

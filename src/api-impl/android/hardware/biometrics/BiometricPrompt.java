@@ -239,6 +239,14 @@ public class BiometricPrompt implements BiometricConstants {
 		public @Nullable PresentationSession getPresentationSession() {
 			return super.getPresentationSession();
 		}
+
+		public CryptoObject(long operationHandle) {
+			super(operationHandle);
+		}
+
+		public long getOperationHandle() {
+			return super.getOpId();
+		}
 	}
 
 	/* AOSP BiometricPrompt.AuthenticationResult (fields of BiometricAuthenticator.AuthenticationResult) */

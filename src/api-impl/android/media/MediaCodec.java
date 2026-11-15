@@ -48,6 +48,7 @@ public class MediaCodec {
 	public void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags) {
 		System.out.println("MediaCodec.configure(" + format + ", " + surface + ", " + crypto + ", " + flags + "): codecName=" + codecName);
 		this.mediaFormat = format;
+		mHasSurface = surface != null;
 
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
@@ -362,6 +363,17 @@ public class MediaCodec {
 			throw new IllegalArgumentException("surface must not be null");
 		if (native_codec != 0)
 			native_setOutputSurface(native_codec, surface);
+	}
+
+	/* AOSP MediaCodec.detachOutputSurface(): no ATL codec can detach its surface (the AOSP
+	 * nullOutputSurfaceSupport() case off), so it fails as there */
+	public static final int CONFIGURE_FLAG_DETACHED_SURFACE = 8;
+	private boolean mHasSurface = false;
+
+	public void detachOutputSurface() {
+		if (!mHasSurface)
+			throw new IllegalStateException("codec was not configured for an output surface");
+		throw new IllegalStateException("codec does not support detaching output surface");
 	}
 
 	public void setParameters(Bundle parameters) {}

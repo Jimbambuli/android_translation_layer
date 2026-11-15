@@ -9,8 +9,7 @@ import javax.crypto.Mac;
 
 /**
  * AOSP android.hardware.biometrics.CryptoObject (android-14), the base of BiometricPrompt.CryptoObject.
- * Without the hidden getOpId(): it asks the keystore (AndroidKeyStoreProvider) for the operation handle,
- * which only the biometric service consumes.
+ * getOpId() and the operation-handle constructor from android-16 (BiometricPrompt.CryptoObject.getOperationHandle()).
  */
 public class CryptoObject {
 	private final Object mCrypto;
@@ -36,6 +35,10 @@ public class CryptoObject {
 		mCrypto = session;
 	}
 
+	public CryptoObject(long operationHandle) {
+		mCrypto = operationHandle;
+	}
+
 	public Signature getSignature() {
 		return mCrypto instanceof Signature ? (Signature)mCrypto : null;
 	}
@@ -55,5 +58,21 @@ public class CryptoObject {
 
 	public PresentationSession getPresentationSession() {
 		return mCrypto instanceof PresentationSession ? (PresentationSession)mCrypto : null;
+	}
+
+	/* AOSP CryptoObject.getOpId(). Signature/Mac/Cipher go to AndroidKeyStoreProvider.getKeyStoreOperationHandle()
+	 * there, which needs a KeyStoreCryptoOperation SPI; ATL's keystore has none, so they end in its
+	 * "not backed by AndroidKeyStore" case (AOSP throws IllegalStateException first for an uninitialized one) */
+	public long getOpId() {
+		if (mCrypto == null) {
+			return 0;
+		} else if (mCrypto instanceof Long) {
+			return (long) mCrypto;
+		} else if (mCrypto instanceof IdentityCredential) {
+			return ((IdentityCredential) mCrypto).getCredstoreOperationHandle();
+		} else if (mCrypto instanceof PresentationSession) {
+			return ((PresentationSession) mCrypto).getCredstoreOperationHandle();
+		}
+		throw new IllegalArgumentException("Crypto primitive not backed by AndroidKeyStore provider: " + mCrypto);
 	}
 }
