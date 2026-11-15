@@ -1261,6 +1261,1037 @@ public class Notification implements Parcelable {
 		}
 	}
 
+	/* AOSP Notification: extras keys of ProgressStyle and MetricStyle (API 36) */
+	public static final String EXTRA_PROGRESS_SEGMENTS = "android.progressSegments";
+	public static final String EXTRA_PROGRESS_POINTS = "android.progressPoints";
+	public static final String EXTRA_STYLED_BY_PROGRESS = "android.styledByProgress";
+	public static final String EXTRA_PROGRESS_TRACKER_ICON = "android.progressTrackerIcon";
+	public static final String EXTRA_PROGRESS_START_ICON = "android.progressStartIcon";
+	public static final String EXTRA_PROGRESS_END_ICON = "android.progressEndIcon";
+	static final String EXTRA_METRICS = "android.metrics";
+
+	/* AOSP Notification.COLOR_DEFAULT (Color.TRANSPARENT) */
+	public static final int COLOR_DEFAULT = 0;
+
+	/* AOSP Notification.safeCharSequenceToString / safeString: cut to MAX_CHARSEQUENCE_LENGTH */
+	public static String safeCharSequenceToString(CharSequence cs) {
+		if (cs == null) return null;
+		String s = cs.toString();
+		if (s.length() > 5 * 1024) {
+			s = s.substring(0, 5 * 1024);
+		}
+		return s;
+	}
+
+	/* AOSP: com.android.internal.util.Preconditions.checkArgument(boolean, String, Object...) */
+	private static void checkArgument(boolean expression, String messageTemplate, Object... args) {
+		if (!expression) {
+			throw new IllegalArgumentException(String.format(messageTemplate, args));
+		}
+	}
+
+	/* AOSP Notification.hasPromotableCharacteristics, the branch without the ui_rich_ongoing flag
+	 * (ATL has no aconfig flags): ATL does not keep a promoted-ongoing request, so it is not part of the check */
+	public boolean hasPromotableCharacteristics() {
+		boolean ongoing = (flags & FLAG_ONGOING_EVENT) != 0;
+		if (!ongoing || isGroupSummary() || containsCustomViews() || !hasTitle()) {
+			return false;
+		}
+		// Only "Ongoing CallStyle" notifications are promotable without EXTRA_COLORIZED
+		if (style instanceof CallStyle && extras != null
+				&& extras.getInt(EXTRA_CALL_TYPE, CallStyle.CALL_TYPE_UNKNOWN) == CallStyle.CALL_TYPE_ONGOING) {
+			return true;
+		}
+		return extras != null && extras.getBoolean(EXTRA_COLORIZED) && hasPromotableStyle();
+	}
+
+	/* AOSP Notification.hasPromotableStyle */
+	boolean hasPromotableStyle() {
+		return style == null
+				|| style instanceof BigTextStyle
+				|| style instanceof CallStyle
+				|| style instanceof MetricStyle
+				|| style instanceof ProgressStyle;
+	}
+
+	/* AOSP Notification.containsCustomViews (ATL keeps no public version) */
+	boolean containsCustomViews() {
+		return contentView != null || bigContentView != null || headsUpContentView != null;
+	}
+
+	/* AOSP Notification.hasTitle */
+	boolean hasTitle() {
+		if (extras == null) {
+			return false;
+		}
+		// CallStyle notifications only use the other person's name as the title.
+		if (style instanceof CallStyle) {
+			Person person = extras.getParcelable(EXTRA_CALL_PERSON, Person.class);
+			return person != null && !TextUtils.isEmpty(person.getName());
+		}
+		if (!TextUtils.isEmpty(extras.getCharSequence(EXTRA_TITLE))) {
+			return true;
+		}
+		// BigTextStyle notifications first use EXTRA_TITLE_BIG
+		if (style instanceof BigTextStyle) {
+			return !TextUtils.isEmpty(extras.getCharSequence(EXTRA_TITLE_BIG));
+		}
+		return false;
+	}
+
+	/* AOSP Notification.MetricStyle: the metrics go into the extras, the desktop notification renders none of the views */
+	public static final class MetricStyle extends Style {
+		private static final int MAX_METRICS = 3;
+
+		private final List<Metric> mMetrics = new ArrayList<>();
+
+		public MetricStyle() {
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof MetricStyle)) return false;
+			MetricStyle that = (MetricStyle) obj;
+			if (this == that) return true;
+			return java.util.Objects.equals(this.mMetrics, that.mMetrics);
+		}
+
+		@Override
+		public int hashCode() {
+			return mMetrics.hashCode();
+		}
+
+		@Override
+		public String toString() {
+			return "MetricStyle{" + mMetrics + "}";
+		}
+
+		public MetricStyle addMetric(Metric metric) {
+			mMetrics.add(java.util.Objects.requireNonNull(metric));
+			return this;
+		}
+
+		public MetricStyle setMetrics(List<Metric> metrics) {
+			mMetrics.clear();
+			for (Metric metric : metrics) {
+				mMetrics.add(java.util.Objects.requireNonNull(metric));
+			}
+			return this;
+		}
+
+		public List<Metric> getMetrics() {
+			return java.util.Collections.unmodifiableList(mMetrics);
+		}
+
+		public boolean areNotificationsVisiblyDifferent(Style other) {
+			if (other == null || getClass() != other.getClass()) {
+				return true;
+			}
+			// Check whether the VISIBLE metrics (max 3) are the same.
+			MetricStyle otherStyle = (MetricStyle) other;
+			if (Math.min(this.getMetrics().size(), MAX_METRICS)
+					!= Math.min(otherStyle.getMetrics().size(), MAX_METRICS)) {
+				return true;
+			}
+			for (int i = 0; i < MAX_METRICS && i < this.getMetrics().size()
+					&& i < otherStyle.getMetrics().size(); i++) {
+				if (!java.util.Objects.equals(this.getMetrics().get(i), otherStyle.getMetrics().get(i))) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			final ArrayList<Bundle> bundles = new ArrayList<>();
+			for (Metric metric : mMetrics) {
+				bundles.add(Metric.toBundle(metric));
+			}
+			extras.putParcelableArrayList(EXTRA_METRICS, bundles);
+		}
+
+		/* AOSP MetricStyle.validate */
+		public void validate() {
+			if (mMetrics.isEmpty()) {
+				throw new IllegalArgumentException("A MetricStyle must have at least one Metric");
+			}
+		}
+	}
+
+	/* AOSP Notification.Metric */
+	public static final class Metric {
+		private static final String KEY_VALUE = "value";
+		private static final String KEY_LABEL = "label";
+
+		private final MetricValue mValue;
+		private final String mLabel;
+
+		public Metric(MetricValue value, CharSequence label) {
+			mValue = java.util.Objects.requireNonNull(value);
+			mLabel = safeCharSequenceToString(java.util.Objects.requireNonNull(label));
+			checkArgument(!mLabel.trim().isEmpty(), "Metric label is required");
+		}
+
+		private static Bundle toBundle(Metric metric) {
+			Bundle bundle = new Bundle();
+			bundle.putBundle(KEY_VALUE, MetricValue.toBundle(metric.mValue));
+			bundle.putString(KEY_LABEL, metric.mLabel);
+			return bundle;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof Metric)) return false;
+			Metric that = (Metric) obj;
+			if (this == that) return true;
+			return java.util.Objects.equals(this.mValue, that.mValue)
+					&& java.util.Objects.equals(this.mLabel, that.mLabel);
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Objects.hash(mValue, mLabel);
+		}
+
+		@Override
+		public String toString() {
+			return "Metric{" + "mValue=" + mValue + ", mLabel=" + mLabel + "}";
+		}
+
+		public MetricValue getValue() {
+			return mValue;
+		}
+
+		public CharSequence getLabel() {
+			return mLabel;
+		}
+
+		/* AOSP Notification.Metric.MetricValue: toValueString (the text rendering) is left out */
+		public abstract static class MetricValue {
+			private static final String KEY_TYPE = "_type";
+			private static final int TYPE_TIME_DIFFERENCE = 1;
+			private static final int TYPE_FIXED_DATE = 2;
+			private static final int TYPE_FIXED_TIME = 3;
+			private static final int TYPE_FIXED_INT = 4;
+			private static final int TYPE_FIXED_FLOAT = 5;
+			private static final int TYPE_FIXED_STRING = 6;
+
+			// Restrict inheritance to inner classes of Notification.
+			private MetricValue() { }
+
+			private static Bundle toBundle(MetricValue value) {
+				Bundle bundle = new Bundle();
+				if (value instanceof TimeDifference) {
+					bundle.putInt(KEY_TYPE, TYPE_TIME_DIFFERENCE);
+				} else if (value instanceof FixedDate) {
+					bundle.putInt(KEY_TYPE, TYPE_FIXED_DATE);
+				} else if (value instanceof FixedTime) {
+					bundle.putInt(KEY_TYPE, TYPE_FIXED_TIME);
+				} else if (value instanceof FixedInt) {
+					bundle.putInt(KEY_TYPE, TYPE_FIXED_INT);
+				} else if (value instanceof FixedFloat) {
+					bundle.putInt(KEY_TYPE, TYPE_FIXED_FLOAT);
+				} else if (value instanceof FixedText) {
+					bundle.putInt(KEY_TYPE, TYPE_FIXED_STRING);
+				} else {
+					throw new AssertionError("Impossible MetricValue subclass: " + value);
+				}
+				value.toBundle(bundle);
+				return bundle;
+			}
+
+			protected abstract void toBundle(Bundle bundle);
+		}
+
+		/* AOSP Notification.Metric.TimeDifference */
+		public static final class TimeDifference extends MetricValue {
+			public static final int FORMAT_ADAPTIVE = 1;
+			public static final int FORMAT_CHRONOMETER = 2;
+
+			private static final String KEY_ZERO_TIME = "zeroTime";
+			private static final String KEY_ZERO_ELAPSED_REALTIME = "zeroElapsedRealtime";
+			private static final String KEY_PAUSED_DURATION = "pausedDuration";
+			private static final String KEY_COUNT_DOWN = "countDown";
+			private static final String KEY_FORMAT = "format";
+
+			// One of these three will be present.
+			private final java.time.Instant mZeroTime;
+			private final Long mZeroElapsedRealtime;
+			private final java.time.Duration mPausedDuration;
+			private final boolean mCountDown;
+			private final int mFormat;
+
+			public static TimeDifference forTimer(java.time.Instant endTime, int format) {
+				return new TimeDifference(java.util.Objects.requireNonNull(endTime),
+						/* zeroElapsedRealtime= */ null, /* pausedDuration= */ null,
+						/* countDown= */ true, format);
+			}
+
+			public static TimeDifference forTimer(long endTime, int format) {
+				return new TimeDifference(/* zeroTime= */ null, endTime,
+						/* pausedDuration= */ null, /* countDown= */ true, format);
+			}
+
+			public static TimeDifference forStopwatch(java.time.Instant startTime, int format) {
+				return new TimeDifference(java.util.Objects.requireNonNull(startTime),
+						/* zeroElapsedRealtime= */ null, /* pausedDuration= */ null,
+						/* countDown= */ false, format);
+			}
+
+			public static TimeDifference forStopwatch(long startTime, int format) {
+				return new TimeDifference(/* zeroTime= */ null, startTime,
+						/* pausedDuration= */ null, /* countDown= */ false, format);
+			}
+
+			public static TimeDifference forPausedTimer(java.time.Duration remainingTime, int format) {
+				return new TimeDifference(/* zeroTime= */ null, /* zeroElapsedRealtime= */ null,
+						java.util.Objects.requireNonNull(remainingTime), /* countDown= */ true, format);
+			}
+
+			public static TimeDifference forPausedStopwatch(java.time.Duration elapsedTime, int format) {
+				return new TimeDifference(/* zeroTime= */ null, /* zeroElapsedRealtime= */ null,
+						java.util.Objects.requireNonNull(elapsedTime), /* countDown= */ false, format);
+			}
+
+			private TimeDifference(java.time.Instant zeroTime, Long zeroElapsedRealtime,
+					java.time.Duration pausedDuration, boolean countDown, int format) {
+				checkArgument((zeroTime != null ? 1 : 0) + (zeroElapsedRealtime != null ? 1 : 0)
+								+ (pausedDuration != null ? 1 : 0) == 1,
+						"Exactly one of zeroTime, zeroElapsedRealtime, or pausedDuration must be "
+								+ "present; received %s,%s,%s",
+						zeroTime, zeroElapsedRealtime, pausedDuration);
+				checkArgument(format >= FORMAT_ADAPTIVE && format <= FORMAT_CHRONOMETER,
+						"Invalid format: %s", format);
+				mZeroTime = zeroTime;
+				mZeroElapsedRealtime = zeroElapsedRealtime;
+				mPausedDuration = pausedDuration;
+				mCountDown = countDown;
+				mFormat = format;
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				if (mZeroTime != null) {
+					bundle.putLong(KEY_ZERO_TIME, mZeroTime.toEpochMilli());
+				} else if (mZeroElapsedRealtime != null) {
+					bundle.putLong(KEY_ZERO_ELAPSED_REALTIME, mZeroElapsedRealtime);
+				} else if (mPausedDuration != null) {
+					bundle.putLong(KEY_PAUSED_DURATION, mPausedDuration.toMillis());
+				}
+				bundle.putBoolean(KEY_COUNT_DOWN, mCountDown);
+				bundle.putInt(KEY_FORMAT, mFormat);
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof TimeDifference)) return false;
+				TimeDifference that = (TimeDifference) obj;
+				if (this == that) return true;
+				return java.util.Objects.equals(this.mZeroTime, that.mZeroTime)
+						&& java.util.Objects.equals(this.mZeroElapsedRealtime, that.mZeroElapsedRealtime)
+						&& java.util.Objects.equals(this.mPausedDuration, that.mPausedDuration)
+						&& this.mCountDown == that.mCountDown
+						&& this.mFormat == that.mFormat;
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mZeroTime, mZeroElapsedRealtime, mPausedDuration, mCountDown,
+						mFormat);
+			}
+
+			@Override
+			public String toString() {
+				StringBuilder sb = new StringBuilder("TimeDifference{");
+				if (mZeroTime != null) {
+					sb.append("mZeroTime=").append(mZeroTime);
+				} else if (mZeroElapsedRealtime != null) {
+					sb.append("mZeroElapsedRealtime=").append(mZeroElapsedRealtime);
+				} else if (mPausedDuration != null) {
+					sb.append("mPausedDuration=").append(mPausedDuration);
+				}
+				sb.append(", mCountDown=").append(mCountDown)
+						.append(", mFormat=").append(mFormat)
+						.append("}");
+				return sb.toString();
+			}
+
+			public java.time.Instant getZeroTime() {
+				return mZeroTime;
+			}
+
+			public Long getZeroElapsedRealtime() {
+				return mZeroElapsedRealtime;
+			}
+
+			public java.time.Duration getPausedDuration() {
+				return mPausedDuration;
+			}
+
+			public boolean isStopwatch() {
+				return !mCountDown;
+			}
+
+			public boolean isTimer() {
+				return mCountDown;
+			}
+
+			public int getFormat() {
+				return mFormat;
+			}
+		}
+
+		/* AOSP Notification.Metric.FixedDate */
+		public static final class FixedDate extends MetricValue {
+			public static final int FORMAT_AUTOMATIC = 0;
+			public static final int FORMAT_LONG_DATE = 1;
+			public static final int FORMAT_SHORT_DATE = 2;
+
+			private static final String KEY_VALUE = "value";
+			private static final String KEY_FORMAT = "format";
+
+			private final java.time.LocalDate mValue;
+			private final int mFormat;
+
+			public FixedDate(java.time.LocalDate value) {
+				this(value, FORMAT_AUTOMATIC);
+			}
+
+			public FixedDate(java.time.LocalDate value, int format) {
+				mValue = java.util.Objects.requireNonNull(value);
+				checkArgument(format >= FORMAT_AUTOMATIC && format <= FORMAT_SHORT_DATE,
+						"Invalid format: %s", format);
+				mFormat = format;
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				bundle.putLong(KEY_VALUE, mValue.toEpochDay());
+				bundle.putInt(KEY_FORMAT, mFormat);
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof FixedDate)) return false;
+				FixedDate that = (FixedDate) obj;
+				if (this == that) return true;
+				return java.util.Objects.equals(this.mValue, that.mValue)
+						&& this.mFormat == that.mFormat;
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mValue, mFormat);
+			}
+
+			@Override
+			public String toString() {
+				return getClass().getSimpleName() + "{"
+						+ "mValue=" + mValue
+						+ ", mFormat=" + mFormat
+						+ "}";
+			}
+
+			public java.time.LocalDate getValue() {
+				return mValue;
+			}
+
+			public int getFormat() {
+				return mFormat;
+			}
+		}
+
+		/* AOSP Notification.Metric.FixedTime */
+		public static final class FixedTime extends MetricValue {
+			private static final String KEY_VALUE = "value";
+
+			private final java.time.LocalTime mValue;
+
+			public FixedTime(java.time.LocalTime value) {
+				mValue = java.util.Objects.requireNonNull(value).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				bundle.putLong(KEY_VALUE, mValue.toSecondOfDay());
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof FixedTime)) return false;
+				FixedTime that = (FixedTime) obj;
+				if (this == that) return true;
+				return java.util.Objects.equals(this.mValue, that.mValue);
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mValue);
+			}
+
+			@Override
+			public String toString() {
+				return getClass().getSimpleName() + "{" + "mValue=" + mValue + "}";
+			}
+
+			public java.time.LocalTime getValue() {
+				return mValue;
+			}
+		}
+
+		/* AOSP Notification.Metric.FixedInt */
+		public static final class FixedInt extends MetricValue {
+			private static final String KEY_VALUE = "value";
+			private static final String KEY_UNIT = "unit";
+
+			private final int mValue;
+			private final String mUnit;
+
+			public FixedInt(int value) {
+				this(value, /* unit= */ null);
+			}
+
+			public FixedInt(int value, CharSequence unit) {
+				mValue = value;
+				mUnit = safeCharSequenceToString(unit);
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				bundle.putInt(KEY_VALUE, mValue);
+				bundle.putString(KEY_UNIT, mUnit);
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof FixedInt)) return false;
+				FixedInt that = (FixedInt) obj;
+				if (this == that) return true;
+				return this.mValue == that.mValue
+						&& java.util.Objects.equals(this.mUnit, that.mUnit);
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mValue, mUnit);
+			}
+
+			@Override
+			public String toString() {
+				return getClass().getSimpleName() + "{"
+						+ "mValue=" + mValue
+						+ ", mUnit=" + mUnit
+						+ "}";
+			}
+
+			public int getValue() {
+				return mValue;
+			}
+
+			public CharSequence getUnit() {
+				return mUnit;
+			}
+		}
+
+		/* AOSP Notification.Metric.FixedFloat */
+		public static final class FixedFloat extends MetricValue {
+			public static final int DEFAULT_MIN_FRACTION_DIGITS = 0;
+			public static final int DEFAULT_MAX_FRACTION_DIGITS = 2;
+
+			private static final int LOWER_BOUND_FRACTION_DIGITS = 0;
+			private static final int UPPER_BOUND_FRACTION_DIGITS = 6;
+
+			private static final String KEY_VALUE = "value";
+			private static final String KEY_UNIT = "unit";
+			private static final String KEY_MIN_FRACTION_DIGITS = "minDigits";
+			private static final String KEY_MAX_FRACTION_DIGITS = "maxDigits";
+
+			private final float mValue;
+			private final String mUnit;
+			private final int mMinFractionDigits;
+			private final int mMaxFractionDigits;
+
+			public FixedFloat(float value) {
+				this(value, /* unit= */ null);
+			}
+
+			public FixedFloat(float value, CharSequence unit) {
+				this(value, unit, DEFAULT_MIN_FRACTION_DIGITS, DEFAULT_MAX_FRACTION_DIGITS);
+			}
+
+			public FixedFloat(float value, CharSequence unit, int minFractionDigits,
+					int maxFractionDigits) {
+				mValue = value;
+				mUnit = safeCharSequenceToString(unit);
+				checkArgument(minFractionDigits >= LOWER_BOUND_FRACTION_DIGITS
+								&& minFractionDigits <= UPPER_BOUND_FRACTION_DIGITS,
+						"Invalid minFractionDigits: %s", minFractionDigits);
+				checkArgument(maxFractionDigits >= LOWER_BOUND_FRACTION_DIGITS
+								&& maxFractionDigits <= UPPER_BOUND_FRACTION_DIGITS,
+						"Invalid maxFractionDigits: %s", maxFractionDigits);
+				checkArgument(minFractionDigits <= maxFractionDigits,
+						"Invalid minFractionDigits/maxFractionDigits: %s/%s",
+						minFractionDigits, maxFractionDigits);
+				mMinFractionDigits = minFractionDigits;
+				mMaxFractionDigits = maxFractionDigits;
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				bundle.putFloat(KEY_VALUE, mValue);
+				bundle.putString(KEY_UNIT, mUnit);
+				bundle.putInt(KEY_MIN_FRACTION_DIGITS, mMinFractionDigits);
+				bundle.putInt(KEY_MAX_FRACTION_DIGITS, mMaxFractionDigits);
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof FixedFloat)) return false;
+				FixedFloat that = (FixedFloat) obj;
+				if (this == that) return true;
+				return this.mValue == that.mValue
+						&& java.util.Objects.equals(this.mUnit, that.mUnit)
+						&& this.mMinFractionDigits == that.mMinFractionDigits
+						&& this.mMaxFractionDigits == that.mMaxFractionDigits;
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mValue, mUnit, mMinFractionDigits, mMaxFractionDigits);
+			}
+
+			@Override
+			public String toString() {
+				return getClass().getSimpleName() + "{"
+						+ "mValue=" + mValue
+						+ ", mUnit=" + mUnit
+						+ ", mMinFractionDigits=" + mMinFractionDigits
+						+ ", mMaxFractionDigits=" + mMaxFractionDigits
+						+ "}";
+			}
+
+			public float getValue() {
+				return mValue;
+			}
+
+			public CharSequence getUnit() {
+				return mUnit;
+			}
+
+			public int getMinFractionDigits() {
+				return mMinFractionDigits;
+			}
+
+			public int getMaxFractionDigits() {
+				return mMaxFractionDigits;
+			}
+		}
+
+		/* AOSP Notification.Metric.FixedString (the API 36.1 name is FixedText) */
+		public static final class FixedText extends MetricValue {
+			private static final String KEY_VALUE = "value";
+			private static final String KEY_UNIT = "unit";
+
+			private final String mValue;
+			private final String mUnit;
+
+			public FixedText(CharSequence value) {
+				this(value, null);
+			}
+
+			public FixedText(CharSequence value, CharSequence unit) {
+				mValue = safeCharSequenceToString(java.util.Objects.requireNonNull(value));
+				mUnit = safeCharSequenceToString(unit);
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				bundle.putString(KEY_VALUE, mValue);
+				bundle.putString(KEY_UNIT, mUnit);
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof FixedText)) return false;
+				FixedText that = (FixedText) obj;
+				if (this == that) return true;
+				return java.util.Objects.equals(this.mValue, that.mValue)
+						&& java.util.Objects.equals(this.mUnit, that.mUnit);
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mValue, mUnit);
+			}
+
+			@Override
+			public String toString() {
+				return getClass().getSimpleName() + "{"
+						+ "mValue=" + mValue
+						+ ", mUnit=" + mUnit
+						+ "}";
+			}
+
+			public CharSequence getValue() {
+				return mValue;
+			}
+
+			public CharSequence getUnit() {
+				return mUnit;
+			}
+		}
+	}
+
+	/* AOSP Notification.ProgressStyle: the data of the progress bar goes into the extras, nothing is drawn;
+	 * purgeResources/reduceImageSizes (ashmem, resource sizes) are left out */
+	public static class ProgressStyle extends Style {
+		private static final String KEY_ELEMENT_ID = "id";
+		private static final String KEY_ELEMENT_COLOR = "colorInt";
+		private static final String KEY_SEGMENT_LENGTH = "length";
+		private static final String KEY_POINT_POSITION = "position";
+
+		private static final int MAX_PROGRESS_SEGMENT_LIMIT = 10;
+		private static final int MAX_PROGRESS_POINT_LIMIT = 4;
+		private static final int DEFAULT_PROGRESS_MAX = 100;
+
+		private List<Segment> mProgressSegments = new ArrayList<>();
+		private List<Point> mProgressPoints = new ArrayList<>();
+		private int mProgress = 0;
+		private boolean mIndeterminate;
+		private boolean mIsStyledByProgress = true;
+		private Icon mTrackerIcon;
+		private Icon mStartIcon;
+		private Icon mEndIcon;
+
+		public ProgressStyle() {
+		}
+
+		public boolean areNotificationsVisiblyDifferent(Style other) {
+			if (other == null || getClass() != other.getClass()) {
+				return true;
+			}
+			final ProgressStyle progressStyle = (ProgressStyle) other;
+			if (!java.util.Objects.equals(mIndeterminate, progressStyle.mIndeterminate)) {
+				return true;
+			}
+			boolean nonIndeterminateCheckResult = false;
+			if (!mIndeterminate) {
+				nonIndeterminateCheckResult = !java.util.Objects.equals(mProgress, progressStyle.mProgress)
+						|| !java.util.Objects.equals(mIsStyledByProgress, progressStyle.mIsStyledByProgress)
+						|| !java.util.Objects.equals(mProgressSegments, progressStyle.mProgressSegments)
+						|| !java.util.Objects.equals(mProgressPoints, progressStyle.mProgressPoints)
+						|| !java.util.Objects.equals(mTrackerIcon, progressStyle.mTrackerIcon);
+			}
+			return !java.util.Objects.equals(mStartIcon, progressStyle.mStartIcon)
+					|| !java.util.Objects.equals(mEndIcon, progressStyle.mEndIcon)
+					|| nonIndeterminateCheckResult;
+		}
+
+		public List<Segment> getProgressSegments() {
+			return mProgressSegments;
+		}
+
+		public ProgressStyle setProgressSegments(List<Segment> progressSegments) {
+			if (mProgressSegments == null) {
+				mProgressSegments = new ArrayList<>();
+			}
+			mProgressSegments.clear();
+			for (Segment segment : progressSegments) {
+				addProgressSegment(segment);
+			}
+			return this;
+		}
+
+		public ProgressStyle addProgressSegment(Segment segment) {
+			if (mProgressSegments == null) {
+				mProgressSegments = new ArrayList<>();
+			}
+			if (segment.getLength() > 0) {
+				mProgressSegments.add(segment);
+				if (mProgressSegments.size() > MAX_PROGRESS_SEGMENT_LIMIT) {
+					android.util.Log.w("Notification", "Progress segments limit ("
+							+ MAX_PROGRESS_SEGMENT_LIMIT + ") is reached. "
+							+ "All segments will be merged into one segment.");
+				}
+			} else {
+				android.util.Log.w("Notification", "Dropped the segment. The length is not a positive integer.");
+			}
+			return this;
+		}
+
+		public List<Point> getProgressPoints() {
+			return mProgressPoints;
+		}
+
+		public ProgressStyle setProgressPoints(List<Point> points) {
+			if (mProgressPoints == null) {
+				mProgressPoints = new ArrayList<>();
+			}
+			mProgressPoints.clear();
+			for (Point point : points) {
+				addProgressPoint(point);
+			}
+			return this;
+		}
+
+		public ProgressStyle addProgressPoint(Point point) {
+			if (mProgressPoints == null) {
+				mProgressPoints = new ArrayList<>();
+			}
+			if (point.getPosition() > 0) {
+				mProgressPoints.add(point);
+				if (mProgressPoints.size() > MAX_PROGRESS_POINT_LIMIT) {
+					android.util.Log.w("Notification", "Progress points limit is reached. First"
+							+ MAX_PROGRESS_POINT_LIMIT + " points will be rendered.");
+				}
+			} else {
+				android.util.Log.w("Notification", "Dropped the point. The position is a negative or zero integer.");
+			}
+			return this;
+		}
+
+		public int getProgress() {
+			return mProgress;
+		}
+
+		public ProgressStyle setProgress(int progress) {
+			mProgress = progress;
+			return this;
+		}
+
+		public int getProgressMax() {
+			final List<Segment> progressSegment = mProgressSegments;
+			if (progressSegment == null || progressSegment.isEmpty()) {
+				return DEFAULT_PROGRESS_MAX;
+			} else {
+				int progressMax = 0;
+				int validSegmentCount = 0;
+				for (int i = 0; i < progressSegment.size(); i++) {
+					int segmentLength = progressSegment.get(i).getLength();
+					if (segmentLength > 0) {
+						try {
+							progressMax = Math.addExact(progressMax, segmentLength);
+							validSegmentCount++;
+						} catch (ArithmeticException e) {
+							android.util.Log.e("Notification",
+									"Notification.ProgressStyle segment total overflowed.", e);
+							return DEFAULT_PROGRESS_MAX;
+						}
+					}
+				}
+				if (validSegmentCount == 0) {
+					return DEFAULT_PROGRESS_MAX;
+				}
+				return progressMax;
+			}
+		}
+
+		public boolean isProgressIndeterminate() {
+			return mIndeterminate;
+		}
+
+		public ProgressStyle setProgressIndeterminate(boolean indeterminate) {
+			mIndeterminate = indeterminate;
+			return this;
+		}
+
+		public boolean isStyledByProgress() {
+			return mIsStyledByProgress;
+		}
+
+		public ProgressStyle setStyledByProgress(boolean enabled) {
+			mIsStyledByProgress = enabled;
+			return this;
+		}
+
+		public Icon getProgressTrackerIcon() {
+			return mTrackerIcon;
+		}
+
+		public ProgressStyle setProgressTrackerIcon(Icon trackerIcon) {
+			mTrackerIcon = trackerIcon;
+			return this;
+		}
+
+		public Icon getProgressStartIcon() {
+			return mStartIcon;
+		}
+
+		public ProgressStyle setProgressStartIcon(Icon startIcon) {
+			mStartIcon = startIcon;
+			return this;
+		}
+
+		public Icon getProgressEndIcon() {
+			return mEndIcon;
+		}
+
+		public ProgressStyle setProgressEndIcon(Icon endIcon) {
+			mEndIcon = endIcon;
+			return this;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			extras.putParcelableArrayList(EXTRA_PROGRESS_SEGMENTS,
+					getProgressSegmentsAsBundleList(mProgressSegments));
+			extras.putParcelableArrayList(EXTRA_PROGRESS_POINTS,
+					getProgressPointsAsBundleList(mProgressPoints));
+			extras.putInt(EXTRA_PROGRESS, mProgress);
+			extras.putBoolean(EXTRA_PROGRESS_INDETERMINATE, mIndeterminate);
+			extras.putInt(EXTRA_PROGRESS_MAX, getProgressMax());
+			extras.putBoolean(EXTRA_STYLED_BY_PROGRESS, mIsStyledByProgress);
+			if (mTrackerIcon != null) {
+				extras.putParcelable(EXTRA_PROGRESS_TRACKER_ICON, mTrackerIcon);
+			} else {
+				extras.remove(EXTRA_PROGRESS_TRACKER_ICON);
+			}
+			if (mStartIcon != null) {
+				extras.putParcelable(EXTRA_PROGRESS_START_ICON, mStartIcon);
+			} else {
+				extras.remove(EXTRA_PROGRESS_START_ICON);
+			}
+			if (mEndIcon != null) {
+				extras.putParcelable(EXTRA_PROGRESS_END_ICON, mEndIcon);
+			} else {
+				extras.remove(EXTRA_PROGRESS_END_ICON);
+			}
+		}
+
+		public static ArrayList<Bundle> getProgressSegmentsAsBundleList(List<Segment> progressSegments) {
+			final ArrayList<Bundle> segments = new ArrayList<>();
+			if (progressSegments != null && !progressSegments.isEmpty()) {
+				for (int i = 0; i < progressSegments.size(); i++) {
+					final Segment segment = progressSegments.get(i);
+					if (segment.getLength() <= 0) {
+						continue;
+					}
+					final Bundle bundle = new Bundle();
+					bundle.putInt(KEY_SEGMENT_LENGTH, segment.getLength());
+					bundle.putInt(KEY_ELEMENT_ID, segment.getId());
+					bundle.putInt(KEY_ELEMENT_COLOR, segment.getColor());
+					segments.add(bundle);
+				}
+			}
+			return segments;
+		}
+
+		public static ArrayList<Bundle> getProgressPointsAsBundleList(List<Point> progressPoints) {
+			final ArrayList<Bundle> points = new ArrayList<>();
+			if (progressPoints != null && !progressPoints.isEmpty()) {
+				for (int i = 0; i < progressPoints.size(); i++) {
+					final Point point = progressPoints.get(i);
+					if (point.getPosition() < 0) {
+						continue;
+					}
+					final Bundle bundle = new Bundle();
+					bundle.putInt(KEY_POINT_POSITION, point.getPosition());
+					bundle.putInt(KEY_ELEMENT_ID, point.getId());
+					bundle.putInt(KEY_ELEMENT_COLOR, point.getColor());
+					points.add(bundle);
+				}
+			}
+			return points;
+		}
+
+		/* AOSP Notification.ProgressStyle.Segment */
+		public static final class Segment {
+			private int mLength;
+			private int mId = 0;
+			private int mColor = Notification.COLOR_DEFAULT;
+
+			public Segment(int length) {
+				mLength = length;
+			}
+
+			public int getLength() {
+				return mLength;
+			}
+
+			public int getId() {
+				return mId;
+			}
+
+			public Segment setId(int id) {
+				mId = id;
+				return this;
+			}
+
+			public int getColor() {
+				return mColor;
+			}
+
+			public Segment setColor(int color) {
+				mColor = color;
+				return this;
+			}
+
+			@Override
+			public boolean equals(Object o) {
+				if (this == o) return true;
+				if (o == null || getClass() != o.getClass()) return false;
+				final Segment segment = (Segment) o;
+				return mLength == segment.mLength && mId == segment.mId
+						&& mColor == segment.mColor;
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mLength, mId, mColor);
+			}
+		}
+
+		/* AOSP Notification.ProgressStyle.Point */
+		public static final class Point {
+			private int mPosition;
+			private int mId = 0;
+			private int mColor = Notification.COLOR_DEFAULT;
+
+			public Point(int position) {
+				mPosition = position;
+			}
+
+			public int getPosition() {
+				return mPosition;
+			}
+
+			public int getId() {
+				return mId;
+			}
+
+			public Point setId(int id) {
+				mId = id;
+				return this;
+			}
+
+			public int getColor() {
+				return mColor;
+			}
+
+			public Point setColor(int color) {
+				mColor = color;
+				return this;
+			}
+
+			@Override
+			public boolean equals(Object o) {
+				if (this == o) return true;
+				if (o == null || getClass() != o.getClass()) return false;
+				final Point point = (Point) o;
+				return mPosition == point.mPosition && mId == point.mId
+						&& mColor == point.mColor;
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mPosition, mId, mColor);
+			}
+		}
+	}
+
 	public static class InboxStyle extends Style {
 		private ArrayList<CharSequence> mTexts = new ArrayList<>(5);
 
