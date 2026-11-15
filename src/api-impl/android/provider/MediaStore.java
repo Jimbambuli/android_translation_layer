@@ -18,6 +18,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -33,6 +34,14 @@ public class MediaStore {
 	/** @hide AOSP MediaStore call() method names and extras of the permission requests */
 	public static final String CREATE_WRITE_REQUEST_CALL = "create_write_request";
 	/** @hide */
+	public static final String CREATE_TRASH_REQUEST_CALL = "create_trash_request";
+	public static final String CREATE_FAVORITE_REQUEST_CALL = "create_favorite_request";
+	public static final String GET_VERSION_CALL = "get_version";
+	public static final String GET_GENERATION_CALL = "get_generation";
+	public static final String GET_DOCUMENT_URI_CALL = "get_document_uri";
+	public static final String GET_MEDIA_URI_CALL = "get_media_uri";
+	public static final String EXTRA_URI = "uri";
+	public static final String EXTRA_URI_PERMISSIONS = "uriPermissions";
 	public static final String CREATE_DELETE_REQUEST_CALL = "create_delete_request";
 	/** @hide */
 	public static final String EXTRA_CLIP_DATA = "clip_data";
@@ -429,5 +438,60 @@ public class MediaStore {
 	/* AOSP MediaStore.createDeleteRequest() */
 	public static PendingIntent createDeleteRequest(ContentResolver resolver, Collection<Uri> uris) {
 		return createRequest(resolver, CREATE_DELETE_REQUEST_CALL, uris, null);
+	}
+
+	/* AOSP MediaStore.createTrashRequest() / createFavoriteRequest(): MediaColumns.IS_TRASHED / IS_FAVORITE are
+	 * "is_trashed" / "is_favorite" */
+	public static PendingIntent createTrashRequest(ContentResolver resolver, Collection<Uri> uris, boolean value) {
+		final ContentValues values = new ContentValues();
+		values.put("is_trashed", value ? 1 : 0);
+		return createRequest(resolver, CREATE_TRASH_REQUEST_CALL, uris, values);
+	}
+
+	public static PendingIntent createFavoriteRequest(ContentResolver resolver, Collection<Uri> uris, boolean value) {
+		final ContentValues values = new ContentValues();
+		values.put("is_favorite", value ? 1 : 0);
+		return createRequest(resolver, CREATE_FAVORITE_REQUEST_CALL, uris, values);
+	}
+
+	/* AOSP MediaStore.getVersion(): the media provider is reached through call() (acquireContentProviderClient
+	 * + client.call() in AOSP, which ContentResolver.call() wraps) */
+	public static String getVersion(Context context) {
+		return getVersion(context, VOLUME_EXTERNAL_PRIMARY);
+	}
+
+	public static String getVersion(Context context, String volumeName) {
+		final Bundle in = new Bundle();
+		in.putString(android.content.Intent.EXTRA_TEXT, volumeName);
+		final Bundle out = context.getContentResolver().call(AUTHORITY, GET_VERSION_CALL, null, in);
+		return out.getString(android.content.Intent.EXTRA_TEXT);
+	}
+
+	public static long getGeneration(Context context, String volumeName) {
+		return getGeneration(context.getContentResolver(), volumeName);
+	}
+
+	public static long getGeneration(ContentResolver resolver, String volumeName) {
+		final Bundle in = new Bundle();
+		in.putString(android.content.Intent.EXTRA_TEXT, volumeName);
+		final Bundle out = resolver.call(AUTHORITY, GET_GENERATION_CALL, null, in);
+		return out.getLong(android.content.Intent.EXTRA_INDEX);
+	}
+
+	private static Uri convertUri(Context context, String method, Uri uri) {
+		final ContentResolver resolver = context.getContentResolver();
+		final Bundle in = new Bundle();
+		in.putParcelable(EXTRA_URI, uri);
+		in.putParcelableArrayList(EXTRA_URI_PERMISSIONS, new ArrayList<>(resolver.getPersistedUriPermissions()));
+		return (Uri)resolver.call(AUTHORITY, method, null, in).getParcelable(EXTRA_URI);
+	}
+
+	/* AOSP MediaStore.getDocumentUri() / getMediaUri() */
+	public static Uri getDocumentUri(Context context, Uri mediaUri) {
+		return convertUri(context, GET_DOCUMENT_URI_CALL, mediaUri);
+	}
+
+	public static Uri getMediaUri(Context context, Uri documentUri) {
+		return convertUri(context, GET_MEDIA_URI_CALL, documentUri);
 	}
 }
