@@ -147,6 +147,14 @@ public class SQLiteCursor extends AbstractWindowedCursor {
 		setWindow(null);
 	}
 
+	/* AOSP SQLiteCursor.setFillWindowForwardOnly: refills start at the required row instead of
+	 * a position that keeps rows before it in the window */
+	private boolean mFillWindowForwardOnly;
+
+	public void setFillWindowForwardOnly(boolean fillWindowForwardOnly) {
+		mFillWindowForwardOnly = fillWindowForwardOnly;
+	}
+
 	private void fillWindow(int requiredPos) {
 		awc_clearOrCreateWindow(getDatabase().getPath());
 
@@ -159,7 +167,7 @@ public class SQLiteCursor extends AbstractWindowedCursor {
 					Log.d(TAG, "received count(*) from native_fill_window: " + mCount);
 				}
 			} else {
-				int startPos = DatabaseUtils.cursorPickFillWindowStartPosition(requiredPos,
+				int startPos = mFillWindowForwardOnly ? requiredPos : DatabaseUtils.cursorPickFillWindowStartPosition(requiredPos,
 				                                                               mCursorWindowCapacity);
 				mQuery.fillWindow(mWindow, startPos, requiredPos, false);
 			}
