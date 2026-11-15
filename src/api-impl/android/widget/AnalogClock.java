@@ -19,6 +19,14 @@ public class AnalogClock extends View {
 		super(context, attrs);
 	}
 
+	public AnalogClock(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+	}
+
+	public AnalogClock(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	/** Sets the specified time zone id (e.g. "America/Los_Angeles"); null uses the default zone */
 	public void setTimeZone(String timeZone) {
 		mTimeZone = timeZone;
