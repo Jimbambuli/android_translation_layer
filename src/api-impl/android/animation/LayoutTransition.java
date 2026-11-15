@@ -1,5 +1,10 @@
 package android.animation;
 
+import android.view.View;
+import android.view.ViewGroup;
+import java.util.ArrayList;
+import java.util.List;
+
 /* After AOSP core/java/android/animation/LayoutTransition.java: the settings (transition types, animators,
  * durations, start delays) are kept as in AOSP; ATL's ViewGroup does not run the transitions */
 public class LayoutTransition {
@@ -104,6 +109,39 @@ public class LayoutTransition {
 	}
 
 	public void setInterpolator(int transitionType, TimeInterpolator interpolator) {}
+
+	/* AOSP TransitionListener: ATL runs no transitions, so the listeners are kept (addTransitionListener() and friends)
+	 * but never called */
+	public interface TransitionListener {
+		public void startTransition(LayoutTransition transition, ViewGroup container, View view, int transitionType);
+
+		public void endTransition(LayoutTransition transition, ViewGroup container, View view, int transitionType);
+	}
+
+	private ArrayList<TransitionListener> mListeners;
+	private boolean mAnimateParentHierarchy = true;
+
+	public void addTransitionListener(TransitionListener listener) {
+		if (mListeners == null) {
+			mListeners = new ArrayList<TransitionListener>();
+		}
+		mListeners.add(listener);
+	}
+
+	public void removeTransitionListener(TransitionListener listener) {
+		if (mListeners == null) {
+			return;
+		}
+		mListeners.remove(listener);
+	}
+
+	public List<TransitionListener> getTransitionListeners() {
+		return mListeners;
+	}
+
+	public void setAnimateParentHierarchy(boolean animateParentHierarchy) {
+		mAnimateParentHierarchy = animateParentHierarchy;
+	}
 
 	/** AOSP isChangingLayout(): true while CHANGE_APPEARING/CHANGE_DISAPPEARING animations run; ATL runs none */
 	public boolean isChangingLayout() {

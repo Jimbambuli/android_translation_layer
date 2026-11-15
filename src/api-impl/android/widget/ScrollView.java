@@ -2,6 +2,7 @@ package android.widget;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Rect;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -137,5 +138,77 @@ public class ScrollView extends FrameLayout {
 	@Override
 	public boolean shouldDelayChildPressedState() {
 		return true;
+	}
+
+	/* AOSP setTopEdgeEffectColor() and friends: the colors are kept, ATL draws no edge glow */
+	private int mEdgeGlowTopColor = 0xff000000;
+	private int mEdgeGlowBottomColor = 0xff000000;
+
+	public void setEdgeEffectColor(int color) {
+		setTopEdgeEffectColor(color);
+		setBottomEdgeEffectColor(color);
+	}
+
+	public void setBottomEdgeEffectColor(int color) {
+		mEdgeGlowBottomColor = color;
+		invalidate();
+	}
+
+	public void setTopEdgeEffectColor(int color) {
+		mEdgeGlowTopColor = color;
+		invalidate();
+	}
+
+	public int getTopEdgeEffectColor() {
+		return mEdgeGlowTopColor;
+	}
+
+	public int getBottomEdgeEffectColor() {
+		return mEdgeGlowBottomColor;
+	}
+
+	/** AOSP computeScrollDeltaToGetChildRectOnScreen(): how far to scroll to show rect (child coordinates); the fading edge
+	 * length is 0 as ATL draws no fading edges (AOSP getVerticalFadingEdgeLength() is 0 unless one is enabled) */
+	protected int computeScrollDeltaToGetChildRectOnScreen(Rect rect) {
+		if (getChildCount() == 0)
+			return 0;
+
+		int height = getHeight();
+		int screenTop = getScrollY();
+		int screenBottom = screenTop + height;
+
+		int scrollYDelta = 0;
+
+		if (rect.bottom > screenBottom && rect.top > screenTop) {
+			// need to move down to get it in view: move down just enough so that the entire rectangle is in view (or at least
+			// the first screen size chunk of it).
+			if (rect.height() > height) {
+				// just enough to get screen size chunk on
+				scrollYDelta += (rect.top - screenTop);
+			} else {
+				// get entire rect at bottom of screen
+				scrollYDelta += (rect.bottom - screenBottom);
+			}
+
+			// make sure we aren't scrolling beyond the end of our content
+			int bottom = getChildAt(0).getBottom();
+			int distanceToBottom = bottom - screenBottom;
+			scrollYDelta = Math.min(scrollYDelta, distanceToBottom);
+
+		} else if (rect.top < screenTop && rect.bottom < screenBottom) {
+			// need to move up to get it in view: move up just enough so that entire rectangle is in view (or at least the first
+			// screen size chunk)
+			if (rect.height() > height) {
+				// screen size chunk
+				scrollYDelta -= (screenBottom - rect.bottom);
+			} else {
+				// entire rect at top
+				scrollYDelta -= (screenTop - rect.top);
+			}
+
+			// make sure we aren't scrolling any further than the top our content
+			scrollYDelta = Math.max(scrollYDelta, -getScrollY());
+		}
+		return scrollYDelta;
 	}
 }
