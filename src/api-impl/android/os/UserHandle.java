@@ -255,4 +255,10 @@ public final class UserHandle {
 			out.writeInt(USER_NULL);
 		}
 	}
+
+	/* AOSP UserHandle.readFromParcel(Parcel): null if USER_NULL was written */
+	public static UserHandle readFromParcel(Parcel in) {
+		int h = in.readInt();
+		return h != USER_NULL ? new UserHandle(h) : null;
+	}
 }

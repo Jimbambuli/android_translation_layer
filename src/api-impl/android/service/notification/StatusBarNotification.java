@@ -1,6 +1,7 @@
 package android.service.notification;
 
 import android.app.Notification;
+import android.os.Parcel;
 import android.os.UserHandle;
 
 /* AOSP StatusBarNotification (android-16): a posted notification with its package, id, tag,
@@ -40,6 +41,32 @@ public class StatusBarNotification {
 	@Deprecated
 	public StatusBarNotification(String pkg, String opPkg, int id, String tag, int uid, int initialPid, int score, Notification notification, UserHandle user, long postTime) {
 		this(pkg, opPkg, id, tag, uid, initialPid, notification, user, null, postTime);
+	}
+
+	/* AOSP StatusBarNotification(Parcel): the fields in the order of writeToParcel(). The log instance id that may
+	 * follow is a single int in AOSP (InstanceId.writeToParcel), ATL has no such field and only reads it past */
+	public StatusBarNotification(Parcel in) {
+		this.pkg = in.readString();
+		this.opPkg = in.readString();
+		this.id = in.readInt();
+		if (in.readInt() != 0) {
+			this.tag = in.readString();
+		} else {
+			this.tag = null;
+		}
+		this.uid = in.readInt();
+		this.initialPid = in.readInt();
+		this.notification = new Notification(in);
+		this.user = UserHandle.readFromParcel(in);
+		this.postTime = in.readLong();
+		if (in.readInt() != 0) {
+			this.overrideGroupKey = in.readString();
+		}
+		if (in.readInt() != 0) {
+			in.readInt();
+		}
+		this.key = key();
+		this.groupKey = groupKey();
 	}
 
 	private String key() {
