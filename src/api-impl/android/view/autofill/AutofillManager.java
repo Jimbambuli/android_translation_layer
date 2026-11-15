@@ -54,4 +54,9 @@ public class AutofillManager {
 	public boolean isAutofillSupported() {
 		return false;
 	}
+
+	/* AOSP getNextAutofillId(): null when there is no AutofillClient, which ATL does not provide */
+	public AutofillId getNextAutofillId() {
+		return null;
+	}
 }

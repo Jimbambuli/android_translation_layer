@@ -113,6 +113,21 @@ public final class Display {
 		return 1.0f;
 	}
 
+	/* AOSP: available when DisplayInfo.hdrSdrRatio is not NaN; ATL's display reports no ratio (getHdrSdrRatio()
+	 * is the NaN fallback 1.0), so the register call fails like on a display without HDR/SDR ratio */
+	public boolean isHdrSdrRatioAvailable() {
+		return false;
+	}
+
+	public void registerHdrSdrRatioChangedListener(java.util.concurrent.Executor executor, java.util.function.Consumer<Display> listener) {
+		if (!isHdrSdrRatioAvailable()) {
+			throw new IllegalStateException("HDR/SDR ratio changed not available");
+		}
+	}
+
+	public void unregisterHdrSdrRatioChangedListener(java.util.function.Consumer<Display> listener) {
+	}
+
 	public RoundedCorner getRoundedCorner(int position) {
 		return null;
 	}

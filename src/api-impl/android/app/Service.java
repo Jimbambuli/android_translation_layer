@@ -143,4 +143,8 @@ public abstract class Service extends ContextWrapper {
 
 	public void onTaskRemoved(Intent rootIntent) {
 	}
+
+	/* AOSP Service.onTimeout(int, int): empty */
+	public void onTimeout(int startId, int fgsType) {
+	}
 }
