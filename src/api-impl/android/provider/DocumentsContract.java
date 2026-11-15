@@ -41,6 +41,10 @@ import java.util.List;
 import java.util.Objects;
 
 public final class DocumentsContract {
+	public static final String EXTRA_SHOW_ADVANCED = "android.provider.extra.SHOW_ADVANCED";
+	public static final String EXTRA_INITIAL_URI = "android.provider.extra.INITIAL_URI";
+	public static final String EXTERNAL_STORAGE_PROVIDER_AUTHORITY = "com.android.externalstorage.documents";
+	public static final String EXTERNAL_STORAGE_PRIMARY_EMULATED_ROOT_ID = "primary";
 	public static final String EXTRA_LOADING = "loading";
 	public static final String EXTRA_INFO = "info";
 	public static final String EXTRA_ERROR = "error";
@@ -271,6 +275,29 @@ public final class DocumentsContract {
 			} else if (e instanceof RuntimeException) {
 				throw (RuntimeException) e;
 			}
+		}
+	}
+
+	/* AOSP buildSearchDocumentsUri() */
+	public static Uri buildSearchDocumentsUri(String authority, String rootId, String query) {
+		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(authority)
+		    .appendPath(PATH_ROOT).appendPath(rootId).appendPath(PATH_SEARCH)
+		    .appendQueryParameter(PARAM_QUERY, query).build();
+	}
+
+	/* AOSP getDocumentThumbnail(): ContentResolver.loadThumbnail() with the size of the point; errors are logged,
+	 * and rethrown for apps targeting O and above (rethrowIfNecessary) */
+	public static android.graphics.Bitmap getDocumentThumbnail(ContentResolver content, Uri documentUri,
+	                                                           android.graphics.Point size,
+	                                                           android.os.CancellationSignal signal)
+	    throws FileNotFoundException {
+		try {
+			return content.loadThumbnail(documentUri, new android.util.Size(size.x, size.y), signal);
+		} catch (Exception e) {
+			if (!(e instanceof android.os.OperationCanceledException))
+				Log.w("DocumentsContract", "Failed to load thumbnail for " + documentUri + ": " + e);
+			rethrowIfNecessary(e);
+			return null;
 		}
 	}
 

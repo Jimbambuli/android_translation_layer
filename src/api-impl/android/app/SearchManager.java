@@ -33,6 +33,8 @@ public class SearchManager {
 	public final static String SUGGEST_COLUMN_INTENT_DATA_ID = "suggest_intent_data_id";
 	public final static String SUGGEST_COLUMN_QUERY = "suggest_intent_query";
 	public final static String SUGGEST_COLUMN_FLAGS = "suggest_flags";
+	public final static String SUGGEST_MIME_TYPE = "vnd.android.cursor.dir/vnd.android.search.suggest";
+	public final static String SUGGEST_COLUMN_FORMAT = "suggest_format";
 
 	/* AOSP SearchManager.getSearchableInfo(): the search information the activity declares in its
 	 * android.app.searchable meta-data, null if it declares none or an invalid one */

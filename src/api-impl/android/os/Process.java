@@ -870,6 +870,18 @@ public class Process {
 		return 1000;
 	};
 
+	/* AOSP getStartRequestedUptimeMillis(): the time the zygote was asked to fork; ATL has no zygote, so the
+	 * request is the start */
+	public static long getStartRequestedUptimeMillis() {
+		return getStartUptimeMillis();
+	}
+
+	/* AOSP isSdkSandbox() = isSdkSandboxUid(myUid()); sandbox uids are 20000..29999, an app's is not */
+	public static final boolean isSdkSandbox() {
+		int uid = myUid();
+		return uid >= 20000 && uid <= 29999;
+	}
+
 	public static long getStartElapsedRealtime() {
 		return 1000;
 	};

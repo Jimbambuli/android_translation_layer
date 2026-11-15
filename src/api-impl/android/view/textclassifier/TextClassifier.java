@@ -1,9 +1,21 @@
 package android.view.textclassifier;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.annotation.StringDef;
 import android.os.LocaleList;
 import android.os.Looper;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.Log;
 import com.android.internal.util.Preconditions;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -96,6 +108,237 @@ public interface TextClassifier {
 	default void destroy() {}
 
 	/** Utility functions for TextClassifier methods (AOSP TextClassifier.Utils, the part ATL needs). @hide */
+	/** @hide */
+	@Retention(RetentionPolicy.SOURCE)
+	@StringDef(prefix = {"TYPE_"}, value = {TYPE_UNKNOWN, TYPE_OTHER, TYPE_EMAIL, TYPE_PHONE, TYPE_ADDRESS, TYPE_URL,
+	                                         TYPE_DATE, TYPE_DATE_TIME, TYPE_FLIGHT_NUMBER, TYPE_DICTIONARY})
+	@interface EntityType {}
+
+	/* AOSP TextClassifier.EntityConfig (frameworks/base core/java/android/view/textclassifier/TextClassifier.java),
+	 * needed by TextLinks.Request */
+    final class EntityConfig implements Parcelable {
+        private final List<String> mIncludedTypes;
+        private final List<String> mExcludedTypes;
+        private final List<String> mHints;
+        private final boolean mIncludeTypesFromTextClassifier;
+
+        private EntityConfig(
+                List<String> includedEntityTypes,
+                List<String> excludedEntityTypes,
+                List<String> hints,
+                boolean includeTypesFromTextClassifier) {
+            mIncludedTypes = Objects.requireNonNull(includedEntityTypes);
+            mExcludedTypes = Objects.requireNonNull(excludedEntityTypes);
+            mHints = Objects.requireNonNull(hints);
+            mIncludeTypesFromTextClassifier = includeTypesFromTextClassifier;
+        }
+
+        private EntityConfig(Parcel in) {
+            mIncludedTypes = new ArrayList<>();
+            in.readStringList(mIncludedTypes);
+            mExcludedTypes = new ArrayList<>();
+            in.readStringList(mExcludedTypes);
+            List<String> tmpHints = new ArrayList<>();
+            in.readStringList(tmpHints);
+            mHints = Collections.unmodifiableList(tmpHints);
+            mIncludeTypesFromTextClassifier = in.readByte() != 0;
+        }
+
+        @Override
+        public void writeToParcel(Parcel parcel, int flags) {
+            parcel.writeStringList(mIncludedTypes);
+            parcel.writeStringList(mExcludedTypes);
+            parcel.writeStringList(mHints);
+            parcel.writeByte((byte) (mIncludeTypesFromTextClassifier ? 1 : 0));
+        }
+
+        /**
+         * Creates an EntityConfig.
+         *
+         * @param hints Hints for the TextClassifier to determine what types of entities to find.
+         *
+         * @deprecated Use {@link Builder} instead.
+         */
+        @Deprecated
+        public static EntityConfig createWithHints(@Nullable Collection<String> hints) {
+            return new EntityConfig.Builder()
+                    .includeTypesFromTextClassifier(true)
+                    .setHints(hints)
+                    .build();
+        }
+
+        /**
+         * Creates an EntityConfig.
+         *
+         * @param hints Hints for the TextClassifier to determine what types of entities to find
+         * @param includedEntityTypes Entity types, e.g. {@link #TYPE_EMAIL}, to explicitly include
+         * @param excludedEntityTypes Entity types, e.g. {@link #TYPE_PHONE}, to explicitly exclude
+         *
+         *
+         * Note that if an entity has been excluded, the exclusion will take precedence.
+         *
+         * @deprecated Use {@link Builder} instead.
+         */
+        @Deprecated
+        public static EntityConfig create(@Nullable Collection<String> hints,
+                @Nullable Collection<String> includedEntityTypes,
+                @Nullable Collection<String> excludedEntityTypes) {
+            return new EntityConfig.Builder()
+                    .setIncludedTypes(includedEntityTypes)
+                    .setExcludedTypes(excludedEntityTypes)
+                    .setHints(hints)
+                    .includeTypesFromTextClassifier(true)
+                    .build();
+        }
+
+        /**
+         * Creates an EntityConfig with an explicit entity list.
+         *
+         * @param entityTypes Complete set of entities, e.g. {@link #TYPE_URL} to find.
+         *
+         * @deprecated Use {@link Builder} instead.
+         */
+        @Deprecated
+        public static EntityConfig createWithExplicitEntityList(
+                @Nullable Collection<String> entityTypes) {
+            return new EntityConfig.Builder()
+                    .setIncludedTypes(entityTypes)
+                    .includeTypesFromTextClassifier(false)
+                    .build();
+        }
+
+        /**
+         * Returns a final list of entity types to find.
+         *
+         * @param entityTypes Entity types we think should be found before factoring in
+         *                    includes/excludes
+         *
+         * This method is intended for use by TextClassifier implementations.
+         */
+        public Collection<String> resolveEntityListModifications(
+                @NonNull Collection<String> entityTypes) {
+            final Set<String> finalSet = new HashSet<>();
+            if (mIncludeTypesFromTextClassifier) {
+                finalSet.addAll(entityTypes);
+            }
+            finalSet.addAll(mIncludedTypes);
+            finalSet.removeAll(mExcludedTypes);
+            return finalSet;
+        }
+
+        /**
+         * Retrieves the list of hints.
+         *
+         * @return An unmodifiable collection of the hints.
+         */
+        public Collection<String> getHints() {
+            return mHints;
+        }
+
+        /**
+         * Return whether the client allows the text classifier to include its own list of
+         * default types. If this function returns {@code true}, a default list of types suggested
+         * from a text classifier will be taking into account.
+         *
+         * <p>NOTE: This method is intended for use by a text classifier.
+         *
+         * @see #resolveEntityListModifications(Collection)
+         */
+        public boolean shouldIncludeTypesFromTextClassifier() {
+            return mIncludeTypesFromTextClassifier;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        public static final @android.annotation.NonNull Parcelable.Creator<EntityConfig> CREATOR =
+                new Parcelable.Creator<EntityConfig>() {
+                    @Override
+                    public EntityConfig createFromParcel(Parcel in) {
+                        return new EntityConfig(in);
+                    }
+
+                    @Override
+                    public EntityConfig[] newArray(int size) {
+                        return new EntityConfig[size];
+                    }
+                };
+
+
+
+        /** Builder class to construct the {@link EntityConfig} object. */
+        public static final class Builder {
+            @Nullable
+            private Collection<String> mIncludedTypes;
+            @Nullable
+            private Collection<String> mExcludedTypes;
+            @Nullable
+            private Collection<String> mHints;
+            private boolean mIncludeTypesFromTextClassifier = true;
+
+            /**
+             * Sets a collection of types that are explicitly included.
+             */
+            @NonNull
+            public Builder setIncludedTypes(@Nullable Collection<String> includedTypes) {
+                mIncludedTypes = includedTypes;
+                return this;
+            }
+
+            /**
+             * Sets a collection of types that are explicitly excluded.
+             */
+            @NonNull
+            public Builder setExcludedTypes(@Nullable Collection<String> excludedTypes) {
+                mExcludedTypes = excludedTypes;
+                return this;
+            }
+
+            /**
+             * Specifies whether or not to include the types suggested by the text classifier. By
+             * default, it is included.
+             */
+            @NonNull
+            public Builder includeTypesFromTextClassifier(boolean includeTypesFromTextClassifier) {
+                mIncludeTypesFromTextClassifier = includeTypesFromTextClassifier;
+                return this;
+            }
+
+
+            /**
+             * Sets the hints for the TextClassifier to determine what types of entities to find.
+             * These hints will only be used if {@link #includeTypesFromTextClassifier} is
+             * set to be true.
+             */
+            @NonNull
+            public Builder setHints(@Nullable Collection<String> hints) {
+                mHints = hints;
+                return this;
+            }
+
+            /**
+             * Combines all of the options that have been set and returns a new {@link EntityConfig}
+             * object.
+             */
+            @NonNull
+            public EntityConfig build() {
+                return new EntityConfig(
+                        mIncludedTypes == null
+                                ? Collections.emptyList()
+                                : new ArrayList<>(mIncludedTypes),
+                        mExcludedTypes == null
+                                ? Collections.emptyList()
+                                : new ArrayList<>(mExcludedTypes),
+                        mHints == null
+                                ? Collections.emptyList()
+                                : Collections.unmodifiableList(new ArrayList<>(mHints)),
+                        mIncludeTypesFromTextClassifier);
+            }
+        }
+    }
+
 	final class Utils {
 		static void checkArgument(CharSequence text, int startIndex, int endIndex) {
 			Preconditions.checkArgument(text != null);

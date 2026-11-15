@@ -21,6 +21,7 @@
 package android.database.sqlite;
 
 import android.database.Cursor;
+import android.content.ContentValues;
 import android.database.DatabaseUtils;
 import android.os.CancellationSignal;
 import android.os.OperationCanceledException;
@@ -645,5 +646,74 @@ public class SQLiteQueryBuilder {
 			return projection;
 		}
 		return null;
+	}
+
+	/* AOSP SQLiteQueryBuilder.computeWhere() / buildUpdate() / update() (without the strict columns and grammar modes,
+	 * which this class does not have) */
+	private String computeWhere(String selection) {
+		final boolean hasInternal = !TextUtils.isEmpty(mWhereClause);
+		final boolean hasExternal = !TextUtils.isEmpty(selection);
+		if (!hasInternal && !hasExternal)
+			return null;
+		final StringBuilder where = new StringBuilder();
+		if (hasInternal)
+			where.append('(').append(mWhereClause).append(')');
+		if (hasInternal && hasExternal)
+			where.append(" AND ");
+		if (hasExternal)
+			where.append('(').append(selection).append(')');
+		return where.toString();
+	}
+
+	public String buildUpdate(ContentValues values, String selection) {
+		if (values == null || values.isEmpty())
+			throw new IllegalArgumentException("Empty values");
+		StringBuilder sql = new StringBuilder(120);
+		sql.append("UPDATE ");
+		sql.append(SQLiteDatabase.findEditTable(mTables));
+		sql.append(" SET ");
+		boolean first = true;
+		for (Entry<String, Object> entry : values.valueSet()) {
+			if (!first)
+				sql.append(',');
+			first = false;
+			sql.append(entry.getKey());
+			sql.append("=?");
+		}
+		appendClause(sql, " WHERE ", computeWhere(selection));
+		return sql.toString();
+	}
+
+	public int update(SQLiteDatabase db, ContentValues values, String selection, String[] selectionArgs) {
+		java.util.Objects.requireNonNull(mTables, "No tables defined");
+		java.util.Objects.requireNonNull(db, "No database defined");
+		java.util.Objects.requireNonNull(values, "No values defined");
+
+		final String sql;
+		final String unwrappedSql = buildUpdate(values, selection);
+		if (mStrict) {
+			// the unwrapped statement must be valid, and the wrapped one is the one that runs (see query())
+			db.validateSql(unwrappedSql, null);
+			sql = buildUpdate(values, TextUtils.isEmpty(selection) ? selection : "(" + selection + ")");
+		} else {
+			sql = unwrappedSql;
+		}
+
+		if (selectionArgs == null)
+			selectionArgs = new String[0];
+		final Object[] sqlArgs = new Object[values.size() + selectionArgs.length];
+		int i = 0;
+		for (Entry<String, Object> entry : values.valueSet())
+			sqlArgs[i++] = entry.getValue();
+		for (String arg : selectionArgs)
+			sqlArgs[i++] = arg;
+		if (Log.isLoggable(TAG, Log.DEBUG))
+			Log.d(TAG, sql);
+		SQLiteStatement statement = new SQLiteStatement(db, sql, sqlArgs);
+		try {
+			return statement.executeUpdateDelete();
+		} finally {
+			statement.close();
+		}
 	}
 }

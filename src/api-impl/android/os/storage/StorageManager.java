@@ -13,6 +13,50 @@ import java.util.concurrent.Executor;
 public class StorageManager {
 	// AOSP: uuid -v5 ad99aa3d-308e-4191-a200-ebcab371c0ad default
 	public static final UUID UUID_DEFAULT = UUID.fromString("41217664-9172-527a-b3d5-edabb50a7d69");
+	public static final String UUID_PRIVATE_INTERNAL = null;
+	public static final String UUID_PRIMARY_PHYSICAL = "primary_physical";
+	public static final String UUID_SYSTEM = "system";
+	private static final String FAT_UUID_PREFIX = "fafafafa-fafa-5afa-8afa-fafa";
+	public static final UUID UUID_PRIMARY_PHYSICAL_ = UUID.fromString("0f95a519-dae7-5abf-9519-fbd6209e05fd");
+	public static final UUID UUID_SYSTEM_ = UUID.fromString("5d258386-e60d-59e3-826d-0089cdd42cc0");
+	public static final int FLAG_FOR_WRITE = 1 << 8;
+	public static final int FLAG_REAL_STATE = 1 << 9;
+	public static final int FLAG_INCLUDE_INVISIBLE = 1 << 10;
+
+	/* AOSP StorageManager.convert(UUID) */
+	public static String convert(UUID storageUuid) {
+		if (UUID_DEFAULT.equals(storageUuid)) {
+			return UUID_PRIVATE_INTERNAL;
+		} else if (UUID_PRIMARY_PHYSICAL_.equals(storageUuid)) {
+			return UUID_PRIMARY_PHYSICAL;
+		} else if (UUID_SYSTEM_.equals(storageUuid)) {
+			return UUID_SYSTEM;
+		}
+		String uuidString = storageUuid.toString();
+		if (uuidString.startsWith(FAT_UUID_PREFIX)) {
+			String fatStr = uuidString.substring(FAT_UUID_PREFIX.length()).toUpperCase(java.util.Locale.US);
+			return fatStr.substring(0, 4) + "-" + fatStr.substring(4);
+		}
+		return uuidString;
+	}
+
+	/* AOSP StorageManager.getPrimaryStorageVolume(): the first volume of the list is the primary one */
+	public StorageVolume getPrimaryStorageVolume() {
+		return getVolumeList()[0];
+	}
+
+	/* AOSP static getVolumeList(int, int): the volumes StorageManagerService reports to the app; ATL has one */
+	public static StorageVolume[] getVolumeList(int userId, int flags) {
+		return new StorageVolume[] {new StorageVolume()};
+	}
+
+	/* AOSP isObbMounted(): ATL never mounts an OBB image, so none is mounted */
+	public boolean isObbMounted(String rawPath) {
+		if (rawPath == null)
+			throw new NullPointerException("rawPath cannot be null");
+		return false;
+	}
+
 	public StorageVolume[] getVolumeList() {
 		StorageVolume[] sVolumes = {new StorageVolume()};
 		return sVolumes;

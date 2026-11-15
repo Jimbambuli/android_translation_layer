@@ -29,6 +29,18 @@ public abstract class AbstractThreadedSyncAdapter {
 
 	public void onSyncCanceled() {}
 
+	/* AOSP AbstractThreadedSyncAdapter */
+	public void onSyncCanceled(Thread thread) {
+		thread.interrupt();
+	}
+
+	public boolean onUnsyncableAccount() {
+		return true;
+	}
+
+	public void onSecurityException(Account account, Bundle extras, String authority, android.content.SyncResult syncResult) {
+	}
+
 	/* returned from the sync adapter service's onBind, so ContentResolver.requestSync can get to the adapter */
 	class SyncAdapterBinder extends Binder {
 		AbstractThreadedSyncAdapter getSyncAdapter() {

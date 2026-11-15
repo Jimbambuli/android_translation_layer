@@ -210,6 +210,41 @@ public abstract class ContentProvider {
 		return null;
 	}
 
+	/* AOSP ContentProvider.isTemporary(), shutdown(), openFileHelper() */
+	protected boolean isTemporary() {
+		return false;
+	}
+
+	public void shutdown() {
+		Log.w("ContentProvider", "implement ContentProvider shutdown() to make sure all database connections are gracefully shutdown");
+	}
+
+	protected final ParcelFileDescriptor openFileHelper(Uri uri, String mode) throws FileNotFoundException {
+		Cursor c = query(uri, new String[] {"_data"}, null, null, null);
+		int count = (c != null) ? c.getCount() : 0;
+		if (count != 1) {
+			// If there is not exactly one result, throw an appropriate exception.
+			if (c != null) {
+				c.close();
+			}
+			if (count == 0) {
+				throw new FileNotFoundException("No entry for " + uri);
+			}
+			throw new FileNotFoundException("Multiple items at " + uri);
+		}
+
+		c.moveToFirst();
+		int i = c.getColumnIndex("_data");
+		String path = (i >= 0 ? c.getString(i) : null);
+		c.close();
+		if (path == null) {
+			throw new FileNotFoundException("Column _data not found.");
+		}
+
+		int modeBits = ParcelFileDescriptor.parseMode(mode);
+		return ParcelFileDescriptor.open(new java.io.File(path), modeBits);
+	}
+
 	public AssetFileDescriptor openTypedAssetFile(Uri uri, String mimeTypeFilter, Bundle opts) throws FileNotFoundException {
 		if ("*/*".equals(mimeTypeFilter)) {
 			// If they can take anything, the untyped open call is good enough.

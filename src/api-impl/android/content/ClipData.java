@@ -47,8 +47,20 @@ public class ClipData implements Parcelable {
 			this.uri = uri;
 		}
 
+		private android.view.textclassifier.TextLinks mTextLinks;
+
 		public CharSequence getText() {
 			return text;
+		}
+
+		/** AOSP ClipData.Item.getTextLinks() */
+		public android.view.textclassifier.TextLinks getTextLinks() {
+			return mTextLinks;
+		}
+
+		/** @hide AOSP ClipData.Item.setTextLinks() */
+		public void setTextLinks(android.view.textclassifier.TextLinks textLinks) {
+			mTextLinks = textLinks;
 		}
 
 		public String getHtmlText() {
@@ -115,7 +127,7 @@ public class ClipData implements Parcelable {
 	}
 
 	/* AOSP ClipData(Parcel) / writeToParcel() / CREATOR, wire format of android-14. ATL has no icon, IntentSender,
-	 * ActivityInfo or TextLinks in a ClipData: they are written as null (AOSP also writes the ActivityInfo
+	 * or ActivityInfo in a ClipData: they are written as null (AOSP also writes the ActivityInfo
 	 * as null for a ClipData that does not parcel them) and a parcel that holds one is rejected. */
 	ClipData(Parcel in) {
 		description = new ClipDescription(in);
@@ -130,8 +142,10 @@ public class ClipData implements Parcelable {
 			skipAbsent(in, "IntentSender");
 			Uri uri = in.readTypedObject(Uri.CREATOR);
 			skipAbsent(in, "ActivityInfo");
-			skipAbsent(in, "TextLinks");
-			items.add(new Item(text, htmlText, intent, uri));
+			android.view.textclassifier.TextLinks textLinks = in.readTypedObject(android.view.textclassifier.TextLinks.CREATOR);
+			Item item = new Item(text, htmlText, intent, uri);
+			item.setTextLinks(textLinks);
+			items.add(item);
 		}
 	}
 
@@ -154,7 +168,7 @@ public class ClipData implements Parcelable {
 			dest.writeInt(0); /* IntentSender */
 			dest.writeTypedObject(item.uri, flags);
 			dest.writeInt(0); /* ActivityInfo */
-			dest.writeInt(0); /* TextLinks */
+			dest.writeTypedObject(item.mTextLinks, flags);
 		}
 	}
 

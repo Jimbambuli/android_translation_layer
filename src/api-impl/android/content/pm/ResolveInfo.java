@@ -20,12 +20,42 @@ public class ResolveInfo {
 	public String resolvePackageName;
 	public boolean system;
 
-	public Drawable loadIcon(PackageManager pm) {
-		Drawable icon = activityInfo.loadIcon(pm);
-		if (icon == null) {
-			icon = new Drawable();
+	/* AOSP ResolveInfo.noResourceId / iconResourceId / getIconResource(): the icon resource of the resolved component;
+	 * noResourceId is only set for managed-profile entries, ATL has none */
+	public boolean noResourceId;
+	public int iconResourceId;
+
+	public final int getIconResource() {
+		if (noResourceId)
+			return 0;
+		return getIconResourceInternal();
+	}
+
+	final int getIconResourceInternal() {
+		if (iconResourceId != 0)
+			return iconResourceId;
+		final ComponentInfo ci = getComponentInfo();
+		if (ci != null) {
+			return ci.getIconResource();
 		}
-		return icon;
+		return 0;
+	}
+
+	/* AOSP ResolveInfo.loadIcon(); getUserBadgedIcon() of the only user returns the icon itself */
+	public Drawable loadIcon(PackageManager pm) {
+		Drawable dr = null;
+		if (resolvePackageName != null && iconResourceId != 0) {
+			dr = pm.getDrawable(resolvePackageName, iconResourceId, null);
+		}
+		ComponentInfo ci = getComponentInfo();
+		if (dr == null && iconResourceId != 0) {
+			ApplicationInfo ai = ci.applicationInfo;
+			dr = pm.getDrawable(ci.packageName, iconResourceId, ai);
+		}
+		if (dr != null) {
+			return dr;
+		}
+		return ci.loadIcon(pm);
 	}
 
 	/* AOSP ResolveInfo.getComponentInfo. ATL always allocates activityInfo and serviceInfo, so the

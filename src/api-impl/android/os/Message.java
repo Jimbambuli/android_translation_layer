@@ -72,6 +72,16 @@ public final class Message implements Parcelable {
 	 */
 	public Messenger replyTo;
 
+	/** @hide AOSP Message.UID_NONE */
+	public static final int UID_NONE = -1;
+
+	/**
+	 * Optional field indicating the uid that sent the message.  This is
+	 * only valid for messages posted by a {@link Messenger}; otherwise,
+	 * it will be -1.
+	 */
+	public int sendingUid = UID_NONE;
+
 	/**
 	 * If set message is in use
 	 */
@@ -136,6 +146,7 @@ public final class Message implements Parcelable {
 		m.arg2 = orig.arg2;
 		m.obj = orig.obj;
 		m.replyTo = orig.replyTo;
+		m.sendingUid = orig.sendingUid;
 		if (orig.data != null) {
 			m.data = new Bundle(orig.data);
 		}
@@ -416,6 +427,7 @@ public final class Message implements Parcelable {
 		arg2 = 0;
 		obj = null;
 		replyTo = null;
+		sendingUid = UID_NONE;
 		when = 0;
 		target = null;
 		callback = null;

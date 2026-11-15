@@ -62,6 +62,24 @@ public class IntentSender implements Parcelable {
 		return 0;
 	}
 
+	/* AOSP writeToParcel(): the strong binder of the target; ATL's target is the PendingIntent, which writes its token */
 	@Override
-	public void writeToParcel(Parcel out, int flags) {}
+	public void writeToParcel(Parcel out, int flags) {
+		if (mPendingIntent != null)
+			mPendingIntent.writeToParcel(out, flags);
+		else
+			out.writeStrongBinder(null);
+	}
+
+	/* AOSP CREATOR: an IntentSender around the target the binder stands for, null without one */
+	public static final Parcelable.Creator<IntentSender> CREATOR = new Parcelable.Creator<IntentSender>() {
+		public IntentSender createFromParcel(Parcel in) {
+			PendingIntent target = PendingIntent.CREATOR.createFromParcel(in);
+			return target != null ? new IntentSender(target) : null;
+		}
+
+		public IntentSender[] newArray(int size) {
+			return new IntentSender[size];
+		}
+	};
 }

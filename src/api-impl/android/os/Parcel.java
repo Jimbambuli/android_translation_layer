@@ -58,6 +58,27 @@ public class Parcel {
 		return new Parcel();
 	}
 
+	/* AOSP Parcel.obtain(IBinder) marks the parcel as belonging to the binder, for the leak tracking of the
+	 * transaction; ATL's parcels are plain objects */
+	public static Parcel obtain(IBinder binder) {
+		return obtain();
+	}
+
+	public static final Parcelable.Creator<String> STRING_CREATOR = new Parcelable.Creator<String>() {
+		public String createFromParcel(Parcel source) {
+			return source.readString();
+		}
+
+		public String[] newArray(int size) {
+			return new String[size];
+		}
+	};
+
+	/* AOSP Parcel.writeParcelableCreator(): the name of the class, from which readParcelableCreator() finds CREATOR */
+	public final void writeParcelableCreator(Parcelable p) {
+		writeString(p.getClass().getName());
+	}
+
 	public void recycle() {}
 
 	public void writeByte(byte value) {
@@ -461,6 +482,57 @@ public class Parcel {
 		} catch (ReflectiveOperationException | IllegalArgumentException e) {
 			throw new BadParcelableException(e);
 		}
+	}
+
+	/* AOSP Parcel.readParcelableCreator(ClassLoader): the creator of the class named in the parcel, without the
+	 * sPairedCreators cache (only a speed-up) */
+	public final Parcelable.Creator<?> readParcelableCreator(ClassLoader loader) {
+		return readParcelableCreatorInternal(loader, null);
+	}
+
+	/* AOSP Parcel.readParcelableCreator(ClassLoader, Class) */
+	public <T> Parcelable.Creator<T> readParcelableCreator(ClassLoader loader, Class<T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		return readParcelableCreatorInternal(loader, clazz);
+	}
+
+	/* AOSP Parcel.readParcelableCreatorInternal(): clazz == null performs no type check */
+	@SuppressWarnings("unchecked")
+	private <T> Parcelable.Creator<T> readParcelableCreatorInternal(ClassLoader loader, Class<T> clazz) {
+		String name = readString();
+		if (name == null)
+			return null;
+
+		Parcelable.Creator<?> creator;
+		try {
+			ClassLoader parcelableClassLoader = (loader == null ? getClass().getClassLoader() : loader);
+			Class<?> parcelableClass = Class.forName(name, false, parcelableClassLoader);
+			if (!Parcelable.class.isAssignableFrom(parcelableClass)) {
+				throw new BadParcelableException("Parcelable protocol requires subclassing from Parcelable on class " + name);
+			}
+			if (clazz != null && !clazz.isAssignableFrom(parcelableClass)) {
+				throw new BadTypeParcelableException("Parcelable creator " + name + " is not a subclass of required class "
+				                                     + clazz.getName() + " provided in the parameter");
+			}
+			java.lang.reflect.Field f = parcelableClass.getField("CREATOR");
+			if ((f.getModifiers() & java.lang.reflect.Modifier.STATIC) == 0) {
+				throw new BadParcelableException("Parcelable protocol requires the CREATOR object to be static on class " + name);
+			}
+			if (!Parcelable.Creator.class.isAssignableFrom(f.getType())) {
+				throw new BadParcelableException("Parcelable protocol requires a Parcelable.Creator object called CREATOR on class " + name);
+			}
+			creator = (Parcelable.Creator<?>)f.get(null);
+		} catch (IllegalAccessException e) {
+			throw new BadParcelableException("IllegalAccessException when unmarshalling: " + name, e);
+		} catch (ClassNotFoundException e) {
+			throw new BadParcelableException("ClassNotFoundException when unmarshalling: " + name, e);
+		} catch (NoSuchFieldException e) {
+			throw new BadParcelableException("Parcelable protocol requires a Parcelable.Creator object called CREATOR on class " + name, e);
+		}
+		if (creator == null) {
+			throw new BadParcelableException("Parcelable protocol requires a non-null Parcelable.Creator object called CREATOR on class " + name);
+		}
+		return (Parcelable.Creator<T>)creator;
 	}
 
 	/** android-14 Parcel.writeString8(): a null-safe UTF-8 string (here the same wire format as writeString()). */
@@ -933,6 +1005,75 @@ public class Parcel {
 
 	public void writeNoException() {
 		writeSerializable(null);
+	}
+
+	/* Parcel.readException(int, String) of AOSP: the exception for the code of the reply header (the codes of
+	 * Parcel.EX_*), thrown without a throws clause. ATL's own reply format is read by readException(). */
+	public final void readException(int code, String msg) {
+		String remoteStackTrace = null;
+		final int remoteStackPayloadSize = readInt();
+		if (remoteStackPayloadSize > 0) {
+			remoteStackTrace = readString();
+		}
+		Exception e = createException(code, msg);
+		// Attach remote stack trace if available (AOSP ExceptionUtils.appendCause)
+		if (remoteStackTrace != null) {
+			RemoteException cause = new RemoteException("Remote stack trace:\n" + remoteStackTrace);
+			Throwable last = e;
+			while (last.getCause() != null && last.getCause() != last)
+				last = last.getCause();
+			last.initCause(cause);
+		}
+		Parcel.<RuntimeException>sneakyThrow(e);
+	}
+
+	@SuppressWarnings("unchecked")
+	private static <E extends Throwable> void sneakyThrow(Throwable e) throws E {
+		throw (E)e;
+	}
+
+	private static final int EX_SECURITY = -1;
+	private static final int EX_BAD_PARCELABLE = -2;
+	private static final int EX_ILLEGAL_ARGUMENT = -3;
+	private static final int EX_NULL_POINTER = -4;
+	private static final int EX_ILLEGAL_STATE = -5;
+	private static final int EX_NETWORK_MAIN_THREAD = -6;
+	private static final int EX_UNSUPPORTED_OPERATION = -7;
+	private static final int EX_SERVICE_SPECIFIC = -8;
+	private static final int EX_PARCELABLE = -9;
+
+	private Exception createException(int code, String msg) {
+		Exception exception = createExceptionOrNull(code, msg);
+		return exception != null ? exception : new RuntimeException("Unknown exception code: " + code + " msg " + msg);
+	}
+
+	/** @hide */
+	public Exception createExceptionOrNull(int code, String msg) {
+		switch (code) {
+		case EX_PARCELABLE:
+			if (readInt() > 0)
+				return (Exception)readParcelable(Parcelable.class.getClassLoader(), java.lang.Exception.class);
+			else
+				return new RuntimeException(msg + " [missing Parcelable]");
+		case EX_SECURITY:
+			return new SecurityException(msg);
+		case EX_BAD_PARCELABLE:
+			return new BadParcelableException(msg);
+		case EX_ILLEGAL_ARGUMENT:
+			return new IllegalArgumentException(msg);
+		case EX_NULL_POINTER:
+			return new NullPointerException(msg);
+		case EX_ILLEGAL_STATE:
+			return new IllegalStateException(msg);
+		case EX_NETWORK_MAIN_THREAD:
+			return new NetworkOnMainThreadException();
+		case EX_UNSUPPORTED_OPERATION:
+			return new UnsupportedOperationException(msg);
+		case EX_SERVICE_SPECIFIC:
+			return new ServiceSpecificException(readInt(), msg);
+		default:
+			return null;
+		}
 	}
 
 	public void readException() {

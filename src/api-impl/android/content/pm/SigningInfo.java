@@ -59,6 +59,11 @@ public final class SigningInfo implements Parcelable {
 		this.signatures = signatures;
 	}
 
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
 	/**
 	 * Although relatively uncommon, packages may be signed by more than one signer, in which case
 	 * their identity is viewed as being the set of all signers, not just any one.
@@ -84,6 +89,32 @@ public final class SigningInfo implements Parcelable {
 			return null;
 		}
 		return getApkContentsSigners();
+	}
+
+	/**
+	 * AOSP SigningInfo.getSchemeVersion(): the signature scheme version of the signing details. ATL does not
+	 * track it (the parcel writes 0 as well): SignatureSchemeVersion.UNKNOWN.
+	 */
+	public int getSchemeVersion() {
+		return 0;
+	}
+
+	/**
+	 * Returns the public keys for the signing certificates (AOSP SigningDetails.getPublicKeys(): the keys of
+	 * the signers' certificates).
+	 */
+	public java.util.Collection<java.security.PublicKey> getPublicKeys() {
+		java.util.ArrayList<java.security.PublicKey> keys = new java.util.ArrayList<>();
+		if (signatures != null) {
+			for (Signature signature : signatures) {
+				try {
+					keys.add(signature.getPublicKey());
+				} catch (java.security.cert.CertificateException e) {
+					throw new IllegalStateException("Signer certificate is not a valid X.509 certificate", e);
+				}
+			}
+		}
+		return keys;
 	}
 
 	/**

@@ -10,6 +10,30 @@ public class Settings {
 	public static class NameValueTable implements BaseColumns {}
 
 	public static final class Secure extends NameValueTable {
+
+		/* AOSP getLong(): the value as long, SettingNotFoundException when the setting does not exist */
+		public static long getLong(ContentResolver cr, String key) throws SettingNotFoundException {
+			Integer output = getIntOrNull(cr, key);
+			if (output == null)
+				throw new SettingNotFoundException(key);
+			return output.longValue();
+		}
+
+		public static long getLong(ContentResolver cr, String key, long def) {
+			Integer output = getIntOrNull(cr, key);
+			return output != null ? output.longValue() : def;
+		}
+
+		/* AOSP putInt() -> putString(): the write needs android.permission.WRITE_SECURE_SETTINGS, which an app does not hold here (ATL has no
+		 * settings provider to write to): SecurityException as for an app without it. The message text is not from
+		 * the SettingsProvider source (not available). */
+		public static boolean putInt(ContentResolver cr, String key, int value) {
+			return putString(cr, key, Integer.toString(value));
+		}
+
+		public static boolean putString(ContentResolver cr, String key, String value) {
+			throw new SecurityException("Permission denial: writing to settings requires " + "android.permission.WRITE_SECURE_SETTINGS");
+		}
 		private final static String TAG = "Settings$Secure";
 		public static final Uri CONTENT_URI = Uri.parse("content://settings/secure");
 
@@ -87,6 +111,30 @@ public class Settings {
 	}
 
 	public static final class System extends NameValueTable {
+
+		/* AOSP getLong(): the value as long, SettingNotFoundException when the setting does not exist */
+		public static long getLong(ContentResolver cr, String key) throws SettingNotFoundException {
+			Integer output = getIntOrNull(cr, key);
+			if (output == null)
+				throw new SettingNotFoundException(key);
+			return output.longValue();
+		}
+
+		public static long getLong(ContentResolver cr, String key, long def) {
+			Integer output = getIntOrNull(cr, key);
+			return output != null ? output.longValue() : def;
+		}
+
+		/* AOSP putInt() -> putString(): the write needs android.permission.WRITE_SETTINGS, which an app does not hold here (ATL has no
+		 * settings provider to write to): SecurityException as for an app without it. The message text is not from
+		 * the SettingsProvider source (not available). */
+		public static boolean putInt(ContentResolver cr, String key, int value) {
+			return putString(cr, key, Integer.toString(value));
+		}
+
+		public static boolean putString(ContentResolver cr, String key, String value) {
+			throw new SecurityException("Permission denial: writing to settings requires " + "android.permission.WRITE_SETTINGS");
+		}
 		/* AOSP: null when the setting is not set, which none is here */
 		public static String getString(ContentResolver cr, String key) {
 			return null;
@@ -105,6 +153,8 @@ public class Settings {
 		public static final Uri DEFAULT_NOTIFICATION_URI = getUriFor("notification_sound");
 
 		public static final Uri DEFAULT_RINGTONE_URI = getUriFor("ringtone");
+		public static final String ALARM_ALERT = "alarm_alert";
+		public static final Uri DEFAULT_ALARM_ALERT_URI = getUriFor(ALARM_ALERT);
 
 		public static Uri getUriFor(String name) {
 			return Uri.withAppendedPath(CONTENT_URI, name);
@@ -170,8 +220,33 @@ public class Settings {
 	}
 
 	public static final class Global extends NameValueTable {
+
+		/* AOSP getLong(): the value as long, SettingNotFoundException when the setting does not exist */
+		public static long getLong(ContentResolver cr, String key) throws SettingNotFoundException {
+			Integer output = getIntOrNull(cr, key);
+			if (output == null)
+				throw new SettingNotFoundException(key);
+			return output.longValue();
+		}
+
+		public static long getLong(ContentResolver cr, String key, long def) {
+			Integer output = getIntOrNull(cr, key);
+			return output != null ? output.longValue() : def;
+		}
+
+		/* AOSP putInt() -> putString(): the write needs android.permission.WRITE_SECURE_SETTINGS, which an app does not hold here (ATL has no
+		 * settings provider to write to): SecurityException as for an app without it. The message text is not from
+		 * the SettingsProvider source (not available). */
+		public static boolean putInt(ContentResolver cr, String key, int value) {
+			return putString(cr, key, Integer.toString(value));
+		}
+
+		public static boolean putString(ContentResolver cr, String key, String value) {
+			throw new SecurityException("Permission denial: writing to settings requires " + "android.permission.WRITE_SECURE_SETTINGS");
+		}
 		private final static String TAG = "Settings$Global";
 		public static final Uri CONTENT_URI = Uri.parse("content://settings/global");
+		public static final String ADB_WIFI_ENABLED = "adb_wifi_enabled";
 
 		public static Uri getUriFor(String name) {
 			return Uri.withAppendedPath(CONTENT_URI, name);
@@ -240,7 +315,13 @@ public class Settings {
 		}
 	}
 
-	public static class SettingNotFoundException extends AndroidException {}
+	public static class SettingNotFoundException extends AndroidException {
+		public SettingNotFoundException() {}
+
+		public SettingNotFoundException(String msg) {
+			super(msg);
+		}
+	}
 
 	public static boolean canDrawOverlays(Context context) {
 		return true;

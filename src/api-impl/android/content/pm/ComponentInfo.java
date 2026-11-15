@@ -74,31 +74,31 @@ public class ComponentInfo extends PackageItemInfo {
 		exported = orig.exported;
 	}
 
+	/* AOSP ComponentInfo.loadUnsafeLabel(): the component's label, else the application's, else the class name.
+	 * (the null check of applicationInfo is ATL's: not every ComponentInfo carries one) */
 	@Override
-	public CharSequence loadLabel(PackageManager pm) { /*
-   if (nonLocalizedLabel != null) {
-       return nonLocalizedLabel;
-   }
-   ApplicationInfo ai = applicationInfo;
-   CharSequence label;
-   if (labelRes != 0) {
-       label = pm.getText(packageName, labelRes, ai);
-       if (label != null) {
-	   return label;
-       }
-   }
-   if (ai.nonLocalizedLabel != null) {
-       return ai.nonLocalizedLabel;
-   }
-   if (ai.labelRes != 0) {
-       label = pm.getText(packageName, ai.labelRes, ai);
-       if (label != null) {
-	   return label;
-       }
-   }
-   return name;
-*/
-		return null;
+	public CharSequence loadLabel(PackageManager pm) {
+		if (nonLocalizedLabel != null) {
+			return nonLocalizedLabel;
+		}
+		ApplicationInfo ai = applicationInfo;
+		CharSequence label;
+		if (labelRes != 0) {
+			label = pm.getText(packageName, labelRes, ai);
+			if (label != null) {
+				return label;
+			}
+		}
+		if (ai != null && ai.nonLocalizedLabel != null) {
+			return ai.nonLocalizedLabel;
+		}
+		if (ai != null && ai.labelRes != 0) {
+			label = pm.getText(packageName, ai.labelRes, ai);
+			if (label != null) {
+				return label;
+			}
+		}
+		return name;
 	}
 
 	/**
@@ -153,7 +153,7 @@ public class ComponentInfo extends PackageItemInfo {
 	 */
 	@Override
 	protected Drawable loadDefaultIcon(PackageManager pm) {
-		return null; // applicationInfo.loadIcon(pm);
+		return applicationInfo != null ? applicationInfo.loadIcon(pm) : pm.getDefaultActivityIcon(); // AOSP ComponentInfo.loadDefaultIcon()
 	}
 
 	/**
@@ -161,7 +161,7 @@ public class ComponentInfo extends PackageItemInfo {
 	 */
 	@Override
 	protected Drawable loadDefaultLogo(PackageManager pm) {
-		return null; // applicationInfo.loadLogo(pm);
+		return applicationInfo != null ? applicationInfo.loadLogo(pm) : null; // AOSP ComponentInfo.loadDefaultLogo()
 	}
 
 	/**

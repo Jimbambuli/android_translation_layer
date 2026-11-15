@@ -1,5 +1,7 @@
 package android.os;
 
+import java.io.FileDescriptor;
+
 public interface IBinder {
 	/** AOSP IBinder.MAX_IPC_SIZE: the size of a transaction that is safe; ATL has no binder transactions */
 	int MAX_IPC_SIZE = 64 * 1024;
@@ -41,6 +43,12 @@ public interface IBinder {
 	public default boolean isBinderAlive() {
 		return true;
 	}
+
+	/* AOSP: abstract; default no-op here for the IBinder implementers that have no dump (BinderProxy: the remote
+	 * has none that ATL could reach) */
+	public default void dump(FileDescriptor fd, String[] args) throws RemoteException {}
+
+	public default void dumpAsync(FileDescriptor fd, String[] args) throws RemoteException {}
 
 	public boolean transact(int code, Parcel data, Parcel reply, int flags) throws RemoteException;
 

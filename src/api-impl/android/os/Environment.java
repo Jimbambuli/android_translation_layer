@@ -60,6 +60,13 @@ public class Environment {
 
 	private static final File DIR_ANDROID_ROOT = getDirectory(ENV_ANDROID_ROOT, "/system");
 	private static final File DIR_MEDIA_STORAGE = getDirectory(ENV_MEDIA_STORAGE, "/data/media");
+	private static final String ENV_ANDROID_STORAGE = "ANDROID_STORAGE";
+	private static final File DIR_ANDROID_STORAGE = getDirectory(ENV_ANDROID_STORAGE, "/storage");
+
+	/* AOSP Environment.getStorageDirectory(): where all the storage volumes are mounted */
+	public static File getStorageDirectory() {
+		return DIR_ANDROID_STORAGE;
+	}
 
 	private static final String CANONCIAL_EMULATED_STORAGE_TARGET = getCanonicalPathOrNull(
 	    ENV_EMULATED_STORAGE_TARGET);

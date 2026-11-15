@@ -399,6 +399,16 @@ public class ContentResolver {
 		return queryArgs;
 	}
 
+	/* AOSP ContentResolver.getStreamTypes(): the provider's answer, null without a provider */
+	public String[] getStreamTypes(Uri url, String mimeTypeFilter) {
+		Objects.requireNonNull(url, "url");
+		Objects.requireNonNull(mimeTypeFilter, "mimeTypeFilter");
+		ContentProvider provider = ContentProvider.atl_get_content_provider(url.getAuthority());
+		if (provider == null)
+			return null;
+		return provider.getStreamTypes(url, mimeTypeFilter);
+	}
+
 	public String getType(Uri uri) {
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		String path;
@@ -574,6 +584,59 @@ public class ContentResolver {
 	}
 
 	public static boolean isSyncActive(Account account, String authority) {
+		return false;
+	}
+
+	/* AOSP ContentResolver.validateSyncExtrasBundle() */
+	public static void validateSyncExtrasBundle(Bundle extras) {
+		try {
+			for (String key : extras.keySet()) {
+				Object value = extras.get(key);
+				if (value == null)
+					continue;
+				if (value instanceof Long)
+					continue;
+				if (value instanceof Integer)
+					continue;
+				if (value instanceof Boolean)
+					continue;
+				if (value instanceof Float)
+					continue;
+				if (value instanceof Double)
+					continue;
+				if (value instanceof String)
+					continue;
+				if (value instanceof Account)
+					continue;
+				throw new IllegalArgumentException("unexpected value type: " + value.getClass().getName());
+			}
+		} catch (IllegalArgumentException e) {
+			throw e;
+		} catch (RuntimeException exc) {
+			throw new IllegalArgumentException("error unparceling Bundle", exc);
+		}
+	}
+
+	/* AOSP ContentResolver.removePeriodicSync(): the ContentService has none (addPeriodicSync above keeps nothing) */
+	public static void removePeriodicSync(Account account, String authority, Bundle extras) {
+		validateSyncExtrasBundle(extras);
+	}
+
+	/* AOSP getPeriodicSyncs(), getCurrentSyncs(), getSyncAdapterTypes(), isSyncPending(): answers of a ContentService
+	 * that runs no sync: nothing periodic, nothing running, no adapter registered with it, nothing pending */
+	public static List<PeriodicSync> getPeriodicSyncs(Account account, String authority) {
+		return new ArrayList<PeriodicSync>();
+	}
+
+	public static List<SyncInfo> getCurrentSyncs() {
+		return new ArrayList<SyncInfo>();
+	}
+
+	public static SyncAdapterType[] getSyncAdapterTypes() {
+		return new SyncAdapterType[0];
+	}
+
+	public static boolean isSyncPending(Account account, String authority) {
 		return false;
 	}
 

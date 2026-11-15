@@ -1109,6 +1109,18 @@ public abstract class Context {
 		System.out.println("revokeUriPermission(" + uri + ", " + mode + ") called");
 	}
 
+	/* AOSP ContextImpl.revokeUriPermission(String, Uri, int): asks ActivityManager to revoke what the package was
+	 * granted; ATL grants no URI permissions, so like the other overload there is nothing to revoke */
+	public void revokeUriPermission(String toPackage, Uri uri, int modeFlags) {
+		System.out.println("revokeUriPermission(" + toPackage + ", " + uri + ", " + modeFlags + ") called");
+	}
+
+	/* AOSP ContextImpl.createContextForSplit(): an app that does not request isolated split loading has all its
+	 * splits loaded, so the context itself serves (ATL installs no isolated splits) */
+	public Context createContextForSplit(String splitName) throws android.content.pm.PackageManager.NameNotFoundException {
+		return this;
+	}
+
 	public String getAttributionTag() {
 		return null;
 	}
@@ -1116,6 +1128,27 @@ public abstract class Context {
 
 	public Drawable getWallpaper() {
 		return null;
+	}
+
+	/* AOSP ContextImpl: WallpaperManager.getDesiredMinimumWidth() asks the wallpaper service, which ATL does not have;
+	 * "if the returned value is <= 0, the caller should use the width of the default display" */
+	@Deprecated
+	public int getWallpaperDesiredMinimumWidth() {
+		return 0;
+	}
+
+	@Deprecated
+	public int getWallpaperDesiredMinimumHeight() {
+		return 0;
+	}
+
+	/* AOSP ContextImpl: PermissionControllerManager.revokeSelfPermissionsOnKill(); nothing is granted by a permission
+	 * controller in ATL ("a permission that is not currently granted is ignored") */
+	public void revokeSelfPermissionsOnKill(java.util.Collection<String> permissions) {
+	}
+
+	public void revokeSelfPermissionOnKill(String permName) {
+		revokeSelfPermissionsOnKill(java.util.Collections.singletonList(permName));
 	}
 
 	public String[] databaseList() {

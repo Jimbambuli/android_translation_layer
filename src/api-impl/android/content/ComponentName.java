@@ -35,6 +35,25 @@ public final class ComponentName implements Cloneable, Comparable<ComponentName>
 	private final String mPackage;
 	private final String mClass;
 
+	/* AOSP ComponentName.createRelative(String, String): a class name starting with '.' is relative to the package */
+	public static ComponentName createRelative(String pkg, String cls) {
+		if (cls == null || cls.isEmpty()) {
+			throw new IllegalArgumentException("class name cannot be empty");
+		}
+		final String fullName;
+		if (cls.charAt(0) == '.') {
+			fullName = pkg + cls;
+		} else {
+			fullName = cls;
+		}
+		return new ComponentName(pkg, fullName);
+	}
+
+	/* AOSP ComponentName.createRelative(Context, String) */
+	public static ComponentName createRelative(Context pkg, String cls) {
+		return createRelative(pkg.getPackageName(), cls);
+	}
+
 	/**
 	 * Create a new component identifier.
 	 *

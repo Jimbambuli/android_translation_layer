@@ -16,6 +16,39 @@ public class VibrationEffect {
 		return new VibrationEffect(new long[] {0, milliseconds}, -1);
 	}
 
+	public static final int EFFECT_CLICK = 0;
+	public static final int EFFECT_DOUBLE_CLICK = 1;
+	public static final int EFFECT_TICK = 2;
+	public static final int EFFECT_THUD = 3;
+	public static final int EFFECT_POP = 4;
+	public static final int EFFECT_HEAVY_CLICK = 5;
+	public static final int EFFECT_TEXTURE_TICK = 21;
+	/** @hide */
+	public static final int[] RINGTONES = java.util.stream.IntStream.rangeClosed(6, 20).toArray();
+
+	/**
+	 * AOSP createPredefined(): a prebaked effect with fallback. The argument check is PrebakedSegment.validate(). The
+	 * vibrator of ATL has no predefined effect (Vibrator.areEffectsSupported() is NO for all) and the fallback patterns
+	 * are device resources of the VibratorManagerService (config_*EffectPattern; not in ATL's framework-res), so the
+	 * effect does not vibrate: that of a device without a vibrator.
+	 */
+	public static VibrationEffect createPredefined(int effectId) {
+		switch (effectId) {
+		case EFFECT_CLICK:
+		case EFFECT_DOUBLE_CLICK:
+		case EFFECT_HEAVY_CLICK:
+		case EFFECT_POP:
+		case EFFECT_TEXTURE_TICK:
+		case EFFECT_THUD:
+		case EFFECT_TICK:
+			break;
+		default:
+			if (effectId < RINGTONES[0] || effectId > RINGTONES[RINGTONES.length - 1])
+				throw new IllegalArgumentException("Unknown prebaked effect type (value=" + effectId + ")");
+		}
+		return new VibrationEffect(new long[] {0}, -1);
+	}
+
 	public static final int DEFAULT_AMPLITUDE = -1;
 	public static final int MAX_AMPLITUDE = 255;
 
@@ -59,5 +92,54 @@ public class VibrationEffect {
 			steps[n++] = timings[i];
 		}
 		return new VibrationEffect(java.util.Arrays.copyOf(steps, n), newRepeat);
+	}
+
+	/**
+	 * AOSP VibrationEffect.startComposition(): a composition of haptic primitives. ATL's vibrator only switches on and
+	 * off and has no primitive (Vibrator.areAllPrimitivesSupported() is false for all), so a composed effect is the one
+	 * that vibrates for no time: AOSP's service skips the primitives a vibrator does not support.
+	 */
+	public static Composition startComposition() {
+		return new Composition();
+	}
+
+	public static final class Composition {
+		public static final int PRIMITIVE_NOOP = 0;
+		public static final int PRIMITIVE_CLICK = 1;
+		public static final int PRIMITIVE_THUD = 2;
+		public static final int PRIMITIVE_SPIN = 3;
+		public static final int PRIMITIVE_QUICK_RISE = 4;
+		public static final int PRIMITIVE_SLOW_RISE = 5;
+		public static final int PRIMITIVE_QUICK_FALL = 6;
+		public static final int PRIMITIVE_TICK = 7;
+		public static final int PRIMITIVE_LOW_TICK = 8;
+
+		private int mSegments;
+
+		Composition() {}
+
+		public Composition addPrimitive(int primitiveId) {
+			return addPrimitive(primitiveId, 1f);
+		}
+
+		public Composition addPrimitive(int primitiveId, float scale) {
+			return addPrimitive(primitiveId, scale, 0);
+		}
+
+		/* AOSP PrimitiveSegment.validate(): the primitive id, scale and delay are in range */
+		public Composition addPrimitive(int primitiveId, float scale, int delay) {
+			com.android.internal.util.Preconditions.checkArgumentInRange(primitiveId, PRIMITIVE_NOOP, PRIMITIVE_LOW_TICK, "primitiveId");
+			com.android.internal.util.Preconditions.checkArgumentInRange(scale, 0f, 1f, "scale");
+			if (delay < 0)
+				throw new IllegalArgumentException("delay must be >= 0");
+			mSegments++;
+			return this;
+		}
+
+		public VibrationEffect compose() {
+			if (mSegments == 0)
+				throw new IllegalStateException("Composition must have at least one element to compose.");
+			return new VibrationEffect(new long[] {0}, -1);
+		}
 	}
 }

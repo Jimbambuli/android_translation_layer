@@ -10,4 +10,9 @@ public class BadParcelableException extends AndroidRuntimeException {
 	public BadParcelableException(Exception cause) {
 		super(cause);
 	}
+
+	/** @hide AOSP BadParcelableException(String, Throwable) */
+	public BadParcelableException(String msg, Throwable cause) {
+		super(msg, cause);
+	}
 }

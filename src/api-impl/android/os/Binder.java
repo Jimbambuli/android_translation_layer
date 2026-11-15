@@ -2,11 +2,21 @@ package android.os;
 
 import android.atl.ATLLoadedApp;
 import android.content.Context;
+import java.io.FileDescriptor;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
 
 public class Binder implements IBinder {
 
 	private String mDescriptor;
 	private IInterface mOwner;
+
+	public Binder() {}
+
+	/* AOSP Binder(String): the descriptor identifies the binder for debugging */
+	public Binder(String descriptor) {
+		mDescriptor = descriptor;
+	}
 
 	public void attachInterface(IInterface owner, String descriptor) {
 		mOwner = owner;
@@ -48,6 +58,46 @@ public class Binder implements IBinder {
 			reply.setDataPosition(0);
 		}
 		return r;
+	}
+
+	/* AOSP Binder.dump(FileDescriptor, String[]): calls the more convenient dump(FileDescriptor, PrintWriter, String[])
+	 * (PrintWriter instead of FastPrintWriter, same output); AOSP's doDump() also prints exceptions into the dump */
+	public void dump(FileDescriptor fd, String[] args) {
+		FileOutputStream fout = new FileOutputStream(fd);
+		PrintWriter pw = new PrintWriter(fout);
+		try {
+			try {
+				dump(fd, pw, args);
+			} catch (SecurityException e) {
+				pw.println("Security exception: " + e.getMessage());
+				throw e;
+			} catch (Throwable e) {
+				pw.println();
+				pw.println("Exception occurred while dumping:");
+				e.printStackTrace(pw);
+			}
+		} finally {
+			pw.flush();
+		}
+	}
+
+	/* AOSP Binder.dumpAsync(): like dump(), but on its own thread */
+	public void dumpAsync(final FileDescriptor fd, final String[] args) {
+		final FileOutputStream fout = new FileOutputStream(fd);
+		final PrintWriter pw = new PrintWriter(fout);
+		Thread thr = new Thread("Binder.dumpAsync") {
+			public void run() {
+				try {
+					dump(fd, pw, args);
+				} finally {
+					pw.flush();
+				}
+			}
+		};
+		thr.start();
+	}
+
+	protected void dump(FileDescriptor fd, PrintWriter fout, String[] args) {
 	}
 
 	/* AOSP Binder.onTransact() without dump, shell command and sysprops transactions */

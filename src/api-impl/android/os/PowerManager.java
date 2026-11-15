@@ -61,6 +61,70 @@ public final class PowerManager {
 
 	public static final int FULL_WAKE_LOCK = 0x1a;
 
+	/* AOSP PowerManager thermal API (THERMAL_STATUS_* = Temperature.THROTTLING_*). ATL has no ThermalManagerService:
+	 * the status is NONE (a device that is not throttled), the headroom is NaN as documented for a device without
+	 * the HAL ("NaN if not supported"), listeners are kept but never called, and the sustained performance mode
+	 * is off (config_sustainedPerformanceModeSupported is false in AOSP's config.xml) */
+	public static final int THERMAL_STATUS_NONE = 0;
+	public static final int THERMAL_STATUS_LIGHT = 1;
+	public static final int THERMAL_STATUS_MODERATE = 2;
+	public static final int THERMAL_STATUS_SEVERE = 3;
+	public static final int THERMAL_STATUS_CRITICAL = 4;
+	public static final int THERMAL_STATUS_EMERGENCY = 5;
+	public static final int THERMAL_STATUS_SHUTDOWN = 6;
+
+	public interface OnThermalStatusChangedListener {
+		void onThermalStatusChanged(int status);
+	}
+
+	private final java.util.Map<OnThermalStatusChangedListener, java.util.concurrent.Executor> mThermalListeners = new java.util.HashMap<>();
+
+	public int getCurrentThermalStatus() {
+		return THERMAL_STATUS_NONE;
+	}
+
+	public void addThermalStatusListener(OnThermalStatusChangedListener listener) {
+		java.util.Objects.requireNonNull(listener, "listener cannot be null");
+		addThermalStatusListener(Runnable::run, listener);
+	}
+
+	public void addThermalStatusListener(java.util.concurrent.Executor executor, OnThermalStatusChangedListener listener) {
+		java.util.Objects.requireNonNull(listener, "listener cannot be null");
+		java.util.Objects.requireNonNull(executor, "executor cannot be null");
+		synchronized (mThermalListeners) {
+			if (mThermalListeners.containsKey(listener))
+				throw new IllegalArgumentException("Listener already registered: " + listener);
+			mThermalListeners.put(listener, executor);
+		}
+	}
+
+	public void removeThermalStatusListener(OnThermalStatusChangedListener listener) {
+		java.util.Objects.requireNonNull(listener, "listener cannot be null");
+		synchronized (mThermalListeners) {
+			if (mThermalListeners.remove(listener) == null)
+				throw new IllegalArgumentException("Listener was not added");
+		}
+	}
+
+	public float getThermalHeadroom(int forecastSeconds) {
+		return Float.NaN;
+	}
+
+	public boolean isSustainedPerformanceModeSupported() {
+		return false;
+	}
+
+	public static final int LOCATION_MODE_NO_CHANGE = 0;
+	public static final int LOCATION_MODE_GPS_DISABLED_WHEN_SCREEN_OFF = 1;
+	public static final int LOCATION_MODE_ALL_DISABLED_WHEN_SCREEN_OFF = 2;
+	public static final int LOCATION_MODE_FOREGROUND_ONLY = 3;
+	public static final int LOCATION_MODE_THROTTLE_REQUESTS_WHEN_SCREEN_OFF = 4;
+
+	/* AOSP getLocationPowerSaveMode(): without battery saver (isPowerSaveMode() is false) nothing changes */
+	public int getLocationPowerSaveMode() {
+		return LOCATION_MODE_NO_CHANGE;
+	}
+
 	public boolean isPowerSaveMode() {
 		return false;
 	}

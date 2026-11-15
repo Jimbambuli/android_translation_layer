@@ -2904,7 +2904,7 @@ public class PackageManager {
 	 * @see #getActivityIcon(Intent)
 	 */
 	public Drawable getActivityIcon(ComponentName activityName) throws NameNotFoundException {
-		return null;
+		return getActivityInfo(activityName, 0).loadIcon(this); // AOSP ApplicationPackageManager.getActivityIcon()
 	}
 
 	/**
@@ -2925,7 +2925,15 @@ public class PackageManager {
 	 * @see #getActivityIcon(ComponentName)
 	 */
 	public Drawable getActivityIcon(Intent intent) throws NameNotFoundException {
-		return null;
+		// AOSP ApplicationPackageManager.getActivityIcon(Intent)
+		if (intent.getComponent() != null) {
+			return getActivityIcon(intent.getComponent());
+		}
+		ResolveInfo info = resolveActivity(intent, MATCH_DEFAULT_ONLY);
+		if (info != null) {
+			return info.activityInfo.loadIcon(this);
+		}
+		throw new NameNotFoundException(intent.toUri(0));
 	}
 
 	/**
@@ -2935,7 +2943,8 @@ public class PackageManager {
 	 * @return Drawable Image of the icon.
 	 */
 	public Drawable getDefaultActivityIcon() {
-		return null;
+		// AOSP ApplicationPackageManager.getDefaultActivityIcon(): sym_def_app_icon of the framework resources
+		return android.content.res.Resources.getSystem().getDrawable(com.android.internal.R.drawable.sym_def_app_icon);
 	}
 
 	/**
@@ -3741,6 +3750,128 @@ public class PackageManager {
 	}
 
 	/**
+	 * AOSP PackageManager.ComponentEnabledSetting (the codegen parts as written out): a component or package
+	 * with the new enabled state and flags.
+	 */
+	public static final class ComponentEnabledSetting implements android.os.Parcelable {
+		private final String mPackageName;
+		private final ComponentName mComponentName;
+		private final int mEnabledState;
+		private final int mEnabledFlags;
+
+		public ComponentEnabledSetting(ComponentName componentName, int newState, int flags) {
+			mPackageName = null;
+			mComponentName = java.util.Objects.requireNonNull(componentName);
+			mEnabledState = newState;
+			mEnabledFlags = flags;
+		}
+
+		public ComponentEnabledSetting(String packageName, int newState, int flags) {
+			mPackageName = java.util.Objects.requireNonNull(packageName);
+			mComponentName = null;
+			mEnabledState = newState;
+			mEnabledFlags = flags;
+		}
+
+		public String getPackageName() {
+			if (isComponent())
+				return mComponentName.getPackageName();
+			return mPackageName;
+		}
+
+		public String getClassName() {
+			if (isComponent())
+				return mComponentName.getClassName();
+			return null;
+		}
+
+		public boolean isComponent() {
+			return mComponentName != null;
+		}
+
+		public ComponentName getComponentName() {
+			return mComponentName;
+		}
+
+		public int getEnabledState() {
+			return mEnabledState;
+		}
+
+		public int getEnabledFlags() {
+			return mEnabledFlags;
+		}
+
+		@Override
+		public void writeToParcel(android.os.Parcel dest, int flags) {
+			byte flg = 0;
+			if (mPackageName != null)
+				flg |= 0x1;
+			if (mComponentName != null)
+				flg |= 0x2;
+			dest.writeByte(flg);
+			if (mPackageName != null)
+				dest.writeString(mPackageName);
+			if (mComponentName != null)
+				dest.writeTypedObject(mComponentName, flags);
+			dest.writeInt(mEnabledState);
+			dest.writeInt(mEnabledFlags);
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		ComponentEnabledSetting(android.os.Parcel in) {
+			byte flg = in.readByte();
+			mPackageName = (flg & 0x1) == 0 ? null : in.readString();
+			mComponentName = (flg & 0x2) == 0 ? null : (ComponentName)in.readTypedObject(ComponentName.CREATOR);
+			mEnabledState = in.readInt();
+			mEnabledFlags = in.readInt();
+		}
+
+		public static final android.os.Parcelable.Creator<ComponentEnabledSetting> CREATOR =
+		    new android.os.Parcelable.Creator<ComponentEnabledSetting>() {
+			    @Override
+			    public ComponentEnabledSetting[] newArray(int size) {
+				    return new ComponentEnabledSetting[size];
+			    }
+
+			    @Override
+			    public ComponentEnabledSetting createFromParcel(android.os.Parcel in) {
+				    return new ComponentEnabledSetting(in);
+			    }
+		    };
+	}
+
+	/**
+	 * AOSP setComponentEnabledSettings(): applies the list; an IllegalArgumentException is thrown if the same
+	 * component is in the list twice (the service's atomic apply has nothing to roll back here, the states are
+	 * only recorded).
+	 */
+	public void setComponentEnabledSettings(List<ComponentEnabledSetting> settings) {
+		java.util.HashSet<String> seen = new java.util.HashSet<>();
+		for (ComponentEnabledSetting setting : settings) {
+			if (!seen.add(setting.isComponent() ? setting.getComponentName().flattenToString() : "package:" + setting.getPackageName()))
+				throw new IllegalArgumentException("Duplicated component name in the list");
+		}
+		for (ComponentEnabledSetting setting : settings) {
+			if (setting.isComponent())
+				setComponentEnabledSetting(setting.getComponentName(), setting.getEnabledState(), setting.getEnabledFlags());
+			else
+				setApplicationEnabledSetting(setting.getPackageName(), setting.getEnabledState(), setting.getEnabledFlags());
+		}
+	}
+
+	/**
+	 * AOSP hasSystemFeature(String, int): the feature is available and its version is at least the one asked for.
+	 * ATL's features carry no version (FeatureInfo.version is 0).
+	 */
+	public boolean hasSystemFeature(String name, int version) {
+		return hasSystemFeature(name) && 0 >= version;
+	}
+
+	/**
 	 * Return the the enabled setting for a package component (activity,
 	 * receiver, service, provider).  This returns the last value set by
 	 * {@link #setComponentEnabledSetting(ComponentName, int, int)}; in most
@@ -3875,6 +4006,40 @@ public class PackageManager {
 	 */
 	public boolean getApplicationBlockedSettingAsUser(String packageName, UserHandle userHandle) {
 		return false;
+	}
+
+	/* AOSP ApplicationPackageManager.isPackageSuspended(String): PackageManagerService answers false for an installed
+	 * package nobody suspended (ATL has no suspend API); an unknown package is a NameNotFoundException */
+	public boolean isPackageSuspended(String packageName) throws NameNotFoundException {
+		getPackageInfo(packageName, 0);
+		return false;
+	}
+
+	/* AOSP ApplicationPackageManager.isPackageSuspended(): the calling package, never suspended here */
+	public boolean isPackageSuspended() {
+		return false;
+	}
+
+	/* AOSP ApplicationPackageManager.getUserBadgedIcon(): hasUserBadge() is false for the only (owner) user, so the
+	 * icon comes back as it is; getUserBadgedLabel() = UserManager.getBadgedLabelForUser(): no managed profile, no label change */
+	public Drawable getUserBadgedIcon(Drawable icon, UserHandle user) {
+		return icon;
+	}
+
+	public CharSequence getUserBadgedLabel(CharSequence label, UserHandle user) {
+		return label;
+	}
+
+	/* AOSP ApplicationPackageManager.isPermissionRevokedByPolicy(): no device policy, no permission revoked by it */
+	public boolean isPermissionRevokedByPolicy(String permName, String pkgName) {
+		return false;
+	}
+
+	/* AOSP PackageManager.isDefaultApplicationIcon(): the icon is the AdaptiveIconDrawable made from sym_def_app_icon */
+	public boolean isDefaultApplicationIcon(Drawable drawable) {
+		int resId = drawable instanceof android.graphics.drawable.AdaptiveIconDrawable
+		    ? ((android.graphics.drawable.AdaptiveIconDrawable)drawable).getSourceDrawableResId() : Resources.ID_NULL;
+		return resId == com.android.internal.R.drawable.sym_def_app_icon;
 	}
 
 	/**

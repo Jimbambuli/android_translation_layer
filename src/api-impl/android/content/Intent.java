@@ -1317,6 +1317,51 @@ public class Intent implements Parcelable {
 		return this;
 	}
 
+	/* AOSP Intent.removeCategory() */
+	public void removeCategory(String category) {
+		if (mCategories != null) {
+			mCategories.remove(category);
+			if (mCategories.size() == 0) {
+				mCategories = null;
+			}
+		}
+	}
+
+	/* AOSP Intent.removeFlags() */
+	public void removeFlags(int flags) {
+		this.flags &= ~flags;
+	}
+
+	/* AOSP Intent.setDataAndNormalize() */
+	public Intent setDataAndNormalize(Uri data) {
+		return setData(data.normalizeScheme());
+	}
+
+	/* AOSP Intent.cloneFilter() = Intent(this, COPY_MODE_FILTER): only what Intent.filterEquals() compares,
+	 * no flags, extras, clip data, selector or source bounds */
+	public Intent cloneFilter() {
+		Intent o = new Intent();
+		o.action = action;
+		o.data = data;
+		o.type = type;
+		o.mIdentifier = mIdentifier;
+		o.packageName = packageName;
+		o.component = component;
+		if (mCategories != null)
+			o.mCategories = new android.util.ArraySet<String>(mCategories);
+		return o;
+	}
+
+	/* AOSP Intent.getCharArrayExtra() */
+	public char[] getCharArrayExtra(String name) {
+		return extras == null ? null : extras.getCharArray(name);
+	}
+
+	/* AOSP Intent.getDoubleArrayExtra() */
+	public double[] getDoubleArrayExtra(String name) {
+		return extras == null ? null : extras.getDoubleArray(name);
+	}
+
 	@Override
 	public String toString() {
 		return "Intent [component=" + component + ", extras=" + extras + ", action=" + action + ", type=" + type + ", uri=" + data + "]";

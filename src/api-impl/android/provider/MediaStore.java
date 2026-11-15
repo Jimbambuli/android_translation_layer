@@ -1,20 +1,28 @@
 package android.provider;
 
 import android.content.ContentResolver;
+import android.app.PendingIntent;
+import android.content.ClipData;
 import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
+import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.util.Size;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /* the URIs and helpers of AOSP 14's MediaStore; ATLMediaContentProvider answers them */
@@ -22,6 +30,25 @@ public class MediaStore {
 
 	public static final String AUTHORITY = "media";
 	public static final Uri AUTHORITY_URI = Uri.parse("content://" + AUTHORITY);
+
+	/** @hide AOSP MediaStore call() method names and extras of the permission requests */
+	public static final String CREATE_WRITE_REQUEST_CALL = "create_write_request";
+	/** @hide */
+	public static final String CREATE_TRASH_REQUEST_CALL = "create_trash_request";
+	public static final String CREATE_FAVORITE_REQUEST_CALL = "create_favorite_request";
+	public static final String GET_VERSION_CALL = "get_version";
+	public static final String GET_GENERATION_CALL = "get_generation";
+	public static final String GET_DOCUMENT_URI_CALL = "get_document_uri";
+	public static final String GET_MEDIA_URI_CALL = "get_media_uri";
+	public static final String EXTRA_URI = "uri";
+	public static final String EXTRA_URI_PERMISSIONS = "uriPermissions";
+	public static final String CREATE_DELETE_REQUEST_CALL = "create_delete_request";
+	/** @hide */
+	public static final String EXTRA_CLIP_DATA = "clip_data";
+	/** @hide */
+	public static final String EXTRA_CONTENT_VALUES = "content_values";
+	/** @hide */
+	public static final String EXTRA_RESULT = "result";
 
 	public static final String VOLUME_INTERNAL = "internal";
 	public static final String VOLUME_EXTERNAL = "external";
@@ -40,6 +67,21 @@ public class MediaStore {
 	public static final int MATCH_ONLY = 3;
 
 	public static final String UNKNOWN_STRING = "<unknown>";
+
+	/* AOSP MediaStore.getVolumeName(File): only /storage/<volume> is a volume of its own, every other path is
+	 * internal; "emulated" is the primary external volume */
+	private static final java.util.regex.Pattern PATTERN_VOLUME_NAME = java.util.regex.Pattern.compile("(?i)^/storage/([^/]+)");
+
+	public static String getVolumeName(java.io.File path) {
+		final java.util.regex.Matcher matcher = PATTERN_VOLUME_NAME.matcher(path.getAbsolutePath());
+		if (matcher.find()) {
+			final String volumeName = matcher.group(1);
+			if (volumeName.equals("emulated"))
+				return VOLUME_EXTERNAL_PRIMARY;
+			return volumeName.toLowerCase(java.util.Locale.ROOT);
+		}
+		return VOLUME_INTERNAL;
+	}
 
 	public static boolean getIncludePending(Uri uri) {
 		return uri.getBooleanQueryParameter(PARAM_INCLUDE_PENDING, false);
@@ -149,6 +191,65 @@ public class MediaStore {
 			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
 			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/image";
+
+			/* AOSP Images.Media.DEFAULT_SORT_ORDER = ImageColumns.BUCKET_DISPLAY_NAME */
+			public static final String DEFAULT_SORT_ORDER = "bucket_display_name";
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
+				return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
+			}
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection, String where, String orderBy) {
+				return cr.query(uri, projection, where, null, orderBy == null ? DEFAULT_SORT_ORDER : orderBy);
+			}
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection, String selection,
+			                                 String[] selectionArgs, String orderBy) {
+				return cr.query(uri, projection, selection, selectionArgs, orderBy == null ? DEFAULT_SORT_ORDER : orderBy);
+			}
+
+			/* AOSP Images.Media.insertImage(ContentResolver, String, String, String) */
+			public static final String insertImage(ContentResolver cr, String imagePath, String name, String description)
+			    throws FileNotFoundException {
+				final Bitmap source;
+				try {
+					source = android.graphics.ImageDecoder.decodeBitmap(
+					    android.graphics.ImageDecoder.createSource(new java.io.File(imagePath)));
+				} catch (IOException e) {
+					throw new FileNotFoundException(e.getMessage());
+				}
+				return insertImage(cr, source, name, description);
+			}
+
+			/* AOSP Images.Media.insertImage(ContentResolver, Bitmap, String, String): a pending row, the JPEG, then
+			 * publish (MediaColumns.IS_PENDING is "is_pending" and so on) */
+			public static final String insertImage(ContentResolver cr, Bitmap source, String title, String description) {
+				if (android.text.TextUtils.isEmpty(title))
+					title = "Image";
+				final long now = System.currentTimeMillis();
+				final ContentValues values = new ContentValues();
+				values.put("_display_name", title);
+				values.put("mime_type", "image/jpeg");
+				values.put("date_added", now / 1000);
+				values.put("date_modified", now / 1000);
+				values.put("is_pending", 1);
+
+				final Uri uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+				try {
+					try (java.io.OutputStream out = cr.openOutputStream(uri)) {
+						source.compress(Bitmap.CompressFormat.JPEG, 90, out);
+					}
+					// everything went well above, publish it
+					values.clear();
+					values.put("is_pending", 0);
+					cr.update(uri, values, null, null);
+					return uri.toString();
+				} catch (Exception e) {
+					android.util.Log.w("MediaStore", "Failed to insert image", e);
+					cr.delete(uri, null, null);
+					return null;
+				}
+			}
 		}
 
 		public static class Thumbnails {
@@ -168,6 +269,17 @@ public class MediaStore {
 				return null;
 			}
 
+			/* AOSP Images.Thumbnails.DEFAULT_SORT_ORDER, query(), queryMiniThumbnails() */
+			public static final String DEFAULT_SORT_ORDER = "image_id ASC";
+
+			public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
+				return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
+			}
+
+			public static final Cursor queryMiniThumbnails(ContentResolver cr, Uri uri, int kind, String[] projection) {
+				return cr.query(uri, projection, "kind = " + kind, null, DEFAULT_SORT_ORDER);
+			}
+
 			/* AOSP MediaStore.Images.Thumbnails.getThumbnail: both forms go to InternalThumbnails.getThumbnail
 			 * (ContentResolver.loadThumbnail at the kind's size; null when that fails) */
 			public static Bitmap getThumbnail(ContentResolver cr, long origId, int kind, BitmapFactory.Options options) {
@@ -182,6 +294,13 @@ public class MediaStore {
 	}
 
 	public static class Video {
+
+		/* AOSP Video.DEFAULT_SORT_ORDER = MediaColumns.DISPLAY_NAME, Video.query() */
+		public static final String DEFAULT_SORT_ORDER = "_display_name";
+
+		public static final Cursor query(ContentResolver cr, Uri uri, String[] projection) {
+			return cr.query(uri, projection, null, null, DEFAULT_SORT_ORDER);
+		}
 
 		public static class Media {
 
@@ -226,6 +345,11 @@ public class MediaStore {
 
 			public static Uri getContentUri(String volumeName) {
 				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("audio").appendPath("media").build();
+			}
+
+			/* AOSP Audio.Media.getContentUriForPath(): the volume of the path (see getVolumeName(File)) */
+			public static Uri getContentUriForPath(String path) {
+				return getContentUri(getVolumeName(new java.io.File(path)));
 			}
 
 			public static Uri getContentUri(String volumeName, long id) {
@@ -382,5 +506,89 @@ public class MediaStore {
 	 */
 	public static int getPickImagesMaxLimit() {
 		return PICK_IMAGES_MAX_LIMIT;
+	}
+
+	/* AOSP MediaStore.createRequest(): the ClipData of the Uris and the ContentValues go to the media provider's
+	 * call(); ATL has no media provider process, so ContentResolver.call() answers like on a device without it
+	 * (IllegalArgumentException "Unknown authority") unless a provider is registered for "media" */
+	private static PendingIntent createRequest(ContentResolver resolver, String method, Collection<Uri> uris, ContentValues values) {
+		Objects.requireNonNull(resolver);
+		Objects.requireNonNull(uris);
+
+		final Iterator<Uri> it = uris.iterator();
+		final ClipData clipData = ClipData.newRawUri(null, it.next());
+		while (it.hasNext()) {
+			clipData.addItem(new ClipData.Item(it.next()));
+		}
+
+		final Bundle extras = new Bundle();
+		extras.putParcelable(EXTRA_CLIP_DATA, clipData);
+		extras.putParcelable(EXTRA_CONTENT_VALUES, values);
+		return (PendingIntent)resolver.call(AUTHORITY, method, null, extras).getParcelable(EXTRA_RESULT);
+	}
+
+	/* AOSP MediaStore.createWriteRequest() */
+	public static PendingIntent createWriteRequest(ContentResolver resolver, Collection<Uri> uris) {
+		return createRequest(resolver, CREATE_WRITE_REQUEST_CALL, uris, null);
+	}
+
+	/* AOSP MediaStore.createDeleteRequest() */
+	public static PendingIntent createDeleteRequest(ContentResolver resolver, Collection<Uri> uris) {
+		return createRequest(resolver, CREATE_DELETE_REQUEST_CALL, uris, null);
+	}
+
+	/* AOSP MediaStore.createTrashRequest() / createFavoriteRequest(): MediaColumns.IS_TRASHED / IS_FAVORITE are
+	 * "is_trashed" / "is_favorite" */
+	public static PendingIntent createTrashRequest(ContentResolver resolver, Collection<Uri> uris, boolean value) {
+		final ContentValues values = new ContentValues();
+		values.put("is_trashed", value ? 1 : 0);
+		return createRequest(resolver, CREATE_TRASH_REQUEST_CALL, uris, values);
+	}
+
+	public static PendingIntent createFavoriteRequest(ContentResolver resolver, Collection<Uri> uris, boolean value) {
+		final ContentValues values = new ContentValues();
+		values.put("is_favorite", value ? 1 : 0);
+		return createRequest(resolver, CREATE_FAVORITE_REQUEST_CALL, uris, values);
+	}
+
+	/* AOSP MediaStore.getVersion(): the media provider is reached through call() (acquireContentProviderClient
+	 * + client.call() in AOSP, which ContentResolver.call() wraps) */
+	public static String getVersion(Context context) {
+		return getVersion(context, VOLUME_EXTERNAL_PRIMARY);
+	}
+
+	public static String getVersion(Context context, String volumeName) {
+		final Bundle in = new Bundle();
+		in.putString(android.content.Intent.EXTRA_TEXT, volumeName);
+		final Bundle out = context.getContentResolver().call(AUTHORITY, GET_VERSION_CALL, null, in);
+		return out.getString(android.content.Intent.EXTRA_TEXT);
+	}
+
+	public static long getGeneration(Context context, String volumeName) {
+		return getGeneration(context.getContentResolver(), volumeName);
+	}
+
+	public static long getGeneration(ContentResolver resolver, String volumeName) {
+		final Bundle in = new Bundle();
+		in.putString(android.content.Intent.EXTRA_TEXT, volumeName);
+		final Bundle out = resolver.call(AUTHORITY, GET_GENERATION_CALL, null, in);
+		return out.getLong(android.content.Intent.EXTRA_INDEX);
+	}
+
+	private static Uri convertUri(Context context, String method, Uri uri) {
+		final ContentResolver resolver = context.getContentResolver();
+		final Bundle in = new Bundle();
+		in.putParcelable(EXTRA_URI, uri);
+		in.putParcelableArrayList(EXTRA_URI_PERMISSIONS, new ArrayList<>(resolver.getPersistedUriPermissions()));
+		return (Uri)resolver.call(AUTHORITY, method, null, in).getParcelable(EXTRA_URI);
+	}
+
+	/* AOSP MediaStore.getDocumentUri() / getMediaUri() */
+	public static Uri getDocumentUri(Context context, Uri mediaUri) {
+		return convertUri(context, GET_DOCUMENT_URI_CALL, mediaUri);
+	}
+
+	public static Uri getMediaUri(Context context, Uri documentUri) {
+		return convertUri(context, GET_MEDIA_URI_CALL, documentUri);
 	}
 }

@@ -2,7 +2,10 @@ package android.accounts;
 
 import android.atl.ATLSecrets;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
+import android.content.res.Resources;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -10,6 +13,7 @@ import android.os.Looper;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
@@ -142,6 +146,46 @@ public class AccountManager {
 		}, callback, handler);
 	}
 
+	/* AOSP getAuthToken() (all three overloads): AccountManagerService asks the authenticator of the account type
+	 * for the token. ATL knows no authenticators (see addAccount), so the bind fails as for a type without one:
+	 * AuthenticatorException "bind failure" from the future. The argument checks are AOSP's. */
+	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType, final Bundle options,
+	                                                 final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (authTokenType == null)
+			throw new IllegalArgumentException("authTokenType is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
+	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType,
+	                                                 final boolean notifyAuthFailure, AccountManagerCallback<Bundle> callback, Handler handler) {
+		return getAuthToken(account, authTokenType, null, notifyAuthFailure, callback, handler);
+	}
+
+	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType, final Bundle options,
+	                                                 final boolean notifyAuthFailure, AccountManagerCallback<Bundle> callback, Handler handler) {
+		return getAuthToken(account, authTokenType, options, (Activity)null, callback, handler);
+	}
+
+	/* AOSP blockingGetAuthToken() */
+	public String blockingGetAuthToken(Account account, String authTokenType, boolean notifyAuthFailure)
+	    throws OperationCanceledException, IOException, AuthenticatorException {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (authTokenType == null)
+			throw new IllegalArgumentException("authTokenType is null");
+		Bundle bundle = getAuthToken(account, authTokenType, notifyAuthFailure, null, null).getResult();
+		if (bundle == null)
+			return null;
+		return bundle.getString(KEY_AUTHTOKEN);
+	}
+
 	/**
 	 * Removes an account from the AccountManager.  Does nothing if the account
 	 * does not exist.  Does not delete the account from the server.
@@ -239,6 +283,55 @@ public class AccountManager {
 		return future;
 	}
 
+	/* AOSP removeAccountExplicitly(): the service removes the account without asking its authenticator */
+	public boolean removeAccountExplicitly(Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return ATLSecrets.mayHoldSecrets() && nativeRemove(account.type, account.name);
+	}
+
+	/* AOSP clearPassword(): the service sets the password to null (nativeSet clears the entry for null);
+	 * without a keyring there is nothing to clear */
+	public void clearPassword(Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (ATLSecrets.mayHoldSecrets())
+			setPassword(account, null);
+	}
+
+	/* AOSP getAuthenticatorTypes(): the authenticators the AccountManagerService knows; ATL registers none
+	 * (see getAccountsByTypeAndFeatures) */
+	public AuthenticatorDescription[] getAuthenticatorTypes() {
+		return new AuthenticatorDescription[0];
+	}
+
+	/* AOSP removeAccount(Account, Activity, ...): AccountManagerService binds the authenticator of the account type to
+	 * remove the account (RemoveAccountSession); ATL knows no authenticators (see addAccount), so the bind fails */
+	public AccountManagerFuture<Bundle> removeAccount(final Account account, final Activity activity,
+	                                                  AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
+	/* AOSP updateCredentials(): asks the authenticator of the account type; none is bound here (see addAccount) */
+	public AccountManagerFuture<Bundle> updateCredentials(final Account account, final String authTokenType, final Bundle options,
+	                                                      final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
 	public String getPassword(Account account) {
 		return keyringGet(account.type, account.name, "password");
 	}
@@ -261,6 +354,69 @@ public class AccountManager {
 
 	public void setAuthToken(Account account, String authTokenType, String authToken) {
 		nativeSet(account.type, account.name, "authtoken:" + authTokenType, authToken);
+		/* index of the token types set for the account: the keyring cannot be enumerated by key, but
+		 * invalidateAuthToken() has to find the entries by token value */
+		String types = keyringGet(account.type, account.name, "authtokentypes");
+		if (authToken != null && (types == null || !("\n" + types + "\n").contains("\n" + authTokenType + "\n")))
+			nativeSet(account.type, account.name, "authtokentypes", types == null || types.isEmpty() ? authTokenType : types + "\n" + authTokenType);
+	}
+
+	/* AOSP AccountManager.invalidateAuthToken(): the argument checks; the cache removal happens in
+	 * AccountManagerService (source not available): the cached token is removed for the accounts of the type */
+	public void invalidateAuthToken(final String accountType, final String authToken) {
+		if (accountType == null)
+			throw new IllegalArgumentException("accountType is null");
+		if (authToken == null)
+			return;
+		for (Account account : getAccountsByType(accountType)) {
+			String types = keyringGet(account.type, account.name, "authtokentypes");
+			if (types == null)
+				continue;
+			for (String authTokenType : types.split("\n")) {
+				if (authToken.equals(keyringGet(account.type, account.name, "authtoken:" + authTokenType)))
+					nativeSet(account.type, account.name, "authtoken:" + authTokenType, null);
+			}
+		}
+	}
+
+	/* The extras of ChooseTypeAndAccountActivity (frameworks/base accounts/ChooseTypeAndAccountActivity.java) */
+	private static final String EXTRA_ALLOWABLE_ACCOUNTS_ARRAYLIST = "allowableAccounts";
+	private static final String EXTRA_ALLOWABLE_ACCOUNT_TYPES_STRING_ARRAY = "allowableAccountTypes";
+	private static final String EXTRA_ADD_ACCOUNT_OPTIONS_BUNDLE = "addAccountOptions";
+	private static final String EXTRA_ADD_ACCOUNT_REQUIRED_FEATURES_STRING_ARRAY = "addAccountRequiredFeatures";
+	private static final String EXTRA_ADD_ACCOUNT_AUTH_TOKEN_TYPE_STRING = "authTokenType";
+	private static final String EXTRA_SELECTED_ACCOUNT = "selectedAccount";
+	private static final String EXTRA_DESCRIPTION_TEXT_OVERRIDE = "descriptionTextOverride";
+
+	/** AOSP: the deprecated overload drops alwaysPromptForAccount. */
+	@Deprecated
+	public static Intent newChooseAccountIntent(Account selectedAccount, ArrayList<Account> allowableAccounts,
+	                                            String[] allowableAccountTypes, boolean alwaysPromptForAccount,
+	                                            String descriptionOverrideText, String addAccountAuthTokenType,
+	                                            String[] addAccountRequiredFeatures, Bundle addAccountOptions) {
+		return newChooseAccountIntent(selectedAccount, allowableAccounts, allowableAccountTypes, descriptionOverrideText,
+		                              addAccountAuthTokenType, addAccountRequiredFeatures, addAccountOptions);
+	}
+
+	/* AOSP: only builds the Intent for the system activity named by config_chooseTypeAndAccountActivity; ATL has no
+	 * such activity, so starting it fails like on a device without it */
+	public static Intent newChooseAccountIntent(Account selectedAccount, List<Account> allowableAccounts,
+	                                            String[] allowableAccountTypes, String descriptionOverrideText,
+	                                            String addAccountAuthTokenType, String[] addAccountRequiredFeatures,
+	                                            Bundle addAccountOptions) {
+		Intent intent = new Intent();
+		ComponentName componentName = ComponentName.unflattenFromString(
+		        Resources.getSystem().getString(com.android.internal.R.string.config_chooseTypeAndAccountActivity));
+		intent.setClassName(componentName.getPackageName(), componentName.getClassName());
+		intent.putExtra(EXTRA_ALLOWABLE_ACCOUNTS_ARRAYLIST,
+		                allowableAccounts == null ? null : new ArrayList<Account>(allowableAccounts));
+		intent.putExtra(EXTRA_ALLOWABLE_ACCOUNT_TYPES_STRING_ARRAY, allowableAccountTypes);
+		intent.putExtra(EXTRA_ADD_ACCOUNT_OPTIONS_BUNDLE, addAccountOptions);
+		intent.putExtra(EXTRA_SELECTED_ACCOUNT, selectedAccount);
+		intent.putExtra(EXTRA_DESCRIPTION_TEXT_OVERRIDE, descriptionOverrideText);
+		intent.putExtra(EXTRA_ADD_ACCOUNT_AUTH_TOKEN_TYPE_STRING, addAccountAuthTokenType);
+		intent.putExtra(EXTRA_ADD_ACCOUNT_REQUIRED_FEATURES_STRING_ARRAY, addAccountRequiredFeatures);
+		return intent;
 	}
 
 	public boolean setAccountVisibility(Account account, String packageName, int visibility) {
