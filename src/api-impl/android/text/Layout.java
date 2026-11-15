@@ -120,6 +120,22 @@ public class Layout {
 	private static final int ATTR_STRIKETHROUGH = 7;
 	private static final int ATTR_HYPHENS = 8;
 
+	/* for DynamicLayout (AOSP reflow()): the text changed; build the Pango layout again at the same width with
+	 * the alignment and the line spacing this layout has, and the spans of the new text */
+	void reflow(CharSequence source) {
+		String str = source != null ? source.toString() : "";
+		int width = native_get_width(layout);
+		long old = layout;
+		this.text = str;
+		layout = native_constructor(str, paint.paint, width);
+		if (source instanceof Spanned)
+			applySpans((Spanned)source);
+		setAlignment(align);
+		if (spacing_mult != 1 || spacing_add != 0)
+			native_set_paragraph_style(layout, spacing_mult, spacing_add, false, 0, 0);
+		native_free(old);
+	}
+
 	/* StaticLayout.Builder.setHyphenationFrequency(): HYPHENATION_FREQUENCY_NONE (0) breaks a word that
 	 * does not fit without a hyphen; Pango has no hyphenation dictionary, so normal and full both leave
 	 * the hyphen it inserts where it has to break a word */
