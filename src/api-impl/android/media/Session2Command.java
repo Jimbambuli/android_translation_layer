@@ -2,6 +2,11 @@ package android.media;
 
 /* AOSP frameworks/base/media/java/android/media/Session2Command.java (public API surface; no backing service in ATL, bodies follow the AOSP no-service path) */
 public final class Session2Command implements android.os.Parcelable {
+    /* AOSP Parcelable.Creator; no service ever hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.media.Session2Command> CREATOR = new android.os.Parcelable.Creator<android.media.Session2Command>() {
+        public android.media.Session2Command createFromParcel(android.os.Parcel source) { return null; }
+        public android.media.Session2Command[] newArray(int size) { return new android.media.Session2Command[size]; }
+    };
     @Deprecated public Session2Command(int arg0)  {}
     @Deprecated public Session2Command(String arg0, android.os.Bundle arg1)  {}
     @Deprecated public int describeContents() { return 0; }

@@ -2,6 +2,11 @@ package android.media.quality;
 
 /* AOSP frameworks/base/media/java/android/media/quality/AmbientBacklightSettings.java (public API surface; no TV service in ATL, bodies follow the AOSP no-service path) */
 public final class AmbientBacklightSettings implements android.os.Parcelable {
+    /* AOSP Parcelable.Creator; no service ever hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.media.quality.AmbientBacklightSettings> CREATOR = new android.os.Parcelable.Creator<android.media.quality.AmbientBacklightSettings>() {
+        public android.media.quality.AmbientBacklightSettings createFromParcel(android.os.Parcel source) { return null; }
+        public android.media.quality.AmbientBacklightSettings[] newArray(int size) { return new android.media.quality.AmbientBacklightSettings[size]; }
+    };
     public AmbientBacklightSettings(int arg0, int arg1, int arg2, int arg3, int arg4, boolean arg5, int arg6)  {}
     public int describeContents() { return 0; }
     public int getColorFormat() { return 0; }

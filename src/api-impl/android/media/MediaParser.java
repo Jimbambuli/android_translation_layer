@@ -75,14 +75,52 @@ public final class MediaParser {
         public static final int UNKNOWN_DURATION = -2147483648; // 0x80000000;
     }
 
+    /* AOSP MediaParser.SeekPoint */
     public static final class SeekPoint {
+        public static final android.media.MediaParser.SeekPoint START = new SeekPoint(0, 0);
+        public final long timeMicros;
+        public final long position;
+
+        private SeekPoint(long timeMicros, long position) {
+            this.timeMicros = timeMicros;
+            this.position = position;
+        }
+
+        public String toString() {
+            return "[timeMicros=" + timeMicros + ", position=" + position + "]";
+        }
+
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            SeekPoint other = (SeekPoint) obj;
+            return timeMicros == other.timeMicros && position == other.position;
+        }
+
+        public int hashCode() {
+            int result = (int) timeMicros;
+            result = 31 * result + (int) position;
+            return result;
+        }
     }
 
     public static interface SeekableInputReader extends android.media.MediaParser.InputReader {
         void seekToPosition(long arg0);
     }
 
+    /* AOSP MediaParser.TrackData */
     public static final class TrackData {
+        public final android.media.MediaFormat mediaFormat;
+        public final android.media.DrmInitData drmInitData;
+
+        private TrackData(android.media.MediaFormat mediaFormat, android.media.DrmInitData drmInitData) {
+            this.mediaFormat = mediaFormat;
+            this.drmInitData = drmInitData;
+        }
     }
 
     public static final class UnrecognizedInputFormatException extends java.io.IOException {

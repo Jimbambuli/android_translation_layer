@@ -42,6 +42,10 @@ public final class MediaQualityManager {
     }
 
     public static final class ProfileQueryParams implements android.os.Parcelable {
+        public static final android.os.Parcelable.Creator<android.media.quality.MediaQualityManager.ProfileQueryParams> CREATOR = new android.os.Parcelable.Creator<android.media.quality.MediaQualityManager.ProfileQueryParams>() {
+            public android.media.quality.MediaQualityManager.ProfileQueryParams createFromParcel(android.os.Parcel source) { return null; }
+            public android.media.quality.MediaQualityManager.ProfileQueryParams[] newArray(int size) { return new android.media.quality.MediaQualityManager.ProfileQueryParams[size]; }
+        };
         public boolean areParametersIncluded() { return false; }
         public int describeContents() { return 0; }
         public void writeToParcel(android.os.Parcel arg0, int arg1) {  }

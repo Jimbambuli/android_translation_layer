@@ -2,6 +2,11 @@ package android.media.quality;
 
 /* AOSP frameworks/base/media/java/android/media/quality/PictureProfile.java (public API surface; no TV service in ATL, bodies follow the AOSP no-service path) */
 public final class PictureProfile implements android.os.Parcelable {
+    /* AOSP Parcelable.Creator; no service ever hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.media.quality.PictureProfile> CREATOR = new android.os.Parcelable.Creator<android.media.quality.PictureProfile>() {
+        public android.media.quality.PictureProfile createFromParcel(android.os.Parcel source) { return null; }
+        public android.media.quality.PictureProfile[] newArray(int size) { return new android.media.quality.PictureProfile[size]; }
+    };
     public int describeContents() { return 0; }
     public String getInputId() { return null; }
     public String getName() { return null; }

@@ -2,6 +2,11 @@ package android.media.quality;
 
 /* AOSP frameworks/base/media/java/android/media/quality/AmbientBacklightEvent.java (public API surface; no TV service in ATL, bodies follow the AOSP no-service path) */
 public final class AmbientBacklightEvent implements android.os.Parcelable {
+    /* AOSP Parcelable.Creator; no service ever hands ATL a parcel of this type */
+    public static final android.os.Parcelable.Creator<android.media.quality.AmbientBacklightEvent> CREATOR = new android.os.Parcelable.Creator<android.media.quality.AmbientBacklightEvent>() {
+        public android.media.quality.AmbientBacklightEvent createFromParcel(android.os.Parcel source) { return null; }
+        public android.media.quality.AmbientBacklightEvent[] newArray(int size) { return new android.media.quality.AmbientBacklightEvent[size]; }
+    };
     public AmbientBacklightEvent(int arg0, android.media.quality.AmbientBacklightMetadata arg1)  {}
     public int describeContents() { return 0; }
     public int getEventType() { return 0; }
