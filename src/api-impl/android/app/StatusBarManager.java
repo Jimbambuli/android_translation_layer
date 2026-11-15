@@ -20,4 +20,9 @@ public class StatusBarManager {
 	 */
 	@UnsupportedAppUsage
 	public void collapsePanels() {}
+
+	/* AOSP: asks the status bar service to bind the TileService for an update; ATL has no quick settings */
+	public void requestTileServiceListeningState(android.content.ComponentName componentName) {
+		java.util.Objects.requireNonNull(componentName);
+	}
 }
