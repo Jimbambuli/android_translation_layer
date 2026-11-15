@@ -1,5 +1,6 @@
 package android.view.inputmethod;
 
+import java.util.HashMap;
 import java.util.Locale;
 
 /**
@@ -19,6 +20,8 @@ public class InputMethodSubtype {
 	private final boolean mOverridesImplicitlyEnabledSubtype;
 	private final boolean mIsAsciiCapable;
 	private final int mSubtypeId;
+	private final CharSequence mSubtypeNameOverride;
+	private HashMap<String, String> mExtraValueHashMapCache;
 
 	public InputMethodSubtype() {
 		this(new InputMethodSubtypeBuilder().setSubtypeLocale(Locale.getDefault().toString()).setLanguageTag(Locale.getDefault().toLanguageTag()).setSubtypeMode("keyboard"));
@@ -35,6 +38,7 @@ public class InputMethodSubtype {
 		mOverridesImplicitlyEnabledSubtype = b.mOverridesImplicitlyEnabledSubtype;
 		mIsAsciiCapable = b.mIsAsciiCapable;
 		mSubtypeId = b.mSubtypeId;
+		mSubtypeNameOverride = b.mSubtypeNameOverride;
 	}
 
 	public int getNameResId() {
@@ -64,6 +68,40 @@ public class InputMethodSubtype {
 
 	public String getExtraValue() {
 		return mSubtypeExtraValue;
+	}
+
+	/* AOSP InputMethodSubtype.getNameOverride() */
+	public CharSequence getNameOverride() {
+		return mSubtypeNameOverride;
+	}
+
+	/* AOSP InputMethodSubtype.containsExtraValueKey()/getExtraValueOf()/getExtraValueHashMap(): the extra value
+	 * is "key1=value1,key2,..." */
+	public boolean containsExtraValueKey(String key) {
+		return getExtraValueHashMap().containsKey(key);
+	}
+
+	public String getExtraValueOf(String key) {
+		return getExtraValueHashMap().get(key);
+	}
+
+	private HashMap<String, String> getExtraValueHashMap() {
+		synchronized (this) {
+			HashMap<String, String> extraValueMap = mExtraValueHashMapCache;
+			if (extraValueMap != null)
+				return extraValueMap;
+			extraValueMap = new HashMap<>();
+			final String[] pairs = mSubtypeExtraValue.split(",");
+			for (int i = 0; i < pairs.length; ++i) {
+				final String[] pair = pairs[i].split("=");
+				if (pair.length == 1)
+					extraValueMap.put(pair[0], null);
+				else if (pair.length > 1)
+					extraValueMap.put(pair[0], pair[1]);
+			}
+			mExtraValueHashMapCache = extraValueMap;
+			return extraValueMap;
+		}
 	}
 
 	public boolean isAuxiliary() {
@@ -103,6 +141,13 @@ public class InputMethodSubtype {
 		private String mSubtypeLanguageTag = "";
 		private String mSubtypeMode = "";
 		private String mSubtypeExtraValue = "";
+		private CharSequence mSubtypeNameOverride = "";
+
+		/* AOSP InputMethodSubtypeBuilder.setSubtypeNameOverride() */
+		public InputMethodSubtypeBuilder setSubtypeNameOverride(CharSequence nameOverride) {
+			mSubtypeNameOverride = nameOverride;
+			return this;
+		}
 
 		public InputMethodSubtypeBuilder setIsAuxiliary(boolean isAuxiliary) {
 			mIsAuxiliary = isAuxiliary;

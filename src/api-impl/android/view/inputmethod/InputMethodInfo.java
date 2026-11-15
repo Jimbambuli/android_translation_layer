@@ -20,6 +20,12 @@ public final class InputMethodInfo {
 		mSettingsActivity = settingsActivity;
 	}
 
+	/* AOSP InputMethodInfo.loadLabel(): the service's label; the test constructor gives it as the
+	 * ResolveInfo's nonLocalizedLabel */
+	public CharSequence loadLabel(android.content.pm.PackageManager pm) {
+		return mLabel;
+	}
+
 	/** The unique id of the input method: the flattened component name of its service */
 	public String getId() {
 		return new ComponentName(mPackageName, mServiceName).flattenToShortString();
