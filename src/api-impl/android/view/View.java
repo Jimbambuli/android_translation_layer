@@ -2462,6 +2462,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return performHapticFeedback(feedbackConstant, 0);
 	}
 
+	/* AOSP View.performHapticFeedbackForInputDevice() (API 35): ATL has one vibrator, the feedback of the view */
+	public void performHapticFeedbackForInputDevice(int feedbackConstant, int inputDeviceId, int inputSource, int flags) {
+		performHapticFeedback(feedbackConstant, flags);
+	}
+
 	public boolean performHapticFeedback(int feedbackConstant, int flags) {
 		// arbitrary; TODO: better mimic what AOSP does
 		Vibrator vibrator = (Vibrator)getContext().getSystemService("vibrator");

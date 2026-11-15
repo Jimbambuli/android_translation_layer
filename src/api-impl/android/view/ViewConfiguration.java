@@ -1282,4 +1282,31 @@ public class ViewConfiguration {
     public static int getHoverTooltipHideShortTimeout() {
         return HOVER_TOOLTIP_HIDE_SHORT_TIMEOUT;
     }
+
+	/** AOSP: the tick interval when haptic scroll feedback has no ticks */
+	public static final int NO_HAPTIC_SCROLL_TICK_INTERVAL = Integer.MAX_VALUE;
+
+	/* AOSP core/res config.xml (android-16.0.0_r4): config_viewRotaryEncoderHapticScrollFedbackEnabled and
+	 * config_viewTouchScreenHapticScrollFeedbackEnabled are false; no device overlay in ATL */
+	private final boolean mRotaryEncoderHapticScrollFeedbackEnabled = false;
+	private final boolean mViewTouchScreenHapticScrollFeedbackEnabled = false;
+
+	/** AOSP ViewConfiguration.isHapticScrollFeedbackEnabled() */
+	public boolean isHapticScrollFeedbackEnabled(int inputDeviceId, int axis, int source) {
+		if (!isInputDeviceInfoValid(inputDeviceId, axis, source))
+			return false;
+		if (source == InputDevice.SOURCE_ROTARY_ENCODER && axis == MotionEvent.AXIS_SCROLL) {
+			return mRotaryEncoderHapticScrollFeedbackEnabled;
+		}
+		if ((source & InputDevice.SOURCE_TOUCHSCREEN) != 0) {
+			return mViewTouchScreenHapticScrollFeedbackEnabled;
+		}
+		return false;
+	}
+
+	/** AOSP ViewConfiguration.getHapticScrollFeedbackTickInterval(): no ticks while rotary feedback is off */
+	public int getHapticScrollFeedbackTickInterval(int inputDeviceId, int axis, int source) {
+		return NO_HAPTIC_SCROLL_TICK_INTERVAL;
+	}
+
 }
