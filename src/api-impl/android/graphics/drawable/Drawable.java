@@ -347,7 +347,17 @@ public class Drawable {
 		return false;
 	}
 
-	public void setTintMode(PorterDuff.Mode tintMode) {}
+	/* AOSP Drawable.setTintMode: forwards to setTintBlendMode, which subclasses override */
+	private boolean mSetTintModeInvoked;
+
+	public void setTintMode(PorterDuff.Mode tintMode) {
+		if (!mSetTintModeInvoked) {
+			mSetTintModeInvoked = true;
+			BlendMode mode = tintMode != null ? BlendMode.fromValue(tintMode.nativeInt) : null;
+			setTintBlendMode(mode != null ? mode : Drawable.DEFAULT_BLEND_MODE);
+			mSetTintModeInvoked = false;
+		}
+	}
 
 	/* AOSP Drawable.setTintBlendMode */
 	private boolean mSetBlendModeInvoked;

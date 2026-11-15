@@ -19,6 +19,8 @@ package android.content.res;
 import android.content.pm.ActivityInfo;
 import android.text.TextUtils;
 import android.os.LocaleList;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.view.View;
 import java.util.Locale;
 
@@ -32,7 +34,7 @@ import java.util.Locale;
  * with {@link android.app.Activity#getResources}:</p>
  * <pre>Configuration config = getResources().getConfiguration();</pre>
  */
-public final class Configuration implements Comparable<Configuration> {
+public final class Configuration implements Parcelable, Comparable<Configuration> {
 	/**
 	 * @hide
 	 */
@@ -1571,25 +1573,32 @@ public final class Configuration implements Comparable<Configuration> {
 	* @return The locale list.
 	*/
 	public LocaleList getLocales() {
-		return LocaleList.getDefault();
-		/*fixUpLocaleList();
-		return mLocaleList;*/
+		fixUpLocaleList();
+		return mLocaleList;
 	}
+
+	/* AOSP Configuration.mLocaleList; ATL starts from the system list, matching the default locale */
+	private LocaleList mLocaleList = LocaleList.getDefault();
+
+	/* AOSP Configuration.fixUpLocaleList: an app may have assigned the public locale field */
+	private void fixUpLocaleList() {
+		if ((locale == null && !mLocaleList.isEmpty()) ||
+		    (locale != null && !locale.equals(mLocaleList.get(0)))) {
+			mLocaleList = locale == null ? LocaleList.getEmptyLocaleList() : new LocaleList(locale);
+		}
+	}
+
 	/**
 	* Set the locale list. This is the preferred way for setting up the locales (instead of using
 	* the direct accessor or {@link #setLocale(Locale)}). This will also set the layout direction
 	* according to the first locale in the list.
 	*
-	* Note that the layout direction will always come from the first locale in the locale list,
-	* even if the locale is not supported by the resources (the resources may only support
-	* another locale further down the list which has a different direction).
-	*
 	* @param locales The locale list. If null, an empty LocaleList will be assigned.
 	*/
 	public void setLocales(LocaleList locales) {
-		/*mLocaleList = locales == null ? LocaleList.getEmptyLocaleList() : locales;
+		mLocaleList = locales == null ? LocaleList.getEmptyLocaleList() : locales;
 		locale = mLocaleList.get(0);
-		setLayoutDirection(locale);*/
+		setLayoutDirection(locale);
 	}
 
 	/**
@@ -1648,5 +1657,89 @@ public final class Configuration implements Comparable<Configuration> {
 	public boolean isScreenRound() {
 		// HACK: return true when hardware is identifying as a watch
 		return System.getenv("ATL_IS_WATCH") != null;
+	}
+
+	/* AOSP Configuration.writeToParcel()/readFromParcel() (core/java/android/content/res/Configuration.java,
+	 * android-14) in the same order, without the fields ATL's Configuration does not have
+	 * (windowConfiguration, mGrammaticalGender) */
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeFloat(fontScale);
+		dest.writeInt(mcc);
+		dest.writeInt(mnc);
+
+		fixUpLocaleList();
+		dest.writeTypedObject(mLocaleList, flags);
+
+		if (userSetLocale) {
+			dest.writeInt(1);
+		} else {
+			dest.writeInt(0);
+		}
+		dest.writeInt(touchscreen);
+		dest.writeInt(keyboard);
+		dest.writeInt(keyboardHidden);
+		dest.writeInt(hardKeyboardHidden);
+		dest.writeInt(navigation);
+		dest.writeInt(navigationHidden);
+		dest.writeInt(orientation);
+		dest.writeInt(screenLayout);
+		dest.writeInt(colorMode);
+		dest.writeInt(uiMode);
+		dest.writeInt(screenWidthDp);
+		dest.writeInt(screenHeightDp);
+		dest.writeInt(smallestScreenWidthDp);
+		dest.writeInt(densityDpi);
+		dest.writeInt(compatScreenWidthDp);
+		dest.writeInt(compatScreenHeightDp);
+		dest.writeInt(compatSmallestScreenWidthDp);
+		dest.writeInt(assetsSeq);
+		dest.writeInt(seq);
+		dest.writeInt(fontWeightAdjustment);
+	}
+
+	public void readFromParcel(Parcel source) {
+		fontScale = source.readFloat();
+		mcc = source.readInt();
+		mnc = source.readInt();
+
+		mLocaleList = source.readTypedObject(LocaleList.CREATOR);
+		locale = mLocaleList.get(0);
+
+		userSetLocale = (source.readInt() == 1);
+		touchscreen = source.readInt();
+		keyboard = source.readInt();
+		keyboardHidden = source.readInt();
+		hardKeyboardHidden = source.readInt();
+		navigation = source.readInt();
+		navigationHidden = source.readInt();
+		orientation = source.readInt();
+		screenLayout = source.readInt();
+		colorMode = source.readInt();
+		uiMode = source.readInt();
+		screenWidthDp = source.readInt();
+		screenHeightDp = source.readInt();
+		smallestScreenWidthDp = source.readInt();
+		densityDpi = source.readInt();
+		compatScreenWidthDp = source.readInt();
+		compatScreenHeightDp = source.readInt();
+		compatSmallestScreenWidthDp = source.readInt();
+		assetsSeq = source.readInt();
+		seq = source.readInt();
+		fontWeightAdjustment = source.readInt();
+	}
+
+	public static final Parcelable.Creator<Configuration> CREATOR = new Parcelable.Creator<Configuration>() {
+		public Configuration createFromParcel(Parcel source) {
+			return new Configuration(source);
+		}
+
+		public Configuration[] newArray(int size) {
+			return new Configuration[size];
+		}
+	};
+
+	private Configuration(Parcel source) {
+		readFromParcel(source);
 	}
 }

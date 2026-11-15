@@ -28,6 +28,20 @@ public class Layout {
 
 	public class Directions {}
 
+	/* AOSP Layout.TextInclusionStrategy and the three strategies (android-16 Layout.java) */
+	public interface TextInclusionStrategy {
+		boolean isSegmentInside(android.graphics.RectF segmentBounds, android.graphics.RectF area);
+	}
+
+	public static final TextInclusionStrategy INCLUSION_STRATEGY_ANY_OVERLAP =
+	    android.graphics.RectF::intersects;
+
+	public static final TextInclusionStrategy INCLUSION_STRATEGY_CONTAINS_CENTER =
+	    (segmentBounds, area) -> area.contains(segmentBounds.centerX(), segmentBounds.centerY());
+
+	public static final TextInclusionStrategy INCLUSION_STRATEGY_CONTAINS_ALL =
+	    (segmentBounds, area) -> area.contains(segmentBounds);
+
 	long layout; // native PangoLayout
 	private CharSequence text;
 	private TextPaint paint;
@@ -364,6 +378,305 @@ public class Layout {
 		for (int i = startLine + 1; i < endLine; i++)
 			path.addRect(0, getLineTop(i), width, getLineBottom(i), Path.Direction.CW);
 		path.addRect(getLineLeft(endLine), getLineTop(endLine), getPrimaryHorizontal(end), bottom, Path.Direction.CW);
+	}
+
+	/* AOSP Layout.getRangeForRect() (android-16). ATL's lines are one left-to-right run (getLineDirections()), so
+	 * the run loop of getStartOrEndOffsetForAreaWithinLine() has one pass; the character bounds that AOSP's
+	 * fillHorizontalBoundsForLine() measures with TextLine come from Pango's cursor positions
+	 * (getPrimaryHorizontal(), already including the line's alignment offset, so lineStartPos is 0). The
+	 * line bottom includes the line spacing (ATL has no getLineBottom(line, false)). */
+	public int[] getRangeForRect(android.graphics.RectF area, SegmentFinder segmentFinder,
+	                             TextInclusionStrategy inclusionStrategy) {
+		// Find the first line whose bottom (without line spacing) is below the top of the area.
+		int startLine = getLineForVertical((int)area.top);
+		if (area.top > getLineBottom(startLine)) {
+			startLine++;
+			if (startLine >= getLineCount()) {
+				// The entire area is below the last line, so it does not contain any text.
+				return null;
+			}
+		}
+
+		// Find the last line whose top is above the bottom of the area.
+		int endLine = getLineForVertical((int)area.bottom);
+		if (endLine == 0 && area.bottom < getLineTop(0)) {
+			// The entire area is above the first line, so it does not contain any text.
+			return null;
+		}
+		if (endLine < startLine) {
+			// The entire area is between two lines, so it does not contain any text.
+			return null;
+		}
+
+		int start = getStartOrEndOffsetForAreaWithinLine(
+		    startLine, area, segmentFinder, inclusionStrategy, /* getStart= */ true);
+		// If the area does not contain any text on this line, keep trying subsequent lines until
+		// the end line is reached.
+		while (start == -1 && startLine < endLine) {
+			startLine++;
+			start = getStartOrEndOffsetForAreaWithinLine(
+			    startLine, area, segmentFinder, inclusionStrategy, /* getStart= */ true);
+		}
+		if (start == -1) {
+			// All lines were checked, the area does not contain any text.
+			return null;
+		}
+
+		int end = getStartOrEndOffsetForAreaWithinLine(
+		    endLine, area, segmentFinder, inclusionStrategy, /* getStart= */ false);
+		// If the area does not contain any text on this line, keep trying previous lines until
+		// the start line is reached.
+		while (end == -1 && startLine < endLine) {
+			endLine--;
+			end = getStartOrEndOffsetForAreaWithinLine(
+			    endLine, area, segmentFinder, inclusionStrategy, /* getStart= */ false);
+		}
+		if (end == -1) {
+			// All lines were checked, the area does not contain any text.
+			return null;
+		}
+
+		// If a text segment spans multiple lines or multiple directional runs (e.g. a hyphenated
+		// word), then getStartOrEndOffsetForAreaWithinLine() can return an offset in the middle of
+		// a text segment. Adjust the range to include the rest of any partial text segments. If
+		// start is already the start boundary of a text segment, then this is a no-op.
+		start = segmentFinder.previousStartBoundary(start + 1);
+		end = segmentFinder.nextEndBoundary(end - 1);
+
+		return new int[] {start, end};
+	}
+
+	/* the left and right edge of each character of the line (AOSP fillHorizontalBoundsForLine()), from the
+	 * cursor positions: a character ends where the next one starts, the last one at the line's right (or
+	 * where it starts, if Pango's line ends before it, as for a trailing space) */
+	private float[] horizontalBoundsForLine(int line) {
+		final int lineStart = getLineStart(line);
+		final int lineEnd = getLineEnd(line);
+		float[] bounds = new float[2 * (lineEnd - lineStart)];
+		float lineRight = getLineRight(line);
+		for (int i = 0; i < lineEnd - lineStart; i++) {
+			bounds[2 * i] = getPrimaryHorizontal(lineStart + i);
+			bounds[2 * i + 1] = lineStart + i + 1 < lineEnd ? getPrimaryHorizontal(lineStart + i + 1) : Math.max(lineRight, bounds[2 * i]);
+		}
+		return bounds;
+	}
+
+	private int getStartOrEndOffsetForAreaWithinLine(int line, android.graphics.RectF area,
+	                                                 SegmentFinder segmentFinder, TextInclusionStrategy inclusionStrategy,
+	                                                 boolean getStart) {
+		int lineTop = getLineTop(line);
+		int lineBottom = getLineBottom(line);
+
+		int lineStartOffset = getLineStart(line);
+		int lineEndOffset = getLineEnd(line);
+		if (lineStartOffset == lineEndOffset) {
+			return -1;
+		}
+
+		float[] horizontalBounds = horizontalBoundsForLine(line);
+		int lineStartPos = 0;
+
+		// one left-to-right run over the line
+		int runStartOffset = 0;
+		int runEndOffset = lineEndOffset - lineStartOffset;
+		boolean isRtl = false;
+		float runLeft = lineStartPos + horizontalBounds[2 * runStartOffset];
+		float runRight = lineStartPos + horizontalBounds[2 * (runEndOffset - 1) + 1];
+
+		return getStart
+		    ? getStartOffsetForAreaWithinRun(
+		          area, lineTop, lineBottom,
+		          lineStartOffset, lineStartPos, horizontalBounds,
+		          runStartOffset, runEndOffset, runLeft, runRight, isRtl,
+		          segmentFinder, inclusionStrategy)
+		    : getEndOffsetForAreaWithinRun(
+		          area, lineTop, lineBottom,
+		          lineStartOffset, lineStartPos, horizontalBounds,
+		          runStartOffset, runEndOffset, runLeft, runRight, isRtl,
+		          segmentFinder, inclusionStrategy);
+	}
+
+	private static int getStartOffsetForAreaWithinRun(
+	    android.graphics.RectF area,
+	    int lineTop, int lineBottom,
+	    int lineStartOffset,
+	    int lineStartPos,
+	    float[] horizontalBounds,
+	    int runStartOffset, int runEndOffset,
+	    float runLeft, float runRight,
+	    boolean isRtl,
+	    SegmentFinder segmentFinder,
+	    TextInclusionStrategy inclusionStrategy) {
+		if (runRight < area.left || runLeft > area.right) {
+			// The run does not overlap the area.
+			return -1;
+		}
+
+		// Find the first character in the run whose bounds overlap with the area.
+		// firstCharOffset is an offset index within the line.
+		int firstCharOffset;
+		if ((!isRtl && area.left <= runLeft) || (isRtl && area.right >= runRight)) {
+			firstCharOffset = runStartOffset;
+		} else {
+			int low = runStartOffset;
+			int high = runEndOffset;
+			int guess;
+			while (high - low > 1) {
+				guess = (high + low) / 2;
+				// Left edge of the character at guess
+				float pos = lineStartPos + horizontalBounds[2 * guess];
+				if ((!isRtl && pos > area.left) || (isRtl && pos < area.right)) {
+					high = guess;
+				} else {
+					low = guess;
+				}
+			}
+			// The area edge is between the left edge of the character at low and the left edge of
+			// the character at high. For LTR text, this is within the character at low. For RTL
+			// text, this is within the character at high.
+			firstCharOffset = isRtl ? high : low;
+		}
+
+		// Find the first text segment containing this character (or, if no text segment contains
+		// this character, the first text segment after this character). All previous text segments
+		// in this run are to the left (for LTR) of the area.
+		int segmentEndOffset =
+		    segmentFinder.nextEndBoundary(lineStartOffset + firstCharOffset);
+		if (segmentEndOffset == SegmentFinder.DONE) {
+			// There are no text segments containing or after firstCharOffset, so no text segments
+			// in this run overlap the area.
+			return -1;
+		}
+		int segmentStartOffset = segmentFinder.previousStartBoundary(segmentEndOffset);
+		if (segmentStartOffset >= lineStartOffset + runEndOffset) {
+			// The text segment is after the end of this run, so no text segments in this run
+			// overlap the area.
+			return -1;
+		}
+		// If the segment extends outside of this run, only consider the piece of the segment within
+		// this run.
+		segmentStartOffset = Math.max(segmentStartOffset, lineStartOffset + runStartOffset);
+		segmentEndOffset = Math.min(segmentEndOffset, lineStartOffset + runEndOffset);
+
+		android.graphics.RectF segmentBounds = new android.graphics.RectF(0, lineTop, 0, lineBottom);
+		while (true) {
+			// Start (left for LTR, right for RTL) edge of the character at segmentStartOffset.
+			float segmentStart = lineStartPos + horizontalBounds[2 * (segmentStartOffset - lineStartOffset) + (isRtl ? 1 : 0)];
+			if ((!isRtl && segmentStart > area.right) || (isRtl && segmentStart < area.left)) {
+				// The entire area is to the left (for LTR) of the text segment. So the area does
+				// not contain any text segments within this run.
+				return -1;
+			}
+			// End (right for LTR, left for RTL) edge of the character at (segmentStartOffset - 1).
+			float segmentEnd = lineStartPos + horizontalBounds[2 * (segmentEndOffset - lineStartOffset - 1) + (isRtl ? 0 : 1)];
+			segmentBounds.left = isRtl ? segmentEnd : segmentStart;
+			segmentBounds.right = isRtl ? segmentStart : segmentEnd;
+			if (inclusionStrategy.isSegmentInside(segmentBounds, area)) {
+				return segmentStartOffset;
+			}
+			// Try the next text segment.
+			segmentStartOffset = segmentFinder.nextStartBoundary(segmentStartOffset);
+			if (segmentStartOffset == SegmentFinder.DONE || segmentStartOffset >= lineStartOffset + runEndOffset) {
+				// No more text segments within this run.
+				return -1;
+			}
+			segmentEndOffset = segmentFinder.nextEndBoundary(segmentStartOffset);
+			// If the segment extends past the end of this run, only consider the piece of the
+			// segment within this run.
+			segmentEndOffset = Math.min(segmentEndOffset, lineStartOffset + runEndOffset);
+		}
+	}
+
+	private static int getEndOffsetForAreaWithinRun(
+	    android.graphics.RectF area,
+	    int lineTop, int lineBottom,
+	    int lineStartOffset,
+	    int lineStartPos,
+	    float[] horizontalBounds,
+	    int runStartOffset, int runEndOffset,
+	    float runLeft, float runRight,
+	    boolean isRtl,
+	    SegmentFinder segmentFinder,
+	    TextInclusionStrategy inclusionStrategy) {
+		if (runRight < area.left || runLeft > area.right) {
+			// The run does not overlap the area.
+			return -1;
+		}
+
+		// Find the last character in the run whose bounds overlap with the area.
+		// firstCharOffset is an offset index within the line.
+		int lastCharOffset;
+		if ((!isRtl && area.right >= runRight) || (isRtl && area.left <= runLeft)) {
+			lastCharOffset = runEndOffset - 1;
+		} else {
+			int low = runStartOffset;
+			int high = runEndOffset;
+			int guess;
+			while (high - low > 1) {
+				guess = (high + low) / 2;
+				// Left edge of the character at guess
+				float pos = lineStartPos + horizontalBounds[2 * guess];
+				if ((!isRtl && pos > area.right) || (isRtl && pos < area.left)) {
+					high = guess;
+				} else {
+					low = guess;
+				}
+			}
+			// The area edge is between the left edge of the character at low and the left edge of
+			// the character at high. For LTR text, this is within the character at low. For RTL
+			// text, this is within the character at high.
+			lastCharOffset = isRtl ? high : low;
+		}
+
+		// Find the last text segment containing this character (or, if no text segment contains
+		// this character, the first text segment before this character). All following text
+		// segments in this run are to the right (for LTR) of the area.
+		// + 1 to allow segmentStartOffset = lineStartOffset + lastCharOffset
+		int segmentStartOffset =
+		    segmentFinder.previousStartBoundary(lineStartOffset + lastCharOffset + 1);
+		if (segmentStartOffset == SegmentFinder.DONE) {
+			// There are no text segments containing or before lastCharOffset, so no text segments
+			// in this run overlap the area.
+			return -1;
+		}
+		int segmentEndOffset = segmentFinder.nextEndBoundary(segmentStartOffset);
+		if (segmentEndOffset <= lineStartOffset + runStartOffset) {
+			// The text segment is before the start of this run, so no text segments in this run
+			// overlap the area.
+			return -1;
+		}
+		// If the segment extends outside of this run, only consider the piece of the segment within
+		// this run.
+		segmentStartOffset = Math.max(segmentStartOffset, lineStartOffset + runStartOffset);
+		segmentEndOffset = Math.min(segmentEndOffset, lineStartOffset + runEndOffset);
+
+		android.graphics.RectF segmentBounds = new android.graphics.RectF(0, lineTop, 0, lineBottom);
+		while (true) {
+			// End (right for LTR, left for RTL) edge of the character at (segmentStartOffset - 1).
+			float segmentEnd = lineStartPos + horizontalBounds[2 * (segmentEndOffset - lineStartOffset - 1) + (isRtl ? 0 : 1)];
+			if ((!isRtl && segmentEnd < area.left) || (isRtl && segmentEnd > area.right)) {
+				// The entire area is to the right (for LTR) of the text segment. So the
+				// area does not contain any text segments within this run.
+				return -1;
+			}
+			// Start (left for LTR, right for RTL) edge of the character at segmentStartOffset.
+			float segmentStart = lineStartPos + horizontalBounds[2 * (segmentStartOffset - lineStartOffset) + (isRtl ? 1 : 0)];
+			segmentBounds.left = isRtl ? segmentEnd : segmentStart;
+			segmentBounds.right = isRtl ? segmentStart : segmentEnd;
+			if (inclusionStrategy.isSegmentInside(segmentBounds, area)) {
+				return segmentEndOffset;
+			}
+			// Try the previous text segment.
+			segmentEndOffset = segmentFinder.previousEndBoundary(segmentEndOffset);
+			if (segmentEndOffset == SegmentFinder.DONE || segmentEndOffset <= lineStartOffset + runStartOffset) {
+				// No more text segments within this run.
+				return -1;
+			}
+			segmentStartOffset = segmentFinder.previousStartBoundary(segmentEndOffset);
+			// If the segment extends past the start of this run, only consider the piece of the
+			// segment within this run.
+			segmentStartOffset = Math.max(segmentStartOffset, lineStartOffset + runStartOffset);
+		}
 	}
 
 	public int getParagraphRight(int line) {

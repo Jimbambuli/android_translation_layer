@@ -68,6 +68,11 @@ public class DateUtils {
 		return formatter;
 	}
 
+	/* AOSP DateUtils.getRelativeTimeSpanString(long) */
+	public static CharSequence getRelativeTimeSpanString(long startTime) {
+		return getRelativeTimeSpanString(startTime, System.currentTimeMillis(), MINUTE_IN_MILLIS);
+	}
+
 	public static CharSequence getRelativeTimeSpanString(long time, long now, long minResolution) {
 		int flags = FORMAT_SHOW_DATE | FORMAT_SHOW_YEAR | FORMAT_ABBREV_MONTH;
 		return getRelativeTimeSpanString(time, now, minResolution, flags);
