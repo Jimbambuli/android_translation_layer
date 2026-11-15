@@ -21,6 +21,7 @@ import android.annotation.Nullable;
 import android.annotation.TestApi;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
+import android.os.Parcel;
 import android.util.Rational;
 
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ import java.util.Objects;
  * mode.
  */
 /* ATL: AOSP android-14 PictureInPictureParams without parceling (it only goes to the system server on Android) */
-public final class PictureInPictureParams {
+public final class PictureInPictureParams implements android.os.Parcelable {
 
     /**
      * Builder class for {@link PictureInPictureParams} objects.
@@ -662,4 +663,117 @@ public final class PictureInPictureParams {
                 + " isLaunchIntoPip=" + isLaunchIntoPip()
                 + ")";
     }
+
+    PictureInPictureParams(Parcel in) {
+        mAspectRatio = readRationalFromParcel(in);
+        mExpandedAspectRatio = readRationalFromParcel(in);
+        if (in.readInt() != 0) {
+            mUserActions = new ArrayList<>();
+            in.readTypedList(mUserActions, RemoteAction.CREATOR);
+        }
+        mCloseAction = in.readTypedObject(RemoteAction.CREATOR);
+        if (in.readInt() != 0) {
+            mSourceRectHint = Rect.CREATOR.createFromParcel(in);
+        }
+        if (in.readInt() != 0) {
+            mAutoEnterEnabled = in.readBoolean();
+        }
+        if (in.readInt() != 0) {
+            mSeamlessResizeEnabled = in.readBoolean();
+        }
+        if (in.readInt() != 0) {
+            mTitle = in.readCharSequence();
+        }
+        if (in.readInt() != 0) {
+            mSubtitle = in.readCharSequence();
+        }
+        if (in.readInt() != 0) {
+            mIsLaunchIntoPip = in.readBoolean();
+        }
+    }
+
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel out, int flags) {
+        writeRationalToParcel(mAspectRatio, out);
+        writeRationalToParcel(mExpandedAspectRatio, out);
+        if (mUserActions != null) {
+            out.writeInt(1);
+            out.writeTypedList(mUserActions, 0);
+        } else {
+            out.writeInt(0);
+        }
+
+        out.writeTypedObject(mCloseAction, 0);
+
+        if (mSourceRectHint != null) {
+            out.writeInt(1);
+            mSourceRectHint.writeToParcel(out, 0);
+        } else {
+            out.writeInt(0);
+        }
+        if (mAutoEnterEnabled != null) {
+            out.writeInt(1);
+            out.writeBoolean(mAutoEnterEnabled);
+        } else {
+            out.writeInt(0);
+        }
+        if (mSeamlessResizeEnabled != null) {
+            out.writeInt(1);
+            out.writeBoolean(mSeamlessResizeEnabled);
+        } else {
+            out.writeInt(0);
+        }
+        if (mTitle != null) {
+            out.writeInt(1);
+            out.writeCharSequence(mTitle);
+        } else {
+            out.writeInt(0);
+        }
+        if (mSubtitle != null) {
+            out.writeInt(1);
+            out.writeCharSequence(mSubtitle);
+        } else {
+            out.writeInt(0);
+        }
+        if (mIsLaunchIntoPip != null) {
+            out.writeInt(1);
+            out.writeBoolean(mIsLaunchIntoPip);
+        } else {
+            out.writeInt(0);
+        }
+    }
+
+    private void writeRationalToParcel(Rational rational, Parcel out) {
+        if (rational != null) {
+            out.writeInt(1);
+            out.writeInt(rational.getNumerator());
+            out.writeInt(rational.getDenominator());
+        } else {
+            out.writeInt(0);
+        }
+    }
+
+    private Rational readRationalFromParcel(Parcel in) {
+        if (in.readInt() != 0) {
+            return new Rational(in.readInt(), in.readInt());
+        }
+        return null;
+    }
+
+
+    public static final @android.annotation.NonNull Creator<PictureInPictureParams> CREATOR =
+            new Creator<PictureInPictureParams>() {
+                public PictureInPictureParams createFromParcel(Parcel in) {
+                    return new PictureInPictureParams(in);
+                }
+                public PictureInPictureParams[] newArray(int size) {
+                    return new PictureInPictureParams[size];
+                }
+            };
 }
