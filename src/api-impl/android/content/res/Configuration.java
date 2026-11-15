@@ -1571,25 +1571,32 @@ public final class Configuration implements Comparable<Configuration> {
 	* @return The locale list.
 	*/
 	public LocaleList getLocales() {
-		return LocaleList.getDefault();
-		/*fixUpLocaleList();
-		return mLocaleList;*/
+		fixUpLocaleList();
+		return mLocaleList;
 	}
+
+	/* AOSP Configuration.mLocaleList; ATL starts from the system list, matching the default locale */
+	private LocaleList mLocaleList = LocaleList.getDefault();
+
+	/* AOSP Configuration.fixUpLocaleList: an app may have assigned the public locale field */
+	private void fixUpLocaleList() {
+		if ((locale == null && !mLocaleList.isEmpty()) ||
+		    (locale != null && !locale.equals(mLocaleList.get(0)))) {
+			mLocaleList = locale == null ? LocaleList.getEmptyLocaleList() : new LocaleList(locale);
+		}
+	}
+
 	/**
 	* Set the locale list. This is the preferred way for setting up the locales (instead of using
 	* the direct accessor or {@link #setLocale(Locale)}). This will also set the layout direction
 	* according to the first locale in the list.
 	*
-	* Note that the layout direction will always come from the first locale in the locale list,
-	* even if the locale is not supported by the resources (the resources may only support
-	* another locale further down the list which has a different direction).
-	*
 	* @param locales The locale list. If null, an empty LocaleList will be assigned.
 	*/
 	public void setLocales(LocaleList locales) {
-		/*mLocaleList = locales == null ? LocaleList.getEmptyLocaleList() : locales;
+		mLocaleList = locales == null ? LocaleList.getEmptyLocaleList() : locales;
 		locale = mLocaleList.get(0);
-		setLayoutDirection(locale);*/
+		setLayoutDirection(locale);
 	}
 
 	/**
