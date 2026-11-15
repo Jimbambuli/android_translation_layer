@@ -276,6 +276,31 @@ public class WebView extends ViewGroup {
 			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
 	}
 
+	/* AOSP WebView.createPrintDocumentAdapter(): always an adapter (the provider's AwPrintDocumentAdapter). WebKitGTK prints only
+	 * through GtkPrintOperation, which cannot produce the PDF stream onWrite() has to write: layout and write report a failure,
+	 * as the provider's adapter does when it cannot print. (PrintManager.print() has no print spooler here anyway.) */
+	@Deprecated
+	public android.print.PrintDocumentAdapter createPrintDocumentAdapter() {
+		return createPrintDocumentAdapter("default");
+	}
+
+	public android.print.PrintDocumentAdapter createPrintDocumentAdapter(String documentName) {
+		return new android.print.PrintDocumentAdapter() {
+			@Override
+			public void onLayout(android.print.PrintAttributes oldAttributes, android.print.PrintAttributes newAttributes,
+			                     android.os.CancellationSignal cancellationSignal, LayoutResultCallback callback,
+			                     android.os.Bundle extras) {
+				callback.onLayoutFailed(null);
+			}
+
+			@Override
+			public void onWrite(android.print.PageRange[] pages, android.os.ParcelFileDescriptor destination,
+			                    android.os.CancellationSignal cancellationSignal, WriteResultCallback callback) {
+				callback.onWriteFailed(null);
+			}
+		};
+	}
+
 	/* ---- WebMessage channels (see AtlWebMessagePort): text messages through evaluateJavascript() and a JavascriptInterface ---- */
 	private final Map<Integer, AtlWebMessagePort> messagePorts = new HashMap<>();
 	private int nextMessagePortId = 1;
