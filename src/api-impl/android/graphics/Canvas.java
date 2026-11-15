@@ -493,30 +493,40 @@ public class Canvas {
 	 */
 	public void drawBitmap(int[] colors, int offset, int stride, float x, float y,
 	                       int width, int height, boolean hasAlpha, Paint paint) {
-		Log.w("Canvas", "STUB: drawBitmap(colors, offset, ...)");
-		/*        // check for valid input
-			if (width < 0) {
-			    throw new IllegalArgumentException("width must be >= 0");
-			}
-			if (height < 0) {
-			    throw new IllegalArgumentException("height must be >= 0");
-			}
-			if (Math.abs(stride) < width) {
-			    throw new IllegalArgumentException("abs(stride) must be >= width");
-			}
-			int lastScanline = offset + (height - 1) * stride;
-			int length = colors.length;
-			if (offset < 0 || (offset + width > length) || lastScanline < 0
-				|| (lastScanline + width > length)) {
-			    throw new ArrayIndexOutOfBoundsException();
-			}
-			// quick escape if there's nothing to draw
-			if (width == 0 || height == 0) {
-			    return;
-			}
-			// punch down to native for the actual draw
-			native_drawBitmap(mNativeCanvas, colors, offset, stride, x, y, width, height, hasAlpha,
-				paint != null ? paint.mNativePaint : 0);*/
+		/* AOSP BaseCanvas.drawBitmap(int[], ...) with the checks; the native part (CanvasJNI DrawBitmapArray in
+		 * libs/hwui/jni/android_graphics_Canvas.cpp: an N32 bitmap from the colors, opaque without hasAlpha,
+		 * drawn at x, y) as a temporary Bitmap. The rows are copied here, which also covers a negative stride */
+		if (width < 0) {
+			throw new IllegalArgumentException("width must be >= 0");
+		}
+		if (height < 0) {
+			throw new IllegalArgumentException("height must be >= 0");
+		}
+		if (Math.abs(stride) < width) {
+			throw new IllegalArgumentException("abs(stride) must be >= width");
+		}
+		int lastScanline = offset + (height - 1) * stride;
+		int length = colors.length;
+		if (offset < 0 || (offset + width > length) || lastScanline < 0
+		    || (lastScanline + width > length)) {
+			throw new ArrayIndexOutOfBoundsException();
+		}
+		// quick escape if there's nothing to draw
+		if (width == 0 || height == 0) {
+			return;
+		}
+		int[] packed = new int[width * height];
+		for (int row = 0; row < height; row++) {
+			System.arraycopy(colors, offset + row * stride, packed, row * width, width);
+		}
+		if (!hasAlpha) {
+			for (int i = 0; i < packed.length; i++)
+				packed[i] |= 0xFF000000;
+		}
+		Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+		bitmap.setHasAlpha(hasAlpha);
+		bitmap.setPixels(packed, 0, width, 0, 0, width, height);
+		drawBitmap(bitmap, x, y, paint);
 	}
 
 	/**
