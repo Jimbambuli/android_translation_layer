@@ -991,6 +991,7 @@ srcs = [
 	'android/view/DragAndDropPermissions.java',
 	'android/view/DragEvent.java',
 	'android/view/FocusFinder.java',
+	'android/view/FrameMetrics.java',
 	'android/view/GestureDetector.java',
 	'android/view/GhostView.java',
 	'android/view/Gravity.java',

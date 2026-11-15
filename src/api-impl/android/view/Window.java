@@ -101,7 +101,10 @@ public class Window {
 		default public void onPointerCaptureChanged(boolean hasCapture) {}
 	}
 
-	public static interface OnFrameMetricsAvailableListener {}
+	/* AOSP Window.OnFrameMetricsAvailableListener */
+	public static interface OnFrameMetricsAvailableListener {
+		void onFrameMetricsAvailable(Window window, FrameMetrics frameMetrics, int dropCountSinceLastInvocation);
+	}
 
 	public long native_window;
 	private ViewGroup decorView;
