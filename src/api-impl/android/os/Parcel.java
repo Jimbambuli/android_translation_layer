@@ -1276,4 +1276,123 @@ public class Parcel {
 		this.pos = offset;
 		this.size = offset + length;
 	}
+
+	/* AOSP Parcel.readValue(ClassLoader, Class) type check: a value of another class is a BadParcelableException */
+	private static <T> T checkValueType(Object object, Class<T> clazz) {
+		if (object != null && clazz != null && !clazz.isInstance(object)) {
+			throw new BadParcelableException("Unparcelled object " + object + " is not an instance of required class "
+			                                 + clazz.getName() + " provided in the parameter");
+		}
+		return (T)object;
+	}
+
+	private Object readValueUnchecked(ClassLoader loader) {
+		try {
+			return readValue(loader);
+		} catch (ReflectiveOperationException e) {
+			throw new BadParcelableException(e);
+		}
+	}
+
+	/* The type-safe readers of AOSP Parcel (API 33): same wire format as the untyped ones, plus the type check. */
+	public <T> void readList(List<? super T> outVal, ClassLoader loader, Class<T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		int size = readInt();
+		outVal.clear();
+		for (int i = 0; i < size; i++)
+			outVal.add(checkValueType(readValueUnchecked(loader), clazz));
+	}
+
+	public <T> ArrayList<T> readArrayList(ClassLoader loader, Class<? extends T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		int size = readInt();
+		if (size == -1)
+			return null;
+		ArrayList<T> list = new ArrayList<>(size);
+		for (int i = 0; i < size; i++)
+			list.add(checkValueType(readValueUnchecked(loader), clazz));
+		return list;
+	}
+
+	public <T> T[] readArray(ClassLoader loader, Class<T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		int size = readInt();
+		if (size == -1)
+			return null;
+		T[] array = (T[])java.lang.reflect.Array.newInstance(clazz, size);
+		for (int i = 0; i < size; i++)
+			array[i] = checkValueType(readValueUnchecked(loader), clazz);
+		return array;
+	}
+
+	public <K, V> HashMap<K, V> readHashMap(ClassLoader loader, Class<? extends K> clazzKey, Class<? extends V> clazzValue) {
+		java.util.Objects.requireNonNull(clazzKey);
+		java.util.Objects.requireNonNull(clazzValue);
+		int size = readInt();
+		if (size == -1)
+			return null;
+		HashMap<K, V> map = new HashMap<>(size);
+		for (int i = 0; i < size; i++) {
+			K key = checkValueType(readString(), clazzKey);
+			V value = checkValueType(readValueUnchecked(loader), clazzValue);
+			map.put(key, value);
+		}
+		return map;
+	}
+
+	public <K, V> void readMap(Map<? super K, ? super V> outVal, ClassLoader loader, Class<K> clazzKey, Class<V> clazzValue) {
+		java.util.Objects.requireNonNull(clazzKey);
+		java.util.Objects.requireNonNull(clazzValue);
+		int size = readInt();
+		outVal.clear();
+		for (int i = 0; i < size; i++) {
+			K key = checkValueType(readString(), clazzKey);
+			V value = checkValueType(readValueUnchecked(loader), clazzValue);
+			outVal.put(key, value);
+		}
+	}
+
+	public <T> SparseArray<T> readSparseArray(ClassLoader loader, Class<? extends T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		int size = readInt();
+		if (size == -1)
+			return null;
+		SparseArray<T> array = new SparseArray<>(size);
+		for (int i = 0; i < size; i++) {
+			int key = readInt();
+			array.put(key, checkValueType(readValueUnchecked(loader), clazz));
+		}
+		return array;
+	}
+
+	public <T> T[] readParcelableArray(ClassLoader loader, Class<T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		int size = readInt();
+		if (size == -1)
+			return null;
+		T[] array = (T[])java.lang.reflect.Array.newInstance(clazz, size);
+		for (int i = 0; i < size; i++)
+			array[i] = readParcelable(loader, clazz);
+		return array;
+	}
+
+	/* AOSP Parcel.readParcelableList(List, ClassLoader): readParcelableListInternal without a class check */
+	public <T extends Parcelable> List<T> readParcelableList(List<T> list, ClassLoader cl) {
+		int n = readInt();
+		if (n == -1) {
+			list.clear();
+			return list;
+		}
+		int i = 0;
+		for (; i < n; i++) {
+			T item = (T)readParcelable(cl);
+			if (i < list.size())
+				list.set(i, item);
+			else
+				list.add(item);
+		}
+		for (; i < list.size(); i++)
+			list.remove(list.size() - 1);
+		return list;
+	}
 }
