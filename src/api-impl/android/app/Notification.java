@@ -241,6 +241,12 @@ public class Notification implements Parcelable {
 	public static final String EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED = "android.showBigPictureWhenCollapsed";
 	public static final String EXTRA_TEXT_LINES = "android.textLines";
 	public static final String EXTRA_TEMPLATE = "android.template";
+	public static final String EXTRA_MEDIA_SESSION = "android.mediaSession";
+	public static final String EXTRA_MEDIA_REMOTE_DEVICE = "android.mediaRemoteDevice";
+	public static final String EXTRA_MEDIA_REMOTE_ICON = "android.mediaRemoteIcon";
+	public static final String EXTRA_MEDIA_REMOTE_INTENT = "android.mediaRemoteIntent";
+	public static final String EXTRA_COMPACT_ACTIONS = "android.compactActions";
+	public static final String CATEGORY_TRANSPORT = "transport";
 	public static final String EXTRA_PEOPLE_LIST = "android.people.list";
 	public static final String EXTRA_SELF_DISPLAY_NAME = "android.selfDisplayName";
 	public static final String EXTRA_MESSAGING_PERSON = "android.messagingUser";
@@ -637,6 +643,19 @@ public class Notification implements Parcelable {
 			return this;
 		}
 
+		/* AOSP: deprecated, the stream type is kept as given */
+		public Builder setSound(Uri sound, int streamType) {
+			notification.sound = sound;
+			notification.audioStreamType = streamType;
+			return this;
+		}
+
+		/* AOSP: deprecated, the same as build() */
+		@Deprecated
+		public Notification getNotification() {
+			return build();
+		}
+
 		public Builder setSound(Uri sound) {
 			notification.sound = sound;
 			notification.audioAttributes = AUDIO_ATTRIBUTES_DEFAULT;
@@ -744,6 +763,9 @@ public class Notification implements Parcelable {
 			notification.extras = extras;
 			if (notification.mLargeIcon == null && notification.largeIcon != null) { // AOSP Builder.build()
 				notification.mLargeIcon = Icon.createWithBitmap(notification.largeIcon);
+			}
+			if (notification.style instanceof MediaStyle && notification.category == null) { // AOSP MediaStyle.buildStyled()
+				notification.category = CATEGORY_TRANSPORT;
 			}
 			if (notification.style instanceof CallStyle && mContext != null) { // AOSP CallStyle.buildStyled(); the host tests build without a context
 				ArrayList<Action> actions = ((CallStyle)notification.style).getActionsListWithSystemActions();
@@ -1133,11 +1155,60 @@ public class Notification implements Parcelable {
 		}
 	}
 
+	/* AOSP MediaStyle: the settings go into the extras; ATL's MediaSession.Token is not
+	 * Parcelable, so EXTRA_MEDIA_SESSION stays out */
 	public static class MediaStyle extends Style {
+		private int[] mActionsToShowInCompact = null;
+		private MediaSession.Token mToken;
+		private CharSequence mDeviceName;
+		private int mDeviceIcon;
+		private PendingIntent mDeviceIntent;
 
-		public MediaStyle setShowActionsInCompactView(int... viewActions) { return this; }
+		public MediaStyle() {}
 
-		public MediaStyle setMediaSession(MediaSession.Token token) { return this; }
+		@Deprecated
+		public MediaStyle(Builder builder) {
+			setBuilder(builder);
+		}
+
+		public MediaStyle setShowActionsInCompactView(int... actions) {
+			mActionsToShowInCompact = actions;
+			return this;
+		}
+
+		public MediaStyle setMediaSession(MediaSession.Token token) {
+			mToken = token;
+			return this;
+		}
+
+		public MediaStyle setRemotePlaybackInfo(CharSequence deviceName, int iconResource, PendingIntent chipIntent) {
+			mDeviceName = deviceName;
+			mDeviceIcon = iconResource;
+			mDeviceIntent = chipIntent;
+			return this;
+		}
+
+		@Override
+		public void addExtras(Bundle extras) {
+			super.addExtras(extras);
+			if (mActionsToShowInCompact != null) {
+				extras.putIntArray(EXTRA_COMPACT_ACTIONS, mActionsToShowInCompact);
+			}
+			if (mDeviceName != null) {
+				extras.putCharSequence(EXTRA_MEDIA_REMOTE_DEVICE, mDeviceName);
+			}
+			if (mDeviceIcon > 0) {
+				extras.putInt(EXTRA_MEDIA_REMOTE_ICON, mDeviceIcon);
+			}
+			if (mDeviceIntent != null) {
+				extras.putParcelable(EXTRA_MEDIA_REMOTE_INTENT, mDeviceIntent);
+			}
+		}
+	}
+
+	/* AOSP DecoratedMediaCustomViewStyle: the custom views inside the media frame */
+	public static class DecoratedMediaCustomViewStyle extends MediaStyle {
+		public DecoratedMediaCustomViewStyle() {}
 	}
 
 	public static class BigTextStyle extends Style {
