@@ -666,6 +666,7 @@ srcs = [
 	'android/media/projection/MediaProjectionManager.java',
 	'android/media/session/MediaController.java',
 	'android/media/session/MediaSession.java',
+	'android/media/session/MediaSessionLegacyHelper.java',
 	'android/media/session/MediaSessionManager.java',
 	'android/media/session/PlaybackState.java',
 	'android/media/tv/TvContentRating.java',

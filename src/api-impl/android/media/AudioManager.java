@@ -449,4 +449,70 @@ public class AudioManager {
 		}
 		return microphones;
 	}
+
+	/* AOSP AudioManager.registerMediaButtonEventReceiver()/unregisterMediaButtonEventReceiver() (deprecated):
+	 * through MediaSessionLegacyHelper, which keeps an active MediaSession per PendingIntent that forwards the
+	 * media buttons to it. The context is the application's (AOSP: the AudioManager's context) */
+	@Deprecated
+	public void registerMediaButtonEventReceiver(android.content.ComponentName eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		if (!eventReceiver.getPackageName().equals(context.getPackageName())) {
+			android.util.Log.e("AudioManager", "registerMediaButtonEventReceiver() error: "
+			                                   + "receiver and context package names don't match");
+			return;
+		}
+		android.content.Intent mediaButtonIntent = new android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON);
+		mediaButtonIntent.setComponent(eventReceiver);
+		android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(context, 0, mediaButtonIntent,
+		                                                                      android.app.PendingIntent.FLAG_IMMUTABLE);
+		registerMediaButtonIntent(pi, eventReceiver);
+	}
+
+	@Deprecated
+	public void registerMediaButtonEventReceiver(android.app.PendingIntent eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		registerMediaButtonIntent(eventReceiver, null);
+	}
+
+	public void registerMediaButtonIntent(android.app.PendingIntent pi, android.content.ComponentName eventReceiver) {
+		if (pi == null) {
+			android.util.Log.e("AudioManager", "Cannot call registerMediaButtonIntent() with a null parameter");
+			return;
+		}
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		android.media.session.MediaSessionLegacyHelper helper = android.media.session.MediaSessionLegacyHelper.getHelper(context);
+		helper.addMediaButtonListener(pi, eventReceiver, context);
+	}
+
+	@Deprecated
+	public void unregisterMediaButtonEventReceiver(android.content.ComponentName eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		android.content.Intent mediaButtonIntent = new android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON);
+		mediaButtonIntent.setComponent(eventReceiver);
+		android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(context, 0, mediaButtonIntent,
+		                                                                      android.app.PendingIntent.FLAG_IMMUTABLE);
+		unregisterMediaButtonIntent(pi);
+	}
+
+	@Deprecated
+	public void unregisterMediaButtonEventReceiver(android.app.PendingIntent eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		unregisterMediaButtonIntent(eventReceiver);
+	}
+
+	public void unregisterMediaButtonIntent(android.app.PendingIntent pi) {
+		android.media.session.MediaSessionLegacyHelper helper =
+		    android.media.session.MediaSessionLegacyHelper.getHelper(android.app.ActivityThread.currentApplication());
+		helper.removeMediaButtonListener(pi);
+	}
 }

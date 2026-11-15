@@ -24,6 +24,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MediaSession {
+	/* AOSP MediaSession.FLAG_HANDLES_MEDIA_BUTTONS/FLAG_HANDLES_TRANSPORT_CONTROLS (deprecated, always handled) */
+	@Deprecated
+	public static final int FLAG_HANDLES_MEDIA_BUTTONS = 1 << 0;
+	@Deprecated
+	public static final int FLAG_HANDLES_TRANSPORT_CONTROLS = 1 << 1;
 
 	private List<QueueItem> queue;
 	private CharSequence queue_title;
