@@ -17,7 +17,7 @@ import java.util.Locale;
  * InputMethodManager.getCurrentInputMethodSubtype() answers is a plain one for the locale of the
  * process; the builder makes the subtypes an app describes itself.
  */
-public class InputMethodSubtype {
+public class InputMethodSubtype implements android.os.Parcelable {
 	private final int mSubtypeNameResId;
 	private final int mSubtypeIconResId;
 	private final String mSubtypeLocale;
@@ -69,6 +69,70 @@ public class InputMethodSubtype {
 		mSubtypeId = b.mSubtypeId;
 		mSubtypeNameOverride = b.mSubtypeNameOverride;
 	}
+
+	/* AOSP InputMethodSubtype(Parcel): the layout label and the physical keyboard language tag and layout type
+	 * (hidden fields) ATL does not keep are written as the AOSP defaults and skipped when read */
+	private InputMethodSubtype(android.os.Parcel source) {
+		String s;
+		mSubtypeNameResId = source.readInt();
+		CharSequence cs = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+		mSubtypeNameOverride = cs != null ? cs : "";
+		source.readInt(); // mLayoutLabelResId
+		TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source); // mLayoutLabelNonLocalized
+		source.readString8(); // mPkLanguageTag
+		source.readString8(); // mPkLayoutType
+		mSubtypeIconResId = source.readInt();
+		s = source.readString();
+		mSubtypeLocale = s != null ? s : "";
+		s = source.readString();
+		mSubtypeLanguageTag = s != null ? s : "";
+		s = source.readString();
+		mSubtypeMode = s != null ? s : "";
+		s = source.readString();
+		mSubtypeExtraValue = s != null ? s : "";
+		mIsAuxiliary = (source.readInt() == 1);
+		mOverridesImplicitlyEnabledSubtype = (source.readInt() == 1);
+		source.readInt(); // mSubtypeHashCode
+		mSubtypeId = source.readInt();
+		mIsAsciiCapable = (source.readInt() == 1);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		dest.writeInt(mSubtypeNameResId);
+		TextUtils.writeToParcel(mSubtypeNameOverride, dest, parcelableFlags);
+		dest.writeInt(0); // mLayoutLabelResId
+		TextUtils.writeToParcel("", dest, parcelableFlags); // mLayoutLabelNonLocalized
+		dest.writeString8(""); // mPkLanguageTag
+		dest.writeString8(""); // mPkLayoutType
+		dest.writeInt(mSubtypeIconResId);
+		dest.writeString(mSubtypeLocale);
+		dest.writeString(mSubtypeLanguageTag);
+		dest.writeString(mSubtypeMode);
+		dest.writeString(mSubtypeExtraValue);
+		dest.writeInt(mIsAuxiliary ? 1 : 0);
+		dest.writeInt(mOverridesImplicitlyEnabledSubtype ? 1 : 0);
+		dest.writeInt(hashCode());
+		dest.writeInt(mSubtypeId);
+		dest.writeInt(mIsAsciiCapable ? 1 : 0);
+	}
+
+	public static final android.os.Parcelable.Creator<InputMethodSubtype> CREATOR = new android.os.Parcelable.Creator<InputMethodSubtype>() {
+		@Override
+		public InputMethodSubtype createFromParcel(android.os.Parcel source) {
+			return new InputMethodSubtype(source);
+		}
+
+		@Override
+		public InputMethodSubtype[] newArray(int size) {
+			return new InputMethodSubtype[size];
+		}
+	};
 
 	public int getNameResId() {
 		return mSubtypeNameResId;
