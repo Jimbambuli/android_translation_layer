@@ -23,4 +23,9 @@ public class LayoutTransition {
 	public boolean isChangingLayout() {
 		return false;
 	}
+
+	/** AOSP isRunning(): true while change/appear/disappear animations run; ATL starts none of them */
+	public boolean isRunning() {
+		return false;
+	}
 }

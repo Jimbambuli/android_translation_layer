@@ -1111,6 +1111,57 @@ public class TextView extends View {
 
 	public void setTextIsSelectable(boolean selectable) {}
 
+	/* AOSP setTextSelectHandle*()/getTextSelectHandle*(): kept for the getters; ATL draws no selection handles
+	 * (GTK draws its own), so AOSP's mEditor.loadHandleDrawables() has nothing to update */
+	private Drawable mTextSelectHandle;
+	private Drawable mTextSelectHandleLeft;
+	private Drawable mTextSelectHandleRight;
+
+	public void setTextSelectHandle(Drawable textSelectHandle) {
+		java.util.Objects.requireNonNull(textSelectHandle, "The text select handle should not be null.");
+		mTextSelectHandle = textSelectHandle;
+	}
+
+	public void setTextSelectHandle(int textSelectHandle) {
+		if (textSelectHandle == 0)
+			throw new IllegalArgumentException("The text select handle should be a valid drawable resource id.");
+		setTextSelectHandle(getContext().getDrawable(textSelectHandle));
+	}
+
+	public Drawable getTextSelectHandle() {
+		return mTextSelectHandle;
+	}
+
+	public void setTextSelectHandleLeft(Drawable textSelectHandleLeft) {
+		java.util.Objects.requireNonNull(textSelectHandleLeft, "The left text select handle should not be null.");
+		mTextSelectHandleLeft = textSelectHandleLeft;
+	}
+
+	public void setTextSelectHandleLeft(int textSelectHandleLeft) {
+		if (textSelectHandleLeft == 0)
+			throw new IllegalArgumentException("The text select left handle should be a valid drawable resource id.");
+		setTextSelectHandleLeft(getContext().getDrawable(textSelectHandleLeft));
+	}
+
+	public Drawable getTextSelectHandleLeft() {
+		return mTextSelectHandleLeft;
+	}
+
+	public void setTextSelectHandleRight(Drawable textSelectHandleRight) {
+		java.util.Objects.requireNonNull(textSelectHandleRight, "The right text select handle should not be null.");
+		mTextSelectHandleRight = textSelectHandleRight;
+	}
+
+	public void setTextSelectHandleRight(int textSelectHandleRight) {
+		if (textSelectHandleRight == 0)
+			throw new IllegalArgumentException("The text select right handle should be a valid drawable resource id.");
+		setTextSelectHandleRight(getContext().getDrawable(textSelectHandleRight));
+	}
+
+	public Drawable getTextSelectHandleRight() {
+		return mTextSelectHandleRight;
+	}
+
 	public final MovementMethod getMovementMethod() {
 		return mMovement;
 	}

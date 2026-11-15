@@ -12,6 +12,11 @@ public class Spinner extends AbsSpinner {
 	private Observer observer;
 	private Drawable popupBackground;
 
+	/** AOSP getPopupContext(): ATL has no android:popupTheme, so the popup uses the spinner's context */
+	public Context getPopupContext() {
+		return getContext();
+	}
+
 	public Spinner(Context context) {
 		this(context, null, 0);
 		haveCustomMeasure = false;
