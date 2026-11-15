@@ -79,6 +79,18 @@ public final class Display {
 		return 60; // FIXME
 	}
 
+	/* AOSP Display.getName() returns DisplayInfo.name; the built-in display is named by
+	 * LocalDisplayAdapter from R.string.display_manager_built_in_display_name */
+	public String getName() {
+		return "Built-in Screen";
+	}
+
+	/* AOSP Display.getShape(): DisplayInfo.displayShape, which is
+	 * DisplayShape.createDefaultDisplayShape() for a device without a shape spec */
+	public DisplayShape getShape() {
+		return DisplayShape.createDefaultDisplayShape(getWidth(), getHeight(), false);
+	}
+
 	public long getAppVsyncOffsetNanos() {
 		return 0; // what else would we return here?
 	}
@@ -181,6 +193,16 @@ public final class Display {
 	}
 
 	public static final class Mode {
+
+		/* AOSP Display.Mode.getModeId(); ATL has a single valid mode (AOSP INVALID_MODE_ID is -1) */
+		public int getModeId() {
+			return 1;
+		}
+
+		/* AOSP Display.Mode.getRefreshRate(); the same rate Display.getRefreshRate() reports */
+		public float getRefreshRate() {
+			return 60;
+		}
 
 		public int getPhysicalWidth() {
 			return window_width;
