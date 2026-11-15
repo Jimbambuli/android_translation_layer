@@ -65,6 +65,29 @@ public interface WindowManager {
 	default void removeScreenRecordingCallback(java.util.function.Consumer<Integer> callback) {
 		throw new UnsupportedOperationException();
 	}
+	/* AOSP WindowManager's defaults for the SurfaceControl input receivers: a WindowManager that does not implement
+	 * them (ATL's has no input channels for a layer) throws, as AOSP's interface does */
+	default android.window.InputTransferToken registerBatchedSurfaceControlInputReceiver(
+			android.window.InputTransferToken hostInputTransferToken, SurfaceControl surfaceControl,
+			Choreographer choreographer, SurfaceControlInputReceiver receiver) {
+		throw new UnsupportedOperationException("registerBatchedSurfaceControlInputReceiver is not implemented");
+	}
+
+	default android.window.InputTransferToken registerUnbatchedSurfaceControlInputReceiver(
+			android.window.InputTransferToken hostInputTransferToken, SurfaceControl surfaceControl,
+			android.os.Looper looper, SurfaceControlInputReceiver receiver) {
+		throw new UnsupportedOperationException("registerUnbatchedSurfaceControlInputReceiver is not implemented");
+	}
+
+	default void unregisterSurfaceControlInputReceiver(SurfaceControl surfaceControl) {
+		throw new UnsupportedOperationException("unregisterSurfaceControlInputReceiver is not implemented");
+	}
+
+	default boolean transferTouchGesture(android.window.InputTransferToken transferFromToken,
+			android.window.InputTransferToken transferToToken) {
+		throw new UnsupportedOperationException("transferTouchGesture is not implemented");
+	}
+
 	public android.view.Display getDefaultDisplay();
 
 	public void addView(View view, ViewGroup.LayoutParams params);

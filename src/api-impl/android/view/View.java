@@ -2603,6 +2603,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * root view of a window as for rootHasWindowFocus; null while the view is not attached */
 	private IBinder windowToken;
 
+	/* AOSP AttachInfo.getRootSurfaceControl() (ViewRootImpl): the root of the hierarchy, kept by the root view */
+	private RootSurfaceControl rootSurfaceControl;
+
+	/* AOSP View.getRootSurfaceControl(): only non-null between onAttachedToWindow() and onDetachedFromWindow() */
+	public AttachedSurfaceControl getRootSurfaceControl() {
+		if (!isAttachedToWindow())
+			return null;
+		View root = getRootView();
+		if (root.rootSurfaceControl == null)
+			root.rootSurfaceControl = new RootSurfaceControl();
+		return root.rootSurfaceControl;
+	}
+
 	public IBinder getWindowToken() {
 		if (!isAttachedToWindow())
 			return null;
