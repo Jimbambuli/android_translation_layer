@@ -5960,7 +5960,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			                                + "attribute defined on view " + mHostView.getClass() + idText);
 		}
 	}
-	public void setForceDarkAllowed(boolean forceDark) {}
+	/* AOSP View.setForceDarkAllowed()/isForceDarkAllowed() (RenderNode, allowed by default); ATL has no force dark,
+	 * so it is only kept */
+	private boolean mForceDarkAllowed = true;
+	public void setForceDarkAllowed(boolean forceDark) {
+		mForceDarkAllowed = forceDark;
+	}
+	public boolean isForceDarkAllowed() {
+		return mForceDarkAllowed;
+	}
 	public void setWindowInsetsAnimationCallback(WindowInsetsAnimation.Callback callback) {}
 	public void setViewTranslationCallback(ViewTranslationCallback callback) {}
 	public void clearViewTranslationCallback() {}
@@ -6783,7 +6791,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		onWindowVisibilityChanged(visibility);
 	}
 
+	/* AOSP View.onVisibilityAggregated(): the background, default focus highlight and foreground drawables follow
+	 * the visibility (animated drawables stop while hidden); no scroll bars, autofill or accessibility panes here */
 	public void onVisibilityAggregated(boolean isVisible) {
+		final Drawable dr = background;
+		if (dr != null && isVisible != dr.isVisible()) {
+			dr.setVisible(isVisible, false);
+		}
+		final Drawable hl = mDefaultFocusHighlight;
+		if (hl != null && isVisible != hl.isVisible()) {
+			hl.setVisible(isVisible, false);
+		}
+		final Drawable fg = mForegroundInfo != null ? mForegroundInfo.mDrawable : null;
+		if (fg != null && isVisible != fg.isVisible()) {
+			fg.setVisible(isVisible, false);
+		}
 	}
 
 	/* AOSP: tells onVisibilityAggregated() whether the view and all its ancestors are visible */
