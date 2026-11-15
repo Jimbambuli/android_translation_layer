@@ -19,7 +19,6 @@ package android.net.wifi;
 import android.annotation.NonNull;
 import android.os.Parcel;
 
-import com.android.modules.utils.build.SdkLevel;
 
 import java.io.ByteArrayInputStream;
 import java.security.KeyFactory;
