@@ -339,4 +339,114 @@ public class AudioManager {
 	public int getStreamMinVolume(int streamType) {
 		return 0;
 	}
+
+	public static final int RINGER_MODE_SILENT = 0;
+	public static final int RINGER_MODE_VIBRATE = 1;
+	public static final int RINGER_MODE_NORMAL = 2;
+	private static final int RINGER_MODE_MAX = RINGER_MODE_NORMAL;
+
+	/* AOSP AudioManager.setRingerMode(): ignores invalid modes (isValidRingerMode(): range check, then
+	 * AudioService), else AudioService.setRingerModeExternal(). ATL has no ringer, getRingerMode() stays */
+	public void setRingerMode(int ringerMode) {
+		if (ringerMode < 0 || ringerMode > RINGER_MODE_MAX) {
+			return;
+		}
+	}
+
+	/* AOSP AudioManager.adjustVolume()/adjustSuggestedStreamVolume(): MediaSessionLegacyHelper.sendAdjustVolumeBy()
+	 * adjusts the stream the media session service picks. ATL has one volume for every stream
+	 * (adjustStreamVolume()), so the stream choice makes no difference */
+	public void adjustVolume(int direction, int flags) {
+		adjustStreamVolume(STREAM_MUSIC, direction, flags);
+	}
+
+	public void adjustSuggestedStreamVolume(int direction, int suggestedStreamType, int flags) {
+		adjustStreamVolume(suggestedStreamType, direction, flags);
+	}
+
+	/* AOSP AudioManager.setWiredHeadsetOn(): deprecated, empty body */
+	@Deprecated
+	public void setWiredHeadsetOn(boolean on) {}
+
+	/* AOSP AudioManager.loadSoundEffects() -> AudioService.loadSoundEffects(); ATL plays no sound effects
+	 * (playSoundEffect()), so there is nothing to load, like unloadSoundEffects() */
+	public void loadSoundEffects() {}
+
+	/* AOSP AudioManager.isHapticPlaybackSupported() -> AudioSystem: whether the audio HAL has an output with
+	 * haptic channels. A desktop has none */
+	public static boolean isHapticPlaybackSupported() {
+		return false;
+	}
+
+	/* AOSP AudioManager.setAllowedCapturePolicy()/getAllowedCapturePolicy(): AudioService keeps the policy of the
+	 * app's uid, ALLOW_CAPTURE_BY_ALL until it is set */
+	private int mAllowedCapturePolicy = AudioAttributes.ALLOW_CAPTURE_BY_ALL;
+
+	public void setAllowedCapturePolicy(int capturePolicy) {
+		mAllowedCapturePolicy = capturePolicy;
+	}
+
+	public int getAllowedCapturePolicy() {
+		return mAllowedCapturePolicy;
+	}
+
+	/* AOSP AudioManager.OnModeChangedListener, add/removeOnModeChangedListener() (CallbackUtil.addListener()/
+	 * removeListener()). ATL's mode is always MODE_NORMAL (setMode() changes nothing), so no listener is called */
+	public interface OnModeChangedListener {
+		void onModeChanged(int mode);
+	}
+
+	private final java.util.ArrayList<OnModeChangedListener> mModeChangedListeners = new java.util.ArrayList<>();
+
+	public void addOnModeChangedListener(java.util.concurrent.Executor executor, OnModeChangedListener listener) {
+		java.util.Objects.requireNonNull(executor);
+		java.util.Objects.requireNonNull(listener);
+		synchronized (mModeChangedListeners) {
+			if (mModeChangedListeners.contains(listener)) {
+				throw new IllegalArgumentException("attempt to call addOnModeChangedListener"
+				                                   + "on a previously registered listener");
+			}
+			mModeChangedListeners.add(listener);
+		}
+	}
+
+	public void removeOnModeChangedListener(OnModeChangedListener listener) {
+		java.util.Objects.requireNonNull(listener);
+		synchronized (mModeChangedListeners) {
+			if (!mModeChangedListeners.remove(listener)) {
+				throw new IllegalArgumentException("attempt to call removeOnModeChangedListener"
+				                                   + " on an unregistered listener");
+			}
+		}
+	}
+
+	/* AOSP AudioManager.getMicrophones(): AudioSystem.getMicrophones() asks the audio HAL for microphone
+	 * characteristics. ATL has no HAL, which takes AOSP's fallback (addMicrophonesFromAudioDeviceInfo() with
+	 * microphoneInfoFromAudioDeviceInfo()): one MicrophoneInfo with unknown characteristics per input device of
+	 * getDevices() except TYPE_TELEPHONY. The port name is the device's product name; the port type is the
+	 * internal device of TYPE_BUILTIN_MIC (AUDIO_DEVICE_IN_BUILTIN_MIC), ATL's only input */
+	public java.util.List<MicrophoneInfo> getMicrophones() throws java.io.IOException {
+		java.util.ArrayList<MicrophoneInfo> microphones = new java.util.ArrayList<MicrophoneInfo>();
+		for (AudioDeviceInfo deviceInfo : getDevices(GET_DEVICES_INPUTS)) {
+			int deviceType = deviceInfo.getType();
+			if (deviceType == AudioDeviceInfo.TYPE_TELEPHONY) {
+				continue;
+			}
+			int micLocation = (deviceType == AudioDeviceInfo.TYPE_BUILTIN_MIC) ? MicrophoneInfo.LOCATION_MAINBODY
+			                  : deviceType == AudioDeviceInfo.TYPE_UNKNOWN ? MicrophoneInfo.LOCATION_UNKNOWN
+			                  : MicrophoneInfo.LOCATION_PERIPHERAL;
+			MicrophoneInfo microphone = new MicrophoneInfo(
+			    deviceInfo.getProductName().toString() + deviceInfo.getId(),
+			    0x80000004 /* AUDIO_DEVICE_IN_BUILTIN_MIC */, deviceInfo.getAddress(), micLocation,
+			    MicrophoneInfo.GROUP_UNKNOWN, MicrophoneInfo.INDEX_IN_THE_GROUP_UNKNOWN,
+			    MicrophoneInfo.POSITION_UNKNOWN, MicrophoneInfo.ORIENTATION_UNKNOWN,
+			    new java.util.ArrayList<android.util.Pair<Float, Float>>(),
+			    new java.util.ArrayList<android.util.Pair<Integer, Integer>>(),
+			    MicrophoneInfo.SENSITIVITY_UNKNOWN, MicrophoneInfo.SPL_UNKNOWN,
+			    MicrophoneInfo.SPL_UNKNOWN, MicrophoneInfo.DIRECTIONALITY_UNKNOWN);
+			microphone.setId(deviceInfo.getId());
+			microphones.add(microphone);
+		}
+		return microphones;
+	}
 }
