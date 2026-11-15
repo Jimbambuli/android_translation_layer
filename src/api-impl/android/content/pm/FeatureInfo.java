@@ -21,7 +21,7 @@ package android.content.pm;
  * to information collected from the
  * AndroidManifest.xml's &lt;uses-feature&gt; tag.
  */
-public class FeatureInfo {
+public class FeatureInfo implements android.os.Parcelable {
 	/**
 	 * The name of this feature, for example "android.hardware.camera".  If
 	 * this is null, then this is an OpenGL ES version feature as described
@@ -84,6 +84,34 @@ public class FeatureInfo {
 
 	public int describeContents() {
 		return 0;
+	}
+
+	/* AOSP FeatureInfo.writeToParcel()/CREATOR/FeatureInfo(Parcel) */
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		dest.writeString8(name);
+		dest.writeInt(version);
+		dest.writeInt(reqGlEsVersion);
+		dest.writeInt(flags);
+	}
+
+	public static final android.os.Parcelable.Creator<FeatureInfo> CREATOR = new android.os.Parcelable.Creator<FeatureInfo>() {
+		@Override
+		public FeatureInfo createFromParcel(android.os.Parcel source) {
+			return new FeatureInfo(source);
+		}
+
+		@Override
+		public FeatureInfo[] newArray(int size) {
+			return new FeatureInfo[size];
+		}
+	};
+
+	private FeatureInfo(android.os.Parcel source) {
+		name = source.readString8();
+		version = source.readInt();
+		reqGlEsVersion = source.readInt();
+		flags = source.readInt();
 	}
 
 	/**
