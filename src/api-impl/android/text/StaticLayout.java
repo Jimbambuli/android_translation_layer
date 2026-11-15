@@ -9,20 +9,24 @@ public class StaticLayout extends Layout {
 	                    boolean includepad,
 	                    TextUtils.TruncateAt ellipsize, int ellipsizedWidth, int maxLines) {
 		super(source, paint, outerwidth, align, spacingmult, spacingadd);
+		mEllipsizedWidth = ellipsize != null ? ellipsizedWidth : outerwidth;
 	}
 
 	public StaticLayout(CharSequence source, TextPaint paint, int outerwidth, Alignment align, float spacingmult, float spacingadd, boolean includepad) {
 		super(source, paint, outerwidth, align, spacingmult, spacingadd);
+		mEllipsizedWidth = outerwidth;
 	}
 
 	public StaticLayout(CharSequence source, int start, int end, TextPaint paint, int outerwidth, Alignment align, float spacingmult, float spacingadd, boolean includepad, TextUtils.TruncateAt ellipsize, int ellipsizedWidth) {
 		super(source, paint, outerwidth, align, spacingmult, spacingadd);
 		if (ellipsize != null)
 			native_set_ellipsize(layout, ellipsize == null ? 0 : ellipsize.ordinal() + 1, ellipsizedWidth);
+		mEllipsizedWidth = ellipsize != null ? ellipsizedWidth : outerwidth;
 	}
 
 	public StaticLayout(CharSequence source, int start, int end, TextPaint paint, int outerwidth, Alignment align, float spacingmult, float spacingadd, boolean includepad) {
 		super(source, paint, outerwidth, align, spacingmult, spacingadd);
+		mEllipsizedWidth = outerwidth;
 	}
 
 	public static class Builder {
@@ -42,6 +46,7 @@ public class StaticLayout extends Layout {
 		public static Builder obtain(CharSequence source, int bufstart, int bufend, TextPaint paint, int outerwidth) {
 			Builder builder = new Builder();
 			builder.layout = new StaticLayout(source, bufstart, bufend, paint, outerwidth, null, null, 1.0f, 0, false, null, 0, 0);
+			builder.ellipsizedWidth = outerwidth;
 			return builder;
 		}
 
@@ -68,8 +73,14 @@ public class StaticLayout extends Layout {
 			return this;
 		}
 
-		/* Pango ellipsizes at the layout width */
-		public Builder setEllipsizedWidth(int ellipsizedWidth) { return this; }
+		/* AOSP StaticLayout.Builder.setEllipsizedWidth(): kept and reported by getEllipsizedWidth() like
+		 * AOSP's StaticLayout; Pango has one width per layout and ellipsizes at it, a narrower ellipsized
+		 * width would also change where the lines break, so it is not applied */
+		public Builder setEllipsizedWidth(int ellipsizedWidth) {
+			this.ellipsizedWidth = ellipsizedWidth;
+			return this;
+		}
+		private int ellipsizedWidth;
 
 		public Builder setLineSpacing(float add, float mult) {
 			spacingAdd = add;
@@ -130,7 +141,14 @@ public class StaticLayout extends Layout {
 			return useBoundsForWidth;
 		}
 
-		public Builder setLineBreakConfig(android.graphics.text.LineBreakConfig lineBreakConfig) { return this; }
+		/* AOSP StaticLayout.Builder.setLineBreakConfig(): line-break style (strict/normal/loose) and word style
+		 * (phrase) for CJK text, which minikin applies. Pango breaks by UAX #14 only and has no such
+		 * setting, so the config is kept and not applied */
+		public Builder setLineBreakConfig(android.graphics.text.LineBreakConfig lineBreakConfig) {
+			this.lineBreakConfig = lineBreakConfig;
+			return this;
+		}
+		private android.graphics.text.LineBreakConfig lineBreakConfig;
 
 		/* the layout exists since obtain(); apply what the setters collected, in the order AOSP's
 		 * StaticLayout lays out: spacing, justification and indents first, the line limit last */
@@ -146,8 +164,17 @@ public class StaticLayout extends Layout {
 			layout.setMaxLines(maxLines, ellipsize);
 			layout.mUseBoundsForWidth = useBoundsForWidth;
 			layout.mFallbackLineSpacing = useLineSpacingFromFallbacks;
+			layout.mEllipsizedWidth = ellipsize != null ? ellipsizedWidth : layout.getWidth();
 			return layout;
 		}
+	}
+
+	/* AOSP StaticLayout: the width ellipsizing uses, the layout width when not ellipsizing */
+	private int mEllipsizedWidth;
+
+	@Override
+	public int getEllipsizedWidth() {
+		return mEllipsizedWidth;
 	}
 
 	/* API 33: what the Builder was given (setUseLineSpacingFromFallbacks()) */
