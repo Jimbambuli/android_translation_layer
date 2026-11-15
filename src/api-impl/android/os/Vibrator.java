@@ -69,6 +69,11 @@ public class Vibrator {
 		vibrate(effect);
 	}
 
+	/* AOSP turns the AudioAttributes into VibrationAttributes, which ATL does not use */
+	public void vibrate(VibrationEffect effect, android.media.AudioAttributes attributes) {
+		vibrate(effect);
+	}
+
 	public void cancel() {
 		if (vibrateThread != null) {
 			vibrateThread.interrupt();
