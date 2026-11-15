@@ -37,12 +37,132 @@ public class ActivityOptions {
 		return new ActivityOptions();
 	}
 
-	public static ActivityOptions makeScaleUpAnimation(View source, int startX, int startY, int startWidth, int startHeight) {
-		return new ActivityOptions();
+	/* AOSP keys and animation types (ActivityOptions, ComponentOptions) for toBundle(); ATL does not animate
+	 * activity starts, the values are kept for toBundle(), update() and the getters only */
+	public static final String KEY_LAUNCH_BOUNDS = "android:activity.launchBounds";
+	public static final String KEY_ANIM_TYPE = "android:activity.animType";
+	public static final String KEY_ANIM_START_X = "android:activity.animStartX";
+	public static final String KEY_ANIM_START_Y = "android:activity.animStartY";
+	public static final String KEY_ANIM_WIDTH = "android:activity.animWidth";
+	public static final String KEY_ANIM_HEIGHT = "android:activity.animHeight";
+	private static final String KEY_LAUNCH_DISPLAY_ID = "android.activity.launchDisplayId";
+	private static final String KEY_USAGE_TIME_REPORT = "android:activity.usageTimeReport";
+	private static final String KEY_PENDING_INTENT_BACKGROUND_ACTIVITY_ALLOWED = "android.pendingIntent.backgroundActivityAllowed";
+	public static final int ANIM_UNDEFINED = -1;
+	public static final int ANIM_SCALE_UP = 2;
+	public static final int ANIM_THUMBNAIL_SCALE_UP = 3;
+	public static final int ANIM_LAUNCH_TASK_BEHIND = 7;
+	public static final int ANIM_CLIP_REVEAL = 11;
+
+	private int mAnimationType = ANIM_UNDEFINED;
+	private int mStartX;
+	private int mStartY;
+	private int mWidth;
+	private int mHeight;
+	private PendingIntent mUsageTimeReport;
+	private int mLaunchDisplayId = -1;  // Display.INVALID_DISPLAY
+	private Boolean mPendingIntentBalAllowed;
+
+	/* AOSP makeScaleUpAnimation/makeClipRevealAnimation: the start rectangle relative to the source view on screen */
+	private static ActivityOptions makeAnimation(int type, View source, int startX, int startY, int width, int height) {
+		ActivityOptions opts = new ActivityOptions();
+		opts.mAnimationType = type;
+		int[] pts = new int[2];
+		source.getLocationOnScreen(pts);
+		opts.mStartX = pts[0] + startX;
+		opts.mStartY = pts[1] + startY;
+		opts.mWidth = width;
+		opts.mHeight = height;
+		return opts;
 	}
 
+	public static ActivityOptions makeScaleUpAnimation(View source, int startX, int startY, int startWidth, int startHeight) {
+		return makeAnimation(ANIM_SCALE_UP, source, startX, startY, startWidth, startHeight);
+	}
+
+	public static ActivityOptions makeClipRevealAnimation(View source, int startX, int startY, int width, int height) {
+		return makeAnimation(ANIM_CLIP_REVEAL, source, startX, startY, width, height);
+	}
+
+	/* AOSP keeps the thumbnail for the window manager; ATL draws no start animation */
+	public static ActivityOptions makeThumbnailScaleUpAnimation(View source, android.graphics.Bitmap thumbnail, int startX, int startY) {
+		return makeAnimation(ANIM_THUMBNAIL_SCALE_UP, source, startX, startY, 0, 0);
+	}
+
+	public static ActivityOptions makeTaskLaunchBehind() {
+		ActivityOptions opts = new ActivityOptions();
+		opts.mAnimationType = ANIM_LAUNCH_TASK_BEHIND;
+		return opts;
+	}
+
+	/* AOSP: the system sends the PendingIntent with the usage time when the activity leaves; ATL keeps no usage stats */
+	public void requestUsageTimeReport(PendingIntent receiver) {
+		mUsageTimeReport = receiver;
+	}
+
+	public ActivityOptions setLaunchDisplayId(int launchDisplayId) {
+		mLaunchDisplayId = launchDisplayId;
+		return this;
+	}
+
+	public int getLaunchDisplayId() {
+		return mLaunchDisplayId;
+	}
+
+	/* AOSP ComponentOptions */
+	@Deprecated
+	public void setPendingIntentBackgroundActivityLaunchAllowed(boolean allowed) {
+		mPendingIntentBalAllowed = allowed;
+	}
+
+	@Deprecated
+	public boolean isPendingIntentBackgroundActivityLaunchAllowed() {
+		return mPendingIntentBalAllowed == null ? true : mPendingIntentBalAllowed;
+	}
+
+	/* AOSP update(): the other options' usage time report and animation replace these */
+	public void update(ActivityOptions otherOptions) {
+		mUsageTimeReport = otherOptions.mUsageTimeReport;
+		mAnimationType = otherOptions.mAnimationType;
+		switch (otherOptions.mAnimationType) {
+			case ANIM_SCALE_UP:
+			case ANIM_CLIP_REVEAL:
+			case ANIM_THUMBNAIL_SCALE_UP:
+				mStartX = otherOptions.mStartX;
+				mStartY = otherOptions.mStartY;
+				mWidth = otherOptions.mWidth;
+				mHeight = otherOptions.mHeight;
+				break;
+		}
+	}
+
+	/* AOSP toBundle(): the set values under their keys (the subset ATL keeps) */
 	public Bundle toBundle() {
-		return null;
+		Bundle b = new Bundle();
+		if (mPendingIntentBalAllowed != null)
+			b.putBoolean(KEY_PENDING_INTENT_BACKGROUND_ACTIVITY_ALLOWED, mPendingIntentBalAllowed);
+		if (mLaunchBounds != null)
+			b.putParcelable(KEY_LAUNCH_BOUNDS, mLaunchBounds);
+		if (mAnimationType != ANIM_UNDEFINED)
+			b.putInt(KEY_ANIM_TYPE, mAnimationType);
+		if (mUsageTimeReport != null)
+			b.putParcelable(KEY_USAGE_TIME_REPORT, mUsageTimeReport);
+		switch (mAnimationType) {
+			case ANIM_SCALE_UP:
+			case ANIM_CLIP_REVEAL:
+				b.putInt(KEY_ANIM_START_X, mStartX);
+				b.putInt(KEY_ANIM_START_Y, mStartY);
+				b.putInt(KEY_ANIM_WIDTH, mWidth);
+				b.putInt(KEY_ANIM_HEIGHT, mHeight);
+				break;
+			case ANIM_THUMBNAIL_SCALE_UP:
+				b.putInt(KEY_ANIM_START_X, mStartX);
+				b.putInt(KEY_ANIM_START_Y, mStartY);
+				break;
+		}
+		if (mLaunchDisplayId != -1)
+			b.putInt(KEY_LAUNCH_DISPLAY_ID, mLaunchDisplayId);
+		return b;
 	}
 
 	/* AOSP (android-14, setAllowPassThroughOnTouchOutside android-15): stored for the getters; ATL starts
