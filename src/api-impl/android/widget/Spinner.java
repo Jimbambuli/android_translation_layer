@@ -27,7 +27,7 @@ public class Spinner extends AbsSpinner implements android.content.DialogInterfa
 	}
 
 	public Spinner(Context context) {
-		this(context, null, 0);
+		this(context, null);
 		haveCustomMeasure = false;
 	}
 
@@ -37,7 +37,7 @@ public class Spinner extends AbsSpinner implements android.content.DialogInterfa
 	}
 
 	public Spinner(Context context, AttributeSet attributeSet) {
-		this(context, attributeSet, 0);
+		this(context, attributeSet, R.attr.spinnerStyle);
 		haveCustomMeasure = false;
 	}
 
