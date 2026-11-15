@@ -27,9 +27,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.ParcelableException;
+import android.os.RemoteException;
+import android.util.Log;
+import dalvik.system.VMRuntime;
+import java.io.FileNotFoundException;
 import com.android.internal.util.Preconditions;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +65,7 @@ public final class DocumentsContract {
 	private static final String PATH_RECENT = "recent";
 	private static final String PATH_DOCUMENT = "document";
 	private static final String PATH_CHILDREN = "children";
+	private static final String TAG = "DocumentsContract";
 	private static final String PATH_SEARCH = "search";
 	private static final String PATH_TREE = "tree";
 	private static final String PARAM_QUERY = "query";
@@ -132,24 +139,142 @@ public final class DocumentsContract {
 		    .build();
 	}
 
-	public static Uri copyDocument(ContentResolver content, Uri sourceDocumentUri, Uri targetParentDocumentUri) {
-		throw new RuntimeException("DocumentsContract.copyDocument not implemented yet");
+	/* AOSP DocumentsContract.copyDocument .. removeDocument, isChildDocument: the request goes to the
+	 * DocumentsProvider through ContentResolver.call(); failures are logged and rethrown by rethrowIfNecessary */
+	public static Uri createDocument(ContentResolver content, Uri parentDocumentUri, String mimeType, String displayName) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, parentDocumentUri);
+			in.putString(Document.COLUMN_MIME_TYPE, mimeType);
+			in.putString(Document.COLUMN_DISPLAY_NAME, displayName);
+
+			final Bundle out = content.call(parentDocumentUri.getAuthority(), METHOD_CREATE_DOCUMENT, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_URI, android.net.Uri.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to create document", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
 	}
 
-	public static Uri createDocument(ContentResolver content, Uri parentDocumentUri, String mimeType, String displayName) {
-		throw new RuntimeException("DocumentsContract.createDocument not implemented yet");
+	public static boolean isChildDocument(ContentResolver content, Uri parentDocumentUri, Uri childDocumentUri) throws FileNotFoundException {
+		Preconditions.checkNotNull(content, "content can not be null");
+		Preconditions.checkNotNull(parentDocumentUri, "parentDocumentUri can not be null");
+		Preconditions.checkNotNull(childDocumentUri, "childDocumentUri can not be null");
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, parentDocumentUri);
+			in.putParcelable(DocumentsContract.EXTRA_TARGET_URI, childDocumentUri);
+
+			final Bundle out = content.call(parentDocumentUri.getAuthority(), METHOD_IS_CHILD_DOCUMENT, null, in);
+			if (out == null) {
+				throw new RemoteException("Failed to get a response from isChildDocument query.");
+			}
+			if (!out.containsKey(DocumentsContract.EXTRA_RESULT)) {
+				throw new RemoteException("Response did not include result field..");
+			}
+			return out.getBoolean(DocumentsContract.EXTRA_RESULT);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to create document", e);
+			rethrowIfNecessary(e);
+			return false;
+		}
 	}
 
-	public static boolean deleteDocument(ContentResolver content, Uri documentUri) {
-		throw new RuntimeException("DocumentsContract.deleteDocument not implemented yet");
+	public static Uri renameDocument(ContentResolver content, Uri documentUri, String displayName) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, documentUri);
+			in.putString(Document.COLUMN_DISPLAY_NAME, displayName);
+
+			final Bundle out = content.call(documentUri.getAuthority(), METHOD_RENAME_DOCUMENT, null, in);
+			final Uri outUri = out.getParcelable(DocumentsContract.EXTRA_URI, android.net.Uri.class);
+			return (outUri != null) ? outUri : documentUri;
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to rename document", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
 	}
 
-	public static Uri renameDocument(ContentResolver content, Uri documentUri, String displayName) {
-		throw new RuntimeException("DocumentsContract.renameDocument not implemented yet");
+	public static boolean deleteDocument(ContentResolver content, Uri documentUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, documentUri);
+
+			content.call(documentUri.getAuthority(), METHOD_DELETE_DOCUMENT, null, in);
+			return true;
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to delete document", e);
+			rethrowIfNecessary(e);
+			return false;
+		}
 	}
 
-	public static boolean isChildDocument(ContentResolver content, Uri parentDocumentUri, Uri childDocumentUri) {
-		throw new RuntimeException("DocumentsContract.isChildDocument not implemented yet");
+	public static Uri copyDocument(ContentResolver content, Uri sourceDocumentUri, Uri targetParentDocumentUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, sourceDocumentUri);
+			in.putParcelable(DocumentsContract.EXTRA_TARGET_URI, targetParentDocumentUri);
+
+			final Bundle out = content.call(sourceDocumentUri.getAuthority(), METHOD_COPY_DOCUMENT, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_URI, android.net.Uri.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to copy document", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
+	public static Uri moveDocument(ContentResolver content, Uri sourceDocumentUri, Uri sourceParentDocumentUri, Uri targetParentDocumentUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, sourceDocumentUri);
+			in.putParcelable(DocumentsContract.EXTRA_PARENT_URI, sourceParentDocumentUri);
+			in.putParcelable(DocumentsContract.EXTRA_TARGET_URI, targetParentDocumentUri);
+
+			final Bundle out = content.call(sourceDocumentUri.getAuthority(), METHOD_MOVE_DOCUMENT, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_URI, android.net.Uri.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to move document", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
+	public static boolean removeDocument(ContentResolver content, Uri documentUri, Uri parentDocumentUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, documentUri);
+			in.putParcelable(DocumentsContract.EXTRA_PARENT_URI, parentDocumentUri);
+
+			content.call(documentUri.getAuthority(), METHOD_REMOVE_DOCUMENT, null, in);
+			return true;
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to remove document", e);
+			rethrowIfNecessary(e);
+			return false;
+		}
+	}
+
+	/* AOSP rethrowIfNecessary; a provider in ATL runs in the same process, so its FileNotFoundException
+	 * arrives as such instead of wrapped in a ParcelableException */
+	private static void rethrowIfNecessary(Exception e) throws FileNotFoundException {
+		if (VMRuntime.getRuntime().getTargetSdkVersion() >= Build.VERSION_CODES.O) {
+			if (e instanceof ParcelableException) {
+				((ParcelableException) e).maybeRethrow(FileNotFoundException.class);
+			} else if (e instanceof FileNotFoundException) {
+				throw (FileNotFoundException) e;
+			} else if (e instanceof RemoteException) {
+				((RemoteException) e).rethrowAsRuntimeException();
+			} else if (e instanceof RuntimeException) {
+				throw (RuntimeException) e;
+			}
+		}
+	}
+
+	public static Uri buildChildDocumentsUri(String authority, String parentDocumentId) {
+		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(authority).appendPath(PATH_DOCUMENT).appendPath(parentDocumentId).appendPath(PATH_CHILDREN).build();
 	}
 
 	public static Uri buildDocumentUri(String authority, String documentId) {
