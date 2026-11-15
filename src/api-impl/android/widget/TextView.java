@@ -1508,6 +1508,11 @@ public class TextView extends View {
 		mError = error == null ? null : TextUtils.stringOrSpannedString(error);
 	}
 
+	/** AOSP setError(CharSequence, Drawable): the icon is not shown (see above), the error is kept as in setError(CharSequence) */
+	public void setError(CharSequence error, Drawable icon) {
+		setError(error);
+	}
+
 	/** AOSP getError(): mEditor == null ? null : mEditor.mError (in ATL an input type stands for the Editor, see mInputType) */
 	public CharSequence getError() {
 		return mInputType == 0 ? null : mError;
@@ -2840,6 +2845,11 @@ public class TextView extends View {
 	 * its text inside the view (a single line label is cut or ellipsized), so nothing moves and AOSP's answer for
 	 * a text that did not scroll is false */
 	public boolean bringPointIntoView(int offset) {
+		return bringPointIntoView(offset, false);
+	}
+
+	/** AOSP bringPointIntoView(int, boolean): nothing scrolls here, see above */
+	public boolean bringPointIntoView(int offset, boolean requestRectWithoutFocus) {
 		return false;
 	}
 

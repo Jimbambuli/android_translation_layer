@@ -22,6 +22,14 @@ public class Toolbar extends View {
 		super(context, attributeSet);
 	}
 
+	public Toolbar(Context context, AttributeSet attrs, int defStyleAttr) {
+		this(context, attrs, defStyleAttr, 0);
+	}
+
+	public Toolbar(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	public CharSequence getTitle() {
 		return titleText;
 	}
@@ -162,6 +170,28 @@ public class Toolbar extends View {
 		public LayoutParams(int width, int height, int gravity) {
 			super(width, height);
 			this.gravity = gravity;
+		}
+
+		public LayoutParams(int gravity) {
+			this(WRAP_CONTENT, MATCH_PARENT, gravity);
+		}
+
+		public LayoutParams(LayoutParams source) {
+			super(source);
+		}
+
+		public LayoutParams(android.app.ActionBar.LayoutParams source) {
+			super(source);
+		}
+
+		public LayoutParams(MarginLayoutParams source) {
+			super(source);
+			// ActionBar.LayoutParams has no MarginLayoutParams constructor (as in AOSP): copy the margins
+			copyMarginsFrom(source);
+		}
+
+		public LayoutParams(android.view.ViewGroup.LayoutParams source) {
+			super(source);
 		}
 	}
 }
