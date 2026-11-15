@@ -1,23 +1,31 @@
 package android.widget;
 
 import android.view.View;
+import android.view.ViewTreeObserver;
 
-public class TabHost extends View {
+/* AOSP frameworks/base core/java/android/widget/TabHost.java (Android 16): extends FrameLayout and
+ * implements ViewTreeObserver.OnTouchModeChangeListener */
+public class TabHost extends FrameLayout implements ViewTreeObserver.OnTouchModeChangeListener {
 	public TabHost(android.content.Context context) {
 		super(context);
 	}
 
 	public TabHost(android.content.Context context, android.util.AttributeSet attrs) {
-		super(context, attrs);
+		this(context, attrs, com.android.internal.R.attr.tabWidgetStyle);
 	}
 
 	public TabHost(android.content.Context context, android.util.AttributeSet attrs, int defStyleAttr) {
 		this(context, attrs, defStyleAttr, 0);
 	}
 
+	/* AOSP passes only context and attrs to FrameLayout (the style is used for the TabWidget attributes) */
 	public TabHost(android.content.Context context, android.util.AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		super(context, attrs, defStyleAttr, defStyleRes);
+		super(context, attrs);
 	}
+
+	/* AOSP onTouchModeChanged(): "No longer used, but kept to maintain API compatibility." */
+	@Override
+	public void onTouchModeChanged(boolean isInTouchMode) {}
 
 	public static class TabSpec {
 		private String tag;
