@@ -34,6 +34,31 @@ public final class ScanResult {
 	public static final int WIFI_STANDARD_11BE = 8;
 
 	public static class InformationElement {
+		public static final int EID_SSID = 0;
+		public static final int EID_SUPPORTED_RATES = 1;
+		public static final int EID_TIM = 5;
+		public static final int EID_COUNTRY = 7;
+		public static final int EID_BSS_LOAD = 11;
+		public static final int EID_ERP = 42;
+		public static final int EID_HT_CAPABILITIES = 45;
+		public static final int EID_RSN = 48;
+		public static final int EID_RSN_EXTENSION = 244;
+		public static final int EID_EXTENDED_SUPPORTED_RATES = 50;
+		public static final int EID_HT_OPERATION = 61;
+		public static final int EID_INTERWORKING = 107;
+		public static final int EID_ROAMING_CONSORTIUM = 111;
+		public static final int EID_EXTENDED_CAPS = 127;
+		public static final int EID_VHT_CAPABILITIES = 191;
+		public static final int EID_VHT_OPERATION = 192;
+		public static final int EID_RNR = 201;
+		public static final int EID_VSA = 221;
+		public static final int EID_EXTENSION_PRESENT = 255;
+		public static final int EID_EXT_HE_CAPABILITIES = 35;
+		public static final int EID_EXT_HE_OPERATION = 36;
+		public static final int EID_EXT_EHT_OPERATION = 106;
+		public static final int EID_EXT_MULTI_LINK = 107;
+		public static final int EID_FRAGMENT_SUB_ELEMENT_MULTI_LINK = 254;
+		public static final int EID_EXT_EHT_CAPABILITIES = 108;
 		public int id;
 		public int idExt;
 		public byte[] bytes;
