@@ -64,12 +64,51 @@ public class PendingIntent implements Parcelable {
 	/* AOSP PendingIntent.send(Context, int, Intent): the system fills the extras of the given intent into the
 	 * stored one (Intent.fillIn() always merges extras) */
 	public void send(Context context, int code, Intent intent) throws CanceledException {
+		send(context, code, intent, null, null, null, null);
+	}
+
+	/* AOSP OnFinished: called by the system once the send is done (FinishedDispatcher, on the handler if given) */
+	public interface OnFinished {
+		void onSendFinished(PendingIntent pendingIntent, Intent intent, int resultCode, String resultData, Bundle resultExtras);
+	}
+
+	public void send(int code, OnFinished onFinished, android.os.Handler handler) throws CanceledException {
+		send(null, code, null, onFinished, handler, null, null);
+	}
+
+	public void send(Context context, int code, Intent intent, OnFinished onFinished, android.os.Handler handler) throws CanceledException {
+		send(context, code, intent, onFinished, handler, null, null);
+	}
+
+	public void send(Context context, int code, Intent intent, OnFinished onFinished, android.os.Handler handler, String requiredPermission) throws CanceledException {
+		send(context, code, intent, onFinished, handler, requiredPermission, null);
+	}
+
+	/* AOSP: the system's PendingIntentRecord.sendInner() fills the intent in and starts it; afterwards it calls the
+	 * finished receiver: for an activity or service with result code 0, for a broadcast (sent ordered with the
+	 * code as initial result) with the final result, here the initial code as ATL's broadcasts are not ordered.
+	 * ATL grants every permission, so requiredPermission does not filter. */
+	public void send(Context context, int code, Intent intent, final OnFinished onFinished, android.os.Handler handler, String requiredPermission, Bundle options) throws CanceledException {
 		Intent filled = this.intent;
 		if (intent != null) {
 			filled = new Intent(this.intent);
 			filled.putExtras(intent);
 		}
 		dispatch(filled, code);
+		if (onFinished != null) {
+			final Intent finalIntent = new Intent(filled);
+			final int resultCode = type == 2 ? code : 0;
+			Runnable r = new Runnable() {
+				@Override
+				public void run() {
+					onFinished.onSendFinished(PendingIntent.this, finalIntent, resultCode, null, null);
+				}
+			};
+			if (handler == null)
+				r.run();
+			else
+				handler.post(r);
+		}
 	}
 
 	public void send() {
@@ -111,6 +150,15 @@ public class PendingIntent implements Parcelable {
 		return new PendingIntent(requestCode, intent, 0);
 	}
 
+	/* AOSP: the options are kept by the system for the activity start; ATL starts without them */
+	public static PendingIntent getActivity(Context context, int requestCode, Intent intent, int flags, Bundle options) {
+		return getActivity(context, requestCode, intent, flags);
+	}
+
+	public static PendingIntent getActivities(Context context, int requestCode, Intent[] intents, int flags) {
+		return getActivities(context, requestCode, intents, flags, null);
+	}
+
 	public static PendingIntent getService(Context context, int requestCode, Intent intent, int flags) {
 		return new PendingIntent(requestCode, intent, 1);
 	}
@@ -137,6 +185,12 @@ public class PendingIntent implements Parcelable {
 		public CanceledException(Exception cause) {
 			super(cause);
 		}
+	}
+
+	/* AOSP: deprecated name of getCreatorPackage() */
+	@Deprecated
+	public String getTargetPackage() {
+		return getCreatorPackage();
 	}
 
 	public String getCreatorPackage() {
