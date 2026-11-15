@@ -234,6 +234,40 @@ public class Layout {
 		draw(canvas);
 	}
 
+	/* AOSP Layout.draw(Canvas, List<Path>, List<Paint>, Path, Paint, int) (API 34): drawHighlights() (the highlight
+	 * paths with their paints, then the selection path, moved down by cursorOffsetVertical) before the text. ATL has
+	 * no high contrast text, so highlights are not drawn on top. */
+	public void draw(Canvas canvas, java.util.List<Path> highlightPaths, java.util.List<Paint> highlightPaints,
+	                 Path selectionPath, Paint selectionPaint, int cursorOffsetVertical) {
+		if (highlightPaths != null || highlightPaints != null) {
+			if (cursorOffsetVertical != 0)
+				canvas.translate(0, cursorOffsetVertical);
+			try {
+				if (highlightPaths != null) {
+					if (highlightPaints == null) {
+						throw new IllegalArgumentException("if highlight is specified, highlightPaint must be specified.");
+					}
+					if (highlightPaints.size() != highlightPaths.size()) {
+						throw new IllegalArgumentException("The highlight path size is different from the size of highlight paints");
+					}
+					for (int i = 0; i < highlightPaths.size(); ++i) {
+						final Path highlight = highlightPaths.get(i);
+						if (highlight != null) {
+							canvas.drawPath(highlight, highlightPaints.get(i));
+						}
+					}
+				}
+				if (selectionPath != null) {
+					canvas.drawPath(selectionPath, selectionPaint);
+				}
+			} finally {
+				if (cursorOffsetVertical != 0)
+					canvas.translate(0, -cursorOffsetVertical);
+			}
+		}
+		draw(canvas);
+	}
+
 	public int getParagraphDirection(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
@@ -327,6 +361,16 @@ public class Layout {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
 		return native_get_line_bottom(layout, line);
+	}
+
+	/* AOSP Layout.getLineBottom(int, boolean) (API 34): getLineTop(line + 1), less getLineExtra(line) without the
+	 * line spacing; getLineBottom(line) is getLineTop(line + 1) */
+	public int getLineBottom(int line, boolean includeLineSpacing) {
+		if (includeLineSpacing) {
+			return getLineBottom(line);
+		} else {
+			return getLineBottom(line) - getLineExtra(line);
+		}
 	}
 
 	/* AOSP Layout.getLineMax(): the width of the line without trailing whitespace plus the paragraph's leading

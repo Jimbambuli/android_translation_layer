@@ -55,6 +55,20 @@ import java.util.ArrayList;
  * @attr ref android.R.styleable#ListView_footerDividersEnabled
  */
 public class ListView extends AbsListView {
+
+	/* AOSP ListView.onInitializeAccessibilityNodeInfoForItem(): the AbsListView actions plus the item's position as
+	 * CollectionItemInfo (heading for headers and footers, selected when checked) */
+	@Override
+	public void onInitializeAccessibilityNodeInfoForItem(View view, int position, android.view.accessibility.AccessibilityNodeInfo info) {
+		super.onInitializeAccessibilityNodeInfoForItem(view, position, info);
+		final LayoutParams lp = (LayoutParams)view.getLayoutParams();
+		final boolean isHeading = lp != null && lp.viewType == ITEM_VIEW_TYPE_HEADER_OR_FOOTER;
+		final boolean isSelected = isItemChecked(position);
+		final android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo itemInfo =
+		    android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo.obtain(position, 1, 0, 1, isHeading, isSelected);
+		info.setCollectionItemInfo(itemInfo);
+	}
+
 	/**
 	 * Used to indicate a no preference for a position type.
 	 */

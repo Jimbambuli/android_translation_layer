@@ -23,8 +23,8 @@ import java.util.Set;
  * Interface for providing text classification related features (AOSP android.view.textclassifier.TextClassifier).
  *
  * ATL has no text classification service, so this interface has the constants and AOSP's (android-16.0.0_r4)
- * default methods for selection, classification, language detection and conversation actions; the result classes
- * of the other features (TextLinks, SelectionEvent) are not in ATL. NO_OP is AOSP's TextClassifier whose methods
+ * default methods for selection, classification, link generation, language detection and conversation actions;
+ * the result classes of the other features (SelectionEvent) are not in ATL. NO_OP is AOSP's TextClassifier whose methods
  * all keep their defaults.
  */
 public interface TextClassifier {
@@ -82,6 +82,13 @@ public interface TextClassifier {
 	}
 
 	/** AOSP default: no classification */
+	/** AOSP default TextClassifier.generateLinks(): no links, the text as it is */
+	default TextLinks generateLinks(TextLinks.Request request) {
+		java.util.Objects.requireNonNull(request);
+		Utils.checkMainThread();
+		return new TextLinks.Builder(request.getText().toString()).build();
+	}
+
 	default TextClassification classifyText(TextClassification.Request request) {
 		Objects.requireNonNull(request);
 		Utils.checkMainThread();

@@ -70,6 +70,19 @@ public class WebView extends ViewGroup {
 		this(context, attrs, 0);
 	}
 
+	/* AOSP WebView(Context, AttributeSet, int, boolean) (deprecated): the provider's init(privateBrowsing);
+	 * Chromium's WebViewChromium.init() (not in the local sources) rejects private browsing for apps targeting
+	 * KitKat or later and only logs it for older ones */
+	public WebView(Context context, AttributeSet attrs, int defStyleAttr, boolean privateBrowsing) {
+		this(context, attrs, defStyleAttr);
+		if (privateBrowsing) {
+			final String msg = "Private browsing is not supported in WebView.";
+			if (context.getApplicationInfo().targetSdkVersion >= 19)
+				throw new IllegalArgumentException(msg);
+			android.util.Log.w("WebView", msg);
+		}
+	}
+
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
 		providerInitialized = true;
@@ -992,6 +1005,14 @@ public class WebView extends ViewGroup {
 		// webkit doesn't allow overwriting the file:// uri scheme. So we replace it with the android-asset:// scheme
 		url = url.replace("file:///android_asset/", "android-asset:///assets/");
 		native_loadUrl(widget, url);
+	}
+
+	/* AOSP WebView.postUrl(): a network URL is loaded with a POST of postData, any other URL with loadUrl().
+	 * WebKitGTK's public API has no request method or body, so a POST is not provided. */
+	public void postUrl(String url, byte[] postData) {
+		if (android.webkit.URLUtil.isNetworkUrl(url))
+			throw new UnsupportedOperationException("WebView.postUrl(): POST is not provided by ATL's WebKitGTK backend");
+		loadUrl(url);
 	}
 
 	/* AOSP WebView.loadUrl(String, Map): as loadUrl(String), the headers go with the request */

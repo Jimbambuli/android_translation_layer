@@ -7374,6 +7374,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void autofill(AutofillValue value) {
 	}
 
+	/* AOSP View.autofill(SparseArray<AutofillValue>): only in autofill compatibility mode (an autofill service with
+	 * a compat allowlist), which ATL does not have, so nothing is filled */
+	public void autofill(android.util.SparseArray<AutofillValue> values) {
+	}
+
 	public int getImportantForAutofill() {
 		return mImportantForAutofill;
 	}
