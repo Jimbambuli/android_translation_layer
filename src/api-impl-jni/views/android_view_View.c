@@ -895,6 +895,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setLayoutParams(JNIEnv *en
 			valign = GTK_ALIGN_FILL;
 	}
 
+	/* a Java layout already placed the child in the rectangle its gravity gives; a GTK alignment other
+	 * than FILL would shrink a native widget (a GtkButton) to its GTK natural size within it and cut
+	 * off what Java draws there (WhatsApp's centered "agree" button) */
+	if (!gtk_places) {
+		halign = GTK_ALIGN_FILL;
+		valign = GTK_ALIGN_FILL;
+	}
+
 	gtk_widget_set_hexpand(widget, hexpand);
 	gtk_widget_set_vexpand(widget, vexpand);
 	gtk_widget_set_halign(widget, halign);

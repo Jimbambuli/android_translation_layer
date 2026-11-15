@@ -169,14 +169,7 @@ public abstract class Context {
 	File nobackup_dir = null;
 	File code_cache_dir = null;
 
-	private static Map<IntentFilter, BroadcastReceiver> receiverMap = new ConcurrentHashMap<>();
-	/* the Handler a receiver was registered with: its onReceive() runs on that thread, as in AOSP */
-	private static Map<BroadcastReceiver, Handler> receiverSchedulers = new ConcurrentHashMap<>();
-
-	private static Handler schedulerOf(BroadcastReceiver receiver) {
-		Handler scheduler = receiverSchedulers.get(receiver);
-		return scheduler != null ? scheduler : new Handler(Looper.getMainLooper());
-	}
+	private static final ReceiverRegistry receiverRegistrations = new ReceiverRegistry();
 
 	static {
 		sys_config = new Configuration();
@@ -321,13 +314,18 @@ public abstract class Context {
 	 * them is returned. Without a receiver (the state query registerReceiver(null, filter)) nothing is
 	 * registered; the result is null when no sticky broadcast matches */
 	public Intent registerReceiver(final BroadcastReceiver receiver, IntentFilter filter) {
+		return registerReceiverInternal(receiver, filter, null);
+	}
+
+	private Intent registerReceiverInternal(final BroadcastReceiver receiver, IntentFilter filter, final Handler registeredWith) {
+		final Handler scheduler = registeredWith != null ? registeredWith : receiver != null ? new Handler(Looper.getMainLooper()) : null;
 		if (receiver != null)
-			receiverMap.put(filter, receiver);
+			receiverRegistrations.add(receiver, filter, registeredWith);
 		java.util.List<Intent> stickies = stickyIntentsFor(filter);
 		if (receiver != null) {
 			final Context context = this;
 			for (final Intent sticky : stickies) {
-				schedulerOf(receiver).post(new Runnable() {
+				scheduler.post(new Runnable() {
 					public void run() {
 						receiver.onReceive(context, new Intent(sticky));
 					}
@@ -874,12 +872,11 @@ public abstract class Context {
 		if ("org.unifiedpush.android.distributor.REGISTER".equals(intent.getAction())) {
 			nativeRegisterUnifiedPush(intent.getStringExtra("token"), intent.getStringExtra("application"));
 		}
-		for (IntentFilter filter : receiverMap.keySet()) {
-			if (filter.matchAction(intent.getAction())) {
-				BroadcastReceiver receiver = receiverMap.get(filter);
-				Handler scheduler = receiverSchedulers.get(receiver);
-				if (scheduler != null)
-					scheduler.post(() -> receiver.onReceive(this, intent));
+		for (ReceiverRegistry.Registration registration : receiverRegistrations) {
+			if (registration.filter.matchAction(intent.getAction())) {
+				BroadcastReceiver receiver = registration.receiver;
+				if (registration.scheduler != null)
+					registration.scheduler.post(() -> receiver.onReceive(this, intent));
 				else
 					receiver.onReceive(this, intent);
 			}
@@ -893,11 +890,11 @@ public abstract class Context {
 
 	/* a broadcast of the system: to the receivers registered at run time, on the main thread */
 	public static void sendBroadcastToReceivers(final Intent intent) {
-		for (final java.util.Map.Entry<IntentFilter, BroadcastReceiver> e : receiverMap.entrySet()) {
-			if (e.getKey().matchAction(intent.getAction())) {
-				schedulerOf(e.getValue()).post(new Runnable() {
+		for (final ReceiverRegistry.Registration e : receiverRegistrations) {
+			if (e.filter.matchAction(intent.getAction())) {
+				(e.scheduler != null ? e.scheduler : new Handler(Looper.getMainLooper())).post(new Runnable() {
 					public void run() {
-						e.getValue().onReceive(android.app.ActivityThread.currentApplication(), intent);
+						e.receiver.onReceive(android.app.ActivityThread.currentApplication(), intent);
 					}
 				});
 			}
@@ -950,10 +947,16 @@ public abstract class Context {
 	 * killer; ATL has no process importance, so nothing changes */
 	public void updateServiceGroup(ServiceConnection conn, int group, int importance) {}
 
+	/* AOSP LoadedApk.forgetReceiverDispatcher(): the receiver object is the key (ArrayMap.get(r), null allowed),
+	 * the dispatcher holds every filter the receiver was registered with and ActivityManagerService
+	 * .unregisterReceiver() removes the whole ReceiverList; a receiver that is not registered, null included,
+	 * is an IllegalArgumentException("Receiver not registered: " + r) that apps catch */
 	public void unregisterReceiver(BroadcastReceiver receiver) {
-		while (receiverMap.values().remove(receiver))
-			;
-		receiverSchedulers.remove(receiver);
+		boolean registered = receiverRegistrations.removeAll(receiver);
+		if (!registered) {
+			Slog.w(TAG, "unregisterReceiver: receiver not registered: " + receiver);
+			throw new IllegalArgumentException("Receiver not registered: " + receiver);
+		}
 	}
 
 	public static final int CONTEXT_INCLUDE_CODE = 0x00000001;
@@ -1037,9 +1040,7 @@ public abstract class Context {
 	}
 
 	public Intent registerReceiver(BroadcastReceiver receiver, IntentFilter filter, String broadcastPermission, Handler scheduler) {
-		if (receiver != null && scheduler != null)
-			receiverSchedulers.put(receiver, scheduler);
-		return registerReceiver(receiver, filter);
+		return registerReceiverInternal(receiver, filter, scheduler);
 	}
 
 	/* there is only one app, so the export flags (RECEIVER_EXPORTED etc.) make no difference */
