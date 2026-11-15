@@ -3,7 +3,7 @@ package android.content.pm;
 import android.content.IntentFilter;
 import android.graphics.drawable.Drawable;
 
-public class ResolveInfo {
+public class ResolveInfo implements android.os.Parcelable {
 	public ActivityInfo activityInfo = new ActivityInfo();
 	public ServiceInfo serviceInfo = new ServiceInfo();
 	public IntentFilter filter = new IntentFilter();
@@ -143,4 +143,98 @@ public class ResolveInfo {
 		private final java.text.Collator mCollator = java.text.Collator.getInstance();
 		private final PackageManager mPM;
 	}
+
+	/* AOSP ResolveInfo.writeToParcel()/ResolveInfo(Parcel)/CREATOR (Android 16). ATL has no targetUserId,
+	 * handleAllWebDataURI, mAutoResolutionAllowed, isInstantAppAvailable or userHandle: their slots are
+	 * written with the AOSP defaults (UserHandle.USER_CURRENT = -2, false) and skipped when read */
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		if (activityInfo != null) {
+			dest.writeInt(1);
+			activityInfo.writeToParcel(dest, parcelableFlags);
+		} else if (serviceInfo != null) {
+			dest.writeInt(2);
+			serviceInfo.writeToParcel(dest, parcelableFlags);
+		} else if (providerInfo != null) {
+			dest.writeInt(3);
+			providerInfo.writeToParcel(dest, parcelableFlags);
+		} else {
+			dest.writeInt(0);
+		}
+		if (filter != null) {
+			dest.writeInt(1);
+			filter.writeToParcel(dest, parcelableFlags);
+		} else {
+			dest.writeInt(0);
+		}
+		dest.writeInt(priority);
+		dest.writeInt(preferredOrder);
+		dest.writeInt(match);
+		dest.writeInt(specificIndex);
+		dest.writeInt(labelRes);
+		android.text.TextUtils.writeToParcel(nonLocalizedLabel, dest, parcelableFlags);
+		dest.writeInt(icon);
+		dest.writeString8(resolvePackageName);
+		dest.writeInt(-2 /* targetUserId: UserHandle.USER_CURRENT */);
+		dest.writeInt(system ? 1 : 0);
+		dest.writeInt(noResourceId ? 1 : 0);
+		dest.writeInt(iconResourceId);
+		dest.writeInt(0 /* handleAllWebDataURI */);
+		dest.writeInt(0 /* mAutoResolutionAllowed */);
+		dest.writeInt(0 /* isInstantAppAvailable */);
+		dest.writeInt(-2 /* userHandle: UserHandle.USER_CURRENT */);
+	}
+
+	private ResolveInfo(android.os.Parcel source) {
+		activityInfo = null;
+		serviceInfo = null;
+		providerInfo = null;
+		switch (source.readInt()) {
+			case 1:
+				activityInfo = ActivityInfo.CREATOR.createFromParcel(source);
+				break;
+			case 2:
+				serviceInfo = ServiceInfo.CREATOR.createFromParcel(source);
+				break;
+			case 3:
+				providerInfo = ProviderInfo.CREATOR.createFromParcel(source);
+				break;
+			default:
+				android.util.Slog.w("ResolveInfo", "Missing ComponentInfo!");
+				break;
+		}
+		filter = null;
+		if (source.readInt() != 0) {
+			filter = IntentFilter.CREATOR.createFromParcel(source);
+		}
+		priority = source.readInt();
+		preferredOrder = source.readInt();
+		match = source.readInt();
+		specificIndex = source.readInt();
+		labelRes = source.readInt();
+		nonLocalizedLabel = android.text.TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+		icon = source.readInt();
+		resolvePackageName = source.readString8();
+		source.readInt(); // targetUserId
+		system = source.readInt() != 0;
+		noResourceId = source.readInt() != 0;
+		iconResourceId = source.readInt();
+		source.readInt(); // handleAllWebDataURI
+		source.readInt(); // mAutoResolutionAllowed
+		source.readInt(); // isInstantAppAvailable
+		source.readInt(); // userHandle
+	}
+
+	public static final android.os.Parcelable.Creator<ResolveInfo> CREATOR = new android.os.Parcelable.Creator<ResolveInfo>() {
+		public ResolveInfo createFromParcel(android.os.Parcel source) {
+			return new ResolveInfo(source);
+		}
+
+		public ResolveInfo[] newArray(int size) {
+			return new ResolveInfo[size];
+		}
+	};
 }
