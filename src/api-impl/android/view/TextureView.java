@@ -116,6 +116,24 @@ public class TextureView extends View {
 		canvas.restore();
 	}
 
+	/* AOSP 16 TextureView.onVisibilityChanged(): no frame updates while invisible. ATL creates the
+	 * SurfaceTexture together with what AOSP calls the layer (in draw()), so mSurface != null stands
+	 * for mLayer != null */
+	@Override
+	protected void onVisibilityChanged(View changedView, int visibility) {
+		super.onVisibilityChanged(changedView, visibility);
+
+		if (mSurface != null) {
+			if (visibility == VISIBLE) {
+				mSurface.setOnFrameAvailableListener(mUpdateListener, new Handler(Looper.getMainLooper()));
+				mUpdateLayer = true;
+				invalidate();
+			} else {
+				mSurface.setOnFrameAvailableListener(null);
+			}
+		}
+	}
+
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
 		super.onSizeChanged(w, h, oldw, oldh);
