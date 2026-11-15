@@ -120,6 +120,22 @@ public class Layout {
 	private static final int ATTR_STRIKETHROUGH = 7;
 	private static final int ATTR_HYPHENS = 8;
 
+	/* for DynamicLayout (AOSP reflow()): the text changed; build the Pango layout again at the same width with
+	 * the alignment and the line spacing this layout has, and the spans of the new text */
+	void reflow(CharSequence source) {
+		String str = source != null ? source.toString() : "";
+		int width = native_get_width(layout);
+		long old = layout;
+		this.text = str;
+		layout = native_constructor(str, paint.paint, width);
+		if (source instanceof Spanned)
+			applySpans((Spanned)source);
+		setAlignment(align);
+		if (spacing_mult != 1 || spacing_add != 0)
+			native_set_paragraph_style(layout, spacing_mult, spacing_add, false, 0, 0);
+		native_free(old);
+	}
+
 	/* StaticLayout.Builder.setHyphenationFrequency(): HYPHENATION_FREQUENCY_NONE (0) breaks a word that
 	 * does not fit without a hyphen; Pango has no hyphenation dictionary, so normal and full both leave
 	 * the hyphen it inserts where it has to break a word */
@@ -302,10 +318,22 @@ public class Layout {
 		return native_get_line_top(layout, line);
 	}
 
+	/* AOSP Layout.getLineExtra(): the line spacing added below the line; the base class has none */
+	public int getLineExtra(int line) {
+		return 0;
+	}
+
 	public int getLineBottom(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
 		return native_get_line_bottom(layout, line);
+	}
+
+	/* AOSP Layout.getLineMax(): the width of the line without trailing whitespace plus the paragraph's leading
+	 * margin. ATL's lines have no leading margins and count trailing whitespace as visible (getLineVisibleEnd() ==
+	 * getLineEnd()), so this is the Pango line width */
+	public float getLineMax(int line) {
+		return getLineWidth(line);
 	}
 
 	public float getLineLeft(int line) {

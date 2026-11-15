@@ -136,4 +136,12 @@ public class EGL14 {
 		javax.microedition.khronos.egl.EGLDisplay raw_display = new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle());
 		return impl.eglTerminate(raw_display);
 	}
+
+	public static boolean eglGetConfigAttrib(EGLDisplay display, EGLConfig config, int attribute, int[] value, int offset) {
+		int[] raw_value = new int[1];
+		boolean ret = impl.eglGetConfigAttrib(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), new javax.microedition.khronos.egl.EGLConfig(config.getNativeHandle()), attribute, raw_value);
+		if (value != null)
+			value[offset] = raw_value[0];
+		return ret;
+	}
 }

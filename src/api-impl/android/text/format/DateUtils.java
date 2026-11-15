@@ -1,6 +1,8 @@
 package android.text.format;
 
 import android.content.Context;
+import android.icu.text.DateFormatSymbols;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Formatter;
 import java.util.Locale;
@@ -15,6 +17,40 @@ public class DateUtils {
 	public static final int FORMAT_SHOW_YEAR = 0x00004;
 	public static final int FORMAT_SHOW_DATE = 0x00010;
 	public static final int FORMAT_ABBREV_MONTH = 0x10000;
+
+	/* AOSP core/java/android/text/format/DateUtils.java: abbrev values and the deprecated name getters */
+	public static final int LENGTH_LONG = 10;
+	public static final int LENGTH_MEDIUM = 20;
+	public static final int LENGTH_SHORT = 30;
+	public static final int LENGTH_SHORTER = 40;
+	public static final int LENGTH_SHORTEST = 50;
+
+	@Deprecated
+	public static String getDayOfWeekString(int dayOfWeek, int abbrev) {
+		DateFormatSymbols dfs = DateFormatSymbols.getInstance();
+		final int width;
+		switch (abbrev) {
+			case LENGTH_LONG:
+				width = DateFormatSymbols.WIDE;
+				break;
+			case LENGTH_SHORTEST:
+				width = DateFormatSymbols.NARROW;
+				break;
+			case LENGTH_MEDIUM:
+			case LENGTH_SHORT:
+			case LENGTH_SHORTER:
+			default:
+				width = DateFormatSymbols.ABBREVIATED;
+				break;
+		}
+		return dfs.getWeekdays(DateFormatSymbols.FORMAT, width)[dayOfWeek];
+	}
+
+	@Deprecated
+	public static String getAMPMString(int ampm) {
+		String[] amPm = DateFormat.getIcuDateFormatSymbols(Locale.getDefault()).getAmPmStrings();
+		return amPm[ampm - Calendar.AM];
+	}
 
 	public static CharSequence getRelativeTimeSpanString(Context c, long millis) {
 		return getRelativeTimeSpanString(c, millis, false /* no preposition */);
@@ -35,20 +71,40 @@ public class DateUtils {
 		return d1.getYear() == d2.getYear() && d1.getMonth() == d2.getMonth() && d1.getDate() == d2.getDate();
 	}
 
+	/* AOSP DateUtils.formatElapsedTime(): MM:SS below an hour, H:MM:SS from an hour (no days; the strings
+	 * elapsed_time_short_format_mm_ss / _h_mm_ss of AOSP's values/strings.xml) */
 	public static String formatElapsedTime(long elapsedSeconds) {
-		final long days = elapsedSeconds / (24 * 60 * 60L);
-		final long hours = elapsedSeconds / (60 * 60L) % 24L;
-		final long minutes = elapsedSeconds / (60L) % 60L;
-		final long seconds = elapsedSeconds % 60L;
+		return formatElapsedTime(null, elapsedSeconds);
+	}
 
-		if (elapsedSeconds < 0) {
-			return "0:00";
-		} else if (days > 0) {
-			return String.format("%d:%02d:%02d:%02d", days, hours, minutes, seconds);
-		} else if (hours > 0) {
-			return String.format("%d:%02d:%02d", hours, minutes, seconds);
+	public static String formatElapsedTime(StringBuilder recycle, long elapsedSeconds) {
+		// Break the elapsed seconds into hours, minutes, and seconds.
+		long hours = 0;
+		long minutes = 0;
+		long seconds = 0;
+		if (elapsedSeconds >= 3600) {
+			hours = elapsedSeconds / 3600;
+			elapsedSeconds -= hours * 3600;
+		}
+		if (elapsedSeconds >= 60) {
+			minutes = elapsedSeconds / 60;
+			elapsedSeconds -= minutes * 60;
+		}
+		seconds = elapsedSeconds;
+
+		// Create a StringBuilder if we weren't given one to recycle.
+		StringBuilder sb = recycle;
+		if (sb == null) {
+			sb = new StringBuilder(8);
 		} else {
-			return String.format("%d:%02d", minutes, seconds);
+			sb.setLength(0);
+		}
+
+		Formatter f = new Formatter(sb, Locale.getDefault());
+		if (hours > 0) {
+			return f.format("%1$d:%2$02d:%3$02d", hours, minutes, seconds).toString();
+		} else {
+			return f.format("%1$02d:%2$02d", minutes, seconds).toString();
 		}
 	}
 
@@ -66,6 +122,12 @@ public class DateUtils {
 	public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis, long endMillis, int flags) {
 		formatter.format("%s", formatDateRange(context, startMillis, endMillis, flags));
 		return formatter;
+	}
+
+	/* AOSP's formatDateRange(..., String timeZone) formats in that zone; ATL's formatDateRange() above is the plain
+	 * formatDateTime() form, which has no zone parameter */
+	public static Formatter formatDateRange(Context context, Formatter formatter, long startMillis, long endMillis, int flags, String timeZone) {
+		return formatDateRange(context, formatter, startMillis, endMillis, flags);
 	}
 
 	/* AOSP DateUtils.getRelativeTimeSpanString(long) */

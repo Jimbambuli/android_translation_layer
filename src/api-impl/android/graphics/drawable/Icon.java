@@ -170,6 +170,19 @@ public class Icon implements Parcelable {
 		return this;
 	}
 
+	/* AOSP Icon.setTintBlendMode(): ATL keeps the tint mode as PorterDuff.Mode, so a BlendMode that has a Porter-Duff
+	 * namesake (CLEAR, SRC, DST, SRC_OVER, DST_OVER, SRC_IN, DST_IN, SRC_OUT, DST_OUT, SRC_ATOP, DST_ATOP, XOR,
+	 * DARKEN, LIGHTEN, MULTIPLY, SCREEN, ADD, OVERLAY) is applied; others (AOSP: separable/non-separable Skia modes)
+	 * fall back to SRC_OVER, the Drawable default */
+	public Icon setTintBlendMode(android.graphics.BlendMode mode) {
+		try {
+			mTintMode = PorterDuff.Mode.valueOf(mode.name());
+		} catch (IllegalArgumentException e) {
+			mTintMode = PorterDuff.Mode.SRC_OVER;
+		}
+		return this;
+	}
+
 	/** Loads the drawable and, as AOSP's loadDrawable(), applies the tint. */
 	public Drawable loadDrawable(Context context) {
 		final Drawable result = loadDrawableInner(context);

@@ -15,8 +15,10 @@ public final class Font {
 	private final int ttcIndex;
 	private final FontVariationAxis[] axes;
 	private final String familyName;
+	private final File file;
 
-	private Font(FontStyle style, int ttcIndex, FontVariationAxis[] axes, String familyName) {
+	private Font(FontStyle style, int ttcIndex, FontVariationAxis[] axes, String familyName, File file) {
+		this.file = file;
 		this.style = style;
 		this.ttcIndex = ttcIndex;
 		this.axes = axes;
@@ -26,6 +28,12 @@ public final class Font {
 	/** @hide */
 	public String getFamilyName() {
 		return familyName;
+	}
+
+	/* AOSP Font.getFile(): the file the font was read from, null when it was built from a buffer in AOSP; here
+	 * buffers and streams are copied to a file (see Builder.copy), so it is set for those as well */
+	public File getFile() {
+		return file;
 	}
 
 	public FontStyle getStyle() {
@@ -137,7 +145,7 @@ public final class Font {
 			}
 			int w = weight != -1 ? weight : style[0];
 			int s = slant != -1 ? slant : (style[1] != 0 ? FontStyle.FONT_SLANT_ITALIC : FontStyle.FONT_SLANT_UPRIGHT);
-			return new Font(new FontStyle(w, s), ttcIndex, axes, familyName);
+			return new Font(new FontStyle(w, s), ttcIndex, axes, familyName, file);
 		}
 	}
 }

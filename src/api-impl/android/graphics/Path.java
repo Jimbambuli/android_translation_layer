@@ -271,7 +271,23 @@ public class Path {
 		Log.w("Path", "STUB: setLastPoint");
 	}
 
-	public void toggleInverseFillType() {}
+	/* AOSP SkPath::toggleInverseFillType(): flips the inverse bit of the fill type */
+	public void toggleInverseFillType() {
+		switch (fillType) {
+			case WINDING:
+				fillType = FillType.INVERSE_WINDING;
+				break;
+			case EVEN_ODD:
+				fillType = FillType.INVERSE_EVEN_ODD;
+				break;
+			case INVERSE_WINDING:
+				fillType = FillType.WINDING;
+				break;
+			case INVERSE_EVEN_ODD:
+				fillType = FillType.EVEN_ODD;
+				break;
+		}
+	}
 
 	@SuppressWarnings("deprecation")
 	@Override

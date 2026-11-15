@@ -8,7 +8,8 @@ import android.util.Log;
 public class Canvas {
 
 	public static enum EdgeType {
-		BW;
+		BW,
+		AA;
 	}
 	public static final int HAS_ALPHA_LAYER_SAVE_FLAG = (1 << 2);
 	public static final int CLIP_SAVE_FLAG = 0x02;

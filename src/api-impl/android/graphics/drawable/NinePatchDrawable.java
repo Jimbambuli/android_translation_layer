@@ -34,6 +34,11 @@ public class NinePatchDrawable extends Drawable {
 			computePadding(0, 0);
 	}
 
+	/* AOSP's deprecated constructor without Resources: the bitmap's own density is what is shown */
+	public NinePatchDrawable(Bitmap bitmap, byte[] chunk, Rect padding, String srcName) {
+		this((Resources)null, bitmap, chunk, padding, srcName);
+	}
+
 	NinePatchDrawable(String path) {
 		setPaintable(nativeCreate(path));
 	}
