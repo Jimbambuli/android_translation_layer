@@ -831,6 +831,11 @@ public class Environment {
 		return true;
 	}
 
+	/* AOSP isExternalStorageLegacy(File): same answer as the no-argument form, there is one volume */
+	public static boolean isExternalStorageLegacy(File path) {
+		return isExternalStorageLegacy();
+	}
+
 	/* AOSP: the state of the storage volume that holds path (StorageManager.getStorageVolume()),
 	 * MEDIA_UNKNOWN if none does; the only volume here is the external storage directory */
 	public static String getExternalStorageState(File path) {

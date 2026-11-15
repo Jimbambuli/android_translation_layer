@@ -18,6 +18,8 @@ package android.os;
 
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -97,5 +99,15 @@ public final class FileUtils {
 			executor.execute(() -> listener.onProgress(progressSnapshot));
 		}
 		return progress;
+	}
+
+	public static long copy(FileDescriptor in, FileDescriptor out) throws IOException {
+		return copy(in, out, null, null, null);
+	}
+
+	/* AOSP copyInternalUserspace(): streams around the descriptors, which stay open (not closed here) */
+	public static long copy(FileDescriptor in, FileDescriptor out, CancellationSignal signal, Executor executor,
+	                        ProgressListener listener) throws IOException {
+		return copy(new FileInputStream(in), new FileOutputStream(out), signal, executor, listener);
 	}
 }
