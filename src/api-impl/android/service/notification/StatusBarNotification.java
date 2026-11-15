@@ -2,11 +2,12 @@ package android.service.notification;
 
 import android.app.Notification;
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.UserHandle;
 
 /* AOSP StatusBarNotification (android-16): a posted notification with its package, id, tag,
- * user and post time. Without parceling, cloning and the logging helpers. */
-public class StatusBarNotification {
+ * user and post time. Without the logging helpers (the log instance id is never set, written as absent). */
+public class StatusBarNotification implements Parcelable {
 	private final String pkg;
 	private final int id;
 	private final String tag;
@@ -67,6 +68,54 @@ public class StatusBarNotification {
 		}
 		this.key = key();
 		this.groupKey = groupKey();
+	}
+
+	/* AOSP StatusBarNotification.writeToParcel: the log instance id is absent here, written as 0 */
+	@Override
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeString(this.pkg);
+		out.writeString(this.opPkg);
+		out.writeInt(this.id);
+		if (this.tag != null) {
+			out.writeInt(1);
+			out.writeString(this.tag);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeInt(this.uid);
+		out.writeInt(this.initialPid);
+		this.notification.writeToParcel(out, flags);
+		user.writeToParcel(out, flags);
+		out.writeLong(this.postTime);
+		if (this.overrideGroupKey != null) {
+			out.writeInt(1);
+			out.writeString(this.overrideGroupKey);
+		} else {
+			out.writeInt(0);
+		}
+		out.writeInt(0);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	public static final Parcelable.Creator<StatusBarNotification> CREATOR = new Parcelable.Creator<StatusBarNotification>() {
+		public StatusBarNotification createFromParcel(Parcel parcel) {
+			return new StatusBarNotification(parcel);
+		}
+
+		public StatusBarNotification[] newArray(int size) {
+			return new StatusBarNotification[size];
+		}
+	};
+
+	/* AOSP StatusBarNotification.clone and cloneShallow */
+	@Override
+	public StatusBarNotification clone() {
+		return new StatusBarNotification(this.pkg, this.opPkg, this.id, this.tag, this.uid, this.initialPid,
+				this.notification.clone(), this.user, this.overrideGroupKey, this.postTime);
 	}
 
 	private String key() {
