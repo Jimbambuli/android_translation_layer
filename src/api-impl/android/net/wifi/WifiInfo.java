@@ -29,4 +29,21 @@ public class WifiInfo {
 	public SupplicantState getSupplicantState() {
 		return SupplicantState.DISCONNECTED;
 	}
+
+	/* AOSP reset(): LINK_SPEED_UNKNOWN; mWifiStandard stays at WIFI_STANDARD_UNKNOWN; mSecurityType = -1 */
+	public int getMaxSupportedTxLinkSpeedMbps() {
+		return -1;
+	}
+
+	public int getMaxSupportedRxLinkSpeedMbps() {
+		return -1;
+	}
+
+	public int getWifiStandard() {
+		return ScanResult.WIFI_STANDARD_UNKNOWN;
+	}
+
+	public int getCurrentSecurityType() {
+		return -1;
+	}
 }

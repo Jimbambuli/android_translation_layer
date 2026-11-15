@@ -133,4 +133,28 @@ public class WifiManager {
 	public boolean isScanThrottleEnabled() {
 		return false;
 	}
+
+	/* AOSP WifiServiceImpl.addOrUpdateNetwork(): -1 for apps targeting Android 10 or later without privileges
+	 * (and, in WifiManager.addNetwork(), for a null config) */
+	@Deprecated
+	public int addNetwork(WifiConfiguration config) {
+		return -1;
+	}
+
+	/* AOSP WifiServiceImpl.removeNetwork(): false for apps targeting Android 10 or later without privileges */
+	@Deprecated
+	public boolean removeNetwork(int netId) {
+		return false;
+	}
+
+	/* AOSP WifiManager.saveConfiguration(): always false */
+	@Deprecated
+	public boolean saveConfiguration() {
+		return false;
+	}
+
+	/* AOSP: needs FEATURE_WIFI_DIRECT, which a device without Wi-Fi hardware does not declare */
+	public boolean isP2pSupported() {
+		return false;
+	}
 }
