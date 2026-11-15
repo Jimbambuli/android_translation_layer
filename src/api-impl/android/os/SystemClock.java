@@ -140,6 +140,9 @@ public final class SystemClock {
 	 */
 	native public static long uptimeMillis();
 
+	/* AOSP SystemClock.uptimeNanos(): nanoseconds since boot, not counting deep sleep */
+	public static native long uptimeNanos();
+
 	/**
 	 * Returns milliseconds since boot, including time spent in sleep.
 	 *

@@ -34,6 +34,7 @@ public final class StrictMode {
 	private static final int DETECT_VM_CREDENTIAL_PROTECTED_WHILE_LOCKED = 1 << 11;
 	private static final int DETECT_VM_INCORRECT_CONTEXT_USE = 1 << 12;
 	private static final int DETECT_VM_UNSAFE_INTENT_LAUNCH = 1 << 13;
+	private static final int DETECT_VM_BACKGROUND_ACTIVITY_LAUNCH_ABORTED = 1 << 14;
 	private static final int DETECT_VM_ALL = 0x0000ffff;
 
 	/** @hide */
@@ -412,6 +413,14 @@ public final class StrictMode {
 
 			public Builder permitImplicitDirectBoot() {
 				return disable(DETECT_VM_IMPLICIT_DIRECT_BOOT);
+			}
+
+			public Builder detectBlockedBackgroundActivityLaunch() {
+				return enable(DETECT_VM_BACKGROUND_ACTIVITY_LAUNCH_ABORTED);
+			}
+
+			public Builder ignoreBlockedBackgroundActivityLaunch() {
+				return disable(DETECT_VM_BACKGROUND_ACTIVITY_LAUNCH_ABORTED);
 			}
 
 			public Builder detectCredentialProtectedWhileLocked() {

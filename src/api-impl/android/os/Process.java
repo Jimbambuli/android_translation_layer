@@ -876,6 +876,51 @@ public class Process {
 		return getStartUptimeMillis();
 	}
 
+	public static final int FIRST_SDK_SANDBOX_UID = 20000;
+	public static final int LAST_SDK_SANDBOX_UID = 29999;
+	public static final int FIRST_APP_ZYGOTE_ISOLATED_UID = 90000;
+	public static final int LAST_APP_ZYGOTE_ISOLATED_UID = 98999;
+
+	/* AOSP isIsolatedUid(): isolated and app zygote isolated uid ranges of the app id */
+	public static final boolean isIsolatedUid(int uid) {
+		uid = UserHandle.getAppId(uid);
+		return (uid >= FIRST_ISOLATED_UID && uid <= LAST_ISOLATED_UID)
+				|| (uid >= FIRST_APP_ZYGOTE_ISOLATED_UID && uid <= LAST_APP_ZYGOTE_ISOLATED_UID);
+	}
+
+	/* AOSP isSdkSandboxUid() */
+	public static final boolean isSdkSandboxUid(int uid) {
+		uid = UserHandle.getAppId(uid);
+		return (uid >= FIRST_SDK_SANDBOX_UID && uid <= LAST_SDK_SANDBOX_UID);
+	}
+
+	/* AOSP getAppUidForSdkSandboxUid() */
+	public static final int getAppUidForSdkSandboxUid(int uid) {
+		if (!isSdkSandboxUid(uid)) {
+			throw new IllegalArgumentException("Input UID is not an SDK sandbox UID");
+		}
+		return uid - (FIRST_SDK_SANDBOX_UID - FIRST_APPLICATION_UID);
+	}
+
+	/* AOSP getSdkSandboxUidForAppUid() */
+	public static final int getSdkSandboxUidForAppUid(int uid) {
+		if (!isApplicationUid(uid)) {
+			throw new IllegalArgumentException("Input UID is not an app UID");
+		}
+		return uid + (FIRST_SDK_SANDBOX_UID - FIRST_APPLICATION_UID);
+	}
+
+	/* AOSP getExclusiveCores(): the cores the scheduler reserved for the foreground app; a desktop reserves none,
+	 * which is the answer "length zero if no CPU cores are exclusively reserved" */
+	public static final int[] getExclusiveCores() {
+		return new int[0];
+	}
+
+	/* AOSP getStartRequestedElapsedRealtime(): before the zygote fork; ATL has no zygote, the request is the start */
+	public static long getStartRequestedElapsedRealtime() {
+		return getStartElapsedRealtime();
+	}
+
 	/* AOSP isSdkSandbox() = isSdkSandboxUid(myUid()); sandbox uids are 20000..29999, an app's is not */
 	public static final boolean isSdkSandbox() {
 		int uid = myUid();
