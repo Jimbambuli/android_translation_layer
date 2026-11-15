@@ -437,6 +437,14 @@ public interface Cursor extends Closeable {
 	void setNotificationUri(ContentResolver cr, Uri uri);
 
 	/**
+	 * Similar to {@link #setNotificationUri(ContentResolver, Uri)}, except this version allows
+	 * to watch multiple content URIs for changes. (AOSP Cursor.setNotificationUris)
+	 */
+	default void setNotificationUris(ContentResolver cr, java.util.List<Uri> uris) {
+		setNotificationUri(cr, uris.get(0));
+	}
+
+	/**
 	 * Return the URI at which notifications of changes in this Cursor's data
 	 * will be delivered, as previously set by {@link #setNotificationUri}.
 	 * @return Returns a URI that can be used with
@@ -445,6 +453,15 @@ public interface Cursor extends Closeable {
 	 * data.  May be null if no notification URI has been set.
 	 */
 	Uri getNotificationUri();
+
+	/**
+	 * Return the URIs at which notifications of changes in this Cursor's data
+	 * will be delivered. (AOSP Cursor.getNotificationUris)
+	 */
+	default java.util.List<Uri> getNotificationUris() {
+		final Uri notifyUri = getNotificationUri();
+		return notifyUri == null ? null : java.util.Arrays.asList(notifyUri);
+	}
 
 	/**
 	 * onMove() will only be called across processes if this method returns true.
