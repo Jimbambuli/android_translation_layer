@@ -18,6 +18,11 @@ public class JobScheduler {
 	private final String namespace;
 	private final Map<Integer, JobInfo> pendingJobs;
 
+	/* AOSP: the abstract JobScheduler has a public constructor without arguments */
+	public JobScheduler() {
+		this(null, null);
+	}
+
 	public JobScheduler(Context context) {
 		this(context, null);
 	}

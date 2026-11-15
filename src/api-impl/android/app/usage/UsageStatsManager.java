@@ -36,6 +36,11 @@ public class UsageStatsManager {
 		return sEmptyResults;
 	}
 
+	/* AOSP: the service's answer, empty results when there is none (ATL has no UsageStatsService) */
+	public UsageEvents queryEvents(UsageEventsQuery query) {
+		return sEmptyResults;
+	}
+
 	public UsageEvents queryEventsForSelf(long beginTime, long endTime) {
 		return sEmptyResults;
 	}
