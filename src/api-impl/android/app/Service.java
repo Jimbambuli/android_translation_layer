@@ -5,7 +5,7 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.os.IBinder;
 
-public abstract class Service extends ContextWrapper {
+public abstract class Service extends ContextWrapper implements android.content.ComponentCallbacks2 {
 
 	private int notification_id;
 
@@ -142,5 +142,24 @@ public abstract class Service extends ContextWrapper {
 	}
 
 	public void onTaskRemoved(Intent rootIntent) {
+	}
+
+	/* AOSP Service: empty hooks (ActivityThread calls them for the configuration change, low memory, trim
+	 * memory, the rebind after onUnbind() returned true and the foreground service timeouts) */
+	public void onConfigurationChanged(android.content.res.Configuration newConfig) {}
+
+	public void onLowMemory() {}
+
+	public void onTrimMemory(int level) {}
+
+	public void onRebind(Intent intent) {}
+
+	public void onTimeout(int startId) {}
+
+	public void onTimeout(int startId, int fgsType) {}
+
+	/* AOSP Service.dump(): there is nothing to dump */
+	protected void dump(java.io.FileDescriptor fd, java.io.PrintWriter writer, String[] args) {
+		writer.println("nothing to dump");
 	}
 }

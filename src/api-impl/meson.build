@@ -197,6 +197,8 @@ srcs = [
 	'android/app/slice/SliceSpec.java',
 	'android/app/usage/StorageStats.java',
 	'android/app/usage/StorageStatsManager.java',
+	'android/app/usage/UsageEvents.java',
+	'android/app/usage/UsageStats.java',
 	'android/app/usage/UsageStatsManager.java',
 	'android/appwidget/AppWidgetManager.java',
 	'android/appwidget/AppWidgetProvider.java',

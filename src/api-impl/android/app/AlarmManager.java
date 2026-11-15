@@ -20,11 +20,14 @@ public class AlarmManager {
 	 * PendingIntent (PendingIntent.get*() gives the same object for the same arguments) */
 	private static final Handler sHandler = new Handler(Looper.getMainLooper());
 	private static final HashMap<PendingIntent, Runnable> sAlarms = new HashMap<>();
+	/* the pending alarm clocks (setAlarmClock()) by PendingIntent, for getNextAlarmClock(); under sAlarms */
+	private static final HashMap<PendingIntent, AlarmClockInfo> sClocks = new HashMap<>();
 
 	/* AOSP: "If there is already an alarm scheduled for the same IntentSender, that previous alarm
 	 * will first be canceled." */
 	private static void schedule(PendingIntent operation, Runnable r, long delay) {
 		synchronized (sAlarms) {
+			sClocks.remove(operation);
 			Runnable old = sAlarms.put(operation, r);
 			if (old != null)
 				sHandler.removeCallbacks(old);
@@ -35,8 +38,10 @@ public class AlarmManager {
 	/* a one-shot alarm is gone once it went off */
 	private static void delivered(PendingIntent operation, Runnable r) {
 		synchronized (sAlarms) {
-			if (sAlarms.get(operation) == r)
+			if (sAlarms.get(operation) == r) {
 				sAlarms.remove(operation);
+				sClocks.remove(operation);
+			}
 		}
 	}
 
@@ -52,6 +57,7 @@ public class AlarmManager {
 		if (operation == null)
 			throw new NullPointerException("cancel() called with a null PendingIntent");
 		synchronized (sAlarms) {
+			sClocks.remove(operation);
 			Runnable old = sAlarms.remove(operation);
 			if (old != null)
 				sHandler.removeCallbacks(old);
@@ -98,7 +104,30 @@ public class AlarmManager {
 		setExact(type, triggerAtMillis, operation);
 	}
 
+	/* AOSP setAlarmClock(): an exact RTC_WAKEUP alarm at the trigger time that the system also reports as the
+	 * user's next alarm (getNextAlarmClock()) */
 	public void setAlarmClock(AlarmClockInfo info, PendingIntent operation) {
+		setExact(RTC_WAKEUP, info.getTriggerTime(), operation);
+		synchronized (sAlarms) {
+			sClocks.put(operation, info);
+		}
+	}
+
+	/* AOSP getNextAlarmClock(): the alarm clock that goes off next; the other apps' are not known to ATL */
+	public AlarmClockInfo getNextAlarmClock() {
+		synchronized (sAlarms) {
+			AlarmClockInfo next = null;
+			for (AlarmClockInfo info : sClocks.values())
+				if (next == null || info.getTriggerTime() < next.getTriggerTime())
+					next = info;
+			return next;
+		}
+	}
+
+	/* AOSP setWindow(): delivered somewhere in [windowStartMillis, windowStartMillis + windowLengthMillis];
+	 * the start is the earliest delivery, taken here */
+	public void setWindow(int type, long windowStartMillis, long windowLengthMillis, PendingIntent operation) {
+		setExact(type, windowStartMillis, operation);
 	}
 
 	public void setAndAllowWhileIdle(int type, long triggerAtMillis, PendingIntent operation) {
