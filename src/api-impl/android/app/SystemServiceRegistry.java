@@ -310,6 +310,13 @@ public final class SystemServiceRegistry {
                 return new UserManager();
             }});
 
+        registerService(Context.LAUNCHER_APPS_SERVICE, android.content.pm.LauncherApps.class,
+                new CachedServiceFetcher<android.content.pm.LauncherApps>() {
+            @Override
+            public android.content.pm.LauncherApps createService(ContextImpl ctx) {
+                return new android.content.pm.LauncherApps(ctx);
+            }});
+
         registerService(Context.CROSS_PROFILE_APPS_SERVICE, CrossProfileApps.class,
                 new CachedServiceFetcher<CrossProfileApps>() {
             @Override
