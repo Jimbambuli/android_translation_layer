@@ -26,7 +26,7 @@ public class DatePicker extends FrameLayout {
 	}
 
 	public DatePicker(Context context, AttributeSet attrs) {
-		this(context, attrs, 0);
+		this(context, attrs, com.android.internal.R.attr.datePickerStyle);
 	}
 
 	public DatePicker(Context context, AttributeSet attrs, int defStyleAttr) {

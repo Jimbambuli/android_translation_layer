@@ -20,7 +20,7 @@ public class TimePicker extends FrameLayout {
 	}
 
 	public TimePicker(Context context, AttributeSet attributeSet) {
-		this(context, attributeSet, 0);
+		this(context, attributeSet, com.android.internal.R.attr.timePickerStyle);
 	}
 
 	public TimePicker(Context context, AttributeSet attrs, int defStyleAttr) {

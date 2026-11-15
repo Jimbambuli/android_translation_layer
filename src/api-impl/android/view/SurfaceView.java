@@ -13,21 +13,15 @@ public class SurfaceView extends View {
 	final ArrayList<SurfaceHolder.Callback> mCallbacks = new ArrayList<SurfaceHolder.Callback>();
 
 	public SurfaceView(Context context) {
-		super(context);
-
-		mSurface.widget = this.widget;
+		this(context, null);
 	}
 
 	public SurfaceView(Context context, AttributeSet attrs) {
-		super(context, attrs);
-
-		mSurface.widget = this.widget;
+		this(context, attrs, 0);
 	}
 
 	public SurfaceView(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
-
-		mSurface.widget = this.widget;
+		this(context, attrs, defStyleAttr, 0);
 	}
 
 	public SurfaceView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {

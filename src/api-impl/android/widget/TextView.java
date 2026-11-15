@@ -106,7 +106,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	private static final int ELLIPSIZE_MARQUEE = 4;
 
 	public TextView(Context context, AttributeSet attrs) {
-		this(context, attrs, 0);
+		this(context, attrs, com.android.internal.R.attr.textViewStyle);
 	}
 
 	public TextView(Context context) {
@@ -120,7 +120,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public TextView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		super(context, attrs, defStyleAttr, defStyleRes);
 
-		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.TextView, defStyleAttr, 0);
+		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.TextView, defStyleAttr, defStyleRes);
 		try {
 			if (a.hasValue(com.android.internal.R.styleable.TextView_text)) {
 				setText(a.getText(com.android.internal.R.styleable.TextView_text));

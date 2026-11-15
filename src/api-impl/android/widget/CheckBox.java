@@ -6,15 +6,15 @@ import android.util.AttributeSet;
 public class CheckBox extends CompoundButton {
 
 	public CheckBox(Context context) {
-		super(context);
+		this(context, null);
 	}
 
-	public CheckBox(Context context, AttributeSet attributeSet) {
-		super(context, attributeSet);
+	public CheckBox(Context context, AttributeSet attrs) {
+		this(context, attrs, com.android.internal.R.attr.checkboxStyle);
 	}
 
 	public CheckBox(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
+		this(context, attrs, defStyleAttr, 0);
 	}
 
 	public CheckBox(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {

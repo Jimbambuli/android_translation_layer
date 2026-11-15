@@ -16,11 +16,11 @@ public class AnalogClock extends View {
 	}
 
 	public AnalogClock(Context context, AttributeSet attrs) {
-		super(context, attrs);
+		this(context, attrs, 0);
 	}
 
 	public AnalogClock(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
+		this(context, attrs, defStyleAttr, 0);
 	}
 
 	public AnalogClock(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {

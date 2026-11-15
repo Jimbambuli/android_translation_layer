@@ -188,7 +188,7 @@ public class PopupWindow {
 	}
 
 	public PopupWindow(Context context) {
-		this(context, null, 0, 0);
+		this(context, null);
 	}
 
 	public PopupWindow() {
@@ -204,7 +204,7 @@ public class PopupWindow {
 	}
 
 	public PopupWindow(View contentView, int width, int height) {
-		this(contentView, width, height, true);
+		this(contentView, width, height, false);
 	}
 
 	/* AOSP PopupWindow(int, int) -> this(null, width, height) */
@@ -212,12 +212,11 @@ public class PopupWindow {
 		popover = native_constructor();
 		setWidth(width);
 		setHeight(height);
-		setFocusable(true);
+		setFocusable(false);
 	}
 
-	/* AOSP PopupWindow(Context, AttributeSet) -> this(context, attrs, R.attr.popupWindowStyle) */
 	public PopupWindow(Context context, AttributeSet attrs) {
-		this(context, attrs, 0, 0);
+		this(context, attrs, com.android.internal.R.attr.popupWindowStyle);
 	}
 
 	/* AOSP PopupWindow(View) -> this(contentView, 0, 0) */

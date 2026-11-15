@@ -21,11 +21,11 @@ public class CalendarView extends FrameLayout {
 	}
 
 	public CalendarView(Context context, AttributeSet attrs) {
-		super(context, attrs);
+		this(context, attrs, com.android.internal.R.attr.calendarViewStyle);
 	}
 
 	public CalendarView(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
+		this(context, attrs, defStyleAttr, 0);
 	}
 
 	public CalendarView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
