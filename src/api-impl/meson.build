@@ -698,6 +698,7 @@ srcs = [
 	'android/os/RemoteException.java',
 	'android/os/ResultReceiver.java',
 	'android/os/ServiceManager.java',
+	'android/os/SharedMemory.java',
 	'android/os/StatFs.java',
 	'android/os/StrictMode.java',
 	'android/os/SystemClock.java',
