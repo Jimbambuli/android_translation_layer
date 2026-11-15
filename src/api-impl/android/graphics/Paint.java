@@ -33,6 +33,13 @@ public class Paint {
 	/* as set by the app: GSK can't stroke with width 0 (hairline), so the native stroke is 1 then */
 	private float stroke_width = 0;
 	private PathEffect path_effect;
+	/* AOSP keeps these in Java fields too (mShadowLayer*); the native side draws the shadow,
+	 * which ATL does not. Skew is native in AOSP, ATL only stores it. */
+	private float shadow_layer_radius;
+	private float shadow_layer_dx;
+	private float shadow_layer_dy;
+	private long shadow_layer_color;
+	private float text_skew_x;
 
 	public static final int HINTING_OFF = 0;
 	public static final int HINTING_ON = 1;
@@ -69,6 +76,11 @@ public class Paint {
 		hinting = paint.hinting;
 		stroke_width = paint.stroke_width;
 		path_effect = paint.path_effect;
+		shadow_layer_radius = paint.shadow_layer_radius;
+		shadow_layer_dx = paint.shadow_layer_dx;
+		shadow_layer_dy = paint.shadow_layer_dy;
+		shadow_layer_color = paint.shadow_layer_color;
+		text_skew_x = paint.text_skew_x;
 	}
 
 	private void setFlag(int flag, boolean on) {
@@ -168,10 +180,52 @@ public class Paint {
 	public void getTextBounds(char[] text, int index, int count, Rect bounds) {
 		native_get_text_bounds(paint, new String(text, index, count), bounds);
 	}
+	/* AOSP Paint.getTextWidths: one advance per char, returns the char count. ATL has no
+	 * per-glyph advances, so each char gets measureText() of itself (a trailing low surrogate
+	 * gets 0, as its advance belongs to the high surrogate). */
 	public int getTextWidths(String text, int start, int end, float[] widths) {
-		Rect bounds = new Rect();
-		native_get_text_bounds(paint, text.substring(start, end), bounds);
-		return bounds.width();
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((start | end | (end - start) | (text.length() - end)) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (end - start > widths.length) {
+			throw new ArrayIndexOutOfBoundsException();
+		}
+		for (int i = start; i < end; i++) {
+			if (Character.isLowSurrogate(text.charAt(i)) && i > start && Character.isHighSurrogate(text.charAt(i - 1))) {
+				widths[i - start] = 0;
+			} else {
+				int next = (Character.isHighSurrogate(text.charAt(i)) && i + 1 < end) ? i + 2 : i + 1;
+				widths[i - start] = measureText(text, i, next);
+			}
+		}
+		return end - start;
+	}
+
+	public int getTextWidths(CharSequence text, int start, int end, float[] widths) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((start | end | (end - start) | (text.length() - end)) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		return getTextWidths(text.toString(), start, end, widths);
+	}
+
+	public int getTextWidths(char[] text, int index, int count, float[] widths) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((index | count) < 0 || index + count > text.length || count > widths.length) {
+			throw new ArrayIndexOutOfBoundsException();
+		}
+		return getTextWidths(new String(text, index, count), 0, count, widths);
+	}
+
+	public int getTextWidths(String text, float[] widths) {
+		return getTextWidths(text, 0, text.length(), widths);
 	}
 	public void setFilterBitmap(boolean filter) {
 		setFlag(FILTER_BITMAP_FLAG, filter);
@@ -300,10 +354,32 @@ public class Paint {
 		return (flags & DITHER_FLAG) != 0;
 	}
 
-	public /*native*/ void setLinearText(boolean linearText) {}
-	public /*native*/ void setSubpixelText(boolean subpixelText) {}
-	public /*native*/ void setUnderlineText(boolean underlineText) {}
-	public /*native*/ void setStrikeThruText(boolean strikeThruText) {}
+	/* AOSP sets these flag bits natively; ATL keeps them for getFlags() and the getters,
+	 * GSK/Pango draw text without underline/strike-through decoration */
+	public void setLinearText(boolean linearText) {
+		setFlag(LINEAR_TEXT_FLAG, linearText);
+	}
+	public void setSubpixelText(boolean subpixelText) {
+		setFlag(SUBPIXEL_TEXT_FLAG, subpixelText);
+	}
+	public void setUnderlineText(boolean underlineText) {
+		setFlag(UNDERLINE_TEXT_FLAG, underlineText);
+	}
+	public void setStrikeThruText(boolean strikeThruText) {
+		setFlag(STRIKE_THRU_TEXT_FLAG, strikeThruText);
+	}
+	public final boolean isLinearText() {
+		return (flags & LINEAR_TEXT_FLAG) != 0;
+	}
+	public final boolean isSubpixelText() {
+		return (flags & SUBPIXEL_TEXT_FLAG) != 0;
+	}
+	public final boolean isUnderlineText() {
+		return (flags & UNDERLINE_TEXT_FLAG) != 0;
+	}
+	public final boolean isStrikeThruText() {
+		return (flags & STRIKE_THRU_TEXT_FLAG) != 0;
+	}
 	/* Pango has no synthetic emboldening of its own, so fake bold asks for a bold weight */
 	public void setFakeBoldText(boolean fakeBoldText) {
 		flags = fakeBoldText ? (flags | FAKE_BOLD_TEXT_FLAG) : (flags & ~FAKE_BOLD_TEXT_FLAG);
@@ -322,10 +398,15 @@ public class Paint {
 
 	public float getTextScaleX() { return text_scale_x; }
 	public void setTextScaleX(float scaleX) { text_scale_x = scaleX; }
-	public /*native*/ float getTextSkewX() { return 0; }
-	public /*native*/ void setTextSkewX(float skewX) {}
+	public float getTextSkewX() { return text_skew_x; }
+	public void setTextSkewX(float skewX) { text_skew_x = skewX; }
 
-	public /*native*/ float descent() { return 0; }
+	/* AOSP nDescent: the descent of the font metrics */
+	public float descent() {
+		FontMetrics metrics = new FontMetrics();
+		getFontMetrics(metrics);
+		return metrics.descent;
+	}
 	public float getFontMetrics(FontMetrics metrics) {
 		return native_get_font_metrics(paint, metrics);
 	}
@@ -337,10 +418,36 @@ public class Paint {
 		return native_get_font_metrics_int(paint, fmi);
 	}
 
-	public void setShadowLayer(float radius, float dx, float dy, int color) {}
+	public void setShadowLayer(float radius, float dx, float dy, int shadowColor) {
+		setShadowLayer(radius, dx, dy, Color.pack(shadowColor));
+	}
 
+	/* AOSP Paint.setShadowLayer; nSetShadowLayer clears the shadow for radius <= 0 */
 	public void setShadowLayer(float radius, float dx, float dy, long shadowColor) {
-		setShadowLayer(radius, dx, dy, Color.toArgb(shadowColor));
+		shadow_layer_radius = radius;
+		shadow_layer_dx = dx;
+		shadow_layer_dy = dy;
+		shadow_layer_color = shadowColor;
+	}
+
+	public float getShadowLayerRadius() {
+		return shadow_layer_radius;
+	}
+
+	public float getShadowLayerDx() {
+		return shadow_layer_dx;
+	}
+
+	public float getShadowLayerDy() {
+		return shadow_layer_dy;
+	}
+
+	public int getShadowLayerColor() {
+		return Color.toArgb(shadow_layer_color);
+	}
+
+	public long getShadowLayerColorLong() {
+		return shadow_layer_color;
 	}
 
 	public Xfermode setXfermode(Xfermode xfermode) {
@@ -448,10 +555,13 @@ public class Paint {
 	public int breakText(String text, boolean measureForwards, float maxWidth, float[] measuredWidth) { return 10; }
 	public int breakText(CharSequence text, int start, int end, boolean measureForwards, float maxWidth, float[] measuredWidth) { return 10; }
 
-	public void clearShadowLayer() {}
+	public void clearShadowLayer() {
+		setShadowLayer(0, 0, 0, 0);
+	}
 
+	/* AOSP nHasShadowLayer: SkPaint has a blur looper, set only for radius > 0 */
 	public boolean hasShadowLayer() {
-		return false;
+		return shadow_layer_radius > 0;
 	}
 
 	public FontMetrics getFontMetrics() {
@@ -578,6 +688,11 @@ public class Paint {
 		color_filter = null;
 		stroke_width = 0;
 		path_effect = null;
+		shadow_layer_radius = 0;
+		shadow_layer_dx = 0;
+		shadow_layer_dy = 0;
+		shadow_layer_color = 0;
+		text_skew_x = 0;
 	}
 
 	private static native long native_create();
