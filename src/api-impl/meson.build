@@ -347,6 +347,7 @@ srcs = [
 	'android/content/ContentProviderOperation.java',
 	'android/content/ContentProviderResult.java',
 	'android/content/ContentResolver.java',
+	'android/content/SyncRequest.java',
 	'android/content/ContentUris.java',
 	'android/content/ContentValues.java',
 	'android/content/ContextParams.java',
