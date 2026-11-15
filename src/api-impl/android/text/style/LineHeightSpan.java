@@ -19,6 +19,11 @@ public interface LineHeightSpan extends ParagraphStyle, WrapTogetherSpan {
 			mHeight = height;
 		}
 
+		/* AOSP: the height is read as an int */
+		public Standard(android.os.Parcel src) {
+			mHeight = src.readInt();
+		}
+
 		public int getHeight() {
 			return mHeight;
 		}

@@ -14,6 +14,11 @@ public interface AlignmentSpan extends ParagraphStyle {
 			mAlignment = alignment;
 		}
 
+		/* AOSP: the alignment is read as its name */
+		public Standard(android.os.Parcel src) {
+			mAlignment = Layout.Alignment.valueOf(src.readString());
+		}
+
 		@Override
 		public Layout.Alignment getAlignment() {
 			return mAlignment;
