@@ -45,6 +45,7 @@ srcs = [
 	'android/credentials/CredentialOption.java',
 	'android/credentials/GetCredentialRequest.java',
 	'android/credentials/GetCredentialResponse.java',
+	'android/credentials/PrepareGetCredentialResponse.java',
 	'android/gesture/Gesture.java',
 	'android/gesture/GestureConstants.java',
 	'android/gesture/GestureLibraries.java',
