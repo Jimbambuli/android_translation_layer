@@ -604,6 +604,7 @@ srcs = [
 	'android/graphics/fonts/SystemFonts.java',
 	'android/graphics/fonts/FontStyle.java',
 	'android/graphics/fonts/FontVariationAxis.java',
+	'android/graphics/pdf/PdfDocument.java',
 	'android/graphics/text/LineBreakConfig.java',
 	'android/graphics/text/MeasuredText.java',
 	'android/hardware/Camera.java',
