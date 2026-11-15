@@ -19,6 +19,15 @@ public class TabWidget extends LinearLayout {
 		setFocusable(true);
 	}
 
+	public TabWidget(Context context, AttributeSet attrs, int defStyleAttr) {
+		this(context, attrs, defStyleAttr, 0);
+	}
+
+	public TabWidget(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+		setFocusable(true);
+	}
+
 	/** AOSP getChildTabViewAt(): the indicator of tab index (the children are the tab indicators) */
 	public View getChildTabViewAt(int index) {
 		return getChildAt(index);
@@ -30,6 +39,11 @@ public class TabWidget extends LinearLayout {
 	}
 
 	public void setDividerDrawable(android.graphics.drawable.Drawable drawable) {}
+
+	/** AOSP setDividerDrawable(int resId) */
+	public void setDividerDrawable(int resId) {
+		setDividerDrawable(getContext().getDrawable(resId));
+	}
 
 	public void setStripEnabled(boolean stripEnabled) {}
 }
