@@ -54,7 +54,9 @@ public class AppWidgetHostView extends FrameLayout {
 			addView(content);
 		}
 		if (mView != content) {
-			removeView(mView);
+			if (mView != null) {
+				removeView(mView);
+			}
 			mView = content;
 		}
 	}
