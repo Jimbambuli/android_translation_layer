@@ -32,6 +32,8 @@ public final class BackEvent {
     public static final int EDGE_LEFT = 0;
     /** Indicates that the edge swipe starts from the right edge of the screen */
     public static final int EDGE_RIGHT = 1;
+    /* AOSP 16 BackEvent.EDGE_NONE: not from an edge swipe (e.g. a back key) */
+    public static final int EDGE_NONE = 2;
 
     /** @hide */
     @IntDef({
@@ -63,6 +65,16 @@ public final class BackEvent {
         mTouchY = touchY;
         mProgress = progress;
         mSwipeEdge = swipeEdge;
+    }
+
+    /* AOSP 16 BackEvent(float, float, float, int, long) */
+    public BackEvent(float touchX, float touchY, float progress, @SwipeEdge int swipeEdge,
+            long frameTimeMillis) {
+        mTouchX = touchX;
+        mTouchY = touchY;
+        mProgress = progress;
+        mSwipeEdge = swipeEdge;
+        mFrameTimeMillis = frameTimeMillis;
     }
 
     /**
