@@ -959,6 +959,8 @@ srcs = [
 	'android/os/strictmode/DiskReadViolation.java',
 	'android/os/strictmode/DiskWriteViolation.java',
 	'android/os/strictmode/Violation.java',
+	'android/os/vibrator/VibratorEnvelopeEffectInfo.java',
+	'android/os/vibrator/VibratorFrequencyProfile.java',
 	'android/preference/GenericInflater.java',
 	'android/preference/ListPreference.java',
 	'android/preference/Preference.java',
