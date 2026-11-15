@@ -105,7 +105,7 @@ public class TabHost extends FrameLayout implements ViewTreeObserver.OnTouchMode
 	 * in {@link android.app.TabActivity TabActivity}.</p>
 	 */
 	public void setup() {
-		mTabWidget = findViewById(R.id.tabs);
+		mTabWidget = (TabWidget) findViewById(R.id.tabs); // ATL: ViewGroup.findViewById is not generic
 		if (mTabWidget == null) {
 			throw new RuntimeException(
 			    "Your TabHost must have a TabWidget whose id attribute is 'android.R.id.tabs'");
@@ -143,7 +143,7 @@ public class TabHost extends FrameLayout implements ViewTreeObserver.OnTouchMode
 			}
 		});
 
-		mTabContent = findViewById(R.id.tabcontent);
+		mTabContent = (FrameLayout) findViewById(R.id.tabcontent); // ATL: ViewGroup.findViewById is not generic
 		if (mTabContent == null) {
 			throw new RuntimeException(
 			    "Your TabHost must have a FrameLayout whose id attribute is "
