@@ -185,11 +185,14 @@ public final class CardEmulation {
 
 	/* AOSP validatePollingLoopFilter() */
 	static String validatePollingLoopFilter(String pollingLoopFilter) {
-		byte[] plfBytes = java.util.HexFormat.of().parseHex(pollingLoopFilter);
-		if (plfBytes.length == 0) {
+		/* HexFormat.parseHex()/formatHex() (Java 17) by hand: an even number of hex digits, upper-cased */
+		if (pollingLoopFilter.length() % 2 != 0 || !pollingLoopFilter.matches("[0-9a-fA-F]*")) {
+			throw new IllegalArgumentException("not a hexadecimal string: " + pollingLoopFilter);
+		}
+		if (pollingLoopFilter.isEmpty()) {
 			throw new IllegalArgumentException("Polling loop filter must contain at least one byte.");
 		}
-		return java.util.HexFormat.of().withUpperCase().formatHex(plfBytes);
+		return pollingLoopFilter.toUpperCase(java.util.Locale.ROOT);
 	}
 
 	/* AOSP validatePollingLoopPatternFilter() */

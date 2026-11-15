@@ -1156,7 +1156,7 @@ public class WorkSource implements Parcelable {
     }
 
     @NonNull
-    public static final Parcelable.Creator<WorkSource> CREATOR = new Parcelable.Creator<>() {
+    public static final Parcelable.Creator<WorkSource> CREATOR = new Parcelable.Creator<WorkSource>() {
         public WorkSource createFromParcel(Parcel in) {
             return new WorkSource(in);
         }

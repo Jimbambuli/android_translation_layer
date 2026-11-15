@@ -92,7 +92,7 @@ public final class TelephonyScanManager {
          *
          * @param error Error code when the scan is failed, as defined in {@link NetworkScan}.
          */
-        public void onError(@NetworkScan.ScanErrorCode int error) {}
+        public void onError(int error) {}
     }
 
     private static class NetworkScanInfo {

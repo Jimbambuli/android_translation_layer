@@ -79,10 +79,6 @@ public class InstrumentationInfo extends PackageItemInfo implements android.os.P
 		return "InstrumentationInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + packageName + "}";
 	}
 
-	public int describeContents() {
-		return 0;
-	}
-
 	/* AOSP InstrumentationInfo.writeToParcel()/InstrumentationInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
 	 * Not parcelled (no such field or helper in ATL): targetProcesses, splitNames, splitSourceDirs, splitPublicSourceDirs, SparseArray, deviceProtectedDataDir, credentialProtectedDataDir, primaryCpuAbi, secondaryCpuAbi, secondaryNativeLibraryDir */
 	public int describeContents() {

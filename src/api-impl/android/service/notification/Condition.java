@@ -241,33 +241,4 @@ public final class Condition implements Parcelable {
 		return input;
 	}
 
-	/* AOSP Condition.writeToParcel()/describeContents()/CREATOR (Condition(Parcel) reads the same order) */
-	@Override
-	public void writeToParcel(android.os.Parcel dest, int flags) {
-		dest.writeParcelable(id, 0);
-		dest.writeString(summary);
-		dest.writeString(line1);
-		dest.writeString(line2);
-		dest.writeInt(icon);
-		dest.writeInt(state);
-		dest.writeInt(this.source);
-		dest.writeInt(this.flags);
-	}
-
-	@Override
-	public int describeContents() {
-		return 0;
-	}
-
-	public static final android.os.Parcelable.Creator<Condition> CREATOR = new android.os.Parcelable.Creator<Condition>() {
-		@Override
-		public Condition createFromParcel(android.os.Parcel source) {
-			return new Condition(source);
-		}
-
-		@Override
-		public Condition[] newArray(int size) {
-			return new Condition[size];
-		}
-	};
 }

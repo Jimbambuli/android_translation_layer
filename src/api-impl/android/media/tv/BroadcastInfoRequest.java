@@ -43,7 +43,7 @@ public abstract class BroadcastInfoRequest implements Parcelable {
             new Parcelable.Creator<BroadcastInfoRequest>() {
                 @Override
                 public BroadcastInfoRequest createFromParcel(Parcel source) {
-                    @TvInputManager.BroadcastInfoType int type = source.readInt();
+                    int type = source.readInt();
                     switch (type) {
                         case TvInputManager.BROADCAST_INFO_TYPE_TS:
                             return TsRequest.createFromParcelBody(source);
@@ -76,18 +76,18 @@ public abstract class BroadcastInfoRequest implements Parcelable {
                 }
             };
 
-    private final @TvInputManager.BroadcastInfoType int mType;
+    private final int mType;
     private final int mRequestId;
-    private final @RequestOption int mOption;
+    private final int mOption;
 
-    BroadcastInfoRequest(@TvInputManager.BroadcastInfoType int type,
-            int requestId, @RequestOption int option) {
+    BroadcastInfoRequest(int type,
+            int requestId, int option) {
         mType = type;
         mRequestId = requestId;
         mOption = option;
     }
 
-    BroadcastInfoRequest(@TvInputManager.BroadcastInfoType int type, Parcel source) {
+    BroadcastInfoRequest(int type, Parcel source) {
         mType = type;
         mRequestId = source.readInt();
         mOption = source.readInt();
@@ -100,7 +100,7 @@ public abstract class BroadcastInfoRequest implements Parcelable {
      * PES (packetized Elementary Stream), TS (transport stream), etc. The type of the
      * request and the related responses should be the same.
      */
-    @TvInputManager.BroadcastInfoType
+    
     public int getType() {
         return mType;
     }
@@ -122,7 +122,7 @@ public abstract class BroadcastInfoRequest implements Parcelable {
      * @see #REQUEST_OPTION_REPEAT
      * @see #REQUEST_OPTION_AUTO_UPDATE
      */
-    @RequestOption
+    
     public int getOption() {
         return mOption;
     }

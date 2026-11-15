@@ -59,7 +59,13 @@ public final class Session2CommandGroup implements Parcelable {
      */
     @SuppressWarnings({"WeakerAccess", "UnsafeParcelApi"}) /* synthetic access */
     Session2CommandGroup(Parcel in) {
-        Parcelable[] commands = in.readParcelableArray(Session2Command.class.getClassLoader());
+        Parcelable[] commands;
+        try {
+            commands = in.readParcelableArray(Session2Command.class.getClassLoader());
+        } catch (ReflectiveOperationException e) {
+            /* ATL: readParcelableArray(ClassLoader) throws a checked exception; unchecked as in AOSP */
+            throw new android.os.BadParcelableException(e);
+        }
         if (commands != null) {
             for (Parcelable command : commands) {
                 mCommands.add((Session2Command) command);

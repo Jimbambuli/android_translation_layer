@@ -750,27 +750,6 @@ public class Paint {
 		}
 	}
 
-	/* AOSP Paint.getTextRunAdvances(): argument checks, then nGetTextAdvances(): the advance of every char and
-	 * their sum. ATL measures each char with measureText(); a surrogate pair's advance is on the high surrogate,
-	 * the low surrogate gets 0. */
-	public float getTextRunAdvances(char[] chars, int index, int count, int contextIndex, int contextCount,
-	                                boolean isRtl, float[] advances, int advancesIndex) {
-		if (chars == null) {
-			throw new IllegalArgumentException("text cannot be null");
-		}
-		if ((index | count | contextIndex | contextCount | advancesIndex
-		     | (index - contextIndex) | (contextCount - count)
-		     | ((contextIndex + contextCount) - (index + count))
-		     | (chars.length - (contextIndex + contextCount))
-		     | (advances == null ? 0 : (advances.length - (advancesIndex + count)))) < 0) {
-			throw new IndexOutOfBoundsException();
-		}
-		if (chars.length == 0 || count == 0) {
-			return 0f;
-		}
-		return char_advances(new String(chars), index, index + count, 0, advances, advancesIndex);
-	}
-
 	public float getTextRunAdvances(CharSequence text, int start, int end, int contextStart, int contextEnd,
 	                                boolean isRtl, float[] advances, int advancesIndex) {
 		if (text == null) {
@@ -785,71 +764,10 @@ public class Paint {
 		if (text.length() == 0 || start == end) {
 			return 0f;
 		}
-		return char_advances(text.toString(), start, end, 0, advances, advancesIndex);
-	}
-
-	/* the advances of the chars in [start, end) into advances (when not null), returns their sum */
-	private float char_advances(String text, int start, int end, int unused, float[] advances, int advancesIndex) {
-		float sum = 0;
-		for (int i = start; i < end; i++) {
-			float a = 0;
-			char c = text.charAt(i);
-			if (Character.isHighSurrogate(c) && i + 1 < end && Character.isLowSurrogate(text.charAt(i + 1)))
-				a = measureText(text, i, i + 2);
-			else if (!Character.isLowSurrogate(c) || i == start || !Character.isHighSurrogate(text.charAt(i - 1)))
-				a = measureText(text, i, i + 1);
-			if (advances != null)
-				advances[advancesIndex + i - start] = a;
-			sum += a;
-		}
-		return sum;
-	}
-
-	/* AOSP Paint.getRunAdvance(): the advance of the run [start, end) up to offset */
-	public float getRunAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
-	                           boolean isRtl, int offset) {
-		if (text == null) {
-			throw new IllegalArgumentException("text cannot be null");
-		}
-		if ((contextStart | start | offset | end | contextEnd
-		     | start - contextStart | offset - start | end - offset
-		     | contextEnd - end | text.length - contextEnd) < 0) {
-			throw new IndexOutOfBoundsException();
-		}
-		if (end == start) {
-			return 0.0f;
-		}
-		return run_advance(new String(text), start, end, isRtl, offset);
-	}
-
-	public float getRunAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd,
-	                           boolean isRtl, int offset) {
-		if (text == null) {
-			throw new IllegalArgumentException("text cannot be null");
-		}
-		if ((contextStart | start | offset | end | contextEnd
-		     | start - contextStart | offset - start | end - offset
-		     | contextEnd - end | text.length() - contextEnd) < 0) {
-			throw new IndexOutOfBoundsException();
-		}
-		if (end == start) {
-			return 0.0f;
-		}
-		return run_advance(text.toString(), start, end, isRtl, offset);
-	}
-
-	/* [start, offset) for LTR, [offset, end) for RTL: the part of the run before offset in reading order */
-	private float run_advance(String text, int start, int end, boolean isRtl, int offset) {
-		return isRtl ? measureText(text, offset, end) : measureText(text, start, offset);
-	}
-
-	/* AOSP Paint.getRunCharacterAdvance(): argument checks (exceptions as in AOSP), the advances per char of the
-	 * run up to offset and their sum. drawBounds is the advance box over the font's top/bottom, the cluster count
-	 * of runInfo is the char count. */
-	public float getRunCharacterAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
-	                                    boolean isRtl, int offset, float[] advances, int advancesIndex) {
-		return getRunCharacterAdvance(text, start, end, contextStart, contextEnd, isRtl, offset, advances, advancesIndex,
-		                              null, null);
+		/* AOSP: copy the context into a char[] and measure there (native shaping as the char[] variant) */
+		char[] buf = new char[contextEnd - contextStart];
+		android.text.TextUtils.getChars(text, contextStart, contextEnd, buf, 0);
+		return getTextRunAdvances(buf, start - contextStart, end - start, 0, contextEnd - contextStart, isRtl, advances, advancesIndex);
 	}
 
 	public float getRunCharacterAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
@@ -859,13 +777,7 @@ public class Paint {
 			throw new IllegalArgumentException("text cannot be null");
 		}
 		return run_character_advance(text.length, start, end, contextStart, contextEnd, offset, advances, advancesIndex,
-		                             drawBounds, runInfo, () -> new String(text));
-	}
-
-	public float getRunCharacterAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd,
-	                                    boolean isRtl, int offset, float[] advances, int advancesIndex) {
-		return getRunCharacterAdvance(text, start, end, contextStart, contextEnd, isRtl, offset, advances, advancesIndex,
-		                              null, null);
+		                             drawBounds, runInfo, () -> getRunCharacterAdvance(text, start, end, contextStart, contextEnd, isRtl, offset, advances, advancesIndex));
 	}
 
 	public float getRunCharacterAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd,
@@ -875,12 +787,12 @@ public class Paint {
 			throw new IllegalArgumentException("text cannot be null");
 		}
 		return run_character_advance(text.length(), start, end, contextStart, contextEnd, offset, advances, advancesIndex,
-		                             drawBounds, runInfo, () -> text.toString());
+		                             drawBounds, runInfo, () -> getRunCharacterAdvance(text, start, end, contextStart, contextEnd, isRtl, offset, advances, advancesIndex));
 	}
 
 	private float run_character_advance(int length, int start, int end, int contextStart, int contextEnd, int offset,
 	                                    float[] advances, int advancesIndex, RectF drawBounds, RunInfo runInfo,
-	                                    java.util.function.Supplier<String> text) {
+	                                    java.util.function.Supplier<Float> measure) {
 		if (contextStart < 0 || contextEnd > length) {
 			throw new IndexOutOfBoundsException("Invalid Context Range: " + contextStart + ", " + contextEnd
 			                                    + " must be in 0, " + length);
@@ -902,7 +814,7 @@ public class Paint {
 				runInfo.setClusterCount(0);
 			return 0.0f;
 		}
-		float sum = char_advances(text.get(), start, offset, 0, advances, advancesIndex);
+		float sum = measure.get();
 		if (drawBounds != null) {
 			FontMetrics metrics = new FontMetrics();
 			getFontMetrics(metrics);
@@ -911,20 +823,6 @@ public class Paint {
 		if (runInfo != null)
 			runInfo.setClusterCount(offset - start);
 		return sum;
-	}
-
-	/* AOSP Paint.getOffsetForAdvance(char[], ...): same as the CharSequence variant below */
-	public int getOffsetForAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
-	                               boolean isRtl, float advance) {
-		if (text == null) {
-			throw new IllegalArgumentException("text cannot be null");
-		}
-		if ((contextStart | start | end | contextEnd
-		     | start - contextStart | end - start | contextEnd - end
-		     | text.length - contextEnd) < 0) {
-			throw new IndexOutOfBoundsException();
-		}
-		return getOffsetForAdvance(new String(text), start, end, contextStart, contextEnd, isRtl, advance);
 	}
 
 	/* AOSP nDescent: the descent of the font metrics */

@@ -160,7 +160,7 @@ public final class AppFunctionException extends Exception implements Parcelable 
 
     private AppFunctionException(@NonNull Parcel in) {
         this(/* errorCode= */ in.readInt(), /* errorMessage= */ in.readString8(),
-                /* extras= */Objects.requireNonNull(in.readBundle(Bundle.class.getClassLoader())));
+                /* extras= */Objects.requireNonNull(in.readBundle() /* ATL: readBundle(ClassLoader) throws a checked exception; same boot class loader */));
     }
 
     /** Returns one of the {@code ERROR} constants. */
@@ -263,7 +263,7 @@ public final class AppFunctionException extends Exception implements Parcelable 
 
     @NonNull
     public static final Creator<AppFunctionException> CREATOR =
-            new Creator<>() {
+            new Creator<AppFunctionException>() {
                 @Override
                 public AppFunctionException createFromParcel(Parcel in) {
                     return new AppFunctionException(in);

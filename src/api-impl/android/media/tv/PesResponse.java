@@ -10,7 +10,7 @@ import android.os.Parcelable;
  * A response for PES from broadcast signal.
  */
 public final class PesResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_PES;
 
     public static final @NonNull Parcelable.Creator<PesResponse> CREATOR =
@@ -33,7 +33,7 @@ public final class PesResponse extends BroadcastInfoResponse implements Parcelab
         return new PesResponse(in);
     }
 
-    public PesResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public PesResponse(int requestId, int sequence, int responseResult,
             @Nullable String sharedFilterToken) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mSharedFilterToken = sharedFilterToken;

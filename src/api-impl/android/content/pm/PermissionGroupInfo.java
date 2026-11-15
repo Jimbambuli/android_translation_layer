@@ -16,6 +16,8 @@
 
 package android.content.pm;
 
+import android.text.TextUtils;
+
 // import android.text.TextUtils;
 
 /**
@@ -93,10 +95,6 @@ public class PermissionGroupInfo extends PackageItemInfo implements android.os.P
 
 	public String toString() {
 		return "PermissionGroupInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + name + " flgs=0x" + Integer.toHexString(flags) + "}";
-	}
-
-	public int describeContents() {
-		return 0;
 	}
 
 	/* AOSP PermissionGroupInfo.writeToParcel()/PermissionGroupInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.

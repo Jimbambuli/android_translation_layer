@@ -420,12 +420,7 @@ public class Matrix44 {
 
     @Override
     public String toString() {
-        return String.format("""
-                        | %f %f %f %f |
-                        | %f %f %f %f |
-                        | %f %f %f %f |
-                        | %f %f %f %f |
-                        """, mBackingArray[0], mBackingArray[1], mBackingArray[2], mBackingArray[3],
+        return String.format("| %f %f %f %f |\n| %f %f %f %f |\n| %f %f %f %f |\n| %f %f %f %f |\n", mBackingArray[0], mBackingArray[1], mBackingArray[2], mBackingArray[3],
                 mBackingArray[4], mBackingArray[5], mBackingArray[6], mBackingArray[7],
                 mBackingArray[8], mBackingArray[9], mBackingArray[10], mBackingArray[11],
                 mBackingArray[12], mBackingArray[13], mBackingArray[14], mBackingArray[15]);

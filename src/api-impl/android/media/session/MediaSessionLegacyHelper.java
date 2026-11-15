@@ -1,5 +1,21 @@
 package android.media.session;
 
+import android.graphics.RectF;
+
+import android.graphics.Paint;
+
+import android.graphics.Canvas;
+
+import android.graphics.Bitmap;
+
+import android.media.MediaMetadataEditor;
+
+import android.media.MediaMetadataRetriever;
+
+import android.media.MediaMetadata;
+
+import android.os.Bundle;
+
 import android.app.PendingIntent;
 import android.app.PendingIntent.CanceledException;
 import android.content.ComponentName;
@@ -237,4 +253,117 @@ public class MediaSessionLegacyHelper {
 			}
 		}
 	}
+
+    /* AOSP android/media/session/MediaSessionLegacyHelper.java: public static Bundle getOldMetadata */
+    public static Bundle getOldMetadata(MediaMetadata metadata, int artworkWidth,
+            int artworkHeight) {
+        boolean includeArtwork = artworkWidth != -1 && artworkHeight != -1;
+        Bundle oldMetadata = new Bundle();
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_ALBUM)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_ALBUM),
+                    metadata.getString(MediaMetadata.METADATA_KEY_ALBUM));
+        }
+        if (includeArtwork && metadata.containsKey(MediaMetadata.METADATA_KEY_ART)) {
+            Bitmap art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ART);
+            oldMetadata.putParcelable(String.valueOf(MediaMetadataEditor.BITMAP_KEY_ARTWORK),
+                    scaleBitmapIfTooBig(art, artworkWidth, artworkHeight));
+        } else if (includeArtwork && metadata.containsKey(MediaMetadata.METADATA_KEY_ALBUM_ART)) {
+            // Fall back to album art if the track art wasn't available
+            Bitmap art = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+            oldMetadata.putParcelable(String.valueOf(MediaMetadataEditor.BITMAP_KEY_ARTWORK),
+                    scaleBitmapIfTooBig(art, artworkWidth, artworkHeight));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST),
+                    metadata.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_ARTIST)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_ARTIST),
+                    metadata.getString(MediaMetadata.METADATA_KEY_ARTIST));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_AUTHOR)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_AUTHOR),
+                    metadata.getString(MediaMetadata.METADATA_KEY_AUTHOR));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_COMPILATION)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_COMPILATION),
+                    metadata.getString(MediaMetadata.METADATA_KEY_COMPILATION));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_COMPOSER)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_COMPOSER),
+                    metadata.getString(MediaMetadata.METADATA_KEY_COMPOSER));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_DATE)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_DATE),
+                    metadata.getString(MediaMetadata.METADATA_KEY_DATE));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_DISC_NUMBER)) {
+            oldMetadata.putLong(String.valueOf(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER),
+                    metadata.getLong(MediaMetadata.METADATA_KEY_DISC_NUMBER));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_DURATION)) {
+            oldMetadata.putLong(String.valueOf(MediaMetadataRetriever.METADATA_KEY_DURATION),
+                    metadata.getLong(MediaMetadata.METADATA_KEY_DURATION));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_GENRE)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_GENRE),
+                    metadata.getString(MediaMetadata.METADATA_KEY_GENRE));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_NUM_TRACKS)) {
+            oldMetadata.putLong(String.valueOf(MediaMetadataRetriever.METADATA_KEY_NUM_TRACKS),
+                    metadata.getLong(MediaMetadata.METADATA_KEY_NUM_TRACKS));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_RATING)) {
+            oldMetadata.putParcelable(String.valueOf(MediaMetadataEditor.RATING_KEY_BY_OTHERS),
+                    metadata.getRating(MediaMetadata.METADATA_KEY_RATING));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_USER_RATING)) {
+            oldMetadata.putParcelable(String.valueOf(MediaMetadataEditor.RATING_KEY_BY_USER),
+                    metadata.getRating(MediaMetadata.METADATA_KEY_USER_RATING));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_TITLE)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_TITLE),
+                    metadata.getString(MediaMetadata.METADATA_KEY_TITLE));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_TRACK_NUMBER)) {
+            oldMetadata.putLong(
+                    String.valueOf(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER),
+                    metadata.getLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_WRITER)) {
+            oldMetadata.putString(String.valueOf(MediaMetadataRetriever.METADATA_KEY_WRITER),
+                    metadata.getString(MediaMetadata.METADATA_KEY_WRITER));
+        }
+        if (metadata.containsKey(MediaMetadata.METADATA_KEY_YEAR)) {
+            oldMetadata.putLong(String.valueOf(MediaMetadataRetriever.METADATA_KEY_YEAR),
+                    metadata.getLong(MediaMetadata.METADATA_KEY_YEAR));
+        }
+        return oldMetadata;
+    }
+
+    /* AOSP android/media/session/MediaSessionLegacyHelper.java: private static Bitmap scaleBitmapIfTooBig */
+    private static Bitmap scaleBitmapIfTooBig(Bitmap bitmap, int maxWidth, int maxHeight) {
+        if (bitmap != null) {
+            final int width = bitmap.getWidth();
+            final int height = bitmap.getHeight();
+            if (width > maxWidth || height > maxHeight) {
+                float scale = Math.min((float) maxWidth / width, (float) maxHeight / height);
+                int newWidth = Math.round(scale * width);
+                int newHeight = Math.round(scale * height);
+                Bitmap.Config newConfig = bitmap.getConfig();
+                if (newConfig == null) {
+                    newConfig = Bitmap.Config.ARGB_8888;
+                }
+                Bitmap outBitmap = Bitmap.createBitmap(newWidth, newHeight, newConfig);
+                Canvas canvas = new Canvas(outBitmap);
+                Paint paint = new Paint();
+                paint.setAntiAlias(true);
+                paint.setFilterBitmap(true);
+                canvas.drawBitmap(bitmap, null,
+                        new RectF(0, 0, outBitmap.getWidth(), outBitmap.getHeight()), paint);
+                bitmap = outBitmap;
+            }
+        }
+        return bitmap;
+    }
 }

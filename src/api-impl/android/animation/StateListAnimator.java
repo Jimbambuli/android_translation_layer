@@ -145,22 +145,6 @@ public class StateListAnimator implements Cloneable {
 	}
 
 	/** If there is an animation running for a recent state change, ends it. */
-	/* AOSP StateListAnimator.clone(): fresh state (no target, no last match, no running animator), every state's
-	 * animator cloned with the original's listener removed; a new instance instead of Object.clone() because ATL's
-	 * fields are final */
-	@Override
-	public StateListAnimator clone() {
-		StateListAnimator clone = new StateListAnimator();
-		final int tupleSize = mTuples.size();
-		for (int i = 0; i < tupleSize; i++) {
-			final Tuple tuple = mTuples.get(i);
-			final Animator animatorClone = tuple.mAnimator.clone();
-			animatorClone.removeListener(mAnimatorListener);
-			clone.addState(tuple.mSpecs, animatorClone);
-		}
-		return clone;
-	}
-
 	public void jumpToCurrentState() {
 		if (mRunningAnimator != null)
 			mRunningAnimator.end();

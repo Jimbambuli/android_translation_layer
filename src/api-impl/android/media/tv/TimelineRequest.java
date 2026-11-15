@@ -10,7 +10,7 @@ import android.os.Parcelable;
  * A request for Timeline from broadcast signal.
  */
 public final class TimelineRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_TIMELINE;
 
     public static final @NonNull Parcelable.Creator<TimelineRequest> CREATOR =
@@ -34,13 +34,13 @@ public final class TimelineRequest extends BroadcastInfoRequest implements Parce
         return new TimelineRequest(in);
     }
 
-    public TimelineRequest(int requestId, @RequestOption int option, int intervalMillis) {
+    public TimelineRequest(int requestId, int option, int intervalMillis) {
         super(REQUEST_TYPE, requestId, option);
         mIntervalMillis = intervalMillis;
         mSelector = null;
     }
 
-    public TimelineRequest(int requestId, @RequestOption int option, int intervalMillis,
+    public TimelineRequest(int requestId, int option, int intervalMillis,
             @NonNull String selector) {
         super(REQUEST_TYPE, requestId, option);
         mIntervalMillis = intervalMillis;

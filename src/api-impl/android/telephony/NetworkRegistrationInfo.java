@@ -20,8 +20,6 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
-import android.compat.annotation.ChangeId;
-import android.compat.annotation.EnabledSince;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -60,9 +58,9 @@ public final class NetworkRegistrationInfo implements Parcelable {
     /** Unknown / Unspecified domain */
     public static final int DOMAIN_UNKNOWN = 0;
     /** Circuit switched domain */
-    public static final int DOMAIN_CS = android.hardware.radio.network.Domain.CS;
+    public static final int DOMAIN_CS = 1; /* Domain */
     /** Packet switched domain */
-    public static final int DOMAIN_PS = android.hardware.radio.network.Domain.PS;
+    public static final int DOMAIN_PS = 2; /* Domain */
     /** Applicable to both CS and PS Domain */
     public static final int DOMAIN_CS_PS = DOMAIN_CS | DOMAIN_PS;
 
@@ -230,7 +228,7 @@ public final class NetworkRegistrationInfo implements Parcelable {
      * Save the {@link ServiceState.RoamingType roaming type}. it can be overridden roaming type
      * from resource overlay or carrier config.
      */
-    .RoamingType
+
     private int mRoamingType;
 
     private int mAccessNetworkTechnology;
@@ -563,7 +561,7 @@ public final class NetworkRegistrationInfo implements Parcelable {
      * roaming type based on resource overlay or carrier config.
      * @hide
      */
-    public void setRoamingType(.RoamingType int roamingType) {
+    public void setRoamingType(int roamingType) {
         mRoamingType = roamingType;
 
         // make sure mRegistrationState to be consistent in case of any roaming type override
@@ -584,7 +582,7 @@ public final class NetworkRegistrationInfo implements Parcelable {
      * @hide
      */
     @SystemApi
-    public .RoamingType int getRoamingType() {
+    public int getRoamingType() {
         return mRoamingType;
     }
 

@@ -13,7 +13,7 @@ import java.util.Objects;
 public final class SuggestedDeviceInfo implements Parcelable {
 	@NonNull
 	public static final Creator<SuggestedDeviceInfo> CREATOR =
-			new Creator<>() {
+			new Creator<SuggestedDeviceInfo>() {
 				@Override
 				public SuggestedDeviceInfo createFromParcel(Parcel in) {
 					return new SuggestedDeviceInfo(in);

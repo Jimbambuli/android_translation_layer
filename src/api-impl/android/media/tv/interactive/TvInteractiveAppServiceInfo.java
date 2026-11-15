@@ -157,7 +157,7 @@ public final class TvInteractiveAppServiceInfo implements Parcelable {
      *
      * @return An int bit map representing supported types.
      */
-    @InteractiveAppType
+    
     @NonNull
     public int getSupportedTypes() {
         return mTypes;
@@ -218,6 +218,11 @@ public final class TvInteractiveAppServiceInfo implements Parcelable {
                     "Failed reading meta-data for " + si.packageName, e);
         } catch (PackageManager.NameNotFoundException e) {
             throw new IllegalStateException("No resources found for " + si.packageName, e);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            /* ATL: PackageItemInfo.loadXmlMetaData() declares Exception (AOSP: none) */
+            throw new IllegalStateException("Failed reading meta-data for " + si.packageName, e);
         }
     }
 

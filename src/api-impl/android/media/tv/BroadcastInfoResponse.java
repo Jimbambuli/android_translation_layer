@@ -34,7 +34,7 @@ public abstract class BroadcastInfoResponse implements Parcelable {
             new Parcelable.Creator<BroadcastInfoResponse>() {
                 @Override
                 public BroadcastInfoResponse createFromParcel(Parcel source) {
-                    @TvInputManager.BroadcastInfoType int type = source.readInt();
+                    int type = source.readInt();
                     switch (type) {
                         case TvInputManager.BROADCAST_INFO_TYPE_TS:
                             return TsResponse.createFromParcelBody(source);
@@ -67,20 +67,20 @@ public abstract class BroadcastInfoResponse implements Parcelable {
                 }
             };
 
-    private final @TvInputManager.BroadcastInfoType int mType;
+    private final int mType;
     private final int mRequestId;
     private final int mSequence;
-    private final @ResponseResult int mResponseResult;
+    private final int mResponseResult;
 
-    BroadcastInfoResponse(@TvInputManager.BroadcastInfoType int type, int requestId,
-            int sequence, @ResponseResult int responseResult) {
+    BroadcastInfoResponse(int type, int requestId,
+            int sequence, int responseResult) {
         mType = type;
         mRequestId = requestId;
         mSequence = sequence;
         mResponseResult = responseResult;
     }
 
-    BroadcastInfoResponse(@TvInputManager.BroadcastInfoType int type, Parcel source) {
+    BroadcastInfoResponse(int type, Parcel source) {
         mType = type;
         mRequestId = source.readInt();
         mSequence = source.readInt();
@@ -94,7 +94,7 @@ public abstract class BroadcastInfoResponse implements Parcelable {
      * PES (packetized Elementary Stream), TS (transport stream), etc. The type of the
      * request and the related responses should be the same.
      */
-    @TvInputManager.BroadcastInfoType
+    
     public int getType() {
         return mType;
     }
@@ -124,7 +124,7 @@ public abstract class BroadcastInfoResponse implements Parcelable {
      * @see #RESPONSE_RESULT_ERROR
      * @see #RESPONSE_RESULT_CANCEL
      */
-    @ResponseResult
+    
     public int getResponseResult() {
         return mResponseResult;
     }

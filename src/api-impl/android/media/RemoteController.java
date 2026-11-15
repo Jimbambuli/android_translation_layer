@@ -332,8 +332,24 @@ import java.util.List;
      * {@link RemoteControlClient} new values for keys that can be edited.
      */
     public class MetadataEditor extends MediaMetadataEditor {
-        
-        
+        /* AOSP RemoteController.MetadataEditor() / MetadataEditor(Bundle, long) (@hide) */
+        protected MetadataEditor() { }
+
+        protected MetadataEditor(Bundle metadata, long editableKeys) {
+            mEditorMetadata = metadata;
+            mEditableKeys = editableKeys;
+
+            mEditorArtwork = (Bitmap) metadata.getParcelable(
+                    String.valueOf(MediaMetadataEditor.BITMAP_KEY_ARTWORK), android.graphics.Bitmap.class);
+            if (mEditorArtwork != null) {
+                cleanupBitmapFromBundle(MediaMetadataEditor.BITMAP_KEY_ARTWORK);
+            }
+
+            mMetadataChanged = true;
+            mArtworkChanged = true;
+            mApplied = false;
+        }
+
         private void cleanupBitmapFromBundle(int key) {
             if (METADATA_KEYS_TYPE.get(key, METADATA_TYPE_INVALID) == METADATA_TYPE_BITMAP) {
                 mEditorMetadata.remove(String.valueOf(key));
@@ -574,4 +590,26 @@ import java.util.List;
         }
     }
 
+    
+
+    /* AOSP android/media/RemoteController.java: public boolean setArtworkConfiguration(boolean wantBitmap */
+    public boolean setArtworkConfiguration(boolean wantBitmap, int width, int height)
+            throws IllegalArgumentException {
+        synchronized (mInfoLock) {
+            if (wantBitmap) {
+                if ((width > 0) && (height > 0)) {
+                    if (width > mMaxBitmapDimension) { width = mMaxBitmapDimension; }
+                    if (height > mMaxBitmapDimension) { height = mMaxBitmapDimension; }
+                    mArtworkWidth = width;
+                    mArtworkHeight = height;
+                } else {
+                    throw new IllegalArgumentException("Invalid dimensions");
+                }
+            } else {
+                mArtworkWidth = -1;
+                mArtworkHeight = -1;
+            }
+        }
+        return true;
     }
+}

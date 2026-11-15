@@ -1237,7 +1237,7 @@ public final class Call {
 			sb.append(", pa: ");
 			sb.append(mAccountHandle);
 			sb.append(", hdl: ");
-			sb.append(Log.piiHandle(mHandle));
+			sb.append(android.telephony.Rlog.pii(false, mHandle)); /* AOSP Log.piiHandle(): the handle hidden as in a user build */
 			sb.append(", hdlPres: ");
 			sb.append(mHandlePresentation);
 			sb.append(", videoState: ");
@@ -1396,14 +1396,6 @@ public final class Call {
 		 * @param remainingPostDialSequence The post-dial characters that remain to be sent.
 		 */
 		public void onPostDialWait(Call call, String remainingPostDialSequence) {}
-
-		/**
-		 * Invoked when the {@code Call.VideoCall} of the {@code Call} has changed.
-		 *
-		 * @param call The {@code Call} invoking this method.
-		 * @param videoCall The {@code Call.VideoCall} associated with the {@code Call}.
-		 */
-		public void onVideoCallChanged(Call call, InCallService.VideoCall videoCall) {}
 
 		/**
 		 * Invoked when the {@code Call} is destroyed. Clients should refrain from cleaning
@@ -1696,7 +1688,7 @@ public final class Call {
 	 * Instructs this {@link #STATE_RINGING} {@code Call} to answer.
 	 * @param videoState The video state in which to answer the call.
 	 */
-	public void answer(@VideoProfile.VideoState int videoState) {
+	public void answer(int videoState) {
 	}
 
 	/**
@@ -2081,7 +2073,7 @@ public final class Call {
 	 * @param extras Bundle containing extra information to be passed to the
 	 *               {@link ConnectionService}
 	 */
-	public void handoverTo(PhoneAccountHandle toHandle, @VideoProfile.VideoState int videoState,
+	public void handoverTo(PhoneAccountHandle toHandle, int videoState,
 			Bundle extras) {
 	}
 
@@ -2289,15 +2281,6 @@ public final class Call {
 	}
 
 	/**
-	 * Obtains an object that can be used to display video from this {@code Call}.
-	 *
-	 * @return An {@code Call.VideoCall}.
-	 */
-	public InCallService.VideoCall getVideoCall() {
-		return null;
-	}
-
-	/**
 	 * Obtains an object containing call details.
 	 *
 	 * @return A {@link Details} object. Depending on the state of the {@code Call}, the
@@ -2471,19 +2454,6 @@ public final class Call {
 				@Override
 				public void run() {
 					callback.onCannedTextResponsesLoaded(call, cannedTextResponses);
-				}
-			});
-		}
-	}
-
-	private void fireVideoCallChanged(final InCallService.VideoCall videoCall) {
-		for (CallbackRecord<Callback> record : mCallbackRecords) {
-			final Call call = this;
-			final Callback callback = record.getCallback();
-			record.getHandler().post(new Runnable() {
-				@Override
-				public void run() {
-					callback.onVideoCallChanged(call, videoCall);
 				}
 			});
 		}

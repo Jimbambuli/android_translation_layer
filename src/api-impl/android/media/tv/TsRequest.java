@@ -9,7 +9,7 @@ import android.os.Parcelable;
  * A request for TS (transport stream) from broadcast signal.
  */
 public final class TsRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_TS;
 
     public static final @NonNull Parcelable.Creator<TsRequest> CREATOR =
@@ -32,7 +32,7 @@ public final class TsRequest extends BroadcastInfoRequest implements Parcelable 
         return new TsRequest(in);
     }
 
-    public TsRequest(int requestId, @RequestOption int option, int tsPid) {
+    public TsRequest(int requestId, int option, int tsPid) {
         super(REQUEST_TYPE, requestId, option);
         mTsPid = tsPid;
     }

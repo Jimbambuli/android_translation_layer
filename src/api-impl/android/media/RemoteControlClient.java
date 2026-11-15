@@ -1,5 +1,7 @@
 package android.media;
 
+import android.media.session.PlaybackState;
+
 import android.app.PendingIntent;
 import android.graphics.Bitmap;
 
@@ -82,4 +84,108 @@ public class RemoteControlClient {
 	}
     /* AOSP 16 API; no backing hardware/service in ATL */
     public android.media.session.MediaSession getMediaSession() { return null; }
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int PLAYSTATE_NONE */
+    public final static int PLAYSTATE_NONE               = 0;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_PREVIOUS */
+    public final static int FLAG_KEY_MEDIA_PREVIOUS = 1 << 0;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_REWIND */
+    public final static int FLAG_KEY_MEDIA_REWIND = 1 << 1;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_PLAY */
+    public final static int FLAG_KEY_MEDIA_PLAY = 1 << 2;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_PLAY_PAUSE */
+    public final static int FLAG_KEY_MEDIA_PLAY_PAUSE = 1 << 3;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_PAUSE */
+    public final static int FLAG_KEY_MEDIA_PAUSE = 1 << 4;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_STOP */
+    public final static int FLAG_KEY_MEDIA_STOP = 1 << 5;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_FAST_FORWARD */
+    public final static int FLAG_KEY_MEDIA_FAST_FORWARD = 1 << 6;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_NEXT */
+    public final static int FLAG_KEY_MEDIA_NEXT = 1 << 7;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_POSITION_UPDATE */
+    public final static int FLAG_KEY_MEDIA_POSITION_UPDATE = 1 << 8;
+
+    /* AOSP android/media/RemoteControlClient.java: public final static int FLAG_KEY_MEDIA_RATING */
+    public final static int FLAG_KEY_MEDIA_RATING = 1 << 9;
+
+    /* AOSP android/media/RemoteControlClient.java: static int getRccStateFromState */
+    static int getRccStateFromState(int state) {
+        switch (state) {
+            case PlaybackState.STATE_BUFFERING:
+                return PLAYSTATE_BUFFERING;
+            case PlaybackState.STATE_ERROR:
+                return PLAYSTATE_ERROR;
+            case PlaybackState.STATE_FAST_FORWARDING:
+                return PLAYSTATE_FAST_FORWARDING;
+            case PlaybackState.STATE_NONE:
+                return PLAYSTATE_NONE;
+            case PlaybackState.STATE_PAUSED:
+                return PLAYSTATE_PAUSED;
+            case PlaybackState.STATE_PLAYING:
+                return PLAYSTATE_PLAYING;
+            case PlaybackState.STATE_REWINDING:
+                return PLAYSTATE_REWINDING;
+            case PlaybackState.STATE_SKIPPING_TO_PREVIOUS:
+                return PLAYSTATE_SKIPPING_BACKWARDS;
+            case PlaybackState.STATE_SKIPPING_TO_NEXT:
+                return PLAYSTATE_SKIPPING_FORWARDS;
+            case PlaybackState.STATE_STOPPED:
+                return PLAYSTATE_STOPPED;
+            default:
+                return -1;
+        }
+    }
+
+    /* AOSP android/media/RemoteControlClient.java: static int getRccControlFlagsFromActions */
+    static int getRccControlFlagsFromActions(long actions) {
+        int rccFlags = 0;
+        long action = 1;
+        while (action <= actions && action < Integer.MAX_VALUE) {
+            if ((action & actions) != 0) {
+                rccFlags |= getRccFlagForAction(action);
+            }
+            action = action << 1;
+        }
+        return rccFlags;
+    }
+
+    /* AOSP android/media/RemoteControlClient.java: private static int getRccFlagForAction */
+    private static int getRccFlagForAction(long action) {
+        // We only care about the lower set of actions that can map to rcc
+        // flags.
+        int testAction = action < Integer.MAX_VALUE ? (int) action : 0;
+        switch (testAction) {
+            case (int) PlaybackState.ACTION_SKIP_TO_PREVIOUS:
+                return FLAG_KEY_MEDIA_PREVIOUS;
+            case (int) PlaybackState.ACTION_REWIND:
+                return FLAG_KEY_MEDIA_REWIND;
+            case (int) PlaybackState.ACTION_PLAY:
+                return FLAG_KEY_MEDIA_PLAY;
+            case (int) PlaybackState.ACTION_PLAY_PAUSE:
+                return FLAG_KEY_MEDIA_PLAY_PAUSE;
+            case (int) PlaybackState.ACTION_PAUSE:
+                return FLAG_KEY_MEDIA_PAUSE;
+            case (int) PlaybackState.ACTION_STOP:
+                return FLAG_KEY_MEDIA_STOP;
+            case (int) PlaybackState.ACTION_FAST_FORWARD:
+                return FLAG_KEY_MEDIA_FAST_FORWARD;
+            case (int) PlaybackState.ACTION_SKIP_TO_NEXT:
+                return FLAG_KEY_MEDIA_NEXT;
+            case (int) PlaybackState.ACTION_SEEK_TO:
+                return FLAG_KEY_MEDIA_POSITION_UPDATE;
+            case (int) PlaybackState.ACTION_SET_RATING:
+                return FLAG_KEY_MEDIA_RATING;
+        }
+        return 0;
+    }
 }

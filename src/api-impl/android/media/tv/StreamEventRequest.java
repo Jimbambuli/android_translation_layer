@@ -10,7 +10,7 @@ import android.os.Parcelable;
  * A request for Stream Event from broadcast signal.
  */
 public final class StreamEventRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_STREAM_EVENT;
 
     public static final @NonNull Parcelable.Creator<StreamEventRequest> CREATOR =
@@ -34,7 +34,7 @@ public final class StreamEventRequest extends BroadcastInfoRequest implements Pa
         return new StreamEventRequest(in);
     }
 
-    public StreamEventRequest(int requestId, @RequestOption int option, @NonNull Uri targetUri,
+    public StreamEventRequest(int requestId, int option, @NonNull Uri targetUri,
             @NonNull String eventName) {
         super(REQUEST_TYPE, requestId, option);
         this.mTargetUri = targetUri;

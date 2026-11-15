@@ -219,4 +219,7 @@ public abstract class InputEvent {
 	public int describeContents() {
 		return 0;
 	}
+
+	/* AOSP InputEvent.getEventTimeNanos() (@hide) */
+	public abstract long getEventTimeNanos();
 }

@@ -106,7 +106,7 @@ public final class TvTrackInfo implements Parcelable {
      * Returns the type of the track. The type should be one of the followings:
      * {@link #TYPE_AUDIO}, {@link #TYPE_VIDEO} and {@link #TYPE_SUBTITLE}.
      */
-    @Type
+    
     public final int getType() {
         return mType;
     }
@@ -443,7 +443,7 @@ public final class TvTrackInfo implements Parcelable {
          * @throws IllegalArgumentException if the type is not any of {@link #TYPE_AUDIO},
          *                                  {@link #TYPE_VIDEO} and {@link #TYPE_SUBTITLE}
          */
-        public Builder(@Type int type, @NonNull String id) {
+        public Builder(int type, @NonNull String id) {
             if (type != TYPE_AUDIO
                     && type != TYPE_VIDEO
                     && type != TYPE_SUBTITLE) {

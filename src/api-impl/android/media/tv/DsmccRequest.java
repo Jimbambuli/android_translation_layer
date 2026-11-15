@@ -10,7 +10,7 @@ import android.os.Parcelable;
  * A request for DSM-CC from broadcast signal.
  */
 public final class DsmccRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_DSMCC;
 
     public static final @NonNull Parcelable.Creator<DsmccRequest> CREATOR =
@@ -33,7 +33,7 @@ public final class DsmccRequest extends BroadcastInfoRequest implements Parcelab
         return new DsmccRequest(in);
     }
 
-    public DsmccRequest(int requestId, @RequestOption int option, @NonNull Uri uri) {
+    public DsmccRequest(int requestId, int option, @NonNull Uri uri) {
         super(REQUEST_TYPE, requestId, option);
         mUri = uri;
     }

@@ -63,7 +63,7 @@ public final class MediaProjectionAppContent implements Parcelable {
 
     @NonNull
     public static final Creator<MediaProjectionAppContent> CREATOR =
-            new Creator<>() {
+            new Creator<MediaProjectionAppContent>() {
                 @NonNull
                 @Override
                 public MediaProjectionAppContent createFromParcel(@NonNull Parcel in) {

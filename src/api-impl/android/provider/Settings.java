@@ -326,4 +326,7 @@ public class Settings {
 	public static boolean canDrawOverlays(Context context) {
 		return true;
 	}
+
+	/* AOSP Settings.ACTION_APPLICATION_DETAILS_SETTINGS */
+	public static final String ACTION_APPLICATION_DETAILS_SETTINGS = "android.settings.APPLICATION_DETAILS_SETTINGS";
 }

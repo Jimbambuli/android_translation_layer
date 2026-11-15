@@ -133,22 +133,20 @@ public final class AccessNetworkConstants {
      * http://www.etsi.org/deliver/etsi_ts/145000_145099/145005/14.00.00_60/ts_145005v140000p.pdf
      */
     public static final class GeranBand {
-        public static final int BAND_T380 = android.hardware.radio.network.GeranBands.BAND_T380;
-        public static final int BAND_T410 = android.hardware.radio.network.GeranBands.BAND_T410;
-        public static final int BAND_450 = android.hardware.radio.network.GeranBands.BAND_450;
-        public static final int BAND_480 = android.hardware.radio.network.GeranBands.BAND_480;
-        public static final int BAND_710 = android.hardware.radio.network.GeranBands.BAND_710;
-        public static final int BAND_750 = android.hardware.radio.network.GeranBands.BAND_750;
-        public static final int BAND_T810 = android.hardware.radio.network.GeranBands.BAND_T810;
-        public static final int BAND_850 = android.hardware.radio.network.GeranBands.BAND_850;
-        public static final int BAND_P900 = android.hardware.radio.network.GeranBands.BAND_P900;
-        public static final int BAND_E900 = android.hardware.radio.network.GeranBands.BAND_E900;
-        public static final int BAND_R900 = android.hardware.radio.network.GeranBands.BAND_R900;
-        public static final int BAND_DCS1800 =
-                android.hardware.radio.network.GeranBands.BAND_DCS1800;
-        public static final int BAND_PCS1900 =
-                android.hardware.radio.network.GeranBands.BAND_PCS1900;
-        public static final int BAND_ER900 = android.hardware.radio.network.GeranBands.BAND_ER900;
+        public static final int BAND_T380 = 1; /* GeranBands */
+        public static final int BAND_T410 = 2; /* GeranBands */
+        public static final int BAND_450 = 3; /* GeranBands */
+        public static final int BAND_480 = 4; /* GeranBands */
+        public static final int BAND_710 = 5; /* GeranBands */
+        public static final int BAND_750 = 6; /* GeranBands */
+        public static final int BAND_T810 = 7; /* GeranBands */
+        public static final int BAND_850 = 8; /* GeranBands */
+        public static final int BAND_P900 = 9; /* GeranBands */
+        public static final int BAND_E900 = 10; /* GeranBands */
+        public static final int BAND_R900 = 11; /* GeranBands */
+        public static final int BAND_DCS1800 = 12; /* GeranBands */
+        public static final int BAND_PCS1900 = 13; /* GeranBands */
+        public static final int BAND_ER900 = 14; /* GeranBands */
 
         /**
          * GeranBand
@@ -227,28 +225,28 @@ public final class AccessNetworkConstants {
      * http://www.etsi.org/deliver/etsi_ts/125100_125199/125104/13.03.00_60/ts_125104v130p.pdf
      */
     public static final class UtranBand {
-        public static final int BAND_1 = android.hardware.radio.network.UtranBands.BAND_1;
-        public static final int BAND_2 = android.hardware.radio.network.UtranBands.BAND_2;
-        public static final int BAND_3 = android.hardware.radio.network.UtranBands.BAND_3;
-        public static final int BAND_4 = android.hardware.radio.network.UtranBands.BAND_4;
-        public static final int BAND_5 = android.hardware.radio.network.UtranBands.BAND_5;
-        public static final int BAND_6 = android.hardware.radio.network.UtranBands.BAND_6;
-        public static final int BAND_7 = android.hardware.radio.network.UtranBands.BAND_7;
-        public static final int BAND_8 = android.hardware.radio.network.UtranBands.BAND_8;
-        public static final int BAND_9 = android.hardware.radio.network.UtranBands.BAND_9;
-        public static final int BAND_10 = android.hardware.radio.network.UtranBands.BAND_10;
-        public static final int BAND_11 = android.hardware.radio.network.UtranBands.BAND_11;
-        public static final int BAND_12 = android.hardware.radio.network.UtranBands.BAND_12;
-        public static final int BAND_13 = android.hardware.radio.network.UtranBands.BAND_13;
-        public static final int BAND_14 = android.hardware.radio.network.UtranBands.BAND_14;
+        public static final int BAND_1 = 1; /* UtranBands */
+        public static final int BAND_2 = 2; /* UtranBands */
+        public static final int BAND_3 = 3; /* UtranBands */
+        public static final int BAND_4 = 4; /* UtranBands */
+        public static final int BAND_5 = 5; /* UtranBands */
+        public static final int BAND_6 = 6; /* UtranBands */
+        public static final int BAND_7 = 7; /* UtranBands */
+        public static final int BAND_8 = 8; /* UtranBands */
+        public static final int BAND_9 = 9; /* UtranBands */
+        public static final int BAND_10 = 10; /* UtranBands */
+        public static final int BAND_11 = 11; /* UtranBands */
+        public static final int BAND_12 = 12; /* UtranBands */
+        public static final int BAND_13 = 13; /* UtranBands */
+        public static final int BAND_14 = 14; /* UtranBands */
         // band 15, 16, 17, 18 are reserved
-        public static final int BAND_19 = android.hardware.radio.network.UtranBands.BAND_19;
-        public static final int BAND_20 = android.hardware.radio.network.UtranBands.BAND_20;
-        public static final int BAND_21 = android.hardware.radio.network.UtranBands.BAND_21;
-        public static final int BAND_22 = android.hardware.radio.network.UtranBands.BAND_22;
+        public static final int BAND_19 = 19; /* UtranBands */
+        public static final int BAND_20 = 20; /* UtranBands */
+        public static final int BAND_21 = 21; /* UtranBands */
+        public static final int BAND_22 = 22; /* UtranBands */
         // band 23, 24 are reserved
-        public static final int BAND_25 = android.hardware.radio.network.UtranBands.BAND_25;
-        public static final int BAND_26 = android.hardware.radio.network.UtranBands.BAND_26;
+        public static final int BAND_25 = 25; /* UtranBands */
+        public static final int BAND_26 = 26; /* UtranBands */
 
         // Frequency bands for TD-SCDMA. Defined in 3GPP TS 25.102, Table 5.2.
 
@@ -257,38 +255,38 @@ public final class AccessNetworkConstants {
          * 1900 - 1920 MHz: Uplink and downlink transmission
          * 2010 - 2025 MHz: Uplink and downlink transmission
          */
-        public static final int BAND_A = android.hardware.radio.network.UtranBands.BAND_A;
+        public static final int BAND_A = 101; /* UtranBands */
 
         /**
          * Band B
          * 1850 - 1910 MHz: Uplink and downlink transmission
          * 1930 - 1990 MHz: Uplink and downlink transmission
          */
-        public static final int BAND_B = android.hardware.radio.network.UtranBands.BAND_B;
+        public static final int BAND_B = 102; /* UtranBands */
 
         /**
          * Band C
          * 1910 - 1930 MHz: Uplink and downlink transmission
          */
-        public static final int BAND_C = android.hardware.radio.network.UtranBands.BAND_C;
+        public static final int BAND_C = 103; /* UtranBands */
 
         /**
          * Band D
          * 2570 - 2620 MHz: Uplink and downlink transmission
          */
-        public static final int BAND_D = android.hardware.radio.network.UtranBands.BAND_D;
+        public static final int BAND_D = 104; /* UtranBands */
 
         /**
          * Band E
          * 2300—2400 MHz: Uplink and downlink transmission
          */
-        public static final int BAND_E = android.hardware.radio.network.UtranBands.BAND_E;
+        public static final int BAND_E = 105; /* UtranBands */
 
         /**
          * Band F
          * 1880 - 1920 MHz: Uplink and downlink transmission
          */
-        public static final int BAND_F = android.hardware.radio.network.UtranBands.BAND_F;
+        public static final int BAND_F = 106; /* UtranBands */
 
         /**
          * UtranBand
@@ -390,66 +388,66 @@ public final class AccessNetworkConstants {
      * https://www.etsi.org/deliver/etsi_ts/136100_136199/136101/15.09.00_60/ts_136101v150900p.pdf
      */
     public static final class EutranBand {
-        public static final int BAND_1 = android.hardware.radio.network.EutranBands.BAND_1;
-        public static final int BAND_2 = android.hardware.radio.network.EutranBands.BAND_2;
-        public static final int BAND_3 = android.hardware.radio.network.EutranBands.BAND_3;
-        public static final int BAND_4 = android.hardware.radio.network.EutranBands.BAND_4;
-        public static final int BAND_5 = android.hardware.radio.network.EutranBands.BAND_5;
-        public static final int BAND_6 = android.hardware.radio.network.EutranBands.BAND_6;
-        public static final int BAND_7 = android.hardware.radio.network.EutranBands.BAND_7;
-        public static final int BAND_8 = android.hardware.radio.network.EutranBands.BAND_8;
-        public static final int BAND_9 = android.hardware.radio.network.EutranBands.BAND_9;
-        public static final int BAND_10 = android.hardware.radio.network.EutranBands.BAND_10;
-        public static final int BAND_11 = android.hardware.radio.network.EutranBands.BAND_11;
-        public static final int BAND_12 = android.hardware.radio.network.EutranBands.BAND_12;
-        public static final int BAND_13 = android.hardware.radio.network.EutranBands.BAND_13;
-        public static final int BAND_14 = android.hardware.radio.network.EutranBands.BAND_14;
-        public static final int BAND_17 = android.hardware.radio.network.EutranBands.BAND_17;
-        public static final int BAND_18 = android.hardware.radio.network.EutranBands.BAND_18;
-        public static final int BAND_19 = android.hardware.radio.network.EutranBands.BAND_19;
-        public static final int BAND_20 = android.hardware.radio.network.EutranBands.BAND_20;
-        public static final int BAND_21 = android.hardware.radio.network.EutranBands.BAND_21;
-        public static final int BAND_22 = android.hardware.radio.network.EutranBands.BAND_22;
-        public static final int BAND_23 = android.hardware.radio.network.EutranBands.BAND_23;
-        public static final int BAND_24 = android.hardware.radio.network.EutranBands.BAND_24;
-        public static final int BAND_25 = android.hardware.radio.network.EutranBands.BAND_25;
-        public static final int BAND_26 = android.hardware.radio.network.EutranBands.BAND_26;
-        public static final int BAND_27 = android.hardware.radio.network.EutranBands.BAND_27;
-        public static final int BAND_28 = android.hardware.radio.network.EutranBands.BAND_28;
-        public static final int BAND_30 = android.hardware.radio.network.EutranBands.BAND_30;
-        public static final int BAND_31 = android.hardware.radio.network.EutranBands.BAND_31;
-        public static final int BAND_33 = android.hardware.radio.network.EutranBands.BAND_33;
-        public static final int BAND_34 = android.hardware.radio.network.EutranBands.BAND_34;
-        public static final int BAND_35 = android.hardware.radio.network.EutranBands.BAND_35;
-        public static final int BAND_36 = android.hardware.radio.network.EutranBands.BAND_36;
-        public static final int BAND_37 = android.hardware.radio.network.EutranBands.BAND_37;
-        public static final int BAND_38 = android.hardware.radio.network.EutranBands.BAND_38;
-        public static final int BAND_39 = android.hardware.radio.network.EutranBands.BAND_39;
-        public static final int BAND_40 = android.hardware.radio.network.EutranBands.BAND_40;
-        public static final int BAND_41 = android.hardware.radio.network.EutranBands.BAND_41;
-        public static final int BAND_42 = android.hardware.radio.network.EutranBands.BAND_42;
-        public static final int BAND_43 = android.hardware.radio.network.EutranBands.BAND_43;
-        public static final int BAND_44 = android.hardware.radio.network.EutranBands.BAND_44;
-        public static final int BAND_45 = android.hardware.radio.network.EutranBands.BAND_45;
-        public static final int BAND_46 = android.hardware.radio.network.EutranBands.BAND_46;
-        public static final int BAND_47 = android.hardware.radio.network.EutranBands.BAND_47;
-        public static final int BAND_48 = android.hardware.radio.network.EutranBands.BAND_48;
-        public static final int BAND_49 = android.hardware.radio.network.EutranBands.BAND_49;
-        public static final int BAND_50 = android.hardware.radio.network.EutranBands.BAND_50;
-        public static final int BAND_51 = android.hardware.radio.network.EutranBands.BAND_51;
-        public static final int BAND_52 = android.hardware.radio.network.EutranBands.BAND_52;
-        public static final int BAND_53 = android.hardware.radio.network.EutranBands.BAND_53;
-        public static final int BAND_65 = android.hardware.radio.network.EutranBands.BAND_65;
-        public static final int BAND_66 = android.hardware.radio.network.EutranBands.BAND_66;
-        public static final int BAND_68 = android.hardware.radio.network.EutranBands.BAND_68;
-        public static final int BAND_70 = android.hardware.radio.network.EutranBands.BAND_70;
-        public static final int BAND_71 = android.hardware.radio.network.EutranBands.BAND_71;
-        public static final int BAND_72 = android.hardware.radio.network.EutranBands.BAND_72;
-        public static final int BAND_73 = android.hardware.radio.network.EutranBands.BAND_73;
-        public static final int BAND_74 = android.hardware.radio.network.EutranBands.BAND_74;
-        public static final int BAND_85 = android.hardware.radio.network.EutranBands.BAND_85;
-        public static final int BAND_87 = android.hardware.radio.network.EutranBands.BAND_87;
-        public static final int BAND_88 = android.hardware.radio.network.EutranBands.BAND_88;
+        public static final int BAND_1 = 1; /* EutranBands */
+        public static final int BAND_2 = 2; /* EutranBands */
+        public static final int BAND_3 = 3; /* EutranBands */
+        public static final int BAND_4 = 4; /* EutranBands */
+        public static final int BAND_5 = 5; /* EutranBands */
+        public static final int BAND_6 = 6; /* EutranBands */
+        public static final int BAND_7 = 7; /* EutranBands */
+        public static final int BAND_8 = 8; /* EutranBands */
+        public static final int BAND_9 = 9; /* EutranBands */
+        public static final int BAND_10 = 10; /* EutranBands */
+        public static final int BAND_11 = 11; /* EutranBands */
+        public static final int BAND_12 = 12; /* EutranBands */
+        public static final int BAND_13 = 13; /* EutranBands */
+        public static final int BAND_14 = 14; /* EutranBands */
+        public static final int BAND_17 = 17; /* EutranBands */
+        public static final int BAND_18 = 18; /* EutranBands */
+        public static final int BAND_19 = 19; /* EutranBands */
+        public static final int BAND_20 = 20; /* EutranBands */
+        public static final int BAND_21 = 21; /* EutranBands */
+        public static final int BAND_22 = 22; /* EutranBands */
+        public static final int BAND_23 = 23; /* EutranBands */
+        public static final int BAND_24 = 24; /* EutranBands */
+        public static final int BAND_25 = 25; /* EutranBands */
+        public static final int BAND_26 = 26; /* EutranBands */
+        public static final int BAND_27 = 27; /* EutranBands */
+        public static final int BAND_28 = 28; /* EutranBands */
+        public static final int BAND_30 = 30; /* EutranBands */
+        public static final int BAND_31 = 31; /* EutranBands */
+        public static final int BAND_33 = 33; /* EutranBands */
+        public static final int BAND_34 = 34; /* EutranBands */
+        public static final int BAND_35 = 35; /* EutranBands */
+        public static final int BAND_36 = 36; /* EutranBands */
+        public static final int BAND_37 = 37; /* EutranBands */
+        public static final int BAND_38 = 38; /* EutranBands */
+        public static final int BAND_39 = 39; /* EutranBands */
+        public static final int BAND_40 = 40; /* EutranBands */
+        public static final int BAND_41 = 41; /* EutranBands */
+        public static final int BAND_42 = 42; /* EutranBands */
+        public static final int BAND_43 = 43; /* EutranBands */
+        public static final int BAND_44 = 44; /* EutranBands */
+        public static final int BAND_45 = 45; /* EutranBands */
+        public static final int BAND_46 = 46; /* EutranBands */
+        public static final int BAND_47 = 47; /* EutranBands */
+        public static final int BAND_48 = 48; /* EutranBands */
+        public static final int BAND_49 = 49; /* EutranBands */
+        public static final int BAND_50 = 50; /* EutranBands */
+        public static final int BAND_51 = 51; /* EutranBands */
+        public static final int BAND_52 = 52; /* EutranBands */
+        public static final int BAND_53 = 53; /* EutranBands */
+        public static final int BAND_65 = 65; /* EutranBands */
+        public static final int BAND_66 = 66; /* EutranBands */
+        public static final int BAND_68 = 68; /* EutranBands */
+        public static final int BAND_70 = 70; /* EutranBands */
+        public static final int BAND_71 = 71; /* EutranBands */
+        public static final int BAND_72 = 72; /* EutranBands */
+        public static final int BAND_73 = 73; /* EutranBands */
+        public static final int BAND_74 = 74; /* EutranBands */
+        public static final int BAND_85 = 85; /* EutranBands */
+        public static final int BAND_87 = 87; /* EutranBands */
+        public static final int BAND_88 = 88; /* EutranBands */
 
         /**
          * EutranBands
@@ -715,61 +713,61 @@ public final class AccessNetworkConstants {
      */
     public static final class NgranBands {
         /** 3GPP TS 38.101-1, Version 16.5.0, Table 5.2-1: FR1 bands */
-        public static final int BAND_1 = android.hardware.radio.network.NgranBands.BAND_1;
-        public static final int BAND_2 = android.hardware.radio.network.NgranBands.BAND_2;
-        public static final int BAND_3 = android.hardware.radio.network.NgranBands.BAND_3;
-        public static final int BAND_5 = android.hardware.radio.network.NgranBands.BAND_5;
-        public static final int BAND_7 = android.hardware.radio.network.NgranBands.BAND_7;
-        public static final int BAND_8 = android.hardware.radio.network.NgranBands.BAND_8;
-        public static final int BAND_12 = android.hardware.radio.network.NgranBands.BAND_12;
-        public static final int BAND_14 = android.hardware.radio.network.NgranBands.BAND_14;
-        public static final int BAND_18 = android.hardware.radio.network.NgranBands.BAND_18;
-        public static final int BAND_20 = android.hardware.radio.network.NgranBands.BAND_20;
-        public static final int BAND_25 = android.hardware.radio.network.NgranBands.BAND_25;
-        public static final int BAND_26 = android.hardware.radio.network.NgranBands.BAND_26;
-        public static final int BAND_28 = android.hardware.radio.network.NgranBands.BAND_28;
-        public static final int BAND_29 = android.hardware.radio.network.NgranBands.BAND_29;
-        public static final int BAND_30 = android.hardware.radio.network.NgranBands.BAND_30;
-        public static final int BAND_34 = android.hardware.radio.network.NgranBands.BAND_34;
-        public static final int BAND_38 = android.hardware.radio.network.NgranBands.BAND_38;
-        public static final int BAND_39 = android.hardware.radio.network.NgranBands.BAND_39;
-        public static final int BAND_40 = android.hardware.radio.network.NgranBands.BAND_40;
-        public static final int BAND_41 = android.hardware.radio.network.NgranBands.BAND_41;
-        public static final int BAND_46 = android.hardware.radio.network.NgranBands.BAND_46;
-        public static final int BAND_48 = android.hardware.radio.network.NgranBands.BAND_48;
-        public static final int BAND_50 = android.hardware.radio.network.NgranBands.BAND_50;
-        public static final int BAND_51 = android.hardware.radio.network.NgranBands.BAND_51;
-        public static final int BAND_53 = android.hardware.radio.network.NgranBands.BAND_53;
-        public static final int BAND_65 = android.hardware.radio.network.NgranBands.BAND_65;
-        public static final int BAND_66 = android.hardware.radio.network.NgranBands.BAND_66;
-        public static final int BAND_70 = android.hardware.radio.network.NgranBands.BAND_70;
-        public static final int BAND_71 = android.hardware.radio.network.NgranBands.BAND_71;
-        public static final int BAND_74 = android.hardware.radio.network.NgranBands.BAND_74;
-        public static final int BAND_75 = android.hardware.radio.network.NgranBands.BAND_75;
-        public static final int BAND_76 = android.hardware.radio.network.NgranBands.BAND_76;
-        public static final int BAND_77 = android.hardware.radio.network.NgranBands.BAND_77;
-        public static final int BAND_78 = android.hardware.radio.network.NgranBands.BAND_78;
-        public static final int BAND_79 = android.hardware.radio.network.NgranBands.BAND_79;
-        public static final int BAND_80 = android.hardware.radio.network.NgranBands.BAND_80;
-        public static final int BAND_81 = android.hardware.radio.network.NgranBands.BAND_81;
-        public static final int BAND_82 = android.hardware.radio.network.NgranBands.BAND_82;
-        public static final int BAND_83 = android.hardware.radio.network.NgranBands.BAND_83;
-        public static final int BAND_84 = android.hardware.radio.network.NgranBands.BAND_84;
-        public static final int BAND_86 = android.hardware.radio.network.NgranBands.BAND_86;
-        public static final int BAND_89 = android.hardware.radio.network.NgranBands.BAND_89;
-        public static final int BAND_90 = android.hardware.radio.network.NgranBands.BAND_90;
-        public static final int BAND_91 = android.hardware.radio.network.NgranBands.BAND_91;
-        public static final int BAND_92 = android.hardware.radio.network.NgranBands.BAND_92;
-        public static final int BAND_93 = android.hardware.radio.network.NgranBands.BAND_93;
-        public static final int BAND_94 = android.hardware.radio.network.NgranBands.BAND_94;
-        public static final int BAND_95 = android.hardware.radio.network.NgranBands.BAND_95;
-        public static final int BAND_96 = android.hardware.radio.network.NgranBands.BAND_96;
+        public static final int BAND_1 = 1; /* NgranBands */
+        public static final int BAND_2 = 2; /* NgranBands */
+        public static final int BAND_3 = 3; /* NgranBands */
+        public static final int BAND_5 = 5; /* NgranBands */
+        public static final int BAND_7 = 7; /* NgranBands */
+        public static final int BAND_8 = 8; /* NgranBands */
+        public static final int BAND_12 = 12; /* NgranBands */
+        public static final int BAND_14 = 14; /* NgranBands */
+        public static final int BAND_18 = 18; /* NgranBands */
+        public static final int BAND_20 = 20; /* NgranBands */
+        public static final int BAND_25 = 25; /* NgranBands */
+        public static final int BAND_26 = 26; /* NgranBands */
+        public static final int BAND_28 = 28; /* NgranBands */
+        public static final int BAND_29 = 29; /* NgranBands */
+        public static final int BAND_30 = 30; /* NgranBands */
+        public static final int BAND_34 = 34; /* NgranBands */
+        public static final int BAND_38 = 38; /* NgranBands */
+        public static final int BAND_39 = 39; /* NgranBands */
+        public static final int BAND_40 = 40; /* NgranBands */
+        public static final int BAND_41 = 41; /* NgranBands */
+        public static final int BAND_46 = 46; /* NgranBands */
+        public static final int BAND_48 = 48; /* NgranBands */
+        public static final int BAND_50 = 50; /* NgranBands */
+        public static final int BAND_51 = 51; /* NgranBands */
+        public static final int BAND_53 = 53; /* NgranBands */
+        public static final int BAND_65 = 65; /* NgranBands */
+        public static final int BAND_66 = 66; /* NgranBands */
+        public static final int BAND_70 = 70; /* NgranBands */
+        public static final int BAND_71 = 71; /* NgranBands */
+        public static final int BAND_74 = 74; /* NgranBands */
+        public static final int BAND_75 = 75; /* NgranBands */
+        public static final int BAND_76 = 76; /* NgranBands */
+        public static final int BAND_77 = 77; /* NgranBands */
+        public static final int BAND_78 = 78; /* NgranBands */
+        public static final int BAND_79 = 79; /* NgranBands */
+        public static final int BAND_80 = 80; /* NgranBands */
+        public static final int BAND_81 = 81; /* NgranBands */
+        public static final int BAND_82 = 82; /* NgranBands */
+        public static final int BAND_83 = 83; /* NgranBands */
+        public static final int BAND_84 = 84; /* NgranBands */
+        public static final int BAND_86 = 86; /* NgranBands */
+        public static final int BAND_89 = 89; /* NgranBands */
+        public static final int BAND_90 = 90; /* NgranBands */
+        public static final int BAND_91 = 91; /* NgranBands */
+        public static final int BAND_92 = 92; /* NgranBands */
+        public static final int BAND_93 = 93; /* NgranBands */
+        public static final int BAND_94 = 94; /* NgranBands */
+        public static final int BAND_95 = 95; /* NgranBands */
+        public static final int BAND_96 = 96; /* NgranBands */
 
         /** 3GPP TS 38.101-2, Version 16.2.0, Table 5.2-1: FR2 bands */
-        public static final int BAND_257 = android.hardware.radio.network.NgranBands.BAND_257;
-        public static final int BAND_258 = android.hardware.radio.network.NgranBands.BAND_258;
-        public static final int BAND_260 = android.hardware.radio.network.NgranBands.BAND_260;
-        public static final int BAND_261 = android.hardware.radio.network.NgranBands.BAND_261;
+        public static final int BAND_257 = 257; /* NgranBands */
+        public static final int BAND_258 = 258; /* NgranBands */
+        public static final int BAND_260 = 260; /* NgranBands */
+        public static final int BAND_261 = 261; /* NgranBands */
 
         /**
          * NR Bands

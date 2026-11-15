@@ -386,7 +386,7 @@ public abstract class Conference extends Conferenceable {
 	 *
 	 * @param videoState The video state in which to answer the connection.
 	 */
-	public void onAnswer(@VideoProfile.VideoState int videoState) {}
+	public void onAnswer(int videoState) {}
 
 	/**
 	 * Notifies this Conference, which is in {@code STATE_RINGING}, of
@@ -1194,7 +1194,7 @@ public abstract class Conference extends Conferenceable {
 	 * @hide
 	 */
 	public final void setAddress(@NonNull Uri address,
-			@TelecomManager.Presentation int presentation) {
+			int presentation) {
 		mAddress = address;
 		mAddressPresentation = presentation;
 		for (Listener l : mListeners) {
@@ -1234,7 +1234,7 @@ public abstract class Conference extends Conferenceable {
 	 * @return The address presentation of the conference.
 	 * @hide
 	 */
-	public final @TelecomManager.Presentation int getAddressPresentation() {
+	public final int getAddressPresentation() {
 		return mAddressPresentation;
 	}
 
@@ -1278,7 +1278,7 @@ public abstract class Conference extends Conferenceable {
 	 * @hide
 	 */
 	public final void setCallerDisplayName(@NonNull String callerDisplayName,
-			@TelecomManager.Presentation int presentation) {
+			int presentation) {
 		mCallerDisplayName = callerDisplayName;
 		mCallerDisplayNamePresentation = presentation;
 		for (Listener l : mListeners) {

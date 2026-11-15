@@ -9,7 +9,7 @@ import android.os.Parcelable;
  * A request for PES from broadcast signal.
  */
 public final class PesRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_PES;
 
     public static final @NonNull Parcelable.Creator<PesRequest> CREATOR =
@@ -33,7 +33,7 @@ public final class PesRequest extends BroadcastInfoRequest implements Parcelable
         return new PesRequest(in);
     }
 
-    public PesRequest(int requestId, @RequestOption int option, int tsPid, int streamId) {
+    public PesRequest(int requestId, int option, int tsPid, int streamId) {
         super(REQUEST_TYPE, requestId, option);
         mTsPid = tsPid;
         mStreamId = streamId;

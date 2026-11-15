@@ -25,7 +25,7 @@ public final class GetCredentialRequest implements Parcelable {
 		mCredentialOptions = Objects.requireNonNull(in.createTypedArrayList(CredentialOption.CREATOR));
 	}
 
-	public static final Creator<GetCredentialRequest> CREATOR = new Creator<>() {
+	public static final Creator<GetCredentialRequest> CREATOR = new Creator<GetCredentialRequest>() {
 		@Override
 		public GetCredentialRequest createFromParcel(Parcel in) {
 			return new GetCredentialRequest(in);

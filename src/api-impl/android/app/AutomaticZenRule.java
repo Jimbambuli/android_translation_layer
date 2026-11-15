@@ -51,62 +51,6 @@ public final class AutomaticZenRule implements android.os.Parcelable {
 		this.enabled = enabled;
 	}
 
-	/* AOSP AutomaticZenRule(Parcel): the fields in the order of writeToParcel(), without the ZenPolicy and the
-	 * ZenDeviceEffects (not in ATL) */
-	public AutomaticZenRule(android.os.Parcel source) {
-		enabled = source.readInt() == 1;
-		if (source.readInt() == 1)
-			name = getTrimmedString(source.readString());
-		interruptionFilter = source.readInt();
-		conditionId = getTrimmedUri((Uri) source.readParcelable(null));
-		owner = getTrimmedComponentName((ComponentName) source.readParcelable(null));
-		configurationActivity = getTrimmedComponentName((ComponentName) source.readParcelable(null));
-		creationTime = source.readLong();
-		mPkg = source.readString();
-		mAllowManualInvocation = source.readInt() != 0;
-		mIconResId = source.readInt();
-		mTriggerDescription = getTrimmedString(source.readString(), MAX_DESC_LENGTH);
-		mType = source.readInt();
-	}
-
-	@Override
-	public int describeContents() {
-		return 0;
-	}
-
-	@Override
-	public void writeToParcel(android.os.Parcel dest, int flags) {
-		dest.writeInt(enabled ? 1 : 0);
-		if (name != null) {
-			dest.writeInt(1);
-			dest.writeString(name);
-		} else {
-			dest.writeInt(0);
-		}
-		dest.writeInt(interruptionFilter);
-		dest.writeParcelable(conditionId, 0);
-		dest.writeParcelable(owner, 0);
-		dest.writeParcelable(configurationActivity, 0);
-		dest.writeLong(creationTime);
-		dest.writeString(mPkg);
-		dest.writeInt(mAllowManualInvocation ? 1 : 0);
-		dest.writeInt(mIconResId);
-		dest.writeString(mTriggerDescription);
-		dest.writeInt(mType);
-	}
-
-	public static final android.os.Parcelable.Creator<AutomaticZenRule> CREATOR = new android.os.Parcelable.Creator<AutomaticZenRule>() {
-		@Override
-		public AutomaticZenRule createFromParcel(android.os.Parcel source) {
-			return new AutomaticZenRule(source);
-		}
-
-		@Override
-		public AutomaticZenRule[] newArray(int size) {
-			return new AutomaticZenRule[size];
-		}
-	};
-
 	public ComponentName getOwner() {
 		return owner;
 	}

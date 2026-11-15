@@ -11,7 +11,7 @@ import android.os.Parcelable;
  * A response for Timeline from broadcast signal.
  */
 public final class TimelineResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_TIMELINE;
 
     public static final @NonNull Parcelable.Creator<TimelineResponse> CREATOR =
@@ -39,7 +39,7 @@ public final class TimelineResponse extends BroadcastInfoResponse implements Par
     }
 
     public TimelineResponse(int requestId, int sequence,
-            @ResponseResult int responseResult, @Nullable String selector, int unitsPerTick,
+            int responseResult, @Nullable String selector, int unitsPerTick,
             int unitsPerSecond, long wallClock, long ticks) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mSelector = selector;

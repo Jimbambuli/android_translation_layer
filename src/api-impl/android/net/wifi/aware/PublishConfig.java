@@ -119,7 +119,7 @@ public final class PublishConfig implements Parcelable {
     }
 
     @NonNull
-    public static final Creator<PublishConfig> CREATOR = new Creator<>() {
+    public static final Creator<PublishConfig> CREATOR = new Creator<PublishConfig>() {
         @Override
         public PublishConfig[] newArray(int size) {
             return new PublishConfig[size];

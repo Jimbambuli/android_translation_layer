@@ -16,6 +16,8 @@
 
 package android.content.pm;
 
+import android.text.TextUtils;
+
 /**
  * Information you can retrieve about a particular security permission
  * known to the system.  This corresponds to information collected from the
@@ -194,10 +196,6 @@ public class PermissionInfo extends PackageItemInfo implements android.os.Parcel
 
 	public String toString() {
 		return "PermissionInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + name + "}";
-	}
-
-	public int describeContents() {
-		return 0;
 	}
 
 	/* AOSP PermissionInfo.getProtection / getProtectionFlags */

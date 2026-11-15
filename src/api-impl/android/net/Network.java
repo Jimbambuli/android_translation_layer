@@ -111,8 +111,4 @@ public class Network implements android.os.Parcelable {
 	public void bindSocket(java.net.DatagramSocket socket) throws java.io.IOException {}
 
 	public void bindSocket(java.io.FileDescriptor fd) throws java.io.IOException {}
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    public int describeContents() { return 0; }
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
 }

@@ -53,7 +53,20 @@ public final class IpSecTransformState implements Parcelable {
         Objects.requireNonNull(mReplayBitmap, "mReplayBitmap is null");
     }
 
-    
+
+    /* AOSP IpSecTransformState(Parcel) */
+    public IpSecTransformState(@NonNull Parcel in) {
+        Objects.requireNonNull(in, "The input PersistableBundle is null");
+        mTimestamp = in.readLong();
+        mTxHighestSequenceNumber = in.readLong();
+        mRxHighestSequenceNumber = in.readLong();
+        mPacketCount = in.readLong();
+        mByteCount = in.readLong();
+        mReplayBitmap = HexDump.hexStringToByteArray(in.readString());
+
+        validate();
+    }
+
     // Parcelable methods
 
     @Override

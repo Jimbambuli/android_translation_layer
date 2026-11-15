@@ -68,4 +68,17 @@ public class SubscriptionInfo {
 	public String getCountryIso() {
 		return mCountryIso;
 	}
+
+	/* AOSP SubscriptionInfo.getPrintableId() (@hide); ATL is no debuggable build (TelephonyUtils.IS_DEBUGGABLE false) */
+	public static String getPrintableId(String id) {
+		String idToPrint = null;
+		if (id != null) {
+			if (id.length() > 9) {
+				idToPrint = id.substring(0, 9) + Rlog.pii(false, id.substring(9));
+			} else {
+				idToPrint = id;
+			}
+		}
+		return idToPrint;
+	}
 }

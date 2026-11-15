@@ -61,7 +61,7 @@ public final class ChooserSessionToken implements Parcelable {
     }
 
     @NonNull
-    public static final Parcelable.Creator<ChooserSessionToken> CREATOR = new Creator<>() {
+    public static final Parcelable.Creator<ChooserSessionToken> CREATOR = new Creator<ChooserSessionToken>() {
         @Override
         public ChooserSessionToken createFromParcel(Parcel source) {
             IBinder binder = source.readStrongBinder();

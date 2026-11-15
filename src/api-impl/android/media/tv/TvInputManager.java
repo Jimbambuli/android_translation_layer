@@ -101,4 +101,6 @@ public final class TvInputManager {
         public void onInputUpdated(String arg0) {  }
         public void onTvInputInfoUpdated(android.media.tv.TvInputInfo arg0) {  }
     }
+
+    public static final int BROADCAST_INFO_TYPE_SIGNALING_DATA = 9; // 0x9;
 }

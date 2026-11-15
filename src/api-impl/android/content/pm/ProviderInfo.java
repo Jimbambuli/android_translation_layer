@@ -128,10 +128,6 @@ public final class ProviderInfo extends ComponentInfo implements android.os.Parc
 		pw.println(prefix + "flags=0x" + Integer.toHexString(flags));
 	}
 
-	public int describeContents() {
-		return 0;
-	}
-
 	public String toString() {
 		return "ContentProviderInfo{name=" + authority + " className=" + name + "}";
 	}

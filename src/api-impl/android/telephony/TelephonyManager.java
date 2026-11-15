@@ -472,4 +472,13 @@ public class TelephonyManager {
 		java.util.Objects.requireNonNull(executor, "Executor was null");
 		return null;
 	}
+
+	/* AOSP TelephonyManager.getSubIdForPhoneAccount() (@hide) */
+	public int getSubIdForPhoneAccount(android.telecom.PhoneAccount phoneAccount) {
+		int retval = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+		if (phoneAccount != null && phoneAccount.hasCapabilities(android.telecom.PhoneAccount.CAPABILITY_SIM_SUBSCRIPTION)) {
+			retval = getSubscriptionId(phoneAccount.getAccountHandle());
+		}
+		return retval;
+	}
 }

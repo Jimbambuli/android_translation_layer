@@ -75,7 +75,7 @@ public final class QueryLocationException extends RuntimeException implements Pa
 	 */
 	public static final
 			@android.annotation.NonNull Parcelable.Creator<QueryLocationException> CREATOR =
-			new Parcelable.Creator<>() {
+			new Parcelable.Creator<QueryLocationException>() {
 				@Override
 				public QueryLocationException createFromParcel(Parcel source) {
 					return new QueryLocationException(source.readString8(), source.readInt());

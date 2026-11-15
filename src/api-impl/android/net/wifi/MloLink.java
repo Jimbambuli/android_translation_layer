@@ -166,7 +166,7 @@ public final class MloLink implements Parcelable {
     }
 
     /** Returns the Wi-Fi band of this link. */
-    @ScanResult.WifiBand
+    
     public int getBand() {
         return mBand;
     }

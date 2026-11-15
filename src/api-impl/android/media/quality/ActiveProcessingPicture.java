@@ -24,7 +24,7 @@ public final class ActiveProcessingPicture implements Parcelable {
     
     
     @NonNull
-    public static final Creator<ActiveProcessingPicture> CREATOR = new Creator<>() {
+    public static final Creator<ActiveProcessingPicture> CREATOR = new Creator<ActiveProcessingPicture>() {
         @Override
         public ActiveProcessingPicture createFromParcel(Parcel in) {
             return new ActiveProcessingPicture(in);

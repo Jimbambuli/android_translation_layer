@@ -3,7 +3,6 @@ package android.nfc.cardemulation;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
-import java.util.HexFormat;
 
 /* AOSP PollingFrame (modules/Nfc) */
 public final class PollingFrame implements Parcelable {
@@ -26,7 +25,7 @@ public final class PollingFrame implements Parcelable {
 	private final long mTimestamp;
 	private boolean mTriggeredAutoTransact;
 
-	public static final Parcelable.Creator<PollingFrame> CREATOR = new Parcelable.Creator<>() {
+	public static final Parcelable.Creator<PollingFrame> CREATOR = new Parcelable.Creator<PollingFrame>() {
 		@Override
 		public PollingFrame createFromParcel(Parcel source) {
 			return new PollingFrame(source.readBundle());
@@ -106,6 +105,17 @@ public final class PollingFrame implements Parcelable {
 	public String toString() {
 		return "PollingFrame { Type: " + (char)getType() + ", gain: " + getVendorSpecificGain() +
 		       ", timestamp: " + Long.toUnsignedString(getTimestamp()) + ", data: [" +
-		       HexFormat.ofDelimiter(" ").formatHex(getData()) + "] }";
+		       hex(getData()) + "] }";
+	}
+
+	/* HexFormat.ofDelimiter(" ").formatHex() (Java 17) by hand */
+	private static String hex(byte[] data) {
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < data.length; i++) {
+			if (i > 0)
+				sb.append(' ');
+			sb.append(String.format("%02x", data[i] & 0xff));
+		}
+		return sb.toString();
 	}
 }

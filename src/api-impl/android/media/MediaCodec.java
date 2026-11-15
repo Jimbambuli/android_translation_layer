@@ -720,7 +720,10 @@ public class MediaCodec {
     /* AOSP 16 API; no backing hardware/service in ATL */
     public android.media.Image getOutputImage(int arg0) { return null; }
     /* AOSP 16 API; no backing hardware/service in ATL */
-    public android.media.MediaCodec.QueueRequest getQueueRequest(int arg0) { return this; }
+    public android.media.MediaCodec.QueueRequest getQueueRequest(int arg0) {
+        /* AOSP: only a codec configured with CONFIGURE_FLAG_USE_BLOCK_MODEL has queue requests; ATL has none */
+        throw new IllegalStateException("The codec is not configured for block model");
+    }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public static android.media.Image mapHardwareBuffer(android.hardware.HardwareBuffer arg0) { return null; }
     /* AOSP 16 API; no backing hardware/service in ATL */

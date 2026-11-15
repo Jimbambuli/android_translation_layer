@@ -369,7 +369,6 @@ public abstract class ViewStructure {
 	public void setPendingCredentialRequest(android.credentials.GetCredentialRequest request,
 			android.os.OutcomeReceiver<android.credentials.GetCredentialResponse, android.credentials.GetCredentialException> callback) {}
 
-	public void clearCredentialManagerRequest() {}
 
 	/**
 	 * Sets the {@link AutofillId} associated with this node.

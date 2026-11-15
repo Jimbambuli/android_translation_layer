@@ -169,15 +169,13 @@ public final class EmergencyNumber implements Parcelable, Comparable<EmergencyNu
      *
      * Reference: 3gpp 22.101, Section 10 - Emergency Calls
      */
-    public static final int EMERGENCY_NUMBER_SOURCE_NETWORK_SIGNALING =
-            android.hardware.radio.voice.EmergencyNumber.SOURCE_NETWORK_SIGNALING;
+    public static final int EMERGENCY_NUMBER_SOURCE_NETWORK_SIGNALING = 1; /* EmergencyNumber */
     /**
      * Bit-field which indicates the number is from the sim.
      *
      * Reference: 3gpp 22.101, Section 10 - Emergency Calls
      */
-    public static final int EMERGENCY_NUMBER_SOURCE_SIM =
-            android.hardware.radio.voice.EmergencyNumber.SOURCE_SIM;
+    public static final int EMERGENCY_NUMBER_SOURCE_SIM = 2; /* EmergencyNumber */
     /**
      * Bit-field which indicates the number is from the platform-maintained database.
      */
@@ -190,8 +188,7 @@ public final class EmergencyNumber implements Parcelable, Comparable<EmergencyNu
     @TestApi
     public static final int EMERGENCY_NUMBER_SOURCE_TEST =  1 << 5;
     /** Bit-field which indicates the number is from the modem config. */
-    public static final int EMERGENCY_NUMBER_SOURCE_MODEM_CONFIG =
-            android.hardware.radio.voice.EmergencyNumber.SOURCE_MODEM_CONFIG;
+    public static final int EMERGENCY_NUMBER_SOURCE_MODEM_CONFIG = 4; /* EmergencyNumber */
     /**
      * Bit-field which indicates the number is available as default.
      *
@@ -200,8 +197,7 @@ public final class EmergencyNumber implements Parcelable, Comparable<EmergencyNu
      *
      * Reference: 3gpp 22.101, Section 10 - Emergency Calls
      */
-    public static final int EMERGENCY_NUMBER_SOURCE_DEFAULT =
-            android.hardware.radio.voice.EmergencyNumber.SOURCE_DEFAULT;
+    public static final int EMERGENCY_NUMBER_SOURCE_DEFAULT = 8; /* EmergencyNumber */
 
     private static final Set<Integer> EMERGENCY_NUMBER_SOURCE_SET;
     static {
@@ -528,12 +524,12 @@ public final class EmergencyNumber implements Parcelable, Comparable<EmergencyNu
      * @return loggable string describing the routing type.
      */
     private String routingToString(@EmergencyCallRouting int routing) {
-        return switch(routing) {
-            case EMERGENCY_CALL_ROUTING_EMERGENCY -> "emergency";
-            case EMERGENCY_CALL_ROUTING_NORMAL -> "normal";
-            case EMERGENCY_CALL_ROUTING_UNKNOWN -> "unknown";
-            default -> "🤷";
-        };
+        switch (routing) {
+            case EMERGENCY_CALL_ROUTING_EMERGENCY: return "emergency";
+            case EMERGENCY_CALL_ROUTING_NORMAL: return "normal";
+            case EMERGENCY_CALL_ROUTING_UNKNOWN: return "unknown";
+            default: return "🤷";
+        }
     }
 
     /**

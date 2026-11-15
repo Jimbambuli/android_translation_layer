@@ -691,10 +691,6 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 		return "ApplicationInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + packageName + "}";
 	}
 
-	public int describeContents() {
-		return 0;
-	}
-
 	/**
 	 * Retrieve the textual description of the application.  This
 	 * will call back on the given PackageManager to load the description from

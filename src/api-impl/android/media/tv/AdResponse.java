@@ -34,10 +34,10 @@ public final class AdResponse implements Parcelable {
             };
 
     private final int mId;
-    private final @ResponseType int mResponseType;
+    private final int mResponseType;
     private final long mElapsedTime;
 
-    public AdResponse(int id, @ResponseType int responseType, long elapsedTime) {
+    public AdResponse(int id, int responseType, long elapsedTime) {
         mId = id;
         mResponseType = responseType;
         mElapsedTime = elapsedTime;
@@ -59,7 +59,7 @@ public final class AdResponse implements Parcelable {
     /**
      * Gets the response type.
      */
-    @ResponseType
+    
     public int getResponseType() {
         return mResponseType;
     }

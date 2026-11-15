@@ -27,7 +27,7 @@ public final class SignalingDataResponse extends BroadcastInfoResponse implement
                     return new SignalingDataResponse(in);
                 }
             };
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_SIGNALING_DATA;
     private final @NonNull List<String> mSignalingDataTypes;
     private final @NonNull List<SignalingDataInfo> mSignalingDataInfoList;
@@ -39,7 +39,7 @@ public final class SignalingDataResponse extends BroadcastInfoResponse implement
     public SignalingDataResponse(
             int requestId,
             int sequence,
-            @ResponseResult int responseResult,
+            int responseResult,
             @NonNull List<String> signalingDataTypes,
             @NonNull List<SignalingDataInfo> signalingDataInfoList) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);

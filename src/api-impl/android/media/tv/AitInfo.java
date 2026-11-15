@@ -35,7 +35,7 @@ public final class AitInfo implements Parcelable {
     /**
      * Constructs AIT info.
      */
-    public AitInfo(@TvInteractiveAppServiceInfo.InteractiveAppType int type, int version) {
+    public AitInfo(int type, int version) {
         mType = type;
         mVersion = version;
     }
@@ -43,7 +43,7 @@ public final class AitInfo implements Parcelable {
     /**
      * Gets interactive app type.
      */
-    @TvInteractiveAppServiceInfo.InteractiveAppType
+    
     public int getType() {
         return mType;
     }

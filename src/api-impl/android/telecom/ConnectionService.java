@@ -84,58 +84,6 @@ public abstract class ConnectionService extends Service {
 		return super.onUnbind(intent);
 	}
 
-	/**
-	 * Create a {@link RemoteConnection} to represent an incoming connection that is handled by
-	 * another {@link ConnectionService}. AOSP: RemoteConnectionManager.createRemoteConnection(), which with no
-	 * remote service registered ends in the two exceptions below.
-	 */
-	public final @Nullable RemoteConnection createRemoteIncomingConnection(
-			@NonNull PhoneAccountHandle connectionManagerPhoneAccount,
-			@NonNull ConnectionRequest request) {
-		return createRemoteConnection(request);
-	}
-
-	public final @Nullable RemoteConnection createRemoteOutgoingConnection(
-			@NonNull PhoneAccountHandle connectionManagerPhoneAccount,
-			@NonNull ConnectionRequest request) {
-		return createRemoteConnection(request);
-	}
-
-	public final @Nullable RemoteConference createRemoteIncomingConference(
-			@Nullable PhoneAccountHandle connectionManagerPhoneAccount,
-			@Nullable ConnectionRequest request) {
-		return createRemoteConnection(request);
-	}
-
-	public final @Nullable RemoteConference createRemoteOutgoingConference(
-			@Nullable PhoneAccountHandle connectionManagerPhoneAccount,
-			@Nullable ConnectionRequest request) {
-		return createRemoteConnection(request);
-	}
-
-	private static <T> T createRemoteConnection(ConnectionRequest request) {
-		PhoneAccountHandle accountHandle = request.getAccountHandle();
-		if (accountHandle == null) {
-			throw new IllegalArgumentException("accountHandle must be specified.");
-		}
-		throw new UnsupportedOperationException("accountHandle not supported: "
-				+ accountHandle.getComponentName());
-	}
-
-	/**
-	 * Ask some other {@code ConnectionService} to create a {@code RemoteConnection} given an
-	 * incoming request. AOSP: RemoteConnectionManager.conferenceRemoteConnections(); the two connections can
-	 * only come from one ConnectionService when Telecom handed them out, so here the request is refused as AOSP
-	 * does for connections of different services (logged and ignored).
-	 */
-	public final void conferenceRemoteConnections(
-			RemoteConnection remoteConnection1,
-			RemoteConnection remoteConnection2) {
-		if (remoteConnection1 == null || remoteConnection2 == null) {
-			throw new NullPointerException();
-		}
-	}
-
 	public final void addConferenceFromConnection(@NonNull Conference conference,
 			@NonNull Connection originalConnection) {
 		if (originalConnection == null || conference == null) {
@@ -281,10 +229,6 @@ public abstract class ConnectionService extends Service {
 	public void onConferenceAdded(Conference conference) {}
 
 	public void onConferenceRemoved(Conference conference) {}
-
-	public void onRemoteConferenceAdded(RemoteConference conference) {}
-
-	public void onRemoteExistingConnectionAdded(RemoteConnection connection) {}
 
 	public void onConnectionServiceFocusLost() {}
 

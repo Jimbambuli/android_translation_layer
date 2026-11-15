@@ -11,7 +11,7 @@ import android.os.Parcelable;
  * A response for Section from broadcast signal.
  */
 public final class SectionResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_SECTION;
 
     public static final @NonNull Parcelable.Creator<SectionResponse> CREATOR =
@@ -36,7 +36,7 @@ public final class SectionResponse extends BroadcastInfoResponse implements Parc
         return new SectionResponse(in);
     }
 
-    public SectionResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public SectionResponse(int requestId, int sequence, int responseResult,
             int sessionId, int version, @Nullable Bundle sessionData) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mSessionId = sessionId;

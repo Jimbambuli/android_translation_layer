@@ -149,11 +149,6 @@ public abstract class WallpaperService extends Service {
 
 		public void onApplyWindowInsets(WindowInsets insets) {}
 
-		/* AOSP Engine.onApplyWallpaper: no description of the current wallpaper by default */
-		public android.app.wallpaper.WallpaperDescription onApplyWallpaper(int which) {
-			return null;
-		}
-
 		/* AOSP Engine.dump(): the state fields of an engine; those of a window do not exist here */
 		protected void dump(String prefix, FileDescriptor fd, PrintWriter out, String[] args) {
 			out.print(prefix); out.print("mDestroyed="); out.println(mDestroyed);
@@ -162,11 +157,6 @@ public abstract class WallpaperService extends Service {
 	}
 
 	public abstract Engine onCreateEngine();
-
-	/* AOSP WallpaperService.onCreateEngine(WallpaperDescription): the default ignores the description */
-	public Engine onCreateEngine(android.app.wallpaper.WallpaperDescription description) {
-		return onCreateEngine();
-	}
 
 	@Override
 	public final IBinder onBind(Intent intent) {

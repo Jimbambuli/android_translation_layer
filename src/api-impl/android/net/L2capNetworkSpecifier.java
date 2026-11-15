@@ -226,7 +226,7 @@ public final class L2capNetworkSpecifier extends NetworkSpecifier implements Par
         dest.writeInt(mPsm);
     }
 
-    public static final @NonNull Creator<L2capNetworkSpecifier> CREATOR = new Creator<>() {
+    public static final @NonNull Creator<L2capNetworkSpecifier> CREATOR = new Creator<L2capNetworkSpecifier>() {
         @Override
         public L2capNetworkSpecifier createFromParcel(Parcel in) {
             return new L2capNetworkSpecifier(in);

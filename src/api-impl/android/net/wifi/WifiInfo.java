@@ -111,4 +111,24 @@ public class WifiInfo {
         public android.net.wifi.WifiInfo.Builder setSsid(byte[] arg0) { return this; }
         public android.net.wifi.WifiInfo.Builder setSubscriptionId(int arg0) { return this; }
     }
+
+	/* AOSP WifiInfo.MAX_RSSI, LINK_SPEED_UNITS, removeDoubleQuotes() (@hide) */
+	public static final int MAX_RSSI = 200;
+	public static final String LINK_SPEED_UNITS = "Mbps";
+
+	public static String removeDoubleQuotes(String string) {
+		if (string == null) return null;
+		final int length = string.length();
+		if ((length > 1) && (string.charAt(0) == '"') && (string.charAt(length - 1) == '"')) {
+			return string.substring(1, length - 1);
+		}
+		return string;
+	}
+
+	/* AOSP WifiInfo.DEFAULT_MAC_ADDRESS, getMeteredHint() (@hide); ATL has no metered hint from a Wi-Fi service: false as an AOSP WifiInfo without it */
+	public static final String DEFAULT_MAC_ADDRESS = "02:00:00:00:00:00";
+
+	public boolean getMeteredHint() {
+		return false;
+	}
 }

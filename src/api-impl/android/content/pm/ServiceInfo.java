@@ -80,10 +80,6 @@ public class ServiceInfo extends ComponentInfo implements android.os.Parcelable 
 		return "ServiceInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + name + "}";
 	}
 
-	public int describeContents() {
-		return 0;
-	}
-
 	/* AOSP ServiceInfo.writeToParcel()/ServiceInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
 	 * Not parcelled (no such field or helper in ATL): mForegroundServiceType */
 	public int describeContents() {

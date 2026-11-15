@@ -11,7 +11,7 @@ import android.os.Parcelable;
 public final class CommandRequest extends BroadcastInfoRequest implements Parcelable {
     public static final String ARGUMENT_TYPE_XML = "xml";
     public static final String ARGUMENT_TYPE_JSON = "json";
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_COMMAND;
 
     public static final @NonNull Parcelable.Creator<CommandRequest> CREATOR =
@@ -37,7 +37,7 @@ public final class CommandRequest extends BroadcastInfoRequest implements Parcel
         return new CommandRequest(in);
     }
 
-    public CommandRequest(int requestId, @RequestOption int option, @NonNull String namespace,
+    public CommandRequest(int requestId, int option, @NonNull String namespace,
             @NonNull String name, @NonNull String arguments, @NonNull String argumentType) {
         super(REQUEST_TYPE, requestId, option);
         mNamespace = namespace;

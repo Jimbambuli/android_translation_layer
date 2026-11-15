@@ -13,7 +13,7 @@ import java.lang.annotation.RetentionPolicy;
  * A request for Table from broadcast signal.
  */
 public final class TableRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_TABLE;
 
     
@@ -69,15 +69,15 @@ public final class TableRequest extends BroadcastInfoRequest implements Parcelab
             };
 
     private final int mTableId;
-    private final @TableName int mTableName;
+    private final int mTableName;
     private final int mVersion;
 
     static TableRequest createFromParcelBody(Parcel in) {
         return new TableRequest(in);
     }
 
-    public TableRequest(int requestId, @RequestOption int option, int tableId,
-            @TableName int tableName, int version) {
+    public TableRequest(int requestId, int option, int tableId,
+            int tableName, int version) {
         super(REQUEST_TYPE, requestId, option);
         mTableId = tableId;
         mTableName = tableName;
@@ -101,7 +101,7 @@ public final class TableRequest extends BroadcastInfoRequest implements Parcelab
     /**
      * Gets the name of requested table.
      */
-    public @TableName int getTableName() {
+    public int getTableName() {
         return mTableName;
     }
 

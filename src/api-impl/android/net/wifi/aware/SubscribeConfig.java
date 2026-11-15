@@ -159,7 +159,7 @@ public final class SubscribeConfig implements Parcelable {
     }
 
     @NonNull
-    public static final Creator<SubscribeConfig> CREATOR = new Creator<>() {
+    public static final Creator<SubscribeConfig> CREATOR = new Creator<SubscribeConfig>() {
         @Override
         public SubscribeConfig[] newArray(int size) {
             return new SubscribeConfig[size];

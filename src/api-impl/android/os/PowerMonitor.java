@@ -43,7 +43,7 @@ public final class PowerMonitor implements Parcelable {
 		return 0;
 	}
 
-	public static final Creator<PowerMonitor> CREATOR = new Creator<>() {
+	public static final Creator<PowerMonitor> CREATOR = new Creator<PowerMonitor>() {
 		@Override
 		public PowerMonitor createFromParcel(Parcel in) {
 			return new PowerMonitor(in);

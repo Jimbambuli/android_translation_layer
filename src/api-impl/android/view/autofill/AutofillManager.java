@@ -71,4 +71,7 @@ public class AutofillManager {
 	public AutofillId getNextAutofillId() {
 		return null;
 	}
+
+	/* AOSP AutofillManager.ANY_HINT (@hide) */
+	public static final String ANY_HINT = "any";
 }

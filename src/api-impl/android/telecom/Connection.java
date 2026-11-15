@@ -1041,7 +1041,7 @@ public abstract class Connection extends Conferenceable {
 			"android.telecom.extra.KEY_QUERY_LOCATION";
 
 	// Flag controlling whether PII is emitted into the logs
-	private static final boolean PII_DEBUG = Log.isLoggable(android.util.Log.DEBUG);
+	private static final boolean PII_DEBUG = android.util.Log.isLoggable("Telecom", android.util.Log.DEBUG); /* AOSP android.telecom.Log.isLoggable(): tag "Telecom" */
 
 	/**
 	 * Renders a set of capability bits ({@code CAPABILITY_*}) as a human readable string.
@@ -1555,7 +1555,7 @@ public abstract class Connection extends Conferenceable {
 	 *
 	 * @return The video state of the connection.
 	 */
-	public final @VideoProfile.VideoState int getVideoState() {
+	public final int getVideoState() {
 		return mVideoState;
 	}
 
@@ -3292,8 +3292,6 @@ public abstract class Connection extends Conferenceable {
 		public void changeCallDataUsage(long dataUsage) {
 			setCallDataUsage(dataUsage);
 		}
-
-		public void changeCameraCapabilities(VideoProfile.CameraCapabilities cameraCapabilities) {}
 
 		public void changeVideoQuality(int videoQuality) {}
 

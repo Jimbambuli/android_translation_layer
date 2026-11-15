@@ -3456,4 +3456,10 @@ public class KeyEvent extends InputEvent implements Parcelable {
 
 	private native boolean native_isSystemKey(int keyCode);
 	private native boolean native_hasDefaultAction(int keyCode);
+
+	/* AOSP KeyEvent.getEventTimeNanos() (InputEvent, @hide) */
+	@Override
+	public final long getEventTimeNanos() {
+		return mEventTime * 1000000L;
+	}
 }

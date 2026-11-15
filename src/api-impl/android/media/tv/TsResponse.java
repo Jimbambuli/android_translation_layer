@@ -10,7 +10,7 @@ import android.os.Parcelable;
  * A response for TS (transport stream) from broadcast signal.
  */
 public final class TsResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_TS;
 
     public static final @NonNull Parcelable.Creator<TsResponse> CREATOR =
@@ -33,7 +33,7 @@ public final class TsResponse extends BroadcastInfoResponse implements Parcelabl
         return new TsResponse(in);
     }
 
-    public TsResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public TsResponse(int requestId, int sequence, int responseResult,
             @Nullable String sharedFilterToken) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         this.mSharedFilterToken = sharedFilterToken;

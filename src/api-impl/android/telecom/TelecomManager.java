@@ -69,4 +69,7 @@ public class TelecomManager {
 		Objects.requireNonNull(events);
 		throw new IllegalStateException("Telecom service is not present");
 	}
+
+	/* AOSP TelecomManager.PRESENTATION_UNKNOWN */
+	public static final int PRESENTATION_UNKNOWN = 3;
 }

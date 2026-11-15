@@ -4588,4 +4588,8 @@ public class PackageManager {
 		}
 		return java.util.Arrays.equals(signature, certificate);
 	}
+
+	/* AOSP PackageManager.VERSION_CODE_HIGHEST, FEATURE_TELEPHONY_RADIO_ACCESS */
+	public static final int VERSION_CODE_HIGHEST = -1;
+	public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
 }

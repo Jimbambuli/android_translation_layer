@@ -19,7 +19,7 @@ import java.util.List;
  * @see SignalingDataResponse
  */
 public final class SignalingDataRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_SIGNALING_DATA;
 
     public static final @NonNull Parcelable.Creator<SignalingDataRequest> CREATOR =
@@ -150,7 +150,7 @@ public final class SignalingDataRequest extends BroadcastInfoRequest implements 
     @Retention(RetentionPolicy.SOURCE)
     public @interface SignalingMetadata {}
 
-    public SignalingDataRequest(int requestId, @RequestOption int option,
+    public SignalingDataRequest(int requestId, int option,
             int group,
             @NonNull List<String> signalingDataTypes) {
         super(REQUEST_TYPE, requestId, option);

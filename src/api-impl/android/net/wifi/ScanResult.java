@@ -33,7 +33,7 @@ public final class ScanResult {
 	public static final int WIFI_STANDARD_11AD = 7;
 	public static final int WIFI_STANDARD_11BE = 8;
 
-	public static class InformationElement {
+	public static class InformationElement implements android.os.Parcelable {
 		public static final int EID_SSID = 0;
 		public static final int EID_SUPPORTED_RATES = 1;
 		public static final int EID_TIM = 5;
@@ -89,11 +89,31 @@ public final class ScanResult {
 			return ByteBuffer.wrap(bytes).asReadOnlyBuffer();
 		}
 	
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    public int describeContents() { return 0; }
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
-}
+		/* AOSP ScanResult.InformationElement: Parcelable */
+		public int describeContents() {
+			return 0;
+		}
+
+		public void writeToParcel(android.os.Parcel dest, int flags) {
+			dest.writeInt(id);
+			dest.writeInt(idExt);
+			dest.writeByteArray(bytes);
+		}
+
+		public static final android.os.Parcelable.Creator<InformationElement> CREATOR = new android.os.Parcelable.Creator<InformationElement>() {
+			public InformationElement createFromParcel(android.os.Parcel in) {
+				InformationElement informationElement = new InformationElement();
+				informationElement.id = in.readInt();
+				informationElement.idExt = in.readInt();
+				informationElement.bytes = in.createByteArray();
+				return informationElement;
+			}
+
+			public InformationElement[] newArray(int size) {
+				return new InformationElement[size];
+			}
+		};
+	}
 
 	public InformationElement[] informationElements;
 

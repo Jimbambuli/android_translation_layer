@@ -10,7 +10,7 @@ import android.os.Parcelable;
  * A response for Stream Event from broadcast signal.
  */
 public final class StreamEventResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_STREAM_EVENT;
 
     public static final @NonNull Parcelable.Creator<StreamEventResponse> CREATOR =
@@ -35,7 +35,7 @@ public final class StreamEventResponse extends BroadcastInfoResponse implements 
         return new StreamEventResponse(in);
     }
 
-    public StreamEventResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public StreamEventResponse(int requestId, int sequence, int responseResult,
             int eventId, long nptMillis, @Nullable byte[] data) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mEventId = eventId;

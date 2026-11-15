@@ -12,7 +12,7 @@ import android.os.SharedMemory;
  * A response for Table from broadcast signal.
  */
 public final class TableResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_TABLE;
 
     public static final @NonNull Parcelable.Creator<TableResponse> CREATOR =
@@ -53,7 +53,7 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
      * @deprecated use {@link Builder} instead.
      */
     @Deprecated
-    public TableResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public TableResponse(int requestId, int sequence, int responseResult,
             @Nullable Uri tableUri, int version, int size) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mVersion = version;
@@ -86,7 +86,7 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
      *                          structure syntax of the table depends on the table name in
      *                          {@link TableRequest#getTableName()} and the corresponding standard.
      */
-    private TableResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    private TableResponse(int requestId, int sequence, int responseResult,
             int version, int size, Uri tableUri, byte[] tableByteArray,
             SharedMemory tableSharedMemory) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
@@ -103,7 +103,7 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
     public static final class Builder {
         private final int mRequestId;
         private final int mSequence;
-        @ResponseResult
+        
         private final int mResponseResult;
         private final int mVersion;
         private final int mSize;
@@ -122,7 +122,7 @@ public final class TableResponse extends BroadcastInfoResponse implements Parcel
          * @param version The version number of requested table.
          * @param size The Size number of table in bytes.
          */
-        public Builder(int requestId, int sequence, @ResponseResult int responseResult, int version,
+        public Builder(int requestId, int sequence, int responseResult, int version,
                 int size) {
             mRequestId = requestId;
             mSequence = sequence;

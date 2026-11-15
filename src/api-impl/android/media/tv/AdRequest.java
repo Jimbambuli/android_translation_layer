@@ -41,7 +41,7 @@ public final class AdRequest implements Parcelable {
             };
 
     private final int mId;
-    private final @RequestType int mRequestType;
+    private final int mRequestType;
     private final ParcelFileDescriptor mFileDescriptor;
     private final long mStartTime;
     private final long mStopTime;
@@ -52,19 +52,19 @@ public final class AdRequest implements Parcelable {
 
     
     
-    public AdRequest(int id, @RequestType int requestType,
+    public AdRequest(int id, int requestType,
             @Nullable ParcelFileDescriptor fileDescriptor, long startTime, long stopTime,
             long echoInterval, @Nullable String mediaFileType, @NonNull Bundle metadata) {
         this(id, requestType, fileDescriptor, null, startTime, stopTime, echoInterval,
                 mediaFileType, metadata);
     }
 
-    public AdRequest(int id, @RequestType int requestType, @Nullable Uri uri, long startTime,
+    public AdRequest(int id, int requestType, @Nullable Uri uri, long startTime,
             long stopTime, long echoInterval, @NonNull Bundle metadata) {
         this(id, requestType, null, uri, startTime, stopTime, echoInterval, null, metadata);
     }
 
-    private AdRequest(int id, @RequestType int requestType,
+    private AdRequest(int id, int requestType,
             @Nullable ParcelFileDescriptor fileDescriptor, @Nullable Uri uri, long startTime,
             long stopTime, long echoInterval, @Nullable String mediaFileType,
             @NonNull Bundle metadata) {
@@ -111,7 +111,7 @@ public final class AdRequest implements Parcelable {
     /**
      * Gets the request type.
      */
-    @RequestType
+    
     public int getRequestType() {
         return mRequestType;
     }

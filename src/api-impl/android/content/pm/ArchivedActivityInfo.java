@@ -80,7 +80,7 @@ public final class ArchivedActivityInfo {
 
         if (bitmap.getWidth() < iconSize || bitmap.getHeight() < iconSize
                 || bitmap.getWidth() > iconSize * 2 || bitmap.getHeight() > iconSize * 2) {
-            var scaledBitmap = Bitmap.createScaledBitmap(bitmap, iconSize, iconSize, true);
+            Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, iconSize, iconSize, true);
             if (scaledBitmap != bitmap) {
                 bitmap.recycle();
             }

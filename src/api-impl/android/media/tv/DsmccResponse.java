@@ -17,7 +17,7 @@ import java.util.List;
  * A response for DSM-CC from broadcast signal.
  */
 public final class DsmccResponse extends BroadcastInfoResponse implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_DSMCC;
 
     
@@ -45,7 +45,7 @@ public final class DsmccResponse extends BroadcastInfoResponse implements Parcel
                 }
             };
 
-    private final @BiopMessageType String mBiopMessageType;
+    private final String mBiopMessageType;
     private final ParcelFileDescriptor mFileDescriptor;
     private final List<String> mChildList;
     private final int[] mEventIds;
@@ -58,7 +58,7 @@ public final class DsmccResponse extends BroadcastInfoResponse implements Parcel
     /**
      * Constructs a BIOP file message response.
      */
-    public DsmccResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public DsmccResponse(int requestId, int sequence, int responseResult,
             @Nullable ParcelFileDescriptor file) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mBiopMessageType = BIOP_MESSAGE_TYPE_FILE;
@@ -71,7 +71,7 @@ public final class DsmccResponse extends BroadcastInfoResponse implements Parcel
     /**
      * Constructs a BIOP service gateway or directory message response.
      */
-    public DsmccResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public DsmccResponse(int requestId, int sequence, int responseResult,
             boolean isServiceGateway, @Nullable List<String> childList) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         if (isServiceGateway) {
@@ -91,7 +91,7 @@ public final class DsmccResponse extends BroadcastInfoResponse implements Parcel
      * <p>The current stream message response does not support other stream messages types than
      * stream event message type.
      */
-    public DsmccResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public DsmccResponse(int requestId, int sequence, int responseResult,
             @Nullable int[] eventIds, @Nullable String[] eventNames) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mBiopMessageType = BIOP_MESSAGE_TYPE_STREAM;
@@ -155,7 +155,7 @@ public final class DsmccResponse extends BroadcastInfoResponse implements Parcel
      * Returns the BIOP message type.
      */
     @NonNull
-    public @BiopMessageType String getBiopMessageType() {
+    public String getBiopMessageType() {
         return mBiopMessageType;
     }
 

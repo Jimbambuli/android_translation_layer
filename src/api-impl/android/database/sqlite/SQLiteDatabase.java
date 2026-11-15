@@ -2301,11 +2301,11 @@ public final class SQLiteDatabase extends SQLiteClosable {
 	        mJournalMode = journalMode;
 	        mSyncMode = syncMode;
 	    }
-	    @IntRange(from = -1)
+	    
 	    public int getLookasideSlotSize() {
 	        return mLookasideSlotSize;
 	    }
-	    @IntRange(from = -1)
+	    
 	    public int getLookasideSlotCount() {
 	        return mLookasideSlotCount;
 	    }

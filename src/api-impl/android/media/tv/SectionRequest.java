@@ -9,7 +9,7 @@ import android.os.Parcelable;
  * A request for Section from broadcast signal.
  */
 public final class SectionRequest extends BroadcastInfoRequest implements Parcelable {
-    private static final @TvInputManager.BroadcastInfoType int REQUEST_TYPE =
+    private static final int REQUEST_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_SECTION;
 
     public static final @NonNull Parcelable.Creator<SectionRequest> CREATOR =
@@ -34,7 +34,7 @@ public final class SectionRequest extends BroadcastInfoRequest implements Parcel
         return new SectionRequest(in);
     }
 
-    public SectionRequest(int requestId, @RequestOption int option, int tsPid, int tableId,
+    public SectionRequest(int requestId, int option, int tsPid, int tableId,
             int version) {
         super(REQUEST_TYPE, requestId, option);
         mTsPid = tsPid;

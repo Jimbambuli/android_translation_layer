@@ -321,4 +321,9 @@ public class ArrayUtils {
 	public static File[] defeatNullable(File[] val) {
 		return (val != null) ? val : EMPTY_FILE;
 	}
+
+    /* AOSP ArrayUtils.isEmpty(Collection) */
+    public static boolean isEmpty(java.util.Collection<?> array) {
+        return array == null || array.isEmpty();
+    }
 }

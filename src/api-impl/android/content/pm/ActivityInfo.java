@@ -605,10 +605,6 @@ public class ActivityInfo extends ComponentInfo implements android.os.Parcelable
 		return "ActivityInfo{" + Integer.toHexString(System.identityHashCode(this)) + " " + name + "}";
 	}
 
-	public int describeContents() {
-		return 0;
-	}
-
 	/* AOSP ActivityInfo.writeToParcel()/ActivityInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
 	 * Not parcelled (no such field or helper in ATL): documentLaunchMode, launchToken, privateFlags, persistableMode, maxRecents, lockTaskLaunchMode, if (windowLayout != null) { dest.writ..., resizeMode, requestedVrComponent, rotationAnimation, colorMode, mMaxAspectRatio, mMinAspectRatio, supportsSizeChanges, sForStringSet.parcel(mKnownActivityEm..., requiredDisplayCategory, requireContentUriPermissionFromCaller */
 	public int describeContents() {

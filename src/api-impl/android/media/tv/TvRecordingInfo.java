@@ -138,7 +138,7 @@ public final class TvRecordingInfo implements Parcelable {
      * https://www.oipf.tv/docs/OIPF-T1-R2_Specification-Volume-5-Declarative-Application-Environment-v2_3-2014-01-24.pdf
      * ">Open IPTV Forum Release 2 Specification</a>. It is described in Volume 5, section 7.10.1.1.
      */
-    @DaysOfWeek
+    
     public int getRepeatDays() {
         return mRepeatDays;
     }
@@ -321,7 +321,7 @@ public final class TvRecordingInfo implements Parcelable {
     }
 
     public static final @android.annotation.NonNull Parcelable.Creator<TvRecordingInfo> CREATOR =
-            new Parcelable.Creator<>() {
+            new Parcelable.Creator<TvRecordingInfo>() {
                 @Override
                 @NonNull
                 public TvRecordingInfo createFromParcel(Parcel in) {

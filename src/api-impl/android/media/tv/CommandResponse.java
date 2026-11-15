@@ -12,7 +12,7 @@ import android.os.Parcelable;
 public final class CommandResponse extends BroadcastInfoResponse implements Parcelable {
     public static final String RESPONSE_TYPE_XML = "xml";
     public static final String RESPONSE_TYPE_JSON = "json";
-    private static final @TvInputManager.BroadcastInfoType int RESPONSE_TYPE =
+    private static final int RESPONSE_TYPE =
             TvInputManager.BROADCAST_INFO_TYPE_COMMAND;
 
     public static final @NonNull Parcelable.Creator<CommandResponse> CREATOR =
@@ -36,7 +36,7 @@ public final class CommandResponse extends BroadcastInfoResponse implements Parc
         return new CommandResponse(in);
     }
 
-    public CommandResponse(int requestId, int sequence, @ResponseResult int responseResult,
+    public CommandResponse(int requestId, int sequence, int responseResult,
             @Nullable String response, @NonNull String responseType) {
         super(RESPONSE_TYPE, requestId, sequence, responseResult);
         mResponse = response;

@@ -57,7 +57,7 @@ public final class InputTransferToken implements Parcelable {
 		dest.writeStrongBinder(mToken);
 	}
 
-	public static final @NonNull Creator<InputTransferToken> CREATOR = new Creator<>() {
+	public static final @NonNull Creator<InputTransferToken> CREATOR = new Creator<InputTransferToken>() {
 		public InputTransferToken createFromParcel(Parcel in) {
 			return new InputTransferToken(in);
 		}

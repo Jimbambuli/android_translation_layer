@@ -66,7 +66,7 @@ public final class Session2Token implements Parcelable {
     public static final int TYPE_SESSION_SERVICE = 1;
 
     private final int mUid;
-    @TokenType
+    
     private final int mType;
     private final String mPackageName;
     private final String mServiceName;
@@ -202,7 +202,7 @@ public final class Session2Token implements Parcelable {
      * @see #TYPE_SESSION
      * @see #TYPE_SESSION_SERVICE
      */
-    public @TokenType int getType() {
+    public int getType() {
         return mType;
     }
 

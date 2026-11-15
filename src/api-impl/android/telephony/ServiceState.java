@@ -56,7 +56,6 @@ import java.util.stream.Collectors;
  * For historical reasons this class is not declared as final; however,
  * it should be treated as though it were final.
  */
-@android.ravenwood.annotation.RavenwoodKeepPartialClass
 public class ServiceState implements Parcelable {
 
     static final String LOG_TAG = "PHONE";
@@ -74,7 +73,7 @@ public class ServiceState implements Parcelable {
      * Normal operation condition, the phone is registered
      * with an operator either in home network or in roaming.
      */
-    public static final int STATE_IN_SERVICE = TelephonyProtoEnums.SERVICE_STATE_IN_SERVICE; // 0
+    public static final int STATE_IN_SERVICE = 0; // 0
 
     /**
      * Phone is not registered with any operator, the phone
@@ -83,19 +82,19 @@ public class ServiceState implements Parcelable {
      * signal is not available.
      */
     public static final int STATE_OUT_OF_SERVICE =
-            TelephonyProtoEnums.SERVICE_STATE_OUT_OF_SERVICE;  // 1
+            1;  // 1
 
     /**
      * The phone is registered and locked.  Only emergency numbers are allowed. {@more}
      */
     //TODO: This state is not used anymore. It should be deprecated in a future release.
     public static final int STATE_EMERGENCY_ONLY =
-            TelephonyProtoEnums.SERVICE_STATE_EMERGENCY_ONLY;  // 2
+            2;  // 2
 
     /**
      * Radio of telephony is explicitly powered off.
      */
-    public static final int STATE_POWER_OFF = TelephonyProtoEnums.SERVICE_STATE_POWER_OFF;  // 3
+    public static final int STATE_POWER_OFF = 3;  // 3
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -1031,7 +1030,6 @@ public class ServiceState implements Parcelable {
      *
      * @hide
      */
-    @android.ravenwood.annotation.RavenwoodKeep
     public static @NonNull String frequencyRangeToString(int range) {
         switch (range) {
             case FREQUENCY_RANGE_UNKNOWN: return "UNKNOWN";

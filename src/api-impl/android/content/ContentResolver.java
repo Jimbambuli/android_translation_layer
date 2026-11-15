@@ -782,4 +782,31 @@ public class ContentResolver {
 		res.id = id;
 		return res;
 	}
+
+	/* AOSP ContentResolver sync extras and the checks SyncRequest.Builder uses (@hide helpers) */
+	public static final String SYNC_EXTRAS_FORCE = "force";
+	public static final String SYNC_EXTRAS_MANUAL = "force";
+	public static final String SYNC_EXTRAS_INITIALIZE = "initialize";
+	public static final String SYNC_EXTRAS_EXPEDITED = "expedited";
+	public static final String SYNC_EXTRAS_REQUIRE_CHARGING = "require_charging";
+	public static final String SYNC_EXTRAS_SCHEDULE_AS_EXPEDITED_JOB = "schedule_as_expedited_job";
+	public static final String SYNC_EXTRAS_IGNORE_BACKOFF = "ignore_backoff";
+	public static final String SYNC_EXTRAS_DO_NOT_RETRY = "do_not_retry";
+	public static final String SYNC_EXTRAS_DISALLOW_METERED = "allow_metered";
+
+	public static boolean hasInvalidScheduleAsEjExtras(Bundle extras) {
+		return extras.getBoolean(ContentResolver.SYNC_EXTRAS_REQUIRE_CHARGING)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED);
+	}
+
+	public static boolean invalidPeriodicExtras(Bundle extras) {
+		return extras.getBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_DO_NOT_RETRY, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_IGNORE_BACKOFF, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_IGNORE_SETTINGS, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_INITIALIZE, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_FORCE, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, false)
+			|| extras.getBoolean(ContentResolver.SYNC_EXTRAS_SCHEDULE_AS_EXPEDITED_JOB, false);
+	}
 }

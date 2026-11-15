@@ -2008,7 +2008,7 @@ public class WifiConfiguration implements Parcelable {
      */
     @RequiresPermission(anyOf = {
             "android.permission.NETWORK_SETTINGS",
-            android.Manifest.permission.NETWORK_SETUP_WIZARD})
+            "android.permission.NETWORK_SETUP_WIZARD"})
     
     @SystemApi
     public void setSendDhcpHostnameEnabled(boolean enabled) {
@@ -4823,7 +4823,7 @@ public class WifiConfiguration implements Parcelable {
     
     
     public void setAllowedToUpdateByOtherUsers(boolean isAllowed) {
-        if (!Environment.isSdkNewerThanB()) {
+        if (!(android.os.Build.VERSION.SDK_INT > 36) /* AOSP android.net.wifi.util.Environment.isSdkNewerThanB(): SDK_INT > BAKLAVA */) {
             throw new UnsupportedOperationException();
         }
         if (!shared && isAllowed) {
@@ -4842,7 +4842,7 @@ public class WifiConfiguration implements Parcelable {
     
     
     public boolean isAllowedToUpdateByOtherUsers() {
-        if (!Environment.isSdkNewerThanB()) {
+        if (!(android.os.Build.VERSION.SDK_INT > 36) /* AOSP android.net.wifi.util.Environment.isSdkNewerThanB(): SDK_INT > BAKLAVA */) {
             throw new UnsupportedOperationException();
         }
         return shared && mIsAllowedToUpdateByOtherUsers;
@@ -4888,7 +4888,7 @@ public class WifiConfiguration implements Parcelable {
     
     
     public @UserIdInt int getCreatorUserId() {
-        if (!Environment.isSdkNewerThanB()) {
+        if (!(android.os.Build.VERSION.SDK_INT > 36) /* AOSP android.net.wifi.util.Environment.isSdkNewerThanB(): SDK_INT > BAKLAVA */) {
             throw new UnsupportedOperationException();
         }
         return getCreatorUserIdInternal();
