@@ -139,4 +139,15 @@ public interface MenuItem {
 	public default CharSequence getTooltipText() {
 		return null;
 	}
+
+	/* AOSP MenuItem.setActionProvider()/getActionProvider() are abstract; MenuItem
+	 * implementations that support action providers override these (ATL's PopupMenu
+	 * item does not yet), the defaults keep the provider unset */
+	public default MenuItem setActionProvider(ActionProvider actionProvider) {
+		return this;
+	}
+
+	public default ActionProvider getActionProvider() {
+		return null;
+	}
 }
