@@ -237,6 +237,50 @@ public class WebView extends ViewGroup {
 		new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> callback.onComplete(requestId));
 	}
 
+	/* AOSP WebView.zoomIn()/zoomOut(): the provider returns whether the page could be zoomed (AwContents.canZoomIn/
+	 * canZoomOut). ATL's WebKit page zoom is not driven from here (see zoomBy()), so no zoom is possible. */
+	public boolean zoomIn() {
+		return false;
+	}
+
+	public boolean zoomOut() {
+		return false;
+	}
+
+	/* AOSP WebView.getFavicon() is the provider's page icon, null until one was received; ATL does not deliver
+	 * page icons. */
+	public android.graphics.Bitmap getFavicon() {
+		return null;
+	}
+
+	/* AOSP WebView.setRendererPriorityPolicy(): only stored by the provider; ATL has no renderer process to
+	 * rank, getRendererRequestedPriority()/getRendererPriorityWaivedWhenNotVisible() are not implemented. */
+	public void setRendererPriorityPolicy(int rendererRequestedPriority, boolean waivedWhenNotVisible) {}
+
+	/* AOSP WebView.clearClientCertPreferences(): clears the remembered client certificate choices, then runs the
+	 * callback on the UI thread. ATL keeps none (no ClientCertRequest persistence), so only the callback. */
+	public static void clearClientCertPreferences(Runnable onCleared) {
+		if (onCleared != null)
+			new android.os.Handler(Looper.getMainLooper()).post(onCleared);
+	}
+
+	/* AOSP WebView.startSafeBrowsing()/setSafeBrowsingWhitelist() hand over to the provider's statics. WebKit has
+	 * no Safe Browsing: a provider without it reports false (not enabled / list not applied). */
+	public static void startSafeBrowsing(Context context, ValueCallback<Boolean> callback) {
+		if (callback != null)
+			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
+	}
+
+	public static void setSafeBrowsingWhitelist(List<String> hosts, ValueCallback<Boolean> callback) {
+		if (callback != null)
+			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
+	}
+
+	/* ViewGroup members (deprecated drawing caches), not present on ATL's ViewGroup: no effect, as on Android 16 */
+	public void setAlwaysDrawnWithCacheEnabled(boolean enabled) {}
+
+	public void setAnimationCacheEnabled(boolean enabled) {}
+
 	/* AOSP WebViewFactory.setDataDirectorySuffix() */
 	public static void setDataDirectorySuffix(String suffix) {
 		if (providerInitialized)
