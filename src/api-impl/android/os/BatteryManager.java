@@ -151,6 +151,18 @@ public class BatteryManager {
 		return Long.MIN_VALUE;
 	}
 
+	/* AOSP getStringProperty(): queryStringProperty() yields null for a property the battery does not report; ATL
+	 * reports no string properties */
+	public String getStringProperty(int id) {
+		return null;
+	}
+
+	/* AOSP computeChargeTimeRemaining(): BatteryStatsImpl returns -1 when no estimate is available (ATL keeps no
+	 * charge history) */
+	public long computeChargeTimeRemaining() {
+		return -1;
+	}
+
 	public boolean isCharging() {
 		State s = state();
 		return s.plugged != 0;

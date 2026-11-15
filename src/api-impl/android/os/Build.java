@@ -1178,6 +1178,61 @@ public class Build {
 		return partitions;
 	}
 
+	/* AOSP Build.VERSION_CODES_FULL (major version * 100000 + minor version) */
+	public static class VERSION_CODES_FULL {
+		private VERSION_CODES_FULL() {}
+
+		public static final int BAKLAVA = 3600000;
+		public static final int BAKLAVA_1 = 3600001;
+		public static final int BASE = 100000;
+		public static final int BASE_1_1 = 200000;
+		public static final int CUPCAKE = 300000;
+		public static final int DONUT = 400000;
+		public static final int ECLAIR = 500000;
+		public static final int ECLAIR_0_1 = 600000;
+		public static final int ECLAIR_MR1 = 700000;
+		public static final int FROYO = 800000;
+		public static final int GINGERBREAD = 900000;
+		public static final int GINGERBREAD_MR1 = 1000000;
+		public static final int HONEYCOMB = 1100000;
+		public static final int HONEYCOMB_MR1 = 1200000;
+		public static final int HONEYCOMB_MR2 = 1300000;
+		public static final int ICE_CREAM_SANDWICH = 1400000;
+		public static final int ICE_CREAM_SANDWICH_MR1 = 1500000;
+		public static final int JELLY_BEAN = 1600000;
+		public static final int JELLY_BEAN_MR1 = 1700000;
+		public static final int JELLY_BEAN_MR2 = 1800000;
+		public static final int KITKAT = 1900000;
+		public static final int KITKAT_WATCH = 2000000;
+		public static final int LOLLIPOP = 2100000;
+		public static final int LOLLIPOP_MR1 = 2200000;
+		public static final int M = 2300000;
+		public static final int N = 2400000;
+		public static final int N_MR1 = 2500000;
+		public static final int O = 2600000;
+		public static final int O_MR1 = 2700000;
+		public static final int P = 2800000;
+		public static final int Q = 2900000;
+		public static final int R = 3000000;
+		public static final int S = 3100000;
+		public static final int S_V2 = 3200000;
+		public static final int TIRAMISU = 3300000;
+		public static final int UPSIDE_DOWN_CAKE = 3400000;
+		public static final int VANILLA_ICE_CREAM = 3500000;
+	}
+
+	public static final int BACKPORTED_FIX_STATUS_UNKNOWN = 0;
+	public static final int BACKPORTED_FIX_STATUS_FIXED = 1;
+	public static final int BACKPORTED_FIX_STATUS_NOT_APPLICABLE = 2;
+	public static final int BACKPORTED_FIX_STATUS_NOT_FIXED = 3;
+
+	/* AOSP Build.getBackportedFixStatus(): FIXED only if the id's bit is set in ro.build.backported_fixes.alias_bitset
+	 * (BackportedFixesProperties), which ATL has no source for, so every id is UNKNOWN (AOSP's statsd report is
+	 * left out) */
+	public static int getBackportedFixStatus(long id) {
+		return BACKPORTED_FIX_STATUS_UNKNOWN;
+	}
+
 	public static final long TIME = getLong("ro.build.date.utc") * 1000;
 	public static final String USER = getString("ro.build.user");
 	public static final String HOST = getString("ro.build.host");

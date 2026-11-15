@@ -117,6 +117,71 @@ public class Binder implements IBinder {
 
 	public static int getCallingPid() { return android.atl.ATLBinderConnection.getCallingPid(); }
 
+	/* AOSP Binder.getCallingUserHandle(): the user of the calling uid */
+	public static final UserHandle getCallingUserHandle() {
+		return UserHandle.getUserHandleForUid(getCallingUid());
+	}
+
+	/* AOSP Binder.setCallingWorkSourceUid() and friends are native (IPCThreadState: work source uid and a propagate
+	 * flag per thread, the token packs both). ATL keeps the two values per thread; nothing propagates them, as
+	 * transactions stay in the process. */
+	private static final int UNSET_WORKSOURCE = -1;
+	private static final ThreadLocal<int[]> sWorkSource = ThreadLocal.withInitial(() -> new int[] {UNSET_WORKSOURCE, 0});
+
+	public static final long setCallingWorkSourceUid(int workSource) {
+		int[] state = sWorkSource.get();
+		long token = ((long)state[1] << 32) | (state[0] & 0xffffffffL);
+		state[0] = workSource;
+		state[1] = 1;
+		return token;
+	}
+
+	public static final int getCallingWorkSourceUid() {
+		return sWorkSource.get()[0];
+	}
+
+	public static final long clearCallingWorkSource() {
+		return setCallingWorkSourceUid(UNSET_WORKSOURCE);
+	}
+
+	public static final void restoreCallingWorkSource(long token) {
+		int[] state = sWorkSource.get();
+		state[0] = (int)token;
+		state[1] = (int)(token >> 32);
+	}
+
+	/* AOSP Binder.joinThreadPool(): BinderInternal.joinThreadPool() never returns; ATL has no binder threads to serve,
+	 * so the thread just stays here (until it is interrupted) */
+	public static final void joinThreadPool() {
+		try {
+			while (true) {
+				Thread.sleep(Long.MAX_VALUE);
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	/* AOSP Binder.pingBinder()/isBinderAlive(): a local Binder is alive; linkToDeath() does nothing and
+	 * unlinkToDeath() returns true (it never dies) */
+	@Override
+	public boolean pingBinder() {
+		return true;
+	}
+
+	@Override
+	public boolean isBinderAlive() {
+		return true;
+	}
+
+	@Override
+	public void linkToDeath(DeathRecipient recipient, int flags) {}
+
+	@Override
+	public boolean unlinkToDeath(DeathRecipient recipient, int flags) {
+		return true;
+	}
+
 	@Override
 	public boolean equals(Object obj) {
 		return obj instanceof Binder;
