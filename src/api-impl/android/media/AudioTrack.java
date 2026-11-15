@@ -312,6 +312,21 @@ public class AudioTrack implements AudioRouting {
 		return bufferSizeInFrames;
 	}
 
+	/* AOSP AudioTrack.getBufferCapacityInFrames(): the largest buffer the track can use, the ALSA buffer */
+	public int getBufferCapacityInFrames() {
+		return bufferSizeInFrames;
+	}
+
+	/* AOSP AudioTrack.getChannelCount() */
+	public int getChannelCount() {
+		return channels;
+	}
+
+	/* AOSP AudioTrack.getMaxVolume(): GAIN_MAX */
+	static public float getMaxVolume() {
+		return 1.0f;
+	}
+
 	/* AOSP AudioTrack.getUnderrunCount(): how often the buffer ran empty while playing */
 	public int getUnderrunCount() {
 		return underrunCount;

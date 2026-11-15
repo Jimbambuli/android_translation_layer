@@ -25,8 +25,30 @@ public class AudioRecord {
 		return System.getenv("ATL_UGLY_ENABLE_MICROPHONE") != null || new java.io.File("/.flatpak-info").exists();
 	}
 
+	/* AOSP AudioRecord fields set by audioParamCheck()/getChannelMaskFromLegacyConfig() and native_setup() */
+	private int mRecordSource;
+	private int mAudioFormat;
+	private int mChannelMask;
+	private final int mSessionId = new AudioManager().generateAudioSessionId();
+
 	public AudioRecord(int streamType, int sampleRateInHz, int channelConfig, int audioFormat, int bufferSizeInBytes) {
 		this.sampleRateInHz = sampleRateInHz;
+		mRecordSource = streamType;
+		mAudioFormat = audioFormat == AudioFormat.ENCODING_DEFAULT ? AudioFormat.ENCODING_PCM_16BIT : audioFormat;
+		switch (channelConfig) {
+			case 1: // AudioFormat.CHANNEL_IN_DEFAULT
+			case 0x10: // AudioFormat.CHANNEL_IN_MONO
+			case 2: // AudioFormat.CHANNEL_CONFIGURATION_MONO
+				mChannelMask = 0x10;
+				break;
+			case 0xc: // AudioFormat.CHANNEL_IN_STEREO
+			case 3: // AudioFormat.CHANNEL_CONFIGURATION_STEREO
+				mChannelMask = 0xc;
+				break;
+			default:
+				mChannelMask = channelConfig;
+				break;
+		}
 		/* AOSP: without RECORD_AUDIO the native setup fails and the AudioRecord stays uninitialized */
 		if (!android.content.pm.PackageManager.deniedByUser("android.permission.RECORD_AUDIO"))
 			pcm_handle = native_constructor(streamType, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
@@ -36,6 +58,37 @@ public class AudioRecord {
 
 	public int getSampleRate() {
 		return sampleRateInHz;
+	}
+
+	/* AOSP AudioRecord.getAudioSource() */
+	public int getAudioSource() {
+		return mRecordSource;
+	}
+
+	/* AOSP AudioRecord.getAudioFormat(): the encoding */
+	public int getAudioFormat() {
+		return mAudioFormat;
+	}
+
+	/* AOSP AudioRecord.getChannelCount(): AudioFormat.channelCountFromInChannelMask(mChannelMask) */
+	public int getChannelCount() {
+		return AudioFormat.channelCountFromInChannelMask(mChannelMask);
+	}
+
+	/* AOSP AudioRecord.getFormat() */
+	public AudioFormat getFormat() {
+		AudioFormat.Builder builder = new AudioFormat.Builder()
+		    .setSampleRate(sampleRateInHz)
+		    .setEncoding(mAudioFormat);
+		if (mChannelMask != AudioFormat.CHANNEL_INVALID) {
+			builder.setChannelMask(mChannelMask);
+		}
+		return builder.build();
+	}
+
+	/* AOSP AudioRecord.getAudioSessionId(): native_setup() allocates a new session (AUDIO_SESSION_ALLOCATE) */
+	public int getAudioSessionId() {
+		return mSessionId;
 	}
 
 	public int getState() {
