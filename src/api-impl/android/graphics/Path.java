@@ -48,8 +48,10 @@ public class Path {
 
 	public Path() {}
 
+	/* AOSP: the copy has the fill type of the source as well */
 	public Path(Path path) {
 		this.path = native_ref_path(path.getGskPath());
+		this.fillType = path.fillType;
 	}
 
 	long getBuilder() {
@@ -247,10 +249,35 @@ public class Path {
 		}
 		Region region1 = new Region();
 		Region region2 = new Region();
-		region1.setPath(path1, null);
-		region2.setPath(path2, null);
+		boolean inverse1 = path1.isInverseFillType();
+		boolean inverse2 = path2.isInverseFillType();
+		if (!inverse1 && !inverse2) {
+			region1.setPath(path1, null);
+			region2.setPath(path2, null);
+			region1.op(region2, op.region_op);
+			region1.getBoundaryPath(this);
+			return true;
+		}
+		/* AOSP SkPathOps with an inverse operand: far outside both paths the result is the op applied to the
+		 * inverse bits; inside their bounds it is computed on regions clipped to these bounds. If the outside
+		 * belongs to the result, the result is the complement within the bounds, with an inverse fill type */
+		bounds1.union(bounds2);
+		Region clip = new Region((int)Math.floor(bounds1.left) - 1, (int)Math.floor(bounds1.top) - 1, (int)Math.ceil(bounds1.right) + 1, (int)Math.ceil(bounds1.bottom) + 1);
+		region1.setPath(path1, clip);
+		region2.setPath(path2, clip);
 		region1.op(region2, op.region_op);
+		boolean outside;
+		switch (op) {
+			case DIFFERENCE: outside = inverse1 && !inverse2; break;
+			case INTERSECT: outside = inverse1 && inverse2; break;
+			case UNION: outside = inverse1 || inverse2; break;
+			case XOR: outside = inverse1 != inverse2; break;
+			default: outside = inverse2 && !inverse1; break; // REVERSE_DIFFERENCE
+		}
+		if (outside)
+			region1.op(clip, region1, Region.Op.DIFFERENCE);
 		region1.getBoundaryPath(this);
+		setFillType(outside ? FillType.INVERSE_WINDING : FillType.WINDING);
 		return true;
 	}
 
@@ -271,9 +298,13 @@ public class Path {
 		return new PathIterator(this);
 	}
 
+	/* AOSP SkPath assignment: the fill type is copied as well */
 	public void set(Path src) {
+		if (src == this)
+			return;
 		reset();
 		addPath(src);
+		fillType = src.fillType;
 	}
 
 	public void offset(float dx, float dy) {
