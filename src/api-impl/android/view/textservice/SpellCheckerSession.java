@@ -59,6 +59,74 @@ public class SpellCheckerSession {
 	public void getSuggestions(TextInfo[] textInfos, int suggestionsLimit, boolean sequentialWords) {
 	}
 
+	/* AOSP SpellCheckerSession.SpellCheckerSessionParams: parameters used to create a SpellCheckerSession */
+	public static class SpellCheckerSessionParams {
+		private final java.util.Locale mLocale;
+		private final boolean mShouldReferToSpellCheckerLanguageSettings;
+		private final int mSupportedAttributes;
+		private final android.os.Bundle mExtras;
+
+		private SpellCheckerSessionParams(java.util.Locale locale, boolean referToSpellCheckerLanguageSettings, int supportedAttributes, android.os.Bundle extras) {
+			mLocale = locale;
+			mShouldReferToSpellCheckerLanguageSettings = referToSpellCheckerLanguageSettings;
+			mSupportedAttributes = supportedAttributes;
+			mExtras = extras;
+		}
+
+		public java.util.Locale getLocale() {
+			return mLocale;
+		}
+
+		public boolean shouldReferToSpellCheckerLanguageSettings() {
+			return mShouldReferToSpellCheckerLanguageSettings;
+		}
+
+		public int getSupportedAttributes() {
+			return mSupportedAttributes;
+		}
+
+		public android.os.Bundle getExtras() {
+			return mExtras;
+		}
+
+		public static final class Builder {
+			private java.util.Locale mLocale;
+			private boolean mShouldReferToSpellCheckerLanguageSettings = false;
+			private int mSupportedAttributes = 0;
+			private android.os.Bundle mExtras = android.os.Bundle.EMPTY;
+
+			public Builder() {}
+
+			public SpellCheckerSessionParams build() {
+				if (mLocale == null && !mShouldReferToSpellCheckerLanguageSettings) {
+					throw new IllegalArgumentException("mLocale should not be null if "
+					                                   + " mShouldReferToSpellCheckerLanguageSettings is false.");
+				}
+				return new SpellCheckerSessionParams(mLocale, mShouldReferToSpellCheckerLanguageSettings, mSupportedAttributes, mExtras);
+			}
+
+			public Builder setLocale(java.util.Locale locale) {
+				mLocale = locale;
+				return this;
+			}
+
+			public Builder setShouldReferToSpellCheckerLanguageSettings(boolean shouldReferToSpellCheckerLanguageSettings) {
+				mShouldReferToSpellCheckerLanguageSettings = shouldReferToSpellCheckerLanguageSettings;
+				return this;
+			}
+
+			public Builder setSupportedAttributes(int supportedAttributes) {
+				mSupportedAttributes = supportedAttributes;
+				return this;
+			}
+
+			public Builder setExtras(android.os.Bundle extras) {
+				mExtras = extras;
+				return this;
+			}
+		}
+	}
+
 	/* AOSP SpellCheckerSession.SpellCheckerSessionListener */
 	public interface SpellCheckerSessionListener {
 		public void onGetSuggestions(SuggestionsInfo[] results);

@@ -20,6 +20,12 @@ public final class InputMethodInfo {
 		mSettingsActivity = settingsActivity;
 	}
 
+	/* AOSP parses the service's meta-data for the settings activity and the subtypes; ATL has no input method services,
+	 * so the info is the service's package, name and label, without settings activity and subtypes */
+	public InputMethodInfo(android.content.Context context, android.content.pm.ResolveInfo service) throws org.xmlpull.v1.XmlPullParserException, java.io.IOException {
+		this(service.serviceInfo.packageName, service.serviceInfo.name, service.loadLabel(context.getPackageManager()), null);
+	}
+
 	/* AOSP InputMethodInfo.loadLabel(): the service's label; the test constructor gives it as the
 	 * ResolveInfo's nonLocalizedLabel */
 	public CharSequence loadLabel(android.content.pm.PackageManager pm) {

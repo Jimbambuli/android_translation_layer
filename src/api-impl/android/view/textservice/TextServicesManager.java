@@ -24,6 +24,19 @@ public class TextServicesManager {
 		return null;
 	}
 
+	/* AOSP newSpellCheckerSession(SpellCheckerSessionParams, Executor, SpellCheckerSessionListener): argument checks as
+	 * AOSP, then null because there is no spell checker (spell checking is not enabled, sci == null) */
+	public SpellCheckerSession newSpellCheckerSession(SpellCheckerSession.SpellCheckerSessionParams params, java.util.concurrent.Executor executor,
+	                                                  SpellCheckerSession.SpellCheckerSessionListener listener) {
+		java.util.Objects.requireNonNull(executor);
+		java.util.Objects.requireNonNull(listener);
+		if (!params.shouldReferToSpellCheckerLanguageSettings() && params.getLocale() == null) {
+			throw new IllegalArgumentException("Locale should not be null if you don't refer"
+			                                   + " settings.");
+		}
+		return null;
+	}
+
 	/* AOSP newSpellCheckerSession(Bundle, Locale, SpellCheckerSessionListener, boolean):
 	 * argument checks as AOSP, then null because there is no spell checker (sci == null) */
 	public SpellCheckerSession newSpellCheckerSession(Bundle bundle, Locale locale,

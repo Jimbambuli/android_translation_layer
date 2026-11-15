@@ -35,6 +35,27 @@ public class InputMethodSubtype {
 		this(new InputMethodSubtypeBuilder().setSubtypeLocale(Locale.getDefault().toString()).setLanguageTag(Locale.getDefault().toLanguageTag()).setSubtypeMode("keyboard"));
 	}
 
+	/* AOSP: the constructor without the subtype id has the id 0 */
+	@Deprecated
+	public InputMethodSubtype(int nameId, int iconId, String locale, String mode, String extraValue, boolean isAuxiliary, boolean overridesImplicitlyEnabledSubtype) {
+		this(nameId, iconId, locale, mode, extraValue, isAuxiliary, overridesImplicitlyEnabledSubtype, 0);
+	}
+
+	/* AOSP: the constructors go through getBuilder(), without the ASCII capability */
+	@Deprecated
+	public InputMethodSubtype(int nameId, int iconId, String locale, String mode, String extraValue, boolean isAuxiliary, boolean overridesImplicitlyEnabledSubtype, int id) {
+		this(new InputMethodSubtypeBuilder()
+		         .setSubtypeNameResId(nameId)
+		         .setSubtypeIconResId(iconId)
+		         .setSubtypeLocale(locale)
+		         .setSubtypeMode(mode)
+		         .setSubtypeExtraValue(extraValue)
+		         .setIsAuxiliary(isAuxiliary)
+		         .setOverridesImplicitlyEnabledSubtype(overridesImplicitlyEnabledSubtype)
+		         .setSubtypeId(id)
+		         .setIsAsciiCapable(false));
+	}
+
 	private InputMethodSubtype(InputMethodSubtypeBuilder b) {
 		mSubtypeNameResId = b.mSubtypeNameResId;
 		mSubtypeIconResId = b.mSubtypeIconResId;
