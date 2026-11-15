@@ -78,6 +78,12 @@ public class AudioTrack implements AudioRouting {
 		this.periodic_update_listener = listener;
 	}
 
+	/* AOSP AudioTrack.setPlaybackPositionUpdateListener(listener, handler): ATL calls the listener from the
+	 * playback thread in either case, as for the variant without a handler */
+	public void setPlaybackPositionUpdateListener(OnPlaybackPositionUpdateListener listener, android.os.Handler handler) {
+		setPlaybackPositionUpdateListener(listener);
+	}
+
 	public int setPositionNotificationPeriod(int periodInFrames) {
 		System.out.println("\n\nAudioTrack.nsetPositionNotificationPeriod(" + periodInFrames + "); called\n\n\n\n");
 		return 0; // SUCCESS
@@ -360,6 +366,29 @@ public class AudioTrack implements AudioRouting {
 
 	@Override
 	public void removeOnRoutingChangedListener(AudioRouting.OnRoutingChangedListener listener) {}
+
+	/* AOSP AudioTrack.OnRoutingChangedListener (deprecated) and its add/remove variants */
+	@Deprecated
+	public interface OnRoutingChangedListener extends AudioRouting.OnRoutingChangedListener {
+		public void onRoutingChanged(AudioTrack audioTrack);
+
+		@Override
+		default public void onRoutingChanged(AudioRouting router) {
+			if (router instanceof AudioTrack) {
+				onRoutingChanged((AudioTrack) router);
+			}
+		}
+	}
+
+	@Deprecated
+	public void addOnRoutingChangedListener(OnRoutingChangedListener listener, android.os.Handler handler) {
+		addOnRoutingChangedListener((AudioRouting.OnRoutingChangedListener) listener, handler);
+	}
+
+	@Deprecated
+	public void removeOnRoutingChangedListener(OnRoutingChangedListener listener) {
+		removeOnRoutingChangedListener((AudioRouting.OnRoutingChangedListener) listener);
+	}
 
 	private native int native_getPlaybackHeadPosition();
 	public native void native_play();
