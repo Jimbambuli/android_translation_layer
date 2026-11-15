@@ -141,8 +141,8 @@ public class PhoneNumberUtils {
 		return (!(networkPortion.equals("+") || android.text.TextUtils.isEmpty(networkPortion))) && isDialable(networkPortion);
 	}
 
-	/* PhoneNumberUtils.isDialable(String): every character is dialable */
-	public static boolean isDialable(String address) {
+	/* PhoneNumberUtils.isDialable(String) (private in AOSP): every character is dialable */
+	private static boolean isDialable(String address) {
 		for (int i = 0, count = address.length(); i < count; i++) {
 			if (!isDialable(address.charAt(i))) {
 				return false;
