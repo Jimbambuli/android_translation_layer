@@ -23,6 +23,7 @@ import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.BlendMode;
 import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -1176,6 +1177,29 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		@Override
 		public void set(View view, Float value) {
 			view.setAlpha(value);
+		}
+	};
+
+	/* AOSP View.ROTATION_X / ROTATION_Y */
+	public static final Property<View, Float> ROTATION_X = new FloatProperty<View>("rotationX") {
+		@Override
+		public void setValue(View object, float value) {
+			object.setRotationX(value);
+		}
+		@Override
+		public Float get(View object) {
+			return object.getRotationX();
+		}
+	};
+
+	public static final Property<View, Float> ROTATION_Y = new FloatProperty<View>("rotationY") {
+		@Override
+		public void setValue(View object, float value) {
+			object.setRotationY(value);
+		}
+		@Override
+		public Float get(View object) {
+			return object.getRotationY();
 		}
 	};
 
@@ -4175,9 +4199,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return userPaddingStart != UNDEFINED_PADDING || userPaddingEnd != UNDEFINED_PADDING;
 	}
 
-	/* AOSP's ForegroundInfo, without the tint */
+	/* AOSP's ForegroundInfo, the tint as AOSP's TintInfo fields */
 	private static class ForegroundInfo {
 		private Drawable mDrawable;
+		private ColorStateList mTintList;
+		private BlendMode mBlendMode;
+		private boolean mHasTintList;
+		private boolean mHasTintMode;
 		private int mGravity = Gravity.FILL;
 		private boolean mInsidePadding = true;
 		private final Rect mSelfBounds = new Rect();
@@ -4212,6 +4240,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mForegroundInfo.mDrawable = foreground;
 		if (foreground != null) {
 			native_drawThroughJava(widget);
+			applyForegroundTint();
+			foreground = mForegroundInfo.mDrawable;
 			foreground.setLayoutDirection(getLayoutDirection());
 			if (foreground.isStateful()) {
 				foreground.setState(getDrawableState());
@@ -4224,6 +4254,68 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		requestLayout();
 		invalidate();
+	}
+
+	/* AOSP View.setForegroundTintList()/getForegroundTintList(), setForegroundTintMode()/getForegroundTintMode(),
+	 * setForegroundTintBlendMode()/getForegroundTintBlendMode(), applyForegroundTint() */
+	public void setForegroundTintList(ColorStateList tint) {
+		if (mForegroundInfo == null)
+			mForegroundInfo = new ForegroundInfo();
+		mForegroundInfo.mTintList = tint;
+		mForegroundInfo.mHasTintList = true;
+		applyForegroundTint();
+	}
+
+	public ColorStateList getForegroundTintList() {
+		return mForegroundInfo != null ? mForegroundInfo.mTintList : null;
+	}
+
+	public void setForegroundTintMode(PorterDuff.Mode tintMode) {
+		BlendMode mode = null;
+		if (tintMode != null)
+			mode = BlendMode.fromValue(tintMode.nativeInt);
+		setForegroundTintBlendMode(mode);
+	}
+
+	public void setForegroundTintBlendMode(BlendMode blendMode) {
+		if (mForegroundInfo == null)
+			mForegroundInfo = new ForegroundInfo();
+		mForegroundInfo.mBlendMode = blendMode;
+		mForegroundInfo.mHasTintMode = true;
+		applyForegroundTint();
+	}
+
+	public PorterDuff.Mode getForegroundTintMode() {
+		BlendMode blendMode = mForegroundInfo != null ? mForegroundInfo.mBlendMode : null;
+		return blendMode != null ? BlendMode.blendModeToPorterDuffMode(blendMode) : null;
+	}
+
+	public BlendMode getForegroundTintBlendMode() {
+		return mForegroundInfo != null ? mForegroundInfo.mBlendMode : null;
+	}
+
+	private void applyForegroundTint() {
+		if (mForegroundInfo != null && mForegroundInfo.mDrawable != null
+				&& (mForegroundInfo.mHasTintList || mForegroundInfo.mHasTintMode)) {
+			mForegroundInfo.mDrawable = mForegroundInfo.mDrawable.mutate();
+			if (mForegroundInfo.mHasTintList)
+				mForegroundInfo.mDrawable.setTintList(mForegroundInfo.mTintList);
+			if (mForegroundInfo.mHasTintMode)
+				mForegroundInfo.mDrawable.setTintBlendMode(mForegroundInfo.mBlendMode);
+			// The drawable (or one of its children) may not have been stateful before applying the tint
+			if (mForegroundInfo.mDrawable.isStateful())
+				mForegroundInfo.mDrawable.setState(getDrawableState());
+		}
+	}
+
+	/* AOSP View.setRevealOnFocusHint()/getRevealOnFocusHint() (PFLAG3_NO_REVEAL_ON_FOCUS); final in AOSP, not
+	 * here because ATL's TextView still declares its own final copy */
+	private boolean mNoRevealOnFocus;
+	public void setRevealOnFocusHint(boolean revealOnFocus) {
+		mNoRevealOnFocus = !revealOnFocus;
+	}
+	public boolean getRevealOnFocusHint() {
+		return !mNoRevealOnFocus;
 	}
 
 	public boolean isForegroundInsidePadding() {
@@ -4817,6 +4909,23 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 	public boolean isScrollbarFadingEnabled() {
 		return mFadeScrollBars;
+	}
+
+	/* AOSP View.set/getScrollBarDefaultDelayBeforeFade(), set/getScrollBarFadeDuration(): kept in the
+	 * ScrollabilityCache, ViewConfiguration's defaults while there is none */
+	private int mScrollBarDefaultDelayBeforeFade = -1;
+	private int mScrollBarFadeDuration = -1;
+	public int getScrollBarDefaultDelayBeforeFade() {
+		return mScrollBarDefaultDelayBeforeFade < 0 ? ViewConfiguration.getScrollDefaultDelay() : mScrollBarDefaultDelayBeforeFade;
+	}
+	public void setScrollBarDefaultDelayBeforeFade(int scrollBarDefaultDelayBeforeFade) {
+		mScrollBarDefaultDelayBeforeFade = scrollBarDefaultDelayBeforeFade;
+	}
+	public int getScrollBarFadeDuration() {
+		return mScrollBarFadeDuration < 0 ? ViewConfiguration.getScrollBarFadeDuration() : mScrollBarFadeDuration;
+	}
+	public void setScrollBarFadeDuration(int scrollBarFadeDuration) {
+		mScrollBarFadeDuration = scrollBarFadeDuration;
 	}
 
 	/* AOSP View.setScrollBarStyle()/getScrollBarStyle(): bits of mViewFlags (no scroll bars to inset here) */
