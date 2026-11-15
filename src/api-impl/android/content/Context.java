@@ -665,6 +665,13 @@ public abstract class Context {
 		return PackageManager.PERMISSION_GRANTED;
 	}
 
+	/* AOSP ContextImpl.checkUriPermission asks the ActivityManager for the grants of pid/uid;
+	 * checkCallingOrSelfUriPermission is this call with the own ids outside of a binder call. ATL keeps
+	 * no grants for other uids, so: the own uid like checkCallingOrSelfUriPermission, every other denied */
+	public int checkUriPermission(Uri uri, int pid, int uid, int modeFlags) {
+		return uid == android.os.Process.myUid() ? checkCallingOrSelfUriPermission(uri, modeFlags) : PackageManager.PERMISSION_DENIED;
+	}
+
 	/* AOSP ContextImpl.registerComponentCallbacks(): the callbacks belong to the application, which calls them
 	 * (Application.onConfigurationChanged(), onLowMemory(), onTrimMemory()) */
 	public void registerComponentCallbacks(ComponentCallbacks callbacks) {
@@ -903,6 +910,21 @@ public abstract class Context {
 
 	public void sendBroadcast(Intent intent, String receiverPermission) {
 		sendBroadcast(intent);
+	}
+
+	/* AOSP ContextImpl.sendBroadcast(Intent, String, Bundle): the options (BroadcastOptions) only steer
+	 * the system's delivery, which ATL does not have */
+	public void sendBroadcast(Intent intent, String receiverPermission, Bundle options) {
+		sendBroadcast(intent, receiverPermission);
+	}
+
+	/* AOSP ContextImpl.sendBroadcastAsUser: ATL has the one user only */
+	public void sendBroadcastAsUser(Intent intent, android.os.UserHandle user) {
+		sendBroadcast(intent);
+	}
+
+	public void sendBroadcastAsUser(Intent intent, android.os.UserHandle user, String receiverPermission) {
+		sendBroadcast(intent, receiverPermission);
 	}
 
 	/* AOSP (deprecated): the broadcast stays and goes to every receiver that registers for it later */
