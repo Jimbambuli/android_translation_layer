@@ -232,6 +232,7 @@ srcs = [
 	'android/atl/GVariantBuilderParcel.java',
 	'android/atl/GVariantIterParcel.java',
 	'android/bluetooth/BluetoothAdapter.java',
+	'android/bluetooth/BluetoothDevice.java',
 	'android/bluetooth/BluetoothManager.java',
 	'android/bluetooth/BluetoothProfile.java',
 	'android/bluetooth/le/ScanCallback.java',
