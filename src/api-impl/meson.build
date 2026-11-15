@@ -396,6 +396,7 @@ srcs = [
 	'android/database/sqlite/SQLiteStatementInfo.java',
 	'android/database/sqlite/SQLiteTableLockedException.java',
 	'android/database/sqlite/SQLiteTransactionListener.java',
+	'android/drm/DrmManagerClient.java',
 	'android/gesture/GestureOverlayView.java',
 	'android/gesture/GestureStore.java',
 	'android/graphics/Bitmap.java',
