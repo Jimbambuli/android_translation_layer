@@ -302,6 +302,11 @@ public class Layout {
 		return native_get_line_top(layout, line);
 	}
 
+	/* AOSP Layout.getLineExtra(): the line spacing added below the line; the base class has none */
+	public int getLineExtra(int line) {
+		return 0;
+	}
+
 	public int getLineBottom(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();

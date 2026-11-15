@@ -31,4 +31,7 @@ public interface Editable extends CharSequence, GetChars, Spannable, Appendable 
 	public Editable append(char text);
 
 	public void clear();
+
+	/* AOSP Editable.clearSpans() */
+	public void clearSpans();
 }
