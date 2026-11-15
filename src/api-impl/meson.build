@@ -1,6 +1,13 @@
 srcs = [
 	'android/accessibilityservice/AccessibilityService.java',
 	'android/accessibilityservice/GestureDescription.java',
+	'android/app/backup/BackupDataInput.java',
+	'android/app/backup/BackupDataInputStream.java',
+	'android/app/backup/BackupDataOutput.java',
+	'android/app/backup/BackupHelper.java',
+	'android/app/backup/FileBackupHelper.java',
+	'android/app/backup/FullBackupDataOutput.java',
+	'android/app/backup/FullRestoreDataInput.java',
 	'android/bluetooth/Attributable.java',
 	'android/bluetooth/BluetoothAssignedNumbers.java',
 	'android/bluetooth/BluetoothClass.java',
