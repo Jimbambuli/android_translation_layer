@@ -521,6 +521,7 @@ srcs = [
 	'android/hardware/camera2/CameraCaptureSession.java',
 	'android/hardware/camera2/CameraCharacteristics.java',
 	'android/hardware/camera2/CameraDevice.java',
+	'android/hardware/camera2/CameraExtensionCharacteristics.java',
 	'android/hardware/camera2/CameraManager.java',
 	'android/hardware/camera2/CaptureFailure.java',
 	'android/hardware/camera2/CaptureRequest.java',

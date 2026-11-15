@@ -253,4 +253,34 @@ public final class OutputConfiguration {
 	public int getSurfaceGroupId() {
 		return mSurfaceGroupId;
 	}
+	/* AOSP equals() over the fields ATL keeps */
+	@Override
+	public boolean equals(Object obj) {
+		if (obj == null)
+			return false;
+		if (this == obj)
+			return true;
+		if (!(obj instanceof OutputConfiguration))
+			return false;
+		final OutputConfiguration other = (OutputConfiguration)obj;
+		if (mRotation != other.mRotation || !java.util.Objects.equals(mConfiguredSize, other.mConfiguredSize) ||
+		    mSurfaceGroupId != other.mSurfaceGroupId || mIsDeferredConfig != other.mIsDeferredConfig ||
+		    mIsShared != other.mIsShared || !java.util.Objects.equals(mPhysicalCameraId, other.mPhysicalCameraId) ||
+		    mIsMultiResolution != other.mIsMultiResolution || mStreamUseCase != other.mStreamUseCase ||
+		    mTimestampBase != other.mTimestampBase || mMirrorMode != other.mMirrorMode ||
+		    mReadoutTimestampEnabled != other.mReadoutTimestampEnabled ||
+		    !mSensorPixelModesUsed.equals(other.mSensorPixelModesUsed) ||
+		    mDynamicRangeProfile != other.mDynamicRangeProfile)
+			return false;
+		/* a deferred configuration compares without its surfaces */
+		return mIsDeferredConfig || mSurfaces.equals(other.mSurfaces);
+	}
+
+	@Override
+	public int hashCode() {
+		return java.util.Objects.hash(mRotation, mIsDeferredConfig ? null : mSurfaces, mConfiguredSize, mSurfaceGroupId,
+		                              mIsShared, mPhysicalCameraId, mIsMultiResolution, mSensorPixelModesUsed,
+		                              mDynamicRangeProfile, mStreamUseCase, mTimestampBase, mMirrorMode,
+		                              mReadoutTimestampEnabled);
+	}
 }
