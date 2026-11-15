@@ -428,7 +428,7 @@ public final class ConnectionRequest implements Parcelable {
             switch (key) {
                 case TelecomManager.EXTRA_INCOMING_CALL_ADDRESS:
                 case TelecomManager.EXTRA_UNKNOWN_CALL_HANDLE:
-                    sb.append(Log.pii(extras.get(key)));
+                    sb.append(extras.get(key));
                     break;
                 default:
                     sb.append(extras.get(key));

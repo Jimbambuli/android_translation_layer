@@ -167,7 +167,7 @@ public final class PhoneAccountHandle implements Parcelable {
         } else {
             // Note: Log.pii called for mId as it can contain personally identifying phone account
             // information such as SIP account IDs.
-            sb.append(Log.pii(mId));
+            sb.append(mId);
         }
         sb.append(", ");
         sb.append(mUserHandle);

@@ -1178,7 +1178,7 @@ public final class PhoneAccount {
         sb.append(" Extras: ");
         sb.append(mExtras);
         sb.append(" GroupId: ");
-        sb.append(Log.pii(mGroupId));
+        sb.append(mGroupId);
         sb.append(" SC Restrictions: ");
         if (hasSimultaneousCallingRestriction()) {
             sb.append("[ ");
