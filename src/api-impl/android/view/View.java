@@ -4948,7 +4948,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mScrollBarSize = scrollBarSize;
 	}
 
-	public void setVerticalScrollbarPosition(int position) {}
+	/* AOSP View.setVerticalScrollbarPosition()/getVerticalScrollbarPosition(): kept (ATL draws no Android scroll
+	 * bars, so nothing moves) */
+	private int mVerticalScrollbarPosition;
+	public void setVerticalScrollbarPosition(int position) {
+		mVerticalScrollbarPosition = position;
+	}
+	public int getVerticalScrollbarPosition() {
+		return mVerticalScrollbarPosition;
+	}
 
 
 	/* AOSP View.setTouchDelegate(). The delegate is asked in onTouchEvent(), which GTK calls for a view with a touch
