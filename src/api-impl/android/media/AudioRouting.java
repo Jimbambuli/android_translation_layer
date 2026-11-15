@@ -48,6 +48,16 @@ public interface AudioRouting {
      */
 	public AudioDeviceInfo getRoutedDevice();
 
+	/* AOSP AudioRouting.getRoutedDevices() (as in AOSP 16, the default returns an empty list) */
+	default java.util.List<AudioDeviceInfo> getRoutedDevices() {
+		java.util.List<AudioDeviceInfo> audioDeviceInfos = new java.util.ArrayList<AudioDeviceInfo>();
+		AudioDeviceInfo audioDeviceInfo = getRoutedDevice();
+		if (audioDeviceInfo != null) {
+			audioDeviceInfos.add(audioDeviceInfo);
+		}
+		return new java.util.ArrayList<AudioDeviceInfo>();
+	}
+
 	/**
      * Adds an {@link AudioRouting.OnRoutingChangedListener} to receive notifications of routing
      * changes on this AudioTrack/AudioRecord.
