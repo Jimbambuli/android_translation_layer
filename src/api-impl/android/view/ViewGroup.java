@@ -2092,6 +2092,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 	}
 
+	/* AOSP ViewGroup.dispatchSystemUiVisibilityChanged() */
+	@Override
+	public void dispatchSystemUiVisibilityChanged(int visible) {
+		super.dispatchSystemUiVisibilityChanged(visible);
+		for (View child : children) {
+			child.dispatchSystemUiVisibilityChanged(visible);
+		}
+	}
+
 	@Override
 	public void dispatchWindowSystemUiVisiblityChanged(int visible) {
 		super.dispatchWindowSystemUiVisiblityChanged(visible);

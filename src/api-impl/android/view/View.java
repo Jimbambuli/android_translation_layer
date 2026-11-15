@@ -1096,6 +1096,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		OnHoverListener mOnHoverListener;
 		OnDragListener mOnDragListener;
 		OnCreateContextMenuListener mOnCreateContextMenuListener;
+		OnSystemUiVisibilityChangeListener mOnSystemUiVisibilityChangeListener;
 		private ArrayList<OnLayoutChangeListener> mOnLayoutChangeListeners;
 		private CopyOnWriteArrayList<OnAttachStateChangeListener> mOnAttachStateChangeListeners;
 	}
@@ -2029,7 +2030,25 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		on_scroll_change_listener = l;
 	}
 
-	public /*native*/ void setOnSystemUiVisibilityChangeListener(OnSystemUiVisibilityChangeListener l) {}
+	/* AOSP View.PUBLIC_STATUS_BAR_VISIBILITY_MASK, SYSTEM_UI_CLEARABLE_FLAGS */
+	public static final int PUBLIC_STATUS_BAR_VISIBILITY_MASK = 0x00003FF7;
+	public static final int SYSTEM_UI_CLEARABLE_FLAGS = SYSTEM_UI_FLAG_LOW_PROFILE | SYSTEM_UI_FLAG_HIDE_NAVIGATION | SYSTEM_UI_FLAG_FULLSCREEN;
+
+	/* AOSP View.setOnSystemUiVisibilityChangeListener()/dispatchSystemUiVisibilityChanged() */
+	public void setOnSystemUiVisibilityChangeListener(OnSystemUiVisibilityChangeListener l) {
+		getListenerInfo().mOnSystemUiVisibilityChangeListener = l;
+	}
+
+	public void dispatchSystemUiVisibilityChanged(int visibility) {
+		ListenerInfo li = mListenerInfo;
+		if (li != null && li.mOnSystemUiVisibilityChangeListener != null) {
+			li.mOnSystemUiVisibilityChangeListener.onSystemUiVisibilityChange(visibility & PUBLIC_STATUS_BAR_VISIBILITY_MASK);
+		}
+	}
+
+	/* AOSP ViewRootImpl.handleDispatchSystemUiVisibilityChanged(): the window's views hear the clearable flags in
+	 * effect, from the main loop and only when they changed; here the flags are in effect as soon as they are set */
+	private int mDispatchedSystemUiVisibility;
 	public final int getWidth() {
 		return right - left;
 	}
@@ -2199,6 +2218,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		   Such a mode doesn't exist on desktop Linux, so we just use normal fullscreen for both modes. */
 		nativeSetFullscreen(widget, (visibility & (View.SYSTEM_UI_FLAG_FULLSCREEN | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)) != 0);
 		system_ui_visibility = visibility;
+		final View root = getRootView();
+		final int clearable = visibility & SYSTEM_UI_CLEARABLE_FLAGS;
+		if (isAttachedToWindow() && root.mDispatchedSystemUiVisibility != clearable) {
+			root.mDispatchedSystemUiVisibility = clearable;
+			root.post(new Runnable() {
+				@Override
+				public void run() {
+					root.dispatchSystemUiVisibilityChanged(clearable);
+				}
+			});
+		}
 	}
 	public int getSystemUiVisibility() {
 		return system_ui_visibility;
