@@ -4,6 +4,16 @@ package android.telephony;
  * ("default implementation empty"). ATL has no modem, so listen() never calls them. */
 public class PhoneStateListener {
 
+	public PhoneStateListener() {}
+
+	/* AOSP: the callbacks run on the executor; the executor must not be null (ATL never calls the callbacks) */
+	@Deprecated
+	public PhoneStateListener(java.util.concurrent.Executor executor) {
+		if (executor == null) {
+			throw new IllegalArgumentException("PhoneStateListener Executor must be non-null");
+		}
+	}
+
 	public void onMessageWaitingIndicatorChanged(boolean mwi) {}
 
 	public void onCallForwardingIndicatorChanged(boolean cfi) {}

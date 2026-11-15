@@ -135,6 +135,28 @@ public class PhoneNumberUtils {
 		return phoneNumber;
 	}
 
+	/* AOSP formats in place by the NANP/Japan rules; ATL has no number formatting rules and leaves the text as it is */
+	@Deprecated
+	public static void formatNumber(android.text.Editable text, int defaultFormattingType) {
+	}
+
+	/* AOSP: formatNumber(Editable, getFormatTypeForLocale(Locale.getDefault())) on a copy of the source */
+	@Deprecated
+	public static String formatNumber(String source) {
+		return source;
+	}
+
+	/* AOSP formats with libphonenumber, using the E164 number to find the country; ATL leaves the number as it is */
+	public static String formatNumber(String phoneNumber, String phoneNumberE164, String defaultCountryIso) {
+		return phoneNumber;
+	}
+
+	/* AOSP: compare(a, b, useStrict) with useStrict from config_use_strict_phone_number_comparation (false by default) */
+	@Deprecated
+	public static boolean compare(android.content.Context context, String a, String b) {
+		return compare(a, b);
+	}
+
 	/* PhoneNumberUtils.isWellFormedSmsAddress() */
 	public static boolean isWellFormedSmsAddress(String address) {
 		String networkPortion = PhoneNumberUtils.extractNetworkPortion(address);
