@@ -278,6 +278,29 @@ public final class DocumentsContract {
 		}
 	}
 
+	/* AOSP buildSearchDocumentsUri() */
+	public static Uri buildSearchDocumentsUri(String authority, String rootId, String query) {
+		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(authority)
+		    .appendPath(PATH_ROOT).appendPath(rootId).appendPath(PATH_SEARCH)
+		    .appendQueryParameter(PARAM_QUERY, query).build();
+	}
+
+	/* AOSP getDocumentThumbnail(): ContentResolver.loadThumbnail() with the size of the point; errors are logged,
+	 * and rethrown for apps targeting O and above (rethrowIfNecessary) */
+	public static android.graphics.Bitmap getDocumentThumbnail(ContentResolver content, Uri documentUri,
+	                                                           android.graphics.Point size,
+	                                                           android.os.CancellationSignal signal)
+	    throws FileNotFoundException {
+		try {
+			return content.loadThumbnail(documentUri, new android.util.Size(size.x, size.y), signal);
+		} catch (Exception e) {
+			if (!(e instanceof android.os.OperationCanceledException))
+				Log.w("DocumentsContract", "Failed to load thumbnail for " + documentUri + ": " + e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
 	public static Uri buildChildDocumentsUri(String authority, String parentDocumentId) {
 		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(authority).appendPath(PATH_DOCUMENT).appendPath(parentDocumentId).appendPath(PATH_CHILDREN).build();
 	}

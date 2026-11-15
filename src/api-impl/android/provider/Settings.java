@@ -105,6 +105,8 @@ public class Settings {
 		public static final Uri DEFAULT_NOTIFICATION_URI = getUriFor("notification_sound");
 
 		public static final Uri DEFAULT_RINGTONE_URI = getUriFor("ringtone");
+		public static final String ALARM_ALERT = "alarm_alert";
+		public static final Uri DEFAULT_ALARM_ALERT_URI = getUriFor(ALARM_ALERT);
 
 		public static Uri getUriFor(String name) {
 			return Uri.withAppendedPath(CONTENT_URI, name);
@@ -172,6 +174,7 @@ public class Settings {
 	public static final class Global extends NameValueTable {
 		private final static String TAG = "Settings$Global";
 		public static final Uri CONTENT_URI = Uri.parse("content://settings/global");
+		public static final String ADB_WIFI_ENABLED = "adb_wifi_enabled";
 
 		public static Uri getUriFor(String name) {
 			return Uri.withAppendedPath(CONTENT_URI, name);
