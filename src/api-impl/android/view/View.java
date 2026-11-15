@@ -1,5 +1,11 @@
 package android.view;
 
+import android.credentials.GetCredentialException;
+import android.credentials.GetCredentialRequest;
+import android.credentials.GetCredentialResponse;
+import android.credentials.CredentialOption;
+import android.os.OutcomeReceiver;
+import android.service.credentials.CredentialProviderService;
 import android.R;
 import android.animation.AnimatorInflater;
 import android.animation.StateListAnimator;
@@ -2537,6 +2543,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		performHapticFeedback(feedbackConstant, flags);
 	}
 
+	/* AOSP View.performHapticFeedback(HapticFeedbackRequest): a usage that is set must be of the feedback class
+	 * (USAGE_CLASS_MASK 0xF, USAGE_CLASS_FEEDBACK 0x2), else no feedback; the rest as the int/int variant */
+	public boolean performHapticFeedback(android.os.vibrator.HapticFeedbackRequest request) {
+		int usage = request.getUsage();
+		if (usage != 0 /* USAGE_UNKNOWN */ && (usage & 0xF) != 0x2)
+			return false;
+		return performHapticFeedback(request.getFeedbackConstant(), request.getFlags());
+	}
+
 	public boolean performHapticFeedback(int feedbackConstant, int flags) {
 		/* AOSP View.performHapticFeedback(): nothing if the view turned it off, unless FLAG_IGNORE_VIEW_SETTING */
 		if ((flags & 0x0001 /* HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING, no ATL class */) == 0 && !isHapticFeedbackEnabled())
@@ -2596,6 +2611,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* AOSP's AttachInfo.mWindowToken (ViewRootImpl's IWindow binder): one per view hierarchy, kept by the
 	 * root view of a window as for rootHasWindowFocus; null while the view is not attached */
 	private IBinder windowToken;
+
+	/* AOSP AttachInfo.getRootSurfaceControl() (ViewRootImpl): the root of the hierarchy, kept by the root view */
+	private RootSurfaceControl rootSurfaceControl;
+
+	/* AOSP View.getRootSurfaceControl(): only non-null between onAttachedToWindow() and onDetachedFromWindow() */
+	public AttachedSurfaceControl getRootSurfaceControl() {
+		if (!isAttachedToWindow())
+			return null;
+		View root = getRootView();
+		if (root.rootSurfaceControl == null)
+			root.rootSurfaceControl = new RootSurfaceControl();
+		return root.rootSurfaceControl;
+	}
 
 	public IBinder getWindowToken() {
 		if (!isAttachedToWindow())
@@ -6085,6 +6113,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * input system; ATL has no pointer capture (no GTK pointer lock), so a request is never granted */
 	public void requestPointerCapture() {}
 
+	/* AOSP View.POINTER_CAPTURE_MODE_*: the capture modes of requestPointerCapture(int) */
+	public static final int POINTER_CAPTURE_MODE_UNCAPTURED = 0;
+	public static final int POINTER_CAPTURE_MODE_ABSOLUTE = 1;
+	public static final int POINTER_CAPTURE_MODE_RELATIVE = 2;
+
+	/* AOSP View.requestPointerCapture(int): as requestPointerCapture(), never granted in ATL */
+	public void requestPointerCapture(int mode) {}
+
 	public void releasePointerCapture() {}
 
 	public boolean hasPointerCapture() {
@@ -7183,6 +7219,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
+	/* AOSP View.showContextMenu(float, float): anchored at the view-relative position, asked of the parent chain */
+	public boolean showContextMenu(float x, float y) {
+		return getParent().showContextMenuForChild(this, x, y);
+	}
+
 	/* AOSP View.OnUnhandledKeyEventListener: asked after the tree did not handle a key, the listeners of the
 	 * children first */
 	private ArrayList<OnUnhandledKeyEventListener> mUnhandledKeyListeners;
@@ -7325,6 +7366,43 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public String[] getAutofillHints() {
 		return mAutofillHints;
+	}
+
+	/* AOSP View.setPendingCredentialRequest()/clearPendingCredentialRequest()/getPendingCredentialRequest()/
+	 * getPendingCredentialCallback(): the view's id is added to the candidate query data of every option. The
+	 * request is fired by AutofillManager on focus; ATL has no credential provider and no autofill session, so it is
+	 * only kept (as AOSP keeps it in ViewCredentialHandler) */
+	private GetCredentialRequest mPendingCredentialRequest;
+	private OutcomeReceiver<GetCredentialResponse, GetCredentialException> mPendingCredentialCallback;
+
+	public void clearPendingCredentialRequest() {
+		mPendingCredentialRequest = null;
+		mPendingCredentialCallback = null;
+	}
+
+	public void setPendingCredentialRequest(GetCredentialRequest request,
+			OutcomeReceiver<GetCredentialResponse, GetCredentialException> callback) {
+		java.util.Objects.requireNonNull(request, "request must not be null");
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+		for (CredentialOption option : request.getCredentialOptions()) {
+			ArrayList<AutofillId> ids = option.getCandidateQueryData()
+					.getParcelableArrayList(CredentialProviderService.EXTRA_AUTOFILL_ID, AutofillId.class);
+			ids = ids != null ? ids : new ArrayList<AutofillId>();
+			if (!ids.contains(getAutofillId())) {
+				ids.add(getAutofillId());
+			}
+			option.getCandidateQueryData().putParcelableArrayList(CredentialProviderService.EXTRA_AUTOFILL_ID, ids);
+		}
+		mPendingCredentialRequest = request;
+		mPendingCredentialCallback = callback;
+	}
+
+	public final GetCredentialRequest getPendingCredentialRequest() {
+		return mPendingCredentialRequest;
+	}
+
+	public final OutcomeReceiver<GetCredentialResponse, GetCredentialException> getPendingCredentialCallback() {
+		return mPendingCredentialCallback;
 	}
 
 	/* AOSP View.getAutofillId(): the id is made once, from an id that is unique in the app */

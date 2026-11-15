@@ -118,6 +118,77 @@ public final class SurfaceControl implements android.os.Parcelable {
 		}
 	}
 
+	/* AOSP SurfaceControl.JankData: SurfaceFlinger's classification of a frame of a surface */
+	public static class JankData {
+		public static final int JANK_NONE = 0;
+		public static final int JANK_COMPOSER = 1 << 0;
+		public static final int JANK_APPLICATION = 1 << 1;
+		public static final int JANK_OTHER = 1 << 2;
+
+		private final long mFrameVsyncId;
+		private final int mJankType;
+		private final long mFrameIntervalNs;
+		private final long mScheduledAppFrameTimeNs;
+		private final long mActualAppFrameTimeNs;
+
+		public JankData(long frameVsyncId, int jankType, long frameIntervalNs, long scheduledAppFrameTimeNs,
+				long actualAppFrameTimeNs) {
+			mFrameVsyncId = frameVsyncId;
+			mJankType = jankType;
+			mFrameIntervalNs = frameIntervalNs;
+			mScheduledAppFrameTimeNs = scheduledAppFrameTimeNs;
+			mActualAppFrameTimeNs = actualAppFrameTimeNs;
+		}
+
+		public long getVsyncId() {
+			return mFrameVsyncId;
+		}
+
+		public int getJankType() {
+			return mJankType;
+		}
+
+		public long getFrameIntervalNanos() {
+			return mFrameIntervalNs;
+		}
+
+		public long getScheduledAppFrameTimeNanos() {
+			return mScheduledAppFrameTimeNs;
+		}
+
+		public long getActualAppFrameTimeNanos() {
+			return mActualAppFrameTimeNs;
+		}
+
+		@Override
+		public String toString() {
+			return "JankData{vsync=" + mFrameVsyncId
+					+ ", jankType=0x" + Integer.toHexString(mJankType)
+					+ ", frameInterval=" + mFrameIntervalNs + "ns"
+					+ ", scheduledAppTime=" + mScheduledAppFrameTimeNs + "ns"
+					+ ", actualAppTime=" + mActualAppFrameTimeNs + "ns}";
+		}
+	}
+
+	/* AOSP SurfaceControl.OnJankDataListener: called with the jank classification of a batch of frames */
+	public interface OnJankDataListener {
+		void onJankDataAvailable(java.util.List<JankData> jankData);
+	}
+
+	/* AOSP SurfaceControl.OnJankDataListenerRegistration: the handle of a registered listener. ATL's compositor
+	 * delivers no jank data, so the only one is AOSP's NONE (the registration of a surface that is not valid) */
+	public static class OnJankDataListenerRegistration {
+		public static final OnJankDataListenerRegistration NONE = new OnJankDataListenerRegistration();
+
+		private OnJankDataListenerRegistration() {}
+
+		public void flush() {}
+
+		public void removeAfter(long afterVsync) {}
+
+		public void release() {}
+	}
+
 	public static class Transaction implements Closeable {
 		public Transaction() {}
 
@@ -134,6 +205,11 @@ public final class SurfaceControl implements android.os.Parcelable {
 		}
 
 		public Transaction setLayer(SurfaceControl sc, int z) {
+			return this;
+		}
+
+		/* AOSP Transaction.setCrop(): the layer's crop; ATL composites no layers (see setPosition) */
+		public Transaction setCrop(SurfaceControl sc, android.graphics.Rect crop) {
 			return this;
 		}
 

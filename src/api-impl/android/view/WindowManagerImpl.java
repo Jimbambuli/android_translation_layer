@@ -162,6 +162,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		view.parent = windowParent;
 		view.dispatchAttachedToWindow();
 		android.atl.ATLViewDump.addRoot(view); // debugging aid (atl-doctor)
+		WindowManagerGlobal.getInstance().viewAdded(view);
 		Rect displayFrame = new Rect();
 		view.getWindowVisibleDisplayFrame(displayFrame);
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
@@ -221,6 +222,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	@Override
 	public void removeView(View view) {
 		android.atl.ATLViewDump.removeRoot(view); // debugging aid (atl-doctor)
+		WindowManagerGlobal.getInstance().viewRemoved(view);
 		view.dispatchDetachedFromWindow();
 		native_removeView(view.widget);
 		view.parent = null;

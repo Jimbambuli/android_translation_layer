@@ -17,10 +17,13 @@
 package android.view;
 
 import android.graphics.Rect;
+import android.graphics.Region;
+import android.util.ArrayMap;
+import android.view.accessibility.AccessibilityNodeInfo.TouchDelegateInfo;
 
 /**
  * android-14 android.view.TouchDelegate with onTouchExplorationHoverEvent() from AOSP 16,
- * without getTouchDelegateInfo().
+ * with getTouchDelegateInfo().
  */
 public class TouchDelegate {
 
@@ -31,6 +34,8 @@ public class TouchDelegate {
 	private Rect mSlopBounds;
 
 	private boolean mDelegateTargeted;
+
+	private TouchDelegateInfo mTouchDelegateInfo;
 
 	public static final int ABOVE = 1;
 
@@ -134,5 +139,19 @@ public class TouchDelegate {
 			handled = mDelegateView.dispatchHoverEvent(event);
 		}
 		return handled;
+	}
+
+	/* AOSP TouchDelegate.getTouchDelegateInfo(): the delegate's bounds mapped to the delegate view, for accessibility */
+	public TouchDelegateInfo getTouchDelegateInfo() {
+		if (mTouchDelegateInfo == null) {
+			final ArrayMap<Region, View> targetMap = new ArrayMap<>(1);
+			Rect bounds = mBounds;
+			if (bounds == null) {
+				bounds = new Rect();
+			}
+			targetMap.put(new Region(bounds), mDelegateView);
+			mTouchDelegateInfo = new TouchDelegateInfo(targetMap);
+		}
+		return mTouchDelegateInfo;
 	}
 }

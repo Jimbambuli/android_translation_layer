@@ -37,7 +37,7 @@ public final class KeyGenParameterSpec implements java.security.spec.AlgorithmPa
 	private boolean criticalToDeviceEncryption = false;
 	private int maxUsageCount = -1;
 	private String attestKeyAlias;
-	private String[] mgf1Digests;
+	private java.util.Set<String> mgf1Digests = java.util.Collections.emptySet();
 	private int userAuthenticationType = 0;
 
 	public static class Builder {
@@ -200,8 +200,8 @@ public final class KeyGenParameterSpec implements java.security.spec.AlgorithmPa
 			return this;
 		}
 
-		public Builder setMgf1Digests(String[] mgf1Digests) {
-			spec.mgf1Digests = mgf1Digests;
+		public Builder setMgf1Digests(String... mgf1Digests) {
+			spec.mgf1Digests = java.util.Set.of(mgf1Digests);
 			return this;
 		}
 
@@ -263,8 +263,16 @@ public final class KeyGenParameterSpec implements java.security.spec.AlgorithmPa
 		return certificateNotAfter;
 	}
 
+	/* AOSP: null means not specified, and asking then is an error */
 	public String[] getDigests() {
-		return digests;
+		if (digests == null) {
+			throw new IllegalStateException("Digests not specified");
+		}
+		return digests.clone();
+	}
+
+	public boolean isDigestsSpecified() {
+		return digests != null;
 	}
 
 	public String[] getSignaturePaddings() {
@@ -343,8 +351,16 @@ public final class KeyGenParameterSpec implements java.security.spec.AlgorithmPa
 		return attestKeyAlias;
 	}
 
-	public String[] getMgf1Digests() {
-		return mgf1Digests;
+	/* AOSP KeyGenParameterSpec.getMgf1Digests() */
+	public java.util.Set<String> getMgf1Digests() {
+		if (mgf1Digests.isEmpty()) {
+			throw new IllegalStateException("Mask generation function (MGF) not specified");
+		}
+		return new java.util.HashSet<>(mgf1Digests);
+	}
+
+	public boolean isMgf1DigestsSpecified() {
+		return !mgf1Digests.isEmpty();
 	}
 
 	public int getUserAuthenticationType() {

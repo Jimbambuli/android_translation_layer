@@ -2187,6 +2187,13 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		return parent != null && parent.showContextMenuForChild(originalView, x, y);
 	}
 
+	/* AOSP ViewGroup.onInterceptTouchEvent(MotionEvent): only a mouse press on a scroll bar thumb is intercepted;
+	 * ATL draws no draggable scroll bar thumbs, so the answer is always false */
+	@Override
+	public boolean onInterceptTouchEvent(MotionEvent event) {
+		return false;
+	}
+
 	/* AOSP ViewGroup.startActionModeForChild(View, ActionMode.Callback): the typed call with TYPE_PRIMARY */
 	@Override
 	public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback) {

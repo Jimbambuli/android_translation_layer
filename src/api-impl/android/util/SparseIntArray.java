@@ -202,6 +202,15 @@ public class SparseIntArray implements Cloneable {
 		return mValues[index];
 	}
 
+	/* AOSP SparseIntArray.setValueAt(): replaces the value of the mapping at the index */
+	public void setValueAt(int index, int value) {
+		if (index >= mSize) {
+			// The array might be slightly bigger than mSize, in which case, indexing won't fail.
+			throw new ArrayIndexOutOfBoundsException(index);
+		}
+		mValues[index] = value;
+	}
+
 	/**
 	 * Returns the index for which {@link #keyAt} would return the
 	 * specified key, or a negative number if the specified

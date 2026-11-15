@@ -16,6 +16,11 @@ public class NetworkSecurityPolicy {
 		return true;
 	}
 
+	/* libcore NetworkSecurityPolicy default: Certificate Transparency is not required (no network security config requires it) */
+	public boolean isCertificateTransparencyVerificationRequired(String hostname) {
+		return false;
+	}
+
 	public boolean isCleartextTrafficPermitted(String hostname) {
 		return true;
 	}

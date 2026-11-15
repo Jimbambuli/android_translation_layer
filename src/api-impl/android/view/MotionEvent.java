@@ -2021,6 +2021,11 @@ public final class MotionEvent extends InputEvent {
 	 * @hide
 	 */
 	@Override
+	/* AOSP MotionEvent.getEventTimeNanos() */
+	public final long getEventTimeNanos() {
+		return getEventTimeNano();
+	}
+
 	public final long getEventTimeNano() {
 		return eventTime * 1000; // FIXME
 	}
@@ -2569,6 +2574,11 @@ public final class MotionEvent extends InputEvent {
 	 *
 	 * @hide
 	 */
+	/* AOSP MotionEvent.getHistoricalEventTimeNanos(): the same value as getHistoricalEventTimeNano() */
+	public final long getHistoricalEventTimeNanos(int pos) {
+		return getHistoricalEventTimeNano(pos);
+	}
+
 	public final long getHistoricalEventTimeNano(int pos) {
 		return nativeGetEventTimeNanos(mNativePtr, pos);
 	}

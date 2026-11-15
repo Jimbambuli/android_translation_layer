@@ -505,6 +505,11 @@ public class Window {
 		return onBackInvokedDispatcher;
 	}
 
+	/* AOSP PhoneWindow.getRootSurfaceControl(): the ViewRootImpl of the decor view, null while it is not attached */
+	public AttachedSurfaceControl getRootSurfaceControl() {
+		return decorView != null ? decorView.getRootSurfaceControl() : null;
+	}
+
 	public View getDecorView() {
 		installDecor();
 		return decorView;
