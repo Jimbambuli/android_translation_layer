@@ -10,12 +10,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/* AOSP core/java/android/hardware/camera2/params/OutputConfiguration.java, reduced: no Parcelable,
- * multi-resolution or color-space part. ATL cannot query a Surface's size, format and dataspace
+/* AOSP core/java/android/hardware/camera2/params/OutputConfiguration.java, reduced: the Parcel carries
+ * ATL's fields only and there is no MultiResolutionImageReader (ATL has no ImageReader). ATL cannot query a Surface's size, format and dataspace
  * (SurfaceUtils), so a surface-backed configuration records no configured size and addSurface() skips
  * the format and dataspace match; the configuration is only consumed by a CameraDevice, which ATL never
  * opens. */
-public final class OutputConfiguration {
+public final class OutputConfiguration implements android.os.Parcelable {
 	public static final int ROTATION_0 = 0;
 
 	public static final int ROTATION_90 = 1;
@@ -62,6 +62,9 @@ public final class OutputConfiguration {
 	private long mUsage;
 	private boolean mReadoutTimestampEnabled;
 	private boolean mIsReadoutSensorTimestampBase;
+	/* AOSP mPublicFormat: ImageFormat.PRIVATE for surface and deferred configurations (SurfaceUtils.getSurfaceFormat()
+	 * of a display surface is HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED), the given format otherwise */
+	private int mConfiguredFormat = 0x22 /*ImageFormat.PRIVATE*/;
 
 	public OutputConfiguration(Surface surface) {
 		this(SURFACE_GROUP_ID_NONE, surface, ROTATION_0);
@@ -124,6 +127,7 @@ public final class OutputConfiguration {
 		mSurfaces = new ArrayList<Surface>();
 		mRotation = ROTATION_0;
 		mConfiguredSize = surfaceSize;
+		mConfiguredFormat = format;
 		mIsDeferredConfig = false;
 		mUsage = usage;
 	}
@@ -330,6 +334,113 @@ public final class OutputConfiguration {
 	public int getSurfaceGroupId() {
 		return mSurfaceGroupId;
 	}
+	/* AOSP OutputConfiguration.getConfiguredSize(): null for a surface-backed configuration here, because ATL cannot
+	 * query a Surface's size (see the class comment) */
+	public Size getConfiguredSize() {
+		return mConfiguredSize;
+	}
+
+	/* AOSP getConfiguredFormat() = mPublicFormat */
+	public int getConfiguredFormat() {
+		return mConfiguredFormat;
+	}
+
+	private static final java.util.concurrent.atomic.AtomicInteger sNextMultiResolutionGroupId =
+	    new java.util.concurrent.atomic.AtomicInteger(0);
+
+	/* AOSP createInstancesForMultiResolutionOutput(Collection<MultiResolutionStreamInfo>, int) */
+	public static List<OutputConfiguration> createInstancesForMultiResolutionOutput(
+	    java.util.Collection<MultiResolutionStreamInfo> streams, int format) {
+		if (streams == null || streams.size() <= 1) {
+			throw new IllegalArgumentException("The streams list must contain at least 2 entries");
+		}
+		if (format == 0x11 /*ImageFormat.NV21*/) {
+			throw new IllegalArgumentException("NV21 format is not supported");
+		}
+		int groupId = sNextMultiResolutionGroupId.getAndIncrement();
+		ArrayList<OutputConfiguration> configs = new ArrayList<OutputConfiguration>();
+		for (MultiResolutionStreamInfo stream : streams) {
+			Size surfaceSize = new Size(stream.getWidth(), stream.getHeight());
+			OutputConfiguration config = new OutputConfiguration(groupId, format, surfaceSize);
+			config.setPhysicalCameraId(stream.getPhysicalCameraId());
+			config.mIsMultiResolution = true;
+			configs.add(config);
+		}
+		return configs;
+	}
+
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(mRotation);
+		dest.writeInt(mSurfaceGroupId);
+		dest.writeInt(mConfiguredSize != null ? mConfiguredSize.getWidth() : 0);
+		dest.writeInt(mConfiguredSize != null ? mConfiguredSize.getHeight() : 0);
+		dest.writeInt(mConfiguredFormat);
+		dest.writeInt(mIsDeferredConfig ? 1 : 0);
+		dest.writeInt(mIsShared ? 1 : 0);
+		dest.writeParcelableArray(mSurfaces.toArray(new Surface[0]), flags);
+		dest.writeString(mPhysicalCameraId);
+		dest.writeInt(mIsMultiResolution ? 1 : 0);
+		dest.writeInt(mSensorPixelModesUsed.size());
+		for (int mode : mSensorPixelModesUsed)
+			dest.writeInt(mode);
+		dest.writeLong(mDynamicRangeProfile);
+		dest.writeInt(mColorSpace);
+		dest.writeLong(mStreamUseCase);
+		dest.writeInt(mTimestampBase);
+		dest.writeInt(mMirrorMode);
+		dest.writeInt(mMirrorModeForSurfaces.size());
+		for (int mode : mMirrorModeForSurfaces)
+			dest.writeInt(mode);
+		dest.writeInt(mReadoutTimestampEnabled ? 1 : 0);
+		dest.writeLong(mUsage);
+	}
+
+	private OutputConfiguration(android.os.Parcel source) {
+		mRotation = source.readInt();
+		mSurfaceGroupId = source.readInt();
+		int width = source.readInt();
+		int height = source.readInt();
+		mConfiguredSize = (width != 0 && height != 0) ? new Size(width, height) : null;
+		mConfiguredFormat = source.readInt();
+		mIsDeferredConfig = source.readInt() == 1;
+		mIsShared = source.readInt() == 1;
+		mSurfaces = new ArrayList<Surface>();
+		try {
+			for (android.os.Parcelable surface : source.readParcelableArray(Surface.class.getClassLoader()))
+				mSurfaces.add((Surface)surface);
+		} catch (ReflectiveOperationException e) {
+			throw new RuntimeException(e);
+		}
+		mPhysicalCameraId = source.readString();
+		mIsMultiResolution = source.readInt() == 1;
+		for (int n = source.readInt(); n > 0; n--)
+			mSensorPixelModesUsed.add(source.readInt());
+		mDynamicRangeProfile = source.readLong();
+		mColorSpace = source.readInt();
+		mStreamUseCase = source.readLong();
+		mTimestampBase = source.readInt();
+		mMirrorMode = source.readInt();
+		for (int n = source.readInt(); n > 0; n--)
+			mMirrorModeForSurfaces.add(source.readInt());
+		mReadoutTimestampEnabled = source.readInt() == 1;
+		mUsage = source.readLong();
+	}
+
+	public static final android.os.Parcelable.Creator<OutputConfiguration> CREATOR =
+	    new android.os.Parcelable.Creator<OutputConfiguration>() {
+		    public OutputConfiguration createFromParcel(android.os.Parcel source) {
+			    return new OutputConfiguration(source);
+		    }
+
+		    public OutputConfiguration[] newArray(int size) {
+			    return new OutputConfiguration[size];
+		    }
+	    };
+
 	/* AOSP equals() over the fields ATL keeps */
 	@Override
 	public boolean equals(Object obj) {

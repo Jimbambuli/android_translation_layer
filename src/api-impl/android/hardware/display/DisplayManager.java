@@ -89,4 +89,30 @@ public final class DisplayManager {
 		android.util.Log.e("DisplayManager", "Could not create virtual display: " + name);
 		return null;
 	}
+
+	/* AOSP DisplayManager.createVirtualDisplay(VirtualDisplayConfig, Handler, Callback): same outcome as the
+	 * argument variant (the config was already checked by its Builder), no display service -> null */
+	public VirtualDisplay createVirtualDisplay(VirtualDisplayConfig config) {
+		return createVirtualDisplay(config, null, null);
+	}
+
+	public VirtualDisplay createVirtualDisplay(VirtualDisplayConfig config, Handler handler, VirtualDisplay.Callback callback) {
+		if (config == null) {
+			throw new IllegalArgumentException("config must not be null");
+		}
+		android.util.Log.e("DisplayManager", "Could not create virtual display: " + config.getName());
+		return null;
+	}
+
+	/* AOSP DisplayManager.MATCH_CONTENT_FRAMERATE_* */
+	public static final int MATCH_CONTENT_FRAMERATE_UNKNOWN = -1;
+	public static final int MATCH_CONTENT_FRAMERATE_NEVER = 0;
+	public static final int MATCH_CONTENT_FRAMERATE_SEAMLESSS_ONLY = 1;
+	public static final int MATCH_CONTENT_FRAMERATE_ALWAYS = 2;
+
+	/* AOSP getMatchContentFrameRateUserPreference(): DisplayManagerService's default switching type is
+	 * SWITCHING_TYPE_WITHIN_GROUPS, which toMatchContentFrameRateSetting() maps to SEAMLESSS_ONLY */
+	public int getMatchContentFrameRateUserPreference() {
+		return MATCH_CONTENT_FRAMERATE_SEAMLESSS_ONLY;
+	}
 }

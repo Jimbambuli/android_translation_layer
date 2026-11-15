@@ -1,7 +1,7 @@
 package android.hardware.usb;
 
-/* AOSP core/java/android/hardware/usb/UsbInterface.java without the Parcelable part (see UsbEndpoint) */
-public class UsbInterface {
+/* AOSP core/java/android/hardware/usb/UsbInterface.java */
+public class UsbInterface implements android.os.Parcelable {
 	private final int mId;
 	private final int mAlternateSetting;
 	private final String mName;
@@ -37,5 +37,34 @@ public class UsbInterface {
 
 	public void setEndpoints(UsbEndpoint[] endpoints) {
 		mEndpoints = com.android.internal.util.Preconditions.checkArrayElementsNotNull(endpoints, "endpoints");
+	}
+
+	public static final android.os.Parcelable.Creator<UsbInterface> CREATOR = new android.os.Parcelable.Creator<UsbInterface>() {
+		public UsbInterface createFromParcel(android.os.Parcel in) {
+			UsbInterface intf = new UsbInterface(in.readInt(), in.readInt(), in.readString(), in.readInt(), in.readInt(), in.readInt());
+			android.os.Parcelable[] p = UsbEndpoint.readArray(in, UsbEndpoint.class);
+			UsbEndpoint[] endpoints = new UsbEndpoint[p.length];
+			System.arraycopy(p, 0, endpoints, 0, p.length);
+			intf.setEndpoints(endpoints);
+			return intf;
+		}
+
+		public UsbInterface[] newArray(int size) {
+			return new UsbInterface[size];
+		}
+	};
+
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel parcel, int flags) {
+		parcel.writeInt(mId);
+		parcel.writeInt(mAlternateSetting);
+		parcel.writeString(mName);
+		parcel.writeInt(mClass);
+		parcel.writeInt(mSubclass);
+		parcel.writeInt(mProtocol);
+		parcel.writeParcelableArray(mEndpoints, 0);
 	}
 }

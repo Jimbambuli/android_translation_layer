@@ -15,9 +15,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
 
-/* AOSP core/java/android/hardware/camera2/params/SessionConfiguration.java without the Parcelable
- * parts (comments and annotations removed) */
-public final class SessionConfiguration {
+/* AOSP core/java/android/hardware/camera2/params/SessionConfiguration.java (comments and annotations removed) */
+public final class SessionConfiguration implements android.os.Parcelable {
 	private static final String TAG = "SessionConfiguration";
 
 	public static final int SESSION_REGULAR = CameraDevice.SESSION_OPERATION_MODE_NORMAL;
@@ -49,6 +48,48 @@ public final class SessionConfiguration {
 		mSessionType = sessionType;
 		mOutputConfigurations = Collections.unmodifiableList(new ArrayList<>(outputs));
 	}
+
+	/* AOSP SessionConfiguration.setStateCallback() */
+	public void setStateCallback(Executor executor, CameraCaptureSession.StateCallback cb) {
+		if (executor == null) {
+			throw new IllegalArgumentException("executor must not be null");
+		}
+		if (cb == null) {
+			throw new IllegalArgumentException("cb must not be null");
+		}
+		mExecutor = executor;
+		mStateCallback = cb;
+	}
+
+	public int describeContents() {
+		return 0;
+	}
+
+	/* AOSP writeToParcel(): session type and output configurations; the input configuration and the session
+	 * parameters are not Parcelable in ATL, executor and callback are not parceled in AOSP either */
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(mSessionType);
+		dest.writeParcelableArray(mOutputConfigurations.toArray(new OutputConfiguration[0]), flags);
+	}
+
+	public static final android.os.Parcelable.Creator<SessionConfiguration> CREATOR =
+	    new android.os.Parcelable.Creator<SessionConfiguration>() {
+		    public SessionConfiguration createFromParcel(android.os.Parcel source) {
+			    int sessionType = source.readInt();
+			    ArrayList<OutputConfiguration> outputs = new ArrayList<>();
+			    try {
+				    for (android.os.Parcelable o : source.readParcelableArray(OutputConfiguration.class.getClassLoader()))
+					    outputs.add((OutputConfiguration)o);
+			    } catch (ReflectiveOperationException e) {
+				    throw new RuntimeException(e);
+			    }
+			    return new SessionConfiguration(sessionType, outputs);
+		    }
+
+		    public SessionConfiguration[] newArray(int size) {
+			    return new SessionConfiguration[size];
+		    }
+	    };
 
 	@Override
 	public boolean equals(Object obj) {
