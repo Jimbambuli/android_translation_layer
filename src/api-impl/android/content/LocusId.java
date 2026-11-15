@@ -1,6 +1,6 @@
 package android.content;
 
-public class LocusId {
+public final class LocusId implements android.os.Parcelable {
 
 	private final String mId;
 
@@ -26,4 +26,27 @@ public class LocusId {
 		LocusId other = (LocusId)obj;
 		return mId == null ? other.mId == null : mId.equals(other.mId);
 	}
+
+	/* AOSP LocusId.describeContents()/writeToParcel()/CREATOR: the id string */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel parcel, int flags) {
+		parcel.writeString(mId);
+	}
+
+	public static final android.os.Parcelable.Creator<LocusId> CREATOR = new android.os.Parcelable.Creator<LocusId>() {
+		@Override
+		public LocusId createFromParcel(android.os.Parcel parcel) {
+			return new LocusId(parcel.readString());
+		}
+
+		@Override
+		public LocusId[] newArray(int size) {
+			return new LocusId[size];
+		}
+	};
 }
