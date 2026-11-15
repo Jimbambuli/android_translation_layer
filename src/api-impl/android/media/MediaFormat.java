@@ -21,6 +21,8 @@ public class MediaFormat {
 	public static final String MIMETYPE_AUDIO_VORBIS = "audio/vorbis";
 	public static final String MIMETYPE_AUDIO_OPUS = "audio/opus";
 	public static final String KEY_MIME = "mime";
+	public static final String KEY_PROFILE = "profile";
+	public static final String KEY_LEVEL = "level";
 	public static final String KEY_SAMPLE_RATE = "sample-rate";
 	public static final String KEY_CHANNEL_COUNT = "channel-count";
 	public static final String KEY_WIDTH = "width";
