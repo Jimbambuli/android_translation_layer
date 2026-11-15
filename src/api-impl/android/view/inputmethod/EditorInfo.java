@@ -27,6 +27,7 @@ import android.os.LocaleList;
 import android.os.UserHandle;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.util.Printer;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.autofill.AutofillId;
@@ -1147,5 +1148,32 @@ public class EditorInfo implements InputType {
 	 */
 	public void setInitialToolType(int toolType) {
 		mInitialToolType = toolType;
+	}
+
+	/* AOSP EditorInfo.dump(Printer, String) with dumpExtras; ATL's EditorInfo has no initial tool type and no
+	 * target user, and the handwriting gesture types are printed as hex instead of through InputMethodDebug */
+	public void dump(Printer pw, String prefix) {
+		pw.println(prefix + "inputType=0x" + Integer.toHexString(inputType)
+				+ " imeOptions=0x" + Integer.toHexString(imeOptions)
+				+ " privateImeOptions=" + privateImeOptions);
+		pw.println(prefix + "actionLabel=" + actionLabel
+				+ " actionId=" + actionId);
+		pw.println(prefix + "initialSelStart=" + initialSelStart
+				+ " initialSelEnd=" + initialSelEnd
+				+ " initialCapsMode=0x"
+				+ Integer.toHexString(initialCapsMode));
+		pw.println(prefix + "hintText=" + hintText
+				+ " label=" + label);
+		pw.println(prefix + "packageName=" + packageName
+				+ " autofillId=" + autofillId
+				+ " fieldId=" + fieldId
+				+ " fieldName=" + fieldName);
+		pw.println(prefix + "extras=" + extras);
+		pw.println(prefix + "hintLocales=" + hintLocales);
+		pw.println(prefix + "supportedHandwritingGestureTypes=0x"
+				+ Integer.toHexString(mSupportedHandwritingGestureTypes));
+		pw.println(prefix + "supportedHandwritingGesturePreviewTypes=0x"
+				+ Integer.toHexString(mSupportedHandwritingGesturePreviewTypes));
+		pw.println(prefix + "contentMimeTypes=" + Arrays.toString(contentMimeTypes));
 	}
 }
