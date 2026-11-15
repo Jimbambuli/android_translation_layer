@@ -257,6 +257,7 @@ srcs = [
 	'android/content/ContentResolver.java',
 	'android/content/ContentUris.java',
 	'android/content/ContentValues.java',
+	'android/content/ContextParams.java',
 	'android/content/Context.java',
 	'android/content/ContextWrapper.java',
 	'android/content/CursorEntityIterator.java',

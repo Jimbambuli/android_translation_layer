@@ -1074,6 +1074,11 @@ public abstract class Context {
 		return this;
 	}
 
+	/* ATL has a single Context; attribution parameters do not change it (like createAttributionContext) */
+	public Context createContext(ContextParams contextParams) {
+		return this;
+	}
+
 	/* ATL has a single (default) device; a device context is the same Context */
 	public Context createDeviceContext(int deviceId) {
 		return this;
