@@ -507,10 +507,35 @@ public class Paint {
 		public int bottom;
 		public int leading;
 
+		/* AOSP FontMetricsInt.set(): copy of the fields; from FontMetrics as GraphicsJNI::set_metrics_int rounds */
+		public void set(FontMetricsInt fontMetricsInt) {
+			top = fontMetricsInt.top;
+			ascent = fontMetricsInt.ascent;
+			descent = fontMetricsInt.descent;
+			bottom = fontMetricsInt.bottom;
+			leading = fontMetricsInt.leading;
+		}
+
+		public void set(FontMetrics fontMetrics) {
+			top = (int)Math.floor(fontMetrics.top);
+			ascent = Math.round(fontMetrics.ascent);
+			descent = Math.round(fontMetrics.descent);
+			bottom = (int)Math.ceil(fontMetrics.bottom);
+			leading = Math.round(fontMetrics.leading);
+		}
+
 		@Override
 		public String toString() {
 			return "FontMetricsInt: top=" + top + " ascent=" + ascent + " descent=" + descent + " bottom=" + bottom + " leading=" + leading;
 		}
+	}
+
+	/* AOSP Paint.RunInfo */
+	public static final class RunInfo {
+		private int mClusterCount = 0;
+
+		public int getClusterCount() { return mClusterCount; }
+		public void setClusterCount(int clusterCount) { mClusterCount = clusterCount; }
 	}
 
 	public int getFlags() { return flags; }
@@ -650,6 +675,256 @@ public class Paint {
 		char[] buf = new char[contextEnd - contextStart];
 		android.text.TextUtils.getChars(text, contextStart, contextEnd, buf, 0);
 		return getOffsetForAdvance(buf, start - contextStart, end - contextStart, 0, contextEnd - contextStart, isRtl, advance) + contextStart;
+	}
+
+	/* AOSP Paint.getStrikeThruPosition()/getStrikeThruThickness() -> hwui jni/Paint.cpp: the font's OS/2 table
+	 * values when Skia has them, else Paint::kStdStrikeThru_Top (-6/21) and Paint::kStdStrikeThru_Thickness (1/18)
+	 * times the text size. ATL's native paint does not expose the font's values, so the fallback is used. */
+	public float getStrikeThruPosition() {
+		return (-6.0f / 21.0f) * getTextSize();
+	}
+
+	public float getStrikeThruThickness() {
+		return (1.0f / 18.0f) * getTextSize();
+	}
+
+	/* AOSP Paint.get/setStartHyphenEdit(), get/setEndHyphenEdit(): kept in the native paint (hyphen edit bits),
+	 * ATL keeps the values in fields. */
+	private int start_hyphen_edit;
+	private int end_hyphen_edit;
+	public int getStartHyphenEdit() { return start_hyphen_edit; }
+	public int getEndHyphenEdit() { return end_hyphen_edit; }
+	public void setStartHyphenEdit(int startHyphen) { start_hyphen_edit = startHyphen; }
+	public void setEndHyphenEdit(int endHyphen) { end_hyphen_edit = endHyphen; }
+
+	/* AOSP Paint.setFontVariationOverride(): the string is kept (mFontVariationOverride), same string = no-op */
+	private String font_variation_override;
+	public void setFontVariationOverride(String fontVariationOverride) {
+		if (java.util.Objects.equals(fontVariationOverride, font_variation_override))
+			return;
+		font_variation_override = fontVariationOverride;
+	}
+	public String getFontVariationOverride() { return font_variation_override; }
+
+	/* AOSP Paint.getFontMetricsForLocale()/getFontMetricsIntForLocale(): the metrics with the locale's line height
+	 * adjustment; ATL's native font has no per-locale adjustment, so these are the plain metrics. */
+	public void getFontMetricsForLocale(FontMetrics metrics) { getFontMetrics(metrics); }
+	public void getFontMetricsIntForLocale(FontMetricsInt metrics) { getFontMetricsInt(metrics); }
+
+	/* AOSP Paint.getFontMetricsInt(CharSequence/char[], ...): argument checks, then the metrics of the run; the
+	 * native side widens them by the fallback fonts used for the run, ATL has no per-run fonts. */
+	public void getFontMetricsInt(CharSequence text, int start, int count, int contextStart, int contextCount,
+	                              boolean isRtl, FontMetricsInt outMetrics) {
+		if (text == null) {
+			throw new IllegalArgumentException("text must not be null");
+		}
+		check_font_metrics_args(text.length(), start, count, contextStart, contextCount, outMetrics);
+		getFontMetricsInt(outMetrics);
+	}
+
+	public void getFontMetricsInt(char[] text, int start, int count, int contextStart, int contextCount,
+	                              boolean isRtl, FontMetricsInt outMetrics) {
+		if (text == null) {
+			throw new IllegalArgumentException("text must not be null");
+		}
+		check_font_metrics_args(text.length, start, count, contextStart, contextCount, outMetrics);
+		getFontMetricsInt(outMetrics);
+	}
+
+	private static void check_font_metrics_args(int length, int start, int count, int contextStart, int contextCount,
+	                                            FontMetricsInt outMetrics) {
+		if (start < 0 || start >= length) {
+			throw new IllegalArgumentException("start argument is out of bounds.");
+		}
+		if (count < 0 || start + count > length) {
+			throw new IllegalArgumentException("count argument is out of bounds.");
+		}
+		if (contextStart < 0 || contextStart >= length) {
+			throw new IllegalArgumentException("ctxStart argument is out of bounds.");
+		}
+		if (contextCount < 0 || contextStart + contextCount > length) {
+			throw new IllegalArgumentException("ctxCount argument is out of bounds.");
+		}
+		if (outMetrics == null) {
+			throw new IllegalArgumentException("outMetrics must not be null.");
+		}
+	}
+
+	/* AOSP Paint.getTextRunAdvances(): argument checks, then nGetTextAdvances(): the advance of every char and
+	 * their sum. ATL measures each char with measureText(); a surrogate pair's advance is on the high surrogate,
+	 * the low surrogate gets 0. */
+	public float getTextRunAdvances(char[] chars, int index, int count, int contextIndex, int contextCount,
+	                                boolean isRtl, float[] advances, int advancesIndex) {
+		if (chars == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((index | count | contextIndex | contextCount | advancesIndex
+		     | (index - contextIndex) | (contextCount - count)
+		     | ((contextIndex + contextCount) - (index + count))
+		     | (chars.length - (contextIndex + contextCount))
+		     | (advances == null ? 0 : (advances.length - (advancesIndex + count)))) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (chars.length == 0 || count == 0) {
+			return 0f;
+		}
+		return char_advances(new String(chars), index, index + count, 0, advances, advancesIndex);
+	}
+
+	public float getTextRunAdvances(CharSequence text, int start, int end, int contextStart, int contextEnd,
+	                                boolean isRtl, float[] advances, int advancesIndex) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((start | end | contextStart | contextEnd | advancesIndex | (end - start)
+		     | (start - contextStart) | (contextEnd - end)
+		     | (text.length() - contextEnd)
+		     | (advances == null ? 0 : (advances.length - (advancesIndex + (end - start))))) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (text.length() == 0 || start == end) {
+			return 0f;
+		}
+		return char_advances(text.toString(), start, end, 0, advances, advancesIndex);
+	}
+
+	/* the advances of the chars in [start, end) into advances (when not null), returns their sum */
+	private float char_advances(String text, int start, int end, int unused, float[] advances, int advancesIndex) {
+		float sum = 0;
+		for (int i = start; i < end; i++) {
+			float a = 0;
+			char c = text.charAt(i);
+			if (Character.isHighSurrogate(c) && i + 1 < end && Character.isLowSurrogate(text.charAt(i + 1)))
+				a = measureText(text, i, i + 2);
+			else if (!Character.isLowSurrogate(c) || i == start || !Character.isHighSurrogate(text.charAt(i - 1)))
+				a = measureText(text, i, i + 1);
+			if (advances != null)
+				advances[advancesIndex + i - start] = a;
+			sum += a;
+		}
+		return sum;
+	}
+
+	/* AOSP Paint.getRunAdvance(): the advance of the run [start, end) up to offset */
+	public float getRunAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
+	                           boolean isRtl, int offset) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | offset | end | contextEnd
+		     | start - contextStart | offset - start | end - offset
+		     | contextEnd - end | text.length - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (end == start) {
+			return 0.0f;
+		}
+		return run_advance(new String(text), start, end, isRtl, offset);
+	}
+
+	public float getRunAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd,
+	                           boolean isRtl, int offset) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | offset | end | contextEnd
+		     | start - contextStart | offset - start | end - offset
+		     | contextEnd - end | text.length() - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (end == start) {
+			return 0.0f;
+		}
+		return run_advance(text.toString(), start, end, isRtl, offset);
+	}
+
+	/* [start, offset) for LTR, [offset, end) for RTL: the part of the run before offset in reading order */
+	private float run_advance(String text, int start, int end, boolean isRtl, int offset) {
+		return isRtl ? measureText(text, offset, end) : measureText(text, start, offset);
+	}
+
+	/* AOSP Paint.getRunCharacterAdvance(): argument checks (exceptions as in AOSP), the advances per char of the
+	 * run up to offset and their sum. drawBounds is the advance box over the font's top/bottom, the cluster count
+	 * of runInfo is the char count. */
+	public float getRunCharacterAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
+	                                    boolean isRtl, int offset, float[] advances, int advancesIndex) {
+		return getRunCharacterAdvance(text, start, end, contextStart, contextEnd, isRtl, offset, advances, advancesIndex,
+		                              null, null);
+	}
+
+	public float getRunCharacterAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
+	                                    boolean isRtl, int offset, float[] advances, int advancesIndex,
+	                                    RectF drawBounds, RunInfo runInfo) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		return run_character_advance(text.length, start, end, contextStart, contextEnd, offset, advances, advancesIndex,
+		                             drawBounds, runInfo, () -> new String(text));
+	}
+
+	public float getRunCharacterAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd,
+	                                    boolean isRtl, int offset, float[] advances, int advancesIndex) {
+		return getRunCharacterAdvance(text, start, end, contextStart, contextEnd, isRtl, offset, advances, advancesIndex,
+		                              null, null);
+	}
+
+	public float getRunCharacterAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd,
+	                                    boolean isRtl, int offset, float[] advances, int advancesIndex,
+	                                    RectF drawBounds, RunInfo runInfo) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		return run_character_advance(text.length(), start, end, contextStart, contextEnd, offset, advances, advancesIndex,
+		                             drawBounds, runInfo, () -> text.toString());
+	}
+
+	private float run_character_advance(int length, int start, int end, int contextStart, int contextEnd, int offset,
+	                                    float[] advances, int advancesIndex, RectF drawBounds, RunInfo runInfo,
+	                                    java.util.function.Supplier<String> text) {
+		if (contextStart < 0 || contextEnd > length) {
+			throw new IndexOutOfBoundsException("Invalid Context Range: " + contextStart + ", " + contextEnd
+			                                    + " must be in 0, " + length);
+		}
+		if (start < contextStart || contextEnd < end) {
+			throw new IndexOutOfBoundsException("Invalid start/end range: " + start + ", " + end
+			                                    + " must be in " + contextStart + ", " + contextEnd);
+		}
+		if (offset < start || end < offset) {
+			throw new IndexOutOfBoundsException("Invalid offset position: " + offset + " must be in " + start + ", " + end);
+		}
+		if (advances != null && advances.length < advancesIndex - start + end) {
+			throw new IndexOutOfBoundsException("Given array doesn't have enough space to receive the result, advances.length: "
+			                                    + advances.length + " advanceIndex: " + advancesIndex + " needed space: "
+			                                    + (offset - start));
+		}
+		if (end == start) {
+			if (runInfo != null)
+				runInfo.setClusterCount(0);
+			return 0.0f;
+		}
+		float sum = char_advances(text.get(), start, offset, 0, advances, advancesIndex);
+		if (drawBounds != null) {
+			FontMetrics metrics = new FontMetrics();
+			getFontMetrics(metrics);
+			drawBounds.set(0, metrics.top, sum, metrics.bottom);
+		}
+		if (runInfo != null)
+			runInfo.setClusterCount(offset - start);
+		return sum;
+	}
+
+	/* AOSP Paint.getOffsetForAdvance(char[], ...): same as the CharSequence variant below */
+	public int getOffsetForAdvance(char[] text, int start, int end, int contextStart, int contextEnd,
+	                               boolean isRtl, float advance) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | end | contextEnd
+		     | start - contextStart | end - start | contextEnd - end
+		     | text.length - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		return getOffsetForAdvance(new String(text), start, end, contextStart, contextEnd, isRtl, advance);
 	}
 
 	/* AOSP nDescent: the descent of the font metrics */
@@ -982,7 +1257,10 @@ public class Paint {
 		return native_has_glyph(paint, text);
 	}
 
-	public MaskFilter setMaskFilter(MaskFilter filter) { return filter; }
+	private MaskFilter mask_filter;
+	/* AOSP Paint.setMaskFilter()/getMaskFilter(): the filter is kept in a Java field (mMaskFilter) */
+	public MaskFilter setMaskFilter(MaskFilter filter) { mask_filter = filter; return filter; }
+	public MaskFilter getMaskFilter() { return mask_filter; }
 
 	public boolean isFakeBoldText() {
 		return (flags & FAKE_BOLD_TEXT_FLAG) != 0;

@@ -135,7 +135,14 @@ public class EGLImpl implements EGL10 {
 	public boolean eglCopyBuffers(EGLDisplay display, EGLSurface surface, Object native_pixmap) { return false; }
 	public EGLSurface eglCreatePixmapSurface(EGLDisplay display, EGLConfig config, Object native_pixmap, int[] attrib_list) { return null; }
 	public boolean eglGetConfigs(EGLDisplay display, EGLConfig[] configs, int config_size, int[] num_config) { return false; }
-	public EGLDisplay eglGetCurrentDisplay() { return null; }
+	public EGLDisplay eglGetCurrentDisplay() {
+		long native_egl_display = native_eglGetCurrentDisplay();
+		return native_egl_display == 0 ? EGL10.EGL_NO_DISPLAY : new EGLDisplay(native_egl_display);
+	}
+
+	public boolean eglSwapInterval(EGLDisplay display, int interval) {
+		return native_eglSwapInterval(display.native_egl_display, interval);
+	}
 	public int eglGetError() { return EGL_SUCCESS; } // don't let yourself get fooled, this is also a stub :P
 
 	/* AOSP EGLImpl.eglGetCurrentSurface()/eglQueryContext()/eglQuerySurface() (com_google_android_gles_jni_EGLImpl.cpp):
@@ -171,6 +178,8 @@ public class EGLImpl implements EGL10 {
 	private native long native_eglCreateWindowSurface(long native_egl_display, long native_egl_config, Surface surface, int[] attrib_list);
 	private native long native_eglGetDisplay(Object native_display);
 	private native long native_eglGetCurrentContext();
+	private native long native_eglGetCurrentDisplay();
+	private native boolean native_eglSwapInterval(long display, int interval);
 	private native long native_eglGetCurrentSurface(int readdraw);
 	private native boolean native_eglQueryContext(long native_egl_display, long native_egl_context, int attribute, int[] value);
 	private native boolean native_eglQuerySurface(long native_egl_display, long native_egl_surface, int attribute, int[] value);

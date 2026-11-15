@@ -165,6 +165,16 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGet
 	return _INTPTR(eglGetCurrentContext());
 }
 
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentDisplay(JNIEnv *env, jobject this)
+{
+	return _INTPTR(eglGetCurrentDisplay());
+}
+
+JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglSwapInterval(JNIEnv *env, jobject this, jlong display, jint interval)
+{
+	return eglSwapInterval(_PTR(display), interval);
+}
+
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentSurface(JNIEnv *env, jobject this, jint readdraw)
 {
 	return _INTPTR(eglGetCurrentSurface(readdraw));

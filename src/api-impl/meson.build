@@ -1,5 +1,6 @@
 srcs = [
 	'android/accessibilityservice/AccessibilityService.java',
+	'android/accessibilityservice/InputMethod.java',
 	'android/accessibilityservice/GestureDescription.java',
 	'android/app/appfunctions/AppFunctionAttribution.java',
 	'android/app/appfunctions/AppFunctionException.java',
@@ -547,6 +548,7 @@ srcs = [
 	'android/graphics/LinearGradient.java',
 	'android/graphics/MaskFilter.java',
 	'android/graphics/Matrix.java',
+	'android/graphics/Matrix44.java',
 	'android/graphics/Movie.java',
 	'android/graphics/Outline.java',
 	'android/graphics/NinePatch.java',
@@ -620,6 +622,7 @@ srcs = [
 	'android/graphics/fonts/SystemFonts.java',
 	'android/graphics/fonts/FontStyle.java',
 	'android/graphics/fonts/FontVariationAxis.java',
+	'android/graphics/pdf/PdfDocument.java',
 	'android/graphics/text/LineBreakConfig.java',
 	'android/graphics/text/MeasuredText.java',
 	'android/graphics/text/PositionedGlyphs.java',

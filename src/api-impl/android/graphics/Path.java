@@ -90,6 +90,11 @@ public class Path {
 		return fillType;
 	}
 
+	/* AOSP Path.isInverseFillType(): the inverse bit of the fill type */
+	public boolean isInverseFillType() {
+		return fillType.inverse;
+	}
+
 	public void moveTo(float x, float y) {
 		native_move_to(getBuilder(), x, y);
 	}

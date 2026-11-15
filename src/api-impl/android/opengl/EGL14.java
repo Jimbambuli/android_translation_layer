@@ -116,6 +116,20 @@ public class EGL14 {
 		return impl.eglDestroyContext(raw_display, raw_context);
 	}
 
+	/* AOSP EGL14.eglGetCurrentDisplay(): the EGL function; EGL_NO_DISPLAY without a current context */
+	public static EGLDisplay eglGetCurrentDisplay() {
+		javax.microedition.khronos.egl.EGLDisplay raw_display = impl.eglGetCurrentDisplay();
+		if (raw_display == EGL10.EGL_NO_DISPLAY)
+			return EGL_NO_DISPLAY;
+		else
+			return new EGLDisplay(raw_display.native_egl_display);
+	}
+
+	/* AOSP EGL14.eglSwapInterval(): the EGL function */
+	public static boolean eglSwapInterval(EGLDisplay display, int interval) {
+		return ((EGLImpl)impl).eglSwapInterval(new javax.microedition.khronos.egl.EGLDisplay(display.getNativeHandle()), interval);
+	}
+
 	public static EGLContext eglGetCurrentContext() {
 		javax.microedition.khronos.egl.EGLContext raw_context = impl.eglGetCurrentContext();
 		if (raw_context == EGL10.EGL_NO_CONTEXT)

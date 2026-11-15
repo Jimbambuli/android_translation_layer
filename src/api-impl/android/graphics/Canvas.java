@@ -685,6 +685,18 @@ public class Canvas {
 		}
 	}
 
+	/* AOSP concat(Matrix44) preconcats the 4x4 matrix; the 2D canvas maps x, y through the rows/columns of x, y and w
+	 * (the z row and column only matter for 3D drawing) */
+	public void concat(Matrix44 m) {
+		if (m == null)
+			return;
+		Matrix matrix = new Matrix();
+		matrix.setValues(new float[] {m.get(0, 0), m.get(0, 1), m.get(0, 3),
+		                              m.get(1, 0), m.get(1, 1), m.get(1, 3),
+		                              m.get(3, 0), m.get(3, 1), m.get(3, 3)});
+		concat(matrix);
+	}
+
 	public void setMatrix(Matrix matrix) {
 		Matrix transform = getMatrix();
 		if (transform.isIdentity()) {

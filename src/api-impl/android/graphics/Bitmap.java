@@ -209,6 +209,38 @@ public final class Bitmap implements Parcelable {
 		return bitmap;
 	}
 
+	public static Bitmap createBitmap(int width, int height, Config config, boolean hasAlpha) {
+		return createBitmap(null, width, height, config, hasAlpha, null);
+	}
+
+	public static Bitmap createBitmap(DisplayMetrics metrics, int width, int height, Config config, boolean hasAlpha) {
+		return createBitmap(metrics, width, height, config, hasAlpha, null);
+	}
+
+	/* AOSP createBitmap(DisplayMetrics, int[], int, int, int, int, Config): argument checks, the bitmap, the pixels
+	 * from colors[offset...] with the stride, the density of the metrics */
+	public static Bitmap createBitmap(DisplayMetrics display, int[] colors, int offset, int stride, int width, int height, Config config) {
+		if (width <= 0 || height <= 0)
+			throw new IllegalArgumentException("width and height must be > 0");
+		if (Math.abs(stride) < width)
+			throw new IllegalArgumentException("abs(stride) must be >= width");
+		int lastScanline = offset + (height - 1) * stride;
+		int length = colors.length;
+		if (offset < 0 || (offset + width > length) || lastScanline < 0 || (lastScanline + width > length))
+			throw new ArrayIndexOutOfBoundsException();
+		Bitmap bm = createBitmap(display, width, height, config);
+		bm.setPixels(colors, offset, stride, 0, 0, width, height);
+		return bm;
+	}
+
+	public static Bitmap createBitmap(int[] colors, int offset, int stride, int width, int height, Config config) {
+		return createBitmap(null, colors, offset, stride, width, height, config);
+	}
+
+	public static Bitmap createBitmap(DisplayMetrics display, int[] colors, int width, int height, Config config) {
+		return createBitmap(display, colors, 0, width, width, height, config);
+	}
+
 	/* AOSP: createBitmap(null, colors, 0, width, width, height, config) */
 	public static Bitmap createBitmap(int[] colors, int width, int height, Config config) {
 		if ((width | height) < 0 || colors.length < width * height)
@@ -312,6 +344,11 @@ public final class Bitmap implements Parcelable {
 			paint.setColor(color);
 			new Canvas(this).drawRect(0, 0, width, height, paint);
 		}
+	}
+
+	/* AOSP eraseColor(long): the color in its own color space; ATL bitmaps are sRGB, so it is converted */
+	public void eraseColor(long color) {
+		eraseColor(Color.toArgb(color));
 	}
 
 	@Export
