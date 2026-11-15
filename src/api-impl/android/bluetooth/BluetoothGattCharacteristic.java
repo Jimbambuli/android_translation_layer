@@ -257,7 +257,7 @@ public class BluetoothGattCharacteristic implements Parcelable {
     }
 
     public static final @NonNull Creator<BluetoothGattCharacteristic> CREATOR =
-            new Creator<>() {
+            new Creator<BluetoothGattCharacteristic>() {
                 public BluetoothGattCharacteristic createFromParcel(Parcel in) {
                     return new BluetoothGattCharacteristic(in);
                 }

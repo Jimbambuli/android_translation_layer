@@ -58,7 +58,7 @@ public class BluetoothGattIncludedService implements Parcelable {
     }
 
     public static final @NonNull Creator<BluetoothGattIncludedService> CREATOR =
-            new Creator<>() {
+            new Creator<BluetoothGattIncludedService>() {
                 public BluetoothGattIncludedService createFromParcel(Parcel in) {
                     return new BluetoothGattIncludedService(in);
                 }

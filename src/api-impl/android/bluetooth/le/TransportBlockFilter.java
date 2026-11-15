@@ -305,7 +305,7 @@ public final class TransportBlockFilter implements Parcelable {
      */
     @NonNull
     public static final Creator<TransportBlockFilter> CREATOR =
-            new Creator<>() {
+            new Creator<TransportBlockFilter>() {
                 @Override
                 public TransportBlockFilter createFromParcel(Parcel source) {
                     final int orgId = source.readInt();

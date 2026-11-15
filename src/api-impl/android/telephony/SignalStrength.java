@@ -283,7 +283,7 @@ public class SignalStrength implements Parcelable {
      *
      */
     public static final @android.annotation.NonNull Parcelable.Creator<SignalStrength> CREATOR =
-            new Parcelable.Creator<>() {
+            new Parcelable.Creator<SignalStrength>() {
                 public SignalStrength createFromParcel(Parcel in) {
                     return new SignalStrength(in);
                 }

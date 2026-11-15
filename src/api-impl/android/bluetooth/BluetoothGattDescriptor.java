@@ -148,7 +148,7 @@ public class BluetoothGattDescriptor implements Parcelable {
     }
 
     public static final @NonNull Creator<BluetoothGattDescriptor> CREATOR =
-            new Creator<>() {
+            new Creator<BluetoothGattDescriptor>() {
                 public BluetoothGattDescriptor createFromParcel(Parcel in) {
                     return new BluetoothGattDescriptor(in);
                 }
