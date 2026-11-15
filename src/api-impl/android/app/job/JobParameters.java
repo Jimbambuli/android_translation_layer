@@ -46,6 +46,13 @@ public class JobParameters implements Parcelable {
 		return jobInfo.isUserInitiated();
 	}
 
+	/* AOSP JobParameters.isOverrideDeadlineExpired(): true when the job was started because its override deadline
+	 * passed before its constraints were met; ATL's JobScheduler starts jobs without waiting for constraints, so
+	 * never for that reason */
+	public boolean isOverrideDeadlineExpired() {
+		return false;
+	}
+
 	public boolean isExpeditedJob() {
 		return jobInfo.isExpedited();
 	}

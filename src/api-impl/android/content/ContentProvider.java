@@ -25,7 +25,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
-public abstract class ContentProvider {
+public abstract class ContentProvider implements ComponentCallbacks2 {
+	/* AOSP ContentProvider (ComponentCallbacks2): the callbacks do nothing unless the provider overrides them */
+	public void onConfigurationChanged(android.content.res.Configuration newConfig) {}
+
+	public void onLowMemory() {}
+
+	public void onTrimMemory(int level) {}
+
 
 	static final HashMap<String, ATLProvider> atl_providers = new HashMap<>();
 
