@@ -147,6 +147,21 @@ public class TelephonyManager {
 		return "";
 	}
 
+	/* TelephonyManager.java: PhoneConstants values; getCurrentPhoneType() is always GSM on Android 16 */
+	public static final int PHONE_TYPE_NONE = 0;
+	public static final int PHONE_TYPE_GSM = 1;
+	public static final int PHONE_TYPE_CDMA = 2;
+	public static final int PHONE_TYPE_SIP = 3;
+	public static final int PHONE_TYPE_IMS = 4;
+
+	public int getCurrentPhoneType() {
+		return PHONE_TYPE_GSM;
+	}
+
+	public int getCurrentPhoneType(int subId) {
+		return PHONE_TYPE_GSM;
+	}
+
 	public int getPhoneType() {
 		return 0; // PHONE_TYPE_NONE
 	}
@@ -159,7 +174,7 @@ public class TelephonyManager {
 	}
 
 	public CellLocation getCellLocation() {
-		return new CellLocation();
+		return null; // getITelephony() == null: AOSP returns null
 	}
 
 	public boolean isNetworkRoaming() {
