@@ -258,6 +258,12 @@ public final class Display {
 		public float[] getAlternativeRefreshRates() {
 			return new float[0];
 		}
+
+		/* AOSP 16 Display.Mode.getSupportedHdrTypes(): a copy of mSupportedHdrTypes; ATL's display has no
+		 * HDR (getHdrCapabilities() is null, isHdr() false), so the mode supports none */
+		public int[] getSupportedHdrTypes() {
+			return new int[0];
+		}
 	}
 
 	public Mode[] getSupportedModes() {

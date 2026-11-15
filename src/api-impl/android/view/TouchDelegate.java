@@ -19,8 +19,8 @@ package android.view;
 import android.graphics.Rect;
 
 /**
- * android-14 android.view.TouchDelegate, without the touch exploration (accessibility) part:
- * onTouchExplorationHoverEvent() and getTouchDelegateInfo().
+ * android-14 android.view.TouchDelegate with onTouchExplorationHoverEvent() from AOSP 16,
+ * without getTouchDelegateInfo().
  */
 public class TouchDelegate {
 
@@ -91,6 +91,47 @@ public class TouchDelegate {
 				event.setLocation(-(slop * 2), -(slop * 2));
 			}
 			handled = mDelegateView.dispatchTouchEvent(event);
+		}
+		return handled;
+	}
+
+	/* AOSP 16 TouchDelegate.onTouchExplorationHoverEvent() */
+	public boolean onTouchExplorationHoverEvent(MotionEvent event) {
+		if (mBounds == null) {
+			return false;
+		}
+
+		final int x = (int)event.getX();
+		final int y = (int)event.getY();
+		boolean hit = true;
+		boolean handled = false;
+
+		final boolean isInbound = mBounds.contains(x, y);
+		switch (event.getActionMasked()) {
+			case MotionEvent.ACTION_HOVER_ENTER:
+				mDelegateTargeted = isInbound;
+				break;
+			case MotionEvent.ACTION_HOVER_MOVE:
+				if (isInbound) {
+					mDelegateTargeted = true;
+				} else {
+					// delegated previously
+					if (mDelegateTargeted && !mSlopBounds.contains(x, y)) {
+						hit = false;
+					}
+				}
+				break;
+			case MotionEvent.ACTION_HOVER_EXIT:
+				mDelegateTargeted = true;
+				break;
+		}
+		if (mDelegateTargeted) {
+			if (hit) {
+				event.setLocation(mDelegateView.getWidth() / 2, mDelegateView.getHeight() / 2);
+			} else {
+				mDelegateTargeted = false;
+			}
+			handled = mDelegateView.dispatchHoverEvent(event);
 		}
 		return handled;
 	}
