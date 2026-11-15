@@ -80,6 +80,32 @@ public class TelephonyManager {
 		return new TelephonyManager();
 	}
 
+	/* PhoneConstants.State.X.toString() */
+	public static final String EXTRA_STATE_IDLE = "IDLE";
+	public static final String EXTRA_STATE_RINGING = "RINGING";
+	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
+
+	/* AOSP TelephonyManager with getITelephony() == null (a device without telephony service) */
+	public TelephonyManager createForSubscriptionId(int subId) {
+		return new TelephonyManager();
+	}
+
+	public int getCallStateForSubscription() {
+		return 0; // getCallState(subId): CALL_STATE_IDLE
+	}
+
+	public int getDataState() {
+		return 0; // DATA_DISCONNECTED
+	}
+
+	public String getMmsUserAgent() {
+		return null;
+	}
+
+	public String getMmsUAProfUrl() {
+		return null;
+	}
+
 	// FIXME: can we return null instead of ""?
 	public String getNetworkOperator() {
 		return "";
