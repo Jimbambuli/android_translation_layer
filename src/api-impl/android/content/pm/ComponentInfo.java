@@ -171,4 +171,24 @@ public class ComponentInfo extends PackageItemInfo {
 	protected ApplicationInfo getApplicationInfo() {
 		return applicationInfo;
 	}
+
+	/* AOSP ComponentInfo.writeToParcel()/ComponentInfo(Parcel) (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): splitName, attributionTags, directBootAware */
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		applicationInfo.writeToParcel(dest, parcelableFlags);
+		dest.writeString8(processName);
+		dest.writeInt(descriptionRes);
+		dest.writeInt(enabled ? 1 : 0);
+		dest.writeInt(exported ? 1 : 0);
+	}
+
+	protected ComponentInfo(android.os.Parcel source) {
+		super(source);
+		applicationInfo = ApplicationInfo.CREATOR.createFromParcel(source);
+		processName = source.readString8();
+		descriptionRes = source.readInt();
+		enabled = (source.readInt() != 0);
+		exported = (source.readInt() != 0);
+	}
 }

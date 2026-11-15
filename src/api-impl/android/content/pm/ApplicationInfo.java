@@ -29,7 +29,7 @@ import java.util.Comparator;
  * corresponds to information collected from the AndroidManifest.xml's
  * &lt;application&gt; tag.
  */
-public class ApplicationInfo extends PackageItemInfo {
+public class ApplicationInfo extends PackageItemInfo implements android.os.Parcelable {
 
 	/**
 	 * Default task affinity of all activities in this application. See
@@ -751,4 +751,109 @@ public class ApplicationInfo extends PackageItemInfo {
 	}
 
 	public String[] splitPublicSourceDirs = new String[0];
+
+	/* AOSP ApplicationInfo.writeToParcel()/ApplicationInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): if (dest.maybeWriteSquashed(this)) { ..., privateFlagsExt, if (storageUuid != null) { dest.write..., scanSourceDir, scanPublicSourceDir, SparseArray, secondaryNativeLibraryDir, nativeLibraryRootDir, nativeLibraryRootRequiresIsa, overlayPaths, sharedLibraryInfos, optionalSharedLibraryInfos, credentialProtectedDataDir, longVersionCode, fullBackupContent, dataExtractionRulesRes, crossProfile, networkSecurityConfigRes, targetSandboxVersion, classLoaderName, splitClassLoaderNames, appComponentFactory, iconRes, roundIconRes, hiddenUntilInstalled, gwpAsanMode, memtagMode, nativeHeapZeroInitialized, sForBoolean.parcel(requestRawExternal..., createTimestamp, if (mAppClassNamesByProcess == null) ..., allowCrossUidActivitySwitchFromBelow, mPageSizeAppCompatFlags, unalignedNativeLibraries, sForStringSet.parcel(mKnownActivityEm... */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		dest.writeString8(taskAffinity);
+		dest.writeString8(permission);
+		dest.writeString8(processName);
+		dest.writeString8(className);
+		dest.writeInt(theme);
+		dest.writeInt(flags);
+		dest.writeInt(privateFlags);
+		dest.writeInt(requiresSmallestWidthDp);
+		dest.writeInt(compatibleWidthLimitDp);
+		dest.writeInt(largestWidthLimitDp);
+		dest.writeString8(sourceDir);
+		dest.writeString8(publicSourceDir);
+		dest.writeString8Array(splitNames);
+		dest.writeString8Array(splitSourceDirs);
+		dest.writeString8Array(splitPublicSourceDirs);
+		dest.writeString8(nativeLibraryDir);
+		dest.writeString8(primaryCpuAbi);
+		dest.writeString8(secondaryCpuAbi);
+		dest.writeString8Array(resourceDirs);
+		dest.writeString8(seInfo);
+		dest.writeString8(seInfoUser);
+		dest.writeString8Array(sharedLibraryFiles);
+		dest.writeString8(dataDir);
+		dest.writeString8(deviceProtectedDataDir);
+		dest.writeInt(uid);
+		dest.writeInt(minSdkVersion);
+		dest.writeInt(targetSdkVersion);
+		dest.writeInt(enabled ? 1 : 0);
+		dest.writeInt(enabledSetting);
+		dest.writeInt(installLocation);
+		dest.writeString8(manageSpaceActivityName);
+		dest.writeString8(backupAgentName);
+		dest.writeInt(descriptionRes);
+		dest.writeInt(uiOptions);
+		dest.writeInt(category);
+		dest.writeInt(compileSdkVersion);
+		dest.writeString8(compileSdkVersionCodename);
+		dest.writeInt(mHiddenApiPolicy);
+		dest.writeString8(zygotePreloadName);
+		dest.writeInt(localeConfigRes);
+	}
+
+	private ApplicationInfo(android.os.Parcel source) {
+		super(source);
+		taskAffinity = source.readString8();
+		permission = source.readString8();
+		processName = source.readString8();
+		className = source.readString8();
+		theme = source.readInt();
+		flags = source.readInt();
+		privateFlags = source.readInt();
+		requiresSmallestWidthDp = source.readInt();
+		compatibleWidthLimitDp = source.readInt();
+		largestWidthLimitDp = source.readInt();
+		sourceDir = source.readString8();
+		publicSourceDir = source.readString8();
+		splitNames = source.createString8Array();
+		splitSourceDirs = source.createString8Array();
+		splitPublicSourceDirs = source.createString8Array();
+		nativeLibraryDir = source.readString8();
+		primaryCpuAbi = source.readString8();
+		secondaryCpuAbi = source.readString8();
+		resourceDirs = source.createString8Array();
+		seInfo = source.readString8();
+		seInfoUser = source.readString8();
+		sharedLibraryFiles = source.createString8Array();
+		dataDir = source.readString8();
+		deviceProtectedDataDir = source.readString8();
+		uid = source.readInt();
+		minSdkVersion = source.readInt();
+		targetSdkVersion = source.readInt();
+		enabled = source.readInt() != 0;
+		enabledSetting = source.readInt();
+		installLocation = source.readInt();
+		manageSpaceActivityName = source.readString8();
+		backupAgentName = source.readString8();
+		descriptionRes = source.readInt();
+		uiOptions = source.readInt();
+		category = source.readInt();
+		compileSdkVersion = source.readInt();
+		compileSdkVersionCodename = source.readString8();
+		mHiddenApiPolicy = source.readInt();
+		zygotePreloadName = source.readString8();
+		localeConfigRes = source.readInt();
+	}
+
+	public static final android.os.Parcelable.Creator<ApplicationInfo> CREATOR = new android.os.Parcelable.Creator<ApplicationInfo>() {
+		public ApplicationInfo createFromParcel(android.os.Parcel source) {
+			return new ApplicationInfo(source);
+		}
+
+		public ApplicationInfo[] newArray(int size) {
+			return new ApplicationInfo[size];
+		}
+	};
 }

@@ -25,7 +25,7 @@ import android.util.Printer;
  * {@link android.content.pm.PackageManager#resolveContentProvider(java.lang.String, int)
  * PackageManager.resolveContentProvider()}.
  */
-public final class ProviderInfo extends ComponentInfo {
+public final class ProviderInfo extends ComponentInfo implements android.os.Parcelable {
 
 	/**
 	 * The name provider is published under content://
@@ -135,4 +135,45 @@ public final class ProviderInfo extends ComponentInfo {
 	public String toString() {
 		return "ContentProviderInfo{name=" + authority + " className=" + name + "}";
 	}
+
+	/* AOSP ProviderInfo.writeToParcel()/ProviderInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): forceUriPermissions */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel out, int parcelableFlags) {
+		super.writeToParcel(out, parcelableFlags);
+		out.writeString8(authority);
+		out.writeString8(readPermission);
+		out.writeString8(writePermission);
+		out.writeInt(grantUriPermissions ? 1 : 0);
+		out.writeInt(multiprocess ? 1 : 0);
+		out.writeInt(initOrder);
+		out.writeInt(flags);
+		out.writeInt(isSyncable ? 1 : 0);
+	}
+
+	private ProviderInfo(android.os.Parcel in) {
+		super(in);
+		authority = in.readString8();
+		readPermission = in.readString8();
+		writePermission = in.readString8();
+		grantUriPermissions = in.readInt() != 0;
+		multiprocess = in.readInt() != 0;
+		initOrder = in.readInt();
+		flags = in.readInt();
+		isSyncable = in.readInt() != 0;
+	}
+
+	public static final android.os.Parcelable.Creator<ProviderInfo> CREATOR = new android.os.Parcelable.Creator<ProviderInfo>() {
+		public ProviderInfo createFromParcel(android.os.Parcel source) {
+			return new ProviderInfo(source);
+		}
+
+		public ProviderInfo[] newArray(int size) {
+			return new ProviderInfo[size];
+		}
+	};
 }

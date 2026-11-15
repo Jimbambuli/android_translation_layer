@@ -21,7 +21,7 @@ package android.content.pm;
  * instrumentation.  This corresponds to information collected
  * from the AndroidManifest.xml's &lt;instrumentation&gt; tag.
  */
-public class InstrumentationInfo extends PackageItemInfo {
+public class InstrumentationInfo extends PackageItemInfo implements android.os.Parcelable {
 	/**
 	 * The name of the application package being instrumented.  From the
 	 * "package" attribute.
@@ -82,4 +82,43 @@ public class InstrumentationInfo extends PackageItemInfo {
 	public int describeContents() {
 		return 0;
 	}
+
+	/* AOSP InstrumentationInfo.writeToParcel()/InstrumentationInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
+	 * Not parcelled (no such field or helper in ATL): targetProcesses, splitNames, splitSourceDirs, splitPublicSourceDirs, SparseArray, deviceProtectedDataDir, credentialProtectedDataDir, primaryCpuAbi, secondaryCpuAbi, secondaryNativeLibraryDir */
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
+		super.writeToParcel(dest, parcelableFlags);
+		dest.writeString8(targetPackage);
+		dest.writeString8(sourceDir);
+		dest.writeString8(publicSourceDir);
+		dest.writeString8(dataDir);
+		dest.writeString8(nativeLibraryDir);
+		dest.writeInt((handleProfiling == false) ? 0 : 1);
+		dest.writeInt((functionalTest == false) ? 0 : 1);
+	}
+
+	private InstrumentationInfo(android.os.Parcel source) {
+		super(source);
+		targetPackage = source.readString8();
+		sourceDir = source.readString8();
+		publicSourceDir = source.readString8();
+		dataDir = source.readString8();
+		nativeLibraryDir = source.readString8();
+		handleProfiling = source.readInt() != 0;
+		functionalTest = source.readInt() != 0;
+	}
+
+	public static final android.os.Parcelable.Creator<InstrumentationInfo> CREATOR = new android.os.Parcelable.Creator<InstrumentationInfo>() {
+		public InstrumentationInfo createFromParcel(android.os.Parcel source) {
+			return new InstrumentationInfo(source);
+		}
+
+		public InstrumentationInfo[] newArray(int size) {
+			return new InstrumentationInfo[size];
+		}
+	};
 }
