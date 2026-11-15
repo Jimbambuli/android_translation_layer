@@ -233,6 +233,11 @@ public final class ContentValues {
 		return mValues.size();
 	}
 
+	/* AOSP ContentValues.isEmpty() */
+	public boolean isEmpty() {
+		return mValues.isEmpty();
+	}
+
 	/**
 	 * Remove a single value.
 	 *

@@ -188,6 +188,11 @@ public class IntentFilter {
 		return dataTypes != null ? dataTypes.size() : 0;
 	}
 
+	/* AOSP IntentFilter.getDataType() */
+	public final String getDataType(int index) {
+		return dataTypes.get(index);
+	}
+
 	public final boolean hasDataType(String type) {
 		return dataTypes != null && findMimeType(type);
 	}

@@ -328,6 +328,11 @@ public final class ArrayMap<K, V> implements Map<K, V> {
 		return key == null ? (indexOfNull() >= 0) : (indexOf(key, key.hashCode()) >= 0);
 	}
 
+	/* AOSP ArrayMap.indexOfKey() (ATL's ArrayMap has no identity-hash mode) */
+	public int indexOfKey(Object key) {
+		return key == null ? indexOfNull() : indexOf(key, key.hashCode());
+	}
+
 	int indexOfValue(Object value) {
 		final int N = mSize * 2;
 		final Object[] array = mArray;

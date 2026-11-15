@@ -304,6 +304,11 @@ public class SparseArray<E> implements Cloneable {
 		mValues[index] = value;
 	}
 
+	/* AOSP SparseArray.contains() */
+	public boolean contains(int key) {
+		return indexOfKey(key) >= 0;
+	}
+
 	/**
 	 * Returns the index for which {@link #keyAt} would return the
 	 * specified key, or a negative number if the specified

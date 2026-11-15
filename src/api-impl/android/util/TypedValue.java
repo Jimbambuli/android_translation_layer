@@ -241,6 +241,11 @@ public class TypedValue {
 	 */
 	public int type;
 
+	/* AOSP TypedValue.isColorType() */
+	public boolean isColorType() {
+		return (type >= TYPE_FIRST_COLOR_INT && type <= TYPE_LAST_COLOR_INT);
+	}
+
 	/**
 	 * If the value holds a string, this is it.
 	 */

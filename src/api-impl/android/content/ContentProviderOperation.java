@@ -181,6 +181,34 @@ public class ContentProviderOperation implements Parcelable {
 			numRows = provider.update(mUri, values, mSelection, selectionArgs);
 		} else if (mType == TYPE_DELETE) {
 			numRows = provider.delete(mUri, mSelection, selectionArgs);
+		} else if (mType == TYPE_ASSERT) {
+			/* AOSP applyInternal(): every row of the query must hold the expected values */
+			String[] projection = null;
+			if (values != null) {
+				final java.util.ArrayList<String> projectionList = new java.util.ArrayList<String>();
+				for (Map.Entry<String, Object> entry : values.valueSet()) {
+					projectionList.add(entry.getKey());
+				}
+				projection = projectionList.toArray(new String[projectionList.size()]);
+			}
+			final android.database.Cursor cursor = provider.query(mUri, projection, mSelection, selectionArgs, null, null);
+			try {
+				numRows = cursor.getCount();
+				if (projection != null) {
+					while (cursor.moveToNext()) {
+						for (int i = 0; i < projection.length; i++) {
+							final String cursorValue = cursor.getString(i);
+							final String expectedValue = values.getAsString(projection[i]);
+							if (!android.text.TextUtils.equals(cursorValue, expectedValue)) {
+								throw new OperationApplicationException("Found value " + cursorValue + " when expected " + expectedValue
+								                                        + " for column " + projection[i]);
+							}
+						}
+					}
+				}
+			} finally {
+				cursor.close();
+			}
 		} else {
 			throw new UnsupportedOperationException("ContentProviderOperation type " + mType + " not implemented");
 		}
@@ -272,6 +300,20 @@ public class ContentProviderOperation implements Parcelable {
 
 	public static Builder newDelete(Uri uri) {
 		return new Builder(TYPE_DELETE, uri);
+	}
+
+	/* AOSP ContentProviderOperation.newAssertQuery() */
+	public static Builder newAssertQuery(Uri uri) {
+		return new Builder(TYPE_ASSERT, uri);
+	}
+
+	/* AOSP ContentProviderOperation.isAssertQuery(), isReadOperation() */
+	public boolean isAssertQuery() {
+		return mType == TYPE_ASSERT;
+	}
+
+	public boolean isReadOperation() {
+		return mType == TYPE_ASSERT;
 	}
 
 	public static class Builder {
@@ -394,6 +436,20 @@ public class ContentProviderOperation implements Parcelable {
 					setSelectionArg(i, selectionArgs[i]);
 				}
 			}
+			return this;
+		}
+
+		/* AOSP Builder.withExpectedCount(), withYieldAllowed() */
+		public Builder withExpectedCount(int count) {
+			if (mType != TYPE_UPDATE && mType != TYPE_DELETE && mType != TYPE_ASSERT) {
+				throw new IllegalArgumentException("only updates, deletes, and asserts can have expected counts");
+			}
+			mExpectedCount = count;
+			return this;
+		}
+
+		public Builder withYieldAllowed(boolean yieldAllowed) {
+			mYieldAllowed = yieldAllowed;
 			return this;
 		}
 
