@@ -1095,6 +1095,9 @@ public final class Debug {
 
 	public static void startMethodTracing(String traceName, int bufferSize, int flags) {}
 
+	/* like startMethodTracing(): ATL has no VM tracer behind VMDebug.startMethodTracing */
+	public static void startMethodTracingSampling(String traceName, int bufferSize, int intervalUs) {}
+
 	public static void stopMethodTracing() {}
 
 	public static void startNativeTracing() {}

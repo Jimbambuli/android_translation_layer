@@ -59,6 +59,11 @@ public final class SigningInfo implements Parcelable {
 		this.signatures = signatures;
 	}
 
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
 	/**
 	 * Although relatively uncommon, packages may be signed by more than one signer, in which case
 	 * their identity is viewed as being the set of all signers, not just any one.

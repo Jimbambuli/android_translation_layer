@@ -171,17 +171,6 @@ public class PackageItemInfo {
 		return pm.getDefaultActivityIcon();
 	}
 
-	/**
-	 * Retrieve the current graphical logo associated with this item. This
-	 * will call back on the given PackageManager to load the logo from
-	 * the application.
-	 *
-	 * @param pm A PackageManager from which the logo can be loaded; usually
-	 * the PackageManager from which you originally retrieved this item.
-	 *
-	 * @return Returns a Drawable containing the item's logo. If the item
-	 * does not have a logo, this method will return null.
-	 */
 	/* AOSP PackageItemInfo.loadBanner() / loadDefaultBanner() */
 	public Drawable loadBanner(PackageManager pm) {
 		if (banner != 0) {
@@ -196,6 +185,17 @@ public class PackageItemInfo {
 		return null;
 	}
 
+	/**
+	 * Retrieve the current graphical logo associated with this item. This
+	 * will call back on the given PackageManager to load the logo from
+	 * the application.
+	 *
+	 * @param pm A PackageManager from which the logo can be loaded; usually
+	 * the PackageManager from which you originally retrieved this item.
+	 *
+	 * @return Returns a Drawable containing the item's logo. If the item
+	 * does not have a logo, this method will return null.
+	 */
 	public Drawable loadLogo(PackageManager pm) {
 		if (logo != 0) {
 			Drawable d = pm.getDrawable(packageName, logo, getApplicationInfo());
