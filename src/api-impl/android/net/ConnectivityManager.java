@@ -66,6 +66,7 @@ public class ConnectivityManager {
 		final PendingIntent operation;
 		final Handler handler;
 		boolean reported;
+		boolean everReported; // for the timeout of requestNetwork(..., int)
 
 		Registration(NetworkRequest request, NetworkCallback callback, PendingIntent operation, Handler handler) {
 			this.request = request;
@@ -172,6 +173,24 @@ public class ConnectivityManager {
 		register(request, callback, null, handler);
 	}
 
+	/* AOSP requestNetwork(NetworkRequest, NetworkCallback, int): checkTimeout(), then the request; when no matching
+	 * network was found within the time, onUnavailable() follows and the request is released */
+	public void requestNetwork(NetworkRequest request, NetworkCallback callback, int timeoutMs) {
+		if (timeoutMs <= 0) {
+			throw new IllegalArgumentException("timeoutMs must be strictly positive.");
+		}
+		final Registration r = register(request, callback, null, null);
+		r.handler.postDelayed(new Runnable() {
+			public void run() {
+				synchronized (registrations) {
+					if (r.everReported || !registrations.remove(r))
+						return;
+				}
+				r.callback.onUnavailable();
+			}
+		}, timeoutMs);
+	}
+
 	public void registerDefaultNetworkCallback(NetworkCallback callback) {
 		register(null, callback, null, null);
 	}
@@ -197,7 +216,7 @@ public class ConnectivityManager {
 	}
 
 	/* request null: the default network, which is the one network ATL knows */
-	private void register(NetworkRequest request, NetworkCallback callback, PendingIntent operation, Handler handler) {
+	private Registration register(NetworkRequest request, NetworkCallback callback, PendingIntent operation, Handler handler) {
 		if (callback == null && operation == null)
 			throw new IllegalArgumentException("null NetworkCallback");
 		nativeStartMonitoring();
@@ -209,6 +228,7 @@ public class ConnectivityManager {
 			if (lastAvailable)
 				notify(r, true);
 		}
+		return r;
 	}
 
 	private static Handler getConnectivityThreadHandler() {
@@ -231,6 +251,7 @@ public class ConnectivityManager {
 			return;
 		}
 		r.reported = available;
+		r.everReported |= available;
 		if (r.operation != null) {
 			if (available) {
 				r.handler.post(new Runnable() {
