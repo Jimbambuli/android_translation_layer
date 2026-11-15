@@ -662,6 +662,7 @@ srcs = [
 	'android/media/metrics/PlaybackStateEvent.java',
 	'android/media/metrics/TrackChangeEvent.java',
 	'android/media/projection/MediaProjection.java',
+	'android/media/projection/MediaProjectionConfig.java',
 	'android/media/projection/MediaProjectionManager.java',
 	'android/media/session/MediaController.java',
 	'android/media/session/MediaSession.java',
