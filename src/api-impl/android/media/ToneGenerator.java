@@ -13,6 +13,11 @@ public class ToneGenerator {
 		return false;
 	}
 
+	/* AOSP startTone(int): the tone plays until stopTone(), durationMs = -1 */
+	public boolean startTone(int toneType) {
+		return startTone(toneType, -1);
+	}
+
 	public void stopTone() {}
 
 	public void release() {}

@@ -19,6 +19,8 @@ public class RemoteControlClient {
 
 	public RemoteControlClient(PendingIntent mediaButtonIntent) {}
 
+	public RemoteControlClient(PendingIntent mediaButtonIntent, android.os.Looper looper) {}
+
 	public MetadataEditor editMetadata(boolean startEmpty) {
 		return new MetadataEditor();
 	}
