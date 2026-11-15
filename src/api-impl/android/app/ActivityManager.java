@@ -548,9 +548,9 @@ public class ActivityManager {
 		return Collections.emptyList();
 	}
 
-	/* AOSP (API 35) returns List<ApplicationStartInfo>; ATL keeps no start records, so the list is
-	 * always empty and the element class is not needed */
-	public List<?> getHistoricalProcessStartReasons(int maxNum) {
+	/* AOSP (API 35) returns the records of the app's last starts; ATL keeps no start records, so the list is
+	 * always empty */
+	public List<ApplicationStartInfo> getHistoricalProcessStartReasons(int maxNum) {
 		return Collections.emptyList();
 	}
 
@@ -571,14 +571,14 @@ public class ActivityManager {
 	public static boolean isRunningInTestHarness() { return false; }
 	public static boolean isRunningInUserTestHarness() { return false; }
 
-	/* AOSP hands the listener the ApplicationStartInfo of this process; ATL has neither ApplicationStartInfo nor start records (Consumer<ApplicationStartInfo> erases to Consumer), so it is never called */
-	public void addApplicationStartInfoCompletionListener(java.util.concurrent.Executor executor, java.util.function.Consumer<?> listener) {
+	/* AOSP hands the listener the ApplicationStartInfo of this process; ATL has no start records, so it is never called */
+	public void addApplicationStartInfoCompletionListener(java.util.concurrent.Executor executor, java.util.function.Consumer<ApplicationStartInfo> listener) {
 		if (executor == null || listener == null) {
 			throw new NullPointerException("executor and listener must not be null");
 		}
 	}
 
-	public void removeApplicationStartInfoCompletionListener(java.util.function.Consumer<?> listener) {
+	public void removeApplicationStartInfoCompletionListener(java.util.function.Consumer<ApplicationStartInfo> listener) {
 		if (listener == null) {
 			throw new NullPointerException("listener must not be null");
 		}

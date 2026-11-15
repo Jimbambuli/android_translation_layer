@@ -1,0 +1,176 @@
+package android.app;
+
+import android.content.ComponentName;
+import android.net.Uri;
+
+/* AOSP AutomaticZenRule (android-16.0.0_r4, AutomaticZenRule.java), the fields that do not need ZenPolicy or
+ * ZenDeviceEffects (ATL has neither): a rule's name, owner, condition, interruption filter and state. Without
+ * Parcelable and Builder. */
+public final class AutomaticZenRule {
+	public static final int TYPE_UNKNOWN = -1;
+	public static final int TYPE_OTHER = 0;
+	public static final int TYPE_SCHEDULE_TIME = 1;
+	public static final int TYPE_SCHEDULE_CALENDAR = 2;
+	public static final int TYPE_BEDTIME = 3;
+	public static final int TYPE_DRIVING = 4;
+	public static final int TYPE_IMMERSIVE = 5;
+	public static final int TYPE_THEATER = 6;
+	public static final int TYPE_MANAGED = 7;
+
+	public static final int FIELD_NAME = 1 << 0;
+	public static final int FIELD_INTERRUPTION_FILTER = 1 << 1;
+	public static final int FIELD_ICON = 1 << 2;
+
+	public static final int MAX_STRING_LENGTH = 500;
+	public static final int MAX_DESC_LENGTH = 150;
+
+	private boolean enabled;
+	private String name;
+	private int interruptionFilter;
+	private Uri conditionId;
+	private ComponentName owner;
+	private ComponentName configurationActivity;
+	private long creationTime;
+	private String mPkg;
+	private int mType = TYPE_UNKNOWN;
+	private int mIconResId;
+	private String mTriggerDescription;
+	private boolean mAllowManualInvocation;
+
+	public AutomaticZenRule(String name, ComponentName owner, Uri conditionId, int interruptionFilter, boolean enabled) {
+		this(name, owner, null, conditionId, interruptionFilter, enabled);
+	}
+
+	public AutomaticZenRule(String name, ComponentName owner, ComponentName configurationActivity, Uri conditionId,
+	                        int interruptionFilter, boolean enabled) {
+		this.name = getTrimmedString(name);
+		this.owner = getTrimmedComponentName(owner);
+		this.configurationActivity = getTrimmedComponentName(configurationActivity);
+		this.conditionId = getTrimmedUri(conditionId);
+		this.interruptionFilter = interruptionFilter;
+		this.enabled = enabled;
+	}
+
+	public ComponentName getOwner() {
+		return owner;
+	}
+
+	public ComponentName getConfigurationActivity() {
+		return configurationActivity;
+	}
+
+	public Uri getConditionId() {
+		return conditionId;
+	}
+
+	public int getInterruptionFilter() {
+		return interruptionFilter;
+	}
+
+	public String getName() {
+		return name;
+	}
+
+	public boolean isEnabled() {
+		return enabled;
+	}
+
+	public long getCreationTime() {
+		return creationTime;
+	}
+
+	public void setConditionId(Uri conditionId) {
+		this.conditionId = getTrimmedUri(conditionId);
+	}
+
+	public void setInterruptionFilter(int interruptionFilter) {
+		this.interruptionFilter = interruptionFilter;
+	}
+
+	public void setName(String name) {
+		this.name = getTrimmedString(name);
+	}
+
+	public void setEnabled(boolean enabled) {
+		this.enabled = enabled;
+	}
+
+	public void setOwner(ComponentName owner) {
+		this.owner = owner;
+	}
+
+	public void setConfigurationActivity(ComponentName componentName) {
+		this.configurationActivity = getTrimmedComponentName(componentName);
+	}
+
+	public void setPackageName(String pkgName) {
+		mPkg = pkgName;
+	}
+
+	public String getPackageName() {
+		return mPkg;
+	}
+
+	public int getType() {
+		return mType;
+	}
+
+	public void setType(int type) {
+		mType = checkValidType(type);
+	}
+
+	public String getTriggerDescription() {
+		return mTriggerDescription;
+	}
+
+	public void setTriggerDescription(String triggerDescription) {
+		mTriggerDescription = getTrimmedString(triggerDescription, MAX_DESC_LENGTH);
+	}
+
+	public int getIconResId() {
+		return mIconResId;
+	}
+
+	public void setIconResId(int iconResId) {
+		mIconResId = iconResId;
+	}
+
+	public boolean isManualInvocationAllowed() {
+		return mAllowManualInvocation;
+	}
+
+	public void setManualInvocationAllowed(boolean allowManualInvocation) {
+		mAllowManualInvocation = allowManualInvocation;
+	}
+
+	private static int checkValidType(int type) {
+		if (type < TYPE_UNKNOWN || type > TYPE_MANAGED) {
+			throw new IllegalArgumentException("Rule type must be one of TYPE_UNKNOWN, TYPE_OTHER, TYPE_SCHEDULE_TIME, "
+			    + "TYPE_SCHEDULE_CALENDAR, TYPE_BEDTIME, TYPE_DRIVING, TYPE_IMMERSIVE, TYPE_THEATER, or TYPE_MANAGED");
+		}
+		return type;
+	}
+
+	private static ComponentName getTrimmedComponentName(ComponentName cn) {
+		if (cn == null) return null;
+		return new ComponentName(getTrimmedString(cn.getPackageName()), getTrimmedString(cn.getClassName()));
+	}
+
+	private static String getTrimmedString(String input) {
+		return getTrimmedString(input, MAX_STRING_LENGTH);
+	}
+
+	private static String getTrimmedString(String input, int length) {
+		if (input != null && input.length() > length) {
+			return input.substring(0, length);
+		}
+		return input;
+	}
+
+	private static Uri getTrimmedUri(Uri input) {
+		if (input != null && input.toString().length() > MAX_STRING_LENGTH) {
+			return Uri.parse(getTrimmedString(input.toString()));
+		}
+		return input;
+	}
+}
