@@ -204,4 +204,26 @@ public class DropBoxManager {
 	public Entry getNextEntry(String tag, long msec) {
 		return null;
 	}
+
+	/* AOSP addText/addData/addFile/isTagEnabled hand over to DropBoxManagerService; ATL has none, so the
+	 * entry is dropped, like one for a blocked tag, after AOSP's argument checks. */
+	public void addText(String tag, String data) {
+		addData(tag, data.getBytes(java.nio.charset.StandardCharsets.UTF_8), IS_TEXT);
+	}
+
+	public void addData(String tag, byte[] data, int flags) {
+		if (data == null)
+			throw new NullPointerException("data == null");
+	}
+
+	public void addFile(String tag, File file, int flags) throws IOException {
+		if (file == null)
+			throw new NullPointerException("file == null");
+		/* AOSP opens the file read-only first, so a missing file throws here as well */
+		new java.io.FileInputStream(file).close();
+	}
+
+	public boolean isTagEnabled(String tag) {
+		return false;
+	}
 }

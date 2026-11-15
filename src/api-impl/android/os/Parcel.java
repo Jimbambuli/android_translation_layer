@@ -1575,4 +1575,457 @@ public class Parcel {
 			list.remove(list.size() - 1);
 		return list;
 	}
+
+	/* AOSP Parcel.enforceNoDataAvail() */
+	public void enforceNoDataAvail() {
+		final int n = dataAvail();
+		if (n > 0) {
+			throw new BadParcelableException("Parcel data not fully consumed, unread size: " + n);
+		}
+	}
+
+	/* AOSP Parcel.setPropagateAllowBlocking(): FLAG_PROPAGATE_ALLOW_BLOCKING only matters to the native binder
+	 * driver; ATL's parcels never reach one, so the flag is only kept */
+	private boolean propagateAllowBlocking;
+
+	public void setPropagateAllowBlocking() {
+		propagateAllowBlocking = true;
+	}
+
+	/* AOSP Parcel.writeBlob()/readBlob(): the native blob is a length, then the bytes (inline); ATL stores it the
+	 * same way as a byte array */
+	public final void writeBlob(byte[] b) {
+		writeBlob(b, 0, (b != null) ? b.length : 0);
+	}
+
+	public final void writeBlob(byte[] b, int offset, int len) {
+		if (b == null) {
+			writeInt(-1);
+			return;
+		}
+		if (offset < 0 || len < 0 || offset > b.length - len)
+			throw new ArrayIndexOutOfBoundsException();
+		writeInt(len);
+		for (int i = 0; i < len; i++)
+			writeByte(b[offset + i]);
+	}
+
+	public final byte[] readBlob() {
+		return createByteArray();
+	}
+
+	/* AOSP Parcel.writeSize()/readSize()/writeSizeF()/readSizeF() */
+	public final void writeSize(android.util.Size val) {
+		writeInt(val.getWidth());
+		writeInt(val.getHeight());
+	}
+
+	public final android.util.Size readSize() {
+		final int width = readInt();
+		final int height = readInt();
+		return new android.util.Size(width, height);
+	}
+
+	public final void writeSizeF(android.util.SizeF val) {
+		writeFloat(val.getWidth());
+		writeFloat(val.getHeight());
+	}
+
+	public final android.util.SizeF readSizeF() {
+		final float width = readFloat();
+		final float height = readFloat();
+		return new android.util.SizeF(width, height);
+	}
+
+	/* AOSP Parcel.writeTypedArrayMap()/createTypedArrayMap()/writeTypedSparseArray()/createTypedSparseArray() */
+	public <T extends Parcelable> void writeTypedArrayMap(android.util.ArrayMap<String, T> val, int parcelableFlags) {
+		if (val == null) {
+			writeInt(-1);
+			return;
+		}
+		final int count = val.size();
+		writeInt(count);
+		for (int i = 0; i < count; i++) {
+			writeString(val.keyAt(i));
+			writeTypedObject(val.valueAt(i), parcelableFlags);
+		}
+	}
+
+	public final <T extends Parcelable> android.util.ArrayMap<String, T>
+	createTypedArrayMap(Parcelable.Creator<T> creator) {
+		final int count = readInt();
+		if (count < 0) {
+			return null;
+		}
+		final android.util.ArrayMap<String, T> map = new android.util.ArrayMap<>(count);
+		for (int i = 0; i < count; i++) {
+			final String key = readString();
+			final T value = readTypedObject(creator);
+			map.append(key, value);
+		}
+		return map;
+	}
+
+	public final <T extends Parcelable> void writeTypedSparseArray(SparseArray<T> val, int parcelableFlags) {
+		if (val == null) {
+			writeInt(-1);
+			return;
+		}
+		final int count = val.size();
+		writeInt(count);
+		for (int i = 0; i < count; i++) {
+			writeInt(val.keyAt(i));
+			writeTypedObject(val.valueAt(i), parcelableFlags);
+		}
+	}
+
+	public final <T extends Parcelable> SparseArray<T> createTypedSparseArray(Parcelable.Creator<T> creator) {
+		final int count = readInt();
+		if (count < 0) {
+			return null;
+		}
+		final SparseArray<T> array = new SparseArray<>(count);
+		for (int i = 0; i < count; i++) {
+			final int index = readInt();
+			final T value = readTypedObject(creator);
+			array.append(index, value);
+		}
+		return array;
+	}
+
+	/* AOSP Parcel.writeInterfaceArray()/createInterfaceArray()/readInterfaceArray()/writeInterfaceList()/
+	 * createInterfaceArrayList()/readInterfaceList() */
+	public final <T extends IInterface> void writeInterfaceArray(T[] val) {
+		if (val != null) {
+			int N = val.length;
+			writeInt(N);
+			for (int i = 0; i < N; i++) {
+				writeStrongInterface(val[i]);
+			}
+		} else {
+			writeInt(-1);
+		}
+	}
+
+	public final <T extends IInterface> T[] createInterfaceArray(java.util.function.IntFunction<T[]> newArray,
+	                                                             java.util.function.Function<IBinder, T> asInterface) {
+		int N = readInt();
+		if (N >= 0) {
+			T[] val = newArray.apply(N);
+			for (int i = 0; i < N; i++) {
+				val[i] = asInterface.apply(readStrongBinder());
+			}
+			return val;
+		} else {
+			return null;
+		}
+	}
+
+	public final <T extends IInterface> void readInterfaceArray(T[] val,
+	                                                            java.util.function.Function<IBinder, T> asInterface) {
+		int N = readInt();
+		if (N == val.length) {
+			for (int i = 0; i < N; i++) {
+				val[i] = asInterface.apply(readStrongBinder());
+			}
+		} else {
+			throw new BadParcelableException("bad array lengths");
+		}
+	}
+
+	public final <T extends IInterface> void writeInterfaceList(List<T> val) {
+		if (val == null) {
+			writeInt(-1);
+			return;
+		}
+		int N = val.size();
+		writeInt(N);
+		for (int i = 0; i < N; i++) {
+			writeStrongInterface(val.get(i));
+		}
+	}
+
+	public final <T extends IInterface> ArrayList<T>
+	createInterfaceArrayList(java.util.function.Function<IBinder, T> asInterface) {
+		int N = readInt();
+		if (N < 0) {
+			return null;
+		}
+		ArrayList<T> l = new ArrayList<T>(N);
+		while (N > 0) {
+			l.add(asInterface.apply(readStrongBinder()));
+			N--;
+		}
+		return l;
+	}
+
+	public final <T extends IInterface> void readInterfaceList(List<T> list,
+	                                                           java.util.function.Function<IBinder, T> asInterface) {
+		int M = list.size();
+		int N = readInt();
+		int i = 0;
+		for (; i < M && i < N; i++) {
+			list.set(i, asInterface.apply(readStrongBinder()));
+		}
+		for (; i < N; i++) {
+			list.add(asInterface.apply(readStrongBinder()));
+		}
+		for (; i < M; i++) {
+			list.remove(N);
+		}
+	}
+
+	/* AOSP Parcel.writeFixedArray()/readFixedArray()/createFixedArray(): fixed-size (possibly multi-dimensional)
+	 * arrays; the memory-limit check of createFixedArray() is not taken over */
+	public <T> void writeFixedArray(T val, int parcelableFlags, int... dimensions) {
+		if (val == null) {
+			writeInt(-1);
+			return;
+		}
+		writeFixedArrayInternal(val, parcelableFlags, 0, dimensions);
+	}
+
+	private <T> void writeFixedArrayInternal(T val, int parcelableFlags, int index, int[] dimensions) {
+		if (index >= dimensions.length) {
+			throw new BadParcelableException("Array has more dimensions than expected: " + dimensions.length);
+		}
+		int length = dimensions[index];
+		if (val == null) {
+			throw new BadParcelableException("Non-null array shouldn't have a null array.");
+		}
+		if (!val.getClass().isArray()) {
+			throw new BadParcelableException("Not an array: " + val);
+		}
+		if (java.lang.reflect.Array.getLength(val) != length) {
+			throw new BadParcelableException("bad length: expected " + length + ", but got " +
+			                                 java.lang.reflect.Array.getLength(val));
+		}
+		final Class<?> componentType = val.getClass().getComponentType();
+		if (!componentType.isArray() && index + 1 != dimensions.length) {
+			throw new BadParcelableException("Array has fewer dimensions than expected: " + dimensions.length);
+		}
+		if (componentType == boolean.class) {
+			writeBooleanArray((boolean[])val);
+		} else if (componentType == byte.class) {
+			writeByteArray((byte[])val);
+		} else if (componentType == char.class) {
+			writeCharArray((char[])val);
+		} else if (componentType == int.class) {
+			writeIntArray((int[])val);
+		} else if (componentType == long.class) {
+			writeLongArray((long[])val);
+		} else if (componentType == float.class) {
+			writeFloatArray((float[])val);
+		} else if (componentType == double.class) {
+			writeDoubleArray((double[])val);
+		} else if (componentType == IBinder.class) {
+			writeBinderArray((IBinder[])val);
+		} else if (IInterface.class.isAssignableFrom(componentType)) {
+			writeInterfaceArray((IInterface[])val);
+		} else if (Parcelable.class.isAssignableFrom(componentType)) {
+			writeTypedArray((Parcelable[])val, parcelableFlags);
+		} else if (componentType.isArray()) {
+			writeInt(length);
+			for (int i = 0; i < length; i++) {
+				writeFixedArrayInternal(java.lang.reflect.Array.get(val, i), parcelableFlags, index + 1, dimensions);
+			}
+		} else {
+			throw new BadParcelableException("unknown type for fixed-size array: " + componentType);
+		}
+	}
+
+	public <T> void readFixedArray(T val) {
+		Class<?> componentType = val.getClass().getComponentType();
+		if (componentType == boolean.class) {
+			readBooleanArray((boolean[])val);
+		} else if (componentType == byte.class) {
+			readByteArray((byte[])val);
+		} else if (componentType == char.class) {
+			readCharArray((char[])val);
+		} else if (componentType == int.class) {
+			readIntArray((int[])val);
+		} else if (componentType == long.class) {
+			readLongArray((long[])val);
+		} else if (componentType == float.class) {
+			readFloatArray((float[])val);
+		} else if (componentType == double.class) {
+			readDoubleArray((double[])val);
+		} else if (componentType == IBinder.class) {
+			readBinderArray((IBinder[])val);
+		} else if (componentType.isArray()) {
+			int length = readInt();
+			if (length != java.lang.reflect.Array.getLength(val)) {
+				throw new BadParcelableException("Bad length: expected " + java.lang.reflect.Array.getLength(val) +
+				                                 ", but got " + length);
+			}
+			for (int i = 0; i < length; i++) {
+				readFixedArray(java.lang.reflect.Array.get(val, i));
+			}
+		} else {
+			throw new BadParcelableException("Unknown type for fixed-size array: " + componentType);
+		}
+	}
+
+	public <T, S extends IInterface> void readFixedArray(T val, java.util.function.Function<IBinder, S> asInterface) {
+		Class<?> componentType = val.getClass().getComponentType();
+		if (IInterface.class.isAssignableFrom(componentType)) {
+			readInterfaceArray((S[])val, asInterface);
+		} else if (componentType.isArray()) {
+			int length = readInt();
+			if (length != java.lang.reflect.Array.getLength(val)) {
+				throw new BadParcelableException("Bad length: expected " + java.lang.reflect.Array.getLength(val) +
+				                                 ", but got " + length);
+			}
+			for (int i = 0; i < length; i++) {
+				readFixedArray(java.lang.reflect.Array.get(val, i), asInterface);
+			}
+		} else {
+			throw new BadParcelableException("Unknown type for fixed-size array: " + componentType);
+		}
+	}
+
+	public <T, S extends Parcelable> void readFixedArray(T val, Parcelable.Creator<S> c) {
+		Class<?> componentType = val.getClass().getComponentType();
+		if (Parcelable.class.isAssignableFrom(componentType)) {
+			readTypedArray((S[])val, c);
+		} else if (componentType.isArray()) {
+			int length = readInt();
+			if (length != java.lang.reflect.Array.getLength(val)) {
+				throw new BadParcelableException("Bad length: expected " + java.lang.reflect.Array.getLength(val) +
+				                                 ", but got " + length);
+			}
+			for (int i = 0; i < length; i++) {
+				readFixedArray(java.lang.reflect.Array.get(val, i), c);
+			}
+		} else {
+			throw new BadParcelableException("Unknown type for fixed-size array: " + componentType);
+		}
+	}
+
+	private void ensureClassHasExpectedDimensions(Class<?> cls, int numDimension) {
+		if (numDimension <= 0) {
+			throw new BadParcelableException("Fixed-size array should have dimensions.");
+		}
+		for (int i = 0; i < numDimension; i++) {
+			if (!cls.isArray()) {
+				throw new BadParcelableException("Array has fewer dimensions than expected: " + numDimension);
+			}
+			cls = cls.getComponentType();
+		}
+		if (cls.isArray()) {
+			throw new BadParcelableException("Array has more dimensions than expected: " + numDimension);
+		}
+	}
+
+	/* the nested part shared by the three createFixedArray(): the innermost class, checked length, new array */
+	private Class<?> fixedArrayInnermost(Class<?> componentType, int[] dimensions) {
+		int length = readInt();
+		if (length < 0) {
+			return null;
+		}
+		if (length != dimensions[0]) {
+			throw new BadParcelableException("Bad length: expected " + dimensions[0] + ", but got " + length);
+		}
+		Class<?> innermost = componentType.getComponentType();
+		while (innermost.isArray()) {
+			innermost = innermost.getComponentType();
+		}
+		return innermost;
+	}
+
+	public <T> T createFixedArray(Class<T> cls, int... dimensions) {
+		ensureClassHasExpectedDimensions(cls, dimensions.length);
+
+		T val = null;
+		final Class<?> componentType = cls.getComponentType();
+		if (componentType == boolean.class) {
+			val = (T)createBooleanArray();
+		} else if (componentType == byte.class) {
+			val = (T)createByteArray();
+		} else if (componentType == char.class) {
+			val = (T)createCharArray();
+		} else if (componentType == int.class) {
+			val = (T)createIntArray();
+		} else if (componentType == long.class) {
+			val = (T)createLongArray();
+		} else if (componentType == float.class) {
+			val = (T)createFloatArray();
+		} else if (componentType == double.class) {
+			val = (T)createDoubleArray();
+		} else if (componentType == IBinder.class) {
+			val = (T)createBinderArray();
+		} else if (componentType.isArray()) {
+			Class<?> innermost = fixedArrayInnermost(componentType, dimensions);
+			if (innermost == null)
+				return null;
+			val = (T)java.lang.reflect.Array.newInstance(innermost, dimensions);
+			for (int i = 0; i < dimensions[0]; i++) {
+				readFixedArray(java.lang.reflect.Array.get(val, i));
+			}
+			return val;
+		} else {
+			throw new BadParcelableException("Unknown type for fixed-size array: " + componentType);
+		}
+
+		if (val != null && java.lang.reflect.Array.getLength(val) != dimensions[0]) {
+			throw new BadParcelableException("Bad length: expected " + dimensions[0] + ", but got " +
+			                                 java.lang.reflect.Array.getLength(val));
+		}
+		return val;
+	}
+
+	public <T, S extends IInterface> T createFixedArray(Class<T> cls, java.util.function.Function<IBinder, S> asInterface,
+	                                                    int... dimensions) {
+		ensureClassHasExpectedDimensions(cls, dimensions.length);
+
+		T val = null;
+		final Class<?> componentType = cls.getComponentType();
+		if (IInterface.class.isAssignableFrom(componentType)) {
+			val = (T)createInterfaceArray(n -> (S[])java.lang.reflect.Array.newInstance(componentType, n), asInterface);
+		} else if (componentType.isArray()) {
+			Class<?> innermost = fixedArrayInnermost(componentType, dimensions);
+			if (innermost == null)
+				return null;
+			val = (T)java.lang.reflect.Array.newInstance(innermost, dimensions);
+			for (int i = 0; i < dimensions[0]; i++) {
+				readFixedArray(java.lang.reflect.Array.get(val, i), asInterface);
+			}
+			return val;
+		} else {
+			throw new BadParcelableException("Unknown type for fixed-size array: " + componentType);
+		}
+
+		if (val != null && java.lang.reflect.Array.getLength(val) != dimensions[0]) {
+			throw new BadParcelableException("Bad length: expected " + dimensions[0] + ", but got " +
+			                                 java.lang.reflect.Array.getLength(val));
+		}
+		return val;
+	}
+
+	public <T, S extends Parcelable> T createFixedArray(Class<T> cls, Parcelable.Creator<S> c, int... dimensions) {
+		ensureClassHasExpectedDimensions(cls, dimensions.length);
+
+		T val = null;
+		final Class<?> componentType = cls.getComponentType();
+		if (Parcelable.class.isAssignableFrom(componentType)) {
+			val = (T)createTypedArray(c);
+		} else if (componentType.isArray()) {
+			Class<?> innermost = fixedArrayInnermost(componentType, dimensions);
+			if (innermost == null)
+				return null;
+			val = (T)java.lang.reflect.Array.newInstance(innermost, dimensions);
+			for (int i = 0; i < dimensions[0]; i++) {
+				readFixedArray(java.lang.reflect.Array.get(val, i), c);
+			}
+			return val;
+		} else {
+			throw new BadParcelableException("Unknown type for fixed-size array: " + componentType);
+		}
+
+		if (val != null && java.lang.reflect.Array.getLength(val) != dimensions[0]) {
+			throw new BadParcelableException("Bad length: expected " + dimensions[0] + ", but got " +
+			                                 java.lang.reflect.Array.getLength(val));
+		}
+		return val;
+	}
 }

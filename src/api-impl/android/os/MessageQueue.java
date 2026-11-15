@@ -19,6 +19,8 @@ package android.os;
 import android.util.AndroidRuntimeException;
 import android.util.Log;
 import android.util.Printer;
+import android.util.SparseArray;
+import java.io.FileDescriptor;
 import java.util.ArrayList;
 
 /**
@@ -65,6 +67,7 @@ public final class MessageQueue {
 	private native static boolean nativePollOnce(long ptr, int timeoutMillis);
 	private native static void nativeWake(long ptr);
 	private native static boolean nativeIsIdling(long ptr);
+	private native void nativeSetFileDescriptorEvents(long ptr, int fd, int events);
 
 	/**
 	 * Callback interface for discovering when a thread is going to block
@@ -131,6 +134,7 @@ public final class MessageQueue {
 	// Must only be called on the looper thread or the finalizer.
 	private void dispose() {
 		if (mPtr != 0) {
+			removeAllFdRecords();
 			nativeDestroy(mPtr);
 			mPtr = 0;
 		}
@@ -573,6 +577,159 @@ public final class MessageQueue {
 				n++;
 			}
 			pw.println(prefix + "(Total messages: " + n + ", idling=" + isIdlingLocked() + ", quitting=" + mQuitting + ")");
+		}
+	}
+
+	/* AOSP (LegacyMessageQueue) addOnFileDescriptorEventListener() and the rest of the fd listener code; the
+	 * polling itself is in android_os_MessageQueue.c */
+	private SparseArray<FileDescriptorRecord> mFileDescriptorRecords;
+
+	public void addOnFileDescriptorEventListener(FileDescriptor fd, int events, OnFileDescriptorEventListener listener) {
+		if (fd == null) {
+			throw new IllegalArgumentException("fd must not be null");
+		}
+		if (listener == null) {
+			throw new IllegalArgumentException("listener must not be null");
+		}
+
+		synchronized (this) {
+			updateOnFileDescriptorEventListenerLocked(fd, events, listener);
+		}
+	}
+
+	public void removeOnFileDescriptorEventListener(FileDescriptor fd) {
+		if (fd == null) {
+			throw new IllegalArgumentException("fd must not be null");
+		}
+
+		synchronized (this) {
+			updateOnFileDescriptorEventListenerLocked(fd, 0, null);
+		}
+	}
+
+	private void removeAllFdRecords() {
+		if (mFileDescriptorRecords != null) {
+			while (mFileDescriptorRecords.size() > 0) {
+				removeOnFileDescriptorEventListener(mFileDescriptorRecords.valueAt(0).mDescriptor);
+			}
+		}
+	}
+
+	private void updateOnFileDescriptorEventListenerLocked(FileDescriptor fd, int events,
+	                                                       OnFileDescriptorEventListener listener) {
+		final int fdNum = fd.getInt$();
+
+		int index = -1;
+		FileDescriptorRecord record = null;
+		if (mFileDescriptorRecords != null) {
+			index = mFileDescriptorRecords.indexOfKey(fdNum);
+			if (index >= 0) {
+				record = mFileDescriptorRecords.valueAt(index);
+				if (record != null && record.mEvents == events) {
+					return;
+				}
+			}
+		}
+
+		if (events != 0) {
+			events |= OnFileDescriptorEventListener.EVENT_ERROR;
+			if (record == null) {
+				if (mFileDescriptorRecords == null) {
+					mFileDescriptorRecords = new SparseArray<FileDescriptorRecord>();
+				}
+				record = new FileDescriptorRecord(fd, events, listener);
+				mFileDescriptorRecords.put(fdNum, record);
+			} else {
+				record.mListener = listener;
+				record.mEvents = events;
+				record.mSeq += 1;
+			}
+			nativeSetFileDescriptorEvents(mPtr, fdNum, events);
+		} else if (record != null) {
+			record.mEvents = 0;
+			mFileDescriptorRecords.removeAt(index);
+			nativeSetFileDescriptorEvents(mPtr, fdNum, 0);
+		}
+	}
+
+	// Called from native code.
+	private int dispatchEvents(int fd, int events) {
+		// Get the file descriptor record and any state that might change.
+		final FileDescriptorRecord record;
+		final int oldWatchedEvents;
+		final OnFileDescriptorEventListener listener;
+		final int seq;
+		synchronized (this) {
+			record = mFileDescriptorRecords.get(fd);
+			if (record == null) {
+				return 0; // spurious, no listener registered
+			}
+
+			oldWatchedEvents = record.mEvents;
+			events &= oldWatchedEvents; // filter events based on current watched set
+			if (events == 0) {
+				return oldWatchedEvents; // spurious, watched events changed
+			}
+
+			listener = record.mListener;
+			seq = record.mSeq;
+		}
+
+		// Invoke the listener outside of the lock.
+		int newWatchedEvents = listener.onFileDescriptorEvents(record.mDescriptor, events);
+		if (newWatchedEvents != 0) {
+			newWatchedEvents |= OnFileDescriptorEventListener.EVENT_ERROR;
+		}
+
+		// Update the file descriptor record if the listener changed the set of
+		// events to watch and the listener itself hasn't been updated since.
+		if (newWatchedEvents != oldWatchedEvents) {
+			synchronized (this) {
+				int index = mFileDescriptorRecords.indexOfKey(fd);
+				if (index >= 0 && mFileDescriptorRecords.valueAt(index) == record && record.mSeq == seq) {
+					record.mEvents = newWatchedEvents;
+					if (newWatchedEvents == 0) {
+						mFileDescriptorRecords.removeAt(index);
+					}
+				}
+			}
+		}
+
+		// Return the new set of events to watch for native code to take care of.
+		return newWatchedEvents;
+	}
+
+	/**
+	 * A listener which is invoked when file descriptor related events occur.
+	 */
+	public interface OnFileDescriptorEventListener {
+		/** File descriptor event: Indicates that the file descriptor is ready for input operations. */
+		public static final int EVENT_INPUT = 1 << 0;
+
+		/** File descriptor event: Indicates that the file descriptor is ready for output operations. */
+		public static final int EVENT_OUTPUT = 1 << 1;
+
+		/** File descriptor event: Indicates that the file descriptor encountered a fatal error. */
+		public static final int EVENT_ERROR = 1 << 2;
+
+		/**
+		 * Called when a file descriptor receives events.
+		 *
+		 * @return The new set of events to watch, or 0 to unregister the listener.
+		 */
+		int onFileDescriptorEvents(FileDescriptor fd, int events);
+	}
+
+	private static final class FileDescriptorRecord {
+		public final FileDescriptor mDescriptor;
+		public int mEvents;
+		public OnFileDescriptorEventListener mListener;
+		public int mSeq;
+
+		public FileDescriptorRecord(FileDescriptor descriptor, int events, OnFileDescriptorEventListener listener) {
+			mDescriptor = descriptor;
+			mEvents = events;
+			mListener = listener;
 		}
 	}
 }

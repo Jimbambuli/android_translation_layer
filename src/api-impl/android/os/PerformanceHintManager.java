@@ -52,6 +52,12 @@ public final class PerformanceHintManager {
 			}
 		}
 
+		/* AOSP setPreferPowerEfficiency(): only forwards to the native session, there is none */
+		public void setPreferPowerEfficiency(boolean enabled) {}
+
+		/* AOSP setThreads(): returns first when mNativeSessionPtr == 0, which is always the case here */
+		public void setThreads(int[] tids) {}
+
 		public void close() {}
 	}
 }

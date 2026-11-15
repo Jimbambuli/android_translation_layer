@@ -123,6 +123,22 @@ public final class Messenger implements Parcelable {
 		};
 	}
 
+	/* AOSP Messenger.writeToParcel() / CREATOR */
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeStrongBinder(getBinder());
+	}
+
+	public static final Parcelable.Creator<Messenger> CREATOR = new Parcelable.Creator<Messenger>() {
+		public Messenger createFromParcel(Parcel in) {
+			IBinder target = in.readStrongBinder();
+			return target != null ? new Messenger(target) : null;
+		}
+
+		public Messenger[] newArray(int size) {
+			return new Messenger[size];
+		}
+	};
+
 	public static void writeMessengerOrNullToParcel(Messenger messenger, Parcel dest) {
 		dest.writeStrongBinder(messenger != null ? messenger.getBinder() : null);
 	}

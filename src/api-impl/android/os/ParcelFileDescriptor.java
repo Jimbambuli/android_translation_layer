@@ -257,6 +257,36 @@ public class ParcelFileDescriptor implements Parcelable, Closeable {
 		return pfd;
 	}
 
+	/* AOSP ParcelFileDescriptor.wrap(): takes over the descriptor of pfd (detached from it) and reports its closing
+	 * to the listener */
+	public static ParcelFileDescriptor wrap(ParcelFileDescriptor pfd, Handler handler, OnCloseListener listener)
+	    throws IOException {
+		final FileDescriptor original = new FileDescriptor();
+		original.setInt$(pfd.detachFd());
+		return fromFd(original, handler, listener);
+	}
+
+	/* AOSP ParcelFileDescriptor.fromFd(FileDescriptor, Handler, OnCloseListener), as open(File, int, Handler,
+	 * OnCloseListener) here watches the comm socket with a ListenerBridge thread */
+	public static ParcelFileDescriptor fromFd(FileDescriptor fd, Handler handler, final OnCloseListener listener)
+	    throws IOException {
+		if (handler == null) {
+			throw new IllegalArgumentException("Handler must not be null");
+		}
+		if (listener == null) {
+			throw new IllegalArgumentException("Listener must not be null");
+		}
+
+		final FileDescriptor[] comm = createCommSocketPair();
+		final ParcelFileDescriptor pfd = new ParcelFileDescriptor(fd, comm[0]);
+
+		IoUtils.setBlocking(comm[1], true);
+		final ListenerBridge bridge = new ListenerBridge(comm[1], handler.getLooper(), listener);
+		bridge.start();
+
+		return pfd;
+	}
+
 	private static FileDescriptor openInternal(File file, int mode) throws FileNotFoundException {
 		int flags = O_CLOEXEC;
 		if ((mode & MODE_READ_WRITE) == MODE_READ_WRITE)

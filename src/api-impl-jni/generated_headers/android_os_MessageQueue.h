@@ -47,6 +47,14 @@ JNIEXPORT void JNICALL Java_android_os_MessageQueue_nativeWake
 JNIEXPORT jboolean JNICALL Java_android_os_MessageQueue_nativeIsIdling
   (JNIEnv *, jclass, jlong);
 
+/*
+ * Class:     android_os_MessageQueue
+ * Method:    nativeSetFileDescriptorEvents
+ * Signature: (JII)V
+ */
+JNIEXPORT void JNICALL Java_android_os_MessageQueue_nativeSetFileDescriptorEvents
+  (JNIEnv *, jobject, jlong, jint, jint);
+
 #ifdef __cplusplus
 }
 #endif
