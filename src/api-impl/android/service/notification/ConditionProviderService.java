@@ -17,6 +17,7 @@
 package android.service.notification;
 
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.IBinder;
@@ -27,7 +28,7 @@ import android.util.Log;
  * AOSP core/java/android/service/notification/ConditionProviderService.java. The system binds it through
  * IConditionProvider and sets mIsConnected on the first onConnected(); ATL has no notification manager
  * that binds, so the service stays "not yet bound" as in AOSP before that call. requestRebind() and
- * requestUnbind() (INotificationManager) are left out.
+ * requestUnbind() ask that manager, which only acts on a provider the user enabled: no-op / disconnect here.
  */
 @Deprecated
 public abstract class ConditionProviderService extends Service {
@@ -71,6 +72,16 @@ public abstract class ConditionProviderService extends Service {
 	@Deprecated
 	public final void notifyConditions(Condition... conditions) {
 		if (!isBound() || conditions == null) return;
+	}
+
+	/* AOSP requestBindProvider: the manager rebinds a provider that is enabled, none is here */
+	@Deprecated
+	public static final void requestRebind(ComponentName componentName) {}
+
+	/* AOSP requestUnbindProvider, then disables future messages */
+	@Deprecated
+	public final void requestUnbind() {
+		mIsConnected = false;
 	}
 
 	@Override

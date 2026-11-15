@@ -2,11 +2,12 @@ package android.service.notification;
 
 import android.app.Notification;
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.UserHandle;
 
 /* AOSP StatusBarNotification (android-16): a posted notification with its package, id, tag,
- * user and post time. Without parceling, cloning and the logging helpers. */
-public class StatusBarNotification implements android.os.Parcelable {
+ * user and post time. Without the logging helpers (the log instance id is never set, written as absent). */
+public class StatusBarNotification implements Parcelable {
 	private final String pkg;
 	private final int id;
 	private final String tag;
@@ -69,8 +70,8 @@ public class StatusBarNotification implements android.os.Parcelable {
 		this.groupKey = groupKey();
 	}
 
-	/* AOSP StatusBarNotification.writeToParcel()/describeContents()/CREATOR; ATL has no log instance id, so
-	 * its marker is always 0 */
+	/* AOSP StatusBarNotification.writeToParcel: the log instance id is absent here, written as 0 */
+	@Override
 	public void writeToParcel(Parcel out, int flags) {
 		out.writeString(this.pkg);
 		out.writeString(this.opPkg);
@@ -95,11 +96,12 @@ public class StatusBarNotification implements android.os.Parcelable {
 		out.writeInt(0);
 	}
 
+	@Override
 	public int describeContents() {
 		return 0;
 	}
 
-	public static final android.os.Parcelable.Creator<StatusBarNotification> CREATOR = new android.os.Parcelable.Creator<StatusBarNotification>() {
+	public static final Parcelable.Creator<StatusBarNotification> CREATOR = new Parcelable.Creator<StatusBarNotification>() {
 		public StatusBarNotification createFromParcel(Parcel parcel) {
 			return new StatusBarNotification(parcel);
 		}
@@ -108,6 +110,13 @@ public class StatusBarNotification implements android.os.Parcelable {
 			return new StatusBarNotification[size];
 		}
 	};
+
+	/* AOSP StatusBarNotification.clone and cloneShallow */
+	@Override
+	public StatusBarNotification clone() {
+		return new StatusBarNotification(this.pkg, this.opPkg, this.id, this.tag, this.uid, this.initialPid,
+				this.notification.clone(), this.user, this.overrideGroupKey, this.postTime);
+	}
 
 	private String key() {
 		String sbnKey = user.getIdentifier() + "|" + pkg + "|" + id + "|" + tag + "|" + uid;

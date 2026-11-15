@@ -21,15 +21,15 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Parcel;
+import android.os.Parcelable;
 import java.util.Objects;
 
 /**
  * The current condition of an {@link android.app.AutomaticZenRule}, provided by a
  * {@link ConditionProviderService}.
- * AOSP core/java/android/service/notification/Condition.java (android-16, modes API enabled). Parcelable,
- * copy() and dumpDebug() (Binder/proto transport) are left out.
+ * AOSP core/java/android/service/notification/Condition.java (android-16, modes API enabled). dumpDebug() (proto transport) is left out.
  */
-public final class Condition implements android.os.Parcelable {
+public final class Condition implements Parcelable {
 
 	public static final String SCHEME = "condition";
 
@@ -100,6 +100,46 @@ public final class Condition implements android.os.Parcelable {
 		     source.readString(), source.readString(), source.readString(), source.readInt(), source.readInt(),
 		     source.readInt(), source.readInt());
 	}
+
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeParcelable(id, 0);
+		dest.writeString(summary);
+		dest.writeString(line1);
+		dest.writeString(line2);
+		dest.writeInt(icon);
+		dest.writeInt(state);
+		dest.writeInt(this.source);
+		dest.writeInt(this.flags);
+	}
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	public Condition copy() {
+		final Parcel parcel = Parcel.obtain();
+		try {
+			writeToParcel(parcel, 0);
+			parcel.setDataPosition(0);
+			return new Condition(parcel);
+		} finally {
+			parcel.recycle();
+		}
+	}
+
+	public static final @NonNull Parcelable.Creator<Condition> CREATOR = new Parcelable.Creator<Condition>() {
+		@Override
+		public Condition createFromParcel(Parcel source) {
+			return new Condition(source);
+		}
+
+		@Override
+		public Condition[] newArray(int size) {
+			return new Condition[size];
+		}
+	};
 
 	public void validate() {
 		checkValidSource(source);

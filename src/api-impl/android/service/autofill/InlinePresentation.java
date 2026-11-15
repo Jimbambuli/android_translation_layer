@@ -1,12 +1,14 @@
 package android.service.autofill;
 
 import android.app.slice.Slice;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.widget.inline.InlinePresentationSpec;
 import java.util.List;
 import java.util.Objects;
 
-/* AOSP InlinePresentation (codegen data class); Parcel code left out, nothing in ATL parcels it */
-public final class InlinePresentation {
+/* AOSP InlinePresentation (codegen data class) */
+public final class InlinePresentation implements Parcelable {
 
 	private final Slice mSlice;
 	private final InlinePresentationSpec mInlinePresentationSpec;
@@ -64,4 +66,45 @@ public final class InlinePresentation {
 		_hash = 31 * _hash + Boolean.hashCode(mPinned);
 		return _hash;
 	}
+
+	/* AOSP InlinePresentation.writeToParcel */
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		byte flg = 0;
+		if (mPinned)
+			flg |= 0x4;
+		dest.writeByte(flg);
+		dest.writeTypedObject(mSlice, flags);
+		dest.writeTypedObject(mInlinePresentationSpec, flags);
+	}
+
+	/* AOSP InlinePresentation.describeContents */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	/* AOSP InlinePresentation(Parcel) */
+	InlinePresentation(Parcel in) {
+		byte flg = in.readByte();
+		boolean pinned = (flg & 0x4) != 0;
+		Slice slice = (Slice) in.readTypedObject(Slice.CREATOR);
+		InlinePresentationSpec inlinePresentationSpec = (InlinePresentationSpec) in.readTypedObject(InlinePresentationSpec.CREATOR);
+		this.mSlice = Objects.requireNonNull(slice);
+		this.mInlinePresentationSpec = Objects.requireNonNull(inlinePresentationSpec);
+		this.mPinned = pinned;
+	}
+
+	/* AOSP InlinePresentation.CREATOR */
+	public static final Parcelable.Creator<InlinePresentation> CREATOR = new Parcelable.Creator<InlinePresentation>() {
+		@Override
+		public InlinePresentation[] newArray(int size) {
+			return new InlinePresentation[size];
+		}
+
+		@Override
+		public InlinePresentation createFromParcel(Parcel in) {
+			return new InlinePresentation(in);
+		}
+	};
 }

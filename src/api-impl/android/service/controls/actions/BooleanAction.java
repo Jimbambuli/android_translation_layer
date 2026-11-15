@@ -18,32 +18,80 @@ package android.service.controls.actions;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.os.Bundle;
+import android.service.controls.Control;
+import android.service.controls.templates.ToggleRangeTemplate;
+import android.service.controls.templates.ToggleTemplate;
 
 /**
- * Action sent by a {@link android.service.controls.templates.ToggleTemplate}.
- * AOSP core/java/android/service/controls/actions/BooleanAction.java
+ * Action sent by user toggling a {@link Control} between checked/unchecked.
+ *
+ * This action is available when the {@link Control} was constructed with either a
+ * {@link ToggleTemplate} or a {@link ToggleRangeTemplate}.
  */
 public final class BooleanAction extends ControlAction {
 
-	private static final @ActionType int TYPE = TYPE_BOOLEAN;
-	private final boolean mNewState;
+    private static final @ActionType int TYPE = TYPE_BOOLEAN;
+    private static final String KEY_NEW_STATE = "key_new_state";
 
-	public BooleanAction(@NonNull String templateId, boolean newState) {
-		this(templateId, newState, null);
-	}
+    private final boolean mNewState;
 
-	public BooleanAction(@NonNull String templateId, boolean newState,
-	                     @Nullable String challengeValue) {
-		super(templateId, challengeValue);
-		mNewState = newState;
-	}
+    /**
+     * @param templateId the identifier of the {@link ToggleTemplate} that produced this action.
+     * @param newState new value for the state displayed by the {@link ToggleTemplate}.
+     */
+    public BooleanAction(@NonNull String templateId, boolean newState) {
+        this(templateId, newState, null);
+    }
 
-	public boolean getNewState() {
-		return mNewState;
-	}
+    /**
+     * @param templateId the identifier of the template that originated this action.
+     * @param newState new value for the state displayed by the template.
+     * @param challengeValue a value sent by the user along with the action to authenticate. {@code}
+     *                       null is sent when no authentication is needed or has not been
+     *                       requested.
+     */
+    public BooleanAction(@NonNull String templateId, boolean newState,
+            @Nullable String challengeValue) {
+        super(templateId, challengeValue);
+        mNewState = newState;
+    }
 
-	@Override
-	public int getActionType() {
-		return TYPE;
-	}
+    /**
+     * @param b
+     * @hide
+     */
+    BooleanAction(Bundle b) {
+        super(b);
+        mNewState = b.getBoolean(KEY_NEW_STATE);
+    }
+
+    /**
+     * The new state set for the button in the corresponding {@link ToggleTemplate}.
+     *
+     * @return {@code true} if the button was toggled from unchecked to checked.
+     */
+    public boolean getNewState() {
+        return mNewState;
+    }
+
+    /**
+     * @return {@link ControlAction#TYPE_BOOLEAN}
+     */
+    @Override
+    public int getActionType() {
+        return TYPE;
+    }
+
+    /**
+     * @return
+     * @hide
+     */
+    @Override
+    @NonNull
+    Bundle getDataBundle() {
+        Bundle b =  super.getDataBundle();
+        b.putBoolean(KEY_NEW_STATE, mNewState);
+        return b;
+    }
 }

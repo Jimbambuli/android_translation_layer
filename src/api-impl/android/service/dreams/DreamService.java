@@ -227,6 +227,15 @@ public class DreamService extends Service implements Window.Callback {
 		return (T) getWindow().findViewById(id);
 	}
 
+	/* AOSP DreamService.requireViewById() */
+	public final <T extends View> T requireViewById(int id) {
+		T view = findViewById(id);
+		if (view == null) {
+			throw new IllegalArgumentException("ID does not reference a View inside this DreamService");
+		}
+		return view;
+	}
+
 	public void setInteractive(boolean interactive) {
 		mInteractive = interactive;
 	}

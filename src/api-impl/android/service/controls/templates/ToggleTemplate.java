@@ -17,34 +17,71 @@
 package android.service.controls.templates;
 
 import android.annotation.NonNull;
+import android.os.Bundle;
+import android.service.controls.Control;
+import android.service.controls.actions.BooleanAction;
+
 import com.android.internal.util.Preconditions;
 
 /**
- * A template for a {@link android.service.controls.Control} with successive states.
- * AOSP core/java/android/service/controls/templates/ToggleTemplate.java
+ * A template for a {@link Control} with a single button that can be toggled between two states.
+ *
+ * The states for the toggle correspond to the states in {@link ControlButton#isChecked()}.
+ * An action on this template will originate a {@link BooleanAction} to change that state.
+ *
+ * @see BooleanAction
  */
 public final class ToggleTemplate extends ControlTemplate {
 
-	private static final @TemplateType int TYPE = TYPE_TOGGLE;
-	private final @NonNull ControlButton mButton;
+    private static final @TemplateType int TYPE = TYPE_TOGGLE;
+    private static final String KEY_BUTTON = "key_button";
+    private final @NonNull ControlButton mButton;
 
-	public ToggleTemplate(@NonNull String templateId, @NonNull ControlButton button) {
-		super(templateId);
-		Preconditions.checkNotNull(button);
-		mButton = button;
-	}
+    /**
+     * @param templateId the identifier for this template object
+     * @param button a {@link ControlButton} that can show the current state and toggle it
+     */
+    public ToggleTemplate(@NonNull String templateId, @NonNull ControlButton button) {
+        super(templateId);
+        Preconditions.checkNotNull(button);
+        mButton = button;
+    }
 
-	public boolean isChecked() {
-		return mButton.isChecked();
-	}
+    /**
+     * @param b
+     * @hide
+     */
+    ToggleTemplate(Bundle b) {
+        super(b);
+        mButton = b.getParcelable(KEY_BUTTON, android.service.controls.templates.ControlButton.class);
+    }
 
-	@NonNull
-	public CharSequence getContentDescription() {
-		return mButton.getActionDescription();
-	}
+    public boolean isChecked() {
+        return mButton.isChecked();
+    }
 
-	@Override
-	public int getTemplateType() {
-		return TYPE;
-	}
+    @NonNull
+    public CharSequence getContentDescription() {
+        return mButton.getActionDescription();
+    }
+
+    /**
+     * @return {@link ControlTemplate#TYPE_TOGGLE}
+     */
+    @Override
+    public int getTemplateType() {
+        return TYPE;
+    }
+
+    /**
+     * @return
+     * @hide
+     */
+    @Override
+    @NonNull
+    Bundle getDataBundle() {
+        Bundle b =  super.getDataBundle();
+        b.putParcelable(KEY_BUTTON, mButton);
+        return b;
+    }
 }

@@ -63,6 +63,18 @@ public class VoiceInteractionService extends Service {
 		return 0;
 	}
 
+	/* AOSP VoiceInteractionService.setUiHints: the hints must be given, then they go to mSystemService,
+	 * which does not exist here (see setDisabledShowContext) */
+	public final void setUiHints(@NonNull Bundle hints) {
+		if (hints == null) {
+			throw new IllegalArgumentException("Hints must be non-null");
+		}
+	}
+
+	/* AOSP VoiceInteractionService.setInvocationEffectEnabled: forwarded to mSystemService, none here */
+	public final void setInvocationEffectEnabled(boolean enabled) {
+	}
+
 	/* AOSP VoiceInteractionService.showSession */
 	public void showSession(Bundle args, int flags) {
 		throw new IllegalStateException("Not available until onReady() is called");

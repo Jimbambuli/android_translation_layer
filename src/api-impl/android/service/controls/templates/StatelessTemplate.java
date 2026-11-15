@@ -17,19 +17,38 @@
 package android.service.controls.templates;
 
 import android.annotation.NonNull;
+import android.os.Bundle;
+import android.service.controls.Control;
+import android.service.controls.actions.CommandAction;
 
 /**
- * A template for a {@link android.service.controls.Control} which has no state.
- * AOSP core/java/android/service/controls/templates/StatelessTemplate.java
+ * A template for a {@link Control} which has no state.
+ *
+ * @see CommandAction
  */
 public final class StatelessTemplate extends ControlTemplate {
 
-	@Override
-	public int getTemplateType() {
-		return TYPE_STATELESS;
-	}
+    /**
+     * @return {@link ControlTemplate#TYPE_STATELESS}
+     */
+    @Override
+    public int getTemplateType() {
+        return TYPE_STATELESS;
+    }
 
-	public StatelessTemplate(@NonNull String templateId) {
-		super(templateId);
-	}
+    /**
+     * Construct a new {@link StatelessTemplate} from a {@link Bundle}
+     * @hide
+     */
+    StatelessTemplate(@NonNull Bundle b) {
+        super(b);
+    }
+
+    /**
+     * Construct a new {@link StatelessTemplate}
+     * @param templateId the identifier for this template
+     */
+    public StatelessTemplate(@NonNull String templateId) {
+        super(templateId);
+    }
 }
