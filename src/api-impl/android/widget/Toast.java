@@ -39,12 +39,21 @@ public class Toast {
 		NotificationManager manager = (NotificationManager)mContext.getSystemService("notification");
 		int id = hashCode();
 		manager.notify(id, notification);
-		new Handler().postDelayed(new Runnable() {
+		mShownManager = manager;
+		mHide = new Runnable() {
 			public void run() {
 				manager.cancel(id);
+				mShownManager = null;
 			}
-		}, 2000);
+		};
+		mHandler = new Handler();
+		mHandler.postDelayed(mHide, 2000);
 	}
+
+	/* the toast as shown by show(), for cancel() */
+	private Handler mHandler;
+	private NotificationManager mShownManager;
+	private Runnable mHide;
 
 	/* AOSP Toast: the accessors keep what the app sets; show() posts the text as a notification */
 	public void setView(View view) { mNextView = view; }
@@ -61,5 +70,11 @@ public class Toast {
 	public int getXOffset() { return mX; }
 	public int getYOffset() { return mY; }
 
-	public void cancel() {}
+	/** AOSP Toast.cancel(): hides the toast if it is showing (here: removes its notification at once) */
+	public void cancel() {
+		if (mShownManager != null) {
+			mHandler.removeCallbacks(mHide);
+			mHide.run();
+		}
+	}
 }

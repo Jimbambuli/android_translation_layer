@@ -82,7 +82,7 @@ public class TextView extends View {
 	private int break_strategy = 0 /*BREAK_STRATEGY_SIMPLE*/;
 	private int hyphenation_frequency = 0 /*HYPHENATION_FREQUENCY_NONE*/;
 	private int gravity = Gravity.TOP | Gravity.START;
-	/* AOSP: the height limits in lines (the pixel and ems modes are not applied here) */
+	/* AOSP: the height limits in lines or pixels (lines via GTK in updateLines(), pixels in onMeasure()) */
 	private static final int LINES = 1;
 	private static final int EMS = LINES;
 	private static final int PIXELS = 2;
@@ -155,12 +155,20 @@ public class TextView extends View {
 
 			int ellipsize = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, ELLIPSIZE_NOT_SET);
 			boolean singleLine = a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false);
-			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
-				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
-			if (a.hasValue(com.android.internal.R.styleable.TextView_minLines))
-				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
+			/* in the order of the AOSP attribute loop (styleable index): maxHeight, minHeight, maxLines, lines,
+			 * height, minLines */
+			if (a.hasValue(com.android.internal.R.styleable.TextView_maxHeight))
+				setMaxHeight(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_maxHeight, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minHeight))
+				setMinHeight(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_minHeight, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxLines))
 				setMaxLines(a.getInt(com.android.internal.R.styleable.TextView_maxLines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_lines))
+				setLines(a.getInt(com.android.internal.R.styleable.TextView_lines, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_height))
+				setHeight(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_height, -1));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_minLines))
+				setMinLines(a.getInt(com.android.internal.R.styleable.TextView_minLines, -1));
 			if (a.hasValue(com.android.internal.R.styleable.TextView_lineSpacingExtra) || a.hasValue(com.android.internal.R.styleable.TextView_lineSpacingMultiplier))
 				setLineSpacing(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_lineSpacingExtra, 0),
 				               a.getFloat(com.android.internal.R.styleable.TextView_lineSpacingMultiplier, 1.0f));
@@ -247,6 +255,10 @@ public class TextView extends View {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
 				setAllCaps(allCaps);
 			}
+
+			// AOSP attribute loop: TextView_textIsSelectable -> setTextIsSelectable()
+			if (a.getBoolean(com.android.internal.R.styleable.TextView_textIsSelectable, false))
+				setTextIsSelectable(true);
 		} catch (java.lang.Exception e) {
 			System.out.println("exception while inflating TextView:");
 			e.printStackTrace();
@@ -983,7 +995,24 @@ public class TextView extends View {
 
 	public void endBatchEdit() {}
 
-	public void setPrivateImeOptions(String type) {}
+	/* AOSP keeps it in Editor.mInputContentType and hands it to the IME in onCreateInputConnection(); ATL keeps it
+	 * for the getter (the GTK input method gets no private options) */
+	private String mPrivateImeOptions;
+
+	public void setPrivateImeOptions(String type) {
+		mPrivateImeOptions = type;
+	}
+
+	public String getPrivateImeOptions() {
+		return mPrivateImeOptions;
+	}
+
+	/** AOSP onCheckIsTextEditor(): mEditor != null && mEditor.mInputType != TYPE_NULL; in ATL an input type
+	 * other than 0 stands for the Editor (see mInputType) */
+	@Override
+	public boolean onCheckIsTextEditor() {
+		return mInputType != 0;
+	}
 
 	public Typeface getTypeface() { return typeface; }
 
@@ -1109,7 +1138,72 @@ public class TextView extends View {
 		}
 	}
 
-	public void setTextIsSelectable(boolean selectable) {}
+	private boolean mTextIsSelectable;
+
+	/** AOSP TextView.setTextIsSelectable(): focusable in touch mode, clickable and long-clickable as selectable;
+	 * the selection itself is made by the GtkLabel */
+	public void setTextIsSelectable(boolean selectable) {
+		if (mTextIsSelectable == selectable)
+			return;
+		mTextIsSelectable = selectable;
+		setFocusableInTouchMode(selectable);
+		setFocusable(FOCUSABLE_AUTO);
+		setClickable(selectable);
+		setLongClickable(selectable);
+		native_setSelectable(widget, selectable);
+	}
+	private native void native_setSelectable(long widget, boolean selectable);
+
+	/* AOSP setTextSelectHandle*()/getTextSelectHandle*(): kept for the getters; ATL draws no selection handles
+	 * (GTK draws its own), so AOSP's mEditor.loadHandleDrawables() has nothing to update */
+	private Drawable mTextSelectHandle;
+	private Drawable mTextSelectHandleLeft;
+	private Drawable mTextSelectHandleRight;
+
+	public void setTextSelectHandle(Drawable textSelectHandle) {
+		java.util.Objects.requireNonNull(textSelectHandle, "The text select handle should not be null.");
+		mTextSelectHandle = textSelectHandle;
+	}
+
+	public void setTextSelectHandle(int textSelectHandle) {
+		if (textSelectHandle == 0)
+			throw new IllegalArgumentException("The text select handle should be a valid drawable resource id.");
+		setTextSelectHandle(getContext().getDrawable(textSelectHandle));
+	}
+
+	public Drawable getTextSelectHandle() {
+		return mTextSelectHandle;
+	}
+
+	public void setTextSelectHandleLeft(Drawable textSelectHandleLeft) {
+		java.util.Objects.requireNonNull(textSelectHandleLeft, "The left text select handle should not be null.");
+		mTextSelectHandleLeft = textSelectHandleLeft;
+	}
+
+	public void setTextSelectHandleLeft(int textSelectHandleLeft) {
+		if (textSelectHandleLeft == 0)
+			throw new IllegalArgumentException("The text select left handle should be a valid drawable resource id.");
+		setTextSelectHandleLeft(getContext().getDrawable(textSelectHandleLeft));
+	}
+
+	public Drawable getTextSelectHandleLeft() {
+		return mTextSelectHandleLeft;
+	}
+
+	public void setTextSelectHandleRight(Drawable textSelectHandleRight) {
+		java.util.Objects.requireNonNull(textSelectHandleRight, "The right text select handle should not be null.");
+		mTextSelectHandleRight = textSelectHandleRight;
+	}
+
+	public void setTextSelectHandleRight(int textSelectHandleRight) {
+		if (textSelectHandleRight == 0)
+			throw new IllegalArgumentException("The text select right handle should be a valid drawable resource id.");
+		setTextSelectHandleRight(getContext().getDrawable(textSelectHandleRight));
+	}
+
+	public Drawable getTextSelectHandleRight() {
+		return mTextSelectHandleRight;
+	}
 
 	public final MovementMethod getMovementMethod() {
 		return mMovement;
@@ -1145,7 +1239,8 @@ public class TextView extends View {
 	}
 
 
-	public boolean isTextSelectable() { return true; }
+	/** AOSP isTextSelectable(): false unless set (mEditor == null or mTextIsSelectable false) */
+	public boolean isTextSelectable() { return mTextIsSelectable; }
 
 
 	public void setTextAppearance(int resId) {
@@ -1334,8 +1429,10 @@ public class TextView extends View {
 		/* AOSP TextView.onMeasure(): unless the width is exact, it is limited by maxWidth/maxEms and minWidth/minEms
 		 * (setWidth(), android:width ...); the height then follows from the text in that width */
 		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
-		if (widthMode == MeasureSpec.EXACTLY)
+		if (widthMode == MeasureSpec.EXACTLY) {
+			applyHeightLimits(heightMeasureSpec);
 			return;
+		}
 		int width = getMeasuredWidth();
 		if (mMaxWidthMode == EMS) {
 			width = Math.min(width, mMaxWidth * getLineHeight());
@@ -1353,6 +1450,25 @@ public class TextView extends View {
 		}
 		if (width != getMeasuredWidth())
 			super.onMeasure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), heightMeasureSpec);
+		applyHeightLimits(heightMeasureSpec);
+	}
+
+	/* AOSP TextView.getDesiredHeight() with onMeasure(): unless the height is exact, a maximum in pixels caps
+	 * it and a minimum in pixels raises it (the limits in lines are applied by GTK, see updateLines()) */
+	private void applyHeightLimits(int heightMeasureSpec) {
+		int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+		if (heightMode == MeasureSpec.EXACTLY)
+			return;
+		int height = getMeasuredHeight();
+		if (mMaxMode == PIXELS)
+			height = Math.min(height, mMaximum);
+		if (mMinMode == PIXELS)
+			height = Math.max(height, mMinimum);
+		height = Math.max(height, getSuggestedMinimumHeight());
+		if (heightMode == MeasureSpec.AT_MOST)
+			height = Math.min(height, MeasureSpec.getSize(heightMeasureSpec));
+		if (height != getMeasuredHeight())
+			setMeasuredDimension(getMeasuredWidth(), height);
 	}
 	private native void native_setFontPadding(long widget, boolean include);
 
@@ -1406,7 +1522,14 @@ public class TextView extends View {
 		invalidate();
 	}
 
-	public void setHeight(int height) {}
+	/** AOSP TextView.setHeight(): minimum and maximum height in pixels (replaces lines/minLines/maxLines) */
+	public void setHeight(int pixels) {
+		mMaximum = mMinimum = pixels;
+		mMaxMode = mMinMode = PIXELS;
+		updateLines();
+		requestLayout();
+		invalidate();
+	}
 
 	public void setFreezesText(boolean freezesText) {}
 
@@ -1425,7 +1548,16 @@ public class TextView extends View {
 	}
 	private native void native_setLetterSpacing(long widget, float spacing);
 
-	public void setMarqueeRepeatLimit(int marqueeLimit) {}
+	/* AOSP mMarqueeRepeatLimit (default 3); ATL does not scroll marquee text (ellipsizes it), so only kept */
+	private int mMarqueeRepeatLimit = 3;
+
+	public void setMarqueeRepeatLimit(int marqueeLimit) {
+		mMarqueeRepeatLimit = marqueeLimit;
+	}
+
+	public int getMarqueeRepeatLimit() {
+		return mMarqueeRepeatLimit;
+	}
 
 	public int getJustificationMode() {
 		return 0; // JUSTIFICATION_MODE_NONE
@@ -2795,8 +2927,6 @@ public class TextView extends View {
 	private int mMaxWidthMode = PIXELS;
 	private int mMinWidth = 0;
 	private int mMinWidthMode = PIXELS;
-	private int mMinHeight = 0;
-	private int mMaxHeightValue = -1;
 
 	public void setEms(int ems) {
 		mMaxWidth = mMinWidth = ems;
@@ -2849,24 +2979,29 @@ public class TextView extends View {
 		return mMaxWidthMode == PIXELS ? mMaxWidth : -1;
 	}
 
+	/* AOSP TextView.setMinHeight()/setMaxHeight(): the height limits in pixels share mMinimum/mMaximum with the
+	 * limits in lines; the getters return -1 while the limit is in lines */
 	public void setMinHeight(int minPixels) {
-		mMinHeight = minPixels;
+		mMinimum = minPixels;
+		mMinMode = PIXELS;
 		requestLayout();
 		invalidate();
 	}
 
 	public int getMinHeight() {
-		return mMinHeight;
+		return mMinMode == PIXELS ? mMinimum : -1;
 	}
 
 	public void setMaxHeight(int maxPixels) {
-		mMaxHeightValue = maxPixels;
+		mMaximum = maxPixels;
+		mMaxMode = PIXELS;
+		updateLines();
 		requestLayout();
 		invalidate();
 	}
 
 	public int getMaxHeight() {
-		return mMaxHeightValue;
+		return mMaxMode == PIXELS ? mMaximum : -1;
 	}
 
 	private KeyListener mKeyListener;

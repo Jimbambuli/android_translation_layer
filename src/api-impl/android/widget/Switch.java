@@ -21,6 +21,8 @@ public class Switch extends CompoundButton {
 	private int mSwitchMinWidth;
 	private int mSwitchPadding;
 	private boolean mSplitTrack;
+	private CharSequence mTextOn;
+	private CharSequence mTextOff;
 
 	private float mThumbPosition;
 	private int mSwitchWidth;
@@ -59,13 +61,32 @@ public class Switch extends CompoundButton {
 		mSwitchMinWidth = a.getDimensionPixelSize(R.styleable.Switch_switchMinWidth, 0);
 		mSwitchPadding = a.getDimensionPixelSize(R.styleable.Switch_switchPadding, 0);
 		mSplitTrack = a.getBoolean(R.styleable.Switch_splitTrack, false);
+		mTextOn = a.getText(R.styleable.Switch_textOn);
+		mTextOff = a.getText(R.styleable.Switch_textOff);
 		a.recycle();
 		refreshDrawableState();
 		mThumbPosition = isChecked() ? 1 : 0;
 	}
 
-	public void setTextOn(CharSequence text) {}
-	public void setTextOff(CharSequence text) {}
+	/* AOSP Switch.setTextOn()/setTextOff(): kept and a new layout requested; ATL draws no thumb text
+	 * (AOSP shows it only with showText) */
+	public CharSequence getTextOn() {
+		return mTextOn;
+	}
+
+	public void setTextOn(CharSequence textOn) {
+		mTextOn = textOn;
+		requestLayout();
+	}
+
+	public CharSequence getTextOff() {
+		return mTextOff;
+	}
+
+	public void setTextOff(CharSequence textOff) {
+		mTextOff = textOff;
+		requestLayout();
+	}
 
 	public void setThumbDrawable(Drawable thumb) {
 		if (mThumbDrawable != null)

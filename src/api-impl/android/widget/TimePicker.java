@@ -54,8 +54,18 @@ public class TimePicker extends FrameLayout {
 		return nativeGetSpinBtnValue(minute_spin_widget);
 	}
 
+	/* AOSP setIs24HourView()/is24HourView(); the GTK spin buttons always show 0-23, as getHour() returns */
+	private boolean mIs24HourView = true;
+
+	public void setIs24HourView(Boolean is24HourView) {
+		if (is24HourView == null) {
+			return;
+		}
+		mIs24HourView = is24HourView;
+	}
+
 	public boolean is24HourView() {
-		return true;
+		return mIs24HourView;
 	}
 
 	public boolean isEnabled() {

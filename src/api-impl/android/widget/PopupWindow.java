@@ -259,6 +259,11 @@ public class PopupWindow {
 		return input_method_mode;
 	}
 
+	/** AOSP isAboveAnchor(): whether the last showAsDropDown()/update() placed the popup above its anchor */
+	public boolean isAboveAnchor() {
+		return native_isAboveAnchor(popover);
+	}
+
 	public boolean isShowing() {
 		return native_isShowing(popover);
 	}
@@ -503,7 +508,8 @@ public class PopupWindow {
 			gravity = Gravity.TOP | Gravity.START;
 		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
 		android.atl.ATLViewDump.addRoot(this);
-		native_showAtLocation(popover, parent.widget, Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection()), x, y);
+		mLocationGravity = Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection());
+		native_showAtLocation(popover, parent.widget, mLocationGravity, x, y);
 		startEnterAnimation();
 		takeWindowFocus(parent);
 	}
@@ -672,7 +678,22 @@ public class PopupWindow {
 		return native_getHeight(popover);
 	}
 
-	public void update(int x, int y, int width, int height) {}
+	/* AOSP computeGravity(): the gravity of the last showAtLocation(), START | TOP before any (here made absolute
+	 * when showing) */
+	private int mLocationGravity = Gravity.TOP | Gravity.LEFT;
+
+	/** AOSP PopupWindow.update(int, int, int, int): the size as with setWidth()/setHeight() (-1 keeps it), and a
+	 * shown popup moves to (x, y) in the window with the gravity of computeGravity(), drop-downs as well */
+	public void update(int x, int y, int width, int height) {
+		if (width >= 0)
+			setWidth(width);
+		if (height >= 0)
+			setHeight(height);
+		if (!isShowing() || !hasContentView())
+			return;
+		native_moveTo(popover, mLocationGravity, x, y);
+	}
+	private native void native_moveTo(long popover, int gravity, int x, int y);
 
 	public void setWindowLayoutMode(int widthSpec, int heightSpec) {}
 
@@ -697,6 +718,7 @@ public class PopupWindow {
 	}
 
 	protected native long native_constructor();
+	protected native boolean native_isAboveAnchor(long widget);
 	protected native void native_setColors(long widget, int background, int foreground);
 	protected native void native_setContentView(long widget, long contentView);
 	protected native void native_showAsDropDown(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int gravity, boolean overlapAnchor);

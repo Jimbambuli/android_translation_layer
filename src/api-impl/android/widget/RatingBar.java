@@ -29,7 +29,22 @@ public class RatingBar extends AbsSeekBar {
 		return mNumStars;
 	}
 
+	/** AOSP setRating(): the progress counts getMax() / numStars per star */
 	public void setRating(float rating) {
-		setProgress((int)rating);
+		setProgress(Math.round(rating * getProgressPerIndicator()));
+	}
+
+	/** AOSP getRating() */
+	public float getRating() {
+		return getProgress() / getProgressPerIndicator();
+	}
+
+	/* AOSP getProgressPerIndicator() */
+	private float getProgressPerIndicator() {
+		if (mNumStars > 0) {
+			return 1f * getMax() / mNumStars;
+		} else {
+			return 1;
+		}
 	}
 }

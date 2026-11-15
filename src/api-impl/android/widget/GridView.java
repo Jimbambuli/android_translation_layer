@@ -1426,6 +1426,162 @@ public class GridView extends AbsListView {
 		return moved;
 	}
 
+	/* AOSP GridView.onKeyDown()/onKeyMultiple()/onKeyUp()/commonKey(): arrows, page and home/end keys move the
+	 * selection, the confirm key clicks the selected item */
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		return commonKey(keyCode, 1, event);
+	}
+
+	@Override
+	public boolean onKeyMultiple(int keyCode, int repeatCount, KeyEvent event) {
+		return commonKey(keyCode, repeatCount, event);
+	}
+
+	@Override
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		return commonKey(keyCode, 1, event);
+	}
+
+	private boolean commonKey(int keyCode, int count, KeyEvent event) {
+		if (mAdapter == null) {
+			return false;
+		}
+
+		if (mDataChanged) {
+			layoutChildren();
+		}
+
+		boolean handled = false;
+		int action = event.getAction();
+		if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers() && action != KeyEvent.ACTION_UP) {
+			handled = resurrectSelectionIfNeeded();
+			if (!handled && event.getRepeatCount() == 0 && getChildCount() > 0) {
+				keyPressed();
+				handled = true;
+			}
+		}
+
+		if (!handled && action != KeyEvent.ACTION_UP) {
+			switch (keyCode) {
+				case KeyEvent.KEYCODE_DPAD_LEFT:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || arrowScroll(FOCUS_LEFT);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_DPAD_RIGHT:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || arrowScroll(FOCUS_RIGHT);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_DPAD_UP:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || arrowScroll(FOCUS_UP);
+					} else if (event.hasModifiers(KeyEvent.META_ALT_ON)) {
+						handled = resurrectSelectionIfNeeded() || fullScroll(FOCUS_UP);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_DPAD_DOWN:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || arrowScroll(FOCUS_DOWN);
+					} else if (event.hasModifiers(KeyEvent.META_ALT_ON)) {
+						handled = resurrectSelectionIfNeeded() || fullScroll(FOCUS_DOWN);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_PAGE_UP:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || pageScroll(FOCUS_UP);
+					} else if (event.hasModifiers(KeyEvent.META_ALT_ON)) {
+						handled = resurrectSelectionIfNeeded() || fullScroll(FOCUS_UP);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_PAGE_DOWN:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || pageScroll(FOCUS_DOWN);
+					} else if (event.hasModifiers(KeyEvent.META_ALT_ON)) {
+						handled = resurrectSelectionIfNeeded() || fullScroll(FOCUS_DOWN);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_MOVE_HOME:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || fullScroll(FOCUS_UP);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_MOVE_END:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || fullScroll(FOCUS_DOWN);
+					}
+					break;
+
+				case KeyEvent.KEYCODE_TAB:
+					if (event.hasNoModifiers()) {
+						handled = resurrectSelectionIfNeeded() || sequenceScroll(FOCUS_FORWARD);
+					} else if (event.hasModifiers(KeyEvent.META_SHIFT_ON)) {
+						handled = resurrectSelectionIfNeeded() || sequenceScroll(FOCUS_BACKWARD);
+					}
+					break;
+			}
+		}
+
+		if (handled) {
+			return true;
+		}
+
+		if (sendToTextFilter(keyCode, count, event)) {
+			return true;
+		}
+
+		switch (action) {
+			case KeyEvent.ACTION_DOWN:
+				return super.onKeyDown(keyCode, event);
+			case KeyEvent.ACTION_UP:
+				return super.onKeyUp(keyCode, event);
+			case KeyEvent.ACTION_MULTIPLE:
+				return super.onKeyMultiple(keyCode, count, event);
+			default:
+				return false;
+		}
+	}
+
+	/* AOSP GridView.sequenceScroll(): TAB moves the selection to the next/previous item (the sound and the
+	 * scrollbar fade-in are left out, as in arrowScroll()) */
+	boolean sequenceScroll(int direction) {
+		int selectedPosition = mSelectedPosition;
+		int count = mItemCount;
+
+		boolean moved = false;
+		switch (direction) {
+			case FOCUS_FORWARD:
+				if (selectedPosition < count - 1) {
+					mLayoutMode = LAYOUT_MOVE_SELECTION;
+					setSelectionInt(selectedPosition + 1);
+					moved = true;
+				}
+				break;
+
+			case FOCUS_BACKWARD:
+				if (selectedPosition > 0) {
+					mLayoutMode = LAYOUT_MOVE_SELECTION;
+					setSelectionInt(selectedPosition - 1);
+					moved = true;
+				}
+				break;
+		}
+
+		if (moved) {
+			invokeOnItemScrollListener();
+		}
+
+		return moved;
+	}
+
 	@Override
 	protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
 		super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);

@@ -25,6 +25,21 @@ public class Toolbar extends View {
 		return titleText;
 	}
 
+	/* AOSP getSubtitle()/setSubtitle(): kept like the title, not rendered */
+	private CharSequence subtitleText;
+
+	public CharSequence getSubtitle() {
+		return subtitleText;
+	}
+
+	public void setSubtitle(int resId) {
+		setSubtitle(getContext().getText(resId));
+	}
+
+	public void setSubtitle(CharSequence subtitle) {
+		subtitleText = subtitle;
+	}
+
 	public int getTitleMarginStart() {
 		return titleMarginStart;
 	}
