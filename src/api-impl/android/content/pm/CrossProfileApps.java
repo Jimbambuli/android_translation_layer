@@ -1,8 +1,10 @@
 package android.content.pm;
 
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.os.Bundle;
 import android.os.UserHandle;
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +24,10 @@ public class CrossProfileApps {
 	public CrossProfileApps() {}
 
 	public void startMainActivity(ComponentName component, UserHandle targetUser) {
+		throw new SecurityException("Not allowed to start activity in another profile: " + targetUser);
+	}
+
+	public void startMainActivity(ComponentName component, UserHandle targetUser, Activity callingActivity, Bundle options) {
 		throw new SecurityException("Not allowed to start activity in another profile: " + targetUser);
 	}
 
