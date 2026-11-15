@@ -624,6 +624,8 @@ srcs = [
 	'android/net/UriCodec.java',
 	'android/net/UrlQuerySanitizer.java',
 	'android/net/http/HttpResponseCache.java',
+	'android/net/http/SslCertificate.java',
+	'android/net/http/SslError.java',
 	'android/net/http/X509TrustManagerExtensions.java',
 	'android/net/nsd/NsdManager.java',
 	'android/net/nsd/NsdServiceInfo.java',
