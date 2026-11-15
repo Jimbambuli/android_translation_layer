@@ -152,6 +152,12 @@ public class ConnectivityManager {
 		register(request, callback, null, handler);
 	}
 
+	/* AOSP: a listen request (LISTEN_FOR_BEST) on the request's capabilities; ATL has one network, so it behaves
+	 * like registerNetworkCallback() */
+	public void registerBestMatchingNetworkCallback(NetworkRequest request, NetworkCallback callback, Handler handler) {
+		register(request, callback, null, handler);
+	}
+
 	public void registerNetworkCallback(NetworkRequest request, PendingIntent operation) {
 		register(request, null, operation, null);
 	}
