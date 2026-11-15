@@ -567,6 +567,7 @@ srcs = [
 	'android/media/MediaDrmException.java',
 	'android/media/MediaDrmResetException.java',
 	'android/media/MediaDrmThrowable.java',
+	'android/media/MediaExtractor.java',
 	'android/media/MediaFormat.java',
 	'android/media/MediaMetadata.java',
 	'android/media/MediaMetadataRetriever.java',
