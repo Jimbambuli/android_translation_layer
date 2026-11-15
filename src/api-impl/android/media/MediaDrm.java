@@ -39,6 +39,35 @@ public final class MediaDrm {
 	public void closeSession(byte[] sessionId) {
 	}
 
+	/* AOSP MediaDrm security levels and offline licenses (native there). The constructor always fails
+	 * (no DRM plugin), so the instance methods are never reached; their JNI side is not in the local sources. */
+	public static final int SECURITY_LEVEL_UNKNOWN = 0;
+	public static final int SECURITY_LEVEL_SW_SECURE_CRYPTO = 1;
+	public static final int SECURITY_LEVEL_SW_SECURE_DECODE = 2;
+	public static final int SECURITY_LEVEL_HW_SECURE_CRYPTO = 3;
+	public static final int SECURITY_LEVEL_HW_SECURE_DECODE = 4;
+	public static final int SECURITY_LEVEL_HW_SECURE_ALL = 5;
+	public static final int SECURITY_LEVEL_MAX = 6;
+	public static final int OFFLINE_LICENSE_STATE_UNKNOWN = 0;
+	public static final int OFFLINE_LICENSE_STATE_USABLE = 1;
+	public static final int OFFLINE_LICENSE_STATE_RELEASED = 2;
+
+	public static final int getMaxSecurityLevel() {
+		return SECURITY_LEVEL_MAX;
+	}
+
+	public int getSecurityLevel(byte[] sessionId) {
+		throw new MediaDrmStateException("no DRM");
+	}
+
+	public List<byte[]> getOfflineLicenseKeySetIds() {
+		return new java.util.ArrayList<byte[]>();
+	}
+
+	public void removeOfflineLicense(byte[] keySetId) {
+		throw new MediaDrmStateException("no DRM");
+	}
+
 	public KeyRequest getKeyRequest(byte[] scope, byte[] init, String mimeType, int keyType, HashMap<String, String> optionalParameters) throws MediaDrmException {
 		throw new MediaDrmException("no DRM");
 	}

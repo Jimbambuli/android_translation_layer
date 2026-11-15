@@ -27,6 +27,32 @@ public class MediaCodecList {
 		}
 	}
 
+	/* AOSP findEncoderForFormat()/findCodecForFormat(): the first codec of the requested kind whose
+	 * capabilities support the format; ATL lists only decoders, so no encoder is ever found */
+	public final String findDecoderForFormat(MediaFormat format) {
+		return findCodecForFormat(false, format);
+	}
+
+	public final String findEncoderForFormat(MediaFormat format) {
+		return findCodecForFormat(true, format);
+	}
+
+	private String findCodecForFormat(boolean encoder, MediaFormat format) {
+		String mime = format.getString(MediaFormat.KEY_MIME);
+		for (MediaCodecInfo info : getCodecInfos()) {
+			if (info.isEncoder() != encoder)
+				continue;
+			try {
+				MediaCodecInfo.CodecCapabilities caps = info.getCapabilitiesForType(mime);
+				if (caps != null && caps.isFormatSupported(format))
+					return info.getName();
+			} catch (IllegalArgumentException e) {
+				// type is not supported
+			}
+		}
+		return null;
+	}
+
 	public MediaCodecInfo[] getCodecInfos() {
 		MediaCodecInfo[] infos = new MediaCodecInfo[getCodecCount()];
 		for (int i = 0; i < infos.length; i++)

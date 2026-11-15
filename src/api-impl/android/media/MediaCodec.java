@@ -48,6 +48,7 @@ public class MediaCodec {
 	public void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags) {
 		System.out.println("MediaCodec.configure(" + format + ", " + surface + ", " + crypto + ", " + flags + "): codecName=" + codecName);
 		this.mediaFormat = format;
+		mHasSurface = surface != null;
 
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
@@ -180,6 +181,12 @@ public class MediaCodec {
 	public ByteBuffer getInputBuffer(int index) {
 		inputBuffers[index].clear();
 		return inputBuffers[index];
+	}
+
+	/* AOSP getInputImage(): null unless the input buffer holds a raw video frame; the input of ATL's
+	 * decoders is always compressed data */
+	public Image getInputImage(int index) {
+		return null;
 	}
 
 	public ByteBuffer[] getOutputBuffers() {
@@ -323,6 +330,31 @@ public class MediaCodec {
 		native_codec = 0;
 	}
 
+	/* AOSP MediaCodec.reset(): back to the Uninitialized state of a freshly created codec. The FFmpeg
+	 * codec is released and created anew; if that fails, android_media_MediaCodec_reset() reports
+	 * UNKNOWN_ERROR, which throwExceptionAsNecessary() throws as CodecException. */
+	public final synchronized void reset() {
+		release();
+		inputBuffers = null;
+		outputBuffers = null;
+		mediaFormat = null;
+		outputFormatSet = false;
+		native_codec = native_constructor(codecName);
+		if (native_codec == 0)
+			throw new CodecException(0x80000000, "reset: failed to create " + codecName);
+	}
+
+	/* AOSP createPersistentInputSurface(): null when MediaCodec::CreatePersistentInputSurface() fails, as
+	 * it does without an encoder (ATL has only decoders) */
+	public static Surface createPersistentInputSurface() {
+		return null;
+	}
+
+	/* AOSP setInputSurface(): only a PersistentSurface is accepted, and ATL never creates one */
+	public void setInputSurface(Surface surface) {
+		throw new IllegalArgumentException("not a PersistentSurface");
+	}
+
 	/* AOSP MediaCodec.setOutputSurface(): the video codec renders into another surface from now on (a player
 	 * moves its video to another SurfaceView, e.g. into picture-in-picture, or to a TextureView's
 	 * Surface(SurfaceTexture)) */
@@ -331,6 +363,17 @@ public class MediaCodec {
 			throw new IllegalArgumentException("surface must not be null");
 		if (native_codec != 0)
 			native_setOutputSurface(native_codec, surface);
+	}
+
+	/* AOSP MediaCodec.detachOutputSurface(): no ATL codec can detach its surface (the AOSP
+	 * nullOutputSurfaceSupport() case off), so it fails as there */
+	public static final int CONFIGURE_FLAG_DETACHED_SURFACE = 8;
+	private boolean mHasSurface = false;
+
+	public void detachOutputSurface() {
+		if (!mHasSurface)
+			throw new IllegalStateException("codec was not configured for an output surface");
+		throw new IllegalStateException("codec does not support detaching output surface");
 	}
 
 	public void setParameters(Bundle parameters) {}
@@ -372,9 +415,25 @@ public class MediaCodec {
 		return new PersistableBundle();
 	}
 
+	/* AOSP createDecoderByType()/createEncoderByType(): new MediaCodec(type, true, encoder) instantiates the
+	 * first codec of the list for the type; if there is none, MediaCodec::CreateByType() reports
+	 * NAME_NOT_FOUND and android_media_MediaCodec_native_setup() throws IllegalArgumentException. ATL's
+	 * list has only decoders, so no encoder is ever found. */
+	public static MediaCodec createDecoderByType(String type) throws IOException {
+		if (type == null)
+			throw new NullPointerException();
+		for (int i = 0; i < MediaCodecList.getCodecCount(); i++) {
+			MediaCodecInfo info = MediaCodecList.getCodecInfoAt(i);
+			if (!info.isEncoder() && type.equalsIgnoreCase(info.getSupportedTypes()[0]))
+				return new MediaCodec(info.getName());
+		}
+		throw new IllegalArgumentException("Failed to initialize " + type + ", error 0xfffffffe (NAME_NOT_FOUND)");
+	}
+
 	public static MediaCodec createEncoderByType(String type) throws IOException {
-		System.out.println("MediaCodec.createEncoderByType(" + type + ")");
-		throw new IOException("encoder not yet implemented");
+		if (type == null)
+			throw new NullPointerException();
+		throw new IllegalArgumentException("Failed to initialize " + type + ", error 0xfffffffe (NAME_NOT_FOUND)");
 	}
 
 	@Override
@@ -483,4 +542,10 @@ public class MediaCodec {
 	}
 
 	public static interface OnFrameRenderedListener {}
+
+	/* AOSP MediaCodec.getCanonicalName(): the name of the underlying codec component; ATL's codecs are no aliases
+	 * (MediaCodecInfo.isAlias()), so it is the name the codec was created with */
+	public final String getCanonicalName() {
+		return codecName;
+	}
 }

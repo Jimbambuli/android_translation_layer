@@ -30,6 +30,20 @@ public class CameraManager {
 		throw new IllegalArgumentException("No cameras available on device");
 	}
 
+	/* AOSP isCameraDeviceSetupSupported()/getCameraDeviceSetup(): the id is checked against the (empty)
+	 * camera id list first */
+	public boolean isCameraDeviceSetupSupported(String cameraId) throws CameraAccessException {
+		if (cameraId == null) {
+			throw new IllegalArgumentException("Camera ID was null");
+		}
+		throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+	}
+
+	public CameraDevice.CameraDeviceSetup getCameraDeviceSetup(String cameraId) throws CameraAccessException {
+		isCameraDeviceSetupSupported(cameraId); /* throws, see above */
+		throw new UnsupportedOperationException("CameraDeviceSetup is not supported for Camera ID: " + cameraId);
+	}
+
 	public void openCamera(String cameraId, CameraDevice.StateCallback callback, Handler handler) throws CameraAccessException {
 		openCameraForUid(cameraId, callback);
 	}
@@ -48,6 +62,50 @@ public class CameraManager {
 			throw new IllegalArgumentException("callback was null");
 		}
 		throw new IllegalArgumentException("No cameras available on device");
+	}
+
+	/* AOSP CameraManagerGlobal.registerTorchCallback(): stored; with the service disabled there is no torch
+	 * status to report */
+	private final Map<TorchCallback, Executor> mTorchCallbackMap = new HashMap<TorchCallback, Executor>();
+
+	public void registerTorchCallback(TorchCallback callback, Handler handler) {
+		synchronized (mTorchCallbackMap) {
+			mTorchCallbackMap.put(callback, checkAndWrapHandler(handler));
+		}
+	}
+
+	public void registerTorchCallback(Executor executor, TorchCallback callback) {
+		if (executor == null)
+			throw new IllegalArgumentException("executor was null");
+		synchronized (mTorchCallbackMap) {
+			mTorchCallbackMap.put(callback, executor);
+		}
+	}
+
+	public void unregisterTorchCallback(TorchCallback callback) {
+		synchronized (mTorchCallbackMap) {
+			mTorchCallbackMap.remove(callback);
+		}
+	}
+
+	/* AOSP: sCameraServiceDisabled -> IllegalArgumentException (AOSP's wording here is "No camera available") */
+	public void turnOnTorchWithStrengthLevel(String cameraId, int torchStrength) throws CameraAccessException {
+		throw new IllegalArgumentException("No camera available on device");
+	}
+
+	/* AOSP getCameraExtensionCharacteristics(): starts with getCameraCharacteristics(), which fails */
+	public CameraExtensionCharacteristics getCameraExtensionCharacteristics(String cameraId) throws CameraAccessException {
+		getCameraCharacteristics(cameraId);
+		return null;
+	}
+
+	/* AOSP CameraManager.TorchCallback */
+	public static abstract class TorchCallback {
+		public void onTorchModeUnavailable(String cameraId) {}
+
+		public void onTorchModeChanged(String cameraId, boolean enabled) {}
+
+		public void onTorchStrengthLevelChanged(String cameraId, int newStrengthLevel) {}
 	}
 
 	public void setTorchMode(String cameraId, boolean enabled) throws CameraAccessException {

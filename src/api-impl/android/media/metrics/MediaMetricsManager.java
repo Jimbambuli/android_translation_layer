@@ -25,9 +25,17 @@ public final class MediaMetricsManager {
 
 	public void releaseSessionId(@NonNull String sessionId) {}
 
+	public void reportEditingEndedEvent(@NonNull String sessionId, EditingEndedEvent editingEndedEvent) {}
+
 	/** Creates a playback session. */
 	@NonNull
 	public PlaybackSession createPlaybackSession() {
 		return new PlaybackSession(UUID.randomUUID().toString(), this);
+	}
+
+	/** Creates an editing session (android-16), with a local id like createPlaybackSession(). */
+	@NonNull
+	public EditingSession createEditingSession() {
+		return new EditingSession(UUID.randomUUID().toString(), this);
 	}
 }

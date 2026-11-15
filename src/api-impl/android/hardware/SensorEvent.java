@@ -8,9 +8,17 @@ public class SensorEvent {
 
 	public Sensor sensor;
 
+	/* AOSP SensorEvent.accuracy: ATL's sensor sources give no status; the events are reported as
+	 * SENSOR_STATUS_ACCURACY_HIGH */
+	public int accuracy = /*SensorManager.SENSOR_STATUS_ACCURACY_HIGH*/ 3;
+
+	/* AOSP SensorEvent.timestamp: nanoseconds in the SystemClock.elapsedRealtimeNanos() base */
+	public long timestamp;
+
 	@Export
 	public SensorEvent(float[] values, Sensor sensor) {
 		this.values = values;
 		this.sensor = sensor;
+		this.timestamp = android.os.SystemClock.elapsedRealtimeNanos();
 	}
 }

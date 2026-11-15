@@ -223,4 +223,30 @@ public class MediaRecorder {
 	public void release() {
 		reset();
 	}
+
+	/* AOSP MediaRecorder.setPreviewDisplay(): only remembers the surface (mSurface) for prepare() */
+	private android.view.Surface mSurface;
+
+	public void setPreviewDisplay(android.view.Surface sv) {
+		mSurface = sv;
+	}
+
+	/* AOSP MediaRecorder.setProfile(): applies the profile through the public setters */
+	public void setProfile(CamcorderProfile profile) {
+		setOutputFormat(profile.fileFormat);
+		setVideoFrameRate(profile.videoFrameRate);
+		setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
+		setVideoEncodingBitRate(profile.videoBitRate);
+		setVideoEncoder(profile.videoCodec);
+		if (profile.quality >= CamcorderProfile.QUALITY_TIME_LAPSE_LOW &&
+		    profile.quality <= CamcorderProfile.QUALITY_TIME_LAPSE_QVGA) {
+			// Nothing needs to be done. Call to setCaptureRate() enables
+			// time lapse video recording.
+		} else {
+			setAudioEncodingBitRate(profile.audioBitRate);
+			setAudioChannels(profile.audioChannels);
+			setAudioSamplingRate(profile.audioSampleRate);
+			setAudioEncoder(profile.audioCodec);
+		}
+	}
 }

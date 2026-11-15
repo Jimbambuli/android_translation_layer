@@ -14,6 +14,12 @@ public class MediaCodecInfo {
 		return name;
 	}
 
+	/* AOSP MediaCodecInfo.getCanonicalName(): the name of the underlying codec; ATL's codecs are no aliases
+	 * (isAlias()), so it is the name */
+	public final String getCanonicalName() {
+		return name;
+	}
+
 	public boolean isEncoder() {
 		return false;
 	}
@@ -40,6 +46,9 @@ public class MediaCodecInfo {
 	}
 
 	public CodecCapabilities getCapabilitiesForType(String type) {
+		/* AOSP: mCaps.get(type) == null -> IllegalArgumentException */
+		if (!mime.equals(type))
+			throw new IllegalArgumentException("codec does not support type");
 		CodecCapabilities caps = new CodecCapabilities();
 		caps.mimeType = type;
 		if ("video/avc".equals(type)) {
@@ -52,6 +61,20 @@ public class MediaCodecInfo {
 	}
 
 	public static class CodecCapabilities {
+
+		/* AOSP CodecCapabilities FEATURE_* */
+		public static final String FEATURE_AdaptivePlayback = "adaptive-playback";
+		public static final String FEATURE_SecurePlayback = "secure-playback";
+		public static final String FEATURE_TunneledPlayback = "tunneled-playback";
+		public static final String FEATURE_DynamicTimestamp = "dynamic-timestamp";
+		public static final String FEATURE_FrameParsing = "frame-parsing";
+		public static final String FEATURE_MultipleFrames = "multiple-frames";
+		public static final String FEATURE_PartialFrame = "partial-frame";
+		public static final String FEATURE_IntraRefresh = "intra-refresh";
+		public static final String FEATURE_LowLatency = "low-latency";
+		public static final String FEATURE_QpBounds = "qp-bounds";
+		public static final String FEATURE_EncodingStatistics = "encoding-statistics";
+		public static final String FEATURE_HdrEditing = "hdr-editing";
 
 		/* AOSP: never null, empty for a codec without profiles */
 		public CodecProfileLevel[] profileLevels = new CodecProfileLevel[0];
@@ -90,6 +113,50 @@ public class MediaCodecInfo {
 
 		public int getMaxSupportedInstances() {
 			return 1;
+		}
+
+		/* AOSP mDefaultFormat: holds the default values of the audio/video capabilities; ATL publishes none,
+		 * so only the mime type is set, as AOSP does before adding the capability defaults */
+		public MediaFormat getDefaultFormat() {
+			MediaFormat format = new MediaFormat();
+			format.setString(MediaFormat.KEY_MIME, mimeType);
+			return format;
+		}
+
+		/* AOSP CodecCapabilities.isFormatSupported(): the mime type must match, requested decoder features
+		 * must be supported (ATL supports and requires none) and a requested profile must be listed at a
+		 * high enough level. ATL's audio/video capabilities accept every size and rate, so their
+		 * supportsFormat() checks always pass. */
+		private static final String[] DECODER_FEATURES = {
+			FEATURE_AdaptivePlayback, FEATURE_SecurePlayback, FEATURE_TunneledPlayback, FEATURE_PartialFrame,
+			FEATURE_FrameParsing, FEATURE_MultipleFrames, FEATURE_DynamicTimestamp, FEATURE_LowLatency,
+		};
+
+		public final boolean isFormatSupported(MediaFormat format) {
+			String mime = format.getString(MediaFormat.KEY_MIME);
+			if (mime != null && !mimeType.equalsIgnoreCase(mime))
+				return false;
+			for (String feature : DECODER_FEATURES) {
+				if (!format.containsKey("feature-" + feature))
+					continue;
+				int yesNo = format.getInteger("feature-" + feature);
+				if ((yesNo == 1 && !isFeatureSupported(feature)) || (yesNo == 0 && isFeatureRequired(feature)))
+					return false;
+			}
+			if (format.containsKey(MediaFormat.KEY_PROFILE)) {
+				int profile = format.getInteger(MediaFormat.KEY_PROFILE);
+				Integer level = format.containsKey(MediaFormat.KEY_LEVEL) ? format.getInteger(MediaFormat.KEY_LEVEL) : null;
+				boolean found = false;
+				for (CodecProfileLevel pl : profileLevels) {
+					if (pl.profile == profile && (level == null || "audio/mp4a-latm".equalsIgnoreCase(mimeType) || pl.level >= level)) {
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+					return false;
+			}
+			return true;
 		}
 	}
 
@@ -220,7 +287,26 @@ public class MediaCodecInfo {
 		public static final int BITRATE_MODE_CBR = 2;
 		public static final int BITRATE_MODE_CBR_FD = 3;
 
+		/* AOSP defaults of an EncoderCapabilities without published limits (unreachable in ATL) */
+		private final android.util.Range<Integer> mQualityRange = new android.util.Range<Integer>(0, 0);
+		private final android.util.Range<Integer> mComplexityRange = new android.util.Range<Integer>(0, 0);
+		private int mBitControl = 0;
+
 		private EncoderCapabilities() {}
+
+		public android.util.Range<Integer> getQualityRange() {
+			return mQualityRange;
+		}
+
+		public android.util.Range<Integer> getComplexityRange() {
+			return mComplexityRange;
+		}
+
+		public boolean isBitrateModeSupported(int mode) {
+			if (mode < BITRATE_MODE_CQ || mode > BITRATE_MODE_CBR_FD)
+				return false;
+			return (mBitControl & (1 << mode)) != 0;
+		}
 	}
 
 	public static class VideoCapabilities {
@@ -247,6 +333,20 @@ public class MediaCodecInfo {
 			if (!SIZE_RANGE.contains(width) || (width % getWidthAlignment()) != 0)
 				throw new IllegalArgumentException("unsupported width");
 			return SIZE_RANGE;
+		}
+
+		/* AOSP FRAME_RATE_RANGE of initWithPlatformLimits() */
+		public android.util.Range<Integer> getSupportedFrameRates() {
+			return new android.util.Range<Integer>(0, 960);
+		}
+
+		/* AOSP getSupportedFrameRatesFor() with the platform limits: 2x2 blocks and an unbounded
+		 * blocks-per-second range */
+		public android.util.Range<Double> getSupportedFrameRatesFor(int width, int height) {
+			if (!isSizeSupported(width, height))
+				throw new IllegalArgumentException("unsupported size");
+			long blockCount = (long)((width + 1) / 2) * ((height + 1) / 2);
+			return new android.util.Range<Double>(Math.max(1.0 / blockCount, 0.0), Math.min(Long.MAX_VALUE / (double)blockCount, 960.0));
 		}
 
 		public int getWidthAlignment() {
@@ -310,6 +410,18 @@ public class MediaCodecInfo {
 
 		public int getMaxInputChannelCount() {
 			return 2;
+		}
+
+		/* AOSP: the lowest bound of getInputChannelCountRanges() */
+		public int getMinInputChannelCount() {
+			return 1;
+		}
+
+		/* AOSP mInputChannelRanges: a single range [1..getMaxInputChannelCount()] */
+		public android.util.Range<Integer>[] getInputChannelCountRanges() {
+			@SuppressWarnings("unchecked")
+			android.util.Range<Integer>[] ranges = new android.util.Range[] {new android.util.Range<Integer>(1, getMaxInputChannelCount())};
+			return ranges;
 		}
 
 		/* No codec-specific limits are published; report the full non-negative range. */

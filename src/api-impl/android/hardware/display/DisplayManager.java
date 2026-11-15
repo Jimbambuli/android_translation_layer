@@ -45,4 +45,32 @@ public final class DisplayManager {
 	public Display[] getDisplays() {
 		return new Display[] {getDisplay(Display.DEFAULT_DISPLAY)};
 	}
+
+	/* AOSP DisplayManager.createVirtualDisplay(): VirtualDisplayConfig.Builder checks the arguments, then
+	 * DisplayManagerGlobal.createVirtualDisplayWrapper() returns null when the display service gives no display
+	 * id ("Could not create virtual display"); ATL has no display service that creates virtual displays (as
+	 * MediaProjection.createVirtualDisplay()) */
+	public VirtualDisplay createVirtualDisplay(String name, int width, int height, int densityDpi,
+	                                           android.view.Surface surface, int flags) {
+		return createVirtualDisplay(name, width, height, densityDpi, surface, flags, null, null);
+	}
+
+	public VirtualDisplay createVirtualDisplay(String name, int width, int height, int densityDpi,
+	                                           android.view.Surface surface, int flags,
+	                                           VirtualDisplay.Callback callback, android.os.Handler handler) {
+		if (name == null) {
+			throw new IllegalArgumentException("Virtual display name is required");
+		}
+		if (width <= 0) {
+			throw new IllegalArgumentException("Virtual display width must be positive");
+		}
+		if (height <= 0) {
+			throw new IllegalArgumentException("Virtual display height must be positive");
+		}
+		if (densityDpi <= 0) {
+			throw new IllegalArgumentException("Virtual display density must be positive");
+		}
+		android.util.Log.e("DisplayManager", "Could not create virtual display: " + name);
+		return null;
+	}
 }

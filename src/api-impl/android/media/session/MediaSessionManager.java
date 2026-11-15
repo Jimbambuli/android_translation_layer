@@ -2,8 +2,11 @@ package android.media.session;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.content.ComponentName;
+import android.os.Handler;
 import android.text.TextUtils;
 import android.view.KeyEvent;
+import java.util.List;
 import java.util.Objects;
 
 /* AOSP MediaSessionManager: the media keys go to the app's media button session. ATL has no
@@ -34,6 +37,48 @@ public class MediaSessionManager {
 			return false;
 		}
 		return sessionToken.session.dispatchMediaKeyEvent(keyEvent);
+	}
+
+	/* AOSP getActiveSessions()/addOnActiveSessionsChangedListener()/getMediaKeyEventSession(): they need
+	 * MEDIA_CONTENT_CONTROL (a privileged permission) or an enabled notification listener and throw a
+	 * SecurityException otherwise (AOSP javadoc). ATL grants neither, so they throw. */
+	public interface OnActiveSessionsChangedListener {
+		void onActiveSessionsChanged(@Nullable List<MediaController> controllers);
+	}
+
+	private static SecurityException noMediaControl() {
+		return new SecurityException("requires MEDIA_CONTENT_CONTROL or an enabled notification listener");
+	}
+
+	public @NonNull List<MediaController> getActiveSessions(@Nullable ComponentName notificationListener) {
+		throw noMediaControl();
+	}
+
+	public void addOnActiveSessionsChangedListener(@NonNull OnActiveSessionsChangedListener sessionListener,
+						       @Nullable ComponentName notificationListener) {
+		addOnActiveSessionsChangedListener(sessionListener, notificationListener, null);
+	}
+
+	public void addOnActiveSessionsChangedListener(@NonNull OnActiveSessionsChangedListener sessionListener,
+						       @Nullable ComponentName notificationListener, @Nullable Handler handler) {
+		Objects.requireNonNull(sessionListener, "sessionListener shouldn't be null");
+		throw noMediaControl();
+	}
+
+	/* nothing was added, so there is nothing to remove */
+	public void removeOnActiveSessionsChangedListener(@NonNull OnActiveSessionsChangedListener sessionListener) {
+		Objects.requireNonNull(sessionListener, "sessionListener shouldn't be null");
+	}
+
+	public @Nullable MediaSession.Token getMediaKeyEventSession() {
+		throw noMediaControl();
+	}
+
+	/* AOSP isTrustedForMediaControl(): the trust decision is MediaSessionService.isTrusted() (not in the
+	 * local sources); without that service the call ends in AOSP's RemoteException path, false */
+	public boolean isTrustedForMediaControl(@NonNull RemoteUserInfo userInfo) {
+		Objects.requireNonNull(userInfo, "userInfo shouldn't be null");
+		return false;
 	}
 
 	private void dispatchMediaKeyEventInternal(KeyEvent keyEvent, boolean asSystemService, boolean needWakeLock) {

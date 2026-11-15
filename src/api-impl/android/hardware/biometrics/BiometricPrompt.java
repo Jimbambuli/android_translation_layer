@@ -47,7 +47,24 @@ public class BiometricPrompt implements BiometricConstants {
 		boolean deviceCredentialAllowed;
 		int authenticators;
 		boolean allowBackgroundAuthentication;
+		int logoRes;
+		android.graphics.Bitmap logoBitmap;
+		String logoDescription;
+		PromptContentView contentView;
 	}
+
+	/* AOSP BiometricPrompt.ButtonInfo */
+	static class ButtonInfo {
+		Executor executor;
+		DialogInterface.OnClickListener listener;
+
+		ButtonInfo(Executor ex, DialogInterface.OnClickListener l) {
+			executor = ex;
+			listener = l;
+		}
+	}
+
+	static final int MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER = 30;
 
 	public static class Builder {
 		private final PromptInfo mPromptInfo;
@@ -79,6 +96,47 @@ public class BiometricPrompt implements BiometricConstants {
 		@NonNull
 		public Builder setUseDefaultSubtitle() {
 			mPromptInfo.useDefaultSubtitle = true;
+			return this;
+		}
+
+		/* AOSP Builder.setLogoRes()/setLogoBitmap()/setLogoDescription()/setContentView() (android-16): kept in
+		 * the PromptInfo; the logo resource is not turned into a bitmap, ATL's prompt shows no dialog */
+		@NonNull
+		public Builder setLogoRes(int logoRes) {
+			if (mPromptInfo.logoBitmap != null) {
+				throw new IllegalStateException("Exclusively one of logo resource or logo bitmap can be set");
+			}
+			if (logoRes != 0) {
+				mPromptInfo.logoRes = logoRes;
+			}
+			return this;
+		}
+
+		@NonNull
+		public Builder setLogoBitmap(@NonNull android.graphics.Bitmap logoBitmap) {
+			if (mPromptInfo.logoRes != 0) {
+				throw new IllegalStateException("Exclusively one of logo resource or logo bitmap can be set");
+			}
+			mPromptInfo.logoBitmap = logoBitmap;
+			return this;
+		}
+
+		@NonNull
+		public Builder setLogoDescription(@NonNull String logoDescription) {
+			if (logoDescription == null || logoDescription.isEmpty()) {
+				throw new IllegalArgumentException("Logo description passed in can not be null");
+			}
+			if (logoDescription.length() > MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER) {
+				android.util.Log.w("BiometricPrompt", "Logo description passed in exceeds" + MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER
+						+ " character number and may be truncated.");
+			}
+			mPromptInfo.logoDescription = logoDescription;
+			return this;
+		}
+
+		@NonNull
+		public Builder setContentView(@NonNull PromptContentView view) {
+			mPromptInfo.contentView = view;
 			return this;
 		}
 
@@ -238,6 +296,14 @@ public class BiometricPrompt implements BiometricConstants {
 
 		public @Nullable PresentationSession getPresentationSession() {
 			return super.getPresentationSession();
+		}
+
+		public CryptoObject(long operationHandle) {
+			super(operationHandle);
+		}
+
+		public long getOperationHandle() {
+			return super.getOpId();
 		}
 	}
 

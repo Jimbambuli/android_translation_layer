@@ -281,6 +281,17 @@ public class AudioManager {
 
 	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
 
+	/* AOSP AudioManager.AudioRecordingCallback */
+	public static abstract class AudioRecordingCallback {
+		public void onRecordingConfigChanged(java.util.List<AudioRecordingConfiguration> configs) {}
+	}
+
+	/* AOSP AudioManager.getActiveRecordingConfigurations(): AudioService's list of active recordings as an
+	 * unprivileged app sees it; ATL knows the app's own AudioRecords */
+	public java.util.List<AudioRecordingConfiguration> getActiveRecordingConfigurations() {
+		return AudioRecord.activeRecordingConfigurations();
+	}
+
 	/* AOSP AudioManager.FX_KEY_CLICK: the standard key click sound */
 	public static final int FX_KEY_CLICK = 0;
 
@@ -327,5 +338,181 @@ public class AudioManager {
 	/* API 28 */
 	public int getStreamMinVolume(int streamType) {
 		return 0;
+	}
+
+	public static final int RINGER_MODE_SILENT = 0;
+	public static final int RINGER_MODE_VIBRATE = 1;
+	public static final int RINGER_MODE_NORMAL = 2;
+	private static final int RINGER_MODE_MAX = RINGER_MODE_NORMAL;
+
+	/* AOSP AudioManager.setRingerMode(): ignores invalid modes (isValidRingerMode(): range check, then
+	 * AudioService), else AudioService.setRingerModeExternal(). ATL has no ringer, getRingerMode() stays */
+	public void setRingerMode(int ringerMode) {
+		if (ringerMode < 0 || ringerMode > RINGER_MODE_MAX) {
+			return;
+		}
+	}
+
+	/* AOSP AudioManager.adjustVolume()/adjustSuggestedStreamVolume(): MediaSessionLegacyHelper.sendAdjustVolumeBy()
+	 * adjusts the stream the media session service picks. ATL has one volume for every stream
+	 * (adjustStreamVolume()), so the stream choice makes no difference */
+	public void adjustVolume(int direction, int flags) {
+		adjustStreamVolume(STREAM_MUSIC, direction, flags);
+	}
+
+	public void adjustSuggestedStreamVolume(int direction, int suggestedStreamType, int flags) {
+		adjustStreamVolume(suggestedStreamType, direction, flags);
+	}
+
+	/* AOSP AudioManager.setWiredHeadsetOn(): deprecated, empty body */
+	@Deprecated
+	public void setWiredHeadsetOn(boolean on) {}
+
+	/* AOSP AudioManager.loadSoundEffects() -> AudioService.loadSoundEffects(); ATL plays no sound effects
+	 * (playSoundEffect()), so there is nothing to load, like unloadSoundEffects() */
+	public void loadSoundEffects() {}
+
+	/* AOSP AudioManager.isHapticPlaybackSupported() -> AudioSystem: whether the audio HAL has an output with
+	 * haptic channels. A desktop has none */
+	public static boolean isHapticPlaybackSupported() {
+		return false;
+	}
+
+	/* AOSP AudioManager.setAllowedCapturePolicy()/getAllowedCapturePolicy(): AudioService keeps the policy of the
+	 * app's uid, ALLOW_CAPTURE_BY_ALL until it is set */
+	private int mAllowedCapturePolicy = AudioAttributes.ALLOW_CAPTURE_BY_ALL;
+
+	public void setAllowedCapturePolicy(int capturePolicy) {
+		mAllowedCapturePolicy = capturePolicy;
+	}
+
+	public int getAllowedCapturePolicy() {
+		return mAllowedCapturePolicy;
+	}
+
+	/* AOSP AudioManager.OnModeChangedListener, add/removeOnModeChangedListener() (CallbackUtil.addListener()/
+	 * removeListener()). ATL's mode is always MODE_NORMAL (setMode() changes nothing), so no listener is called */
+	public interface OnModeChangedListener {
+		void onModeChanged(int mode);
+	}
+
+	private final java.util.ArrayList<OnModeChangedListener> mModeChangedListeners = new java.util.ArrayList<>();
+
+	public void addOnModeChangedListener(java.util.concurrent.Executor executor, OnModeChangedListener listener) {
+		java.util.Objects.requireNonNull(executor);
+		java.util.Objects.requireNonNull(listener);
+		synchronized (mModeChangedListeners) {
+			if (mModeChangedListeners.contains(listener)) {
+				throw new IllegalArgumentException("attempt to call addOnModeChangedListener"
+				                                   + "on a previously registered listener");
+			}
+			mModeChangedListeners.add(listener);
+		}
+	}
+
+	public void removeOnModeChangedListener(OnModeChangedListener listener) {
+		java.util.Objects.requireNonNull(listener);
+		synchronized (mModeChangedListeners) {
+			if (!mModeChangedListeners.remove(listener)) {
+				throw new IllegalArgumentException("attempt to call removeOnModeChangedListener"
+				                                   + " on an unregistered listener");
+			}
+		}
+	}
+
+	/* AOSP AudioManager.getMicrophones(): AudioSystem.getMicrophones() asks the audio HAL for microphone
+	 * characteristics. ATL has no HAL, which takes AOSP's fallback (addMicrophonesFromAudioDeviceInfo() with
+	 * microphoneInfoFromAudioDeviceInfo()): one MicrophoneInfo with unknown characteristics per input device of
+	 * getDevices() except TYPE_TELEPHONY. The port name is the device's product name; the port type is the
+	 * internal device of TYPE_BUILTIN_MIC (AUDIO_DEVICE_IN_BUILTIN_MIC), ATL's only input */
+	public java.util.List<MicrophoneInfo> getMicrophones() throws java.io.IOException {
+		java.util.ArrayList<MicrophoneInfo> microphones = new java.util.ArrayList<MicrophoneInfo>();
+		for (AudioDeviceInfo deviceInfo : getDevices(GET_DEVICES_INPUTS)) {
+			int deviceType = deviceInfo.getType();
+			if (deviceType == AudioDeviceInfo.TYPE_TELEPHONY) {
+				continue;
+			}
+			int micLocation = (deviceType == AudioDeviceInfo.TYPE_BUILTIN_MIC) ? MicrophoneInfo.LOCATION_MAINBODY
+			                  : deviceType == AudioDeviceInfo.TYPE_UNKNOWN ? MicrophoneInfo.LOCATION_UNKNOWN
+			                  : MicrophoneInfo.LOCATION_PERIPHERAL;
+			MicrophoneInfo microphone = new MicrophoneInfo(
+			    deviceInfo.getProductName().toString() + deviceInfo.getId(),
+			    0x80000004 /* AUDIO_DEVICE_IN_BUILTIN_MIC */, deviceInfo.getAddress(), micLocation,
+			    MicrophoneInfo.GROUP_UNKNOWN, MicrophoneInfo.INDEX_IN_THE_GROUP_UNKNOWN,
+			    MicrophoneInfo.POSITION_UNKNOWN, MicrophoneInfo.ORIENTATION_UNKNOWN,
+			    new java.util.ArrayList<android.util.Pair<Float, Float>>(),
+			    new java.util.ArrayList<android.util.Pair<Integer, Integer>>(),
+			    MicrophoneInfo.SENSITIVITY_UNKNOWN, MicrophoneInfo.SPL_UNKNOWN,
+			    MicrophoneInfo.SPL_UNKNOWN, MicrophoneInfo.DIRECTIONALITY_UNKNOWN);
+			microphone.setId(deviceInfo.getId());
+			microphones.add(microphone);
+		}
+		return microphones;
+	}
+
+	/* AOSP AudioManager.registerMediaButtonEventReceiver()/unregisterMediaButtonEventReceiver() (deprecated):
+	 * through MediaSessionLegacyHelper, which keeps an active MediaSession per PendingIntent that forwards the
+	 * media buttons to it. The context is the application's (AOSP: the AudioManager's context) */
+	@Deprecated
+	public void registerMediaButtonEventReceiver(android.content.ComponentName eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		if (!eventReceiver.getPackageName().equals(context.getPackageName())) {
+			android.util.Log.e("AudioManager", "registerMediaButtonEventReceiver() error: "
+			                                   + "receiver and context package names don't match");
+			return;
+		}
+		android.content.Intent mediaButtonIntent = new android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON);
+		mediaButtonIntent.setComponent(eventReceiver);
+		android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(context, 0, mediaButtonIntent,
+		                                                                      android.app.PendingIntent.FLAG_IMMUTABLE);
+		registerMediaButtonIntent(pi, eventReceiver);
+	}
+
+	@Deprecated
+	public void registerMediaButtonEventReceiver(android.app.PendingIntent eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		registerMediaButtonIntent(eventReceiver, null);
+	}
+
+	public void registerMediaButtonIntent(android.app.PendingIntent pi, android.content.ComponentName eventReceiver) {
+		if (pi == null) {
+			android.util.Log.e("AudioManager", "Cannot call registerMediaButtonIntent() with a null parameter");
+			return;
+		}
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		android.media.session.MediaSessionLegacyHelper helper = android.media.session.MediaSessionLegacyHelper.getHelper(context);
+		helper.addMediaButtonListener(pi, eventReceiver, context);
+	}
+
+	@Deprecated
+	public void unregisterMediaButtonEventReceiver(android.content.ComponentName eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		android.content.Intent mediaButtonIntent = new android.content.Intent(android.content.Intent.ACTION_MEDIA_BUTTON);
+		mediaButtonIntent.setComponent(eventReceiver);
+		android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(context, 0, mediaButtonIntent,
+		                                                                      android.app.PendingIntent.FLAG_IMMUTABLE);
+		unregisterMediaButtonIntent(pi);
+	}
+
+	@Deprecated
+	public void unregisterMediaButtonEventReceiver(android.app.PendingIntent eventReceiver) {
+		if (eventReceiver == null) {
+			return;
+		}
+		unregisterMediaButtonIntent(eventReceiver);
+	}
+
+	public void unregisterMediaButtonIntent(android.app.PendingIntent pi) {
+		android.media.session.MediaSessionLegacyHelper helper =
+		    android.media.session.MediaSessionLegacyHelper.getHelper(android.app.ActivityThread.currentApplication());
+		helper.removeMediaButtonListener(pi);
 	}
 }
