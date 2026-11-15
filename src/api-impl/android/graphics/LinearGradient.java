@@ -29,6 +29,10 @@ public class LinearGradient extends Shader {
 		this(x0, y0, x1, y1, new int[] {color0, color1}, null, tile);
 	}
 
+	public LinearGradient(float x0, float y0, float x1, float y1, long color0, long color1, TileMode tile) {
+		this(x0, y0, x1, y1, new long[] {color0, color1}, null, tile);
+	}
+
 	/* the color longs converted to sRGB */
 	private static int[] toArgb(long[] colors) {
 		int[] argb = new int[colors.length];
