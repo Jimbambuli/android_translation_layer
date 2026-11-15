@@ -159,6 +159,11 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
+	public Context createCredentialProtectedStorageContext() {
+		return this.baseContext.createCredentialProtectedStorageContext();
+	}
+
+	@Override
 	public int getThemeResId() {
 		return this.baseContext.getThemeResId();
 	}

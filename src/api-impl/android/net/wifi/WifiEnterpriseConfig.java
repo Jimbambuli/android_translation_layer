@@ -263,25 +263,35 @@ public class WifiEnterpriseConfig implements Parcelable {
      * Fields that are supported in {@link #mFields}.
      * Each entry includes the supported field's key and its maximum allowed length.
      */
-    private static final Map<String, Integer> SUPPORTED_FIELDS = Map.ofEntries(
-            Map.entry(ALTSUBJECT_MATCH_KEY, 1024),
-            Map.entry(ANON_IDENTITY_KEY, 1024),
-            Map.entry(CA_CERT_KEY, CERTIFICATE_MAX_LENGTH),
-            Map.entry(CA_PATH_KEY, 4096),
-            Map.entry(CLIENT_CERT_KEY, CERTIFICATE_MAX_LENGTH),
-            Map.entry(DECORATED_IDENTITY_PREFIX_KEY, 256),
-            Map.entry(DOM_SUFFIX_MATCH_KEY, 256),
-            Map.entry(EAP_ERP, 1),
-            Map.entry(ENGINE_KEY, 1),
-            Map.entry(ENGINE_ID_KEY, 64),
-            Map.entry(IDENTITY_KEY, 256),
-            Map.entry(OPP_KEY_CACHING, 1),
-            Map.entry(PASSWORD_KEY, 256),
-            Map.entry(PLMN_KEY, 16),
-            Map.entry(PRIVATE_KEY_ID_KEY, 256),
-            Map.entry(REALM_KEY, 256),
-            Map.entry(SUBJECT_MATCH_KEY, 256),
-            Map.entry(WAPI_CERT_SUITE_KEY, CERTIFICATE_MAX_LENGTH)
+    /* ATL: Map.ofEntries()/Map.entry() are missing from ATL's libcore (Java 8 level), same unmodifiable map */
+    @SafeVarargs
+    private static Map<String, Integer> mapOfEntries(Map.Entry<String, Integer>... entries) {
+        Map<String, Integer> map = new java.util.HashMap<>();
+        for (Map.Entry<String, Integer> e : entries) {
+            map.put(e.getKey(), e.getValue());
+        }
+        return java.util.Collections.unmodifiableMap(map);
+    }
+
+    private static final Map<String, Integer> SUPPORTED_FIELDS = mapOfEntries(
+            new java.util.AbstractMap.SimpleImmutableEntry<>(ALTSUBJECT_MATCH_KEY, 1024),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(ANON_IDENTITY_KEY, 1024),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(CA_CERT_KEY, CERTIFICATE_MAX_LENGTH),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(CA_PATH_KEY, 4096),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(CLIENT_CERT_KEY, CERTIFICATE_MAX_LENGTH),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(DECORATED_IDENTITY_PREFIX_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(DOM_SUFFIX_MATCH_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(EAP_ERP, 1),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(ENGINE_KEY, 1),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(ENGINE_ID_KEY, 64),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(IDENTITY_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(OPP_KEY_CACHING, 1),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(PASSWORD_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(PLMN_KEY, 16),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(PRIVATE_KEY_ID_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(REALM_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(SUBJECT_MATCH_KEY, 256),
+            new java.util.AbstractMap.SimpleImmutableEntry<>(WAPI_CERT_SUITE_KEY, CERTIFICATE_MAX_LENGTH)
     );
 
     /**

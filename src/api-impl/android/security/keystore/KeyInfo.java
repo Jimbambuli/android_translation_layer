@@ -67,25 +67,25 @@ public class KeyInfo implements KeySpec {
     private final String mKeystoreAlias;
     private final int mKeySize;
     private final boolean mInsideSecureHardware;
-    private final @KeyProperties.OriginEnum int mOrigin;
+    private final int mOrigin;
     private final Date mKeyValidityStart;
     private final Date mKeyValidityForOriginationEnd;
     private final Date mKeyValidityForConsumptionEnd;
-    private final @KeyProperties.PurposeEnum int mPurposes;
-    private final @KeyProperties.EncryptionPaddingEnum String[] mEncryptionPaddings;
-    private final @KeyProperties.SignaturePaddingEnum String[] mSignaturePaddings;
-    private final @KeyProperties.DigestEnum String[] mDigests;
-    private final @KeyProperties.BlockModeEnum String[] mBlockModes;
+    private final int mPurposes;
+    private final String[] mEncryptionPaddings;
+    private final String[] mSignaturePaddings;
+    private final String[] mDigests;
+    private final String[] mBlockModes;
     private final boolean mUserAuthenticationRequired;
     private final int mUserAuthenticationValidityDurationSeconds;
-    private final @KeyProperties.AuthEnum int mUserAuthenticationType;
+    private final int mUserAuthenticationType;
     private final boolean mUserAuthenticationRequirementEnforcedBySecureHardware;
     private final boolean mUserAuthenticationValidWhileOnBody;
     private final boolean mUnlockedDeviceRequired;
     private final boolean mTrustedUserPresenceRequired;
     private final boolean mInvalidatedByBiometricEnrollment;
     private final boolean mUserConfirmationRequired;
-    private final @KeyProperties.SecurityLevelEnum int mSecurityLevel;
+    private final int mSecurityLevel;
     private final int mRemainingUsageCount;
 
     /**
@@ -93,26 +93,26 @@ public class KeyInfo implements KeySpec {
      */
     public KeyInfo(String keystoreKeyAlias,
             boolean insideSecureHardware,
-            @KeyProperties.OriginEnum int origin,
+            int origin,
             int keySize,
             Date keyValidityStart,
             Date keyValidityForOriginationEnd,
             Date keyValidityForConsumptionEnd,
-            @KeyProperties.PurposeEnum int purposes,
-            @KeyProperties.EncryptionPaddingEnum String[] encryptionPaddings,
-            @KeyProperties.SignaturePaddingEnum String[] signaturePaddings,
-            @KeyProperties.DigestEnum String[] digests,
-            @KeyProperties.BlockModeEnum String[] blockModes,
+            int purposes,
+            String[] encryptionPaddings,
+            String[] signaturePaddings,
+            String[] digests,
+            String[] blockModes,
             boolean userAuthenticationRequired,
             int userAuthenticationValidityDurationSeconds,
-            @KeyProperties.AuthEnum int userAuthenticationType,
+            int userAuthenticationType,
             boolean userAuthenticationRequirementEnforcedBySecureHardware,
             boolean userAuthenticationValidWhileOnBody,
             boolean unlockedDeviceRequired,
             boolean trustedUserPresenceRequired,
             boolean invalidatedByBiometricEnrollment,
             boolean userConfirmationRequired,
-            @KeyProperties.SecurityLevelEnum int securityLevel,
+            int securityLevel,
             int remainingUsageCount) {
         mKeystoreAlias = keystoreKeyAlias;
         mInsideSecureHardware = insideSecureHardware;
@@ -164,7 +164,7 @@ public class KeyInfo implements KeySpec {
     /**
      * Gets the origin of the key. See {@link KeyProperties}.{@code ORIGIN} constants.
      */
-    public @KeyProperties.OriginEnum int getOrigin() {
+    public int getOrigin() {
         return mOrigin;
     }
 
@@ -211,7 +211,7 @@ public class KeyInfo implements KeySpec {
      *
      * <p>See {@link KeyProperties}.{@code PURPOSE} flags.
      */
-    public @KeyProperties.PurposeEnum int getPurposes() {
+    public int getPurposes() {
         return mPurposes;
     }
 
@@ -223,7 +223,7 @@ public class KeyInfo implements KeySpec {
      * <p>See {@link KeyProperties}.{@code BLOCK_MODE} constants.
      */
     @NonNull
-    public @KeyProperties.BlockModeEnum String[] getBlockModes() {
+    public String[] getBlockModes() {
         return ArrayUtils.cloneIfNotEmpty(mBlockModes);
     }
 
@@ -235,7 +235,7 @@ public class KeyInfo implements KeySpec {
      * <p>See {@link KeyProperties}.{@code ENCRYPTION_PADDING} constants.
      */
     @NonNull
-    public @KeyProperties.EncryptionPaddingEnum String[] getEncryptionPaddings() {
+    public String[] getEncryptionPaddings() {
         return ArrayUtils.cloneIfNotEmpty(mEncryptionPaddings);
     }
 
@@ -247,7 +247,7 @@ public class KeyInfo implements KeySpec {
      * <p>See {@link KeyProperties}.{@code SIGNATURE_PADDING} constants.
      */
     @NonNull
-    public @KeyProperties.SignaturePaddingEnum String[] getSignaturePaddings() {
+    public String[] getSignaturePaddings() {
         return ArrayUtils.cloneIfNotEmpty(mSignaturePaddings);
     }
 
@@ -258,7 +258,7 @@ public class KeyInfo implements KeySpec {
      * <p>See {@link KeyProperties}.{@code DIGEST} constants.
      */
     @NonNull
-    public @KeyProperties.DigestEnum String[] getDigests() {
+    public String[] getDigests() {
         return ArrayUtils.cloneIfNotEmpty(mDigests);
     }
 
@@ -340,7 +340,7 @@ public class KeyInfo implements KeySpec {
      *
      * @see #isUserAuthenticationRequired()
      */
-    public @KeyProperties.AuthEnum int getUserAuthenticationType() {
+    public int getUserAuthenticationType() {
         return mUserAuthenticationType;
     }
 
@@ -390,7 +390,7 @@ public class KeyInfo implements KeySpec {
      *
      * <p>See {@link KeyProperties}.{@code SecurityLevelEnum} constants.
      */
-    public @KeyProperties.SecurityLevelEnum int getSecurityLevel() {
+    public int getSecurityLevel() {
         return mSecurityLevel;
     }
 

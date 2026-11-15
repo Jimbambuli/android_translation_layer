@@ -477,7 +477,7 @@ public final class OverlayInfo implements CriticalOverlayInfo, Parcelable {
     }
 
     public static final @NonNull Parcelable.Creator<OverlayInfo> CREATOR =
-            new Parcelable.Creator<>() {
+            new Parcelable.Creator<OverlayInfo>() {
                 @Override
                 public OverlayInfo createFromParcel(Parcel source) {
                     return new OverlayInfo(source);

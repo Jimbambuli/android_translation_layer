@@ -106,6 +106,7 @@ public class BulletSpan implements LeadingMarginSpan, ParcelableSpan {
     }
 
     private BulletSpan(int gapWidth, int color, boolean wantColor,
+            int bulletRadius) {
         mGapWidth = gapWidth;
         mBulletRadius = bulletRadius;
         mColor = color;

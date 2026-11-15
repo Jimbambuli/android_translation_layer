@@ -7,17 +7,14 @@ import java.util.Objects;
 
 /* AOSP core/java/android/hardware/display/DeviceProductInfo.java */
 public final class DeviceProductInfo implements Parcelable {
-	public static final int CONNECTION_TO_SINK_UNKNOWN =
-			IDeviceProductInfoConstants.CONNECTION_TO_SINK_UNKNOWN;
+	/* values of frameworks/native aidl android/hardware/display/IDeviceProductInfoConstants.aidl */
+	public static final int CONNECTION_TO_SINK_UNKNOWN = 0;
 
-	public static final int CONNECTION_TO_SINK_BUILT_IN =
-			IDeviceProductInfoConstants.CONNECTION_TO_SINK_BUILT_IN;
+	public static final int CONNECTION_TO_SINK_BUILT_IN = 1;
 
-	public static final int CONNECTION_TO_SINK_DIRECT =
-			IDeviceProductInfoConstants.CONNECTION_TO_SINK_DIRECT;
+	public static final int CONNECTION_TO_SINK_DIRECT = 2;
 
-	public static final int CONNECTION_TO_SINK_TRANSITIVE =
-			IDeviceProductInfoConstants.CONNECTION_TO_SINK_TRANSITIVE;
+	public static final int CONNECTION_TO_SINK_TRANSITIVE = 3;
 
 	private final String mName;
 	private final String mManufacturerPnpId;
@@ -55,12 +52,22 @@ public final class DeviceProductInfo implements Parcelable {
 		mConnectionToSinkType = connectionToSinkType;
 	}
 
+	/* AOSP calls Parcel.readValue(null) directly; ATL's readValue() declares ReflectiveOperationException, which
+	 * becomes a BadParcelableException as in Parcel.readMap() */
+	private static Object readValue(Parcel in) {
+		try {
+			return in.readValue(null);
+		} catch (ReflectiveOperationException e) {
+			throw new android.os.BadParcelableException(e);
+		}
+	}
+
 	private DeviceProductInfo(Parcel in) {
 		mName = in.readString();
 		mManufacturerPnpId = in.readString();
-		mProductId = (String) in.readValue(null);
-		mModelYear = (Integer) in.readValue(null);
-		mManufactureDate = (ManufactureDate) in.readValue(null);
+		mProductId = (String) readValue(in);
+		mModelYear = (Integer) readValue(in);
+		mManufactureDate = (ManufactureDate) readValue(in);
 		mConnectionToSinkType = in.readInt();
 	}
 
@@ -177,8 +184,8 @@ public final class DeviceProductInfo implements Parcelable {
 		}
 
 		protected ManufactureDate(Parcel in) {
-			mWeek = (Integer) in.readValue(null);
-			mYear = (Integer) in.readValue(null);
+			mWeek = (Integer) readValue(in);
+			mYear = (Integer) readValue(in);
 		}
 
 		@Override

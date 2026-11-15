@@ -322,7 +322,7 @@ public final class CallAttributes implements Parcelable {
      */
     public static final @android.annotation.NonNull
             Parcelable.Creator<CallAttributes> CREATOR =
-            new Parcelable.Creator<>() {
+            new Parcelable.Creator<CallAttributes>() {
                 @Override
                 public CallAttributes createFromParcel(Parcel source) {
                     return new CallAttributes(source.readParcelable(getClass().getClassLoader(),

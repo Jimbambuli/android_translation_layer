@@ -604,7 +604,6 @@ public class ApplicationInfo extends PackageItemInfo {
 	public String[] splitNames;
 	public String seInfo;
 	public String seInfoUser;
-	public String deviceProtectedDataDir;
 	public int compileSdkVersion;
 	public String compileSdkVersionCodename;
 	public String zygotePreloadName;

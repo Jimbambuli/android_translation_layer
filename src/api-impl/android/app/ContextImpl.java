@@ -659,6 +659,13 @@ public final class ContextImpl extends Context {
 		                       this.atl_flags | ATL_FLAG_PROTECTED_STORAGE);
 	}
 
+	/* AOSP ContextImpl.createCredentialProtectedStorageContext(): the device-protected flag is cleared */
+	@Override
+	public Context createCredentialProtectedStorageContext() {
+		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(),
+		                       this.atl_flags & ~ATL_FLAG_PROTECTED_STORAGE);
+	}
+
 	@Override
 	public int getThemeResId() {
 		return mThemeResource;

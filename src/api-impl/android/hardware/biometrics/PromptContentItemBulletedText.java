@@ -24,7 +24,7 @@ public final class PromptContentItemBulletedText implements PromptContentItemPar
 		dest.writeString(mText);
 	}
 
-	public static final Creator<PromptContentItemBulletedText> CREATOR = new Creator<>() {
+	public static final Creator<PromptContentItemBulletedText> CREATOR = new Creator<PromptContentItemBulletedText>() {
 		@Override
 		public PromptContentItemBulletedText createFromParcel(Parcel in) {
 			return new PromptContentItemBulletedText(in.readString());

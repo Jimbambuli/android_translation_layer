@@ -26,7 +26,7 @@ import java.util.Set;
  * This class is used to store a set of values that the {@link ContentResolver}
  * can process.
  */
-public final class ContentValues {
+public final class ContentValues implements android.os.Parcelable {
 	public static final String TAG = "ContentValues";
 
 	/**
@@ -70,6 +70,36 @@ public final class ContentValues {
 	 */
 	private ContentValues(HashMap<String, Object> values) {
 		mValues = values;
+	}
+
+	/* AOSP ContentValues is Parcelable: the map is written as a whole (AOSP writeInt(size) + writeArrayMap(),
+	 * here Parcel.writeMap() whose layout readMap() reads back) */
+	private ContentValues(android.os.Parcel in) {
+		mValues = new HashMap<String, Object>();
+		in.readMap(mValues, null);
+	}
+
+	public static final android.os.Parcelable.Creator<ContentValues> CREATOR =
+	    new android.os.Parcelable.Creator<ContentValues>() {
+		    @Override
+		    public ContentValues createFromParcel(android.os.Parcel in) {
+			    return new ContentValues(in);
+		    }
+
+		    @Override
+		    public ContentValues[] newArray(int size) {
+			    return new ContentValues[size];
+		    }
+	    };
+
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel parcel, int flags) {
+		parcel.writeMap(mValues);
 	}
 
 	@Override

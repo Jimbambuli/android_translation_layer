@@ -163,6 +163,7 @@ public class WifiManager {
 
 	@Deprecated
 	public boolean reconnect() {
+		return false;
 	}
 
 	/* AOSP WifiServiceImpl.addOrUpdateNetwork(): -1 for apps targeting Android 10 or later without privileges

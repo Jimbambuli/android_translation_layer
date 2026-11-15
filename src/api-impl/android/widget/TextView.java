@@ -3030,6 +3030,43 @@ public class TextView extends View {
 		mTextClassifier = textClassifier;
 	}
 
+	/* AOSP TextView.requestActionMode(TextLinkSpan) (@hide): starts the selection action mode around the link.
+	 * ATL's TextView has no selection action mode, so none is started (AOSP's answer when it cannot start one) */
+	public boolean requestActionMode(android.view.textclassifier.TextLinks.TextLinkSpan clickedSpan) {
+		java.util.Objects.requireNonNull(clickedSpan);
+		return false;
+	}
+
+	/* AOSP TextView.handleClick(TextLinkSpan) (@hide): classifies the link text off the UI thread and sends the
+	 * first action's intent. AOSP gives up after 1 s (completeOnTimeout); that timeout is not carried over */
+	public boolean handleClick(android.view.textclassifier.TextLinks.TextLinkSpan clickedSpan) {
+		java.util.Objects.requireNonNull(clickedSpan);
+		final CharSequence text = getText();
+		if (text instanceof android.text.Spanned) {
+			final android.text.Spanned spanned = (android.text.Spanned) text;
+			final int start = spanned.getSpanStart(clickedSpan);
+			final int end = spanned.getSpanEnd(clickedSpan);
+			if (start >= 0 && end <= text.length() && start < end) {
+				final android.view.textclassifier.TextClassification.Request request =
+				    new android.view.textclassifier.TextClassification.Request.Builder(text, start, end)
+				        .setDefaultLocales(getTextLocales())
+				        .build();
+				final TextClassifier classifier = getTextClassifier();
+				new Thread(() -> {
+					android.view.textclassifier.TextClassification classification = classifier.classifyText(request);
+					if (classification != null && !classification.getActions().isEmpty()) {
+						// AOSP catches PendingIntent.CanceledException here; ATL's send() does not throw it
+						classification.getActions().get(0).getActionIntent().send();
+					} else {
+						Log.d("TextView", "No link action to perform");
+					}
+				}).start();
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/* AOSP TextView.getTextClassifier(): the one set, else the one of the TextClassificationManager */
 	public TextClassifier getTextClassifier() {
 		if (mTextClassifier == null) {

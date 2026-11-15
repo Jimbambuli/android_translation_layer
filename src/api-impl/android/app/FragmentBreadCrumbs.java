@@ -204,8 +204,8 @@ public class FragmentBreadCrumbs extends ViewGroup
 
         final View child = getChildAt(0);
 
-        final int childTop = mPaddingTop;
-        final int childBottom = mPaddingTop + child.getMeasuredHeight() - mPaddingBottom;
+        final int childTop = getPaddingTop();
+        final int childBottom = getPaddingTop() + child.getMeasuredHeight() - getPaddingBottom();
 
         int childLeft;
         int childRight;
@@ -214,28 +214,28 @@ public class FragmentBreadCrumbs extends ViewGroup
         final int horizontalGravity = mGravity & Gravity.RELATIVE_HORIZONTAL_GRAVITY_MASK;
         switch (Gravity.getAbsoluteGravity(horizontalGravity, layoutDirection)) {
             case Gravity.RIGHT:
-                childRight = mRight - mLeft - mPaddingRight;
+                childRight = getRight() - getLeft() - getPaddingRight();
                 childLeft = childRight - child.getMeasuredWidth();
                 break;
 
             case Gravity.CENTER_HORIZONTAL:
-                childLeft = mPaddingLeft + (mRight - mLeft - child.getMeasuredWidth()) / 2;
+                childLeft = getPaddingLeft() + (getRight() - getLeft() - child.getMeasuredWidth()) / 2;
                 childRight = childLeft + child.getMeasuredWidth();
                 break;
 
             case Gravity.LEFT:
             default:
-                childLeft = mPaddingLeft;
+                childLeft = getPaddingLeft();
                 childRight = childLeft + child.getMeasuredWidth();
                 break;
         }
 
-        if (childLeft < mPaddingLeft) {
-            childLeft = mPaddingLeft;
+        if (childLeft < getPaddingLeft()) {
+            childLeft = getPaddingLeft();
         }
 
-        if (childRight > mRight - mLeft - mPaddingRight) {
-            childRight = mRight - mLeft - mPaddingRight;
+        if (childRight > getRight() - getLeft() - getPaddingRight()) {
+            childRight = getRight() - getLeft() - getPaddingRight();
         }
 
         child.layout(childLeft, childTop, childRight, childBottom);
@@ -262,8 +262,8 @@ public class FragmentBreadCrumbs extends ViewGroup
         }
 
         // Account for padding too
-        maxWidth += mPaddingLeft + mPaddingRight;
-        maxHeight += mPaddingTop + mPaddingBottom;
+        maxWidth += getPaddingLeft() + getPaddingRight();
+        maxHeight += getPaddingTop() + getPaddingBottom();
 
         // Check against our minimum height and width
         maxHeight = Math.max(maxHeight, getSuggestedMinimumHeight());

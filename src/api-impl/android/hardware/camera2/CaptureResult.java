@@ -103,7 +103,7 @@ public class CaptureResult {
 	public static final Key<Boolean> CONTROL_AE_LOCK = new Key<Boolean>("android.control.aeLock", (Class<Boolean>) (Class<?>) boolean.class);
 	public static final Key<Integer> CONTROL_AE_MODE = new Key<Integer>("android.control.aeMode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<android.hardware.camera2.params.MeteringRectangle[]> CONTROL_AE_REGIONS = new Key<android.hardware.camera2.params.MeteringRectangle[]>("android.control.aeRegions", android.hardware.camera2.params.MeteringRectangle[].class);
-	public static final Key<android.util.Range<Integer>> CONTROL_AE_TARGET_FPS_RANGE = new Key<android.util.Range<Integer>>("android.control.aeTargetFpsRange", new android.hardware.camera2.utils.TypeReference<android.util.Range<Integer>>() {{ }});
+	public static final Key<android.util.Range<Integer>> CONTROL_AE_TARGET_FPS_RANGE = new Key<android.util.Range<Integer>>("android.control.aeTargetFpsRange", (Class<android.util.Range<Integer>>) (Class<?>) android.util.Range.class);
 	public static final Key<Integer> CONTROL_AE_PRECAPTURE_TRIGGER = new Key<Integer>("android.control.aePrecaptureTrigger", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> CONTROL_AE_STATE = new Key<Integer>("android.control.aeState", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> CONTROL_AF_MODE = new Key<Integer>("android.control.afMode", (Class<Integer>) (Class<?>) int.class);
@@ -142,7 +142,7 @@ public class CaptureResult {
 	public static final Key<Float> LENS_FILTER_DENSITY = new Key<Float>("android.lens.filterDensity", (Class<Float>) (Class<?>) float.class);
 	public static final Key<Float> LENS_FOCAL_LENGTH = new Key<Float>("android.lens.focalLength", (Class<Float>) (Class<?>) float.class);
 	public static final Key<Float> LENS_FOCUS_DISTANCE = new Key<Float>("android.lens.focusDistance", (Class<Float>) (Class<?>) float.class);
-	public static final Key<android.util.Pair<Float,Float>> LENS_FOCUS_RANGE = new Key<android.util.Pair<Float,Float>>("android.lens.focusRange", new android.hardware.camera2.utils.TypeReference<android.util.Pair<Float,Float>>() {{ }});
+	public static final Key<android.util.Pair<Float,Float>> LENS_FOCUS_RANGE = new Key<android.util.Pair<Float,Float>>("android.lens.focusRange", (Class<android.util.Pair<Float,Float>>) (Class<?>) android.util.Pair.class);
 	public static final Key<Integer> LENS_OPTICAL_STABILIZATION_MODE = new Key<Integer>("android.lens.opticalStabilizationMode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> LENS_STATE = new Key<Integer>("android.lens.state", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<float[]> LENS_POSE_ROTATION = new Key<float[]>("android.lens.poseRotation", float[].class);
@@ -160,7 +160,7 @@ public class CaptureResult {
 	public static final Key<Integer> SENSOR_SENSITIVITY = new Key<Integer>("android.sensor.sensitivity", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Long> SENSOR_TIMESTAMP = new Key<Long>("android.sensor.timestamp", (Class<Long>) (Class<?>) long.class);
 	public static final Key<android.util.Rational[]> SENSOR_NEUTRAL_COLOR_POINT = new Key<android.util.Rational[]>("android.sensor.neutralColorPoint", android.util.Rational[].class);
-	public static final Key<android.util.Pair<Double,Double>[]> SENSOR_NOISE_PROFILE = new Key<android.util.Pair<Double,Double>[]>("android.sensor.noiseProfile", new android.hardware.camera2.utils.TypeReference<android.util.Pair<Double,Double>[]>() {{ }});
+	public static final Key<android.util.Pair<Double,Double>[]> SENSOR_NOISE_PROFILE = new Key<android.util.Pair<Double,Double>[]>("android.sensor.noiseProfile", (Class<android.util.Pair<Double,Double>[]>) (Class<?>) android.util.Pair[].class);
 	public static final Key<Float> SENSOR_GREEN_SPLIT = new Key<Float>("android.sensor.greenSplit", (Class<Float>) (Class<?>) float.class);
 	public static final Key<int[]> SENSOR_TEST_PATTERN_DATA = new Key<int[]>("android.sensor.testPatternData", int[].class);
 	public static final Key<Integer> SENSOR_TEST_PATTERN_MODE = new Key<Integer>("android.sensor.testPatternMode", (Class<Integer>) (Class<?>) int.class);

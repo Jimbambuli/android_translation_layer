@@ -13,6 +13,19 @@ public final class BluetoothGattServer implements BluetoothProfile {
 
 	BluetoothGattServer() {}
 
+	/* AOSP BluetoothGattServer: the BluetoothProfile proxy hooks are empty, getAdapter() is the adapter that opened
+	 * the server (as BluetoothGatt here: the default adapter) */
+	@Override
+	public void onServiceConnected(android.os.IBinder service) {}
+
+	@Override
+	public void onServiceDisconnected() {}
+
+	@Override
+	public BluetoothAdapter getAdapter() {
+		return BluetoothAdapter.getDefaultAdapter();
+	}
+
 	public void close() {
 		Log.d(TAG, "close()");
 	}

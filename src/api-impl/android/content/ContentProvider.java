@@ -173,7 +173,10 @@ public abstract class ContentProvider {
 
 	public abstract String getType(Uri uri);
 
-	public abstract ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException;
+	/* AOSP ContentProvider.openFile(Uri, String): not abstract, a provider without files throws */
+	public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
+		throw new FileNotFoundException("No files supported by provider at " + uri);
+	}
 
 	public AssetFileDescriptor openAssetFile(Uri uri, String mode) throws FileNotFoundException {
 		ParcelFileDescriptor fd = openFile(uri, mode);

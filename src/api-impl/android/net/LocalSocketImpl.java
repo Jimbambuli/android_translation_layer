@@ -64,7 +64,10 @@ class LocalSocketImpl
             FileDescriptor myFd = fd;
             if (myFd == null) throw new IOException("socket closed");
             try {
-                return Os.ioctlInt(myFd, OsConstants.FIONREAD);
+                // ATL's libcore has the older ioctlInt(fd, cmd, MutableInt) form of Os.ioctlInt()
+                android.util.MutableInt avail = new android.util.MutableInt(0);
+                Os.ioctlInt(myFd, OsConstants.FIONREAD, avail);
+                return avail.value;
             } catch (ErrnoException e) {
                 throw e.rethrowAsIOException();
             }

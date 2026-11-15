@@ -631,7 +631,7 @@ public final class RouteInfo implements Parcelable {
     public static final @android.annotation.NonNull Creator<RouteInfo> CREATOR =
         new Creator<RouteInfo>() {
         public RouteInfo createFromParcel(Parcel in) {
-            IpPrefix dest = in.readParcelable(null);
+            IpPrefix dest = (IpPrefix) in.readParcelable(null);
 
             InetAddress gateway = null;
             byte[] addr = in.createByteArray();

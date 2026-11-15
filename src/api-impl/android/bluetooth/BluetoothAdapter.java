@@ -26,6 +26,13 @@ public class BluetoothAdapter {
 		return STATE_OFF;
 	}
 
+	/* AOSP BluetoothAdapter.isLeEnabled(): ON, BLE_ON or turning on/off; ATL's adapter has no LE-only state, its
+	 * getLeState() would be getState() */
+	public boolean isLeEnabled() {
+		final int state = getState();
+		return state == STATE_ON || state == STATE_TURNING_ON || state == STATE_TURNING_OFF;
+	}
+
 	public boolean isEnabled() {
 		return getState() == STATE_ON;
 	}

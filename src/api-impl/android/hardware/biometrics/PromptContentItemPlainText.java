@@ -24,7 +24,7 @@ public final class PromptContentItemPlainText implements PromptContentItemParcel
 		dest.writeString(mText);
 	}
 
-	public static final Creator<PromptContentItemPlainText> CREATOR = new Creator<>() {
+	public static final Creator<PromptContentItemPlainText> CREATOR = new Creator<PromptContentItemPlainText>() {
 		@Override
 		public PromptContentItemPlainText createFromParcel(Parcel in) {
 			return new PromptContentItemPlainText(in.readString());

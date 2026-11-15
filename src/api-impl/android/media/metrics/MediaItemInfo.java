@@ -394,7 +394,7 @@ public final class MediaItemInfo implements Parcelable {
 	}
 
 	public static final Creator<MediaItemInfo> CREATOR =
-			new Creator<>() {
+			new Creator<MediaItemInfo>() {
 				@Override
 				public MediaItemInfo[] newArray(int size) {
 					return new MediaItemInfo[size];

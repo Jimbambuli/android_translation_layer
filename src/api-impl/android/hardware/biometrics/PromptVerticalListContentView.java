@@ -61,7 +61,7 @@ public final class PromptVerticalListContentView implements PromptContentViewPar
 		dest.writeString(mDescription);
 	}
 
-	public static final Creator<PromptVerticalListContentView> CREATOR = new Creator<>() {
+	public static final Creator<PromptVerticalListContentView> CREATOR = new Creator<PromptVerticalListContentView>() {
 		@Override
 		public PromptVerticalListContentView createFromParcel(Parcel in) {
 			return new PromptVerticalListContentView(in);

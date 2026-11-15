@@ -177,6 +177,11 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return this;
 		}
 
+		/* AOSP Builder.setIcon(Drawable): like setIcon(int), ATL's dialog shows no icon */
+		public AlertDialog.Builder setIcon(android.graphics.drawable.Drawable icon) {
+			return this;
+		}
+
 		/* AOSP Builder.setIconAttribute(): resolves the theme attribute to a drawable resource and uses it as the
 		 * icon, like setIcon(int); ATL's dialog shows no icon, so this too only returns the builder */
 		public AlertDialog.Builder setIconAttribute(int attrId) {

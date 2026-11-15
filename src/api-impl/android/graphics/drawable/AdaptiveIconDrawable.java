@@ -484,11 +484,11 @@ public class AdaptiveIconDrawable extends Drawable implements Drawable.Callback 
 	 *
 	 * @hide
 	 */
-	/*@DrawableRes
+	/*@DrawableRes*/
 	public int getSourceDrawableResId() {
 		final LayerState state = mLayerState;
 		return state == null ? 0 : state.mSourceDrawableId;
-	}*/
+	}
 
 	/**
 	 * Inflates child layers using the specified parser.

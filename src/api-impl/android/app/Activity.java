@@ -1384,6 +1384,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return true; // FIXME?
 	}
 
+	/* AOSP Activity.isResumed() (@hide, final there): mResumed, here as in dump(). Not final here, so an app
+	 * class that declares its own isResumed() still links */
+	public boolean isResumed() {
+		return !paused && started;
+	}
+
 	public boolean isDestroyed() {
 		return destroyed;
 	}

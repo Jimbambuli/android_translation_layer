@@ -249,7 +249,7 @@ public final class EditingEndedEvent extends Event implements Parcelable {
 	}
 
 	public static final Creator<EditingEndedEvent> CREATOR =
-			new Creator<>() {
+			new Creator<EditingEndedEvent>() {
 				@Override
 				public EditingEndedEvent[] newArray(int size) {
 					return new EditingEndedEvent[size];

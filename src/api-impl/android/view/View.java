@@ -746,7 +746,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public interface OnSystemUiVisibilityChangeListener {
-		// TODO
+		/* AOSP View.OnSystemUiVisibilityChangeListener */
+		public void onSystemUiVisibilityChange(int visibility);
 	}
 
 	public static interface OnKeyListener {

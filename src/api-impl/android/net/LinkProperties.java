@@ -26,6 +26,19 @@ public class LinkProperties {
 	public LinkProperties() {
 	}
 
+	/* AOSP LinkProperties(LinkProperties): a copy of the fields ATL keeps */
+	public LinkProperties(LinkProperties source) {
+		if (source != null) {
+			mIfaceName = source.mIfaceName;
+			mLinkAddresses.addAll(source.mLinkAddresses);
+			mRoutes.addAll(source.mRoutes);
+			mDnses.addAll(source.mDnses);
+			mDomains = source.mDomains;
+			mMtu = source.mMtu;
+			mHttpProxy = source.mHttpProxy;
+		}
+	}
+
 	/** ATL: the link of the computer's network (ConnectivityManager.getLinkProperties()) */
 	static LinkProperties forHost() {
 		LinkProperties lp = new LinkProperties();

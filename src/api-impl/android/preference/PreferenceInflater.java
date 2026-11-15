@@ -77,14 +77,9 @@ class PreferenceInflater extends GenericInflater<Preference, PreferenceGroup> {
         if (tag.equals(INTENT_TAG_NAME)) {
             Intent intent = null;
             
-            try {
-                intent = Intent.parseIntent(getContext().getResources(), parser, attrs);
-            } catch (IOException e) {
-                XmlPullParserException ex = new XmlPullParserException(
-                        "Error parsing preference");
-                ex.initCause(e);
-                throw ex;
-            }
+            // AOSP wraps an IOException of parseIntent() into an XmlPullParserException; ATL's parseIntent()
+            // throws no checked exception
+            intent = Intent.parseIntent(getContext().getResources(), parser, attrs);
             
             if (intent != null) {
                 parentPreference.setIntent(intent);

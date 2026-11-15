@@ -82,16 +82,9 @@ public class TelephonyManager {
 	public static final String EXTRA_STATE_RINGING = "RINGING";
 	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
 
-	public static final int DATA_ACTIVITY_NONE = 0;
-
 	public static TelephonyManager getDefault() {
 		return new TelephonyManager();
 	}
-
-	/* PhoneConstants.State.X.toString() */
-	public static final String EXTRA_STATE_IDLE = "IDLE";
-	public static final String EXTRA_STATE_RINGING = "RINGING";
-	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
 
 	/* AOSP TelephonyManager with getITelephony() == null (a device without telephony service) */
 	private int mSubId = SubscriptionManager.DEFAULT_SUBSCRIPTION_ID;
@@ -263,11 +256,6 @@ public class TelephonyManager {
 	/* AOSP TelephonyManager.getDeviceId(): null when there is no ITelephony service */
 	public String getDeviceId() {
 		return null;
-	}
-
-	/* AOSP getDataActivity(): without ITelephony DATA_ACTIVITY_NONE */
-	public int getDataActivity() {
-		return DATA_ACTIVITY_NONE;
 	}
 
 	/* AOSP getServiceStateForSlot(): null when getITelephony() is null */

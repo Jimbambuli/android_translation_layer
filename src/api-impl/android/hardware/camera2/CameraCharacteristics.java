@@ -162,7 +162,7 @@ public final class CameraCharacteristics {
 	public static final Key<Boolean> CONTROL_AE_LOCK_AVAILABLE = new Key<Boolean>("android.control.aeLockAvailable", (Class<Boolean>) (Class<?>) boolean.class);
 	public static final Key<Boolean> CONTROL_AWB_LOCK_AVAILABLE = new Key<Boolean>("android.control.awbLockAvailable", (Class<Boolean>) (Class<?>) boolean.class);
 	public static final Key<int[]> CONTROL_AVAILABLE_MODES = new Key<int[]>("android.control.availableModes", int[].class);
-	public static final Key<android.util.Range<Integer>> CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE = new Key<android.util.Range<Integer>>("android.control.postRawSensitivityBoostRange", new android.hardware.camera2.utils.TypeReference<android.util.Range<Integer>>() {{ }});
+	public static final Key<android.util.Range<Integer>> CONTROL_POST_RAW_SENSITIVITY_BOOST_RANGE = new Key<android.util.Range<Integer>>("android.control.postRawSensitivityBoostRange", (Class<android.util.Range<Integer>>) (Class<?>) android.util.Range.class);
 	/* value type Capability does not exist in ATL yet */
 	public static final Key<Object> CONTROL_AVAILABLE_EXTENDED_SCENE_MODE_CAPABILITIES = new Key<Object>("android.control.availableExtendedSceneModeCapabilities", Object.class);
 	public static final Key<Boolean> CONTROL_AUTOFRAMING_AVAILABLE = new Key<Boolean>("android.control.autoframingAvailable", (Class<Boolean>) (Class<?>) boolean.class);
@@ -209,9 +209,9 @@ public final class CameraCharacteristics {
 	public static final Key<Object> SCALER_MANDATORY_PREVIEW_STABILIZATION_OUTPUT_STREAM_COMBINATIONS = new Key<Object>("android.scaler.mandatoryPreviewStabilizationOutputStreamCombinations", Object.class);
 	/* value type MandatoryStreamCombination does not exist in ATL yet */
 	public static final Key<Object> SCALER_MANDATORY_USE_CASE_STREAM_COMBINATIONS = new Key<Object>("android.scaler.mandatoryUseCaseStreamCombinations", Object.class);
-	public static final Key<android.util.Range<Integer>> SENSOR_INFO_SENSITIVITY_RANGE = new Key<android.util.Range<Integer>>("android.sensor.info.sensitivityRange", new android.hardware.camera2.utils.TypeReference<android.util.Range<Integer>>() {{ }});
+	public static final Key<android.util.Range<Integer>> SENSOR_INFO_SENSITIVITY_RANGE = new Key<android.util.Range<Integer>>("android.sensor.info.sensitivityRange", (Class<android.util.Range<Integer>>) (Class<?>) android.util.Range.class);
 	public static final Key<Integer> SENSOR_INFO_COLOR_FILTER_ARRANGEMENT = new Key<Integer>("android.sensor.info.colorFilterArrangement", (Class<Integer>) (Class<?>) int.class);
-	public static final Key<android.util.Range<Long>> SENSOR_INFO_EXPOSURE_TIME_RANGE = new Key<android.util.Range<Long>>("android.sensor.info.exposureTimeRange", new android.hardware.camera2.utils.TypeReference<android.util.Range<Long>>() {{ }});
+	public static final Key<android.util.Range<Long>> SENSOR_INFO_EXPOSURE_TIME_RANGE = new Key<android.util.Range<Long>>("android.sensor.info.exposureTimeRange", (Class<android.util.Range<Long>>) (Class<?>) android.util.Range.class);
 	public static final Key<Long> SENSOR_INFO_MAX_FRAME_DURATION = new Key<Long>("android.sensor.info.maxFrameDuration", (Class<Long>) (Class<?>) long.class);
 	public static final Key<Integer> SENSOR_INFO_WHITE_LEVEL = new Key<Integer>("android.sensor.info.whiteLevel", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Boolean> SENSOR_INFO_LENS_SHADING_APPLIED = new Key<Boolean>("android.sensor.info.lensShadingApplied", (Class<Boolean>) (Class<?>) boolean.class);

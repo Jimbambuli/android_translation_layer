@@ -1167,6 +1167,9 @@ public abstract class Context {
 
 	public abstract Context createDeviceProtectedStorageContext();
 
+	/* AOSP Context.createCredentialProtectedStorageContext() (@SystemApi) */
+	public abstract Context createCredentialProtectedStorageContext();
+
 	public AttributionSource getAttributionSource() {
 		return null;
 	}

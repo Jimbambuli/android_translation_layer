@@ -625,7 +625,9 @@ public final class TextLinks implements Parcelable {
             if (widget instanceof TextView) {
                 final TextView textView = (TextView) widget;
                 final Context context = textView.getContext();
-                if (TextClassificationManager.getSettings(context).isSmartLinkifyEnabled()) {
+                // AOSP: TextClassificationManager.getSettings(context).isSmartLinkifyEnabled(); ATL has no DeviceConfig,
+                // so it is TextClassificationConstants.SMART_LINKIFY_ENABLED_DEFAULT (true)
+                if (true) {
                     switch (invocationMethod) {
                         case INVOCATION_METHOD_TOUCH:
                             textView.requestActionMode(this);

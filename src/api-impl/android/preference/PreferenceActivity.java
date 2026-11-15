@@ -568,7 +568,12 @@ public abstract class PreferenceActivity extends ListActivity implements
 
         sa.recycle();
 
-        setContentView(layoutResId);
+        try {
+            setContentView(layoutResId);
+        } catch (Exception e) {
+            // ATL's Activity.setContentView(int) declares Exception; in AOSP the inflate errors are unchecked
+            throw new RuntimeException(e);
+        }
 
         mListFooter = (FrameLayout)findViewById(com.android.internal.R.id.list_footer);
         mPrefsContainer = (ViewGroup) findViewById(com.android.internal.R.id.prefs_frame);

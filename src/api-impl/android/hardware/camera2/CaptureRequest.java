@@ -157,7 +157,7 @@ public final class CaptureRequest {
 	public static final Key<Boolean> CONTROL_AE_LOCK = new Key<Boolean>("android.control.aeLock", (Class<Boolean>) (Class<?>) boolean.class);
 	public static final Key<Integer> CONTROL_AE_MODE = new Key<Integer>("android.control.aeMode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<android.hardware.camera2.params.MeteringRectangle[]> CONTROL_AE_REGIONS = new Key<android.hardware.camera2.params.MeteringRectangle[]>("android.control.aeRegions", android.hardware.camera2.params.MeteringRectangle[].class);
-	public static final Key<android.util.Range<Integer>> CONTROL_AE_TARGET_FPS_RANGE = new Key<android.util.Range<Integer>>("android.control.aeTargetFpsRange", new android.hardware.camera2.utils.TypeReference<android.util.Range<Integer>>() {{ }});
+	public static final Key<android.util.Range<Integer>> CONTROL_AE_TARGET_FPS_RANGE = new Key<android.util.Range<Integer>>("android.control.aeTargetFpsRange", (Class<android.util.Range<Integer>>) (Class<?>) android.util.Range.class);
 	public static final Key<Integer> CONTROL_AE_PRECAPTURE_TRIGGER = new Key<Integer>("android.control.aePrecaptureTrigger", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> CONTROL_AF_MODE = new Key<Integer>("android.control.afMode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<android.hardware.camera2.params.MeteringRectangle[]> CONTROL_AF_REGIONS = new Key<android.hardware.camera2.params.MeteringRectangle[]>("android.control.afRegions", android.hardware.camera2.params.MeteringRectangle[].class);

@@ -15,6 +15,17 @@ public class RingtoneManager {
 	public static final int TYPE_ALARM = 4;
 	public static final int TYPE_ALL = TYPE_RINGTONE | TYPE_NOTIFICATION | TYPE_ALARM;
 
+	/* AOSP RingtoneManager: the ringtone picker action and its extras */
+	public static final String ACTION_RINGTONE_PICKER = "android.intent.action.RINGTONE_PICKER";
+	public static final String EXTRA_RINGTONE_SHOW_DEFAULT = "android.intent.extra.ringtone.SHOW_DEFAULT";
+	public static final String EXTRA_RINGTONE_SHOW_SILENT = "android.intent.extra.ringtone.SHOW_SILENT";
+	public static final String EXTRA_RINGTONE_EXISTING_URI = "android.intent.extra.ringtone.EXISTING_URI";
+	public static final String EXTRA_RINGTONE_DEFAULT_URI = "android.intent.extra.ringtone.DEFAULT_URI";
+	public static final String EXTRA_RINGTONE_TYPE = "android.intent.extra.ringtone.TYPE";
+	public static final String EXTRA_RINGTONE_TITLE = "android.intent.extra.ringtone.TITLE";
+	public static final String EXTRA_RINGTONE_AUDIO_ATTRIBUTES_FLAGS = "android.intent.extra.ringtone.AUDIO_ATTRIBUTES_FLAGS";
+	public static final String EXTRA_RINGTONE_PICKED_URI = "android.intent.extra.ringtone.PICKED_URI";
+
 	public static final int ID_COLUMN_INDEX = 0;
 	public static final int TITLE_COLUMN_INDEX = 1;
 	public static final int URI_COLUMN_INDEX = 2;

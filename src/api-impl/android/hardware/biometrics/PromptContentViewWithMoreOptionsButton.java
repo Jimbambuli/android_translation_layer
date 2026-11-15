@@ -53,7 +53,7 @@ public final class PromptContentViewWithMoreOptionsButton implements PromptConte
 		dest.writeString(mDescription);
 	}
 
-	public static final Creator<PromptContentViewWithMoreOptionsButton> CREATOR = new Creator<>() {
+	public static final Creator<PromptContentViewWithMoreOptionsButton> CREATOR = new Creator<PromptContentViewWithMoreOptionsButton>() {
 		@Override
 		public PromptContentViewWithMoreOptionsButton createFromParcel(Parcel in) {
 			return new PromptContentViewWithMoreOptionsButton(in);

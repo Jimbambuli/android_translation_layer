@@ -886,6 +886,18 @@ public class Parcel {
 		return list;
 	}
 
+	/* AOSP Parcel.writeTypedList(List, int): as writeTypedList(List) (same layout, read by readTypedList()) with the
+	 * given parcelable flags */
+	public <T extends Parcelable> void writeTypedList(List<T> list, int parcelableFlags) {
+		int len = list == null ? -1 : list.size();
+		writeInt(len);
+		for (int i = 0; i < len; i++) {
+			writeBoolean(list.get(i) != null);
+			if (list.get(i) != null)
+				list.get(i).writeToParcel(this, parcelableFlags);
+		}
+	}
+
 	public <T extends Parcelable> void writeTypedList(List<T> list) {
 		int len = list == null ? -1 : list.size();
 		writeInt(len);

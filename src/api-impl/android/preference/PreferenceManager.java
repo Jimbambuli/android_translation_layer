@@ -26,7 +26,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.pm.ResolveInfo;
 import android.content.res.XmlResourceParser;
 import android.os.Build;
@@ -291,15 +290,21 @@ public class PreferenceManager {
                 final Context context;
                 try {
                     context = mContext.createPackageContext(activityInfo.packageName, 0);
-                } catch (NameNotFoundException e) {
+                } catch (Exception e) { // AOSP: NameNotFoundException, which ATL's createPackageContext() does not declare
                     Log.w(TAG, "Could not create context for " + activityInfo.packageName + ": "
                             + Log.getStackTraceString(e));
                     continue;
                 }
 
                 final PreferenceInflater inflater = new PreferenceInflater(context, this);
-                final XmlResourceParser parser = activityInfo.loadXmlMetaData(context
-                        .getPackageManager(), METADATA_KEY_PREFERENCES);
+                XmlResourceParser parser;
+                try {
+                    parser = activityInfo.loadXmlMetaData(context
+                            .getPackageManager(), METADATA_KEY_PREFERENCES);
+                } catch (Exception e) {
+                    // AOSP's loadXmlMetaData() returns null when the resource cannot be loaded; ATL's declares Exception
+                    parser = null;
+                }
                 rootPreferences = (PreferenceScreen) inflater
                         .inflate(parser, rootPreferences, true);
                 parser.close();

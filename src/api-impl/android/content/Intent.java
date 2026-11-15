@@ -29,6 +29,10 @@ public class Intent implements Parcelable {
 	public static final int FLAG_ACTIVITY_CLEAR_TOP = 1 << 26;
 	public static final int FLAG_ACTIVITY_NEW_TASK = 1 << 28;
 	public static final int FLAG_ACTIVITY_SINGLE_TOP = 0x20000000;
+	/* AOSP Intent: FLAG_ACTIVITY_MULTIPLE_TASK, FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET and its alias FLAG_ACTIVITY_NEW_DOCUMENT */
+	public static final int FLAG_ACTIVITY_MULTIPLE_TASK = 0x08000000;
+	public static final int FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET = 0x00080000;
+	public static final int FLAG_ACTIVITY_NEW_DOCUMENT = FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET;
 	public static final int FLAG_RECEIVER_REGISTERED_ONLY = 0x40000000;
 	public static final int FLAG_RECEIVER_REPLACE_PENDING = 0x20000000;
 	public static final int FLAG_RECEIVER_FOREGROUND = 0x10000000;

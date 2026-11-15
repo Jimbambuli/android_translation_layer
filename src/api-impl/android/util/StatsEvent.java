@@ -60,7 +60,6 @@ import java.util.concurrent.atomic.AtomicReference;
  * @hide
  **/
 @SystemApi
-@android.ravenwood.annotation.RavenwoodKeepWholeClass
 public final class StatsEvent {
     // Type Ids.
     /**

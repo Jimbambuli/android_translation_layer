@@ -50,6 +50,13 @@ public final class AudioDeviceInfo {
 	public static final int TYPE_TV_TUNER = 17;
 	public static final int TYPE_TELEPHONY = 18;
 	public static final int TYPE_AUX_LINE = 19;
+
+	/* AOSP AudioDeviceInfo.convertInternalDeviceToDeviceType(): INT_TO_EXT_DEVICE_MAPPING.get(intDevice, TYPE_UNKNOWN).
+	 * Only the entry of the one internal device ATL hands out (AudioManager.getMicrophones():
+	 * AUDIO_DEVICE_IN_BUILTIN_MIC) is carried over */
+	public static int convertInternalDeviceToDeviceType(int intDevice) {
+		return intDevice == 0x80000004 /* AudioSystem.DEVICE_IN_BUILTIN_MIC */ ? TYPE_BUILTIN_MIC : TYPE_UNKNOWN;
+	}
 	public static final int TYPE_IP = 20;
 	public static final int TYPE_BUS = 21;
 	public static final int TYPE_USB_HEADSET = 22;
