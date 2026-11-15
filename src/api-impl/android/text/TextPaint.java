@@ -79,4 +79,14 @@ public class TextPaint extends Paint {
 		underlineColor = color;
 		underlineThickness = thickness;
 	}
+
+	/* AOSP TextPaint.getUnderlineThickness() (@hide override): the custom thickness only when a color is set */
+	@Override
+	public float getUnderlineThickness() {
+		if (underlineColor != 0) {
+			return underlineThickness;
+		} else {
+			return super.getUnderlineThickness();
+		}
+	}
 }
