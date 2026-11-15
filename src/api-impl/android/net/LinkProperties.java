@@ -17,6 +17,7 @@ import java.util.List;
 public class LinkProperties {
 	private String mIfaceName;
 	private final ArrayList<LinkAddress> mLinkAddresses = new ArrayList<>();
+	private final ArrayList<RouteInfo> mRoutes = new ArrayList<>();
 	private final ArrayList<InetAddress> mDnses = new ArrayList<>();
 	private String mDomains;
 	private int mMtu;
@@ -67,6 +68,11 @@ public class LinkProperties {
 	/**
 	 * Returns all the {@link InetAddress} for DNS servers on this link.
 	 */
+	/* AOSP LinkProperties.getRoutes(): the unmodifiable route list; ATL does not read the host's routing table */
+	public List<RouteInfo> getRoutes() {
+		return java.util.Collections.unmodifiableList(mRoutes);
+	}
+
 	public List<InetAddress> getDnsServers() {
 		return Collections.unmodifiableList(mDnses);
 	}
