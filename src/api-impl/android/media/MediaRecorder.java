@@ -121,6 +121,27 @@ public class MediaRecorder {
 	}
 
 	public void setVideoEncoder(int videoEncoder) {}
+
+	/* AOSP MediaRecorder.setVideoEncodingProfileLevel(): the checks, then setParameter() for the video encoder,
+	 * which ATL does not have (prepare() with a video source fails), as the other video setters */
+	public void setVideoEncodingProfileLevel(int profile, int level) {
+		if (profile < 0) {
+			throw new IllegalArgumentException("Video encoding profile is not positive");
+		}
+		if (level < 0) {
+			throw new IllegalArgumentException("Video encoding level is not positive");
+		}
+	}
+
+	/* AOSP MediaRecorder.setCamera() (deprecated): hands the camera to the native recorder, used for a CAMERA video
+	 * source at prepare(); ATL records no video */
+	public void setCamera(android.hardware.Camera c) {}
+
+	/* AOSP MediaRecorder.getSurface(): IllegalStateException unless prepared with VIDEO_SOURCE_SURFACE; ATL's
+	 * prepare() rejects every video source, so there is never such a surface */
+	public android.view.Surface getSurface() {
+		throw new IllegalStateException("failed to get surface");
+	}
 	public void setVideoSize(int width, int height) {}
 	public void setVideoFrameRate(int rate) {}
 	public void setVideoEncodingBitRate(int bitRate) {}

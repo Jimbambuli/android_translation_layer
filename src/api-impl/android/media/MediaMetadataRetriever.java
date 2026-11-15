@@ -108,6 +108,22 @@ public class MediaMetadataRetriever implements AutoCloseable {
 		return getScaledFrameAtTime(timeUs, option, dstWidth, dstHeight);
 	}
 
+	/* AOSP MediaMetadataRetriever.getFrameAtIndex(int) -> getFramesAtIndexInternal(frameIndex, 1, null): the checks
+	 * on METADATA_KEY_HAS_VIDEO and METADATA_KEY_VIDEO_FRAME_COUNT as in AOSP (ATL's media backend does not report
+	 * the frame count, so Integer.parseInt(null) fails as in AOSP for such a source); the frame itself is the one
+	 * closest to the index's share of the duration, as the backend seeks by time */
+	public Bitmap getFrameAtIndex(int frameIndex) {
+		if (!"yes".equals(extractMetadata(METADATA_KEY_HAS_VIDEO))) {
+			throw new IllegalStateException("Does not contain video or image sequences");
+		}
+		int frameCount = Integer.parseInt(extractMetadata(METADATA_KEY_VIDEO_FRAME_COUNT));
+		if (frameIndex < 0 || frameIndex >= frameCount) {
+			throw new IllegalArgumentException("Invalid frameIndex or numFrames: " + frameIndex + ", " + 1);
+		}
+		long durationUs = Long.parseLong(extractMetadata(METADATA_KEY_DURATION)) * 1000;
+		return getFrameAtTime(durationUs * frameIndex / frameCount, OPTION_CLOSEST);
+	}
+
 	/* null as in AOSP when the source has no still image track (HEIF/AVIF), which the media
 	 * backend does not read */
 	public Bitmap getThumbnailImageAtIndex(int imageIndex, BitmapParams params, int targetSize, int maxPixels) {

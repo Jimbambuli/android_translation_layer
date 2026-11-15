@@ -16,6 +16,16 @@ public class MediaProjectionManager {
 		return i;
 	}
 
+	public static final String EXTRA_MEDIA_PROJECTION_CONFIG = "android.media.projection.extra.EXTRA_MEDIA_PROJECTION_CONFIG";
+
+	/* AOSP createScreenCaptureIntent(MediaProjectionConfig): the plain intent with the config as an extra (the
+	 * own-app-content check behind Flags.appContentSharing() is left out) */
+	public Intent createScreenCaptureIntent(MediaProjectionConfig config) {
+		Intent i = createScreenCaptureIntent();
+		i.putExtra(EXTRA_MEDIA_PROJECTION_CONFIG, config);
+		return i;
+	}
+
 	/* AOSP: null unless RESULT_OK with an EXTRA_MEDIA_PROJECTION binder, which ATL never hands out */
 	public MediaProjection getMediaProjection(int resultCode, Intent resultData) {
 		return null;
