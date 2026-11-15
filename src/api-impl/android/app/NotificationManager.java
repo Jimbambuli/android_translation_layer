@@ -286,6 +286,187 @@ public class NotificationManager {
 		throw new SecurityException("Notification policy access denied");
 	}
 
+	/* AOSP NotificationManager.getNotificationPolicy(): the Do Not Disturb policy of the manual rule
+	 * (ZenModeConfig.toNotificationPolicy()); nobody changes it on ATL, so it is the one built from the
+	 * ZenModeConfig DEFAULT_* values: alarms, media, calls and messages from starred contacts, repeat callers,
+	 * important conversations, no priority channels; full screen intents, lights, peeking and ambient
+	 * suppressed (with the legacy SCREEN_OFF/SCREEN_ON bits). Reading needs no policy access. */
+	public Policy getNotificationPolicy() {
+		return new Policy(Policy.PRIORITY_CATEGORY_ALARMS | Policy.PRIORITY_CATEGORY_MEDIA
+		                  | Policy.PRIORITY_CATEGORY_CALLS | Policy.PRIORITY_CATEGORY_MESSAGES
+		                  | Policy.PRIORITY_CATEGORY_REPEAT_CALLERS | Policy.PRIORITY_CATEGORY_CONVERSATIONS,
+		                  Policy.PRIORITY_SENDERS_STARRED, Policy.PRIORITY_SENDERS_STARRED,
+		                  Policy.SUPPRESSED_EFFECT_SCREEN_OFF | Policy.SUPPRESSED_EFFECT_FULL_SCREEN_INTENT
+		                  | Policy.SUPPRESSED_EFFECT_LIGHTS | Policy.SUPPRESSED_EFFECT_PEEK
+		                  | Policy.SUPPRESSED_EFFECT_SCREEN_ON | Policy.SUPPRESSED_EFFECT_AMBIENT,
+		                  0, Policy.CONVERSATION_SENDERS_IMPORTANT);
+	}
+
+	/* AOSP NotificationManager.Policy: the public part (constants, fields, constructors, parcel, equals) */
+	public static class Policy implements android.os.Parcelable {
+		public static final int PRIORITY_CATEGORY_REMINDERS = 1 << 0;
+		public static final int PRIORITY_CATEGORY_EVENTS = 1 << 1;
+		public static final int PRIORITY_CATEGORY_MESSAGES = 1 << 2;
+		public static final int PRIORITY_CATEGORY_CALLS = 1 << 3;
+		public static final int PRIORITY_CATEGORY_REPEAT_CALLERS = 1 << 4;
+		public static final int PRIORITY_CATEGORY_ALARMS = 1 << 5;
+		public static final int PRIORITY_CATEGORY_MEDIA = 1 << 6;
+		public static final int PRIORITY_CATEGORY_SYSTEM = 1 << 7;
+		public static final int PRIORITY_CATEGORY_CONVERSATIONS = 1 << 8;
+
+		public static final int PRIORITY_SENDERS_ANY = 0;
+		public static final int PRIORITY_SENDERS_CONTACTS = 1;
+		public static final int PRIORITY_SENDERS_STARRED = 2;
+
+		public static final int CONVERSATION_SENDERS_ANYONE = 1; // ZenPolicy values
+		public static final int CONVERSATION_SENDERS_IMPORTANT = 2;
+		public static final int CONVERSATION_SENDERS_NONE = 3;
+		public static final int CONVERSATION_SENDERS_UNSET = -1;
+
+		public static final int SUPPRESSED_EFFECTS_UNSET = -1;
+		@Deprecated public static final int SUPPRESSED_EFFECT_SCREEN_OFF = 1 << 0;
+		@Deprecated public static final int SUPPRESSED_EFFECT_SCREEN_ON = 1 << 1;
+		public static final int SUPPRESSED_EFFECT_FULL_SCREEN_INTENT = 1 << 2;
+		public static final int SUPPRESSED_EFFECT_LIGHTS = 1 << 3;
+		public static final int SUPPRESSED_EFFECT_PEEK = 1 << 4;
+		public static final int SUPPRESSED_EFFECT_STATUS_BAR = 1 << 5;
+		public static final int SUPPRESSED_EFFECT_BADGE = 1 << 6;
+		public static final int SUPPRESSED_EFFECT_AMBIENT = 1 << 7;
+		public static final int SUPPRESSED_EFFECT_NOTIFICATION_LIST = 1 << 8;
+
+		public static final int STATE_HAS_PRIORITY_CHANNELS = 1 << 0;
+		public static final int STATE_PRIORITY_CHANNELS_BLOCKED = 1 << 1;
+		public static final int STATE_UNSET = -1;
+
+		public final int priorityCategories;
+		public final int priorityCallSenders;
+		public final int priorityMessageSenders;
+		public final int priorityConversationSenders;
+		public final int suppressedVisualEffects;
+		public final int state;
+
+		public Policy(int priorityCategories, int priorityCallSenders, int priorityMessageSenders) {
+			this(priorityCategories, priorityCallSenders, priorityMessageSenders,
+			     SUPPRESSED_EFFECTS_UNSET, STATE_UNSET, CONVERSATION_SENDERS_UNSET);
+		}
+
+		public Policy(int priorityCategories, int priorityCallSenders, int priorityMessageSenders, int suppressedVisualEffects) {
+			this(priorityCategories, priorityCallSenders, priorityMessageSenders,
+			     suppressedVisualEffects, STATE_UNSET, CONVERSATION_SENDERS_UNSET);
+		}
+
+		public Policy(int priorityCategories, int priorityCallSenders, int priorityMessageSenders, int suppressedVisualEffects, int priorityConversationSenders) {
+			this(priorityCategories, priorityCallSenders, priorityMessageSenders,
+			     suppressedVisualEffects, STATE_UNSET, priorityConversationSenders);
+		}
+
+		/* @hide in AOSP */
+		public Policy(int priorityCategories, int priorityCallSenders, int priorityMessageSenders, int suppressedVisualEffects, int state, int priorityConversationSenders) {
+			this.priorityCategories = priorityCategories;
+			this.priorityCallSenders = priorityCallSenders;
+			this.priorityMessageSenders = priorityMessageSenders;
+			this.suppressedVisualEffects = suppressedVisualEffects;
+			this.state = state;
+			this.priorityConversationSenders = priorityConversationSenders;
+		}
+
+		public Policy(android.os.Parcel source) {
+			this(source.readInt(), source.readInt(), source.readInt(), source.readInt(),
+			     source.readInt(), source.readInt());
+		}
+
+		@Override
+		public void writeToParcel(android.os.Parcel dest, int flags) {
+			dest.writeInt(priorityCategories);
+			dest.writeInt(priorityCallSenders);
+			dest.writeInt(priorityMessageSenders);
+			dest.writeInt(suppressedVisualEffects);
+			dest.writeInt(state);
+			dest.writeInt(priorityConversationSenders);
+		}
+
+		@Override
+		public int describeContents() {
+			return 0;
+		}
+
+		public static final android.os.Parcelable.Creator<Policy> CREATOR = new android.os.Parcelable.Creator<Policy>() {
+			@Override
+			public Policy createFromParcel(android.os.Parcel in) {
+				return new Policy(in);
+			}
+
+			@Override
+			public Policy[] newArray(int size) {
+				return new Policy[size];
+			}
+		};
+
+		/* AOSP Policy.allowPriorityChannels() (API 35); hasPriorityChannels() is @hide */
+		public boolean hasPriorityChannels() {
+			return (state & STATE_HAS_PRIORITY_CHANNELS) != 0;
+		}
+
+		public boolean allowPriorityChannels() {
+			return state == STATE_UNSET || (state & STATE_PRIORITY_CHANNELS_BLOCKED) == 0;
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Objects.hash(priorityCategories, priorityCallSenders, priorityMessageSenders,
+			                              suppressedVisualEffects, state, priorityConversationSenders);
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (!(o instanceof Policy))
+				return false;
+			if (o == this)
+				return true;
+			final Policy other = (Policy)o;
+			return other.priorityCategories == priorityCategories
+			    && other.priorityCallSenders == priorityCallSenders
+			    && other.priorityMessageSenders == priorityMessageSenders
+			    && suppressedVisualEffectsEqual(suppressedVisualEffects, other.suppressedVisualEffects)
+			    && other.state == this.state
+			    && other.priorityConversationSenders == this.priorityConversationSenders;
+		}
+
+		private static boolean suppressedVisualEffectsEqual(int suppressedEffects, int otherSuppressedVisualEffects) {
+			if (suppressedEffects == otherSuppressedVisualEffects)
+				return true;
+			if ((suppressedEffects & SUPPRESSED_EFFECT_SCREEN_ON) != 0)
+				suppressedEffects |= SUPPRESSED_EFFECT_PEEK;
+			if ((suppressedEffects & SUPPRESSED_EFFECT_SCREEN_OFF) != 0) {
+				suppressedEffects |= SUPPRESSED_EFFECT_FULL_SCREEN_INTENT;
+				suppressedEffects |= SUPPRESSED_EFFECT_LIGHTS;
+				suppressedEffects |= SUPPRESSED_EFFECT_AMBIENT;
+			}
+			if ((otherSuppressedVisualEffects & SUPPRESSED_EFFECT_SCREEN_ON) != 0)
+				otherSuppressedVisualEffects |= SUPPRESSED_EFFECT_PEEK;
+			if ((otherSuppressedVisualEffects & SUPPRESSED_EFFECT_SCREEN_OFF) != 0) {
+				otherSuppressedVisualEffects |= SUPPRESSED_EFFECT_FULL_SCREEN_INTENT;
+				otherSuppressedVisualEffects |= SUPPRESSED_EFFECT_LIGHTS;
+				otherSuppressedVisualEffects |= SUPPRESSED_EFFECT_AMBIENT;
+			}
+			if ((suppressedEffects & SUPPRESSED_EFFECT_SCREEN_ON) != (otherSuppressedVisualEffects & SUPPRESSED_EFFECT_SCREEN_ON)) {
+				int currSuppressedEffects = (suppressedEffects & SUPPRESSED_EFFECT_SCREEN_ON) != 0 ? otherSuppressedVisualEffects : suppressedEffects;
+				if ((currSuppressedEffects & SUPPRESSED_EFFECT_PEEK) == 0)
+					return false;
+			}
+			if ((suppressedEffects & SUPPRESSED_EFFECT_SCREEN_OFF) != (otherSuppressedVisualEffects & SUPPRESSED_EFFECT_SCREEN_OFF)) {
+				int currSuppressedEffects = (suppressedEffects & SUPPRESSED_EFFECT_SCREEN_OFF) != 0 ? otherSuppressedVisualEffects : suppressedEffects;
+				if ((currSuppressedEffects & SUPPRESSED_EFFECT_FULL_SCREEN_INTENT) == 0
+				    || (currSuppressedEffects & SUPPRESSED_EFFECT_LIGHTS) == 0
+				    || (currSuppressedEffects & SUPPRESSED_EFFECT_AMBIENT) == 0)
+					return false;
+			}
+			int thisWithoutOldEffects = suppressedEffects & ~SUPPRESSED_EFFECT_SCREEN_ON & ~SUPPRESSED_EFFECT_SCREEN_OFF;
+			int otherWithoutOldEffects = otherSuppressedVisualEffects & ~SUPPRESSED_EFFECT_SCREEN_ON & ~SUPPRESSED_EFFECT_SCREEN_OFF;
+			return thisWithoutOldEffects == otherWithoutOldEffects;
+		}
+	}
+
 	/* AOSP NotificationManagerService.isPackagePaused(): true only while the package is suspended, which
 	 * ATL never does */
 	public boolean areNotificationsPaused() {
