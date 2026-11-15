@@ -1167,6 +1167,8 @@ srcs = [
 	'android/view/inspector/InspectionCompanion.java',
 	'android/view/inspector/PropertyMapper.java',
 	'android/view/inspector/PropertyReader.java',
+	'android/view/textclassifier/ConversationAction.java',
+	'android/view/textclassifier/ConversationActions.java',
 	'android/view/textclassifier/EntityConfidence.java',
 	'android/view/textclassifier/SystemTextClassifierMetadata.java',
 	'android/view/textclassifier/TextClassification.java',
