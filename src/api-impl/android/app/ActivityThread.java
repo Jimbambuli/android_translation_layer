@@ -21,6 +21,11 @@ public class ActivityThread {
 	public static Application currentApplication() {
 		return ATLLoadedApp.getPrimaryApplication().getApplication();
 	}
+	/* AOSP ActivityThread.getProcessName(): mBoundApplication.processName, the name currentProcessName() returns */
+	public String getProcessName() {
+		return Application.getProcessName();
+	}
+
 	public Application getApplication() {
 		return ATLLoadedApp.getPrimaryApplication().getApplication();
 	}
