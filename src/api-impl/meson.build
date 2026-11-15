@@ -1124,6 +1124,7 @@ srcs = [
 	'android/view/inputmethod/SurroundingText.java',
 	'android/view/inputmethod/TextAppearanceInfo.java',
 	'android/view/inputmethod/TextAttribute.java',
+	'android/view/inspector/InspectionCompanion.java',
 	'android/view/inspector/PropertyMapper.java',
 	'android/view/inspector/PropertyReader.java',
 	'android/view/textclassifier/EntityConfidence.java',
