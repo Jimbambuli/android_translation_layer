@@ -1145,6 +1145,36 @@ public class AppOpsManager {
 			return -1;
 		}
 
+		@Deprecated
+		public long getLastAccessTime() {
+			return -1;
+		}
+
+		@Deprecated
+		public long getLastAccessForegroundTime() {
+			return -1;
+		}
+
+		@Deprecated
+		public long getLastAccessBackgroundTime() {
+			return -1;
+		}
+
+		@Deprecated
+		public long getLastRejectTime() {
+			return -1;
+		}
+
+		@Deprecated
+		public long getLastRejectForegroundTime() {
+			return -1;
+		}
+
+		@Deprecated
+		public long getLastRejectBackgroundTime() {
+			return -1;
+		}
+
 		public boolean isRunning() {
 			return false;
 		}
