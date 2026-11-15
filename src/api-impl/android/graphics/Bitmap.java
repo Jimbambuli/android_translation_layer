@@ -395,8 +395,26 @@ public final class Bitmap implements Parcelable {
 	}
 
 	/* AOSP: whether the decoder attached the gainmap of an Ultra HDR image; ATL's decoders never read one */
+	/* AOSP Bitmap.hasGainmap/getGainmap/setGainmap. ATL's decoders never extract a gainmap
+	 * (no Ultra HDR support), so only one set by the app is reported. */
+	private Gainmap mGainmap;
+
 	public boolean hasGainmap() {
-		return false;
+		if (recycled)
+			throw new IllegalStateException("Can't call hasGainmap() on a recycled bitmap");
+		return mGainmap != null;
+	}
+
+	public Gainmap getGainmap() {
+		if (recycled)
+			throw new IllegalStateException("Can't call getGainmap() on a recycled bitmap");
+		return mGainmap;
+	}
+
+	public void setGainmap(Gainmap gainmap) {
+		if (recycled)
+			throw new IllegalStateException("Can't call setGainmap() on a recycled bitmap");
+		mGainmap = gainmap;
 	}
 
 	/* AOSP keeps the flag in the native bitmap; nothing here uses mip maps, but BitmapDrawable reads and sets it */

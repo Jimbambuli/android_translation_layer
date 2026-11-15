@@ -419,6 +419,7 @@ srcs = [
 	'android/graphics/CornerPathEffect.java',
 	'android/graphics/DashPathEffect.java',
 	'android/graphics/FontFamily.java',
+	'android/graphics/Gainmap.java',
 	'android/graphics/HardwareRenderer.java',
 	'android/graphics/ImageFormat.java',
 	'android/graphics/Insets.java',
