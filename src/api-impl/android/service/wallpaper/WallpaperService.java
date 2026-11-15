@@ -21,7 +21,12 @@ import android.app.WallpaperColors;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.content.Context;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
+import android.view.WindowInsets;
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 
 /**
  * A wallpaper service is responsible for showing a live wallpaper behind applications that would like
@@ -102,6 +107,57 @@ public abstract class WallpaperService extends Service {
 			if (mDestroyed) {
 				return;
 			}
+		}
+
+		private boolean mOffsetNotificationsEnabled;
+
+		/* AOSP Engine.setOffsetNotificationsEnabled: sets PRIVATE_FLAG_WANTS_OFFSET_NOTIFICATIONS on the window, which
+		 * is applied once the surface exists */
+		public void setOffsetNotificationsEnabled(boolean enabled) {
+			mOffsetNotificationsEnabled = enabled;
+		}
+
+		/* AOSP Engine.getWallpaperFlags: mIWallpaperEngine.mWhich, set when attached; unattached 0 */
+		public int getWallpaperFlags() {
+			return 0;
+		}
+
+		/* AOSP Engine.getDesiredMinimumWidth/Height: mIWallpaperEngine.mReqWidth/mReqHeight, the size the wallpaper host
+		 * asked for; unattached 0 */
+		public int getDesiredMinimumWidth() {
+			return 0;
+		}
+
+		public int getDesiredMinimumHeight() {
+			return 0;
+		}
+
+		/* AOSP Engine.getDisplayContext: the context of the display the engine is on; the service's, on the one display */
+		public Context getDisplayContext() {
+			return WallpaperService.this;
+		}
+
+		public void onTouchEvent(MotionEvent event) {}
+
+		public void onWallpaperFlagsChanged(int flags) {}
+
+		public void onDesiredSizeChanged(int desiredWidth, int desiredHeight) {}
+
+		public void onZoomChanged(float zoom) {}
+
+		public void onSurfaceRedrawNeeded(SurfaceHolder holder) {}
+
+		public void onApplyWindowInsets(WindowInsets insets) {}
+
+		/* AOSP Engine.onApplyWallpaper: no description of the current wallpaper by default */
+		public android.app.wallpaper.WallpaperDescription onApplyWallpaper(int which) {
+			return null;
+		}
+
+		/* AOSP Engine.dump(): the state fields of an engine; those of a window do not exist here */
+		protected void dump(String prefix, FileDescriptor fd, PrintWriter out, String[] args) {
+			out.print(prefix); out.print("mDestroyed="); out.println(mDestroyed);
+			out.print(prefix); out.print("mOffsetNotificationsEnabled="); out.println(mOffsetNotificationsEnabled);
 		}
 	}
 
