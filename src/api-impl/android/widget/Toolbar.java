@@ -1,6 +1,7 @@
 package android.widget;
 
 import android.content.Context;
+import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.View;
 
@@ -56,7 +57,52 @@ public class Toolbar extends View {
 		return titleMarginBottom;
 	}
 
-	public void setNavigationIcon(int resId) {}
+	/* AOSP setTitle(): stored like the subtitle, not rendered */
+	public void setTitle(int resId) {
+		setTitle(getContext().getText(resId));
+	}
+
+	public void setTitle(CharSequence title) {
+		titleText = title;
+	}
+
+	/* AOSP navigation icon, overflow icon and navigation content description: stored (there is no navigation
+	 * button or overflow menu in this Toolbar) so the getters return what was set */
+	private Drawable navigationIcon;
+	private Drawable overflowIcon;
+	private CharSequence navigationContentDescription;
+
+	public void setNavigationIcon(int resId) {
+		setNavigationIcon(resId != 0 ? getContext().getDrawable(resId) : null);
+	}
+
+	public void setNavigationIcon(Drawable icon) {
+		navigationIcon = icon;
+	}
+
+	public Drawable getNavigationIcon() {
+		return navigationIcon;
+	}
+
+	public void setOverflowIcon(Drawable icon) {
+		overflowIcon = icon;
+	}
+
+	public Drawable getOverflowIcon() {
+		return overflowIcon;
+	}
+
+	public void setNavigationContentDescription(int resId) {
+		setNavigationContentDescription(resId != 0 ? getContext().getText(resId) : null);
+	}
+
+	public void setNavigationContentDescription(CharSequence description) {
+		navigationContentDescription = description;
+	}
+
+	public CharSequence getNavigationContentDescription() {
+		return navigationContentDescription;
+	}
 
 	public void setNavigationOnClickListener(OnClickListener listener) {}
 }
