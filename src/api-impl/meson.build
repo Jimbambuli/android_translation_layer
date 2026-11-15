@@ -455,6 +455,7 @@ srcs = [
 	'android/graphics/Rect.java',
 	'android/graphics/RectF.java',
 	'android/graphics/Region.java',
+	'android/graphics/RegionIterator.java',
 	'android/graphics/RenderEffect.java',
 	'android/graphics/RuntimeShader.java',
 	'android/graphics/RenderNode.java',

@@ -243,7 +243,7 @@ public class Region implements Parcelable {
 	private static native boolean nativeIsRect(long region);
 	private static native boolean nativeIsComplex(long region);
 	private static native boolean nativeGetBounds(long region, Rect bounds);
-	private static native int[] nativeGetBoundaryPathRects(long region);
+	static native int[] nativeGetBoundaryPathRects(long region);
 	private static native boolean nativeContains(long region, int x, int y);
 	private static native boolean nativeQuickContains(long region, int left, int top, int right, int bottom);
 	private static native boolean nativeQuickRejectRect(long region, int left, int top, int right, int bottom);
