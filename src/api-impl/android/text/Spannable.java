@@ -45,6 +45,17 @@ public interface Spannable
 	public void removeSpan(Object what);
 
 	/**
+	 * Remove the specified object from the range of text to which it
+	 * was attached, if it was.  It is OK to remove an object that was
+	 * never attached in the first place.
+	 * AOSP core/java/android/text/Spannable.java; Selection.removeSelection() uses it.
+	 * @hide
+	 */
+	default void removeSpan(Object what, int flags) {
+		removeSpan(what);
+	}
+
+	/**
 	 * Factory used by TextView to create new Spannables.  You can subclass
 	 * it to provide something other than SpannableString.
 	 */
