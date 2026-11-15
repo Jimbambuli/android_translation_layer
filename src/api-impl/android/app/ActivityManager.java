@@ -411,6 +411,12 @@ public class ActivityManager {
 		public RecentTaskInfo getTaskInfo() {
 			return new RecentTaskInfo();
 		}
+
+		/* AOSP AppTask.finishAndRemoveTask()/setExcludeFromRecents(): calls into the task of the
+		 * ActivityTaskManager. getAppTasks() here is always empty, so no AppTask exists to receive it. */
+		public void finishAndRemoveTask() {}
+
+		public void setExcludeFromRecents(boolean exclude) {}
 	}
 	public List<ActivityManager.AppTask> getAppTasks() {
 		return new ArrayList<>();

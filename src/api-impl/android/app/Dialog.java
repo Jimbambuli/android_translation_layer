@@ -33,7 +33,7 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import java.util.ArrayList;
 
-public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callback {
+public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callback, View.OnCreateContextMenuListener {
 	protected long nativePtr;
 
 	protected native long nativeInit(long decor_view);
@@ -918,5 +918,25 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	/* AOSP Dialog.getCurrentFocus(): mWindow.getCurrentFocus() */
 	public View getCurrentFocus() {
 		return window != null ? window.getCurrentFocus() : null;
+	}
+
+	/* AOSP Dialog.registerForContextMenu/unregisterForContextMenu/openContextMenu/onCreateContextMenu/
+	 * onContextItemSelected; ATL has no context menus (View.showContextMenu() shows none) */
+	public void registerForContextMenu(View view) {
+		view.setOnCreateContextMenuListener(this);
+	}
+
+	public void unregisterForContextMenu(View view) {
+		view.setOnCreateContextMenuListener(null);
+	}
+
+	public void openContextMenu(View view) {
+		view.showContextMenu();
+	}
+
+	public void onCreateContextMenu(android.view.ContextMenu menu, View v, android.view.ContextMenu.ContextMenuInfo menuInfo) {}
+
+	public boolean onContextItemSelected(android.view.MenuItem item) {
+		return false;
 	}
 }

@@ -119,6 +119,7 @@ srcs = [
 	'android/app/AppComponentFactory.java',
 	'android/app/AppGlobals.java',
 	'android/app/Application.java',
+	'android/app/AuthenticationRequiredException.java',
 	'android/app/ApplicationErrorReport.java',
 	'android/app/ApplicationExitInfo.java',
 	'android/app/AppOpsManager.java',
