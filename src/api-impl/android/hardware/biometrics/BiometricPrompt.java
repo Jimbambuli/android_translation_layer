@@ -11,6 +11,7 @@ import android.text.TextUtils;
 import java.security.Signature;
 import java.util.concurrent.Executor;
 import javax.crypto.Cipher;
+import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 
 /**
@@ -268,6 +269,10 @@ public class BiometricPrompt implements BiometricConstants {
 			super(mac);
 		}
 
+		public CryptoObject(@NonNull KeyAgreement keyAgreement) {
+			super(keyAgreement);
+		}
+
 		@Deprecated
 		public CryptoObject(@NonNull IdentityCredential credential) {
 			super(credential);
@@ -287,6 +292,10 @@ public class BiometricPrompt implements BiometricConstants {
 
 		public Mac getMac() {
 			return super.getMac();
+		}
+
+		public @Nullable KeyAgreement getKeyAgreement() {
+			return super.getKeyAgreement();
 		}
 
 		@Deprecated
