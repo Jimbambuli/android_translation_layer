@@ -41,19 +41,40 @@ public final class MediaQualityManager {
         public void onPictureProfileUpdated(String arg0, android.media.quality.PictureProfile arg1) {  }
     }
 
+    /* AOSP MediaQualityManager.ProfileQueryParams */
     public static final class ProfileQueryParams implements android.os.Parcelable {
-        public static final android.os.Parcelable.Creator<android.media.quality.MediaQualityManager.ProfileQueryParams> CREATOR = new android.os.Parcelable.Creator<android.media.quality.MediaQualityManager.ProfileQueryParams>() {
-            public android.media.quality.MediaQualityManager.ProfileQueryParams createFromParcel(android.os.Parcel source) { return null; }
-            public android.media.quality.MediaQualityManager.ProfileQueryParams[] newArray(int size) { return new android.media.quality.MediaQualityManager.ProfileQueryParams[size]; }
+        private final boolean mParametersIncluded;
+
+        private ProfileQueryParams(android.os.Parcel in) {
+            mParametersIncluded = in.readBoolean();
+        }
+
+        public ProfileQueryParams(boolean parametersIncluded) {
+            mParametersIncluded = parametersIncluded;
+        }
+
+        public static final android.os.Parcelable.Creator<ProfileQueryParams> CREATOR = new android.os.Parcelable.Creator<ProfileQueryParams>() {
+            public ProfileQueryParams createFromParcel(android.os.Parcel in) { return new ProfileQueryParams(in); }
+            public ProfileQueryParams[] newArray(int size) { return new ProfileQueryParams[size]; }
         };
-        public boolean areParametersIncluded() { return false; }
+
         public int describeContents() { return 0; }
-        public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+
+        public void writeToParcel(android.os.Parcel dest, int flags) { dest.writeBoolean(mParametersIncluded); }
+
+        public boolean areParametersIncluded() { return mParametersIncluded; }
 
         public static final class Builder {
-            public Builder()  {}
-            public android.media.quality.MediaQualityManager.ProfileQueryParams build() { return null; }
-            public android.media.quality.MediaQualityManager.ProfileQueryParams.Builder setParametersIncluded(boolean arg0) { return this; }
+            private boolean mParametersIncluded;
+
+            public Builder() {}
+
+            public ProfileQueryParams.Builder setParametersIncluded(boolean parametersIncluded) {
+                mParametersIncluded = parametersIncluded;
+                return this;
+            }
+
+            public ProfileQueryParams build() { return new ProfileQueryParams(mParametersIncluded); }
         }
     }
 
