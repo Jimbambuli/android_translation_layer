@@ -7,15 +7,15 @@ import android.view.View;
 public class Space extends View {
 
 	public Space(Context context) {
-		super(context);
+		this(context, null);
 	}
 
 	public Space(Context context, AttributeSet attributeSet) {
-		super(context, attributeSet);
+		this(context, attributeSet, 0);
 	}
 
 	public Space(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr);
+		this(context, attrs, defStyleAttr, 0);
 	}
 
 	public Space(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {

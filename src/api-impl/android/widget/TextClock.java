@@ -29,7 +29,7 @@ public class TextClock extends TextView {
 	};
 
 	public TextClock(Context context, AttributeSet attrs) {
-		super(context, attrs, 0);
+		this(context, attrs, 0);
 	}
 
 	public TextClock(Context context) {
@@ -37,7 +37,7 @@ public class TextClock extends TextView {
 	}
 
 	public TextClock(Context context, AttributeSet attrs, int defStyleAttr) {
-		super(context, attrs, defStyleAttr, 0);
+		this(context, attrs, defStyleAttr, 0);
 	}
 
 	public TextClock(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {

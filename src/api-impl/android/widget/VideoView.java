@@ -73,7 +73,7 @@ public class VideoView extends SurfaceView implements MediaController.MediaPlaye
 	}
 
 	public VideoView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		super(context, attrs);
+		super(context, attrs, defStyleAttr, defStyleRes);
 		mVideoWidth = 0;
 		mVideoHeight = 0;
 		mAudioManager = (AudioManager)context.getSystemService(Context.AUDIO_SERVICE);

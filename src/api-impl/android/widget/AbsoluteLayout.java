@@ -37,16 +37,16 @@ import android.view.ViewGroup;
 @Deprecated
 public class AbsoluteLayout extends ViewGroup {
 	public AbsoluteLayout(Context context) {
-		super(context);
+		this(context, null);
 	}
 
 	public AbsoluteLayout(Context context, AttributeSet attrs) {
-		super(context, attrs);
+		this(context, attrs, 0);
 	}
 
 	public AbsoluteLayout(Context context, AttributeSet attrs,
 	                      int defStyle) {
-		super(context, attrs, defStyle);
+		this(context, attrs, defStyle, 0);
 	}
 
 	public AbsoluteLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
