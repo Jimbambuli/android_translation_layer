@@ -508,6 +508,7 @@ srcs = [
 	'android/hardware/ConsumerIrManager.java',
 	'android/hardware/DataSpace.java',
 	'android/hardware/GeomagneticField.java',
+	'android/hardware/HardwareBuffer.java',
 	'android/hardware/Sensor.java',
 	'android/hardware/SensorEvent.java',
 	'android/hardware/SensorEventListener.java',
