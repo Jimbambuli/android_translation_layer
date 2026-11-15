@@ -1106,6 +1106,18 @@ public class Window {
 		return getAttributes().getColorMode();
 	}
 
+	/* AOSP Window.setHideOverlayWindows(): needs HIDE_(NON_SYSTEM_)OVERLAY_WINDOWS, then a private flag */
+	public final void setHideOverlayWindows(boolean hide) {
+		if (context.checkSelfPermission("android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS") != android.content.pm.PackageManager.PERMISSION_GRANTED
+		    && context.checkSelfPermission("android.permission.HIDE_OVERLAY_WINDOWS") != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+			throw new SecurityException("Permission denial: setHideOverlayWindows: HIDE_OVERLAY_WINDOWS");
+		}
+		final WindowManager.LayoutParams attrs = getAttributes();
+		final int mask = WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
+		attrs.privateFlags = (attrs.privateFlags & ~mask) | ((hide ? mask : 0) & mask);
+		dispatchWindowAttributesChanged(attrs);
+	}
+
 	/* AOSP Window.setSustainedPerformanceMode() (setPrivateFlags()) */
 	public void setSustainedPerformanceMode(boolean enable) {
 		final WindowManager.LayoutParams attrs = getAttributes();
