@@ -5,6 +5,7 @@ import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import com.android.internal.R;
@@ -45,6 +46,70 @@ public class HorizontalScrollView extends FrameLayout {
 
 	public boolean fullScroll(int direction) {
 		return true;
+	}
+
+	/** AOSP pageScroll(): one page (the view width) to the left or right, limited to the child; no focus change */
+	public boolean pageScroll(int direction) {
+		if (getChildCount() == 0)
+			return false;
+		final int width = getWidth();
+		final int scrollX = getScrollX();
+		final int target;
+		if (direction == View.FOCUS_RIGHT)
+			target = Math.min(scrollX + width, getChildAt(getChildCount() - 1).getRight() - width);
+		else
+			target = Math.max(scrollX - width, 0);
+		smoothScrollBy(target - scrollX, 0);
+		return getScrollX() != scrollX;
+	}
+
+	/** AOSP getMaxScrollAmount() with MAX_SCROLL_FACTOR 0.5 */
+	public int getMaxScrollAmount() {
+		return (int)(0.5f * (getRight() - getLeft()));
+	}
+
+	/** AOSP fling(): the distance of an OverScroller fling over 0..child width - viewport, from the current position;
+	 * ATL scrolls there at once instead of animated and draws no edge effects */
+	public void fling(int velocityX) {
+		if (getChildCount() > 0) {
+			final int width = getWidth() - getPaddingRight() - getPaddingLeft();
+			final int right = getChildAt(0).getRight() - getPaddingLeft();
+			OverScroller scroller = new OverScroller(getContext());
+			scroller.fling(getScrollX(), 0, velocityX, 0, 0, Math.max(0, right - width), 0, 0, 0, 0);
+			smoothScrollBy(scroller.getFinalX() - getScrollX(), 0);
+		}
+	}
+
+	/** AOSP executeKeyEvent(): keys that scroll; arrowScroll() scrolls by getMaxScrollAmount() without the focus search,
+	 * as AOSP does when no next focus is found. */
+	public boolean executeKeyEvent(KeyEvent event) {
+		if (getChildCount() == 0)
+			return false;
+		boolean handled = false;
+		if (event.getAction() == KeyEvent.ACTION_DOWN) {
+			switch (event.getKeyCode()) {
+				case KeyEvent.KEYCODE_DPAD_LEFT:
+					if (!event.isAltPressed()) {
+						smoothScrollBy(-getMaxScrollAmount(), 0);
+						handled = true;
+					} else {
+						handled = fullScroll(View.FOCUS_LEFT);
+					}
+					break;
+				case KeyEvent.KEYCODE_DPAD_RIGHT:
+					if (!event.isAltPressed()) {
+						smoothScrollBy(getMaxScrollAmount(), 0);
+						handled = true;
+					} else {
+						handled = fullScroll(View.FOCUS_RIGHT);
+					}
+					break;
+				case KeyEvent.KEYCODE_SPACE:
+					pageScroll(event.isShiftPressed() ? View.FOCUS_LEFT : View.FOCUS_RIGHT);
+					break;
+			}
+		}
+		return handled;
 	}
 
 	/* AOSP: whether arrowScroll() scrolls smoothly; ATL keeps the setting, GTK scrolls on its own */

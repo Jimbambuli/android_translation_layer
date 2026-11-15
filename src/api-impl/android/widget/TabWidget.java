@@ -1,10 +1,32 @@
 package android.widget;
 
+import android.content.Context;
+import android.util.AttributeSet;
 import android.view.View;
 
-public class TabWidget extends View {
-	public TabWidget(android.content.Context context) {
-		super(context);
+/**
+ * AOSP TabWidget is a LinearLayout holding the tab indicators (android16 core/java/android/widget/TabWidget.java).
+ * ATL keeps the container and the child lookup; the selection state and the strip drawing are not done (TabHost has no
+ * widget connection either).
+ */
+public class TabWidget extends LinearLayout {
+	public TabWidget(Context context) {
+		this(context, null);
+	}
+
+	public TabWidget(Context context, AttributeSet attrs) {
+		super(context, attrs);
+		setFocusable(true);
+	}
+
+	/** AOSP getChildTabViewAt(): the indicator of tab index (the children are the tab indicators) */
+	public View getChildTabViewAt(int index) {
+		return getChildAt(index);
+	}
+
+	/** AOSP getTabCount() */
+	public int getTabCount() {
+		return getChildCount();
 	}
 
 	public void setDividerDrawable(android.graphics.drawable.Drawable drawable) {}
