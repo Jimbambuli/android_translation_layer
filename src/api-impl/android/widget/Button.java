@@ -14,8 +14,10 @@ public class Button extends TextView {
 		this(context, null);
 	}
 
-	public Button(Context context, AttributeSet attributeSet) {
-		this(context, attributeSet, 0);
+	/* AOSP: this(context, attrs, getButtonDefaultStyleAttr(context), getButtonDefaultStyleRes()), which are
+	 * R.attr.buttonStyle and 0 except for the Material 3 style of Wear watches */
+	public Button(Context context, AttributeSet attrs) {
+		this(context, attrs, com.android.internal.R.attr.buttonStyle, 0);
 	}
 
 	public Button(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -25,7 +27,7 @@ public class Button extends TextView {
 	public Button(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		super(context, attrs, defStyleAttr, defStyleRes);
 
-		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.TextView, 0, 0);
+		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.TextView, defStyleAttr, defStyleRes);
 		if (a.hasValue(com.android.internal.R.styleable.TextView_text)) {
 			setText(a.getText(com.android.internal.R.styleable.TextView_text));
 		}

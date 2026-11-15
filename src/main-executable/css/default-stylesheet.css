@@ -1,6 +1,10 @@
 /* Border Styling */
+/* a Button with an Android background (buttonStyle's btn_default_material, a color, an app's drawable): the
+ * drawable shows the states as on Android, GTK's frame, shadow and focus ring are not drawn on top of it */
 .ATL-no-border {
 	border: unset;
+	box-shadow: none;
+	outline: none;
 }
 
 /* Text styling */
