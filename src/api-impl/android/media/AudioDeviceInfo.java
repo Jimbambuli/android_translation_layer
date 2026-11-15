@@ -149,6 +149,17 @@ public final class AudioDeviceInfo {
 		return new int[0];
 	}
 
+	/* AOSP AudioDeviceInfo.getAudioProfiles() (API 31): the profiles of the device port; ATL's ports carry none
+	 * (like the empty getSampleRates()/getEncodings(): any) */
+	public @NonNull java.util.List<AudioProfile> getAudioProfiles() {
+		return new java.util.ArrayList<>();
+	}
+
+	/* AOSP AudioDeviceInfo.getAudioDescriptors() (API 31): the port's extra descriptors (EDID blocks), none here */
+	public @NonNull java.util.List<AudioDescriptor> getAudioDescriptors() {
+		return new java.util.ArrayList<>();
+	}
+
 	/**
 	 * @return The speaker layout of a TYPE_BUILTIN_SPEAKER device (API 36). ATL's output is whatever ALSA
 	 * plays on, whose layout is not known: AudioFormat.CHANNEL_INVALID, as for a device whose audio HAL

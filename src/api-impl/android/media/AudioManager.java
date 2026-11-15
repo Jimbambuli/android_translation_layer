@@ -294,6 +294,13 @@ public class AudioManager {
 		return DIRECT_PLAYBACK_NOT_SUPPORTED;
 	}
 
+	/* AOSP AudioManager.getDirectProfilesForAttributes() (API 33): AudioSystem lists the direct output profiles of the
+	 * audio policy; ATL's PulseAudio output has none (see getDirectPlaybackSupport()), so the list is empty */
+	public @android.annotation.NonNull java.util.List<AudioProfile> getDirectProfilesForAttributes(@android.annotation.NonNull AudioAttributes attributes) {
+		java.util.Objects.requireNonNull(attributes);
+		return new java.util.ArrayList<>();
+	}
+
 	/* API 28 */
 	public int getStreamMinVolume(int streamType) {
 		return 0;
