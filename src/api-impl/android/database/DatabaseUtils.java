@@ -1312,4 +1312,34 @@ public class DatabaseUtils {
 		}
 		return -1;
 	}
+
+	/**
+	 * Make a deep copy of the given argument list, ensuring that the returned
+	 * value is completely isolated from any changes to the original arguments.
+	 * (AOSP DatabaseUtils.deepCopyOf)
+	 *
+	 * @hide
+	 */
+	public static Object[] deepCopyOf(Object[] args) {
+		if (args == null)
+			return null;
+
+		final Object[] res = new Object[args.length];
+		for (int i = 0; i < args.length; i++) {
+			final Object arg = args[i];
+
+			if ((arg == null) || (arg instanceof Number) || (arg instanceof String)) {
+				// When the argument is immutable, we can copy by reference
+				res[i] = arg;
+			} else if (arg instanceof byte[]) {
+				// Need to deep copy blobs
+				final byte[] castArg = (byte[])arg;
+				res[i] = java.util.Arrays.copyOf(castArg, castArg.length);
+			} else {
+				// Convert everything else to string, making it immutable
+				res[i] = String.valueOf(arg);
+			}
+		}
+		return res;
+	}
 }
