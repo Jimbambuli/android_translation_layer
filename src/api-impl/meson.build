@@ -1049,6 +1049,8 @@ srcs = [
 	'android/view/WindowId.java',
 	'android/view/WindowInsets.java',
 	'android/view/WindowInsetsAnimation.java',
+	'android/view/WindowInsetsAnimationControlListener.java',
+	'android/view/WindowInsetsAnimationController.java',
 	'android/view/WindowInsetsController.java',
 	'android/view/WindowManager.java',
 	'android/view/WindowManagerGlobal.java',

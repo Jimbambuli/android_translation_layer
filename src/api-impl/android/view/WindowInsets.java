@@ -423,6 +423,15 @@ public final class WindowInsets {
         return java.util.Collections.emptyList();
     }
 
+    /* AOSP WindowInsets.getBoundingRectsIgnoringVisibility(): IME has none to ask for; otherwise, as above, ATL has no
+     * per-type bounding rects (the desktop window has no caption bar or cutout the system reports) */
+    public java.util.List<Rect> getBoundingRectsIgnoringVisibility(int typeMask) {
+        if ((typeMask & Type.IME) != 0) {
+            throw new IllegalArgumentException("Unable to query the bounding rects for IME");
+        }
+        return java.util.Collections.emptyList();
+    }
+
     /**
      * Returns the right system window inset in pixels.
      *
