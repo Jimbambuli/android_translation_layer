@@ -122,8 +122,25 @@ public class ResolveInfo {
 		return data;
 	}
 
-	public static class DisplayNameComparator {
+	/* AOSP ResolveInfo.DisplayNameComparator: orders by label with a PRIMARY-strength Collator. ATL has
+	 * no targetUserId (one user, AOSP's default USER_CURRENT), so AOSP's moving of other users' entries
+	 * to the end never applies */
+	public static class DisplayNameComparator implements java.util.Comparator<ResolveInfo> {
+		public DisplayNameComparator(PackageManager pm) {
+			mPM = pm;
+			mCollator.setStrength(java.text.Collator.PRIMARY);
+		}
 
-		public DisplayNameComparator(PackageManager pm) {}
+		public final int compare(ResolveInfo a, ResolveInfo b) {
+			CharSequence sa = a.loadLabel(mPM);
+			if (sa == null) sa = a.activityInfo.name;
+			CharSequence sb = b.loadLabel(mPM);
+			if (sb == null) sb = b.activityInfo.name;
+
+			return mCollator.compare(sa.toString(), sb.toString());
+		}
+
+		private final java.text.Collator mCollator = java.text.Collator.getInstance();
+		private final PackageManager mPM;
 	}
 }

@@ -90,13 +90,13 @@ public class Telephony {
 			public static final Uri CONTENT_URI = Uri.parse("content://mms/outbox");
 		}
 
-		public static final class Addr {
+		public static final class Addr implements android.provider.BaseColumns {
 			public static Uri getAddrUriForMessage(String messageId) {
 				return Mms.CONTENT_URI.buildUpon().appendPath(String.valueOf(messageId)).appendPath("addr").build();
 			}
 		}
 
-		public static final class Part {
+		public static final class Part implements android.provider.BaseColumns {
 			private static final String TABLE_PART = "part";
 			public static final Uri CONTENT_URI = Uri.withAppendedPath(Mms.CONTENT_URI, TABLE_PART);
 
@@ -110,12 +110,12 @@ public class Telephony {
 		}
 	}
 
-	public static final class MmsSms {
+	public static final class MmsSms implements android.provider.BaseColumns {
 		public static final Uri CONTENT_URI = Uri.parse("content://mms-sms/");
 		public static final Uri CONTENT_CONVERSATIONS_URI = Uri.parse("content://mms-sms/conversations");
 		public static final Uri CONTENT_FILTER_BYPHONE_URI = Uri.parse("content://mms-sms/messages/byphone");
 
-		public static final class PendingMessages {
+		public static final class PendingMessages implements android.provider.BaseColumns {
 			public static final Uri CONTENT_URI = Uri.withAppendedPath(MmsSms.CONTENT_URI, "pending");
 		}
 	}
@@ -163,7 +163,7 @@ public class Telephony {
 		}
 	}
 
-	public static final class Carriers {
+	public static final class Carriers implements android.provider.BaseColumns {
 		public static final Uri CONTENT_URI = Uri.parse("content://telephony/carriers");
 	}
 }
