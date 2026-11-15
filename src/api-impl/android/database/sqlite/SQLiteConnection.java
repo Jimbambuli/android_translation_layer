@@ -117,7 +117,15 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 	private int mCancellationSignalAttachCount;
 
 	private static native long nativeOpen(String path, int openFlags, String label,
-	                                      boolean enableTrace, boolean enableProfile);
+	                                      boolean enableTrace, boolean enableProfile,
+	                                      int lookasideSlotSize, int lookasideSlotCount);
+	private static native void nativeRegisterCustomScalarFunction(long connectionPtr, String name,
+	                                                              java.util.function.UnaryOperator<String> function);
+	private static native void nativeRegisterCustomAggregateFunction(long connectionPtr, String name,
+	                                                                 java.util.function.BinaryOperator<String> function);
+	private static native long nativeLastInsertRowId(long connectionPtr);
+	private static native long nativeChanges(long connectionPtr);
+	private static native long nativeTotalChanges(long connectionPtr);
 	private static native void nativeClose(long connectionPtr);
 	private static native void nativeRegisterCustomFunction(long connectionPtr,
 	                                                        SQLiteCustomFunction function);
@@ -210,7 +218,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 	private void open() {
 		mConnectionPtr = nativeOpen(mConfiguration.path, mConfiguration.openFlags,
 		                            mConfiguration.label,
-		                            SQLiteDebug.DEBUG_SQL_STATEMENTS, SQLiteDebug.DEBUG_SQL_TIME);
+		                            SQLiteDebug.DEBUG_SQL_STATEMENTS, SQLiteDebug.DEBUG_SQL_TIME,
+		                            mConfiguration.lookasideSlotSize, mConfiguration.lookasideSlotCount);
 
 		setPageSize();
 		setForeignKeyModeFromConfiguration();
@@ -226,7 +235,31 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 			SQLiteCustomFunction function = mConfiguration.customFunctions.get(i);
 			nativeRegisterCustomFunction(mConnectionPtr, function);
 		}
+		// AOSP: register the custom scalar and aggregate functions of SQLiteDatabase.setCustom*Function()
+		for (java.util.Map.Entry<String, java.util.function.UnaryOperator<String>> e : mConfiguration.customScalarFunctions.entrySet()) {
+			nativeRegisterCustomScalarFunction(mConnectionPtr, e.getKey(), e.getValue());
+		}
+		for (java.util.Map.Entry<String, java.util.function.BinaryOperator<String>> e : mConfiguration.customAggregateFunctions.entrySet()) {
+			nativeRegisterCustomAggregateFunction(mConnectionPtr, e.getKey(), e.getValue());
+		}
 		executePerConnectionSqlFromConfiguration(0);
+	}
+
+	/* AOSP SQLiteConnection.acquirePersistentStatement(): a prepared statement that stays acquired until released */
+	PreparedStatement acquirePersistentStatement(String sql) {
+		return acquirePreparedStatement(sql);
+	}
+
+	long getLastInsertRowId() {
+		return nativeLastInsertRowId(mConnectionPtr);
+	}
+
+	long getLastChangedRowCount() {
+		return nativeChanges(mConnectionPtr);
+	}
+
+	long getTotalChangedRowCount() {
+		return nativeTotalChanges(mConnectionPtr);
 	}
 
 	// AOSP SQLiteConnection.executePerConnectionSqlFromConfiguration
@@ -313,8 +346,8 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 				setJournalMode("WAL");
 				setSyncMode(SQLiteGlobal.getWALSyncMode());
 			} else {
-				setJournalMode(SQLiteGlobal.getDefaultJournalMode());
-				setSyncMode(SQLiteGlobal.getDefaultSyncMode());
+				setJournalMode(mConfiguration.journalMode != null ? mConfiguration.journalMode : SQLiteGlobal.getDefaultJournalMode());
+				setSyncMode(mConfiguration.syncMode != null && !mConfiguration.syncMode.isEmpty() ? mConfiguration.syncMode : SQLiteGlobal.getDefaultSyncMode());
 			}
 		}
 	}
@@ -911,7 +944,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 		}
 	}
 
-	private PreparedStatement acquirePreparedStatement(String sql) {
+	PreparedStatement acquirePreparedStatement(String sql) {
 		PreparedStatement statement = mPreparedStatementCache.get(sql);
 		boolean skipCache = false;
 		if (statement != null) {
@@ -946,7 +979,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 		return statement;
 	}
 
-	private void releasePreparedStatement(PreparedStatement statement) {
+	void releasePreparedStatement(PreparedStatement statement) {
 		statement.mInUse = false;
 		if (statement.mInCache) {
 			try {
@@ -1251,7 +1284,7 @@ public final class SQLiteConnection implements CancellationSignal.OnCancelListen
 	 * resource disposal because all native statement objects must be freed before
 	 * the native database object can be closed.  So no finalizers here.
 	 */
-	private static final class PreparedStatement {
+	static final class PreparedStatement {
 		// Next item in pool.
 		public PreparedStatement mPoolNext;
 

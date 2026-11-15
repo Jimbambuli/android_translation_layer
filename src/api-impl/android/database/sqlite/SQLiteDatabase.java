@@ -253,9 +253,25 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
 	private SQLiteDatabase(String path, int openFlags, CursorFactory cursorFactory,
 	                       DatabaseErrorHandler errorHandler) {
+		this(path, openFlags, cursorFactory, errorHandler, -1, -1, -1, null, null);
+	}
+
+	/* AOSP SQLiteDatabase(...): the OpenParams variant, in-memory databases never close idle connections */
+	private SQLiteDatabase(String path, int openFlags, CursorFactory cursorFactory,
+	                       DatabaseErrorHandler errorHandler, int lookasideSlotSize, int lookasideSlotCount,
+	                       long idleConnectionTimeoutMs, String journalMode, String syncMode) {
 		mCursorFactory = cursorFactory;
 		mErrorHandler = errorHandler != null ? errorHandler : new DefaultDatabaseErrorHandler();
 		mConfigurationLocked = new SQLiteDatabaseConfiguration(path, openFlags);
+		mConfigurationLocked.lookasideSlotSize = lookasideSlotSize;
+		mConfigurationLocked.lookasideSlotCount = lookasideSlotCount;
+		long effectiveTimeoutMs = Long.MAX_VALUE;
+		if (!mConfigurationLocked.isInMemoryDb() && idleConnectionTimeoutMs >= 0) {
+			effectiveTimeoutMs = idleConnectionTimeoutMs;
+		}
+		mConfigurationLocked.idleConnectionTimeoutMs = effectiveTimeoutMs;
+		mConfigurationLocked.journalMode = journalMode;
+		mConfigurationLocked.syncMode = syncMode;
 	}
 
 	@Override
@@ -2255,5 +2271,214 @@ public final class SQLiteDatabase extends SQLiteClosable {
 
 	public void enableLocalizedCollators() {
 		mConnectionPoolLocked.enableLocalizedCollators();
+	}
+
+	private static void checkArgument(boolean expression, String message, Object... args) {
+		if (!expression) {
+			throw new IllegalArgumentException(String.format(message, args));
+		}
+	}
+
+	/* AOSP SQLiteDatabase.OpenParams */
+    public static final class OpenParams {
+	    private final int mOpenFlags;
+	    private final CursorFactory mCursorFactory;
+	    private final DatabaseErrorHandler mErrorHandler;
+	    private final int mLookasideSlotSize;
+	    private final int mLookasideSlotCount;
+	    private final long mIdleConnectionTimeout;
+	    private final String mJournalMode;
+	    private final String mSyncMode;
+	    private OpenParams(int openFlags, CursorFactory cursorFactory,
+	            DatabaseErrorHandler errorHandler, int lookasideSlotSize, int lookasideSlotCount,
+	            long idleConnectionTimeout, String journalMode, String syncMode) {
+	        mOpenFlags = openFlags;
+	        mCursorFactory = cursorFactory;
+	        mErrorHandler = errorHandler;
+	        mLookasideSlotSize = lookasideSlotSize;
+	        mLookasideSlotCount = lookasideSlotCount;
+	        mIdleConnectionTimeout = idleConnectionTimeout;
+	        mJournalMode = journalMode;
+	        mSyncMode = syncMode;
+	    }
+	    @IntRange(from = -1)
+	    public int getLookasideSlotSize() {
+	        return mLookasideSlotSize;
+	    }
+	    @IntRange(from = -1)
+	    public int getLookasideSlotCount() {
+	        return mLookasideSlotCount;
+	    }
+	    public int getOpenFlags() {
+	        return mOpenFlags;
+	    }
+	    public CursorFactory getCursorFactory() {
+	        return mCursorFactory;
+	    }
+	    public DatabaseErrorHandler getErrorHandler() {
+	        return mErrorHandler;
+	    }
+	    public long getIdleConnectionTimeout() {
+	        return mIdleConnectionTimeout;
+	    }
+	    public String getJournalMode() {
+	        return mJournalMode;
+	    }
+	    public String getSynchronousMode() {
+	        return mSyncMode;
+	    }
+	    public Builder toBuilder() {
+	        return new Builder(this);
+	    }
+	    public static final class Builder {
+	        private int mLookasideSlotSize = -1;
+	        private int mLookasideSlotCount = -1;
+	        private long mIdleConnectionTimeout = -1;
+	        private int mOpenFlags;
+	        private CursorFactory mCursorFactory;
+	        private DatabaseErrorHandler mErrorHandler;
+	        private String mJournalMode;
+	        private String mSyncMode;
+	        public Builder() {
+	        }
+	        public Builder(OpenParams params) {
+	            mLookasideSlotSize = params.mLookasideSlotSize;
+	            mLookasideSlotCount = params.mLookasideSlotCount;
+	            mOpenFlags = params.mOpenFlags;
+	            mCursorFactory = params.mCursorFactory;
+	            mErrorHandler = params.mErrorHandler;
+	            mJournalMode = params.mJournalMode;
+	            mSyncMode = params.mSyncMode;
+	        }
+	        public Builder setLookasideConfig(final int slotSize,
+	                final int slotCount) {
+	            checkArgument(slotSize >= 0,
+	                    "lookasideSlotCount cannot be negative");
+	            checkArgument(slotCount >= 0,
+	                    "lookasideSlotSize cannot be negative");
+	            checkArgument(
+	                    (slotSize > 0 && slotCount > 0) || (slotCount == 0 && slotSize == 0),
+	                    "Invalid configuration: %d, %d", slotSize, slotCount);
+	            mLookasideSlotSize = slotSize;
+	            mLookasideSlotCount = slotCount;
+	            return this;
+	        }
+	        public boolean isWriteAheadLoggingEnabled() {
+	            return (mOpenFlags & ENABLE_WRITE_AHEAD_LOGGING) != 0;
+	        }
+	        public Builder setOpenFlags(int openFlags) {
+	            mOpenFlags = openFlags;
+	            return this;
+	        }
+	        public Builder addOpenFlags(int openFlags) {
+	            mOpenFlags |= openFlags;
+	            return this;
+	        }
+	        public Builder removeOpenFlags(int openFlags) {
+	            mOpenFlags &= ~openFlags;
+	            return this;
+	        }
+	        public void setWriteAheadLoggingEnabled(boolean enabled) {
+	            if (enabled) {
+	                addOpenFlags(ENABLE_WRITE_AHEAD_LOGGING);
+	            } else {
+	                removeOpenFlags(ENABLE_WRITE_AHEAD_LOGGING);
+	            }
+	        }
+	        public Builder setCursorFactory(CursorFactory cursorFactory) {
+	            mCursorFactory = cursorFactory;
+	            return this;
+	        }
+	        public Builder setErrorHandler(DatabaseErrorHandler errorHandler) {
+	            mErrorHandler = errorHandler;
+	            return this;
+	        }
+	        public Builder setIdleConnectionTimeout(
+	                long idleConnectionTimeoutMs) {
+	            checkArgument(idleConnectionTimeoutMs >= 0,
+	                    "idle connection timeout cannot be negative");
+	            mIdleConnectionTimeout = idleConnectionTimeoutMs;
+	            return this;
+	        }
+	        public Builder setJournalMode(String journalMode) {
+	            java.util.Objects.requireNonNull(journalMode);
+	            mJournalMode = journalMode;
+	            return this;
+	        }
+	        public Builder setSynchronousMode(String syncMode) {
+	            java.util.Objects.requireNonNull(syncMode);
+	            mSyncMode = syncMode;
+	            return this;
+	        }
+
+	        public OpenParams build() {
+	            return new OpenParams(mOpenFlags, mCursorFactory, mErrorHandler, mLookasideSlotSize,
+	                                  mLookasideSlotCount, mIdleConnectionTimeout, mJournalMode, mSyncMode);
+	        }
+	    }
+	}
+
+	public static SQLiteDatabase openDatabase(File path, OpenParams openParams) {
+		return openDatabase(path.getPath(), openParams);
+	}
+
+	private static SQLiteDatabase openDatabase(String path, OpenParams openParams) {
+		checkArgument(openParams != null, "OpenParams cannot be null");
+		SQLiteDatabase db = new SQLiteDatabase(path, openParams.mOpenFlags, openParams.mCursorFactory, openParams.mErrorHandler,
+		                                       openParams.mLookasideSlotSize, openParams.mLookasideSlotCount,
+		                                       openParams.mIdleConnectionTimeout, openParams.mJournalMode, openParams.mSyncMode);
+		db.open();
+		return db;
+	}
+
+	public static SQLiteDatabase createInMemory(OpenParams openParams) {
+		return openDatabase(SQLiteDatabaseConfiguration.MEMORY_DB_PATH, openParams.toBuilder().addOpenFlags(CREATE_IF_NECESSARY).build());
+	}
+
+	public void setCustomScalarFunction(String functionName, java.util.function.UnaryOperator<String> scalarFunction) throws SQLiteException {
+		java.util.Objects.requireNonNull(functionName);
+		java.util.Objects.requireNonNull(scalarFunction);
+		synchronized (mLock) {
+			throwIfNotOpenLocked();
+			mConfigurationLocked.customScalarFunctions.put(functionName, scalarFunction);
+			try {
+				mConnectionPoolLocked.reconfigure(mConfigurationLocked);
+			} catch (RuntimeException ex) {
+				mConfigurationLocked.customScalarFunctions.remove(functionName);
+				throw ex;
+			}
+		}
+	}
+
+	public void setCustomAggregateFunction(String functionName, java.util.function.BinaryOperator<String> aggregateFunction) throws SQLiteException {
+		java.util.Objects.requireNonNull(functionName);
+		java.util.Objects.requireNonNull(aggregateFunction);
+		synchronized (mLock) {
+			throwIfNotOpenLocked();
+			mConfigurationLocked.customAggregateFunctions.put(functionName, aggregateFunction);
+			try {
+				mConnectionPoolLocked.reconfigure(mConfigurationLocked);
+			} catch (RuntimeException ex) {
+				mConfigurationLocked.customAggregateFunctions.remove(functionName);
+				throw ex;
+			}
+		}
+	}
+
+	public SQLiteRawStatement createRawStatement(String sql) {
+		java.util.Objects.requireNonNull(sql);
+		return new SQLiteRawStatement(this, sql);
+	}
+
+	public long getLastInsertRowId() {
+		return getThreadSession().getLastInsertRowId();
+	}
+
+	public long getLastChangedRowCount() {
+		return getThreadSession().getLastChangedRowCount();
+	}
+
+	public long getTotalChangedRowCount() {
+		return getThreadSession().getTotalChangedRowCount();
 	}
 }
