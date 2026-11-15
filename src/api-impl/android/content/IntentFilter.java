@@ -156,6 +156,26 @@ public class IntentFilter implements android.os.Parcelable {
 		addAction(action);
 	}
 
+	/* AOSP IntentFilter(String, String): the action and the data type */
+	public IntentFilter(String action, String dataType) throws MalformedMimeTypeException {
+		addAction(action);
+		addDataType(dataType);
+	}
+
+	/* AOSP IntentFilter(IntentFilter): copies the lists of the filter (the fields ATL keeps) */
+	public IntentFilter(IntentFilter o) {
+		actions = new ArrayList<>(o.actions);
+		categories = new java.util.LinkedHashSet<>(o.categories);
+		dataSchemes = new ArrayList<>(o.dataSchemes);
+		dataAuthorities = new ArrayList<>(o.dataAuthorities);
+		if (o.dataPaths != null)
+			dataPaths = new ArrayList<>(o.dataPaths);
+		if (o.dataTypes != null)
+			dataTypes = new ArrayList<>(o.dataTypes);
+		hasPartialTypes = o.hasPartialTypes;
+		autoVerify = o.autoVerify;
+	}
+
 	public void addAction(String action) {
 		actions.add(action);
 	}

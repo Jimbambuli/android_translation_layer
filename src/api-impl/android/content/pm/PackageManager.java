@@ -3453,6 +3453,20 @@ public class PackageManager {
 	 *
 	 * @see #getResourcesForApplication(ApplicationInfo)
 	 */
+	/* AOSP getResourcesForApplication(ApplicationInfo, Configuration): the app's resources with the override
+	 * configuration (null: the app's own) */
+	public Resources getResourcesForApplication(ApplicationInfo app, android.content.res.Configuration configuration) throws NameNotFoundException {
+		Resources res = getResourcesForApplication(app);
+		if (configuration == null)
+			return res;
+		return new Resources(res.getAssets(), res.getDisplayMetrics(), new android.content.res.Configuration(configuration));
+	}
+
+	/* AOSP getPackageGids(String, int) -> getPackageGids(String, PackageInfoFlags.of(flags)) */
+	public int[] getPackageGids(String packageName, int flags) throws NameNotFoundException {
+		return getPackageGids(packageName, PackageInfoFlags.of(flags));
+	}
+
 	public Resources getResourcesForApplication(String appPackageName) throws NameNotFoundException {
 		ATLLoadedApp app = ATLLoadedAppManager.getAppFromPackageName(appPackageName);
 		if (app == null)
