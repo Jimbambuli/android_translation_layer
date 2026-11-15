@@ -209,6 +209,105 @@ public class InputMethodService extends AbstractInputMethodService {
 		return input_connection;
 	}
 
+	/* Defaults as in AOSP InputMethodService. ATL has no extract view (mExtractEditText == null), no other input
+	 * methods and no IMM window state, so those branches reduce to what the AOSP body does in that state. */
+	public void onInitializeInterface() {}
+
+	public void onUnbindInput() {}
+
+	public void onWindowShown() {}
+
+	public void onWindowHidden() {}
+
+	public void onUpdateCursorAnchorInfo(android.view.inputmethod.CursorAnchorInfo cursorAnchorInfo) {}
+
+	public void onExtractedCursorMovement(int dx, int dy) {}
+
+	public void onExtractedTextClicked() {}
+
+	public void onUpdateSelection(int oldSelStart, int oldSelEnd, int newSelStart, int newSelEnd, int candidatesStart, int candidatesEnd) {}
+
+	public void onFinishInputView(boolean finishingInput) {
+		if (!finishingInput) {
+			InputConnection ic = getCurrentInputConnection();
+			if (ic != null)
+				ic.finishComposingText();
+		}
+	}
+
+	public boolean onEvaluateFullscreenMode() {
+		Configuration config = getResources().getConfiguration();
+		if (config.orientation != Configuration.ORIENTATION_LANDSCAPE)
+			return false;
+		EditorInfo info = getCurrentInputEditorInfo();
+		return info == null || (info.imeOptions & EditorInfo.IME_FLAG_NO_FULLSCREEN) == 0;
+	}
+
+	/* AOSP: mDecorViewVisible, i.e. the keyboard window is up */
+	public boolean isInputViewShown() {
+		return kb_dialog != null && kb_dialog.isShowing();
+	}
+
+	public void showWindow(boolean showInput) {
+		if (kb_dialog != null)
+			kb_dialog.show();
+	}
+
+	public void hideWindow() {
+		if (kb_dialog != null)
+			kb_dialog.hide();
+	}
+
+	/* AOSP without the settings observer's hard-keyboard preference: not shown when the view is not wanted, or
+	 * when only implicit and the IME would be fullscreen and is not up yet. */
+	public boolean onShowInputRequested(int flags, boolean configChange) {
+		if (!onEvaluateInputViewShown())
+			return false;
+		if ((flags & android.view.inputmethod.InputMethod.SHOW_EXPLICIT) == 0) {
+			if (!configChange && onEvaluateFullscreenMode() && !isInputViewShown())
+				return false;
+			if (getResources().getConfiguration().keyboard != Configuration.KEYBOARD_NOKEYS)
+				return false;
+		}
+		return true;
+	}
+
+	/* AOSP routes these through mPrivOps (InputMethodManagerService); ATL has a single input method: nothing to
+	 * switch to. */
+	public final boolean shouldOfferSwitchingToNextInputMethod() {
+		return false;
+	}
+
+	public final boolean switchToNextInputMethod(boolean onlyCurrentIme) {
+		return false;
+	}
+
+	public final boolean switchToPreviousInputMethod() {
+		return false;
+	}
+
+	public void switchInputMethod(String id) {}
+
+	public final void switchInputMethod(String id, android.view.inputmethod.InputMethodSubtype subtype) {}
+
+	/* AOSP: ISE after onCreate(); isHighEndGfx() is true on a desktop (not a low-RAM device) */
+	@Deprecated
+	public boolean enableHardwareAcceleration() {
+		if (kb_dialog != null)
+			throw new IllegalStateException("Must be called before onCreate()");
+		return true;
+	}
+
+	/* BACK/movement handling needs the extract view and the IME window state: not handled (AOSP returns false
+	 * for movement keys without an extract view, and for BACK when the window is not shown). */
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		return false;
+	}
+
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		return false;
+	}
+
 	/* --- */
 
 	public AbstractInputMethodImpl onCreateInputMethodInterface() {
