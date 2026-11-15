@@ -82,6 +82,13 @@ public interface TextClassifier {
 		return classifyText(request);
 	}
 
+	/** AOSP default TextClassifier.detectLanguage(): no language detected */
+	default TextLanguage detectLanguage(TextLanguage.Request request) {
+		Objects.requireNonNull(request);
+		Utils.checkMainThread();
+		return TextLanguage.EMPTY;
+	}
+
 	/** AOSP default: the maximum length of text that can be processed by generateLinks(); none here */
 	default int getMaxGenerateLinksTextLength() {
 		return 0;

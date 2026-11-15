@@ -1174,6 +1174,7 @@ srcs = [
 	'android/view/textclassifier/TextClassificationManager.java',
 	'android/view/textclassifier/TextClassificationSession.java',
 	'android/view/textclassifier/TextClassifier.java',
+	'android/view/textclassifier/TextLanguage.java',
 	'android/view/textclassifier/TextSelection.java',
 	'android/view/textservice/SentenceSuggestionsInfo.java',
 	'android/view/textservice/SpellCheckerInfo.java',
