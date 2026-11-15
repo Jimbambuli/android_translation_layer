@@ -63,6 +63,12 @@ public class InputDevice {
 		return false;
 	}
 
+	/* AOSP 16 InputDevice.isExternal(): mIsExternal. ATL's single device presents itself as the
+	 * built-in touchscreen (getSources(), isVirtual() false), which is not external */
+	public boolean isExternal() {
+		return false;
+	}
+
 	public int getSources() {
 		return 2 | 4098 /* SOURCE_CLASS_POINTER | SOURCE_TOUCHSCREEN */; // FIXME
 	}
