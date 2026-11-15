@@ -10,6 +10,8 @@ import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.view.GestureDetector;
+import java.lang.ref.WeakReference;
+import java.util.HashMap;
 
 public class PendingIntent implements Parcelable {
 	public static final int FLAG_ONE_SHOT = 1 << 30;
@@ -48,8 +50,93 @@ public class PendingIntent implements Parcelable {
 		this.intent = intent;
 		this.type = type;
 	}
+
+	/* AOSP PendingIntentRecord.Key: the same type, request code, intent (Intent.filterEquals(), the
+	 * extras do not count) and flags give the same PendingIntent. ATL has one app and one user, so
+	 * package, feature, user and activity token are left out. */
+	private static final class Key {
+		final int type;
+		final int requestCode;
+		final Intent requestIntent;
+		final int flags;
+
+		Key(int type, int requestCode, Intent requestIntent, int flags) {
+			this.type = type;
+			this.requestCode = requestCode;
+			this.requestIntent = requestIntent;
+			this.flags = flags;
+		}
+
+		@Override
+		public boolean equals(Object otherObj) {
+			if (!(otherObj instanceof Key))
+				return false;
+			Key other = (Key)otherObj;
+			if (type != other.type || requestCode != other.requestCode || flags != other.flags)
+				return false;
+			if (requestIntent != other.requestIntent) {
+				if (requestIntent != null) {
+					if (!requestIntent.filterEquals(other.requestIntent))
+						return false;
+				} else if (other.requestIntent != null) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		@Override
+		public int hashCode() {
+			int hash = 7;
+			hash = (hash * 31) + flags;
+			hash = (hash * 31) + requestCode;
+			if (requestIntent != null)
+				hash = (hash * 31) + requestIntent.filterHashCode();
+			hash = (hash * 31) + type;
+			return hash;
+		}
+	}
+
+	/* AOSP PendingIntentController.mIntentSenderRecords */
+	private static final HashMap<Key, WeakReference<PendingIntent>> sRecords = new HashMap<>();
+
+	private Key key;
+	private boolean canceled;
+
+	/* AOSP PendingIntentController.getIntentSender(): an existing PendingIntent is returned
+	 * (FLAG_UPDATE_CURRENT replaces its extras with the new intent's), FLAG_CANCEL_CURRENT cancels
+	 * it and makes a new one, FLAG_NO_CREATE returns null instead of making one */
+	private static PendingIntent getIntentSender(int type, int requestCode, Intent intent, int flags) {
+		final boolean noCreate = (flags & FLAG_NO_CREATE) != 0;
+		final boolean cancelCurrent = (flags & FLAG_CANCEL_CURRENT) != 0;
+		final boolean updateCurrent = (flags & FLAG_UPDATE_CURRENT) != 0;
+		flags &= ~(FLAG_NO_CREATE | FLAG_CANCEL_CURRENT | FLAG_UPDATE_CURRENT);
+		Key key = new Key(type, requestCode, intent == null ? null : new Intent(intent), flags);
+		synchronized (sRecords) {
+			WeakReference<PendingIntent> ref = sRecords.get(key);
+			PendingIntent rec = ref != null ? ref.get() : null;
+			if (rec != null) {
+				if (!cancelCurrent) {
+					if (updateCurrent && rec.intent != null) {
+						Bundle extras = intent != null ? intent.getExtras() : null;
+						rec.intent.replaceExtras(extras != null ? new Bundle(extras) : null);
+					}
+					return rec;
+				}
+				rec.canceled = true;
+				sRecords.remove(key);
+			}
+			if (noCreate)
+				return rec;
+			rec = new PendingIntent(requestCode, key.requestIntent, type);
+			rec.key = key;
+			sRecords.put(key, new WeakReference<>(rec));
+			return rec;
+		}
+	}
+
 	public static PendingIntent getBroadcast(Context context, int requestCode, Intent intent, int flags) {
-		return new PendingIntent(requestCode, intent, 2);
+		return getIntentSender(2, requestCode, intent, flags);
 	}
 
 	/** @hide AOSP asks the system server for it, ATL holds it */
@@ -131,7 +218,17 @@ public class PendingIntent implements Parcelable {
 		return pi;
 	}
 
+	/* AOSP PendingIntentRecord.sendInner(): a canceled PendingIntent is not sent; FLAG_ONE_SHOT
+	 * cancels it with the first send */
 	private void dispatch(Intent intent, int resultCode) throws CanceledException {
+		if (key != null) {
+			synchronized (sRecords) {
+				if (canceled)
+					throw new CanceledException();
+				if ((key.flags & FLAG_ONE_SHOT) != 0)
+					cancelLocked();
+			}
+		}
 		if (type == 3) {
 			resultActivity.deliverPendingResult(requestCode, resultCode, intent);
 			return;
@@ -147,7 +244,7 @@ public class PendingIntent implements Parcelable {
 	}
 
 	public static PendingIntent getActivity(Context context, int requestCode, Intent intent, int flags) {
-		return new PendingIntent(requestCode, intent, 0);
+		return getIntentSender(0, requestCode, intent, flags);
 	}
 
 	/* AOSP: the options are kept by the system for the activity start; ATL starts without them */
@@ -160,11 +257,11 @@ public class PendingIntent implements Parcelable {
 	}
 
 	public static PendingIntent getService(Context context, int requestCode, Intent intent, int flags) {
-		return new PendingIntent(requestCode, intent, 1);
+		return getIntentSender(1, requestCode, intent, flags);
 	}
 
 	public static PendingIntent getActivities(Context context, int requestCode, Intent[] intents, int flags, Bundle options) {
-		return new PendingIntent(requestCode, intents[0], 0);
+		return getIntentSender(0, requestCode, intents[0], flags);
 	}
 
 	public String toString() {
@@ -172,7 +269,22 @@ public class PendingIntent implements Parcelable {
 		     + new String[] {"activity", "service", "broadcast"}[type] + "]";
 	}
 
-	public void cancel() {}
+	/* AOSP PendingIntentController.cancelIntentSender(): the PendingIntent is canceled and
+	 * forgotten, a later get*() with the same arguments makes a new one */
+	public void cancel() {
+		synchronized (sRecords) {
+			cancelLocked();
+		}
+	}
+
+	private void cancelLocked() {
+		canceled = true;
+		if (key != null) {
+			WeakReference<PendingIntent> ref = sRecords.get(key);
+			if (ref != null && ref.get() == this)
+				sRecords.remove(key);
+		}
+	}
 
 	public static class CanceledException extends android.util.AndroidException {
 		public CanceledException() {
