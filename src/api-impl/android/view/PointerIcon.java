@@ -1,12 +1,22 @@
 package android.view;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.content.res.XmlResourceParser;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
+import com.android.internal.util.XmlUtils;
 
 /**
  * Represents an icon that can be used as a mouse pointer (AOSP android.view.PointerIcon). A system icon is
- * known by its type; ATL does not draw custom icons, the desktop's cursor of that type stands for it.
+ * known by its type; ATL does not draw custom icons, the desktop's cursor of that type stands for it. Custom icons
+ * (create(), load()) keep their bitmap and hot spot as in AOSP android-16.0.0_r4 PointerIcon.
  */
 public final class PointerIcon {
+	public static final int TYPE_CUSTOM = -1;
 	public static final int TYPE_NOT_SPECIFIED = 1;
 	public static final int TYPE_NULL = 0;
 	public static final int TYPE_ARROW = 1000;
@@ -33,9 +43,85 @@ public final class PointerIcon {
 	public static final int TYPE_DEFAULT = TYPE_ARROW;
 
 	private final int mType;
+	private Bitmap mBitmap;
+	private float mHotSpotX;
+	private float mHotSpotY;
 
 	private PointerIcon(int type) {
 		mType = type;
+	}
+
+	/** AOSP PointerIcon.create(): a custom icon from a bitmap; the hot spot must lie inside the bitmap */
+	public static PointerIcon create(Bitmap bitmap, float hotSpotX, float hotSpotY) {
+		if (bitmap == null) {
+			throw new IllegalArgumentException("bitmap must not be null");
+		}
+		validateHotSpot(bitmap, hotSpotX, hotSpotY);
+		PointerIcon icon = new PointerIcon(TYPE_CUSTOM);
+		icon.mBitmap = bitmap;
+		icon.mHotSpotX = hotSpotX;
+		icon.mHotSpotY = hotSpotY;
+		return icon;
+	}
+
+	/** AOSP PointerIcon.load(): a custom icon from a <pointer-icon> XML resource (bitmap, hotSpotX, hotSpotY);
+	 * AOSP's animated icons keep only their first frame here */
+	public static PointerIcon load(Resources resources, int resourceId) {
+		if (resources == null) {
+			throw new IllegalArgumentException("resources must not be null");
+		}
+		final XmlResourceParser parser = resources.getXml(resourceId);
+		final int bitmapRes;
+		final float hotSpotX;
+		final float hotSpotY;
+		try {
+			XmlUtils.beginDocument(parser, "pointer-icon");
+			final TypedArray a = resources.obtainAttributes(parser, com.android.internal.R.styleable.PointerIcon);
+			bitmapRes = a.getResourceId(com.android.internal.R.styleable.PointerIcon_bitmap, 0);
+			hotSpotX = (int)a.getDimension(com.android.internal.R.styleable.PointerIcon_hotSpotX, 0);
+			hotSpotY = (int)a.getDimension(com.android.internal.R.styleable.PointerIcon_hotSpotY, 0);
+			a.recycle();
+		} catch (Exception ex) {
+			throw new IllegalArgumentException("Exception parsing pointer icon resource.", ex);
+		} finally {
+			parser.close();
+		}
+		if (bitmapRes == 0) {
+			throw new IllegalArgumentException("<pointer-icon> is missing bitmap attribute.");
+		}
+		Drawable drawable = resources.getDrawable(bitmapRes, null);
+		if (drawable instanceof android.graphics.drawable.AnimationDrawable) {
+			drawable = ((android.graphics.drawable.AnimationDrawable)drawable).getFrame(0);
+		}
+		final Bitmap bitmap;
+		if (drawable instanceof BitmapDrawable) {
+			bitmap = ((BitmapDrawable)drawable).getBitmap();
+		} else {
+			/* AOSP draws a VectorDrawable into a bitmap of its intrinsic size */
+			final int w = drawable.getIntrinsicWidth();
+			final int h = drawable.getIntrinsicHeight();
+			if (w <= 0 || h <= 0) {
+				throw new IllegalArgumentException("<pointer-icon> bitmap attribute must refer to a bitmap drawable.");
+			}
+			bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+			drawable.setBounds(0, 0, w, h);
+			drawable.draw(new Canvas(bitmap));
+		}
+		validateHotSpot(bitmap, hotSpotX, hotSpotY);
+		PointerIcon icon = new PointerIcon(TYPE_CUSTOM);
+		icon.mBitmap = bitmap;
+		icon.mHotSpotX = hotSpotX;
+		icon.mHotSpotY = hotSpotY;
+		return icon;
+	}
+
+	private static void validateHotSpot(Bitmap bitmap, float hotSpotX, float hotSpotY) {
+		if (hotSpotX < 0 || hotSpotX >= bitmap.getWidth()) {
+			throw new IllegalArgumentException("x hotspot lies outside of the bitmap area");
+		}
+		if (hotSpotY < 0 || hotSpotY >= bitmap.getHeight()) {
+			throw new IllegalArgumentException("y hotspot lies outside of the bitmap area");
+		}
 	}
 
 	/** AOSP PointerIcon.getSystemIcon(): the icon of a type; TYPE_NOT_SPECIFIED is a mistake, invalid types throw */
@@ -61,7 +147,15 @@ public final class PointerIcon {
 		if (other == null || !(other instanceof PointerIcon)) {
 			return false;
 		}
-		return mType == ((PointerIcon)other).mType;
+		PointerIcon otherIcon = (PointerIcon)other;
+		if (mType != otherIcon.mType) {
+			return false;
+		}
+		/* AOSP: custom icons are equal only with the same bitmap and hot spot */
+		if (mType == TYPE_CUSTOM) {
+			return mBitmap == otherIcon.mBitmap && mHotSpotX == otherIcon.mHotSpotX && mHotSpotY == otherIcon.mHotSpotY;
+		}
+		return true;
 	}
 
 	@Override
