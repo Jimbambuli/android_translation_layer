@@ -307,7 +307,24 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return getWindow().requestFeature(featureId);
 	}
 
-	public final void setVolumeControlStream(int streamType) {}
+	/* AOSP Activity.setVolumeControlStream()/getVolumeControlStream(): the window's */
+	public final void setVolumeControlStream(int streamType) {
+		getWindow().setVolumeControlStream(streamType);
+	}
+
+	public final int getVolumeControlStream() {
+		return getWindow().getVolumeControlStream();
+	}
+
+	/* AOSP Activity.onActivityReenter(): empty hook (called when a started activity finished with a shared
+	 * element transition) */
+	public void onActivityReenter(int resultCode, Intent data) {}
+
+	/* AOSP Activity.startIntentSenderFromChild() (deprecated): startIntentSenderForResult() of this activity */
+	@Deprecated
+	public void startIntentSenderFromChild(Activity child, IntentSender intent, int requestCode, Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags) throws IntentSender.SendIntentException {
+		startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags, null);
+	}
 
 	protected void onCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onCreate - yay!");
@@ -1548,6 +1565,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 	public void registerForContextMenu(View view) {}
 
+	/* AOSP Activity.unregisterForContextMenu(): view.setOnCreateContextMenuListener(null) */
+	public void unregisterForContextMenu(View view) {
+		view.setOnCreateContextMenuListener(null);
+	}
+
 	public void onCreateContextMenu(android.view.ContextMenu menu, View v, android.view.ContextMenu.ContextMenuInfo menuInfo) {}
 	public native boolean isInMultiWindowMode();
 
@@ -2082,10 +2104,74 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		performPostStart();
 	}
 
+	/* AOSP Activity.ManagedCursor: a cursor of startManagingCursor()/managedQuery() with its state for stop/restart */
+	private static final class ManagedCursor {
+		ManagedCursor(android.database.Cursor cursor) {
+			mCursor = cursor;
+		}
+
+		private final android.database.Cursor mCursor;
+		private boolean mReleased;
+		private boolean mUpdated;
+	}
+
+	private final ArrayList<ManagedCursor> mManagedCursors = new ArrayList<>();
+
+	@Deprecated
+	public void startManagingCursor(android.database.Cursor c) {
+		synchronized (mManagedCursors) {
+			mManagedCursors.add(new ManagedCursor(c));
+		}
+	}
+
+	@Deprecated
+	public void stopManagingCursor(android.database.Cursor c) {
+		synchronized (mManagedCursors) {
+			for (int i = 0; i < mManagedCursors.size(); i++) {
+				if (mManagedCursors.get(i).mCursor == c) {
+					mManagedCursors.remove(i);
+					break;
+				}
+			}
+		}
+	}
+
+	@Deprecated
+	public final android.database.Cursor managedQuery(Uri uri, String[] projection, String selection, String sortOrder) {
+		android.database.Cursor c = getContentResolver().query(uri, projection, selection, null, sortOrder);
+		if (c != null) {
+			startManagingCursor(c);
+		}
+		return c;
+	}
+
+	@Deprecated
+	public final android.database.Cursor managedQuery(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+		android.database.Cursor c = getContentResolver().query(uri, projection, selection, selectionArgs, sortOrder);
+		if (c != null) {
+			startManagingCursor(c);
+		}
+		return c;
+	}
+
 	/* like AOSP: a stopped activity that comes back gets onRestart() before onStart() */
 	@Export
 	private void performRestart() {
 		mCanEnterPictureInPicture = true;
+		/* AOSP performRestart(): the cursors that were deactivated when the activity stopped, or that changed,
+		 * are requeried; one that cannot be requeried fails an app targeting API 14 and later */
+		synchronized (mManagedCursors) {
+			for (ManagedCursor mc : mManagedCursors) {
+				if (mc.mReleased || mc.mUpdated) {
+					if (!mc.mCursor.requery()) {
+						if (getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+							throw new IllegalStateException("trying to requery an already closed cursor  " + mc.mCursor);
+					}
+					mc.mReleased = false;
+					mc.mUpdated = false;
+				}
+			}
+		}
 		stopped = false;
 		mFragments.noteStateNotSaved();
 		ensureActivityConfiguration();
@@ -2132,6 +2218,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		dispatchActivityPreStopped();
 		mFragments.dispatchStop();
 		onStop();
+		/* AOSP performStop(): the cursors managed by the activity are deactivated */
+		synchronized (mManagedCursors) {
+			for (ManagedCursor mc : mManagedCursors) {
+				if (!mc.mReleased) {
+					mc.mCursor.deactivate();
+					mc.mReleased = true;
+				}
+			}
+		}
 		dispatchActivityPostStopped();
 		started = false;
 		stopped = true;
@@ -2163,6 +2258,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mFragments.dispatchDestroy();
 		onDestroy();
 		mFragments.doLoaderDestroy();
+		/* AOSP performDestroy(): the cursors managed by the activity are closed */
+		synchronized (mManagedCursors) {
+			for (ManagedCursor mc : mManagedCursors)
+				mc.mCursor.close();
+			mManagedCursors.clear();
+		}
 		dispatchActivityPostDestroyed();
 		Dialog.closeWindowsOf(this);
 		if (window != null)

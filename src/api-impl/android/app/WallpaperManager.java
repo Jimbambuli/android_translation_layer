@@ -29,5 +29,49 @@ public class WallpaperManager {
 		return null;
 	}
 
+	/* AOSP WallpaperManager.OnColorsChangedListener: told when the colors of the wallpaper change */
+	public interface OnColorsChangedListener {
+		void onColorsChanged(WallpaperColors colors, int which);
+	}
+
+	/* AOSP keeps the listeners and calls them when WallpaperManagerService reports new colors; ATL has no such
+	 * service, getWallpaperColors() stays null and the colors never change */
+	public void addOnColorsChangedListener(OnColorsChangedListener listener, android.os.Handler handler) {}
+
+	public void removeOnColorsChangedListener(OnColorsChangedListener callback) {}
+
+	/* AOSP DisabledWallpaperManager (what SystemServiceRegistry hands out on a device without a wallpaper service):
+	 * nothing can be read back, desired size is -1, clear() does nothing. Unlike DisabledWallpaperManager,
+	 * isWallpaperSupported()/isSetWallpaperAllowed() say true because ATL's setBitmap() does set the wallpaper. */
+	public android.graphics.drawable.Drawable getDrawable() {
+		return null;
+	}
+
+	public int getDesiredMinimumWidth() {
+		return -1;
+	}
+
+	public int getDesiredMinimumHeight() {
+		return -1;
+	}
+
+	public boolean isWallpaperSupported() {
+		return true;
+	}
+
+	public boolean isSetWallpaperAllowed() {
+		return true;
+	}
+
+	public void clear() throws java.io.IOException {}
+
+	public void clear(int which) throws java.io.IOException {}
+
+	/* DisabledWallpaperManager.setStream(): unsupported(), returns 0 */
+	public int setStream(java.io.InputStream bitmapData, android.graphics.Rect visibleCropHint, boolean allowBackup, int which)
+	    throws java.io.IOException {
+		return 0;
+	}
+
 	private static native void set_bitmap(long texture);
 }

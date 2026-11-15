@@ -55,12 +55,130 @@ public class ActivityManager {
 
 	/* the entry of the task in the list of recent apps; ATL has no such list, the window has its own title */
 	public static class TaskDescription {
-		public TaskDescription() {}
-		public TaskDescription(String name) {}
-		public TaskDescription(String name, Bitmap icon) {}
-		public TaskDescription(String name, Bitmap icon, int color) {}
-		public TaskDescription(String name, int iconRes) {}
-		public TaskDescription(String name, int iconRes, int colorPrimary) {}
+		private String mLabel;
+		private android.graphics.drawable.Icon mIcon;
+		private int mColorPrimary;
+		private int mColorBackground;
+		private int mStatusBarColor;
+		private int mNavigationBarColor;
+
+		/* AOSP ActivityManager.TaskDescription.Builder */
+		public static final class Builder {
+			private String mLabel = null;
+			private int mIconRes = 0;
+			private int mPrimaryColor = 0;
+			private int mBackgroundColor = 0;
+			private int mStatusBarColor = 0;
+			private int mNavigationBarColor = 0;
+
+			public Builder setLabel(String label) {
+				mLabel = label;
+				return this;
+			}
+
+			public Builder setIcon(int iconRes) {
+				mIconRes = iconRes;
+				return this;
+			}
+
+			public Builder setPrimaryColor(int color) {
+				mPrimaryColor = color;
+				return this;
+			}
+
+			public Builder setBackgroundColor(int color) {
+				mBackgroundColor = color;
+				return this;
+			}
+
+			public Builder setStatusBarColor(int color) {
+				mStatusBarColor = color;
+				return this;
+			}
+
+			public Builder setNavigationBarColor(int color) {
+				mNavigationBarColor = color;
+				return this;
+			}
+
+			public TaskDescription build() {
+				final android.graphics.drawable.Icon icon = mIconRes == 0 ? null : android.graphics.drawable.Icon.createWithResource(ActivityThread.currentPackageName(), mIconRes);
+				return new TaskDescription(mLabel, icon, mPrimaryColor, mBackgroundColor, mStatusBarColor, mNavigationBarColor);
+			}
+		}
+
+		/* AOSP: the label, icon and colors are kept for the system's recents list; ATL has none (the desktop
+		 * window has its own title), so nothing reads them but the getters */
+		public TaskDescription(String label, android.graphics.drawable.Icon icon, int colorPrimary, int colorBackground, int statusBarColor, int navigationBarColor) {
+			mLabel = label;
+			mIcon = icon;
+			mColorPrimary = colorPrimary;
+			mColorBackground = colorBackground;
+			mStatusBarColor = statusBarColor;
+			mNavigationBarColor = navigationBarColor;
+		}
+
+		public TaskDescription() {
+			this(null, null, 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label) {
+			this(label, null, 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label, Bitmap icon) {
+			this(label, icon != null ? android.graphics.drawable.Icon.createWithBitmap(icon) : null, 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label, Bitmap icon, int colorPrimary) {
+			this(label, icon != null ? android.graphics.drawable.Icon.createWithBitmap(icon) : null, colorPrimary, 0, 0, 0);
+			if ((colorPrimary != 0) && (android.graphics.Color.alpha(colorPrimary) != 255))
+				throw new RuntimeException("A TaskDescription's primary color should be opaque");
+		}
+
+		public TaskDescription(String label, int iconRes) {
+			this(label, android.graphics.drawable.Icon.createWithResource(ActivityThread.currentPackageName(), iconRes), 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label, int iconRes, int colorPrimary) {
+			this(label, android.graphics.drawable.Icon.createWithResource(ActivityThread.currentPackageName(), iconRes), colorPrimary, 0, 0, 0);
+			if ((colorPrimary != 0) && (android.graphics.Color.alpha(colorPrimary) != 255))
+				throw new RuntimeException("A TaskDescription's primary color should be opaque");
+		}
+
+		public TaskDescription(TaskDescription td) {
+			this(td.mLabel, td.mIcon, td.mColorPrimary, td.mColorBackground, td.mStatusBarColor, td.mNavigationBarColor);
+		}
+
+		public String getLabel() { return mLabel; }
+
+		public int getPrimaryColor() { return mColorPrimary; }
+
+		public int getBackgroundColor() { return mColorBackground; }
+
+		public int getStatusBarColor() { return mStatusBarColor; }
+
+		public int getNavigationBarColor() { return mNavigationBarColor; }
+
+		public void setLabel(String label) { mLabel = label; }
+
+		public void setPrimaryColor(int primaryColor) {
+			if ((primaryColor != 0) && (android.graphics.Color.alpha(primaryColor) != 255))
+				throw new RuntimeException("A TaskDescription's primary color should be opaque");
+			mColorPrimary = primaryColor;
+		}
+
+		public void setBackgroundColor(int backgroundColor) {
+			if ((backgroundColor != 0) && (android.graphics.Color.alpha(backgroundColor) != 255))
+				throw new RuntimeException("A TaskDescription's background color should be opaque");
+			mColorBackground = backgroundColor;
+		}
+
+		public void setStatusBarColor(int statusBarColor) { mStatusBarColor = statusBarColor; }
+
+		public void setNavigationBarColor(int navigationBarColor) { mNavigationBarColor = navigationBarColor; }
+
+		public void setIcon(android.graphics.drawable.Icon icon) { mIcon = icon; }
 	}
 
 	/* the app's processes (android:process, see ATLProcess); a process started by the main process knows itself */
@@ -105,16 +223,23 @@ public class ActivityManager {
 	}
 
 	public static class MemoryInfo implements Parcelable {
-		/* For now, just always report there's 10GB free RAM */
-		public long availMem = 10000;
+		public long availMem;
 
-		public long totalMem = 10000;
+		public long totalMem;
 
-		public long advertisedMem = 10000;
+		public long advertisedMem;
 
-		public long threshold = 200;
+		public long threshold;
 
-		public boolean lowMemory = false;
+		public boolean lowMemory;
+
+		public long hiddenAppThreshold;
+
+		public long secondaryServerThreshold;
+
+		public long visibleAppThreshold;
+
+		public long foregroundAppThreshold;
 
 		public int describeContents() {
 			return 0;
@@ -126,6 +251,10 @@ public class ActivityManager {
 			dest.writeLong(advertisedMem);
 			dest.writeLong(threshold);
 			dest.writeInt(lowMemory ? 1 : 0);
+			dest.writeLong(hiddenAppThreshold);
+			dest.writeLong(secondaryServerThreshold);
+			dest.writeLong(visibleAppThreshold);
+			dest.writeLong(foregroundAppThreshold);
 		}
 
 		public void readFromParcel(Parcel source) {
@@ -134,6 +263,10 @@ public class ActivityManager {
 			advertisedMem = source.readLong();
 			threshold = source.readLong();
 			lowMemory = source.readInt() != 0;
+			hiddenAppThreshold = source.readLong();
+			secondaryServerThreshold = source.readLong();
+			visibleAppThreshold = source.readLong();
+			foregroundAppThreshold = source.readLong();
 		}
 
 		public static final Parcelable.Creator<MemoryInfo> CREATOR = new Parcelable.Creator<MemoryInfo>() {
@@ -149,8 +282,47 @@ public class ActivityManager {
 		};
 	}
 
+	/* AOSP ProcessList.getMemoryInfo(): availMem = MemFree + Cached and totalMem = MemTotal of /proc/meminfo
+	 * (android_util_Process.cpp), the thresholds the low memory killer levels of ProcessList.updateOomLevels()
+	 * (max scale, 64 bit: foreground 73728 KB, visible 92160 KB, cached/home/service 221184 KB, which for a
+	 * device with less than 700 MB would need the display size too: this takes the memory scale only);
+	 * advertisedMem is totalMem here (not looked up) */
 	public void getMemoryInfo(MemoryInfo outInfo) {
-		outInfo = new MemoryInfo();
+		long free = 0, cached = 0, total = 0;
+		try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader("/proc/meminfo"))) {
+			String line;
+			while ((line = r.readLine()) != null) {
+				String[] f = line.split("\\s+");
+				if (f.length < 2)
+					continue;
+				if (f[0].equals("MemFree:"))
+					free = Long.parseLong(f[1]) * 1024;
+				else if (f[0].equals("Cached:"))
+					cached = Long.parseLong(f[1]) * 1024;
+				else if (f[0].equals("MemTotal:"))
+					total = Long.parseLong(f[1]) * 1024;
+			}
+		} catch (java.io.IOException | NumberFormatException e) {
+			/* total 0, as the native code when the file can't be read */
+		}
+		final float scaleMem = ((float)(total / (1024 * 1024) - 350)) / (700 - 350);
+		final float scale = scaleMem < 0 ? 0 : scaleMem > 1 ? 1 : scaleMem;
+		final int[] low = {12288, 18432, 24576, 36864, 43008, 49152};
+		final int[] high = {73728, 92160, 110592, 129024, 147456 * 3 / 2, 184320 * 7 / 4};
+		final long[] level = new long[6]; // foreground, visible, perceptible, perceptible low, cached min, cached lmk first
+		for (int i = 0; i < 6; i++)
+			level[i] = (long)(int)(low[i] + ((high[i] - low[i]) * scale)) * 1024;
+		final long homeAppMem = level[4]; // getMemLevel(HOME_APP_ADJ 600): the first level with adj >= 600 is 900
+		final long cachedAppMem = level[4];
+		outInfo.advertisedMem = total;
+		outInfo.availMem = free + cached;
+		outInfo.totalMem = total;
+		outInfo.threshold = homeAppMem;
+		outInfo.lowMemory = outInfo.availMem < (homeAppMem + ((cachedAppMem - homeAppMem) / 2));
+		outInfo.hiddenAppThreshold = cachedAppMem;
+		outInfo.secondaryServerThreshold = level[4];
+		outInfo.visibleAppThreshold = level[1];
+		outInfo.foregroundAppThreshold = level[0];
 	}
 
 	public ConfigurationInfo getDeviceConfigurationInfo() {
@@ -160,7 +332,19 @@ public class ActivityManager {
 	public int getMemoryClass() { return 20; }      // suggested heap size in MB
 	public int getLargeMemoryClass() { return 60; } // value chosen arbitrarily
 
-	public static void getMyMemoryState(RunningAppProcessInfo outInfo) {}
+	/* AOSP ActivityManagerService.fillInProcMemInfoLocked(): the process's own ids and its importance; ATL
+	 * does not track whether the app is visible, it counts as the top app (IMPORTANCE_FOREGROUND, state TOP) */
+	public static void getMyMemoryState(RunningAppProcessInfo outInfo) {
+		outInfo.pid = android.os.Process.myPid();
+		outInfo.uid = android.os.Process.myUid();
+		String pkg = ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+		outInfo.processName = pkg;
+		outInfo.pkgList = new String[] {pkg};
+		outInfo.lastTrimLevel = 0;
+		outInfo.importance = RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
+		outInfo.importanceReasonCode = RunningAppProcessInfo.REASON_UNKNOWN;
+		outInfo.processState = 2; // PROCESS_STATE_TOP
+	}
 
 	/* AOSP ActivityManager.getProcessMemoryInfo(): ActivityManagerService fills each MemoryInfo with
 	 * Debug.getMemoryInfo() of the process */
@@ -227,6 +411,12 @@ public class ActivityManager {
 		public RecentTaskInfo getTaskInfo() {
 			return new RecentTaskInfo();
 		}
+
+		/* AOSP AppTask.finishAndRemoveTask()/setExcludeFromRecents(): calls into the task of the
+		 * ActivityTaskManager. getAppTasks() here is always empty, so no AppTask exists to receive it. */
+		public void finishAndRemoveTask() {}
+
+		public void setExcludeFromRecents(boolean exclude) {}
 	}
 	public List<ActivityManager.AppTask> getAppTasks() {
 		return new ArrayList<>();
@@ -358,9 +548,9 @@ public class ActivityManager {
 		return Collections.emptyList();
 	}
 
-	/* AOSP (API 35) returns List<ApplicationStartInfo>; ATL keeps no start records, so the list is
-	 * always empty and the element class is not needed */
-	public List<?> getHistoricalProcessStartReasons(int maxNum) {
+	/* AOSP (API 35) returns the records of the app's last starts; ATL keeps no start records, so the list is
+	 * always empty */
+	public List<ApplicationStartInfo> getHistoricalProcessStartReasons(int maxNum) {
 		return Collections.emptyList();
 	}
 
@@ -381,14 +571,14 @@ public class ActivityManager {
 	public static boolean isRunningInTestHarness() { return false; }
 	public static boolean isRunningInUserTestHarness() { return false; }
 
-	/* AOSP hands the listener the ApplicationStartInfo of this process; ATL has neither ApplicationStartInfo nor start records (Consumer<ApplicationStartInfo> erases to Consumer), so it is never called */
-	public void addApplicationStartInfoCompletionListener(java.util.concurrent.Executor executor, java.util.function.Consumer<?> listener) {
+	/* AOSP hands the listener the ApplicationStartInfo of this process; ATL has no start records, so it is never called */
+	public void addApplicationStartInfoCompletionListener(java.util.concurrent.Executor executor, java.util.function.Consumer<ApplicationStartInfo> listener) {
 		if (executor == null || listener == null) {
 			throw new NullPointerException("executor and listener must not be null");
 		}
 	}
 
-	public void removeApplicationStartInfoCompletionListener(java.util.function.Consumer<?> listener) {
+	public void removeApplicationStartInfoCompletionListener(java.util.function.Consumer<ApplicationStartInfo> listener) {
 		if (listener == null) {
 			throw new NullPointerException("listener must not be null");
 		}

@@ -41,9 +41,26 @@ public class JobParameters implements Parcelable {
 		return jobInfo.getExtras();
 	}
 
-	/* JobInfo.Builder.setUserInitiated() is not kept: ATL runs every job as a regular one */
+	/* AOSP: the job's flags FLAG_USER_INITIATED/FLAG_EXPEDITED as the Builder set them */
 	public boolean isUserInitiatedJob() {
-		return false;
+		return jobInfo.isUserInitiated();
+	}
+
+	public boolean isExpeditedJob() {
+		return jobInfo.isExpedited();
+	}
+
+	/* AOSP JobParameters.getTransientExtras()/getClipData()/getClipGrantFlags(): from the JobInfo */
+	public android.os.Bundle getTransientExtras() {
+		return jobInfo.getTransientExtras();
+	}
+
+	public android.content.ClipData getClipData() {
+		return jobInfo.getClipData();
+	}
+
+	public int getClipGrantFlags() {
+		return jobInfo.getClipGrantFlags();
 	}
 
 	/* ATL never stops jobs, so STOP_REASON_UNDEFINED */

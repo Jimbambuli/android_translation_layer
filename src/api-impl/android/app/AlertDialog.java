@@ -177,6 +177,12 @@ public class AlertDialog extends Dialog implements DialogInterface {
 			return this;
 		}
 
+		/* AOSP Builder.setIconAttribute(): resolves the theme attribute to a drawable resource and uses it as the
+		 * icon, like setIcon(int); ATL's dialog shows no icon, so this too only returns the builder */
+		public AlertDialog.Builder setIconAttribute(int attrId) {
+			return this;
+		}
+
 		public AlertDialog.Builder setTitle(CharSequence title) {
 			System.out.println("AlertDialog.Builder setTitle called with: '" + title + "'");
 			dialog.setTitle(title);

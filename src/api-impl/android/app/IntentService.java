@@ -9,8 +9,15 @@ public abstract class IntentService extends Service {
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		this.onHandleIntent(intent);
+		onStart(intent, startId); // AOSP IntentService.onStartCommand()
 		return 0;
+	}
+
+	/* AOSP IntentService.onStart() hands the intent to onHandleIntent() (there on the worker thread, here
+	 * in place); subclasses overriding onStart() are called as on Android */
+	@Override
+	public void onStart(Intent intent, int startId) {
+		this.onHandleIntent(intent);
 	}
 
 	@Override

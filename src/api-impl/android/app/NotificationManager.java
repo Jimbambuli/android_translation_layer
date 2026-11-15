@@ -280,6 +280,24 @@ public class NotificationManager {
 		return false;
 	}
 
+	/* AOSP NotificationManagerService.enforcePolicyAccess(): without the access granted by the user
+	 * (isNotificationPolicyAccessGranted(), never in ATL) setInterruptionFilter throws */
+	public final void setInterruptionFilter(int interruptionFilter) {
+		throw new SecurityException("Notification policy access denied");
+	}
+
+	/* AOSP NotificationManagerService.isPackagePaused(): true only while the package is suspended, which
+	 * ATL never does */
+	public boolean areNotificationsPaused() {
+		return false;
+	}
+
+	/* AOSP: the listener is enabled by the user in the settings (enabled_notification_listeners), which ATL
+	 * does not have */
+	public boolean isNotificationListenerAccessGranted(android.content.ComponentName listener) {
+		return false;
+	}
+
 	/* AOSP: the service allows full screen intents below target SDK 34, above with USE_FULL_SCREEN_INTENT,
 	 * which ATL grants like every permission */
 	public boolean canUseFullScreenIntent() {

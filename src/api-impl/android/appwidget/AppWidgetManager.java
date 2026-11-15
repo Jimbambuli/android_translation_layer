@@ -32,6 +32,14 @@ public class AppWidgetManager {
 		return android.os.Bundle.EMPTY;
 	}
 
+	/* AOSP AppWidgetServiceImpl.updateAppWidgetOptions(): an id the host service does not know is ignored */
+	public void updateAppWidgetOptions(int appWidgetId, android.os.Bundle options) {}
+
+	/* AOSP: the providers of the package that the service knows; ATL has no widget host and none registered */
+	public java.util.List<AppWidgetProviderInfo> getInstalledProvidersForPackage(String packageName, android.os.UserHandle profile) {
+		return new java.util.ArrayList<>();
+	}
+
 	public void updateAppWidget(int[] appWidgetIds, RemoteViews views) {}
 
 	public int[] getAppWidgetIds(ComponentName provider) {
@@ -63,4 +71,19 @@ public class AppWidgetManager {
 	public void updateAppWidget(ComponentName provider, RemoteViews views) {}
 
 	public void partiallyUpdateAppWidget(int appWidgetId, RemoteViews views) {}
+
+	/* AOSP AppWidgetManager.setWidgetPreview(): hands the preview to AppWidgetServiceImpl, which stores it and
+	 * returns false only when rate-limited. The desktop has no widget host to show or keep previews, so the call
+	 * is accepted and nothing is stored; getWidgetPreview() then finds none. */
+	public boolean setWidgetPreview(ComponentName provider, int widgetCategories, RemoteViews preview) {
+		return true;
+	}
+
+	/* AOSP: the service returns null when the provider has no preview for that category */
+	public RemoteViews getWidgetPreview(ComponentName provider, android.os.UserHandle profile, int widgetCategory) {
+		return null;
+	}
+
+	/* AOSP: "If the provider does not have a preview for the specified widget category, this is a no-op." */
+	public void removeWidgetPreview(ComponentName provider, int widgetCategories) {}
 }
