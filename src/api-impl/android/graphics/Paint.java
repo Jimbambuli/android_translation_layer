@@ -452,14 +452,6 @@ public class Paint {
 		return shadow_layer_dy;
 	}
 
-	public int getShadowLayerColor() {
-		return Color.toArgb(shadow_layer_color);
-	}
-
-	public long getShadowLayerColorLong() {
-		return shadow_layer_color;
-	}
-
 	public Xfermode setXfermode(Xfermode xfermode) {
 		this.xfermode = xfermode;
 		return xfermode;
