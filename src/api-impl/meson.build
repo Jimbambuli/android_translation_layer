@@ -146,6 +146,7 @@ srcs = [
 	'android/app/IntentService.java',
 	'android/app/KeyguardManager.java',
 	'android/app/ListActivity.java',
+	'android/app/LocaleConfig.java',
 	'android/app/LocaleManager.java',
 	'android/app/NativeActivity.java',
 	'android/app/Notification.java',

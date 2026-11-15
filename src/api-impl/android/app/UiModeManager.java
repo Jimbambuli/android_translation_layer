@@ -21,6 +21,16 @@ public class UiModeManager {
 	public static final int MODE_NIGHT_YES = 2;
 	public static final int MODE_NIGHT_CUSTOM = 3;
 
+	/* AOSP UiModeManagerService DEFAULT_CUSTOM_NIGHT_START_TIME/END_TIME, what the custom night mode (MODE_NIGHT_CUSTOM)
+	 * switches at; ATL follows the desktop's night mode and never sets another */
+	public java.time.LocalTime getCustomNightModeStart() {
+		return java.time.LocalTime.of(22, 0);
+	}
+
+	public java.time.LocalTime getCustomNightModeEnd() {
+		return java.time.LocalTime.of(6, 0);
+	}
+
 	/* AOSP asks the system service, which needs MODIFY_DAY_NIGHT_MODE for the whole device; ATL follows
 	 * the night mode of the desktop and has nothing to change */
 	public void setNightMode(int mode) {}

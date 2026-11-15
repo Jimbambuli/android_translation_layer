@@ -1565,6 +1565,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 	public void registerForContextMenu(View view) {}
 
+	/* AOSP Activity.unregisterForContextMenu(): view.setOnCreateContextMenuListener(null) */
+	public void unregisterForContextMenu(View view) {
+		view.setOnCreateContextMenuListener(null);
+	}
+
 	public void onCreateContextMenu(android.view.ContextMenu menu, View v, android.view.ContextMenu.ContextMenuInfo menuInfo) {}
 	public native boolean isInMultiWindowMode();
 

@@ -568,6 +568,16 @@ public class Notification implements Parcelable {
 			return addAction(new Action.Builder(icon, title, intent).build());
 		}
 
+		/* AOSP Notification.Builder.setActions() (hidden): replaces the actions, null entries are skipped */
+		public Builder setActions(Action... actions) {
+			mActions.clear();
+			for (int i = 0; i < actions.length; i++) {
+				if (actions[i] != null)
+					mActions.add(actions[i]);
+			}
+			return this;
+		}
+
 		public Builder addAction(Action action) {
 			if (action != null) {
 				mActions.add(action);

@@ -71,6 +71,13 @@ public class ApplicationInfo extends PackageItemInfo {
 	 */
 	public int theme;
 
+	/* AOSP ApplicationInfo.localeConfigRes: the android:localeConfig resource of the application element, 0 if none */
+	public int localeConfigRes;
+
+	public int getLocaleConfigRes() {
+		return localeConfigRes;
+	}
+
 	/**
 	 * Class implementing the Application's manage space
 	 * functionality.  From the "manageSpaceActivity"
@@ -603,6 +610,7 @@ public class ApplicationInfo extends PackageItemInfo {
 		processName = orig.processName;
 		className = orig.className;
 		theme = orig.theme;
+		localeConfigRes = orig.localeConfigRes;
 		flags = orig.flags;
 		privateFlags = orig.privateFlags;
 		requiresSmallestWidthDp = orig.requiresSmallestWidthDp;

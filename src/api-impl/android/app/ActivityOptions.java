@@ -168,6 +168,7 @@ public class ActivityOptions {
 	/* AOSP (android-14, setAllowPassThroughOnTouchOutside android-15): stored for the getters; ATL starts
 	 * activities of the app only, so they change nothing */
 	private boolean mShareIdentity;
+	private int mPendingIntentCreatorBackgroundActivityStartMode; // MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED
 	private int mPendingIntentBackgroundActivityStartMode;  // MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED
 	private boolean mAllowPassThroughOnTouchOutside;
 
@@ -194,6 +195,16 @@ public class ActivityOptions {
 	public ActivityOptions setPendingIntentBackgroundActivityStartMode(int state) {
 		mPendingIntentBackgroundActivityStartMode = state;
 		return this;
+	}
+
+	/* AOSP: the mode the creator of the PendingIntent grants for starting background activities */
+	public ActivityOptions setPendingIntentCreatorBackgroundActivityStartMode(int mode) {
+		mPendingIntentCreatorBackgroundActivityStartMode = mode;
+		return this;
+	}
+
+	public int getPendingIntentCreatorBackgroundActivityStartMode() {
+		return mPendingIntentCreatorBackgroundActivityStartMode;
 	}
 
 	/**

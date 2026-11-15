@@ -29,5 +29,16 @@ public class WallpaperManager {
 		return null;
 	}
 
+	/* AOSP WallpaperManager.OnColorsChangedListener: told when the colors of the wallpaper change */
+	public interface OnColorsChangedListener {
+		void onColorsChanged(WallpaperColors colors, int which);
+	}
+
+	/* AOSP keeps the listeners and calls them when WallpaperManagerService reports new colors; ATL has no such
+	 * service, getWallpaperColors() stays null and the colors never change */
+	public void addOnColorsChangedListener(OnColorsChangedListener listener, android.os.Handler handler) {}
+
+	public void removeOnColorsChangedListener(OnColorsChangedListener callback) {}
+
 	private static native void set_bitmap(long texture);
 }

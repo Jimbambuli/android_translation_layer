@@ -36,6 +36,9 @@ public class DownloadManager {
 
 		public Request addRequestHeader(String header, String value) { return this; }
 
+		/* AOSP: kept in the request; no download is made here */
+		public Request setAllowedOverRoaming(boolean allowed) { return this; }
+
 		public Request setAllowedOverMetered(boolean allow) { return this; }
 
 		public Request setDestinationInExternalPublicDir(String dirType, String subPath) { return this; }
@@ -79,6 +82,11 @@ public class DownloadManager {
 			throw new IllegalArgumentException("input param 'ids' can't be null");
 		}
 		return 0;
+	}
+
+	/* AOSP: the mime type of a completed download, null for an id the provider does not know (none here) */
+	public String getMimeTypeForDownloadedFile(long id) {
+		return null;
 	}
 
 	public Uri getUriForDownloadedFile(long id) {

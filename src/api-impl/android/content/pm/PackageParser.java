@@ -1916,6 +1916,8 @@ public class PackageParser {
 		    com.android.internal.R.styleable.AndroidManifestApplication_theme, 0);
 		ai.descriptionRes = sa.getResourceId(
 		    com.android.internal.R.styleable.AndroidManifestApplication_description, 0);
+		ai.localeConfigRes = sa.getResourceId(
+		    com.android.internal.R.styleable.AndroidManifestApplication_localeConfig, 0);
 
 		if ((flags & PARSE_IS_SYSTEM) != 0) {
 			if (sa.getBoolean(
