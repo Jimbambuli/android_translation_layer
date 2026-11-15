@@ -2,14 +2,16 @@ package android.service.autofill;
 
 import android.app.assist.AssistStructure;
 import android.app.assist.AssistStructure.ViewNode;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.ArrayMap;
 import android.util.SparseIntArray;
 import android.view.autofill.AutofillId;
 import java.util.ArrayDeque;
 import java.util.Objects;
 
-/* AOSP FillContext; Parcel code left out, nothing in ATL parcels it */
-public final class FillContext {
+/* AOSP FillContext (codegen Parcelable) */
+public final class FillContext implements Parcelable {
 
 	private final int mRequestId;
 	private final AssistStructure mStructure;
@@ -33,6 +35,36 @@ public final class FillContext {
 	public AutofillId getFocusedId() {
 		return mFocusedId;
 	}
+
+	/* AOSP FillContext.writeToParcel */
+	@Override
+	public void writeToParcel(Parcel dest, int flags) {
+		dest.writeInt(mRequestId);
+		dest.writeTypedObject(mStructure, flags);
+		dest.writeTypedObject(mFocusedId, flags);
+	}
+
+	/* AOSP FillContext.describeContents */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	/* AOSP FillContext.CREATOR */
+	public static final Parcelable.Creator<FillContext> CREATOR = new Parcelable.Creator<FillContext>() {
+		@Override
+		public FillContext[] newArray(int size) {
+			return new FillContext[size];
+		}
+
+		@Override
+		public FillContext createFromParcel(Parcel in) {
+			int requestId = in.readInt();
+			AssistStructure structure = (AssistStructure) in.readTypedObject(AssistStructure.CREATOR);
+			AutofillId focusedId = (AutofillId) in.readTypedObject(AutofillId.CREATOR);
+			return new FillContext(requestId, structure, focusedId);
+		}
+	};
 
 	/* AOSP FillContext.findViewNodesByAutofillIds */
 	public ViewNode[] findViewNodesByAutofillIds(AutofillId[] ids) {
