@@ -13,6 +13,13 @@ public class InputManager {
 	public void registerInputDeviceListener(InputManager.InputDeviceListener listener, Handler handler) {
 	}
 
+	/* AOSP InputManager.unregisterInputDeviceListener(): a null listener is rejected; registered listeners
+	 * are not kept, as ATL's input devices never change */
+	public void unregisterInputDeviceListener(InputDeviceListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("listener must not be null");
+	}
+
 	public int[] getInputDeviceIds() {
 		return InputDevice.getDeviceIds();
 	}
