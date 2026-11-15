@@ -16,6 +16,39 @@ public class VibrationEffect {
 		return new VibrationEffect(new long[] {0, milliseconds}, -1);
 	}
 
+	public static final int EFFECT_CLICK = 0;
+	public static final int EFFECT_DOUBLE_CLICK = 1;
+	public static final int EFFECT_TICK = 2;
+	public static final int EFFECT_THUD = 3;
+	public static final int EFFECT_POP = 4;
+	public static final int EFFECT_HEAVY_CLICK = 5;
+	public static final int EFFECT_TEXTURE_TICK = 21;
+	/** @hide */
+	public static final int[] RINGTONES = java.util.stream.IntStream.rangeClosed(6, 20).toArray();
+
+	/**
+	 * AOSP createPredefined(): a prebaked effect with fallback. The argument check is PrebakedSegment.validate(). The
+	 * vibrator of ATL has no predefined effect (Vibrator.areEffectsSupported() is NO for all) and the fallback patterns
+	 * are device resources of the VibratorManagerService (config_*EffectPattern; not in ATL's framework-res), so the
+	 * effect does not vibrate: that of a device without a vibrator.
+	 */
+	public static VibrationEffect createPredefined(int effectId) {
+		switch (effectId) {
+		case EFFECT_CLICK:
+		case EFFECT_DOUBLE_CLICK:
+		case EFFECT_HEAVY_CLICK:
+		case EFFECT_POP:
+		case EFFECT_TEXTURE_TICK:
+		case EFFECT_THUD:
+		case EFFECT_TICK:
+			break;
+		default:
+			if (effectId < RINGTONES[0] || effectId > RINGTONES[RINGTONES.length - 1])
+				throw new IllegalArgumentException("Unknown prebaked effect type (value=" + effectId + ")");
+		}
+		return new VibrationEffect(new long[] {0}, -1);
+	}
+
 	public static final int DEFAULT_AMPLITUDE = -1;
 	public static final int MAX_AMPLITUDE = 255;
 
