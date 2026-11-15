@@ -86,8 +86,39 @@ public class TelephonyManager {
 	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
 
 	/* AOSP TelephonyManager with getITelephony() == null (a device without telephony service) */
+	private int mSubId = SubscriptionManager.DEFAULT_SUBSCRIPTION_ID;
+
 	public TelephonyManager createForSubscriptionId(int subId) {
-		return new TelephonyManager();
+		TelephonyManager tm = new TelephonyManager();
+		tm.mSubId = subId;
+		return tm;
+	}
+
+	/* AOSP getSubscriptionId() / getSubId() */
+	public int getSubscriptionId() {
+		if (SubscriptionManager.isUsableSubIdValue(mSubId)) {
+			return mSubId;
+		}
+		return SubscriptionManager.getDefaultSubscriptionId();
+	}
+
+	public static final int DATA_ACTIVITY_NONE = 0x00000000;
+	public static final int DATA_ACTIVITY_IN = 0x00000001;
+	public static final int DATA_ACTIVITY_OUT = 0x00000002;
+	public static final int DATA_ACTIVITY_INOUT = 0x00000003;
+	public static final int DATA_ACTIVITY_DORMANT = 0x00000004;
+
+	/* getITelephony() == null: DATA_ACTIVITY_NONE */
+	public int getDataActivity() {
+		return DATA_ACTIVITY_NONE;
+	}
+
+	/* getITelephony() == null: returns without doing anything */
+	public void sendDialerSpecialCode(String inputCode) {}
+
+	/* getImei(getSlotIndex()): no ITelephony, null */
+	public String getImei() {
+		return null;
 	}
 
 	public int getCallStateForSubscription() {

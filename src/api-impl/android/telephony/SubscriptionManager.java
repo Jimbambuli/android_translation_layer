@@ -15,6 +15,22 @@ public class SubscriptionManager {
 		return (SubscriptionManager) context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
 	}
 
+	public static final int MIN_SUBSCRIPTION_ID_VALUE = 0;
+	public static final int MAX_SUBSCRIPTION_ID_VALUE = DEFAULT_SUBSCRIPTION_ID - 1;
+
+	public static boolean isUsableSubscriptionId(int subscriptionId) {
+		return isUsableSubIdValue(subscriptionId);
+	}
+
+	public static boolean isUsableSubIdValue(int subId) {
+		return subId >= MIN_SUBSCRIPTION_ID_VALUE && subId <= MAX_SUBSCRIPTION_ID_VALUE;
+	}
+
+	/* AOSP getDefaultSubscriptionId(): the cache's default INVALID_SUBSCRIPTION_ID when ISub is missing */
+	public static int getDefaultSubscriptionId() {
+		return INVALID_SUBSCRIPTION_ID;
+	}
+
 	public static boolean isValidSubscriptionId(int subscriptionId) {
 		return subscriptionId > INVALID_SUBSCRIPTION_ID;
 	}
