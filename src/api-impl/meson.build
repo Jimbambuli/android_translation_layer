@@ -652,6 +652,7 @@ srcs = [
 	'android/media/session/MediaSessionManager.java',
 	'android/media/session/PlaybackState.java',
 	'android/media/tv/TvContentRating.java',
+	'android/media/tv/TvContract.java',
 	'android/media/tv/TvInputManager.java',
 	'android/net/ConnectivityManager.java',
 	'android/net/DhcpInfo.java',
