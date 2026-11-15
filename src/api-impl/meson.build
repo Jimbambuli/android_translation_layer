@@ -1334,6 +1334,7 @@ srcs = [
 	'android/webkit/WebStorage.java',
 	'android/webkit/WebView.java',
 	'android/webkit/WebViewClient.java',
+	'android/webkit/AtlWebMessagePort.java',
 	'android/webkit/WebViewDatabase.java',
 	'android/webkit/WebViewRenderProcess.java',
 	'android/webkit/WebViewRenderProcessClient.java',

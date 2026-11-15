@@ -276,6 +276,104 @@ public class WebView extends ViewGroup {
 			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
 	}
 
+	/* ---- WebMessage channels (see AtlWebMessagePort): text messages through evaluateJavascript() and a JavascriptInterface ---- */
+	private final Map<Integer, AtlWebMessagePort> messagePorts = new HashMap<>();
+	private int nextMessagePortId = 1;
+	private boolean messageBridgeAdded;
+
+	public class AtlWebMessageBridge {
+		@JavascriptInterface
+		public void onMessage(int pageEndId, String data) {
+			AtlWebMessagePort pageEnd;
+			synchronized (messagePorts) {
+				pageEnd = messagePorts.get(pageEndId);
+			}
+			if (pageEnd != null && pageEnd.mPeer != null)
+				pageEnd.mPeer.fromPage(data);
+		}
+	}
+
+	private static String jsString(String s) {
+		StringBuilder sb = new StringBuilder("\"");
+		for (int i = 0; i < s.length(); i++) {
+			char c = s.charAt(i);
+			switch (c) {
+			case '\\': sb.append("\\\\"); break;
+			case '"': sb.append("\\\""); break;
+			case '\n': sb.append("\\n"); break;
+			case '\r': sb.append("\\r"); break;
+			case '\u2028': sb.append("\\u2028"); break;
+			case '\u2029': sb.append("\\u2029"); break;
+			default:
+				if (c < 0x20)
+					sb.append(String.format("\\u%04x", (int) c));
+				else
+					sb.append(c);
+			}
+		}
+		return sb.append('"').toString();
+	}
+
+	/* AOSP WebView.createWebMessageChannel(): the two ends of a new channel */
+	public WebMessagePort[] createWebMessageChannel() {
+		if (!messageBridgeAdded) {
+			messageBridgeAdded = true;
+			addJavascriptInterface(new AtlWebMessageBridge(), "__atlWebMessage");
+		}
+		AtlWebMessagePort a, b;
+		synchronized (messagePorts) {
+			a = new AtlWebMessagePort(this, nextMessagePortId++);
+			b = new AtlWebMessagePort(this, nextMessagePortId++);
+			a.mPeer = b;
+			b.mPeer = a;
+			messagePorts.put(a.mId, a);
+			messagePorts.put(b.mId, b);
+		}
+		return new WebMessagePort[] {a, b};
+	}
+
+	/* AOSP WebView.postWebMessage(): a MessageEvent in the main frame, delivered if targetOrigin is "*" or the page's origin */
+	public void postWebMessage(WebMessage message, android.net.Uri targetOrigin) {
+		if (isDestroyed())
+			return;
+		WebMessagePort[] ports = message.getPorts();
+		List<AtlWebMessagePort> handed = new ArrayList<>();
+		if (ports != null) {
+			for (WebMessagePort p : ports) {
+				if (!(p instanceof AtlWebMessagePort) || ((AtlWebMessagePort) p).mClosed || ((AtlWebMessagePort) p).mTransferred
+				    || ((AtlWebMessagePort) p).mPeer == null)
+					throw new IllegalStateException("Port is already started, closed or transferred");
+				handed.add((AtlWebMessagePort) p);
+			}
+		}
+		StringBuilder js = new StringBuilder();
+		js.append("(function(){var t=").append(jsString(targetOrigin.toString())).append(";");
+		js.append("if(t!=='*'&&t!==window.location.origin)return;");
+		js.append("window.__atlPorts=window.__atlPorts||{};var ports=[];");
+		for (AtlWebMessagePort p : handed) {
+			js.append("(function(id){var mc=new MessageChannel();window.__atlPorts[id]=mc.port2;")
+			    .append("mc.port2.onmessage=function(e){__atlWebMessage.onMessage(id,String(e.data));};ports.push(mc.port1);})(")
+			    .append(p.mId).append(");");
+		}
+		js.append("window.dispatchEvent(new MessageEvent('message',{data:").append(jsString(message.getData()))
+		    .append(",origin:'',ports:ports}));})();");
+		evaluateJavascript(js.toString(), null);
+		for (AtlWebMessagePort p : handed)
+			p.handedToPage();
+	}
+
+	void postToPagePort(int pageEndId, String data) {
+		evaluateJavascript("(function(){var p=window.__atlPorts&&window.__atlPorts[" + pageEndId + "];if(p)p.postMessage("
+		                       + jsString(data) + ");})();",
+		                   null);
+	}
+
+	void closePagePort(int pageEndId) {
+		evaluateJavascript("(function(){var p=window.__atlPorts&&window.__atlPorts[" + pageEndId
+		                       + "];if(p){p.close();delete window.__atlPorts[" + pageEndId + "];}})();",
+		                   null);
+	}
+
 	/* ViewGroup members (deprecated drawing caches), not present on ATL's ViewGroup: no effect, as on Android 16 */
 	public void setAlwaysDrawnWithCacheEnabled(boolean enabled) {}
 
