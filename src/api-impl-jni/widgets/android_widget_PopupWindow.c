@@ -662,3 +662,10 @@ JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isAboveAnchor
 {
 	return GPOINTER_TO_INT(g_object_get_data(G_OBJECT(_PTR(popover_ptr)), "atl-above-anchor")) != 0;
 }
+
+/* PopupWindow.update(x, y, width, height): a shown popup moves to (x, y) in the window, as AOSP sets
+ * WindowManager.LayoutParams.x/y */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1moveTo(JNIEnv *env, jobject this, jlong popover_ptr, jint gravity, jint x, jint y)
+{
+	atl_popover_place_at_location(GTK_POPOVER(_PTR(popover_ptr)), gravity, x, y);
+}
