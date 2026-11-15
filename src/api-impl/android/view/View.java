@@ -6421,6 +6421,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return true;
 	}
 
+	/* AOSP View.addChildrenForAccessibility(): a view has no children to add */
+	public void addChildrenForAccessibility(ArrayList<View> outChildren) {}
+
 	public AccessibilityNodeProvider getAccessibilityNodeProvider() {
 		if (mAccessibilityDelegate != null) {
 			return mAccessibilityDelegate.getAccessibilityNodeProvider(this);

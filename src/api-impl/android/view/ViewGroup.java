@@ -14,6 +14,7 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -1951,6 +1952,65 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	public void onNestedScroll(View target, int dxConsumed, int dyConsumed, int dxUnconsumed, int dyUnconsumed) {}
 
+	/* AOSP ViewGroup.getChildVisibleRect(View, Rect, Point, false): the rectangle of the child mapped into this
+	 * group, clipped like the group draws, and on up to the root */
+	public boolean getChildVisibleRect(View child, Rect r, android.graphics.Point offset) {
+		final RectF rect = new RectF();
+		rect.set(r);
+
+		if (!child.hasIdentityMatrix()) {
+			child.getMatrix().mapRect(rect);
+		}
+
+		final int dx = child.getLeft() - getScrollX();
+		final int dy = child.getTop() - getScrollY();
+
+		rect.offset(dx, dy);
+
+		if (offset != null) {
+			if (!child.hasIdentityMatrix()) {
+				float[] position = new float[2];
+				position[0] = offset.x;
+				position[1] = offset.y;
+				child.getMatrix().mapPoints(position);
+				offset.x = Math.round(position[0]);
+				offset.y = Math.round(position[1]);
+			}
+			offset.x += dx;
+			offset.y += dy;
+		}
+
+		final int width = getRight() - getLeft();
+		final int height = getBottom() - getTop();
+
+		boolean rectIsVisible = true;
+		if (parent == null ||
+				(parent instanceof ViewGroup && ((ViewGroup)parent).getClipChildren())) {
+			// Clip to bounds.
+			rectIsVisible = rect.intersect(0, 0, width, height);
+		}
+
+		if (rectIsVisible && getClipToPadding()) {
+			// Clip to padding.
+			rectIsVisible = rect.intersect(getPaddingLeft(), getPaddingTop(),
+					width - getPaddingRight(), height - getPaddingBottom());
+		}
+
+		final Rect clipBounds = getClipBounds();
+		if (rectIsVisible && clipBounds != null) {
+			// Clip to clipBounds.
+			rectIsVisible = rect.intersect(clipBounds.left, clipBounds.top, clipBounds.right,
+					clipBounds.bottom);
+		}
+		r.set((int)Math.floor(rect.left), (int)Math.floor(rect.top),
+				(int)Math.ceil(rect.right), (int)Math.ceil(rect.bottom));
+
+		if (rectIsVisible && parent != null) {
+			rectIsVisible = parent.getChildVisibleRect(this, r, offset);
+		}
+		return rectIsVisible;
+	}
+
 	public boolean getClipChildren() {
 		return clipChildren;
 	}
@@ -2242,6 +2302,25 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	@Override
 	public CharSequence getAccessibilityClassName() {
 		return ViewGroup.class.getName();
+	}
+
+	/* AOSP ViewGroup.addChildrenForAccessibility(): the visible children in the accessibility tree, and of the
+	 * others their children; in child order, as ATL's other accessibility traversals (AOSP's
+	 * ChildListForAccessibility sorts by position on screen) */
+	@Override
+	public void addChildrenForAccessibility(ArrayList<View> outChildren) {
+		if (getAccessibilityNodeProvider() != null) {
+			return;
+		}
+		for (View child : children) {
+			if (child.getVisibility() == VISIBLE) {
+				if (child.includeForAccessibility()) {
+					outChildren.add(child);
+				} else {
+					child.addChildrenForAccessibility(outChildren);
+				}
+			}
+		}
 	}
 
 	/* AOSP ViewGroup accessibility: a group that is in the tree lets its own view populate the event first, then

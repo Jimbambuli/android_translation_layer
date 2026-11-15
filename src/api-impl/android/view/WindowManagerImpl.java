@@ -16,6 +16,13 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 	 * touch events or to take part in nested scrolling. */
 	private static class WindowViewParent implements ViewParent {
 
+		/* AOSP ViewRootImpl.getChildVisibleRect(): the window clips, without its scroll offset; the window is
+		 * as large as its one child */
+		@Override
+		public boolean getChildVisibleRect(View child, android.graphics.Rect r, android.graphics.Point offset) {
+			return r.intersect(0, 0, child.getWidth(), child.getHeight());
+		}
+
 		/* AOSP ViewRootImpl.bringChildToFront(): the root has one child */
 		@Override
 		public void bringChildToFront(View child) {}
