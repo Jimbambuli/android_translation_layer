@@ -1,6 +1,6 @@
 package android.net;
 
-public final class NetworkCapabilities {
+public final class NetworkCapabilities implements android.os.Parcelable {
 	public static final int NET_CAPABILITY_MMS = 0;
 	public static final int NET_CAPABILITY_SUPL = 1;
 	public static final int NET_CAPABILITY_DUN = 2;
@@ -247,4 +247,79 @@ public final class NetworkCapabilities {
 	public int getOwnerUid() {
 		return -1;
 	}
+
+	/* AOSP NetworkCapabilities.describeContents()/writeToParcel()/CREATOR (Connectivity framework), layout of
+	 * Android 16. ATL keeps capabilities, transports, bandwidths, signal strength and the specifier; the
+	 * rest is written as on an AOSP NetworkCapabilities that has none of it (no forbidden capabilities,
+	 * transport info, uids, SSID, admin uids, subscription ids or underlying networks, owner/requestor
+	 * INVALID_UID, enterprise id 0, RES_ID_UNSET) and skipped when read. AOSP masks with
+	 * ALL_VALID_CAPABILITIES/ALL_VALID_TRANSPORTS; ATL keeps the values as they are. A specifier that
+	 * is not Parcelable is written as null. */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeLong(mNetworkCapabilities);
+		dest.writeLong(0L); // mForbiddenNetworkCapabilities
+		dest.writeLong(mTransportTypes);
+		dest.writeInt(mLinkUpBandwidthKbps);
+		dest.writeInt(mLinkDownBandwidthKbps);
+		dest.writeParcelable(mNetworkSpecifier instanceof android.os.Parcelable ? (android.os.Parcelable)mNetworkSpecifier : null, flags);
+		dest.writeParcelable(null, flags); // mTransportInfo
+		dest.writeInt(mSignalStrength);
+		dest.writeInt(-1); // mUids: null
+		dest.writeIntArray(new int[0]); // mAllowedUids
+		dest.writeString(null); // mSSID
+		dest.writeBoolean(false); // mPrivateDnsBroken
+		dest.writeIntArray(new int[0]); // administrator uids
+		dest.writeInt(-1); // mOwnerUid: Process.INVALID_UID
+		dest.writeInt(-1); // mRequestorUid: Process.INVALID_UID
+		dest.writeString(null); // mRequestorPackageName
+		dest.writeIntArray(new int[0]); // mSubIds
+		dest.writeTypedList((java.util.List<Network>)null); // mUnderlyingNetworks
+		dest.writeInt(0); // mEnterpriseId
+		dest.writeInt(0); // mReservationId: RES_ID_UNSET
+		dest.writeBoolean(false); // mMatchNonThreadLocalNetworks
+	}
+
+	public static final android.os.Parcelable.Creator<NetworkCapabilities> CREATOR = new android.os.Parcelable.Creator<NetworkCapabilities>() {
+		@Override
+		public NetworkCapabilities createFromParcel(android.os.Parcel in) {
+			NetworkCapabilities netCap = new NetworkCapabilities();
+			netCap.mNetworkCapabilities = in.readLong();
+			in.readLong(); // forbidden capabilities
+			netCap.mTransportTypes = in.readLong();
+			netCap.mLinkUpBandwidthKbps = in.readInt();
+			netCap.mLinkDownBandwidthKbps = in.readInt();
+			android.os.Parcelable specifier = in.readParcelable(null);
+			netCap.mNetworkSpecifier = specifier instanceof NetworkSpecifier ? (NetworkSpecifier)specifier : null;
+			in.readParcelable(null); // transport info
+			netCap.mSignalStrength = in.readInt();
+			final int uidCount = in.readInt(); // uid ranges
+			for (int i = 0; i < uidCount; i++) {
+				in.readParcelable(null);
+			}
+			in.createIntArray(); // allowed uids
+			in.readString(); // SSID
+			in.readBoolean(); // private DNS broken
+			in.createIntArray(); // administrator uids
+			in.readInt(); // owner uid
+			in.readInt(); // requestor uid
+			in.readString(); // requestor package name
+			in.createIntArray(); // subscription ids
+			in.createTypedArrayList(Network.CREATOR); // underlying networks
+			in.readInt(); // enterprise id
+			in.readInt(); // reservation id
+			in.readBoolean(); // match non-thread-local networks
+			return netCap;
+		}
+
+		@Override
+		public NetworkCapabilities[] newArray(int size) {
+			return new NetworkCapabilities[size];
+		}
+	};
 }
