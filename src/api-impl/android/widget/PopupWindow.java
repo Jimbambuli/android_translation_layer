@@ -259,6 +259,11 @@ public class PopupWindow {
 		return input_method_mode;
 	}
 
+	/** AOSP isAboveAnchor(): whether the last showAsDropDown()/update() placed the popup above its anchor */
+	public boolean isAboveAnchor() {
+		return native_isAboveAnchor(popover);
+	}
+
 	public boolean isShowing() {
 		return native_isShowing(popover);
 	}
@@ -697,6 +702,7 @@ public class PopupWindow {
 	}
 
 	protected native long native_constructor();
+	protected native boolean native_isAboveAnchor(long widget);
 	protected native void native_setColors(long widget, int background, int foreground);
 	protected native void native_setContentView(long widget, long contentView);
 	protected native void native_showAsDropDown(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int gravity, boolean overlapAnchor);

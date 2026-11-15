@@ -179,6 +179,8 @@ void atl_popover_place_as_dropdown(GtkPopover *popover, GtkWidget *anchor, int a
 		if (above >= 0)
 			y = above;
 	}
+	/* PopupWindow.isAboveAnchor(): AOSP keeps the result of findDropDownPosition() in mAboveAnchor */
+	g_object_set_data(G_OBJECT(popover), "atl-above-anchor", GINT_TO_POINTER(y < a.y + (overlap_anchor ? 0 : anchor_height) + yoff));
 
 	place_popover(popover, frame, clamp_to_frame(x, width, frame_width), clamp_to_frame(y, height, frame_height));
 }
@@ -654,4 +656,9 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1update(JNIEnv *en
 	apply_touch_modal(popover);
 	atl_popover_place_as_dropdown(popover, GTK_WIDGET(anchor), anchor_width, anchor_height, x, y, gravity, overlap_anchor);
 	popup(popover);
+}
+
+JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isAboveAnchor(JNIEnv *env, jobject this, jlong popover_ptr)
+{
+	return GPOINTER_TO_INT(g_object_get_data(G_OBJECT(_PTR(popover_ptr)), "atl-above-anchor")) != 0;
 }
