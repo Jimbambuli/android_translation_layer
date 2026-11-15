@@ -64,6 +64,19 @@ public class TabHost extends View {
 
 	public void setup() {}
 
+	private android.app.LocalActivityManager mLocalActivityManager;
+
+	/* AOSP TabHost.setup(LocalActivityManager): setup() and keep the manager that launches tab content intents */
+	public void setup(android.app.LocalActivityManager activityGroup) {
+		setup();
+		mLocalActivityManager = activityGroup;
+	}
+
+	/* AOSP TabHost.getTabWidget(): the widget found by id android.R.id.tabs in setup(); ATL has none (see below) */
+	public TabWidget getTabWidget() {
+		return null;
+	}
+
 	/* AOSP TabHost keeps the spec list and the current index and notifies the listener on a change
 	 * (android-14 core/java/android/widget/TabHost.java addTab/setCurrentTab/getCurrentTabTag).
 	 * ATL has no tab widget or content frame, so nothing is shown. */
