@@ -172,4 +172,50 @@ public class PhoneNumberUtils {
 		}
 		return true;
 	}
+
+	/* AOSP PhoneNumberUtils: the character, TOA and digit helpers that need no libphonenumber or telephony service */
+	public static final int TOA_International = 0x91;
+	public static final int TOA_Unknown = 0x81;
+	private static final String PREFIX_WPS = "*272";
+	private static final String PREFIX_WPS_CLIR_ACTIVATE = "*31#*272";
+	private static final String PREFIX_WPS_CLIR_DEACTIVATE = "#31#*272";
+
+	public static boolean is12Key(char c) {
+		return (c >= '0' && c <= '9') || c == '*' || c == '#';
+	}
+	public static boolean isReallyDialable(char c) {
+		return (c >= '0' && c <= '9') || c == '*' || c == '#' || c == '+';
+	}
+	public static boolean isISODigit(char c) {
+		return c >= '0' && c <= '9';
+	}
+	public static String stringFromStringAndTOA(String s, int TOA) {
+		if (s == null) return null;
+		if (TOA == TOA_International && s.length() > 0 && s.charAt(0) != '+') {
+			return "+" + s;
+		}
+		return s;
+	}
+	public static int toaFromString(String s) {
+		if (s != null && s.length() > 0 && s.charAt(0) == '+') {
+			return TOA_International;
+		}
+		return TOA_Unknown;
+	}
+	public static String replaceUnicodeDigits(String number) {
+		StringBuilder normalizedDigits = new StringBuilder(number.length());
+		for (char c : number.toCharArray()) {
+			int digit = Character.digit(c, 10);
+			if (digit != -1) {
+				normalizedDigits.append(digit);
+			} else {
+				normalizedDigits.append(c);
+			}
+		}
+		return normalizedDigits.toString();
+	}
+	public static boolean isWpsCallNumber(String number) {
+		return (number != null) && (number.startsWith(PREFIX_WPS) || number.startsWith(PREFIX_WPS_CLIR_ACTIVATE)
+		                            || number.startsWith(PREFIX_WPS_CLIR_DEACTIVATE));
+	}
 }
