@@ -157,6 +157,17 @@ public class MediaStore {
 				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("images").appendPath("thumbnails").build();
 			}
 
+			/* AOSP InternalThumbnails.cancelThumbnail(): cancels a pending request; ATL has no getThumbnail(), so
+			 * none is ever pending */
+			@Deprecated
+			public static void cancelThumbnailRequest(android.content.ContentResolver cr, long origId) {
+			}
+
+			@Deprecated
+			public static void cancelThumbnailRequest(android.content.ContentResolver cr, long origId, long groupId) {
+				cancelThumbnailRequest(cr, origId);
+			}
+
 			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
 			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 
@@ -202,6 +213,17 @@ public class MediaStore {
 
 			public static Uri getContentUri(String volumeName) {
 				return AUTHORITY_URI.buildUpon().appendPath(volumeName).appendPath("video").appendPath("thumbnails").build();
+			}
+
+			/* AOSP InternalThumbnails.cancelThumbnail(): cancels a pending request; ATL has no getThumbnail(), so
+			 * none is ever pending */
+			@Deprecated
+			public static void cancelThumbnailRequest(android.content.ContentResolver cr, long origId) {
+			}
+
+			@Deprecated
+			public static void cancelThumbnailRequest(android.content.ContentResolver cr, long origId, long groupId) {
+				cancelThumbnailRequest(cr, origId);
 			}
 
 			public static final Uri EXTERNAL_CONTENT_URI = getContentUri("external");
@@ -382,5 +404,9 @@ public class MediaStore {
 	 */
 	public static int getPickImagesMaxLimit() {
 		return PICK_IMAGES_MAX_LIMIT;
+	}
+
+	public static Uri getMediaScannerUri() {
+		return AUTHORITY_URI.buildUpon().appendPath("none").appendPath("media_scanner").build();
 	}
 }
