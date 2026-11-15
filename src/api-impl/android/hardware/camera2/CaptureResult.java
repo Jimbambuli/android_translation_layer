@@ -12,7 +12,7 @@ import java.util.Map;
  * capture ever produces a result; the class keeps AOSP's keys (types still missing in ATL are typed
  * Object) and answers from its own result map. */
 @SuppressWarnings("unchecked")
-public class CaptureResult {
+public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 
 	public static final class Key<T> {
 		private final String mName;
