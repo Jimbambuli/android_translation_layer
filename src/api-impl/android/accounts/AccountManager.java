@@ -301,6 +301,20 @@ public class AccountManager {
 		return new AuthenticatorDescription[0];
 	}
 
+	/* AOSP removeAccount(Account, Activity, ...): AccountManagerService binds the authenticator of the account type to
+	 * remove the account (RemoveAccountSession); ATL knows no authenticators (see addAccount), so the bind fails */
+	public AccountManagerFuture<Bundle> removeAccount(final Account account, final Activity activity,
+	                                                  AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return runAsync(new Callable<Bundle>() {
+			@Override
+			public Bundle call() throws Exception {
+				throw new AuthenticatorException("bind failure");
+			}
+		}, callback, handler);
+	}
+
 	/* AOSP updateCredentials(): asks the authenticator of the account type; none is bound here (see addAccount) */
 	public AccountManagerFuture<Bundle> updateCredentials(final Account account, final String authTokenType, final Bundle options,
 	                                                      final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
