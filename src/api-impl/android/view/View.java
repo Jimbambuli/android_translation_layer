@@ -6064,7 +6064,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private int importantForContentCapture = 0; // IMPORTANT_FOR_CONTENT_CAPTURE_AUTO
 	public void setImportantForContentCapture(int mode) { importantForContentCapture = mode; }
 	public int getImportantForContentCapture() { return importantForContentCapture; }
-	public boolean isImportantForContentCapture() { return false; }
+	/* AOSP View.IMPORTANT_FOR_CONTENT_CAPTURE_* and isImportantForContentCapture()
+	 * (calculateIsImportantForContentCapture(), without the cache) */
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_AUTO = 0x0;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES = 0x1;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO = 0x2;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS = 0x4;
+	public static final int IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS = 0x8;
+
+	public boolean isImportantForContentCapture() {
+		ViewParent parent = getParent();
+		while (parent instanceof View) {
+			final int parentImportance = ((View)parent).getImportantForContentCapture();
+			if (parentImportance == IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+			    || parentImportance == IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS)
+				return false;
+			parent = parent.getParent();
+		}
+		final int importance = getImportantForContentCapture();
+		if (importance == IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS || importance == IMPORTANT_FOR_CONTENT_CAPTURE_YES)
+			return true;
+		if (importance != IMPORTANT_FOR_CONTENT_CAPTURE_AUTO)
+			return false;
+		// a view group is important if at least one child is
+		if (this instanceof ViewGroup) {
+			final ViewGroup group = (ViewGroup)this;
+			for (int i = 0; i < group.getChildCount(); i++) {
+				if (group.getChildAt(i).isImportantForContentCapture())
+					return true;
+			}
+		}
+		// explicit autofill hints make it important
+		return getAutofillHints() != null;
+	}
 
 	private int outlineAmbientShadowColor = 0xff000000;
 	private int outlineSpotShadowColor = 0xff000000;
