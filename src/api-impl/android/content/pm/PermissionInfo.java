@@ -199,4 +199,13 @@ public class PermissionInfo extends PackageItemInfo {
 	public int describeContents() {
 		return 0;
 	}
+
+	/* AOSP PermissionInfo.getProtection / getProtectionFlags */
+	public int getProtection() {
+		return protectionLevel & PROTECTION_MASK_BASE;
+	}
+
+	public int getProtectionFlags() {
+		return protectionLevel & ~PROTECTION_MASK_BASE;
+	}
 }

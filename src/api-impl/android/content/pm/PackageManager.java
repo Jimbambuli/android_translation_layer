@@ -1487,6 +1487,29 @@ public class PackageManager {
 	 * launch the main activity in the package, or null if the package does
 	 * not contain such an activity.
 	 */
+	/* AOSP ApplicationPackageManager.getLeanbackLaunchIntentForPackage / getLaunchIntentForPackageAndCategory */
+	public Intent getLeanbackLaunchIntentForPackage(String packageName) {
+		// Try to find a main launcher activity for the given categories.
+		Intent intentToResolve = new Intent(Intent.ACTION_MAIN);
+		intentToResolve.addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER);
+		intentToResolve.setPackage(packageName);
+		List<ResolveInfo> ris = queryIntentActivities(intentToResolve, 0);
+
+		if (ris == null || ris.size() <= 0) {
+			return null;
+		}
+		Intent intent = new Intent(intentToResolve);
+		intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		intent.setClassName(ris.get(0).activityInfo.packageName, ris.get(0).activityInfo.name);
+		return intent;
+	}
+
+	/* AOSP ApplicationPackageManager.isAutoRevokeWhitelisted asks the permission manager whether the
+	 * user or installer exempted the app from permission auto-revoke; no exemption is the default. */
+	public boolean isAutoRevokeWhitelisted() {
+		return false;
+	}
+
 	public Intent getLaunchIntentForPackage(String packageName) {
 		PackageParser.Package pkg = ATLLoadedApp.getPrimaryApplication().pkg;
 		if (!pkg.packageName.equals(packageName)) {
