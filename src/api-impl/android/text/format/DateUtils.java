@@ -1,6 +1,8 @@
 package android.text.format;
 
 import android.content.Context;
+import android.icu.text.DateFormatSymbols;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Formatter;
 import java.util.Locale;
@@ -15,6 +17,40 @@ public class DateUtils {
 	public static final int FORMAT_SHOW_YEAR = 0x00004;
 	public static final int FORMAT_SHOW_DATE = 0x00010;
 	public static final int FORMAT_ABBREV_MONTH = 0x10000;
+
+	/* AOSP core/java/android/text/format/DateUtils.java: abbrev values and the deprecated name getters */
+	public static final int LENGTH_LONG = 10;
+	public static final int LENGTH_MEDIUM = 20;
+	public static final int LENGTH_SHORT = 30;
+	public static final int LENGTH_SHORTER = 40;
+	public static final int LENGTH_SHORTEST = 50;
+
+	@Deprecated
+	public static String getDayOfWeekString(int dayOfWeek, int abbrev) {
+		DateFormatSymbols dfs = DateFormatSymbols.getInstance();
+		final int width;
+		switch (abbrev) {
+			case LENGTH_LONG:
+				width = DateFormatSymbols.WIDE;
+				break;
+			case LENGTH_SHORTEST:
+				width = DateFormatSymbols.NARROW;
+				break;
+			case LENGTH_MEDIUM:
+			case LENGTH_SHORT:
+			case LENGTH_SHORTER:
+			default:
+				width = DateFormatSymbols.ABBREVIATED;
+				break;
+		}
+		return dfs.getWeekdays(DateFormatSymbols.FORMAT, width)[dayOfWeek];
+	}
+
+	@Deprecated
+	public static String getAMPMString(int ampm) {
+		String[] amPm = DateFormat.getIcuDateFormatSymbols(Locale.getDefault()).getAmPmStrings();
+		return amPm[ampm - Calendar.AM];
+	}
 
 	public static CharSequence getRelativeTimeSpanString(Context c, long millis) {
 		return getRelativeTimeSpanString(c, millis, false /* no preposition */);

@@ -1007,6 +1007,7 @@ srcs = [
 	'android/util/StateSet.java',
 	'android/util/StringBuilderPrinter.java',
 	'android/util/TimingLogger.java',
+	'android/util/TimeFormatException.java',
 	'android/util/TypedValue.java',
 	'android/util/UtilConfig.java',
 	'android/util/Xml.java',
