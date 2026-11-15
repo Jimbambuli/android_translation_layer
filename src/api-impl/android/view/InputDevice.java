@@ -109,7 +109,7 @@ public class InputDevice {
 		float max;
 
 		public MotionRange(int axis) {
-			this(axis, getSources());
+			this(axis, InputDevice.this.getSources());
 		}
 
 		MotionRange(int axis, int source) {
