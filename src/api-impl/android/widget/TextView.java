@@ -255,6 +255,10 @@ public class TextView extends View {
 				boolean allCaps = a.getBoolean(com.android.internal.R.styleable.TextView_textAllCaps, false);
 				setAllCaps(allCaps);
 			}
+
+			// AOSP attribute loop: TextView_textIsSelectable -> setTextIsSelectable()
+			if (a.getBoolean(com.android.internal.R.styleable.TextView_textIsSelectable, false))
+				setTextIsSelectable(true);
 		} catch (java.lang.Exception e) {
 			System.out.println("exception while inflating TextView:");
 			e.printStackTrace();
