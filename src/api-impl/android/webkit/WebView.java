@@ -23,7 +23,19 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class WebView extends ViewGroup {
+/* AOSP frameworks/base core/java/android/webkit/WebView.java: WebView extends AbsoluteLayout (a ViewGroup); the
+ * WebKitGTK widget still comes from WebView.native_constructor(), AbsoluteLayout has no native part */
+public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.OnHierarchyChangeListener, android.view.ViewTreeObserver.OnGlobalFocusChangeListener {
+	/* AOSP WebView.onChildViewAdded()/onChildViewRemoved()/onGlobalFocusChanged(): deprecated, empty */
+	@Deprecated
+	public void onChildViewAdded(android.view.View parent, android.view.View child) {}
+
+	@Deprecated
+	public void onChildViewRemoved(android.view.View p, android.view.View child) {}
+
+	@Deprecated
+	public void onGlobalFocusChanged(android.view.View oldFocus, android.view.View newFocus) {}
+
 	private static final String TAG = "WebView";
 	// AOSP WebView: URI scheme for telephone number, email address and map address
 	public static final String SCHEME_TEL = "tel:";
