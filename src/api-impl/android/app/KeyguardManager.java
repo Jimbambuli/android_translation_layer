@@ -21,6 +21,26 @@ public class KeyguardManager {
 		return false;
 	}
 
+	/* AOSP isDeviceLocked(): the trust manager's answer for the user; ATL shows no lock screen, as isKeyguardLocked() */
+	public boolean isDeviceLocked() {
+		return false;
+	}
+
+	public static final String ACTION_CONFIRM_DEVICE_CREDENTIAL = "android.app.action.CONFIRM_DEVICE_CREDENTIAL";
+	public static final String EXTRA_TITLE = "android.app.extra.TITLE";
+	public static final String EXTRA_DESCRIPTION = "android.app.extra.DESCRIPTION";
+
+	/* AOSP: null when the device is not secure (isDeviceSecure()), else the settings' confirm credential intent */
+	@Deprecated
+	public android.content.Intent createConfirmDeviceCredentialIntent(CharSequence title, CharSequence description) {
+		if (!isDeviceSecure())
+			return null;
+		android.content.Intent intent = new android.content.Intent(ACTION_CONFIRM_DEVICE_CREDENTIAL);
+		intent.putExtra(EXTRA_TITLE, title);
+		intent.putExtra(EXTRA_DESCRIPTION, description);
+		return intent;
+	}
+
 	public class KeyguardLock {
 		public void disableKeyguard() {}
 		public void reenableKeyguard() {}
