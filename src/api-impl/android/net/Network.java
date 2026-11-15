@@ -26,6 +26,20 @@ public class Network {
 		return javax.net.SocketFactory.getDefault();
 	}
 
+	/* AOSP Network.openConnection(URL): with the network's proxy (ConnectivityManager.getProxyForNetwork(), none on
+	 * ATL: getDefaultProxy() is null) -> openConnection(url, Proxy.NO_PROXY) */
+	public java.net.URLConnection openConnection(java.net.URL url) throws java.io.IOException {
+		return openConnection(url, java.net.Proxy.NO_PROXY);
+	}
+
+	/* AOSP Network.openConnection(URL, Proxy): an HTTP or HTTPS connection whose names and sockets go through this
+	 * network; on ATL's one network that is the platform's own URLConnection */
+	public java.net.URLConnection openConnection(java.net.URL url, java.net.Proxy proxy) throws java.io.IOException {
+		if (proxy == null)
+			throw new IllegalArgumentException("proxy is null");
+		return url.openConnection(proxy);
+	}
+
 	public void bindSocket(java.net.Socket socket) throws java.io.IOException {}
 
 	public void bindSocket(java.net.DatagramSocket socket) throws java.io.IOException {}

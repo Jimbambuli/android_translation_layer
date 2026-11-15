@@ -2131,6 +2131,17 @@ public class PackageParser {
 					return false;
 				}
 
+			} else if (parser.getName().equals("property")) {
+				// AOSP ParsingPackageUtils: <property> of the application, kept by name for
+				// PackageManager.getProperty(name, packageName)
+				PackageManager.Property property = parseProperty(res, parser, attrs, owner.packageName, outError);
+				if (property == null && outError[0] != null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+				if (property != null)
+					owner.mProperties.put(property.getName(), property);
+
 			} else if (tagName.equals("library")) {
 				sa = res.obtainAttributes(attrs,
 				                          com.android.internal.R.styleable.AndroidManifestLibrary);
@@ -3247,6 +3258,45 @@ public class PackageParser {
 		return data;
 	}
 
+	/* AOSP ParsingPackageUtils.parseMetaData() for <property>: android:resource gives a resource id, else
+	 * android:value a string, boolean, integer or float, as for <meta-data> */
+	private PackageManager.Property parseProperty(Resources res, XmlPullParser parser, AttributeSet attrs,
+	                                              String packageName, String[] outError)
+	    throws XmlPullParserException, IOException {
+		TypedArray sa = res.obtainAttributes(attrs, com.android.internal.R.styleable.AndroidManifestProperty);
+		try {
+			String name = sa.getNonConfigurationString(com.android.internal.R.styleable.AndroidManifestProperty_name, 0);
+			if (name == null) {
+				outError[0] = "<property> requires an android:name attribute";
+				return null;
+			}
+			name = name.intern();
+			TypedValue v = sa.peekValue(com.android.internal.R.styleable.AndroidManifestProperty_resource);
+			if (v != null && v.resourceId != 0)
+				return new PackageManager.Property(name, v.resourceId, true, packageName, null);
+			v = sa.peekValue(com.android.internal.R.styleable.AndroidManifestProperty_value);
+			if (v == null) {
+				outError[0] = "<property> requires an android:value or android:resource attribute";
+				return null;
+			}
+			if (v.type == TypedValue.TYPE_STRING) {
+				CharSequence cs = v.coerceToString();
+				return new PackageManager.Property(name, cs != null ? cs.toString() : null, packageName, null);
+			} else if (v.type == TypedValue.TYPE_INT_BOOLEAN) {
+				return new PackageManager.Property(name, v.data != 0, packageName, null);
+			} else if (v.type >= TypedValue.TYPE_FIRST_INT && v.type <= TypedValue.TYPE_LAST_INT) {
+				return new PackageManager.Property(name, v.data, false, packageName, null);
+			} else if (v.type == TypedValue.TYPE_FLOAT) {
+				return new PackageManager.Property(name, v.getFloat(), packageName, null);
+			}
+			Slog.w(TAG, "<property> only supports string, integer, float, color, boolean, and resource reference types: " + parser.getName() + " at " + mArchiveSourcePath + " " + parser.getPositionDescription());
+			return null; // skipped as the non-rigid parser does for <meta-data>
+		} finally {
+			sa.recycle();
+			XmlUtils.skipCurrentTag(parser);
+		}
+	}
+
 	private static VerifierInfo parseVerifier(Resources res, XmlPullParser parser,
 	                                          AttributeSet attrs, int flags, String[] outError) throws XmlPullParserException,
 													   IOException {
@@ -3346,6 +3396,8 @@ public class PackageParser {
 
 		// We store the application meta-data independently to avoid multiple unwanted references
 		public Bundle mAppMetaData = null;
+		/* the application's <property> elements by name (AOSP ParsingPackage.getProperties()) */
+		public final HashMap<String, PackageManager.Property> mProperties = new HashMap<>();
 
 		// If this is a 3rd party app, this is the path of the zip file.
 		public String mPath;

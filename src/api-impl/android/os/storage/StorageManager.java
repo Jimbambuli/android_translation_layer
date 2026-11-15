@@ -11,6 +11,16 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 
 public class StorageManager {
+
+	/* AOSP StorageManager.openProxyFileDescriptor(int, ProxyFileDescriptorCallback, Handler): checkNotNull(handler)
+	 * and the callback, then the AppFuse bridge of the StorageManagerService (mountProxyFileDescriptorBridge()).
+	 * ATL has no such service, so the bridge cannot be mounted: IOException("Failed to mount proxy bridge"). */
+	public android.os.ParcelFileDescriptor openProxyFileDescriptor(int mode, android.os.ProxyFileDescriptorCallback callback, android.os.Handler handler) throws IOException {
+		java.util.Objects.requireNonNull(handler);
+		java.util.Objects.requireNonNull(callback);
+		throw new IOException("Failed to mount proxy bridge");
+	}
+
 	// AOSP: uuid -v5 ad99aa3d-308e-4191-a200-ebcab371c0ad default
 	public static final UUID UUID_DEFAULT = UUID.fromString("41217664-9172-527a-b3d5-edabb50a7d69");
 	public static final String UUID_PRIVATE_INTERNAL = null;

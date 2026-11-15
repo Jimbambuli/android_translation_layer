@@ -28,9 +28,9 @@ import java.util.Locale;
  *  Encapsulates the telecom audio state, including the current audio routing, supported audio
  *  routing and mute.
  *
- *  ATL: the android.bluetooth.BluetoothDevice members (getActiveBluetoothDevice(),
- *  getSupportedBluetoothDevices(), their constructor and parcel fields) and the hidden
- *  AudioState constructor are left out; ATL has neither BluetoothDevice nor AudioState.
+ *  ATL: the BluetoothDevice constructor and parcel fields and the hidden AudioState constructor
+ *  are left out; getActiveBluetoothDevice()/getSupportedBluetoothDevices() answer as for the
+ *  public constructor, which sets no device (ATL has no Bluetooth adapter).
  */
 public final class CallAudioState implements Parcelable {
 	/** @hide */
@@ -101,6 +101,16 @@ public final class CallAudioState implements Parcelable {
 		isMuted = state.isMuted();
 		route = state.getRoute();
 		supportedRouteMask = state.getSupportedRouteMask();
+	}
+
+	/* AOSP CallAudioState(boolean, int, int) -> this(muted, route, supportedRouteMask, null,
+	 * Collections.emptyList()) */
+	public android.bluetooth.BluetoothDevice getActiveBluetoothDevice() {
+		return null;
+	}
+
+	public java.util.Collection<android.bluetooth.BluetoothDevice> getSupportedBluetoothDevices() {
+		return java.util.Collections.emptyList();
 	}
 
 	@Override

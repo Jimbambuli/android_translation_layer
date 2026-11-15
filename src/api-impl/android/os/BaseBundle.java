@@ -46,7 +46,7 @@ public class BaseBundle {
 			return null;
 		}
 		if (value instanceof Bundle) {
-			return new Bundle((Bundle)value);
+			return ((Bundle)value).deepCopy(); // AOSP BaseBundle.deepCopyValue()
 		}
 		if (value instanceof PersistableBundle) {
 			return ((PersistableBundle)value).deepCopy();

@@ -165,6 +165,29 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGet
 	return _INTPTR(eglGetCurrentContext());
 }
 
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentSurface(JNIEnv *env, jobject this, jint readdraw)
+{
+	return _INTPTR(eglGetCurrentSurface(readdraw));
+}
+
+JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQueryContext(JNIEnv *env, jobject this, jlong display, jlong context, jint attribute, jintArray value)
+{
+	EGLint v = 0;
+	EGLBoolean ret = eglQueryContext(_PTR(display), _PTR(context), attribute, &v);
+	jint value_out = v;
+	(*env)->SetIntArrayRegion(env, value, 0, 1, &value_out);
+	return ret;
+}
+
+JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQuerySurface(JNIEnv *env, jobject this, jlong display, jlong surface, jint attribute, jintArray value)
+{
+	EGLint v = 0;
+	EGLBoolean ret = eglQuerySurface(_PTR(display), _PTR(surface), attribute, &v);
+	jint value_out = v;
+	(*env)->SetIntArrayRegion(env, value, 0, 1, &value_out);
+	return ret;
+}
+
 JNIEXPORT jstring JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQueryString(JNIEnv *env, jobject this, jlong display, jint name)
 {
 	const char *ret = eglQueryString(_PTR(display), name);

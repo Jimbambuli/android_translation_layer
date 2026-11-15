@@ -61,4 +61,11 @@ public class SubscriptionInfo {
 	public String getIccId() {
 		return mIccId;
 	}
+
+	/* AOSP SubscriptionInfo.getCountryIso(): mCountryIso, not set before ISub fills it */
+	private String mCountryIso;
+
+	public String getCountryIso() {
+		return mCountryIso;
+	}
 }

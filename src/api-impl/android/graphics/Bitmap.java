@@ -23,7 +23,9 @@ public final class Bitmap implements Parcelable {
 		ARGB_4444(2, -1, /*ANDROID_BITMAP_FORMAT_RGBA_4444*/ 7),
 		ALPHA_8(1, /*GDK_MEMORY_A8*/ 24, /*ANDROID_BITMAP_FORMAT_A_8*/ 8),
 		RGBA_F16(8, /*GDK_MEMORY_R16G16B16A16_FLOAT*/ 14, /*ANDROID_BITMAP_FORMAT_RGBA_F16*/ 9),
-		HARDWARE(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /*ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1);
+		HARDWARE(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /*ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1),
+		/* AOSP Bitmap.Config.RGBA_1010102 (API 33): 4 bytes per pixel; GDK has no matching memory format */
+		RGBA_1010102(4, -1, /*ANDROID_BITMAP_FORMAT_RGBA_1010102*/ 10);
 
 		private int bytes_per_pixel;
 		private int gdk_memory_format;
@@ -247,6 +249,20 @@ public final class Bitmap implements Parcelable {
 
 	public int getHeight() {
 		return height;
+	}
+
+	/* AOSP Bitmap.wrapHardwareBuffer(): the usage checks, then nativeWrapHardwareBufferBitmap(), which is null when
+	 * the buffer cannot be wrapped. ATL has no AHardwareBuffer allocator (HardwareBuffer never has a native
+	 * buffer), so no buffer can be wrapped. */
+	public static Bitmap wrapHardwareBuffer(android.hardware.HardwareBuffer hardwareBuffer, ColorSpace colorSpace) {
+		final long usage = hardwareBuffer.getUsage();
+		if ((usage & android.hardware.HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE) == 0) {
+			throw new IllegalArgumentException("usage flags must contain USAGE_GPU_SAMPLED_IMAGE.");
+		}
+		if ((usage & android.hardware.HardwareBuffer.USAGE_PROTECTED_CONTENT) != 0) {
+			throw new IllegalArgumentException("Bitmap is not compatible with protected buffers");
+		}
+		return null;
 	}
 
 	public Config getConfig() {

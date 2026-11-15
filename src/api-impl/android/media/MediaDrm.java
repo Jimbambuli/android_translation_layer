@@ -126,6 +126,12 @@ public final class MediaDrm {
 		return false;
 	}
 
+	/* AOSP MediaDrm.requiresSecureDecoder(String, int) (API 31); no MediaDrm instance exists on ATL (no scheme is
+	 * supported), as for the variant without a security level */
+	public boolean requiresSecureDecoder(String mime, int level) {
+		return false;
+	}
+
 	public PlaybackComponent getPlaybackComponent(byte[] sessionId) {
 		return null;
 	}

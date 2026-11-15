@@ -125,6 +125,14 @@ public class SurfaceTexture {
 	}
 
 	/* AOSP SurfaceTexture.updateTexImage() (GLConsumer::updateTexImage()) */
+	/* AOSP SurfaceTexture.getDataSpace() -> GLConsumer mCurrentDataSpace: HAL_DATASPACE_UNKNOWN until a frame is
+	 * latched; ATL's frames are sRGB bitmaps (DataSpace.DATASPACE_SRGB) */
+	public int getDataSpace() {
+		synchronized (this) {
+			return latched != null ? android.hardware.DataSpace.DATASPACE_SRGB : android.hardware.DataSpace.DATASPACE_UNKNOWN;
+		}
+	}
+
 	public void updateTexImage() {
 		if (released)
 			throw new RuntimeException("Error during updateTexImage (see logcat for details)"); // NO_INIT: abandoned

@@ -1052,8 +1052,43 @@ public abstract class Context {
 
 	public abstract Context createConfigurationContext(Configuration configuration);
 
-	public void sendOrderedBroadcast(Intent intent, String receiverPermission, BroadcastReceiver resultReceiver, Handler handler, int flags, String extra, Bundle options) {
-		System.out.println("sendOrderedBroadcast(" + intent + ", " + receiverPermission + ", " + resultReceiver + ", " + handler + ", " + flags + ", " + extra + ", " + options + ") called");
+	/* AOSP ContextImpl.sendOrderedBroadcast(Intent, String, BroadcastReceiver, Handler, int, String, Bundle): the
+	 * receivers get the broadcast, then resultReceiver gets it last with the result, on scheduler or, when that is
+	 * null, on the main thread. ATL's receivers do not pass a result on, so the result receiver sees the initial
+	 * code, data and extras. */
+	public void sendOrderedBroadcast(Intent intent, String receiverPermission, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+		sendOrderedBroadcast(intent, receiverPermission);
+		if (resultReceiver == null)
+			return;
+		Context context = this;
+		(scheduler != null ? scheduler : new Handler(Looper.getMainLooper())).post(() -> {
+			resultReceiver.setResult(initialCode, initialData, initialExtras);
+			resultReceiver.onReceive(context, intent);
+		});
+	}
+
+	/* AOSP Context.sendOrderedBroadcast(Intent, String, Bundle) (API 31): the options (BroadcastOptions) only steer
+	 * the system's delivery */
+	public void sendOrderedBroadcast(Intent intent, String receiverPermission, Bundle options) {
+		sendOrderedBroadcast(intent, receiverPermission);
+	}
+
+	/* AOSP Context.sendOrderedBroadcast(Intent, String, Bundle, BroadcastReceiver, Handler, int, String, Bundle)
+	 * (API 31): as the variant without options */
+	public void sendOrderedBroadcast(Intent intent, String receiverPermission, Bundle options, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+		sendOrderedBroadcast(intent, receiverPermission, resultReceiver, scheduler, initialCode, initialData, initialExtras);
+	}
+
+	/* AOSP Context.sendOrderedBroadcast(Intent, String, String, BroadcastReceiver, Handler, int, String, Bundle)
+	 * (API 30): receiverAppOp only limits the receivers to those allowed the app op; ATL has no app ops */
+	public void sendOrderedBroadcast(Intent intent, String receiverPermission, String receiverAppOp, BroadcastReceiver resultReceiver, Handler scheduler, int initialCode, String initialData, Bundle initialExtras) {
+		sendOrderedBroadcast(intent, receiverPermission, resultReceiver, scheduler, initialCode, initialData, initialExtras);
+	}
+
+	/* AOSP Context.sendOrderedBroadcast(Intent, int, String, String, BroadcastReceiver, Handler, String, Bundle,
+	 * Bundle) (API 30) */
+	public void sendOrderedBroadcast(Intent intent, int initialCode, String receiverPermission, String receiverAppOp, BroadcastReceiver resultReceiver, Handler scheduler, String initialData, Bundle initialExtras, Bundle options) {
+		sendOrderedBroadcast(intent, receiverPermission, resultReceiver, scheduler, initialCode, initialData, initialExtras);
 	}
 
 	public abstract Context createDisplayContext(Display display);

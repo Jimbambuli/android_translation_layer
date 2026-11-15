@@ -113,4 +113,9 @@ public class SubscriptionManager {
 	}
 
 	public void removeOnSubscriptionsChangedListener(OnSubscriptionsChangedListener listener) {}
+
+	/* AOSP SubscriptionManager.isNetworkRoaming(int): getPhoneId(subId) is INVALID_PHONE_INDEX without ISub, so false */
+	public boolean isNetworkRoaming(int subId) {
+		return false;
+	}
 }

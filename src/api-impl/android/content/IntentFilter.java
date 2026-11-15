@@ -9,7 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-public class IntentFilter {
+public class IntentFilter implements android.os.Parcelable {
 
 	public static final int MATCH_CATEGORY_MASK = 0xfff0000;
 	public static final int MATCH_ADJUSTMENT_MASK = 0x000ffff;
@@ -45,6 +45,113 @@ public class IntentFilter {
 	private boolean autoVerify;
 
 	public IntentFilter() {}
+
+	/* AOSP IntentFilter.writeToParcel()/IntentFilter(Parcel)/CREATOR, in AOSP's order. ATL keeps fewer fields: the
+	 * data types go as static and dynamic types alike (AOSP addDataType() adds them to both), the fields ATL has
+	 * not (MIME groups, scheme specific parts, priority, instant app visibility, order, extras, relative URI
+	 * groups) as absent or 0, and are skipped when read. */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public final void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeStringArray(actions.toArray(new String[actions.size()]));
+		dest.writeInt(1);
+		dest.writeStringList(new ArrayList<>(categories));
+		dest.writeInt(1);
+		dest.writeStringList(dataSchemes);
+		if (dataTypes != null) {
+			dest.writeInt(1);
+			dest.writeStringList(dataTypes);
+			dest.writeInt(1);
+			dest.writeStringList(dataTypes);
+		} else {
+			dest.writeInt(0);
+			dest.writeInt(0);
+		}
+		dest.writeInt(0); // mMimeGroups
+		dest.writeInt(0); // mDataSchemeSpecificParts
+		dest.writeInt(dataAuthorities.size());
+		for (AuthorityEntry entry : dataAuthorities)
+			entry.writeToParcel(dest);
+		if (dataPaths != null) {
+			dest.writeInt(dataPaths.size());
+			for (PatternMatcher path : dataPaths)
+				path.writeToParcel(dest, flags);
+		} else {
+			dest.writeInt(0);
+		}
+		dest.writeInt(0); // mPriority
+		dest.writeInt(hasPartialTypes ? 1 : 0);
+		dest.writeInt(hasPartialTypes ? 1 : 0);
+		dest.writeInt(getAutoVerify() ? 1 : 0);
+		dest.writeInt(0); // mInstantAppVisibility
+		dest.writeInt(0); // mOrder
+		dest.writeInt(0); // mExtras
+		dest.writeInt(0); // mUriRelativeFilterGroups
+	}
+
+	public IntentFilter(android.os.Parcel source) {
+		List<String> actionList = new ArrayList<>();
+		source.readStringList(actionList);
+		actions.addAll(actionList);
+		if (source.readInt() != 0) {
+			List<String> list = new ArrayList<>();
+			source.readStringList(list);
+			categories.addAll(list);
+		}
+		if (source.readInt() != 0)
+			source.readStringList(dataSchemes);
+		if (source.readInt() != 0) { // static data types
+			dataTypes = new ArrayList<>();
+			source.readStringList(dataTypes);
+		}
+		if (source.readInt() != 0) {
+			List<String> list = new ArrayList<>();
+			source.readStringList(list);
+			if (dataTypes == null)
+				dataTypes = new ArrayList<>();
+			for (String type : list)
+				if (!dataTypes.contains(type))
+					dataTypes.add(type);
+		}
+		if (source.readInt() != 0) { // mMimeGroups
+			source.createStringArrayList();
+		}
+		int n = source.readInt();
+		for (int i = 0; i < n; i++) // mDataSchemeSpecificParts
+			new PatternMatcher(source);
+		n = source.readInt();
+		for (int i = 0; i < n; i++)
+			dataAuthorities.add(new AuthorityEntry(source));
+		n = source.readInt();
+		if (n > 0) {
+			dataPaths = new ArrayList<>(n);
+			for (int i = 0; i < n; i++)
+				dataPaths.add(new PatternMatcher(source));
+		}
+		source.readInt(); // mPriority
+		hasPartialTypes = source.readInt() > 0;
+		hasPartialTypes |= source.readInt() > 0;
+		setAutoVerify(source.readInt() > 0);
+		source.readInt(); // mInstantAppVisibility
+		source.readInt(); // mOrder
+		if (source.readInt() != 0)
+			android.os.PersistableBundle.CREATOR.createFromParcel(source);
+		source.readInt(); // mUriRelativeFilterGroups (ATL writes none)
+	}
+
+	public static final android.os.Parcelable.Creator<IntentFilter> CREATOR = new android.os.Parcelable.Creator<IntentFilter>() {
+		public IntentFilter createFromParcel(android.os.Parcel source) {
+			return new IntentFilter(source);
+		}
+
+		public IntentFilter[] newArray(int size) {
+			return new IntentFilter[size];
+		}
+	};
 	public IntentFilter(String action) {
 		addAction(action);
 	}
@@ -380,6 +487,21 @@ public class IntentFilter {
 		private final String mHost;
 		private final boolean mWild;
 		private final int mPort;
+
+		/* AOSP AuthorityEntry(Parcel)/writeToParcel(Parcel) */
+		AuthorityEntry(android.os.Parcel src) {
+			mOrigHost = src.readString();
+			mHost = src.readString();
+			mWild = src.readInt() != 0;
+			mPort = src.readInt();
+		}
+
+		void writeToParcel(android.os.Parcel dest) {
+			dest.writeString(mOrigHost);
+			dest.writeString(mHost);
+			dest.writeInt(mWild ? 1 : 0);
+			dest.writeInt(mPort);
+		}
 
 		public AuthorityEntry(String host, String port) {
 			mOrigHost = host;

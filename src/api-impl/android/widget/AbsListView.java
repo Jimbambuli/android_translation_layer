@@ -832,6 +832,36 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 	 *
 	 * @see #setChoiceMode(int)
 	 */
+	/* AOSP AbsListView.onInitializeAccessibilityNodeInfoForItem() (@hide): select/clear selection, click and long
+	 * click actions of an item, when the list and the item are enabled */
+	public void onInitializeAccessibilityNodeInfoForItem(View view, int position, android.view.accessibility.AccessibilityNodeInfo info) {
+		if (position == INVALID_POSITION) {
+			return;
+		}
+		boolean isItemActionable = isEnabled();
+		final ViewGroup.LayoutParams lp = view.getLayoutParams();
+		if (lp instanceof AbsListView.LayoutParams) {
+			isItemActionable &= ((AbsListView.LayoutParams)lp).isEnabled;
+		}
+		if (position == getSelectedItemPosition()) {
+			info.setSelected(true);
+			if (isItemActionable)
+				info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLEAR_SELECTION);
+		} else if (isItemActionable) {
+			info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SELECT);
+		}
+		if (!view.hasExplicitFocusable()) { // isItemClickable()
+			if (isItemActionable)
+				info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_CLICK);
+			info.setClickable(isItemActionable);
+		}
+		if (isLongClickable()) {
+			if (isItemActionable)
+				info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_LONG_CLICK);
+			info.setLongClickable(isItemActionable);
+		}
+	}
+
 	public boolean isItemChecked(int position) {
 		if (mChoiceMode != CHOICE_MODE_NONE && mCheckStates != null) {
 			return mCheckStates.get(position);

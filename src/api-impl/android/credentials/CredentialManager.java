@@ -44,6 +44,35 @@ public final class CredentialManager {
 		throw new IllegalStateException("no credential manager service");
 	}
 
+	/* AOSP getCredential(Context, PendingGetCredentialHandle, ...): checks, then pendingGetCredentialHandle.show() */
+	public void getCredential(android.content.Context context,
+	                          PrepareGetCredentialResponse.PendingGetCredentialHandle pendingGetCredentialHandle,
+	                          android.os.CancellationSignal cancellationSignal, java.util.concurrent.Executor executor,
+	                          android.os.OutcomeReceiver<GetCredentialResponse, GetCredentialException> callback) {
+		java.util.Objects.requireNonNull(pendingGetCredentialHandle, "pendingGetCredentialHandle must not be null");
+		java.util.Objects.requireNonNull(context, "context must not be null");
+		java.util.Objects.requireNonNull(executor, "executor must not be null");
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+		if (cancellationSignal != null && cancellationSignal.isCanceled()) {
+			android.util.Log.w(TAG, "getCredential already canceled");
+			return;
+		}
+		pendingGetCredentialHandle.show(context, cancellationSignal, executor, callback);
+	}
+
+	public void prepareGetCredential(GetCredentialRequest request, android.os.CancellationSignal cancellationSignal,
+	                                 java.util.concurrent.Executor executor,
+	                                 android.os.OutcomeReceiver<PrepareGetCredentialResponse, GetCredentialException> callback) {
+		java.util.Objects.requireNonNull(request, "request must not be null");
+		java.util.Objects.requireNonNull(executor, "executor must not be null");
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+		if (cancellationSignal != null && cancellationSignal.isCanceled()) {
+			android.util.Log.w(TAG, "prepareGetCredential already canceled");
+			return;
+		}
+		throw new IllegalStateException("no credential manager service");
+	}
+
 	public void createCredential(android.content.Context context, CreateCredentialRequest request,
 	                             android.os.CancellationSignal cancellationSignal,
 	                             java.util.concurrent.Executor executor,

@@ -550,6 +550,9 @@ public class DevicePolicyManager {
     public int getStorageEncryptionStatus(int userHandle) { return ENCRYPTION_STATUS_UNSUPPORTED; }
     public int setStorageEncryption(ComponentName admin, boolean encrypt) { throw noAdmin(admin); }
     public void wipeData(int flags) { throw new SecurityException("No active admin owned by uid"); }
+    /* AOSP bindDeviceAdminServiceAsUser(): only a device or profile owner may bind (DevicePolicyManagerService);
+     * there is none, so as for the other owner-only calls */
+    public boolean bindDeviceAdminServiceAsUser(ComponentName admin, android.content.Intent serviceIntent, android.content.ServiceConnection conn, int flags, android.os.UserHandle targetUser) { throw noAdmin(admin); }
 
     public boolean getCameraDisabled(ComponentName admin) { return false; }
     /* AOSP DevicePolicyManager with mService == null (no device policy service): these calls do nothing */

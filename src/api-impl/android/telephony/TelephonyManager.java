@@ -223,6 +223,12 @@ public class TelephonyManager {
 		}
 	}
 
+	/* AOSP TelephonyManager.registerTelephonyCallback(int, Executor, TelephonyCallback) (API 33): same as above,
+	 * includeLocationData only selects which location fields a modem would report */
+	public void registerTelephonyCallback(int includeLocationData, java.util.concurrent.Executor executor, TelephonyCallback callback) {
+		registerTelephonyCallback(executor, callback);
+	}
+
 	public void unregisterTelephonyCallback(TelephonyCallback callback) {}
 
 	public int getNetworkType() {
@@ -242,6 +248,18 @@ public class TelephonyManager {
 	 * that is neither voice, SMS nor data capable) all SIMs count as absent */
 	public int getSimState() {
 		return 1; // SIM_STATE_ABSENT
+	}
+
+	/* AOSP TelephonyManager.getSimState(int) -> getSimStateForSlotIndex(int): SIM_STATE_UNKNOWN when
+	 * getITelephony() is null, as on ATL */
+	public int getSimState(int slotIndex) {
+		return 0; // SIM_STATE_UNKNOWN
+	}
+
+	/* AOSP TelephonyManager.getPhoneCount() -> getActiveModemCount(): multisim config UNKNOWN and neither voice,
+	 * SMS nor data capable, so 0 */
+	public int getPhoneCount() {
+		return 0;
 	}
 
 	/* AOSP getSimOperatorNameForPhone(): the property icc_operator_alpha, "" when not set (no SIM) */

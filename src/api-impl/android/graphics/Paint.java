@@ -402,6 +402,61 @@ public class Paint {
 	public float getTextSkewX() { return text_skew_x; }
 	public void setTextSkewX(float skewX) { text_skew_x = skewX; }
 
+	/* AOSP Paint.getUnderlinePosition()/getUnderlineThickness() -> hwui jni/Paint.cpp (not in the local sources):
+	 * the font's post table values when Skia has them, else Paint::kStdUnderline_Top (1/9 - 1/36) and
+	 * Paint::kStdUnderline_Thickness (1/18) times the text size. ATL's native paint does not expose the font's
+	 * values, so the fallback is used. */
+	public float getUnderlinePosition() {
+		return (1.0f / 9.0f - 0.5f * (1.0f / 18.0f)) * getTextSize();
+	}
+
+	public float getUnderlineThickness() {
+		return (1.0f / 18.0f) * getTextSize();
+	}
+
+	/* AOSP Paint.equalsForTextMeasurement() -> nEqualsForTextMeasurement(): the same typeface, size, scale, skew,
+	 * spacing, text flags, hinting, locales and font settings. Compared on the values ATL keeps. */
+	public boolean equalsForTextMeasurement(Paint other) {
+		return java.util.Objects.equals(typeface, other.typeface)
+		    && getTextSize() == other.getTextSize()
+		    && text_scale_x == other.text_scale_x
+		    && text_skew_x == other.text_skew_x
+		    && getLetterSpacing() == other.getLetterSpacing()
+		    && mWordSpacing == other.mWordSpacing
+		    && flags == other.flags
+		    && hinting == other.hinting
+		    && java.util.Objects.equals(text_locales, other.text_locales)
+		    && java.util.Objects.equals(font_feature_settings, other.font_feature_settings)
+		    && java.util.Objects.equals(font_variation_settings, other.font_variation_settings)
+		    && elegant_text_height == other.elegant_text_height;
+	}
+
+	/* AOSP Paint.getOffsetForAdvance(CharSequence, ...): argument checks, then nGetOffsetForAdvance(), the offset
+	 * in [start, end] whose position is closest to advance. ATL measures each prefix with measureText() and does
+	 * not stop inside a surrogate pair. */
+	public int getOffsetForAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd, boolean isRtl, float advance) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | end | contextEnd
+		     | start - contextStart | end - start | contextEnd - end
+		     | text.length() - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		int best = start;
+		float bestDistance = Math.abs(advance);
+		for (int i = start + 1; i <= end; i++) {
+			if (i < end && Character.isLowSurrogate(text.charAt(i)) && Character.isHighSurrogate(text.charAt(i - 1)))
+				continue;
+			float distance = Math.abs(measureText(text, start, i) - advance);
+			if (distance < bestDistance) {
+				best = i;
+				bestDistance = distance;
+			}
+		}
+		return best;
+	}
+
 	/* AOSP nDescent: the descent of the font metrics */
 	public float descent() {
 		FontMetrics metrics = new FontMetrics();

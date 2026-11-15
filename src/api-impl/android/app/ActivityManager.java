@@ -595,6 +595,11 @@ public class ActivityManager {
 		}
 	}
 
+	/* AOSP ActivityManager.moveTaskToFront(int, int): moveTaskToFront(taskId, flags, null) */
+	public void moveTaskToFront(int taskId, int flags) {
+		moveTaskToFront(taskId, flags, null);
+	}
+
 	public void moveTaskToFront(int taskId, int flags, Bundle options) {
 	}
 }

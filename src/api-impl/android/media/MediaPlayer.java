@@ -732,7 +732,15 @@ public class MediaPlayer {
 	public void setAudioAttributes(AudioAttributes attributes) {}
 	public void setAudioStreamType(int dummy) {}
 
-	public int getAudioSessionId() { return 0; }
+	/* AOSP MediaPlayer.setAudioSessionId(): the session the player's audio is attached to (native, set before
+	 * setDataSource()); ATL keeps it for getAudioSessionId(), 0 until set */
+	private int mAudioSessionId;
+
+	public void setAudioSessionId(int sessionId) {
+		mAudioSessionId = sessionId;
+	}
+
+	public int getAudioSessionId() { return mAudioSessionId; }
 
 	public void setWakeMode(Context context, int mode) {}
 

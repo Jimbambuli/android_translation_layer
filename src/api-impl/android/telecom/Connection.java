@@ -543,6 +543,19 @@ public abstract class Connection extends Conferenceable {
 	 */
 	public void onAbort() {}
 
+	/* AOSP Connection callbacks (API 23/25/26), empty unless the app overrides them; the Telecom sources are not
+	 * in the local AOSP copy. ATL has no Telecom service that would call them. */
+	public void onUnhold() {}
+
+	public void onCallEvent(String event, android.os.Bundle extras) {}
+
+	public void onExtrasChanged(android.os.Bundle extras) {}
+
+	/* AOSP Connection.requestBluetoothAudio() (API 28): asks Telecom (through the connection's listeners) to route
+	 * the call audio to that device; ATL has no Telecom service and no Bluetooth adapter, so nobody takes the
+	 * request */
+	public void requestBluetoothAudio(android.bluetooth.BluetoothDevice bluetoothDevice) {}
+
 	/**
 	 * Notifies this Connection, which is in {@link #STATE_RINGING}, of
 	 * a request to accept.

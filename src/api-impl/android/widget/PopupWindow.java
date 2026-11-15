@@ -207,6 +207,11 @@ public class PopupWindow {
 		this(contentView, width, height, true);
 	}
 
+	/* AOSP PopupWindow(View) -> this(contentView, 0, 0) */
+	public PopupWindow(View contentView) {
+		this(contentView, 0, 0);
+	}
+
 	private View contentView;
 	private Drawable background;
 	private long popover; // native pointer to GtkPopover
@@ -694,6 +699,20 @@ public class PopupWindow {
 		native_moveTo(popover, mLocationGravity, x, y);
 	}
 	private native void native_moveTo(long popover, int gravity, int x, int y);
+
+	/** AOSP PopupWindow.update(): a shown popup takes over changed animation, flags and gravity. ATL's setters
+	 * (setFocusable(), setTouchable(), setOutsideTouchable()) change the GtkPopover right away, so nothing is left
+	 * to apply */
+	public void update() {}
+
+	/** AOSP PopupWindow.update(int, int): update(p.x, p.y, width, height, false), the size at the current
+	 * position (-1 keeps a dimension) */
+	public void update(int width, int height) {
+		if (width >= 0)
+			setWidth(width);
+		if (height >= 0)
+			setHeight(height);
+	}
 
 	public void setWindowLayoutMode(int widthSpec, int heightSpec) {}
 

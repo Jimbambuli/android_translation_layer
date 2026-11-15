@@ -198,6 +198,18 @@ public final class BluetoothDevice implements Parcelable {
 		throw new java.io.IOException();
 	}
 
+	/* AOSP BluetoothDevice.createL2capChannel() / createInsecureL2capChannel(): isBluetoothEnabled() is false
+	 * without an adapter */
+	public BluetoothSocket createL2capChannel(int psm) throws java.io.IOException {
+		Log.e(TAG, "createL2capChannel: Bluetooth is not enabled");
+		throw new java.io.IOException();
+	}
+
+	public BluetoothSocket createInsecureL2capChannel(int psm) throws java.io.IOException {
+		Log.e(TAG, "createInsecureL2capChannel: Bluetooth is not enabled");
+		throw new java.io.IOException();
+	}
+
 	/* AOSP: callback null -> NullPointerException; then the adapter's IBluetoothGatt is null ("BLE is not
 	 * supported") and the result is null */
 	public BluetoothGatt connectGatt(android.content.Context context, boolean autoConnect, BluetoothGattCallback callback) {

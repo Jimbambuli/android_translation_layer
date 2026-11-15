@@ -31,6 +31,66 @@ public class Notification implements Parcelable {
 
 	public Notification() {}
 
+	/* AOSP Notification.clone() -> cloneInto(that, true): a heavy copy; extras, actions, vibrate, the RemoteViews
+	 * and publicVersion are copied, PendingIntents, icons and the immutable values are shared */
+	@Override
+	public Notification clone() {
+		Notification that = new Notification();
+		that.when = when;
+		that.largeIcon = largeIcon;
+		that.audioStreamType = audioStreamType;
+		that.icon = icon;
+		that.deleteIntent = deleteIntent;
+		that.tickerText = tickerText;
+		that.iconLevel = iconLevel;
+		that.bigContentView = bigContentView != null ? bigContentView.clone() : null;
+		that.contentView = contentView != null ? contentView.clone() : null;
+		that.headsUpContentView = headsUpContentView != null ? headsUpContentView.clone() : null;
+		that.vibrate = vibrate != null ? vibrate.clone() : null;
+		that.ledARGB = ledARGB;
+		that.ledOnMS = ledOnMS;
+		that.ledOffMS = ledOffMS;
+		that.flags = flags;
+		that.defaults = defaults;
+		that.sound = sound;
+		that.audioAttributes = audioAttributes;
+		that.extras = extras != null ? new Bundle(extras) : null;
+		that.category = category;
+		that.priority = priority;
+		that.channelId = channelId;
+		that.text = text;
+		that.title = title;
+		if (actions != null) {
+			that.actions = new Action[actions.length];
+			for (int i = 0; i < actions.length; i++)
+				if (actions[i] != null)
+					that.actions[i] = actions[i].clone();
+		}
+		that.contentIntent = contentIntent;
+		that.iconPath = iconPath;
+		that.ongoing = ongoing;
+		that.style = style;
+		that.number = number;
+		that.color = color;
+		that.visibility = visibility;
+		that.fullScreenIntent = fullScreenIntent;
+		that.publicVersion = publicVersion != null ? publicVersion.clone() : null;
+		that.mGroupKey = mGroupKey;
+		that.mSortKey = mSortKey;
+		that.mGroupAlertBehavior = mGroupAlertBehavior;
+		that.mBadgeIcon = mBadgeIcon;
+		that.mTimeout = mTimeout;
+		that.mShortcutId = mShortcutId;
+		that.mSettingsText = mSettingsText;
+		that.mLargeIcon = mLargeIcon;
+		that.mBubbleMetadata = mBubbleMetadata;
+		that.mAllowSystemGeneratedContextualActions = mAllowSystemGeneratedContextualActions;
+		that.mForegroundServiceBehavior = mForegroundServiceBehavior;
+		that.mLocusId = mLocusId;
+		that.mSmallIcon = mSmallIcon;
+		return that;
+	}
+
 	/* AOSP Notification(Parcel) / readFromParcelImpl and writeToParcel: the public fields and those the
 	 * getters answer. Not parcelled: the RemoteViews (contentView, bigContentView, headsUpContentView) and
 	 * the Style object, which AOSP does not parcel either (Builder.recoverBuilder rebuilds it from extras). */
@@ -365,6 +425,28 @@ public class Notification implements Parcelable {
 		public Builder(Context context, String channelId) {
 			this(context);
 			notification.channelId = channelId;
+		}
+
+		/* AOSP Builder.recoverBuilder() -> Builder(Context, Notification toAdopt): the builder takes the notification
+		 * over with its actions, its people and its extras (build() writes them back). The Style is taken from the
+		 * notification object; restoring it from EXTRA_TEMPLATE (Style.restoreFromExtras) is not provided, so a
+		 * notification that came through a Parcel has no Style afterwards. */
+		public static Builder recoverBuilder(Context context, Notification n) {
+			Builder b = new Builder(context);
+			b.notification = n;
+			if (n.actions != null) {
+				for (Action action : n.actions)
+					b.mActions.add(action);
+			}
+			if (n.extras != null) {
+				b.mExtras = new Bundle(n.extras);
+				ArrayList<Person> people = n.extras.getParcelableArrayList(EXTRA_PEOPLE_LIST);
+				if (people != null && !people.isEmpty())
+					b.mPersonList.addAll(people);
+			}
+			if (n.style != null)
+				n.style.setBuilder(b);
+			return b;
 		}
 
 		private void setFlag(int mask, boolean value) {

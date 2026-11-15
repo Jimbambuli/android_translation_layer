@@ -38,6 +38,13 @@ public class MediaCodec {
 		return new MediaCodec(codecName);
 	}
 
+	/* AOSP MediaCodec.getName(): the name the codec was created with; IllegalStateException once released */
+	public String getName() {
+		if (native_codec == 0)
+			throw new IllegalStateException();
+		return codecName;
+	}
+
 	public MediaCodecInfo getCodecInfo() {
 		for (int i = 0; i < MediaCodecList.getCodecCount(); i++)
 			if (MediaCodecList.getCodecInfoAt(i).getName().equals(codecName))
@@ -237,6 +244,14 @@ public class MediaCodec {
 
 	public MediaFormat getOutputFormat() {
 		return mediaFormat;
+	}
+
+	/* AOSP MediaCodec.getOutputFormat(int): the format of a dequeued output buffer (IllegalStateException for an
+	 * index the app does not hold); ATL's output buffers all have the codec's output format */
+	public synchronized MediaFormat getOutputFormat(int index) {
+		if (outputBuffers == null || index < 0 || index >= outputBuffers.length || freeOutputBuffers.contains(index))
+			throw new IllegalStateException();
+		return getOutputFormat();
 	}
 
 	public synchronized void flush() {

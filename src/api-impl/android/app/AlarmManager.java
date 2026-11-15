@@ -64,8 +64,93 @@ public class AlarmManager {
 		}
 	}
 
+	/* AOSP AlarmManager.cancel(OnAlarmListener): null throws, an unknown listener is only logged */
 	public void cancel(OnAlarmListener listener) {
 		Slog.i(TAG, "cancel(" + listener + ") called");
+		if (listener == null)
+			throw new NullPointerException("cancel() called with a null OnAlarmListener");
+		synchronized (sAlarms) {
+			ListenerAlarm old = sListenerAlarms.remove(listener);
+			if (old == null) {
+				Slog.w(TAG, "Unrecognized alarm listener " + listener);
+				return;
+			}
+			old.handler.removeCallbacks(old);
+		}
+	}
+
+	/* a direct-callback alarm (AOSP ListenerWrapper): one-shot, onAlarm() runs on the given Handler or, when that is
+	 * null, on the main looper; setting the same listener again replaces the earlier alarm */
+	private static final HashMap<OnAlarmListener, ListenerAlarm> sListenerAlarms = new HashMap<>();
+
+	private static final class ListenerAlarm implements Runnable {
+		final OnAlarmListener listener;
+		final Handler handler;
+
+		ListenerAlarm(OnAlarmListener listener, Handler handler) {
+			this.listener = listener;
+			this.handler = handler;
+		}
+
+		@Override
+		public void run() {
+			synchronized (sAlarms) {
+				if (sListenerAlarms.get(listener) != this)
+					return;
+				sListenerAlarms.remove(listener);
+			}
+			listener.onAlarm();
+		}
+	}
+
+	private static void scheduleListener(int type, long triggerTime, OnAlarmListener listener, Handler targetHandler) {
+		if (listener == null) { // AlarmManagerService.setImpl() (services/, not in the local sources) logs and drops it
+			Slog.w(TAG, "Alarms must either supply a PendingIntent or an AlarmReceiver");
+			return;
+		}
+		long delay = triggerTime - ((type == 2 || type == 3) ? SystemClock.elapsedRealtime() : System.currentTimeMillis());
+		ListenerAlarm alarm = new ListenerAlarm(listener, targetHandler != null ? targetHandler : sHandler);
+		synchronized (sAlarms) {
+			ListenerAlarm old = sListenerAlarms.put(listener, alarm);
+			if (old != null)
+				old.handler.removeCallbacks(old);
+		}
+		alarm.handler.postDelayed(alarm, delay);
+	}
+
+	/* AOSP set(int, long, String, OnAlarmListener, Handler): tag only names the alarm in dumpsys */
+	public void set(int type, long triggerAtMillis, String tag, OnAlarmListener listener, Handler targetHandler) {
+		Slog.i(TAG, "set(" + type + ", " + triggerAtMillis + ", " + tag + ", " + listener + ") called");
+		scheduleListener(type, triggerAtMillis, listener, targetHandler);
+	}
+
+	/* AOSP setExact(int, long, String, OnAlarmListener, Handler) */
+	public void setExact(int type, long triggerAtMillis, String tag, OnAlarmListener listener, Handler targetHandler) {
+		Slog.i(TAG, "setExact(" + type + ", " + triggerAtMillis + ", " + tag + ", " + listener + ") called");
+		scheduleListener(type, triggerAtMillis, listener, targetHandler);
+	}
+
+	/* AOSP setWindow(int, long, long, String, OnAlarmListener, Handler): the window start is the earliest delivery,
+	 * taken here as for the PendingIntent variant */
+	public void setWindow(int type, long windowStartMillis, long windowLengthMillis, String tag, OnAlarmListener listener, Handler targetHandler) {
+		Slog.i(TAG, "setWindow(" + type + ", " + windowStartMillis + ", " + windowLengthMillis + ", " + tag + ", " + listener + ") called");
+		scheduleListener(type, windowStartMillis, listener, targetHandler);
+	}
+
+	/* AOSP AlarmManager.setTime(): AlarmManagerService.setTime() enforces android.permission.SET_TIME
+	 * (signature|privileged), which an app does not hold */
+	public void setTime(long millis) {
+		throw new SecurityException("setTime: Neither user " + android.os.Process.myUid() + " nor current process has android.permission.SET_TIME.");
+	}
+
+	/* AOSP AlarmManager.setTimeZone(): empty is ignored, an unknown zone is rejected (target SDK M and later), then
+	 * AlarmManagerService enforces android.permission.SET_TIME_ZONE (signature|privileged) */
+	public void setTimeZone(String timeZone) {
+		if (android.text.TextUtils.isEmpty(timeZone))
+			return;
+		if (!java.util.Arrays.asList(java.util.TimeZone.getAvailableIDs()).contains(timeZone))
+			throw new IllegalArgumentException("Timezone: " + timeZone + " is not an Olson ID");
+		throw new SecurityException("setTimeZone: Neither user " + android.os.Process.myUid() + " nor current process has android.permission.SET_TIME_ZONE.");
 	}
 
 	public void setInexactRepeating(int type, long triggerTime, long interval, PendingIntent operation) {

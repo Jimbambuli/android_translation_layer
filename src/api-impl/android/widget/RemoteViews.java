@@ -396,6 +396,11 @@ public class RemoteViews implements Parcelable, Cloneable {
 	/** Needs RemoteViewsAdapter and the app widget service (not in ATL): recorded nowhere, as before. */
 	public void setRemoteAdapter(int viewId, Intent intent) {}
 
+	/* AOSP setRemoteAdapter(int appWidgetId, int viewId, Intent) (deprecated) -> setRemoteAdapter(viewId, intent) */
+	public void setRemoteAdapter(int appWidgetId, int viewId, Intent intent) {
+		setRemoteAdapter(viewId, intent);
+	}
+
 	public void setRemoteAdapter(int viewId, RemoteCollectionItems items) {
 		addAction(new SetRemoteCollectionItemListAdapterAction(viewId, items));
 	}
