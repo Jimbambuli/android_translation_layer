@@ -67,7 +67,12 @@ public class MediaSession {
 		Token(MediaSession session) {
 			this.session = session;
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+}
 
 	public static class QueueItem {
 		public static final int UNKNOWN_ID = -1;
@@ -86,7 +91,12 @@ public class MediaSession {
 		public long getQueueId() {
 			return id;
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int describeContents() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+}
 
 	public MediaSession(Context context, String tag) {
 		this(context, tag, null);

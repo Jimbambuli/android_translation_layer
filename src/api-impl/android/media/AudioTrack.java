@@ -775,4 +775,18 @@ public class AudioTrack implements AudioRouting {
 	public int getAudioFormat() {
 		return audioFormat == AudioFormat.ENCODING_DEFAULT ? AudioFormat.ENCODING_PCM_16BIT : audioFormat;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int setLoopPoints(int arg0, int arg1, int arg2) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.VolumeShaper createVolumeShaper(android.media.VolumeShaper.Configuration arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getStartThresholdInFrames() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int reloadStaticData() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int setPlaybackHeadPosition(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int setPresentation(android.media.AudioPresentation arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int setStartThresholdInFrames(int arg0) { return 0; }
 }

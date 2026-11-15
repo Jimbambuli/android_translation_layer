@@ -158,7 +158,10 @@ public class MediaCodecInfo {
 			}
 			return true;
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static android.media.MediaCodecInfo.CodecCapabilities createFromProfileLevel(String arg0, int arg1, int arg2) { return null; }
+}
 
 	public static final class CodecProfileLevel {
 
@@ -454,4 +457,6 @@ public class MediaCodecInfo {
 			return ranges;
 		}
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getSecurityModel() { return 0; }
 }

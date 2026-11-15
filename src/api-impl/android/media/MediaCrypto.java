@@ -26,4 +26,6 @@ public final class MediaCrypto {
 
 	public void release() {
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    protected void finalize() {  }
 }

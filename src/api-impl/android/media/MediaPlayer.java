@@ -1223,4 +1223,28 @@ public class MediaPlayer implements AudioRouting {
 	private static native long native_videoTexture(long player);
 	private static native void native_showTexture(long widget, long texture, boolean crop);
 	private static native void native_release(long player);
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.VolumeShaper createVolumeShaper(android.media.VolumeShaper.Configuration arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addTimedTextSource(android.content.Context arg0, android.net.Uri arg1, String arg2) throws java.io.IOException, java.lang.IllegalArgumentException, java.lang.IllegalStateException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addTimedTextSource(java.io.FileDescriptor arg0, long arg1, long arg2, String arg3) throws java.lang.IllegalArgumentException, java.lang.IllegalStateException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addTimedTextSource(java.io.FileDescriptor arg0, String arg1) throws java.lang.IllegalArgumentException, java.lang.IllegalStateException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addTimedTextSource(String arg0, String arg1) throws java.io.IOException, java.lang.IllegalArgumentException, java.lang.IllegalStateException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void attachAuxEffect(int arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void deselectTrack(int arg0) throws java.lang.IllegalStateException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.os.PersistableBundle getMetrics() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.SyncParams getSyncParams() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void selectTrack(int arg0) throws java.lang.IllegalStateException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setAuxEffectSendLevel(float arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setSyncParams(android.media.SyncParams arg0) {  }
 }

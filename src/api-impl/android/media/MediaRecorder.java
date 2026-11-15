@@ -270,4 +270,54 @@ public class MediaRecorder {
 			setAudioEncoder(profile.audioCodec);
 		}
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setNextOutputFile(java.io.File arg0) throws java.io.IOException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setNextOutputFile(java.io.FileDescriptor arg0) throws java.io.IOException {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setPrivacySensitive(boolean arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setCaptureRate(double arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setPreferredMicrophoneDirection(int arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addOnRoutingChangedListener(android.media.AudioRouting.OnRoutingChangedListener arg0, android.os.Handler arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    protected void finalize() {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.media.MicrophoneInfo> getActiveMicrophones() throws java.io.IOException { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.AudioRecordingConfiguration getActiveRecordingConfiguration() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final int getAudioSourceMax() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.metrics.LogSessionId getLogSessionId() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.os.PersistableBundle getMetrics() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.AudioDeviceInfo getPreferredDevice() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.AudioDeviceInfo getRoutedDevice() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.media.AudioDeviceInfo> getRoutedDevices() { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isPrivacySensitive() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void registerAudioRecordingCallback(java.util.concurrent.Executor arg0, android.media.AudioManager.AudioRecordingCallback arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeOnRoutingChangedListener(android.media.AudioRouting.OnRoutingChangedListener arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setAudioProfile(android.media.EncoderProfiles.AudioProfile arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setInputSurface(android.view.Surface arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setLogSessionId(android.media.metrics.LogSessionId arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setPreferredDevice(android.media.AudioDeviceInfo arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setPreferredMicrophoneFieldDimension(float arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setVideoProfile(android.media.EncoderProfiles.VideoProfile arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void unregisterAudioRecordingCallback(android.media.AudioManager.AudioRecordingCallback arg0) {  }
 }

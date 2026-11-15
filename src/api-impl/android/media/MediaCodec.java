@@ -715,4 +715,18 @@ public class MediaCodec {
 	public final String getCanonicalName() {
 		return codecName;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.MediaCodec.OutputFrame getOutputFrame(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.Image getOutputImage(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.MediaCodec.QueueRequest getQueueRequest(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static android.media.Image mapHardwareBuffer(android.hardware.HardwareBuffer arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void queueInputBuffers(int arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void queueSecureInputBuffers(int arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1, java.util.ArrayDeque<android.media.MediaCodec.CryptoInfo> arg2) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setAudioPresentation(android.media.AudioPresentation arg0) {  }
 }

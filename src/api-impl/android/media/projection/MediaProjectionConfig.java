@@ -140,6 +140,14 @@ public final class MediaProjectionConfig implements Parcelable {
 			return new MediaProjectionConfig(in);
 		}
 	};
-
-
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getInitiallySelectedSource() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getProjectionSources() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public CharSequence getRequesterHint() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isOwnAppContentProvided() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isSourceEnabled(int arg0) { return false; }
 }

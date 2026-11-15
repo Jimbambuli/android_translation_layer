@@ -412,7 +412,16 @@ public class MediaRouter {
 		public RouteInfo getRouteAt(int index) {
 			return mRoutes.get(index);
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addRoute(android.media.MediaRouter.RouteInfo arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addRoute(android.media.MediaRouter.RouteInfo arg0, int arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeRoute(int arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeRoute(android.media.MediaRouter.RouteInfo arg0) {  }
+}
 
 	/* AOSP MediaRouter.VolumeCallback */
 	public static abstract class VolumeCallback {

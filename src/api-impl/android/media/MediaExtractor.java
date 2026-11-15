@@ -219,4 +219,12 @@ public final class MediaExtractor {
 	public PersistableBundle getMetrics() {
 		return new PersistableBundle();
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    protected void finalize() {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.media.AudioPresentation> getAudioPresentations(int arg0) { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.MediaExtractor.CasInfo getCasInfo(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setMediaCas(android.media.MediaCas arg0) {  }
 }

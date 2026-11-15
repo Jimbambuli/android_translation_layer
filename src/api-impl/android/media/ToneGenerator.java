@@ -25,4 +25,6 @@ public class ToneGenerator {
 	/* AOSP ToneGenerator.finalize(): native_finalize() frees the native tone generator, which ATL has none of */
 	@Override
 	protected void finalize() {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public final int getAudioSessionId() { return 0; }
 }
