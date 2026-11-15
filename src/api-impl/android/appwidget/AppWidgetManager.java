@@ -10,12 +10,36 @@ public class AppWidgetManager {
 		return new AppWidgetManager();
 	}
 
+	public static final String ACTION_APPWIDGET_UPDATE = "android.appwidget.action.APPWIDGET_UPDATE";
+	public static final String ACTION_APPWIDGET_ENABLE_AND_UPDATE = "android.appwidget.action.APPWIDGET_ENABLE_AND_UPDATE";
+	public static final String ACTION_APPWIDGET_OPTIONS_CHANGED = "android.appwidget.action.APPWIDGET_UPDATE_OPTIONS";
+	public static final String ACTION_APPWIDGET_DELETED = "android.appwidget.action.APPWIDGET_DELETED";
+	public static final String ACTION_APPWIDGET_DISABLED = "android.appwidget.action.APPWIDGET_DISABLED";
+	public static final String ACTION_APPWIDGET_ENABLED = "android.appwidget.action.APPWIDGET_ENABLED";
+	public static final String ACTION_APPWIDGET_RESTORED = "android.appwidget.action.APPWIDGET_RESTORED";
+	public static final String EXTRA_APPWIDGET_ID = "appWidgetId";
+	public static final String EXTRA_APPWIDGET_IDS = "appWidgetIds";
+	public static final String EXTRA_APPWIDGET_OLD_IDS = "appWidgetOldIds";
+	public static final String EXTRA_APPWIDGET_OPTIONS = "appWidgetOptions";
+	public static final int INVALID_APPWIDGET_ID = 0;
+
+	/* AOSP answers these without a widget service (mService == null) as follows; the desktop has no widget host */
+	public AppWidgetProviderInfo getAppWidgetInfo(int appWidgetId) {
+		return null;
+	}
+
+	public android.os.Bundle getAppWidgetOptions(int appWidgetId) {
+		return android.os.Bundle.EMPTY;
+	}
+
+	public void updateAppWidget(int[] appWidgetIds, RemoteViews views) {}
+
 	public int[] getAppWidgetIds(ComponentName provider) {
 		return new int[0];
 	}
 
 	/* AOSP: List<AppWidgetProviderInfo> from AppWidgetServiceImpl (ATL has no such class); the desktop has no widget host */
-	public java.util.List<?> getInstalledProviders() {
+	public java.util.List<AppWidgetProviderInfo> getInstalledProviders() {
 		return new java.util.ArrayList<>();
 	}
 
