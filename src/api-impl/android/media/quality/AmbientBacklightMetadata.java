@@ -1,0 +1,17 @@
+package android.media.quality;
+
+/* AOSP frameworks/base/media/java/android/media/quality/AmbientBacklightMetadata.java (public API surface; no TV service in ATL, bodies follow the AOSP no-service path) */
+public final class AmbientBacklightMetadata implements android.os.Parcelable {
+    public AmbientBacklightMetadata(String arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int[] arg6)  {}
+    public int describeContents() { return 0; }
+    public int getColorFormat() { return 0; }
+    public int getCompressionAlgorithm() { return 0; }
+    public int getHorizontalZonesCount() { return 0; }
+    public String getPackageName() { return null; }
+    public int getSource() { return 0; }
+    public int getVerticalZonesCount() { return 0; }
+    public int[] getZoneColors() { return null; }
+    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
+    public static final int ALGORITHM_NONE = 0; // 0x0;
+    public static final int ALGORITHM_RLE = 1; // 0x1;
+}
