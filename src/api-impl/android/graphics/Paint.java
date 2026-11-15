@@ -179,9 +179,8 @@ public class Paint {
 	public void getTextBounds(char[] text, int index, int count, Rect bounds) {
 		native_get_text_bounds(paint, new String(text, index, count), bounds);
 	}
-	/* AOSP Paint.getTextWidths: one advance per char, returns the char count. ATL has no
-	 * per-glyph advances, so each char gets measureText() of itself (a trailing low surrogate
-	 * gets 0, as its advance belongs to the high surrogate). */
+	/* AOSP Paint.getTextWidths(): nGetTextAdvances() over the range with the range as context, one advance per
+	 * char (a cluster's advance on its first char, 0 for the others), returns the char count */
 	public int getTextWidths(String text, int start, int end, float[] widths) {
 		if (text == null) {
 			throw new IllegalArgumentException("text cannot be null");
@@ -192,14 +191,10 @@ public class Paint {
 		if (end - start > widths.length) {
 			throw new ArrayIndexOutOfBoundsException();
 		}
-		for (int i = start; i < end; i++) {
-			if (Character.isLowSurrogate(text.charAt(i)) && i > start && Character.isHighSurrogate(text.charAt(i - 1))) {
-				widths[i - start] = 0;
-			} else {
-				int next = (Character.isHighSurrogate(text.charAt(i)) && i + 1 < end) ? i + 2 : i + 1;
-				widths[i - start] = measureText(text, i, next);
-			}
+		if (text.length() == 0 || start == end) {
+			return 0;
 		}
+		native_get_text_advances(paint, text.toCharArray(), start, end - start, start, end - start, false, widths, 0);
 		return end - start;
 	}
 
@@ -220,7 +215,11 @@ public class Paint {
 		if ((index | count) < 0 || index + count > text.length || count > widths.length) {
 			throw new ArrayIndexOutOfBoundsException();
 		}
-		return getTextWidths(new String(text, index, count), 0, count, widths);
+		if (text.length == 0 || count == 0) {
+			return 0;
+		}
+		native_get_text_advances(paint, text, index, count, index, count, false, widths, 0);
+		return count;
 	}
 
 	public int getTextWidths(String text, float[] widths) {
@@ -239,19 +238,194 @@ public class Paint {
 		native_set_style(paint, style.ordinal());
 	}
 
+	/* AOSP nAscent: the ascent of the font metrics */
 	public float ascent() {
-		return -getTextSize();
+		FontMetrics metrics = new FontMetrics();
+		getFontMetrics(metrics);
+		return metrics.ascent;
 	}
 
-	public float measureText(char[] text, int index, int count) { return 10; }
-	public float measureText(String text, int start, int end) {
-		return (end - start) * getTextSize() * .6f;
+	/* AOSP Paint.measureText(): ceil of nGetTextAdvances() over the range, the range being its own context */
+	public float measureText(char[] text, int index, int count) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((index | count) < 0 || index + count > text.length) {
+			throw new ArrayIndexOutOfBoundsException();
+		}
+		if (text.length == 0 || count == 0) {
+			return 0f;
+		}
+		return (float)Math.ceil(native_get_text_advances(paint, text, index, count, index, count, false, null, 0));
 	}
+
+	public float measureText(String text, int start, int end) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((start | end | (end - start) | (text.length() - end)) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (text.length() == 0 || start == end) {
+			return 0f;
+		}
+		char[] buf = new char[end - start];
+		text.getChars(start, end, buf, 0);
+		return measureText(buf, 0, buf.length);
+	}
+
 	public float measureText(String text) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
 		return measureText(text, 0, text.length());
 	}
+
 	public float measureText(CharSequence text, int start, int end) {
-		return measureText(text.toString(), start, end);
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((start | end | (end - start) | (text.length() - end)) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (text.length() == 0 || start == end) {
+			return 0f;
+		}
+		char[] buf = new char[end - start];
+		android.text.TextUtils.getChars(text, start, end, buf, 0);
+		return measureText(buf, 0, buf.length);
+	}
+
+	/* AOSP Paint.getTextRunAdvances(): nGetTextAdvances() of the run shaped in its context, forced LTR or RTL */
+	public float getTextRunAdvances(char[] chars, int index, int count, int contextIndex, int contextCount, boolean isRtl, float[] advances, int advancesIndex) {
+		if (chars == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((index | count | contextIndex | contextCount | advancesIndex
+		     | (index - contextIndex) | (contextCount - count)
+		     | ((contextIndex + contextCount) - (index + count))
+		     | (chars.length - (contextIndex + contextCount))
+		     | (advances == null ? 0 : (advances.length - (advancesIndex + count)))) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (chars.length == 0 || count == 0) {
+			return 0f;
+		}
+		return native_get_text_advances(paint, chars, index, count, contextIndex, contextCount, isRtl, advances, advancesIndex);
+	}
+
+	/* AOSP Paint.getRunAdvance(): the advance from start to offset of the run [start, end) shaped in its context
+	 * (minikin sums the char advances; a cluster's advance lies on its first char) */
+	public float getRunAdvance(char[] text, int start, int end, int contextStart, int contextEnd, boolean isRtl, int offset) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | offset | end | contextEnd
+		     | start - contextStart | offset - start | end - offset
+		     | contextEnd - end | text.length - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (end == start) {
+			return 0.0f;
+		}
+		float[] advances = new float[end - start];
+		native_get_text_advances(paint, text, start, end - start, contextStart, contextEnd - contextStart, isRtl, advances, 0);
+		float result = 0;
+		for (int i = 0; i < offset - start; i++)
+			result += advances[i];
+		return result;
+	}
+
+	public float getRunAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd, boolean isRtl, int offset) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | offset | end | contextEnd
+		     | start - contextStart | offset - start | end - offset
+		     | contextEnd - end | text.length() - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (end == start) {
+			return 0.0f;
+		}
+		char[] buf = new char[contextEnd - contextStart];
+		android.text.TextUtils.getChars(text, contextStart, contextEnd, buf, 0);
+		return getRunAdvance(buf, start - contextStart, end - contextStart, 0, contextEnd - contextStart, isRtl, offset - contextStart);
+	}
+
+	/* AOSP Paint.getRunCharacterAdvance(): the char advances of [start, end) into advances[advancesIndex...] and
+	 * the run advance at offset, as getRunAdvance() */
+	public float getRunCharacterAdvance(char[] text, int start, int end, int contextStart, int contextEnd, boolean isRtl, int offset, float[] advances, int advancesIndex) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if (contextStart < 0 || contextEnd > text.length) {
+			throw new IndexOutOfBoundsException("Invalid Context Range: " + contextStart + ", " + contextEnd + " must be in 0, " + text.length);
+		}
+		if (start < contextStart || contextEnd < end) {
+			throw new IndexOutOfBoundsException("Invalid start/end range: " + start + ", " + end + " must be in " + contextStart + ", " + contextEnd);
+		}
+		if (offset < start || end < offset) {
+			throw new IndexOutOfBoundsException("Invalid offset position: " + offset + " must be in " + start + ", " + end);
+		}
+		if (advances != null && advances.length < advancesIndex - start + end) {
+			throw new IndexOutOfBoundsException("Given array doesn't have enough space to receive the result, advances.length: "
+			                                    + advances.length + " advanceIndex: " + advancesIndex + " needed space: " + (offset - start));
+		}
+		if (end == start) {
+			return 0.0f;
+		}
+		float[] run = new float[end - start];
+		native_get_text_advances(paint, text, start, end - start, contextStart, contextEnd - contextStart, isRtl, run, 0);
+		if (advances != null)
+			System.arraycopy(run, 0, advances, advancesIndex, end - start);
+		float result = 0;
+		for (int i = 0; i < offset - start; i++)
+			result += run[i];
+		return result;
+	}
+
+	public float getRunCharacterAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd, boolean isRtl, int offset, float[] advances, int advancesIndex) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if (contextStart < 0 || contextEnd > text.length()) {
+			throw new IndexOutOfBoundsException("Invalid Context Range: " + contextStart + ", " + contextEnd + " must be in 0, " + text.length());
+		}
+		if (start < contextStart || contextEnd < end) {
+			throw new IndexOutOfBoundsException("Invalid start/end range: " + start + ", " + end + " must be in " + contextStart + ", " + contextEnd);
+		}
+		if (offset < start || end < offset) {
+			throw new IndexOutOfBoundsException("Invalid offset position: " + offset + " must be in " + start + ", " + end);
+		}
+		if (advances != null && advances.length < advancesIndex - start + end) {
+			throw new IndexOutOfBoundsException("Given array doesn't have enough space to receive the result, advances.length: "
+			                                    + advances.length + " advanceIndex: " + advancesIndex + " needed space: " + (offset - start));
+		}
+		if (end == start) {
+			return 0.0f;
+		}
+		char[] buf = new char[contextEnd - contextStart];
+		android.text.TextUtils.getChars(text, contextStart, contextEnd, buf, 0);
+		return getRunCharacterAdvance(buf, start - contextStart, end - contextStart, 0, contextEnd - contextStart, isRtl, offset - contextStart, advances, advancesIndex);
+	}
+
+	/* AOSP Paint.getTextPath(): the glyph outlines of the text at its origin x, y (moved by the alignment as in
+	 * Canvas.drawText()), the path receives them in place of its previous contents */
+	public void getTextPath(char[] text, int index, int count, float x, float y, Path path) {
+		if ((index | count) < 0 || index + count > text.length) {
+			throw new ArrayIndexOutOfBoundsException();
+		}
+		path.reset();
+		native_get_text_path(paint, text, index, count, x, y, path.getBuilder());
+	}
+
+	public void getTextPath(String text, int start, int end, float x, float y, Path path) {
+		if ((start | end | (end - start) | (text.length() - end)) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		path.reset();
+		native_get_text_path(paint, text.toCharArray(), start, end - start, x, y, path.getBuilder());
 	}
 
 	public ColorFilter setColorFilter(ColorFilter colorFilter) {
@@ -429,9 +603,41 @@ public class Paint {
 		    && elegant_text_height == other.elegant_text_height;
 	}
 
-	/* AOSP Paint.getOffsetForAdvance(CharSequence, ...): argument checks, then nGetOffsetForAdvance(), the offset
-	 * in [start, end] whose position is closest to advance. ATL measures each prefix with measureText() and does
-	 * not stop inside a surrogate pair. */
+	/* AOSP Paint.getOffsetForAdvance(): the offset in [start, end) on a grapheme cluster boundary whose run advance
+	 * (getRunAdvance()) is closest to advance; minikin's getOffsetForAdvance() also only considers cluster
+	 * boundaries */
+	public int getOffsetForAdvance(char[] text, int start, int end, int contextStart, int contextEnd, boolean isRtl, float advance) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((contextStart | start | end | contextEnd
+		     | start - contextStart | end - start | contextEnd - end
+		     | text.length - contextEnd) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (end == start) {
+			return start;
+		}
+		float[] advances = new float[end - start];
+		native_get_text_advances(paint, text, start, end - start, contextStart, contextEnd - contextStart, isRtl, advances, 0);
+		java.text.BreakIterator it = java.text.BreakIterator.getCharacterInstance();
+		it.setText(new String(text, contextStart, contextEnd - contextStart));
+		int best = start;
+		float bestDistance = Math.abs(advance);
+		float pos = 0;
+		for (int i = start + 1; i <= end; i++) {
+			pos += advances[i - 1 - start];
+			if (i < end && !it.isBoundary(i - contextStart))
+				continue;
+			float distance = Math.abs(pos - advance);
+			if (distance < bestDistance) {
+				best = i;
+				bestDistance = distance;
+			}
+		}
+		return best;
+	}
+
 	public int getOffsetForAdvance(CharSequence text, int start, int end, int contextStart, int contextEnd, boolean isRtl, float advance) {
 		if (text == null) {
 			throw new IllegalArgumentException("text cannot be null");
@@ -441,18 +647,9 @@ public class Paint {
 		     | text.length() - contextEnd) < 0) {
 			throw new IndexOutOfBoundsException();
 		}
-		int best = start;
-		float bestDistance = Math.abs(advance);
-		for (int i = start + 1; i <= end; i++) {
-			if (i < end && Character.isLowSurrogate(text.charAt(i)) && Character.isHighSurrogate(text.charAt(i - 1)))
-				continue;
-			float distance = Math.abs(measureText(text, start, i) - advance);
-			if (distance < bestDistance) {
-				best = i;
-				bestDistance = distance;
-			}
-		}
-		return best;
+		char[] buf = new char[contextEnd - contextStart];
+		android.text.TextUtils.getChars(text, contextStart, contextEnd, buf, 0);
+		return getOffsetForAdvance(buf, start - contextStart, end - contextStart, 0, contextEnd - contextStart, isRtl, advance) + contextStart;
 	}
 
 	/* AOSP nDescent: the descent of the font metrics */
@@ -607,9 +804,71 @@ public class Paint {
 		return effect;
 	}
 
-	public int breakText(char[] text, int index, int count, float maxWidth, float[] measuredWidth) { return 10; }
-	public int breakText(String text, boolean measureForwards, float maxWidth, float[] measuredWidth) { return 10; }
-	public int breakText(CharSequence text, int start, int end, boolean measureForwards, float maxWidth, float[] measuredWidth) { return 10; }
+	/* AOSP Paint.breakText(): nBreakText() measures the chars of the range (count < 0: backwards from its end) and
+	 * stops before the char whose advance would exceed maxWidth; a surrogate pair is not split. Returns the number
+	 * of chars measured, measuredWidth[0] receives their width. */
+	public int breakText(char[] text, int index, int count, float maxWidth, float[] measuredWidth) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if (index < 0 || text.length - index < Math.abs(count)) {
+			throw new ArrayIndexOutOfBoundsException();
+		}
+		if (text.length == 0 || count == 0) {
+			return 0;
+		}
+		boolean forwards = count > 0;
+		int n = Math.abs(count);
+		float[] advances = new float[n];
+		native_get_text_advances(paint, text, index, n, index, n, false, advances, 0);
+		float width = 0;
+		int i = 0;
+		while (i < n) {
+			int pos = forwards ? i : n - 1 - i;
+			int step = 1;
+			float w = advances[pos];
+			if (forwards && pos + 1 < n && Character.isHighSurrogate(text[index + pos]) && Character.isLowSurrogate(text[index + pos + 1])) {
+				step = 2;
+				w += advances[pos + 1];
+			} else if (!forwards && pos > 0 && Character.isLowSurrogate(text[index + pos]) && Character.isHighSurrogate(text[index + pos - 1])) {
+				step = 2;
+				w += advances[pos - 1];
+			}
+			if (width + w > maxWidth)
+				break;
+			width += w;
+			i += step;
+		}
+		if (measuredWidth != null)
+			measuredWidth[0] = width;
+		return i;
+	}
+
+	public int breakText(String text, boolean measureForwards, float maxWidth, float[] measuredWidth) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if (text.length() == 0) {
+			return 0;
+		}
+		char[] buf = text.toCharArray();
+		return breakText(buf, 0, measureForwards ? buf.length : -buf.length, maxWidth, measuredWidth);
+	}
+
+	public int breakText(CharSequence text, int start, int end, boolean measureForwards, float maxWidth, float[] measuredWidth) {
+		if (text == null) {
+			throw new IllegalArgumentException("text cannot be null");
+		}
+		if ((start | end | (end - start) | (text.length() - end)) < 0) {
+			throw new IndexOutOfBoundsException();
+		}
+		if (text.length() == 0 || start == end) {
+			return 0;
+		}
+		char[] buf = new char[end - start];
+		android.text.TextUtils.getChars(text, start, end, buf, 0);
+		return breakText(buf, 0, measureForwards ? end - start : -(end - start), maxWidth, measuredWidth);
+	}
 
 	public void clearShadowLayer() {
 		setShadowLayer(0, 0, 0, 0);
@@ -794,6 +1053,8 @@ public class Paint {
 	private static native void native_set_text_flags(long paint, int flags);
 	private static native void native_set_text_skew_x(long paint, float skewX);
 	private static native void native_set_shadow_layer(long paint, float radius, float dx, float dy, int color);
+	private static native float native_get_text_advances(long paint, char[] text, int index, int count, int contextIndex, int contextCount, boolean isRtl, float[] advances, int advancesIndex);
+	private static native void native_get_text_path(long paint, char[] text, int index, int count, float x, float y, long builder);
 
 	/** Option for getTextRunCursor: the next cursor position after the offset */
 	public static final int CURSOR_AFTER = 0;

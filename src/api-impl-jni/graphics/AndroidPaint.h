@@ -2,6 +2,7 @@
 #include <gdk/gdk.h>
 #include <gsk/gsk.h>
 #include <gtk/gtk.h>
+#include <jni.h>
 #include <pango/pango.h>
 
 struct AndroidPaint {
@@ -32,6 +33,19 @@ void android_paint_append_layout(GtkSnapshot *snapshot, PangoLayout *layout, str
 void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGlyphString *glyphs, const graphene_point_t *origin, struct AndroidPaint *paint);
 void android_paint_add_layout_outline(GskPathBuilder *builder, PangoLayout *layout, float x, float y);
 void android_paint_add_glyphs_outline(GskPathBuilder *builder, PangoFont *font, PangoGlyphString *glyphs, float x, float y);
+
+/* one glyph of a shaped run: its id in font (a reference the caller drops), its origin relative to the run's */
+struct android_shaped_glyph {
+	PangoGlyph id;
+	float x;
+	float y;
+	PangoFont *font;
+};
+/* shapes text[0, len) (the context) and lays out the chars [start, end) of it in visual order: the advance of every
+ * char of the context into advances (len floats, may be NULL), the glyphs of [start, end) into glyphs_out (may be
+ * NULL), the total advance of [start, end) into total */
+void android_paint_shape_run(struct AndroidPaint *paint, const jchar *text, int len, int start, int end, bool rtl,
+                             float *advances, GArray *glyphs_out, float *total);
 
 /* Paint.setLetterSpacing as a Pango attribute over the whole text (Pango wants absolute units) */
 static inline void android_paint_apply_letter_spacing(PangoLayout *layout, struct AndroidPaint *paint)

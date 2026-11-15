@@ -279,6 +279,22 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1skew_1x
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1shadow_1layer
   (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jint);
 
+/*
+ * Class:     android_graphics_Paint
+ * Method:    native_get_text_advances
+ * Signature: (J[CIIIIZ[FI)F
+ */
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1text_1advances
+  (JNIEnv *, jclass, jlong, jcharArray, jint, jint, jint, jint, jboolean, jfloatArray, jint);
+
+/*
+ * Class:     android_graphics_Paint
+ * Method:    native_get_text_path
+ * Signature: (J[CIIFFJ)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1text_1path
+  (JNIEnv *, jclass, jlong, jcharArray, jint, jint, jfloat, jfloat, jlong);
+
 #ifdef __cplusplus
 }
 #endif

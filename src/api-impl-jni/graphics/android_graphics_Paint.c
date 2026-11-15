@@ -1,4 +1,5 @@
 #include <glib.h>
+#include <string.h>
 #include <gsk/gsk.h>
 #include <gtk/gtk.h>
 
@@ -540,4 +541,161 @@ void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGl
 		transform_skew(snapshot, paint);
 	append_text(snapshot, paint, NULL, font, glyphs);
 	gtk_snapshot_restore(snapshot);
+}
+
+/* ---- text shaping for the measuring methods, TextRunShaper and getTextPath ----
+ *
+ * AOSP shapes with minikin (Layout over the context, BIDI_FORCE_LTR/RTL for a run); here Pango itemizes and
+ * shapes with HarfBuzz. A forced direction overrides the bidi level of every item, as minikin lays out the
+ * whole run in that direction. Advances follow Paint.getTextRunAdvances(): the advance of a cluster belongs to
+ * its first char, the other chars of the cluster get 0. Letter spacing is added per cluster, half of it before
+ * and half after the cluster (minikin's Layout does the same for Paint.setLetterSpacing). */
+
+/* a copy of the UTF-16 text with unpaired surrogates replaced by U+FFFD (same length, so indices stay valid) */
+static gunichar2 *utf16_sanitized(const jchar *text, int len)
+{
+	gunichar2 *buf = g_new(gunichar2, len + 1);
+	for (int i = 0; i < len; i++) {
+		jchar c = text[i];
+		if (c >= 0xD800 && c <= 0xDBFF) {
+			if (i + 1 < len && text[i + 1] >= 0xDC00 && text[i + 1] <= 0xDFFF) {
+				buf[i] = c;
+				buf[i + 1] = text[i + 1];
+				i++;
+				continue;
+			}
+			c = 0xFFFD;
+		} else if (c >= 0xDC00 && c <= 0xDFFF) {
+			c = 0xFFFD;
+		}
+		buf[i] = c;
+	}
+	buf[len] = 0;
+	return buf;
+}
+
+void android_paint_shape_run(struct AndroidPaint *paint, const jchar *text, int len, int start, int end, bool rtl,
+                             float *advances, GArray *glyphs_out, float *total)
+{
+	*total = 0;
+	if (advances)
+		memset(advances, 0, sizeof(float) * len);
+	if (len <= 0 || start >= end)
+		return;
+	gunichar2 *buf = utf16_sanitized(text, len);
+	glong bytes = 0;
+	gchar *utf8 = g_utf16_to_utf8(buf, len, NULL, &bytes, NULL);
+	g_free(buf);
+	if (!utf8)
+		return;
+	/* the UTF-16 index of every UTF-8 byte offset */
+	int *u16_at = g_new0(int, bytes + 1);
+	int u16 = 0;
+	for (const gchar *p = utf8; *p; p = g_utf8_next_char(p)) {
+		const gchar *next = g_utf8_next_char(p);
+		for (const gchar *q = p; q < next; q++)
+			u16_at[q - utf8] = u16;
+		u16 += g_utf8_get_char(p) >= 0x10000 ? 2 : 1;
+	}
+	u16_at[bytes] = u16;
+
+	float spacing = paint->letter_spacing * pango_font_description_get_size(paint->font) / PANGO_SCALE;
+	PangoAttrList *attrs = pango_attr_list_new();
+	pango_attr_list_insert(attrs, pango_attr_font_desc_new(paint->font));
+	GList *items = pango_itemize_with_base_dir(atl_pango_context(), rtl ? PANGO_DIRECTION_RTL : PANGO_DIRECTION_LTR,
+	                                           utf8, 0, bytes, attrs, NULL);
+	pango_attr_list_unref(attrs);
+	if (rtl) /* forced RTL: the items (in logical order) are laid out from right to left */
+		items = g_list_reverse(items);
+
+	float pen = 0;
+	PangoGlyphString *glyphs = pango_glyph_string_new();
+	for (GList *l = items; l; l = l->next) {
+		PangoItem *item = l->data;
+		item->analysis.level = rtl ? 1 : 0;
+		pango_shape_item(item, utf8, bytes, NULL, glyphs, PANGO_SHAPE_NONE);
+		for (int i = 0; i < glyphs->num_glyphs; i++) {
+			PangoGlyphInfo *info = &glyphs->glyphs[i];
+			int index = u16_at[item->offset + glyphs->log_clusters[i]];
+			bool cluster_start = info->attr.is_cluster_start;
+			float width = (float)info->geometry.width / PANGO_SCALE;
+			if (advances)
+				advances[index] += width + (cluster_start ? spacing : 0);
+			if (index < start || index >= end)
+				continue;
+			if (cluster_start)
+				pen += spacing / 2;
+			if (glyphs_out && info->glyph != PANGO_GLYPH_EMPTY) {
+				struct android_shaped_glyph g = {
+					.id = (info->glyph & PANGO_GLYPH_UNKNOWN_FLAG) ? 0 : info->glyph,
+					.x = pen + (float)info->geometry.x_offset / PANGO_SCALE,
+					.y = (float)info->geometry.y_offset / PANGO_SCALE,
+					.font = g_object_ref(item->analysis.font),
+				};
+				g_array_append_val(glyphs_out, g);
+			}
+			pen += width;
+			if (cluster_start)
+				pen += spacing / 2;
+		}
+	}
+	pango_glyph_string_free(glyphs);
+	g_list_free_full(items, (GDestroyNotify)pango_item_free);
+	g_free(u16_at);
+	g_free(utf8);
+	*total = pen;
+}
+
+/* Paint.nGetTextAdvances(): the total advance of text[index, index + count) shaped in its context, the advance
+ * of every char into advances[advances_index...] if given */
+JNIEXPORT jfloat JNICALL Java_android_graphics_Paint_native_1get_1text_1advances(JNIEnv *env, jclass clazz, jlong paint_ptr, jcharArray text_arr, jint index, jint count, jint context_index, jint context_count, jboolean is_rtl, jfloatArray advances_arr, jint advances_index)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	if (count <= 0 || context_count <= 0)
+		return 0;
+	jchar *text = g_new(jchar, context_count);
+	(*env)->GetCharArrayRegion(env, text_arr, context_index, context_count, text);
+	float *advances = g_new(float, context_count);
+	float total;
+	android_paint_shape_run(paint, text, context_count, index - context_index, index - context_index + count, is_rtl, advances, NULL, &total);
+	if (advances_arr)
+		(*env)->SetFloatArrayRegion(env, advances_arr, advances_index, count, advances + (index - context_index));
+	g_free(advances);
+	g_free(text);
+	return total;
+}
+
+/* Paint.nGetTextPath(): the glyph outlines of the text, its origin (left end of the baseline, moved by the
+ * paint's alignment as Canvas.drawText() does) at x, y, appended to the path builder */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1text_1path(JNIEnv *env, jclass clazz, jlong paint_ptr, jcharArray text_arr, jint index, jint count, jfloat x, jfloat y, jlong builder_ptr)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	GskPathBuilder *builder = _PTR(builder_ptr);
+	if (count <= 0)
+		return;
+	jchar *text = g_new(jchar, count);
+	(*env)->GetCharArrayRegion(env, text_arr, index, count, text);
+	GArray *glyphs = g_array_new(FALSE, FALSE, sizeof(struct android_shaped_glyph));
+	float total;
+	android_paint_shape_run(paint, text, count, 0, count, false, NULL, glyphs, &total);
+	g_free(text);
+	if (paint->alignment == PANGO_ALIGN_CENTER)
+		x -= total / 2.f;
+	else if (paint->alignment == PANGO_ALIGN_RIGHT)
+		x -= total;
+	PangoGlyphString *one = pango_glyph_string_new();
+	pango_glyph_string_set_size(one, 1);
+	for (guint i = 0; i < glyphs->len; i++) {
+		struct android_shaped_glyph *g = &g_array_index(glyphs, struct android_shaped_glyph, i);
+		one->glyphs[0].glyph = g->id;
+		one->glyphs[0].geometry.width = 0;
+		one->glyphs[0].geometry.x_offset = 0;
+		one->glyphs[0].geometry.y_offset = 0;
+		one->glyphs[0].attr.is_cluster_start = 1;
+		one->log_clusters[0] = 0;
+		android_paint_add_glyphs_outline(builder, g->font, one, x + g->x, y + g->y);
+		g_object_unref(g->font);
+	}
+	pango_glyph_string_free(one);
+	g_array_free(glyphs, TRUE);
 }
