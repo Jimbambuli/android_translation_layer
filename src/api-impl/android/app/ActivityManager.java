@@ -73,6 +73,32 @@ public class ActivityManager {
 
 	public boolean isLowRamDevice() { return false; }
 
+	/* AOSP ActivityManager.getLauncherLargeIconSizeInner: app_icon_size, one density step larger from
+	 * smallestScreenWidthDp 600 on (the framework dimen is the same in the app's and the system resources) */
+	public int getLauncherLargeIconSize() {
+		final android.content.res.Resources res = android.content.res.Resources.getSystem();
+		final int size = res.getDimensionPixelSize(android.R.dimen.app_icon_size);
+		final int sw = res.getConfiguration().smallestScreenWidthDp;
+		if (sw < 600)
+			return size;
+		switch (res.getDisplayMetrics().densityDpi) {
+			case android.util.DisplayMetrics.DENSITY_LOW:
+				return (size * android.util.DisplayMetrics.DENSITY_MEDIUM) / android.util.DisplayMetrics.DENSITY_LOW;
+			case android.util.DisplayMetrics.DENSITY_MEDIUM:
+				return (size * android.util.DisplayMetrics.DENSITY_HIGH) / android.util.DisplayMetrics.DENSITY_MEDIUM;
+			case android.util.DisplayMetrics.DENSITY_TV:
+				return (size * android.util.DisplayMetrics.DENSITY_XHIGH) / android.util.DisplayMetrics.DENSITY_HIGH;
+			case android.util.DisplayMetrics.DENSITY_HIGH:
+				return (size * android.util.DisplayMetrics.DENSITY_XHIGH) / android.util.DisplayMetrics.DENSITY_HIGH;
+			case android.util.DisplayMetrics.DENSITY_XHIGH:
+				return (size * android.util.DisplayMetrics.DENSITY_XXHIGH) / android.util.DisplayMetrics.DENSITY_XHIGH;
+			case android.util.DisplayMetrics.DENSITY_XXHIGH:
+				return (size * android.util.DisplayMetrics.DENSITY_XHIGH * 2) / android.util.DisplayMetrics.DENSITY_XXHIGH;
+			default:
+				return (int)((size * 1.5f) + .5f);
+		}
+	}
+
 	public static class MemoryInfo implements Parcelable {
 		/* For now, just always report there's 10GB free RAM */
 		public long availMem = 10000;

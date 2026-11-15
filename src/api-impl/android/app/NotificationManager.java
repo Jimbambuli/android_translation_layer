@@ -231,6 +231,34 @@ public class NotificationManager {
 		}
 	}
 
+	/* AOSP getImportance asks NotificationManagerService.getPackageImportance: IMPORTANCE_DEFAULT while the app
+	 * holds POST_NOTIFICATIONS, else IMPORTANCE_NONE (same test as areNotificationsEnabled here) */
+	public int getImportance() {
+		return areNotificationsEnabled() ? IMPORTANCE_DEFAULT : IMPORTANCE_NONE;
+	}
+
+	public static final int INTERRUPTION_FILTER_UNKNOWN = 0;
+	public static final int INTERRUPTION_FILTER_ALL = 1;
+	public static final int INTERRUPTION_FILTER_PRIORITY = 2;
+	public static final int INTERRUPTION_FILTER_NONE = 3;
+	public static final int INTERRUPTION_FILTER_ALARMS = 4;
+
+	/* AOSP: zenModeToInterruptionFilter(getZenMode()); ATL has no Do Not Disturb, the zen mode is off */
+	public final int getCurrentInterruptionFilter() {
+		return INTERRUPTION_FILTER_ALL;
+	}
+
+	/* AOSP: Do Not Disturb access is granted by the user in the settings, which ATL does not have */
+	public boolean isNotificationPolicyAccessGranted() {
+		return false;
+	}
+
+	/* AOSP: the service allows full screen intents below target SDK 34, above with USE_FULL_SCREEN_INTENT,
+	 * which ATL grants like every permission */
+	public boolean canUseFullScreenIntent() {
+		return true;
+	}
+
 	public boolean areNotificationsEnabled() {
 		return !android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS");
 	}
