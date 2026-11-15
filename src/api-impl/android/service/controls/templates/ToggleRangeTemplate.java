@@ -17,52 +17,101 @@
 package android.service.controls.templates;
 
 import android.annotation.NonNull;
+import android.os.Bundle;
+import android.service.controls.Control;
+
 import com.android.internal.util.Preconditions;
 
 /**
- * A template for a {@link android.service.controls.Control} supporting toggling and a range.
- * AOSP core/java/android/service/controls/templates/ToggleRangeTemplate.java
+ * A template for a {@link Control} supporting toggling and a range.
+ *
+ * @see ToggleTemplate
+ * @see RangeTemplate
  */
 public final class ToggleRangeTemplate extends ControlTemplate {
 
-	private static final @TemplateType int TYPE = TYPE_TOGGLE_RANGE;
+    private static final @TemplateType int TYPE = TYPE_TOGGLE_RANGE;
+    private static final String KEY_BUTTON = "key_button";
+    private static final String KEY_RANGE = "key_range";
 
-	private @NonNull final ControlButton mControlButton;
-	private @NonNull final RangeTemplate mRangeTemplate;
+    private @NonNull final ControlButton mControlButton;
+    private @NonNull final RangeTemplate mRangeTemplate;
 
-	public ToggleRangeTemplate(@NonNull String templateId,
-	                           @NonNull ControlButton button,
-	                           @NonNull RangeTemplate range) {
-		super(templateId);
-		Preconditions.checkNotNull(button);
-		Preconditions.checkNotNull(range);
-		mControlButton = button;
-		mRangeTemplate = range;
-	}
+    /**
+     * @param b
+     * @hide
+     */
+    ToggleRangeTemplate(@NonNull Bundle b) {
+        super(b);
+        mControlButton = b.getParcelable(KEY_BUTTON, android.service.controls.templates.ControlButton.class);
+        mRangeTemplate = new RangeTemplate(b.getBundle(KEY_RANGE));
+    }
 
-	public ToggleRangeTemplate(@NonNull String templateId,
-	                           boolean checked,
-	                           @NonNull CharSequence actionDescription,
-	                           @NonNull RangeTemplate range) {
-		this(templateId, new ControlButton(checked, actionDescription), range);
-	}
+    /**
+     * Constructs a new {@link ToggleRangeTemplate}.
+     * @param templateId the identifier for this template.
+     * @param button a {@link ControlButton} to use for the toggle interface
+     * @param range a {@link RangeTemplate} to use for the range interface
+     */
+    public ToggleRangeTemplate(@NonNull String templateId,
+            @NonNull ControlButton button,
+            @NonNull RangeTemplate range) {
+        super(templateId);
+        Preconditions.checkNotNull(button);
+        Preconditions.checkNotNull(range);
+        mControlButton = button;
+        mRangeTemplate = range;
+    }
 
-	@NonNull
-	public RangeTemplate getRange() {
-		return mRangeTemplate;
-	}
+    /**
+     * Constructs a new {@link ToggleRangeTemplate}.
+     * @param templateId the identifier for this template.
+     * @param checked true if the toggle should be rendered as active.
+     * @param actionDescription action description for the button.
+     * @param range  {@link RangeTemplate} to use for the range interface
+     * @see ControlButton
+     */
+    public ToggleRangeTemplate(@NonNull String templateId,
+            boolean checked,
+            @NonNull CharSequence actionDescription,
+            @NonNull RangeTemplate range) {
+        this(templateId,
+                new ControlButton(checked, actionDescription),
+                range);
+    }
 
-	public boolean isChecked() {
-		return mControlButton.isChecked();
-	}
+    /**
+     * @return
+     * @hide
+     */
+    @Override
+    @NonNull
+    Bundle getDataBundle() {
+        Bundle b = super.getDataBundle();
+        b.putParcelable(KEY_BUTTON, mControlButton);
+        b.putBundle(KEY_RANGE, mRangeTemplate.getDataBundle());
+        return b;
+    }
 
-	@NonNull
-	public CharSequence getActionDescription() {
-		return mControlButton.getActionDescription();
-	}
+    @NonNull
+    public RangeTemplate getRange() {
+        return mRangeTemplate;
+    }
 
-	@Override
-	public int getTemplateType() {
-		return TYPE;
-	}
+    public boolean isChecked() {
+        return mControlButton.isChecked();
+    }
+
+    @NonNull
+    public CharSequence getActionDescription() {
+        return mControlButton.getActionDescription();
+    }
+
+    /**
+     * @return {@link ControlTemplate#TYPE_TOGGLE_RANGE}
+     */
+    @Override
+    public int getTemplateType() {
+        return TYPE;
+    }
 }

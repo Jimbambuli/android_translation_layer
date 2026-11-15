@@ -18,32 +18,75 @@ package android.service.controls.actions;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.os.Bundle;
+import android.service.controls.templates.RangeTemplate;
+import android.service.controls.templates.ToggleRangeTemplate;
 
 /**
- * Action sent by a {@link android.service.controls.templates.RangeTemplate}.
- * AOSP core/java/android/service/controls/actions/FloatAction.java
+ * Action sent by a {@link RangeTemplate}, {@link ToggleRangeTemplate}.
  */
 public final class FloatAction extends ControlAction {
 
-	private static final @ActionType int TYPE = TYPE_FLOAT;
-	private final float mNewValue;
+    private static final @ActionType int TYPE = TYPE_FLOAT;
+    private static final String KEY_NEW_VALUE = "key_new_value";
 
-	public FloatAction(@NonNull String templateId, float newValue) {
-		this(templateId, newValue, null);
-	}
+    private final float mNewValue;
 
-	public FloatAction(@NonNull String templateId, float newValue,
-	                   @Nullable String challengeValue) {
-		super(templateId, challengeValue);
-		mNewValue = newValue;
-	}
+    /**
+     * @param templateId the identifier of the {@link RangeTemplate} that produced this action.
+     * @param newValue new value for the state displayed by the {@link RangeTemplate}.
+     */
+    public FloatAction(@NonNull String templateId, float newValue) {
+        this(templateId, newValue, null);
+    }
 
-	public float getNewValue() {
-		return mNewValue;
-	}
+    /**
+     * @param templateId the identifier of the {@link RangeTemplate} that originated this action.
+     * @param newValue new value for the state of the {@link RangeTemplate}.
+     * @param challengeValue a value sent by the user along with the action to authenticate. {@code}
+     *                       null is sent when no authentication is needed or has not been
+     *                       requested.
+     */
 
-	@Override
-	public int getActionType() {
-		return TYPE;
-	}
+    public FloatAction(@NonNull String templateId, float newValue,
+            @Nullable String challengeValue) {
+        super(templateId, challengeValue);
+        mNewValue = newValue;
+    }
+
+    /**
+     * @param b
+     * @hide
+     */
+    FloatAction(Bundle b) {
+        super(b);
+        mNewValue = b.getFloat(KEY_NEW_VALUE);
+    }
+
+    /**
+     * The new value set for the range in the corresponding {@link RangeTemplate}.
+     */
+    public float getNewValue() {
+        return mNewValue;
+    }
+
+    /**
+     * @return {@link ControlAction#TYPE_FLOAT}
+     */
+    @Override
+    public int getActionType() {
+        return TYPE;
+    }
+
+    /**
+     * @return
+     * @hide
+     */
+    @Override
+    @NonNull
+    Bundle getDataBundle() {
+        Bundle b = super.getDataBundle();
+        b.putFloat(KEY_NEW_VALUE, mNewValue);
+        return b;
+    }
 }

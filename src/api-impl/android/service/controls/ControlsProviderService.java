@@ -19,9 +19,14 @@ package android.service.controls;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.Service;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
 import android.service.controls.actions.ControlAction;
+import android.service.controls.templates.ControlTemplate;
+import android.text.TextUtils;
+import com.android.internal.util.Preconditions;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -29,7 +34,7 @@ import java.util.function.Consumer;
  * Service implementation allowing applications to contribute controls to the System UI.
  * AOSP core/java/android/service/controls/ControlsProviderService.java. AOSP onBind() wraps the four
  * abstract methods in an IControlsProvider.Stub for System UI; ATL has no such client, so nothing
- * binds. requestAddControl() needs the config_controlsPackage broadcast and is left out.
+ * binds. requestAddControl() builds the AOSP intent but cannot broadcast it: there is no System UI controls package.
  */
 public abstract class ControlsProviderService extends Service {
 
@@ -84,5 +89,27 @@ public abstract class ControlsProviderService extends Service {
 	@Override
 	public final boolean onUnbind(@NonNull Intent intent) {
 		return true;
+	}
+
+	/* AOSP ControlsProviderService.requestAddControl(): the broadcast to config_controlsPackage (System UI,
+	 * permission BIND_CONTROLS) is not sent: a desktop has no such package, so nobody would receive it */
+	public static void requestAddControl(@NonNull Context context, @NonNull ComponentName componentName,
+	                                     @NonNull Control control) {
+		Preconditions.checkNotNull(context);
+		Preconditions.checkNotNull(componentName);
+		Preconditions.checkNotNull(control);
+		Intent intent = new Intent(ACTION_ADD_CONTROL);
+		intent.putExtra(Intent.EXTRA_COMPONENT_NAME, componentName);
+		if (isStatelessControl(control)) {
+			intent.putExtra(EXTRA_CONTROL, control);
+		} else {
+			intent.putExtra(EXTRA_CONTROL, new Control.StatelessBuilder(control).build());
+		}
+	}
+
+	private static boolean isStatelessControl(Control control) {
+		return (control.getStatus() == Control.STATUS_UNKNOWN
+				&& control.getControlTemplate().getTemplateType() == ControlTemplate.TYPE_NO_TEMPLATE
+				&& TextUtils.isEmpty(control.getStatusText()));
 	}
 }
