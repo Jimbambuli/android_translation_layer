@@ -32,8 +32,10 @@ public class MeasuredText {
 	private final Paint[] mRunPaints;
 	private final float[] mRunReplacementWidths; /* NaN: a style run */
 	private final boolean mComputeLayout;
+	private final boolean mComputeHyphenation;
 
-	private MeasuredText(char[] chars, int[] runEnds, Paint[] paints, float[] replacementWidths, boolean computeLayout) {
+	private MeasuredText(char[] chars, int[] runEnds, Paint[] paints, float[] replacementWidths, boolean computeLayout, boolean computeHyphenation) {
+		mComputeHyphenation = computeHyphenation;
 		mChars = chars;
 		mRunEnds = runEnds;
 		mRunPaints = paints;
@@ -125,6 +127,23 @@ public class MeasuredText {
 			mText = text.clone();
 		}
 
+		/* AOSP Builder(MeasuredText): a builder for the same text (AOSP reuses the measured runs as a hint; ATL
+		 * measures when asked, so only the text and the settings are taken) */
+		public Builder(MeasuredText text) {
+			if (text == null)
+				throw new NullPointerException("text can not be null");
+			if (!text.mComputeLayout)
+				throw new IllegalArgumentException("The input MeasuredText must not be created with setComputeLayout(false).");
+			mText = text.mChars.clone();
+			mComputeHyphenation = text.mComputeHyphenation;
+			mComputeLayout = text.mComputeLayout;
+		}
+
+		/* AOSP appendStyleRun with a LineBreakConfig; ATL does not keep the line break settings of a run */
+		public Builder appendStyleRun(Paint paint, LineBreakConfig lineBreakConfig, int length, boolean isRtl) {
+			return appendStyleRun(paint, length, isRtl);
+		}
+
 		/** Apply the style run to the text from the current offset to length characters on. */
 		public Builder appendStyleRun(Paint paint, int length, boolean isRtl) {
 			if (paint == null)
@@ -157,6 +176,25 @@ public class MeasuredText {
 			return this;
 		}
 
+		public static final int HYPHENATION_MODE_NONE = 0;
+		public static final int HYPHENATION_MODE_NORMAL = 1;
+		public static final int HYPHENATION_MODE_FAST = 2;
+
+		/* AOSP setComputeHyphenation(int): NORMAL and FAST both compute hyphenation (ATL has no fast variant) */
+		public Builder setComputeHyphenation(int mode) {
+			switch (mode) {
+				case HYPHENATION_MODE_NORMAL:
+				case HYPHENATION_MODE_FAST:
+					mComputeHyphenation = true;
+					break;
+				case HYPHENATION_MODE_NONE:
+				default:
+					mComputeHyphenation = false;
+					break;
+			}
+			return this;
+		}
+
 		/** By passing true to this method, the build method will compute all possible hyphenation pieces as well. */
 		public Builder setComputeHyphenation(boolean computeHyphenation) {
 			mComputeHyphenation = computeHyphenation;
@@ -181,7 +219,7 @@ public class MeasuredText {
 				paints[i] = mPaints.get(i);
 				widths[i] = mWidths.get(i);
 			}
-			return new MeasuredText(mText, ends, paints, widths, mComputeLayout);
+			return new MeasuredText(mText, ends, paints, widths, mComputeLayout, mComputeHyphenation);
 		}
 	}
 }
