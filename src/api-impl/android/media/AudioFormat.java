@@ -1,6 +1,6 @@
 package android.media;
 
-public class AudioFormat {
+public class AudioFormat implements android.os.Parcelable {
 
 	/** Invalid audio channel mask */
 	public static final int CHANNEL_INVALID = 0;
@@ -44,6 +44,8 @@ public class AudioFormat {
 	int sampleRate = 44100;
 	int channelMask;
 	int encoding;
+	int channelIndexMask;
+	int propertySetMask; // AUDIO_FORMAT_HAS_PROPERTY_*, as set by the Builder
 
 	/* AOSP AudioFormat getters; ATL's Builder sets no channel index mask */
 	public int getEncoding() {
@@ -59,8 +61,69 @@ public class AudioFormat {
 	}
 
 	public int getChannelIndexMask() {
-		return CHANNEL_INVALID;
+		return channelIndexMask;
 	}
+
+	/* AOSP AudioFormat.getFrameSizeInBytes(): sample size times channel count for PCM, else (also for an
+	 * invalid encoding or a channel count of 0) 1 */
+	public int getFrameSizeInBytes() {
+		int frameSizeInBytes = 1;
+		switch (encoding) { // AudioFormat.getBytesPerSample(); other encodings throw there and give 1
+			case ENCODING_PCM_8BIT:
+				frameSizeInBytes = getChannelCount();
+				break;
+			case ENCODING_PCM_16BIT:
+			case ENCODING_IEC61937:
+			case ENCODING_DEFAULT:
+				frameSizeInBytes = 2 * getChannelCount();
+				break;
+			case ENCODING_PCM_24BIT_PACKED:
+				frameSizeInBytes = 3 * getChannelCount();
+				break;
+			case ENCODING_PCM_FLOAT:
+			case ENCODING_PCM_32BIT:
+				frameSizeInBytes = 4 * getChannelCount();
+				break;
+			default:
+				break;
+		}
+		return frameSizeInBytes != 0 ? frameSizeInBytes : 1;
+	}
+
+	/* AOSP AudioFormat.describeContents(), writeToParcel(), AudioFormat(Parcel) and CREATOR */
+	@Override
+	public int describeContents() {
+		return 0;
+	}
+
+	@Override
+	public void writeToParcel(android.os.Parcel dest, int flags) {
+		dest.writeInt(propertySetMask);
+		dest.writeInt(encoding);
+		dest.writeInt(sampleRate);
+		dest.writeInt(channelMask);
+		dest.writeInt(channelIndexMask);
+	}
+
+	private AudioFormat(android.os.Parcel in) {
+		propertySetMask = in.readInt();
+		encoding = in.readInt();
+		sampleRate = in.readInt();
+		channelMask = in.readInt();
+		channelIndexMask = in.readInt();
+	}
+
+	public AudioFormat() {}
+
+	public static final android.os.Parcelable.Creator<AudioFormat> CREATOR = new android.os.Parcelable.Creator<AudioFormat>() {
+		public AudioFormat createFromParcel(android.os.Parcel p) {
+			return new AudioFormat(p);
+		}
+
+		public AudioFormat[] newArray(int size) {
+			return new AudioFormat[size];
+		}
+	};
 
 	/* AOSP: computed in the constructor from the position and index masks */
 	public int getChannelCount() {
@@ -166,20 +229,39 @@ public static String toLogFriendlyEncoding(int enc) {
 			audioFormat.encoding = af.encoding;
 			audioFormat.sampleRate = af.sampleRate;
 			audioFormat.channelMask = af.channelMask;
+			audioFormat.channelIndexMask = af.channelIndexMask;
+			audioFormat.propertySetMask = af.propertySetMask;
 		}
 
 		public Builder setSampleRate(int sampleRate) {
 			audioFormat.sampleRate = sampleRate;
+			audioFormat.propertySetMask |= 0x2; // AUDIO_FORMAT_HAS_PROPERTY_SAMPLE_RATE
 			return this;
 		}
 
 		public Builder setChannelMask(int channelMask) {
 			audioFormat.channelMask = channelMask;
+			audioFormat.propertySetMask |= 0x4; // AUDIO_FORMAT_HAS_PROPERTY_CHANNEL_MASK
+			return this;
+		}
+
+		/* AOSP AudioFormat.Builder.setChannelIndexMask() */
+		public Builder setChannelIndexMask(int channelIndexMask) {
+			if (channelIndexMask == 0) {
+				throw new IllegalArgumentException("Invalid zero channel index mask");
+			} else if (audioFormat.channelMask != 0 &&
+			           Integer.bitCount(channelIndexMask) != Integer.bitCount(audioFormat.channelMask)) {
+				throw new IllegalArgumentException("Mismatched channel count for index mask " +
+				                                   Integer.toHexString(channelIndexMask).toUpperCase());
+			}
+			audioFormat.channelIndexMask = channelIndexMask;
+			audioFormat.propertySetMask |= 0x8; // AUDIO_FORMAT_HAS_PROPERTY_CHANNEL_INDEX_MASK
 			return this;
 		}
 
 		public Builder setEncoding(int encoding) {
 			audioFormat.encoding = encoding;
+			audioFormat.propertySetMask |= 0x1; // AUDIO_FORMAT_HAS_PROPERTY_ENCODING
 			return this;
 		}
 
