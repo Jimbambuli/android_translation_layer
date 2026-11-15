@@ -147,6 +147,18 @@ public class SurfaceTexture {
 		}
 	}
 
+	/* AOSP SurfaceTexture.releaseTexImage(): gives the buffer latched last back to the producer (single buffered
+	 * mode). The C++ side (GLConsumer) is not in the local sources; ATL's producers queue copies and never wait for the
+	 * buffer, so nothing is held back: the same checks as updateTexImage(), otherwise nothing to do. */
+	public void releaseTexImage() {
+		if (released)
+			throw new RuntimeException("Error during releaseTexImage (see logcat for details)");
+		synchronized (this) {
+			if (!attached)
+				throw new IllegalStateException("Unable to release texture contents (see logcat for details)");
+		}
+	}
+
 	/* AOSP GLConsumer::detachFromContext(): in the SurfaceTexture's EGL context (if it has one yet), the GL texture
 	 * is deleted; then the SurfaceTexture has no context until attachToGLContext() */
 	public void detachFromGLContext() {

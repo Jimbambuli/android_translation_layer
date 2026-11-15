@@ -1,4 +1,6 @@
 #include <gsk/gsk.h>
+#include <stdbool.h>
+#include <stdlib.h>
 
 #include "../defines.h"
 
@@ -224,4 +226,65 @@ JNIEXPORT void JNICALL Java_android_graphics_Path_native_1get_1bounds(JNIEnv *en
 JNIEXPORT jboolean JNICALL Java_android_graphics_Path_native_1contains(JNIEnv *env, jclass class, jlong path_ptr, jint fill_rule, jboolean inverse, jfloat x, jfloat y)
 {
 	return gsk_path_in_fill(_PTR(path_ptr), &GRAPHENE_POINT_INIT(x, y), fill_rule) ^ inverse;
+}
+
+/* the segments of a path as {verb, x0, y0, ...} (verbs and point counts as SkPath: 0 move 1, 1 line 2, 2 quad 3,
+ * 3 conic 3 (+ weight), 4 cubic 4, 5 close 0 points), for PathIterator */
+struct segments {
+	float *data;
+	size_t len;
+	size_t cap;
+};
+
+static void segments_add(struct segments *seg, float verb, const graphene_point_t *pts, size_t n_pts, float weight, bool has_weight)
+{
+	size_t need = 1 + n_pts * 2 + (has_weight ? 1 : 0);
+	if (seg->len + need > seg->cap) {
+		seg->cap = (seg->len + need) * 2;
+		seg->data = realloc(seg->data, seg->cap * sizeof(float));
+	}
+	seg->data[seg->len++] = verb;
+	for (size_t i = 0; i < n_pts; i++) {
+		seg->data[seg->len++] = pts[i].x;
+		seg->data[seg->len++] = pts[i].y;
+	}
+	if (has_weight)
+		seg->data[seg->len++] = weight;
+}
+
+static gboolean segments_cb(GskPathOperation op, const graphene_point_t *pts, gsize n_pts, float weight, gpointer user_data)
+{
+	struct segments *seg = user_data;
+	switch (op) {
+	case GSK_PATH_MOVE:
+		segments_add(seg, 0, pts, 1, 0, false);
+		break;
+	case GSK_PATH_CLOSE:
+		segments_add(seg, 5, pts, 0, 0, false);
+		break;
+	case GSK_PATH_LINE:
+		segments_add(seg, 1, pts, 2, 0, false);
+		break;
+	case GSK_PATH_QUAD:
+		segments_add(seg, 2, pts, 3, 0, false);
+		break;
+	case GSK_PATH_CUBIC:
+		segments_add(seg, 4, pts, 4, 0, false);
+		break;
+	case GSK_PATH_CONIC:
+		segments_add(seg, 3, pts, 3, weight, true);
+		break;
+	}
+	return TRUE;
+}
+
+JNIEXPORT jfloatArray JNICALL Java_android_graphics_Path_native_1get_1segments(JNIEnv *env, jclass this, jlong path_ptr)
+{
+	struct segments seg = {0};
+	gsk_path_foreach(_PTR(path_ptr), GSK_PATH_FOREACH_ALLOW_QUAD | GSK_PATH_FOREACH_ALLOW_CUBIC | GSK_PATH_FOREACH_ALLOW_CONIC, segments_cb, &seg);
+	jfloatArray ret = (*env)->NewFloatArray(env, seg.len);
+	if (ret && seg.len)
+		(*env)->SetFloatArrayRegion(env, ret, 0, seg.len, seg.data);
+	free(seg.data);
+	return ret;
 }

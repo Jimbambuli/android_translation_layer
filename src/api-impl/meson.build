@@ -538,6 +538,7 @@ srcs = [
 	'android/graphics/Path.java',
 	'android/graphics/PathDashPathEffect.java',
 	'android/graphics/PathEffect.java',
+	'android/graphics/PathIterator.java',
 	'android/graphics/PathMeasure.java',
 	'android/graphics/Picture.java',
 	'android/graphics/PixelFormat.java',

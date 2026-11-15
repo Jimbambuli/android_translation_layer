@@ -53,7 +53,25 @@ public class Path {
 		this.path = native_ref_path(path.getGskPath());
 	}
 
+	/* bumped by every change of the path: PathIterator throws ConcurrentModificationException when it differs */
+	private int generation;
+
+	int getGenerationId() {
+		return generation;
+	}
+
+	/* AOSP Path.getPathIterator(): the iterator over the segments of the path as they are now */
+	public PathIterator getPathIterator() {
+		return new PathIterator(this);
+	}
+
+	/* {verb, points...} of every segment, see PathIterator */
+	float[] getSegments() {
+		return native_get_segments(getGskPath());
+	}
+
 	long getBuilder() {
+		generation++;
 		if (builder == 0 || path != 0) {
 			builder = native_create_builder(path, builder);
 			path = 0;
@@ -70,6 +88,7 @@ public class Path {
 	}
 
 	public void reset() {
+		generation++;
 		native_reset(path, builder);
 		path = 0;
 		builder = 0;
@@ -396,5 +415,6 @@ public class Path {
 	private static native void native_add_round_rect(long builder, float left, float top, float right, float bottom, float[] radii);
 	private static native void native_get_bounds(long path, RectF rect);
 	private static native long native_transform(long path, long matrix);
+	private static native float[] native_get_segments(long path);
 	private static native boolean native_contains(long path, int fill_rule, boolean inverse, float x, float y);
 }
