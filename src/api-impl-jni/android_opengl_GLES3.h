@@ -44,9 +44,11 @@ static inline void release_strings(JNIEnv *env, jobjectArray array, const GLchar
 }
 
 
+typedef GLuint (GL_APIENTRYP atl_get_debug_message_log)(GLuint count, GLsizei bufSize, GLenum *sources, GLenum *types, GLuint *ids, GLenum *severities, GLsizei *lengths, GLchar *messageLog);
+
 /* glGetDebugMessageLog/glGetDebugMessageLogKHR returning the messages as String[]: up to count messages, the
  * sources, types, ids and severities written to the given arrays/buffers */
-static inline jobjectArray debug_message_log_strings(JNIEnv *env, PFNGLGETDEBUGMESSAGELOGKHRPROC get_log, jint count, GLenum *sources, GLenum *types, GLuint *ids, GLenum *severities)
+static inline jobjectArray debug_message_log_strings(JNIEnv *env, atl_get_debug_message_log get_log, jint count, GLenum *sources, GLenum *types, GLuint *ids, GLenum *severities)
 {
 	GLint max_length = 0;
 	glGetIntegerv(GL_MAX_DEBUG_MESSAGE_LENGTH, &max_length);
