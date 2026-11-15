@@ -114,6 +114,17 @@ public final class PowerManager {
 		return false;
 	}
 
+	public static final int LOCATION_MODE_NO_CHANGE = 0;
+	public static final int LOCATION_MODE_GPS_DISABLED_WHEN_SCREEN_OFF = 1;
+	public static final int LOCATION_MODE_ALL_DISABLED_WHEN_SCREEN_OFF = 2;
+	public static final int LOCATION_MODE_FOREGROUND_ONLY = 3;
+	public static final int LOCATION_MODE_THROTTLE_REQUESTS_WHEN_SCREEN_OFF = 4;
+
+	/* AOSP getLocationPowerSaveMode(): without battery saver (isPowerSaveMode() is false) nothing changes */
+	public int getLocationPowerSaveMode() {
+		return LOCATION_MODE_NO_CHANGE;
+	}
+
 	public boolean isPowerSaveMode() {
 		return false;
 	}

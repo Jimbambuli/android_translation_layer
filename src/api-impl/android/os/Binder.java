@@ -8,6 +8,13 @@ public class Binder implements IBinder {
 	private String mDescriptor;
 	private IInterface mOwner;
 
+	public Binder() {}
+
+	/* AOSP Binder(String): the descriptor identifies the binder for debugging */
+	public Binder(String descriptor) {
+		mDescriptor = descriptor;
+	}
+
 	public void attachInterface(IInterface owner, String descriptor) {
 		mOwner = owner;
 		mDescriptor = descriptor;

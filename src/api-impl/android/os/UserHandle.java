@@ -205,6 +205,11 @@ public final class UserHandle {
 		mHandle = h;
 	}
 
+	/* AOSP UserHandle(Parcel): keep in sync with createFromParcel() */
+	public UserHandle(Parcel in) {
+		mHandle = in.readInt();
+	}
+
 	/**
 	 * @hide
 	 */
