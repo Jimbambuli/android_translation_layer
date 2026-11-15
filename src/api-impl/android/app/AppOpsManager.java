@@ -88,6 +88,17 @@ public class AppOpsManager {
 		return unsafeCheckOp(op, uid, packageName);
 	}
 
+	/* AOSP checkOp(String, int, String, String): the service answers MODE_ALLOWED for ATL's one package (as checkOp()) */
+	public int checkOp(String op, int uid, String packageName, String attributionTag) {
+		strOpToOp(op);
+		return MODE_ALLOWED;
+	}
+
+	public int checkOpNoThrow(String op, int uid, String packageName, String attributionTag) {
+		strOpToOp(op);
+		return MODE_ALLOWED;
+	}
+
 	public int unsafeCheckOp(String op, int uid, String packageName) {
 		return MODE_ALLOWED;
 	}
@@ -1027,12 +1038,30 @@ public class AppOpsManager {
 
 	public interface OnOpChangedListener {
 		void onOpChanged(String op, String packageName);
+
+		/* AOSP: the default of the variant with the user id goes on to onOpChanged(String, String), where the empty
+		 * package name of a global change becomes null; the variant with the device id goes to the user one */
+		default void onOpChanged(String op, String packageName, int userId) {
+			if ("".equals(packageName))
+				packageName = null;
+			onOpChanged(op, packageName);
+		}
+
+		default void onOpChanged(String op, String packageName, int userId, String persistentDeviceId) {
+			if ("default:0".equals(persistentDeviceId)) /* VirtualDeviceManager.PERSISTENT_DEVICE_ID_DEFAULT */
+				onOpChanged(op, packageName, userId);
+		}
 	}
 
 	/* AOSP registers the listener with AppOpsService, which calls it when the mode changes; ATL has none, the
 	 * modes never change and the listener is never called. The op string is checked like in AOSP. */
 	public void startWatchingMode(String op, String packageName, OnOpChangedListener callback) {
 		strOpToOp(op);
+	}
+
+	/* AOSP: the flags (WATCH_FOREGROUND_CHANGES) only select which changes the service reports; there are none */
+	public void startWatchingMode(String op, String packageName, int flags, OnOpChangedListener callback) {
+		startWatchingMode(op, packageName, callback);
 	}
 
 	public void stopWatchingMode(OnOpChangedListener callback) {}
@@ -1067,6 +1096,17 @@ public class AppOpsManager {
 
 	/* AOSP AppOpsManager.setOnOpNotedCallback(): the state checks; the registration with the service is left out */
 	public void setOnOpNotedCallback(java.util.concurrent.Executor asyncExecutor, OnOpNotedCallback callback) {
+		setOnOpNotedCallback(asyncExecutor, callback, 0);
+	}
+
+	/* AOSP AppOpsManager.OP_NOTED_CALLBACK_FLAG_IGNORE_ASYNC: leave out the async notes (there are none here) */
+	public static final int OP_NOTED_CALLBACK_FLAG_IGNORE_ASYNC = 1 << 0;
+
+	public void setOnOpNotedCallback(java.util.concurrent.Executor asyncExecutor, OnOpNotedCallback callback, int flags) {
+		if (flags != 0 && flags != OP_NOTED_CALLBACK_FLAG_IGNORE_ASYNC)
+			throw new IllegalArgumentException("Invalid flags " + flags);
+		if (callback == null && flags != 0)
+			throw new IllegalArgumentException("Invalid flags " + flags);
 		if ((callback == null) != (asyncExecutor == null)) {
 			throw new IllegalStateException();
 		}

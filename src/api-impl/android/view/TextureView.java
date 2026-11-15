@@ -38,6 +38,10 @@ public class TextureView extends View {
 		super(context, attributeSet, defStyleAttr);
 	}
 
+	public TextureView(Context context, AttributeSet attributeSet, int defStyleAttr, int defStyleRes) {
+		super(context, attributeSet, defStyleAttr, defStyleRes);
+	}
+
 	public interface SurfaceTextureListener {
 		void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height);
 		void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height);

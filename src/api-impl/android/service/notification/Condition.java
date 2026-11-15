@@ -20,6 +20,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Parcel;
 import java.util.Objects;
 
 /**
@@ -91,6 +92,13 @@ public final class Condition {
 		this.state = state;
 		this.source = checkValidSource(source);
 		this.flags = flags;
+	}
+
+	/* AOSP Condition(Parcel): the fields in constructor order, strings trimmed by the full constructor */
+	public Condition(Parcel source) {
+		this((Uri)source.readParcelable(Condition.class.getClassLoader(), android.net.Uri.class),
+		     source.readString(), source.readString(), source.readString(), source.readInt(), source.readInt(),
+		     source.readInt(), source.readInt());
 	}
 
 	public void validate() {

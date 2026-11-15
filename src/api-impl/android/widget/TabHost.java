@@ -7,6 +7,18 @@ public class TabHost extends View {
 		super(context);
 	}
 
+	public TabHost(android.content.Context context, android.util.AttributeSet attrs) {
+		super(context, attrs);
+	}
+
+	public TabHost(android.content.Context context, android.util.AttributeSet attrs, int defStyleAttr) {
+		this(context, attrs, defStyleAttr, 0);
+	}
+
+	public TabHost(android.content.Context context, android.util.AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	public static class TabSpec {
 		private String tag;
 		public TabSpec(String tag) {
@@ -22,6 +34,14 @@ public class TabHost extends View {
 		}
 
 		public TabSpec setIndicator(CharSequence label, android.graphics.drawable.Drawable icon) {
+			return this;
+		}
+
+		public TabSpec setIndicator(View view) {
+			return this;
+		}
+
+		public TabSpec setContent(int viewId) {
 			return this;
 		}
 

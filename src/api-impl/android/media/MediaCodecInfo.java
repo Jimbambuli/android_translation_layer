@@ -391,6 +391,24 @@ public class MediaCodecInfo {
 				this.frameRate = frameRate;
 			}
 
+			/* AOSP covers(MediaFormat): the format's size and frame rate (rounded up to a whole number) as a point */
+			public boolean covers(MediaFormat format) {
+				int frameRate = 0;
+				switch (format.getValueTypeForKey("frame-rate")) {
+					case MediaFormat.TYPE_INTEGER:
+						frameRate = format.getInteger("frame-rate", 0);
+						break;
+					case MediaFormat.TYPE_LONG:
+						frameRate = (int) Math.round((float) Math.ceil(format.getLong("frame-rate", 0)));
+						break;
+					case MediaFormat.TYPE_FLOAT:
+						frameRate = Math.round((float) Math.ceil(format.getFloat("frame-rate", 0)));
+						break;
+				}
+				return covers(new PerformancePoint(format.getInteger(MediaFormat.KEY_WIDTH, 0),
+						format.getInteger(MediaFormat.KEY_HEIGHT, 0), frameRate));
+			}
+
 			public boolean covers(PerformancePoint other) {
 				return width * height >= other.width * other.height && frameRate >= other.frameRate;
 			}

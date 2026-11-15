@@ -24,6 +24,14 @@ public class CalendarView extends FrameLayout {
 		super(context, attrs);
 	}
 
+	public CalendarView(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+	}
+
+	public CalendarView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	/** AOSP setDate(): the legacy delegate does not call the listener for a programmatic change */
 	public void setDate(long date) {
 		mDate = date;

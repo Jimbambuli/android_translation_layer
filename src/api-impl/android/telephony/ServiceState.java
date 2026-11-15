@@ -11,6 +11,14 @@ public class ServiceState {
 	public static final int STATE_EMERGENCY_ONLY = 2;
 	public static final int STATE_POWER_OFF = 3;
 
+	public ServiceState() {}
+
+	/* AOSP copyFrom(s): this class holds no state beyond the init() one, so there is nothing to copy */
+	public ServiceState(ServiceState s) {}
+
+	/* AOSP reads the fields from the parcel; this class holds no state beyond the init() one */
+	public ServiceState(android.os.Parcel in) {}
+
 	/* init(): mVoiceRegState = STATE_OUT_OF_SERVICE */
 	public int getState() {
 		return STATE_OUT_OF_SERVICE;

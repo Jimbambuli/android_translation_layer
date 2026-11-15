@@ -49,6 +49,10 @@ public class AbsoluteLayout extends ViewGroup {
 		super(context, attrs, defStyle);
 	}
 
+	public AbsoluteLayout(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		int count = getChildCount();
@@ -205,9 +209,9 @@ public class AbsoluteLayout extends ViewGroup {
 		/**
 		 * {@inheritDoc}
 		 */
-		/*public LayoutParams(ViewGroup.LayoutParams source) {
+		public LayoutParams(ViewGroup.LayoutParams source) {
 			super(source);
-		}*/
+		}
 
 		/*@Override
 		public String debug(String output) {

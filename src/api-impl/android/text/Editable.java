@@ -24,6 +24,9 @@ public interface Editable extends CharSequence, GetChars, Spannable, Appendable 
 
 	public Editable insert(int where, CharSequence text);
 
+	/* AOSP Editable.insert(int, CharSequence, int, int) */
+	public Editable insert(int where, CharSequence text, int start, int end);
+
 	public Editable append(CharSequence text);
 
 	public Editable append(CharSequence text, int start, int end);

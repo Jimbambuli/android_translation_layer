@@ -304,6 +304,20 @@ public final class Rect implements Parcelable {
 		right -= dx;
 		bottom -= dy;
 	}
+
+	public void inset(Insets insets) {
+		left += insets.left;
+		top += insets.top;
+		right -= insets.right;
+		bottom -= insets.bottom;
+	}
+
+	public void inset(int left, int top, int right, int bottom) {
+		this.left += left;
+		this.top += top;
+		this.right -= right;
+		this.bottom -= bottom;
+	}
 	/**
 	 * Returns true if (x,y) is inside the rectangle. The left and top are
 	 * considered to be inside, while the right and bottom are not. This means

@@ -20,6 +20,12 @@ public class TextToSpeech {
 		});
 	}
 
+	/* AOSP TextToSpeech(Context, OnInitListener, String engine): the engine package is looked up, which fails as
+	 * without a name, as ATL has no engine installed */
+	public TextToSpeech(Context context, TextToSpeech.OnInitListener listener, String engine) {
+		this(context, listener);
+	}
+
 	public int setOnUtteranceCompletedListener(TextToSpeech.OnUtteranceCompletedListener listener) {
 		return ERROR;
 	}
@@ -161,6 +167,10 @@ public class TextToSpeech {
 	}
 
 	public int synthesizeToFile(final CharSequence text, final android.os.Bundle params, final java.io.File file, final String utteranceId) {
+		return notBound(ERROR, "synthesizeToFile");
+	}
+
+	public int synthesizeToFile(final CharSequence text, final android.os.Bundle params, final android.os.ParcelFileDescriptor fileDescriptor, final String utteranceId) {
 		return notBound(ERROR, "synthesizeToFile");
 	}
 

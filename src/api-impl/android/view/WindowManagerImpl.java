@@ -120,6 +120,16 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		}
 
 		@Override
+		public boolean showContextMenuForChild(View originalView, float x, float y) {
+			return false;
+		}
+
+		@Override
+		public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback) {
+			return null;
+		}
+
+		@Override
 		public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback, int type) {
 			return null;
 		}

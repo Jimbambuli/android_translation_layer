@@ -24,6 +24,10 @@ public class AutofillManager {
 
 	public void notifyViewEntered(View view, int id, Rect bounds) {}
 
+	public void notifyViewEntered(View view) {}
+
+	public void notifyViewExited(View view) {}
+
 	public void notifyValueChanged(View view) {}
 
 	public void notifyValueChanged(View view, int id, AutofillValue value) {}

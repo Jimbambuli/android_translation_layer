@@ -291,6 +291,11 @@ public final class Sensor {
 		return sSensorReportingModes[offset];
 	}
 
+	/* AOSP Sensor.getReportingMode() */
+	public int getReportingMode() {
+		return getReportingMode(this);
+	}
+
 	static int getMaxLengthValuesArray(Sensor sensor, int sdkLevel) {
 		int type = sensor.mType;
 		// RotationVector length has changed to 3 to 5 for API level 18

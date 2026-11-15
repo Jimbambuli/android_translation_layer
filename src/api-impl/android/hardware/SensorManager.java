@@ -15,6 +15,32 @@ public class SensorManager {
 		return new Sensor(type);
 	}
 
+	/* AOSP getDefaultSensor(int, boolean): ATL's sensors are not wake-up sensors, so only wakeUp == false matches */
+	public Sensor getDefaultSensor(int type, boolean wakeUp) {
+		return wakeUp ? null : getDefaultSensor(type);
+	}
+
+	/* AOSP legacy registerListener(SensorListener, int[, int]) (LegacySensorManager): the legacy
+	 * sensors are not delivered, so there is nothing to register and the result is false (as for a
+	 * device without the requested sensors) */
+	@Deprecated
+	public boolean registerListener(SensorListener listener, int sensors) {
+		return false;
+	}
+
+	@Deprecated
+	public boolean registerListener(SensorListener listener, int sensors, int rate) {
+		return false;
+	}
+
+	@Deprecated
+	public void unregisterListener(SensorListener listener) {
+	}
+
+	@Deprecated
+	public void unregisterListener(SensorListener listener, int sensors) {
+	}
+
 	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, Handler handler) {
 		return true; // we could try saying that the sensor doesn't exist and hope the app just doesn't use it then, but as long as we never call the handler the app should leave this alone
 	}

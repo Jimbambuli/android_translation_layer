@@ -34,6 +34,11 @@ public class ContentProviderClient implements AutoCloseable {
 		return contentProvider.query(url, projection, selection, selectionArgs, sortOrder, cancellationSignal);
 	}
 
+	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) throws RemoteException {
+		Objects.requireNonNull(uri, "url");
+		return contentProvider.query(uri, projection, queryArgs, cancellationSignal);
+	}
+
 	public Bundle call(String method, String arg, Bundle extras) throws RemoteException {
 		return contentProvider.call(method, arg, extras);
 	}
@@ -96,6 +101,18 @@ public class ContentProviderClient implements AutoCloseable {
 
 	public AssetFileDescriptor openAssetFile(Uri url, String mode) throws RemoteException, FileNotFoundException {
 		return contentProvider.openAssetFile(url, mode);
+	}
+
+	public ParcelFileDescriptor openFile(Uri url, String mode, CancellationSignal signal) throws RemoteException, FileNotFoundException {
+		Objects.requireNonNull(url, "url");
+		Objects.requireNonNull(mode, "mode");
+		return contentProvider.openFile(url, mode, signal);
+	}
+
+	public AssetFileDescriptor openAssetFile(Uri url, String mode, CancellationSignal signal) throws RemoteException, FileNotFoundException {
+		Objects.requireNonNull(url, "url");
+		Objects.requireNonNull(mode, "mode");
+		return contentProvider.openAssetFile(url, mode, signal);
 	}
 
 	public InputStream openInputStream(Uri url) throws FileNotFoundException, RemoteException {

@@ -15,6 +15,9 @@ import android.graphics.Point;
 import android.net.Uri;
 import android.os.Bundle;
 import java.util.Objects;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import android.os.CancellationSignal;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
@@ -138,7 +141,35 @@ public class ContentResolver {
 		return path;
 	}
 
+	public static final int NOTIFY_SYNC_TO_NETWORK = 1 << 0;
+	public static final int NOTIFY_SKIP_NOTIFY_FOR_DESCENDANTS = 1 << 1;
+	public static final int NOTIFY_INSERT = 1 << 2;
+	public static final int NOTIFY_UPDATE = 1 << 3;
+	public static final int NOTIFY_DELETE = 1 << 4;
+	public static final int NOTIFY_NO_DELAY = 1 << 15;
+
 	public void notifyChange(Uri uri, ContentObserver observer) {
+		notifyChange(uri, observer, NOTIFY_SYNC_TO_NETWORK);
+	}
+	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
+		notifyChange(uri, observer, syncToNetwork ? NOTIFY_SYNC_TO_NETWORK : 0);
+	}
+	public void notifyChange(Uri uri, ContentObserver observer, int flags) {
+		Objects.requireNonNull(uri, "uri");
+		for (ContentObserver o : matchingObservers(uri, observer, flags))
+			o.dispatchChange(o == observer, uri, flags);
+	}
+	public void notifyChange(Collection<Uri> uris, ContentObserver observer, int flags) {
+		Objects.requireNonNull(uris, "uris");
+		// one notification per observer, carrying all the URIs it matched (as AOSP delivers them)
+		LinkedHashMap<ContentObserver, ArrayList<Uri>> byObserver = new LinkedHashMap<>();
+		for (Uri uri : uris)
+			for (ContentObserver o : matchingObservers(uri, observer, flags))
+				byObserver.computeIfAbsent(o, k -> new ArrayList<>()).add(uri);
+		for (Map.Entry<ContentObserver, ArrayList<Uri>> e : byObserver.entrySet())
+			e.getKey().dispatchChange(e.getKey() == observer, e.getValue(), flags);
+	}
+	private List<ContentObserver> matchingObservers(Uri uri, ContentObserver observer, int flags) {
 		List<String> changed = observedPath(uri);
 		ArrayList<ContentObserver> notify = new ArrayList<>();
 		synchronized (sObservations) {
@@ -151,15 +182,14 @@ public class ContentResolver {
 				else
 					// the change is at an ancestor of the observed URI
 					match = observed.subList(0, changed.size()).equals(changed);
+				// NOTIFY_SKIP_NOTIFY_FOR_DESCENDANTS: skip the root URI of observers that notify for descendants
+				if (match && (flags & NOTIFY_SKIP_NOTIFY_FOR_DESCENDANTS) != 0 && o.notifyForDescendants && observed.size() == changed.size())
+					match = false;
 				if (match && (o.observer != observer || observer.deliverSelfNotifications()) && !notify.contains(o.observer))
 					notify.add(o.observer);
 			}
 		}
-		for (ContentObserver o : notify)
-			o.dispatchChange(o == observer, uri);
-	}
-	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
-		notifyChange(uri, observer);
+		return notify;
 	}
 	public int getUserId() {
 		return 0;
@@ -557,6 +587,10 @@ public class ContentResolver {
 	}
 
 	public static void cancelSync(Account account, String authority) {
+	}
+
+	public void cancelSync(Uri uri) {
+		cancelSync(null /* all accounts */, uri != null ? uri.getAuthority() : null);
 	}
 
 	public static void setMasterSyncAutomatically(boolean sync) {

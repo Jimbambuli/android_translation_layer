@@ -34,6 +34,11 @@ public class UsbDevice {
 
 	public String getDeviceName() { return mName; }
 
+	/* AOSP UsbDevice.getDeviceName(int id): native_get_device_name(), "/dev/bus/usb/BBB/DDD" from id = bus * 1000 + device */
+	public static String getDeviceName(int id) {
+		return String.format("/dev/bus/usb/%03d/%03d", id / 1000, id % 1000);
+	}
+
 	public String getManufacturerName() { return mManufacturerName; }
 
 	public String getProductName() { return mProductName; }

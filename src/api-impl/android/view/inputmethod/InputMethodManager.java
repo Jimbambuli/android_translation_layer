@@ -120,6 +120,29 @@ public class InputMethodManager {
 			throw new NullPointerException("delegatorView");
 	}
 
+	public void prepareStylusHandwritingDelegation(View delegatorView, String delegatePackageName) {
+		if (delegatePackageName == null)
+			throw new NullPointerException("delegatePackageName");
+		prepareStylusHandwritingDelegation(delegatorView);
+	}
+
+	public boolean acceptStylusHandwritingDelegation(View delegateView, String delegatorPackageName) {
+		if (delegatorPackageName == null)
+			throw new NullPointerException("delegatorPackageName");
+		return acceptStylusHandwritingDelegation(delegateView);
+	}
+
+	/* AOSP: the callback is called with false when no handwriting can be started */
+	public void acceptStylusHandwritingDelegation(View delegateView, String delegatorPackageName, java.util.concurrent.Executor executor, java.util.function.Consumer<Boolean> callback) {
+		acceptStylusHandwritingDelegation(delegateView, delegatorPackageName, 0, executor, callback);
+	}
+
+	public void acceptStylusHandwritingDelegation(View delegateView, String delegatorPackageName, int flags, java.util.concurrent.Executor executor, java.util.function.Consumer<Boolean> callback) {
+		if (delegatorPackageName == null || delegateView == null || executor == null || callback == null)
+			throw new NullPointerException();
+		executor.execute(() -> callback.accept(false));
+	}
+
 	public boolean acceptStylusHandwritingDelegation(View delegatorView) {
 		if (delegatorView == null)
 			throw new NullPointerException("delegatorView");

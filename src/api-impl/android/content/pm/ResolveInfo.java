@@ -25,6 +25,28 @@ public class ResolveInfo {
 	public boolean noResourceId;
 	public int iconResourceId;
 
+	public ResolveInfo() {
+	}
+
+	/* AOSP ResolveInfo(ResolveInfo): copies the fields AOSP copies (ATL has none of its hidden user fields) */
+	public ResolveInfo(ResolveInfo orig) {
+		activityInfo = orig.activityInfo;
+		serviceInfo = orig.serviceInfo;
+		providerInfo = orig.providerInfo;
+		filter = orig.filter;
+		priority = orig.priority;
+		preferredOrder = orig.preferredOrder;
+		match = orig.match;
+		specificIndex = orig.specificIndex;
+		labelRes = orig.labelRes;
+		nonLocalizedLabel = orig.nonLocalizedLabel;
+		icon = orig.icon;
+		resolvePackageName = orig.resolvePackageName;
+		noResourceId = orig.noResourceId;
+		iconResourceId = orig.iconResourceId;
+		system = orig.system;
+	}
+
 	public final int getIconResource() {
 		if (noResourceId)
 			return 0;

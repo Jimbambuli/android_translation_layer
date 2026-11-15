@@ -246,4 +246,19 @@ public final class UserHandle {
 	public void writeToParcel(Parcel out, int flags) {
 		out.writeInt(mHandle);
 	}
+
+	/* AOSP UserHandle.writeToParcel(UserHandle, Parcel): null is written as USER_NULL */
+	public static void writeToParcel(UserHandle h, Parcel out) {
+		if (h != null) {
+			h.writeToParcel(out, 0);
+		} else {
+			out.writeInt(USER_NULL);
+		}
+	}
+
+	/* AOSP UserHandle.readFromParcel(Parcel): null if USER_NULL was written */
+	public static UserHandle readFromParcel(Parcel in) {
+		int h = in.readInt();
+		return h != USER_NULL ? new UserHandle(h) : null;
+	}
 }

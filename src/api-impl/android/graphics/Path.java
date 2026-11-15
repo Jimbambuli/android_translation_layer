@@ -213,6 +213,11 @@ public class Path {
 		native_get_bounds(getGskPath(), bounds);
 	}
 
+	/* AOSP computeBounds(RectF): the exact bounds */
+	public void computeBounds(RectF bounds) {
+		computeBounds(bounds, true);
+	}
+
 	public boolean op(Path path, Op op) {
 		return op(this, path, op);
 	}
@@ -265,6 +270,16 @@ public class Path {
 		Matrix matrix = new Matrix();
 		matrix.setTranslate(dx, dy);
 		transform(matrix);
+	}
+
+	/* AOSP offset(dx, dy, dst): a translated copy in dst, this path itself when dst is null */
+	public void offset(float dx, float dy, Path dst) {
+		if (dst == null) {
+			offset(dx, dy);
+			return;
+		}
+		dst.set(this);
+		dst.offset(dx, dy);
 	}
 
 	public void setLastPoint(float x, float y) {

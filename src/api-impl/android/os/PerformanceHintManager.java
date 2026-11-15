@@ -32,6 +32,26 @@ public final class PerformanceHintManager {
 
 		public void reportActualWorkDuration(long actualDurationNanos) {}
 
+		/* AOSP reportActualWorkDuration(WorkDuration): the checks, then the (absent) HAL gets the report */
+		public void reportActualWorkDuration(WorkDuration workDuration) {
+			if (workDuration.getWorkPeriodStartTimestampNanos() <= 0) {
+				throw new IllegalArgumentException("the work period start timestamp should be greater than zero.");
+			}
+			if (workDuration.getActualTotalDurationNanos() <= 0) {
+				throw new IllegalArgumentException("the actual total duration should be greater than zero.");
+			}
+			if (workDuration.getActualCpuDurationNanos() < 0) {
+				throw new IllegalArgumentException("the actual CPU duration should be greater than or equal to zero.");
+			}
+			if (workDuration.getActualGpuDurationNanos() < 0) {
+				throw new IllegalArgumentException("the actual GPU duration should be greater than or equal to zero.");
+			}
+			if (workDuration.getActualCpuDurationNanos() + workDuration.getActualGpuDurationNanos() <= 0) {
+				throw new IllegalArgumentException(
+				    "either the actual CPU duration or the actual GPU duration should be greater" + "than zero.");
+			}
+		}
+
 		public void close() {}
 	}
 }

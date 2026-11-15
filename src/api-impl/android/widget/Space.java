@@ -14,6 +14,14 @@ public class Space extends View {
 		super(context, attributeSet);
 	}
 
+	public Space(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+	}
+
+	public Space(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	/* as in AOSP: unlike View, a Space doesn't fill an AT_MOST spec but keeps its minimum size,
 	 * so it can serve as a weighted spacer in a wrapping LinearLayout */
 	private static int getDefaultSize2(int size, int measureSpec) {

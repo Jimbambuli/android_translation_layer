@@ -116,6 +116,11 @@ public class Window {
 	private int visibleInsetTypes = WindowInsets.Type.defaultVisible();
 	private boolean applyInsetsPending;
 
+	/* AOSP Window(Context): a window without a Window.Callback, which an Activity or Dialog sets with setCallback() */
+	public Window(Context context) {
+		this(context, null);
+	}
+
 	public Window(Context context, Window.Callback callback) {
 		this.callback = callback;
 		this.context = context;
@@ -462,6 +467,17 @@ public class Window {
 	private void setThemeFlag(TypedArray a, int attr, boolean defValue, int flag) {
 		if (a.getBoolean(attr, defValue))
 			setFlags(flag, flag & ~forcedWindowFlags);
+	}
+
+	/* AOSP PhoneWindow.setContentView(int): inflates the layout into the content, as Activity.setContentView(int) does here */
+	public void setContentView(int layoutResID) {
+		setContentView(LayoutInflater.from(context).inflate(layoutResID, null, false));
+	}
+
+	/* AOSP PhoneWindow.setContentView(View, LayoutParams): the content is the view with the given layout parameters */
+	public void setContentView(View view, ViewGroup.LayoutParams params) {
+		view.setLayoutParams(params);
+		setContentView(view);
 	}
 
 	public void setContentView(View view) {

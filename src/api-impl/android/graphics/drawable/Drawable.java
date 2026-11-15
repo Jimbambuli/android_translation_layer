@@ -26,6 +26,7 @@ import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.LayoutDirection;
 import android.util.TypedValue;
+import android.util.Xml;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -388,6 +389,21 @@ public class Drawable {
 
 	public boolean isProjected() { return false; }
 
+	public static Drawable createFromXml(Resources resources, XmlPullParser parser) throws XmlPullParserException, IOException {
+		return createFromXml(resources, parser, null);
+	}
+
+	public static Drawable createFromXml(Resources resources, XmlPullParser parser, Theme theme) throws XmlPullParserException, IOException {
+		AttributeSet attrs = Xml.asAttributeSet(parser);
+		int type;
+		while ((type = parser.next()) != XmlPullParser.START_TAG && type != XmlPullParser.END_DOCUMENT)
+			;
+		if (type != XmlPullParser.START_TAG)
+			throw new XmlPullParserException("No start tag found");
+
+		return createFromXmlInner(resources, parser, attrs, theme);
+	}
+
 	public static Drawable createFromXml(Resources resources, XmlResourceParser parser) throws XmlPullParserException, IOException {
 		return createFromXml(resources, parser, null);
 	}
@@ -521,8 +537,20 @@ public class Drawable {
 		return null;
 	}
 
+	public static Drawable createFromResourceStream(Resources resources, TypedValue value, InputStream is, String file) {
+		return createFromResourceStream(resources, value, is, file, (BitmapFactory.Options) null);
+	}
+
 	public static Drawable createFromResourceStream(Resources resources, TypedValue value, InputStream is, String file,
 	                                                Object object) {
+		return createFromResourceStream(resources, value, is, file, object instanceof BitmapFactory.Options ? (BitmapFactory.Options) object : null);
+	}
+
+	/* AOSP createFromResourceStream(): the options (may be null) are those of the bitmap decode */
+	public static Drawable createFromResourceStream(Resources resources, TypedValue value, InputStream is, String file,
+	                                                BitmapFactory.Options opts) {
+		if (is == null)
+			return null;
 		/* the pixels are kept as they are, so the bitmap is as sharp as the resource on a
 		 * monitor with a higher density, and the density sets the size (as AOSP's
 		 * BitmapFactory.decodeResourceStream() does for the scaling) */
@@ -534,7 +562,7 @@ public class Drawable {
 		/* like AOSP's createFromResourceStream(): decode the stream, and when the bitmap carries a 9-patch
 		 * chunk (BitmapFactory takes it from the PNG) make a NinePatchDrawable of it; nothing is written */
 		final Rect pad = new Rect();
-		final Bitmap bm = BitmapFactory.decodeStream(is, pad, null);
+		final Bitmap bm = BitmapFactory.decodeStream(is, pad, opts);
 		if (bm == null)
 			return null;
 		bm.setDensity(density);

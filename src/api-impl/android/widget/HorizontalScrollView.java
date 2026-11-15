@@ -18,8 +18,16 @@ public class HorizontalScrollView extends FrameLayout {
 	}
 
 	public HorizontalScrollView(Context context, AttributeSet attributeSet) {
-		super(context, attributeSet);
-		final TypedArray a = context.obtainStyledAttributes(attributeSet, R.styleable.HorizontalScrollView, R.attr.horizontalScrollViewStyle, 0);
+		this(context, attributeSet, R.attr.horizontalScrollViewStyle);
+	}
+
+	public HorizontalScrollView(Context context, AttributeSet attrs, int defStyleAttr) {
+		this(context, attrs, defStyleAttr, 0);
+	}
+
+	public HorizontalScrollView(Context context, AttributeSet attributeSet, int defStyleAttr, int defStyleRes) {
+		super(context, attributeSet, defStyleAttr, defStyleRes);
+		final TypedArray a = context.obtainStyledAttributes(attributeSet, R.styleable.HorizontalScrollView, defStyleAttr, defStyleRes);
 		setFillViewport(a.getBoolean(R.styleable.HorizontalScrollView_fillViewport, false));
 		a.recycle();
 	}

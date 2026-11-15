@@ -45,6 +45,11 @@ public final class SessionConfiguration {
 		mExecutor = executor;
 	}
 
+	public SessionConfiguration(int sessionType, List<OutputConfiguration> outputs) {
+		mSessionType = sessionType;
+		mOutputConfigurations = Collections.unmodifiableList(new ArrayList<>(outputs));
+	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (obj == null) {

@@ -13,6 +13,14 @@ public class CheckBox extends CompoundButton {
 		super(context, attributeSet);
 	}
 
+	public CheckBox(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+	}
+
+	public CheckBox(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		super(context, attrs, defStyleAttr, defStyleRes);
+	}
+
 	public void setLines(int lines) {}
 
 	@Override

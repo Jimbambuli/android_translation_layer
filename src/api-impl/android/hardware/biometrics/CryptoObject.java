@@ -5,6 +5,7 @@ import android.security.identity.IdentityCredential;
 import android.security.identity.PresentationSession;
 import java.security.Signature;
 import javax.crypto.Cipher;
+import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 
 /**
@@ -35,6 +36,10 @@ public class CryptoObject {
 		mCrypto = session;
 	}
 
+	public CryptoObject(@NonNull KeyAgreement keyAgreement) {
+		mCrypto = keyAgreement;
+	}
+
 	public CryptoObject(long operationHandle) {
 		mCrypto = operationHandle;
 	}
@@ -49,6 +54,10 @@ public class CryptoObject {
 
 	public Mac getMac() {
 		return mCrypto instanceof Mac ? (Mac)mCrypto : null;
+	}
+
+	public KeyAgreement getKeyAgreement() {
+		return mCrypto instanceof KeyAgreement ? (KeyAgreement)mCrypto : null;
 	}
 
 	@Deprecated

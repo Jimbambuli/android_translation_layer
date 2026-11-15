@@ -204,4 +204,72 @@ public class Surface implements android.os.Parcelable {
 	public void setFrameRate(float frameRate, int compatibility) {}
 
 	public void setFrameRate(float frameRate, int compatibility, int changeFrameRateStrategy) {}
+
+	/* AOSP Surface.FrameRateParams: the values only; ATL has no display refresh rate control, so setFrameRate does nothing */
+	public static class FrameRateParams {
+		private FrameRateParams() {}
+
+		public static final FrameRateParams IGNORE = new FrameRateParams.Builder().setDesiredRateRange(0f, Float.MAX_VALUE).build();
+
+		public static final class Builder {
+			private float mDesiredMinRate;
+			private float mDesiredMaxRate;
+			private float mFixedSourceRate;
+			private int mChangeFrameRateStrategy;
+
+			public Builder() {}
+
+			public Builder setDesiredRateRange(float desiredMinRate, float desiredMaxRate) {
+				if (desiredMaxRate < desiredMinRate) {
+					System.err.println("Surface: Failed to set desired frame rate range. desiredMaxRate should be greater than or equal to desiredMinRate");
+					return this;
+				}
+				mDesiredMinRate = desiredMinRate;
+				mDesiredMaxRate = desiredMaxRate;
+				return this;
+			}
+
+			public Builder setFixedSourceRate(float fixedSourceRate) {
+				mFixedSourceRate = fixedSourceRate;
+				return this;
+			}
+
+			public Builder setChangeFrameRateStrategy(int changeFrameRateStrategy) {
+				mChangeFrameRateStrategy = changeFrameRateStrategy;
+				return this;
+			}
+
+			public FrameRateParams build() {
+				FrameRateParams frameRate = new FrameRateParams();
+				frameRate.mDesiredMinRate = this.mDesiredMinRate;
+				frameRate.mDesiredMaxRate = this.mDesiredMaxRate;
+				frameRate.mFixedSourceRate = this.mFixedSourceRate;
+				frameRate.mChangeFrameRateStrategy = this.mChangeFrameRateStrategy;
+				return frameRate;
+			}
+		}
+
+		public float getDesiredMinRate() {
+			return mDesiredMinRate;
+		}
+
+		public float getDesiredMaxRate() {
+			return mDesiredMaxRate;
+		}
+
+		public float getFixedSourceRate() {
+			return mFixedSourceRate;
+		}
+
+		public int getChangeFrameRateStrategy() {
+			return mChangeFrameRateStrategy;
+		}
+
+		float mDesiredMinRate;
+		float mDesiredMaxRate;
+		float mFixedSourceRate;
+		int mChangeFrameRateStrategy;
+	}
+
+	public void setFrameRate(FrameRateParams frameRateParams) {}
 }

@@ -17,6 +17,28 @@ public class RenderScript {
 		return new RenderScript();
 	}
 
+	public enum ContextType {
+		NORMAL(0),
+		DEBUG(1),
+		PROFILE(2);
+
+		int mID;
+
+		ContextType(int id) {
+			mID = id;
+		}
+	}
+
+	/* AOSP create(ctx, ct) and create(ctx, ct, flags): the type and flags only select the debugging mode of
+	 * the driver, which ATL does not have */
+	public static RenderScript create(Context ctx, ContextType ct) {
+		return create(ctx);
+	}
+
+	public static RenderScript create(Context ctx, ContextType ct, int flags) {
+		return create(ctx);
+	}
+
 	void validate() {
 		if (mDestroyed) {
 			throw new RSInvalidStateException("Calling RS with an invalid or destroyed context.");

@@ -58,6 +58,8 @@ public final class OutputConfiguration {
 	private long mStreamUseCase = 0 /*CameraMetadata.SCALER_AVAILABLE_STREAM_USE_CASES_DEFAULT*/;
 	private int mTimestampBase = TIMESTAMP_BASE_DEFAULT;
 	private int mMirrorMode = MIRROR_MODE_AUTO;
+	private ArrayList<Integer> mMirrorModeForSurfaces = new ArrayList<Integer>();
+	private long mUsage;
 	private boolean mReadoutTimestampEnabled;
 	private boolean mIsReadoutSensorTimestampBase;
 
@@ -79,6 +81,7 @@ public final class OutputConfiguration {
 		mSurfaceGroupId = surfaceGroupId;
 		mSurfaces = new ArrayList<Surface>();
 		mSurfaces.add(surface);
+		mMirrorModeForSurfaces.add(mMirrorMode);
 		mRotation = rotation;
 		mConfiguredSize = null;
 		mIsDeferredConfig = false;
@@ -96,6 +99,33 @@ public final class OutputConfiguration {
 		mRotation = ROTATION_0;
 		mConfiguredSize = surfaceSize;
 		mIsDeferredConfig = true;
+	}
+
+	/* AOSP OutputConfiguration(int format, Size surfaceSize[, long usage]) for an ImageReader surface to be
+	 * added later with addSurface() (the format is not recorded, see the class comment) */
+	public OutputConfiguration(int format, Size surfaceSize) {
+		this(format, surfaceSize, format == 0x22 /*ImageFormat.PRIVATE*/ ? 0 : 3 /*HardwareBuffer.USAGE_CPU_READ_OFTEN*/);
+	}
+
+	public OutputConfiguration(int surfaceGroupId, int format, Size surfaceSize) {
+		this(surfaceGroupId, format, surfaceSize,
+				format == 0x22 /*ImageFormat.PRIVATE*/ ? 0 : 3 /*HardwareBuffer.USAGE_CPU_READ_OFTEN*/);
+	}
+
+	public OutputConfiguration(int format, Size surfaceSize, long usage) {
+		this(SURFACE_GROUP_ID_NONE, format, surfaceSize, usage);
+	}
+
+	public OutputConfiguration(int surfaceGroupId, int format, Size surfaceSize, long usage) {
+		checkNotNull(surfaceSize, "surfaceSize must not be null");
+		if (surfaceSize.getWidth() == 0 || surfaceSize.getHeight() == 0)
+			throw new IllegalArgumentException("Surface size needs to be non-zero");
+		mSurfaceGroupId = surfaceGroupId;
+		mSurfaces = new ArrayList<Surface>();
+		mRotation = ROTATION_0;
+		mConfiguredSize = surfaceSize;
+		mIsDeferredConfig = false;
+		mUsage = usage;
 	}
 
 	public void setDynamicRangeProfile(long profile) {
@@ -118,6 +148,7 @@ public final class OutputConfiguration {
 			throw new IllegalArgumentException("Exceeds maximum number of surfaces");
 		}
 		mSurfaces.add(surface);
+		mMirrorModeForSurfaces.add(mMirrorMode);
 	}
 
 	public void enableSurfaceSharing() {
@@ -165,9 +196,12 @@ public final class OutputConfiguration {
 			throw new IllegalArgumentException(
 					"Cannot remove surface associated with this output configuration");
 		}
-		if (!mSurfaces.remove(surface)) {
+		int surfaceIndex = mSurfaces.indexOf(surface);
+		if (surfaceIndex == -1) {
 			throw new IllegalArgumentException("Surface is not part of this output configuration");
 		}
+		mSurfaces.remove(surfaceIndex);
+		mMirrorModeForSurfaces.remove(surfaceIndex);
 	}
 
 	public void setStreamUseCase(long streamUseCase) {
@@ -216,10 +250,34 @@ public final class OutputConfiguration {
 			throw new IllegalArgumentException("Not a valid mirror mode " + mirrorMode);
 		}
 		mMirrorMode = mirrorMode;
+		for (int j = 0; j < mMirrorModeForSurfaces.size(); j++) {
+			mMirrorModeForSurfaces.set(j, mirrorMode);
+		}
 	}
 
 	public int getMirrorMode() {
 		return mMirrorMode;
+	}
+
+	public void setMirrorMode(Surface surface, int mirrorMode) {
+		checkNotNull(surface, "Surface must not be null");
+		if (mirrorMode < MIRROR_MODE_AUTO || mirrorMode > MIRROR_MODE_V) {
+			throw new IllegalArgumentException("Not a valid mirror mode " + mirrorMode);
+		}
+		int surfaceIndex = mSurfaces.indexOf(surface);
+		if (surfaceIndex == -1) {
+			throw new IllegalArgumentException("Surface not part of the OutputConfiguration");
+		}
+		mMirrorModeForSurfaces.set(surfaceIndex, mirrorMode);
+	}
+
+	public int getMirrorMode(Surface surface) {
+		checkNotNull(surface, "Surface must not be null");
+		int surfaceIndex = mSurfaces.indexOf(surface);
+		if (surfaceIndex == -1) {
+			throw new IllegalArgumentException("Surface not part of the OutputConfiguration");
+		}
+		return mMirrorModeForSurfaces.get(surfaceIndex);
 	}
 
 	/* android-16 OutputConfiguration color space (the constructors start at UNSPECIFIED) */
@@ -287,7 +345,8 @@ public final class OutputConfiguration {
 		    mIsShared != other.mIsShared || !java.util.Objects.equals(mPhysicalCameraId, other.mPhysicalCameraId) ||
 		    mIsMultiResolution != other.mIsMultiResolution || mStreamUseCase != other.mStreamUseCase ||
 		    mTimestampBase != other.mTimestampBase || mMirrorMode != other.mMirrorMode ||
-		    mReadoutTimestampEnabled != other.mReadoutTimestampEnabled ||
+		    mReadoutTimestampEnabled != other.mReadoutTimestampEnabled || mUsage != other.mUsage ||
+		    !mMirrorModeForSurfaces.equals(other.mMirrorModeForSurfaces) ||
 		    !mSensorPixelModesUsed.equals(other.mSensorPixelModesUsed) ||
 		    mDynamicRangeProfile != other.mDynamicRangeProfile)
 			return false;

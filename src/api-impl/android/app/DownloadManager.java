@@ -468,12 +468,39 @@ public class DownloadManager {
 		}
 	}
 
+	private static void validateArgumentIsNonEmpty(String paramName, String val) {
+		if (android.text.TextUtils.isEmpty(val))
+			throw new IllegalArgumentException(paramName + " can't be null");
+	}
+
 	/* AOSP: a finished file is registered as a completed download of its own */
 	public long addCompletedDownload(String title, String description, boolean isMediaScannerScannable, String mimeType, String path, long length, boolean showNotification) {
+		return addCompletedDownload(title, description, isMediaScannerScannable, mimeType, path, length, showNotification, false, null, null);
+	}
+
+	public long addCompletedDownload(String title, String description, boolean isMediaScannerScannable, String mimeType, String path, long length, boolean showNotification, Uri uri, Uri referer) {
+		return addCompletedDownload(title, description, isMediaScannerScannable, mimeType, path, length, showNotification, false, uri, referer);
+	}
+
+	@Deprecated
+	public long addCompletedDownload(String title, String description, boolean isMediaScannerScannable, String mimeType, String path, long length, boolean showNotification, boolean allowWrite) {
+		return addCompletedDownload(title, description, isMediaScannerScannable, mimeType, path, length, showNotification, allowWrite, null, null);
+	}
+
+	/* AOSP: the referer becomes a request header of the entry, which ATL's rows do not keep; the download has no
+	 * source Uri unless one is given, and allowWrite only sets the file's permissions */
+	@Deprecated
+	public long addCompletedDownload(String title, String description, boolean isMediaScannerScannable, String mimeType, String path, long length, boolean showNotification, boolean allowWrite, Uri uri, Uri referer) {
+		validateArgumentIsNonEmpty("title", title);
+		validateArgumentIsNonEmpty("description", description);
+		validateArgumentIsNonEmpty("path", path);
+		validateArgumentIsNonEmpty("mimeType", mimeType);
+		if (length < 0)
+			throw new IllegalArgumentException(" invalid value for param: totalBytes");
 		if (path == null || !new File(path).isAbsolute())
 			throw new IllegalArgumentException("Not a valid path: " + path);
 		Row row = new Row();
-		row.uri = Uri.fromFile(new File(path));
+		row.uri = uri != null ? uri : Uri.fromFile(new File(path));
 		row.title = title;
 		row.description = description;
 		row.mimeType = mimeType;

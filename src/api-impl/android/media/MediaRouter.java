@@ -95,6 +95,10 @@ public class MediaRouter {
 		return new RouteCategory(this, name, ROUTE_TYPE_USER, isGroupable);
 	}
 
+	public RouteCategory createRouteCategory(int nameResId, boolean isGroupable) {
+		return new RouteCategory(this, nameResId, ROUTE_TYPE_USER, isGroupable);
+	}
+
 	public UserRouteInfo createUserRoute(RouteCategory category) {
 		return new UserRouteInfo(category);
 	}
@@ -147,6 +151,7 @@ public class MediaRouter {
 		final CharSequence mName;
 		final int mTypes;
 		final boolean mGroupable;
+		int mNameResId;
 
 		RouteCategory(MediaRouter router, CharSequence name, int types, boolean groupable) {
 			mRouter = router;
@@ -155,11 +160,23 @@ public class MediaRouter {
 			mGroupable = groupable;
 		}
 
+		/* AOSP RouteCategory(int nameResId, ...): the name is looked up in the resources when asked for */
+		RouteCategory(MediaRouter router, int nameResId, int types, boolean groupable) {
+			mRouter = router;
+			mName = null;
+			mNameResId = nameResId;
+			mTypes = types;
+			mGroupable = groupable;
+		}
+
 		public CharSequence getName() {
-			return mName;
+			return getName(android.app.ActivityThread.currentApplication());
 		}
 
 		public CharSequence getName(Context context) {
+			if (mNameResId != 0) {
+				return context.getResources().getText(mNameResId);
+			}
 			return mName;
 		}
 

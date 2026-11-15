@@ -132,6 +132,7 @@ public final class MediaRoute2Info implements Parcelable {
 	final String mProviderId;
 	final boolean mIsVisibilityRestricted;
 	final Set<String> mAllowedPackages;
+	final boolean mAlsoAllowPrivilegedPackages;
 	final int mSuitabilityStatus;
 
 	MediaRoute2Info(Builder builder) {
@@ -154,6 +155,7 @@ public final class MediaRoute2Info implements Parcelable {
 		mProviderId = builder.mProviderId;
 		mIsVisibilityRestricted = builder.mIsVisibilityRestricted;
 		mAllowedPackages = builder.mAllowedPackages;
+		mAlsoAllowPrivilegedPackages = builder.mAlsoAllowPrivilegedPackages;
 		mSuitabilityStatus = builder.mSuitabilityStatus;
 	}
 
@@ -178,6 +180,7 @@ public final class MediaRoute2Info implements Parcelable {
 		mProviderId = in.readString();
 		mIsVisibilityRestricted = in.readBoolean();
 		mAllowedPackages = Set.of(in.createString8Array());
+		mAlsoAllowPrivilegedPackages = in.readBoolean();
 		mSuitabilityStatus = in.readInt();
 	}
 
@@ -366,6 +369,7 @@ public final class MediaRoute2Info implements Parcelable {
 				&& Objects.equals(mProviderId, other.mProviderId)
 				&& (mIsVisibilityRestricted == other.mIsVisibilityRestricted)
 				&& Objects.equals(mAllowedPackages, other.mAllowedPackages)
+				&& mAlsoAllowPrivilegedPackages == other.mAlsoAllowPrivilegedPackages
 				&& mSuitabilityStatus == other.mSuitabilityStatus;
 	}
 
@@ -378,7 +382,7 @@ public final class MediaRoute2Info implements Parcelable {
 		return Objects.hash(mId, mName, mFeatures, mType, mIsSystem, mIconUri, mDescription,
 				mConnectionState, mClientPackageName, mPackageName, mVolumeHandling, mVolumeMax,
 				mVolume, mAddress, mDeduplicationIds, mProviderId, mIsVisibilityRestricted,
-				mAllowedPackages, mSuitabilityStatus);
+				mAllowedPackages, mAlsoAllowPrivilegedPackages, mSuitabilityStatus);
 	}
 
 	@Override
@@ -429,6 +433,7 @@ public final class MediaRoute2Info implements Parcelable {
 		dest.writeString(mProviderId);
 		dest.writeBoolean(mIsVisibilityRestricted);
 		dest.writeString8Array(mAllowedPackages.toArray(new String[0]));
+		dest.writeBoolean(mAlsoAllowPrivilegedPackages);
 		dest.writeInt(mSuitabilityStatus);
 	}
 
@@ -503,6 +508,7 @@ public final class MediaRoute2Info implements Parcelable {
 		String mProviderId;
 		boolean mIsVisibilityRestricted;
 		Set<String> mAllowedPackages;
+		boolean mAlsoAllowPrivilegedPackages;
 		int mSuitabilityStatus;
 
 		public Builder(String id, CharSequence name) {
@@ -551,6 +557,7 @@ public final class MediaRoute2Info implements Parcelable {
 			mProviderId = routeInfo.mProviderId;
 			mIsVisibilityRestricted = routeInfo.mIsVisibilityRestricted;
 			mAllowedPackages = routeInfo.mAllowedPackages;
+			mAlsoAllowPrivilegedPackages = routeInfo.mAlsoAllowPrivilegedPackages;
 			mSuitabilityStatus = routeInfo.mSuitabilityStatus;
 		}
 
@@ -655,12 +662,21 @@ public final class MediaRoute2Info implements Parcelable {
 		public Builder setVisibilityPublic() {
 			mIsVisibilityRestricted = false;
 			mAllowedPackages = Set.of();
+			mAlsoAllowPrivilegedPackages = false;
 			return this;
 		}
 
 		public Builder setVisibilityRestricted(Set<String> allowedPackages) {
 			mIsVisibilityRestricted = true;
 			mAllowedPackages = Set.copyOf(allowedPackages);
+			mAlsoAllowPrivilegedPackages = false;
+			return this;
+		}
+
+		public Builder setVisibilityRestricted(Set<String> allowedPackages, boolean alsoAllowPrivileged) {
+			mIsVisibilityRestricted = true;
+			mAllowedPackages = Set.copyOf(allowedPackages);
+			mAlsoAllowPrivilegedPackages = alsoAllowPrivileged;
 			return this;
 		}
 

@@ -158,6 +158,16 @@ public static String toLogFriendlyEncoding(int enc) {
 
 		private AudioFormat audioFormat = new AudioFormat();
 
+		public Builder() {
+		}
+
+		/* AOSP AudioFormat.Builder(AudioFormat af): reuse the data of af */
+		public Builder(AudioFormat af) {
+			audioFormat.encoding = af.encoding;
+			audioFormat.sampleRate = af.sampleRate;
+			audioFormat.channelMask = af.channelMask;
+		}
+
 		public Builder setSampleRate(int sampleRate) {
 			audioFormat.sampleRate = sampleRate;
 			return this;

@@ -698,6 +698,10 @@ public class Intent implements Parcelable {
 		}
 	}
 
+	public static Intent getIntentOld(String uri) throws java.net.URISyntaxException {
+		return getIntentOld(uri, 0);
+	}
+
 	/* AOSP Intent.getIntentOld(): the "#action(...)categories(...)..." form of old toURI() */
 	private static Intent getIntentOld(String uri, int flags) throws java.net.URISyntaxException {
 		Intent intent;
@@ -1215,6 +1219,11 @@ public class Intent implements Parcelable {
 		return this;
 	}
 
+	public Intent replaceExtras(Intent src) {
+		extras = src.extras != null ? new Bundle(src.extras) : new Bundle();
+		return this;
+	}
+
 	public Intent replaceExtras(Bundle extras) {
 		this.extras = extras;
 		return this;
@@ -1712,7 +1721,15 @@ public class Intent implements Parcelable {
 	}
 
 	public String resolveType(Context context) {
-		return type;
+		return resolveType(context.getContentResolver());
+	}
+
+	public String resolveType(ContentResolver resolver) {
+		if (type != null)
+			return type;
+		if (data != null && "content".equals(data.getScheme()))
+			return resolver.getType(data);
+		return null;
 	}
 
 	public Intent getSelector() {

@@ -26,6 +26,14 @@ public class PrecomputedText implements Spannable {
 				mPaint = paint;
 			}
 
+			/* AOSP Builder(Params): starts from the values of the given Params */
+			public Builder(Params params) {
+				mPaint = params.mPaint;
+				mTextDir = params.mTextDir;
+				mBreakStrategy = params.mBreakStrategy;
+				mHyphenationFrequency = params.mHyphenationFrequency;
+			}
+
 			public Builder setBreakStrategy(int strategy) {
 				mBreakStrategy = strategy;
 				return this;

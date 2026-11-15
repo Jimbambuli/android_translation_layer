@@ -16,6 +16,8 @@ public class EGLContext {
 		return GL_INSTANCE;
 	}
 
+	public EGLContext() {}
+
 	public EGLContext(long native_egl_context) {
 		this.native_egl_context = native_egl_context;
 	}

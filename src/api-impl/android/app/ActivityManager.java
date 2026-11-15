@@ -46,6 +46,13 @@ public class ActivityManager {
 		public static final int REASON_PROVIDER_IN_USE = 1;
 		public static final int REASON_SERVICE_IN_USE = 2;
 
+		/* AOSP RunningAppProcessInfo(): a foreground process of unknown reason */
+		public RunningAppProcessInfo() {
+			importance = IMPORTANCE_FOREGROUND;
+			importanceReasonCode = REASON_UNKNOWN;
+			processState = 6; /* PROCESS_STATE_IMPORTANT_FOREGROUND */
+		}
+
 		public RunningAppProcessInfo(String processName, int pid, String[] pkgList) {
 			this.processName = processName;
 			this.pid = pid;

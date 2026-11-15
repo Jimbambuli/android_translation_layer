@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.MessageQueue;
+import android.os.PersistableBundle;
 import android.util.Slog;
 import android.view.KeyEvent;
 import dalvik.system.DexClassLoader;
@@ -140,6 +141,18 @@ public class Instrumentation {
 		return (Application)context.getApplicationContext();
 	}
 
+	/* AOSP: the app's AppComponentFactory instantiates the application and the context is attached to it */
+	public Application newApplication(ClassLoader cl, String className, Context context) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+		Application app = AppComponentFactory.DEFAULT.instantiateApplication(cl, className);
+		app.atl_attach_base_context(context);
+		return app;
+	}
+
+	/* AOSP: the app's AppComponentFactory instantiates the activity */
+	public Activity newActivity(ClassLoader cl, String className, Intent intent) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+		return AppComponentFactory.DEFAULT.instantiateActivity(cl, className, intent);
+	}
+
 	public Activity newActivity(Class<?> clazz, Context context, IBinder token, Application application,
 	                            Intent intent, ActivityInfo info, CharSequence title, Activity parent,
 	                            String id, Object lastNonConfigurationInstance) throws InstantiationException, IllegalAccessException {
@@ -158,6 +171,15 @@ public class Instrumentation {
 			}
 		});
 		//postPerformCreate(activity);
+	}
+
+	/* AOSP performCreate(): onCreate(Bundle, PersistableBundle), whose default is onCreate(Bundle) */
+	public void callActivityOnCreate(Activity activity, Bundle savedState, PersistableBundle persistentState) {
+		runOnMainSync(new Runnable() {
+			public void run() {
+				activity.onCreate(savedState, persistentState);
+			}
+		});
 	}
 
 	public Activity startActivitySync(Intent intent) {

@@ -85,6 +85,15 @@ public class AccessibilityManager {
 		return true;
 	}
 
+	/* AOSP: the handler is where the listener is called back; the state never changes here, so it is not used */
+	public void addAccessibilityStateChangeListener(AccessibilityStateChangeListener listener, android.os.Handler handler) {
+		addAccessibilityStateChangeListener(listener);
+	}
+
+	public void addTouchExplorationStateChangeListener(TouchExplorationStateChangeListener listener, android.os.Handler handler) {
+		addTouchExplorationStateChangeListener(listener);
+	}
+
 	public boolean addTouchExplorationStateChangeListener(TouchExplorationStateChangeListener listener) {
 		synchronized (mTouchExplorationStateChangeListeners) {
 			if (!mTouchExplorationStateChangeListeners.contains(listener))

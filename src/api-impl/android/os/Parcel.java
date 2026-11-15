@@ -1137,6 +1137,14 @@ public class Parcel {
 		return hasFileDescriptors;
 	}
 
+	/* AOSP hasFileDescriptors(offset, length): ATL does not record where a descriptor was written, so any
+	 * descriptor in the parcel counts (the range is checked for validity as AOSP does) */
+	public boolean hasFileDescriptors(int offset, int length) {
+		if (offset < 0 || length < 0 || (long) offset + length > size)
+			throw new IllegalArgumentException("Out of bounds");
+		return hasFileDescriptors;
+	}
+
 	public void writeStrongBinder(IBinder binder) {
 		if (binder != null) {
 			if (binders == null)
@@ -1423,6 +1431,24 @@ public class Parcel {
 
 	public byte[] marshall() {
 		return Arrays.copyOf(data, size);
+	}
+
+	/* AOSP Parcel.marshall(ByteBuffer): the parcel's bytes are put at the buffer's position */
+	public void marshall(java.nio.ByteBuffer buffer) {
+		if (buffer == null)
+			throw new NullPointerException();
+		if (buffer.isReadOnly())
+			throw new java.nio.ReadOnlyBufferException();
+		buffer.put(marshall());
+	}
+
+	/* AOSP Parcel.unmarshall(ByteBuffer): the remaining bytes become the parcel, the position moves to the limit */
+	public void unmarshall(java.nio.ByteBuffer buffer) {
+		if (buffer == null)
+			throw new NullPointerException();
+		byte[] bytes = new byte[buffer.remaining()];
+		buffer.get(bytes);
+		unmarshall(bytes, 0, bytes.length);
 	}
 
 	public void unmarshall(byte[] data, int offset, int length) {

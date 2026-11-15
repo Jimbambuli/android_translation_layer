@@ -24,6 +24,10 @@ public abstract class CameraExtensionSession implements AutoCloseable {
 				CaptureRequest request) {
 		}
 
+		public void onCaptureFailed(CameraExtensionSession session,
+				CaptureRequest request, int failure) {
+		}
+
 		public void onCaptureSequenceCompleted(CameraExtensionSession session,
 				int sequenceId) {
 		}

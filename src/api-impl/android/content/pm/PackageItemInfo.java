@@ -19,6 +19,7 @@ package android.content.pm;
 import android.content.res.XmlResourceParser;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.text.TextUtils;
 import android.util.Printer;
 import java.text.Collator;
@@ -268,6 +269,30 @@ public class PackageItemInfo {
 	 */
 	protected ApplicationInfo getApplicationInfo() {
 		return null;
+	}
+
+	/* AOSP PackageItemInfo.writeToParcel()/PackageItemInfo(Parcel); ATL has no showUserIcon/isArchived fields,
+	 * so those two are not written */
+	public void writeToParcel(Parcel dest, int parcelableFlags) {
+		dest.writeString8(name);
+		dest.writeString8(packageName);
+		dest.writeInt(labelRes);
+		TextUtils.writeToParcel(nonLocalizedLabel, dest, parcelableFlags);
+		dest.writeInt(icon);
+		dest.writeInt(logo);
+		dest.writeBundle(metaData);
+		dest.writeInt(banner);
+	}
+
+	protected PackageItemInfo(Parcel source) {
+		name = source.readString8();
+		packageName = source.readString8();
+		labelRes = source.readInt();
+		nonLocalizedLabel = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
+		icon = source.readInt();
+		logo = source.readInt();
+		metaData = source.readBundle();
+		banner = source.readInt();
 	}
 
 	public static class DisplayNameComparator

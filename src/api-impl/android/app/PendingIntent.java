@@ -198,6 +198,11 @@ public class PendingIntent implements Parcelable {
 		}
 	}
 
+	/* AOSP PendingIntent.send(int): send(null, code, null, null, null, null) */
+	public void send(int code) throws CanceledException {
+		send(null, code, null, null, null, null, null);
+	}
+
 	public void send() {
 		try {
 			dispatch(intent, 0);

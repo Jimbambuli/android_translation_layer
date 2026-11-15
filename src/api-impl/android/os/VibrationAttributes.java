@@ -33,6 +33,50 @@ public final class VibrationAttributes {
 
 		public Builder() {}
 
+		/* AOSP Builder(VibrationAttributes): null leaves the defaults */
+		public Builder(VibrationAttributes vib) {
+			if (vib != null) {
+				mUsage = vib.mUsage;
+			}
+		}
+
+		/* AOSP Builder(AudioAttributes): setUsage(AudioAttributes), the flags are not kept by ATL */
+		public Builder(android.media.AudioAttributes audio) {
+			switch (audio.getUsage()) {
+				case android.media.AudioAttributes.USAGE_NOTIFICATION:
+				case android.media.AudioAttributes.USAGE_NOTIFICATION_EVENT:
+				case android.media.AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_DELAYED:
+				case android.media.AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT:
+				case android.media.AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_REQUEST:
+					mUsage = USAGE_NOTIFICATION;
+					break;
+				case android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION:
+				case android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION_SIGNALLING:
+				case android.media.AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE:
+				case android.media.AudioAttributes.USAGE_ASSISTANT:
+					mUsage = USAGE_COMMUNICATION_REQUEST;
+					break;
+				case android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE:
+					mUsage = USAGE_RINGTONE;
+					break;
+				case android.media.AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY:
+					mUsage = USAGE_ACCESSIBILITY;
+					break;
+				case android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION:
+					mUsage = USAGE_TOUCH;
+					break;
+				case android.media.AudioAttributes.USAGE_ALARM:
+					mUsage = USAGE_ALARM;
+					break;
+				case android.media.AudioAttributes.USAGE_MEDIA:
+				case android.media.AudioAttributes.USAGE_GAME:
+					mUsage = USAGE_MEDIA;
+					break;
+				default:
+					mUsage = USAGE_UNKNOWN;
+			}
+		}
+
 		public Builder setUsage(int usage) {
 			mUsage = usage;
 			return this;

@@ -14,6 +14,11 @@ public final class SyncFence implements AutoCloseable {
 	private SyncFence() {
 	}
 
+	/* AOSP SyncFence(SyncFence): copy of a fence; ATL fences are always empty (mNativePtr == 0), so
+	 * there is no native reference to increment */
+	public SyncFence(SyncFence other) {
+	}
+
 	public static SyncFence createEmpty() {
 		return new SyncFence();
 	}
