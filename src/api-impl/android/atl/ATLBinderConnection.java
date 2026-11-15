@@ -79,8 +79,11 @@ public final class ATLBinderConnection {
 	private final ExecutorService oneway = Executors.newSingleThreadExecutor(new BinderThreadFactory("oneway"));
 
 	private static final AtomicInteger binderThreads = new AtomicInteger();
-	/* the binder thread pool, like ProcessState's (at most 15 threads) */
-	private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(1, 15, 60, TimeUnit.SECONDS,
+	/* the binder thread pool, like ProcessState's (at most 15 threads). With an unbounded queue a
+	 * ThreadPoolExecutor never grows past its core size, so the core size is the limit: with one thread, a
+	 * call that waits for another process (bindService() into a process that calls back) blocked every
+	 * other incoming call until its time ran out. Idle threads end after 60 s. */
+	private static final ThreadPoolExecutor pool = new ThreadPoolExecutor(15, 15, 60, TimeUnit.SECONDS,
 	                                                                       new LinkedBlockingQueue<Runnable>(), new BinderThreadFactory(null));
 	static {
 		pool.allowCoreThreadTimeOut(true);
