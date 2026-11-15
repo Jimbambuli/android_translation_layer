@@ -49,12 +49,42 @@ static GBytes *from_16bit(const uint8_t *in, int32_t width, int32_t height, int3
 	return g_bytes_new_take(rgba, (size_t)width * height * 4);
 }
 
+/* Bitmap.isPremultiplied() (an RGB_565 bitmap has no gdk_memory_format, it does not get here) */
+static bool is_premultiplied(JNIEnv *env, jobject bitmap)
+{
+	return _GET_BOOL_FIELD(bitmap, "requestPremultiplied") && _GET_BOOL_FIELD(bitmap, "hasAlpha");
+}
+
+/* the pixels as AOSP has them in memory, like Bitmap.rawMemoryFormat(): premultiplied for a premultiplied bitmap */
+static int raw_format(JNIEnv *env, jobject bitmap, int format)
+{
+	if (is_premultiplied(env, bitmap)) {
+		if (format == GDK_MEMORY_R8G8B8A8)
+			return GDK_MEMORY_R8G8B8A8_PREMULTIPLIED;
+		if (format == GDK_MEMORY_R16G16B16A16_FLOAT)
+			return GDK_MEMORY_R16G16B16A16_FLOAT_PREMULTIPLIED;
+	}
+	return format;
+}
+
+/* NDK bitmap.h AndroidBitmapInfo.flags */
+#define ANDROID_BITMAP_FLAGS_ALPHA_PREMUL 0
+#define ANDROID_BITMAP_FLAGS_ALPHA_OPAQUE 1
+#define ANDROID_BITMAP_FLAGS_ALPHA_UNPREMUL 2
+
 int AndroidBitmap_getInfo(JNIEnv *env, jobject bitmap, struct AndroidBitmapInfo *info)
 {
 	info->width = _GET_INT_FIELD(bitmap, "width");
 	info->height = _GET_INT_FIELD(bitmap, "height");
 	info->stride = _GET_INT_FIELD(bitmap, "stride");
 	info->format = _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "android_memory_format");
+	/* like AOSP's ABitmap_getInfo: the alpha type of the bitmap */
+	if (info->format == ANDROID_BITMAP_FORMAT_RGB_565 || !_GET_BOOL_FIELD(bitmap, "hasAlpha"))
+		info->flags = ANDROID_BITMAP_FLAGS_ALPHA_OPAQUE;
+	else if (_GET_BOOL_FIELD(bitmap, "requestPremultiplied"))
+		info->flags = ANDROID_BITMAP_FLAGS_ALPHA_PREMUL;
+	else
+		info->flags = ANDROID_BITMAP_FLAGS_ALPHA_UNPREMUL;
 	return ANDROID_BITMAP_RESULT_SUCCESS;
 }
 
@@ -64,6 +94,8 @@ int AndroidBitmap_lockPixels(JNIEnv *env, jobject bitmap, void **pixels)
 	GdkTexture *texture = _PTR(J__Bitmap__getTexture(env, bitmap));
 	int stride = _GET_INT_FIELD(bitmap, "stride");
 	int format = _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "gdk_memory_format");
+	if (format != -1)
+		format = raw_format(env, bitmap, format);
 	if (format == -1) {
 		int32_t width = gdk_texture_get_width(texture), height = gdk_texture_get_height(texture);
 		uint8_t *rgba = g_malloc((size_t)width * height * 4);
@@ -113,6 +145,8 @@ int AndroidBitmap_unlockPixels(JNIEnv *env, jobject bitmap)
 	int height = _GET_INT_FIELD(bitmap, "height");
 	int stride = _GET_INT_FIELD(bitmap, "stride");
 	int format = _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "gdk_memory_format");
+	if (format != -1)
+		format = raw_format(env, bitmap, format);
 	GdkTexture *texture;
 	if (format == -1) {
 		GBytes *rgba = from_16bit(g_bytes_get_data(bytes, NULL), width, height, stride, _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "android_memory_format"));

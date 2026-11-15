@@ -144,6 +144,10 @@ public class GskCanvas extends DisplayListCanvas {
 
 	@Override
 	public void drawBitmap(Bitmap bitmap, Rect src, Rect dst, Paint paint) {
+		/* AOSP BaseCanvas.throwIfCannotDraw() (its recycled check is left out: ATL's own code may still draw
+		 * bitmaps it has recycled internally) */
+		if (!bitmap.isPremultiplied() && bitmap.getConfig() == Bitmap.Config.ARGB_8888 && bitmap.hasAlpha())
+			throw new RuntimeException("Canvas: trying to use a non-premultiplied bitmap " + bitmap);
 		if (src == null)
 			native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
 		else

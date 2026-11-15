@@ -265,6 +265,15 @@ public final class Bitmap implements Parcelable {
 		return null;
 	}
 
+	/* AOSP Bitmap.getHardwareBuffer(): IllegalStateException for a recycled bitmap or one that is not HARDWARE.
+	 * ATL has no AHardwareBuffer allocator (HardwareBuffer.create() fails), so a HARDWARE bitmap has no buffer
+	 * to hand out either. */
+	public android.hardware.HardwareBuffer getHardwareBuffer() {
+		if (recycled)
+			throw new IllegalStateException("Can't getHardwareBuffer from a recycled bitmap");
+		throw new IllegalStateException("Bitmap has no HardwareBuffer");
+	}
+
 	public Config getConfig() {
 		return config;
 	}
@@ -483,19 +492,38 @@ public final class Bitmap implements Parcelable {
 			System.out.println("copyPixelsToBuffer: format " + config.name() + " not implemented");
 			System.exit(1);
 		}
-		native_copy_to_buffer(getTexture(), buffer, config.gdk_memory_format, getRowBytes());
+		native_copy_to_buffer(getTexture(), buffer, rawMemoryFormat(), getRowBytes());
 		buffer.position(buffer.position() + getByteCount());
+	}
+
+	/* The GDK memory format of the pixels as AOSP has them in memory (copyPixelsToBuffer(), the NDK's
+	 * AndroidBitmap_lockPixels() in libandroid/bitmap.c): Skia keeps a premultiplied bitmap premultiplied
+	 * (the ARGB_8888 config: "the color is premultiplied" unless setPremultiplied(false)) */
+	int rawMemoryFormat() {
+		if (isPremultiplied()) {
+			if (config.gdk_memory_format == /*GDK_MEMORY_R8G8B8A8*/ 5)
+				return /*GDK_MEMORY_R8G8B8A8_PREMULTIPLIED*/ 2;
+			if (config.gdk_memory_format == /*GDK_MEMORY_R16G16B16A16_FLOAT*/ 14)
+				return /*GDK_MEMORY_R16G16B16A16_FLOAT_PREMULTIPLIED*/ 13;
+		}
+		return config.gdk_memory_format;
+	}
+
+	/* Skia's SkUnPreMultiply: the color channel of a premultiplied pixel back to the straight value */
+	private static int unpremultiply(int c, int a) {
+		return a == 0 ? 0 : a == 255 ? c : Math.min(255, (c * 255 + a / 2) / a);
 	}
 
 	/* AOSP: the pixels in the layout of the config, read from the buffer's position on, which then moves past them.
 	 * ATL turns them into colors for setPixels(); ARGB_8888 is taken as R, G, B, A bytes like copyPixelsToBuffer()
-	 * writes them (GDK_MEMORY_R8G8B8A8, not premultiplied) */
+	 * writes them, premultiplied if isPremultiplied() (as Skia stores them), so they are unpremultiplied */
 	public void copyPixelsFromBuffer(Buffer src) {
 		final int w = getWidth(), h = getHeight(), n = w * h;
 		final int bpp = config == Config.ARGB_8888 ? 4 : config == Config.RGB_565 ? 2 : config == Config.ALPHA_8 ? 1 : 0;
 		if (bpp == 0)
 			throw new RuntimeException("copyPixelsFromBuffer: config " + config + " not supported");
 		final int[] colors = new int[n];
+		final boolean premultiplied = bpp == 4 && isPremultiplied();
 		if (src instanceof java.nio.IntBuffer && bpp == 4) {
 			java.nio.IntBuffer ib = (java.nio.IntBuffer)src;
 			if (ib.remaining() < n)
@@ -503,6 +531,10 @@ public final class Bitmap implements Parcelable {
 			for (int i = 0; i < n; i++) {
 				int v = ib.get(); // the bytes R, G, B, A in native (little endian) order
 				colors[i] = (v & 0xff000000) | ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff);
+				if (premultiplied) {
+					int a = colors[i] >>> 24;
+					colors[i] = (a << 24) | (unpremultiply((colors[i] >> 16) & 0xff, a) << 16) | (unpremultiply((colors[i] >> 8) & 0xff, a) << 8) | unpremultiply(colors[i] & 0xff, a);
+				}
 			}
 		} else if (src instanceof java.nio.ByteBuffer) {
 			java.nio.ByteBuffer bb = (java.nio.ByteBuffer)src;
@@ -511,6 +543,11 @@ public final class Bitmap implements Parcelable {
 			for (int i = 0; i < n; i++) {
 				if (bpp == 4) {
 					int r = bb.get() & 0xff, g = bb.get() & 0xff, b = bb.get() & 0xff, a = bb.get() & 0xff;
+					if (premultiplied) {
+						r = unpremultiply(r, a);
+						g = unpremultiply(g, a);
+						b = unpremultiply(b, a);
+					}
 					colors[i] = (a << 24) | (r << 16) | (g << 8) | b;
 				} else if (bpp == 2) {
 					int lo = bb.get() & 0xff, hi = bb.get() & 0xff;
@@ -628,6 +665,12 @@ public final class Bitmap implements Parcelable {
 		this.allocationByteCount = allocation;
 		this.width = width;
 		this.height = height;
+		/* AOSP: "When converting to 565, the new bitmap will always be considered opaque. When converting from
+		 * 565, the new bitmap will be considered non-opaque, and will respect the value set by setPremultiplied()." */
+		if (config == Config.RGB_565)
+			this.hasAlpha = false;
+		else if (this.config == Config.RGB_565)
+			this.hasAlpha = true;
 		this.config = config;
 		this.stride = stride;
 		notifyPixelsChanged();
@@ -645,8 +688,10 @@ public final class Bitmap implements Parcelable {
 		reconfigure(getWidth(), getHeight(), config);
 	}
 
-	/* AOSP Bitmap.setPremultiplied()/isPremultiplied(): the flag of the native bitmap's alpha type. ATL
-	 * keeps the flag only, the GdkTexture's pixels are converted as before. isPremultiplied() follows
+	/* AOSP Bitmap.setPremultiplied()/isPremultiplied(): the flag of the native bitmap's alpha type. The GdkTexture
+	 * converts by itself, so the flag tells how the raw pixels are laid out (copyPixelsToBuffer(),
+	 * copyPixelsFromBuffer(), the NDK's AndroidBitmap_lockPixels()), and a Canvas refuses to draw a
+	 * non-premultiplied ARGB_8888 bitmap with alpha (BaseCanvas.throwIfCannotDraw()). isPremultiplied() follows
 	 * Skia's alpha type: opaque (RGB_565, setHasAlpha(false)) is never premultiplied */
 	public void setPremultiplied(boolean premultiplied) {
 		if (recycled)
