@@ -178,4 +178,18 @@ public final class SystemClock {
 	 * @hide
 	 */
 	public static native long currentTimeMicro();
+
+	/**
+	 * AOSP SystemClock.currentGnssTimeClock(): the time of the GNSS receiver through the LocationManager's
+	 * getGnssTimeMillis(). ATL has no GNSS receiver, which is the answer of a device without one: no time, so
+	 * the clock throws DateTimeException (the same as AOSP when getGnssTimeMillis() returns null).
+	 */
+	public static java.time.Clock currentGnssTimeClock() {
+		return new SimpleClock(java.time.ZoneOffset.UTC) {
+			@Override
+			public long millis() {
+				throw new java.time.DateTimeException("Gnss based time is not available.");
+			}
+		};
+	}
 }

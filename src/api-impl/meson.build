@@ -727,6 +727,7 @@ srcs = [
 	'android/os/ResultReceiver.java',
 	'android/os/ServiceManager.java',
 	'android/os/SharedMemory.java',
+	'android/os/SimpleClock.java',
 	'android/os/StatFs.java',
 	'android/os/StrictMode.java',
 	'android/os/SystemClock.java',

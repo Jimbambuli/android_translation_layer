@@ -1129,6 +1129,16 @@ public class Build {
 		return null;
 	}
 
+	/* AOSP Build.getMajorSdkVersion()/getMinorSdkVersion(): SDK_INT_FULL has the minor version in the last 5 digits
+	 * (VERSION_CODES_FULL.SDK_INT_MULTIPLIER) */
+	public static int getMajorSdkVersion(int sdkIntFull) {
+		return sdkIntFull / 100000;
+	}
+
+	public static int getMinorSdkVersion(int sdkIntFull) {
+		return sdkIntFull % 100000;
+	}
+
 	private static String getString(String property) {
 		return SystemProperties.get(property, UNKNOWN);
 	}
