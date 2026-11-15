@@ -155,6 +155,27 @@ public class SensorManager {
 		return true;
 	}
 
+	/* AOSP SensorManager.PRESSURE_STANDARD_ATMOSPHERE and getAltitude() */
+	public static final float PRESSURE_STANDARD_ATMOSPHERE = 1013.25f;
+
+	public static float getAltitude(float p0, float p) {
+		final float coef = 1.0f / 5.255f;
+		return 44330.0f * (1.0f - (float) Math.pow(p / p0, coef));
+	}
+
+	/* AOSP SensorManager.getQuaternionFromVector() */
+	public static void getQuaternionFromVector(float[] Q, float[] rv) {
+		if (rv.length >= 4) {
+			Q[0] = rv[3];
+		} else {
+			Q[0] = 1 - rv[0] * rv[0] - rv[1] * rv[1] - rv[2] * rv[2];
+			Q[0] = (Q[0] > 0) ? (float) Math.sqrt(Q[0]) : 0;
+		}
+		Q[1] = rv[0];
+		Q[2] = rv[1];
+		Q[3] = rv[2];
+	}
+
 	/* AOSP SensorManager.getRotationMatrix() */
 	public static boolean getRotationMatrix(float[] R, float[] I,
 			float[] gravity, float[] geomagnetic) {
