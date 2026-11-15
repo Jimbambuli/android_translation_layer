@@ -674,6 +674,14 @@ public abstract class Context {
 		return uid == android.os.Process.myUid() ? checkCallingOrSelfUriPermission(uri, modeFlags) : PackageManager.PERMISSION_DENIED;
 	}
 
+	/* AOSP ContextImpl.checkUriPermissions(): checkUriPermission() of each Uri, in order */
+	public int[] checkUriPermissions(java.util.List<Uri> uris, int pid, int uid, int modeFlags) {
+		int[] res = new int[uris.size()];
+		for (int i = 0; i < res.length; i++)
+			res[i] = checkUriPermission(uris.get(i), pid, uid, modeFlags);
+		return res;
+	}
+
 	/* AOSP ContextImpl.registerComponentCallbacks(): the callbacks belong to the application, which calls them
 	 * (Application.onConfigurationChanged(), onLowMemory(), onTrimMemory()) */
 	public void registerComponentCallbacks(ComponentCallbacks callbacks) {

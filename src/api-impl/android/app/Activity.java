@@ -307,7 +307,24 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return getWindow().requestFeature(featureId);
 	}
 
-	public final void setVolumeControlStream(int streamType) {}
+	/* AOSP Activity.setVolumeControlStream()/getVolumeControlStream(): the window's */
+	public final void setVolumeControlStream(int streamType) {
+		getWindow().setVolumeControlStream(streamType);
+	}
+
+	public final int getVolumeControlStream() {
+		return getWindow().getVolumeControlStream();
+	}
+
+	/* AOSP Activity.onActivityReenter(): empty hook (called when a started activity finished with a shared
+	 * element transition) */
+	public void onActivityReenter(int resultCode, Intent data) {}
+
+	/* AOSP Activity.startIntentSenderFromChild() (deprecated): startIntentSenderForResult() of this activity */
+	@Deprecated
+	public void startIntentSenderFromChild(Activity child, IntentSender intent, int requestCode, Intent fillInIntent, int flagsMask, int flagsValues, int extraFlags) throws IntentSender.SendIntentException {
+		startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags, null);
+	}
 
 	protected void onCreate(Bundle savedInstanceState) {
 		Slog.i(TAG, "- onCreate - yay!");
