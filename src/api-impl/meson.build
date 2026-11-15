@@ -493,6 +493,7 @@ srcs = [
 	'android/graphics/drawable/StateListDrawable.java',
 	'android/graphics/drawable/TransitionDrawable.java',
 	'android/graphics/drawable/VectorDrawable.java',
+	'android/graphics/drawable/shapes/ArcShape.java',
 	'android/graphics/drawable/shapes/OvalShape.java',
 	'android/graphics/drawable/shapes/PathShape.java',
 	'android/graphics/drawable/shapes/RectShape.java',

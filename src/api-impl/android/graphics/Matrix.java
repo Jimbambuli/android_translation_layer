@@ -201,6 +201,13 @@ public class Matrix {
 	 * Returns true if the matrix is identity.
 	 * This maybe faster than testing if (getType() == 0)
 	 */
+	/* AOSP Matrix.isAffine(): no perspective part (SkMatrix::isAffine = !hasPerspective()) */
+	public boolean isAffine() {
+		float[] v = new float[9];
+		getValues(v);
+		return v[MPERSP_0] == 0 && v[MPERSP_1] == 0 && v[MPERSP_2] == 1;
+	}
+
 	public boolean isIdentity() {
 		return native_isIdentity(native_instance);
 	}

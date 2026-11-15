@@ -1729,6 +1729,19 @@ public final class Configuration implements Parcelable, Comparable<Configuration
 		fontWeightAdjustment = source.readInt();
 	}
 
+	/* AOSP Configuration.java: isNightModeActive(), isScreenWideColorGamut(), isScreenHdr() */
+	public boolean isNightModeActive() {
+		return (uiMode & UI_MODE_NIGHT_MASK) == UI_MODE_NIGHT_YES;
+	}
+
+	public boolean isScreenWideColorGamut() {
+		return (colorMode & COLOR_MODE_WIDE_COLOR_GAMUT_MASK) == COLOR_MODE_WIDE_COLOR_GAMUT_YES;
+	}
+
+	public boolean isScreenHdr() {
+		return (colorMode & COLOR_MODE_HDR_MASK) == COLOR_MODE_HDR_YES;
+	}
+
 	public static final Parcelable.Creator<Configuration> CREATOR = new Parcelable.Creator<Configuration>() {
 		public Configuration createFromParcel(Parcel source) {
 			return new Configuration(source);
