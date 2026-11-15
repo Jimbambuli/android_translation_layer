@@ -356,6 +356,21 @@ public abstract class ViewStructure {
 	@Nullable
 	public abstract AutofillId getAutofillId();
 
+	/* AOSP ViewStructure.getPendingCredentialRequest()/getPendingCredentialCallback(): null unless a node (AssistStructure.ViewNode) keeps them */
+	public android.credentials.GetCredentialRequest getPendingCredentialRequest() {
+		return null;
+	}
+
+	public android.os.OutcomeReceiver<android.credentials.GetCredentialResponse, android.credentials.GetCredentialException> getPendingCredentialCallback() {
+		return null;
+	}
+
+	/* AOSP ViewStructure.setPendingCredentialRequest()/clearCredentialManagerRequest(): empty in the base class */
+	public void setPendingCredentialRequest(android.credentials.GetCredentialRequest request,
+			android.os.OutcomeReceiver<android.credentials.GetCredentialResponse, android.credentials.GetCredentialException> callback) {}
+
+	public void clearCredentialManagerRequest() {}
+
 	/**
 	 * Sets the {@link AutofillId} associated with this node.
 	 */

@@ -32,6 +32,11 @@ public abstract class Property<T, V> {
 	/**
 	 * A constructor that takes an identifying name and {@link #getType() type} for the property.
 	 */
+	/* AOSP Property.of(): a property that reads and writes through the getter/setter or field of the host type */
+	public static <T, V> Property<T, V> of(Class<T> hostType, Class<V> valueType, String name) {
+		return new ReflectiveProperty<T, V>(hostType, valueType, name);
+	}
+
 	public Property(Class<V> type, String name) {
 		mName = name;
 		mType = type;

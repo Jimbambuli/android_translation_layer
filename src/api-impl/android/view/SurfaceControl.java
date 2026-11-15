@@ -137,6 +137,11 @@ public final class SurfaceControl implements android.os.Parcelable {
 			return this;
 		}
 
+		/* AOSP Transaction.setCrop(): the layer's crop; ATL composites no layers (see setPosition) */
+		public Transaction setCrop(SurfaceControl sc, android.graphics.Rect crop) {
+			return this;
+		}
+
 		public Transaction setAlpha(SurfaceControl sc, float alpha) {
 			return this;
 		}

@@ -79,6 +79,12 @@ public final class Display {
 		return 60; // FIXME
 	}
 
+	/* AOSP Display.getDeviceProductInfo(): DisplayInfo.deviceProductInfo, set only for a display whose EDID the
+	 * display service read; the answer for a display without product information is null */
+	public android.hardware.display.DeviceProductInfo getDeviceProductInfo() {
+		return null;
+	}
+
 	/* AOSP Display.getName() returns DisplayInfo.name; the built-in display is named by
 	 * LocalDisplayAdapter from R.string.display_manager_built_in_display_name */
 	public String getName() {

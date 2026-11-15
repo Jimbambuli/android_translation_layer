@@ -1,5 +1,11 @@
 package android.view;
 
+import android.credentials.GetCredentialException;
+import android.credentials.GetCredentialRequest;
+import android.credentials.GetCredentialResponse;
+import android.credentials.CredentialOption;
+import android.os.OutcomeReceiver;
+import android.service.credentials.CredentialProviderService;
 import android.R;
 import android.animation.AnimatorInflater;
 import android.animation.StateListAnimator;
@@ -6085,6 +6091,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * input system; ATL has no pointer capture (no GTK pointer lock), so a request is never granted */
 	public void requestPointerCapture() {}
 
+	/* AOSP View.POINTER_CAPTURE_MODE_*: the capture modes of requestPointerCapture(int) */
+	public static final int POINTER_CAPTURE_MODE_UNCAPTURED = 0;
+	public static final int POINTER_CAPTURE_MODE_ABSOLUTE = 1;
+	public static final int POINTER_CAPTURE_MODE_RELATIVE = 2;
+
+	/* AOSP View.requestPointerCapture(int): as requestPointerCapture(), never granted in ATL */
+	public void requestPointerCapture(int mode) {}
+
 	public void releasePointerCapture() {}
 
 	public boolean hasPointerCapture() {
@@ -7183,6 +7197,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
+	/* AOSP View.showContextMenu(float, float): anchored at the view-relative position, asked of the parent chain */
+	public boolean showContextMenu(float x, float y) {
+		return getParent().showContextMenuForChild(this, x, y);
+	}
+
 	/* AOSP View.OnUnhandledKeyEventListener: asked after the tree did not handle a key, the listeners of the
 	 * children first */
 	private ArrayList<OnUnhandledKeyEventListener> mUnhandledKeyListeners;
@@ -7325,6 +7344,43 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public String[] getAutofillHints() {
 		return mAutofillHints;
+	}
+
+	/* AOSP View.setPendingCredentialRequest()/clearPendingCredentialRequest()/getPendingCredentialRequest()/
+	 * getPendingCredentialCallback(): the view's id is added to the candidate query data of every option. The
+	 * request is fired by AutofillManager on focus; ATL has no credential provider and no autofill session, so it is
+	 * only kept (as AOSP keeps it in ViewCredentialHandler) */
+	private GetCredentialRequest mPendingCredentialRequest;
+	private OutcomeReceiver<GetCredentialResponse, GetCredentialException> mPendingCredentialCallback;
+
+	public void clearPendingCredentialRequest() {
+		mPendingCredentialRequest = null;
+		mPendingCredentialCallback = null;
+	}
+
+	public void setPendingCredentialRequest(GetCredentialRequest request,
+			OutcomeReceiver<GetCredentialResponse, GetCredentialException> callback) {
+		java.util.Objects.requireNonNull(request, "request must not be null");
+		java.util.Objects.requireNonNull(callback, "callback must not be null");
+		for (CredentialOption option : request.getCredentialOptions()) {
+			ArrayList<AutofillId> ids = option.getCandidateQueryData()
+					.getParcelableArrayList(CredentialProviderService.EXTRA_AUTOFILL_ID, AutofillId.class);
+			ids = ids != null ? ids : new ArrayList<AutofillId>();
+			if (!ids.contains(getAutofillId())) {
+				ids.add(getAutofillId());
+			}
+			option.getCandidateQueryData().putParcelableArrayList(CredentialProviderService.EXTRA_AUTOFILL_ID, ids);
+		}
+		mPendingCredentialRequest = request;
+		mPendingCredentialCallback = callback;
+	}
+
+	public final GetCredentialRequest getPendingCredentialRequest() {
+		return mPendingCredentialRequest;
+	}
+
+	public final OutcomeReceiver<GetCredentialResponse, GetCredentialException> getPendingCredentialCallback() {
+		return mPendingCredentialCallback;
 	}
 
 	/* AOSP View.getAutofillId(): the id is made once, from an id that is unique in the app */
