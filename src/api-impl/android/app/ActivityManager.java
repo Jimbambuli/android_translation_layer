@@ -55,12 +55,130 @@ public class ActivityManager {
 
 	/* the entry of the task in the list of recent apps; ATL has no such list, the window has its own title */
 	public static class TaskDescription {
-		public TaskDescription() {}
-		public TaskDescription(String name) {}
-		public TaskDescription(String name, Bitmap icon) {}
-		public TaskDescription(String name, Bitmap icon, int color) {}
-		public TaskDescription(String name, int iconRes) {}
-		public TaskDescription(String name, int iconRes, int colorPrimary) {}
+		private String mLabel;
+		private android.graphics.drawable.Icon mIcon;
+		private int mColorPrimary;
+		private int mColorBackground;
+		private int mStatusBarColor;
+		private int mNavigationBarColor;
+
+		/* AOSP ActivityManager.TaskDescription.Builder */
+		public static final class Builder {
+			private String mLabel = null;
+			private int mIconRes = 0;
+			private int mPrimaryColor = 0;
+			private int mBackgroundColor = 0;
+			private int mStatusBarColor = 0;
+			private int mNavigationBarColor = 0;
+
+			public Builder setLabel(String label) {
+				mLabel = label;
+				return this;
+			}
+
+			public Builder setIcon(int iconRes) {
+				mIconRes = iconRes;
+				return this;
+			}
+
+			public Builder setPrimaryColor(int color) {
+				mPrimaryColor = color;
+				return this;
+			}
+
+			public Builder setBackgroundColor(int color) {
+				mBackgroundColor = color;
+				return this;
+			}
+
+			public Builder setStatusBarColor(int color) {
+				mStatusBarColor = color;
+				return this;
+			}
+
+			public Builder setNavigationBarColor(int color) {
+				mNavigationBarColor = color;
+				return this;
+			}
+
+			public TaskDescription build() {
+				final android.graphics.drawable.Icon icon = mIconRes == 0 ? null : android.graphics.drawable.Icon.createWithResource(ActivityThread.currentPackageName(), mIconRes);
+				return new TaskDescription(mLabel, icon, mPrimaryColor, mBackgroundColor, mStatusBarColor, mNavigationBarColor);
+			}
+		}
+
+		/* AOSP: the label, icon and colors are kept for the system's recents list; ATL has none (the desktop
+		 * window has its own title), so nothing reads them but the getters */
+		public TaskDescription(String label, android.graphics.drawable.Icon icon, int colorPrimary, int colorBackground, int statusBarColor, int navigationBarColor) {
+			mLabel = label;
+			mIcon = icon;
+			mColorPrimary = colorPrimary;
+			mColorBackground = colorBackground;
+			mStatusBarColor = statusBarColor;
+			mNavigationBarColor = navigationBarColor;
+		}
+
+		public TaskDescription() {
+			this(null, null, 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label) {
+			this(label, null, 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label, Bitmap icon) {
+			this(label, icon != null ? android.graphics.drawable.Icon.createWithBitmap(icon) : null, 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label, Bitmap icon, int colorPrimary) {
+			this(label, icon != null ? android.graphics.drawable.Icon.createWithBitmap(icon) : null, colorPrimary, 0, 0, 0);
+			if ((colorPrimary != 0) && (android.graphics.Color.alpha(colorPrimary) != 255))
+				throw new RuntimeException("A TaskDescription's primary color should be opaque");
+		}
+
+		public TaskDescription(String label, int iconRes) {
+			this(label, android.graphics.drawable.Icon.createWithResource(ActivityThread.currentPackageName(), iconRes), 0, 0, 0, 0);
+		}
+
+		public TaskDescription(String label, int iconRes, int colorPrimary) {
+			this(label, android.graphics.drawable.Icon.createWithResource(ActivityThread.currentPackageName(), iconRes), colorPrimary, 0, 0, 0);
+			if ((colorPrimary != 0) && (android.graphics.Color.alpha(colorPrimary) != 255))
+				throw new RuntimeException("A TaskDescription's primary color should be opaque");
+		}
+
+		public TaskDescription(TaskDescription td) {
+			this(td.mLabel, td.mIcon, td.mColorPrimary, td.mColorBackground, td.mStatusBarColor, td.mNavigationBarColor);
+		}
+
+		public String getLabel() { return mLabel; }
+
+		public int getPrimaryColor() { return mColorPrimary; }
+
+		public int getBackgroundColor() { return mColorBackground; }
+
+		public int getStatusBarColor() { return mStatusBarColor; }
+
+		public int getNavigationBarColor() { return mNavigationBarColor; }
+
+		public void setLabel(String label) { mLabel = label; }
+
+		public void setPrimaryColor(int primaryColor) {
+			if ((primaryColor != 0) && (android.graphics.Color.alpha(primaryColor) != 255))
+				throw new RuntimeException("A TaskDescription's primary color should be opaque");
+			mColorPrimary = primaryColor;
+		}
+
+		public void setBackgroundColor(int backgroundColor) {
+			if ((backgroundColor != 0) && (android.graphics.Color.alpha(backgroundColor) != 255))
+				throw new RuntimeException("A TaskDescription's background color should be opaque");
+			mColorBackground = backgroundColor;
+		}
+
+		public void setStatusBarColor(int statusBarColor) { mStatusBarColor = statusBarColor; }
+
+		public void setNavigationBarColor(int navigationBarColor) { mNavigationBarColor = navigationBarColor; }
+
+		public void setIcon(android.graphics.drawable.Icon icon) { mIcon = icon; }
 	}
 
 	/* the app's processes (android:process, see ATLProcess); a process started by the main process knows itself */
