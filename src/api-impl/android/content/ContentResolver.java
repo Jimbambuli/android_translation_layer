@@ -10,6 +10,7 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Bundle;
+import java.util.Objects;
 import android.os.CancellationSignal;
 import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
@@ -286,20 +287,66 @@ public class ContentResolver {
 		return query(uri, projection, selection, selectionArgs, sortOrder);
 	}
 
-	public int delete(Uri uri, String selection, String[] selectionArgs) {
+	/* AOSP ContentResolver: the SQL-style calls go through the Bundle forms, which reach the provider's
+	 * Bundle methods (their defaults fall back to the SQL-style ones). Without a provider ATL keeps its
+	 * answer (0 / null) instead of AOSP's IllegalArgumentException("Unknown URL"). */
+	public final int delete(Uri uri, String selection, String[] selectionArgs) {
+		return delete(uri, createSqlQueryBundle(selection, selectionArgs));
+	}
+
+	public final int delete(Uri uri, Bundle extras) {
+		Objects.requireNonNull(uri, "url");
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
-			return provider.delete(uri, selection, selectionArgs);
+			return provider.delete(uri, extras);
 		else
 			return 0;
 	}
 
-	public Uri insert(Uri uri, ContentValues values) {
+	public final Uri insert(Uri uri, ContentValues values) {
+		return insert(uri, values, null);
+	}
+
+	public final Uri insert(Uri uri, ContentValues values, Bundle extras) {
+		Objects.requireNonNull(uri, "url");
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
-			return provider.insert(uri, values);
+			return provider.insert(uri, values, extras);
 		else
 			return null;
+	}
+
+	public final int bulkInsert(Uri uri, ContentValues[] values) {
+		Objects.requireNonNull(uri, "url");
+		Objects.requireNonNull(values, "values");
+		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		if (provider != null)
+			return provider.bulkInsert(uri, values);
+		else
+			return 0;
+	}
+
+	/* AOSP ContentResolver.createSqlQueryBundle */
+	public static Bundle createSqlQueryBundle(String selection, String[] selectionArgs) {
+		return createSqlQueryBundle(selection, selectionArgs, null);
+	}
+
+	public static Bundle createSqlQueryBundle(String selection, String[] selectionArgs, String sortOrder) {
+		if (selection == null && selectionArgs == null && sortOrder == null) {
+			return null;
+		}
+
+		Bundle queryArgs = new Bundle();
+		if (selection != null) {
+			queryArgs.putString(QUERY_ARG_SQL_SELECTION, selection);
+		}
+		if (selectionArgs != null) {
+			queryArgs.putStringArray(QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs);
+		}
+		if (sortOrder != null) {
+			queryArgs.putString(QUERY_ARG_SQL_SORT_ORDER, sortOrder);
+		}
+		return queryArgs;
 	}
 
 	public String getType(Uri uri) {
@@ -315,10 +362,15 @@ public class ContentResolver {
 			return null;
 	}
 
-	public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+	public final int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+		return update(uri, values, createSqlQueryBundle(selection, selectionArgs));
+	}
+
+	public final int update(Uri uri, ContentValues values, Bundle extras) {
+		Objects.requireNonNull(uri, "uri");
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
 		if (provider != null)
-			return provider.update(uri, values, selection, selectionArgs);
+			return provider.update(uri, values, extras);
 		else
 			return 0;
 	}
@@ -400,7 +452,7 @@ public class ContentResolver {
 
 	public final ContentProviderClient acquireContentProviderClient(String name) {
 		ContentProvider provider = ContentProvider.atl_get_content_provider(name);
-		return provider != null ? new ContentProviderClient(provider) : null;
+		return provider != null ? new ContentProviderClient(provider, name) : null;
 	}
 
 	public final ContentProviderClient acquireUnstableContentProviderClient(Uri uri) {
@@ -431,7 +483,7 @@ public class ContentResolver {
 						SyncResult syncResult = new SyncResult();
 						try {
 							adapter.onPerformSync(account, extras != null ? extras : new Bundle(), authority,
-							                      provider != null ? new ContentProviderClient(provider) : null, syncResult);
+							                      provider != null ? new ContentProviderClient(provider, authority) : null, syncResult);
 							Log.i("ContentResolver", "requestSync: sync for " + authority + " finished: " + syncResult);
 						} catch (Throwable t) {
 							Log.e("ContentResolver", "requestSync: sync for " + authority + " failed", t);

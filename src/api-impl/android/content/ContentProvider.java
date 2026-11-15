@@ -143,6 +143,34 @@ public abstract class ContentProvider {
 
 	public abstract int delete(Uri uri, String selection, String[] selectionArgs);
 
+	/* AOSP ContentProvider.insert(Uri, ContentValues, Bundle), bulkInsert, delete(Uri, Bundle) and
+	 * update(Uri, ContentValues, Bundle): the defaults that fall back to the SQL-style methods */
+	public Uri insert(Uri uri, ContentValues values, Bundle extras) {
+		return insert(uri, values);
+	}
+
+	public int bulkInsert(Uri uri, ContentValues[] values) {
+		int numValues = values.length;
+		for (int i = 0; i < numValues; i++) {
+			insert(uri, values[i]);
+		}
+		return numValues;
+	}
+
+	public int delete(Uri uri, Bundle extras) {
+		extras = (extras != null) ? extras : Bundle.EMPTY;
+		return delete(uri,
+		    extras.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+		    extras.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS));
+	}
+
+	public int update(Uri uri, ContentValues values, Bundle extras) {
+		extras = (extras != null) ? extras : Bundle.EMPTY;
+		return update(uri, values,
+		    extras.getString(ContentResolver.QUERY_ARG_SQL_SELECTION),
+		    extras.getStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS));
+	}
+
 	public abstract String getType(Uri uri);
 
 	public abstract ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException;
