@@ -463,6 +463,57 @@ public class Parcel {
 		}
 	}
 
+	/* AOSP Parcel.readParcelableCreator(ClassLoader): the creator of the class named in the parcel, without the
+	 * sPairedCreators cache (only a speed-up) */
+	public final Parcelable.Creator<?> readParcelableCreator(ClassLoader loader) {
+		return readParcelableCreatorInternal(loader, null);
+	}
+
+	/* AOSP Parcel.readParcelableCreator(ClassLoader, Class) */
+	public <T> Parcelable.Creator<T> readParcelableCreator(ClassLoader loader, Class<T> clazz) {
+		java.util.Objects.requireNonNull(clazz);
+		return readParcelableCreatorInternal(loader, clazz);
+	}
+
+	/* AOSP Parcel.readParcelableCreatorInternal(): clazz == null performs no type check */
+	@SuppressWarnings("unchecked")
+	private <T> Parcelable.Creator<T> readParcelableCreatorInternal(ClassLoader loader, Class<T> clazz) {
+		String name = readString();
+		if (name == null)
+			return null;
+
+		Parcelable.Creator<?> creator;
+		try {
+			ClassLoader parcelableClassLoader = (loader == null ? getClass().getClassLoader() : loader);
+			Class<?> parcelableClass = Class.forName(name, false, parcelableClassLoader);
+			if (!Parcelable.class.isAssignableFrom(parcelableClass)) {
+				throw new BadParcelableException("Parcelable protocol requires subclassing from Parcelable on class " + name);
+			}
+			if (clazz != null && !clazz.isAssignableFrom(parcelableClass)) {
+				throw new BadTypeParcelableException("Parcelable creator " + name + " is not a subclass of required class "
+				                                     + clazz.getName() + " provided in the parameter");
+			}
+			java.lang.reflect.Field f = parcelableClass.getField("CREATOR");
+			if ((f.getModifiers() & java.lang.reflect.Modifier.STATIC) == 0) {
+				throw new BadParcelableException("Parcelable protocol requires the CREATOR object to be static on class " + name);
+			}
+			if (!Parcelable.Creator.class.isAssignableFrom(f.getType())) {
+				throw new BadParcelableException("Parcelable protocol requires a Parcelable.Creator object called CREATOR on class " + name);
+			}
+			creator = (Parcelable.Creator<?>)f.get(null);
+		} catch (IllegalAccessException e) {
+			throw new BadParcelableException("IllegalAccessException when unmarshalling: " + name, e);
+		} catch (ClassNotFoundException e) {
+			throw new BadParcelableException("ClassNotFoundException when unmarshalling: " + name, e);
+		} catch (NoSuchFieldException e) {
+			throw new BadParcelableException("Parcelable protocol requires a Parcelable.Creator object called CREATOR on class " + name, e);
+		}
+		if (creator == null) {
+			throw new BadParcelableException("Parcelable protocol requires a non-null Parcelable.Creator object called CREATOR on class " + name);
+		}
+		return (Parcelable.Creator<T>)creator;
+	}
+
 	/** android-14 Parcel.writeString8(): a null-safe UTF-8 string (here the same wire format as writeString()). */
 	public void writeString8(String val) {
 		writeString(val);
