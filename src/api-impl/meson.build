@@ -858,6 +858,8 @@ srcs = [
 	'android/service/quicksettings/Tile.java',
 	'android/service/quicksettings/TileService.java',
 	'android/speech/RecognitionListener.java',
+	'android/speech/RecognitionSupport.java',
+	'android/speech/RecognitionSupportCallback.java',
 	'android/speech/RecognizerIntent.java',
 	'android/speech/SpeechRecognizer.java',
 	'android/speech/tts/TextToSpeech.java',

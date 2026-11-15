@@ -84,4 +84,26 @@ public class SpeechRecognizer {
 
 	public void destroy() {
 	}
+
+	/* AOSP isOnDeviceRecognitionAvailable(): config_defaultOnDeviceSpeechRecognitionService names a component;
+	 * it is empty in AOSP's config.xml (and ATL's framework-res), so unflattenFromString() gives null */
+	public static boolean isOnDeviceRecognitionAvailable(final Context context) {
+		ComponentName componentName = ComponentName.unflattenFromString(
+		    context.getString(com.android.internal.R.string.config_defaultOnDeviceSpeechRecognitionService));
+		return componentName != null;
+	}
+
+	public static SpeechRecognizer createOnDeviceSpeechRecognizer(final Context context) {
+		if (!isOnDeviceRecognitionAvailable(context)) {
+			throw new UnsupportedOperationException("On-device recognition is not available");
+		}
+		return createSpeechRecognizer(context);
+	}
+
+	/* AOSP checkRecognitionSupport(): queued (putMessage()) until the service connection exists, i.e. never */
+	public void checkRecognitionSupport(Intent recognizerIntent, java.util.concurrent.Executor executor,
+	                                    RecognitionSupportCallback supportListener) {
+		java.util.Objects.requireNonNull(recognizerIntent, "intent must not be null");
+		java.util.Objects.requireNonNull(supportListener, "listener must not be null");
+	}
 }
