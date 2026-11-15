@@ -83,6 +83,17 @@ public final class CameraCharacteristics {
 		return Collections.unmodifiableList(new ArrayList<Key<?>>(mProperties.keySet()));
 	}
 
+	/* AOSP getAvailableSessionCharacteristicsKeys(): AVAILABLE_SESSION_CHARACTERISTICS_KEYS_MAP has the
+	 * one entry 35 -> {CONTROL_ZOOM_RATIO_RANGE, SCALER_AVAILABLE_MAX_DIGITAL_ZOOM} */
+	public List<Key<?>> getAvailableSessionCharacteristicsKeys() {
+		Integer queryVersion = get(INFO_SESSION_CONFIGURATION_QUERY_VERSION);
+		if (queryVersion == null || queryVersion < 35)
+			return List.of();
+		return List.of(CONTROL_ZOOM_RATIO_RANGE, SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+	}
+
+	public static final Key<Integer> INFO_SESSION_CONFIGURATION_QUERY_VERSION = new Key<Integer>("android.info.sessionConfigurationQueryVersion", (Class<Integer>) (Class<?>) int.class);
+
 	public Set<String> getPhysicalCameraIds() {
 		return Collections.unmodifiableSet(new HashSet<String>());
 	}

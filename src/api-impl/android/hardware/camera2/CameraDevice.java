@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.view.Surface;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Executor;
 
 /* AOSP core/java/android/hardware/camera2/CameraDevice.java. ATL has no camera service, so
  * CameraManager.openCamera() never hands out an instance; the abstract class and its StateCallback
@@ -101,6 +102,21 @@ public abstract class CameraDevice implements AutoCloseable {
 
 	@Override
 	public abstract void close();
+
+	/* AOSP CameraDevice.CameraDeviceSetup (API 35); CameraManager.getCameraDeviceSetup() hands none out */
+	public abstract static class CameraDeviceSetup {
+		public abstract CaptureRequest.Builder createCaptureRequest(int templateType) throws CameraAccessException;
+
+		public abstract boolean isSessionConfigurationSupported(SessionConfiguration config) throws CameraAccessException;
+
+		public abstract CameraCharacteristics getSessionCharacteristics(SessionConfiguration sessionConfig) throws CameraAccessException;
+
+		public abstract void openCamera(Executor executor, StateCallback callback) throws CameraAccessException;
+
+		public abstract String getId();
+
+		public CameraDeviceSetup() {}
+	}
 
 	public static abstract class StateCallback {
 		public static final int ERROR_CAMERA_IN_USE = 1;

@@ -127,9 +127,11 @@ public class CaptureResult {
 	public static final Key<Integer> CONTROL_SETTINGS_OVERRIDE = new Key<Integer>("android.control.settingsOverride", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> CONTROL_AUTOFRAMING = new Key<Integer>("android.control.autoframing", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> CONTROL_AUTOFRAMING_STATE = new Key<Integer>("android.control.autoframingState", (Class<Integer>) (Class<?>) int.class);
+	public static final Key<Integer> CONTROL_LOW_LIGHT_BOOST_STATE = new Key<Integer>("android.control.lowLightBoostState", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> EDGE_MODE = new Key<Integer>("android.edge.mode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> FLASH_MODE = new Key<Integer>("android.flash.mode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> FLASH_STATE = new Key<Integer>("android.flash.state", (Class<Integer>) (Class<?>) int.class);
+	public static final Key<Integer> FLASH_STRENGTH_LEVEL = new Key<Integer>("android.flash.strengthLevel", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> HOT_PIXEL_MODE = new Key<Integer>("android.hotPixel.mode", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<android.location.Location> JPEG_GPS_LOCATION = new Key<android.location.Location>("android.jpeg.gpsLocation", android.location.Location.class);
 	public static final Key<Integer> JPEG_ORIENTATION = new Key<Integer>("android.jpeg.orientation", (Class<Integer>) (Class<?>) int.class);

@@ -30,6 +30,20 @@ public class CameraManager {
 		throw new IllegalArgumentException("No cameras available on device");
 	}
 
+	/* AOSP isCameraDeviceSetupSupported()/getCameraDeviceSetup(): the id is checked against the (empty)
+	 * camera id list first */
+	public boolean isCameraDeviceSetupSupported(String cameraId) throws CameraAccessException {
+		if (cameraId == null) {
+			throw new IllegalArgumentException("Camera ID was null");
+		}
+		throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+	}
+
+	public CameraDevice.CameraDeviceSetup getCameraDeviceSetup(String cameraId) throws CameraAccessException {
+		isCameraDeviceSetupSupported(cameraId); /* throws, see above */
+		throw new UnsupportedOperationException("CameraDeviceSetup is not supported for Camera ID: " + cameraId);
+	}
+
 	public void openCamera(String cameraId, CameraDevice.StateCallback callback, Handler handler) throws CameraAccessException {
 		openCameraForUid(cameraId, callback);
 	}
