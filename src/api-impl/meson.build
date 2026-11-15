@@ -443,6 +443,7 @@ srcs = [
 	'android/graphics/PorterDuff.java',
 	'android/graphics/PorterDuffColorFilter.java',
 	'android/graphics/PorterDuffXfermode.java',
+	'android/graphics/PostProcessor.java',
 	'android/graphics/RadialGradient.java',
 	'android/graphics/RecordingCanvas.java',
 	'android/graphics/Rect.java',

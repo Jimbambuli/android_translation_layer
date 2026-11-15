@@ -210,10 +210,6 @@ public final class ImageDecoder implements AutoCloseable {
 	private boolean mUnpremultipliedRequired = false;
 	private PostProcessor mPostProcessor;
 
-	public interface PostProcessor {
-		int onPostProcess(Canvas canvas);
-	}
-
 	public void setPostProcessor(PostProcessor postProcessor) {
 		mPostProcessor = postProcessor;
 	}
@@ -359,10 +355,13 @@ public final class ImageDecoder implements AutoCloseable {
 	}
 
 	/**
-	 * Specify the desired {@link ColorSpace} for the output. Images are decoded to sRGB.
+	 * Specify the desired {@link ColorSpace} for the output. Kept like AOSP's mDesiredColorSpace;
+	 * ATL's decoders convert every image to sRGB, so it is not applied.
 	 */
 	public void setTargetColorSpace(ColorSpace colorSpace) {
+		mDesiredColorSpace = colorSpace;
 	}
+	private ColorSpace mDesiredColorSpace;
 
 	@Override
 	public void close() {
@@ -449,12 +448,29 @@ public final class ImageDecoder implements AutoCloseable {
 		if (decoder.mDesiredWidth != decoder.mWidth || decoder.mDesiredHeight != decoder.mHeight) {
 			decoded = Bitmap.createScaledBitmap(decoded, decoder.mDesiredWidth, decoder.mDesiredHeight, true);
 		}
+		/* AOSP ImageDecoder.checkState() */
+		if (decoder.mPostProcessor != null && decoder.mUnpremultipliedRequired)
+			throw new IllegalStateException("Cannot draw to unpremultiplied pixels!");
 		if (decoder.mUnpremultipliedRequired)
 			decoded.setPremultiplied(false);
 		if (decoder.mPostProcessor != null) {
 			if (!decoded.isMutable())
 				decoded = decoded.copy(decoded.getConfig(), true);
-			decoder.mPostProcessor.onPostProcess(new Canvas(decoded));
+			/* AOSP ImageDecoder_nDecodeBitmap() (libs/hwui/jni/ImageDecoder.cpp): the returned opacity
+			 * sets the alpha type of the bitmap */
+			int pixelFormat = decoder.mPostProcessor.onPostProcess(new Canvas(decoded));
+			switch (pixelFormat) {
+				case PixelFormat.UNKNOWN:
+					break;
+				case PixelFormat.TRANSLUCENT:
+					decoded.setHasAlpha(true);
+					break;
+				case PixelFormat.OPAQUE:
+					decoded.setHasAlpha(false);
+					break;
+				default:
+					throw new IllegalArgumentException("invalid return from postProcess: " + pixelFormat);
+			}
 		}
 		return decoded;
 	}
