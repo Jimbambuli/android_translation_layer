@@ -370,7 +370,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<DownloadManager>() {
             @Override
             public DownloadManager createService(ContextImpl ctx) {
-                return new DownloadManager();
+                return new DownloadManager(ctx);
             }});
 
         registerService(Context.ACCOUNT_SERVICE, AccountManager.class,
