@@ -130,6 +130,19 @@ public class AccountManager {
 		return true;
 	}
 
+	/* AOSP: adds the account, then sets the visibility of every entry of the map */
+	public boolean addAccountExplicitly(Account account, String password, Bundle extras, Map<String, Integer> visibility) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (!addAccountExplicitly(account, password, extras))
+			return false;
+		if (visibility != null) {
+			for (Map.Entry<String, Integer> entry : visibility.entrySet())
+				setAccountVisibility(account, entry.getKey(), entry.getValue());
+		}
+		return true;
+	}
+
 	/* AOSP: AccountManagerService binds the authenticator of the account type, which adds the account (usually with
 	 * its own activity). ATL knows no authenticators (see getAccountsByTypeAndFeatures), so the bind fails as for a
 	 * type without one: onError(ERROR_CODE_REMOTE_EXCEPTION, "bind failure") -> AuthenticatorException */

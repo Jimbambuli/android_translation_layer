@@ -57,6 +57,11 @@ public abstract class AccessibilityService extends Service {
 	}
 
 	public AccessibilityNodeInfo getRootInActiveWindow() {
+		return getRootInActiveWindow(AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_HYBRID);
+	}
+
+	/* ATL: no window content is exposed to accessibility services */
+	public AccessibilityNodeInfo getRootInActiveWindow(int prefetchingStrategy) {
 		return null;
 	}
 
