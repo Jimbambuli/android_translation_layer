@@ -21,6 +21,24 @@ public class ConnectivityManager {
 	public static final int TYPE_WIFI = 1;
 	public static final int TYPE_ETHERNET = 9;
 	public static final int TYPE_VPN = 17;
+	/* AOSP ConnectivityManager: the remaining deprecated network types, TYPE_NONE and TYPE_TEST (hidden) */
+	public static final int TYPE_BLUETOOTH = 7;
+	public static final int TYPE_DUMMY = 8;
+	public static final int TYPE_MOBILE_DUN = 4;
+	public static final int TYPE_MOBILE_HIPRI = 5;
+	public static final int TYPE_MOBILE_MMS = 2;
+	public static final int TYPE_MOBILE_SUPL = 3;
+	public static final int TYPE_WIMAX = 6;
+	private static final int TYPE_NONE = -1;
+	private static final int TYPE_TEST = 18;
+	private static final int MAX_NETWORK_TYPE = TYPE_TEST;
+	private static final int MIN_NETWORK_TYPE = TYPE_MOBILE;
+
+	/* AOSP ConnectivityManager: the MULTIPATH_PREFERENCE_* bits of getMultipathPreference() */
+	public static final int MULTIPATH_PREFERENCE_HANDOVER = 1 << 0;
+	public static final int MULTIPATH_PREFERENCE_RELIABILITY = 1 << 1;
+	public static final int MULTIPATH_PREFERENCE_PERFORMANCE = 1 << 2;
+	static final int MULTIPATH_PREFERENCE_UNMETERED = MULTIPATH_PREFERENCE_HANDOVER | MULTIPATH_PREFERENCE_RELIABILITY | MULTIPATH_PREFERENCE_PERFORMANCE;
 
 	/* AOSP ConnectivityService.sendGeneralBroadcast(): the sticky CONNECTIVITY_ACTION of the default network.
 	 * Built on the app's main thread at registerReceiver() time, so it reads the last known state without
@@ -42,6 +60,16 @@ public class ConnectivityManager {
 
 	// static like in AOSP: apps call the no-argument constructor of their subclasses
 	public static class NetworkCallback {
+		/* AOSP: FLAG_NONE (hidden) and FLAG_INCLUDE_LOCATION_INFO; ATL's network has no location info to redact */
+		public static final int FLAG_NONE = 0;
+		public static final int FLAG_INCLUDE_LOCATION_INFO = 1 << 0;
+
+		public NetworkCallback() {
+			this(FLAG_NONE);
+		}
+
+		public NetworkCallback(int flags) {}
+
 		public void onAvailable(Network network) {}
 
 		public void onLosing(Network network, int maxMsToLive) {}
@@ -55,6 +83,14 @@ public class ConnectivityManager {
 		public void onLinkPropertiesChanged(Network network, LinkProperties linkProperties) {}
 
 		public void onBlockedStatusChanged(Network network, boolean blocked) {}
+
+		/* AOSP: called for a reservation (reserveNetwork) that was made */
+		public void onReserved(NetworkCapabilities networkCapabilities) {}
+	}
+
+	/* AOSP ConnectivityManager.OnNetworkActiveListener */
+	public interface OnNetworkActiveListener {
+		void onNetworkActive();
 	}
 
 	/* the one network GNetworkMonitor reports on */
@@ -173,13 +209,24 @@ public class ConnectivityManager {
 		register(request, callback, null, handler);
 	}
 
+	/* AOSP requestNetwork(NetworkRequest, PendingIntent): the intent is sent when a matching network is up */
+	public void requestNetwork(NetworkRequest request, PendingIntent operation) {
+		if (operation == null)
+			throw new NullPointerException("PendingIntent cannot be null.");
+		register(request, null, operation, null);
+	}
+
 	/* AOSP requestNetwork(NetworkRequest, NetworkCallback, int): checkTimeout(), then the request; when no matching
 	 * network was found within the time, onUnavailable() follows and the request is released */
 	public void requestNetwork(NetworkRequest request, NetworkCallback callback, int timeoutMs) {
+		requestNetwork(request, callback, null, timeoutMs);
+	}
+
+	public void requestNetwork(NetworkRequest request, NetworkCallback callback, Handler handler, int timeoutMs) {
 		if (timeoutMs <= 0) {
 			throw new IllegalArgumentException("timeoutMs must be strictly positive.");
 		}
-		final Registration r = register(request, callback, null, null);
+		final Registration r = register(request, callback, null, handler);
 		r.handler.postDelayed(new Runnable() {
 			public void run() {
 				synchronized (registrations) {
@@ -189,6 +236,18 @@ public class ConnectivityManager {
 				r.callback.onUnavailable();
 			}
 		}, timeoutMs);
+	}
+
+	/* AOSP reserveNetwork() (RESERVATION request): only an Ethernet provider can reserve a network, and ATL has
+	 * none, so the system decides that the reservation can never be fulfilled: onUnavailable() */
+	public void reserveNetwork(NetworkRequest request, Handler handler, final NetworkCallback networkCallback) {
+		if (request == null || networkCallback == null)
+			throw new NullPointerException();
+		(handler != null ? handler : getConnectivityThreadHandler()).post(new Runnable() {
+			public void run() {
+				networkCallback.onUnavailable();
+			}
+		});
 	}
 
 	public void registerDefaultNetworkCallback(NetworkCallback callback) {
@@ -292,6 +351,13 @@ public class ConnectivityManager {
 		Context.sendBroadcastToReceivers(connectivityIntent());
 	}
 
+	/* AOSP releaseNetworkRequest(PendingIntent): the same as unregisterNetworkCallback(PendingIntent), null refused */
+	public void releaseNetworkRequest(PendingIntent operation) {
+		if (operation == null)
+			throw new NullPointerException("PendingIntent cannot be null.");
+		unregisterNetworkCallback(operation);
+	}
+
 	public ProxyInfo getDefaultProxy() { return null; }
 
 	/* AOSP: the link of the given network; ATL has one, the computer's */
@@ -299,14 +365,39 @@ public class ConnectivityManager {
 		return network != null ? LinkProperties.forHost() : null;
 	}
 
-	/* bindProcessToNetwork() with ATL's single network: binding changes nothing and succeeds, as
-	 * setProcessDefaultNetwork() does for a network that exists */
+	/* AOSP: the network the process is bound to, null when none is; ATL has one network, so binding changes
+	 * nothing but is remembered for getBoundNetworkForProcess() */
+	private static volatile Network boundNetwork;
+
 	public boolean bindProcessToNetwork(Network network) {
+		boundNetwork = network;
 		return true;
+	}
+
+	@Deprecated
+	public static boolean setProcessDefaultNetwork(Network network) {
+		boundNetwork = network;
+		return true;
+	}
+
+	public Network getBoundNetworkForProcess() {
+		return getProcessDefaultNetwork();
+	}
+
+	@Deprecated
+	public static Network getProcessDefaultNetwork() {
+		return boundNetwork;
 	}
 
 	/* the connectivity service evaluates the report; nothing to do without one */
 	public void reportNetworkConnectivity(Network network, boolean hasConnectivity) {}
+
+	/* AOSP reportBadNetwork(): reportNetworkConnectivity(network, true) and then (network, false) */
+	@Deprecated
+	public void reportBadNetwork(Network network) {
+		reportNetworkConnectivity(network, true);
+		reportNetworkConnectivity(network, false);
+	}
 
 	/* AOSP: "assume that background data is allowed" */
 	@Deprecated
@@ -320,5 +411,59 @@ public class ConnectivityManager {
 	/* ConnectivityService looks the socket up in the kernel; no owner found is Process.INVALID_UID */
 	public int getConnectionOwnerUid(int protocol, java.net.InetSocketAddress local, java.net.InetSocketAddress remote) {
 		return -1;
+	}
+
+	/* AOSP ConnectivityManager: removed functionality, TYPE_NONE and a no-op setter */
+	@Deprecated
+	public void setNetworkPreference(int preference) {}
+
+	@Deprecated
+	public int getNetworkPreference() {
+		return TYPE_NONE;
+	}
+
+	@Deprecated
+	public static boolean isNetworkTypeValid(int networkType) {
+		return MIN_NETWORK_TYPE <= networkType && networkType <= MAX_NETWORK_TYPE;
+	}
+
+	/* ConnectivityService.requestBandwidthUpdate(): true when the network is up (the service polls its
+	 * bandwidth), false for a network that is no longer valid */
+	public boolean requestBandwidthUpdate(Network network) {
+		return network != null && nativeGetNetworkAvailable();
+	}
+
+	/* ConnectivityService.getMultipathPreference(): an unmetered network gets all bits; for a metered one
+	 * NetworkPolicyManager has no preference and config_networkMeteredMultipathPreference is 0 */
+	public int getMultipathPreference(Network network) {
+		if (network != null && nativeGetNetworkAvailable() && !isActiveNetworkMetered())
+			return MULTIPATH_PREFERENCE_UNMETERED;
+		return 0;
+	}
+
+	/* ConnectivityService.getNetworkWatchlistConfigHash(): null, there is no network watchlist config */
+	public byte[] getNetworkWatchlistConfigHash() {
+		return null;
+	}
+
+	/* AOSP: the data network of a desktop is not a radio with a power state, so it is always active
+	 * (NetworkActivityTracker.isDefaultNetworkActive()); the listeners are never called */
+	private final java.util.ArrayList<OnNetworkActiveListener> networkActiveListeners = new java.util.ArrayList<>();
+
+	public void addDefaultNetworkActiveListener(OnNetworkActiveListener l) {
+		synchronized (networkActiveListeners) {
+			networkActiveListeners.add(l);
+		}
+	}
+
+	public void removeDefaultNetworkActiveListener(OnNetworkActiveListener l) {
+		synchronized (networkActiveListeners) {
+			if (!networkActiveListeners.remove(l))
+				throw new IllegalArgumentException("Listener was not registered.");
+		}
+	}
+
+	public boolean isDefaultNetworkActive() {
+		return true;
 	}
 }
