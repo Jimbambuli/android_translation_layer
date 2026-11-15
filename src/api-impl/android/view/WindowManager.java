@@ -17,6 +17,22 @@ import java.util.List;
 import java.util.Objects;
 
 public interface WindowManager {
+
+	/* AOSP WindowManager.isCrossWindowBlurEnabled() and listener methods: interface defaults
+	 * (false / no-op); WindowManagerImpl overrides them like AOSP's WindowManagerImpl */
+	default boolean isCrossWindowBlurEnabled() {
+		return false;
+	}
+
+	default void addCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
+	}
+
+	default void addCrossWindowBlurEnabledListener(java.util.concurrent.Executor executor,
+			java.util.function.Consumer<Boolean> listener) {
+	}
+
+	default void removeCrossWindowBlurEnabledListener(java.util.function.Consumer<Boolean> listener) {
+	}
 	public android.view.Display getDefaultDisplay();
 
 	public void addView(View view, ViewGroup.LayoutParams params);
