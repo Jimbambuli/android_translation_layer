@@ -1,19 +1,130 @@
 package android.media.quality;
 
-/* AOSP frameworks/base/media/java/android/media/quality/AmbientBacklightEvent.java (public API surface; no TV service in ATL, bodies follow the AOSP no-service path) */
-public final class AmbientBacklightEvent implements android.os.Parcelable {
-    /* AOSP Parcelable.Creator; no service ever hands ATL a parcel of this type */
-    public static final android.os.Parcelable.Creator<android.media.quality.AmbientBacklightEvent> CREATOR = new android.os.Parcelable.Creator<android.media.quality.AmbientBacklightEvent>() {
-        public android.media.quality.AmbientBacklightEvent createFromParcel(android.os.Parcel source) { return null; }
-        public android.media.quality.AmbientBacklightEvent[] newArray(int size) { return new android.media.quality.AmbientBacklightEvent[size]; }
-    };
-    public AmbientBacklightEvent(int arg0, android.media.quality.AmbientBacklightMetadata arg1)  {}
-    public int describeContents() { return 0; }
-    public int getEventType() { return 0; }
-    public android.media.quality.AmbientBacklightMetadata getMetadata() { return null; }
-    public void writeToParcel(android.os.Parcel arg0, int arg1) {  }
-    public static final int AMBIENT_BACKLIGHT_EVENT_DISABLED = 2; // 0x2;
-    public static final int AMBIENT_BACKLIGHT_EVENT_ENABLED = 1; // 0x1;
-    public static final int AMBIENT_BACKLIGHT_EVENT_INTERRUPTED = 4; // 0x4;
-    public static final int AMBIENT_BACKLIGHT_EVENT_METADATA_AVAILABLE = 3; // 0x3;
+/* AOSP android/media/quality/AmbientBacklightEvent.java */
+import android.annotation.IntDef;
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.os.Parcel;
+import android.os.Parcelable;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.util.Objects;
+
+/**
+ * Ambient backlight event
+ */
+public final class AmbientBacklightEvent implements Parcelable {
+
+    
+    /**
+     * Event type for ambient backlight events. The ambient backlight is enabled.
+     */
+    public static final int AMBIENT_BACKLIGHT_EVENT_ENABLED = 1;
+
+    /**
+     * Event type for ambient backlight events. The ambient backlight is disabled.
+     */
+    public static final int AMBIENT_BACKLIGHT_EVENT_DISABLED = 2;
+
+    /**
+     * Event type for ambient backlight events. The ambient backlight metadata is
+     * available.
+     */
+    public static final int AMBIENT_BACKLIGHT_EVENT_METADATA_AVAILABLE = 3;
+
+    /**
+     * Event type for ambient backlight events. The ambient backlight event is preempted by another
+     * application.
+     */
+    public static final int AMBIENT_BACKLIGHT_EVENT_INTERRUPTED = 4;
+
+    private final int mEventType;
+    @Nullable
+    private final AmbientBacklightMetadata mMetadata;
+
+    /**
+     * Constructs AmbientBacklightEvent.
+     */
+    public AmbientBacklightEvent(@Type int eventType,
+            @Nullable AmbientBacklightMetadata metadata) {
+        mEventType = eventType;
+        mMetadata = metadata;
+    }
+
+    private AmbientBacklightEvent(Parcel in) {
+        mEventType = in.readInt();
+        mMetadata = in.readParcelable(AmbientBacklightMetadata.class.getClassLoader(),
+                AmbientBacklightMetadata.class);
+    }
+
+    /**
+     * Gets event type.
+     */
+    @Type
+    public int getEventType() {
+        return mEventType;
+    }
+
+    /**
+     * Gets ambient backlight metadata.
+     *
+     * @return the metadata of the event. It's non-null only for
+     * {@link #AMBIENT_BACKLIGHT_EVENT_METADATA_AVAILABLE}.
+     */
+    @Nullable
+    public AmbientBacklightMetadata getMetadata() {
+        return mMetadata;
+    }
+
+    @Override
+    public void writeToParcel(@NonNull Parcel dest, int flags) {
+        dest.writeInt(mEventType);
+        dest.writeParcelable(mMetadata, flags);
+    }
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @NonNull
+    public static final Parcelable.Creator<AmbientBacklightEvent> CREATOR =
+            new Parcelable.Creator<AmbientBacklightEvent>() {
+                public AmbientBacklightEvent createFromParcel(Parcel in) {
+                    return new AmbientBacklightEvent(in);
+                }
+
+                public AmbientBacklightEvent[] newArray(int size) {
+                    return new AmbientBacklightEvent[size];
+                }
+            };
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+
+        if (!(obj instanceof AmbientBacklightEvent)) {
+            return false;
+        }
+
+        AmbientBacklightEvent other = (AmbientBacklightEvent) obj;
+        return mEventType == other.mEventType
+                && Objects.equals(mMetadata, other.mMetadata);
+    }
+
+    @Override
+    public int hashCode() {
+        return mEventType * 31 + (mMetadata != null ? mMetadata.hashCode() : 0);
+    }
+
+    @Override
+    public String toString() {
+        return "AmbientBacklightEvent{"
+                + "mEventType=" + mEventType
+                + ", mMetadata=" + mMetadata
+                + '}';
+    }
 }
