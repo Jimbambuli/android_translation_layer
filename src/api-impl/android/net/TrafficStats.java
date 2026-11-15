@@ -40,4 +40,7 @@ public class TrafficStats {
 	public static void incrementOperationCount(int tag, int operationCount) {}
 	public static void tagSocket(java.net.Socket socket) throws java.net.SocketException {}
 	public static void untagSocket(java.net.Socket socket) throws java.net.SocketException {}
+	/* SocketTagger.get().tag()/untag(): libcore's default tagger does nothing */
+	public static void tagDatagramSocket(java.net.DatagramSocket socket) throws java.net.SocketException {}
+	public static void untagDatagramSocket(java.net.DatagramSocket socket) throws java.net.SocketException {}
 }
