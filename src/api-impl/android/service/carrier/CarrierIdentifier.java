@@ -53,13 +53,16 @@ public class CarrierIdentifier implements Parcelable {
     private @Nullable String mImsi;
     private @Nullable String mGid1;
     private @Nullable String mGid2;
-    private int mCarrierId = TelephonyManager.UNKNOWN_CARRIER_ID;
-    private int mSpecificCarrierId = TelephonyManager.UNKNOWN_CARRIER_ID;
+    // TelephonyManager.UNKNOWN_CARRIER_ID (not defined in ATL's TelephonyManager)
+    private static final int UNKNOWN_CARRIER_ID = -1;
+
+    private int mCarrierId = UNKNOWN_CARRIER_ID;
+    private int mSpecificCarrierId = UNKNOWN_CARRIER_ID;
 
     public CarrierIdentifier(String mcc, String mnc, @Nullable String spn, @Nullable String imsi,
             @Nullable String gid1, @Nullable String gid2) {
-        this(mcc, mnc, spn, imsi, gid1, gid2, TelephonyManager.UNKNOWN_CARRIER_ID,
-                TelephonyManager.UNKNOWN_CARRIER_ID);
+        this(mcc, mnc, spn, imsi, gid1, gid2, UNKNOWN_CARRIER_ID,
+                UNKNOWN_CARRIER_ID);
     }
 
     /**
