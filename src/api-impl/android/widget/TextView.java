@@ -1548,7 +1548,16 @@ public class TextView extends View {
 	}
 	private native void native_setLetterSpacing(long widget, float spacing);
 
-	public void setMarqueeRepeatLimit(int marqueeLimit) {}
+	/* AOSP mMarqueeRepeatLimit (default 3); ATL does not scroll marquee text (ellipsizes it), so only kept */
+	private int mMarqueeRepeatLimit = 3;
+
+	public void setMarqueeRepeatLimit(int marqueeLimit) {
+		mMarqueeRepeatLimit = marqueeLimit;
+	}
+
+	public int getMarqueeRepeatLimit() {
+		return mMarqueeRepeatLimit;
+	}
 
 	public int getJustificationMode() {
 		return 0; // JUSTIFICATION_MODE_NONE
