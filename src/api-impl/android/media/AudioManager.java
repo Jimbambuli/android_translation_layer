@@ -617,4 +617,69 @@ public class AudioManager {
 		    android.media.session.MediaSessionLegacyHelper.getHelper(android.app.ActivityThread.currentApplication());
 		helper.removeMediaButtonListener(pi);
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void registerRemoteControlClient(android.media.RemoteControlClient arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void unregisterRemoteControlClient(android.media.RemoteControlClient arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.media.AudioPlaybackConfiguration> getActivePlaybackConfigurations() { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public float getStreamVolumeDb(int arg0, int arg1, int arg2) { return 0f; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addOnPreferredMixerAttributesChangedListener(java.util.concurrent.Executor arg0, android.media.AudioManager.OnPreferredMixerAttributesChangedListener arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void adjustVolumeGroupVolume(int arg0, int arg1, int arg2) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean clearPreferredMixerAttributes(android.media.AudioAttributes arg0, android.media.AudioDeviceInfo arg1) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getAudioHwSyncForSession(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getEncodedSurroundMode() { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.AudioMixerAttributes getPreferredMixerAttributes(android.media.AudioAttributes arg0, android.media.AudioDeviceInfo arg1) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getRouting(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.Set<java.lang.Integer> getSupportedDeviceTypes(int arg0) { return new java.util.HashSet<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.media.AudioMixerAttributes> getSupportedMixerAttributes(android.media.AudioDeviceInfo arg0) { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getVibrateSetting(int arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int getVolumeGroupIdForAttributes(android.media.AudioAttributes arg0) { return 0; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isCallScreeningModeSupported() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isRampingRingerEnabled() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isSurroundFormatEnabled(int arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isVolumeGroupMuted(int arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean registerRemoteController(android.media.RemoteController arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeOnPreferredMixerAttributesChangedListener(android.media.AudioManager.OnPreferredMixerAttributesChangedListener arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setBluetoothA2dpOn(boolean arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setEncodedSurroundMode(int arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setPreferredMixerAttributes(android.media.AudioAttributes arg0, android.media.AudioDeviceInfo arg1, android.media.AudioMixerAttributes arg2) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setRouting(int arg0, int arg1, int arg2) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setStreamSolo(int arg0, boolean arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setSurroundFormatEnabled(int arg0, boolean arg1) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setVibrateSetting(int arg0, int arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean shouldVibrate(int arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void unregisterRemoteController(android.media.RemoteController arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnPreferredMixerAttributesChangedListener {
+        void onPreferredMixerAttributesChanged(android.media.AudioAttributes arg0, android.media.AudioDeviceInfo arg1, android.media.AudioMixerAttributes arg2);
+    }
 }

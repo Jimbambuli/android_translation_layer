@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class MediaMetadataRetriever implements AutoCloseable {
@@ -108,20 +110,75 @@ public class MediaMetadataRetriever implements AutoCloseable {
 		return getScaledFrameAtTime(timeUs, option, dstWidth, dstHeight);
 	}
 
-	/* AOSP MediaMetadataRetriever.getFrameAtIndex(int) -> getFramesAtIndexInternal(frameIndex, 1, null): the checks
-	 * on METADATA_KEY_HAS_VIDEO and METADATA_KEY_VIDEO_FRAME_COUNT as in AOSP (ATL's media backend does not report
-	 * the frame count, so Integer.parseInt(null) fails as in AOSP for such a source); the frame itself is the one
-	 * closest to the index's share of the duration, as the backend seeks by time */
+	/* AOSP MediaMetadataRetriever.getFrameAtIndex(int[, BitmapParams]) -> getFramesAtIndex(frameIndex, 1, params).get(0) */
+	public Bitmap getFrameAtIndex(int frameIndex, BitmapParams params) {
+		return getFramesAtIndex(frameIndex, 1, params).get(0);
+	}
+
 	public Bitmap getFrameAtIndex(int frameIndex) {
+		return getFramesAtIndex(frameIndex, 1).get(0);
+	}
+
+	public List<Bitmap> getFramesAtIndex(int frameIndex, int numFrames, BitmapParams params) {
+		return getFramesAtIndexInternal(frameIndex, numFrames, params);
+	}
+
+	public List<Bitmap> getFramesAtIndex(int frameIndex, int numFrames) {
+		return getFramesAtIndexInternal(frameIndex, numFrames, null);
+	}
+
+	/* AOSP MediaMetadataRetriever.getFramesAtIndexInternal(): the checks on METADATA_KEY_HAS_VIDEO and
+	 * METADATA_KEY_VIDEO_FRAME_COUNT as in AOSP (ATL's media backend does not report the frame count, so
+	 * Integer.parseInt(null) fails as in AOSP for such a source). _getFrameAtIndex() is replaced by seeking by
+	 * time to the index's share of the duration, as the backend has no frame index; like the native one the list
+	 * is shorter than requested if a frame cannot be retrieved */
+	private List<Bitmap> getFramesAtIndexInternal(int frameIndex, int numFrames, BitmapParams params) {
 		if (!"yes".equals(extractMetadata(METADATA_KEY_HAS_VIDEO))) {
 			throw new IllegalStateException("Does not contain video or image sequences");
 		}
 		int frameCount = Integer.parseInt(extractMetadata(METADATA_KEY_VIDEO_FRAME_COUNT));
-		if (frameIndex < 0 || frameIndex >= frameCount) {
-			throw new IllegalArgumentException("Invalid frameIndex or numFrames: " + frameIndex + ", " + 1);
+		if (frameIndex < 0 || numFrames < 1 || frameIndex >= frameCount || frameIndex > frameCount - numFrames) {
+			throw new IllegalArgumentException("Invalid frameIndex or numFrames: " + frameIndex + ", " + numFrames);
 		}
 		long durationUs = Long.parseLong(extractMetadata(METADATA_KEY_DURATION)) * 1000;
-		return getFrameAtTime(durationUs * frameIndex / frameCount, OPTION_CLOSEST);
+		List<Bitmap> frames = new ArrayList<>();
+		for (int i = frameIndex; i < frameIndex + numFrames; i++) {
+			Bitmap frame = getFrameAtTime(durationUs * i / frameCount, OPTION_CLOSEST);
+			if (frame == null)
+				break;
+			frames.add(frame);
+		}
+		return frames;
+	}
+
+	/* AOSP MediaMetadataRetriever.getImageAtIndex()/getPrimaryImage() -> getImageAtIndexInternal() */
+	public Bitmap getImageAtIndex(int imageIndex, BitmapParams params) {
+		return getImageAtIndexInternal(imageIndex, params);
+	}
+
+	public Bitmap getImageAtIndex(int imageIndex) {
+		return getImageAtIndexInternal(imageIndex, null);
+	}
+
+	public Bitmap getPrimaryImage(BitmapParams params) {
+		return getImageAtIndexInternal(-1, params);
+	}
+
+	public Bitmap getPrimaryImage() {
+		return getImageAtIndexInternal(-1, null);
+	}
+
+	/* AOSP getImageAtIndexInternal(): the checks as in AOSP; _getImageAtIndex() is null as the media backend does
+	 * not read still image tracks (HEIF/AVIF), the same as getThumbnailImageAtIndex() */
+	private Bitmap getImageAtIndexInternal(int imageIndex, BitmapParams params) {
+		if (!"yes".equals(extractMetadata(METADATA_KEY_HAS_IMAGE))) {
+			throw new IllegalStateException("Does not contain still images");
+		}
+		String imageCount = extractMetadata(METADATA_KEY_IMAGE_COUNT);
+		if (imageIndex >= Integer.parseInt(imageCount)) {
+			throw new IllegalArgumentException("Invalid image index: " + imageCount);
+		}
+		return null;
 	}
 
 	/* null as in AOSP when the source has no still image track (HEIF/AVIF), which the media

@@ -156,6 +156,17 @@ public final class AudioDeviceInfo {
 		return new int[0];
 	}
 
+	/* AOSP AudioDeviceInfo.getEncapsulationModes(): mPort.encapsulationModes(); ATL's port is an ordinary
+	 * output that supports no encapsulation, i.e. an empty array */
+	public @NonNull int[] getEncapsulationModes() {
+		return new int[0];
+	}
+
+	/* AOSP AudioDeviceInfo.getEncapsulationMetadataTypes(): mPort.encapsulationMetadataTypes(); none for ATL's port */
+	public @NonNull int[] getEncapsulationMetadataTypes() {
+		return new int[0];
+	}
+
 	/* AOSP AudioDeviceInfo.getAudioProfiles() (API 31): the profiles of the device port; ATL's ports carry none
 	 * (like the empty getSampleRates()/getEncodings(): any) */
 	public @NonNull java.util.List<AudioProfile> getAudioProfiles() {

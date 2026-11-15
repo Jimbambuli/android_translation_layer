@@ -539,5 +539,8 @@ public final class RoutingSessionInfo implements Parcelable {
 			}
 			return new RoutingSessionInfo(this);
 		}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.RoutingSessionInfo.Builder setTransferInitiator(android.os.UserHandle arg0, String arg1) { return null; }
+}
 }

@@ -42,4 +42,15 @@ public class Spatializer {
 	public void addOnSpatializerStateChangedListener(Executor executor, OnSpatializerStateChangedListener listener) {}
 
 	public void removeOnSpatializerStateChangedListener(OnSpatializerStateChangedListener listener) {}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addOnHeadTrackerAvailableListener(java.util.concurrent.Executor arg0, android.media.Spatializer.OnHeadTrackerAvailableListener arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isHeadTrackerAvailable() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeOnHeadTrackerAvailableListener(android.media.Spatializer.OnHeadTrackerAvailableListener arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnHeadTrackerAvailableListener {
+        void onHeadTrackerAvailableChanged(android.media.Spatializer arg0, boolean arg1);
+    }
 }

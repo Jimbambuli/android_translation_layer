@@ -109,6 +109,18 @@ public class MediaCodec {
 		public abstract void onOutputBufferAvailable(MediaCodec codec, int index, BufferInfo info);
 		public abstract void onError(MediaCodec codec, CodecException e);
 		public abstract void onOutputFormatChanged(MediaCodec codec, MediaFormat format);
+
+		/* AOSP MediaCodec.Callback (frameworks/base/media/java/android/media/MediaCodec.java) */
+		public void onOutputBuffersAvailable(MediaCodec codec, int index, ArrayDeque<BufferInfo> infos) {
+			throw new IllegalStateException("Client must override onOutputBuffersAvailable when codec is configured to operate with multiple access units");
+		}
+
+		public void onCryptoError(MediaCodec codec, CryptoException e) {
+			throw new IllegalStateException("Client must override onCryptoError when the codec is configured with CONFIGURE_FLAG_USE_CRYPTO_ASYNC.", e);
+		}
+
+		public void onMetricsFlushed(MediaCodec codec, PersistableBundle metrics) {
+		}
 	}
 
 	public static final class CodecException extends IllegalStateException {
@@ -530,16 +542,55 @@ public class MediaCodec {
 	}
 
 	public static final class CryptoException extends RuntimeException implements MediaDrmThrowable {
-		private final int errorCode;
-
 		public CryptoException(int errorCode, String detailMessage) {
-			super(detailMessage);
-			this.errorCode = errorCode;
+			this(detailMessage, errorCode, 0, 0, 0, null);
 		}
+
+		/* AOSP: @hide */
+		CryptoException(String message, int errorCode, int vendorError, int oemError, int errorContext, CryptoInfo cryptoInfo) {
+			super(message);
+			mErrorCode = errorCode;
+			mVendorError = vendorError;
+			mOemError = oemError;
+			mErrorContext = errorContext;
+			mCryptoInfo = cryptoInfo;
+		}
+
+		public static final int ERROR_NO_KEY = MediaDrm.ErrorCodes.ERROR_NO_KEY;
+		public static final int ERROR_KEY_EXPIRED = MediaDrm.ErrorCodes.ERROR_KEY_EXPIRED;
+		public static final int ERROR_RESOURCE_BUSY = MediaDrm.ErrorCodes.ERROR_RESOURCE_BUSY;
+		public static final int ERROR_INSUFFICIENT_OUTPUT_PROTECTION = MediaDrm.ErrorCodes.ERROR_INSUFFICIENT_OUTPUT_PROTECTION;
+		public static final int ERROR_SESSION_NOT_OPENED = MediaDrm.ErrorCodes.ERROR_SESSION_NOT_OPENED;
+		public static final int ERROR_UNSUPPORTED_OPERATION = MediaDrm.ErrorCodes.ERROR_UNSUPPORTED_OPERATION;
+		public static final int ERROR_INSUFFICIENT_SECURITY = MediaDrm.ErrorCodes.ERROR_INSUFFICIENT_SECURITY;
+		public static final int ERROR_FRAME_TOO_LARGE = MediaDrm.ErrorCodes.ERROR_FRAME_TOO_LARGE;
+		public static final int ERROR_LOST_STATE = MediaDrm.ErrorCodes.ERROR_LOST_STATE;
 
 		public int getErrorCode() {
-			return errorCode;
+			return mErrorCode;
 		}
+
+		@Override
+		public int getVendorError() {
+			return mVendorError;
+		}
+
+		@Override
+		public int getOemError() {
+			return mOemError;
+		}
+
+		@Override
+		public int getErrorContext() {
+			return mErrorContext;
+		}
+
+		public CryptoInfo getCryptoInfo() {
+			return mCryptoInfo;
+		}
+
+		private final int mErrorCode, mVendorError, mOemError, mErrorContext;
+		private final CryptoInfo mCryptoInfo;
 	}
 
 	public static final class BufferInfo {
@@ -556,11 +607,164 @@ public class MediaCodec {
 		}
 	}
 
-	public static interface OnFrameRenderedListener {}
+	public static interface OnFrameRenderedListener {
+		void onFrameRendered(MediaCodec codec, long presentationTimeUs, long nanoTime);
+	}
+
+	public interface OnFirstTunnelFrameReadyListener {
+		void onFirstTunnelFrameReady(MediaCodec codec);
+	}
+
+	private OnFirstTunnelFrameReadyListener onFirstTunnelFrameReadyListener;
+
+	/* Stored for parity; ATL has no tunneled playback, so the callback is never invoked. */
+	public void setOnFirstTunnelFrameReadyListener(android.os.Handler handler, OnFirstTunnelFrameReadyListener listener) {
+		synchronized (mListenerLock) {
+			onFirstTunnelFrameReadyListener = listener;
+		}
+	}
+
+	/* AOSP MediaCodec.configure(MediaFormat, Surface, int, MediaDescrambler): a MediaDescrambler can only exist
+	 * for a CAS plugin, and ATL has none (MediaDescrambler's constructor throws), so descrambler is always
+	 * null here; AOSP then reduces to configure(format, surface, null crypto, flags). */
+	public void configure(MediaFormat format, Surface surface, int flags, MediaDescrambler descrambler) {
+		configure(format, surface, (MediaCrypto) null, flags);
+	}
+
+	/* AOSP MediaCodec.getParameterDescriptor(): null for a name the component does not know; ATL's codecs
+	 * describe no parameters */
+	public ParameterDescriptor getParameterDescriptor(String name) {
+		java.util.Objects.requireNonNull(name);
+		return null;
+	}
+
+	public static class ParameterDescriptor {
+		private ParameterDescriptor() {
+		}
+
+		public String getName() {
+			return mName;
+		}
+
+		public int getType() {
+			return mType;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (o == null) {
+				return false;
+			}
+			if (!(o instanceof ParameterDescriptor)) {
+				return false;
+			}
+			ParameterDescriptor other = (ParameterDescriptor) o;
+			return this.mName.equals(other.mName) && this.mType == other.mType;
+		}
+
+		@Override
+		public int hashCode() {
+			return java.util.Arrays.asList((Object) mName, (Object) Integer.valueOf(mType)).hashCode();
+		}
+
+		private String mName;
+		private int mType;
+	}
+
+	public class IncompatibleWithBlockModelException extends RuntimeException {
+		IncompatibleWithBlockModelException() {
+		}
+
+		IncompatibleWithBlockModelException(String message) {
+			super(message);
+		}
+
+		IncompatibleWithBlockModelException(String message, Throwable cause) {
+			super(message, cause);
+		}
+
+		IncompatibleWithBlockModelException(Throwable cause) {
+			super(cause);
+		}
+	}
+
+	public class InvalidBufferFlagsException extends RuntimeException {
+		InvalidBufferFlagsException(String message) {
+			super(message);
+		}
+	}
+
+	public static final class MetricsConstants {
+		private MetricsConstants() {
+		}
+
+		public static final String CODEC = "android.media.mediacodec.codec";
+		public static final String ENCODER = "android.media.mediacodec.encoder";
+		public static final String HEIGHT = "android.media.mediacodec.height";
+		public static final String MIME_TYPE = "android.media.mediacodec.mime";
+		public static final String MODE = "android.media.mediacodec.mode";
+		public static final String MODE_AUDIO = "audio";
+		public static final String MODE_VIDEO = "video";
+		public static final String ROTATION = "android.media.mediacodec.rotation";
+		public static final String SECURE = "android.media.mediacodec.secure";
+		public static final String WIDTH = "android.media.mediacodec.width";
+	}
 
 	/* AOSP MediaCodec.getCanonicalName(): the name of the underlying codec component; ATL's codecs are no aliases
 	 * (MediaCodecInfo.isAlias()), so it is the name the codec was created with */
 	public final String getCanonicalName() {
 		return codecName;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.MediaCodec.OutputFrame getOutputFrame(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.Image getOutputImage(int arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.MediaCodec.QueueRequest getQueueRequest(int arg0) { return this; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static android.media.Image mapHardwareBuffer(android.hardware.HardwareBuffer arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void queueInputBuffers(int arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void queueSecureInputBuffers(int arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1, java.util.ArrayDeque<android.media.MediaCodec.CryptoInfo> arg2) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setAudioPresentation(android.media.AudioPresentation arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class LinearBlock {
+        protected void finalize() {  }
+        public static boolean isCodecCopyFreeCompatible(String[] arg0) { return false; }
+        public boolean isMappable() { return false; }
+        public java.nio.ByteBuffer map() { return null; }
+        public static android.media.MediaCodec.LinearBlock obtain(int arg0, String[] arg1) { return null; }
+        public void recycle() {  }
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static final class OutputFrame {
+        public java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> getBufferInfos() { return null; }
+        public java.util.Set<java.lang.String> getChangedKeys() { return null; }
+        public int getFlags() { return 0; }
+        public android.media.MediaFormat getFormat() { return null; }
+        public android.hardware.HardwareBuffer getHardwareBuffer() { return null; }
+        public android.media.MediaCodec.LinearBlock getLinearBlock() { return null; }
+        public long getPresentationTimeUs() { return 0L; }
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public final class QueueRequest {
+        public void queue() {  }
+        public android.media.MediaCodec.QueueRequest setByteBufferParameter(String arg0, java.nio.ByteBuffer arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setEncryptedLinearBlock(android.media.MediaCodec.LinearBlock arg0, int arg1, int arg2, android.media.MediaCodec.CryptoInfo arg3) { return this; }
+        public android.media.MediaCodec.QueueRequest setFlags(int arg0) { return this; }
+        public android.media.MediaCodec.QueueRequest setFloatParameter(String arg0, float arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setHardwareBuffer(android.hardware.HardwareBuffer arg0) { return this; }
+        public android.media.MediaCodec.QueueRequest setIntegerParameter(String arg0, int arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setLinearBlock(android.media.MediaCodec.LinearBlock arg0, int arg1, int arg2) { return this; }
+        public android.media.MediaCodec.QueueRequest setLongParameter(String arg0, long arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setMultiFrameEncryptedLinearBlock(android.media.MediaCodec.LinearBlock arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1, java.util.ArrayDeque<android.media.MediaCodec.CryptoInfo> arg2) { return this; }
+        public android.media.MediaCodec.QueueRequest setMultiFrameLinearBlock(android.media.MediaCodec.LinearBlock arg0, java.util.ArrayDeque<android.media.MediaCodec.BufferInfo> arg1) { return this; }
+        public android.media.MediaCodec.QueueRequest setPresentationTimeUs(long arg0) { return this; }
+        public android.media.MediaCodec.QueueRequest setStringParameter(String arg0, String arg1) { return this; }
+    }
 }

@@ -81,6 +81,18 @@ public class AudioEffect {
 	/* AOSP releases the native effect engine; ATL has none */
 	public void release() {}
 
+	private Descriptor mDescriptor;
+
+	/* AOSP finalize(): native_finalize() releases the native effect engine; ATL has none */
+	@Override
+	protected void finalize() {}
+
+	/* AOSP getDescriptor(): checkState() then mDescriptor */
+	public Descriptor getDescriptor() throws IllegalStateException {
+		checkState("getDescriptor()");
+		return mDescriptor;
+	}
+
 	/* AOSP AudioEffect.checkState(): no ATL effect has an engine, so none is ever STATE_INITIALIZED */
 	public void checkState(String methodName) throws IllegalStateException {
 		throw (new IllegalStateException(methodName + " called on uninitialized AudioEffect."));

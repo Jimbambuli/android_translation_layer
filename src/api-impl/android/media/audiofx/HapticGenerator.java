@@ -24,4 +24,6 @@ public class HapticGenerator extends AudioEffect implements AutoCloseable {
 	public void close() {
 		release();
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public int setEnabled(boolean arg0) { return 0; }
 }

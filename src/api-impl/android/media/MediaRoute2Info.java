@@ -134,6 +134,8 @@ public final class MediaRoute2Info implements Parcelable {
 	final Set<String> mAllowedPackages;
 	final boolean mAlsoAllowPrivilegedPackages;
 	final int mSuitabilityStatus;
+	final int mRoutingTypeFlags;
+	final List<Set<String>> mRequiredPermissions;
 
 	MediaRoute2Info(Builder builder) {
 		mId = builder.mId;
@@ -157,6 +159,8 @@ public final class MediaRoute2Info implements Parcelable {
 		mAllowedPackages = builder.mAllowedPackages;
 		mAlsoAllowPrivilegedPackages = builder.mAlsoAllowPrivilegedPackages;
 		mSuitabilityStatus = builder.mSuitabilityStatus;
+		mRoutingTypeFlags = builder.mRoutingTypeFlags;
+		mRequiredPermissions = List.copyOf(builder.mRequiredPermissions);
 	}
 
 	MediaRoute2Info(Parcel in) {
@@ -182,6 +186,13 @@ public final class MediaRoute2Info implements Parcelable {
 		mAllowedPackages = Set.of(in.createString8Array());
 		mAlsoAllowPrivilegedPackages = in.readBoolean();
 		mSuitabilityStatus = in.readInt();
+		mRoutingTypeFlags = validateRoutingTypeFlags(in.readInt());
+		ArrayList<Set<String>> requiredPermissions = new ArrayList<>();
+		int numRequiredPermissionSets = in.readInt();
+		for (int i = 0; i < numRequiredPermissionSets; i++) {
+			requiredPermissions.add(Set.of(in.createString8Array()));
+		}
+		mRequiredPermissions = List.copyOf(requiredPermissions);
 	}
 
 	public String getId() {
@@ -226,6 +237,19 @@ public final class MediaRoute2Info implements Parcelable {
 
 	public String getPackageName() {
 		return mPackageName;
+	}
+
+	/* AOSP getProviderPackageName(): the package of the provider that published the route; ATL keeps it in mPackageName */
+	public String getProviderPackageName() {
+		return mPackageName;
+	}
+
+	public int getSupportedRoutingTypes() {
+		return mRoutingTypeFlags;
+	}
+
+	public List<Set<String>> getRequiredPermissions() {
+		return mRequiredPermissions;
 	}
 
 	public int getVolumeHandling() {
@@ -370,7 +394,9 @@ public final class MediaRoute2Info implements Parcelable {
 				&& (mIsVisibilityRestricted == other.mIsVisibilityRestricted)
 				&& Objects.equals(mAllowedPackages, other.mAllowedPackages)
 				&& mAlsoAllowPrivilegedPackages == other.mAlsoAllowPrivilegedPackages
-				&& mSuitabilityStatus == other.mSuitabilityStatus;
+				&& mSuitabilityStatus == other.mSuitabilityStatus
+				&& mRoutingTypeFlags == other.mRoutingTypeFlags
+				&& Objects.equals(mRequiredPermissions, other.mRequiredPermissions);
 	}
 
 	public int getSuitabilityStatus() {
@@ -382,7 +408,7 @@ public final class MediaRoute2Info implements Parcelable {
 		return Objects.hash(mId, mName, mFeatures, mType, mIsSystem, mIconUri, mDescription,
 				mConnectionState, mClientPackageName, mPackageName, mVolumeHandling, mVolumeMax,
 				mVolume, mAddress, mDeduplicationIds, mProviderId, mIsVisibilityRestricted,
-				mAllowedPackages, mAlsoAllowPrivilegedPackages, mSuitabilityStatus);
+				mAllowedPackages, mAlsoAllowPrivilegedPackages, mSuitabilityStatus, mRoutingTypeFlags, mRequiredPermissions);
 	}
 
 	@Override
@@ -403,6 +429,8 @@ public final class MediaRoute2Info implements Parcelable {
 				.append(", providerId=").append(getProviderId())
 				.append(", isVisibilityRestricted=").append(mIsVisibilityRestricted)
 				.append(", allowedPackages=").append(String.join(",", mAllowedPackages))
+				.append(", supportedRoutingTypes=").append(getRoutingTypeFlagsString(mRoutingTypeFlags))
+				.append(", requiredPermissions=").append(mRequiredPermissions.stream().map(set -> String.join(",", set)).collect(java.util.stream.Collectors.toList()))
 				.append(" }");
 		return result.toString();
 	}
@@ -435,6 +463,37 @@ public final class MediaRoute2Info implements Parcelable {
 		dest.writeString8Array(mAllowedPackages.toArray(new String[0]));
 		dest.writeBoolean(mAlsoAllowPrivilegedPackages);
 		dest.writeInt(mSuitabilityStatus);
+		dest.writeInt(mRoutingTypeFlags);
+		dest.writeInt(mRequiredPermissions.size());
+		for (Set<String> permissionSet : mRequiredPermissions) {
+			dest.writeString8Array(permissionSet.toArray(new String[0]));
+		}
+	}
+
+	public static final int FLAG_ROUTING_TYPE_SYSTEM_AUDIO = 1;
+	public static final int FLAG_ROUTING_TYPE_SYSTEM_VIDEO = 1 << 1;
+	public static final int FLAG_ROUTING_TYPE_REMOTE = 1 << 2;
+	private static final int FLAG_ROUTING_TYPE_ALL = FLAG_ROUTING_TYPE_SYSTEM_AUDIO | FLAG_ROUTING_TYPE_SYSTEM_VIDEO | FLAG_ROUTING_TYPE_REMOTE;
+
+	private static String getRoutingTypeFlagsString(int routingTypeFlags) {
+		List<String> typeStrings = new ArrayList<>();
+		if ((routingTypeFlags & FLAG_ROUTING_TYPE_SYSTEM_AUDIO) != 0) {
+			typeStrings.add("SYSTEM_AUDIO");
+		}
+		if ((routingTypeFlags & FLAG_ROUTING_TYPE_SYSTEM_VIDEO) != 0) {
+			typeStrings.add("SYSTEM_VIDEO");
+		}
+		if ((routingTypeFlags & FLAG_ROUTING_TYPE_REMOTE) != 0) {
+			typeStrings.add("REMOTE");
+		}
+		return String.join("|", typeStrings);
+	}
+
+	private static int validateRoutingTypeFlags(int routingTypeFlags) {
+		if (routingTypeFlags == 0 || (routingTypeFlags & ~FLAG_ROUTING_TYPE_ALL) != 0) {
+			throw new IllegalArgumentException("Invalid routing type flags: " + Integer.toHexString(routingTypeFlags));
+		}
+		return routingTypeFlags;
 	}
 
 	private static String getDeviceTypeString(int deviceType) {
@@ -508,6 +567,8 @@ public final class MediaRoute2Info implements Parcelable {
 		String mProviderId;
 		boolean mIsVisibilityRestricted;
 		Set<String> mAllowedPackages;
+		int mRoutingTypeFlags = FLAG_ROUTING_TYPE_REMOTE;
+		List<Set<String>> mRequiredPermissions = List.of();
 		boolean mAlsoAllowPrivilegedPackages;
 		int mSuitabilityStatus;
 
@@ -557,6 +618,8 @@ public final class MediaRoute2Info implements Parcelable {
 			mProviderId = routeInfo.mProviderId;
 			mIsVisibilityRestricted = routeInfo.mIsVisibilityRestricted;
 			mAllowedPackages = routeInfo.mAllowedPackages;
+			mRoutingTypeFlags = routeInfo.mRoutingTypeFlags;
+			mRequiredPermissions = routeInfo.mRequiredPermissions;
 			mAlsoAllowPrivilegedPackages = routeInfo.mAlsoAllowPrivilegedPackages;
 			mSuitabilityStatus = routeInfo.mSuitabilityStatus;
 		}
@@ -662,6 +725,7 @@ public final class MediaRoute2Info implements Parcelable {
 		public Builder setVisibilityPublic() {
 			mIsVisibilityRestricted = false;
 			mAllowedPackages = Set.of();
+			mRequiredPermissions = List.of();
 			mAlsoAllowPrivilegedPackages = false;
 			return this;
 		}
@@ -677,6 +741,20 @@ public final class MediaRoute2Info implements Parcelable {
 			mIsVisibilityRestricted = true;
 			mAllowedPackages = Set.copyOf(allowedPackages);
 			mAlsoAllowPrivilegedPackages = alsoAllowPrivileged;
+			return this;
+		}
+
+		public Builder setSupportedRoutingTypes(int routingTypeFlags) {
+			mRoutingTypeFlags = validateRoutingTypeFlags(routingTypeFlags);
+			return this;
+		}
+
+		public Builder setRequiredPermissions(Set<String> requiredPermissions) {
+			return setRequiredPermissions(List.of(requiredPermissions));
+		}
+
+		public Builder setRequiredPermissions(List<Set<String>> requiresOneOf) {
+			mRequiredPermissions = List.copyOf(requiresOneOf);
 			return this;
 		}
 

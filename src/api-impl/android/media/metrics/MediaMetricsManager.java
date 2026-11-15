@@ -23,6 +23,9 @@ public final class MediaMetricsManager {
 
 	public void reportPlaybackErrorEvent(@NonNull String sessionId, PlaybackErrorEvent event) {}
 
+	/* AOSP MediaMetricsManager.reportBundleMetrics() (@hide, used by BundleSession): no service, dropped */
+	public void reportBundleMetrics(@NonNull String sessionId, android.os.PersistableBundle metrics) {}
+
 	public void releaseSessionId(@NonNull String sessionId) {}
 
 	public void reportEditingEndedEvent(@NonNull String sessionId, EditingEndedEvent editingEndedEvent) {}
@@ -37,5 +40,23 @@ public final class MediaMetricsManager {
 	@NonNull
 	public EditingSession createEditingSession() {
 		return new EditingSession(UUID.randomUUID().toString(), this);
+	}
+
+	/** Creates a recording session (android-16), with a local id like createPlaybackSession(). */
+	@NonNull
+	public RecordingSession createRecordingSession() {
+		return new RecordingSession(UUID.randomUUID().toString(), this);
+	}
+
+	/** Creates a transcoding session (android-16), with a local id like createPlaybackSession(). */
+	@NonNull
+	public TranscodingSession createTranscodingSession() {
+		return new TranscodingSession(UUID.randomUUID().toString(), this);
+	}
+
+	/** Creates a bundle session (android-16), with a local id like createPlaybackSession(). */
+	@NonNull
+	public BundleSession createBundleSession() {
+		return new BundleSession(UUID.randomUUID().toString(), this);
 	}
 }

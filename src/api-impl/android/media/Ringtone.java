@@ -129,4 +129,10 @@ public class Ringtone {
 			mLocalPlayer = null;
 		}
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    protected void finalize() {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean isHapticGeneratorEnabled() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean setHapticGeneratorEnabled(boolean arg0) { return false; }
 }

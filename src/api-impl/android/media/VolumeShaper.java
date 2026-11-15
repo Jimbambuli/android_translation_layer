@@ -30,6 +30,12 @@ public final class VolumeShaper implements AutoCloseable {
 	@Override
 	public void close() {}
 
+	/* AOSP finalize(): close() */
+	@Override
+	protected void finalize() {
+		close();
+	}
+
 	public static final class Configuration implements Parcelable {
 		private static final int MAXIMUM_CURVE_POINTS = 16;
 

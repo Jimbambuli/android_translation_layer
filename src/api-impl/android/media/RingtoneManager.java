@@ -178,4 +178,20 @@ public class RingtoneManager {
 		String uriString = Settings.System.getString(context.getContentResolver(), setting);
 		return uriString != null ? Uri.parse(uriString) : null;
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static void setActualDefaultRingtoneUri(android.content.Context arg0, int arg1, android.net.Uri arg2) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean getIncludeDrm() { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static android.net.Uri getValidRingtoneUri(android.content.Context arg0) { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public boolean hasHapticChannels(int arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static boolean hasHapticChannels(android.content.Context arg0, android.net.Uri arg1) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static boolean hasHapticChannels(android.net.Uri arg0) { return false; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static android.content.res.AssetFileDescriptor openDefaultRingtoneUri(android.content.Context arg0, android.net.Uri arg1) throws java.io.FileNotFoundException { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void setIncludeDrm(boolean arg0) {  }
 }

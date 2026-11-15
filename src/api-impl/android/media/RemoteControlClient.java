@@ -64,7 +64,10 @@ public class RemoteControlClient {
 		public void clear() {}
 
 		public void apply() {}
-	}
+	
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public Object clone() throws java.lang.CloneNotSupportedException { return null; }
+}
 
 	public interface OnMetadataUpdateListener {
 		void onMetadataUpdate(int key, Object newValue);
@@ -77,4 +80,6 @@ public class RemoteControlClient {
 	public interface OnGetPlaybackPositionListener {
 		long onGetPlaybackPosition();
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public android.media.session.MediaSession getMediaSession() { return null; }
 }

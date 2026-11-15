@@ -135,4 +135,30 @@ public class MediaSessionManager {
 			return Objects.hash(mPackageName, mPid, mUid);
 		}
 	}
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addOnMediaKeyEventSessionChangedListener(java.util.concurrent.Executor arg0, android.media.session.MediaSessionManager.OnMediaKeyEventSessionChangedListener arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addOnSession2TokensChangedListener(android.media.session.MediaSessionManager.OnSession2TokensChangedListener arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void addOnSession2TokensChangedListener(android.media.session.MediaSessionManager.OnSession2TokensChangedListener arg0, android.os.Handler arg1) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public String getMediaKeyEventSessionPackageName() { return null; }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public java.util.List<android.media.Session2Token> getSession2Tokens() { return new java.util.ArrayList<>(); }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void notifySession2Created(android.media.Session2Token arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeOnMediaKeyEventSessionChangedListener(android.media.session.MediaSessionManager.OnMediaKeyEventSessionChangedListener arg0) {  }
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public void removeOnSession2TokensChangedListener(android.media.session.MediaSessionManager.OnSession2TokensChangedListener arg0) {  }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnMediaKeyEventSessionChangedListener {
+        void onMediaKeyEventSessionChanged(String arg0, android.media.session.MediaSession.Token arg1);
+    }
+
+    /* AOSP 16 API; no backing hardware/service in ATL */
+    public static interface OnSession2TokensChangedListener {
+        void onSession2TokensChanged(java.util.List<android.media.Session2Token> arg0);
+    }
 }
