@@ -48,6 +48,15 @@ public class BluetoothAdapter {
 		return new BluetoothDevice(address);
 	}
 
+	/* AOSP BluetoothAdapter.getRemoteDevice(byte[]) */
+	public BluetoothDevice getRemoteDevice(byte[] address) {
+		if (address == null || address.length != 6) {
+			throw new IllegalArgumentException("Bluetooth address must have 6 bytes");
+		}
+		return new BluetoothDevice(String.format(java.util.Locale.US, "%02X:%02X:%02X:%02X:%02X:%02X", address[0], address[1],
+		                                         address[2], address[3], address[4], address[5]));
+	}
+
 	public static boolean checkBluetoothAddress(String address) {
 		if (address == null || address.length() != ADDRESS_LENGTH) {
 			return false;

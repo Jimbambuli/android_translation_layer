@@ -115,6 +115,18 @@ public final class BluetoothGatt implements BluetoothProfile {
 		return false;
 	}
 
+	/* AOSP BluetoothGatt.writeDescriptor(descriptor, value): argument checks, then ERROR_PROFILE_SERVICE_NOT_BOUND
+	 * since the GATT client is never registered (no Bluetooth service) */
+	public int writeDescriptor(BluetoothGattDescriptor descriptor, byte[] value) {
+		if (descriptor == null) {
+			throw new IllegalArgumentException("descriptor must not be null");
+		}
+		if (value == null) {
+			throw new IllegalArgumentException("value must not be null");
+		}
+		return 9; // BluetoothStatusCodes.ERROR_PROFILE_SERVICE_NOT_BOUND
+	}
+
 	public boolean beginReliableWrite() {
 		return false;
 	}

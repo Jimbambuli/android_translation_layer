@@ -1,8 +1,8 @@
 package android.hardware.usb;
 
-/* AOSP core/java/android/hardware/usb/UsbDevice.java without the Parcelable part and the serial-number
- * reader (see UsbEndpoint): ATL lists no USB devices, so no instance is ever handed out. */
-public class UsbDevice {
+/* AOSP core/java/android/hardware/usb/UsbDevice.java without the serial-number reader binder (the
+ * serial number travels as a string) and the capability flags: ATL lists no USB devices, so no instance is ever handed out. */
+public class UsbDevice implements android.os.Parcelable {
 	private final String mName;
 	private final String mManufacturerName;
 	private final String mProductName;
@@ -33,6 +33,17 @@ public class UsbDevice {
 	}
 
 	public String getDeviceName() { return mName; }
+
+	public int getDeviceId() { return getDeviceId(mName); }
+
+	/* AOSP UsbDevice.getDeviceId(String): native_get_device_id() = usb_device_get_unique_id_from_name(), bus * 1000 + device
+	 * of "/dev/bus/usb/BBB/DDD", -1 for any other name */
+	public static int getDeviceId(String name) {
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("^/dev/bus/usb/(\\d+)/(\\d+)$").matcher(name);
+		if (!m.matches())
+			return -1;
+		return Integer.parseInt(m.group(1)) * 1000 + Integer.parseInt(m.group(2));
+	}
 
 	/* AOSP UsbDevice.getDeviceName(int id): native_get_device_name(), "/dev/bus/usb/BBB/DDD" from id = bus * 1000 + device */
 	public static String getDeviceName(int id) {
@@ -100,5 +111,47 @@ public class UsbDevice {
 		    ",mClass=" + mClass + ",mSubclass=" + mSubclass + ",mProtocol=" + mProtocol +
 		    ",mManufacturerName=" + mManufacturerName + ",mProductName=" + mProductName +
 		    ",mVersion=" + mVersion + "]";
+	}
+
+	public static final android.os.Parcelable.Creator<UsbDevice> CREATOR = new android.os.Parcelable.Creator<UsbDevice>() {
+		public UsbDevice createFromParcel(android.os.Parcel in) {
+			String name = in.readString();
+			int vendorId = in.readInt();
+			int productId = in.readInt();
+			int clasz = in.readInt();
+			int subClass = in.readInt();
+			int protocol = in.readInt();
+			String manufacturerName = in.readString();
+			String productName = in.readString();
+			String version = in.readString();
+			String serialNumber = in.readString();
+			android.os.Parcelable[] p = UsbEndpoint.readArray(in, UsbConfiguration.class);
+			UsbConfiguration[] configurations = new UsbConfiguration[p.length];
+			System.arraycopy(p, 0, configurations, 0, p.length);
+			return new UsbDevice(name, vendorId, productId, clasz, subClass, protocol, manufacturerName, productName, version,
+			                     configurations, serialNumber);
+		}
+
+		public UsbDevice[] newArray(int size) {
+			return new UsbDevice[size];
+		}
+	};
+
+	public int describeContents() {
+		return 0;
+	}
+
+	public void writeToParcel(android.os.Parcel parcel, int flags) {
+		parcel.writeString(mName);
+		parcel.writeInt(mVendorId);
+		parcel.writeInt(mProductId);
+		parcel.writeInt(mClass);
+		parcel.writeInt(mSubclass);
+		parcel.writeInt(mProtocol);
+		parcel.writeString(mManufacturerName);
+		parcel.writeString(mProductName);
+		parcel.writeString(mVersion);
+		parcel.writeString(mSerialNumber);
+		parcel.writeParcelableArray(mConfigurations, 0);
 	}
 }
