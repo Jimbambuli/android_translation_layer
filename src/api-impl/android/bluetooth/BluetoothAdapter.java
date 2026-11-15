@@ -69,6 +69,28 @@ public class BluetoothAdapter {
 	public static final int SCAN_MODE_CONNECTABLE = 21;
 	public static final int SCAN_MODE_CONNECTABLE_DISCOVERABLE = 23;
 
+	/* ATL's adapter has no BluetoothManagerService behind it: the manager's answers for a device whose Bluetooth
+	 * cannot be switched on (no address or name known, enable()/disable() refused). */
+	public boolean enable() {
+		return isEnabled();
+	}
+
+	public boolean disable() {
+		return false;
+	}
+
+	public String getAddress() {
+		return null;
+	}
+
+	public String getName() {
+		return null;
+	}
+
+	public BluetoothDevice getRemoteLeDevice(String address, int addressType) {
+		return new BluetoothDevice(address, addressType);
+	}
+
 	/* the branches of the AOSP methods for getState() != STATE_ON */
 	public boolean startDiscovery() {
 		return false;
