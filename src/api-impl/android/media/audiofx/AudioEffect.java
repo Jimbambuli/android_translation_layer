@@ -1,5 +1,7 @@
 package android.media.audiofx;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.UUID;
 
 /* AOSP media/java/android/media/audiofx/AudioEffect.java. ATL has no effect engines: queryEffects() lists
@@ -78,4 +80,170 @@ public class AudioEffect {
 
 	/* AOSP releases the native effect engine; ATL has none */
 	public void release() {}
+
+	/* AOSP AudioEffect.checkState(): no ATL effect has an engine, so none is ever STATE_INITIALIZED */
+	public void checkState(String methodName) throws IllegalStateException {
+		throw (new IllegalStateException(methodName + " called on uninitialized AudioEffect."));
+	}
+
+	/* AOSP setParameter()/getParameter()/getId()/hasControl(): checkState() before the native call */
+	public int setParameter(byte[] param, byte[] value) throws IllegalStateException {
+		checkState("setParameter()");
+		return ERROR_NO_INIT;
+	}
+
+	public int setParameter(int param, int value) throws IllegalStateException {
+		byte[] p = intToByteArray(param);
+		byte[] v = intToByteArray(value);
+		return setParameter(p, v);
+	}
+
+	public int setParameter(int param, short value) throws IllegalStateException {
+		byte[] p = intToByteArray(param);
+		byte[] v = shortToByteArray(value);
+		return setParameter(p, v);
+	}
+
+	public int setParameter(int param, byte[] value) throws IllegalStateException {
+		byte[] p = intToByteArray(param);
+		return setParameter(p, value);
+	}
+
+	public int getParameter(byte[] param, byte[] value) throws IllegalStateException {
+		checkState("getParameter()");
+		return ERROR_NO_INIT;
+	}
+
+	public int getParameter(int param, byte[] value) throws IllegalStateException {
+		byte[] p = intToByteArray(param);
+		return getParameter(p, value);
+	}
+
+	public int getId() throws IllegalStateException {
+		checkState("getId()");
+		return 0;
+	}
+
+	public boolean hasControl() throws IllegalStateException {
+		checkState("hasControl()");
+		return false;
+	}
+
+	/* AOSP listeners: stored; ATL has no engine that would post the events (NativeEventHandler) */
+	public final Object mListenerLock = new Object();
+	private OnEnableStatusChangeListener mEnableStatusChangeListener = null;
+	private OnControlStatusChangeListener mControlChangeStatusListener = null;
+	private OnParameterChangeListener mParameterChangeListener = null;
+
+	public void setEnableStatusListener(OnEnableStatusChangeListener listener) {
+		synchronized (mListenerLock) {
+			mEnableStatusChangeListener = listener;
+		}
+	}
+
+	public void setControlStatusListener(OnControlStatusChangeListener listener) {
+		synchronized (mListenerLock) {
+			mControlChangeStatusListener = listener;
+		}
+	}
+
+	public void setParameterListener(OnParameterChangeListener listener) {
+		synchronized (mListenerLock) {
+			mParameterChangeListener = listener;
+		}
+	}
+
+	public interface OnEnableStatusChangeListener {
+		void onEnableStatusChange(AudioEffect effect, boolean enabled);
+	}
+
+	public interface OnControlStatusChangeListener {
+		void onControlStatusChange(AudioEffect effect, boolean controlGranted);
+	}
+
+	public interface OnParameterChangeListener {
+		void onParameterChange(AudioEffect effect, int status, byte[] param, byte[] value);
+	}
+
+	public void checkStatus(int status) {
+		if (isError(status)) {
+			switch (status) {
+			case AudioEffect.ERROR_BAD_VALUE:
+				throw (new IllegalArgumentException("AudioEffect: bad parameter value"));
+			case AudioEffect.ERROR_INVALID_OPERATION:
+				throw (new UnsupportedOperationException("AudioEffect: invalid parameter operation"));
+			default:
+				throw (new RuntimeException("AudioEffect: set/get parameter error"));
+			}
+		}
+	}
+
+	public static boolean isError(int status) {
+		return (status < 0);
+	}
+
+	public static int byteArrayToInt(byte[] valueBuf) {
+		return byteArrayToInt(valueBuf, 0);
+	}
+
+	public static int byteArrayToInt(byte[] valueBuf, int offset) {
+		ByteBuffer converter = ByteBuffer.wrap(valueBuf);
+		converter.order(ByteOrder.nativeOrder());
+		return converter.getInt(offset);
+	}
+
+	public static byte[] intToByteArray(int value) {
+		ByteBuffer converter = ByteBuffer.allocate(4);
+		converter.order(ByteOrder.nativeOrder());
+		converter.putInt(value);
+		return converter.array();
+	}
+
+	public static short byteArrayToShort(byte[] valueBuf) {
+		return byteArrayToShort(valueBuf, 0);
+	}
+
+	public static short byteArrayToShort(byte[] valueBuf, int offset) {
+		ByteBuffer converter = ByteBuffer.wrap(valueBuf);
+		converter.order(ByteOrder.nativeOrder());
+		return converter.getShort(offset);
+	}
+
+	public static byte[] shortToByteArray(short value) {
+		ByteBuffer converter = ByteBuffer.allocate(2);
+		converter.order(ByteOrder.nativeOrder());
+		converter.putShort(value);
+		return converter.array();
+	}
+
+	public static float byteArrayToFloat(byte[] valueBuf) {
+		return byteArrayToFloat(valueBuf, 0);
+	}
+
+	public static float byteArrayToFloat(byte[] valueBuf, int offset) {
+		ByteBuffer converter = ByteBuffer.wrap(valueBuf);
+		converter.order(ByteOrder.nativeOrder());
+		return converter.getFloat(offset);
+	}
+
+	public static byte[] floatToByteArray(float value) {
+		ByteBuffer converter = ByteBuffer.allocate(4);
+		converter.order(ByteOrder.nativeOrder());
+		converter.putFloat(value);
+		return converter.array();
+	}
+
+	public static byte[] concatArrays(byte[]... arrays) {
+		int len = 0;
+		for (byte[] a : arrays) {
+			len += a.length;
+		}
+		byte[] b = new byte[len];
+		int offs = 0;
+		for (byte[] a : arrays) {
+			System.arraycopy(a, 0, b, offs, a.length);
+			offs += a.length;
+		}
+		return b;
+	}
 }
