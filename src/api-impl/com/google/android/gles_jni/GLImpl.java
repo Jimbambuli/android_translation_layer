@@ -23,6 +23,7 @@ package com.google.android.gles_jni;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;*/
 import android.opengl.GLES10;
+import android.opengl.GLES20;
 /*import android.os.Build;
 import android.os.UserHandle;
 import android.util.Log;
@@ -1231,7 +1232,7 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
 	    int pname,
 	    float[] params,
 	    int offset) {
-		GLES10.glGetFloatv(pname, params, offset);
+		GLES20.glGetFloatv(pname, params, offset);
 	}
 
 	// C function void glGetFloatv ( GLenum pname, GLfloat *params )
