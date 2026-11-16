@@ -20,12 +20,12 @@ public class MediaController extends FrameLayout {
 	}
 
 	public MediaController(Context context, boolean useFastForward) {
-		this(context);
+		super(context);
 		mUseFastForward = useFastForward;
 	}
 
 	public MediaController(Context context) {
-		super(context);
+		this(context, true);
 	}
 
 	public void setMediaPlayer(MediaPlayerControl player) {
