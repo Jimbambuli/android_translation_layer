@@ -2302,32 +2302,38 @@ public class PackageParser {
 				XmlUtils.skipCurrentTag(parser);
 				outInfo.addCategory(value);
 			} else if (nodeName.equals("data")) {
-				String scheme = parser.getAttributeValue(
-				    ANDROID_RESOURCES, "scheme");
-				if (!TextUtils.isEmpty(scheme))
-					outInfo.addDataScheme(scheme);
-				/* AOSP ParsedIntentInfoUtils.parseData(): host and port make an authority */
-				String host = parser.getAttributeValue(ANDROID_RESOURCES, "host");
-				String port = parser.getAttributeValue(ANDROID_RESOURCES, "port");
-				if (host != null)
-					outInfo.addDataAuthority(host, port);
-				/* AOSP ParsedIntentInfoUtils.parseData(): MIME type and paths */
-				String mimeType = parser.getAttributeValue(ANDROID_RESOURCES, "mimeType");
-				if (mimeType != null) {
-					try {
-						outInfo.addDataType(mimeType);
-					} catch (IntentFilter.MalformedMimeTypeException e) {
-						outError[0] = e.toString();
-						return false;
+				/* AOSP ParsedIntentInfoUtils.parseData(): the attributes are read through a TypedArray, as a
+				 * resource reference (android:mimeType="@string/…") is resolved there */
+				TypedArray da = res.obtainAttributes(attrs, com.android.internal.R.styleable.AndroidManifestData);
+				try {
+					String str = da.getNonConfigurationString(com.android.internal.R.styleable.AndroidManifestData_mimeType, 0);
+					if (str != null) {
+						try {
+							outInfo.addDataType(str);
+						} catch (IntentFilter.MalformedMimeTypeException e) {
+							outError[0] = e.toString();
+							return false;
+						}
 					}
-				}
-				String[] pathAttrs = {"path", "pathPrefix", "pathPattern", "pathAdvancedPattern", "pathSuffix"};
-				int[] pathTypes = {PatternMatcher.PATTERN_LITERAL, PatternMatcher.PATTERN_PREFIX, PatternMatcher.PATTERN_SIMPLE_GLOB,
-				                   PatternMatcher.PATTERN_ADVANCED_GLOB, PatternMatcher.PATTERN_SUFFIX};
-				for (int i = 0; i < pathTypes.length; i++) {
-					String path = parser.getAttributeValue(ANDROID_RESOURCES, pathAttrs[i]);
-					if (path != null)
-						outInfo.addDataPath(path, pathTypes[i]);
+					str = da.getNonConfigurationString(com.android.internal.R.styleable.AndroidManifestData_scheme, 0);
+					if (str != null)
+						outInfo.addDataScheme(str);
+					String host = da.getNonConfigurationString(com.android.internal.R.styleable.AndroidManifestData_host, 0);
+					String port = da.getNonConfigurationString(com.android.internal.R.styleable.AndroidManifestData_port, 0);
+					if (host != null)
+						outInfo.addDataAuthority(host, port);
+					int[] pathAttrs = {com.android.internal.R.styleable.AndroidManifestData_path, com.android.internal.R.styleable.AndroidManifestData_pathPrefix,
+					                   com.android.internal.R.styleable.AndroidManifestData_pathPattern, com.android.internal.R.styleable.AndroidManifestData_pathAdvancedPattern,
+					                   com.android.internal.R.styleable.AndroidManifestData_pathSuffix};
+					int[] pathTypes = {PatternMatcher.PATTERN_LITERAL, PatternMatcher.PATTERN_PREFIX, PatternMatcher.PATTERN_SIMPLE_GLOB,
+					                   PatternMatcher.PATTERN_ADVANCED_GLOB, PatternMatcher.PATTERN_SUFFIX};
+					for (int i = 0; i < pathTypes.length; i++) {
+						str = da.getNonConfigurationString(pathAttrs[i], 0);
+						if (str != null)
+							outInfo.addDataPath(str, pathTypes[i]);
+					}
+				} finally {
+					da.recycle();
 				}
 				XmlUtils.skipCurrentTag(parser);
 			} else if (!RIGID_PARSER) {
