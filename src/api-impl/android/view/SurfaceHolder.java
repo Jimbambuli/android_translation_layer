@@ -127,6 +127,19 @@ public interface SurfaceHolder {
 		 * @param holder The SurfaceHolder whose surface has changed.
 		 */
 		public void surfaceRedrawNeeded(SurfaceHolder holder);
+
+		/**
+		 * An alternative to surfaceRedrawNeeded where it is not required to block
+		 * until the redraw is complete. You should initiate your redraw, and return,
+		 * later invoking drawingFinished.run() when your redraw is complete.
+		 *
+		 * @param holder The SurfaceHolder whose surface has changed.
+		 * @param drawingFinished A runnable to signal completion of the redraw.
+		 */
+		default void surfaceRedrawNeededAsync(SurfaceHolder holder, Runnable drawingFinished) {
+			surfaceRedrawNeeded(holder);
+			drawingFinished.run();
+		}
 	}
 
 	/**

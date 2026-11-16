@@ -553,12 +553,12 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 	 * This method is part of the SurfaceHolder.Callback2 interface, and is
 	 * not normally called or subclassed by clients of GLSurfaceView.
 	 */
-	/*@Override
+	@Override
 	public void surfaceRedrawNeededAsync(SurfaceHolder holder, Runnable finishDrawing) {
 		if (mGLThread != null) {
 			mGLThread.requestRenderAndNotify(finishDrawing);
 		}
-	}*/
+	}
 
 	/**
 	 * This method is part of the SurfaceHolder.Callback2 interface, and is
