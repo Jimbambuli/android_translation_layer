@@ -147,7 +147,54 @@ public class DateFormat {
 	 * @return true if 24 hour time format is selected, false otherwise.
 	 */
 	public static boolean is24HourFormat(Context context) {
-		return true;
+		return is24HourFormat(context, 0 /* the one user, AOSP: context.getUserId() */);
+	}
+
+	/**
+	 * @hide
+	 */
+	public static boolean is24HourFormat(Context context, int userHandle) {
+		/* AOSP reads Settings.System.TIME_12_24 ("12"/"24"); ATL has no settings provider, so this is null
+		 * and the locale decides */
+		final String value = Settings.System.getString(context.getContentResolver(), "time_12_24");
+		if (value != null) {
+			return value.equals("24");
+		}
+
+		return is24HourLocale(context.getResources().getConfiguration().locale);
+	}
+
+	/**
+	 * Returns true if the specified locale uses a 24-hour time format by default, ignoring user
+	 * settings.
+	 * @param locale the locale to check
+	 * @return true if the locale uses a 24 hour time format by default, false otherwise
+	 * @hide
+	 */
+	public static boolean is24HourLocale(Locale locale) {
+		synchronized (sLocaleLock) {
+			if (sIs24HourLocale != null && sIs24HourLocale.equals(locale)) {
+				return sIs24Hour;
+			}
+		}
+
+		final java.text.DateFormat natural = java.text.DateFormat.getTimeInstance(java.text.DateFormat.LONG, locale);
+
+		final boolean is24Hour;
+		if (natural instanceof SimpleDateFormat) {
+			final SimpleDateFormat sdf = (SimpleDateFormat)natural;
+			final String pattern = sdf.toPattern();
+			is24Hour = hasDesignator(pattern, 'H');
+		} else {
+			is24Hour = false;
+		}
+
+		synchronized (sLocaleLock) {
+			sIs24HourLocale = locale;
+			sIs24Hour = is24Hour;
+		}
+
+		return is24Hour;
 	}
 
 	/**
@@ -188,7 +235,8 @@ public class DateFormat {
 	 * @return the {@link java.text.DateFormat} object that properly formats the time.
 	 */
 	public static java.text.DateFormat getTimeFormat(Context context) {
-		return new java.text.SimpleDateFormat(getTimeFormatString(context));
+		final Locale locale = context.getResources().getConfiguration().locale;
+		return new java.text.SimpleDateFormat(getTimeFormatString(context), locale);
 	}
 
 	/**
@@ -198,7 +246,30 @@ public class DateFormat {
 	 * @hide
 	 */
 	public static String getTimeFormatString(Context context) {
-		return "HH:mm";
+		return getTimeFormatString(context, 0);
+	}
+
+	/**
+	 * @hide
+	 */
+	public static String getTimeFormatString(Context context, int userHandle) {
+		android.icu.util.ULocale uLocale = android.icu.util.ULocale.forLocale(context.getResources().getConfiguration().locale);
+		android.icu.text.DateTimePatternGenerator dtpg = android.icu.text.DateTimePatternGenerator.getInstance(uLocale);
+		String pattern = is24HourFormat(context, userHandle) ? dtpg.getBestPattern("Hm") : dtpg.getBestPattern("hm");
+		return getCompatibleEnglishPattern(uLocale, pattern);
+	}
+
+	private static String getCompatibleEnglishPattern(android.icu.util.ULocale locale, String pattern) {
+		if (pattern == null || locale == null || !"en".equals(locale.getLanguage())) {
+			return pattern;
+		}
+
+		String region = locale.getCountry();
+		if (region != null && !region.isEmpty() && !"US".equals(region)) {
+			return pattern;
+		}
+
+		return pattern.replace('\u202f', ' ');
 	}
 
 	/**
