@@ -4228,7 +4228,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		state_list_animator = stateListAnimator;
 		if (stateListAnimator != null) {
 			stateListAnimator.setTarget(this);
-			stateListAnimator.setState(getDrawableState());
+			if (isAttachedToWindow()) {
+				stateListAnimator.setState(getDrawableState());
+			}
 		}
 	}
 	private StateListAnimator state_list_animator;
@@ -4520,6 +4522,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			return;
 		attachedToWindow = true;
 		mWindowAttachCount++;
+		// We will need to evaluate the drawable state at least once.
+		mPrivateFlags |= PFLAG_DRAWABLE_STATE_DIRTY;
 		/* AOSP resolves the RTL properties when the view is measured after it was attached (the
 		 * window's root view before); Compose initialises its layout direction there */
 		resolveRtlPropertiesIfNeeded();
@@ -4541,6 +4545,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			for (OnAttachStateChangeListener listener : listeners) {
 				listener.onViewAttachedToWindow(this);
 			}
+		}
+
+		if ((mPrivateFlags & PFLAG_DRAWABLE_STATE_DIRTY) != 0) {
+			// If nobody has evaluated the drawable state yet, then do it now.
+			refreshDrawableState();
 		}
 	}
 
