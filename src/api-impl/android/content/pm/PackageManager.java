@@ -2514,7 +2514,14 @@ public class PackageManager {
 	 * user id is not currently assigned.
 	 */
 	public String getNameForUid(int uid) {
-		return "example user";
+		// as PackageManagerService: "<sharedUserId>:<uid>" for a uid shared by packages, the package name for
+		// a uid of one package, null for a uid not assigned
+		PackageParser.Package primary = ATLLoadedApp.getPrimaryApplication().pkg;
+		if (uid != primary.applicationInfo.uid)
+			return null;
+		if (primary.mSharedUserId != null)
+			return primary.mSharedUserId + ":" + uid;
+		return primary.packageName;
 	}
 
 	/**
@@ -2531,7 +2538,10 @@ public class PackageManager {
 	 */
 	public int getUidForSharedUser(String sharedUserName)
 	    throws NameNotFoundException {
-		return 1000;
+		PackageParser.Package primary = ATLLoadedApp.getPrimaryApplication().pkg;
+		if (sharedUserName != null && sharedUserName.equals(primary.mSharedUserId))
+			return primary.applicationInfo.uid;
+		throw new NameNotFoundException("No shared userid for user:" + sharedUserName);
 	}
 
 	/**
