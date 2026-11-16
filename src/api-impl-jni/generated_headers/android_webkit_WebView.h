@@ -413,6 +413,14 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_postUrl
+ * Signature: (JLjava/lang/String;[BLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1postUrl
+  (JNIEnv *, jobject, jlong, jstring, jbyteArray, jstring);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_reload
  * Signature: (J)V
  */
