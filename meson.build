@@ -203,6 +203,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/database/android_database_SQLiteRawStatement.c',
                                                                   	'src/api-impl-jni/egl/com_google_android_gles_jni_EGLImpl.c',
                                                                   	'src/api-impl-jni/egl/android_opengl_EGL14.c',
+                                                                  	'src/api-impl-jni/egl/android_opengl_EGL15.c',
                                                                   	'src/api-impl-jni/egl/android_opengl_EGLExt.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
