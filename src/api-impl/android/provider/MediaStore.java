@@ -394,6 +394,13 @@ public class MediaStore {
 			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/artists";
 			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/artist";
+
+			/* AOSP MediaStore.Audio.Artists.Albums */
+			public static final class Albums {
+				public static final Uri getContentUri(String volumeName, long artistId) {
+					return ContentUris.withAppendedId(Artists.getContentUri(volumeName), artistId).buildUpon().appendPath("albums").build();
+				}
+			}
 		}
 
 		public static class Albums {
@@ -418,6 +425,23 @@ public class MediaStore {
 			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/genre";
 			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/genre";
+			public static final String DEFAULT_SORT_ORDER = "name";
+
+			public static Uri getContentUriForAudioId(String volumeName, int audioId) {
+				return ContentUris.withAppendedId(Audio.Media.getContentUri(volumeName), audioId).buildUpon().appendPath("genres").build();
+			}
+
+			/* AOSP MediaStore.Audio.Genres.Members */
+			public static final class Members {
+				public static final Uri getContentUri(String volumeName, long genreId) {
+					return ContentUris.withAppendedId(Genres.getContentUri(volumeName), genreId).buildUpon().appendPath("members").build();
+				}
+
+				public static final String CONTENT_DIRECTORY = "members";
+				public static final String DEFAULT_SORT_ORDER = "title_key";
+				public static final String AUDIO_ID = "audio_id";
+				public static final String GENRE_ID = "genre_id";
+			}
 		}
 
 		public static class Playlists {
@@ -430,6 +454,29 @@ public class MediaStore {
 			public static final Uri INTERNAL_CONTENT_URI = getContentUri("internal");
 			public static final String CONTENT_TYPE = "vnd.android.cursor.dir/playlist";
 			public static final String ENTRY_CONTENT_TYPE = "vnd.android.cursor.item/playlist";
+			public static final String DEFAULT_SORT_ORDER = "name";
+
+			/* AOSP MediaStore.Audio.Playlists.Members */
+			public static final class Members {
+				public static final Uri getContentUri(String volumeName, long playlistId) {
+					return ContentUris.withAppendedId(Playlists.getContentUri(volumeName), playlistId).buildUpon().appendPath("members").build();
+				}
+
+				public static final boolean moveItem(ContentResolver res, long playlistId, int from, int to) {
+					Uri uri = Playlists.Members.getContentUri("external", playlistId).buildUpon().appendEncodedPath(String.valueOf(from))
+					              .appendQueryParameter("move", "true").build();
+					ContentValues values = new ContentValues();
+					values.put(Playlists.Members.PLAY_ORDER, to);
+					return res.update(uri, values, null, null) != 0;
+				}
+
+				public static final String _ID = "_id";
+				public static final String CONTENT_DIRECTORY = "members";
+				public static final String AUDIO_ID = "audio_id";
+				public static final String PLAYLIST_ID = "playlist_id";
+				public static final String PLAY_ORDER = "play_order";
+				public static final String DEFAULT_SORT_ORDER = PLAY_ORDER;
+			}
 		}
 	}
 
