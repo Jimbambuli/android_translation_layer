@@ -176,7 +176,13 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private native void native_setBooleanSetting(long widget, String name, boolean value);
 	private native void native_setStringSetting(long widget, String name, String value);
 
-	public void setDownloadListener(DownloadListener downloadListener) {}
+	private DownloadListener downloadListener;
+
+	/* AOSP WebView.setDownloadListener(): a response the WebView can't show goes to the listener instead
+	 * (internalDownloadStart()); without one it is dropped */
+	public void setDownloadListener(DownloadListener downloadListener) {
+		this.downloadListener = downloadListener;
+	}
 
 	public void setScrollBarStyle(int scrollBarStyle) {}
 
@@ -702,6 +708,14 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		}
 	}
 
+	/* as Chromium's AwContentsClientBridge.newDownload(): url, the user agent, Content-Disposition, MIME type and
+	 * length of the response that is a download */
+	@Export
+	void internalDownloadStart(String url, String contentDisposition, String mimeType, long contentLength) {
+		if (downloadListener != null)
+			downloadListener.onDownloadStart(internalToAppUrl(url), getSettings().getUserAgentString(), contentDisposition, mimeType, contentLength);
+	}
+
 	@Export
 	boolean internalShouldOverrideUrlLoading(String url) {
 		url = internalToAppUrl(url);
@@ -1043,11 +1057,50 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	/* AOSP WebView.postUrl(): a network URL is loaded with a POST of postData, any other URL with loadUrl().
-	 * WebKitGTK's public API has no request method or body, so a POST is not provided. */
+	 * Chromium (AwContents.postUrl(), LoadUrlParams.createLoadHttpPostParams()) sends postData as
+	 * application/x-www-form-urlencoded. WebKitGTK's API has no request method or body: the POST is the submission
+	 * of an HTML form with the fields of postData (decoded as that type; WebKit encodes them again), which WebKit
+	 * submits in place of the page that holds it (native_postUrl()) */
 	public void postUrl(String url, byte[] postData) {
-		if (android.webkit.URLUtil.isNetworkUrl(url))
-			throw new UnsupportedOperationException("WebView.postUrl(): POST is not provided by ATL's WebKitGTK backend");
-		loadUrl(url);
+		if (!android.webkit.URLUtil.isNetworkUrl(url)) {
+			loadUrl(url);
+			return;
+		}
+		if (isDestroyed())
+			return;
+		String formId = "atl-post-" + Long.toHexString(new java.security.SecureRandom().nextLong());
+		StringBuilder form = new StringBuilder("<!DOCTYPE html><meta charset=\"utf-8\"><form id=\"").append(formId)
+			.append("\" method=\"post\" enctype=\"application/x-www-form-urlencoded\" accept-charset=\"utf-8\" action=\"")
+			.append(attributeEscape(url)).append("\">");
+		String data = postData != null ? new String(postData, java.nio.charset.StandardCharsets.UTF_8) : "";
+		for (String field : data.split("&")) {
+			if (field.isEmpty())
+				continue;
+			int equals = field.indexOf('=');
+			form.append("<input type=\"hidden\" name=\"").append(attributeEscape(formDecode(equals < 0 ? field : field.substring(0, equals))))
+				.append("\" value=\"").append(attributeEscape(equals < 0 ? "" : formDecode(field.substring(equals + 1)))).append("\">");
+		}
+		form.append("</form>");
+		native_postUrl(widget, url, form.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), formId);
+	}
+
+	private static String attributeEscape(String s) {
+		return s.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;");
+	}
+
+	/* application/x-www-form-urlencoded parsing of one name or value: '+' is a space, %XX a byte (UTF-8); a '%'
+	 * without two hex digits stays as it is */
+	private static String formDecode(String s) {
+		java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+		byte[] in = s.replace('+', ' ').getBytes(java.nio.charset.StandardCharsets.UTF_8);
+		for (int i = 0; i < in.length; i++) {
+			if (in[i] == '%' && i + 2 < in.length && Character.digit(in[i + 1], 16) >= 0 && Character.digit(in[i + 2], 16) >= 0) {
+				bytes.write(Character.digit(in[i + 1], 16) * 16 + Character.digit(in[i + 2], 16));
+				i += 2;
+			} else
+				bytes.write(in[i]);
+		}
+		return new String(bytes.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
 	}
 
 	/* AOSP WebView.loadUrl(String, Map): as loadUrl(String), the headers go with the request */
@@ -1194,9 +1247,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	/* AOSP WebView.getWebViewClassLoader() (@hide): the ClassLoader of the WebView implementation package. ATL's
-	 * implementation is WebView itself, so it is the loader of this class; the implementation's own classes
-	 * (e.g. the chromium support-lib boundary) are not in it, a lookup of them fails with ClassNotFoundException
-	 * just as with a provider that does not have them. */
+	 * implementation is WebView itself, so it is the loader of this class; androidx.webkit finds the support-library
+	 * glue (org.chromium.support_lib_glue.SupportLibReflectionUtil) in it. */
 	public static ClassLoader getWebViewClassLoader() {
 		return WebView.class.getClassLoader();
 	}
@@ -1245,6 +1297,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	protected native long native_constructor(Context context, AttributeSet attrs);
 	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);
 	private native void native_loadUrl(long widget, String url);
+	private native void native_postUrl(long widget, String url, byte[] form, String formId);
 	private native void native_reload(long widget);
 	private native void native_addJavascriptInterface(long widget, String name, String methodNames);
 	private native void native_evaluateJavascript(long widget, String script, ValueCallback<String> callback);

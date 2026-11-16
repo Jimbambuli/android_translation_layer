@@ -338,6 +338,19 @@ static gboolean history_can_go(WebKitWebView *web_view, gint steps)
 	return !(steps < 0 && target == limit && g_object_get_data(G_OBJECT(web_view), "atl-history-floor-excl"));
 }
 
+/* WebView.postUrl(): "atl-post" is how far the POST got, "atl-post-script" the script that submits the form */
+enum { POST_NONE, POST_REQUESTED, POST_FORM_PAGE, POST_SUBMITTED };
+
+static void post_set_stage(WebKitWebView *web_view, int stage)
+{
+	WebKitUserScript *script = g_object_get_data(G_OBJECT(web_view), "atl-post-script");
+	if (stage != POST_REQUESTED && stage != POST_FORM_PAGE && script) {
+		webkit_user_content_manager_remove_script(webkit_web_view_get_user_content_manager(web_view), script);
+		g_object_set_data(G_OBJECT(web_view), "atl-post-script", NULL);
+	}
+	g_object_set_data(G_OBJECT(web_view), "atl-post", GINT_TO_POINTER(stage));
+}
+
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
@@ -352,7 +365,14 @@ static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_
 	 * PruneAllButLastCommitted() drops them on Android) */
 	if (load_event == WEBKIT_LOAD_COMMITTED && webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(web_view)) != g_object_get_data(G_OBJECT(web_view), "atl-history-ceiling"))
 		history_set_ceiling(web_view, NULL);
-	J__WebView__internalLoadChanged(env, this, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
+	/* WebView.postUrl(): one load for the app (onPageStarted() of the form page, the rest from the POST) */
+	int post = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(web_view), "atl-post"));
+	gboolean hidden = (post == POST_REQUESTED || post == POST_FORM_PAGE) ? load_event != WEBKIT_LOAD_STARTED : post == POST_SUBMITTED;
+	// the form page may still finish after the submission was decided; the POST's own load starts after that
+	if (post == POST_SUBMITTED && load_event == WEBKIT_LOAD_STARTED)
+		post_set_stage(web_view, POST_NONE);
+	if (!hidden)
+		J__WebView__internalLoadChanged(env, this, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
 	(*env)->DeleteLocalRef(env, this);
 }
 
@@ -436,6 +456,15 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 			webkit_policy_decision_use(decision);
 			return TRUE;
 		}
+		/* WebView.postUrl(): the form page was the app's load (asked like loadUrl()), its submission is the POST of
+		 * that same load; any other navigation ends the postUrl() */
+		int post = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(web_view), "atl-post"));
+		if (post && webkit_navigation_action_get_navigation_type(action) == WEBKIT_NAVIGATION_TYPE_FORM_SUBMITTED) {
+			post_set_stage(web_view, POST_SUBMITTED);
+			webkit_policy_decision_use(decision);
+			return TRUE;
+		}
+		post_set_stage(web_view, post == POST_REQUESTED ? POST_FORM_PAGE : POST_NONE);
 
 		JNIEnv *env = get_jni_env();
 		jobject this = webview_jobject(env, wrapper);
@@ -443,11 +472,30 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 		jboolean result = this ? J__WebView__internalShouldOverrideUrlLoading(env, this, _JSTRING(uri)) : JNI_TRUE;
 		if (this)
 			(*env)->DeleteLocalRef(env, this);
-		if (result)
+		if (result) {
+			post_set_stage(web_view, POST_NONE);
 			webkit_policy_decision_ignore(decision);
-		else
+		} else
 			webkit_policy_decision_use(decision);
 		return result;
+	}
+	/* a response WebKit can't show, or one to be saved (Content-Disposition: attachment), is a download: as in
+	 * Chromium it goes to the app's DownloadListener (WebView.setDownloadListener()) and isn't loaded */
+	if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
+		WebKitResponsePolicyDecision *response_decision = WEBKIT_RESPONSE_POLICY_DECISION(decision);
+		WebKitURIResponse *response = webkit_response_policy_decision_get_response(response_decision);
+		SoupMessageHeaders *headers = webkit_uri_response_get_http_headers(response);
+		const char *disposition = headers ? soup_message_headers_get_one(headers, "Content-Disposition") : NULL;
+		if (webkit_response_policy_decision_is_mime_type_supported(response_decision) && !(disposition && g_ascii_strncasecmp(disposition, "attachment", strlen("attachment")) == 0))
+			return FALSE;
+		JNIEnv *env = get_jni_env();
+		jobject this = webview_jobject(env, wrapper);
+		if (this) {
+			J__WebView__internalDownloadStart(env, this, _JSTRING(webkit_uri_response_get_uri(response)), disposition ? _JSTRING(disposition) : NULL, _JSTRING(webkit_uri_response_get_mime_type(response)), webkit_uri_response_get_content_length(response));
+			(*env)->DeleteLocalRef(env, this);
+		}
+		webkit_policy_decision_ignore(decision);
+		return TRUE;
 	}
 	return FALSE;
 }
@@ -787,6 +835,32 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl(JNIEnv *env, 
 	webkit_web_view_load_uri(webview, _CSTRING(url));
 }
 
+/* WebView.postUrl(): the form page (from Java) is loaded with the URL as its own; a script in a world of its own
+ * (so it also runs with the page's scripts turned off, enable-javascript-markup) submits the form while the page
+ * loads, WebKit's navigation then replaces the form page's history entry */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1postUrl(JNIEnv *env, jobject this, jlong widget_ptr, jstring url, jbyteArray form, jstring form_id)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+
+	WebKitWebView *webview = _PTR(widget_ptr);
+	post_set_stage(webview, POST_NONE);
+	const char *id = _CSTRING(form_id);
+	g_autofree char *source = g_strdup_printf("var form = document.getElementById('%s'); if (form) form.submit();", id);
+	(*env)->ReleaseStringUTFChars(env, form_id, id);
+	WebKitUserScript *script = webkit_user_script_new_for_world(source, WEBKIT_USER_CONTENT_INJECT_TOP_FRAME, WEBKIT_USER_SCRIPT_INJECT_AT_DOCUMENT_END, "atl-post", NULL, NULL);
+	webkit_user_content_manager_add_script(webkit_web_view_get_user_content_manager(webview), script);
+	g_object_set_data_full(G_OBJECT(webview), "atl-post-script", script, (GDestroyNotify)webkit_user_script_unref);
+	post_set_stage(webview, POST_REQUESTED);
+	jsize length = (*env)->GetArrayLength(env, form);
+	jbyte *bytes = (*env)->GetByteArrayElements(env, form, NULL);
+	g_autoptr(GBytes) data = g_bytes_new(bytes, length);
+	(*env)->ReleaseByteArrayElements(env, form, bytes, JNI_ABORT);
+	const char *uri = _CSTRING(url);
+	webkit_web_view_load_bytes(webview, data, "text/html", "UTF-8", uri);
+	(*env)->ReleaseStringUTFChars(env, url, uri);
+}
+
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload(JNIEnv *env, jobject this, jlong widget_ptr)
 {
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
@@ -1072,6 +1146,79 @@ JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1removeAllCookie
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
 		return;
 	g_main_context_invoke(NULL, remove_all_cookies_on_main, NULL);
+}
+
+/* CookieManager.removeSessionCookies(): the cookies without an expiry date go, on the main thread; the calling
+ * thread waits for the result */
+struct remove_session_cookies {
+	GMutex lock;
+	GCond cond;
+	guint pending; // cookie list + deletions not yet answered
+	gboolean removed;
+};
+
+static void remove_session_cookies_step(struct remove_session_cookies *data)
+{
+	g_mutex_lock(&data->lock);
+	data->pending--;
+	g_cond_signal(&data->cond);
+	g_mutex_unlock(&data->lock);
+}
+
+static void session_cookie_deleted_cb(GObject *cookie_manager, GAsyncResult *res, gpointer user_data)
+{
+	webkit_cookie_manager_delete_cookie_finish(WEBKIT_COOKIE_MANAGER(cookie_manager), res, NULL);
+	remove_session_cookies_step(user_data);
+}
+
+static void session_cookies_listed_cb(GObject *cookie_manager, GAsyncResult *res, gpointer user_data)
+{
+	struct remove_session_cookies *data = user_data;
+	GList *cookies = webkit_cookie_manager_get_all_cookies_finish(WEBKIT_COOKIE_MANAGER(cookie_manager), res, NULL);
+	for (GList *l = cookies; l; l = l->next) {
+		if (soup_cookie_get_expires(l->data))
+			continue;
+		g_mutex_lock(&data->lock);
+		data->pending++;
+		data->removed = TRUE;
+		g_mutex_unlock(&data->lock);
+		webkit_cookie_manager_delete_cookie(WEBKIT_COOKIE_MANAGER(cookie_manager), l->data, NULL, session_cookie_deleted_cb, data);
+	}
+	g_list_free_full(cookies, (GDestroyNotify)soup_cookie_free);
+	remove_session_cookies_step(data);
+}
+
+static gboolean remove_session_cookies_on_main(gpointer data)
+{
+	webkit_cookie_manager_get_all_cookies(webkit_network_session_get_cookie_manager(webkit_network_session_get_default()), NULL, session_cookies_listed_cb, data);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1removeSessionCookies(JNIEnv *env, jclass class)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return JNI_FALSE;
+	struct remove_session_cookies data = {.pending = 1};
+	g_mutex_init(&data.lock);
+	g_cond_init(&data.cond);
+	gboolean main_thread = g_thread_self() == main_thread_id;
+	if (main_thread)
+		remove_session_cookies_on_main(&data);
+	else
+		g_main_context_invoke(NULL, remove_session_cookies_on_main, &data);
+	g_mutex_lock(&data.lock);
+	while (data.pending) {
+		if (main_thread) {
+			g_mutex_unlock(&data.lock);
+			g_main_context_iteration(g_main_context_default(), TRUE);
+			g_mutex_lock(&data.lock);
+		} else
+			g_cond_wait(&data.cond, &data.lock);
+	}
+	g_mutex_unlock(&data.lock);
+	g_mutex_clear(&data.lock);
+	g_cond_clear(&data.cond);
+	return data.removed;
 }
 
 static gboolean set_accept_policy_on_main(gpointer policy)
