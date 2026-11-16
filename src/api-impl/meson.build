@@ -1526,6 +1526,7 @@ srcs = [
 	'android/telephony/TelephonyDisplayInfo.java',
 	'android/telephony/ServiceState.java',
 	'android/telephony/NetworkRegistrationInfo.java',
+	'android/telephony/PhoneNumberFormattingTextWatcher.java',
 	'android/telephony/TelephonyManager.java',
 	'android/text/Annotation.java',
 	'android/text/AutoText.java',
