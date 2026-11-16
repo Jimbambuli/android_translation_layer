@@ -435,14 +435,6 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (_GET_BOOL_FIELD(activity, "finishing"))
 		return;
 
-	J__Activity__onPostResume(env, activity);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-	if (_GET_BOOL_FIELD(activity, "finishing"))
-		return;
-
 	/* like ActivityThread.handleResumeActivity(), the window is shown after onResume() and onPostResume(),
 	 * unless the activity started another one meanwhile, which is now in front of it */
 	if (!activity_backlog || !(*env)->IsSameObject(env, activity_backlog->data, activity))
