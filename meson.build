@@ -164,6 +164,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/android_app_NativeActivity.c',
                                                                   	'src/api-impl-jni/android_atl_ATLViewDump.c',
                                                                   	'src/api-impl-jni/android_content_res_AssetManager.c',
+                                                                  	'src/api-impl-jni/android_hardware_SyncFence.c',
                                                                   	'src/api-impl-jni/android_opengl_GLES20.c',
                                                                   	'src/api-impl-jni/android_opengl_GLES30.c',
                                                                   	'src/api-impl-jni/android_opengl_GLES31.c',
