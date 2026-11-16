@@ -8,6 +8,12 @@
 
 #include "generated_headers/com_google_android_gles_jni_GLImpl.h"
 
+JNIEXPORT jstring JNICALL Java_com_google_android_gles_1jni_GLImpl__1glGetString(JNIEnv *env, jobject this, jint name)
+{
+	const char *chars = (const char *)glGetString((GLenum)name);
+	return _JSTRING(chars);
+}
+
 JNIEXPORT void JNICALL Java_com_google_android_gles_1jni_GLImpl_glHint(JNIEnv *env, jclass this, jint target, jint mode)
 {
 	glHint((GLenum)target, (GLenum)mode);
