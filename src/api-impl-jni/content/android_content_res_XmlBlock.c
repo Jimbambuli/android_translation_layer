@@ -13,6 +13,12 @@ JNIEXPORT jlong JNICALL Java_android_content_res_XmlBlock_nativeCreate(JNIEnv *e
 	return _INTPTR(tree);
 }
 
+JNIEXPORT jlong JNICALL Java_android_content_res_XmlBlock_nativeGetStringBlock(JNIEnv *env, jclass this, jlong block)
+{
+	struct ResXMLTree *tree = (struct ResXMLTree *)_PTR(block);
+	return _INTPTR(ResXMLTree_getStrings(tree));
+}
+
 JNIEXPORT jlong JNICALL Java_android_content_res_XmlBlock_nativeCreateParseState(JNIEnv *env, jobject this, jlong block)
 {
 	struct ResXMLTree *tree = (struct ResXMLTree *)_PTR(block);
@@ -45,7 +51,7 @@ JNIEXPORT jint JNICALL Java_android_content_res_XmlBlock_nativeNext(JNIEnv *env,
 	}
 }
 
-JNIEXPORT jstring JNICALL Java_android_content_res_XmlBlock_nativeGetPooledString(JNIEnv *env, jobject this, jlong parser_ptr, jint index)
+static jstring get_pooled_string(JNIEnv *env, jlong parser_ptr, jint index)
 {
 	struct ResXMLParser *parser = (struct ResXMLParser *)_PTR(parser_ptr);
 	const struct ResStringPool *string_pool = ResXMLParser_getStrings(parser);
@@ -62,7 +68,7 @@ JNIEXPORT jstring JNICALL Java_android_content_res_XmlBlock_nativeGetName(JNIEnv
 	int idx = ResXMLParser_getElementNameID(parser);
 	if (idx < 0)
 		return NULL;
-	return Java_android_content_res_XmlBlock_nativeGetPooledString(env, this, parser_ptr, idx);
+	return get_pooled_string(env, parser_ptr, idx);
 }
 
 JNIEXPORT jint JNICALL Java_android_content_res_XmlBlock_nativeGetAttributeCount(JNIEnv *env, jobject this, jlong parser_ptr)
@@ -101,7 +107,7 @@ JNIEXPORT jstring JNICALL Java_android_content_res_XmlBlock_nativeGetAttributeSt
 	int idx = ResXMLParser_getAttributeValueStringID(parser, index);
 	if (idx < 0)
 		return NULL;
-	return Java_android_content_res_XmlBlock_nativeGetPooledString(env, this, parser_ptr, idx);
+	return get_pooled_string(env, parser_ptr, idx);
 }
 
 JNIEXPORT jint JNICALL Java_android_content_res_XmlBlock_nativeGetLineNumber(JNIEnv *env, jobject this, jlong parser_ptr)
