@@ -2177,6 +2177,7 @@ srcs = [
 	'org/ccil/cowan/tagsoup/ScanHandler.java',
 	'org/ccil/cowan/tagsoup/Scanner.java',
 	'org/ccil/cowan/tagsoup/Schema.java',
+	'org/chromium/support_lib_glue/SupportLibReflectionUtil.java',
 ]
 java_args = [
 	'-bootclasspath', bootclasspath,
