@@ -100,20 +100,15 @@ public final class ViewStub extends View {
 		this(context, attrs, defStyle, 0);
 	}
 
-	/* AOSP ViewStub(Context, AttributeSet, int, int): the style resource goes to the ViewStub and View attributes too */
 	public ViewStub(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		super(context, attrs, defStyleAttr, defStyleRes);
-		int defStyle = defStyleAttr;
+		super(context);
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.ViewStub,
-		                                              defStyle, defStyleRes);
+		                                              defStyleAttr, defStyleRes);
+		saveAttributeDataForStyleable(context, com.android.internal.R.styleable.ViewStub, attrs, a, defStyleAttr, defStyleRes);
 
 		mInflatedId = a.getResourceId(R.styleable.ViewStub_inflatedId, NO_ID);
 		mLayoutResource = a.getResourceId(R.styleable.ViewStub_layout, 0);
-
-		a.recycle();
-
-		a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.View, defStyle, defStyleRes);
-		id = a.getResourceId(R.styleable.View_id, NO_ID);
+		id = a.getResourceId(R.styleable.ViewStub_id, NO_ID);
 		a.recycle();
 
 		initialize(context);

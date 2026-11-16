@@ -86,13 +86,12 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	 * Chromium's WebViewChromium.init() (not in the local sources) rejects private browsing for apps targeting
 	 * KitKat or later and only logs it for older ones */
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr, boolean privateBrowsing) {
-		this(context, attrs, defStyleAttr);
-		if (privateBrowsing) {
-			final String msg = "Private browsing is not supported in WebView.";
-			if (context.getApplicationInfo().targetSdkVersion >= 19)
-				throw new IllegalArgumentException(msg);
-			android.util.Log.w("WebView", msg);
-		}
+		this(context, attrs, defStyleAttr, 0, null, privateBrowsing);
+	}
+
+	protected WebView(Context context, AttributeSet attrs, int defStyleAttr, Map<String, Object> javaScriptInterfaces,
+	                  boolean privateBrowsing) {
+		this(context, attrs, defStyleAttr, 0, javaScriptInterfaces, privateBrowsing);
 	}
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -100,7 +99,21 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	public WebView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		this(context, attrs, defStyleAttr, defStyleRes, null, false);
+	}
+
+	/* AOSP: the constructor all others end in; WebViewChromium.init() adds the javaScriptInterfaces and handles privateBrowsing */
+	protected WebView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes,
+	                  Map<String, Object> javaScriptInterfaces, boolean privateBrowsing) {
 		super(context, attrs, defStyleAttr, defStyleRes);
+		if (context == null)
+			throw new IllegalArgumentException("Invalid context argument");
+		if (privateBrowsing) {
+			final String msg = "Private browsing is not supported in WebView.";
+			if (context.getApplicationInfo().targetSdkVersion >= 19)
+				throw new IllegalArgumentException(msg);
+			android.util.Log.w("WebView", msg);
+		}
 		providerInitialized = true;
 		// AOSP WebView constructor: a WebView allows CookieSyncManager.getInstance()
 		CookieSyncManager.setGetInstanceIsAllowed();
@@ -113,6 +126,10 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		String language = java.util.Locale.getDefault().toLanguageTag();
 		if (!"und".equals(language))
 			native_setPreferredLanguage(language);
+		if (javaScriptInterfaces != null) {
+			for (Map.Entry<String, Object> entry : javaScriptInterfaces.entrySet())
+				addJavascriptInterface(entry.getValue(), entry.getKey());
+		}
 	}
 
 	private static native void native_setPreferredLanguage(String language);

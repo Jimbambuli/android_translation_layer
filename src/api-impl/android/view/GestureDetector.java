@@ -270,6 +270,7 @@ public class GestureDetector {
 	 * Determines speed during touch scrolling
 	*/
 	private VelocityTracker mVelocityTracker;
+	private final int mVelocityTrackerStrategy;
 
 	private class GestureHandler extends Handler {
 		GestureHandler() {
@@ -380,6 +381,11 @@ public class GestureDetector {
 	* @throws NullPointerException if {@code listener} is null.
 	*/
 	public GestureDetector(Context context, OnGestureListener listener, Handler handler) {
+		this(context, listener, handler, VelocityTracker.VELOCITY_TRACKER_STRATEGY_DEFAULT);
+	}
+
+	/** @hide AOSP: the strategy the velocity tracker of fling detection uses */
+	public GestureDetector(Context context, OnGestureListener listener, Handler handler, int velocityTrackerStrategy) {
 		if (handler != null) {
 			mHandler = new GestureHandler(handler);
 		} else {
@@ -392,6 +398,7 @@ public class GestureDetector {
 		if (listener instanceof OnContextClickListener) {
 			setContextClickListener((OnContextClickListener)listener);
 		}
+		mVelocityTrackerStrategy = velocityTrackerStrategy;
 		init(context);
 	}
 
@@ -502,7 +509,7 @@ public class GestureDetector {
 		mCurrentMotionEvent = MotionEvent.obtain(ev);
 
 		if (mVelocityTracker == null) {
-			mVelocityTracker = VelocityTracker.obtain();
+			mVelocityTracker = VelocityTracker.obtain(mVelocityTrackerStrategy);
 		}
 		mVelocityTracker.addMovement(ev);
 

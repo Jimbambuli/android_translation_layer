@@ -25,7 +25,13 @@ public class SurfaceView extends View {
 	}
 
 	public SurfaceView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+		this(context, attrs, defStyleAttr, defStyleRes, false);
+	}
+
+	/** @hide AOSP: disableBackgroundLayer only controls the background layer of the window compositor, which ATL does not have */
+	public SurfaceView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes, boolean disableBackgroundLayer) {
 		super(context, attrs, defStyleAttr, defStyleRes);
+		setWillNotDraw(true);
 
 		mSurface.widget = this.widget;
 	}

@@ -22,7 +22,10 @@ public abstract class TvInputService extends android.app.Service {
         public abstract String getHardwareInputId();
         public void onHardwareVideoAvailable() {  }
         public void onHardwareVideoUnavailable(int arg0) {  }
-        public final boolean onSetSurface(android.view.Surface arg0) { return false; }
+        public final boolean onSetSurface(android.view.Surface surface) {
+            android.util.Log.e("TvInputService", "onSetSurface() should not be called in HardwareProxySession.");
+            return false;
+        }
     }
 
     public abstract static class RecordingSession {
@@ -35,15 +38,19 @@ public abstract class TvInputService extends android.app.Service {
         public abstract void onRelease();
         public void onResumeRecording(android.os.Bundle arg0) {  }
         public abstract void onStartRecording(android.net.Uri arg0);
-        public void onStartRecording(android.net.Uri arg0, android.os.Bundle arg1) {  }
+        public void onStartRecording(android.net.Uri programUri, android.os.Bundle params) { onStartRecording(programUri); }
         public abstract void onStopRecording();
         public abstract void onTune(android.net.Uri arg0);
-        public void onTune(android.net.Uri arg0, android.os.Bundle arg1) {  }
+        public void onTune(android.net.Uri channelUri, android.os.Bundle params) { onTune(channelUri); }
     }
 
     public abstract static class Session implements android.view.KeyEvent.Callback {
         public Session(android.content.Context arg0)  {}
-        public void layoutSurface(int arg0, int arg1, int arg2, int arg3) {  }
+        public void layoutSurface(int left, int top, int right, int bottom) {
+            if (left > right || top > bottom) {
+                throw new IllegalArgumentException("Invalid parameter");
+            }
+        }
         public void notifyAdBufferConsumed(android.media.tv.AdBuffer arg0) {  }
         public void notifyAdResponse(android.media.tv.AdResponse arg0) {  }
         public void notifyAitInfoUpdated(android.media.tv.AitInfo arg0) {  }
@@ -53,7 +60,9 @@ public abstract class TvInputService extends android.app.Service {
         public void notifyBroadcastInfoResponse(android.media.tv.BroadcastInfoResponse arg0) {  }
         public void notifyChannelRetuned(android.net.Uri arg0) {  }
         public void notifyContentAllowed() {  }
-        public void notifyContentBlocked(android.media.tv.TvContentRating arg0) {  }
+        public void notifyContentBlocked(android.media.tv.TvContentRating rating) {
+            java.util.Objects.requireNonNull(rating);
+        }
         public void notifyCueingMessageAvailability(boolean arg0) {  }
         public void notifySignalStrength(int arg0) {  }
         public void notifyTimeShiftMode(int arg0) {  }
