@@ -81,12 +81,25 @@ public final class KeyboardShortcutInfo implements Parcelable {
      *     {@link KeyEvent#META_SYM_ON}.
      */
     public KeyboardShortcutInfo(CharSequence label, char baseCharacter, int modifiers) {
+        this(label, null, baseCharacter, modifiers);
+    }
+
+    /**
+     * @param label The label that identifies the action performed by this shortcut.
+     * @param icon An icon that identifies the action performed by this shortcut.
+     * @param baseCharacter The character that triggers the shortcut.
+     * @param modifiers The set of modifiers that, combined with the key, trigger the shortcut.
+     *
+     * @hide
+     */
+    public KeyboardShortcutInfo(
+            CharSequence label, @Nullable Icon icon, char baseCharacter, int modifiers) {
         mLabel = label;
         checkArgument(baseCharacter != MIN_VALUE);
         mBaseCharacter = baseCharacter;
         mKeycode = KeyEvent.KEYCODE_UNKNOWN;
         mModifiers = modifiers;
-        mIcon = null;
+        mIcon = icon;
     }
 
     private KeyboardShortcutInfo(Parcel source) {
