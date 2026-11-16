@@ -97,6 +97,7 @@ public final class AssetManager implements AutoCloseable {
 	private int mNObject; // used by the NDK
 
 	private StringBlock mStringBlocks[] = null;
+	private static final HashMap<Long, StringBlock> sStringBlocks = new HashMap<Long, StringBlock>();
 
 	private int mNumRefs = 1;
 	private boolean mOpen = true;
@@ -211,8 +212,10 @@ public final class AssetManager implements AutoCloseable {
 		if (id == 0)
 			return "";
 		TypedValue value = new TypedValue();
-		loadResourceValue(id, (short)0, value, true);
-		return value.coerceToString();
+		if (getResourceValue(id, 0, value, true)) {
+			return value.coerceToString();
+		}
+		return null;
 	}
 
 	/**
@@ -222,10 +225,13 @@ public final class AssetManager implements AutoCloseable {
 	/*package*/ final CharSequence getResourceBagText(int ident, int bagEntryId) {
 		TypedValue value = new TypedValue();
 		int block = loadResourceBagValue(ident, bagEntryId, value, true);
-		if (block >= 0) {
-			return value.coerceToString();
+		if (block <= 0) {
+			return null;
 		}
-		return null;
+		if (value.type == TypedValue.TYPE_STRING) {
+			return getPooledString(block, value.data);
+		}
+		return value.coerceToString();
 	}
 
 	/**
@@ -242,7 +248,15 @@ public final class AssetManager implements AutoCloseable {
 	                                           TypedValue outValue,
 	                                           boolean resolveRefs) {
 		int block = loadResourceValue(ident, (short)density, outValue, resolveRefs);
-		return block >= 0;
+		if (block <= 0) {
+			return false;
+		}
+		if (outValue.type == TypedValue.TYPE_STRING) {
+			if ((outValue.string = getPooledString(block, outValue.data)) == null) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -254,7 +268,7 @@ public final class AssetManager implements AutoCloseable {
 		int n = getArraySize(id);
 		int[] valueArray = new int[n * STYLE_NUM_ENTRIES];
 		retrieveArray(id, valueArray);
-		CharSequence[] values = new String[n];
+		CharSequence[] values = new CharSequence[n];
 		TypedValue value = new TypedValue();
 		for (int i = 0; i < n; i++) {
 			value.data = valueArray[i * STYLE_NUM_ENTRIES + STYLE_DATA];
@@ -272,7 +286,15 @@ public final class AssetManager implements AutoCloseable {
 	/*package*/ final boolean getThemeValue(long style, int ident,
 	                                        TypedValue outValue, boolean resolveRefs) {
 		int block = loadThemeAttributeValue(style, ident, outValue, resolveRefs);
-		return block >= 0;
+		if (block <= 0) {
+			return false;
+		}
+		if (outValue.type == TypedValue.TYPE_STRING) {
+			if ((outValue.string = getPooledString(block, outValue.data)) == null) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/*package*/ final void ensureStringBlocks() {
@@ -300,7 +322,24 @@ public final class AssetManager implements AutoCloseable {
 		}
 	}
 
-	/*package*/ native final CharSequence getPooledString(int block, int id);
+	/* like AOSP's getPooledStringForCookie(): the string with its style spans, from the StringBlock of the
+	 * ApkAssets of the cookie. ATL never frees ApkAssets (load_apk_assets() in AssetManager.c), so their
+	 * string pools live for good and there is one StringBlock per pool, shared like AOSP's ApkAssets.mStringBlock. */
+	/*package*/ final CharSequence getPooledString(int block, int id) {
+		final long pool = getNativeStringBlock(block - 1);
+		if (pool == 0) {
+			return null;
+		}
+		StringBlock stringBlock;
+		synchronized (sStringBlocks) {
+			stringBlock = sStringBlocks.get(pool);
+			if (stringBlock == null) {
+				stringBlock = new StringBlock(pool, true);
+				sStringBlocks.put(pool, stringBlock);
+			}
+		}
+		return stringBlock.getSequence(id);
+	}
 
 	/**
 	 * Open an asset using ACCESS_STREAMING mode.  This provides access to
@@ -795,7 +834,7 @@ public final class AssetManager implements AutoCloseable {
 	/*package*/ native final int getArraySize(int resource);
 	/*package*/ native final int retrieveArray(int resource, int[] outValues);
 	private native final int getStringBlockCount();
-	private native final int getNativeStringBlock(int block);
+	private native final long getNativeStringBlock(int block);
 
 	/**
 	 * {@hide}

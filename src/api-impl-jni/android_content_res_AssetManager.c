@@ -303,14 +303,8 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceValue(J
 		_SET_INT_FIELD(outValue, "assetCookie", JAVA_COOKIE(cookie));
 		/* the density of the configuration the value comes from, which sizes a bitmap */
 		_SET_INT_FIELD(outValue, "density", outConfig.density);
-		if (value.dataType == TYPE_STRING) {
-			const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
-			size_t len;
-			const char16_t *string = ResStringPool_stringAt(string_pool, value.data, &len);
-			_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", (*env)->NewString(env, string, len));
-		} else {
-			_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", NULL);
-		}
+		/* like AOSP's CopyValue(): the Java side gets a TYPE_STRING from the StringBlock, with its styles */
+		_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", NULL);
 	}
 	return JAVA_COOKIE(cookie);
 }
@@ -384,14 +378,13 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_getResourceIdentifi
 	return ret;
 }
 
-JNIEXPORT jobject JNICALL Java_android_content_res_AssetManager_getPooledString(JNIEnv *env, jobject this, jint cookie, jint index)
+/* the string pool of the ApkAssets at index block, for a StringBlock (0 if there is none); ATL never frees
+ * ApkAssets (load_apk_assets()), so the pool outlives the AssetManager */
+JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_getNativeStringBlock(JNIEnv *env, jobject this, jint block)
 {
 	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
 	AM_SCOPEDLOCK(asset_manager)
-	const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, NATIVE_COOKIE(cookie));
-	size_t len;
-	const char16_t *string = ResStringPool_stringAt(string_pool, index, &len);
-	return (*env)->NewString(env, string, len);
+	return _INTPTR(AssetManager_getStringPoolForCookie(asset_manager, block));
 }
 
 JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_newTheme(JNIEnv *env, jobject this)
@@ -441,14 +434,8 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadThemeAttributeV
 		_SET_INT_FIELD(outValue, "resourceId", ref);
 		_SET_INT_FIELD(outValue, "assetCookie", JAVA_COOKIE(cookie));
 		_SET_INT_FIELD(outValue, "density", outConfig.density);
-		if (value.dataType == TYPE_STRING) {
-			const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
-			size_t len;
-			const char16_t *string = ResStringPool_stringAt(string_pool, value.data, &len);
-			_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", (*env)->NewString(env, string, len));
-		} else {
-			_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", NULL);
-		}
+		/* like AOSP's CopyValue(): the Java side gets a TYPE_STRING from the StringBlock, with its styles */
+		_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", NULL);
 	}
 	return JAVA_COOKIE(cookie);
 }
@@ -717,14 +704,8 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_loadResourceBagValu
 			_SET_INT_FIELD(outValue, "data", value.data);
 			_SET_INT_FIELD(outValue, "resourceId", ref);
 			_SET_INT_FIELD(outValue, "assetCookie", JAVA_COOKIE(cookie));
-			if (value.dataType == TYPE_STRING) {
-				const struct ResStringPool *string_pool = AssetManager_getStringPoolForCookie(asset_manager, cookie);
-				size_t len;
-				const char16_t *string = ResStringPool_stringAt(string_pool, value.data, &len);
-				_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", (*env)->NewString(env, string, len));
-			} else {
-				_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", NULL);
-			}
+			/* like AOSP's CopyValue(): the Java side gets a TYPE_STRING from the StringBlock, with its styles */
+			_SET_OBJ_FIELD(outValue, "string", "Ljava/lang/CharSequence;", NULL);
 			break;
 		}
 	}
