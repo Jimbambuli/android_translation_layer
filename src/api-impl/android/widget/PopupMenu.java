@@ -167,6 +167,12 @@ public class PopupMenu {
 	protected native void native_dismiss(long popover);
 	protected native void native_show(long popover, long anchor, int anchorWidth, int anchorHeight, int gravity);
 
+	/* the GMenu item shows the title as plain text (GtkPopoverMenu ignores "use-markup"), so its spans are kept
+	 * only for getTitle(); a null title is shown as an empty one */
+	private static String label(CharSequence title) {
+		return title == null ? "" : title.toString();
+	}
+
 	/* every item has a key of its own for the GMenu action: item ids need not be unique (add(title)
 	 * gives them all 0), so the id would always find the first item */
 	private int nextKey;
@@ -289,7 +295,7 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem add(int groupId, int itemId, int order, CharSequence title) {
-			MenuItemImpl item = new MenuItemImpl(itemId, groupId, order, this, String.valueOf(title), null);
+			MenuItemImpl item = new MenuItemImpl(itemId, groupId, order, this, title, null);
 			insert(item);
 			return item;
 		}
@@ -360,7 +366,7 @@ public class PopupMenu {
 
 		@Override
 		public SubMenu addSubMenu(int groupId, int itemId, int order, CharSequence title) {
-			SubMenuImpl submenu = new SubMenuImpl(itemId, groupId, order, this, String.valueOf(title));
+			SubMenuImpl submenu = new SubMenuImpl(itemId, groupId, order, this, title);
 			insert(submenu.item);
 			return submenu;
 		}
@@ -455,7 +461,7 @@ public class PopupMenu {
 	private class SubMenuImpl extends MenuImpl implements SubMenu {
 		private MenuItemImpl item;
 
-		public SubMenuImpl(int id, int groupId, int order, MenuImpl parent, String title) {
+		public SubMenuImpl(int id, int groupId, int order, MenuImpl parent, CharSequence title) {
 			item = new MenuItemImpl(id, groupId, order, parent, title, this);
 		}
 
@@ -510,7 +516,7 @@ public class PopupMenu {
 		private final int groupId;
 		private final int order;
 		private MenuImpl parent;
-		private String title;
+		private CharSequence title;
 		private CharSequence titleCondensed;
 		SubMenuImpl subMenu;
 		int position; // position in list of visible items, or -1 if not visible
@@ -533,7 +539,7 @@ public class PopupMenu {
 
 		private final int key = nextKey++;
 
-		private MenuItemImpl(int id, int groupId, int order, MenuImpl parent, String title, SubMenuImpl subMenu) {
+		private MenuItemImpl(int id, int groupId, int order, MenuImpl parent, CharSequence title, SubMenuImpl subMenu) {
 			keyed.add(this);
 			this.id = id;
 			this.groupId = groupId;
@@ -578,9 +584,9 @@ public class PopupMenu {
 						break;
 				}
 				if (subMenu != null)
-					native_insertSubmenu(parent.menu, position, title, subMenu.menu);
+					native_insertSubmenu(parent.menu, position, label(title), subMenu.menu);
 				else
-					native_insertItem(parent.menu, position, title, key);
+					native_insertItem(parent.menu, position, label(title), key);
 			}
 			return this;
 		}
@@ -618,14 +624,14 @@ public class PopupMenu {
 
 		@Override
 		public MenuItem setTitle(CharSequence title) {
-			this.title = String.valueOf(title);
+			this.title = title;
 			// GMenu items are immutable, so replace a visible item to show the new title
 			if (isVisible()) {
 				native_removeItem(parent.menu, position);
 				if (subMenu != null)
-					native_insertSubmenu(parent.menu, position, this.title, subMenu.menu);
+					native_insertSubmenu(parent.menu, position, label(title), subMenu.menu);
 				else
-					native_insertItem(parent.menu, position, this.title, key);
+					native_insertItem(parent.menu, position, label(title), key);
 			}
 			return this;
 		}
