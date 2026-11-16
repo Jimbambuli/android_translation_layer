@@ -130,6 +130,15 @@ public class Window {
 				return onBackInvokedDispatcher;
 			}
 
+			/* like AOSP's DecorView: until the window is shown, the controller of the window
+			 * (AOSP's PendingInsetsController) is handed out */
+			@Override
+			public WindowInsetsController getWindowInsetsController() {
+				if (isAttachedToWindow())
+					return super.getWindowInsetsController();
+				return Window.this.getInsetsController();
+			}
+
 			/* like AOSP's DecorView: the window's Window.Callback hears when the window gains or loses
 			 * the focus and when it is attached or detached */
 			@Override
