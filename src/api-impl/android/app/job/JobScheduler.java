@@ -149,9 +149,11 @@ public class JobScheduler {
 		if (pendingJobs.containsKey(job.getId()))
 			return 1; //RESULT_SUCCESS
 		pendingJobs.put(job.getId(), job);
-		new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+		Runnable start = new Runnable() {
 			@Override
 			public void run() {
+				if (pendingJobs.get(job.getId()) != job)
+					return; // cancelled meanwhile
 				try {
 					String className = job.getService().getClassName();
 					Class<? extends JobService> cls = context.get_atl_loaded_app()
@@ -172,8 +174,60 @@ public class JobScheduler {
 					e.printStackTrace();
 				}
 			}
-		}, job.minLatencyMillis);
+		};
+		if (job.getTriggerContentUris() != null)
+			contentTriggers.put(job, new ContentTrigger(job, start));
+		else
+			new Handler(Looper.getMainLooper()).postDelayed(start, job.minLatencyMillis);
 		return 1; //RESULT_SUCCESS
+	}
+
+	/* the jobs that wait for a change of their trigger content URIs */
+	private static IdentityHashMap<JobInfo, ContentTrigger> contentTriggers = new IdentityHashMap<>();
+
+	/* AOSP ContentObserverController: a job with trigger content URIs runs only after a change of one of them was
+	 * reported, getTriggerContentUpdateDelay() after the last change and at most getTriggerContentMaxDelay() after
+	 * the first one (JobStatus: default 10 s / 2 min, at least 500 ms / 1 s); then the observers go */
+	private final class ContentTrigger extends android.database.ContentObserver {
+		private final JobInfo job;
+		private final Runnable start;
+		private final Handler handler = new Handler(Looper.getMainLooper());
+		private final Runnable trigger = new Runnable() {
+			@Override
+			public void run() {
+				detach();
+				handler.postDelayed(start, Math.max(0, scheduled + job.minLatencyMillis - android.os.SystemClock.elapsedRealtime()));
+			}
+		};
+		private final long scheduled = android.os.SystemClock.elapsedRealtime();
+		private boolean pending;
+
+		ContentTrigger(JobInfo job, Runnable start) {
+			super(new Handler(Looper.getMainLooper()));
+			this.job = job;
+			this.start = start;
+			for (JobInfo.TriggerContentUri uri : job.getTriggerContentUris())
+				context.getContentResolver().registerContentObserver(uri.getUri(),
+				    (uri.getFlags() & JobInfo.TriggerContentUri.FLAG_NOTIFY_FOR_DESCENDANTS) != 0, this);
+		}
+
+		@Override
+		public void onChange(boolean selfChange, android.net.Uri uri) {
+			if (!pending) {
+				pending = true;
+				long max = job.getTriggerContentMaxDelay();
+				handler.postDelayed(trigger, max < 0 ? 2 * 60 * 1000 : Math.max(max, 1000));
+			}
+			handler.removeCallbacks(trigger, this);
+			long update = job.getTriggerContentUpdateDelay();
+			handler.postAtTime(trigger, this, android.os.SystemClock.uptimeMillis() + (update < 0 ? 10 * 1000 : Math.max(update, 500)));
+		}
+
+		void detach() {
+			handler.removeCallbacksAndMessages(null);
+			context.getContentResolver().unregisterContentObserver(this);
+			contentTriggers.remove(job);
+		}
 	}
 
 	public JobInfo getPendingJob(int jobId) {
@@ -211,6 +265,9 @@ public class JobScheduler {
 
 	public void cancel(int id) {
 		JobInfo job = pendingJobs.remove(id);
+		ContentTrigger trigger = job != null ? contentTriggers.get(job) : null;
+		if (trigger != null)
+			trigger.detach();
 		if (job != null && job.running) {
 			new Handler(Looper.getMainLooper()).post(new Runnable() {
 				@Override
