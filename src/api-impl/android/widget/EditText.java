@@ -176,6 +176,10 @@ public class EditText extends TextView {
 		onTextChanged(s, 0, old.length(), s.length());
 		for (TextWatcher watcher : watchers)
 			watcher.afterTextChanged(s);
+		if (mSelectionChangePending) {
+			mSelectionChangePending = false;
+			onSelectionChanged(getSelectionStart(), getSelectionEnd());
+		}
 	}
 
 	private String mPreviousText = "";
@@ -265,9 +269,19 @@ public class EditText extends TextView {
 		setSelection(0, native_getText(widget).length());
 	}
 
-	/* called from native code when the cursor or the selection moved */
+	/* the cursor moved with a text change that sendTextChanged() has not passed on yet */
+	private boolean mSelectionChangePending;
+
+	/* called from native code when the cursor or the selection moved. GtkText moves the cursor before it reports
+	 * the change of its text; AOSP's SpannableStringBuilder.replace() calls the TextWatchers first and the span
+	 * watchers (TextView.spanChange() -> onSelectionChanged()) after them, with the Editable already changed. So
+	 * while the typed text is not in the Editable yet, onSelectionChanged() waits for sendTextChanged(). */
 	@Export
 	private void sendSelectionChanged() {
+		if (!native_getText(widget).equals(mPreviousText)) {
+			mSelectionChangePending = true;
+			return;
+		}
 		onSelectionChanged(getSelectionStart(), getSelectionEnd());
 	}
 
