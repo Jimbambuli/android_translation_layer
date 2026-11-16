@@ -708,6 +708,8 @@ srcs = [
 	'android/hardware/display/VirtualDisplay.java',
 	'android/hardware/display/VirtualDisplayConfig.java',
 	'android/hardware/fingerprint/FingerprintManager.java',
+	'android/hardware/input/HostUsiVersion.java',
+	'android/hardware/input/InputDeviceIdentifier.java',
 	'android/hardware/input/InputManager.java',
 	'android/hardware/usb/UsbAccessory.java',
 	'android/hardware/usb/UsbConfiguration.java',
