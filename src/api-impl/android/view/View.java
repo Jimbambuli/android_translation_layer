@@ -7828,4 +7828,34 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public Runnable getHandwritingDelegatorCallback() {
 		return mHandwritingDelegatorCallback;
 	}
+
+	/* AOSP View: the delegate side of the handwriting delegation (setIsHandwritingDelegate() and the allowed
+	 * packages); values only, as ATL has no handwriting service. */
+	private boolean mIsHandwritingDelegate;
+	private String mAllowedHandwritingDelegatePackageName;
+	private String mAllowedHandwritingDelegatorPackageName;
+
+	public void setAllowedHandwritingDelegatePackage(String allowedPackageName) {
+		mAllowedHandwritingDelegatePackageName = allowedPackageName;
+	}
+
+	public String getAllowedHandwritingDelegatePackageName() {
+		return mAllowedHandwritingDelegatePackageName;
+	}
+
+	public void setIsHandwritingDelegate(boolean isHandwritingDelegate) {
+		mIsHandwritingDelegate = isHandwritingDelegate;
+	}
+
+	public boolean isHandwritingDelegate() {
+		return mIsHandwritingDelegate;
+	}
+
+	public void setAllowedHandwritingDelegatorPackage(String allowedPackageName) {
+		mAllowedHandwritingDelegatorPackageName = allowedPackageName;
+	}
+
+	public String getAllowedHandwritingDelegatorPackageName() {
+		return mAllowedHandwritingDelegatorPackageName;
+	}
 }
