@@ -10,10 +10,26 @@ extern "C" {
 /*
  * Class:     android_graphics_SurfaceTexture
  * Method:    nativeUpdateTexImage
- * Signature: (I)Z
+ * Signature: (IJ)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_graphics_SurfaceTexture_nativeUpdateTexImage
+  (JNIEnv *, jobject, jint, jlong);
+
+/*
+ * Class:     android_graphics_SurfaceTexture
+ * Method:    nativeDetachFromGLContext
+ * Signature: (I)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_SurfaceTexture_nativeDetachFromGLContext
   (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     android_graphics_SurfaceTexture
+ * Method:    nativeRelease
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_SurfaceTexture_nativeRelease
+  (JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }

@@ -9,6 +9,8 @@ extern "C" {
 #endif
 #undef android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM
 #define android_media_MediaCodec_BUFFER_FLAG_END_OF_STREAM 4L
+#undef android_media_MediaCodec_CONFIGURE_FLAG_DETACHED_SURFACE
+#define android_media_MediaCodec_CONFIGURE_FLAG_DETACHED_SURFACE 8L
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_constructor
@@ -20,10 +22,10 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_setOutputSurface
- * Signature: (JJ)V
+ * Signature: (JLandroid/view/Surface;)V
  */
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1setOutputSurface
-  (JNIEnv *, jobject, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jobject);
 
 /*
  * Class:     android_media_MediaCodec
@@ -36,10 +38,18 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_configure_video
- * Signature: (JLjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Landroid/view/Surface;)V
+ * Signature: (JLjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Landroid/view/Surface;I)V
  */
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video
-  (JNIEnv *, jobject, jlong, jobject, jobject, jobject);
+  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jint);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_setVideoScalingMode
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1setVideoScalingMode
+  (JNIEnv *, jobject, jlong, jboolean);
 
 /*
  * Class:     android_media_MediaCodec
