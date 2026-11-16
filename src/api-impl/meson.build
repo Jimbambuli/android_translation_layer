@@ -1046,6 +1046,7 @@ srcs = [
 	'android/net/wifi/util/BuildProperties.java',
 	'android/net/wifi/util/HexEncoding.java',
 	'android/net/wifi/util/PersistableBundleUtils.java',
+	'android/net/wifi/AnqpInformationElement.java',
 	'android/net/wifi/ScanResult.java',
 	'android/net/wifi/SecurityParams.java',
 	'android/net/wifi/SoftApConfiguration.java',
