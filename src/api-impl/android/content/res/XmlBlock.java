@@ -34,8 +34,7 @@ public final class XmlBlock implements AutoCloseable {
 	public XmlBlock(byte[] data) {
 		mAssets = null;
 		mNative = nativeCreate(data, 0, data.length);
-		// mStrings = new StringBlock(nativeGetStringBlock(mNative), false);
-		mStrings = null;
+		mStrings = new StringBlock(nativeGetStringBlock(mNative), false);
 	}
 
 	public XmlBlock(byte[] data, int offset, int size) {
@@ -49,8 +48,7 @@ public final class XmlBlock implements AutoCloseable {
 			throw new ArrayIndexOutOfBoundsException("Array length is " + data.length + " but the offset + read size is " + offset + " + " + size);
 		}
 		mNative = nativeCreate(data, offset, size);
-		// mStrings = new StringBlock(nativeGetStringBlock(mNative), false);
-		mStrings = null;
+		mStrings = new StringBlock(nativeGetStringBlock(mNative), false);
 	}
 
 	@Override
@@ -66,6 +64,7 @@ public final class XmlBlock implements AutoCloseable {
 	private void decOpenCountLocked() {
 		mOpenCount--;
 		if (mOpenCount == 0) {
+			mStrings.close();
 			nativeDestroy(mNative);
 			if (mAssets != null) {
 				mAssets.xmlBlockGone(hashCode());
@@ -148,7 +147,7 @@ public final class XmlBlock implements AutoCloseable {
 		}
 		public String getText() {
 			int id = nativeGetText(mParseState);
-			return id >= 0 ? (String)getPooledString(id) : null;
+			return id >= 0 ? getSequenceString(mStrings.getSequence(id)) : null;
 		}
 		public int getLineNumber() {
 			return nativeGetLineNumber(mParseState);
@@ -176,7 +175,7 @@ public final class XmlBlock implements AutoCloseable {
 		}
 		public String getNamespace() {
 			int id = nativeGetNamespace(mParseState);
-			return id >= 0 ? (String)getPooledString(id) : "";
+			return id >= 0 ? getSequenceString(mStrings.getSequence(id)) : "";
 		}
 		public String getName() {
 			return nativeGetName(mParseState);
@@ -186,7 +185,7 @@ public final class XmlBlock implements AutoCloseable {
 			if (DEBUG)
 				System.out.println("getAttributeNamespace of " + index + " = " + id);
 			if (id >= 0)
-				return (String)getPooledString(id);
+				return getSequenceString(mStrings.getSequence(id));
 			else if (id == -1)
 				return "";
 			throw new IndexOutOfBoundsException(String.valueOf(index));
@@ -196,7 +195,7 @@ public final class XmlBlock implements AutoCloseable {
 			if (DEBUG)
 				System.out.println("getAttributeName of " + index + " = " + id);
 			if (id >= 0)
-				return (String)getPooledString(id);
+				return getSequenceString(mStrings.getSequence(id));
 			throw new IndexOutOfBoundsException(String.valueOf(index));
 		}
 		public String getAttributePrefix(int index) {
@@ -428,7 +427,7 @@ public final class XmlBlock implements AutoCloseable {
 
 		public String getIdAttribute() {
 			int id = nativeGetIdAttribute(mParseState);
-			return id >= 0 ? (String)getPooledString(id) : null;
+			return id >= 0 ? getSequenceString(mStrings.getSequence(id)) : null;
 		}
 		public String getClassAttribute() {
 			return nativeGetClassAttribute(mParseState);
@@ -457,10 +456,19 @@ public final class XmlBlock implements AutoCloseable {
 			close();
 		}
 
+		private String getSequenceString(CharSequence str) {
+			if (str == null) {
+				// A value of null retrieved from a StringPool indicates that retrieval of the
+				// string failed due to incremental installation. The presence of all the XmlBlock
+				// data is verified when it is created, so this exception must not be possible.
+				throw new IllegalStateException("Retrieving a string from the StringPool of an"
+				                                + " XmlBlock should never fail");
+			}
+			return str.toString();
+		}
+
 		/*package*/ final CharSequence getPooledString(int id) {
-			if (id < 0)
-				return null;
-			return nativeGetPooledString(mParseState, id);
+			return mStrings.getSequence(id);
 		}
 
 		/*package*/ long mParseState;
@@ -484,8 +492,7 @@ public final class XmlBlock implements AutoCloseable {
 	XmlBlock(AssetManager assets, long xmlBlock) {
 		mAssets = assets;
 		mNative = xmlBlock;
-		// mStrings = new StringBlock(nativeGetStringBlock(xmlBlock), false);
-		mStrings = null;
+		mStrings = new StringBlock(nativeGetStringBlock(xmlBlock), false);
 	}
 
 	private final AssetManager mAssets;
@@ -497,7 +504,7 @@ public final class XmlBlock implements AutoCloseable {
 	private static final native long nativeCreate(byte[] data,
 	                                              int offset,
 	                                              int size);
-	private static final native int nativeGetStringBlock(long obj);
+	private static final native long nativeGetStringBlock(long obj);
 
 	private static final native long nativeCreateParseState(long obj);
 	/*package*/ static final native int nativeNext(long state);
@@ -517,7 +524,6 @@ public final class XmlBlock implements AutoCloseable {
 	private static final native int nativeGetStyleAttribute(long state);
 	private static final native int nativeGetAttributeIndex(long state, String namespace, String name);
 	private static final native void nativeDestroyParseState(long state);
-	private static final native String nativeGetPooledString(long state, int id);
 
 	private static final native void nativeDestroy(long obj);
 }
