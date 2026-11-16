@@ -159,7 +159,13 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private native void native_setBooleanSetting(long widget, String name, boolean value);
 	private native void native_setStringSetting(long widget, String name, String value);
 
-	public void setDownloadListener(DownloadListener downloadListener) {}
+	private DownloadListener downloadListener;
+
+	/* AOSP WebView.setDownloadListener(): a response the WebView can't show goes to the listener instead
+	 * (internalDownloadStart()); without one it is dropped */
+	public void setDownloadListener(DownloadListener downloadListener) {
+		this.downloadListener = downloadListener;
+	}
 
 	public void setScrollBarStyle(int scrollBarStyle) {}
 
@@ -683,6 +689,14 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 			if (webViewClient != null)
 				webViewClient.onPageFinished(this, url);
 		}
+	}
+
+	/* as Chromium's AwContentsClientBridge.newDownload(): url, the user agent, Content-Disposition, MIME type and
+	 * length of the response that is a download */
+	@Export
+	void internalDownloadStart(String url, String contentDisposition, String mimeType, long contentLength) {
+		if (downloadListener != null)
+			downloadListener.onDownloadStart(internalToAppUrl(url), getSettings().getUserAgentString(), contentDisposition, mimeType, contentLength);
 	}
 
 	@Export

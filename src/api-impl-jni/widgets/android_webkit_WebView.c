@@ -478,6 +478,24 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 			webkit_policy_decision_use(decision);
 		return result;
 	}
+	/* a response WebKit can't show, or one to be saved (Content-Disposition: attachment), is a download: as in
+	 * Chromium it goes to the app's DownloadListener (WebView.setDownloadListener()) and isn't loaded */
+	if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
+		WebKitResponsePolicyDecision *response_decision = WEBKIT_RESPONSE_POLICY_DECISION(decision);
+		WebKitURIResponse *response = webkit_response_policy_decision_get_response(response_decision);
+		SoupMessageHeaders *headers = webkit_uri_response_get_http_headers(response);
+		const char *disposition = headers ? soup_message_headers_get_one(headers, "Content-Disposition") : NULL;
+		if (webkit_response_policy_decision_is_mime_type_supported(response_decision) && !(disposition && g_ascii_strncasecmp(disposition, "attachment", strlen("attachment")) == 0))
+			return FALSE;
+		JNIEnv *env = get_jni_env();
+		jobject this = webview_jobject(env, wrapper);
+		if (this) {
+			J__WebView__internalDownloadStart(env, this, _JSTRING(webkit_uri_response_get_uri(response)), disposition ? _JSTRING(disposition) : NULL, _JSTRING(webkit_uri_response_get_mime_type(response)), webkit_uri_response_get_content_length(response));
+			(*env)->DeleteLocalRef(env, this);
+		}
+		webkit_policy_decision_ignore(decision);
+		return TRUE;
+	}
 	return FALSE;
 }
 
