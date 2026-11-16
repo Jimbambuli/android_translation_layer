@@ -33,23 +33,12 @@ public class Button extends TextView {
 		}
 
 		a.recycle();
-	}
 
-	/* a button with a background of its own draws no GTK frame; MaterialButton, for one,
-	 * sets its background only after the constructor */
-	@Override
-	public void setBackgroundDrawable(Drawable backgroundDrawable) {
-		super.setBackgroundDrawable(backgroundDrawable);
-		if (backgroundDrawable != null)
-			native_addClass(widget, "ATL-no-border");
-		else
-			native_removeClass(widget, "ATL-no-border");
-	}
-
-	@Override
-	public void setBackgroundColor(int color) {
-		super.setBackgroundColor(color);
+		/* AOSP's Button draws only its background drawable and nothing without one (background="@null"): the
+		 * GtkButton never draws a frame, shadow or focus ring of its own, nor its own background */
 		native_addClass(widget, "ATL-no-border");
+		if (getBackground() == null)
+			native_setBackgroundDrawable(widget, 0);
 	}
 
 	@Override
