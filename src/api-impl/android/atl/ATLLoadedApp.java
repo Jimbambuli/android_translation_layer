@@ -49,6 +49,9 @@ public final class ATLLoadedApp {
 	public final int effective_sdk_compat;
 	private final Object init_lock;
 	private final HashMap<String, ServiceRecord> running_services;
+	/* connections bound without BIND_AUTO_CREATE to a service that is not running (ActiveServices keeps
+	 * their bindings and connects them once the service is brought up by someone else) */
+	private final HashMap<String, HashMap<ServiceConnection, Integer>> pending_bindings = new HashMap<>();
 	private Application application;
 	private Resources.Theme default_theme;
 	/* the AssetManagers for the override configurations, see createResources() */
@@ -403,6 +406,16 @@ public final class ATLLoadedApp {
 			public void run() {
 				try {
 					ServiceRecord r = getServiceRecord(className);
+					if (r == null && serviceConnection != null && (flags & Context.BIND_AUTO_CREATE) == 0) {
+						synchronized (running_services) {
+							HashMap<ServiceConnection, Integer> pending = pending_bindings.get(className);
+							if (pending == null)
+								pending_bindings.put(className, pending = new HashMap<>());
+							pending.put(serviceConnection, flags);
+						}
+						return;
+					}
+					HashMap<ServiceConnection, Integer> pending = null;
 					if (r == null) {
 						Class<? extends Service> cls = ATLLoadedApp.this.loadClass(className).asSubclass(Service.class);
 						Service service = cls.getConstructor().newInstance();
@@ -418,6 +431,25 @@ public final class ATLLoadedApp {
 						r = new ServiceRecord(service, serviceFlags);
 						synchronized (running_services) {
 							running_services.put(className, r);
+							pending = pending_bindings.remove(className);
+							if (pending != null) {
+								pending.remove(serviceConnection);
+								r.connections.putAll(pending);
+							}
+						}
+					}
+					/* ActiveServices.realStartServiceLocked(): the bindings that waited for the service, before onStartCommand() */
+					if (pending != null && !pending.isEmpty()) {
+						Intent bindIntent = new Intent(intent);
+						bindIntent.setComponent(new ComponentName(pkg.packageName, className));
+						if (r.bindIntent == null)
+							r.bindIntent = bindIntent;
+						android.os.IBinder binder = r.service.onBind(r.bindIntent);
+						for (ServiceConnection connection : pending.keySet()) {
+							if (binder != null)
+								connection.onServiceConnected(bindIntent.getComponent(), binder);
+							else
+								connection.onNullBinding(bindIntent.getComponent());
 						}
 					}
 
@@ -519,6 +551,8 @@ public final class ATLLoadedApp {
 				ServiceRecord r = null;
 				Integer bindFlags = null;
 				synchronized (running_services) {
+					for (HashMap<ServiceConnection, Integer> pending : pending_bindings.values())
+						pending.remove(serviceConnection);
 					for (Map.Entry<String, ServiceRecord> entry : running_services.entrySet()) {
 						bindFlags = entry.getValue().connections.remove(serviceConnection);
 						if (bindFlags != null) {
