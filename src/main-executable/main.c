@@ -789,6 +789,12 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	g_free(android_font_name);
 	pango_font_description_free(font);
 	g_free(font_name);
+	/* Android rasterizes text without FreeType's autohinter (Skia's FreeType port loads glyphs with
+	 * FT_LOAD_NO_AUTOHINT), so Roboto, which has no TrueType instructions, is not hinted at all. GTK's automatic
+	 * font rendering would autohint it (slight), which moves cap heights onto the pixel grid. So GTK's automatic
+	 * settings (grayscale antialiasing, unhinted metrics), but no hinting */
+	g_object_set(gtk_settings_get_default(), "gtk-font-rendering", GTK_FONT_RENDERING_MANUAL, "gtk-xft-antialias", 1,
+	             "gtk-xft-hinting", 0, "gtk-xft-hintstyle", "hintnone", "gtk-xft-rgba", "none", "gtk-hint-font-metrics", FALSE, NULL);
 
 	/* -- misc -- */
 
