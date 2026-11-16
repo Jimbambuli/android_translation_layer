@@ -1468,7 +1468,6 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			setScaleY(sy);
 		}
 		a.recycle();
-		onCreateDrawableState(0);
 	}
 
 	/* AOSP View.onCreateDrawableState(); ATL: state_focused follows whether GTK shows the focus
