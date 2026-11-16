@@ -1,5 +1,7 @@
 package android.opengl;
 
+import android.hardware.SyncFence;
+
 /* AOSP opengl/java/android/opengl/EGLExt.java (only the part the app side needs here). */
 public class EGLExt {
 	// EGL_KHR_create_context
@@ -16,6 +18,14 @@ public class EGLExt {
 	public static final int EGL_NO_NATIVE_FENCE_FD_ANDROID = -1;
 
 	public EGLExt() {}
+
+	/* AOSP eglDupNativeFenceFDANDROID() wraps the fd of eglDupNativeFenceFDANDROID() (EGL_ANDROID_native_fence_sync)
+	 * in a SyncFence, or returns SyncFence.createEmpty() when there is none (EGL_NO_NATIVE_FENCE_FD_ANDROID).
+	 * ATL has no native fences (no EGL15.eglCreateSync, SyncFence carries no fd), so there is never an fd here:
+	 * the result is the invalid fence, as from an EGL without the extension. */
+	public static SyncFence eglDupNativeFenceFDANDROID(EGLDisplay display, EGLSync sync) {
+		return SyncFence.createEmpty();
+	}
 
 	/* AOSP eglPresentationTimeANDROID(): native. ATL's EGL layer answers EGL_ANDROID_presentation_time itself
 	 * (libandroid/egl.c, desktop Mesa does not have the extension; the time is only a hint) */

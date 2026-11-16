@@ -1109,6 +1109,7 @@ srcs = [
 	'android/opengl/EGLExt.java',
 	'android/opengl/EGLObjectHandle.java',
 	'android/opengl/EGLSurface.java',
+	'android/opengl/EGLSync.java',
 	'android/opengl/GLES10.java',
 	'android/opengl/GLES20.java',
 	'android/opengl/GLES30.java',
