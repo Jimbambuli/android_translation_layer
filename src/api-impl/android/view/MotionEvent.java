@@ -18,6 +18,8 @@ package android.view;
 
 import android.atl.annotation.Export;
 import android.graphics.Matrix;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.SystemClock;
 import android.util.SparseArray;
 
@@ -164,7 +166,7 @@ import android.util.SparseArray;
  * received an {@link #ACTION_UP} for the prior gesture.
  * </p>
  */
-public final class MotionEvent extends InputEvent {
+public final class MotionEvent extends InputEvent implements Parcelable {
 	private static final long NS_PER_MS = 1000000;
 
 	/**
@@ -1464,6 +1466,153 @@ public final class MotionEvent extends InputEvent {
 
 		this.ids = ids;
 		this.coords = coords;
+	}
+
+	/* AOSP MotionEvent.CREATOR/writeToParcel(): the token and the body that libinput's MotionEvent::writeToParcel()
+	 * writes (ids, the device, source, display, HMAC, action, flags, transform, precision, cursor position, raw
+	 * transform, down time, the pointers and the samples with PointerCoords::writeToParcel()). ATL's MotionEvent has
+	 * no history, flags, classification or transform: they are written as 0, none and the offset of the coordinates
+	 * (x, y minus the raw ones), and only x, y and the scroll axes of the pointer coordinates exist. */
+	public static final Parcelable.Creator<MotionEvent> CREATOR = new Parcelable.Creator<MotionEvent>() {
+		public MotionEvent createFromParcel(Parcel in) {
+			in.readInt(); // skip token, we already know this is a MotionEvent
+			return MotionEvent.createFromParcelBody(in);
+		}
+
+		public MotionEvent[] newArray(int size) {
+			return new MotionEvent[size];
+		}
+	};
+
+	/** @hide */
+	public static MotionEvent createFromParcelBody(Parcel in) {
+		MotionEvent ev = obtain();
+		int pointerCount = in.readInt();
+		int sampleCount = in.readInt();
+		if (pointerCount < 1 || pointerCount > MAX_POINTERS || sampleCount < 1 || sampleCount > MAX_SAMPLES)
+			throw new IllegalArgumentException("Parcel does not contain a valid MotionEvent");
+		in.readInt(); // id
+		in.readInt(); // device id
+		ev.source = in.readInt();
+		in.readInt(); // display id
+		in.createByteArray(); // hmac
+		ev.action = in.readInt();
+		ev.actionButton = in.readInt();
+		in.readInt(); // flags
+		ev.mEdgeFlags = in.readInt();
+		ev.metaState = in.readInt();
+		ev.buttonState = in.readInt();
+		in.readInt(); // classification
+		in.readFloat(); // transform dsdx
+		in.readFloat(); // dtdx
+		in.readFloat(); // dtdy
+		in.readFloat(); // dsdy
+		float tx = in.readFloat();
+		float ty = in.readFloat();
+		in.readFloat(); // x precision
+		in.readFloat(); // y precision
+		in.readFloat(); // raw x cursor position
+		in.readFloat(); // raw y cursor position
+		for (int i = 0; i < 6; i++)
+			in.readFloat(); // raw transform
+		in.readLong(); // down time
+		ev.ids = new int[pointerCount];
+		for (int i = 0; i < pointerCount; i++) {
+			ev.ids[i] = in.readInt();
+			in.readInt(); // tool type
+		}
+		ev.coords = new float[pointerCount * 4];
+		/* the first sample is the one of the event, the others (history) have no place in ATL's event */
+		for (int h = 0; h < sampleCount; h++) {
+			long time = in.readLong();
+			if (h == 0)
+				ev.eventTime = time;
+			for (int i = 0; i < pointerCount; i++) {
+				long bits = in.readLong();
+				float x = 0, y = 0;
+				for (int axis = 0; axis < 64; axis++) {
+					if ((bits & (1L << axis)) == 0)
+						continue;
+					float value = in.readFloat();
+					if (h != 0)
+						continue;
+					if (axis == AXIS_X)
+						x = value;
+					else if (axis == AXIS_Y)
+						y = value;
+					else if (axis == AXIS_HSCROLL && i == 0)
+						ev.scroll_dx = value;
+					else if (axis == AXIS_VSCROLL && i == 0)
+						ev.scroll_dy = value;
+				}
+				in.readInt(); // is resampled
+				if (h == 0) {
+					ev.coords[4 * i + RAW_X_OFFSET] = x;
+					ev.coords[4 * i + RAW_Y_OFFSET] = y;
+					ev.coords[4 * i + X_OFFSET] = x + tx;
+					ev.coords[4 * i + Y_OFFSET] = y + ty;
+				}
+			}
+		}
+		return ev;
+	}
+
+	private static final int MAX_POINTERS = 32;
+	private static final int MAX_SAMPLES = 0x10000;
+
+	public void writeToParcel(Parcel out, int flags) {
+		out.writeInt(PARCEL_TOKEN_MOTION_EVENT);
+		int pointerCount = ids.length;
+		out.writeInt(pointerCount);
+		out.writeInt(1); // samples: no history
+		out.writeInt(getSequenceNumber()); // id
+		out.writeInt(getDeviceId());
+		out.writeInt(source);
+		out.writeInt(0); // display id: Display.DEFAULT_DISPLAY
+		out.writeByteArray(new byte[32]); // hmac: none
+		out.writeInt(action);
+		out.writeInt(actionButton);
+		out.writeInt(getFlags());
+		out.writeInt(mEdgeFlags);
+		out.writeInt(metaState);
+		out.writeInt(buttonState);
+		out.writeInt(getClassification());
+		/* the transform from the raw coordinates to the ones of the view: the offset of the first pointer */
+		float tx = pointerCount > 0 ? coords[X_OFFSET] - coords[RAW_X_OFFSET] : 0;
+		float ty = pointerCount > 0 ? coords[Y_OFFSET] - coords[RAW_Y_OFFSET] : 0;
+		out.writeFloat(1); // dsdx
+		out.writeFloat(0); // dtdx
+		out.writeFloat(0); // dtdy
+		out.writeFloat(1); // dsdy
+		out.writeFloat(tx);
+		out.writeFloat(ty);
+		out.writeFloat(getXPrecision());
+		out.writeFloat(getYPrecision());
+		out.writeFloat(Float.NaN); // raw x cursor position: AMOTION_EVENT_INVALID_CURSOR_POSITION
+		out.writeFloat(Float.NaN); // raw y cursor position
+		out.writeFloat(1); // raw transform
+		out.writeFloat(0);
+		out.writeFloat(0);
+		out.writeFloat(1);
+		out.writeFloat(0);
+		out.writeFloat(0);
+		out.writeLong(getDownTime());
+		for (int i = 0; i < pointerCount; i++) {
+			out.writeInt(ids[i]);
+			out.writeInt(getToolType(i));
+		}
+		out.writeLong(eventTime);
+		for (int i = 0; i < pointerCount; i++) {
+			boolean scroll = i == 0 && (scroll_dx != 0 || scroll_dy != 0);
+			out.writeLong((1L << AXIS_X) | (1L << AXIS_Y) | (scroll ? (1L << AXIS_VSCROLL) | (1L << AXIS_HSCROLL) : 0));
+			out.writeFloat(coords[4 * i + RAW_X_OFFSET]);
+			out.writeFloat(coords[4 * i + RAW_Y_OFFSET]);
+			if (scroll) {
+				out.writeFloat(scroll_dy);
+				out.writeFloat(scroll_dx);
+			}
+			out.writeInt(0); // is resampled
+		}
 	}
 
 	@Override
