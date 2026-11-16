@@ -571,6 +571,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		native_setTextSize(size);
 	}
 	private native void native_setTextSize(float size);
+	private native void native_setPaintFlags(int flags);
 
 	public native final void native_setTextColor(int color);
 	public void setTextColor(int color) {
@@ -3313,6 +3314,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setPaintFlags(int flags) {
 		if (getPaint().getFlags() != flags) {
 			getPaint().setFlags(flags);
+			native_setPaintFlags(flags);
 			requestLayout();
 			invalidate();
 		}
