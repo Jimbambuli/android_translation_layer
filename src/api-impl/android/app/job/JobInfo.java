@@ -365,6 +365,7 @@ public class JobInfo implements android.os.Parcelable {
 			jobInfo = new JobInfo();
 			jobInfo.id = jobId;
 			jobInfo.service = jobService;
+			jobInfo.extras = PersistableBundle.EMPTY; // AOSP Builder.mExtras
 		}
 
 		/* AOSP: a backoff below getMinBackoffMillis() is raised to it */
@@ -593,6 +594,7 @@ public class JobInfo implements android.os.Parcelable {
 			default:
 				throw new IllegalArgumentException("Invalid priority level provided: " + j.priority);
 			}
+			j.extras = j.extras.deepCopy(); // AOSP JobInfo(Builder)
 			return j;
 		}
 	}
