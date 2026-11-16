@@ -553,12 +553,12 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 	 * This method is part of the SurfaceHolder.Callback2 interface, and is
 	 * not normally called or subclassed by clients of GLSurfaceView.
 	 */
-	/*@Override
+	@Override
 	public void surfaceRedrawNeededAsync(SurfaceHolder holder, Runnable finishDrawing) {
 		if (mGLThread != null) {
 			mGLThread.requestRenderAndNotify(finishDrawing);
 		}
-	}*/
+	}
 
 	/**
 	 * This method is part of the SurfaceHolder.Callback2 interface, and is
@@ -1153,8 +1153,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 					gl = view.mGLWrapper.wrap(gl);
 				}
 
-				/* FIXME */
-				/*if ((view.mDebugFlags & (DEBUG_CHECK_GL_ERROR | DEBUG_LOG_GL_CALLS)) != 0) {
+				if ((view.mDebugFlags & (DEBUG_CHECK_GL_ERROR | DEBUG_LOG_GL_CALLS)) != 0) {
 					int configFlags = 0;
 					Writer log = null;
 					if ((view.mDebugFlags & DEBUG_CHECK_GL_ERROR) != 0) {
@@ -1164,7 +1163,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 						log = new LogWriter();
 					}
 					gl = GLDebugHelper.wrap(gl, configFlags, log);
-				}*/
+				}
 			}
 			return gl;
 		}
@@ -1235,7 +1234,7 @@ public class GLSurfaceView extends SurfaceView implements SurfaceHolder.Callback
 
 		public static String formatEglError(String function, int error) {
 			return function + " failed: "
-			     + "FIXME" /*EGLLogWrapper.getErrorString(error)*/;
+			     + EGLLogWrapper.getErrorString(error);
 		}
 
 		private WeakReference<GLSurfaceView> mGLSurfaceViewWeakRef;
