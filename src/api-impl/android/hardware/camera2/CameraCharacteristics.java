@@ -111,8 +111,6 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	public static final Key<Integer> CONTROL_MAX_REGIONS_AWB = new Key<Integer>("android.control.maxRegionsAwb", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Range<Float>> CONTROL_ZOOM_RATIO_RANGE = new Key<Range<Float>>("android.control.zoomRatioRange", (Class<Range<Float>>) (Class<?>) Range.class);
 	public static final Key<Boolean> FLASH_INFO_AVAILABLE = new Key<Boolean>("android.flash.info.available", (Class<Boolean>) (Class<?>) boolean.class);
-	// FLASH_TORCH_STRENGTH_DEFAULT_LEVEL: not in the AOSP source at hand (newer API level), left out
-	// FLASH_TORCH_STRENGTH_MAX_LEVEL: not in the AOSP source at hand (newer API level), left out
 	/* value type DeviceStateSensorOrientationMap does not exist in ATL yet */
 	public static final Key<Object> INFO_DEVICE_STATE_SENSOR_ORIENTATION_MAP = new Key<Object>("android.info.deviceStateSensorOrientationMap", Object.class);
 	// INFO_SESSION_CONFIGURATION_QUERY_VERSION: not in the AOSP source at hand (newer API level), left out
@@ -169,6 +167,14 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	public static final Key<int[]> EDGE_AVAILABLE_EDGE_MODES = new Key<int[]>("android.edge.availableEdgeModes", int[].class);
 	public static final Key<Integer> FLASH_INFO_STRENGTH_MAXIMUM_LEVEL = new Key<Integer>("android.flash.info.strengthMaximumLevel", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> FLASH_INFO_STRENGTH_DEFAULT_LEVEL = new Key<Integer>("android.flash.info.strengthDefaultLevel", (Class<Integer>) (Class<?>) int.class);
+	public static final Key<int[]> COLOR_CORRECTION_AVAILABLE_MODES = new Key<int[]>("android.colorCorrection.availableModes", int[].class);
+	public static final Key<Range<Integer>> COLOR_CORRECTION_COLOR_TEMPERATURE_RANGE = new Key<Range<Integer>>("android.colorCorrection.colorTemperatureRange", (Class<Range<Integer>>) (Class<?>) Range.class);
+	public static final Key<int[]> CONTROL_AE_AVAILABLE_PRIORITY_MODES = new Key<int[]>("android.control.aeAvailablePriorityModes", int[].class);
+	public static final Key<Range<Float>> CONTROL_LOW_LIGHT_BOOST_INFO_LUMINANCE_RANGE = new Key<Range<Float>>("android.control.lowLightBoostInfoLuminanceRange", (Class<Range<Float>>) (Class<?>) Range.class);
+	public static final Key<Integer> FLASH_SINGLE_STRENGTH_MAX_LEVEL = new Key<Integer>("android.flash.singleStrengthMaxLevel", (Class<Integer>) (Class<?>) int.class);
+	public static final Key<Integer> FLASH_SINGLE_STRENGTH_DEFAULT_LEVEL = new Key<Integer>("android.flash.singleStrengthDefaultLevel", (Class<Integer>) (Class<?>) int.class);
+	public static final Key<Integer> FLASH_TORCH_STRENGTH_MAX_LEVEL = new Key<Integer>("android.flash.torchStrengthMaxLevel", (Class<Integer>) (Class<?>) int.class);
+	public static final Key<Integer> FLASH_TORCH_STRENGTH_DEFAULT_LEVEL = new Key<Integer>("android.flash.torchStrengthDefaultLevel", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<int[]> HOT_PIXEL_AVAILABLE_HOT_PIXEL_MODES = new Key<int[]>("android.hotPixel.availableHotPixelModes", int[].class);
 	public static final Key<android.util.Size[]> JPEG_AVAILABLE_THUMBNAIL_SIZES = new Key<android.util.Size[]>("android.jpeg.availableThumbnailSizes", android.util.Size[].class);
 	public static final Key<float[]> LENS_INFO_AVAILABLE_APERTURES = new Key<float[]>("android.lens.info.availableApertures", float[].class);
