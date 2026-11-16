@@ -463,13 +463,11 @@ public class GLImpl implements GL10, GL10Ext, GL11, GL11Ext, GL11ExtensionPack {
 	    int name);
 
 	public String glGetString(
-	    int name) { /*
-			 String returnValue;
-			 returnValue = _glGetString(
-			     name
-			 );
-			 return returnValue;*/
-		return "FIXME";
+	    int name) {
+		String returnValue;
+		returnValue = _glGetString(
+		    name);
+		return returnValue;
 	}
 
 	// C function void glHint ( GLenum target, GLenum mode )
