@@ -2293,8 +2293,20 @@ public class PackageManager {
 				else
 					return PERMISSION_DENIED;
 			default:
-				System.out.println("PackageManager.checkPermission: >" + permName + "< not handled\n");
-				return PERMISSION_DENIED;
+				return isNormalPermissionRequested(permName) ? PERMISSION_GRANTED : PERMISSION_DENIED;
+		}
+	}
+
+	/* AOSP: the system grants a permission of protection level normal at install time to the app that requests it
+	 * in its manifest; any other name is denied. The level comes from the manifest that declares the permission
+	 * (the app's own, framework-res' or Play Services'). */
+	private boolean isNormalPermissionRequested(String permName) {
+		if (!ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName))
+			return false;
+		try {
+			return getPermissionInfo(permName, 0).getProtection() == PermissionInfo.PROTECTION_NORMAL;
+		} catch (NameNotFoundException e) {
+			return false;
 		}
 	}
 
@@ -2626,7 +2638,10 @@ public class PackageManager {
 	public boolean hasSystemFeature(String name) {
 		switch (name) {
 			case FEATURE_TOUCHSCREEN:
-			case "android.hardware.touchscreen.multitouch.distinct":
+			// a touch screen with distinct tracking also lists the basic and the jazzhand level on an AOSP device
+			case FEATURE_TOUCHSCREEN_MULTITOUCH:
+			case FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT:
+			case FEATURE_TOUCHSCREEN_MULTITOUCH_JAZZHAND:
 			/* AOSP lists it on every device with a touchscreen; Google Play implies it for apps that do not
 			 * require android.hardware.touchscreen */
 			case FEATURE_FAKETOUCH:
@@ -2658,7 +2673,7 @@ public class PackageManager {
 			case "android.software.webview":
 				return true;
 			default:
-				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
+				// AOSP: a feature the device does not declare is not available
 				return false;
 		}
 	}
