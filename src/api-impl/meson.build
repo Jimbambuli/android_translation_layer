@@ -1128,6 +1128,7 @@ srcs = [
 	'android/opengl/GLU.java',
 	'android/opengl/GLUtils.java',
 	'android/opengl/Matrix.java',
+	'android/opengl/Visibility.java',
 	'android/os/AsyncTask.java',
 	'android/os/BadParcelableException.java',
 	'android/os/BaseBundle.java',
