@@ -1178,8 +1178,25 @@ public class Paint {
 		return font_feature_settings;
 	}
 
+	/* AOSP getFillPath() -> SkPaint::getFillPath(): FILL leaves the path as it is; a stroke becomes the outline of the
+	 * stroke (to fill with WINDING, inverse like src); a hairline (width 0) stays the path, to draw as a line (false).
+	 * Of the path effects ATL has the dash of DashPathEffect (only for strokes, like Skia), the others are not applied
+	 * here either, as when drawing. */
 	public boolean getFillPath(Path src, Path dst) {
-		return false;
+		Style style = getStyle();
+		boolean hairline = style != Style.FILL && stroke_width <= 0;
+		if (style == Style.FILL || (hairline && !(path_effect instanceof DashPathEffect))) {
+			if (dst != src)
+				dst.set(src);
+			return !hairline;
+		}
+		if (dst == src)
+			src = new Path(src);
+		boolean inverse = src.isInverseFillType();
+		dst.reset();
+		native_get_fill_path(paint, src.getGskPath(), dst.getBuilder(), hairline ? 0 : stroke_width, stroke_miter);
+		dst.setFillType(inverse ? Path.FillType.INVERSE_WINDING : Path.FillType.WINDING);
+		return !hairline;
 	}
 
 	public void reset() {
@@ -1210,6 +1227,7 @@ public class Paint {
 	private static native void native_set_style(long paint, int style);
 	private static native int native_get_style(long paint);
 	private static native void native_set_stroke_width(long paint, float width);
+	private static native void native_get_fill_path(long paint, long src, long dst, float width, float miter);
 	private static native void native_set_dash(long paint, float[] intervals, float phase);
 	private static native void native_set_stroke_cap(long paint, int cap);
 	private static native int native_get_stroke_cap(long paint);

@@ -103,6 +103,13 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1dash(JNIEnv *env
 	(*env)->ReleaseFloatArrayElements(env, intervals_arr, intervals, JNI_ABORT);
 }
 
+/* AOSP Paint.getFillPath() -> SkPaint::getFillPath() for a stroke (or a dashed hairline) */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1get_1fill_1path(JNIEnv *env, jclass clazz, jlong paint_ptr, jlong src_ptr, jlong dst_ptr, jfloat width, jfloat miter)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	android_path_add_stroke(_PTR(dst_ptr), _PTR(src_ptr), paint->gsk_stroke, width, miter, paint->is_fill);
+}
+
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1stroke_1width(JNIEnv *env, jclass clazz, jlong paint_ptr, jfloat width)
 {
 	struct AndroidPaint *paint = _PTR(paint_ptr);
