@@ -14,4 +14,10 @@ public class SSLSockets {
 		if (!isSupportedSocket(socket))
 			throw new IllegalArgumentException("Not a conscrypt socket: " + socket.getClass().getName());
 	}
+
+	/* AOSP: Conscrypt.setEchConfigList(socket, echConfigList.toBytes()), which turns a socket that is not Conscrypt's down */
+	public static void setEchConfigList(SSLSocket socket, EchConfigList echConfigList) {
+		if (!isSupportedSocket(socket))
+			throw new IllegalArgumentException("Not a conscrypt socket: " + socket.getClass().getName());
+	}
 }
