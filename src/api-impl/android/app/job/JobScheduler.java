@@ -102,7 +102,8 @@ public class JobScheduler {
 					String className = job.getService().getClassName();
 					Class<?> cls = context.get_atl_loaded_app().loadClass(className);
 					job.running = true;
-						boolean result;
+					started(job, params);
+					boolean result;
 					if (JobService.class.isAssignableFrom(cls)) {
 						result = jobService(cls.asSubclass(JobService.class)).onStartJob(params);
 					} else {
@@ -145,6 +146,14 @@ public class JobScheduler {
 		return engine;
 	}
 
+	/* the parameters of the jobs that are running, which onStopJob() gets when the job is cancelled */
+	private static IdentityHashMap<JobInfo, JobParameters> startedParams = new IdentityHashMap<>();
+
+	private static void started(JobInfo job, JobParameters params) {
+		startedParams.values().removeIf(p -> !p.jobInfo.running);
+		startedParams.put(job, params);
+	}
+
 	/* starts a scheduled job once its delay or its trigger content change is due */
 	private final class Start implements Runnable {
 		private final JobInfo job;
@@ -169,6 +178,7 @@ public class JobScheduler {
 				params.triggeredContentUris = changedUris;
 				params.triggeredContentAuthorities = changedAuthorities;
 				job.running = true;
+				started(job, params);
 				boolean result = jobService(cls).onStartJob(params);
 				Slog.i(TAG, "onStartJob() returned " + result);
 			} catch (ReflectiveOperationException e) {
@@ -286,18 +296,32 @@ public class JobScheduler {
 		ContentTrigger trigger = job != null ? contentTriggers.get(job) : null;
 		if (trigger != null)
 			trigger.detach();
-		if (job != null && job.running) {
+		JobParameters params = job != null && job.running ? startedParams.remove(job) : null;
+		if (params != null) {
+			/* AOSP JobServiceContext.cancelExecutingJobLocked(): the service is told with onStopJob() */
+			params.stopReason = JobParameters.STOP_REASON_CANCELLED_BY_APP;
 			new Handler(Looper.getMainLooper()).post(new Runnable() {
 				@Override
 				public void run() {
-					JobService service = runningServices.get(job.getService().getClass());
-					if (service != null) {
-						JobParameters params = new JobParameters(job, namespace);
-						service.onStopJob(params);
-						job.running = false;
+					Object service = runningServices.get(loadClass(job));
+					if (service == null) {
+						service = engines.get(job.getService().getClassName());
 					}
+					if (service instanceof JobService)
+						((JobService)service).onStopJob(params);
+					else if (service instanceof JobServiceEngine)
+						((JobServiceEngine)service).onStopJob(params);
+					job.running = false;
 				}
 			});
+		}
+	}
+
+	private Class<?> loadClass(JobInfo job) {
+		try {
+			return context.get_atl_loaded_app().loadClass(job.getService().getClassName());
+		} catch (ClassNotFoundException e) {
+			return null;
 		}
 	}
 }

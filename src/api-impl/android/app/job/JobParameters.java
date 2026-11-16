@@ -9,9 +9,28 @@ public class JobParameters implements Parcelable {
 
 	public static final Creator<JobParameters> CREATOR = null;
 
+	public static final int STOP_REASON_UNDEFINED = 0;
+	public static final int STOP_REASON_CANCELLED_BY_APP = 1;
+	public static final int STOP_REASON_PREEMPT = 2;
+	public static final int STOP_REASON_TIMEOUT = 3;
+	public static final int STOP_REASON_DEVICE_STATE = 4;
+	public static final int STOP_REASON_CONSTRAINT_BATTERY_NOT_LOW = 5;
+	public static final int STOP_REASON_CONSTRAINT_CHARGING = 6;
+	public static final int STOP_REASON_CONSTRAINT_CONNECTIVITY = 7;
+	public static final int STOP_REASON_CONSTRAINT_DEVICE_IDLE = 8;
+	public static final int STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW = 9;
+	public static final int STOP_REASON_QUOTA = 10;
+	public static final int STOP_REASON_BACKGROUND_RESTRICTION = 11;
+	public static final int STOP_REASON_APP_STANDBY = 12;
+	public static final int STOP_REASON_USER = 13;
+	public static final int STOP_REASON_SYSTEM_PROCESSING = 14;
+	public static final int STOP_REASON_ESTIMATED_APP_LAUNCH_TIME_CHANGED = 15;
+	public static final int STOP_REASON_TIMEOUT_ABANDONED = 16;
+
 	JobInfo jobInfo;
 	Uri[] triggeredContentUris;
 	String[] triggeredContentAuthorities;
+	int stopReason = STOP_REASON_UNDEFINED;
 	String namespace;
 
 	JobParameters(JobInfo jobInfo, String namespace) {
@@ -72,9 +91,9 @@ public class JobParameters implements Parcelable {
 		return jobInfo.getClipGrantFlags();
 	}
 
-	/* ATL never stops jobs, so STOP_REASON_UNDEFINED */
+	/* AOSP: STOP_REASON_UNDEFINED until onStopJob() was called, then the reason of the stop */
 	public int getStopReason() {
-		return 0;
+		return stopReason;
 	}
 
 	/* the work of JobScheduler.enqueue(), which AOSP keeps in JobStatus and hands out through IJobCallback */
