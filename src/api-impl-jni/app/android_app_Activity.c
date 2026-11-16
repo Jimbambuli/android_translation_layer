@@ -363,6 +363,11 @@ static void stack_show_page(GtkStack *stack, GtkWidget *page)
 	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
 	gboolean had_focus = old_page && focus && gtk_widget_is_ancestor(focus, old_page);
 
+	/* like WindowManager.addView() in ActivityThread.handleResumeActivity(): a new activity's window is added
+	 * only now, so its views are attached to the window (onAttachedToWindow()) after onResume() */
+	if (gtk_widget_get_parent(page) != GTK_WIDGET(stack))
+		gtk_stack_add_child(stack, page);
+
 	if (old_page && old_page != page) {
 		GWeakRef *ref = g_new(GWeakRef, 1);
 		g_weak_ref_init(ref, had_focus ? focus : NULL);
@@ -422,6 +427,26 @@ static void activity_focus(JNIEnv *env, jobject activity)
 			return;
 	}
 
+	J__Activity__performResume(env, activity);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	if (_GET_BOOL_FIELD(activity, "finishing"))
+		return;
+
+	J__Activity__onPostResume(env, activity);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	if (_GET_BOOL_FIELD(activity, "finishing"))
+		return;
+
+	/* like ActivityThread.handleResumeActivity(), the window is shown after onResume() and onPostResume(),
+	 * unless the activity started another one meanwhile, which is now in front of it */
+	if (!activity_backlog || !(*env)->IsSameObject(env, activity_backlog->data, activity))
+		return;
 	GtkWidget *decor_view = get_decor_view(env, activity);
 	GtkStack *stack = get_stack();
 	GtkWidget *old_page = gtk_stack_get_visible_child(stack);
@@ -442,22 +467,6 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	(*env)->DeleteLocalRef(env, window_jobj);
 	backdrop_show(decor_view, old_page, translucent);
 	stack_show_page(stack, decor_view);
-
-	J__Activity__performResume(env, activity);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-	if (_GET_BOOL_FIELD(activity, "finishing"))
-		return;
-
-	J__Activity__onPostResume(env, activity);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-	if (_GET_BOOL_FIELD(activity, "finishing"))
-		return;
 
 	J__Activity__onTopResumedActivityChanged(env, activity, true);
 	if ((*env)->ExceptionCheck(env)) {
@@ -1477,11 +1486,7 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	}
 
 	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
-
-	GtkWidget *decor_view = get_decor_view(env, activity_object);
-	GtkStack *stack = get_stack();
-	gtk_stack_add_child(stack, decor_view);
-
+	/* the decor view is added to the stack when the activity is shown (stack_show_page()) */
 	activity_update_current(env);
 	transition_from = NULL;
 }
@@ -1596,8 +1601,6 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	if (_GET_BOOL_FIELD(activity, "finishing")) { // finish() was called while it was created
 		activity_backlog = g_list_delete_link(activity_backlog, l);
 	} else {
-		GtkStack *stack = get_stack();
-		gtk_stack_add_child(stack, get_decor_view(env, activity));
 		l->data = _REF(activity);
 	}
 	_UNREF(old_activity);
