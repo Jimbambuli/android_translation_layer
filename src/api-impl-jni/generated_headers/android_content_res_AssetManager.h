@@ -37,14 +37,6 @@ extern "C" {
 #define android_content_res_AssetManager_STYLE_SOURCE_RESOURCE_ID 6L
 /*
  * Class:     android_content_res_AssetManager
- * Method:    getPooledString
- * Signature: (II)Ljava/lang/CharSequence;
- */
-JNIEXPORT jobject JNICALL Java_android_content_res_AssetManager_getPooledString
-  (JNIEnv *, jobject, jint, jint);
-
-/*
- * Class:     android_content_res_AssetManager
  * Method:    list
  * Signature: (Ljava/lang/String;)[Ljava/lang/String;
  */
@@ -286,9 +278,9 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_getStringBlockCount
 /*
  * Class:     android_content_res_AssetManager
  * Method:    getNativeStringBlock
- * Signature: (I)I
+ * Signature: (I)J
  */
-JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_getNativeStringBlock
+JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_getNativeStringBlock
   (JNIEnv *, jobject, jint);
 
 /*
