@@ -1468,7 +1468,7 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		this.coords = coords;
 	}
 
-	/* AOSP MotionEvent.CREATOR/writeToParcel(): the token and the body that libinput's MotionEvent::writeToParcel()
+	/* AOSP MotionEvent.CREATOR/writeToParcel(): the token and the body that libinput's MotionEvent::writeToParcel() (aosp-src/android16/frameworks-native/libs/input/Input.cpp)
 	 * writes (ids, the device, source, display, HMAC, action, flags, transform, precision, cursor position, raw
 	 * transform, down time, the pointers and the samples with PointerCoords::writeToParcel()). ATL's MotionEvent has
 	 * no history, flags, classification or transform: they are written as 0, none and the offset of the coordinates
@@ -1502,12 +1502,12 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		ev.mEdgeFlags = in.readInt();
 		ev.metaState = in.readInt();
 		ev.buttonState = in.readInt();
-		in.readInt(); // classification
+		in.readByte(); // classification
 		in.readFloat(); // transform dsdx
 		in.readFloat(); // dtdx
+		float tx = in.readFloat();
 		in.readFloat(); // dtdy
 		in.readFloat(); // dsdy
-		float tx = in.readFloat();
 		float ty = in.readFloat();
 		in.readFloat(); // x precision
 		in.readFloat(); // y precision
@@ -1557,8 +1557,8 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		return ev;
 	}
 
-	private static final int MAX_POINTERS = 32;
-	private static final int MAX_SAMPLES = 0x10000;
+	private static final int MAX_POINTERS = 16;
+	private static final int MAX_SAMPLES = 0xFFFF; // UINT16_MAX, Input.h
 
 	public void writeToParcel(Parcel out, int flags) {
 		out.writeInt(PARCEL_TOKEN_MOTION_EVENT);
@@ -1576,25 +1576,25 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		out.writeInt(mEdgeFlags);
 		out.writeInt(metaState);
 		out.writeInt(buttonState);
-		out.writeInt(getClassification());
+		out.writeByte((byte) getClassification());
 		/* the transform from the raw coordinates to the ones of the view: the offset of the first pointer */
 		float tx = pointerCount > 0 ? coords[X_OFFSET] - coords[RAW_X_OFFSET] : 0;
 		float ty = pointerCount > 0 ? coords[Y_OFFSET] - coords[RAW_Y_OFFSET] : 0;
 		out.writeFloat(1); // dsdx
 		out.writeFloat(0); // dtdx
+		out.writeFloat(tx);
 		out.writeFloat(0); // dtdy
 		out.writeFloat(1); // dsdy
-		out.writeFloat(tx);
 		out.writeFloat(ty);
 		out.writeFloat(getXPrecision());
 		out.writeFloat(getYPrecision());
 		out.writeFloat(Float.NaN); // raw x cursor position: AMOTION_EVENT_INVALID_CURSOR_POSITION
 		out.writeFloat(Float.NaN); // raw y cursor position
-		out.writeFloat(1); // raw transform
+		out.writeFloat(1); // raw transform: dsdx, dtdx, tx, dtdy, dsdy, ty
+		out.writeFloat(0);
 		out.writeFloat(0);
 		out.writeFloat(0);
 		out.writeFloat(1);
-		out.writeFloat(0);
 		out.writeFloat(0);
 		out.writeLong(getDownTime());
 		for (int i = 0; i < pointerCount; i++) {
