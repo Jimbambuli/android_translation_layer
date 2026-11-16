@@ -421,7 +421,7 @@ public class GestureDetector {
 
 		// Fallback to support pre-donuts releases
 		int touchSlop, doubleTapSlop, doubleTapTouchSlop;
-		/*if (context == null) {
+		if (context == null) {
 			//noinspection deprecation
 			touchSlop = ViewConfiguration.getTouchSlop();
 			doubleTapTouchSlop = touchSlop; // Hack rather than adding a hidden method for this
@@ -430,15 +430,14 @@ public class GestureDetector {
 			mMinimumFlingVelocity = ViewConfiguration.getMinimumFlingVelocity();
 			mMaximumFlingVelocity = ViewConfiguration.getMaximumFlingVelocity();
 			mAmbiguousGestureMultiplier = ViewConfiguration.getAmbiguousGestureMultiplier();
-		} else*/
-		{
+		} else {
 			final ViewConfiguration configuration = ViewConfiguration.get(context);
 			touchSlop = configuration.getScaledTouchSlop();
-			doubleTapTouchSlop = configuration.getScaledTouchSlop(); // configuration.getScaledDoubleTapTouchSlop();
+			doubleTapTouchSlop = configuration.getScaledDoubleTapTouchSlop();
 			doubleTapSlop = configuration.getScaledDoubleTapSlop();
 			mMinimumFlingVelocity = configuration.getScaledMinimumFlingVelocity();
 			mMaximumFlingVelocity = configuration.getScaledMaximumFlingVelocity();
-			mAmbiguousGestureMultiplier = 0; // configuration.getScaledAmbiguousGestureMultiplier();
+			mAmbiguousGestureMultiplier = configuration.getScaledAmbiguousGestureMultiplier();
 		}
 		mTouchSlopSquare = touchSlop * touchSlop;
 		mDoubleTapTouchSlopSquare = doubleTapTouchSlop * doubleTapTouchSlop;
