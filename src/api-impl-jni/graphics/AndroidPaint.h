@@ -34,6 +34,10 @@ void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGl
 void android_paint_add_layout_outline(GskPathBuilder *builder, PangoLayout *layout, float x, float y);
 void android_paint_add_glyphs_outline(GskPathBuilder *builder, PangoFont *font, PangoGlyphString *glyphs, float x, float y);
 
+/* android_graphics_Path.c: adds the outline of the stroke of src (width 0: only the dashes of src) to dst, and src
+ * itself for add_fill (Paint.getFillPath) */
+void android_path_add_stroke(GskPathBuilder *dst, GskPath *src, const GskStroke *stroke, float width, float miter_limit, bool add_fill);
+
 /* one glyph of a shaped run: its id in font (a reference the caller drops), its origin relative to the run's */
 struct android_shaped_glyph {
 	PangoGlyph id;

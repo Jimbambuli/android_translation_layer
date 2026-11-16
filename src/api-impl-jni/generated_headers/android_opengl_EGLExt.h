@@ -7,8 +7,31 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_opengl_EGLExt_EGL_CONTEXT_MAJOR_VERSION_KHR
+#define android_opengl_EGLExt_EGL_CONTEXT_MAJOR_VERSION_KHR 12440L
+#undef android_opengl_EGLExt_EGL_CONTEXT_MINOR_VERSION_KHR
+#define android_opengl_EGLExt_EGL_CONTEXT_MINOR_VERSION_KHR 12539L
+#undef android_opengl_EGLExt_EGL_CONTEXT_FLAGS_KHR
+#define android_opengl_EGLExt_EGL_CONTEXT_FLAGS_KHR 12540L
+#undef android_opengl_EGLExt_EGL_OPENGL_ES3_BIT_KHR
+#define android_opengl_EGLExt_EGL_OPENGL_ES3_BIT_KHR 64L
 #undef android_opengl_EGLExt_EGL_RECORDABLE_ANDROID
 #define android_opengl_EGLExt_EGL_RECORDABLE_ANDROID 12610L
+#undef android_opengl_EGLExt_EGL_SYNC_NATIVE_FENCE_ANDROID
+#define android_opengl_EGLExt_EGL_SYNC_NATIVE_FENCE_ANDROID 12612L
+#undef android_opengl_EGLExt_EGL_SYNC_NATIVE_FENCE_FD_ANDROID
+#define android_opengl_EGLExt_EGL_SYNC_NATIVE_FENCE_FD_ANDROID 12613L
+#undef android_opengl_EGLExt_EGL_SYNC_NATIVE_FENCE_SIGNALED_ANDROID
+#define android_opengl_EGLExt_EGL_SYNC_NATIVE_FENCE_SIGNALED_ANDROID 12614L
+#undef android_opengl_EGLExt_EGL_NO_NATIVE_FENCE_FD_ANDROID
+#define android_opengl_EGLExt_EGL_NO_NATIVE_FENCE_FD_ANDROID -1L
+/*
+ * Class:     android_opengl_EGLExt
+ * Method:    eglDupNativeFenceFDANDROIDImpl
+ * Signature: (Landroid/opengl/EGLDisplay;Landroid/opengl/EGLSync;)I
+ */
+JNIEXPORT jint JNICALL Java_android_opengl_EGLExt_eglDupNativeFenceFDANDROIDImpl
+  (JNIEnv *, jclass, jobject, jobject);
 
 /*
  * Class:     android_opengl_EGLExt

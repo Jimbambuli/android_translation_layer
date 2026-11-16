@@ -1,6 +1,7 @@
 package android.hardware.camera2.params;
 
 import android.graphics.ImageFormat;
+import android.graphics.PixelFormat;
 import android.util.Range;
 import android.util.Size;
 import android.util.SparseIntArray;
@@ -184,11 +185,9 @@ public final class StreamConfigurationMap {
 		return Arrays.hashCode(mConfigurations) * 31 + Arrays.hashCode(mMinFrameDurations);
 	}
 
-	/* AOSP checkArgumentFormat(): the format has to be an ImageFormat or a PixelFormat public format
-	 * (PixelFormat.isPublicFormat(): RGBA_8888, RGBX_8888, RGB_888, RGB_565, RGBA_F16 0x16, RGBA_1010102 0x2b) */
+	/* AOSP checkArgumentFormat(): the format has to be an ImageFormat or a PixelFormat public format */
 	private static int checkArgumentFormat(int format) {
-		boolean pixelFormat = format == 1 || format == 2 || format == 3 || format == 4 || format == 0x16 || format == 0x2b;
-		if (!ImageFormat.isPublicFormat(format) && !pixelFormat) {
+		if (!ImageFormat.isPublicFormat(format) && !PixelFormat.isPublicFormat(format)) {
 			throw new IllegalArgumentException(String.format("format 0x%x was not defined in either ImageFormat or PixelFormat", format));
 		}
 		return format;

@@ -1,6 +1,8 @@
 #include <gsk/gsk.h>
+#include <math.h>
 
 #include "../defines.h"
+#include "AndroidPaint.h"
 
 #include "../generated_headers/android_graphics_Path.h"
 
@@ -520,4 +522,365 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Path_native_1set_1last_1point(JNIE
 	}
 	g_array_free(segments, TRUE);
 	return _INTPTR(builder);
+}
+
+/* Paint.getFillPath() for the stroke styles (AOSP: SkStrokeRec::applyToPath with the dash of SkDashPath): the
+ * outline of the stroke of src as contours to fill with WINDING. Curves are flattened (to 0.1 px) before stroking,
+ * where Skia keeps them as quads; joins and caps are Skia's (SkStrokerPriv.cpp). */
+
+#define STROKE_TOLERANCE 0.1f
+#define STROKE_NEARLY_ZERO (1.f / 4096)
+
+struct stroker {
+	GskPathBuilder *dst;
+	float hw; /* half the width, 0 for a hairline (then the dashes are added as they are) */
+	GskLineCap cap;
+	GskLineJoin join;
+	float inv_miter_limit;
+	const float *dash; /* NULL or an even number of intervals with a positive sum */
+	gsize n_dash;
+	float dash_total;
+	float dash_offset;
+};
+
+static void points_add(GArray *pts, graphene_point_t p)
+{
+	if (pts->len) {
+		graphene_point_t *last = &g_array_index(pts, graphene_point_t, pts->len - 1);
+		if (fabsf(last->x - p.x) <= STROKE_NEARLY_ZERO && fabsf(last->y - p.y) <= STROKE_NEARLY_ZERO)
+			return;
+	}
+	g_array_append_val(pts, p);
+}
+
+static int curve_steps(float ddx, float ddy)
+{
+	/* the distance of a curve from its chords is at most |P''| / (8 n^2) */
+	float n = ceilf(sqrtf(sqrtf(ddx * ddx + ddy * ddy) / (8 * STROKE_TOLERANCE)));
+	return CLAMP((int)n, 1, 256);
+}
+
+static void flatten_segment(GArray *pts, const struct path_segment *s)
+{
+	const float *p = s->pts;
+	switch ((int)s->verb) {
+		case VERB_LINE:
+			points_add(pts, GRAPHENE_POINT_INIT(p[2], p[3]));
+			break;
+		case VERB_QUAD:
+		case VERB_CONIC: {
+			float w = (int)s->verb == VERB_CONIC ? p[6] : 1.f;
+			int n = curve_steps(2 * w * (p[0] - 2 * p[2] + p[4]), 2 * w * (p[1] - 2 * p[3] + p[5]));
+			for (int i = 1; i <= n; i++) {
+				float t = (float)i / n, a = (1 - t) * (1 - t), b = 2 * w * t * (1 - t), c = t * t;
+				float d = a + b + c;
+				points_add(pts, GRAPHENE_POINT_INIT((a * p[0] + b * p[2] + c * p[4]) / d, (a * p[1] + b * p[3] + c * p[5]) / d));
+			}
+			break;
+		}
+		case VERB_CUBIC: {
+			int n = curve_steps(6 * fmaxf(fabsf(p[0] - 2 * p[2] + p[4]), fabsf(p[2] - 2 * p[4] + p[6])),
+			                    6 * fmaxf(fabsf(p[1] - 2 * p[3] + p[5]), fabsf(p[3] - 2 * p[5] + p[7])));
+			for (int i = 1; i <= n; i++) {
+				float t = (float)i / n, u = 1 - t;
+				float a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+				points_add(pts, GRAPHENE_POINT_INIT(a * p[0] + b * p[2] + c * p[4] + d * p[6], a * p[1] + b * p[3] + c * p[5] + d * p[7]));
+			}
+			break;
+		}
+	}
+}
+
+static graphene_vec2_t unit_dir(const graphene_point_t *a, const graphene_point_t *b)
+{
+	graphene_vec2_t v;
+	graphene_vec2_init(&v, b->x - a->x, b->y - a->y);
+	graphene_vec2_normalize(&v, &v);
+	return v;
+}
+
+/* the offset of p by s along the normal (-u.y, u.x) of the direction u */
+static void line_to_offset(GskPathBuilder *dst, const graphene_point_t *p, const graphene_vec2_t *u, float s)
+{
+	gsk_path_builder_line_to(dst, p->x - s * graphene_vec2_get_y(u), p->y + s * graphene_vec2_get_x(u));
+}
+
+/* a circular arc around p of radius |s| from the normal of u1 to the normal of u2 (at most 180 degrees, towards the
+ * outside), as cubics of at most 90 degrees: Skia's conics are exact, but GSK's bounds of conics are not those of
+ * their points (SkPath::computeBounds) */
+static void arc_to(GskPathBuilder *dst, const graphene_point_t *p, const graphene_vec2_t *u1, const graphene_vec2_t *u2, float s)
+{
+	float dot = CLAMP(graphene_vec2_dot(u1, u2), -1.f, 1.f);
+	float angle = acosf(dot);
+	int n = CLAMP((int)ceilf(angle / (G_PI / 2) - 0.001f), 1, 2);
+	float a = angle / n, sign = s > 0 ? -1.f : 1.f; /* turn towards the outside */
+	float nx = -s * graphene_vec2_get_y(u1), ny = s * graphene_vec2_get_x(u1);
+	for (int i = 0; i < n; i++) {
+		float c = cosf(a), sn = sign * sinf(a), t = sign * 4.f / 3 * tanf(a / 4);
+		float ex = nx * c - ny * sn, ey = nx * sn + ny * c;
+		gsk_path_builder_cubic_to(dst, p->x + nx - t * ny, p->y + ny + t * nx, p->x + ex + t * ey, p->y + ey - t * ex, p->x + ex, p->y + ey);
+		nx = ex;
+		ny = ey;
+	}
+}
+
+/* SkStrokerPriv's joiners at p from direction u1 to u2 on the side s; the current point is p offset along u1 */
+static void stroke_join(struct stroker *k, const graphene_point_t *p, const graphene_vec2_t *u1, const graphene_vec2_t *u2, float s)
+{
+	float dot = graphene_vec2_dot(u1, u2);
+	float cross = graphene_vec2_get_x(u1) * graphene_vec2_get_y(u2) - graphene_vec2_get_y(u1) * graphene_vec2_get_x(u2);
+	if (dot >= 1.f - STROKE_NEARLY_ZERO && fabsf(cross) <= STROKE_NEARLY_ZERO) {
+		line_to_offset(k->dst, p, u2, s);
+		return;
+	}
+	if (s * cross > 0) { /* the inner side goes through the pivot */
+		gsk_path_builder_line_to(k->dst, p->x, p->y);
+		line_to_offset(k->dst, p, u2, s);
+		return;
+	}
+	switch (k->join) {
+		case GSK_LINE_JOIN_ROUND:
+			arc_to(k->dst, p, u1, u2, s);
+			return;
+		case GSK_LINE_JOIN_MITER: {
+			float sin_half = sqrtf((1 + dot) / 2);
+			if (sin_half >= k->inv_miter_limit && sin_half > STROKE_NEARLY_ZERO) {
+				graphene_vec2_t mid;
+				graphene_vec2_add(u1, u2, &mid);
+				graphene_vec2_normalize(&mid, &mid);
+				line_to_offset(k->dst, p, &mid, s / sin_half);
+			}
+			break;
+		}
+		default:
+			break;
+	}
+	line_to_offset(k->dst, p, u2, s);
+}
+
+/* the cap at the end p of a stroke going in direction u, from the offset s to the offset -s */
+static void stroke_cap(struct stroker *k, const graphene_point_t *p, const graphene_vec2_t *u, float s)
+{
+	float ux = graphene_vec2_get_x(u) * fabsf(s), uy = graphene_vec2_get_y(u) * fabsf(s);
+	float nx = -s * graphene_vec2_get_y(u), ny = s * graphene_vec2_get_x(u);
+	switch (k->cap) {
+		case GSK_LINE_CAP_ROUND: {
+			graphene_vec2_t back;
+			graphene_vec2_negate(u, &back);
+			arc_to(k->dst, p, u, &back, s);
+			break;
+		}
+		case GSK_LINE_CAP_SQUARE:
+			gsk_path_builder_line_to(k->dst, p->x + nx + ux, p->y + ny + uy);
+			gsk_path_builder_line_to(k->dst, p->x - nx + ux, p->y - ny + uy);
+			gsk_path_builder_line_to(k->dst, p->x - nx, p->y - ny);
+			break;
+		default:
+			gsk_path_builder_line_to(k->dst, p->x - nx, p->y - ny);
+			break;
+	}
+}
+
+/* one side of the polyline pts[0..n) with joins, from the offset of pts[0] (the current point); a closed polyline
+ * repeats pts[0] at its end and gets the join there too */
+static void stroke_side(struct stroker *k, const graphene_point_t *pts, int n, int step, bool closed, float s)
+{
+	int first = step > 0 ? 0 : n - 1;
+	graphene_vec2_t u = unit_dir(&pts[first], &pts[first + step]);
+	graphene_vec2_t u0 = u;
+	for (int i = 1; i < n - 1; i++) {
+		const graphene_point_t *p = &pts[first + i * step];
+		graphene_vec2_t next = unit_dir(p, p + step);
+		line_to_offset(k->dst, p, &u, s);
+		stroke_join(k, p, &u, &next, s);
+		u = next;
+	}
+	line_to_offset(k->dst, &pts[first + (n - 1) * step], &u, s);
+	if (closed)
+		stroke_join(k, &pts[first + (n - 1) * step], &u, &u0, s);
+}
+
+static void move_to_offset(GskPathBuilder *dst, const graphene_point_t *p, const graphene_vec2_t *u, float s)
+{
+	gsk_path_builder_move_to(dst, p->x - s * graphene_vec2_get_y(u), p->y + s * graphene_vec2_get_x(u));
+}
+
+static void stroke_polyline(struct stroker *k, GArray *points, bool closed, bool has_segments)
+{
+	const graphene_point_t *pts = (const graphene_point_t *)points->data;
+	int n = points->len;
+	if (n == 0)
+		return;
+	if (k->hw == 0) { /* hairline: the (dashed) path itself */
+		gsk_path_builder_move_to(k->dst, pts[0].x, pts[0].y);
+		for (int i = 1; i < n; i++)
+			gsk_path_builder_line_to(k->dst, pts[i].x, pts[i].y);
+		if (closed)
+			gsk_path_builder_close(k->dst);
+		return;
+	}
+	if (closed && n > 1 && fabsf(pts[0].x - pts[n - 1].x) <= STROKE_NEARLY_ZERO && fabsf(pts[0].y - pts[n - 1].y) <= STROKE_NEARLY_ZERO)
+		n--;
+	if (n == 1) { /* SkStroke: a zero length contour is a dot for round and square caps */
+		if (has_segments && k->cap != GSK_LINE_CAP_BUTT) {
+			graphene_vec2_t u, back;
+			graphene_vec2_init(&u, 1, 0);
+			graphene_vec2_init(&back, -1, 0);
+			move_to_offset(k->dst, &pts[0], &u, k->hw);
+			stroke_cap(k, &pts[0], &u, k->hw);
+			stroke_cap(k, &pts[0], &back, k->hw);
+			gsk_path_builder_close(k->dst);
+		}
+		return;
+	}
+	if (closed && n > 2) {
+		/* the outer side in the direction of the contour, so that the stroke winds like its fill (SkStroke adds the
+		 * fill of StrokeAndFill in the direction of the outer side) */
+		float area = 0;
+		for (int i = 0; i < n; i++)
+			area += pts[i].x * pts[(i + 1) % n].y - pts[(i + 1) % n].x * pts[i].y;
+		float s = area > 0 ? -k->hw : k->hw;
+		graphene_point_t start = pts[0];
+		g_array_set_size(points, n);
+		g_array_append_val(points, start);
+		pts = (const graphene_point_t *)points->data;
+		graphene_vec2_t u = unit_dir(&pts[0], &pts[1]);
+		move_to_offset(k->dst, &pts[0], &u, s);
+		stroke_side(k, pts, n + 1, 1, true, s);
+		gsk_path_builder_close(k->dst);
+		u = unit_dir(&pts[n], &pts[n - 1]);
+		move_to_offset(k->dst, &pts[n], &u, s);
+		stroke_side(k, pts, n + 1, -1, true, s);
+		gsk_path_builder_close(k->dst);
+		return;
+	}
+	graphene_vec2_t u = unit_dir(&pts[0], &pts[1]);
+	graphene_vec2_t end = unit_dir(&pts[n - 2], &pts[n - 1]);
+	graphene_vec2_t back;
+	graphene_vec2_negate(&u, &back);
+	move_to_offset(k->dst, &pts[0], &u, k->hw);
+	stroke_side(k, pts, n, 1, false, k->hw);
+	stroke_cap(k, &pts[n - 1], &end, k->hw);
+	stroke_side(k, pts, n, -1, false, k->hw);
+	stroke_cap(k, &pts[0], &back, k->hw);
+	gsk_path_builder_close(k->dst);
+}
+
+/* SkDashPath::InternalFilter: the "on" intervals of each contour, starting anew at the dash offset; on a closed
+ * contour the dash running through the start point is one piece */
+static void stroke_dashed(struct stroker *k, GArray *points, bool closed)
+{
+	if (closed && points->len) {
+		graphene_point_t start = g_array_index(points, graphene_point_t, 0);
+		g_array_append_val(points, start);
+	}
+	const graphene_point_t *pts = (const graphene_point_t *)points->data;
+	gsize idx = 0;
+	float phase = fmodf(k->dash_offset, k->dash_total);
+	if (phase < 0)
+		phase += k->dash_total;
+	while (phase >= k->dash[idx]) {
+		phase -= k->dash[idx];
+		idx = (idx + 1) % k->n_dash;
+	}
+	float remain = k->dash[idx] - phase;
+	bool starts_on = !(idx & 1);
+	GArray *piece = g_array_new(FALSE, FALSE, sizeof(graphene_point_t));
+	GArray *first = NULL;
+	if (starts_on && points->len)
+		g_array_append_val(piece, pts[0]);
+	for (guint j = 0; j + 1 < points->len; j++) {
+		float dx = pts[j + 1].x - pts[j].x, dy = pts[j + 1].y - pts[j].y;
+		float len = sqrtf(dx * dx + dy * dy), pos = 0;
+		while (pos < len) {
+			float step = MIN(remain, len - pos);
+			pos += step;
+			remain -= step;
+			graphene_point_t q = GRAPHENE_POINT_INIT(pts[j].x + dx * pos / len, pts[j].y + dy * pos / len);
+			if (!(idx & 1))
+				points_add(piece, q);
+			if (remain > 0)
+				break;
+			if (!(idx & 1)) {
+				if (closed && starts_on && !first) {
+					first = piece;
+					piece = g_array_new(FALSE, FALSE, sizeof(graphene_point_t));
+				} else {
+					stroke_polyline(k, piece, false, true);
+					g_array_set_size(piece, 0);
+				}
+			}
+			idx = (idx + 1) % k->n_dash;
+			remain = k->dash[idx];
+			if (!(idx & 1))
+				g_array_append_val(piece, q);
+		}
+	}
+	if (!(idx & 1) && piece->len && first) { /* closed: the last dash goes on into the first one */
+		for (guint i = 0; i < first->len; i++)
+			points_add(piece, g_array_index(first, graphene_point_t, i));
+		g_array_free(first, TRUE);
+		first = NULL;
+	}
+	if (!(idx & 1) && piece->len)
+		stroke_polyline(k, piece, false, true);
+	if (first) {
+		stroke_polyline(k, first, false, true);
+		g_array_free(first, TRUE);
+	}
+	g_array_free(piece, TRUE);
+}
+
+static void stroke_contour(struct stroker *k, GArray *points, bool closed, bool has_segments)
+{
+	if (k->dash && points->len > 1)
+		stroke_dashed(k, points, closed);
+	else
+		stroke_polyline(k, points, closed, has_segments);
+	g_array_set_size(points, 0);
+}
+
+void android_path_add_stroke(GskPathBuilder *dst, GskPath *src, const GskStroke *stroke, float width, float miter_limit, bool add_fill)
+{
+	struct stroker k = {
+		.dst = dst,
+		.hw = width / 2,
+		.cap = gsk_stroke_get_line_cap(stroke),
+		.join = gsk_stroke_get_line_join(stroke),
+		.inv_miter_limit = miter_limit > 1 ? 1 / miter_limit : 1,
+		.dash_offset = gsk_stroke_get_dash_offset(stroke),
+	};
+	k.dash = gsk_stroke_get_dash(stroke, &k.n_dash);
+	if (k.join == GSK_LINE_JOIN_MITER && miter_limit <= 1)
+		k.join = GSK_LINE_JOIN_BEVEL;
+	for (gsize i = 0; i < k.n_dash; i++)
+		k.dash_total += k.dash[i];
+	if (k.n_dash < 2 || !(k.dash_total > 0))
+		k.dash = NULL;
+	GArray *segments = path_segments(src);
+	GArray *points = g_array_new(FALSE, FALSE, sizeof(graphene_point_t));
+	bool has_segments = false;
+	for (guint i = 0; i < segments->len; i++) {
+		const struct path_segment *s = &g_array_index(segments, struct path_segment, i);
+		switch ((int)s->verb) {
+			case VERB_MOVE:
+				stroke_contour(&k, points, false, has_segments);
+				points_add(points, GRAPHENE_POINT_INIT(s->pts[0], s->pts[1]));
+				has_segments = false;
+				break;
+			case VERB_CLOSE:
+				stroke_contour(&k, points, true, has_segments);
+				has_segments = false;
+				break;
+			default:
+				flatten_segment(points, s);
+				has_segments = true;
+				break;
+		}
+	}
+	stroke_contour(&k, points, false, has_segments);
+	g_array_free(points, TRUE);
+	g_array_free(segments, TRUE);
+	if (add_fill)
+		gsk_path_builder_add_path(dst, src);
 }
