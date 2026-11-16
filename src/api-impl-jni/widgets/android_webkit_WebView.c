@@ -1100,6 +1100,79 @@ JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1removeAllCookie
 	g_main_context_invoke(NULL, remove_all_cookies_on_main, NULL);
 }
 
+/* CookieManager.removeSessionCookies(): the cookies without an expiry date go, on the main thread; the calling
+ * thread waits for the result */
+struct remove_session_cookies {
+	GMutex lock;
+	GCond cond;
+	guint pending; // cookie list + deletions not yet answered
+	gboolean removed;
+};
+
+static void remove_session_cookies_step(struct remove_session_cookies *data)
+{
+	g_mutex_lock(&data->lock);
+	data->pending--;
+	g_cond_signal(&data->cond);
+	g_mutex_unlock(&data->lock);
+}
+
+static void session_cookie_deleted_cb(GObject *cookie_manager, GAsyncResult *res, gpointer user_data)
+{
+	webkit_cookie_manager_delete_cookie_finish(WEBKIT_COOKIE_MANAGER(cookie_manager), res, NULL);
+	remove_session_cookies_step(user_data);
+}
+
+static void session_cookies_listed_cb(GObject *cookie_manager, GAsyncResult *res, gpointer user_data)
+{
+	struct remove_session_cookies *data = user_data;
+	GList *cookies = webkit_cookie_manager_get_all_cookies_finish(WEBKIT_COOKIE_MANAGER(cookie_manager), res, NULL);
+	for (GList *l = cookies; l; l = l->next) {
+		if (soup_cookie_get_expires(l->data))
+			continue;
+		g_mutex_lock(&data->lock);
+		data->pending++;
+		data->removed = TRUE;
+		g_mutex_unlock(&data->lock);
+		webkit_cookie_manager_delete_cookie(WEBKIT_COOKIE_MANAGER(cookie_manager), l->data, NULL, session_cookie_deleted_cb, data);
+	}
+	g_list_free_full(cookies, (GDestroyNotify)soup_cookie_free);
+	remove_session_cookies_step(data);
+}
+
+static gboolean remove_session_cookies_on_main(gpointer data)
+{
+	webkit_cookie_manager_get_all_cookies(webkit_network_session_get_cookie_manager(webkit_network_session_get_default()), NULL, session_cookies_listed_cb, data);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1removeSessionCookies(JNIEnv *env, jclass class)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return JNI_FALSE;
+	struct remove_session_cookies data = {.pending = 1};
+	g_mutex_init(&data.lock);
+	g_cond_init(&data.cond);
+	gboolean main_thread = g_thread_self() == main_thread_id;
+	if (main_thread)
+		remove_session_cookies_on_main(&data);
+	else
+		g_main_context_invoke(NULL, remove_session_cookies_on_main, &data);
+	g_mutex_lock(&data.lock);
+	while (data.pending) {
+		if (main_thread) {
+			g_mutex_unlock(&data.lock);
+			g_main_context_iteration(g_main_context_default(), TRUE);
+			g_mutex_lock(&data.lock);
+		} else
+			g_cond_wait(&data.cond, &data.lock);
+	}
+	g_mutex_unlock(&data.lock);
+	g_mutex_clear(&data.lock);
+	g_cond_clear(&data.cond);
+	return data.removed;
+}
+
 static gboolean set_accept_policy_on_main(gpointer policy)
 {
 	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());

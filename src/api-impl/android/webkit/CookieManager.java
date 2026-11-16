@@ -32,9 +32,12 @@ public class CookieManager {
 			callback.onReceiveValue(true);
 	}
 
+	/* AOSP (Chromium AwCookieManager.removeSessionCookies()): removes the cookies without an expiry date; the
+	 * callback gets whether any was removed */
 	public void removeSessionCookies(ValueCallback<Boolean> callback) {
+		boolean removed = native_removeSessionCookies();
 		if (callback != null)
-			callback.onReceiveValue(true);
+			callback.onReceiveValue(removed);
 	}
 
 	public void removeExpiredCookie() {}
@@ -43,7 +46,10 @@ public class CookieManager {
 		native_removeAllCookies();
 	}
 
-	public void removeSessionCookie() {}
+	/* AOSP (WebViewChromium CookieManagerAdapter): removeSessionCookies() without callback */
+	public void removeSessionCookie() {
+		removeSessionCookies(null);
+	}
 
 	public void flush() {}
 
@@ -99,6 +105,7 @@ public class CookieManager {
 	private native String native_getCookie(String url);
 	private static native boolean native_setCookie(String url, String value);
 	private static native void native_removeAllCookies();
+	private static native boolean native_removeSessionCookies();
 	private static native void native_setAcceptPolicy(int policy);
 
 	/* AOSP CookieManager.allowFileSchemeCookies(): file scheme cookies are off by default */
