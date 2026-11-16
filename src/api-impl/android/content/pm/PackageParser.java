@@ -1720,13 +1720,14 @@ public class PackageParser {
 
 		perm.info.protectionLevel = PermissionInfo.fixProtectionLevel(perm.info.protectionLevel);
 
-		if ((perm.info.protectionLevel & PermissionInfo.PROTECTION_MASK_FLAGS) != 0) {
-			if ((perm.info.protectionLevel & PermissionInfo.PROTECTION_MASK_BASE) != PermissionInfo.PROTECTION_SIGNATURE) {
-				outError[0] = "<permission>  protectionLevel specifies a flag but is "
-				            + "not based on signature type";
-				mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
-				return null;
-			}
+		/* AOSP ParsedPermissionUtils.parsePermission(): flags other than appop (0x40), instant (0x1000) and
+		 * runtimeOnly (0x2000) need a signature based permission; ATL's PermissionInfo has no constants for them */
+		int otherProtectionFlags = (perm.info.protectionLevel & ~PermissionInfo.PROTECTION_MASK_BASE) & ~(0x40 | 0x1000 | 0x2000);
+		if (otherProtectionFlags != 0 && (perm.info.protectionLevel & PermissionInfo.PROTECTION_MASK_BASE) != PermissionInfo.PROTECTION_SIGNATURE) {
+			outError[0] = "<permission> protectionLevel specifies a non-instant, non-appop,"
+			            + " non-runtimeOnly flag but is not based on signature type";
+			mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+			return null;
 		}
 
 		if (!parseAllMetaData(res, parser, attrs, "<permission>", perm,

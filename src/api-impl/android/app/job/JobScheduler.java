@@ -2,6 +2,7 @@ package android.app.job;
 
 import android.atl.ATLLoadedApp;
 import android.content.Context;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Slog;
@@ -101,6 +102,7 @@ public class JobScheduler {
 					String className = job.getService().getClassName();
 					Class<?> cls = context.get_atl_loaded_app().loadClass(className);
 					job.running = true;
+					started(job, params);
 					boolean result;
 					if (JobService.class.isAssignableFrom(cls)) {
 						result = jobService(cls.asSubclass(JobService.class)).onStartJob(params);
@@ -144,37 +146,53 @@ public class JobScheduler {
 		return engine;
 	}
 
+	/* the parameters of the jobs that are running, which onStopJob() gets when the job is cancelled */
+	private static IdentityHashMap<JobInfo, JobParameters> startedParams = new IdentityHashMap<>();
+
+	private static void started(JobInfo job, JobParameters params) {
+		startedParams.values().removeIf(p -> !p.jobInfo.running);
+		startedParams.put(job, params);
+	}
+
+	/* starts a scheduled job once its delay or its trigger content change is due */
+	private final class Start implements Runnable {
+		private final JobInfo job;
+		/* AOSP JobStatus.changedUris/changedAuthorities, handed to the service in the JobParameters */
+		Uri[] changedUris;
+		String[] changedAuthorities;
+
+		Start(JobInfo job) {
+			this.job = job;
+		}
+
+		@Override
+		public void run() {
+			if (pendingJobs.get(job.getId()) != job)
+				return; // cancelled meanwhile
+			try {
+				String className = job.getService().getClassName();
+				Class<? extends JobService> cls = context.get_atl_loaded_app()
+				                                      .loadClass(className)
+				                                      .asSubclass(JobService.class);
+				JobParameters params = new JobParameters(job, namespace);
+				params.triggeredContentUris = changedUris;
+				params.triggeredContentAuthorities = changedAuthorities;
+				job.running = true;
+				started(job, params);
+				boolean result = jobService(cls).onStartJob(params);
+				Slog.i(TAG, "onStartJob() returned " + result);
+			} catch (ReflectiveOperationException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public int schedule(JobInfo job) {
 		Slog.i(TAG, "JobScheduler.schedule() called with job: " + job);
 		if (pendingJobs.containsKey(job.getId()))
 			return 1; //RESULT_SUCCESS
 		pendingJobs.put(job.getId(), job);
-		Runnable start = new Runnable() {
-			@Override
-			public void run() {
-				if (pendingJobs.get(job.getId()) != job)
-					return; // cancelled meanwhile
-				try {
-					String className = job.getService().getClassName();
-					Class<? extends JobService> cls = context.get_atl_loaded_app()
-					                                      .loadClass(className)
-					                                      .asSubclass(JobService.class);
-					if (!runningServices.containsKey(cls)) {
-						JobService service = cls.getConstructor().newInstance();
-						ATLLoadedApp atlLoadedApp = context.get_atl_loaded_app();
-						service.attachBaseContext(atlLoadedApp.createContext(null, null,
-						                                                     atlLoadedApp.pkg.applicationInfo.theme));
-						service.onCreate();
-						runningServices.put(cls, service);
-					}
-					job.running = true;
-					boolean result = runningServices.get(cls).onStartJob(new JobParameters(job, namespace));
-					Slog.i(TAG, "onStartJob() returned " + result);
-				} catch (ReflectiveOperationException e) {
-					e.printStackTrace();
-				}
-			}
-		};
+		Start start = new Start(job);
 		if (job.getTriggerContentUris() != null)
 			contentTriggers.put(job, new ContentTrigger(job, start));
 		else
@@ -190,19 +208,24 @@ public class JobScheduler {
 	 * the first one (JobStatus: default 10 s / 2 min, at least 500 ms / 1 s); then the observers go */
 	private final class ContentTrigger extends android.database.ContentObserver {
 		private final JobInfo job;
-		private final Runnable start;
+		private final Start start;
 		private final Handler handler = new Handler(Looper.getMainLooper());
 		private final Runnable trigger = new Runnable() {
 			@Override
 			public void run() {
 				detach();
+				start.changedUris = changedUris.toArray(new Uri[0]);
+				start.changedAuthorities = changedAuthorities.toArray(new String[0]);
 				handler.postDelayed(start, Math.max(0, scheduled + job.minLatencyMillis - android.os.SystemClock.elapsedRealtime()));
 			}
 		};
 		private final long scheduled = android.os.SystemClock.elapsedRealtime();
 		private boolean pending;
+		/* AOSP ContentObserverController.ObserverInstance: the changed URIs (at most 50) and authorities */
+		private final LinkedHashSet<Uri> changedUris = new LinkedHashSet<>();
+		private final LinkedHashSet<String> changedAuthorities = new LinkedHashSet<>();
 
-		ContentTrigger(JobInfo job, Runnable start) {
+		ContentTrigger(JobInfo job, Start start) {
 			super(new Handler(Looper.getMainLooper()));
 			this.job = job;
 			this.start = start;
@@ -212,7 +235,12 @@ public class JobScheduler {
 		}
 
 		@Override
-		public void onChange(boolean selfChange, android.net.Uri uri) {
+		public void onChange(boolean selfChange, Uri uri) {
+			if (uri != null) {
+				if (changedUris.size() < 50)
+					changedUris.add(uri);
+				changedAuthorities.add(uri.getAuthority());
+			}
 			if (!pending) {
 				pending = true;
 				long max = job.getTriggerContentMaxDelay();
@@ -268,18 +296,32 @@ public class JobScheduler {
 		ContentTrigger trigger = job != null ? contentTriggers.get(job) : null;
 		if (trigger != null)
 			trigger.detach();
-		if (job != null && job.running) {
+		JobParameters params = job != null && job.running ? startedParams.remove(job) : null;
+		if (params != null) {
+			/* AOSP JobServiceContext.cancelExecutingJobLocked(): the service is told with onStopJob() */
+			params.stopReason = JobParameters.STOP_REASON_CANCELLED_BY_APP;
 			new Handler(Looper.getMainLooper()).post(new Runnable() {
 				@Override
 				public void run() {
-					JobService service = runningServices.get(job.getService().getClass());
-					if (service != null) {
-						JobParameters params = new JobParameters(job, namespace);
-						service.onStopJob(params);
-						job.running = false;
+					Object service = runningServices.get(loadClass(job));
+					if (service == null) {
+						service = engines.get(job.getService().getClassName());
 					}
+					if (service instanceof JobService)
+						((JobService)service).onStopJob(params);
+					else if (service instanceof JobServiceEngine)
+						((JobServiceEngine)service).onStopJob(params);
+					job.running = false;
 				}
 			});
+		}
+	}
+
+	private Class<?> loadClass(JobInfo job) {
+		try {
+			return context.get_atl_loaded_app().loadClass(job.getService().getClassName());
+		} catch (ClassNotFoundException e) {
+			return null;
 		}
 	}
 }
