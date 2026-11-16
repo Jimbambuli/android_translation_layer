@@ -367,8 +367,9 @@ static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_
 		history_set_ceiling(web_view, NULL);
 	/* WebView.postUrl(): one load for the app (onPageStarted() of the form page, the rest from the POST) */
 	int post = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(web_view), "atl-post"));
-	gboolean hidden = (post == POST_REQUESTED || post == POST_FORM_PAGE) ? load_event != WEBKIT_LOAD_STARTED : post == POST_SUBMITTED && load_event == WEBKIT_LOAD_STARTED;
-	if (post == POST_SUBMITTED && load_event != WEBKIT_LOAD_STARTED)
+	gboolean hidden = (post == POST_REQUESTED || post == POST_FORM_PAGE) ? load_event != WEBKIT_LOAD_STARTED : post == POST_SUBMITTED;
+	// the form page may still finish after the submission was decided; the POST's own load starts after that
+	if (post == POST_SUBMITTED && load_event == WEBKIT_LOAD_STARTED)
 		post_set_stage(web_view, POST_NONE);
 	if (!hidden)
 		J__WebView__internalLoadChanged(env, this, load_event, _JSTRING(webkit_web_view_get_uri(web_view)));
