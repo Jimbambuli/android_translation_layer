@@ -2670,7 +2670,7 @@ public class PackageManager {
 			case "android.software.webview":
 				return true;
 			default:
-				Slog.e(TAG, "!!!!!!! hasSystemFeature: case >" + name + "< is not implemented yet");
+				// AOSP: a feature the device does not declare is not available
 				return false;
 		}
 	}
