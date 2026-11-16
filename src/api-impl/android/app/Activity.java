@@ -397,7 +397,6 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return;
 	}
 
-	@Export
 	protected void onPostResume() {
 		Slog.i(TAG, "- onPostResume - yay!");
 		return;
@@ -2236,6 +2235,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		onResume();
 		mFragments.dispatchResume();
 		mFragments.execPendingActions();
+		onPostResume();
 		dispatchActivityPostResumed();
 	}
 
