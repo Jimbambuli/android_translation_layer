@@ -2638,7 +2638,10 @@ public class PackageManager {
 	public boolean hasSystemFeature(String name) {
 		switch (name) {
 			case FEATURE_TOUCHSCREEN:
-			case "android.hardware.touchscreen.multitouch.distinct":
+			// a touch screen with distinct tracking also lists the basic and the jazzhand level on an AOSP device
+			case FEATURE_TOUCHSCREEN_MULTITOUCH:
+			case FEATURE_TOUCHSCREEN_MULTITOUCH_DISTINCT:
+			case FEATURE_TOUCHSCREEN_MULTITOUCH_JAZZHAND:
 			/* AOSP lists it on every device with a touchscreen; Google Play implies it for apps that do not
 			 * require android.hardware.touchscreen */
 			case FEATURE_FAKETOUCH:
