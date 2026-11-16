@@ -130,7 +130,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		Uri uri = uriString != null ? Uri.parse(uriString) : null;
 		/* a link from the desktop, like a browser starts it on Android: VIEW, BROWSABLE, for an activity with
 		 * a matching filter in CATEGORY_DEFAULT (MATCH_DEFAULT_ONLY) */
-		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : new Intent();
+		Intent intent = uri != null ? new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE) : null;
 		/* a local file: VIEW with its type, else SEND, as from a file manager on Android */
 		if (className == null && uri != null && ("file".equals(uri.getScheme()) || "data".equals(uri.getScheme()))) {
 			Intent file = desktopFileIntent(uri);
@@ -172,6 +172,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		if (className == null) {
 			System.err.println("Failed to find main Activity");
 			System.exit(1);
+		}
+		if (intent == null) {
+			/* started from the desktop like the launcher starts an app on Android (LauncherApps.getMainActivityLaunchIntent()):
+			 * MAIN in CATEGORY_LAUNCHER for the component, in a new task */
+			intent = Intent.makeMainActivity(new ComponentName(ATLLoadedApp.getPrimaryApplication().pkg.packageName, className))
+			             .addCategory(Intent.CATEGORY_LAUNCHER)
+			             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | 0x00200000 /* FLAG_ACTIVITY_RESET_TASK_IF_NEEDED, not yet in Intent */);
 		}
 		ATLLoadedApp.setTaskBaseIntent(intent);
 		return internalCreateActivity(className, native_window, intent);
