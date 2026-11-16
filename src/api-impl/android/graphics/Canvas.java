@@ -922,12 +922,13 @@ public class Canvas {
 	}
 
 	public void drawPoints(float[] pts, Paint paint) {
-		drawPoints(pts, 0, pts.length / 2, paint);
+		drawPoints(pts, 0, pts.length, paint);
 	}
 
 	public void drawPoints(float[] pts, int offset, int count, Paint paint) {
-		for (int i = offset; i < count; i++) {
-			drawPoint(pts[i * 2], pts[i * 2 + 1], paint);
+		/* count is the number of values; two make one point */
+		for (int i = offset; i + 2 <= offset + count; i += 2) {
+			drawPoint(pts[i], pts[i + 1], paint);
 		}
 	}
 
