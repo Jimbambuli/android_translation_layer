@@ -43,14 +43,18 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 	/* TaskFragment.computeConfigResourceOverrides(): the orientation follows the window's screen size,
 	 * without it no -port/-land resources match */
 	_SET_INT_FIELD(configuration, "orientation", screen_width_dp <= screen_height_dp ? /*ORIENTATION_PORTRAIT*/ 1 : /*ORIENTATION_LANDSCAPE*/ 2);
-	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on */
-	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(geometry.width, geometry.height));
-	/* the layout direction bits come from the locale (Configuration.setLayoutDirection()) */
-	jint layout_dir = _GET_INT_FIELD(configuration, "screenLayout") & /*SCREENLAYOUT_LAYOUTDIR_MASK*/ 0xC0;
-	if (geometry.width >= 800 && geometry.height >= 800)
-		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_LARGE*/ 0x03 | layout_dir);
-	else
-		_SET_INT_FIELD(configuration, "screenLayout", /*SCREENLAYOUT_SIZE_NORMAL*/ 0x02 | layout_dir);
+	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on; like
+	 * TaskFragment.computeConfigResourceOverrides() for a floating (freeform) task, it is the smaller
+	 * side of the window, not of the monitor: a phone-sized window gets the phone resources */
+	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(screen_width_dp, screen_height_dp));
+	/* the size and long bits from the window's screen size as for the other sizes, like
+	 * TaskFragment.computeConfigResourceOverrides() (Configuration.reduceScreenLayout()); the layout
+	 * direction bits come from the locale (Configuration.setLayoutDirection()) and are kept */
+	jclass config_class = (*env)->GetObjectClass(env, configuration);
+	jint screen_layout = (*env)->CallStaticIntMethod(env, config_class, _STATIC_METHOD(config_class, "resetScreenLayout", "(I)I"), _GET_INT_FIELD(configuration, "screenLayout"));
+	screen_layout = (*env)->CallStaticIntMethod(env, config_class, _STATIC_METHOD(config_class, "reduceScreenLayout", "(III)I"), screen_layout,
+	                                            MAX(screen_width_dp, screen_height_dp), MIN(screen_width_dp, screen_height_dp));
+	_SET_INT_FIELD(configuration, "screenLayout", screen_layout);
 }
 
 /* The appearance of the desktop, from the XDG settings portal (namespace org.freedesktop.appearance) and

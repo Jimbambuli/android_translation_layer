@@ -1262,6 +1262,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		Configuration newConfig = new Configuration(oldConfig);
 		newConfig.screenWidthDp = sys_config.screenWidthDp;
 		newConfig.screenHeightDp = sys_config.screenHeightDp;
+		newConfig.smallestScreenWidthDp = sys_config.smallestScreenWidthDp;
+		newConfig.screenLayout = sys_config.screenLayout;
 		newConfig.orientation = sys_config.orientation;
 		int diff = oldConfig.diff(newConfig);
 		if (diff == 0)
