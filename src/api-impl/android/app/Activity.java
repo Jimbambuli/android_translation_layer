@@ -178,7 +178,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			 * MAIN in CATEGORY_LAUNCHER for the component, in a new task */
 			intent = Intent.makeMainActivity(new ComponentName(ATLLoadedApp.getPrimaryApplication().pkg.packageName, className))
 			             .addCategory(Intent.CATEGORY_LAUNCHER)
-			             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | 0x00200000 /* FLAG_ACTIVITY_RESET_TASK_IF_NEEDED, not yet in Intent */);
+			             .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
 		}
 		ATLLoadedApp.setTaskBaseIntent(intent);
 		return internalCreateActivity(className, native_window, intent);

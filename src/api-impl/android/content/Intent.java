@@ -33,6 +33,7 @@ public class Intent implements Parcelable {
 	public static final int FLAG_ACTIVITY_MULTIPLE_TASK = 0x08000000;
 	public static final int FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET = 0x00080000;
 	public static final int FLAG_ACTIVITY_NEW_DOCUMENT = FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET;
+	public static final int FLAG_ACTIVITY_RESET_TASK_IF_NEEDED = 0x00200000;
 	public static final int FLAG_RECEIVER_REGISTERED_ONLY = 0x40000000;
 	public static final int FLAG_RECEIVER_REPLACE_PENDING = 0x20000000;
 	public static final int FLAG_RECEIVER_FOREGROUND = 0x10000000;
