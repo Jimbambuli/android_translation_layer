@@ -1,23 +1,68 @@
 package android.app;
 
 import android.content.Intent;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.Message;
 
+/* AOSP IntentService: the intents are handled one after the other on a worker thread, and the service stops
+ * itself (stopSelf(startId)) when the last one is done */
 public abstract class IntentService extends Service {
+	private volatile Looper mServiceLooper;
+	private volatile ServiceHandler mServiceHandler;
+	private String mName;
+	private boolean mRedelivery;
+
+	private final class ServiceHandler extends Handler {
+		public ServiceHandler(Looper looper) {
+			super(looper);
+		}
+
+		@Override
+		public void handleMessage(Message msg) {
+			onHandleIntent((Intent)msg.obj);
+			stopSelf(msg.arg1);
+		}
+	}
+
 	public IntentService(String name) {
+		super();
+		mName = name;
+	}
+
+	public void setIntentRedelivery(boolean enabled) {
+		mRedelivery = enabled;
+	}
+
+	@Override
+	public void onCreate() {
+		super.onCreate();
+		HandlerThread thread = new HandlerThread("IntentService[" + mName + "]");
+		thread.start();
+
+		mServiceLooper = thread.getLooper();
+		mServiceHandler = new ServiceHandler(mServiceLooper);
+	}
+
+	@Override
+	public void onStart(Intent intent, int startId) {
+		Message msg = mServiceHandler.obtainMessage();
+		msg.arg1 = startId;
+		msg.obj = intent;
+		mServiceHandler.sendMessage(msg);
 	}
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		onStart(intent, startId); // AOSP IntentService.onStartCommand()
-		return 0;
+		onStart(intent, startId);
+		return mRedelivery ? START_REDELIVER_INTENT : START_NOT_STICKY;
 	}
 
-	/* AOSP IntentService.onStart() hands the intent to onHandleIntent() (there on the worker thread, here
-	 * in place); subclasses overriding onStart() are called as on Android */
 	@Override
-	public void onStart(Intent intent, int startId) {
-		this.onHandleIntent(intent);
+	public void onDestroy() {
+		mServiceLooper.quit();
 	}
 
 	@Override
