@@ -47,6 +47,10 @@ public class CookieManager {
 
 	public void flush() {}
 
+	public boolean hasCookies() {
+		return native_hasCookies();
+	}
+
 	public String getCookie(String url) {
 		return native_getCookie(url);
 	}
@@ -99,6 +103,7 @@ public class CookieManager {
 	private native String native_getCookie(String url);
 	private static native boolean native_setCookie(String url, String value);
 	private static native void native_removeAllCookies();
+	private static native boolean native_hasCookies();
 	private static native void native_setAcceptPolicy(int policy);
 
 	/* AOSP CookieManager.allowFileSchemeCookies(): file scheme cookies are off by default */
