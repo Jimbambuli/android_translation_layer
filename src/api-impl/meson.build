@@ -2100,6 +2100,7 @@ srcs = [
 	'com/android/internal/util/Preconditions.java',
 	'com/android/internal/util/XmlUtils.java',
 	'com/android/internal/util/CharSequences.java',
+	'com/android/internal/widget/PreferenceImageView.java',
 	'com/android/location/provider/ProviderPropertiesUnbundled.java',
 	'com/android/net/module/util/HexDump.java',
 	'com/android/net/module/util/InetAddressUtils.java',
