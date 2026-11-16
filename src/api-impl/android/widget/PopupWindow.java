@@ -209,10 +209,7 @@ public class PopupWindow {
 
 	/* AOSP PopupWindow(int, int) -> this(null, width, height) */
 	public PopupWindow(int width, int height) {
-		popover = native_constructor();
-		setWidth(width);
-		setHeight(height);
-		setFocusable(false);
+		this(null, width, height);
 	}
 
 	public PopupWindow(Context context, AttributeSet attrs) {
