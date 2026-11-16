@@ -1607,6 +1607,7 @@ srcs = [
 	'android/text/style/ImageSpan.java',
 	'android/text/style/LeadingMarginSpan.java',
 	'android/text/style/LineBackgroundSpan.java',
+	'android/text/style/LineBreakConfigSpan.java',
 	'android/text/style/LineHeightSpan.java',
 	'android/text/style/LocaleSpan.java',
 	'android/text/style/MaskFilterSpan.java',

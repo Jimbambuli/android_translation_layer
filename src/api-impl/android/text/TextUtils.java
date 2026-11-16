@@ -897,6 +897,8 @@ public class TextUtils {
     /** @hide */
     public static final int ACCESSIBILITY_REPLACEMENT_SPAN = 29;
     /** @hide */
+    public static final int LINE_BREAK_CONFIG_SPAN = 30;
+    /** @hide */
     public static final int LAST_SPAN = ACCESSIBILITY_REPLACEMENT_SPAN;
 
     /**
