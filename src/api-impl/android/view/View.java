@@ -5896,9 +5896,15 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void announceForAccessibility(CharSequence text) {}
 
 	public WindowInsetsController getWindowInsetsController() {
-		/* like AOSP, null while the view is not attached to a window */
+		/* like AOSP: the controller of the window the view is attached to; before that the one of the
+		 * nearest ancestor (the DecorView of a window answers with the window's controller) */
 		Window window = native_get_window(widget);
-		return window != null ? window.getInsetsController() : null;
+		if (window != null)
+			return window.getInsetsController();
+		ViewParent parent = getParent();
+		if (parent instanceof View)
+			return ((View) parent).getWindowInsetsController();
+		return null;
 	}
 
 	/* AOSP View.isKeyboardNavigationCluster() and setKeyboardNavigationCluster(): the root of a group of views

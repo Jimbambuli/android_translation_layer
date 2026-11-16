@@ -33,6 +33,14 @@ JNIEXPORT void JNICALL Java_android_webkit_CookieManager_native_1removeAllCookie
 
 /*
  * Class:     android_webkit_CookieManager
+ * Method:    native_hasCookies
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1hasCookies
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_webkit_CookieManager
  * Method:    native_setAcceptPolicy
  * Signature: (I)V
  */

@@ -1000,6 +1000,35 @@ JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_native_1getCookie(JN
 	return ret;
 }
 
+static void get_all_cookies_cb(GObject *cookie_manager, GAsyncResult *res, gpointer user_data)
+{
+	struct get_cookies_data *data = user_data;
+	data->cookies = webkit_cookie_manager_get_all_cookies_finish(WEBKIT_COOKIE_MANAGER(cookie_manager), res, NULL);
+	data->done = TRUE;
+}
+
+/* CookieManager.hasCookies(): whether the cookie store holds any cookie; synchronous like getCookie() */
+JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_native_1hasCookies(JNIEnv *env, jclass class)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return JNI_FALSE;
+
+	if (g_thread_self() != main_thread_id) {
+		fprintf(stderr, "CookieManager.hasCookies: not supported off the main thread\n");
+		return JNI_FALSE;
+	}
+
+	struct get_cookies_data data = {0};
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_get_all_cookies(cookie_manager, NULL, get_all_cookies_cb, &data);
+	while (!data.done)
+		g_main_context_iteration(g_main_context_default(), TRUE);
+
+	jboolean ret = data.cookies != NULL;
+	g_list_free_full(data.cookies, (GDestroyNotify)soup_cookie_free);
+	return ret;
+}
+
 /* WebKit's cookie store belongs to the main thread; CookieManager may be used from any thread, so the change
  * runs there (at once when called on it) */
 static gboolean add_cookie_on_main(gpointer cookie)
