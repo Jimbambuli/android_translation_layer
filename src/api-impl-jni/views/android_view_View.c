@@ -219,7 +219,15 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
 	return ret;
 }
 
-static void call_hover_callback(jobject this, int action, float x, float y, float raw_x, float raw_y)
+/* the time of a hover event, in SystemClock.uptimeMillis() like the touch events: the input event's, or now for the
+ * crossings and motions GTK sends without one (CLOCK_MONOTONIC is the clock of both GDK's and uptimeMillis()) */
+static guint32 hover_event_time(GtkEventController *controller)
+{
+	guint32 time = controller ? gtk_event_controller_get_current_event_time(controller) : 0;
+	return time ? time : g_get_monotonic_time() / 1000;
+}
+
+static void call_hover_callback(jobject this, int action, float x, float y, float raw_x, float raw_y, guint32 timestamp)
 {
 	JNIEnv *env = get_jni_env();
 	/* the pointer id of the mouse's presses (see on_pointer_event()): hover and press are one pointer, as on
@@ -228,7 +236,7 @@ static void call_hover_callback(jobject this, int action, float x, float y, floa
 	(*env)->SetIntArrayRegion(env, ids, 0, 1, &(jint){1});
 	jfloatArray coords = (*env)->NewFloatArray(env, 4);
 	(*env)->SetFloatArrayRegion(env, coords, 0, 4, (jfloat[]){x, y, raw_x, raw_y});
-	jobject motion_event = J_new__MotionEvent(env, SOURCE_MOUSE, action, (jlong)0, ids, coords);
+	jobject motion_event = J_new__MotionEvent(env, SOURCE_MOUSE, action, (jlong)timestamp, ids, coords);
 	J__View__dispatchHoverEventFromNative(env, this, motion_event);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
@@ -432,7 +440,7 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 	}
 	if (pointer_indices->len == 0 && wrapper->hover_exit_pending) {
 		wrapper->hover_exit_pending = FALSE;
-		call_hover_callback(wrapper->jobj, ACTION_HOVER_EXIT, x, y, raw_x, raw_y);
+		call_hover_callback(wrapper->jobj, ACTION_HOVER_EXIT, x, y, raw_x, raw_y, timestamp);
 	}
 	return ret;
 }
@@ -561,7 +569,7 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
 
 	// HACK: replay last hover event to work around scrolling issues in composeUI apps
 	if (wrapper->hover_x && wrapper->hover_y)
-		call_hover_callback(this, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y);
+		call_hover_callback(this, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y, gdk_event_get_time(event));
 
 	(*env)->DeleteLocalRef(env, motion_event);
 	(*env)->DeleteLocalRef(env, this);
@@ -674,7 +682,7 @@ static gboolean on_scroll_event(WrapperWidget *wrapper, GdkEvent *event)
 	gtk_native_get_surface_transform(native, &off_x, &off_y);
 	for (GtkWidget *w = gtk_widget_pick(GTK_WIDGET(native), raw_x - off_x, raw_y - off_y, GTK_PICK_DEFAULT); w && w != GTK_WIDGET(native); w = gtk_widget_get_parent(w)) {
 		if (WRAPPER_IS_WIDGET(w) && g_object_get_data(G_OBJECT(w), "scroll_controller") && WRAPPER_WIDGET(w)->hover_x && WRAPPER_WIDGET(w)->hover_y)
-			call_hover_callback(WRAPPER_WIDGET(w)->jobj, ACTION_HOVER_MOVE, WRAPPER_WIDGET(w)->hover_x, WRAPPER_WIDGET(w)->hover_y, WRAPPER_WIDGET(w)->hover_x, WRAPPER_WIDGET(w)->hover_y);
+			call_hover_callback(WRAPPER_WIDGET(w)->jobj, ACTION_HOVER_MOVE, WRAPPER_WIDGET(w)->hover_x, WRAPPER_WIDGET(w)->hover_y, WRAPPER_WIDGET(w)->hover_x, WRAPPER_WIDGET(w)->hover_y, gdk_event_get_time(event));
 		if (w == GTK_WIDGET(wrapper))
 			break;
 	}
@@ -723,7 +731,7 @@ static void hover_leave_cb(GtkEventControllerMotion *controller, WrapperWidget *
 	if (pointer_indices->len) // composeUI apps don't like ACTION_HOVER_EXIT events while a pointer is down
 		wrapper->hover_exit_pending = TRUE;
 	else
-		call_hover_callback(wrapper->jobj, ACTION_HOVER_EXIT, 0, 0, 0, 0);
+		call_hover_callback(wrapper->jobj, ACTION_HOVER_EXIT, 0, 0, 0, 0, hover_event_time(GTK_EVENT_CONTROLLER(controller)));
 }
 
 static void hover_motion_cb(GtkEventControllerMotion *controller, double x, double y, WrapperWidget *wrapper)
@@ -732,14 +740,18 @@ static void hover_motion_cb(GtkEventControllerMotion *controller, double x, doub
 	double raw_y;
 	if (pointer_indices && pointer_indices->len) // like Android: the pointer is down, it doesn't hover
 		return;
+	/* like Android's InputReader, no movement, no event: GTK repeats the motion (without an event time) when the
+	 * widgets under the pointer change */
+	if (!wrapper->hover_enter_pending && x == wrapper->hover_x && y == wrapper->hover_y)
+		return;
 	get_raw_position(controller, wrapper, x, y, &raw_x, &raw_y);
 	wrapper->hover_x = x;
 	wrapper->hover_y = y;
 	if (wrapper->hover_enter_pending) {
 		wrapper->hover_enter_pending = FALSE;
-		call_hover_callback(wrapper->jobj, ACTION_HOVER_ENTER, x, y, raw_x, raw_y);
+		call_hover_callback(wrapper->jobj, ACTION_HOVER_ENTER, x, y, raw_x, raw_y, hover_event_time(GTK_EVENT_CONTROLLER(controller)));
 	}
-	call_hover_callback(wrapper->jobj, ACTION_HOVER_MOVE, x, y, raw_x, raw_y);
+	call_hover_callback(wrapper->jobj, ACTION_HOVER_MOVE, x, y, raw_x, raw_y, hover_event_time(GTK_EVENT_CONTROLLER(controller)));
 }
 
 void _setOnTouchListener(JNIEnv *env, jobject this, GtkWidget *widget)
