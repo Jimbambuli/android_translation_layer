@@ -815,28 +815,6 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnClickListener(JNIEnv *e
 	widget_set_needs_allocation(widget);
 }
 
-JNIEXPORT jint JNICALL Java_android_view_View_getWidth(JNIEnv *env, jobject this)
-{
-	GtkWidget *widget = GTK_WIDGET(_PTR(_GET_LONG_FIELD(this, "widget")));
-
-	if (ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget))) {
-		AndroidLayout *layout = ATL_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget));
-		return layout->real_width;
-	}
-	return gtk_widget_get_width(widget);
-}
-
-JNIEXPORT jint JNICALL Java_android_view_View_getHeight(JNIEnv *env, jobject this)
-{
-	GtkWidget *widget = GTK_WIDGET(_PTR(_GET_LONG_FIELD(this, "widget")));
-
-	if (ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget))) {
-		AndroidLayout *layout = ATL_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget));
-		return layout->real_height;
-	}
-	return gtk_widget_get_height(widget);
-}
-
 #define GRAVITY_TOP               (1 << 5) //0x30
 #define GRAVITY_BOTTOM            (1 << 6) //0x50
 #define GRAVITY_LEFT              (1 << 1) //0x3
@@ -1280,7 +1258,9 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1getGlobalVisibleRect(J
 		return false;
 	_SET_INT_FIELD(rect, "left", point_out.x);
 	_SET_INT_FIELD(rect, "top", point_out.y);
-	point_in = (graphene_point_t){Java_android_view_View_getWidth(env, this), Java_android_view_View_getHeight(env, this)};
+	/* the size of the view as laid out (AOSP: mRight - mLeft, mBottom - mTop); the GTK size of a native
+	 * widget is its content box without the CSS padding the view's padding becomes */
+	point_in = (graphene_point_t){_GET_INT_FIELD(this, "right") - _GET_INT_FIELD(this, "left"), _GET_INT_FIELD(this, "bottom") - _GET_INT_FIELD(this, "top")};
 	ret = atl_compute_point_in_window(widget, &point_in, &point_out);
 	if (!ret)
 		return false;
