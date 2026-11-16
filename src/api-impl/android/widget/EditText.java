@@ -161,7 +161,7 @@ public class EditText extends TextView {
 	private void sendTextChanged(String text) {
 		if (!programmatic_text)
 			InputTrace.textChanged(this, text.length());
-		String previous = mPreviousText;
+		String previous = mPreviousText != null ? mPreviousText : "";
 		mPreviousText = text;
 		syncEditable(text);
 		Editable s = getText();
@@ -182,7 +182,9 @@ public class EditText extends TextView {
 		}
 	}
 
-	private String mPreviousText = "";
+	/* no initializer: TextView's constructor sets the first text before EditText's field initializers run,
+	 * so null is the empty text from before it */
+	private String mPreviousText;
 
 	/* called from native code when Enter was pressed */
 	@Export
@@ -278,7 +280,7 @@ public class EditText extends TextView {
 	 * while the typed text is not in the Editable yet, onSelectionChanged() waits for sendTextChanged(). */
 	@Export
 	private void sendSelectionChanged() {
-		if (!native_getText(widget).equals(mPreviousText)) {
+		if (!native_getText(widget).equals(mPreviousText != null ? mPreviousText : "")) {
 			mSelectionChangePending = true;
 			return;
 		}
