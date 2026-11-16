@@ -10,6 +10,8 @@ public class JobParameters implements Parcelable {
 	public static final Creator<JobParameters> CREATOR = null;
 
 	JobInfo jobInfo;
+	Uri[] triggeredContentUris;
+	String[] triggeredContentAuthorities;
 	String namespace;
 
 	JobParameters(JobInfo jobInfo, String namespace) {
@@ -128,13 +130,13 @@ public class JobParameters implements Parcelable {
 		JobScheduler.pendingJobs(namespace).remove(jobInfo.getId());
 	}
 
-	/* AOSP JobParameters: null when no content change triggered the job; ATL's scheduler does not
-	 * watch content URIs, so it is always null (an empty array read as "triggered by content") */
+	/* AOSP JobParameters: the URIs (at most 50) and authorities of the content changes that triggered the job,
+	 * null when no change did */
 	public Uri[] getTriggeredContentUris() {
-		return null;
+		return triggeredContentUris;
 	}
 
 	public String[] getTriggeredContentAuthorities() {
-		return null;
+		return triggeredContentAuthorities;
 	}
 }
