@@ -43,8 +43,10 @@ static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject
 	/* TaskFragment.computeConfigResourceOverrides(): the orientation follows the window's screen size,
 	 * without it no -port/-land resources match */
 	_SET_INT_FIELD(configuration, "orientation", screen_width_dp <= screen_height_dp ? /*ORIENTATION_PORTRAIT*/ 1 : /*ORIENTATION_LANDSCAPE*/ 2);
-	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on */
-	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(geometry.width, geometry.height));
+	/* without it, no resources with an sw<N>dp qualifier match, which tablet layouts rely on; like
+	 * TaskFragment.computeConfigResourceOverrides() for a floating (freeform) task, it is the smaller
+	 * side of the window, not of the monitor: a phone-sized window gets the phone resources */
+	_SET_INT_FIELD(configuration, "smallestScreenWidthDp", MIN(screen_width_dp, screen_height_dp));
 	/* the layout direction bits come from the locale (Configuration.setLayoutDirection()) */
 	jint layout_dir = _GET_INT_FIELD(configuration, "screenLayout") & /*SCREENLAYOUT_LAYOUTDIR_MASK*/ 0xC0;
 	if (geometry.width >= 800 && geometry.height >= 800)
