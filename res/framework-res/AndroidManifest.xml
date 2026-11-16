@@ -5431,7 +5431,7 @@
         android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
         android:description="@string/permdesc_foregroundServiceSpecialUse"
         android:label="@string/permlab_foregroundServiceSpecialUse"
-        android:protectionLevel="normal|instant" />
+        android:protectionLevel="normal|appop|instant" />
 
     <permission
         android:name="android.permission.ACCESS_SHORTCUTS"
@@ -5521,11 +5521,11 @@
         android:name="android.permission.USE_FULL_SCREEN_INTENT"
         android:label="@string/permlab_fullScreenIntent"
         android:description="@string/permdesc_fullScreenIntent"
-        android:protectionLevel="normal" />
+        android:protectionLevel="normal|appop" />
 
     <permission
         android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"
-        android:protectionLevel="normal"
+        android:protectionLevel="normal|appop"
         android:featureFlag="android.app.ui_rich_ongoing"/>
 
     <permission
