@@ -230,7 +230,7 @@ public class ContentResolver {
 			if (provider != null)
 				return provider.openFile(uri, mode);
 			else
-				return null;
+				throw new FileNotFoundException("No content provider: " + uri);
 		}
 	}
 
@@ -247,7 +247,7 @@ public class ContentResolver {
 			if (provider != null)
 				return provider.openAssetFile(uri, mode);
 			else
-				return null;
+				throw new FileNotFoundException("No content provider: " + uri);
 		}
 	}
 
