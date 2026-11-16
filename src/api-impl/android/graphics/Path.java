@@ -168,7 +168,18 @@ public class Path {
 	}
 
 	public void addRect(float left, float top, float right, float bottom, Path.Direction dir) {
-		native_add_rect(getBuilder(), left, top, right, bottom);
+		if (dir == Direction.CCW) {
+			/* GSK adds rectangles clockwise; the direction decides the winding number, e.g. for a mask
+			 * built as shape (CW) plus bounds (CCW). Same points as Skia's SkPath::addRect(). */
+			long builder = getBuilder();
+			native_move_to(builder, left, top);
+			native_line_to(builder, left, bottom);
+			native_line_to(builder, right, bottom);
+			native_line_to(builder, right, top);
+			native_close(builder);
+		} else {
+			native_add_rect(getBuilder(), left, top, right, bottom);
+		}
 	}
 
 	public void addRoundRect(float left, float top, float right, float bottom,
