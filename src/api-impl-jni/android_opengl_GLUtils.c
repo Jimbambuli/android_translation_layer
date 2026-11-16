@@ -12,12 +12,16 @@
 	#define GL_PALETTE8_RGBA8_OES 0x8B96
 #endif
 
-/* AOSP: bitmap.isValid() && bitmap.getPixels() != nullptr */
-static void *get_pixels(JNIEnv *env, jobject bitmap)
+/* AOSP: bitmap.isValid() && bitmap.getPixels() != nullptr; getPixels() is AndroidBitmap_lockPixels(), the pixels are only
+ * there between lock and unlock (the "bytes" field is the GBytes of the lock, 0 otherwise) */
+static void *lock_pixels(JNIEnv *env, jobject bitmap)
 {
-	if (!bitmap || _GET_BOOL_FIELD(bitmap, "mRecycled"))
+	void *pixels = NULL;
+	if (!bitmap || _GET_BOOL_FIELD(bitmap, "recycled"))
 		return NULL;
-	return _PTR(_GET_LONG_FIELD(bitmap, "bytes"));
+	if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0)
+		return NULL;
+	return pixels;
 }
 
 // The internal format is no longer the same as pixel format, per Table 2 in
@@ -119,7 +123,7 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1getType(JNIEnv *env, 
 JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1texImage2D(JNIEnv *env, jclass clazz, jint target, jint level,
                                                                       jint internalformat, jobject bitmapObj, jint type, jint border)
 {
-	void *pixels = get_pixels(env, bitmapObj);
+	void *pixels = lock_pixels(env, bitmapObj);
 	if (pixels != NULL) {
 		struct AndroidBitmapInfo bitmapInfo;
 		AndroidBitmap_getInfo(env, bitmapObj, &bitmapInfo);
@@ -134,8 +138,10 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1texImage2D(JNIEnv *en
 		if (checkInternalFormat(bitmapInfo.format, internalformat, type)) {
 			glTexImage2D(target, level, internalformat, bitmapInfo.width, bitmapInfo.height, border,
 			             getPixelFormatFromInternalFormat(internalformat), type, pixels);
+			AndroidBitmap_unlockPixels(env, bitmapObj);
 			return 0;
 		}
+		AndroidBitmap_unlockPixels(env, bitmapObj);
 	}
 	return -1;
 }
@@ -143,7 +149,7 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1texImage2D(JNIEnv *en
 JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1texSubImage2D(JNIEnv *env, jclass clazz, jint target, jint level,
                                                                          jint xoffset, jint yoffset, jobject bitmapObj, jint format, jint type)
 {
-	void *pixels = get_pixels(env, bitmapObj);
+	void *pixels = lock_pixels(env, bitmapObj);
 	if (pixels != NULL) {
 		struct AndroidBitmapInfo bitmapInfo;
 		AndroidBitmap_getInfo(env, bitmapObj, &bitmapInfo);
@@ -151,15 +157,19 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLUtils_native_1texSubImage2D(JNIEnv 
 		int internalFormat = getInternalFormat(bitmapInfo.format);
 		if (format < 0) {
 			format = getPixelFormatFromInternalFormat(internalFormat);
-			if (format == GL_PALETTE8_RGBA8_OES)
+			if (format == GL_PALETTE8_RGBA8_OES) {
+				AndroidBitmap_unlockPixels(env, bitmapObj);
 				return -1; // glCompressedTexSubImage2D() not supported
+			}
 		}
 
 		if (checkInternalFormat(bitmapInfo.format, internalFormat, type)) {
 			glTexSubImage2D(target, level, xoffset, yoffset, bitmapInfo.width, bitmapInfo.height,
 			                format, type, pixels);
+			AndroidBitmap_unlockPixels(env, bitmapObj);
 			return 0;
 		}
+		AndroidBitmap_unlockPixels(env, bitmapObj);
 	}
 	return -1;
 }

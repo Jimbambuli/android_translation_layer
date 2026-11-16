@@ -26,4 +26,7 @@ struct AndroidBitmapInfo {
 int AndroidBitmap_getInfo(JNIEnv *env, jobject bitmap,
                           struct AndroidBitmapInfo *info);
 
+int AndroidBitmap_lockPixels(JNIEnv *env, jobject bitmap, void **pixels);
+int AndroidBitmap_unlockPixels(JNIEnv *env, jobject bitmap);
+
 #endif
