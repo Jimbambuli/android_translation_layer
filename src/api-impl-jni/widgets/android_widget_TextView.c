@@ -137,6 +137,24 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTextSize(JNIEnv *
 	pango_attr_list_unref(attrs);
 }
 
+/* Paint.UNDERLINE_TEXT_FLAG and STRIKE_THRU_TEXT_FLAG of the TextView's paint: Skia draws them for the whole
+ * text, here they are Pango attributes of the whole label */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setPaintFlags(JNIEnv *env, jobject this, jint flags)
+{
+	GtkWidget *box = _PTR(_GET_LONG_FIELD(this, "widget"));
+	if (!GTK_IS_BOX(box)) // EditText (GtkText) and Button have widgets of their own
+		return;
+	GtkLabel *label = box_get_label(env, box);
+	if (!label)
+		return;
+	PangoAttrList *old_attrs = gtk_label_get_attributes(label);
+	PangoAttrList *attrs = old_attrs ? pango_attr_list_copy(old_attrs) : pango_attr_list_new();
+	pango_attr_list_change(attrs, pango_attr_underline_new((flags & 0x08) ? PANGO_UNDERLINE_SINGLE : PANGO_UNDERLINE_NONE));
+	pango_attr_list_change(attrs, pango_attr_strikethrough_new((flags & 0x10) != 0));
+	gtk_label_set_attributes(label, attrs);
+	pango_attr_list_unref(attrs);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLines(JNIEnv *env, jobject this, jint lines, jint ellipsize_mode)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));

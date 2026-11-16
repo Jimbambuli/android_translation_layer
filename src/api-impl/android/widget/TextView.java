@@ -51,6 +51,7 @@ import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
 import android.text.style.URLSpan;
 import android.text.style.UnderlineSpan;
+import android.util.SparseIntArray;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.ActionMode;
@@ -129,24 +130,17 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 				setHint(a.getText(com.android.internal.R.styleable.TextView_hint));
 			}
 
+			/* as AOSP: the text appearance, then the appearance attributes of the view itself (fontFamily,
+			 * typeface, textFontWeight, ... included) are read into one set, which is applied once */
+			final TextAppearanceAttributes attributes = new TextAppearanceAttributes();
 			int ap = a.getResourceId(com.android.internal.R.styleable.TextView_textAppearance, -1);
-			if (ap != -1)
-				setTextAppearance(context, ap);
-			if (a.hasValue(com.android.internal.R.styleable.TextView_textColor)) {
-				setTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColor));
+			if (ap != -1) {
+				final TypedArray appearance = context.obtainStyledAttributes(ap, com.android.internal.R.styleable.TextAppearance);
+				readTextAppearance(context, appearance, attributes, false /* styleArray */);
+				appearance.recycle();
 			}
-			if (a.hasValue(com.android.internal.R.styleable.TextView_textColorHint))
-				setHintTextColor(a.getColorStateList(com.android.internal.R.styleable.TextView_textColorHint));
-			if (a.hasValue(com.android.internal.R.styleable.TextView_textSize)) {
-				// as AOSP: the pixel size and its unit are kept, the size is set with the layout request
-				mTextSizeUnit = a.peekValue(com.android.internal.R.styleable.TextView_textSize).getComplexUnit();
-				setRawTextSize(a.getDimensionPixelSize(com.android.internal.R.styleable.TextView_textSize, 10), true);
-			}
-
-			if (a.hasValue(com.android.internal.R.styleable.TextView_textStyle)) {
-				int textStyle = a.getInt(com.android.internal.R.styleable.TextView_textStyle, 0);
-				setTypeface(getTypeface(), textStyle);
-			}
+			readTextAppearance(context, a, attributes, true /* styleArray */);
+			applyTextAppearance(attributes);
 
 			include_padding = a.getBoolean(com.android.internal.R.styleable.TextView_includeFontPadding, true);
 
@@ -577,6 +571,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		native_setTextSize(size);
 	}
 	private native void native_setTextSize(float size);
+	private native void native_setPaintFlags(int flags);
 
 	public native final void native_setTextColor(int color);
 	public void setTextColor(int color) {
@@ -775,12 +770,75 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	}
 
+	private static final SparseIntArray sAppearanceValues = new SparseIntArray();
+	static {
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColorHighlight,
+				com.android.internal.R.styleable.TextAppearance_textColorHighlight);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_searchResultHighlightColor,
+				com.android.internal.R.styleable.TextAppearance_searchResultHighlightColor);
+		sAppearanceValues.put(
+				com.android.internal.R.styleable.TextView_focusedSearchResultHighlightColor,
+				com.android.internal.R.styleable.TextAppearance_focusedSearchResultHighlightColor);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColor,
+				com.android.internal.R.styleable.TextAppearance_textColor);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColorHint,
+				com.android.internal.R.styleable.TextAppearance_textColorHint);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textColorLink,
+				com.android.internal.R.styleable.TextAppearance_textColorLink);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textSize,
+				com.android.internal.R.styleable.TextAppearance_textSize);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textLocale,
+				com.android.internal.R.styleable.TextAppearance_textLocale);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_typeface,
+				com.android.internal.R.styleable.TextAppearance_typeface);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_fontFamily,
+				com.android.internal.R.styleable.TextAppearance_fontFamily);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textStyle,
+				com.android.internal.R.styleable.TextAppearance_textStyle);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textFontWeight,
+				com.android.internal.R.styleable.TextAppearance_textFontWeight);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_textAllCaps,
+				com.android.internal.R.styleable.TextAppearance_textAllCaps);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_shadowColor,
+				com.android.internal.R.styleable.TextAppearance_shadowColor);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_shadowDx,
+				com.android.internal.R.styleable.TextAppearance_shadowDx);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_shadowDy,
+				com.android.internal.R.styleable.TextAppearance_shadowDy);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_shadowRadius,
+				com.android.internal.R.styleable.TextAppearance_shadowRadius);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_elegantTextHeight,
+				com.android.internal.R.styleable.TextAppearance_elegantTextHeight);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_fallbackLineSpacing,
+				com.android.internal.R.styleable.TextAppearance_fallbackLineSpacing);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_letterSpacing,
+				com.android.internal.R.styleable.TextAppearance_letterSpacing);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_fontFeatureSettings,
+				com.android.internal.R.styleable.TextAppearance_fontFeatureSettings);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_fontVariationSettings,
+				com.android.internal.R.styleable.TextAppearance_fontVariationSettings);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_lineBreakStyle,
+				com.android.internal.R.styleable.TextAppearance_lineBreakStyle);
+		sAppearanceValues.put(com.android.internal.R.styleable.TextView_lineBreakWordStyle,
+				com.android.internal.R.styleable.TextAppearance_lineBreakWordStyle);
+	}
+
+	/* AOSP readTextAppearance(): styleArray tells whether the TypedArray is a TextView style (its indexes are
+	 * translated with sAppearanceValues) or a TextAppearance */
 	private void readTextAppearance(Context context, TypedArray appearance,
-			TextAppearanceAttributes attributes) {
+			TextAppearanceAttributes attributes, boolean styleArray) {
 		final int n = appearance.getIndexCount();
 		for (int i = 0; i < n; i++) {
 			final int attr = appearance.getIndex(i);
 			int index = attr;
+			// Translate style array index ids to TextAppearance ids.
+			if (styleArray) {
+				index = sAppearanceValues.get(attr, -1);
+				if (index == -1) {
+					// This value is not part of a Text Appearance and should be ignored.
+					continue;
+				}
+			}
 			switch (index) {
 				case com.android.internal.R.styleable.TextAppearance_textColorHighlight:
 					attributes.mTextColorHighlight =
@@ -826,6 +884,11 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 					}
 					break;
 				case com.android.internal.R.styleable.TextAppearance_fontFamily:
+					try {
+						attributes.mFontTypeface = appearance.getFont(attr);
+					} catch (UnsupportedOperationException | Resources.NotFoundException e) {
+						// Expected if it is not a font resource.
+					}
 					if (attributes.mFontTypeface == null) {
 						attributes.mFontFamily = appearance.getString(attr);
 					}
@@ -971,7 +1034,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setTextAppearance(Context context, int resId) {
 		final TypedArray ta = context.obtainStyledAttributes(resId, com.android.internal.R.styleable.TextAppearance);
 		final TextAppearanceAttributes attributes = new TextAppearanceAttributes();
-		readTextAppearance(context, ta, attributes);
+		readTextAppearance(context, ta, attributes, false /* styleArray */);
 		ta.recycle();
 		applyTextAppearance(attributes);
 	}
@@ -3251,6 +3314,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setPaintFlags(int flags) {
 		if (getPaint().getFlags() != flags) {
 			getPaint().setFlags(flags);
+			native_setPaintFlags(flags);
 			requestLayout();
 			invalidate();
 		}

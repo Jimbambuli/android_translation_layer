@@ -389,6 +389,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setText
 
 /*
  * Class:     android_widget_TextView
+ * Method:    native_setPaintFlags
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setPaintFlags
+  (JNIEnv *, jobject, jint);
+
+/*
+ * Class:     android_widget_TextView
  * Method:    native_setTextSize
  * Signature: (F)V
  */
