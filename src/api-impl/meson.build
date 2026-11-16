@@ -1461,6 +1461,7 @@ srcs = [
 	'android/telecom/StatusHints.java',
 	'android/telecom/TelecomManager.java',
 	'android/telecom/VideoProfile.java',
+	'android/system/SystemCleaner.java',
 	'android/telephony/cdma/CdmaCellLocation.java',
 	'android/telephony/CellConfigLte.java',
 	'android/telephony/CellIdentity.java',
