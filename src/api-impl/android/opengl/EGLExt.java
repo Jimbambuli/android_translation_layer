@@ -1,6 +1,8 @@
 package android.opengl;
 
 import android.hardware.SyncFence;
+import android.os.ParcelFileDescriptor;
+import android.util.Log;
 
 /* AOSP opengl/java/android/opengl/EGLExt.java (only the part the app side needs here). */
 public class EGLExt {
@@ -19,13 +21,19 @@ public class EGLExt {
 
 	public EGLExt() {}
 
-	/* AOSP eglDupNativeFenceFDANDROID() wraps the fd of eglDupNativeFenceFDANDROID() (EGL_ANDROID_native_fence_sync)
-	 * in a SyncFence, or returns SyncFence.createEmpty() when there is none (EGL_NO_NATIVE_FENCE_FD_ANDROID).
-	 * ATL has no native fences (no EGL15.eglCreateSync, SyncFence carries no fd), so there is never an fd here:
-	 * the result is the invalid fence, as from an EGL without the extension. */
+	/* AOSP eglDupNativeFenceFDANDROID(): the fd of the EGL_ANDROID_native_fence_sync call of the desktop EGL
+	 * (android_opengl_EGLExt.c), wrapped in a SyncFence; an invalid SyncFence for EGL_NO_NATIVE_FENCE_FD_ANDROID */
 	public static SyncFence eglDupNativeFenceFDANDROID(EGLDisplay display, EGLSync sync) {
-		return SyncFence.createEmpty();
+		int fd = eglDupNativeFenceFDANDROIDImpl(display, sync);
+		Log.d("EGL", "eglDupNativeFence returned " + fd);
+		if (fd >= 0) {
+			return SyncFence.create(ParcelFileDescriptor.adoptFd(fd));
+		} else {
+			return SyncFence.createEmpty();
+		}
 	}
+
+	private static native int eglDupNativeFenceFDANDROIDImpl(EGLDisplay display, EGLSync sync);
 
 	/* AOSP eglPresentationTimeANDROID(): native. ATL's EGL layer answers EGL_ANDROID_presentation_time itself
 	 * (libandroid/egl.c, desktop Mesa does not have the extension; the time is only a hint) */
