@@ -195,7 +195,8 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLine(JNIEnv *env, 
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLines(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloatArray points_arr, jint offset, jint count, jlong paint_ptr)
 {
 	jfloat *points = (*env)->GetFloatArrayElements(env, points_arr, NULL);
-	for (int i = offset; i < count; i++)
+	/* count is the number of values in points; four make one line */
+	for (int i = offset; i + 4 <= offset + count; i += 4)
 		Java_android_atl_GskCanvas_native_1drawLine(env, this_class, snapshot_ptr, points[i + 0], points[i + 1], points[i + 2], points[i + 3], paint_ptr);
 	(*env)->ReleaseFloatArrayElements(env, points_arr, points, 0);
 }
