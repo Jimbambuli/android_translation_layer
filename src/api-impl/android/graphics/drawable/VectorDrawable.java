@@ -19,6 +19,7 @@ import android.annotation.Nullable;
 import android.atl.annotation.Export;
 import android.content.res.ColorStateList;
 import android.content.res.ComplexColor;
+import android.content.res.GradientColor;
 import android.content.res.Resources;
 import android.content.res.Resources.Theme;
 import android.content.res.TypedArray;
@@ -35,6 +36,7 @@ import android.graphics.PixelFormat;
 import android.graphics.PorterDuff.Mode;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
+import android.graphics.Shader;
 import android.util.ArrayMap;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
@@ -1124,7 +1126,7 @@ public class VectorDrawable extends Drawable {
 				// android:fillType: nonZero (0) or evenOdd (1), as VectorDrawable's native Path does
 				mRenderPath.setFillType(fullPath.mFillRule == 1 ? Path.FillType.EVEN_ODD : Path.FillType.WINDING);
 
-				if (fullPath.mFillColor != Color.TRANSPARENT) {
+				if (fullPath.mFillGradient != null || fullPath.mFillColor != Color.TRANSPARENT) {
 					if (mFillPaint == null) {
 						mFillPaint = new Paint();
 						mFillPaint.setStyle(Paint.Style.FILL);
@@ -1132,7 +1134,16 @@ public class VectorDrawable extends Drawable {
 					}
 
 					final Paint fillPaint = mFillPaint;
-					fillPaint.setColor(applyAlpha(fullPath.mFillColor, fullPath.mFillAlpha));
+					if (fullPath.mFillGradient != null) {
+						/* hwui FullPath::draw(): the gradient, modulated by the fill alpha; it is defined in
+						 * the coordinates of the path, which mRenderPath has mapped by mFinalPathMatrix */
+						fullPath.mFillGradient.setLocalMatrix(mFinalPathMatrix);
+						fillPaint.setShader(fullPath.mFillGradient);
+						fillPaint.setColor(applyAlpha(Color.BLACK, fullPath.mFillAlpha));
+					} else {
+						fillPaint.setShader(null);
+						fillPaint.setColor(applyAlpha(fullPath.mFillColor, fullPath.mFillAlpha));
+					}
 					fillPaint.setColorFilter(filter);
 					canvas.drawPath(mRenderPath, fillPaint);
 				}
@@ -1639,6 +1650,9 @@ public class VectorDrawable extends Drawable {
 		float mStrokeWidth = 0;
 
 		int mFillColor = Color.TRANSPARENT;
+		/* AOSP: a GradientColor fill is kept with its shader (hwui fill gradient) */
+		ComplexColor mFillColors = null;
+		Shader mFillGradient = null;
 		float mStrokeAlpha = 1.0f;
 		int mFillRule;
 		float mFillAlpha = 1.0f;
@@ -1662,6 +1676,8 @@ public class VectorDrawable extends Drawable {
 			mStrokeWidth = copy.mStrokeWidth;
 			mStrokeAlpha = copy.mStrokeAlpha;
 			mFillColor = copy.mFillColor;
+			mFillColors = copy.mFillColors;
+			mFillGradient = copy.mFillGradient;
 			mFillRule = copy.mFillRule;
 			mFillAlpha = copy.mFillAlpha;
 			mTrimPathStart = copy.mTrimPathStart;
@@ -1728,9 +1744,23 @@ public class VectorDrawable extends Drawable {
 				mPathData = new PathParser.PathData(pathData);
 			}
 
-			ComplexColor fillColor = a.getComplexColor(R.styleable.VectorDrawablePath_fillColor);
-			if (fillColor != null)
-				mFillColor = fillColor.getDefaultColor();
+			Shader fillGradient = null;
+			final ComplexColor fillColors = a.getComplexColor(R.styleable.VectorDrawablePath_fillColor);
+			if (fillColors != null) {
+				// If the colors is a gradient color, or the color state list is stateful, keep the
+				// colors information. Otherwise, discard the colors and keep the default color.
+				if (fillColors instanceof GradientColor) {
+					mFillColors = fillColors;
+					fillGradient = ((GradientColor)fillColors).getShader();
+				} else if (fillColors.isStateful() || fillColors.canApplyTheme()) {
+					mFillColors = fillColors;
+				} else {
+					mFillColors = null;
+				}
+				mFillColor = fillColors.getDefaultColor();
+			}
+			// Update the gradient info, even if the gradient is null.
+			mFillGradient = fillGradient;
 			mFillAlpha = a.getFloat(R.styleable.VectorDrawablePath_fillAlpha,
 			                        mFillAlpha);
 			mFillRule = a.getInt(R.styleable.VectorDrawablePath_fillType, mFillRule);

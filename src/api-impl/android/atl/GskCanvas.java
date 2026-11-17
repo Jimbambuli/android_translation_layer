@@ -260,9 +260,24 @@ public class GskCanvas extends DisplayListCanvas {
 		if (paint == null || paint.getStyle() != Paint.Style.FILL || !(paint.getShader() instanceof LinearGradient))
 			return false;
 		LinearGradient gradient = (LinearGradient)paint.getShader();
+		/* AOSP Shader.setLocalMatrix(): the gradient is defined in the coordinates the local matrix maps
+		 * to the canvas; the area is mapped back into them. A local matrix that cannot be inverted draws nothing */
+		Matrix local = new Matrix();
+		boolean has_local = gradient.getLocalMatrix(local);
+		RectF area = new RectF(left, top, right, bottom);
+		if (has_local) {
+			Matrix inverse = new Matrix();
+			if (!local.invert(inverse))
+				return true;
+			inverse.mapRect(area);
+			save();
+			concat(local);
+		}
 		// TileMode.MIRROR is not supported by GSK and falls back to CLAMP
-		native_drawLinearGradient(snapshot, left, top, right, bottom, gradient.x0, gradient.y0, gradient.x1, gradient.y1,
+		native_drawLinearGradient(snapshot, area.left, area.top, area.right, area.bottom, gradient.x0, gradient.y0, gradient.x1, gradient.y1,
 		                          gradient.colors, gradient.positions, gradient.tileMode == Shader.TileMode.REPEAT, paint.paint);
+		if (has_local)
+			restore();
 		return true;
 	}
 
