@@ -184,7 +184,7 @@ public class Path {
 
 	public void addRoundRect(float left, float top, float right, float bottom,
 	                         float[] radii, Direction direction) {
-		native_add_round_rect(getBuilder(), left, top, right, bottom, radii);
+		native_add_round_rect(getBuilder(), left, top, right, bottom, radii, direction == Direction.CCW);
 	}
 
 	public void addRoundRect(RectF rect, float[] radii, Direction direction) {
@@ -447,7 +447,7 @@ public class Path {
 	private static native void native_add_arc(long builder, float left, float top, float right, float bottom, float startAngle, float sweepAngle);
 	private static native void native_add_path(long builder, long path, long matrix);
 	private static native void native_add_rect(long builder, float left, float top, float right, float bottom);
-	private static native void native_add_round_rect(long builder, float left, float top, float right, float bottom, float[] radii);
+	private static native void native_add_round_rect(long builder, float left, float top, float right, float bottom, float[] radii, boolean ccw);
 	private static native void native_get_bounds(long path, RectF rect);
 	private static native long native_transform(long path, long matrix);
 	private static native boolean native_contains(long path, int fill_rule, boolean inverse, float x, float y);

@@ -146,10 +146,10 @@ JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1rect
 /*
  * Class:     android_graphics_Path
  * Method:    native_add_round_rect
- * Signature: (JFFFF[F)V
+ * Signature: (JFFFF[FZ)V
  */
 JNIEXPORT void JNICALL Java_android_graphics_Path_native_1add_1round_1rect
-  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloatArray);
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jfloat, jfloat, jfloatArray, jboolean);
 
 /*
  * Class:     android_graphics_Path
