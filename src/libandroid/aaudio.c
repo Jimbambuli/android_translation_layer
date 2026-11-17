@@ -647,6 +647,23 @@ static int64_t pcm_delay(AAudioStream *stream)
 	return delay;
 }
 
+/*
+ * Playback starts by hand (start_threshold is the boundary), like AudioFlinger's Track::isReady():
+ * an active track is mixed once min(start threshold = frame count, buffer size) frames are ready,
+ * so the device starts with a primed buffer. ALSA can't take more than fits, so a chunk that no
+ * longer fits starts it as well.
+ */
+static void start_if_primed(AAudioStream *stream, int32_t next_frames)
+{
+	if (stream->direction != AAUDIO_DIRECTION_OUTPUT || !is_active(stream) || snd_pcm_state(stream->pcm) != SND_PCM_STATE_PREPARED)
+		return;
+	snd_pcm_sframes_t avail = snd_pcm_avail_update(stream->pcm);
+	int32_t queued = stream->buffer_capacity - (avail < 0 ? 0 : avail);
+	int32_t threshold = atomic_load(&stream->buffer_size);
+	if (queued >= threshold || (queued > 0 && avail < next_frames))
+		snd_pcm_start(stream->pcm);
+}
+
 /* returns the frames transferred, or AAUDIO_ERROR_DISCONNECTED when the device is gone */
 static aaudio_result_t pcm_transfer(AAudioStream *stream, void *buffer, int32_t num_frames, bool blocking)
 {
@@ -656,8 +673,19 @@ static aaudio_result_t pcm_transfer(AAudioStream *stream, void *buffer, int32_t 
 	snd_pcm_nonblock(stream->pcm, blocking ? 0 : 1);
 	while (done < num_frames) {
 		char *data = (char *)buffer + (size_t)done * stream->bytes_per_frame;
-		snd_pcm_sframes_t n = output ? snd_pcm_writei(stream->pcm, data, num_frames - done)
-		                             : snd_pcm_readi(stream->pcm, data, num_frames - done);
+		snd_pcm_uframes_t count = num_frames - done;
+		if (output && snd_pcm_state(stream->pcm) == SND_PCM_STATE_PREPARED) {
+			/* a not yet started device never frees space: write only what fits, then prime */
+			start_if_primed(stream, count);
+			snd_pcm_sframes_t avail = snd_pcm_avail_update(stream->pcm);
+			if (snd_pcm_state(stream->pcm) == SND_PCM_STATE_PREPARED && avail >= 0 && (snd_pcm_uframes_t)avail < count) {
+				if (avail == 0)
+					break;
+				count = avail;
+			}
+		}
+		snd_pcm_sframes_t n = output ? snd_pcm_writei(stream->pcm, data, count)
+		                             : snd_pcm_readi(stream->pcm, data, count);
 		if (n == -EAGAIN || n == 0)
 			break;
 		if (n == -EPIPE || n == -ESTRPIPE || n == -EINTR) {
@@ -672,10 +700,9 @@ static aaudio_result_t pcm_transfer(AAudioStream *stream, void *buffer, int32_t 
 		if (n < 0)
 			return AAUDIO_ERROR_DISCONNECTED;
 		done += n;
-		/* playback starts by hand (start_threshold is the boundary), so that data written before requestStart() waits */
-		if (output && is_active(stream) && snd_pcm_state(stream->pcm) == SND_PCM_STATE_PREPARED)
-			snd_pcm_start(stream->pcm);
 	}
+	if (output)
+		start_if_primed(stream, stream->frames_per_burst);
 	if (output)
 		atomic_fetch_add(&stream->frames_written, done);
 	else
@@ -717,6 +744,7 @@ static void *callback_thread(void *arg)
 				continue;
 			}
 			if (avail < stream->buffer_capacity && stream->buffer_capacity - avail + num_frames > atomic_load(&stream->buffer_size)) {
+				start_if_primed(stream, num_frames);
 				snd_pcm_wait(stream->pcm, 100);
 				continue;
 			}
@@ -773,13 +801,13 @@ static aaudio_result_t request_start_l(AAudioStream *stream)
 
 	aaudio_stream_state_t original_state = get_state(stream);
 	set_state(stream, AAUDIO_STREAM_STATE_STARTING);
-	if (snd_pcm_state(stream->pcm) == SND_PCM_STATE_PREPARED) {
-		/* output starts once there is data, see pcm_transfer() */
-		bool has_data = stream->direction == AAUDIO_DIRECTION_INPUT || snd_pcm_avail(stream->pcm) < stream->buffer_capacity;
-		if (has_data && snd_pcm_start(stream->pcm) < 0) {
+	if (stream->direction == AAUDIO_DIRECTION_INPUT) {
+		if (snd_pcm_state(stream->pcm) == SND_PCM_STATE_PREPARED && snd_pcm_start(stream->pcm) < 0) {
 			set_state(stream, original_state);
 			return AAUDIO_ERROR_INTERNAL;
 		}
+	} else {
+		start_if_primed(stream, stream->frames_per_burst); /* data written before the start */
 	}
 	if (stream->data_callback) {
 		atomic_store(&stream->callback_enabled, true);
@@ -837,6 +865,9 @@ static aaudio_result_t request_stop_l(AAudioStream *stream)
 	if (stream->direction == AAUDIO_DIRECTION_OUTPUT) {
 		/* the frames already written are still played; snd_pcm_drain() of ALSA's pulse plugin can hang, so wait at most one buffer */
 		int64_t wait_us = (int64_t)stream->buffer_capacity * 1000000 / stream->sample_rate + 20000;
+		/* Track::isReady(): a stopping track plays whatever is ready, even if the buffer never filled */
+		if (snd_pcm_state(stream->pcm) == SND_PCM_STATE_PREPARED && pcm_delay(stream) > 0)
+			snd_pcm_start(stream->pcm);
 		while (wait_us > 0 && snd_pcm_state(stream->pcm) == SND_PCM_STATE_RUNNING && pcm_delay(stream) > 0) {
 			usleep(5000);
 			wait_us -= 5000;
