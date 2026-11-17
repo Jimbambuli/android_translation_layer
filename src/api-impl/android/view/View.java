@@ -1047,7 +1047,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/* the bits of AOSP's mPrivateFlags that ATL keeps in Java */
 	int mPrivateFlags = PFLAG_FORCE_LAYOUT;
-	/* ATL clears PFLAG_FORCE_LAYOUT when the view is measured (GTK measures and allocates separately), AOSP in layout() */
+	/* as in AOSP, PFLAG_FORCE_LAYOUT is cleared when the view is laid out, not when it is measured */
 	static final int PFLAG_FORCE_LAYOUT                = 0x00001000;
 	static final int PFLAG_LAYOUT_REQUIRED             = 0x00002000;
 	static final int PFLAG_SELECTED                    = 0x00000004;
@@ -2851,14 +2851,24 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	@Export
 	public final void measure(int widthMeasureSpec, int heightMeasureSpec) {
 		if ((mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT || widthMeasureSpec != oldWidthMeasureSpec || heightMeasureSpec != oldHeightMeasureSpec) {
-			mPrivateFlags &= ~PFLAG_FORCE_LAYOUT;
 			resolveRtlPropertiesIfNeeded();
 			oldWidthMeasureSpec = widthMeasureSpec;
 			oldHeightMeasureSpec = heightMeasureSpec;
-			onMeasure(widthMeasureSpec, heightMeasureSpec);
+			boolean root = !(parent instanceof View);
+			if (root)
+				sRootMeasureDepth++;
+			try {
+				onMeasure(widthMeasureSpec, heightMeasureSpec);
+			} finally {
+				if (root)
+					sRootMeasureDepth--;
+			}
 			mPrivateFlags |= PFLAG_LAYOUT_REQUIRED;
 		}
 	}
+
+	/* the root of a window is being measured (AOSP: ViewRootImpl.measureHierarchy()) */
+	private static int sRootMeasureDepth;
 
 	public final int getMeasuredState() {
 		return (measuredWidth&MEASURED_STATE_MASK)
@@ -2967,6 +2977,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (this.in_layout)                   // check re-entrancy
 			native_queueAllocate(widget); // GTK is not re-entrant-safe. Queue allocation
 		else {
+			/* AOSP lays out a view that was measured since its last layout (onLayout()) even if its bounds
+			 * stay the same; GTK calls layoutInternal() only for a widget that is marked for allocation */
+			if ((mPrivateFlags & PFLAG_LAYOUT_REQUIRED) == PFLAG_LAYOUT_REQUIRED)
+				native_queueAllocate(widget);
 			layoutCall = true; // layoutInternal() leaves the layout change listeners to this method
 			native_layout(widget, l, t, r, b);
 			layoutCall = false;
@@ -2981,6 +2995,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		// native widgets without Java children (e.g. WebView) are never laid out through layoutInternal()
 		dispatchLayoutChange(changed, l, t, r, b, oldL, oldT, oldR, oldB);
+		mPrivateFlags &= ~PFLAG_FORCE_LAYOUT;
 		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
 		if (sizeChanged && needsOutline())
 			invalidateOutline();
@@ -3000,6 +3015,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (changed)
 			onSizeChanged(width, height, oldW, oldH);
 		onLayout(changed, 0, 0, width, height);
+		mPrivateFlags &= ~PFLAG_FORCE_LAYOUT;
 		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
 	}
 
@@ -3032,7 +3048,28 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		} finally {
 			sLayoutDepth--;
 		}
+		/* AOSP ViewRootImpl.performLayout(): views that requested a layout while the window was laid out and
+		 * still need one (not laid out after the request, not gone) request it again: GTK lays out once more */
+		if (sLayoutDepth == 0 && !sLayoutRequesters.isEmpty()) {
+			ArrayList<View> requesters = new ArrayList<>(sLayoutRequesters);
+			sLayoutRequesters.clear();
+			for (View view : requesters) {
+				if ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0)
+					continue;
+				boolean gone = false;
+				for (View v = view; v != null; v = v.parent instanceof View ? (View)v.parent : null)
+					gone |= v.visibility == GONE;
+				if (gone)
+					continue;
+				for (View v = view; v != null && (v.mPrivateFlags & PFLAG_FORCE_LAYOUT) != 0; v = v.parent instanceof View ? (View)v.parent : null)
+					v.mPrivateFlags &= ~PFLAG_FORCE_LAYOUT;
+				view.requestLayout();
+			}
+		}
 	}
+
+	/* AOSP ViewRootImpl.mLayoutRequesters: views that requested a layout during a layout pass */
+	private static final ArrayList<View> sLayoutRequesters = new ArrayList<>();
 
 	/* the layout passes under way (AOSP: ViewRootImpl.mInLayout of the root the view is in) */
 	private static int sLayoutDepth;
@@ -3040,9 +3077,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private void layoutInternalImpl(int width, int height) {
 		in_layout = true;
 		// if the layout is triggered from a native widget, we might not have measured yet
-		// also measure again if a descendant requested a layout without our size changing
-		if (!(parent instanceof ViewGroup) && ((mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT || width != getMeasuredWidth() || height != getMeasuredHeight())) {
-			requestLayout();
+		// also measure again if a descendant requested a layout without our size changing (and GTK did not measure since)
+		if (!(parent instanceof ViewGroup) && ((mPrivateFlags & (PFLAG_FORCE_LAYOUT | PFLAG_LAYOUT_REQUIRED)) == PFLAG_FORCE_LAYOUT || width != getMeasuredWidth() || height != getMeasuredHeight())) {
+			forceLayout();
 			measure(width | MeasureSpec.EXACTLY, height | MeasureSpec.EXACTLY);
 		}
 		boolean changed = oldWidth != width || oldHeight != height;
@@ -3071,6 +3108,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		if (!layoutCall)
 			dispatchLayoutChange(changed, left, top, right, bottom, oldL, oldT, oldR, oldB);
+		mPrivateFlags &= ~PFLAG_FORCE_LAYOUT;
 		mPrivateFlags3 |= PFLAG3_IS_LAID_OUT;
 		oldWidth = width;
 		oldHeight = height;
@@ -3193,22 +3231,37 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return true;
 	}
 
+	/* AOSP View.requestLayout(): the view and its parents up to the first one that has requested a layout
+	 * already are marked. Only a request that reaches the root unmarked asks GTK for a new layout pass
+	 * (ViewRootImpl.requestLayout()); otherwise the pending or running pass of the marked parent measures
+	 * the view, and GTK is only asked to lay it out. A request while the root is measured starts no new
+	 * pass (ViewRootImpl.measureHierarchy()), one during the layout is handled after it */
 	public void requestLayout() {
-		native_requestLayout(widget);
+		if (sRootMeasureDepth == 0 && sLayoutDepth > 0 && parent instanceof View && !sLayoutRequesters.contains(this))
+			sLayoutRequesters.add(this);
+		boolean rootRequest = (mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0 || !(parent instanceof View);
+		mPrivateFlags |= PFLAG_FORCE_LAYOUT;
 		View view = this;
-		while ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0) {
-			view.mPrivateFlags |= PFLAG_FORCE_LAYOUT;
-			if (view.parent instanceof View)
-				view = (View)view.parent;
-			else
-				break;
-			/* AOSP calls mParent.requestLayout(): a parent that overrides it gets the call and goes on from
-			 * there; Compose's AndroidViewsHandler remeasures the layout node of the child that asked */
-			if ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) == 0 && overridesRequestLayout(view.getClass())) {
-				view.requestLayout();
+		while (view.parent instanceof View) {
+			view = (View)view.parent;
+			if ((view.mPrivateFlags & PFLAG_FORCE_LAYOUT) != 0) {
+				rootRequest = false;
 				break;
 			}
+			/* AOSP calls mParent.requestLayout(): a parent that overrides it gets the call and goes on from
+			 * there; Compose's AndroidViewsHandler remeasures the layout node of the child that asked */
+			if (overridesRequestLayout(view.getClass())) {
+				view.requestLayout();
+				rootRequest = false;
+				break;
+			}
+			view.mPrivateFlags |= PFLAG_FORCE_LAYOUT;
+			rootRequest = true;
 		}
+		if (rootRequest && sRootMeasureDepth == 0)
+			native_requestLayout(widget);
+		else
+			native_queueAllocate(widget);
 	};
 
 	private static final Map<Class<?>, Boolean> requestLayoutOverridden = new HashMap<>();
