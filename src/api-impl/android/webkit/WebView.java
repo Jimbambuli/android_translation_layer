@@ -1116,7 +1116,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		return originalUrl != null ? internalToAppUrl(originalUrl) : null;
 	}
 
-	/* AOSP WebView.getTitle(): null if no page has been loaded */
+	/* AOSP WebView.getTitle() with Chromium as the provider: null only for a destroyed WebView (native_getTitle()) */
 	public String getTitle() {
 		if (isDestroyed())
 			return null;

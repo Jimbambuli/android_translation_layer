@@ -968,11 +968,21 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearHistory(JNIEnv *
 	history_set_ceiling(WEBKIT_WEB_VIEW(webview), current);
 }
 
+/* Chromium (AwContents.getTitle() -> WebContentsImpl::GetTitle(), NavigationEntryImpl::GetTitleForDisplay()): the
+ * title of the last committed page, the URL of a page without one (Chromium formats it for display with
+ * url_formatter, not done here), and an empty string before a page has committed (the initial entry has an empty
+ * URL); never null */
 JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getTitle(JNIEnv *env, jobject this, jlong widget_ptr)
 {
 	GtkWidget *webview = _PTR(widget_ptr);
-	const char *title = WEBKIT_IS_WEB_VIEW(webview) ? webkit_web_view_get_title(WEBKIT_WEB_VIEW(webview)) : NULL;
-	return title ? _JSTRING(title) : NULL;
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return _JSTRING("");
+	const char *title = webkit_web_view_get_title(WEBKIT_WEB_VIEW(webview));
+	if (title && *title)
+		return _JSTRING(title);
+	WebKitBackForwardListItem *current = webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview)));
+	const char *uri = current ? webkit_back_forward_list_item_get_uri(current) : NULL;
+	return _JSTRING(uri ? uri : "");
 }
 
 // the URL first asked for the current entry, before redirects
