@@ -116,6 +116,10 @@ void (*bionic_eglGetProcAddress(char const *procname))(void)
 			return (void (*)(void))bionic_eglSetDamageRegionKHR;
 		if (!strcmp(procname, "eglSwapBuffersWithDamageKHR") || !strcmp(procname, "eglSwapBuffersWithDamageEXT"))
 			return (void (*)(void))bionic_eglSwapBuffersWithDamage;
+		/* EGL_KHR_get_all_proc_addresses: the same function as the exported one, which binds the back buffer of
+		 * an ANativeWindow surface for framebuffer 0 (Flutter's Impeller loads all GL functions this way) */
+		if (!strcmp(procname, "glBindFramebuffer"))
+			return (void (*)(void))bionic_glBindFramebuffer;
 	}
 
 	return eglGetProcAddress(procname);
