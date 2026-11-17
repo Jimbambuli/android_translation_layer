@@ -145,7 +145,18 @@ public class Path {
 		addArc(oval.left, oval.top, oval.right, oval.bottom, startAngle, sweepAngle);
 	}
 
+	/* SkPath::addArc: nothing for an empty oval or no sweep; a sweep of 360 degrees or more that starts at a multiple
+	 * of 90 degrees is the oval (an arc to its own start point would add nothing). */
 	public void addArc(float left, float top, float right, float bottom, float startAngle, float sweepAngle) {
+		if (!(left < right && top < bottom) || sweepAngle == 0)
+			return;
+		if (Math.abs(sweepAngle) >= 360.0f) {
+			float startOver90 = startAngle / 90.f;
+			if (Math.abs(startOver90 - Math.round(startOver90)) <= 1.0f / (1 << 12)) {
+				addOval(left, top, right, bottom, sweepAngle > 0 ? Direction.CW : Direction.CCW);
+				return;
+			}
+		}
 		native_add_arc(getBuilder(), left, top, right, bottom, startAngle, sweepAngle);
 	}
 

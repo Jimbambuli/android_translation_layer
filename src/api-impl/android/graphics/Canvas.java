@@ -875,11 +875,22 @@ public class Canvas {
 		return clipRect((float)left, top, right, bottom, Region.Op.DIFFERENCE);
 	}
 
-	public void drawArc(float left, float top, float right, float bottom, float startAngle, float sweepAngle, boolean includeCenter, Paint paint) {
+	/* hwui SkiaCanvas::drawArc: a sweep of 360 degrees or more is the whole oval. Otherwise SkCanvas::drawArc and
+	 * SkPathPriv::CreateDrawArcPath: nothing for an empty oval or no sweep, a wedge (center, arc, close) with useCenter. */
+	public void drawArc(float left, float top, float right, float bottom, float startAngle, float sweepAngle, boolean useCenter, Paint paint) {
+		if (Math.abs(sweepAngle) >= 360.0f) {
+			drawOval(left, top, right, bottom, paint);
+			return;
+		}
+		if (!(left < right && top < bottom) || sweepAngle == 0)
+			return;
 		Path path = new Path();
-		path.addArc(left, top, right, bottom, startAngle, sweepAngle);
+		if (useCenter)
+			path.moveTo((left + right) / 2, (top + bottom) / 2);
+		path.arcTo(left, top, right, bottom, startAngle, sweepAngle, !useCenter);
+		if (useCenter)
+			path.close();
 		drawPath(path, paint);
-		path.reset();
 	}
 
 	public boolean getClipBounds(Rect outRect) {
