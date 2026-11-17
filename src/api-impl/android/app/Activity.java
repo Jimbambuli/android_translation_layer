@@ -2717,7 +2717,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	public boolean shouldShowRequestPermissionRationale(String permission) {
-		return true;
+		return getPackageManager().shouldShowRequestPermissionRationale(permission);
 	}
 
 	/* AOSP asks the package manager of the device; ATL has the one device */

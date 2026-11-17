@@ -2236,6 +2236,24 @@ public class PackageManager {
 		return Resources.getSystem().getText(com.android.internal.R.string.app_permission_button_allow_always);
 	}
 
+	/* AOSP PermissionManagerServiceImpl.shouldShowRequestPermissionRationale(): false for a granted or unknown
+	 * permission, else whether the user set its state (FLAG_PERMISSION_USER_SET). ATL has no grant dialog the user
+	 * could have answered; the one user decision is switching a permission off (ATL_DENIED_PERMISSIONS), which
+	 * the permission controller's settings also record as USER_SET. A permission denied because the device lacks
+	 * it (no camera, no location portal) is fixed by the system, so no rationale either. @hide */
+	public boolean shouldShowRequestPermissionRationale(String permName) {
+		if (checkPermission(permName, android.atl.ATLLoadedApp.getPrimaryApplication().pkg.packageName) == PERMISSION_GRANTED)
+			return false;
+		if (!deniedByUser(permName))
+			return false;
+		try {
+			getPermissionInfo(permName, 0);
+		} catch (NameNotFoundException e) {
+			return false;
+		}
+		return true;
+	}
+
 	private static java.util.Set<String> deniedByUser;
 
 	/* a permission the user switched off for this app (the launcher passes them in ATL_DENIED_PERMISSIONS, comma
