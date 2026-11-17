@@ -399,6 +399,7 @@ public final class ATLLoadedApp {
 			Slog.w(TAG, "startService: no matching service found for intent: " + intent);
 			return null;
 		}
+		final ComponentName name = component;
 		final String className = component.getClassName();
 
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
@@ -463,9 +464,9 @@ public final class ATLLoadedApp {
 						// onServiceConnected with a null binder (which crashes callers that dereference it).
 						android.os.IBinder binder = r.service.onBind(intent);
 						if (binder != null) {
-							serviceConnection.onServiceConnected(intent.getComponent(), binder);
+							serviceConnection.onServiceConnected(name, binder);
 						} else {
-							serviceConnection.onNullBinding(intent.getComponent());
+							serviceConnection.onNullBinding(name);
 						}
 					} else {
 						int startId;
