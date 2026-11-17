@@ -123,6 +123,7 @@ shared_includes_dir = include_directories('src/api-impl-jni/')
 
 # libandroid
 libandroid_so = shared_library('android', [
+                                          	'src/libandroid/aaudio.c',
                                           	'src/libandroid/asset_manager.c',
                                           	'src/libandroid/bitmap.c',
                                           	'src/libandroid/configuration.c',
@@ -152,6 +153,7 @@ libandroid_so = shared_library('android', [
                                           ],
                                           link_args : [
                                           	'-Wl,-z,lazy',  # outdated Nvidia driver version 340 lacks EGL symbols
+                                          	'-lasound',
                                           ])
 
 wayland_protos_dep = dependency('wayland-protocols', version: '>=1.12')
