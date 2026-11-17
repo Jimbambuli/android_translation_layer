@@ -1657,46 +1657,6 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		this.transition = transition;
 	}
 
-	/* classes that override drawChild(), see dispatchDraw() */
-	private static final java.util.Map<Class<?>, Boolean> drawChildOverridden = new java.util.HashMap<>();
-
-	private boolean overridesDrawChild() {
-		Class<?> cls = getClass();
-		Boolean overridden = drawChildOverridden.get(cls);
-		if (overridden == null) {
-			overridden = false;
-			for (Class<?> c = cls; c != ViewGroup.class && !overridden; c = c.getSuperclass()) {
-				try {
-					c.getDeclaredMethod("drawChild", Canvas.class, View.class, long.class);
-					overridden = true;
-				} catch (NoSuchMethodException e) {
-				}
-			}
-			drawChildOverridden.put(cls, overridden);
-		}
-		return overridden;
-	}
-
-	/* AOSP ViewGroup.dispatchDraw() draws each child with drawChild(), which subclasses override to draw
-	 * between or over the children (DrawerLayout's scrim over the content). Without such an override GTK
-	 * draws all children at once, in the same order (the order of the children). */
-	@Export
-	@Override
-	protected void dispatchDraw(Canvas canvas) {
-		if (!(canvas instanceof GskCanvas) || !overridesDrawChild()) {
-			super.dispatchDraw(canvas);
-			return;
-		}
-		final long drawingTime = getDrawingTime();
-		final int childrenCount = getChildCount();
-		for (int i = 0; i < childrenCount; i++) {
-			final View child = getChildAt(i);
-			if (child.getVisibility() == VISIBLE || child.getAnimation() != null)
-				drawChild(canvas, child, drawingTime);
-		}
-	}
-
-	@Export
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
 		if (canvas instanceof GskCanvas)
 			native_drawChild(widget, child.widget, ((GskCanvas)canvas).snapshot);

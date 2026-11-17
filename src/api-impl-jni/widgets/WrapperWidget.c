@@ -1108,12 +1108,7 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 	jmethodID on_draw_method = _METHOD(_CLASS(jobj), "onDraw", "(Landroid/graphics/Canvas;)V");
 	jmethodID dispatch_draw_method = _METHOD(_CLASS(jobj), "dispatchDraw", "(Landroid/graphics/Canvas;)V");
 	jmethodID draw_method = _METHOD(_CLASS(jobj), "draw", "(Landroid/graphics/Canvas;)V");
-	/* ViewGroup's dispatchDraw() and drawChild() are ATL's own; a group that overrides drawChild() draws over
-	 * or between its children (DrawerLayout's scrim), which needs the draw through Java as well */
-	gboolean custom_dispatch_draw = dispatch_draw_method != _CACHED_METHOD(View__dispatchDraw) && dispatch_draw_method != _CACHED_METHOD(ViewGroup__dispatchDraw);
-	if (!custom_dispatch_draw && (*env)->IsInstanceOf(env, jobj, _CACHED_CLASS(ViewGroup)))
-		custom_dispatch_draw = _METHOD(_CLASS(jobj), "drawChild", "(Landroid/graphics/Canvas;Landroid/view/View;J)Z") != _CACHED_METHOD(ViewGroup__drawChild);
-	if (on_draw_method != _CACHED_METHOD(View__onDraw) || draw_method != _CACHED_METHOD(View__draw) || custom_dispatch_draw)
+	if (on_draw_method != _CACHED_METHOD(View__onDraw) || draw_method != _CACHED_METHOD(View__draw) || dispatch_draw_method != _CACHED_METHOD(View__dispatchDraw))
 		wrapper_widget_draw_through_java(wrapper, env);
 
 	jmethodID performClick_method = _METHOD(_CLASS(jobj), "performClick", "()Z");
