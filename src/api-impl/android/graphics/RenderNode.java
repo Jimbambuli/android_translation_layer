@@ -63,6 +63,8 @@ public final class RenderNode extends android.view.RenderNode {
 		}
 		prepareRecording(width, height);
 		recordingCanvas = new RecordingCanvas(this, createRecordingSnapshot());
+		recordingCanvas.width = width;
+		recordingCanvas.height = height;
 		return recordingCanvas;
 	}
 

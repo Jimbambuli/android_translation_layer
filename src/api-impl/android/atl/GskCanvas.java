@@ -22,6 +22,9 @@ public class GskCanvas extends DisplayListCanvas {
 	private boolean compositing = false;
 	/* the snapshot is drawn into a bitmap (android.graphics.Canvas): it starts transparent, like a layer */
 	public boolean offscreen = false;
+	/* AOSP RecordingCanvas: the size of what is recorded (the view or render node), set before drawing */
+	public int width = 0;
+	public int height = 0;
 	private static Boolean can_composite;
 
 	/* GTK >= 4.22: Porter-Duff modes are drawn with GSK composite nodes */
@@ -39,6 +42,16 @@ public class GskCanvas extends DisplayListCanvas {
 		state_stack.push(new Matrix());
 		/* the unit of a GTK snapshot is a logical pixel, which ATL gives the device density */
 		setDensity(android.util.DisplayMetrics.DENSITY_DEVICE);
+	}
+
+	@Override
+	public int getWidth() {
+		return width;
+	}
+
+	@Override
+	public int getHeight() {
+		return height;
 	}
 
 	@Override

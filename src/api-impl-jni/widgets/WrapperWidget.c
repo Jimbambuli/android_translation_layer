@@ -445,6 +445,9 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_x", 0);
 		_SET_FLOAT_FIELD(wrapper->canvas, "stretch_y", 0);
 		_SET_LONG_FIELD(wrapper->canvas, "snapshot", _INTPTR(content));
+		/* AOSP: the view records into a canvas of its own size (Canvas.getWidth()/getHeight()) */
+		_SET_INT_FIELD(wrapper->canvas, "width", wrapper->real_width);
+		_SET_INT_FIELD(wrapper->canvas, "height", wrapper->real_height);
 		_SET_BOOL_FIELD(wrapper->canvas, "drew_render_node", FALSE);
 		J__View__draw(env, wrapper->jobj, wrapper->canvas);
 		if ((*env)->ExceptionCheck(env)) {

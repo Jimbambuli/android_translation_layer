@@ -404,12 +404,15 @@ public class RenderNode {
 
 	public DisplayListCanvas start(int width, int height) {
 		prepareRecording(width, height);
-		return new GskCanvas(nativeCreateSnapshot()) {
+		GskCanvas canvas = new GskCanvas(nativeCreateSnapshot()) {
 			@Override
 			public void drawRenderNode(RenderNode node) {
 				recordChild(snapshot, node);
 			}
 		};
+		canvas.width = width;
+		canvas.height = height;
+		return canvas;
 	}
 
 	public void end(DisplayListCanvas canvas) {
