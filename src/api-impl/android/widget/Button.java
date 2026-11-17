@@ -2,13 +2,10 @@ package android.widget;
 
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 
 public class Button extends TextView {
-
-	private Drawable compoundDrawableLeft;
 
 	public Button(Context context) {
 		this(context, null);
@@ -46,8 +43,6 @@ public class Button extends TextView {
 	public native void native_setText(long widget, String text);
 	@Override
 	protected native void nativeSetOnClickListener(long widget);
-	/* the native side draws the drawable in its bounds at the time it is drawn */
-	protected native void native_setCompoundDrawables(long widget, Drawable drawable);
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
@@ -70,24 +65,4 @@ public class Button extends TextView {
 	}
 
 	private native void native_setTextSize(long widget, float size);
-
-	/* the native Button draws only the left drawable (TextView keeps all of them) */
-	@Override
-	protected void updateNativeCompoundDrawables() {
-		Drawable left = getCompoundDrawables()[0];
-		if (left == null && compoundDrawableLeft == null)
-			return;
-		compoundDrawableLeft = left;
-		native_setCompoundDrawables(widget, compoundDrawableLeft);
-	}
-
-	/* the drawable is drawn in the bounds it has then: MaterialButton sets them in onLayout() */
-	@Override
-	public void layout(int l, int t, int r, int b) {
-		super.layout(l, t, r, b);
-		if (compoundDrawableLeft != null)
-			native_updateCompoundDrawable(widget);
-	}
-
-	private native void native_updateCompoundDrawable(long widget);
 }

@@ -344,28 +344,133 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawableP
 		gtk_box_set_spacing(GTK_BOX(box), pad);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables(JNIEnv *env, jobject this, jlong widget_ptr, jlong left, jlong top, jlong right, jlong bottom)
+/* A compound drawable, drawn as AOSP's TextView.onDraw() does: it takes the size of the drawable's bounds
+ * at the time it is set (AOSP mDrawableSizeLeft/mDrawableHeightLeft ...), is centered across the box
+ * (left and right vertically, top and bottom horizontally) and is drawn by Drawable.draw(), which moves
+ * it by the bounds it has then (MaterialButton moves its icon next to the centered text in onLayout()). */
+#define ATL_TYPE_COMPOUND_DRAWABLE (atl_compound_drawable_get_type())
+G_DECLARE_FINAL_TYPE(AtlCompoundDrawable, atl_compound_drawable, ATL, COMPOUND_DRAWABLE, GtkWidget)
+
+struct _AtlCompoundDrawable {
+	GtkWidget parent_instance;
+	GdkPaintable *paintable; // of the drawable, for its invalidations
+	jobject drawable; // global reference to the android.graphics.drawable.Drawable
+	int width;
+	int height;
+};
+
+G_DEFINE_TYPE(AtlCompoundDrawable, atl_compound_drawable, GTK_TYPE_WIDGET)
+
+static void atl_compound_drawable_measure(GtkWidget *widget, GtkOrientation orientation, int for_size, int *minimum, int *natural, int *minimum_baseline, int *natural_baseline)
+{
+	AtlCompoundDrawable *self = ATL_COMPOUND_DRAWABLE(widget);
+	*minimum = *natural = orientation == GTK_ORIENTATION_HORIZONTAL ? self->width : self->height;
+}
+
+static void atl_compound_drawable_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
+{
+	AtlCompoundDrawable *self = ATL_COMPOUND_DRAWABLE(widget);
+	if (!self->drawable)
+		return;
+	JNIEnv *env = get_jni_env();
+	(*env)->PushLocalFrame(env, 8); // called from GTK, which never returns to Java to free them
+	GtkOrientation orientation = gtk_orientable_get_orientation(GTK_ORIENTABLE(gtk_widget_get_parent(widget)));
+	gtk_snapshot_save(snapshot);
+	if (orientation == GTK_ORIENTATION_HORIZONTAL)
+		gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(0, (gtk_widget_get_height(widget) - self->height) / 2));
+	else
+		gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT((gtk_widget_get_width(widget) - self->width) / 2, 0));
+	jobject canvas = J_new__GskCanvas(env, _INTPTR(snapshot));
+	J__Drawable__draw(env, self->drawable, canvas);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	gtk_snapshot_restore(snapshot);
+	(*env)->PopLocalFrame(env, NULL);
+}
+
+static void compound_drawable_set(AtlCompoundDrawable *self, jobject drawable);
+
+static void atl_compound_drawable_dispose(GObject *object)
+{
+	compound_drawable_set(ATL_COMPOUND_DRAWABLE(object), NULL);
+	G_OBJECT_CLASS(atl_compound_drawable_parent_class)->dispose(object);
+}
+
+static void atl_compound_drawable_class_init(AtlCompoundDrawableClass *class)
+{
+	G_OBJECT_CLASS(class)->dispose = atl_compound_drawable_dispose;
+	GTK_WIDGET_CLASS(class)->measure = atl_compound_drawable_measure;
+	GTK_WIDGET_CLASS(class)->snapshot = atl_compound_drawable_snapshot;
+}
+
+static void atl_compound_drawable_init(AtlCompoundDrawable *self)
+{
+}
+
+static void invalidate_contents_cb(GdkPaintable *paintable, GtkWidget *widget)
+{
+	gtk_widget_queue_draw(widget);
+}
+
+static void compound_drawable_set(AtlCompoundDrawable *self, jobject drawable)
+{
+	JNIEnv *env = get_jni_env();
+	if (self->paintable)
+		g_signal_handlers_disconnect_by_func(self->paintable, invalidate_contents_cb, self);
+	g_clear_object(&self->paintable);
+	if (self->drawable)
+		(*env)->DeleteGlobalRef(env, self->drawable);
+	self->drawable = NULL;
+	self->width = self->height = 0;
+	if (!drawable)
+		return;
+	self->drawable = (*env)->NewGlobalRef(env, drawable);
+	GdkPaintable *paintable = _PTR(_GET_LONG_FIELD(drawable, "paintable"));
+	if (paintable) {
+		self->paintable = g_object_ref(paintable);
+		g_signal_connect_object(paintable, "invalidate-contents", G_CALLBACK(invalidate_contents_cb), self, 0);
+	}
+	jobject bounds = _GET_OBJ_FIELD(drawable, "mBounds", "Landroid/graphics/Rect;");
+	self->width = MAX(0, _GET_INT_FIELD(bounds, "right") - _GET_INT_FIELD(bounds, "left"));
+	self->height = MAX(0, _GET_INT_FIELD(bounds, "bottom") - _GET_INT_FIELD(bounds, "top"));
+	(*env)->DeleteLocalRef(env, bounds);
+}
+
+/* the compound drawable before (first == TRUE) or after the label in the box */
+static void box_set_compound_drawable(GtkWidget *box, gboolean first, jobject drawable)
+{
+	GtkWidget *child = first ? gtk_widget_get_first_child(box) : gtk_widget_get_last_child(box);
+	if (!ATL_IS_COMPOUND_DRAWABLE(child)) {
+		if (!drawable)
+			return;
+		child = g_object_new(ATL_TYPE_COMPOUND_DRAWABLE, NULL);
+		if (first)
+			gtk_widget_insert_after(child, box, NULL);
+		else
+			gtk_widget_insert_before(child, box, NULL);
+	}
+	compound_drawable_set(ATL_COMPOUND_DRAWABLE(child), drawable);
+	gtk_widget_set_visible(child, drawable != NULL);
+	gtk_widget_queue_resize(child);
+}
+
+/* the box holds the label with at most one drawable before and one after it: left and right side by side,
+ * else top and bottom above each other (a Button has the box in a GtkButton) */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables(JNIEnv *env, jobject this, jlong widget_ptr, jobject left, jobject top, jobject right, jobject bottom)
 {
 	GtkWidget *box = GTK_WIDGET(_PTR(widget_ptr));
-	gtk_orientable_set_orientation(GTK_ORIENTABLE(box), (left || right) ? GTK_ORIENTATION_HORIZONTAL : GTK_ORIENTATION_VERTICAL);
-
-	GdkPaintable *paintable = _PTR(left ?: top); // paintable before text
-	GtkWidget *picture = gtk_widget_get_first_child(box);
-	if (GTK_IS_PICTURE(picture)) {
-		gtk_picture_set_paintable(GTK_PICTURE(picture), paintable);
-	} else if (paintable) {
-		picture = gtk_picture_new_for_paintable(paintable);
-		gtk_widget_insert_after(picture, box, NULL);
-	}
-
-	paintable = _PTR(right ?: bottom); // paintable after text
-	picture = gtk_widget_get_last_child(box);
-	if (GTK_IS_PICTURE(picture)) {
-		gtk_picture_set_paintable(GTK_PICTURE(picture), paintable);
-	} else if (paintable) {
-		picture = gtk_picture_new_for_paintable(paintable);
-		gtk_widget_insert_before(picture, box, NULL);
-	}
+	if (GTK_IS_BUTTON(box))
+		box = gtk_button_get_child(GTK_BUTTON(box));
+	gboolean horizontal = left || right;
+	gtk_orientable_set_orientation(GTK_ORIENTABLE(box), horizontal ? GTK_ORIENTATION_HORIZONTAL : GTK_ORIENTATION_VERTICAL);
+	/* AOSP: the text has the space between the paddings of the drawables, the gravity places it there */
+	GtkLabel *label = box_get_label(env, box);
+	if (label)
+		gtk_widget_set_vexpand(GTK_WIDGET(label), !horizontal && (top || bottom));
+	box_set_compound_drawable(box, TRUE, left ?: top);
+	box_set_compound_drawable(box, FALSE, right ?: bottom);
 }
 
 /* TextView.setTextIsSelectable(): the GtkLabel lets the user select (and copy) its text */

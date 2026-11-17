@@ -1141,7 +1141,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	private native void native_setCompoundDrawablePadding(long widget, int pad);
 	private native void native_setTypeface(long widget, Typeface tf);
 
-	protected native void native_setCompoundDrawables(long widget, long left, long top, long right, long bottom);
+	protected native void native_setCompoundDrawables(long widget, Drawable left, Drawable top, Drawable right, Drawable bottom);
 
 	public void setAllCaps(boolean allCaps) {
 		mAllCaps = allCaps;
@@ -1871,20 +1871,18 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 
-	/* ATL: AOSP's onDraw() paints the compound drawables itself; here the GtkBox of the label does, so every
-	 * change of the drawables that are shown (mShowing, already resolved for the layout direction) is passed
-	 * to it. Subclasses whose native widget is no GtkBox (Button, EditText) or that add a drawable
-	 * (CheckedTextView) override this. */
+	/* ATL: AOSP's onDraw() paints the compound drawables itself; here the GtkBox of the label does (in their
+	 * bounds, see native_setCompoundDrawables), so every change of the drawables that are shown (mShowing,
+	 * already resolved for the layout direction) is passed to it. A Button has the box in its GtkButton.
+	 * Subclasses whose native widget has no such box (EditText) or that add a drawable (CheckedTextView)
+	 * override this. */
 	protected void updateNativeCompoundDrawables() {
 		final Drawable[] d = getCompoundDrawables();
 		boolean any = d[Drawables.LEFT] != null || d[Drawables.TOP] != null || d[Drawables.RIGHT] != null || d[Drawables.BOTTOM] != null;
 		if (!any && !nativeHasDrawables)
 			return; // the constructor sets "no drawables": nothing to tell the native side
 		nativeHasDrawables = any;
-		native_setCompoundDrawables(widget, d[Drawables.LEFT] != null ? d[Drawables.LEFT].paintable : 0,
-				d[Drawables.TOP] != null ? d[Drawables.TOP].paintable : 0,
-				d[Drawables.RIGHT] != null ? d[Drawables.RIGHT].paintable : 0,
-				d[Drawables.BOTTOM] != null ? d[Drawables.BOTTOM].paintable : 0);
+		native_setCompoundDrawables(widget, d[Drawables.LEFT], d[Drawables.TOP], d[Drawables.RIGHT], d[Drawables.BOTTOM]);
 	}
 
 	/* resolveDrawables() and the reset on a direction change are View's, as in AOSP */

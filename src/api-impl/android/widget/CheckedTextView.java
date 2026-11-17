@@ -121,20 +121,18 @@ public class CheckedTextView extends TextView implements Checkable {
 
 	private void updateCheckMark() {
 		Drawable[] d = getCompoundDrawables();
-		long left = paintable(d[0]);
-		long right = paintable(d[2]);
+		Drawable left = d[0];
+		Drawable right = d[2];
 		if (mCheckMarkDrawable != null) {
+			/* AOSP onDraw(): the check mark is drawn at its intrinsic size */
+			mCheckMarkDrawable.setBounds(0, 0, mCheckMarkDrawable.getIntrinsicWidth(), mCheckMarkDrawable.getIntrinsicHeight());
 			int gravity = Gravity.getAbsoluteGravity(mCheckMarkGravity, getLayoutDirection());
 			if ((gravity & Gravity.HORIZONTAL_GRAVITY_MASK) == Gravity.LEFT)
-				left = mCheckMarkDrawable.paintable;
+				left = mCheckMarkDrawable;
 			else
-				right = mCheckMarkDrawable.paintable;
+				right = mCheckMarkDrawable;
 		}
-		native_setCompoundDrawables(widget, left, paintable(d[1]), right, paintable(d[3]));
-	}
-
-	private static long paintable(Drawable d) {
-		return d != null ? d.paintable : 0;
+		native_setCompoundDrawables(widget, left, d[1], right, d[3]);
 	}
 
 	@Override
