@@ -166,7 +166,9 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLines(JNIEnv *env
 
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setAlignment(JNIEnv *env, jobject this, jfloat xalign, jfloat yalign)
 {
-	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
+	GtkWidget *widget = _PTR(_GET_LONG_FIELD(this, "widget"));
+	/* a Button has the box of its label in a GtkButton */
+	GtkLabel *label = box_get_label(env, GTK_IS_BUTTON(widget) ? gtk_button_get_child(GTK_BUTTON(widget)) : widget);
 	if (!label)
 		return;
 	gtk_label_set_xalign(label, xalign);
