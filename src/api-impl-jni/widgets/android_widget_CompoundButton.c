@@ -14,7 +14,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_CompoundButton_native_1constructor(J
 	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 	GtkWidget *label = gtk_label_new("");
 	gtk_widget_set_hexpand(label, TRUE);
-	gtk_widget_set_halign(label, GTK_ALIGN_START);
+	gtk_label_set_xalign(GTK_LABEL(label), 0.f); // the gravity sets the alignment (TextView.setGravity())
 	gtk_box_append(GTK_BOX(box), label);
 	GtkWidget *switcher = gtk_switch_new();
 	g_signal_connect(switcher, "state-set", G_CALLBACK(on_state_set), NULL);

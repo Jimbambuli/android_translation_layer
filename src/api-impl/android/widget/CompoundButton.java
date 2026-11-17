@@ -30,14 +30,20 @@ public abstract class CompoundButton extends Button implements Checkable {
 		super(context, attrs, defStyleAttr, defStyleRes);
 		TypedArray typedArray = context.obtainStyledAttributes(
 		    attrs, R.styleable.CompoundButton, defStyleAttr, defStyleRes);
+		/* AOSP: the button drawable comes from the style; ToggleButton has none and shows only its text */
+		final Drawable d = typedArray.getDrawable(R.styleable.CompoundButton_button);
+		if (d != null) {
+			setButtonDrawable(d);
+		}
 		if (typedArray.hasValue(R.styleable.CompoundButton_checked)) {
 			this.setChecked(typedArray.getBoolean(R.styleable.CompoundButton_checked, false));
 		}
 		typedArray.recycle();
 		setSwitchColorsFromTheme(context);
 		/* AndroidX SwitchCompat/MaterialSwitch and ATL's own Switch draw thumb and track in onDraw() like AOSP's Switch;
-		 * the GtkSwitch would be drawn under them, so it stays as state holder only */
-		mDrawsItself = overridesOnDraw(getClass()) && native_hideSwitch(widget);
+		 * the GtkSwitch would be drawn under them, so it stays as state holder only. The same without a button
+		 * drawable (ToggleButton), where AOSP's onDraw() draws none. */
+		mDrawsItself = (overridesOnDraw(getClass()) || button_drawable == null) && native_hideSwitch(widget);
 	}
 
 	private boolean mDrawsItself;
