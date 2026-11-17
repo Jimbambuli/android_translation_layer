@@ -351,9 +351,28 @@ static void post_set_stage(WebKitWebView *web_view, int stage)
 	g_object_set_data(G_OBJECT(web_view), "atl-post", GINT_TO_POINTER(stage));
 }
 
+/* A load of the app (loadUrl(), loadData*(), reload(), postUrl()): Chromium (AwContentBrowserClient::
+ * ShouldOverrideUrlLoading()) does not offer application-initiated navigations to shouldOverrideUrlLoading()
+ * unless they are a redirect. WebKit's navigation action does not say who started it, so the app's load is marked
+ * until its own policy decision (or its start, if WebKit asks none) */
+static void app_load_begin(WebKitWebView *web_view)
+{
+	g_object_set_data(G_OBJECT(web_view), "atl-app-load", GINT_TO_POINTER(1));
+}
+
+static gboolean app_load_take(WebKitWebView *web_view)
+{
+	gboolean app_load = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(web_view), "atl-app-load"));
+	g_object_set_data(G_OBJECT(web_view), "atl-app-load", NULL);
+	return app_load;
+}
+
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
+	// the app's load started without a policy decision (e.g. loadData*()): later navigations are the page's
+	if (load_event == WEBKIT_LOAD_STARTED)
+		app_load_take(web_view);
 	JNIEnv *env = get_jni_env();
 	jobject this = webview_jobject(env, wrapper);
 	if (!this)
@@ -456,8 +475,8 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 			webkit_policy_decision_use(decision);
 			return TRUE;
 		}
-		/* WebView.postUrl(): the form page was the app's load (asked like loadUrl()), its submission is the POST of
-		 * that same load; any other navigation ends the postUrl() */
+		/* WebView.postUrl(): the form page was the app's load, its submission is the POST of that same load; any
+		 * other navigation ends the postUrl() */
 		int post = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(web_view), "atl-post"));
 		if (post && webkit_navigation_action_get_navigation_type(action) == WEBKIT_NAVIGATION_TYPE_FORM_SUBMITTED) {
 			post_set_stage(web_view, POST_SUBMITTED);
@@ -465,6 +484,16 @@ static gboolean decide_policy(WebKitWebView *web_view, WebKitPolicyDecision *dec
 			return TRUE;
 		}
 		post_set_stage(web_view, post == POST_REQUESTED ? POST_FORM_PAGE : POST_NONE);
+
+		/* AwContentBrowserClient::ShouldOverrideUrlLoading(): only GETs can be overridden, and the app's own
+		 * navigations only when they are a redirect */
+		gboolean redirect = webkit_navigation_action_is_redirect(action);
+		gboolean app_load = !redirect && app_load_take(web_view);
+		const gchar *method = webkit_uri_request_get_http_method(request);
+		if (app_load || (method && strcmp(method, "GET") != 0)) {
+			webkit_policy_decision_use(decision);
+			return TRUE;
+		}
 
 		JNIEnv *env = get_jni_env();
 		jobject this = webview_jobject(env, wrapper);
@@ -573,6 +602,7 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	webkit_user_content_manager_remove_all_scripts(content_manager);
 	webkit_user_content_manager_remove_all_style_sheets(content_manager);
 	g_signal_handlers_disconnect_by_func(webview, web_view_load_changed, NULL);
+	app_load_take(webview);
 	g_signal_handlers_disconnect_by_func(webview, web_view_uri_changed, NULL);
 	g_signal_handlers_disconnect_by_func(webview, context_menu_cb, NULL);
 	g_signal_handlers_disconnect_by_data(webview, wrapper);
@@ -832,6 +862,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl(JNIEnv *env, 
 		return;
 
 	WebKitWebView *webview = _PTR(widget_ptr);
+	app_load_begin(webview);
 	webkit_web_view_load_uri(webview, _CSTRING(url));
 }
 
@@ -857,6 +888,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1postUrl(JNIEnv *env, 
 	g_autoptr(GBytes) data = g_bytes_new(bytes, length);
 	(*env)->ReleaseByteArrayElements(env, form, bytes, JNI_ABORT);
 	const char *uri = _CSTRING(url);
+	app_load_begin(webview);
 	webkit_web_view_load_bytes(webview, data, "text/html", "UTF-8", uri);
 	(*env)->ReleaseStringUTFChars(env, url, uri);
 }
@@ -866,6 +898,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload(JNIEnv *env, j
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
 		return;
 	WebKitWebView *webview = _PTR(widget_ptr);
+	app_load_begin(webview);
 	webkit_web_view_reload(webview);
 }
 
@@ -895,6 +928,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrlWithHeaders(JN
 		if (jvalue)
 			(*env)->DeleteLocalRef(env, jvalue);
 	}
+	app_load_begin(WEBKIT_WEB_VIEW(webview));
 	webkit_web_view_load_request(WEBKIT_WEB_VIEW(webview), request);
 	g_object_unref(request);
 }
@@ -1025,6 +1059,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(J
 	jsize data_jlen = (*env)->GetStringLength(env, data_jstr);
 	char *data = malloc(data_len + 1); // + 1 for NUL
 	(*env)->GetStringUTFRegion(env, data_jstr, 0, data_jlen, data);
+	app_load_begin(webview);
 	webkit_web_view_load_bytes(webview, g_bytes_new(data, data_len), mime_type ? _CSTRING(mime_type) : "text/html", encoding ? _CSTRING(encoding) : NULL, base_url ? _CSTRING(base_url) : NULL);
 }
 
