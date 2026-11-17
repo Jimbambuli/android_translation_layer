@@ -1042,6 +1042,8 @@ static void get_cookies_cb(GObject *cookie_manager, GAsyncResult *res, gpointer 
 
 JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_native_1getCookie(JNIEnv *env, jobject this, jstring url)
 {
+	if (!url)
+		return NULL;
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
 		return _JSTRING("");
 

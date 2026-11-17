@@ -3,6 +3,7 @@ package android.webkit;
 import android.atl.ATLLoadedApp;
 import android.content.Context;
 import android.webkit.WebView;
+import java.util.Objects;
 
 public class CookieManager {
 	/* AwCookieManager / AwSettings: cookies are accepted, third-party cookies only where a WebView allows them
@@ -57,7 +58,10 @@ public class CookieManager {
 		return native_hasCookies();
 	}
 
+	/* AOSP (Chromium CookieManagerAdapter.getCookie() -> AwCookieManager.getCookieWithUrlFixup()): the URL fixup
+	 * matches a pattern against the URL, so a null URL throws a NullPointerException */
 	public String getCookie(String url) {
+		Objects.requireNonNull(url, "url");
 		return native_getCookie(url);
 	}
 
