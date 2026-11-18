@@ -933,8 +933,12 @@ public class Window {
 		return (getFeatures() & (1 << featureId)) != 0;
 	}
 
+	/* the desktop's window title. Without a title (Activity.setTitle(null)) it is the application's label, like the
+	 * caption of a desktop window in AOSP (WindowDecorTaskResourceLoader: pm.getApplicationLabel()) */
 	public void setTitle(CharSequence title) {
-		set_title(native_window, title != null ? title.toString() : context.getPackageName());
+		if (title == null)
+			title = context.getPackageManager().getApplicationLabel(context.getApplicationInfo());
+		set_title(native_window, title.toString());
 	}
 
 	/* AOSP's Transition is abstract; an empty TransitionSet is the transition that does nothing (no shared elements) */

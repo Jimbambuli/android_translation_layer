@@ -7,6 +7,7 @@ import android.app.ContextImpl;
 import android.app.Service;
 import android.atl.annotation.Export;
 import android.content.*;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.pm.ServiceInfo;
@@ -283,13 +284,13 @@ public final class ATLLoadedApp {
 	public Activity createActivity(String className, Intent intent)
 	    throws ReflectiveOperationException {
 		int theme_res = 0;
-		int label_res = 0;
+		ActivityInfo info = null;
 		int soft_input_mode = 0;
 		String activityClass = className;
 		for (PackageParser.Activity activity : pkg.activities) {
 			if (className.equals(activity.className)) {
 				soft_input_mode = activity.info.softInputMode;
-				label_res = activity.info.labelRes;
+				info = activity.info;
 				theme_res = activity.info.getThemeResource();
 				// an <activity-alias> (e.g. the launch intent of an app with switchable icons) runs its target,
 				// the activity keeps the alias as its component like in AOSP
@@ -321,11 +322,9 @@ public final class ATLLoadedApp {
 		activity.getWindow().setColorMode(0 /* ActivityInfo.COLOR_MODE_DEFAULT */);
 		activity.getWindow().setPreferMinimalPostProcessing(false);
 		activity.setTheme(theme_res);
-		if (label_res != 0) {
-			activity.setTitle(r.getText(label_res));
-		} else if (pkg.applicationInfo.labelRes != 0) {
-			activity.setTitle(r.getText(pkg.applicationInfo.labelRes));
-		}
+		// ActivityThread.performLaunchActivity(): the title is r.activityInfo.loadLabel(), i.e. the activity's label,
+		// else the application's, a literal android:label (nonLocalizedLabel) as well as a string resource
+		activity.setTitle(info != null ? info.loadLabel(activity.getPackageManager()) : pkg.applicationInfo.loadLabel(activity.getPackageManager()));
 		return activity;
 	}
 
