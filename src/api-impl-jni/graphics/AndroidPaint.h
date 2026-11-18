@@ -28,7 +28,7 @@ struct AndroidPaint {
 
 /* android_graphics_Paint.c */
 void android_paint_apply_text_decoration(PangoLayout *layout, struct AndroidPaint *paint);
-bool android_paint_push_text_shadow(GtkSnapshot *snapshot, struct AndroidPaint *paint);
+bool android_paint_push_shadow(GtkSnapshot *snapshot, struct AndroidPaint *paint);
 void android_paint_append_layout(GtkSnapshot *snapshot, PangoLayout *layout, struct AndroidPaint *paint);
 void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGlyphString *glyphs, const graphene_point_t *origin, struct AndroidPaint *paint);
 void android_paint_add_layout_outline(GskPathBuilder *builder, PangoLayout *layout, float x, float y);

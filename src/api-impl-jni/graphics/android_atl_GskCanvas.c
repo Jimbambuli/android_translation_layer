@@ -65,7 +65,10 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRect(JNIEnv *env, 
 	graphene_rect_t bounds = GRAPHENE_RECT_INIT(left, top, right - left, bottom - top);
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
 	gtk_snapshot_append_color(snapshot, &paint->color, &bounds);
+	if (shadow)
+		gtk_snapshot_pop(snapshot);
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
 }
@@ -121,6 +124,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath(JNIEnv *env, 
 	struct AndroidPaint *paint = _PTR(paint_ptr);
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
 	if (inverse) {
 		/* Skia: an inverse fill type covers everything outside the path; a stroke keeps the inverse bit
 		 * (SkStroke), so it covers everything outside the stroke */
@@ -141,6 +145,8 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath(JNIEnv *env, 
 			gtk_snapshot_append_fill(snapshot, path, fill_rule, &paint->color);
 		}
 	}
+	if (shadow)
+		gtk_snapshot_pop(snapshot);
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
 }
@@ -171,33 +177,51 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1restore(JNIEnv *env, j
 	gtk_snapshot_restore(snapshot);
 }
 
-JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLine(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat x0, jfloat y0, jfloat x1, jfloat y1, jlong paint_ptr)
+static void draw_line(GdkSnapshot *snapshot, struct AndroidPaint *paint, jfloat x0, jfloat y0, jfloat x1, jfloat y1)
 {
 	if (!isfinite(x0) || !isfinite(y0) || !isfinite(x1) || !isfinite(y1)) {
 		return;
 	}
-	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
-	struct AndroidPaint *paint = _PTR(paint_ptr);
 	gtk_snapshot_save(snapshot);
 	gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(x0, y0));
 	float rotation = atan2(y1 - y0, x1 - x0);
 	gtk_snapshot_rotate(snapshot, rotation * 180 / M_PI);
 	float length = sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
 	float stroke_width = gsk_stroke_get_line_width(paint->gsk_stroke);
-	if (paint->use_color_filter)
-		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
 	gtk_snapshot_append_color(snapshot, &paint->color, &GRAPHENE_RECT_INIT(0, -stroke_width / 2, length, stroke_width));
-	if (paint->use_color_filter)
-		gtk_snapshot_pop(snapshot);
 	gtk_snapshot_restore(snapshot);
 }
 
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLine(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat x0, jfloat y0, jfloat x1, jfloat y1, jlong paint_ptr)
+{
+	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	if (paint->use_color_filter)
+		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
+	draw_line(snapshot, paint, x0, y0, x1, y1);
+	if (shadow)
+		gtk_snapshot_pop(snapshot);
+	if (paint->use_color_filter)
+		gtk_snapshot_pop(snapshot);
+}
+
+/* like hwui's drawLines(), one draw (one shadow) for all lines */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLines(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloatArray points_arr, jint offset, jint count, jlong paint_ptr)
 {
+	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
+	struct AndroidPaint *paint = _PTR(paint_ptr);
 	jfloat *points = (*env)->GetFloatArrayElements(env, points_arr, NULL);
+	if (paint->use_color_filter)
+		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
 	/* count is the number of values in points; four make one line */
 	for (int i = offset; i + 4 <= offset + count; i += 4)
-		Java_android_atl_GskCanvas_native_1drawLine(env, this_class, snapshot_ptr, points[i + 0], points[i + 1], points[i + 2], points[i + 3], paint_ptr);
+		draw_line(snapshot, paint, points[i + 0], points[i + 1], points[i + 2], points[i + 3]);
+	if (shadow)
+		gtk_snapshot_pop(snapshot);
+	if (paint->use_color_filter)
+		gtk_snapshot_pop(snapshot);
 	(*env)->ReleaseFloatArrayElements(env, points_arr, points, 0);
 }
 
@@ -253,7 +277,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawGlyphs(JNIEnv *env
 	jfloat *pos = (*env)->GetFloatArrayElements(env, pos_arr, NULL);
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
-	bool shadow = android_paint_push_text_shadow(snapshot, paint);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
 	PangoGlyphString *glyphs = pango_glyph_string_new();
 	pango_glyph_string_set_size(glyphs, 1);
 	for (jint i = 0; i < count; i++) {
@@ -296,6 +320,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRoundRect(JNIEnv *
 	const float widths[4] = {width, width, width, width};
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
 	if (paint->is_fill) {
 		gtk_snapshot_push_rounded_clip(snapshot, &round_rect);
 		gtk_snapshot_append_color(snapshot, gdk_color, &round_rect.bounds);
@@ -304,6 +329,8 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRoundRect(JNIEnv *
 	if (paint->is_stroke) {
 		gtk_snapshot_append_border(snapshot, &round_rect, widths, gdk_color);
 	}
+	if (shadow)
+		gtk_snapshot_pop(snapshot);
 	if (paint->use_color_filter)
 		gtk_snapshot_pop(snapshot);
 }

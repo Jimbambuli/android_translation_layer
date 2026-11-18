@@ -470,11 +470,12 @@ static void append_text(GtkSnapshot *snapshot, struct AndroidPaint *paint, Pango
 		gtk_snapshot_pop(snapshot);
 }
 
-/* Paint.setShadowLayer() below the text. hwui (jni/Paint.cpp, utils/Blur.cpp) makes a blur of
+/* Paint.setShadowLayer() below what the paint draws (hwui SkiaCanvas::applyLooper() draws the shadow first, for
+ * text and shapes alike). hwui (jni/Paint.cpp, utils/Blur.cpp) makes a blur of
  * sigma = 0.57735 * radius + 0.5 from the radius; GSK's blur radius is twice the sigma. Paint.java: "The alpha of
  * the shadow will be the paint's alpha if the shadow color is opaque, or the alpha from the shadow color if not."
  * GSK colors the shadow with the alpha of what is drawn (the paint's), so that is divided out. */
-bool android_paint_push_text_shadow(GtkSnapshot *snapshot, struct AndroidPaint *paint)
+bool android_paint_push_shadow(GtkSnapshot *snapshot, struct AndroidPaint *paint)
 {
 	if (paint->shadow_radius <= 0)
 		return false;
@@ -502,7 +503,7 @@ static void transform_skew(GtkSnapshot *snapshot, struct AndroidPaint *paint)
  * the caller has pushed the color filter */
 void android_paint_append_layout(GtkSnapshot *snapshot, PangoLayout *layout, struct AndroidPaint *paint)
 {
-	bool shadow = android_paint_push_text_shadow(snapshot, paint);
+	bool shadow = android_paint_push_shadow(snapshot, paint);
 	if (paint->text_skew_x == 0.f) {
 		append_text(snapshot, paint, layout, NULL, NULL);
 	} else {
@@ -538,7 +539,7 @@ void android_paint_append_layout(GtkSnapshot *snapshot, PangoLayout *layout, str
 		gtk_snapshot_pop(snapshot);
 }
 
-/* glyphs with the paint's text effects but the shadow (one android_paint_push_text_shadow() is meant to cover all
+/* glyphs with the paint's text effects but the shadow (one android_paint_push_shadow() is meant to cover all
  * glyphs of a draw), their origin on the baseline at origin; the caller has pushed the color filter */
 void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGlyphString *glyphs, const graphene_point_t *origin, struct AndroidPaint *paint)
 {
