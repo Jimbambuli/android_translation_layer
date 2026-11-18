@@ -82,18 +82,18 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1flush
 /*
  * Class:     android_media_AudioTrack
  * Method:    native_write
- * Signature: ([BIIF)I
+ * Signature: ([BIIFZ)I
  */
-JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIF
-  (JNIEnv *, jobject, jbyteArray, jint, jint, jfloat);
+JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIFZ
+  (JNIEnv *, jobject, jbyteArray, jint, jint, jfloat, jboolean);
 
 /*
  * Class:     android_media_AudioTrack
  * Method:    native_write
- * Signature: ([SIIF)I
+ * Signature: ([SIIFZ)I
  */
-JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIF
-  (JNIEnv *, jobject, jshortArray, jint, jint, jfloat);
+JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIFZ
+  (JNIEnv *, jobject, jshortArray, jint, jint, jfloat, jboolean);
 
 /*
  * Class:     android_media_AudioTrack

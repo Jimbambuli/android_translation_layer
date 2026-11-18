@@ -208,46 +208,76 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1play(JNIEnv *env, j
 	/*--↑*/
 }
 
-static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume)
+/* blocking: AOSP WRITE_BLOCKING on a playing track; otherwise what fits now, 0 when the buffer is full */
+static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume, jboolean blocking)
 {
 	if (!pcm_handle)
 		return -1; // uninitialized track (no audio device): report a write error
-	if (volume != 1.f) {
-		for (int i = 0; i < frames_to_write * 2; i++)
-			((jshort *)(buffer))[i] *= volume;
+	gboolean playing = _GET_INT_FIELD(this, "playbackState") == 3 /* PLAYSTATE_PLAYING */;
+	/* AOSP: what is written before play() (or after flush() while paused) waits for play(). A PCM that was not
+	 * started since it was prepared starts by itself once enough frames are queued (ALSA: start_threshold, the
+	 * pulse plugin: its prebuf, buffer size less one period), so until play() it takes at most two periods less
+	 * than the buffer (a short count, as AOSP's write() returns for a stopped or paused track) */
+	if (!playing && snd_pcm_state(pcm_handle) == SND_PCM_STATE_PREPARED) {
+		snd_pcm_uframes_t buffer_size, period_size;
+		snd_pcm_sframes_t avail = snd_pcm_avail(pcm_handle);
+		if (snd_pcm_get_params(pcm_handle, &buffer_size, &period_size) < 0 || avail < 0)
+			return 0;
+		snd_pcm_sframes_t room = (snd_pcm_sframes_t)(buffer_size - 2 * period_size) - (snd_pcm_sframes_t)(buffer_size - avail);
+		if (room <= 0)
+			return 0;
+		if (frames_to_write > room)
+			frames_to_write = room;
 	}
+	/* the volume goes into a copy: the app's data stays as it is (after a short write it comes again) */
+	jshort *scaled = NULL;
+	if (volume != 1.f) {
+		int samples = frames_to_write * _GET_INT_FIELD(this, "channels");
+		scaled = malloc(samples * sizeof(jshort));
+		if (!scaled)
+			return 0;
+		for (int i = 0; i < samples; i++)
+			scaled[i] = ((const jshort *)buffer)[i] * volume;
+		buffer = scaled;
+	}
+	snd_pcm_nonblock(pcm_handle, blocking ? 0 : 1);
 	snd_pcm_sframes_t frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
 	if (frames_written == -EPIPE) {
 		printf("XRUN.\n");
 		_SET_INT_FIELD(this, "underrunCount", _GET_INT_FIELD(this, "underrunCount") + 1); // AudioTrack.getUnderrunCount()
 		snd_pcm_recover(pcm_handle, frames_written, 0);
 		frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
-		snd_pcm_start(pcm_handle);
+		if (playing)
+			snd_pcm_start(pcm_handle); // a paused or stopped track waits for play()
 	}
-	if (frames_written < 0) {
+	if (frames_written == -EAGAIN) {
+		frames_written = 0; // non-blocking: the buffer is full
+	} else if (frames_written < 0) {
 		printf("ERROR. Can't write to PCM device. %s\n", snd_strerror(frames_written));
 		frames_written = 0;
 	}
+	snd_pcm_nonblock(pcm_handle, 0);
+	free(scaled);
 	return frames_written;
 }
 
-JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIF(JNIEnv *env, jobject this, jbyteArray audio_data, jint offset_in_bytes, jint frames_to_write, jfloat volume)
+JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIFZ(JNIEnv *env, jobject this, jbyteArray audio_data, jint offset_in_bytes, jint frames_to_write, jfloat volume, jboolean blocking)
 {
 	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
 
 	jbyte *buffer = _GET_BYTE_ARRAY_ELEMENTS(audio_data);
-	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_bytes, frames_to_write, volume);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_bytes, frames_to_write, volume, blocking);
 	_RELEASE_BYTE_ARRAY_ELEMENTS(audio_data, buffer);
 
 	return frames_written;
 }
 
-JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIF(JNIEnv *env, jobject this, jshortArray audio_data, jint offset_in_shorts, jint frames_to_write, jfloat volume)
+JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIFZ(JNIEnv *env, jobject this, jshortArray audio_data, jint offset_in_shorts, jint frames_to_write, jfloat volume, jboolean blocking)
 {
 	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
 
 	jshort *buffer = (*env)->GetShortArrayElements(env, audio_data, NULL);
-	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_shorts, frames_to_write, volume);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_shorts, frames_to_write, volume, blocking);
 	(*env)->ReleaseShortArrayElements(env, audio_data, buffer, 0);
 
 	return frames_written;
@@ -284,7 +314,8 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1getPlaybackHeadPosi
 	if (!pcm_handle)
 		return 0; // uninitialized track: no playback position
 	snd_pcm_sframes_t delay;
-	snd_pcm_delay(pcm_handle, &delay);
+	if (snd_pcm_delay(pcm_handle, &delay) < 0)
+		return 0; // e.g. right after flush(): nothing queued
 
 	return delay;
 }

@@ -198,6 +198,20 @@ public class AudioTrack implements AudioRouting {
 	}
 
 	public int write(byte[] audioData, int offsetInBytes, int sizeInBytes) {
+		return write(audioData, offsetInBytes, sizeInBytes, WRITE_BLOCKING);
+	}
+
+	/* AOSP: WRITE_BLOCKING waits until all data is queued, WRITE_NON_BLOCKING queues what fits and returns at once
+	 * (0 when the buffer is full). A track that is stopped or paused on entry returns a short count instead of
+	 * waiting (AOSP write(byte[], int, int)), here like a non-blocking write. */
+	private boolean blocking(int writeMode) {
+		return writeMode == WRITE_BLOCKING && playbackState == PLAYSTATE_PLAYING;
+	}
+
+	public int write(byte[] audioData, int offsetInBytes, int sizeInBytes, int writeMode) {
+		if ((writeMode != WRITE_BLOCKING) && (writeMode != WRITE_NON_BLOCKING)) {
+			return ERROR_BAD_VALUE;
+		}
 		/* sanity check the parameters before calling native_write */
 		if ((audioData == null)
 		    || (offsetInBytes < 0) || (sizeInBytes < 0)
@@ -207,7 +221,7 @@ public class AudioTrack implements AudioRouting {
 		}
 
 		int framesToWrite = sizeInBytes / channels / 2; // 2 means PCM16
-		int ret = native_write(audioData, offsetInBytes, framesToWrite, volume);
+		int ret = native_write(audioData, offsetInBytes, framesToWrite, volume, blocking(writeMode));
 		if (ret > 0) {
 			playbackHeadPosition += ret;
 		}
@@ -216,16 +230,19 @@ public class AudioTrack implements AudioRouting {
 
 	/* AOSP AudioTrack.write(ByteBuffer, int, int): the bytes from the position, a direct buffer too */
 	public int write(ByteBuffer audioData, int sizeInBytes, int writeMode) {
+		if ((writeMode != WRITE_BLOCKING) && (writeMode != WRITE_NON_BLOCKING)) {
+			return ERROR_BAD_VALUE;
+		}
 		if (audioData == null || sizeInBytes < 0 || sizeInBytes > audioData.remaining()) {
 			return ERROR_BAD_VALUE;
 		}
 		int ret;
 		if (audioData.hasArray()) {
-			ret = write(audioData.array(), audioData.arrayOffset() + audioData.position(), sizeInBytes);
+			ret = write(audioData.array(), audioData.arrayOffset() + audioData.position(), sizeInBytes, writeMode);
 		} else {
 			byte[] copy = new byte[sizeInBytes];
 			audioData.duplicate().get(copy);
-			ret = write(copy, 0, sizeInBytes);
+			ret = write(copy, 0, sizeInBytes, writeMode);
 		}
 		if (ret > 0) {
 			audioData.position(audioData.position() + ret);
@@ -239,12 +256,8 @@ public class AudioTrack implements AudioRouting {
 		return write(audioData, sizeInBytes, writeMode);
 	}
 
-	public int write(byte[] audioData, int offsetInBytes, int sizeInBytes, int writeMode) {
-		return write(audioData, offsetInBytes, sizeInBytes);
-	}
-
-	public int write(short[] audioData, int offsetInShorts, int sizeInShorts, int writeMode) {
-		return write(audioData, offsetInShorts, sizeInShorts);
+	public int write(short[] audioData, int offsetInShorts, int sizeInShorts) {
+		return write(audioData, offsetInShorts, sizeInShorts, WRITE_BLOCKING);
 	}
 
 	/* AOSP AudioTrack.write(float[], ...): ENCODING_PCM_FLOAT data. ATL's output is PCM16 (native_constructor), the
@@ -259,10 +272,13 @@ public class AudioTrack implements AudioRouting {
 			float sample = audioData[offsetInFloats + i];
 			pcm[i] = (short)Math.max(-32768, Math.min(32767, Math.round(sample * 32768f)));
 		}
-		return write(pcm, 0, sizeInFloats);
+		return write(pcm, 0, sizeInFloats, writeMode);
 	}
 
-	public int write(short audioData[], int offsetInShorts, int sizeInShorts) {
+	public int write(short audioData[], int offsetInShorts, int sizeInShorts, int writeMode) {
+		if ((writeMode != WRITE_BLOCKING) && (writeMode != WRITE_NON_BLOCKING)) {
+			return ERROR_BAD_VALUE;
+		}
 		/* sanity check the parameters before calling native_write */
 		if ((audioData == null)
 		    || (offsetInShorts < 0) || (sizeInShorts < 0)
@@ -272,7 +288,7 @@ public class AudioTrack implements AudioRouting {
 		}
 
 		int framesToWrite = sizeInShorts / channels;
-		int ret = native_write(audioData, offsetInShorts, framesToWrite, volume);
+		int ret = native_write(audioData, offsetInShorts, framesToWrite, volume, blocking(writeMode));
 		if (ret > 0) {
 			playbackHeadPosition += ret;
 		}
@@ -312,8 +328,11 @@ public class AudioTrack implements AudioRouting {
 		native_pause();
 	}
 
+	/* the frames written less those still queued (ALSA's delay, which also counts the latency of the output and
+	 * can exceed what was written at first); AOSP's position starts at 0 */
 	public int getPlaybackHeadPosition() {
-		return playbackHeadPosition - native_getPlaybackHeadPosition();
+		int position = playbackHeadPosition - native_getPlaybackHeadPosition();
+		return (position < 0 && playbackHeadPosition >= 0) ? 0 : position;
 	}
 
 	public int setVolume(float volume) {
@@ -642,8 +661,8 @@ public class AudioTrack implements AudioRouting {
 	public native void native_play();
 	public native void native_pause();
 	private native void native_flush();
-	private native int native_write(byte[] audioData, int offsetInBytes, int framesToWrite, float volume);
-	private native int native_write(short[] audioData, int offsetInShorts, int framesToWrite, float volume);
+	private native int native_write(byte[] audioData, int offsetInBytes, int framesToWrite, float volume, boolean blocking);
+	private native int native_write(short[] audioData, int offsetInShorts, int framesToWrite, float volume, boolean blocking);
 	public native void native_release();
 
 	public static int getNativeOutputSampleRate(int i) {
