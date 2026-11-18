@@ -437,10 +437,11 @@ public class DrawableContainer extends Drawable implements Drawable.Callback {
 			}
 		}
 
-		/* AOSP also sets the owner as callback; this DrawableContainer is no Drawable.Callback
-		 * and addChild() does not set it either */
+		/* like AOSP: the owner is the child's callback, so invalidations of the child (e.g. an
+		 * AnimatedVectorDrawable frame) reach the view through the container */
 		private Drawable prepareDrawable(Drawable child) {
 			child = child.mutate();
+			child.setCallback(owner);
 			return child;
 		}
 
@@ -479,6 +480,10 @@ public class DrawableContainer extends Drawable implements Drawable.Callback {
 			if (childCount >= drawables.length) {
 				growArray(drawables.length, drawables.length * 2);
 			}
+			dr.mutate();
+			dr.setVisible(false, true);
+			dr.setCallback(owner);
+
 			drawables[childCount] = dr;
 			mChildrenChangingConfigurations |= dr.getChangingConfigurations();
 			mConstantPadding = null;
