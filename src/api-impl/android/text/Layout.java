@@ -9,6 +9,7 @@ import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.MetricAffectingSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
 import android.text.style.StrikethroughSpan;
@@ -51,21 +52,89 @@ public class Layout {
 	private int maxLines = Integer.MAX_VALUE;
 
 	protected Layout(CharSequence text, TextPaint paint, int width, Layout.Alignment align, float spacingMult, float spacingAdd) {
-		if (text instanceof Spanned) {
-			Spanned spanned = (Spanned)text;
-			// call every ReplacementSpan.getSize method to prevent "PlaceholderSpan is not laid out yet." errors in ComposeUI
-			for (ReplacementSpan span : spanned.getSpans(0, spanned.length(), ReplacementSpan.class))
-				span.getSize(paint, text, spanned.getSpanStart(span), spanned.getSpanEnd(span), paint.getFontMetricsInt());
-		}
 		String str = text != null ? text.toString() : "";
 		this.text = str;
 		this.paint = paint;
 		this.spacing_mult = spacingMult;
 		this.spacing_add = spacingAdd;
-		layout = native_constructor(str, paint.paint, width);
-		if (text instanceof Spanned)
+		layout = native_constructor(pangoText(text), paint.paint, width);
+		if (text instanceof Spanned) {
 			applySpans((Spanned)text);
+			applyReplacements((Spanned)text);
+		}
 		setAlignment(align);
+	}
+
+	/* the ReplacementSpans of the text and the text they are in; drawn by draw() (AOSP TextLine.handleReplacement()) */
+	private Spanned replacementText;
+	private ReplacementSpan[] replacements;
+
+	/* AOSP TextLine: the first character of a replacement is U+FFFC, the rest U+FEFF (zero width), so the
+	 * text keeps its offsets and the span gets one placeholder */
+	private static String pangoText(CharSequence text) {
+		if (text == null)
+			return "";
+		if (!(text instanceof Spanned))
+			return text.toString();
+		Spanned spanned = (Spanned)text;
+		char[] chars = text.toString().toCharArray();
+		for (ReplacementSpan span : spanned.getSpans(0, spanned.length(), ReplacementSpan.class)) {
+			int start = spanned.getSpanStart(span);
+			int end = Math.min(spanned.getSpanEnd(span), chars.length);
+			if (start < 0 || end <= start)
+				continue;
+			chars[start] = '\uFFFC';
+			for (int i = start + 1; i < end; i++)
+				chars[i] = '\uFEFF';
+		}
+		return new String(chars);
+	}
+
+	/* each ReplacementSpan takes the width and the font metrics its getSize() gives (AOSP
+	 * MeasuredParagraph.applyReplacementRun(): the line grows to them); Pango leaves a gap of that size */
+	private void applyReplacements(Spanned text) {
+		replacementText = text;
+		replacements = text.getSpans(0, text.length(), ReplacementSpan.class);
+		for (ReplacementSpan span : replacements) {
+			int start = text.getSpanStart(span);
+			int end = text.getSpanEnd(span);
+			if (start < 0 || end <= start)
+				continue;
+			TextPaint wp = replacementPaint(text, span, false);
+			Paint.FontMetricsInt fm = wp.getFontMetricsInt();
+			int width = span.getSize(wp, text, start, end, fm);
+			native_add_placeholder(layout, start, width, fm.ascent, fm.descent);
+		}
+	}
+
+	/* AOSP: the paint with the other MetricAffectingSpans of the range applied, their measure state for getSize()
+	 * (MeasuredParagraph), their draw state for draw() (TextLine.handleRun()) */
+	private TextPaint replacementPaint(Spanned text, ReplacementSpan replacement, boolean draw) {
+		TextPaint wp = new TextPaint();
+		wp.set(paint);
+		for (MetricAffectingSpan span : text.getSpans(text.getSpanStart(replacement), text.getSpanEnd(replacement), MetricAffectingSpan.class)) {
+			if (span instanceof ReplacementSpan)
+				continue;
+			if (draw)
+				span.updateDrawState(wp);
+			else
+				span.updateMeasureState(wp);
+		}
+		return wp;
+	}
+
+	private void drawReplacements(Canvas canvas) {
+		if (replacements == null)
+			return;
+		float[] place = new float[4];
+		for (ReplacementSpan span : replacements) {
+			int start = replacementText.getSpanStart(span);
+			int end = replacementText.getSpanEnd(span);
+			if (start < 0 || end <= start || !native_get_placeholder(layout, start, place))
+				continue;
+			span.draw(canvas, replacementText, start, end, place[0], Math.round(place[1]), Math.round(place[2]),
+			          Math.round(place[3]), replacementPaint(replacementText, span, true));
+		}
 	}
 
 	/* the character spans that change how the text looks become Pango attributes */
@@ -127,9 +196,12 @@ public class Layout {
 		int width = native_get_width(layout);
 		long old = layout;
 		this.text = str;
-		layout = native_constructor(str, paint.paint, width);
-		if (source instanceof Spanned)
+		replacements = null;
+		layout = native_constructor(pangoText(source), paint.paint, width);
+		if (source instanceof Spanned) {
 			applySpans((Spanned)source);
+			applyReplacements((Spanned)source);
+		}
 		setAlignment(align);
 		if (spacing_mult != 1 || spacing_add != 0)
 			native_set_paragraph_style(layout, spacing_mult, spacing_add, false, 0, 0);
@@ -228,6 +300,7 @@ public class Layout {
 			native_draw(layout, ((GskCanvas)canvas).snapshot, paint.paint);
 		else
 			native_draw_custom_canvas(layout, canvas, paint);
+		drawReplacements(canvas);
 	}
 
 	public void draw(Canvas canvas, Path selectionHighlight, Paint paint, int selectionOffset) {
@@ -804,6 +877,8 @@ public class Layout {
 	protected static native long native_constructor(String text, long paint, int width);
 	/* start and end in UTF-16 units of the text; color as ARGB, size in pixels, scale as factor */
 	private static native void native_add_attribute(long layout, int type, int start, int end, int color, float value);
+	private static native void native_add_placeholder(long layout, int offset, int width, int ascent, int descent);
+	private static native boolean native_get_placeholder(long layout, int offset, float[] place);
 	protected native void native_set_width(long layout, int width);
 	/* 0 left, 1 center, 2 right (the layout direction is always LTR) */
 	private static native void native_set_alignment(long layout, int alignment);

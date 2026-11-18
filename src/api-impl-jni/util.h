@@ -63,6 +63,7 @@ void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
 void atl_unref_on_main_thread(gpointer object);
 PangoContext *atl_pango_context(void);
+gboolean atl_pango_layout_placeholder(PangoLayout *layout, guint index, float place[4]);
 gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out);
 void atl_snapshot_concat_matrix(GtkSnapshot *snapshot, const graphene_matrix_t *matrix);
 

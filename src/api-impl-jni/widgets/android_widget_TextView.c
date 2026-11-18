@@ -259,9 +259,9 @@ JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline(JNIEnv *
 	return baseline + MAX(height - natural, 0) * gtk_label_get_yalign(label);
 }
 
-/* the markup, with the placeholders of its ImageSpans: places is (UTF-16 index of the placeholder character in the
- * text of the markup, width, height, y relative to the baseline) per image, in pixels. Pango leaves a gap of that
- * size (PangoAttrShape); GtkLabel does not draw a shape, the TextView draws the image there (native_getImagePosition) */
+/* the markup, with the placeholders of its ReplacementSpans: places is (UTF-16 index of the placeholder character in
+ * the text of the markup, width, height, y relative to the baseline) per span, in pixels. Pango leaves a gap of that
+ * size (PangoAttrShape); GtkLabel does not draw a shape, the TextView has the span draw there (native_getPlaceholderPosition) */
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *env, jobject this, jstring markup_jstr, jintArray places_array)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
@@ -317,8 +317,9 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setMarkup(JNIEnv *en
 	pango_attr_list_unref(pango_attrs);
 }
 
-/* where the label has put the placeholder of the image: x, y of its top left corner in the view */
-JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getImagePosition(JNIEnv *env, jobject this, jlong widget_ptr, jint index, jfloatArray xy_array)
+/* where the label has put the placeholder of a ReplacementSpan: x of its left edge, top, baseline and bottom of its
+ * line, in the view (the arguments of AOSP ReplacementSpan.draw()); none when an ellipsis has taken its place */
+JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getPlaceholderPosition(JNIEnv *env, jobject this, jlong widget_ptr, jint index, jfloatArray place_array)
 {
 	GtkLabel *label = box_get_label(env, _PTR(widget_ptr));
 	GArray *bytes = label ? g_object_get_data(G_OBJECT(label), "atl-image-bytes") : NULL;
@@ -328,12 +329,14 @@ JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getImagePosition
 	graphene_point_t origin;
 	if (!gtk_widget_compute_point(GTK_WIDGET(label), wrapper, &GRAPHENE_POINT_INIT(0, 0), &origin))
 		return JNI_FALSE;
+	float pos[4];
+	if (!atl_pango_layout_placeholder(gtk_label_get_layout(label), g_array_index(bytes, guint, index), pos))
+		return JNI_FALSE;
 	int offset_x, offset_y;
 	gtk_label_get_layout_offsets(label, &offset_x, &offset_y);
-	PangoRectangle pos;
-	pango_layout_index_to_pos(gtk_label_get_layout(label), g_array_index(bytes, guint, index), &pos);
-	jfloat xy[2] = {origin.x + offset_x + (float)pos.x / PANGO_SCALE, origin.y + offset_y + (float)pos.y / PANGO_SCALE};
-	(*env)->SetFloatArrayRegion(env, xy_array, 0, 2, xy);
+	float x = origin.x + offset_x, y = origin.y + offset_y;
+	jfloat place[4] = {x + pos[0], y + pos[1], y + pos[2], y + pos[3]};
+	(*env)->SetFloatArrayRegion(env, place_array, 0, 4, place);
 	return JNI_TRUE;
 }
 

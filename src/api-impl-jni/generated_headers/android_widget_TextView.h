@@ -365,10 +365,10 @@ JNIEXPORT jlong JNICALL Java_android_widget_TextView_native_1constructor
 
 /*
  * Class:     android_widget_TextView
- * Method:    native_getImagePosition
+ * Method:    native_getPlaceholderPosition
  * Signature: (JI[F)Z
  */
-JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getImagePosition
+JNIEXPORT jboolean JNICALL Java_android_widget_TextView_native_1getPlaceholderPosition
   (JNIEnv *, jobject, jlong, jint, jfloatArray);
 
 /*

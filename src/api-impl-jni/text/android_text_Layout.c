@@ -100,6 +100,38 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1attribute(JNIEnv *e
 	pango_attr_list_unref(attrs);
 }
 
+/* the placeholder of a ReplacementSpan at offset (its U+FFFC): Pango leaves a gap of width and of the span's
+ * ascent and descent for it (PangoAttrShape), Layout.draw() has the span draw there */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1placeholder(JNIEnv *env, jclass class, jlong layout, jint offset, jint width, jint ascent, jint descent)
+{
+	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
+	const char *text = pango_layout_get_text(pango_layout);
+	guint index = utf16_to_byte_offset(text, offset);
+	if (!text[index])
+		return;
+	PangoAttrList *attrs = pango_layout_get_attributes(pango_layout);
+	attrs = attrs ? pango_attr_list_ref(attrs) : pango_attr_list_new();
+	PangoRectangle rect = {0, ascent * PANGO_SCALE, width * PANGO_SCALE, (descent - ascent) * PANGO_SCALE};
+	PangoAttribute *shape = pango_attr_shape_new(&rect, &rect);
+	shape->start_index = index;
+	shape->end_index = g_utf8_next_char(text + index) - text;
+	pango_attr_list_insert(attrs, shape);
+	pango_layout_set_attributes(pango_layout, attrs);
+	pango_attr_list_unref(attrs);
+}
+
+/* x of the left edge of the placeholder at offset, top, baseline and bottom of its line; FALSE when an
+ * ellipsis has taken its place */
+JNIEXPORT jboolean JNICALL Java_android_text_Layout_native_1get_1placeholder(JNIEnv *env, jclass class, jlong layout, jint offset, jfloatArray place_array)
+{
+	PangoLayout *pango_layout = PANGO_LAYOUT(_PTR(layout));
+	float place[4];
+	if (!atl_pango_layout_placeholder(pango_layout, utf16_to_byte_offset(pango_layout_get_text(pango_layout), offset), place))
+		return JNI_FALSE;
+	(*env)->SetFloatArrayRegion(env, place_array, 0, 4, place);
+	return JNI_TRUE;
+}
+
 JNIEXPORT void JNICALL Java_android_text_Layout_native_1set_1alignment(JNIEnv *env, jclass class, jlong layout, jint alignment)
 {
 	static const PangoAlignment pango_alignments[] = {PANGO_ALIGN_LEFT, PANGO_ALIGN_CENTER, PANGO_ALIGN_RIGHT};

@@ -288,6 +288,35 @@ PangoContext *atl_pango_context(void)
 	return context;
 }
 
+/* the placeholder of a ReplacementSpan at byte index in the layout: x of its left edge, top, baseline and bottom of
+ * its line, in Pango units of the layout (the arguments of AOSP ReplacementSpan.draw()); FALSE when an ellipsis
+ * has taken its place (AOSP TextLine draws no replacement inside the ellipsis) */
+gboolean atl_pango_layout_placeholder(PangoLayout *layout, guint index, float place[4])
+{
+	PangoLayoutIter *iter = pango_layout_get_iter(layout);
+	gboolean shown = FALSE;
+	do {
+		PangoLayoutRun *run = pango_layout_iter_get_run_readonly(iter);
+		if (!run || index < (guint)run->item->offset || index >= (guint)(run->item->offset + run->item->length))
+			continue;
+		shown = !(run->item->analysis.flags & PANGO_ANALYSIS_FLAG_IS_ELLIPSIS);
+		break;
+	} while (pango_layout_iter_next_run(iter));
+	int top, bottom;
+	pango_layout_iter_get_line_yrange(iter, &top, &bottom);
+	int baseline = pango_layout_iter_get_baseline(iter);
+	pango_layout_iter_free(iter);
+	if (!shown)
+		return FALSE;
+	PangoRectangle pos;
+	pango_layout_index_to_pos(layout, index, &pos);
+	place[0] = (float)MIN(pos.x, pos.x + pos.width) / PANGO_SCALE;
+	place[1] = (float)top / PANGO_SCALE;
+	place[2] = (float)baseline / PANGO_SCALE;
+	place[3] = (float)bottom / PANGO_SCALE;
+	return TRUE;
+}
+
 /* Fades the opacity of a widget from its current opacity to `to`, with the default interpolator of
  * Android's animators (AccelerateDecelerate), then calls done (unless cancelled or replaced). Used for
  * what Android animates as a whole window: popups, and the dim behind dialogs. */

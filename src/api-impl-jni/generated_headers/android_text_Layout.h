@@ -43,6 +43,22 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1attribute
 
 /*
  * Class:     android_text_Layout
+ * Method:    native_add_placeholder
+ * Signature: (JIIII)V
+ */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1placeholder
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jint);
+
+/*
+ * Class:     android_text_Layout
+ * Method:    native_get_placeholder
+ * Signature: (JI[F)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_text_Layout_native_1get_1placeholder
+  (JNIEnv *, jclass, jlong, jint, jfloatArray);
+
+/*
+ * Class:     android_text_Layout
  * Method:    native_set_width
  * Signature: (JI)V
  */

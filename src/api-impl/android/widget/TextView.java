@@ -35,12 +35,11 @@ import android.text.method.MovementMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TransformationMethod;
 import android.text.style.CharacterStyle;
-import android.text.style.DynamicDrawableSpan;
-import android.text.style.ImageSpan;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.MetricAffectingSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
 import android.text.style.SubscriptSpan;
@@ -318,53 +317,76 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	private ColorStateList linkTextColor;
 
 	/* the character spans as Pango markup; a ClickableSpan becomes a link whose URI is its index in linkSpans */
-	/* the images of ImageSpans in the markup: UTF-16 index of the placeholder in the markup's text and the
+	/* the ReplacementSpans in the markup: UTF-16 index of the placeholder in the markup's text and the
 	 * size and vertical offset (relative to the baseline) the placeholder takes in the line */
-	private final ArrayList<int[]> imagePlaces = new ArrayList<>();
+	private final ArrayList<int[]> replacementPlaces = new ArrayList<>();
 
 	private void setPangoMarkup(Spanned text) {
 		String markup = toPangoMarkup(text);
-		int[] places = new int[imagePlaces.size() * 4];
-		for (int i = 0; i < imagePlaces.size(); i++)
-			System.arraycopy(imagePlaces.get(i), 0, places, i * 4, 4);
+		int[] places = new int[replacementPlaces.size() * 4];
+		for (int i = 0; i < replacementPlaces.size(); i++)
+			System.arraycopy(replacementPlaces.get(i), 0, places, i * 4, 4);
 		native_setMarkup(markup, places);
-		if (!imageDrawables.isEmpty()) {
-			if (mImageOverlay == null)
-				mImageOverlay = new ImageSpansDrawable();
-			getOverlay().add(mImageOverlay);
-			mImageOverlay.invalidateSelf();
-		} else if (mImageOverlay != null) {
-			getOverlay().remove(mImageOverlay);
+		if (!replacementSpans.isEmpty()) {
+			if (mReplacementOverlay == null)
+				mReplacementOverlay = new ReplacementSpansDrawable();
+			getOverlay().add(mReplacementOverlay);
+			mReplacementOverlay.invalidateSelf();
+		} else if (mReplacementOverlay != null) {
+			getOverlay().remove(mReplacementOverlay);
 		}
 	}
 
-	/* the images of the ImageSpans: the label leaves a gap of their size (PangoAttrShape) and they are drawn there
-	 * by the overlay of the view, at the position Pango has set for the placeholder */
-	private ImageSpansDrawable mImageOverlay;
-	private final ArrayList<Drawable> imageDrawables = new ArrayList<>();
+	/* the ReplacementSpans: the label leaves a gap of their size (PangoAttrShape) and the overlay of the view
+	 * calls their draw() there, with the line Pango has put the placeholder on (AOSP TextLine.handleReplacement()) */
+	private ReplacementSpansDrawable mReplacementOverlay;
+	private final ArrayList<ReplacementSpan> replacementSpans = new ArrayList<>();
+	private Spanned replacementText;
 
-	private final class ImageSpansDrawable extends Drawable {
+	private final class ReplacementSpansDrawable extends Drawable {
 		@Override
 		public void draw(Canvas canvas) {
-			float[] xy = new float[2];
-			for (int i = 0; i < imageDrawables.size(); i++) {
-				Drawable image = imageDrawables.get(i);
-				if (!native_getImagePosition(widget, i, xy))
+			float[] place = new float[4];
+			for (int i = 0; i < replacementSpans.size(); i++) {
+				ReplacementSpan span = replacementSpans.get(i);
+				if (!native_getPlaceholderPosition(widget, i, place))
 					continue;
-				Rect bounds = image.getBounds();
-				canvas.save();
-				canvas.translate(xy[0] - bounds.left, xy[1] - bounds.top);
-				image.draw(canvas);
-				canvas.restore();
+				span.draw(canvas, replacementText, replacementText.getSpanStart(span), replacementText.getSpanEnd(span),
+				          place[0], Math.round(place[1]), Math.round(place[2]), Math.round(place[3]), replacementPaint(replacementText, span, true));
 			}
 		}
 	}
 
-	private native boolean native_getImagePosition(long widget, int index, float[] xy);
+	/* AOSP: the paint of the text with the other MetricAffectingSpans of the range applied, their measure state for
+	 * getSize() (MeasuredParagraph.applyMetricsAffectingSpan()), their draw state for draw() (TextLine.handleRun());
+	 * for draw() it has the colours TextView.onDraw() gives mTextPaint */
+	private TextPaint replacementPaint(Spanned text, ReplacementSpan replacement, boolean draw) {
+		TextPaint wp = new TextPaint();
+		wp.set(getPaint());
+		if (draw) {
+			wp.setColor(getCurrentTextColor());
+			wp.linkColor = getLinkTextColors().getColorForState(getDrawableState(), getLinkTextColors().getDefaultColor());
+			wp.drawableState = getDrawableState();
+		}
+		for (MetricAffectingSpan span : text.getSpans(text.getSpanStart(replacement), text.getSpanEnd(replacement), MetricAffectingSpan.class)) {
+			if (span instanceof ReplacementSpan)
+				continue;
+			if (draw)
+				span.updateDrawState(wp);
+			else
+				span.updateMeasureState(wp);
+		}
+		return wp;
+	}
+
+	/* x (left edge), top, baseline and bottom of the line of the placeholder, in the view; false when there is
+	 * none (the text has no such place, or an ellipsis replaces it) */
+	private native boolean native_getPlaceholderPosition(long widget, int index, float[] place);
 
 	private String toPangoMarkup(Spanned text) {
-		imagePlaces.clear();
-		imageDrawables.clear();
+		replacementPlaces.clear();
+		replacementSpans.clear();
+		replacementText = text;
 		int plain = 0;
 		CharacterStyle[] spans = text.getSpans(0, text.length(), CharacterStyle.class);
 		linkSpans = text.getSpans(0, text.length(), ClickableSpan.class);
@@ -448,38 +470,22 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			}
 			markup.append(open);
 			for (int i = start; i < end; i++) {
-				/* AOSP draws a ReplacementSpan (ImageSpan) instead of its text; Pango markup cannot draw the
-				 * image, so the characters of the range give way to a gap as wide as the span (getSize()) */
+				/* AOSP draws a ReplacementSpan instead of its text; the characters of the range give way to one
+				 * placeholder of the span's width and font metrics (getSize()), the last span is effective */
 				ReplacementSpan replaced = null;
 				for (ReplacementSpan r : replacements) {
-					if (text.getSpanStart(r) <= i && i < text.getSpanEnd(r)) {
+					if (text.getSpanStart(r) <= i && i < text.getSpanEnd(r))
 						replaced = r;
-						break;
-					}
 				}
 				if (replaced != null) {
 					if (i == Math.max(0, text.getSpanStart(replaced))) {
-						Drawable image = replaced instanceof ImageSpan ? ((ImageSpan)replaced).getDrawable() : null;
-						int width = replaced.getSize(getPaint(), text, text.getSpanStart(replaced), text.getSpanEnd(replaced), null);
-						if (image != null && width > 0 && image.getBounds().height() > 0) {
-							/* a placeholder character, for which Pango leaves a gap of the size of the image (PangoAttrShape,
-							 * see native_setMarkup); the vertical position as DynamicDrawableSpan.draw() */
-							Paint.FontMetricsInt fm = getPaint().getFontMetricsInt();
-							int height = image.getBounds().height();
-							int align = ((ImageSpan)replaced).getVerticalAlignment();
-							int y = align == DynamicDrawableSpan.ALIGN_BASELINE ? -height
-								: align == DynamicDrawableSpan.ALIGN_CENTER ? (fm.ascent + fm.descent - height) / 2 : fm.descent - height;
-							imagePlaces.add(new int[] {plain, width, height, y});
-							imageDrawables.add(image);
-							markup.append('\uFFFC');
-							plain++;
-						} else {
-							float space = getPaint().measureText(" ");
-							for (int n = space > 0 ? Math.max(1, Math.round(width / space)) : 1; n > 0; n--) {
-								markup.append(' ');
-								plain++;
-							}
-						}
+						TextPaint wp = replacementPaint(text, replaced, false);
+						Paint.FontMetricsInt fm = wp.getFontMetricsInt();
+						int width = replaced.getSize(wp, text, text.getSpanStart(replaced), text.getSpanEnd(replaced), fm);
+						replacementPlaces.add(new int[] {plain, width, fm.descent - fm.ascent, fm.ascent});
+						replacementSpans.add(replaced);
+						markup.append('\uFFFC');
+						plain++;
 					}
 					continue;
 				}
