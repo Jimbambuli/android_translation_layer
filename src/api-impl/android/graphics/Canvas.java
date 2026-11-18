@@ -611,19 +611,8 @@ public class Canvas {
 
 	public void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, Paint paint) {
 		synchronized (bitmap) {
-			if (paint.getShader() instanceof BitmapShader) {
-				BitmapShader shader = (BitmapShader)paint.getShader();
-				Matrix localMatrix = new Matrix();
-				if (shader.getLocalMatrix(localMatrix)) {
-					// the shader maps the bitmap with its local matrix (AOSP Shader.setLocalMatrix)
-					int saveCount = save();
-					concat(localMatrix);
-					drawBitmap(shader.bitmap, 0, 0, paint);
-					restoreToCount(saveCount);
-				} else {
-					drawBitmap(shader.bitmap, 0, 0, paint);
-				}
-			} else if (!GskCanvas.canComposite() && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
+			/* a shader fills the rounded rectangle (GskCanvas.drawRoundRect()), as in hwui */
+			if (!GskCanvas.canComposite() && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
 				int oldSaveCount = gsk_canvas.getSaveCount();
 				gsk_canvas.restoreToCount(1);
 				bitmap.eraseColor(0);
