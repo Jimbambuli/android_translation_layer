@@ -605,7 +605,12 @@ public class BitmapFactory {
 			}
 			return null;
 		}
-		Bitmap decoded = new Bitmap(texture);
+		/* AOSP BitmapFactory.cpp doDecode(): RGB_565 only for an opaque image (SkAndroidCodec::computeOutputColorType())
+		 * that is not a 9-patch, otherwise ARGB_8888 */
+		Bitmap.Config config = Bitmap.Config.ARGB_8888;
+		if (opts != null && opts.inPreferredConfig == Bitmap.Config.RGB_565 && ninePatchChunk[0] == null && Bitmap.native_is_opaque(texture))
+			config = Bitmap.Config.RGB_565;
+		Bitmap decoded = new Bitmap(texture, config);
 		decoded.setNinePatchChunk(ninePatchChunk[0]);
 		if (opts != null) {
 			opts.outWidth = decoded.getWidth();

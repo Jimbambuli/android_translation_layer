@@ -106,16 +106,43 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1ref_1texture(JNIEnv
 	return _INTPTR(g_object_ref(GDK_TEXTURE(_PTR(texture_ptr))));
 }
 
+/* whether the texture has no alpha channel, as Skia's kOpaque_SkAlphaType of an encoded image */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Bitmap_native_1is_1opaque(JNIEnv *env, jclass class, jlong texture_ptr)
+{
+	switch (gdk_texture_get_format(GDK_TEXTURE(_PTR(texture_ptr)))) {
+		case GDK_MEMORY_R8G8B8:
+		case GDK_MEMORY_B8G8R8:
+		case GDK_MEMORY_R16G16B16:
+		case GDK_MEMORY_R16G16B16_FLOAT:
+		case GDK_MEMORY_R32G32B32_FLOAT:
+		case GDK_MEMORY_G8:
+		case GDK_MEMORY_G16:
+		case GDK_MEMORY_B8G8R8X8:
+		case GDK_MEMORY_X8R8G8B8:
+		case GDK_MEMORY_R8G8B8X8:
+		case GDK_MEMORY_X8B8G8R8:
+			return JNI_TRUE;
+		default:
+			return JNI_FALSE;
+	}
+}
+
+/* hwui Bitmap_getPixels(): the area as unpremultiplied BGRA_8888 (an int 0xAARRGGBB on little endian), row by
+ * row with the stride (which may be negative) from pixels[offset] on; Bitmap.java has checked the bounds */
 JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1get_1pixels(JNIEnv *env, jclass class, jlong texture_ptr, jintArray pixels, jint offset, jint stride, jint x, jint y, jint width, jint height)
 {
 	GdkTexture *texture = GDK_TEXTURE(_PTR(texture_ptr));
-	if (x != 0 || y != 0 || width != gdk_texture_get_width(texture) || height != gdk_texture_get_height(texture)) {
-		printf("Bitmap.readPixels: partial read not supported\n");
-		exit(1);
-	}
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
+	gdk_texture_downloader_set_format(downloader, GDK_MEMORY_B8G8R8A8);
+	gsize texture_stride;
+	GBytes *bytes = gdk_texture_downloader_download_bytes(downloader, &texture_stride);
+	gdk_texture_downloader_free(downloader);
+	const guchar *data = g_bytes_get_data(bytes, NULL);
 	jint *array = (*env)->GetIntArrayElements(env, pixels, NULL);
-	gdk_texture_download(texture, (guchar *)(array + offset), stride * 4);
+	for (int row = 0; row < height; row++)
+		memcpy(array + offset + row * stride, data + (y + row) * texture_stride + x * 4, width * 4);
 	(*env)->ReleaseIntArrayElements(env, pixels, array, 0);
+	g_bytes_unref(bytes);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1to_1buffer(JNIEnv *env, jclass class, jlong texture_ptr, jobject buffer, jint memory_format, jint stride)

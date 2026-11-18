@@ -115,12 +115,17 @@ public final class Bitmap implements Parcelable {
 	private int generationId = nextGenerationId.getAndIncrement();
 
 	Bitmap(long texture) {
-		this(native_get_width(texture), native_get_height(texture), Config.ARGB_8888);
+		this(texture, Config.ARGB_8888);
+	}
+
+	Bitmap(long texture, Config config) {
+		this(native_get_width(texture), native_get_height(texture), config);
 		this.texture = texture;
 	}
 
 	private Bitmap(int width, int height, Config config) {
 		this.config = config;
+		this.hasAlpha = config != Config.RGB_565; // Skia: RGB_565 is always opaque
 		this.width = width;
 		this.height = height;
 		int stride = width * config.bytes_per_pixel;
@@ -445,7 +450,7 @@ public final class Bitmap implements Parcelable {
 	}
 
 	public void setHasAlpha(boolean hasAlpha) {
-		this.hasAlpha = hasAlpha;
+		this.hasAlpha = hasAlpha && config != Config.RGB_565; // Skia: RGB_565 is always opaque
 	}
 
 	public boolean hasAlpha() {
@@ -492,14 +497,89 @@ public final class Bitmap implements Parcelable {
 		this.hasMipMap = hasMipMap;
 	}
 
+	/* AOSP copy(): the pixels in the new config (hwui bitmapCopyTo(): Skia's readPixels() into the same alpha type,
+	 * RGB_565 opaque), mutable as asked, with the premultiplied flag and the density of this bitmap */
 	public Bitmap copy(Bitmap.Config config, boolean isMutable) {
+		checkRecycled("Can't copy a recycled bitmap");
+		if (config == Config.HARDWARE && isMutable)
+			throw new IllegalArgumentException("Hardware bitmaps are always immutable");
 		Bitmap bitmap = new Bitmap(width, height, config);
-		bitmap.texture = native_ref_texture(getTexture());
+		if (config == Config.RGB_565) {
+			/* opaque: the premultiplied color with its alpha dropped, as the bitmap over black */
+			int[] colors = new int[width * height];
+			getPixels(colors, 0, width, 0, 0, width, height);
+			for (int i = 0; i < colors.length; i++) {
+				int c = colors[i], a = c >>> 24;
+				colors[i] = 0xff000000 | premultiply((c >> 16) & 0xff, a) << 16 | premultiply((c >> 8) & 0xff, a) << 8 | premultiply(c & 0xff, a);
+			}
+			bitmap.setPixels(colors, 0, width, 0, 0, width, height);
+		} else {
+			bitmap.texture = native_ref_texture(getTexture());
+			bitmap.hasAlpha = hasAlpha;
+		}
+		bitmap.mutable = isMutable;
+		bitmap.setPremultiplied(requestPremultiplied);
+		bitmap.density = density;
 		return bitmap;
 	}
 
+	/* Skia's SkMulDiv255Round() */
+	private static int premultiply(int c, int a) {
+		int prod = c * a + 128;
+		return (prod + (prod >> 8)) >> 8;
+	}
+
+	/* AOSP: checks as below, then the colors unpremultiplied (hwui Bitmap_getPixels()) */
 	public void getPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
+		checkRecycled("Can't call getPixels() on a recycled bitmap");
+		checkHardware("unable to getPixels(), pixel access is not supported on Config#HARDWARE bitmaps");
+		if (width == 0 || height == 0)
+			return; // nothing to do
+		checkPixelsAccess(x, y, width, height, offset, stride, pixels);
 		native_get_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
+	}
+
+	private void checkRecycled(String errorMessage) {
+		if (recycled)
+			throw new IllegalStateException(errorMessage);
+	}
+
+	private void checkHardware(String errorMessage) {
+		if (config == Config.HARDWARE)
+			throw new IllegalStateException(errorMessage);
+	}
+
+	private static void checkXYSign(int x, int y) {
+		if (x < 0)
+			throw new IllegalArgumentException("x must be >= 0");
+		if (y < 0)
+			throw new IllegalArgumentException("y must be >= 0");
+	}
+
+	private void checkPixelAccess(int x, int y) {
+		checkXYSign(x, y);
+		if (x >= getWidth())
+			throw new IllegalArgumentException("x must be < bitmap.width()");
+		if (y >= getHeight())
+			throw new IllegalArgumentException("y must be < bitmap.height()");
+	}
+
+	private void checkPixelsAccess(int x, int y, int width, int height, int offset, int stride, int pixels[]) {
+		checkXYSign(x, y);
+		if (width < 0)
+			throw new IllegalArgumentException("width must be >= 0");
+		if (height < 0)
+			throw new IllegalArgumentException("height must be >= 0");
+		if (x + width > getWidth())
+			throw new IllegalArgumentException("x + width must be <= bitmap.width()");
+		if (y + height > getHeight())
+			throw new IllegalArgumentException("y + height must be <= bitmap.height()");
+		if (Math.abs(stride) < width)
+			throw new IllegalArgumentException("abs(stride) must be >= width");
+		int lastScanline = offset + (height - 1) * stride;
+		int length = pixels.length;
+		if (offset < 0 || (offset + width > length) || lastScanline < 0 || (lastScanline + width > length))
+			throw new ArrayIndexOutOfBoundsException();
 	}
 
 	public boolean sameAs(Bitmap other) {
@@ -519,18 +599,60 @@ public final class Bitmap implements Parcelable {
 	}
 
 	public int getPixel(int x, int y) {
+		checkRecycled("Can't call getPixel() on a recycled bitmap");
+		checkHardware("unable to getPixel(), pixel access is not supported on Config#HARDWARE bitmaps");
+		checkPixelAccess(x, y);
 		int[] pixels = new int[1];
 		native_get_pixels(getTexture(), pixels, 0, 1, x, y, 1, 1);
 		return pixels[0];
 	}
 
 	public void copyPixelsToBuffer(Buffer buffer) {
+		if (config == Config.RGB_565) {
+			copyRgb565ToBuffer(buffer);
+			return;
+		}
 		if (config.gdk_memory_format == -1) {
 			System.out.println("copyPixelsToBuffer: format " + config.name() + " not implemented");
 			System.exit(1);
 		}
 		native_copy_to_buffer(getTexture(), buffer, rawMemoryFormat(), getRowBytes());
 		buffer.position(buffer.position() + getByteCount());
+	}
+
+	/* AOSP copyPixelsToBuffer() of an RGB_565 bitmap, which has no GDK memory format: the 16 bit pixels
+	 * (Skia's store_565: each channel rounded to 5, 6, 5 bits) in native byte order, getRowBytes() per row */
+	private void copyRgb565ToBuffer(Buffer dst) {
+		int shift;
+		if (dst instanceof java.nio.ByteBuffer)
+			shift = 0;
+		else if (dst instanceof java.nio.ShortBuffer)
+			shift = 1;
+		else if (dst instanceof java.nio.IntBuffer)
+			shift = 2;
+		else
+			throw new RuntimeException("unsupported Buffer subclass");
+		int pixelSize = getByteCount();
+		if (((long)dst.remaining() << shift) < pixelSize)
+			throw new RuntimeException("Buffer not large enough for pixels");
+		int[] colors = new int[width * height];
+		getPixels(colors, 0, width, 0, 0, width, height);
+		java.nio.ByteBuffer bytes = java.nio.ByteBuffer.allocate(pixelSize).order(java.nio.ByteOrder.nativeOrder());
+		for (int y = 0; y < height; y++) {
+			bytes.position(y * getRowBytes());
+			for (int x = 0; x < width; x++) {
+				int c = colors[y * width + x];
+				int r = (((c >> 16) & 0xff) * 31 + 127) / 255, g = (((c >> 8) & 0xff) * 63 + 127) / 255, b = ((c & 0xff) * 31 + 127) / 255;
+				bytes.putShort((short)(r << 11 | g << 5 | b));
+			}
+		}
+		bytes.rewind();
+		if (shift == 0)
+			((java.nio.ByteBuffer)dst).put(bytes);
+		else if (shift == 1)
+			((java.nio.ShortBuffer)dst).put(bytes.asShortBuffer());
+		else
+			((java.nio.IntBuffer)dst).put(bytes.asIntBuffer());
 	}
 
 	/* The GDK memory format of the pixels as AOSP has them in memory (copyPixelsToBuffer(), the NDK's
@@ -780,6 +902,7 @@ public final class Bitmap implements Parcelable {
 	private static native long native_erase_color(int color, int width, int height);
 	private static native void native_recycle(long texture, long snapshot);
 	private static native long native_ref_texture(long texture);
+	static native boolean native_is_opaque(long texture);
 	private static native void native_get_pixels(long texture, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 	private static native void native_copy_to_buffer(long texture, Buffer buffer, int memory_format, int stride);
 	private static native byte[] native_compress(long texture, int format, int quality);
