@@ -58,6 +58,82 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawBitmap__JJIIIIIIII
 		gtk_snapshot_pop(snapshot);
 }
 
+/* AOSP Shader.TileMode.nativeInt */
+enum { TILE_CLAMP, TILE_REPEAT, TILE_MIRROR, TILE_DECAL };
+
+/* a part [start, end) of the filled area along one axis, which repeats the part [child_start, child_start + child_len)
+ * of the tile */
+struct tile_segment {
+	float start, end, child_start, child_len;
+};
+
+/* the parts of [a0, a1) along an axis of the bitmap of the given size (AOSP SkBitmapProcShader): CLAMP extends the edge
+ * pixels, REPEAT repeats the bitmap, MIRROR repeats it together with its mirror image, DECAL leaves the outside empty */
+static int tile_segments(int mode, float size, float a0, float a1, struct tile_segment *seg)
+{
+	struct tile_segment all[3];
+	int n = 0;
+	switch (mode) {
+		case TILE_CLAMP:
+			all[n++] = (struct tile_segment){a0, 0, 0, 1};
+			all[n++] = (struct tile_segment){0, size, 0, size};
+			all[n++] = (struct tile_segment){size, a1, size - 1, 1};
+			break;
+		case TILE_REPEAT:
+			all[n++] = (struct tile_segment){a0, a1, 0, size};
+			break;
+		case TILE_MIRROR:
+			all[n++] = (struct tile_segment){a0, a1, 0, 2 * size};
+			break;
+		default:
+			all[n++] = (struct tile_segment){0, size, 0, size};
+			break;
+	}
+	int count = 0;
+	for (int i = 0; i < n; i++) {
+		all[i].start = MAX(all[i].start, a0);
+		all[i].end = MIN(all[i].end, a1);
+		if (all[i].end > all[i].start)
+			seg[count++] = all[i];
+	}
+	return count;
+}
+
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1fillBitmapShader(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong texture_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jint tile_x, jint tile_y, jlong paint_ptr)
+{
+	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);
+	GdkTexture *texture = GDK_TEXTURE(_PTR(texture_ptr));
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	float width = gdk_texture_get_width(texture);
+	float height = gdk_texture_get_height(texture);
+	struct tile_segment xs[3], ys[3];
+	int nx = tile_segments(tile_x, width, left, right, xs);
+	int ny = tile_segments(tile_y, height, top, bottom, ys);
+	if (paint->use_color_filter)
+		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
+	push_paint_alpha(snapshot, paint);
+	for (int j = 0; j < ny; j++) {
+		for (int i = 0; i < nx; i++) {
+			gtk_snapshot_push_repeat(snapshot, &GRAPHENE_RECT_INIT(xs[i].start, ys[j].start, xs[i].end - xs[i].start, ys[j].end - ys[j].start),
+			                         &GRAPHENE_RECT_INIT(xs[i].child_start, ys[j].child_start, xs[i].child_len, ys[j].child_len));
+			/* the bitmap, for MIRROR followed by its mirror image right of and below it */
+			for (int my = 0; my <= (tile_y == TILE_MIRROR); my++) {
+				for (int mx = 0; mx <= (tile_x == TILE_MIRROR); mx++) {
+					gtk_snapshot_save(snapshot);
+					gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(mx ? 2 * width : 0, my ? 2 * height : 0));
+					gtk_snapshot_scale(snapshot, mx ? -1 : 1, my ? -1 : 1);
+					gtk_snapshot_append_texture(snapshot, texture, &GRAPHENE_RECT_INIT(0, 0, width, height));
+					gtk_snapshot_restore(snapshot);
+				}
+			}
+			gtk_snapshot_pop(snapshot);
+		}
+	}
+	pop_paint_alpha(snapshot, paint);
+	if (paint->use_color_filter)
+		gtk_snapshot_pop(snapshot);
+}
+
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRect(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jlong paint_ptr)
 {
 	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);

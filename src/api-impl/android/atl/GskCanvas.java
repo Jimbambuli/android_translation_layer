@@ -256,17 +256,26 @@ public class GskCanvas extends DisplayListCanvas {
 	 */
 	private boolean fillWithShader(float left, float top, float right, float bottom, Paint paint) {
 		if (paint != null && paint.getStyle() == Paint.Style.FILL && paint.getShader() instanceof BitmapShader) {
-			/* the bitmap, mapped by the shader's local matrix (AOSP SkBitmapProcShader); the edges are not
-			 * extended (TileMode.CLAMP) or repeated: what is outside the bitmap stays empty */
+			/* the bitmap, mapped by the shader's local matrix (AOSP SkBitmapProcShader); outside the bitmap
+			 * each axis follows its TileMode. The area is mapped back into the shader's coordinates */
 			BitmapShader shader = (BitmapShader)paint.getShader();
 			if (shader.bitmap == null)
 				return false;
 			Matrix local = new Matrix();
+			RectF area = new RectF(left, top, right, bottom);
 			save();
 			clipRect(left, top, right, bottom);
-			if (shader.getLocalMatrix(local))
+			if (shader.getLocalMatrix(local)) {
+				Matrix inverse = new Matrix();
+				if (!local.invert(inverse)) {
+					restore();
+					return true;
+				}
+				inverse.mapRect(area);
 				concat(local);
-			drawBitmap(shader.bitmap, null, new Rect(0, 0, shader.bitmap.getWidth(), shader.bitmap.getHeight()), paint);
+			}
+			native_fillBitmapShader(snapshot, shader.bitmap.getTexture(), area.left, area.top, area.right, area.bottom,
+			                        tileModeInt(shader.tileX), tileModeInt(shader.tileY), paint.paint);
 			restore();
 			return true;
 		}
@@ -292,6 +301,20 @@ public class GskCanvas extends DisplayListCanvas {
 		if (has_local)
 			restore();
 		return true;
+	}
+
+	/* AOSP Shader.TileMode.nativeInt */
+	private static int tileModeInt(Shader.TileMode mode) {
+		switch (mode) {
+			case REPEAT:
+				return 1;
+			case MIRROR:
+				return 2;
+			case DECAL:
+				return 3;
+			default:
+				return 0;
+		}
 	}
 
 	@Override
@@ -474,6 +497,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_drawBitmap(long snapshot, long texture, int x, int y, int width, int height, int src_x, int src_y, int src_width, int src_height, long paint);
 	protected native void native_drawRect(long snapshot, float left, float top, float right, float bottom, long paint);
 	protected native void native_drawPath(long snapshot, long path, int fill_rule, boolean inverse, long paint);
+	protected native void native_fillBitmapShader(long snapshot, long texture, float left, float top, float right, float bottom, int tile_x, int tile_y, long paint);
 	protected native void native_drawLinearGradient(long snapshot, float left, float top, float right, float bottom, float x0, float y0, float x1, float y1, int[] colors, float[] positions, boolean repeat, long paint);
 	protected native void native_translate(long snapshot, float dx, float dy);
 	protected native void native_rotate(long snapshot, float degrees);

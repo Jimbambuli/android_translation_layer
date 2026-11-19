@@ -4,6 +4,9 @@ public class BitmapShader extends Shader {
 
 	/* AOSP's hidden mBitmap; android.atl.GskCanvas draws it */
 	public Bitmap bitmap;
+	/* AOSP's private mTileX/mTileY; android.atl.GskCanvas repeats, mirrors or extends the bitmap with them */
+	public final TileMode tileX;
+	public final TileMode tileY;
 
 	/* AOSP BitmapShader.java: filter mode and anisotropy are kept; android.atl.GskCanvas draws with the paint's filter */
 	public static final int FILTER_MODE_DEFAULT = 0;
@@ -33,6 +36,11 @@ public class BitmapShader extends Shader {
 	}
 
 	public BitmapShader(Bitmap bitmap, TileMode tileX, TileMode tileY) {
+		if (bitmap == null) {
+			throw new IllegalArgumentException("Bitmap must be non-null");
+		}
 		this.bitmap = bitmap;
+		this.tileX = tileX;
+		this.tileY = tileY;
 	}
 }
