@@ -127,6 +127,35 @@ static void set_padding(JNIEnv *env, jobject rect, jbyteArray chunk)
 	(*env)->SetIntField(env, rect, (*env)->GetFieldID(env, rect_class, "bottom", "I"), values[3]);
 }
 
+/* AOSP BitmapFactory.cpp doDecode(): a grayscale image (SkAndroidCodec::computeOutputColorType() gives kGray_8 for an
+ * ALPHA_8 request) is decoded into an ALPHA_8 bitmap, its gray values become the alpha. A sample factor picks every
+ * factor-th pixel from factor / 2 on, like Skia's sampled decode (SkSampler) */
+static GdkTexture *gray_to_alpha(GdkTexture *gray, int factor)
+{
+	int src_width = gdk_texture_get_width(gray);
+	int src_height = gdk_texture_get_height(gray);
+	int width = MAX(src_width / factor, 1);
+	int height = MAX(src_height / factor, 1);
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(gray);
+	gdk_texture_downloader_set_format(downloader, GDK_MEMORY_G8);
+	gsize stride;
+	GBytes *src = gdk_texture_downloader_download_bytes(downloader, &stride);
+	gdk_texture_downloader_free(downloader);
+	if (factor > 1) {
+		const guchar *data = g_bytes_get_data(src, NULL);
+		guchar *pixels = g_malloc(width * height);
+		for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
+				pixels[y * width + x] = data[MIN(y * factor + factor / 2, src_height - 1) * stride + MIN(x * factor + factor / 2, src_width - 1)];
+		g_bytes_unref(src);
+		src = g_bytes_new_take(pixels, width * height);
+		stride = width;
+	}
+	GdkTexture *alpha = gdk_memory_texture_new(width, height, GDK_MEMORY_A8, src, stride);
+	g_bytes_unref(src);
+	return alpha;
+}
+
 JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(JNIEnv *env, jclass, jobject is, jbyteArray storage, jobject outPadding, jobject opts, jobjectArray outNinePatchChunk)
 {
 	GInputStream *stream = java_input_stream_new(env, is, storage);
@@ -152,11 +181,16 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 	 * inJustDecodeBounds only wants the full dimensions, so it is left unscaled. */
 	int sample = 1;
 	jboolean bounds_only = JNI_FALSE;
+	jboolean want_alpha = JNI_FALSE;
 	if (opts) {
 		jclass opts_class = (*env)->GetObjectClass(env, opts);
 		bounds_only = (*env)->GetBooleanField(env, opts, (*env)->GetFieldID(env, opts_class, "inJustDecodeBounds", "Z"));
 		if (!bounds_only)
 			sample = (*env)->GetIntField(env, opts, (*env)->GetFieldID(env, opts_class, "inSampleSize", "I"));
+		jclass config_class = (*env)->FindClass(env, "android/graphics/Bitmap$Config");
+		jobject alpha_8 = (*env)->GetStaticObjectField(env, config_class, (*env)->GetStaticFieldID(env, config_class, "ALPHA_8", "Landroid/graphics/Bitmap$Config;"));
+		jobject config = (*env)->GetObjectField(env, opts, (*env)->GetFieldID(env, opts_class, "inPreferredConfig", "Landroid/graphics/Bitmap$Config;"));
+		want_alpha = (*env)->IsSameObject(env, config, alpha_8);
 	}
 
 	if (outPadding && !bounds_only) // like AOSP, a decode of the bounds leaves the padding alone
@@ -165,12 +199,22 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 	/* GTK decodes PNG, JPEG and TIFF itself, in process. gdk-pixbuf may hand every image to a sandboxed
 	 * loader process (glycin), which costs about a millisecond even for a small icon, and apps decode
 	 * many of those while they inflate a layout. */
-	if (sample <= 1) {
+	if (sample <= 1 || want_alpha) {
 		GdkTexture *texture = gdk_texture_new_from_bytes(bytes, NULL);
-		if (texture) {
+		if (texture && want_alpha && gdk_texture_get_format(texture) == GDK_MEMORY_G8) {
+			int factor = 1;
+			while (factor * 2 <= sample) // the same power of two as the subsampling below
+				factor *= 2;
+			GdkTexture *alpha = gray_to_alpha(texture, factor);
+			g_object_unref(texture);
+			g_bytes_unref(bytes);
+			return _INTPTR(alpha);
+		}
+		if (texture && sample <= 1) {
 			g_bytes_unref(bytes);
 			return _INTPTR(texture);
 		}
+		g_clear_object(&texture);
 	}
 
 	GInputStream *memory_stream = g_memory_input_stream_new_from_bytes(bytes);
@@ -203,4 +247,9 @@ JNIEXPORT jlong JNICALL Java_android_graphics_BitmapFactory_nativeDecodeStream(J
 	GdkTexture *texture = gdk_texture_new_for_pixbuf(pixbuf);
 	g_object_unref(pixbuf);
 	return _INTPTR(texture);
+}
+
+JNIEXPORT jboolean JNICALL Java_android_graphics_BitmapFactory_nativeIsAlpha8(JNIEnv *env, jclass, jlong texture_ptr)
+{
+	return gdk_texture_get_format(GDK_TEXTURE(_PTR(texture_ptr))) == GDK_MEMORY_A8;
 }

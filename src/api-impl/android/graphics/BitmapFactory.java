@@ -606,10 +606,13 @@ public class BitmapFactory {
 			return null;
 		}
 		/* AOSP BitmapFactory.cpp doDecode(): RGB_565 only for an opaque image (SkAndroidCodec::computeOutputColorType())
-		 * that is not a 9-patch, otherwise ARGB_8888 */
+		 * that is not a 9-patch, ALPHA_8 only for a grayscale image (the native decoder made its gray the alpha),
+		 * otherwise ARGB_8888 */
 		Bitmap.Config config = Bitmap.Config.ARGB_8888;
 		if (opts != null && opts.inPreferredConfig == Bitmap.Config.RGB_565 && ninePatchChunk[0] == null && Bitmap.native_is_opaque(texture))
 			config = Bitmap.Config.RGB_565;
+		else if (nativeIsAlpha8(texture))
+			config = Bitmap.Config.ALPHA_8;
 		Bitmap decoded = new Bitmap(texture, config);
 		decoded.setNinePatchChunk(ninePatchChunk[0]);
 		if (opts != null) {
@@ -706,4 +709,5 @@ public class BitmapFactory {
 	private static native Bitmap nativeDecodeByteArray(byte[] data, int offset,
 	                                                   int length, Options opts);
 	private static native boolean nativeIsSeekable(FileDescriptor fd);
+	private static native boolean nativeIsAlpha8(long texture);
 }
