@@ -2,10 +2,12 @@ package android.webkit;
 
 import android.atl.ATLLoadedApp;
 import android.content.Context;
+import android.util.Log;
 import android.webkit.WebView;
 import java.util.Objects;
 
 public class CookieManager {
+	private static final String TAG = "CookieManager";
 	/* AwCookieManager / AwSettings: cookies are accepted, third-party cookies only where a WebView allows them
 	 * (default off for apps since Android 5). WebKit has one policy for all views: third-party cookies are
 	 * accepted while one WebView allows them. */
@@ -65,12 +67,25 @@ public class CookieManager {
 		return native_getCookie(url);
 	}
 
-	/* AOSP CookieManager.setCookie(): value is a Set-Cookie header, an invalid one is ignored */
+	/* AOSP CookieManager.setCookie(): value is a Set-Cookie header, an invalid one is ignored. As Chromium's
+	 * CookieManagerAdapter: a null value is only logged (the callback hears nothing), and the URL fixup
+	 * (AwCookieManager.fixupUrlValue()) matches a pattern against the URL, so a null URL throws a
+	 * NullPointerException */
 	public void setCookie(String url, String value) {
+		if (value == null) {
+			Log.e(TAG, "Not setting cookie with null value for URL: " + url);
+			return;
+		}
+		Objects.requireNonNull(url, "url");
 		native_setCookie(url, value);
 	}
 
 	public void setCookie(String url, String value, ValueCallback<Boolean> callback) {
+		if (value == null) {
+			Log.e(TAG, "Not setting cookie with null value for URL: " + url);
+			return;
+		}
+		Objects.requireNonNull(url, "url");
 		boolean set = native_setCookie(url, value);
 		if (callback != null)
 			callback.onReceiveValue(set);
