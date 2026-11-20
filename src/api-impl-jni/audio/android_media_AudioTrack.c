@@ -1,8 +1,12 @@
 #include <gtk/gtk.h>
 
 #include <alsa/asoundlib.h>
+#include <errno.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/eventfd.h>
+#include <unistd.h>
 
 #include "../defines.h"
 #include "../util.h"
@@ -95,6 +99,8 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 	snd_pcm_hw_params_get_buffer_size(params, &buffer_size_as_uframes_t);
 	_SET_INT_FIELD(this, "bufferSizeInFrames", buffer_size_as_uframes_t);
 	_SET_INT_FIELD(this, "period_time", period_time);
+	/* AOSP ClientProxy::interrupt(): pause() and stop() wake a write() that waits for room */
+	_SET_INT_FIELD(this, "interrupt_fd", eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
 }
 
 JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize(JNIEnv *env, jclass this_class, jint sampleRateInHz, jint channelConfig, jint audioFormat)
@@ -211,6 +217,37 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1play(JNIEnv *env, j
 	/*--↑*/
 }
 
+/* AOSP ClientProxy::interrupt(): wakes a blocking write() (pause(), stop(), release()) */
+static void interrupt_write(JNIEnv *env, jobject this)
+{
+	int fd = _GET_INT_FIELD(this, "interrupt_fd");
+	if (fd > 0)
+		eventfd_write(fd, 1);
+}
+
+/* waits until the PCM has room; FALSE when interrupt_write() came first */
+static gboolean wait_for_room(snd_pcm_t *pcm_handle, int interrupt_fd)
+{
+	int count = snd_pcm_poll_descriptors_count(pcm_handle);
+	if (count <= 0)
+		return FALSE;
+	struct pollfd fds[count + 1];
+	snd_pcm_poll_descriptors(pcm_handle, fds, count);
+	fds[count] = (struct pollfd){.fd = interrupt_fd, .events = POLLIN};
+	while (poll(fds, count + 1, -1) < 0) {
+		if (errno != EINTR)
+			return FALSE;
+	}
+	if (fds[count].revents & POLLIN) {
+		eventfd_t value;
+		eventfd_read(interrupt_fd, &value);
+		return FALSE;
+	}
+	unsigned short revents;
+	snd_pcm_poll_descriptors_revents(pcm_handle, fds, count, &revents);
+	return TRUE;
+}
+
 /* blocking: AOSP WRITE_BLOCKING on a playing track; otherwise what fits now, 0 when the buffer is full */
 static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume, jboolean blocking)
 {
@@ -243,21 +280,37 @@ static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const 
 			scaled[i] = ((const jshort *)buffer)[i] * volume;
 		buffer = scaled;
 	}
-	snd_pcm_nonblock(pcm_handle, blocking ? 0 : 1);
-	snd_pcm_sframes_t frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
-	if (frames_written == -EPIPE) {
-		printf("XRUN.\n");
-		_SET_INT_FIELD(this, "underrunCount", _GET_INT_FIELD(this, "underrunCount") + 1); // AudioTrack.getUnderrunCount()
-		snd_pcm_recover(pcm_handle, frames_written, 0);
-		frames_written = snd_pcm_writei(pcm_handle, buffer, frames_to_write);
-		if (playing)
-			snd_pcm_start(pcm_handle); // a paused or stopped track waits for play()
+	/* AOSP AudioTrack::write(): a blocking write waits for room until all is queued, but pause(), stop() or
+	 * release() from another thread interrupt the wait; it returns what was queued so far (0 if nothing). An
+	 * interrupt that came before the write does not count (ClientProxy::obtainBuffer(): ignoreInitialPendingInterrupt) */
+	int interrupt_fd = _GET_INT_FIELD(this, "interrupt_fd");
+	if (blocking && interrupt_fd > 0) {
+		eventfd_t value;
+		eventfd_read(interrupt_fd, &value);
 	}
-	if (frames_written == -EAGAIN) {
-		frames_written = 0; // non-blocking: the buffer is full
-	} else if (frames_written < 0) {
-		printf("ERROR. Can't write to PCM device. %s\n", snd_strerror(frames_written));
-		frames_written = 0;
+	int frame_size = _GET_INT_FIELD(this, "channels") * 2; // 2 means PCM16
+	snd_pcm_sframes_t frames_written = 0;
+	snd_pcm_nonblock(pcm_handle, 1);
+	while (frames_written < frames_to_write) {
+		snd_pcm_sframes_t ret = snd_pcm_writei(pcm_handle, (const char *)buffer + frames_written * frame_size, frames_to_write - frames_written);
+		if (ret == -EPIPE) {
+			printf("XRUN.\n");
+			_SET_INT_FIELD(this, "underrunCount", _GET_INT_FIELD(this, "underrunCount") + 1); // AudioTrack.getUnderrunCount()
+			snd_pcm_recover(pcm_handle, ret, 0);
+			ret = snd_pcm_writei(pcm_handle, (const char *)buffer + frames_written * frame_size, frames_to_write - frames_written);
+			if (playing)
+				snd_pcm_start(pcm_handle); // a paused or stopped track waits for play()
+		}
+		if (ret > 0) {
+			frames_written += ret;
+		} else if (ret == -EAGAIN || ret == 0) {
+			// the buffer is full: non-blocking returns, blocking waits unless interrupted
+			if (!blocking || interrupt_fd <= 0 || !wait_for_room(pcm_handle, interrupt_fd))
+				break;
+		} else {
+			printf("ERROR. Can't write to PCM device. %s\n", snd_strerror(ret));
+			break;
+		}
 	}
 	snd_pcm_nonblock(pcm_handle, 0);
 	free(scaled);
@@ -292,6 +345,14 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1pause(JNIEnv *env, 
 	if (!pcm_handle)
 		return; // uninitialized track: nothing to pause
 	snd_pcm_pause(pcm_handle, TRUE);
+	interrupt_write(env, this);
+}
+
+/* AOSP AudioTrack::stop(): interrupts a blocking write(); what was written still plays out (ATL's stop()) */
+JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1stop(JNIEnv *env, jobject this)
+{
+	if (_GET_LONG_FIELD(this, "pcm_handle"))
+		interrupt_write(env, this);
 }
 
 JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1flush(JNIEnv *env, jobject this)
@@ -308,6 +369,7 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1release(JNIEnv *env
 	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
 	if (!pcm_handle)
 		return; // uninitialized track: nothing to release
+	interrupt_write(env, this);
 	snd_async_handler_t *pcm_callback = _PTR(_GET_LONG_FIELD(this, "async_handler"));
 	if (pcm_callback) {
 		struct jni_callback_data *callback_data = snd_async_handler_get_callback_private(pcm_callback);
@@ -318,6 +380,8 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1release(JNIEnv *env
 		_SET_LONG_FIELD(this, "async_handler", 0);
 	}
 	snd_pcm_close(pcm_handle);
+	close(_GET_INT_FIELD(this, "interrupt_fd"));
+	_SET_INT_FIELD(this, "interrupt_fd", -1);
 }
 
 JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1getPlaybackHeadPosition(JNIEnv *env, jobject this)

@@ -80,6 +80,7 @@ public class AudioTrack implements AudioRouting {
 	int bufferSizeInFrames; // the ALSA buffer
 	int underrunCount;      // ALSA underruns (EPIPE) the writes recovered from
 	long async_handler;     // the periodic callback, set up by the first play(), removed by release()
+	int interrupt_fd;       // wakes a blocking write() on pause(), stop() and release()
 	// mostly
 	static int frames;
 	OnPlaybackPositionUpdateListener periodic_update_listener;
@@ -155,6 +156,7 @@ public class AudioTrack implements AudioRouting {
 	/* like AOSP for streaming tracks: what was written before is still played out */
 	public void stop() {
 		playbackState = PLAYSTATE_STOPPED;
+		native_stop();
 	}
 
 	/**
@@ -661,6 +663,7 @@ public class AudioTrack implements AudioRouting {
 	private native int native_getPlaybackHeadPosition();
 	public native void native_play();
 	public native void native_pause();
+	private native void native_stop();
 	private native void native_flush();
 	private native int native_write(byte[] audioData, int offsetInBytes, int framesToWrite, float volume, boolean blocking);
 	private native int native_write(short[] audioData, int offsetInShorts, int framesToWrite, float volume, boolean blocking);
