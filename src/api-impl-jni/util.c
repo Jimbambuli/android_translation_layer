@@ -288,6 +288,29 @@ PangoContext *atl_pango_context(void)
 	return context;
 }
 
+static GPrivate thread_hinted_pango_context = G_PRIVATE_INIT(g_object_unref);
+
+/* Like atl_pango_context(), with the same font map, resolution and font options, but full hinting: for the text of
+ * a Paint with HINTING_ON in a font that hints itself (android_paint_pango_context()) */
+PangoContext *atl_pango_context_hinted(void)
+{
+	PangoContext *context = g_private_get(&thread_hinted_pango_context);
+	if (!context) {
+		PangoContext *base = atl_pango_context();
+		const cairo_font_options_t *base_options = pango_cairo_context_get_font_options(base);
+		cairo_font_options_t *options = base_options ? cairo_font_options_copy(base_options) : cairo_font_options_create();
+		cairo_font_options_set_hint_style(options, CAIRO_HINT_STYLE_FULL);
+		context = pango_font_map_create_context(pango_context_get_font_map(base));
+		pango_context_set_font_description(context, pango_context_get_font_description(base));
+		pango_context_set_language(context, pango_context_get_language(base));
+		pango_cairo_context_set_resolution(context, pango_cairo_context_get_resolution(base));
+		pango_cairo_context_set_font_options(context, options);
+		cairo_font_options_destroy(options);
+		g_private_set(&thread_hinted_pango_context, context);
+	}
+	return context;
+}
+
 /* the placeholder of a ReplacementSpan at byte index in the layout: x of its left edge, top, baseline and bottom of
  * its line, in Pango units of the layout (the arguments of AOSP ReplacementSpan.draw()); FALSE when an ellipsis
  * has taken its place (AOSP TextLine draws no replacement inside the ellipsis) */

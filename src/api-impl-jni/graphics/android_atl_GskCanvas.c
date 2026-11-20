@@ -305,7 +305,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawText(JNIEnv *env, 
 {
 	GdkSnapshot *snapshot = GTK_SNAPSHOT(_PTR(snapshot_ptr));
 	struct AndroidPaint *paint = _PTR(paint_ptr);
-	PangoLayout *layout = pango_layout_new(atl_pango_context());
+	PangoLayout *layout = pango_layout_new(android_paint_pango_context(paint, paint->font));
 	pango_layout_set_font_description(layout, paint->font);
 	android_paint_apply_letter_spacing(layout, paint);
 	const char *str = (*env)->GetStringUTFChars(env, text, NULL);
@@ -345,7 +345,7 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawGlyphs(JNIEnv *env
 	}
 	pango_font_description_set_weight(desc, CLAMP(weight, 100, 1000));
 	pango_font_description_set_style(desc, slant ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
-	PangoFont *font = pango_context_load_font(atl_pango_context(), desc);
+	PangoFont *font = pango_context_load_font(android_paint_pango_context(paint, desc), desc);
 	pango_font_description_free(desc);
 	if (!font)
 		return;

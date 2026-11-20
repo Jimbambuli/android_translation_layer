@@ -265,6 +265,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1flags
 
 /*
  * Class:     android_graphics_Paint
+ * Method:    native_set_hinting
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1hinting
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_graphics_Paint
  * Method:    native_set_text_skew_x
  * Signature: (JF)V
  */

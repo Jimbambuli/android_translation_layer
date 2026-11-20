@@ -24,10 +24,14 @@ struct AndroidPaint {
 	bool underline : 1; /* Paint.UNDERLINE_TEXT_FLAG */
 	bool strike_thru : 1; /* Paint.STRIKE_THRU_TEXT_FLAG */
 	bool fake_bold : 1; /* Paint.FAKE_BOLD_TEXT_FLAG */
+	bool hinting : 1; /* Paint.setHinting(), HINTING_ON by default */
+	bool font_hinted : 1; /* android_paint_pango_context(): the font of hinted_font hints itself */
+	PangoFontDescription *hinted_font; /* the font description font_hinted was found for, NULL: none yet */
 };
 
 /* android_graphics_Paint.c */
 void android_paint_apply_text_decoration(PangoLayout *layout, struct AndroidPaint *paint);
+PangoContext *android_paint_pango_context(struct AndroidPaint *paint, const PangoFontDescription *desc);
 bool android_paint_push_shadow(GtkSnapshot *snapshot, struct AndroidPaint *paint);
 void android_paint_append_layout(GtkSnapshot *snapshot, PangoLayout *layout, struct AndroidPaint *paint);
 void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGlyphString *glyphs, const graphene_point_t *origin, struct AndroidPaint *paint);

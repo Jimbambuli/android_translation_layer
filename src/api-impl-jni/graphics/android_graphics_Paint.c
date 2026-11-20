@@ -18,6 +18,7 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Paint_native_1create(JNIEnv *env, 
 	paint->gsk_stroke = gsk_stroke_new(1);
 	paint->font = pango_font_description_new();
 	paint->is_fill = true;
+	paint->hinting = true;
 	return _INTPTR(paint);
 }
 
@@ -27,6 +28,7 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Paint_native_1clone(JNIEnv *env, j
 	struct AndroidPaint *clone = g_memdup2(paint, sizeof(struct AndroidPaint));
 	clone->gsk_stroke = gsk_stroke_copy(paint->gsk_stroke);
 	clone->font = pango_font_description_copy(paint->font);
+	clone->hinted_font = NULL;
 	return _INTPTR(clone);
 }
 
@@ -35,6 +37,8 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1recycle(JNIEnv *env, 
 	struct AndroidPaint *paint = _PTR(paint_ptr);
 	gsk_stroke_free(paint->gsk_stroke);
 	pango_font_description_free(paint->font);
+	if (paint->hinted_font)
+		pango_font_description_free(paint->hinted_font);
 	g_free(paint);
 }
 
@@ -314,6 +318,60 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1flags(JNIE
 	paint->underline = (flags & UNDERLINE_TEXT_FLAG) != 0;
 	paint->strike_thru = (flags & STRIKE_THRU_TEXT_FLAG) != 0;
 	paint->fake_bold = (flags & FAKE_BOLD_TEXT_FLAG) != 0;
+}
+
+JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1hinting(JNIEnv *env, jclass clazz, jlong paint_ptr, jint mode)
+{
+	struct AndroidPaint *paint = _PTR(paint_ptr);
+	paint->hinting = mode != 0; /* HINTING_OFF is 0 */
+}
+
+/* whether FreeType hints the font with its own hinting: a TrueType font (it has a loca table) without instructions
+ * (maxp.maxSizeOfInstructions 0) and without fpgm and prep has none, for it FreeType would use its autohinter (the
+ * same test as FT_Load_Glyph()); a font with instructions or a CFF font is hinted by its own hints */
+static bool font_has_own_hinting(PangoFont *font)
+{
+	hb_face_t *face = hb_font_get_face(pango_font_get_hb_font(font));
+	hb_blob_t *loca = hb_face_reference_table(face, HB_TAG('l', 'o', 'c', 'a'));
+	hb_blob_t *maxp = hb_face_reference_table(face, HB_TAG('m', 'a', 'x', 'p'));
+	hb_blob_t *fpgm = hb_face_reference_table(face, HB_TAG('f', 'p', 'g', 'm'));
+	hb_blob_t *prep = hb_face_reference_table(face, HB_TAG('p', 'r', 'e', 'p'));
+	unsigned int length;
+	const uint8_t *data = (const uint8_t *)hb_blob_get_data(maxp, &length);
+	int instructions = length >= 28 ? (data[26] << 8 | data[27]) : 0; /* maxp 1.0: maxSizeOfInstructions */
+	bool own = !hb_blob_get_length(loca) || instructions || hb_blob_get_length(fpgm) || hb_blob_get_length(prep);
+	hb_blob_destroy(prep);
+	hb_blob_destroy(fpgm);
+	hb_blob_destroy(maxp);
+	hb_blob_destroy(loca);
+	return own;
+}
+
+/* The PangoContext to draw the paint's text in the font desc with. Android's Skia loads glyphs with FreeType with
+ * hinting for HINTING_ON (the default, SkFontHinting::kNormal: FT_LOAD_TARGET_NORMAL) but never with the autohinter
+ * (FT_LOAD_NO_AUTOHINT, SkFontHost_FreeType.cpp), and without hinting for HINTING_OFF. ATL draws text without hinting
+ * (main.c); with HINTING_ON a font that hints itself is drawn with a context with full hinting (FT_LOAD_TARGET_NORMAL
+ * in cairo), a font without hints stays unhinted. The font is the one Pango chooses for the description on top of the
+ * context's (as a PangoLayout does: without a family that is Roboto, the default font); the answer is kept in the
+ * paint for that description. */
+PangoContext *android_paint_pango_context(struct AndroidPaint *paint, const PangoFontDescription *desc)
+{
+	PangoContext *context = atl_pango_context();
+	if (!paint->hinting)
+		return context;
+	if (!paint->hinted_font || !pango_font_description_equal(paint->hinted_font, desc)) {
+		PangoFontDescription *full = pango_font_description_copy(pango_context_get_font_description(context));
+		pango_font_description_merge(full, desc, TRUE);
+		PangoFont *font = pango_context_load_font(context, full);
+		pango_font_description_free(full);
+		paint->font_hinted = font && font_has_own_hinting(font);
+		if (font)
+			g_object_unref(font);
+		if (paint->hinted_font)
+			pango_font_description_free(paint->hinted_font);
+		paint->hinted_font = pango_font_description_copy(desc);
+	}
+	return paint->font_hinted ? atl_pango_context_hinted() : context;
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1text_1skew_1x(JNIEnv *env, jclass clazz, jlong paint_ptr, jfloat skew_x)

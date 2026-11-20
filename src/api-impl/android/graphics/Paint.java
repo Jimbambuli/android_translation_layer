@@ -541,7 +541,10 @@ public class Paint {
 	public int getFlags() { return flags; }
 
 	public int getHinting() { return hinting; }
-	public void setHinting(int mode) { hinting = mode; }
+	public void setHinting(int mode) {
+		hinting = mode;
+		native_set_hinting(paint, mode);
+	}
 
 	public void setDither(boolean dither) {
 		setFlag(DITHER_FLAG, dither);
@@ -1214,6 +1217,7 @@ public class Paint {
 		shadow_layer_dy = 0;
 		shadow_layer_color = 0;
 		text_skew_x = 0;
+		hinting = HINTING_ON;
 		native_set_text_flags(paint, flags);
 	}
 
@@ -1245,6 +1249,7 @@ public class Paint {
 	private static native float native_get_font_metrics(long paint, FontMetrics metrics);
 	private static native int native_get_font_metrics_int(long paint, FontMetricsInt metrics);
 	private static native void native_set_text_flags(long paint, int flags);
+	private static native void native_set_hinting(long paint, int mode);
 	private static native void native_set_text_skew_x(long paint, float skewX);
 	private static native void native_set_shadow_layer(long paint, float radius, float dx, float dy, int color);
 	private static native float native_get_text_advances(long paint, char[] text, int index, int count, int contextIndex, int contextCount, boolean isRtl, float[] advances, int advancesIndex);
