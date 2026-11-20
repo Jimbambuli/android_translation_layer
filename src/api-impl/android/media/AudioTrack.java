@@ -79,6 +79,7 @@ public class AudioTrack implements AudioRouting {
 	int period_time;
 	int bufferSizeInFrames; // the ALSA buffer
 	int underrunCount;      // ALSA underruns (EPIPE) the writes recovered from
+	long async_handler;     // the periodic callback, set up by the first play(), removed by release()
 	// mostly
 	static int frames;
 	OnPlaybackPositionUpdateListener periodic_update_listener;

@@ -139,7 +139,6 @@ struct jni_callback_data {
 	JavaVM *jvm;
 	jobject this;
 	jclass this_class;
-	jobject listener;
 	jint period_time;
 };
 void periodic_update_callback(snd_async_handler_t *pcm_callback)
@@ -160,8 +159,10 @@ void periodic_update_callback(snd_async_handler_t *pcm_callback)
 		// TODO error checking
 	}
 
-	if (d->listener)
-		J__AudioTrack__OnPlaybackPositionUpdateListener__onPeriodicNotification(env, d->listener, d->this);
+	/* the listener set now (setPlaybackPositionUpdateListener() may come after play()) */
+	jobject listener = _GET_OBJ_FIELD(d->this, "periodic_update_listener", "Landroid/media/AudioTrack$OnPlaybackPositionUpdateListener;");
+	if (listener)
+		J__AudioTrack__OnPlaybackPositionUpdateListener__onPeriodicNotification(env, listener, d->this);
 
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
@@ -182,27 +183,29 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1play(JNIEnv *env, j
 	if (!pcm_handle)
 		return; // uninitialized track (no audio device): nothing to start
 
-	jint period_time = _GET_INT_FIELD(this, "period_time");
+	/* one callback for the life of the track, like AOSP's AudioTrackThread (created with the track, ended by
+	 * release()); the first play() sets it up */
+	if (!_GET_LONG_FIELD(this, "async_handler")) {
+		JavaVM *jvm;
+		(*env)->GetJavaVM(env, &jvm);
 
-	// FIXME - this callback should probably be set up elsewhere
+		struct jni_callback_data *callback_data = malloc(sizeof(struct jni_callback_data));
+		callback_data->jvm = jvm;
+		callback_data->this = _REF(this);
+		callback_data->this_class = _REF(_CLASS(this));
+		callback_data->period_time = _GET_INT_FIELD(this, "period_time");
 
-	JavaVM *jvm;
-	(*env)->GetJavaVM(env, &jvm);
-
-	struct jni_callback_data *callback_data = malloc(sizeof(struct jni_callback_data));
-	callback_data->jvm = jvm;
-	callback_data->this = _REF(this);
-	callback_data->this_class = _REF(_CLASS(this));
-	callback_data->listener = _REF(_GET_OBJ_FIELD(this, "periodic_update_listener", "Landroid/media/AudioTrack$OnPlaybackPositionUpdateListener;"));
-	callback_data->period_time = period_time;
-
-	// microseconds to milliseconds
-	//g_timeout_add (period_time / 1000, G_SOURCE_FUNC(helper_loop), callback_data);
+		snd_async_handler_t *pcm_callback;
+		if (snd_async_add_pcm_handler(&pcm_callback, pcm_handle, periodic_update_callback, callback_data) == 0) {
+			_SET_LONG_FIELD(this, "async_handler", _INTPTR(pcm_callback));
+		} else {
+			_UNREF(callback_data->this);
+			_UNREF(callback_data->this_class);
+			free(callback_data);
+		}
+	}
 
 	/*--↓*/
-	snd_async_handler_t *pcm_callback;
-
-	snd_async_add_pcm_handler(&pcm_callback, pcm_handle, periodic_update_callback, callback_data);
 	snd_pcm_start(pcm_handle);
 	snd_pcm_pause(pcm_handle, FALSE);
 	/*--↑*/
@@ -305,6 +308,15 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1release(JNIEnv *env
 	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
 	if (!pcm_handle)
 		return; // uninitialized track: nothing to release
+	snd_async_handler_t *pcm_callback = _PTR(_GET_LONG_FIELD(this, "async_handler"));
+	if (pcm_callback) {
+		struct jni_callback_data *callback_data = snd_async_handler_get_callback_private(pcm_callback);
+		snd_async_del_handler(pcm_callback);
+		_UNREF(callback_data->this);
+		_UNREF(callback_data->this_class);
+		free(callback_data);
+		_SET_LONG_FIELD(this, "async_handler", 0);
+	}
 	snd_pcm_close(pcm_handle);
 }
 
