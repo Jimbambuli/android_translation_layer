@@ -644,6 +644,23 @@ public class PopupMenu {
 			return this;
 		}
 
+		/* AOSP MenuItemImpl.setActionProvider(): the provider replaces the action view */
+		private android.view.ActionProvider actionProvider;
+
+		@Override
+		public MenuItem setActionProvider(android.view.ActionProvider actionProvider) {
+			if (this.actionProvider != null)
+				this.actionProvider.reset();
+			this.actionView = null;
+			this.actionProvider = actionProvider;
+			return this;
+		}
+
+		@Override
+		public android.view.ActionProvider getActionProvider() {
+			return actionProvider;
+		}
+
 		@Override
 		public void setShowAsAction(int action) {}
 

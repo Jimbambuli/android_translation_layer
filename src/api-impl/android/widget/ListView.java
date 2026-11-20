@@ -3608,20 +3608,21 @@ public class ListView extends AbsListView {
 		return false;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public View findViewById(int id) {
+	public <T extends View> T findViewById(int id) {
 		View view = super.findViewById(id);
 		if (view != null)
-			return view;
+			return (T) view;
 		for (FixedViewInfo info : mHeaderViewInfos) {
 			view = info.view.findViewById(id);
 			if (view != null)
-				return view;
+				return (T) view;
 		}
 		for (FixedViewInfo info : mFooterViewInfos) {
 			view = info.view.findViewById(id);
 			if (view != null)
-				return view;
+				return (T) view;
 		}
 		return null;
 	}

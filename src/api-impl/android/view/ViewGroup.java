@@ -1532,7 +1532,10 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		mClipToPadding = clipToPadding;
 	}
 
-	public View findViewById(int id) {
+	/* AOSP View.findViewById() is generic, so the found view needs no cast */
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends View> T findViewById(int id) {
 		if (id == NO_ID) // as in AOSP: views without an id are not found by it
 			return null;
 		if (Log.isLoggable(TAG, Log.VERBOSE))
@@ -1541,12 +1544,12 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (this.id == id) {
 			if (Log.isLoggable(TAG, Log.VERBOSE))
 				Slog.v(TAG, "findViewById: found: " + this + " | id: " + String.format("%x", this.getId()) + ", id_str: " + this.getIdName());
-			return this;
+			return (T) this;
 		}
 		for (View child : children) {
 			View result = child.findViewById(id);
 			if (result != null)
-				return result;
+				return (T) result;
 		}
 		return null;
 	}

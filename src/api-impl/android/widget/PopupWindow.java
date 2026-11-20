@@ -26,6 +26,11 @@ import android.view.ViewGroup;
 import java.lang.ref.WeakReference;
 
 public class PopupWindow {
+	/* AOSP PopupWindow: the modes of setInputMethodMode() */
+	public static final int INPUT_METHOD_FROM_FOCUSABLE = 0;
+	public static final int INPUT_METHOD_NEEDED = 1;
+	public static final int INPUT_METHOD_NOT_NEEDED = 2;
+
 
 	int input_method_mode = 0;
 	private Transition enter_transition;

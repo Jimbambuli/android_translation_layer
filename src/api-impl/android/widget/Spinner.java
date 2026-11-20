@@ -26,6 +26,12 @@ public class Spinner extends AbsSpinner implements android.content.DialogInterfa
 		return mPopupContext;
 	}
 
+	/** @hide AOSP Spinner.setOnItemClickListenerInt(): the listener for the framework's own spinners
+	 * (AOSP Spinner.setOnItemClickListener() throws) */
+	public void setOnItemClickListenerInt(OnItemClickListener l) {
+		super.setOnItemClickListener(l);
+	}
+
 	public Spinner(Context context) {
 		this(context, null);
 		haveCustomMeasure = false;

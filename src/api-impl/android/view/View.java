@@ -894,6 +894,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		 * @param mode the mode of the measure specification
 		 * @return the measure specification based on size and mode
 		 */
+		/** @hide AOSP View.MeasureSpec.makeSafeMeasureSpec() (Android 16: the same as makeMeasureSpec()) */
+		public static int makeSafeMeasureSpec(int size, int mode) {
+			return makeMeasureSpec(size, mode);
+		}
+
 		public static int makeMeasureSpec(int size, int mode) {
 			if (sUseBrokenMakeMeasureSpec) {
 				return size + mode;
@@ -5016,6 +5021,20 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * last setSystemUiVisibility() of a view of the window set */
 	public int getWindowSystemUiVisibility() {
 		return isAttachedToWindow() ? getRootView().system_ui_visibility : 0;
+	}
+
+	/** @hide AOSP View.setDisabledSystemUiVisibility(): the system UI flags the window may not use while the
+	 * action bar shows an action mode (ViewRootImpl takes them out). ATL's window has no system bars that
+	 * the flags would hide, so there is nothing to take out. */
+	public void setDisabledSystemUiVisibility(int flags) {
+	}
+
+	/** @hide AOSP View.hasContentOnApplyWindowInsetsListener(): whether the window applies the insets to its
+	 * content, which AOSP's window does by default (Window.setDecorFitsSystemWindows(true)); ATL's window
+	 * always fits its content (setDecorFitsSystemWindows() changes nothing), so it is the case for every
+	 * attached view */
+	protected boolean hasContentOnApplyWindowInsetsListener() {
+		return isAttachedToWindow();
 	}
 
 
