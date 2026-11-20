@@ -83,7 +83,7 @@ void wrapper_widget_set_shadow(WrapperWidget *wrapper, graphene_rect_t *rect, fl
 void wrapper_widget_set_outline_clip(WrapperWidget *wrapper, gboolean enabled, graphene_rect_t *rect, float radius, GskPath *path);
 void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnapshot *snapshot);
 void atl_snapshot_shadow(GdkSnapshot *snapshot, const graphene_rect_t *rect, float radius, float z, const GdkRGBA *ambient_color,
-                         const GdkRGBA *spot_color, float light_x, float light_y, float light_z, float light_radius);
+                         const GdkRGBA *spot_color, float light_x, float light_y, float light_z, float light_radius, gboolean transparent);
 void wrapper_widget_consume_touch_events(WrapperWidget *wrapper);
 void wrapper_widget_register_invalidation_listener(WrapperWidget *wrapper);
 void wrapper_widget_set_animating(WrapperWidget *wrapper, gboolean animating);

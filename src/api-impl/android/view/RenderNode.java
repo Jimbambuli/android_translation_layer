@@ -53,9 +53,10 @@ public class RenderNode {
 	                                            float clipRadius, long shadowNode,
 	                                            float scaleX, float scaleY, float translationX, float translationY,
 	                                            float rotation, float pivotX, float pivotY, float alpha);
-	/* the elevation shadow of an outline rectangle, a new node */
+	/* the elevation shadow of an outline rectangle, a new node; transparent: the caster is translucent
+	 * (hwui's kTransparentOccluder), otherwise the shadow is left out behind the outline */
 	protected static native long nativeCreateShadowNode(float left, float top, float right, float bottom, float radius, float z,
-	                                                    int ambientColor, int spotColor, float lightZ, float lightRadius);
+	                                                    int ambientColor, int spotColor, float lightZ, float lightRadius, boolean transparent);
 	/* a blur of sigma and an offset (RenderEffect); returns a new node */
 	protected static native long nativeApplyEffect(long node, float sigma, float offsetX, float offsetY);
 

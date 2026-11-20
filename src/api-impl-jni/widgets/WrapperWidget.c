@@ -272,11 +272,22 @@ static void append_blurred(GdkSnapshot *snapshot, const GskRoundedRect *rect, co
  * light source of the window. GSK draws Skia's blur variant of it: the ambient shadow is the outline
  * outset and blurred, the spot shadow the outline projected from the light onto the parent and
  * blurred (SkDrawShadowMetrics::GetSpotParams()). The light is given relative to the outline's
- * coordinates, the colors carry the alphas. A translucent outline (kTransparentOccluder) is drawn like
- * an opaque one. */
+ * coordinates, the colors carry the alphas. hwui sets kTransparentOccluder for a translucent caster
+ * (alpha < 1); without it Skia culls the shadow behind the occluder (SkShadowUtils.h, the ring of
+ * SurfaceDrawContext::drawFastShadow()), so it shows only outside the outline. */
 void atl_snapshot_shadow(GdkSnapshot *snapshot, const graphene_rect_t *rect, float radius, float z, const GdkRGBA *ambient_color,
-                         const GdkRGBA *spot_color, float light_x, float light_y, float light_z, float light_radius)
+                         const GdkRGBA *spot_color, float light_x, float light_y, float light_z, float light_radius, gboolean transparent)
 {
+	GskRoundedRect caster;
+	gsk_rounded_rect_init_from_rect(&caster, rect, radius);
+	if (!transparent) { /* the shadow where the outline does not cover */
+		gtk_snapshot_push_mask(snapshot, GSK_MASK_MODE_INVERTED_ALPHA);
+		gtk_snapshot_push_rounded_clip(snapshot, &caster);
+		gtk_snapshot_append_color(snapshot, &(GdkRGBA){0, 0, 0, 1}, rect);
+		gtk_snapshot_pop(snapshot);
+		gtk_snapshot_pop(snapshot);
+	}
+
 	if (ambient_color->alpha > 0) {
 		/* SkShadowUtils::DrawShadow(), "draw with blur" for the ambient shadow */
 		float devSpaceOutset = ambient_blur_radius(z);
@@ -301,6 +312,8 @@ void atl_snapshot_shadow(GdkSnapshot *snapshot, const graphene_rect_t *rect, flo
 		                                scale * radius);
 		append_blurred(snapshot, &spot, spot_color, radius_to_sigma(spot_radius));
 	}
+	if (!transparent)
+		gtk_snapshot_pop(snapshot);
 }
 
 /* the shadow of a child view, in the parent; as in LightingInfo, the light is centered over the window
@@ -326,7 +339,7 @@ void wrapper_widget_snapshot_shadow(GtkWidget *parent, GtkWidget *child, GdkSnap
 	gtk_snapshot_translate(snapshot, &origin);
 	/* the light relative to the child */
 	atl_snapshot_shadow(snapshot, &wrapper->shadow_rect, wrapper->shadow_radius, z, &ambient_color, &spot_color,
-	                    gtk_widget_get_width(root) / 2.0f - window_origin.x, wrapper->light_y - window_origin.y, wrapper->light_z, wrapper->light_radius);
+	                    gtk_widget_get_width(root) / 2.0f - window_origin.x, wrapper->light_y - window_origin.y, wrapper->light_z, wrapper->light_radius, caster_alpha < 1);
 	gtk_snapshot_restore(snapshot);
 }
 

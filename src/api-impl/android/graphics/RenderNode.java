@@ -180,7 +180,7 @@ public final class RenderNode extends android.view.RenderNode {
 		return nativeCreateShadowNode(bounds.left, bounds.top, bounds.right, bounds.bottom, radius, z,
 		                              shadowColor(ambientShadowColor, AMBIENT_SHADOW_ALPHA * casterAlpha),
 		                              shadowColor(spotShadowColor, SPOT_SHADOW_ALPHA * casterAlpha),
-		                              LIGHT_Z_DP * density, LIGHT_RADIUS_DP * density);
+		                              LIGHT_Z_DP * density, LIGHT_RADIUS_DP * density, casterAlpha < 1);
 	}
 
 	/* hwui multiplies the shadow color's alpha by the light's alpha and the caster's */

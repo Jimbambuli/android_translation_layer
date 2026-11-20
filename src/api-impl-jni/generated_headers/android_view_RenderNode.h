@@ -90,10 +90,10 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties
 /*
  * Class:     android_view_RenderNode
  * Method:    nativeCreateShadowNode
- * Signature: (FFFFFFIIFF)J
+ * Signature: (FFFFFFIIFFZ)J
  */
 JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateShadowNode
-  (JNIEnv *, jclass, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jint, jint, jfloat, jfloat);
+  (JNIEnv *, jclass, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jint, jint, jfloat, jfloat, jboolean);
 
 /*
  * Class:     android_view_RenderNode

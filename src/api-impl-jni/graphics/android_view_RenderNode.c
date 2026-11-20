@@ -180,13 +180,13 @@ JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeApplyProperties(JNIEn
 
 /* the elevation shadow of an outline (see atl_snapshot_shadow()); hwui places the light relative to the window,
  * which a render node does not know: here it is over the outline's center */
-JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateShadowNode(JNIEnv *env, jclass this_class, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat radius, jfloat z, jint ambient_color, jint spot_color, jfloat light_z, jfloat light_radius)
+JNIEXPORT jlong JNICALL Java_android_view_RenderNode_nativeCreateShadowNode(JNIEnv *env, jclass this_class, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat radius, jfloat z, jint ambient_color, jint spot_color, jfloat light_z, jfloat light_radius, jboolean transparent)
 {
 	GtkSnapshot *snapshot = gtk_snapshot_new();
 	const GdkRGBA ambient = {((ambient_color >> 16) & 0xff) / 255.f, ((ambient_color >> 8) & 0xff) / 255.f, (ambient_color & 0xff) / 255.f, ((ambient_color >> 24) & 0xff) / 255.f};
 	const GdkRGBA spot = {((spot_color >> 16) & 0xff) / 255.f, ((spot_color >> 8) & 0xff) / 255.f, (spot_color & 0xff) / 255.f, ((spot_color >> 24) & 0xff) / 255.f};
 	atl_snapshot_shadow(snapshot, &GRAPHENE_RECT_INIT(left, top, right - left, bottom - top), radius, z, &ambient, &spot,
-	                    (left + right) / 2, (top + bottom) / 2, light_z, light_radius);
+	                    (left + right) / 2, (top + bottom) / 2, light_z, light_radius, transparent);
 	return _INTPTR(gtk_snapshot_free_to_node(snapshot));
 }
 
