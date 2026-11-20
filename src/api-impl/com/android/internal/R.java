@@ -21902,97 +21902,97 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int use_lock_pattern_drawable = 0x0111000f;
 	}
 	public static final class color {
-		public static final int GM2_grey_800 = 0x01060130;
+		public static final int GM2_grey_800 = 0x01060140;
 		/**  Material Cyan 300
          */
-		public static final int SIM_color_blue = 0x0106011e;
+		public static final int SIM_color_blue = 0x0106012e;
 		/**  Grey
  Multi-sim sim colors
          */
-		public static final int SIM_color_cyan = 0x0106011c;
+		public static final int SIM_color_cyan = 0x0106012c;
 		/**  Material Blue 300
          */
-		public static final int SIM_color_green = 0x01060120;
+		public static final int SIM_color_green = 0x01060130;
 		/**  Material Pink 300
          */
-		public static final int SIM_color_orange = 0x01060126;
+		public static final int SIM_color_orange = 0x01060136;
 		/**  Material Purple 300
          */
-		public static final int SIM_color_pink = 0x01060124;
+		public static final int SIM_color_pink = 0x01060134;
 		/**  Material Green 300
          */
-		public static final int SIM_color_purple = 0x01060122;
+		public static final int SIM_color_purple = 0x01060132;
 		/**  Material Blue 800
          */
-		public static final int SIM_dark_mode_color_blue = 0x0106011f;
+		public static final int SIM_dark_mode_color_blue = 0x0106012f;
 		/**  Material Custom Cyan
          */
-		public static final int SIM_dark_mode_color_cyan = 0x0106011d;
+		public static final int SIM_dark_mode_color_cyan = 0x0106012d;
 		/**  Material Green 800
          */
-		public static final int SIM_dark_mode_color_green = 0x01060121;
+		public static final int SIM_dark_mode_color_green = 0x01060131;
 		/**  Material Custom Orange
          */
-		public static final int SIM_dark_mode_color_orange = 0x01060127;
+		public static final int SIM_dark_mode_color_orange = 0x01060137;
 		/**  Material Pink 800
          */
-		public static final int SIM_dark_mode_color_pink = 0x01060125;
+		public static final int SIM_dark_mode_color_pink = 0x01060135;
 		/**  Material Purple 800
          */
-		public static final int SIM_dark_mode_color_purple = 0x01060123;
-		public static final int accent_device_default = 0x01060253;
+		public static final int SIM_dark_mode_color_purple = 0x01060133;
+		public static final int accent_device_default = 0x0106030e;
 		/**
        accent_device_default_dark
          > from values/system_accent1_100
          ! replaced with color/system_accent1_400
 
          */
-		public static final int accent_device_default_dark = 0x01060252;
+		public static final int accent_device_default_dark = 0x0106030d;
 		/**   Accent colors
          */
-		public static final int accent_device_default_light = 0x01060251;
-		public static final int accent_material_dark = 0x010602cb;
-		public static final int accent_material_light = 0x010602ca;
-		public static final int accent_primary_device_default = 0x01060254;
-		public static final int accent_primary_variant_dark_device_default = 0x0106025a;
+		public static final int accent_device_default_light = 0x0106030c;
+		public static final int accent_material_dark = 0x010603e0;
+		public static final int accent_material_light = 0x010603df;
+		public static final int accent_primary_device_default = 0x0106030f;
+		public static final int accent_primary_variant_dark_device_default = 0x01060315;
 		/**  Accent variants
          */
-		public static final int accent_primary_variant_light_device_default = 0x01060257;
-		public static final int accent_secondary_device_default = 0x01060255;
-		public static final int accent_secondary_variant_dark_device_default = 0x0106025b;
-		public static final int accent_secondary_variant_light_device_default = 0x01060258;
-		public static final int accent_tertiary_device_default = 0x01060256;
-		public static final int accent_tertiary_variant_dark_device_default = 0x0106025c;
-		public static final int accent_tertiary_variant_light_device_default = 0x01060259;
-		public static final int accessibility_color_inversion_background = 0x0106016e;
-		public static final int accessibility_daltonizer_background = 0x0106016d;
+		public static final int accent_primary_variant_light_device_default = 0x01060312;
+		public static final int accent_secondary_device_default = 0x01060310;
+		public static final int accent_secondary_variant_dark_device_default = 0x01060316;
+		public static final int accent_secondary_variant_light_device_default = 0x01060313;
+		public static final int accent_tertiary_device_default = 0x01060311;
+		public static final int accent_tertiary_variant_dark_device_default = 0x01060317;
+		public static final int accent_tertiary_variant_light_device_default = 0x01060314;
+		public static final int accessibility_color_inversion_background = 0x01060229;
+		public static final int accessibility_daltonizer_background = 0x01060228;
 		/**  Accessibility shortcut icon background color
          */
-		public static final int accessibility_feature_background = 0x0106016b;
-		public static final int accessibility_focus_highlight_color = 0x01060109;
+		public static final int accessibility_feature_background = 0x01060226;
+		public static final int accessibility_focus_highlight_color = 0x01060119;
 		/**  Google grey 700
          */
-		public static final int accessibility_magnification_background = 0x0106016c;
-		public static final int accessibility_magnification_thumbnail_background_color = 0x01060170;
-		public static final int accessibility_magnification_thumbnail_container_background_color = 0x01060171;
-		public static final int accessibility_magnification_thumbnail_container_stroke_color = 0x01060172;
+		public static final int accessibility_magnification_background = 0x01060227;
+		public static final int accessibility_magnification_thumbnail_background_color = 0x0106022b;
+		public static final int accessibility_magnification_thumbnail_container_background_color = 0x0106022c;
+		public static final int accessibility_magnification_thumbnail_container_stroke_color = 0x0106022d;
 		/**  Fullscreen magnification thumbnail color
          */
-		public static final int accessibility_magnification_thumbnail_stroke_color = 0x0106016f;
+		public static final int accessibility_magnification_thumbnail_stroke_color = 0x0106022a;
 		/**  Activity Embedding divider
          */
-		public static final int activity_embedding_divider_color = 0x01060173;
-		public static final int activity_embedding_divider_color_pressed = 0x01060174;
+		public static final int activity_embedding_divider_color = 0x0106022e;
+		public static final int activity_embedding_divider_color_pressed = 0x0106022f;
 		/**  Autofill colors
          */
-		public static final int autofill_background_material_dark = 0x01060301;
-		public static final int autofill_background_material_light = 0x01060302;
-		public static final int autofilled_highlight = 0x0106010a;
-		public static final int background_cache_hint_selector_device_default = 0x01060306;
-		public static final int background_cache_hint_selector_holo_dark = 0x01060307;
-		public static final int background_cache_hint_selector_holo_light = 0x01060308;
-		public static final int background_cache_hint_selector_material_dark = 0x01060309;
-		public static final int background_cache_hint_selector_material_light = 0x0106030a;
+		public static final int autofill_background_material_dark = 0x01060416;
+		public static final int autofill_background_material_light = 0x01060417;
+		public static final int autofilled_highlight = 0x0106011a;
+		public static final int background_cache_hint_selector_device_default = 0x0106041b;
+		public static final int background_cache_hint_selector_holo_dark = 0x0106041c;
+		public static final int background_cache_hint_selector_holo_light = 0x0106041d;
+		public static final int background_cache_hint_selector_material_dark = 0x0106041e;
+		public static final int background_cache_hint_selector_material_light = 0x0106041f;
 		/**  Equivalent to 0xff000000
  Equivalent to 0xff000000
          */
@@ -22004,52 +22004,52 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          ! replaced with custom color #000000
 
          */
-		public static final int background_device_default_dark = 0x0106025d;
-		public static final int background_device_default_light = 0x0106025e;
+		public static final int background_device_default_dark = 0x01060318;
+		public static final int background_device_default_light = 0x01060319;
 		/**  Derived from accent color at 20% luminance
          */
-		public static final int background_floating_device_default_dark = 0x0106025f;
-		public static final int background_floating_device_default_light = 0x01060260;
-		public static final int background_floating_material_dark = 0x010602bb;
-		public static final int background_floating_material_light = 0x010602bc;
-		public static final int background_holo_dark = 0x01060276;
-		public static final int background_holo_light = 0x01060277;
-		public static final int background_leanback_dark = 0x0106029e;
+		public static final int background_floating_device_default_dark = 0x0106031a;
+		public static final int background_floating_device_default_light = 0x0106031b;
+		public static final int background_floating_material_dark = 0x010603d0;
+		public static final int background_floating_material_light = 0x010603d1;
+		public static final int background_holo_dark = 0x0106038b;
+		public static final int background_holo_light = 0x0106038c;
+		public static final int background_leanback_dark = 0x010603b3;
 		/**  Equivalent to 0xffffffff
  Equivalent to 0xffffffff
          */
 		public static final int background_light = 0x0106000f;
-		public static final int background_material_dark = 0x010602b9;
-		public static final int background_material_light = 0x010602ba;
+		public static final int background_material_dark = 0x010603ce;
+		public static final int background_material_light = 0x010603cf;
 		/**  The color black, equivalent to 0xff000000
          */
 		public static final int black = 0x0106000c;
-		public static final int bright_foreground_dark = 0x010600c4;
-		public static final int bright_foreground_dark_disabled = 0x010600c6;
-		public static final int bright_foreground_dark_inverse = 0x010600c8;
-		public static final int bright_foreground_disabled_holo_dark = 0x0106027a;
-		public static final int bright_foreground_disabled_holo_light = 0x0106027b;
-		public static final int bright_foreground_holo_dark = 0x01060278;
-		public static final int bright_foreground_holo_light = 0x01060279;
-		public static final int bright_foreground_inverse_holo_dark = 0x0106027c;
-		public static final int bright_foreground_inverse_holo_light = 0x0106027d;
-		public static final int bright_foreground_light = 0x010600c5;
-		public static final int bright_foreground_light_disabled = 0x010600c7;
-		public static final int bright_foreground_light_inverse = 0x010600c9;
-		public static final int btn_colored_background_material = 0x0106030b;
-		public static final int btn_colored_borderless_text_material = 0x0106030c;
-		public static final int btn_colored_text_material = 0x0106030d;
-		public static final int btn_default_material_dark = 0x0106030e;
-		public static final int btn_default_material_light = 0x0106030f;
-		public static final int btn_leanback_color = 0x01060310;
-		public static final int btn_leanback_focused = 0x010602a2;
-		public static final int btn_leanback_text_color = 0x01060311;
-		public static final int btn_leanback_unfocused = 0x010602a3;
-		public static final int btn_text_leanback_focused = 0x010602a4;
-		public static final int btn_text_leanback_unfocused = 0x010602a5;
-		public static final int btn_watch_default_dark = 0x01060312;
-		public static final int button_material_dark = 0x010602cc;
-		public static final int button_material_light = 0x010602cd;
+		public static final int bright_foreground_dark = 0x010600d4;
+		public static final int bright_foreground_dark_disabled = 0x010600d6;
+		public static final int bright_foreground_dark_inverse = 0x010600d8;
+		public static final int bright_foreground_disabled_holo_dark = 0x0106038f;
+		public static final int bright_foreground_disabled_holo_light = 0x01060390;
+		public static final int bright_foreground_holo_dark = 0x0106038d;
+		public static final int bright_foreground_holo_light = 0x0106038e;
+		public static final int bright_foreground_inverse_holo_dark = 0x01060391;
+		public static final int bright_foreground_inverse_holo_light = 0x01060392;
+		public static final int bright_foreground_light = 0x010600d5;
+		public static final int bright_foreground_light_disabled = 0x010600d7;
+		public static final int bright_foreground_light_inverse = 0x010600d9;
+		public static final int btn_colored_background_material = 0x01060420;
+		public static final int btn_colored_borderless_text_material = 0x01060421;
+		public static final int btn_colored_text_material = 0x01060422;
+		public static final int btn_default_material_dark = 0x01060423;
+		public static final int btn_default_material_light = 0x01060424;
+		public static final int btn_leanback_color = 0x01060425;
+		public static final int btn_leanback_focused = 0x010603b7;
+		public static final int btn_leanback_text_color = 0x01060426;
+		public static final int btn_leanback_unfocused = 0x010603b8;
+		public static final int btn_text_leanback_focused = 0x010603b9;
+		public static final int btn_text_leanback_unfocused = 0x010603ba;
+		public static final int btn_watch_default_dark = 0x01060427;
+		public static final int button_material_dark = 0x010603e1;
+		public static final int button_material_light = 0x010603e2;
 		/**
        button_normal_device_default_dark
          - uses ?attr/disabledAlpha and ?attr/colorSurface to draw state list
@@ -22057,267 +22057,267 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          - see color-watch/btn_watch_default_dark.xml
 
          */
-		public static final int button_normal_device_default_dark = 0x01060275;
+		public static final int button_normal_device_default_dark = 0x01060330;
 		/**  The color of the Answer action on a CallStyle notification
          */
-		public static final int call_notification_answer_color = 0x01060104;
+		public static final int call_notification_answer_color = 0x01060114;
 		/**  The color of the Decline and Hang Up actions on a CallStyle notification
          */
-		public static final int call_notification_decline_color = 0x01060103;
-		public static final int car_accent = 0x010601c2;
-		public static final int car_accent_dark = 0x010601c1;
-		public static final int car_accent_light = 0x010601c0;
-		public static final int car_action1 = 0x010601a5;
-		public static final int car_action1_dark = 0x010601a4;
-		public static final int car_action1_light = 0x010601a3;
-		public static final int car_background = 0x01060181;
-		public static final int car_blue_100 = 0x010601de;
-		public static final int car_blue_200 = 0x010601dd;
-		public static final int car_blue_300 = 0x010601dc;
-		public static final int car_blue_400 = 0x010601db;
-		public static final int car_blue_50 = 0x010601df;
-		public static final int car_blue_500 = 0x010601da;
-		public static final int car_blue_600 = 0x010601d9;
-		public static final int car_blue_700 = 0x010601d8;
-		public static final int car_blue_800 = 0x010601d7;
-		public static final int car_blue_900 = 0x010601d6;
-		public static final int car_blue_grey_800 = 0x01060232;
-		public static final int car_blue_grey_900 = 0x01060233;
-		public static final int car_body1 = 0x01060199;
-		public static final int car_body1_dark = 0x01060198;
-		public static final int car_body1_light = 0x01060197;
-		public static final int car_body2 = 0x0106019c;
-		public static final int car_body2_dark = 0x0106019b;
-		public static final int car_body2_light = 0x0106019a;
-		public static final int car_body3 = 0x0106019f;
-		public static final int car_body3_dark = 0x0106019e;
-		public static final int car_body3_light = 0x0106019d;
-		public static final int car_body4 = 0x010601a2;
-		public static final int car_body4_dark = 0x010601a1;
-		public static final int car_body4_light = 0x010601a0;
-		public static final int car_borderless_button_text_color = 0x01060313;
-		public static final int car_button_text_color = 0x01060314;
+		public static final int call_notification_decline_color = 0x01060113;
+		public static final int car_accent = 0x0106027d;
+		public static final int car_accent_dark = 0x0106027c;
+		public static final int car_accent_light = 0x0106027b;
+		public static final int car_action1 = 0x01060260;
+		public static final int car_action1_dark = 0x0106025f;
+		public static final int car_action1_light = 0x0106025e;
+		public static final int car_background = 0x0106023c;
+		public static final int car_blue_100 = 0x01060299;
+		public static final int car_blue_200 = 0x01060298;
+		public static final int car_blue_300 = 0x01060297;
+		public static final int car_blue_400 = 0x01060296;
+		public static final int car_blue_50 = 0x0106029a;
+		public static final int car_blue_500 = 0x01060295;
+		public static final int car_blue_600 = 0x01060294;
+		public static final int car_blue_700 = 0x01060293;
+		public static final int car_blue_800 = 0x01060292;
+		public static final int car_blue_900 = 0x01060291;
+		public static final int car_blue_grey_800 = 0x010602ed;
+		public static final int car_blue_grey_900 = 0x010602ee;
+		public static final int car_body1 = 0x01060254;
+		public static final int car_body1_dark = 0x01060253;
+		public static final int car_body1_light = 0x01060252;
+		public static final int car_body2 = 0x01060257;
+		public static final int car_body2_dark = 0x01060256;
+		public static final int car_body2_light = 0x01060255;
+		public static final int car_body3 = 0x0106025a;
+		public static final int car_body3_dark = 0x01060259;
+		public static final int car_body3_light = 0x01060258;
+		public static final int car_body4 = 0x0106025d;
+		public static final int car_body4_dark = 0x0106025c;
+		public static final int car_body4_light = 0x0106025b;
+		public static final int car_borderless_button_text_color = 0x01060428;
+		public static final int car_button_text_color = 0x01060429;
 		/**  The default color of a card in car UI.
          */
-		public static final int car_card = 0x010601af;
-		public static final int car_card_dark = 0x010601ae;
+		public static final int car_card = 0x0106026a;
+		public static final int car_card_dark = 0x01060269;
 		/**  A light and dark colored card.
          */
-		public static final int car_card_light = 0x010601ad;
+		public static final int car_card_light = 0x01060268;
 		/**  The ripple color for a light colored card.
          */
-		public static final int car_card_ripple_background = 0x010601b2;
+		public static final int car_card_ripple_background = 0x0106026d;
 		/**  The ripple colors. The "dark" and "light" designation here refers to the color of the
          ripple  itself.
          */
-		public static final int car_card_ripple_background_dark = 0x010601b0;
+		public static final int car_card_ripple_background_dark = 0x0106026b;
 		/**  The ripple color for a dark-colored card. This color is the opposite of
          car_card_ripple_background.
          */
-		public static final int car_card_ripple_background_inverse = 0x010601b3;
-		public static final int car_card_ripple_background_light = 0x010601b1;
-		public static final int car_colorPrimary = 0x01060182;
-		public static final int car_colorPrimaryDark = 0x01060184;
-		public static final int car_colorSecondary = 0x01060183;
-		public static final int car_cyan_100 = 0x0106022e;
-		public static final int car_cyan_200 = 0x0106022d;
-		public static final int car_cyan_300 = 0x0106022c;
-		public static final int car_cyan_400 = 0x0106022b;
-		public static final int car_cyan_50 = 0x0106022f;
-		public static final int car_cyan_500 = 0x0106022a;
-		public static final int car_cyan_600 = 0x01060229;
-		public static final int car_cyan_700 = 0x01060228;
-		public static final int car_cyan_800 = 0x01060227;
-		public static final int car_cyan_900 = 0x01060226;
-		public static final int car_dark_blue_grey_1000 = 0x01060238;
-		public static final int car_dark_blue_grey_600 = 0x01060234;
-		public static final int car_dark_blue_grey_700 = 0x01060235;
-		public static final int car_dark_blue_grey_800 = 0x01060236;
-		public static final int car_dark_blue_grey_900 = 0x01060237;
-		public static final int car_green_100 = 0x010601e8;
-		public static final int car_green_200 = 0x010601e7;
-		public static final int car_green_300 = 0x010601e6;
-		public static final int car_green_400 = 0x010601e5;
-		public static final int car_green_50 = 0x010601e9;
-		public static final int car_green_500 = 0x010601e4;
-		public static final int car_green_600 = 0x010601e3;
-		public static final int car_green_700 = 0x010601e2;
-		public static final int car_green_800 = 0x010601e1;
-		public static final int car_green_900 = 0x010601e0;
-		public static final int car_grey_100 = 0x010601d4;
-		public static final int car_grey_1000 = 0x01060230;
-		public static final int car_grey_200 = 0x010601d3;
-		public static final int car_grey_300 = 0x010601d2;
-		public static final int car_grey_400 = 0x010601d1;
-		public static final int car_grey_50 = 0x010601d5;
-		public static final int car_grey_500 = 0x010601d0;
-		public static final int car_grey_600 = 0x010601cf;
-		public static final int car_grey_700 = 0x010601ce;
-		public static final int car_grey_746 = 0x010601cd;
-		public static final int car_grey_772 = 0x010601cc;
-		public static final int car_grey_800 = 0x010601cb;
-		public static final int car_grey_846 = 0x010601ca;
-		public static final int car_grey_868 = 0x010601c9;
-		public static final int car_grey_900 = 0x010601c8;
-		public static final int car_grey_928 = 0x010601c7;
-		public static final int car_grey_958 = 0x010601c6;
+		public static final int car_card_ripple_background_inverse = 0x0106026e;
+		public static final int car_card_ripple_background_light = 0x0106026c;
+		public static final int car_colorPrimary = 0x0106023d;
+		public static final int car_colorPrimaryDark = 0x0106023f;
+		public static final int car_colorSecondary = 0x0106023e;
+		public static final int car_cyan_100 = 0x010602e9;
+		public static final int car_cyan_200 = 0x010602e8;
+		public static final int car_cyan_300 = 0x010602e7;
+		public static final int car_cyan_400 = 0x010602e6;
+		public static final int car_cyan_50 = 0x010602ea;
+		public static final int car_cyan_500 = 0x010602e5;
+		public static final int car_cyan_600 = 0x010602e4;
+		public static final int car_cyan_700 = 0x010602e3;
+		public static final int car_cyan_800 = 0x010602e2;
+		public static final int car_cyan_900 = 0x010602e1;
+		public static final int car_dark_blue_grey_1000 = 0x010602f3;
+		public static final int car_dark_blue_grey_600 = 0x010602ef;
+		public static final int car_dark_blue_grey_700 = 0x010602f0;
+		public static final int car_dark_blue_grey_800 = 0x010602f1;
+		public static final int car_dark_blue_grey_900 = 0x010602f2;
+		public static final int car_green_100 = 0x010602a3;
+		public static final int car_green_200 = 0x010602a2;
+		public static final int car_green_300 = 0x010602a1;
+		public static final int car_green_400 = 0x010602a0;
+		public static final int car_green_50 = 0x010602a4;
+		public static final int car_green_500 = 0x0106029f;
+		public static final int car_green_600 = 0x0106029e;
+		public static final int car_green_700 = 0x0106029d;
+		public static final int car_green_800 = 0x0106029c;
+		public static final int car_green_900 = 0x0106029b;
+		public static final int car_grey_100 = 0x0106028f;
+		public static final int car_grey_1000 = 0x010602eb;
+		public static final int car_grey_200 = 0x0106028e;
+		public static final int car_grey_300 = 0x0106028d;
+		public static final int car_grey_400 = 0x0106028c;
+		public static final int car_grey_50 = 0x01060290;
+		public static final int car_grey_500 = 0x0106028b;
+		public static final int car_grey_600 = 0x0106028a;
+		public static final int car_grey_700 = 0x01060289;
+		public static final int car_grey_746 = 0x01060288;
+		public static final int car_grey_772 = 0x01060287;
+		public static final int car_grey_800 = 0x01060286;
+		public static final int car_grey_846 = 0x01060285;
+		public static final int car_grey_868 = 0x01060284;
+		public static final int car_grey_900 = 0x01060283;
+		public static final int car_grey_928 = 0x01060282;
+		public static final int car_grey_958 = 0x01060281;
 		/**  Color palette for cars
          */
-		public static final int car_grey_972 = 0x010601c5;
-		public static final int car_headline1 = 0x0106018d;
-		public static final int car_headline1_dark = 0x0106018c;
-		public static final int car_headline1_light = 0x0106018b;
-		public static final int car_headline2 = 0x01060190;
-		public static final int car_headline2_dark = 0x0106018f;
-		public static final int car_headline2_light = 0x0106018e;
-		public static final int car_headline3 = 0x01060193;
-		public static final int car_headline3_dark = 0x01060192;
-		public static final int car_headline3_light = 0x01060191;
-		public static final int car_headline4 = 0x01060196;
-		public static final int car_headline4_dark = 0x01060195;
-		public static final int car_headline4_light = 0x01060194;
-		public static final int car_highlight = 0x010601bf;
-		public static final int car_highlight_dark = 0x010601be;
+		public static final int car_grey_972 = 0x01060280;
+		public static final int car_headline1 = 0x01060248;
+		public static final int car_headline1_dark = 0x01060247;
+		public static final int car_headline1_light = 0x01060246;
+		public static final int car_headline2 = 0x0106024b;
+		public static final int car_headline2_dark = 0x0106024a;
+		public static final int car_headline2_light = 0x01060249;
+		public static final int car_headline3 = 0x0106024e;
+		public static final int car_headline3_dark = 0x0106024d;
+		public static final int car_headline3_light = 0x0106024c;
+		public static final int car_headline4 = 0x01060251;
+		public static final int car_headline4_dark = 0x01060250;
+		public static final int car_headline4_light = 0x0106024f;
+		public static final int car_highlight = 0x0106027a;
+		public static final int car_highlight_dark = 0x01060279;
 		/**  Misc colors
          */
-		public static final int car_highlight_light = 0x010601bd;
-		public static final int car_keyboard_divider_line = 0x01060241;
-		public static final int car_keyboard_text_primary_color = 0x01060242;
-		public static final int car_keyboard_text_secondary_color = 0x01060243;
-		public static final int car_light_blue_300 = 0x01060239;
-		public static final int car_light_blue_500 = 0x0106023a;
-		public static final int car_light_blue_600 = 0x0106023b;
-		public static final int car_light_blue_700 = 0x0106023c;
-		public static final int car_light_blue_800 = 0x0106023d;
-		public static final int car_light_blue_900 = 0x0106023e;
+		public static final int car_highlight_light = 0x01060278;
+		public static final int car_keyboard_divider_line = 0x010602fc;
+		public static final int car_keyboard_text_primary_color = 0x010602fd;
+		public static final int car_keyboard_text_secondary_color = 0x010602fe;
+		public static final int car_light_blue_300 = 0x010602f4;
+		public static final int car_light_blue_500 = 0x010602f5;
+		public static final int car_light_blue_600 = 0x010602f6;
+		public static final int car_light_blue_700 = 0x010602f7;
+		public static final int car_light_blue_800 = 0x010602f8;
+		public static final int car_light_blue_900 = 0x010602f9;
 		/**  The color of the dividers in the list. This color is assumed to be on a light colored
          view.
          */
-		public static final int car_list_divider = 0x010601ac;
+		public static final int car_list_divider = 0x01060267;
 		/**  The color of the divider. The color here is a darker shade.
          */
-		public static final int car_list_divider_dark = 0x010601ab;
+		public static final int car_list_divider_dark = 0x01060266;
 		/**  The color of the divider. The color here is a lighter shade.
          */
-		public static final int car_list_divider_light = 0x010601aa;
-		public static final int car_orange_100 = 0x01060206;
-		public static final int car_orange_200 = 0x01060205;
-		public static final int car_orange_300 = 0x01060204;
-		public static final int car_orange_400 = 0x01060203;
-		public static final int car_orange_50 = 0x01060207;
-		public static final int car_orange_500 = 0x01060202;
-		public static final int car_orange_600 = 0x01060201;
-		public static final int car_orange_700 = 0x01060200;
-		public static final int car_orange_800 = 0x010601ff;
-		public static final int car_orange_900 = 0x010601fe;
-		public static final int car_pink_100 = 0x01060210;
-		public static final int car_pink_200 = 0x0106020f;
-		public static final int car_pink_300 = 0x0106020e;
-		public static final int car_pink_400 = 0x0106020d;
-		public static final int car_pink_50 = 0x01060211;
-		public static final int car_pink_500 = 0x0106020c;
-		public static final int car_pink_600 = 0x0106020b;
-		public static final int car_pink_700 = 0x0106020a;
-		public static final int car_pink_800 = 0x01060209;
-		public static final int car_pink_900 = 0x01060208;
-		public static final int car_purple_100 = 0x01060224;
-		public static final int car_purple_200 = 0x01060223;
-		public static final int car_purple_300 = 0x01060222;
-		public static final int car_purple_400 = 0x01060221;
-		public static final int car_purple_50 = 0x01060225;
-		public static final int car_purple_500 = 0x01060220;
-		public static final int car_purple_600 = 0x0106021f;
-		public static final int car_purple_700 = 0x0106021e;
-		public static final int car_purple_800 = 0x0106021d;
-		public static final int car_purple_900 = 0x0106021c;
-		public static final int car_red_100 = 0x010601f2;
-		public static final int car_red_200 = 0x010601f1;
-		public static final int car_red_300 = 0x010601f0;
-		public static final int car_red_400 = 0x010601ef;
-		public static final int car_red_50 = 0x010601f3;
-		public static final int car_red_500 = 0x010601ee;
-		public static final int car_red_500a = 0x0106023f;
-		public static final int car_red_600 = 0x010601ed;
-		public static final int car_red_700 = 0x010601ec;
-		public static final int car_red_800 = 0x010601eb;
-		public static final int car_red_900 = 0x010601ea;
-		public static final int car_red_a700 = 0x01060240;
+		public static final int car_list_divider_light = 0x01060265;
+		public static final int car_orange_100 = 0x010602c1;
+		public static final int car_orange_200 = 0x010602c0;
+		public static final int car_orange_300 = 0x010602bf;
+		public static final int car_orange_400 = 0x010602be;
+		public static final int car_orange_50 = 0x010602c2;
+		public static final int car_orange_500 = 0x010602bd;
+		public static final int car_orange_600 = 0x010602bc;
+		public static final int car_orange_700 = 0x010602bb;
+		public static final int car_orange_800 = 0x010602ba;
+		public static final int car_orange_900 = 0x010602b9;
+		public static final int car_pink_100 = 0x010602cb;
+		public static final int car_pink_200 = 0x010602ca;
+		public static final int car_pink_300 = 0x010602c9;
+		public static final int car_pink_400 = 0x010602c8;
+		public static final int car_pink_50 = 0x010602cc;
+		public static final int car_pink_500 = 0x010602c7;
+		public static final int car_pink_600 = 0x010602c6;
+		public static final int car_pink_700 = 0x010602c5;
+		public static final int car_pink_800 = 0x010602c4;
+		public static final int car_pink_900 = 0x010602c3;
+		public static final int car_purple_100 = 0x010602df;
+		public static final int car_purple_200 = 0x010602de;
+		public static final int car_purple_300 = 0x010602dd;
+		public static final int car_purple_400 = 0x010602dc;
+		public static final int car_purple_50 = 0x010602e0;
+		public static final int car_purple_500 = 0x010602db;
+		public static final int car_purple_600 = 0x010602da;
+		public static final int car_purple_700 = 0x010602d9;
+		public static final int car_purple_800 = 0x010602d8;
+		public static final int car_purple_900 = 0x010602d7;
+		public static final int car_red_100 = 0x010602ad;
+		public static final int car_red_200 = 0x010602ac;
+		public static final int car_red_300 = 0x010602ab;
+		public static final int car_red_400 = 0x010602aa;
+		public static final int car_red_50 = 0x010602ae;
+		public static final int car_red_500 = 0x010602a9;
+		public static final int car_red_500a = 0x010602fa;
+		public static final int car_red_600 = 0x010602a8;
+		public static final int car_red_700 = 0x010602a7;
+		public static final int car_red_800 = 0x010602a6;
+		public static final int car_red_900 = 0x010602a5;
+		public static final int car_red_a700 = 0x010602fb;
 		/**  The color of the scroll bar indicator in the PagedListView. This color is assumed to be on
          a light-colored background.
          */
-		public static final int car_scrollbar_thumb = 0x010601b6;
-		public static final int car_scrollbar_thumb_dark = 0x010601b5;
+		public static final int car_scrollbar_thumb = 0x01060271;
+		public static final int car_scrollbar_thumb_dark = 0x01060270;
 		/**  The inverted color of the scroll bar indicator. This color is always the opposite of
          car_scrollbar_thumb.
          */
-		public static final int car_scrollbar_thumb_inverse = 0x010601b7;
+		public static final int car_scrollbar_thumb_inverse = 0x01060272;
 		/**  The lighter and darker color for the scrollbar thumb.
          */
-		public static final int car_scrollbar_thumb_light = 0x010601b4;
+		public static final int car_scrollbar_thumb_light = 0x0106026f;
 		/**  The color of the seekbar track background in SeekbarListItem. This color is assumed to be
          on a light-colored background.
          */
-		public static final int car_seekbar_track_background = 0x010601bb;
-		public static final int car_seekbar_track_background_dark = 0x010601ba;
+		public static final int car_seekbar_track_background = 0x01060276;
+		public static final int car_seekbar_track_background_dark = 0x01060275;
 		/**  The lighter and darker color for the seekbar track background.
          */
-		public static final int car_seekbar_track_background_light = 0x010601b9;
+		public static final int car_seekbar_track_background_light = 0x01060274;
 		/**  The color of the seekbar track secondary progress in SeekbarListItem.
          */
-		public static final int car_seekbar_track_secondary_progress = 0x010601b8;
-		public static final int car_switch = 0x01060315;
-		public static final int car_switch_track = 0x01060316;
-		public static final int car_teal_100 = 0x0106021a;
-		public static final int car_teal_200 = 0x01060219;
-		public static final int car_teal_300 = 0x01060218;
-		public static final int car_teal_400 = 0x01060217;
-		public static final int car_teal_50 = 0x0106021b;
-		public static final int car_teal_500 = 0x01060216;
-		public static final int car_teal_600 = 0x01060215;
-		public static final int car_teal_700 = 0x01060214;
-		public static final int car_teal_800 = 0x01060213;
-		public static final int car_teal_900 = 0x01060212;
+		public static final int car_seekbar_track_secondary_progress = 0x01060273;
+		public static final int car_switch = 0x0106042a;
+		public static final int car_switch_track = 0x0106042b;
+		public static final int car_teal_100 = 0x010602d5;
+		public static final int car_teal_200 = 0x010602d4;
+		public static final int car_teal_300 = 0x010602d3;
+		public static final int car_teal_400 = 0x010602d2;
+		public static final int car_teal_50 = 0x010602d6;
+		public static final int car_teal_500 = 0x010602d1;
+		public static final int car_teal_600 = 0x010602d0;
+		public static final int car_teal_700 = 0x010602cf;
+		public static final int car_teal_800 = 0x010602ce;
+		public static final int car_teal_900 = 0x010602cd;
 		/**  The tinting color for an icon. This icon is assumed to be on a light background.
          */
-		public static final int car_tint = 0x010601a8;
-		public static final int car_tint_dark = 0x010601a7;
+		public static final int car_tint = 0x01060263;
+		public static final int car_tint_dark = 0x01060262;
 		/**  An inverted tinting from car_tint.
          */
-		public static final int car_tint_inverse = 0x010601a9;
+		public static final int car_tint_inverse = 0x01060264;
 		/**  The tinting colors to create a light- and dark-colored icon respectively.
          */
-		public static final int car_tint_light = 0x010601a6;
-		public static final int car_title = 0x01060187;
-		public static final int car_title2 = 0x0106018a;
-		public static final int car_title2_dark = 0x01060189;
-		public static final int car_title2_light = 0x01060188;
-		public static final int car_title_dark = 0x01060186;
+		public static final int car_tint_light = 0x01060261;
+		public static final int car_title = 0x01060242;
+		public static final int car_title2 = 0x01060245;
+		public static final int car_title2_dark = 0x01060244;
+		public static final int car_title2_light = 0x01060243;
+		public static final int car_title_dark = 0x01060241;
 		/**  Various colors for text sizes. "Light" and "dark" here refer to the lighter or darker
           shades.
          */
-		public static final int car_title_light = 0x01060185;
+		public static final int car_title_light = 0x01060240;
 		/**  background is car_grey_868 with
          */
-		public static final int car_toast_background = 0x010601bc;
-		public static final int car_user_switcher_user_image_bgcolor = 0x010601c3;
-		public static final int car_user_switcher_user_image_fgcolor = 0x010601c4;
-		public static final int car_white_1000 = 0x01060231;
-		public static final int car_yellow_100 = 0x010601fc;
-		public static final int car_yellow_200 = 0x010601fb;
-		public static final int car_yellow_300 = 0x010601fa;
-		public static final int car_yellow_400 = 0x010601f9;
-		public static final int car_yellow_50 = 0x010601fd;
-		public static final int car_yellow_500 = 0x010601f8;
-		public static final int car_yellow_600 = 0x010601f7;
-		public static final int car_yellow_700 = 0x010601f6;
-		public static final int car_yellow_800 = 0x010601f5;
-		public static final int car_yellow_900 = 0x010601f4;
-		public static final int chooser_gradient_background = 0x0106012e;
-		public static final int chooser_gradient_highlight = 0x0106012f;
-		public static final int chooser_row_divider = 0x0106012d;
+		public static final int car_toast_background = 0x01060277;
+		public static final int car_user_switcher_user_image_bgcolor = 0x0106027e;
+		public static final int car_user_switcher_user_image_fgcolor = 0x0106027f;
+		public static final int car_white_1000 = 0x010602ec;
+		public static final int car_yellow_100 = 0x010602b7;
+		public static final int car_yellow_200 = 0x010602b6;
+		public static final int car_yellow_300 = 0x010602b5;
+		public static final int car_yellow_400 = 0x010602b4;
+		public static final int car_yellow_50 = 0x010602b8;
+		public static final int car_yellow_500 = 0x010602b3;
+		public static final int car_yellow_600 = 0x010602b2;
+		public static final int car_yellow_700 = 0x010602b1;
+		public static final int car_yellow_800 = 0x010602b0;
+		public static final int car_yellow_900 = 0x010602af;
+		public static final int chooser_gradient_background = 0x0106013e;
+		public static final int chooser_gradient_highlight = 0x0106013f;
+		public static final int chooser_row_divider = 0x0106013d;
 		/**  Default color for notification LED.
          */
-		public static final int config_defaultNotificationColor = 0x01060304;
+		public static final int config_defaultNotificationColor = 0x01060419;
 		/**  Color of the letterbox background if one following conditions is true
             - Option 0 is selected for R.integer.config_letterboxBackgroundType.
             - Option 1 is selected for R.integer.config_letterboxBackgroundType and
@@ -22329,73 +22329,95 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
             provided.
 
          */
-		public static final int config_letterboxBackgroundColor = 0x01060305;
-		public static final int config_progress_background_tint = 0x01060317;
-		public static final int control_checkable_material = 0x01060318;
-		public static final int control_default_material = 0x01060319;
-		public static final int control_highlight_material = 0x0106031a;
-		public static final int conversation_important_highlight = 0x01060133;
+		public static final int config_letterboxBackgroundColor = 0x0106041a;
+		public static final int config_progress_background_tint = 0x0106042c;
+		public static final int control_checkable_material = 0x0106042d;
+		public static final int control_default_material = 0x0106042e;
+		public static final int control_highlight_material = 0x0106042f;
+		public static final int conversation_important_highlight = 0x01060143;
+		public static final int customColorBrandA = 0x01060375;
+		public static final int customColorBrandB = 0x01060376;
+		public static final int customColorBrandC = 0x01060377;
+		public static final int customColorBrandD = 0x01060378;
+		public static final int customColorClockHour = 0x01060379;
+		public static final int customColorClockMinute = 0x0106037a;
+		public static final int customColorClockSecond = 0x0106037b;
+		public static final int customColorOnShadeActive = 0x0106037c;
+		public static final int customColorOnShadeActiveVariant = 0x0106037d;
+		public static final int customColorOnShadeInactive = 0x0106037e;
+		public static final int customColorOnShadeInactiveVariant = 0x0106037f;
+		public static final int customColorOnThemeApp = 0x01060380;
+		public static final int customColorOverviewBackground = 0x01060381;
+		public static final int customColorShadeActive = 0x01060382;
+		public static final int customColorShadeDisabled = 0x01060383;
+		public static final int customColorShadeInactive = 0x01060384;
+		public static final int customColorThemeApp = 0x01060385;
+		public static final int customColorThemeAppRing = 0x01060386;
+		public static final int customColorThemeNotif = 0x01060387;
+		public static final int customColorUnderSurface = 0x01060388;
+		public static final int customColorWeatherTemp = 0x01060389;
+		public static final int customColorWidgetBackground = 0x0106038a;
 		/**  Equivalent to 0xffaaaaaa
  A dark gray, equivalent to 0xffaaaaaa
          */
 		public static final int darker_gray = 0x01060000;
-		public static final int datepicker_default_circle_background_color_material_dark = 0x010602fe;
-		public static final int datepicker_default_circle_background_color_material_light = 0x010602fd;
-		public static final int datepicker_default_disabled_text_color_material_dark = 0x010602f8;
-		public static final int datepicker_default_disabled_text_color_material_light = 0x010602f7;
-		public static final int datepicker_default_header_dayofweek_background_color_material_dark = 0x010602f4;
-		public static final int datepicker_default_header_dayofweek_background_color_material_light = 0x010602f3;
-		public static final int datepicker_default_header_selector_background_material_dark = 0x010602f2;
-		public static final int datepicker_default_header_selector_background_material_light = 0x010602f1;
-		public static final int datepicker_default_normal_text_color_material_dark = 0x010602f6;
-		public static final int datepicker_default_normal_text_color_material_light = 0x010602f5;
-		public static final int datepicker_default_pressed_text_color_material_dark = 0x010602fc;
-		public static final int datepicker_default_pressed_text_color_material_light = 0x010602fb;
-		public static final int datepicker_default_selected_text_color_material_dark = 0x010602fa;
-		public static final int datepicker_default_selected_text_color_material_light = 0x010602f9;
-		public static final int datepicker_default_view_animator_color_material_dark = 0x01060300;
-		public static final int datepicker_default_view_animator_color_material_light = 0x010602ff;
-		public static final int decor_button_dark_color = 0x0106031b;
-		public static final int decor_button_light_color = 0x0106031c;
-		public static final int decor_view_status_guard = 0x010600d9;
-		public static final int decor_view_status_guard_light = 0x010600da;
+		public static final int datepicker_default_circle_background_color_material_dark = 0x01060413;
+		public static final int datepicker_default_circle_background_color_material_light = 0x01060412;
+		public static final int datepicker_default_disabled_text_color_material_dark = 0x0106040d;
+		public static final int datepicker_default_disabled_text_color_material_light = 0x0106040c;
+		public static final int datepicker_default_header_dayofweek_background_color_material_dark = 0x01060409;
+		public static final int datepicker_default_header_dayofweek_background_color_material_light = 0x01060408;
+		public static final int datepicker_default_header_selector_background_material_dark = 0x01060407;
+		public static final int datepicker_default_header_selector_background_material_light = 0x01060406;
+		public static final int datepicker_default_normal_text_color_material_dark = 0x0106040b;
+		public static final int datepicker_default_normal_text_color_material_light = 0x0106040a;
+		public static final int datepicker_default_pressed_text_color_material_dark = 0x01060411;
+		public static final int datepicker_default_pressed_text_color_material_light = 0x01060410;
+		public static final int datepicker_default_selected_text_color_material_dark = 0x0106040f;
+		public static final int datepicker_default_selected_text_color_material_light = 0x0106040e;
+		public static final int datepicker_default_view_animator_color_material_dark = 0x01060415;
+		public static final int datepicker_default_view_animator_color_material_light = 0x01060414;
+		public static final int decor_button_dark_color = 0x01060430;
+		public static final int decor_button_light_color = 0x01060431;
+		public static final int decor_view_status_guard = 0x010600e9;
+		public static final int decor_view_status_guard_light = 0x010600ea;
 		/**  Magnifier
          */
-		public static final int default_magnifier_color_overlay = 0x0106012c;
-		public static final int dim_foreground_dark = 0x010600ca;
-		public static final int dim_foreground_dark_disabled = 0x010600cb;
-		public static final int dim_foreground_dark_inverse = 0x010600cc;
-		public static final int dim_foreground_dark_inverse_disabled = 0x010600cd;
-		public static final int dim_foreground_disabled_holo_dark = 0x0106027f;
-		public static final int dim_foreground_disabled_holo_light = 0x01060284;
-		public static final int dim_foreground_holo_dark = 0x0106027e;
-		public static final int dim_foreground_holo_light = 0x01060283;
-		public static final int dim_foreground_inverse_disabled_holo_dark = 0x01060281;
-		public static final int dim_foreground_inverse_disabled_holo_light = 0x01060286;
-		public static final int dim_foreground_inverse_holo_dark = 0x01060280;
-		public static final int dim_foreground_inverse_holo_light = 0x01060285;
-		public static final int dim_foreground_light = 0x010600cf;
-		public static final int dim_foreground_light_disabled = 0x010600d0;
-		public static final int dim_foreground_light_inverse = 0x010600d1;
-		public static final int dim_foreground_light_inverse_disabled = 0x010600d2;
-		public static final int edge_effect_device_default_dark = 0x01060274;
-		public static final int edge_effect_device_default_light = 0x01060273;
+		public static final int default_magnifier_color_overlay = 0x0106013c;
+		public static final int dim_foreground_dark = 0x010600da;
+		public static final int dim_foreground_dark_disabled = 0x010600db;
+		public static final int dim_foreground_dark_inverse = 0x010600dc;
+		public static final int dim_foreground_dark_inverse_disabled = 0x010600dd;
+		public static final int dim_foreground_disabled_holo_dark = 0x01060394;
+		public static final int dim_foreground_disabled_holo_light = 0x01060399;
+		public static final int dim_foreground_holo_dark = 0x01060393;
+		public static final int dim_foreground_holo_light = 0x01060398;
+		public static final int dim_foreground_inverse_disabled_holo_dark = 0x01060396;
+		public static final int dim_foreground_inverse_disabled_holo_light = 0x0106039b;
+		public static final int dim_foreground_inverse_holo_dark = 0x01060395;
+		public static final int dim_foreground_inverse_holo_light = 0x0106039a;
+		public static final int dim_foreground_light = 0x010600df;
+		public static final int dim_foreground_light_disabled = 0x010600e0;
+		public static final int dim_foreground_light_inverse = 0x010600e1;
+		public static final int dim_foreground_light_inverse_disabled = 0x010600e2;
+		public static final int edge_effect_device_default_dark = 0x0106032f;
+		public static final int edge_effect_device_default_light = 0x0106032e;
 		/**  Error color
  Matches the Wear Compose error color.
          */
-		public static final int error_color_device_default_dark = 0x01060269;
-		public static final int error_color_device_default_light = 0x0106026a;
-		public static final int error_color_material_dark = 0x010602ce;
+		public static final int error_color_device_default_dark = 0x01060324;
+		public static final int error_color_device_default_light = 0x01060325;
+		public static final int error_color_material_dark = 0x010603e3;
 		/**  deep orange 400
          */
-		public static final int error_color_material_light = 0x010602cf;
+		public static final int error_color_material_light = 0x010603e4;
 		/**  FaceLock
          */
-		public static final int facelock_spotlight_mask = 0x010600f3;
+		public static final int facelock_spotlight_mask = 0x01060103;
 		/**  FloatingToolbar
          */
-		public static final int floating_popup_divider_dark = 0x0106012a;
-		public static final int floating_popup_divider_light = 0x0106012b;
+		public static final int floating_popup_divider_dark = 0x0106013a;
+		public static final int floating_popup_divider_light = 0x0106013b;
 		/**
        foreground_device_default_dark
          - introduced to avoid coupling to foreground_material_dark
@@ -22403,28 +22425,28 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          ! fixed as white for optimal glanceability/contrast
 
          */
-		public static final int foreground_device_default_dark = 0x01060268;
+		public static final int foreground_device_default_dark = 0x01060323;
 		/**  Please refer to text_color_[primary]_device_default_[light].xml for text colors
          */
-		public static final int foreground_device_default_light = 0x01060267;
-		public static final int foreground_material_dark = 0x010602b7;
-		public static final int foreground_material_light = 0x010602b8;
-		public static final int global_actions_container_background = 0x0106031d;
-		public static final int group_button_dialog_focused_holo_dark = 0x0106029b;
-		public static final int group_button_dialog_focused_holo_light = 0x0106029d;
-		public static final int group_button_dialog_pressed_holo_dark = 0x0106029a;
-		public static final int group_button_dialog_pressed_holo_light = 0x0106029c;
-		public static final int highlighted_text_dark = 0x010600d4;
-		public static final int highlighted_text_holo_dark = 0x01060288;
-		public static final int highlighted_text_holo_light = 0x01060289;
-		public static final int highlighted_text_light = 0x010600d5;
-		public static final int highlighted_text_material = 0x0106031e;
-		public static final int hint_foreground_dark = 0x010600ce;
-		public static final int hint_foreground_holo_dark = 0x01060282;
-		public static final int hint_foreground_holo_light = 0x01060287;
-		public static final int hint_foreground_light = 0x010600d3;
-		public static final int hint_foreground_material_dark = 0x0106031f;
-		public static final int hint_foreground_material_light = 0x01060320;
+		public static final int foreground_device_default_light = 0x01060322;
+		public static final int foreground_material_dark = 0x010603cc;
+		public static final int foreground_material_light = 0x010603cd;
+		public static final int global_actions_container_background = 0x01060432;
+		public static final int group_button_dialog_focused_holo_dark = 0x010603b0;
+		public static final int group_button_dialog_focused_holo_light = 0x010603b2;
+		public static final int group_button_dialog_pressed_holo_dark = 0x010603af;
+		public static final int group_button_dialog_pressed_holo_light = 0x010603b1;
+		public static final int highlighted_text_dark = 0x010600e4;
+		public static final int highlighted_text_holo_dark = 0x0106039d;
+		public static final int highlighted_text_holo_light = 0x0106039e;
+		public static final int highlighted_text_light = 0x010600e5;
+		public static final int highlighted_text_material = 0x01060433;
+		public static final int hint_foreground_dark = 0x010600de;
+		public static final int hint_foreground_holo_dark = 0x01060397;
+		public static final int hint_foreground_holo_light = 0x0106039c;
+		public static final int hint_foreground_light = 0x010600e3;
+		public static final int hint_foreground_material_dark = 0x01060434;
+		public static final int hint_foreground_material_light = 0x01060435;
 		/**  A really bright Holo shade of blue. Equivalent to #ff00ddff.
          */
 		public static final int holo_blue_bright = 0x0106001b;
@@ -22434,36 +22456,36 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  A light Holo shade of blue. Equivalent to #ff33b5e5.
          */
 		public static final int holo_blue_light = 0x01060012;
-		public static final int holo_button_normal = 0x01060293;
-		public static final int holo_button_pressed = 0x01060292;
-		public static final int holo_control_activated = 0x01060290;
-		public static final int holo_control_normal = 0x01060291;
+		public static final int holo_button_normal = 0x010603a8;
+		public static final int holo_button_pressed = 0x010603a7;
+		public static final int holo_control_activated = 0x010603a5;
+		public static final int holo_control_normal = 0x010603a6;
 		/**  A really bright Holo shade of gray. Equivalent to #33cccccc.
          */
-		public static final int holo_gray_bright = 0x0106028d;
+		public static final int holo_gray_bright = 0x010603a2;
 		/**  A light Holo shade of gray. Equivalent to #33999999.
          */
-		public static final int holo_gray_light = 0x0106028c;
+		public static final int holo_gray_light = 0x010603a1;
 		/**  A dark Holo shade of green. Equivalent to #ff669900
          */
 		public static final int holo_green_dark = 0x01060015;
 		/**  A light Holo shade of green. Equivalent to #ff99cc00.
          */
 		public static final int holo_green_light = 0x01060014;
-		public static final int holo_light_button_normal = 0x01060299;
-		public static final int holo_light_button_pressed = 0x01060298;
-		public static final int holo_light_control_activated = 0x01060296;
-		public static final int holo_light_control_normal = 0x01060297;
-		public static final int holo_light_primary = 0x01060295;
-		public static final int holo_light_primary_dark = 0x01060294;
+		public static final int holo_light_button_normal = 0x010603ae;
+		public static final int holo_light_button_pressed = 0x010603ad;
+		public static final int holo_light_control_activated = 0x010603ab;
+		public static final int holo_light_control_normal = 0x010603ac;
+		public static final int holo_light_primary = 0x010603aa;
+		public static final int holo_light_primary_dark = 0x010603a9;
 		/**  A dark Holo shade of orange. Equivalent to ffff8800.
          */
 		public static final int holo_orange_dark = 0x01060019;
 		/**  A light Holo shade of orange. Equivalent to #ffffbb33.
          */
 		public static final int holo_orange_light = 0x01060018;
-		public static final int holo_primary = 0x0106028f;
-		public static final int holo_primary_dark = 0x0106028e;
+		public static final int holo_primary = 0x010603a4;
+		public static final int holo_primary_dark = 0x010603a3;
 		/**  A Holo shade of purple. Equivalent to #ffaa66cc
          */
 		public static final int holo_purple = 0x0106001a;
@@ -22476,248 +22498,316 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Green 300
  Default instant app badge color
          */
-		public static final int instant_app_badge = 0x0106011b;
+		public static final int instant_app_badge = 0x0106012b;
 		/**  Keyguard colors
          */
-		public static final int keyguard_avatar_frame_color = 0x01060105;
-		public static final int keyguard_avatar_frame_pressed_color = 0x01060108;
-		public static final int keyguard_avatar_frame_shadow_color = 0x01060106;
-		public static final int keyguard_avatar_nick_color = 0x01060107;
-		public static final int keyguard_text_color_decline = 0x010600e9;
+		public static final int keyguard_avatar_frame_color = 0x01060115;
+		public static final int keyguard_avatar_frame_pressed_color = 0x01060118;
+		public static final int keyguard_avatar_frame_shadow_color = 0x01060116;
+		public static final int keyguard_avatar_nick_color = 0x01060117;
+		public static final int keyguard_text_color_decline = 0x010600f9;
 		/**  keyguard tab
          */
-		public static final int keyguard_text_color_normal = 0x010600e5;
-		public static final int keyguard_text_color_soundoff = 0x010600e7;
-		public static final int keyguard_text_color_soundon = 0x010600e8;
-		public static final int keyguard_text_color_unlock = 0x010600e6;
+		public static final int keyguard_text_color_normal = 0x010600f5;
+		public static final int keyguard_text_color_soundoff = 0x010600f7;
+		public static final int keyguard_text_color_soundon = 0x010600f8;
+		public static final int keyguard_text_color_unlock = 0x010600f6;
 		/**  keyguard overscroll widget pager
          */
-		public static final int kg_multi_user_text_active = 0x010600ee;
-		public static final int kg_multi_user_text_inactive = 0x010600ef;
-		public static final int kg_widget_pager_gradient = 0x010600f0;
-		public static final int language_picker_item_selected_bg = 0x0106017a;
-		public static final int language_picker_item_selected_indicator = 0x01060179;
-		public static final int language_picker_item_selected_stroke = 0x0106017b;
+		public static final int kg_multi_user_text_active = 0x010600fe;
+		public static final int kg_multi_user_text_inactive = 0x010600ff;
+		public static final int kg_widget_pager_gradient = 0x01060100;
+		public static final int language_picker_item_selected_bg = 0x01060235;
+		public static final int language_picker_item_selected_indicator = 0x01060234;
+		public static final int language_picker_item_selected_stroke = 0x01060236;
 		/**  Lily Language Picker language item view colors
          */
-		public static final int language_picker_item_text_color = 0x01060175;
-		public static final int language_picker_item_text_color_secondary = 0x01060176;
-		public static final int language_picker_item_text_color_secondary_selected = 0x01060178;
-		public static final int language_picker_item_text_color_selected = 0x01060177;
-		public static final int legacy_button_normal = 0x010602b0;
-		public static final int legacy_button_pressed = 0x010602af;
-		public static final int legacy_control_activated = 0x010602ad;
-		public static final int legacy_control_normal = 0x010602ae;
+		public static final int language_picker_item_text_color = 0x01060230;
+		public static final int language_picker_item_text_color_secondary = 0x01060231;
+		public static final int language_picker_item_text_color_secondary_selected = 0x01060233;
+		public static final int language_picker_item_text_color_selected = 0x01060232;
+		public static final int legacy_button_normal = 0x010603c5;
+		public static final int legacy_button_pressed = 0x010603c4;
+		public static final int legacy_control_activated = 0x010603c2;
+		public static final int legacy_control_normal = 0x010603c3;
 		/**  A bright Android-y green
          */
-		public static final int legacy_green = 0x010602a6;
-		public static final int legacy_light_button_normal = 0x010602b6;
-		public static final int legacy_light_button_pressed = 0x010602b5;
-		public static final int legacy_light_control_activated = 0x010602b3;
-		public static final int legacy_light_control_normal = 0x010602b4;
-		public static final int legacy_light_primary = 0x010602b2;
-		public static final int legacy_light_primary_dark = 0x010602b1;
-		public static final int legacy_long_pressed_highlight = 0x010602aa;
+		public static final int legacy_green = 0x010603bb;
+		public static final int legacy_light_button_normal = 0x010603cb;
+		public static final int legacy_light_button_pressed = 0x010603ca;
+		public static final int legacy_light_control_activated = 0x010603c8;
+		public static final int legacy_light_control_normal = 0x010603c9;
+		public static final int legacy_light_primary = 0x010603c7;
+		public static final int legacy_light_primary_dark = 0x010603c6;
+		public static final int legacy_long_pressed_highlight = 0x010603bf;
 		/**  A bright orange suitable for use in the early 2000s
          */
-		public static final int legacy_orange = 0x010602a7;
-		public static final int legacy_pressed_highlight = 0x010602a8;
-		public static final int legacy_primary = 0x010602ac;
-		public static final int legacy_primary_dark = 0x010602ab;
-		public static final int legacy_selected_highlight = 0x010602a9;
+		public static final int legacy_orange = 0x010603bc;
+		public static final int legacy_pressed_highlight = 0x010603bd;
+		public static final int legacy_primary = 0x010603c1;
+		public static final int legacy_primary_dark = 0x010603c0;
+		public static final int legacy_selected_highlight = 0x010603be;
 		/**  For settings framework
          */
-		public static final int lighter_gray = 0x010600db;
-		public static final int link_text_dark = 0x010600d6;
-		public static final int link_text_holo_dark = 0x0106028a;
-		public static final int link_text_holo_light = 0x0106028b;
-		public static final int link_text_light = 0x010600d7;
-		public static final int list_divider_color_dark = 0x0106026c;
-		public static final int list_divider_color_light = 0x0106026b;
-		public static final int list_divider_opacity_device_default_dark = 0x0106026e;
-		public static final int list_divider_opacity_device_default_light = 0x0106026d;
+		public static final int lighter_gray = 0x010600eb;
+		public static final int link_text_dark = 0x010600e6;
+		public static final int link_text_holo_dark = 0x0106039f;
+		public static final int link_text_holo_light = 0x010603a0;
+		public static final int link_text_light = 0x010600e7;
+		public static final int list_divider_color_dark = 0x01060327;
+		public static final int list_divider_color_light = 0x01060326;
+		public static final int list_divider_opacity_device_default_dark = 0x01060329;
+		public static final int list_divider_opacity_device_default_light = 0x01060328;
 		/**  List divider opacity
          */
-		public static final int list_divider_opacity_material = 0x01060303;
-		public static final int list_highlight_material = 0x01060321;
-		public static final int loading_gradient_background_color_dark = 0x0106026f;
-		public static final int loading_gradient_background_color_light = 0x01060270;
-		public static final int loading_gradient_highlight_color_dark = 0x01060271;
-		public static final int loading_gradient_highlight_color_light = 0x01060272;
+		public static final int list_divider_opacity_material = 0x01060418;
+		public static final int list_highlight_material = 0x01060436;
+		public static final int loading_gradient_background_color_dark = 0x0106032a;
+		public static final int loading_gradient_background_color_light = 0x0106032b;
+		public static final int loading_gradient_highlight_color_dark = 0x0106032c;
+		public static final int loading_gradient_highlight_color_light = 0x0106032d;
 		/**  LockPatternView
          */
-		public static final int lock_pattern_view_regular_color = 0x010600f1;
-		public static final int lock_pattern_view_success_color = 0x010600f2;
-		public static final int lockscreen_clock_am_pm = 0x010600ec;
+		public static final int lock_pattern_view_regular_color = 0x01060101;
+		public static final int lock_pattern_view_success_color = 0x01060102;
+		public static final int lockscreen_clock_am_pm = 0x010600fc;
 		/**  keyguard clock
          */
-		public static final int lockscreen_clock_background = 0x010600ea;
-		public static final int lockscreen_clock_foreground = 0x010600eb;
-		public static final int lockscreen_owner_info = 0x010600ed;
-		public static final int material_blue_grey_200 = 0x010602e4;
-		public static final int material_blue_grey_700 = 0x010602e5;
-		public static final int material_blue_grey_800 = 0x010602e6;
-		public static final int material_blue_grey_900 = 0x010602e7;
-		public static final int material_blue_grey_950 = 0x010602e8;
-		public static final int material_deep_teal_100 = 0x010602e0;
-		public static final int material_deep_teal_200 = 0x010602e1;
-		public static final int material_deep_teal_300 = 0x010602e2;
-		public static final int material_deep_teal_500 = 0x010602e3;
-		public static final int material_grey_100 = 0x010602de;
-		public static final int material_grey_200 = 0x010602dd;
-		public static final int material_grey_300 = 0x010602dc;
-		public static final int material_grey_50 = 0x010602df;
-		public static final int material_grey_600 = 0x010602db;
-		public static final int material_grey_800 = 0x010602da;
-		public static final int material_grey_850 = 0x010602d9;
-		public static final int material_grey_900 = 0x010602d8;
-		public static final int material_red_A100 = 0x010602e9;
-		public static final int material_red_A700 = 0x010602ea;
-		public static final int micro_text_light = 0x010600f4;
+		public static final int lockscreen_clock_background = 0x010600fa;
+		public static final int lockscreen_clock_foreground = 0x010600fb;
+		public static final int lockscreen_owner_info = 0x010600fd;
+		public static final int materialColorBackground = 0x01060331;
+		public static final int materialColorControlActivated = 0x01060332;
+		public static final int materialColorControlHighlight = 0x01060333;
+		public static final int materialColorControlNormal = 0x01060334;
+		public static final int materialColorError = 0x01060335;
+		public static final int materialColorErrorContainer = 0x01060336;
+		public static final int materialColorErrorDim = 0x01060337;
+		public static final int materialColorInverseOnSurface = 0x01060338;
+		public static final int materialColorInversePrimary = 0x01060339;
+		public static final int materialColorInverseSurface = 0x0106033a;
+		public static final int materialColorOnBackground = 0x0106033b;
+		public static final int materialColorOnError = 0x0106033c;
+		public static final int materialColorOnErrorContainer = 0x0106033d;
+		public static final int materialColorOnPrimary = 0x0106033e;
+		public static final int materialColorOnPrimaryContainer = 0x0106033f;
+		public static final int materialColorOnPrimaryFixed = 0x01060369;
+		public static final int materialColorOnPrimaryFixedVariant = 0x0106036a;
+		public static final int materialColorOnSecondary = 0x01060340;
+		public static final int materialColorOnSecondaryContainer = 0x01060341;
+		public static final int materialColorOnSecondaryFixed = 0x0106036b;
+		public static final int materialColorOnSecondaryFixedVariant = 0x0106036c;
+		public static final int materialColorOnSurface = 0x01060342;
+		public static final int materialColorOnSurfaceVariant = 0x01060343;
+		public static final int materialColorOnTertiary = 0x01060344;
+		public static final int materialColorOnTertiaryContainer = 0x01060345;
+		public static final int materialColorOnTertiaryFixed = 0x0106036d;
+		public static final int materialColorOnTertiaryFixedVariant = 0x0106036e;
+		public static final int materialColorOutline = 0x01060346;
+		public static final int materialColorOutlineVariant = 0x01060347;
+		public static final int materialColorPaletteKeyColorError = 0x01060348;
+		public static final int materialColorPaletteKeyColorNeutral = 0x01060349;
+		public static final int materialColorPaletteKeyColorNeutralVariant = 0x0106034a;
+		public static final int materialColorPaletteKeyColorPrimary = 0x0106034b;
+		public static final int materialColorPaletteKeyColorSecondary = 0x0106034c;
+		public static final int materialColorPaletteKeyColorTertiary = 0x0106034d;
+		public static final int materialColorPrimary = 0x0106034e;
+		public static final int materialColorPrimaryContainer = 0x0106034f;
+		public static final int materialColorPrimaryDim = 0x01060350;
+		public static final int materialColorPrimaryFixed = 0x0106036f;
+		public static final int materialColorPrimaryFixedDim = 0x01060370;
+		public static final int materialColorScrim = 0x01060351;
+		public static final int materialColorSecondary = 0x01060352;
+		public static final int materialColorSecondaryContainer = 0x01060353;
+		public static final int materialColorSecondaryDim = 0x01060354;
+		public static final int materialColorSecondaryFixed = 0x01060371;
+		public static final int materialColorSecondaryFixedDim = 0x01060372;
+		public static final int materialColorSemanticRedContainerHigh = 0x01060355;
+		public static final int materialColorShadow = 0x01060356;
+		public static final int materialColorSurface = 0x01060357;
+		public static final int materialColorSurfaceBright = 0x01060358;
+		public static final int materialColorSurfaceContainer = 0x01060359;
+		public static final int materialColorSurfaceContainerHigh = 0x0106035a;
+		public static final int materialColorSurfaceContainerHighest = 0x0106035b;
+		public static final int materialColorSurfaceContainerLow = 0x0106035c;
+		public static final int materialColorSurfaceContainerLowest = 0x0106035d;
+		public static final int materialColorSurfaceDim = 0x0106035e;
+		public static final int materialColorSurfaceTint = 0x0106035f;
+		public static final int materialColorSurfaceVariant = 0x01060360;
+		public static final int materialColorTertiary = 0x01060361;
+		public static final int materialColorTertiaryContainer = 0x01060362;
+		public static final int materialColorTertiaryDim = 0x01060363;
+		public static final int materialColorTertiaryFixed = 0x01060373;
+		public static final int materialColorTertiaryFixedDim = 0x01060374;
+		public static final int materialColorTextHintInverse = 0x01060364;
+		public static final int materialColorTextPrimaryInverse = 0x01060365;
+		public static final int materialColorTextPrimaryInverseDisableOnly = 0x01060366;
+		public static final int materialColorTextSecondaryAndTertiaryInverse = 0x01060367;
+		public static final int materialColorTextSecondaryAndTertiaryInverseDisabled = 0x01060368;
+		public static final int material_blue_grey_200 = 0x010603f9;
+		public static final int material_blue_grey_700 = 0x010603fa;
+		public static final int material_blue_grey_800 = 0x010603fb;
+		public static final int material_blue_grey_900 = 0x010603fc;
+		public static final int material_blue_grey_950 = 0x010603fd;
+		public static final int material_deep_teal_100 = 0x010603f5;
+		public static final int material_deep_teal_200 = 0x010603f6;
+		public static final int material_deep_teal_300 = 0x010603f7;
+		public static final int material_deep_teal_500 = 0x010603f8;
+		public static final int material_grey_100 = 0x010603f3;
+		public static final int material_grey_200 = 0x010603f2;
+		public static final int material_grey_300 = 0x010603f1;
+		public static final int material_grey_50 = 0x010603f4;
+		public static final int material_grey_600 = 0x010603f0;
+		public static final int material_grey_800 = 0x010603ef;
+		public static final int material_grey_850 = 0x010603ee;
+		public static final int material_grey_900 = 0x010603ed;
+		public static final int material_red_A100 = 0x010603fe;
+		public static final int material_red_A700 = 0x010603ff;
+		public static final int micro_text_light = 0x01060104;
 		/**  Color for system bars
          */
-		public static final int navigation_bar_compatible = 0x0106017f;
+		public static final int navigation_bar_compatible = 0x0106023a;
 		/**  This uses non-regular transparent intentionally. It is used to tell if the transparent
          color is set by the framework or not.
          */
-		public static final int navigation_bar_default = 0x01060180;
-		public static final int navigation_bar_divider_device_default_settings = 0x01060250;
+		public static final int navigation_bar_default = 0x0106023b;
+		public static final int navigation_bar_divider_device_default_settings = 0x0106030b;
 		/**  Gray 600
          */
-		public static final int notification_action_button_text_color = 0x010600ff;
-		public static final int notification_action_list = 0x01060101;
-		public static final int notification_action_list_background_color = 0x01060102;
-		public static final int notification_default_color = 0x010600fe;
-		public static final int notification_default_color_current = 0x010600fd;
-		public static final int notification_default_color_dark = 0x010600f9;
-		public static final int notification_default_color_light = 0x010600fa;
-		public static final int notification_primary_text_color_current = 0x010600fb;
-		public static final int notification_primary_text_color_dark = 0x010600f6;
-		public static final int notification_primary_text_color_light = 0x010600f5;
-		public static final int notification_progress_background_color = 0x01060100;
-		public static final int notification_secondary_text_color_current = 0x010600fc;
-		public static final int notification_secondary_text_color_dark = 0x010600f8;
+		public static final int notification_action_button_text_color = 0x0106010f;
+		public static final int notification_action_list = 0x01060111;
+		public static final int notification_action_list_background_color = 0x01060112;
+		public static final int notification_default_color = 0x0106010e;
+		public static final int notification_default_color_current = 0x0106010d;
+		public static final int notification_default_color_dark = 0x01060109;
+		public static final int notification_default_color_light = 0x0106010a;
+		public static final int notification_primary_text_color_current = 0x0106010b;
+		public static final int notification_primary_text_color_dark = 0x01060106;
+		public static final int notification_primary_text_color_light = 0x01060105;
+		public static final int notification_progress_background_color = 0x01060110;
+		public static final int notification_secondary_text_color_current = 0x0106010c;
+		public static final int notification_secondary_text_color_dark = 0x01060108;
 		/**  Note that the primary and secondary notification text colors are, in fact, the same.
          */
-		public static final int notification_secondary_text_color_light = 0x010600f7;
-		public static final int overview_background = 0x01060322;
-		public static final int overview_background_dark = 0x01060323;
+		public static final int notification_secondary_text_color_light = 0x01060107;
+		public static final int overview_background = 0x01060437;
+		public static final int overview_background_dark = 0x01060438;
 		/**  For security permissions
          */
-		public static final int perms_dangerous_grp_color = 0x010600dc;
-		public static final int perms_dangerous_perm_color = 0x010600dd;
+		public static final int perms_dangerous_grp_color = 0x010600ec;
+		public static final int perms_dangerous_perm_color = 0x010600ed;
 		/**  Color for personal app suspension notification button text and icon tint.
          */
-		public static final int personal_apps_suspension_notification_color = 0x01060132;
-		public static final int primary_dark_device_default_dark = 0x01060248;
-		public static final int primary_dark_device_default_light = 0x01060249;
-		public static final int primary_dark_device_default_settings = 0x0106024a;
-		public static final int primary_dark_device_default_settings_light = 0x0106024b;
-		public static final int primary_dark_material_dark = 0x010602c1;
-		public static final int primary_dark_material_light = 0x010602c2;
-		public static final int primary_dark_material_light_light_status_bar = 0x010602c3;
-		public static final int primary_dark_material_settings = 0x010602c4;
-		public static final int primary_dark_material_settings_light = 0x010602c5;
+		public static final int personal_apps_suspension_notification_color = 0x01060142;
+		public static final int primary_dark_device_default_dark = 0x01060303;
+		public static final int primary_dark_device_default_light = 0x01060304;
+		public static final int primary_dark_device_default_settings = 0x01060305;
+		public static final int primary_dark_device_default_settings_light = 0x01060306;
+		public static final int primary_dark_material_dark = 0x010603d6;
+		public static final int primary_dark_material_light = 0x010603d7;
+		public static final int primary_dark_material_light_light_status_bar = 0x010603d8;
+		public static final int primary_dark_material_settings = 0x010603d9;
+		public static final int primary_dark_material_settings_light = 0x010603da;
 		/**
         primary_device_default_dark
           > from values/colors/system_neutral1_900
           ! replaced with system_neutral1_500
 
          */
-		public static final int primary_device_default_dark = 0x01060244;
-		public static final int primary_device_default_light = 0x01060245;
-		public static final int primary_device_default_settings = 0x01060246;
-		public static final int primary_device_default_settings_light = 0x01060247;
-		public static final int primary_material_dark = 0x010602bd;
-		public static final int primary_material_light = 0x010602be;
-		public static final int primary_material_settings = 0x010602bf;
-		public static final int primary_material_settings_light = 0x010602c0;
+		public static final int primary_device_default_dark = 0x010602ff;
+		public static final int primary_device_default_light = 0x01060300;
+		public static final int primary_device_default_settings = 0x01060301;
+		public static final int primary_device_default_settings_light = 0x01060302;
+		public static final int primary_material_dark = 0x010603d2;
+		public static final int primary_material_light = 0x010603d3;
+		public static final int primary_material_settings = 0x010603d4;
+		public static final int primary_material_settings_light = 0x010603d5;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
 		public static final int primary_text_dark = 0x01060001;
-		public static final int primary_text_dark_disable_only = 0x01060324;
-		public static final int primary_text_dark_focused = 0x01060325;
+		public static final int primary_text_dark_disable_only = 0x01060439;
+		public static final int primary_text_dark_focused = 0x0106043a;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
 		public static final int primary_text_dark_nodisable = 0x01060002;
 		/**  100% white
          */
-		public static final int primary_text_default_material_dark = 0x010602d6;
+		public static final int primary_text_default_material_dark = 0x010603eb;
 		/**  87% black
          */
-		public static final int primary_text_default_material_light = 0x010602d4;
-		public static final int primary_text_disable_only_holo_dark = 0x01060326;
-		public static final int primary_text_disable_only_holo_light = 0x01060327;
-		public static final int primary_text_disable_only_material_dark = 0x01060328;
-		public static final int primary_text_disable_only_material_light = 0x01060329;
-		public static final int primary_text_focused_holo_dark = 0x0106032a;
-		public static final int primary_text_holo_dark = 0x0106032b;
-		public static final int primary_text_holo_light = 0x0106032c;
-		public static final int primary_text_inverse_when_activated_material = 0x0106032d;
-		public static final int primary_text_leanback_dark = 0x0106029f;
-		public static final int primary_text_leanback_formwizard_dark = 0x0106032e;
-		public static final int primary_text_leanback_formwizard_default_dark = 0x010602a1;
+		public static final int primary_text_default_material_light = 0x010603e9;
+		public static final int primary_text_disable_only_holo_dark = 0x0106043b;
+		public static final int primary_text_disable_only_holo_light = 0x0106043c;
+		public static final int primary_text_disable_only_material_dark = 0x0106043d;
+		public static final int primary_text_disable_only_material_light = 0x0106043e;
+		public static final int primary_text_focused_holo_dark = 0x0106043f;
+		public static final int primary_text_holo_dark = 0x01060440;
+		public static final int primary_text_holo_light = 0x01060441;
+		public static final int primary_text_inverse_when_activated_material = 0x01060442;
+		public static final int primary_text_leanback_dark = 0x010603b4;
+		public static final int primary_text_leanback_formwizard_dark = 0x01060443;
+		public static final int primary_text_leanback_formwizard_default_dark = 0x010603b6;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
 		public static final int primary_text_light = 0x01060003;
-		public static final int primary_text_light_disable_only = 0x0106032f;
+		public static final int primary_text_light_disable_only = 0x01060444;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
 		public static final int primary_text_light_nodisable = 0x01060004;
-		public static final int primary_text_material_dark = 0x01060330;
-		public static final int primary_text_material_light = 0x01060331;
-		public static final int primary_text_nodisable_holo_dark = 0x01060332;
-		public static final int primary_text_nodisable_holo_light = 0x01060333;
-		public static final int primary_text_secondary_when_activated_material = 0x01060334;
-		public static final int primary_text_secondary_when_activated_material_inverse = 0x01060335;
+		public static final int primary_text_material_dark = 0x01060445;
+		public static final int primary_text_material_light = 0x01060446;
+		public static final int primary_text_nodisable_holo_dark = 0x01060447;
+		public static final int primary_text_nodisable_holo_light = 0x01060448;
+		public static final int primary_text_secondary_when_activated_material = 0x01060449;
+		public static final int primary_text_secondary_when_activated_material_inverse = 0x0106044a;
 		/**  white
  Default profile badge colors
          */
-		public static final int profile_badge_1 = 0x01060115;
+		public static final int profile_badge_1 = 0x01060125;
 		/**  Green
          */
-		public static final int profile_badge_1_dark = 0x01060118;
+		public static final int profile_badge_1_dark = 0x01060128;
 		/**  Blue
          */
-		public static final int profile_badge_2 = 0x01060116;
+		public static final int profile_badge_2 = 0x01060126;
 		/**  Blue 300
          */
-		public static final int profile_badge_2_dark = 0x01060119;
+		public static final int profile_badge_2_dark = 0x01060129;
 		/**  Orange
          */
-		public static final int profile_badge_3 = 0x01060117;
+		public static final int profile_badge_3 = 0x01060127;
 		/**  Orange 300
          */
-		public static final int profile_badge_3_dark = 0x0106011a;
-		public static final int quaternary_device_default_settings = 0x0106024f;
-		public static final int quaternary_material_settings = 0x010602c9;
-		public static final int ratingbar_background_material = 0x01060336;
-		public static final int red = 0x010600c3;
-		public static final int resolver_accent_ripple = 0x01060337;
+		public static final int profile_badge_3_dark = 0x0106012a;
+		public static final int quaternary_device_default_settings = 0x0106030a;
+		public static final int quaternary_material_settings = 0x010603de;
+		public static final int ratingbar_background_material = 0x0106044b;
+		public static final int red = 0x010600d3;
+		public static final int resolver_accent_ripple = 0x0106044c;
 		/**  Resolver/Chooser
          */
-		public static final int resolver_text_color_secondary_dark = 0x01060131;
-		public static final int ripple_material_dark = 0x01060338;
-		public static final int ripple_material_light = 0x01060339;
-		public static final int safe_mode_text = 0x010600c2;
-		public static final int search_url_text = 0x0106033a;
-		public static final int search_url_text_holo = 0x0106033b;
-		public static final int search_url_text_material_dark = 0x0106033c;
-		public static final int search_url_text_material_light = 0x0106033d;
+		public static final int resolver_text_color_secondary_dark = 0x01060141;
+		public static final int ripple_material_dark = 0x0106044d;
+		public static final int ripple_material_light = 0x0106044e;
+		public static final int safe_mode_text = 0x010600d2;
+		public static final int search_url_text = 0x0106044f;
+		public static final int search_url_text_holo = 0x01060450;
+		public static final int search_url_text_material_dark = 0x01060451;
+		public static final int search_url_text_material_light = 0x01060452;
 		/**  For search-related UIs
          */
-		public static final int search_url_text_normal = 0x010600df;
-		public static final int search_url_text_pressed = 0x010600e1;
-		public static final int search_url_text_selected = 0x010600e0;
-		public static final int search_widget_corpus_item_background = 0x010600e2;
-		public static final int secondary_device_default_settings = 0x0106024c;
-		public static final int secondary_device_default_settings_light = 0x0106024d;
-		public static final int secondary_material_settings = 0x010602c6;
-		public static final int secondary_material_settings_light = 0x010602c7;
+		public static final int search_url_text_normal = 0x010600ef;
+		public static final int search_url_text_pressed = 0x010600f1;
+		public static final int search_url_text_selected = 0x010600f0;
+		public static final int search_widget_corpus_item_background = 0x010600f2;
+		public static final int secondary_device_default_settings = 0x01060307;
+		public static final int secondary_device_default_settings_light = 0x01060308;
+		public static final int secondary_material_settings = 0x010603db;
+		public static final int secondary_material_settings_light = 0x010603dc;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
@@ -22728,14 +22818,14 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int secondary_text_dark_nodisable = 0x01060006;
 		/**  70% white
          */
-		public static final int secondary_text_default_material_dark = 0x010602d7;
+		public static final int secondary_text_default_material_dark = 0x010603ec;
 		/**  54% black
          */
-		public static final int secondary_text_default_material_light = 0x010602d5;
-		public static final int secondary_text_holo_dark = 0x0106033e;
-		public static final int secondary_text_holo_light = 0x0106033f;
-		public static final int secondary_text_inverse_when_activated_material = 0x01060340;
-		public static final int secondary_text_leanback_dark = 0x010602a0;
+		public static final int secondary_text_default_material_light = 0x010603ea;
+		public static final int secondary_text_holo_dark = 0x01060453;
+		public static final int secondary_text_holo_light = 0x01060454;
+		public static final int secondary_text_inverse_when_activated_material = 0x01060455;
+		public static final int secondary_text_leanback_dark = 0x010603b5;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
@@ -22744,385 +22834,627 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          */
 		@Deprecated
 		public static final int secondary_text_light_nodisable = 0x01060008;
-		public static final int secondary_text_material_dark = 0x01060341;
-		public static final int secondary_text_material_light = 0x01060342;
-		public static final int secondary_text_nodisable_holo_dark = 0x01060343;
-		public static final int secondary_text_nodisable_holo_light = 0x01060344;
-		public static final int secondary_text_nofocus = 0x01060345;
-		public static final int seekbar_track_progress_material = 0x01060346;
-		public static final int shadow = 0x010600de;
-		public static final int side_fps_button_color = 0x0106017e;
-		public static final int side_fps_text_color = 0x0106017d;
+		public static final int secondary_text_material_dark = 0x01060456;
+		public static final int secondary_text_material_light = 0x01060457;
+		public static final int secondary_text_nodisable_holo_dark = 0x01060458;
+		public static final int secondary_text_nodisable_holo_light = 0x01060459;
+		public static final int secondary_text_nofocus = 0x0106045a;
+		public static final int seekbar_track_progress_material = 0x0106045b;
+		public static final int shadow = 0x010600ee;
+		public static final int side_fps_button_color = 0x01060239;
+		public static final int side_fps_text_color = 0x01060238;
 		/**  Color for side fps toast light theme
          */
-		public static final int side_fps_toast_background = 0x0106017c;
+		public static final int side_fps_toast_background = 0x01060237;
 		/**  SlidingTab
          */
-		public static final int sliding_tab_text_color_active = 0x010600e3;
-		public static final int sliding_tab_text_color_shadow = 0x010600e4;
-		public static final int suggestion_highlight_text = 0x010600d8;
+		public static final int sliding_tab_text_color_active = 0x010600f3;
+		public static final int sliding_tab_text_color_shadow = 0x010600f4;
+		public static final int suggestion_highlight_text = 0x010600e8;
 		/**  Currently matches the "surface dark" definition for phones.
          */
-		public static final int surface_dark = 0x01060265;
+		public static final int surface_dark = 0x01060320;
 		/**  Surface colors
          */
-		public static final int surface_header_dark = 0x01060261;
-		public static final int surface_header_light = 0x01060262;
-		public static final int surface_highlight_dark = 0x01060347;
-		public static final int surface_highlight_light = 0x01060266;
-		public static final int surface_light = 0x01060348;
-		public static final int surface_variant_dark = 0x01060263;
-		public static final int surface_variant_light = 0x01060264;
-		public static final int switch_thumb_disabled_material_dark = 0x010602d2;
-		public static final int switch_thumb_disabled_material_light = 0x010602d3;
-		public static final int switch_thumb_material_dark = 0x01060349;
-		public static final int switch_thumb_material_light = 0x0106034a;
+		public static final int surface_header_dark = 0x0106031c;
+		public static final int surface_header_light = 0x0106031d;
+		public static final int surface_highlight_dark = 0x0106045c;
+		public static final int surface_highlight_light = 0x01060321;
+		public static final int surface_light = 0x0106045d;
+		public static final int surface_variant_dark = 0x0106031e;
+		public static final int surface_variant_light = 0x0106031f;
+		public static final int switch_thumb_disabled_material_dark = 0x010603e7;
+		public static final int switch_thumb_disabled_material_light = 0x010603e8;
+		public static final int switch_thumb_material_dark = 0x0106045e;
+		public static final int switch_thumb_material_light = 0x0106045f;
 		/**  deep orange 500
          */
-		public static final int switch_thumb_normal_material_dark = 0x010602d0;
-		public static final int switch_thumb_normal_material_light = 0x010602d1;
-		public static final int switch_thumb_watch_default_dark = 0x0106034b;
-		public static final int switch_track_material = 0x0106034c;
-		public static final int switch_track_watch_default_dark = 0x0106034d;
-		/** Lightest shade of the Primary color used by the system. White.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
+		public static final int switch_thumb_normal_material_dark = 0x010603e5;
+		public static final int switch_thumb_normal_material_light = 0x010603e6;
+		public static final int switch_thumb_watch_default_dark = 0x01060460;
+		public static final int switch_track_material = 0x01060461;
+		public static final int switch_track_watch_default_dark = 0x01060462;
 		public static final int system_accent1_0 = 0x01060037;
-		/** Shade of the Primary system color at 99% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Lightest shade of the Primary color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_0_dark = 0x01060192;
+		/** Lightest shade of the Primary color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_0_light = 0x01060144;
 		public static final int system_accent1_10 = 0x01060038;
-		/** Shade of the Primary system color at 90% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent1_100 = 0x0106003a;
-		/** Darkest shade of the Primary color used by the system. Black.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent1_1000 = 0x01060043;
-		/** Shade of the Primary system color at 80% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Darkest shade of the Primary color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_1000_dark = 0x0106019e;
+		/** Darkest shade of the Primary color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_1000_light = 0x01060150;
+		/** Shade of the Primary system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_100_dark = 0x01060195;
+		/** Shade of the Primary system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_100_light = 0x01060147;
+		/** Shade of the Primary system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_10_dark = 0x01060193;
+		/** Shade of the Primary system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_10_light = 0x01060145;
 		public static final int system_accent1_200 = 0x0106003b;
-		/** Shade of the Primary system color at 70% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_200_dark = 0x01060196;
+		/** Shade of the Primary system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_200_light = 0x01060148;
 		public static final int system_accent1_300 = 0x0106003c;
-		/** Shade of the Primary system color at 60% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_300_dark = 0x01060197;
+		/** Shade of the Primary system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_300_light = 0x01060149;
 		public static final int system_accent1_400 = 0x0106003d;
-		/** Shade of the Primary system color at 95% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_400_dark = 0x01060198;
+		/** Shade of the Primary system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_400_light = 0x0106014a;
 		public static final int system_accent1_50 = 0x01060039;
-		/** Shade of the Primary system color at 50% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent1_500 = 0x0106003e;
-		/** Shade of the Primary system color at 40% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_500_dark = 0x01060199;
+		/** Shade of the Primary system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_500_light = 0x0106014b;
+		/** Shade of the Primary system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_50_dark = 0x01060194;
+		/** Shade of the Primary system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_50_light = 0x01060146;
 		public static final int system_accent1_600 = 0x0106003f;
-		/** Shade of the Primary system color at 30% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_600_dark = 0x0106019a;
+		/** Shade of the Primary system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_600_light = 0x0106014c;
 		public static final int system_accent1_700 = 0x01060040;
-		/** Shade of the Primary system color at 20% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_700_dark = 0x0106019b;
+		/** Shade of the Primary system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_700_light = 0x0106014d;
 		public static final int system_accent1_800 = 0x01060041;
-		/** Shade of the Primary system color at 10% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_800_dark = 0x0106019c;
+		/** Shade of the Primary system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_800_light = 0x0106014e;
 		public static final int system_accent1_900 = 0x01060042;
-		/** Lightest shade of the Secondary color used by the system. White.
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Primary system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent1_900_dark = 0x0106019d;
+		/** Shade of the Primary system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent1_900_light = 0x0106014f;
 		public static final int system_accent2_0 = 0x01060044;
-		/** Shade of the Secondary system color at 99% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Lightest shade of the Secondary color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_0_dark = 0x0106019f;
+		/** Lightest shade of the Secondary color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_0_light = 0x01060151;
 		public static final int system_accent2_10 = 0x01060045;
-		/** Shade of the Secondary system color at 90% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent2_100 = 0x01060047;
-		/** Darkest shade of the Secondary color used by the system. Black.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent2_1000 = 0x01060050;
-		/** Shade of the Secondary system color at 80% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Darkest shade of the Secondary color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_1000_dark = 0x010601ab;
+		/** Darkest shade of the Secondary color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_1000_light = 0x0106015d;
+		/** Shade of the Secondary system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_100_dark = 0x010601a2;
+		/** Shade of the Secondary system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_100_light = 0x01060154;
+		/** Shade of the Secondary system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_10_dark = 0x010601a0;
+		/** Shade of the Secondary system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_10_light = 0x01060152;
 		public static final int system_accent2_200 = 0x01060048;
-		/** Shade of the Secondary system color at 70% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_200_dark = 0x010601a3;
+		/** Shade of the Secondary system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_200_light = 0x01060155;
 		public static final int system_accent2_300 = 0x01060049;
-		/** Shade of the Secondary system color at 60% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_300_dark = 0x010601a4;
+		/** Shade of the Secondary system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_300_light = 0x01060156;
 		public static final int system_accent2_400 = 0x0106004a;
-		/** Shade of the Secondary system color at 95% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_400_dark = 0x010601a5;
+		/** Shade of the Secondary system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_400_light = 0x01060157;
 		public static final int system_accent2_50 = 0x01060046;
-		/** Shade of the Secondary system color at 50% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent2_500 = 0x0106004b;
-		/** Shade of the Secondary system color at 40% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_500_dark = 0x010601a6;
+		/** Shade of the Secondary system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_500_light = 0x01060158;
+		/** Shade of the Secondary system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_50_dark = 0x010601a1;
+		/** Shade of the Secondary system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_50_light = 0x01060153;
 		public static final int system_accent2_600 = 0x0106004c;
-		/** Shade of the Secondary system color at 30% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_600_dark = 0x010601a7;
+		/** Shade of the Secondary system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_600_light = 0x01060159;
 		public static final int system_accent2_700 = 0x0106004d;
-		/** Shade of the Secondary system color at 20% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_700_dark = 0x010601a8;
+		/** Shade of the Secondary system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_700_light = 0x0106015a;
 		public static final int system_accent2_800 = 0x0106004e;
-		/** Shade of the Secondary system color at 10% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_800_dark = 0x010601a9;
+		/** Shade of the Secondary system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_800_light = 0x0106015b;
 		public static final int system_accent2_900 = 0x0106004f;
-		/** Lightest shade of the Tertiary color used by the system. White.
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Secondary system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent2_900_dark = 0x010601aa;
+		/** Shade of the Secondary system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent2_900_light = 0x0106015c;
 		public static final int system_accent3_0 = 0x01060051;
-		/** Shade of the Tertiary system color at 99% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Lightest shade of the Tertiary color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_0_dark = 0x010601ac;
+		/** Lightest shade of the Tertiary color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_0_light = 0x0106015e;
 		public static final int system_accent3_10 = 0x01060052;
-		/** Shade of the Tertiary system color at 90% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent3_100 = 0x01060054;
-		/** Darkest shade of the Tertiary color used by the system. Black.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent3_1000 = 0x0106005d;
-		/** Shade of the Tertiary system color at 80% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Darkest shade of the Tertiary color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_1000_dark = 0x010601b8;
+		/** Darkest shade of the Tertiary color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_1000_light = 0x0106016a;
+		/** Shade of the Tertiary system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_100_dark = 0x010601af;
+		/** Shade of the Tertiary system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_100_light = 0x01060161;
+		/** Shade of the Tertiary system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_10_dark = 0x010601ad;
+		/** Shade of the Tertiary system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_10_light = 0x0106015f;
 		public static final int system_accent3_200 = 0x01060055;
-		/** Shade of the Tertiary system color at 70% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_200_dark = 0x010601b0;
+		/** Shade of the Tertiary system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_200_light = 0x01060162;
 		public static final int system_accent3_300 = 0x01060056;
-		/** Shade of the Tertiary system color at 60% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_300_dark = 0x010601b1;
+		/** Shade of the Tertiary system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_300_light = 0x01060163;
 		public static final int system_accent3_400 = 0x01060057;
-		/** Shade of the Tertiary system color at 95% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_400_dark = 0x010601b2;
+		/** Shade of the Tertiary system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_400_light = 0x01060164;
 		public static final int system_accent3_50 = 0x01060053;
-		/** Shade of the Tertiary system color at 50% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_accent3_500 = 0x01060058;
-		/** Shade of the Tertiary system color at 40% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_500_dark = 0x010601b3;
+		/** Shade of the Tertiary system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_500_light = 0x01060165;
+		/** Shade of the Tertiary system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_50_dark = 0x010601ae;
+		/** Shade of the Tertiary system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_50_light = 0x01060160;
 		public static final int system_accent3_600 = 0x01060059;
-		/** Shade of the Tertiary system color at 30% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_600_dark = 0x010601b4;
+		/** Shade of the Tertiary system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_600_light = 0x01060166;
 		public static final int system_accent3_700 = 0x0106005a;
-		/** Shade of the Tertiary system color at 20% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_700_dark = 0x010601b5;
+		/** Shade of the Tertiary system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_700_light = 0x01060167;
 		public static final int system_accent3_800 = 0x0106005b;
-		/** Shade of the Tertiary system color at 10% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Tertiary system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_accent3_800_dark = 0x010601b6;
+		/** Shade of the Tertiary system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_800_light = 0x01060168;
 		public static final int system_accent3_900 = 0x0106005c;
+		/** Shade of the Tertiary system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_900_dark = 0x010601b7;
+		/** Shade of the Tertiary system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_accent3_900_light = 0x01060169;
 		public static final int system_background_dark = 0x01060095;
 		public static final int system_background_light = 0x0106006a;
-		public static final int system_bar_background_semi_transparent = 0x0106034e;
-		public static final int system_brand_a_dark = 0x0106015e;
-		public static final int system_brand_a_light = 0x01060149;
-		public static final int system_brand_b_dark = 0x0106015f;
-		public static final int system_brand_b_light = 0x0106014a;
-		public static final int system_brand_c_dark = 0x01060160;
-		public static final int system_brand_c_light = 0x0106014b;
-		public static final int system_brand_d_dark = 0x01060161;
-		public static final int system_brand_d_light = 0x0106014c;
-		public static final int system_clock_hour_dark = 0x01060157;
-		public static final int system_clock_hour_light = 0x01060142;
-		public static final int system_clock_minute_dark = 0x01060158;
-		public static final int system_clock_minute_light = 0x01060143;
-		public static final int system_clock_second_dark = 0x01060159;
-		public static final int system_clock_second_light = 0x01060144;
+		public static final int system_bar_background_semi_transparent = 0x01060463;
+		public static final int system_brand_a_dark = 0x0106020e;
+		public static final int system_brand_a_light = 0x010601f8;
+		public static final int system_brand_b_dark = 0x0106020f;
+		public static final int system_brand_b_light = 0x010601f9;
+		public static final int system_brand_c_dark = 0x01060210;
+		public static final int system_brand_c_light = 0x010601fa;
+		public static final int system_brand_d_dark = 0x01060211;
+		public static final int system_brand_d_light = 0x010601fb;
+		public static final int system_clock_hour_dark = 0x01060212;
+		public static final int system_clock_hour_light = 0x010601fc;
+		public static final int system_clock_minute_dark = 0x01060213;
+		public static final int system_clock_minute_light = 0x010601fd;
+		public static final int system_clock_second_dark = 0x01060214;
+		public static final int system_clock_second_light = 0x010601fe;
 		public static final int system_control_activated_dark = 0x010600a7;
 		public static final int system_control_activated_light = 0x0106007c;
 		public static final int system_control_highlight_dark = 0x010600a9;
 		public static final int system_control_highlight_light = 0x0106007e;
 		public static final int system_control_normal_dark = 0x010600a8;
 		public static final int system_control_normal_light = 0x0106007d;
-		/**  Lightest shade of the error color used by the system. White.
- This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_0 = 0x010600c5;
+		/** Lightest shade of the Error color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_0 = 0x01060134;
-		/**  Shade of the error system color at 99% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_0_dark = 0x010601d3;
+		/** Lightest shade of the Error color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_10 = 0x01060135;
-		/**  Shade of the error system color at 90% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_0_light = 0x01060185;
+		public static final int system_error_10 = 0x010600c6;
+		public static final int system_error_100 = 0x010600c8;
+		public static final int system_error_1000 = 0x010600d1;
+		/** Darkest shade of the Error color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_100 = 0x01060137;
-		/**  Darkest shade of the error color used by the system. Black.
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_1000_dark = 0x010601df;
+		/** Darkest shade of the Error color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_1000 = 0x01060140;
-		/**  Shade of the error system color at 80% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_1000_light = 0x01060191;
+		/** Shade of the Error system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_200 = 0x01060138;
-		/**  Shade of the error system color at 70% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_100_dark = 0x010601d6;
+		/** Shade of the Error system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_300 = 0x01060139;
-		/**  Shade of the error system color at 60% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_100_light = 0x01060188;
+		/** Shade of the Error system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_400 = 0x0106013a;
-		/**  Shade of the error system color at 95% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_10_dark = 0x010601d4;
+		/** Shade of the Error system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_50 = 0x01060136;
-		/**  Shade of the error system color at 49% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_10_light = 0x01060186;
+		public static final int system_error_200 = 0x010600c9;
+		/** Shade of the Error system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_500 = 0x0106013b;
-		/**  Shade of the error system color at 40% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_200_dark = 0x010601d7;
+		/** Shade of the Error system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_600 = 0x0106013c;
-		/**  Shade of the error system color at 30% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_200_light = 0x01060189;
+		public static final int system_error_300 = 0x010600ca;
+		/** Shade of the Error system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_700 = 0x0106013d;
-		/**  Shade of the error system color at 20% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_300_dark = 0x010601d8;
+		/** Shade of the Error system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_800 = 0x0106013e;
-		/**  Shade of the error system color at 10% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		public static final int system_error_300_light = 0x0106018a;
+		public static final int system_error_400 = 0x010600cb;
+		/** Shade of the Error system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
-		public static final int system_error_900 = 0x0106013f;
+		public static final int system_error_400_dark = 0x010601d9;
+		/** Shade of the Error system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_400_light = 0x0106018b;
+		public static final int system_error_50 = 0x010600c7;
+		public static final int system_error_500 = 0x010600cc;
+		/** Shade of the Error system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_500_dark = 0x010601da;
+		/** Shade of the Error system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_500_light = 0x0106018c;
+		/** Shade of the Error system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_50_dark = 0x010601d5;
+		/** Shade of the Error system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_50_light = 0x01060187;
+		public static final int system_error_600 = 0x010600cd;
+		/** Shade of the Error system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_600_dark = 0x010601db;
+		/** Shade of the Error system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_600_light = 0x0106018d;
+		public static final int system_error_700 = 0x010600ce;
+		/** Shade of the Error system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_700_dark = 0x010601dc;
+		/** Shade of the Error system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_700_light = 0x0106018e;
+		public static final int system_error_800 = 0x010600cf;
+		/** Shade of the Error system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_800_dark = 0x010601dd;
+		/** Shade of the Error system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_800_light = 0x0106018f;
+		public static final int system_error_900 = 0x010600d0;
+		/** Shade of the Error system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_900_dark = 0x010601de;
+		/** Shade of the Error system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_error_900_light = 0x01060190;
 		public static final int system_error_container_dark = 0x010600a5;
 		public static final int system_error_container_light = 0x0106007a;
 		public static final int system_error_dark = 0x010600a3;
+		public static final int system_error_dim_dark = 0x010601ec;
+		public static final int system_error_dim_light = 0x010601e0;
 		public static final int system_error_light = 0x01060078;
-		/** Lightest shade of the Neutral color used by the system. White.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
+		public static final int system_inverse_on_surface_dark = 0x010601ed;
+		public static final int system_inverse_on_surface_light = 0x010601e1;
+		public static final int system_inverse_primary_dark = 0x010601ee;
+		public static final int system_inverse_primary_light = 0x010601e2;
+		public static final int system_inverse_surface_dark = 0x010601ef;
+		public static final int system_inverse_surface_light = 0x010601e3;
 		public static final int system_neutral1_0 = 0x0106001d;
-		/** Shade of the Neutral system color at 99% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Lightest shade of the Neutral color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_0_dark = 0x010601b9;
+		/** Lightest shade of the Neutral color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_0_light = 0x0106016b;
 		public static final int system_neutral1_10 = 0x0106001e;
-		/** Shade of the Neutral system color at 90% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_neutral1_100 = 0x01060020;
-		/** Darkest shade of the Neutral color used by the system. Black.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_neutral1_1000 = 0x01060029;
-		/** Shade of the Neutral system color at 80% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Darkest shade of the Neutral color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_1000_dark = 0x010601c5;
+		/** Darkest shade of the Neutral color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_1000_light = 0x01060177;
+		/** Shade of the Neutral system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_100_dark = 0x010601bc;
+		/** Shade of the Neutral system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_100_light = 0x0106016e;
+		/** Shade of the Neutral system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_10_dark = 0x010601ba;
+		/** Shade of the Neutral system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_10_light = 0x0106016c;
 		public static final int system_neutral1_200 = 0x01060021;
-		/** Shade of the Neutral system color at 70% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_200_dark = 0x010601bd;
+		/** Shade of the Neutral system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_200_light = 0x0106016f;
 		public static final int system_neutral1_300 = 0x01060022;
-		/** Shade of the Neutral system color at 60% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_300_dark = 0x010601be;
+		/** Shade of the Neutral system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_300_light = 0x01060170;
 		public static final int system_neutral1_400 = 0x01060023;
-		/** Shade of the Neutral system color at 95% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_400_dark = 0x010601bf;
+		/** Shade of the Neutral system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_400_light = 0x01060171;
 		public static final int system_neutral1_50 = 0x0106001f;
-		/** Shade of the Neutral system color at 50% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_neutral1_500 = 0x01060024;
-		/** Shade of the Neutral system color at 40% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_500_dark = 0x010601c0;
+		/** Shade of the Neutral system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_500_light = 0x01060172;
+		/** Shade of the Neutral system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_50_dark = 0x010601bb;
+		/** Shade of the Neutral system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_50_light = 0x0106016d;
 		public static final int system_neutral1_600 = 0x01060025;
-		/** Shade of the Neutral system color at 30% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_600_dark = 0x010601c1;
+		/** Shade of the Neutral system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_600_light = 0x01060173;
 		public static final int system_neutral1_700 = 0x01060026;
-		/** Shade of the Neutral system color at 20% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_700_dark = 0x010601c2;
+		/** Shade of the Neutral system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_700_light = 0x01060174;
 		public static final int system_neutral1_800 = 0x01060027;
-		/** Shade of the Neutral system color at 10% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_800_dark = 0x010601c3;
+		/** Shade of the Neutral system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_800_light = 0x01060175;
 		public static final int system_neutral1_900 = 0x01060028;
-		/** Lightest shade of the Secondary Neutral color used by the system. White.
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral1_900_dark = 0x010601c4;
+		/** Shade of the Neutral system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral1_900_light = 0x01060176;
 		public static final int system_neutral2_0 = 0x0106002a;
-		/** Shade of the Secondary Neutral system color at 99% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Lightest shade of the Neutral Variant color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_0_dark = 0x010601c6;
+		/** Lightest shade of the Neutral Variant color used by the system. White. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_0_light = 0x01060178;
 		public static final int system_neutral2_10 = 0x0106002b;
-		/** Shade of the Secondary Neutral system color at 90% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_neutral2_100 = 0x0106002d;
-		/** Darkest shade of the Secondary Neutral color used by the system. Black.
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_neutral2_1000 = 0x01060036;
-		/** Shade of the Secondary Neutral system color at 80% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Darkest shade of the Neutral Variant color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_1000_dark = 0x010601d2;
+		/** Darkest shade of the Neutral Variant color used by the system. Black. This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_1000_light = 0x01060184;
+		/** Shade of the Neutral Variant system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_100_dark = 0x010601c9;
+		/** Shade of the Neutral Variant system color at 90% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_100_light = 0x0106017b;
+		/** Shade of the Neutral Variant system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_10_dark = 0x010601c7;
+		/** Shade of the Neutral Variant system color at 99% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_10_light = 0x01060179;
 		public static final int system_neutral2_200 = 0x0106002e;
-		/** Shade of the Secondary Neutral system color at 70% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_200_dark = 0x010601ca;
+		/** Shade of the Neutral Variant system color at 80% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_200_light = 0x0106017c;
 		public static final int system_neutral2_300 = 0x0106002f;
-		/** Shade of the Secondary Neutral system color at 60% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_300_dark = 0x010601cb;
+		/** Shade of the Neutral Variant system color at 70% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_300_light = 0x0106017d;
 		public static final int system_neutral2_400 = 0x01060030;
-		/** Shade of the Secondary Neutral system color at 95% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_400_dark = 0x010601cc;
+		/** Shade of the Neutral Variant system color at 60% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_400_light = 0x0106017e;
 		public static final int system_neutral2_50 = 0x0106002c;
-		/** Shade of the Secondary Neutral system color at 50% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
-         */
 		public static final int system_neutral2_500 = 0x01060031;
-		/** Shade of the Secondary Neutral system color at 40% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_500_dark = 0x010601cd;
+		/** Shade of the Neutral Variant system color at 50% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_500_light = 0x0106017f;
+		/** Shade of the Neutral Variant system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_50_dark = 0x010601c8;
+		/** Shade of the Neutral Variant system color at 95% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_50_light = 0x0106017a;
 		public static final int system_neutral2_600 = 0x01060032;
-		/** Shade of the Secondary Neutral system color at 30% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_600_dark = 0x010601ce;
+		/** Shade of the Neutral Variant system color at 40% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_600_light = 0x01060180;
 		public static final int system_neutral2_700 = 0x01060033;
-		/** Shade of the Secondary Neutral system color at 20% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_700_dark = 0x010601cf;
+		/** Shade of the Neutral Variant system color at 30% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_700_light = 0x01060181;
 		public static final int system_neutral2_800 = 0x01060034;
-		/** Shade of the Secondary Neutral system color at 10% perceptual luminance (L* in L*a*b* color space).
-     This value can be overlaid at runtime by OverlayManager RROs.
+		/** Shade of the Neutral Variant system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
          */
+		public static final int system_neutral2_800_dark = 0x010601d0;
+		/** Shade of the Neutral Variant system color at 20% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_800_light = 0x01060182;
 		public static final int system_neutral2_900 = 0x01060035;
+		/** Shade of the Neutral Variant system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_900_dark = 0x010601d1;
+		/** Shade of the Neutral Variant system color at 10% perceptual luminance (L* in L*a*b* color space). This value can be overlaid at runtime by OverlayManager RROs.
+         */
+		public static final int system_neutral2_900_light = 0x01060183;
 		/**  @hide
          */
 		@android.annotation.SystemApi
@@ -23145,16 +23477,16 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_on_secondary_fixed = 0x010600ba;
 		public static final int system_on_secondary_fixed_variant = 0x010600bb;
 		public static final int system_on_secondary_light = 0x01060065;
-		public static final int system_on_shade_active_dark = 0x01060164;
-		public static final int system_on_shade_active_light = 0x0106014f;
-		public static final int system_on_shade_active_variant_dark = 0x01060165;
-		public static final int system_on_shade_active_variant_light = 0x01060150;
-		public static final int system_on_shade_inactive_dark = 0x01060167;
-		public static final int system_on_shade_inactive_light = 0x01060152;
-		public static final int system_on_shade_inactive_variant_dark = 0x01060168;
-		public static final int system_on_shade_inactive_variant_light = 0x01060153;
+		public static final int system_on_shade_active_dark = 0x01060215;
+		public static final int system_on_shade_active_light = 0x010601ff;
+		public static final int system_on_shade_active_variant_dark = 0x01060216;
+		public static final int system_on_shade_active_variant_light = 0x01060200;
+		public static final int system_on_shade_inactive_dark = 0x01060217;
+		public static final int system_on_shade_inactive_light = 0x01060201;
+		public static final int system_on_shade_inactive_variant_dark = 0x01060218;
+		public static final int system_on_shade_inactive_variant_light = 0x01060202;
 		public static final int system_on_surface_dark = 0x01060098;
-		public static final int system_on_surface_disabled = 0x0106034f;
+		public static final int system_on_surface_disabled = 0x010600c3;
 		public static final int system_on_surface_light = 0x0106006d;
 		public static final int system_on_surface_variant_dark = 0x010600a1;
 		public static final int system_on_surface_variant_light = 0x01060076;
@@ -23164,17 +23496,21 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_on_tertiary_fixed = 0x010600be;
 		public static final int system_on_tertiary_fixed_variant = 0x010600bf;
 		public static final int system_on_tertiary_light = 0x01060069;
-		public static final int system_on_theme_app_dark = 0x0106015b;
-		public static final int system_on_theme_app_light = 0x01060146;
-		public static final int system_on_theme_app_ring_dark = 0x0106015d;
-		public static final int system_on_theme_app_ring_light = 0x01060148;
+		public static final int system_on_theme_app_dark = 0x01060219;
+		public static final int system_on_theme_app_light = 0x01060203;
+		public static final int system_on_theme_app_ring_dark = 0x01060225;
+		/**  ATL: removed in android-16.0.0_r4, still used by customColorOnThemeAppRing of ATL's DeviceDefault themes
+         */
+		public static final int system_on_theme_app_ring_light = 0x01060224;
 		public static final int system_outline_dark = 0x010600a2;
-		public static final int system_outline_disabled = 0x01060350;
+		public static final int system_outline_disabled = 0x010600c4;
 		public static final int system_outline_light = 0x01060077;
 		public static final int system_outline_variant_dark = 0x010600c1;
 		public static final int system_outline_variant_light = 0x010600c0;
-		public static final int system_overview_background_dark = 0x0106016a;
-		public static final int system_overview_background_light = 0x01060155;
+		public static final int system_overview_background_dark = 0x0106021a;
+		public static final int system_overview_background_light = 0x01060204;
+		public static final int system_palette_key_color_error_dark = 0x010601f0;
+		public static final int system_palette_key_color_error_light = 0x010601e4;
 		public static final int system_palette_key_color_neutral_dark = 0x010600b2;
 		public static final int system_palette_key_color_neutral_light = 0x01060087;
 		public static final int system_palette_key_color_neutral_variant_dark = 0x010600b3;
@@ -23186,26 +23522,38 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_palette_key_color_tertiary_dark = 0x010600b1;
 		public static final int system_palette_key_color_tertiary_light = 0x01060086;
 		public static final int system_primary_container_dark = 0x01060089;
-		/**  Colors used in Android system, from design system.
-     These values can be overlaid at runtime by OverlayManager RROs.
+		/**  ===============================================================
+    Resources added in version U of the platform: only the colors (the dynamic colors of
+    Material You, which framework-res already has), with the ids of android-14
+    ===============================================================
          */
 		public static final int system_primary_container_light = 0x0106005e;
 		public static final int system_primary_dark = 0x0106008b;
+		public static final int system_primary_dim_dark = 0x010601f1;
+		public static final int system_primary_dim_light = 0x010601e5;
 		public static final int system_primary_fixed = 0x010600b4;
 		public static final int system_primary_fixed_dim = 0x010600b5;
 		public static final int system_primary_light = 0x01060060;
+		public static final int system_scrim_dark = 0x010601f2;
+		public static final int system_scrim_light = 0x010601e6;
 		public static final int system_secondary_container_dark = 0x0106008d;
 		public static final int system_secondary_container_light = 0x01060062;
 		public static final int system_secondary_dark = 0x0106008f;
+		public static final int system_secondary_dim_dark = 0x010601f3;
+		public static final int system_secondary_dim_light = 0x010601e7;
 		public static final int system_secondary_fixed = 0x010600b8;
 		public static final int system_secondary_fixed_dim = 0x010600b9;
 		public static final int system_secondary_light = 0x01060064;
-		public static final int system_shade_active_dark = 0x01060163;
-		public static final int system_shade_active_light = 0x0106014e;
-		public static final int system_shade_disabled_dark = 0x01060169;
-		public static final int system_shade_disabled_light = 0x01060154;
-		public static final int system_shade_inactive_dark = 0x01060166;
-		public static final int system_shade_inactive_light = 0x01060151;
+		public static final int system_semantic_red_container_high_dark = 0x010601f4;
+		public static final int system_semantic_red_container_high_light = 0x010601e8;
+		public static final int system_shade_active_dark = 0x0106021b;
+		public static final int system_shade_active_light = 0x01060205;
+		public static final int system_shade_disabled_dark = 0x0106021c;
+		public static final int system_shade_disabled_light = 0x01060206;
+		public static final int system_shade_inactive_dark = 0x0106021d;
+		public static final int system_shade_inactive_light = 0x01060207;
+		public static final int system_shadow_dark = 0x010601f5;
+		public static final int system_shadow_light = 0x010601e9;
 		public static final int system_surface_bright_dark = 0x0106009e;
 		public static final int system_surface_bright_light = 0x01060073;
 		/**  Wear flattens the typical 5 container layers to 3; container + high & low
@@ -23226,13 +23574,17 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_surface_dark = 0x01060097;
 		public static final int system_surface_dim_dark = 0x0106009f;
 		public static final int system_surface_dim_light = 0x01060074;
-		public static final int system_surface_disabled = 0x01060351;
+		public static final int system_surface_disabled = 0x010600c2;
 		public static final int system_surface_light = 0x0106006c;
+		public static final int system_surface_tint_dark = 0x010601f6;
+		public static final int system_surface_tint_light = 0x010601ea;
 		public static final int system_surface_variant_dark = 0x010600a0;
 		public static final int system_surface_variant_light = 0x01060075;
 		public static final int system_tertiary_container_dark = 0x01060091;
 		public static final int system_tertiary_container_light = 0x01060066;
 		public static final int system_tertiary_dark = 0x01060093;
+		public static final int system_tertiary_dim_dark = 0x010601f7;
+		public static final int system_tertiary_dim_light = 0x010601eb;
 		public static final int system_tertiary_fixed = 0x010600bc;
 		public static final int system_tertiary_fixed_dim = 0x010600bd;
 		public static final int system_tertiary_light = 0x01060068;
@@ -23246,92 +23598,93 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int system_text_secondary_and_tertiary_inverse_disabled_dark = 0x010600ad;
 		public static final int system_text_secondary_and_tertiary_inverse_disabled_light = 0x01060082;
 		public static final int system_text_secondary_and_tertiary_inverse_light = 0x01060080;
-		public static final int system_theme_app_dark = 0x0106015a;
-		public static final int system_theme_app_light = 0x01060145;
-		public static final int system_theme_app_ring_dark = 0x0106015c;
-		public static final int system_theme_app_ring_light = 0x01060147;
-		public static final int system_under_surface_dark = 0x01060162;
-		public static final int system_under_surface_light = 0x0106014d;
-		public static final int system_widget_background_dark = 0x01060156;
-		/** Colors used in Android system, from design system. These values can be overlaid at runtime
-     by OverlayManager RROs.
-         */
-		public static final int system_widget_background_light = 0x01060141;
-		public static final int tab_highlight_material = 0x01060352;
-		public static final int tab_indicator_material = 0x01060353;
+		public static final int system_theme_app_dark = 0x0106021e;
+		public static final int system_theme_app_light = 0x01060208;
+		public static final int system_theme_app_ring_dark = 0x0106021f;
+		public static final int system_theme_app_ring_light = 0x01060209;
+		public static final int system_theme_notif_dark = 0x01060220;
+		public static final int system_theme_notif_light = 0x0106020a;
+		public static final int system_under_surface_dark = 0x01060221;
+		public static final int system_under_surface_light = 0x0106020b;
+		public static final int system_weather_temp_dark = 0x01060222;
+		public static final int system_weather_temp_light = 0x0106020c;
+		public static final int system_widget_background_dark = 0x01060223;
+		public static final int system_widget_background_light = 0x0106020d;
+		public static final int tab_highlight_material = 0x01060464;
+		public static final int tab_indicator_material = 0x01060465;
 		/**  Equivalent to 0xff808080
          */
 		public static final int tab_indicator_text = 0x01060009;
-		public static final int tab_indicator_text_material = 0x01060354;
-		public static final int tab_indicator_text_v4 = 0x01060355;
-		public static final int tertiary_device_default_settings = 0x0106024e;
-		public static final int tertiary_material_settings = 0x010602c8;
+		public static final int tab_indicator_text_material = 0x01060466;
+		public static final int tab_indicator_text_v4 = 0x01060467;
+		public static final int tertiary_device_default_settings = 0x01060309;
+		public static final int tertiary_material_settings = 0x010603dd;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
 		public static final int tertiary_text_dark = 0x01060010;
-		public static final int tertiary_text_holo_dark = 0x01060356;
-		public static final int tertiary_text_holo_light = 0x01060357;
+		public static final int tertiary_text_holo_dark = 0x01060468;
+		public static final int tertiary_text_holo_light = 0x01060469;
 		/**  {@deprecated Use a text color from your theme instead.}
          */
 		@Deprecated
 		public static final int tertiary_text_light = 0x01060011;
-		public static final int text_color_on_accent_device_default = 0x01060358;
-		public static final int text_color_primary = 0x01060359;
-		public static final int text_color_primary_device_default_dark = 0x0106035a;
-		public static final int text_color_primary_device_default_light = 0x0106035b;
-		public static final int text_color_secondary = 0x0106035c;
-		public static final int text_color_secondary_device_default_dark = 0x0106035d;
-		public static final int text_color_secondary_device_default_light = 0x0106035e;
-		public static final int text_color_tertiary_device_default_dark = 0x0106035f;
-		public static final int text_color_tertiary_device_default_light = 0x01060360;
-		public static final int timepicker_default_ampm_selected_background_color_material = 0x010602ed;
-		public static final int timepicker_default_ampm_unselected_background_color_material = 0x010602ee;
-		public static final int timepicker_default_background_material = 0x010602eb;
-		public static final int timepicker_default_numbers_background_color_material = 0x010602f0;
-		public static final int timepicker_default_selector_color_material = 0x010602ef;
-		public static final int timepicker_default_text_color_material = 0x010602ec;
+		public static final int text_color_on_accent_device_default = 0x0106046a;
+		public static final int text_color_primary = 0x0106046b;
+		public static final int text_color_primary_device_default_dark = 0x0106046c;
+		public static final int text_color_primary_device_default_light = 0x0106046d;
+		public static final int text_color_secondary = 0x0106046e;
+		public static final int text_color_secondary_device_default_dark = 0x0106046f;
+		public static final int text_color_secondary_device_default_light = 0x01060470;
+		public static final int text_color_tertiary_device_default_dark = 0x01060471;
+		public static final int text_color_tertiary_device_default_light = 0x01060472;
+		public static final int timepicker_default_ampm_selected_background_color_material = 0x01060402;
+		public static final int timepicker_default_ampm_unselected_background_color_material = 0x01060403;
+		public static final int timepicker_default_background_material = 0x01060400;
+		public static final int timepicker_default_numbers_background_color_material = 0x01060405;
+		public static final int timepicker_default_selector_color_material = 0x01060404;
+		public static final int timepicker_default_text_color_material = 0x01060401;
 		/**  Material Orange 300
          */
-		public static final int tooltip_background_dark = 0x01060128;
-		public static final int tooltip_background_light = 0x01060129;
+		public static final int tooltip_background_dark = 0x01060138;
+		public static final int tooltip_background_light = 0x01060139;
 		/**  Fully transparent, equivalent to 0x00000000
          */
 		public static final int transparent = 0x0106000d;
 		/**  Default user icon colors
          */
-		public static final int user_icon_1 = 0x0106010b;
+		public static final int user_icon_1 = 0x0106011b;
 		/**  red
          */
-		public static final int user_icon_2 = 0x0106010c;
+		public static final int user_icon_2 = 0x0106011c;
 		/**  purple
          */
-		public static final int user_icon_3 = 0x0106010d;
+		public static final int user_icon_3 = 0x0106011d;
 		/**  blue
          */
-		public static final int user_icon_4 = 0x0106010e;
+		public static final int user_icon_4 = 0x0106011e;
 		/**  pink
          */
-		public static final int user_icon_5 = 0x0106010f;
+		public static final int user_icon_5 = 0x0106011f;
 		/**  green
          */
-		public static final int user_icon_6 = 0x01060110;
+		public static final int user_icon_6 = 0x01060120;
 		/**  cyan
          */
-		public static final int user_icon_7 = 0x01060111;
+		public static final int user_icon_7 = 0x01060121;
 		/**  yellow
          */
-		public static final int user_icon_8 = 0x01060112;
+		public static final int user_icon_8 = 0x01060122;
 		/**  orange
          */
-		public static final int user_icon_default_gray = 0x01060113;
+		public static final int user_icon_default_gray = 0x01060123;
 		/**  gray 500
          */
-		public static final int user_icon_default_white = 0x01060114;
+		public static final int user_icon_default_white = 0x01060124;
 		/**  The color white, equivalent to 0xffffffff
          */
 		public static final int white = 0x0106000b;
-		public static final int white_disabled_material = 0x01060361;
+		public static final int white_disabled_material = 0x01060473;
 		/**  Equivalent to 0xff000000
          */
 		public static final int widget_edittext_dark = 0x0106000a;
