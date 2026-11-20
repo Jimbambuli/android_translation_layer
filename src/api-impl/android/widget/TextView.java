@@ -24,6 +24,7 @@ import android.text.SpannableStringBuilder;
 import android.text.Spannable;
 import android.text.Spanned;
 import android.text.SpannedString;
+import android.text.StaticLayout;
 import android.text.TextDirectionHeuristic;
 import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
@@ -34,11 +35,15 @@ import android.text.method.LinkMovementMethod;
 import android.text.method.MovementMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TransformationMethod;
+import android.text.style.AlignmentSpan;
 import android.text.style.CharacterStyle;
 import android.text.style.AbsoluteSizeSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.LeadingMarginSpan;
+import android.text.style.LineBackgroundSpan;
+import android.text.style.LineHeightSpan;
 import android.text.style.MetricAffectingSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
@@ -306,10 +311,140 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	private void updateNativeText() {
+		/* (Button and EditText have widgets of their own, not the label) */
+		if (mTransformed instanceof Spanned && !(this instanceof Button || this instanceof EditText) && hasParagraphSpans((Spanned)mTransformed)) {
+			showParagraphLayout(true);
+			return;
+		}
+		showParagraphLayout(false);
 		if (mTransformed instanceof Spanned)
 			setPangoMarkup((Spanned)mTransformed);
 		else
 			native_setText(mTransformed.toString());
+	}
+
+	/* --- ParagraphStyle spans ---
+	 * AOSP's TextView lays out and draws its text with a StaticLayout. The GtkLabel of ATL's TextView knows no
+	 * paragraph spans (leading margins and what they draw, line heights, line backgrounds, the alignment of a
+	 * paragraph), so a text with such spans is laid out and drawn like AOSP with android.text.StaticLayout (which
+	 * handles them, see Layout) on the canvas of the view, and the label stays empty. Links of such a text are not
+	 * clickable and it cannot be selected (both are the label's). */
+	private Layout mParagraphLayout;
+	private ParagraphLayoutDrawable mParagraphOverlay;
+	private boolean mParagraphText;
+
+	private static boolean hasParagraphSpans(Spanned text) {
+		return text.getSpans(0, text.length(), LeadingMarginSpan.class).length > 0 || text.getSpans(0, text.length(), LineHeightSpan.class).length > 0
+		    || text.getSpans(0, text.length(), LineBackgroundSpan.class).length > 0 || text.getSpans(0, text.length(), AlignmentSpan.class).length > 0;
+	}
+
+	private void showParagraphLayout(boolean show) {
+		mParagraphLayout = null;
+		if (show == mParagraphText) {
+			if (show)
+				invalidate();
+			return;
+		}
+		mParagraphText = show;
+		if (show) {
+			native_setText("");
+			replacementSpans.clear();
+			if (mReplacementOverlay != null)
+				getOverlay().remove(mReplacementOverlay);
+			linkSpans = NO_LINKS;
+			if (mParagraphOverlay == null)
+				mParagraphOverlay = new ParagraphLayoutDrawable();
+			getOverlay().add(mParagraphOverlay);
+			invalidate();
+		} else if (mParagraphOverlay != null) {
+			getOverlay().remove(mParagraphOverlay);
+		}
+	}
+
+	/* AOSP TextView.makeNewLayout() for the text at the width (without the paddings) */
+	private Layout makeParagraphLayout(int width) {
+		mParagraphLayout = StaticLayout.Builder.obtain(mTransformed, 0, mTransformed.length(), getPaint(), Math.max(0, width))
+		    .setAlignment(getLayoutAlignment())
+		    .setLineSpacing(mSpacingAdd, mSpacingMult)
+		    .setIncludePad(include_padding)
+		    .setBreakStrategy(getBreakStrategy())
+		    .setJustificationMode(mJustificationMode)
+		    .setMaxLines(mMaxMode == LINES ? mMaximum : Integer.MAX_VALUE)
+		    .setEllipsize(mEllipsize)
+		    .build();
+		return mParagraphLayout;
+	}
+
+	/* AOSP TextView.onMeasure(): the width from the desired width of the text (unless exact), limited like there,
+	 * the height from the layout at that width */
+	private void measureParagraphs(int widthMeasureSpec, int heightMeasureSpec) {
+		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+		int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+		int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+		int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+		int pad = getCompoundPaddingLeft() + getCompoundPaddingRight();
+		int width;
+		if (widthMode == MeasureSpec.EXACTLY) {
+			width = widthSize;
+		} else {
+			width = (int)Math.ceil(Layout.getDesiredWidth(mTransformed, getPaint())) + pad;
+			if (mMaxWidthMode == EMS)
+				width = Math.min(width, mMaxWidth * getLineHeight());
+			else
+				width = Math.min(width, mMaxWidth);
+			if (mMinWidthMode == EMS)
+				width = Math.max(width, mMinWidth * getLineHeight());
+			else
+				width = Math.max(width, mMinWidth);
+			width = Math.max(width, getSuggestedMinimumWidth());
+			if (widthMode == MeasureSpec.AT_MOST)
+				width = Math.min(widthSize, width);
+		}
+		Layout layout = makeParagraphLayout(width - pad);
+		int height;
+		if (heightMode == MeasureSpec.EXACTLY) {
+			height = heightSize;
+		} else {
+			height = layout.getHeight() + getCompoundPaddingTop() + getCompoundPaddingBottom();
+			height = Math.max(height, getSuggestedMinimumHeight());
+			if (heightMode == MeasureSpec.AT_MOST)
+				height = Math.min(height, heightSize);
+		}
+		setMeasuredDimension(width, height);
+		applyHeightLimits(heightMeasureSpec);
+	}
+
+	/* AOSP TextView.getVerticalOffset(): the text moved down by the vertical gravity when it is lower than the view */
+	private int paragraphVerticalOffset(Layout layout) {
+		int gravity = this.gravity & Gravity.VERTICAL_GRAVITY_MASK;
+		if (gravity == Gravity.TOP)
+			return 0;
+		int boxht = getHeight() - getExtendedPaddingTop() - getExtendedPaddingBottom();
+		int textht = layout.getHeight();
+		if (textht >= boxht)
+			return 0;
+		return gravity == Gravity.BOTTOM ? boxht - textht : (boxht - textht) >> 1;
+	}
+
+	private Layout paragraphLayout() {
+		int width = getWidth() - getCompoundPaddingLeft() - getCompoundPaddingRight();
+		return mParagraphLayout != null && mParagraphLayout.getWidth() == Math.max(0, width) ? mParagraphLayout : makeParagraphLayout(width);
+	}
+
+	/* AOSP TextView.onDraw(): the paint gets the current colours, the layout is drawn inside the paddings */
+	private final class ParagraphLayoutDrawable extends Drawable {
+		@Override
+		public void draw(Canvas canvas) {
+			Layout layout = paragraphLayout();
+			TextPaint textPaint = getPaint();
+			textPaint.setColor(getCurrentTextColor());
+			textPaint.linkColor = getLinkTextColors().getColorForState(getDrawableState(), getLinkTextColors().getDefaultColor());
+			textPaint.drawableState = getDrawableState();
+			canvas.save();
+			canvas.translate(getCompoundPaddingLeft(), getExtendedPaddingTop() + paragraphVerticalOffset(layout));
+			layout.draw(canvas);
+			canvas.restore();
+		}
 	}
 
 	private static final ClickableSpan[] NO_LINKS = new ClickableSpan[0];
@@ -343,24 +478,27 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	private final ArrayList<ReplacementSpan> replacementSpans = new ArrayList<>();
 	private Spanned replacementText;
 
+	private final ArrayList<int[]> replacementRuns = new ArrayList<>(); // start and end of the run of each placeholder
+
 	private final class ReplacementSpansDrawable extends Drawable {
 		@Override
 		public void draw(Canvas canvas) {
 			float[] place = new float[4];
 			for (int i = 0; i < replacementSpans.size(); i++) {
 				ReplacementSpan span = replacementSpans.get(i);
+				int[] run = replacementRuns.get(i);
 				if (!native_getPlaceholderPosition(widget, i, place))
 					continue;
-				span.draw(canvas, replacementText, replacementText.getSpanStart(span), replacementText.getSpanEnd(span),
-				          place[0], Math.round(place[1]), Math.round(place[2]), Math.round(place[3]), replacementPaint(replacementText, span, true));
+				span.draw(canvas, replacementText, run[0], run[1], place[0], Math.round(place[1]), Math.round(place[2]),
+				          Math.round(place[3]), replacementPaint(replacementText, run[0], run[1], true));
 			}
 		}
 	}
 
-	/* AOSP: the paint of the text with the other MetricAffectingSpans of the range applied, their measure state for
-	 * getSize() (MeasuredParagraph.applyMetricsAffectingSpan()), their draw state for draw() (TextLine.handleRun());
+	/* AOSP: the paint of the text with the other MetricAffectingSpans of the replaced run applied, their measure state
+	 * for getSize() (MeasuredParagraph.applyMetricsAffectingSpan()), their draw state for draw() (TextLine.handleRun());
 	 * for draw() it has the colours TextView.onDraw() gives mTextPaint */
-	private TextPaint replacementPaint(Spanned text, ReplacementSpan replacement, boolean draw) {
+	private TextPaint replacementPaint(Spanned text, int start, int end, boolean draw) {
 		TextPaint wp = new TextPaint();
 		wp.set(getPaint());
 		if (draw) {
@@ -368,8 +506,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			wp.linkColor = getLinkTextColors().getColorForState(getDrawableState(), getLinkTextColors().getDefaultColor());
 			wp.drawableState = getDrawableState();
 		}
-		for (MetricAffectingSpan span : text.getSpans(text.getSpanStart(replacement), text.getSpanEnd(replacement), MetricAffectingSpan.class)) {
-			if (span instanceof ReplacementSpan)
+		for (MetricAffectingSpan span : text.getSpans(start, end, MetricAffectingSpan.class)) {
+			if (span instanceof ReplacementSpan || text.getSpanStart(span) == text.getSpanEnd(span))
 				continue;
 			if (draw)
 				span.updateDrawState(wp);
@@ -386,11 +524,29 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	private String toPangoMarkup(Spanned text) {
 		replacementPlaces.clear();
 		replacementSpans.clear();
+		replacementRuns.clear();
 		replacementText = text;
 		int plain = 0;
 		CharacterStyle[] spans = text.getSpans(0, text.length(), CharacterStyle.class);
 		linkSpans = text.getSpans(0, text.length(), ClickableSpan.class);
-		ReplacementSpan[] replacements = text.getSpans(0, text.length(), ReplacementSpan.class);
+		/* AOSP MeasuredParagraph/TextLine: a paragraph is split at the transitions of its MetricAffectingSpans; the
+		 * last ReplacementSpan of a run replaces it, getSize() and draw() are called per run */
+		ReplacementSpan[] runSpan = new ReplacementSpan[text.length()];
+		int[] runEnd = new int[text.length()];
+		if (text.getSpans(0, text.length(), ReplacementSpan.class).length > 0) {
+			for (int p = 0, pend; p < text.length(); p = pend) {
+				pend = TextUtils.indexOf(text, '\n', p, text.length());
+				pend = pend < 0 ? text.length() : pend + 1;
+				for (int s = p, next; s < pend; s = next) {
+					next = text.nextSpanTransition(s, pend, MetricAffectingSpan.class);
+					for (MetricAffectingSpan span : text.getSpans(s, next, MetricAffectingSpan.class)) {
+						if (span instanceof ReplacementSpan && text.getSpanStart(span) != text.getSpanEnd(span))
+							runSpan[s] = (ReplacementSpan)span;
+					}
+					runEnd[s] = next;
+				}
+			}
+		}
 		TreeSet<Integer> bounds = new TreeSet<>();
 		bounds.add(0);
 		bounds.add(text.length());
@@ -400,6 +556,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		}
 		int linkColor = getLinkTextColors().getColorForState(getDrawableState(), getLinkTextColors().getDefaultColor());
 		StringBuilder markup = new StringBuilder();
+		int replacedUntil = 0;
 		Integer start = bounds.first();
 		for (Integer end : bounds.tailSet(start, false)) {
 			StringBuilder open = new StringBuilder();
@@ -470,23 +627,25 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			}
 			markup.append(open);
 			for (int i = start; i < end; i++) {
-				/* AOSP draws a ReplacementSpan instead of its text; the characters of the range give way to one
-				 * placeholder of the span's width and font metrics (getSize()), the last span is effective */
-				ReplacementSpan replaced = null;
-				for (ReplacementSpan r : replacements) {
-					if (text.getSpanStart(r) <= i && i < text.getSpanEnd(r))
-						replaced = r;
-				}
-				if (replaced != null) {
-					if (i == Math.max(0, text.getSpanStart(replaced))) {
-						TextPaint wp = replacementPaint(text, replaced, false);
-						Paint.FontMetricsInt fm = wp.getFontMetricsInt();
-						int width = replaced.getSize(wp, text, text.getSpanStart(replaced), text.getSpanEnd(replaced), fm);
-						replacementPlaces.add(new int[] {plain, width, fm.descent - fm.ascent, fm.ascent});
-						replacementSpans.add(replaced);
-						markup.append('\uFFFC');
+				/* AOSP draws a ReplacementSpan instead of the text of a run; the characters of the run give way to one
+				 * placeholder of the width and font metrics getSize() gives for the run (a line break stays) */
+				if (i < replacedUntil) {
+					if (text.charAt(i) == '\n') {
+						markup.append('\n');
 						plain++;
 					}
+					continue;
+				}
+				if (runSpan[i] != null) {
+					TextPaint wp = replacementPaint(text, i, runEnd[i], false);
+					Paint.FontMetricsInt fm = wp.getFontMetricsInt();
+					int width = runSpan[i].getSize(wp, text, i, runEnd[i], fm);
+					replacementPlaces.add(new int[] {plain, width, fm.descent - fm.ascent, fm.ascent});
+					replacementSpans.add(runSpan[i]);
+					replacementRuns.add(new int[] {i, runEnd[i]});
+					markup.append('\uFFFC');
+					plain++;
+					replacedUntil = runEnd[i];
 					continue;
 				}
 				char c = text.charAt(i);
@@ -1130,6 +1289,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	 * gravity (BaselineLayout, baseline-aligned LinearLayouts and others place the text by it) */
 	@Override
 	public int getBaseline() {
+		if (mParagraphText) {
+			Layout layout = paragraphLayout();
+			return getExtendedPaddingTop() + paragraphVerticalOffset(layout) + layout.getLineBaseline(0);
+		}
 		int baseline = native_getBaseline(widget, getMeasuredWidth() - getPaddingLeft() - getPaddingRight(),
 		                                  getMeasuredHeight() - getPaddingTop() - getPaddingBottom());
 		return baseline < 0 ? super.getBaseline() : getPaddingTop() + baseline;
@@ -1185,7 +1348,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	public InputFilter[] getFilters() { return filters; }
 
-	public int getLineCount() { return 1; }
+	public int getLineCount() {
+		return mParagraphText ? paragraphLayout().getLineCount() : 1;
+	}
 
 	/* as AOSP: the movement method, null unless set (or the default of a subclass) */
 	private MovementMethod mMovement;
@@ -1292,6 +1457,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	public Layout getLayout() {
+		if (mParagraphText)
+			return paragraphLayout();
 		return new BoringLayout(getText(), getPaint(), getWidth(), Layout.Alignment.ALIGN_NORMAL, 1, 0, new BoringLayout.Metrics(), false);
 	}
 
@@ -1493,6 +1660,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	/* the font padding depends on the font, which may have changed since the last measure */
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		if (mParagraphText) {
+			measureParagraphs(widthMeasureSpec, heightMeasureSpec);
+			return;
+		}
 		native_setFontPadding(widget, include_padding);
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 		/* AOSP TextView.onMeasure(): unless the width is exact, it is limited by maxWidth/maxEms and minWidth/minEms
