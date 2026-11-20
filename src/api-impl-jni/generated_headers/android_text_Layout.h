@@ -195,6 +195,14 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1descent
 
 /*
  * Class:     android_text_Layout
+ * Method:    native_get_line_metrics
+ * Signature: (JI[I)V
+ */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1get_1line_1metrics
+  (JNIEnv *, jclass, jlong, jint, jintArray);
+
+/*
+ * Class:     android_text_Layout
  * Method:    native_get_line_for_vertical
  * Signature: (JI)I
  */

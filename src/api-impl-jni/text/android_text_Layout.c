@@ -300,6 +300,17 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1descent(JNIEn
 	return PANGO_DESCENT(logical_rect) / PANGO_SCALE;
 }
 
+/* for the line table of Layout's paragraph mode: the ascent (negative) and the descent of the line rounded outwards,
+ * as AOSP's Paint.FontMetricsInt (Skia floors the ascent and ceils the descent), and the baseline Pango gives it */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1get_1line_1metrics(JNIEnv *env, jclass class, jlong layout, jint line, jintArray metrics_array)
+{
+	int baseline;
+	PangoRectangle logical_rect;
+	get_line_metrics(_PTR(layout), line, &baseline, &logical_rect);
+	jint metrics[3] = {-PANGO_PIXELS_CEIL(PANGO_ASCENT(logical_rect)), PANGO_PIXELS_CEIL(PANGO_DESCENT(logical_rect)), baseline};
+	(*env)->SetIntArrayRegion(env, metrics_array, 0, 3, metrics);
+}
+
 JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1for_1vertical(JNIEnv *env, jobject object, jlong layout, jint y)
 {
 	PangoLayout *pango_layout = _PTR(layout);

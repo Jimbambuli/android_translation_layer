@@ -6,9 +6,13 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Typeface;
 import android.text.style.AbsoluteSizeSpan;
+import android.text.style.AlignmentSpan;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.LeadingMarginSpan;
+import android.text.style.LineBackgroundSpan;
+import android.text.style.LineHeightSpan;
 import android.text.style.MetricAffectingSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.ReplacementSpan;
@@ -16,6 +20,7 @@ import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
 import android.text.style.TextAppearanceSpan;
 import android.text.style.UnderlineSpan;
+import java.util.ArrayList;
 
 public class Layout {
 
@@ -43,77 +48,119 @@ public class Layout {
 	public static final TextInclusionStrategy INCLUSION_STRATEGY_CONTAINS_ALL =
 	    (segmentBounds, area) -> area.contains(segmentBounds);
 
-	long layout; // native PangoLayout
+	long layout; // native PangoLayout; in paragraph mode the one of the first paragraph
 	private CharSequence text;
 	private TextPaint paint;
 	private float spacing_mult;
 	private float spacing_add;
 	private Alignment align;
 	private int maxLines = Integer.MAX_VALUE;
+	private int width;
 
 	protected Layout(CharSequence text, TextPaint paint, int width, Layout.Alignment align, float spacingMult, float spacingAdd) {
-		String str = text != null ? text.toString() : "";
-		this.text = str;
 		this.paint = paint;
 		this.spacing_mult = spacingMult;
 		this.spacing_add = spacingAdd;
-		layout = native_constructor(pangoText(text), paint.paint, width);
-		if (text instanceof Spanned) {
-			applySpans((Spanned)text);
-			applyReplacements((Spanned)text);
+		this.align = align;
+		build(text, 0, text != null ? text.length() : 0, width);
+	}
+
+	/* the text [start, end) of source at width (-1: no wrapping), for getDesiredWidth() */
+	private Layout(CharSequence source, int start, int end, TextPaint paint) {
+		measureOnly = true;
+		this.paint = paint;
+		this.spacing_mult = 1;
+		this.align = Alignment.ALIGN_NORMAL;
+		build(source, start, end, -1);
+	}
+
+	/* the Pango layout(s) of the text [start, end) of source; the spans keep their offsets in source, as AOSP hands
+	 * source and its offsets to the spans */
+	private void build(CharSequence source, int start, int end, int width) {
+		this.text = source != null ? source.subSequence(start, end).toString() : "";
+		this.width = width;
+		replacementText = source instanceof Spanned ? (Spanned)source : null;
+		findReplacementRuns(start, end);
+		textStart = start;
+		paras = null;
+		if (replacementText != null && hasParagraphSpans(replacementText, start, end)) {
+			buildParagraphs(start, end);
+			return;
 		}
+		layout = native_constructor(pangoText(source, start, end), paint.paint, width);
+		if (replacementText != null)
+			applySpans(layout, start, start, end);
 		setAlignment(align);
 	}
 
-	/* the ReplacementSpans of the text and the text they are in; drawn by draw() (AOSP TextLine.handleReplacement()) */
+	/* --- ReplacementSpan ---
+	 * AOSP MeasuredParagraph.applyMetricsAffectingSpan() and TextLine.handleRun(): a paragraph is split at the
+	 * transitions of its MetricAffectingSpans; a run that a ReplacementSpan covers is replaced, by the last such
+	 * span (the other spans of the run change its paint), and getSize() and draw() are called for that run only.
+	 * A span that crosses a transition is so measured and drawn once per run. */
 	private Spanned replacementText;
-	private ReplacementSpan[] replacements;
+	private ReplacementSpan[] runSpans;
+	private int[] runStarts;
+	private int[] runEnds;
+	private int textStart; // the offset in replacementText of the Pango text
 
-	/* AOSP TextLine: the first character of a replacement is U+FFFC, the rest U+FEFF (zero width), so the
-	 * text keeps its offsets and the span gets one placeholder */
-	private static String pangoText(CharSequence text) {
-		if (text == null)
+	private void findReplacementRuns(int start, int end) {
+		ArrayList<ReplacementSpan> spans = new ArrayList<>();
+		ArrayList<int[]> runs = new ArrayList<>();
+		Spanned sp = replacementText;
+		if (sp != null && sp.getSpans(start, end, ReplacementSpan.class).length > 0) {
+			for (int p = start, pend; p < end; p = pend) {
+				pend = TextUtils.indexOf(sp, '\n', p, end);
+				pend = pend < 0 ? end : pend + 1;
+				for (int s = p, next; s < pend; s = next) {
+					next = sp.nextSpanTransition(s, pend, MetricAffectingSpan.class);
+					ReplacementSpan replacement = null;
+					for (MetricAffectingSpan span : sp.getSpans(s, next, MetricAffectingSpan.class)) {
+						if (span instanceof ReplacementSpan && sp.getSpanStart(span) != sp.getSpanEnd(span))
+							replacement = (ReplacementSpan)span;
+					}
+					if (replacement != null) {
+						spans.add(replacement);
+						runs.add(new int[] {s, next});
+					}
+				}
+			}
+		}
+		runSpans = spans.toArray(new ReplacementSpan[0]);
+		runStarts = new int[runs.size()];
+		runEnds = new int[runs.size()];
+		for (int i = 0; i < runs.size(); i++) {
+			runStarts[i] = runs.get(i)[0];
+			runEnds[i] = runs.get(i)[1];
+		}
+	}
+
+	/* AOSP TextLine.set(): the first character of a replaced run is U+FFFC, the rest U+FEFF (zero width), so the
+	 * text keeps its offsets and each run gets one placeholder; a line break stays one */
+	private String pangoText(CharSequence source, int start, int end) {
+		if (source == null)
 			return "";
-		if (!(text instanceof Spanned))
-			return text.toString();
-		Spanned spanned = (Spanned)text;
-		char[] chars = text.toString().toCharArray();
-		for (ReplacementSpan span : spanned.getSpans(0, spanned.length(), ReplacementSpan.class)) {
-			int start = spanned.getSpanStart(span);
-			int end = Math.min(spanned.getSpanEnd(span), chars.length);
-			if (start < 0 || end <= start)
+		char[] chars = source.subSequence(start, end).toString().toCharArray();
+		for (int i = 0; i < runStarts.length; i++) {
+			if (runStarts[i] < start || runStarts[i] >= end)
 				continue;
-			chars[start] = '\uFFFC';
-			for (int i = start + 1; i < end; i++)
-				chars[i] = '\uFEFF';
+			chars[runStarts[i] - start] = '￼';
+			for (int j = runStarts[i] + 1; j < Math.min(runEnds[i], end); j++) {
+				if (chars[j - start] != '\n')
+					chars[j - start] = '﻿';
+			}
 		}
 		return new String(chars);
 	}
 
-	/* each ReplacementSpan takes the width and the font metrics its getSize() gives (AOSP
-	 * MeasuredParagraph.applyReplacementRun(): the line grows to them); Pango leaves a gap of that size */
-	private void applyReplacements(Spanned text) {
-		replacementText = text;
-		replacements = text.getSpans(0, text.length(), ReplacementSpan.class);
-		for (ReplacementSpan span : replacements) {
-			int start = text.getSpanStart(span);
-			int end = text.getSpanEnd(span);
-			if (start < 0 || end <= start)
-				continue;
-			TextPaint wp = replacementPaint(text, span, false);
-			Paint.FontMetricsInt fm = wp.getFontMetricsInt();
-			int width = span.getSize(wp, text, start, end, fm);
-			native_add_placeholder(layout, start, width, fm.ascent, fm.descent);
-		}
-	}
-
-	/* AOSP: the paint with the other MetricAffectingSpans of the range applied, their measure state for getSize()
-	 * (MeasuredParagraph), their draw state for draw() (TextLine.handleRun()) */
-	private TextPaint replacementPaint(Spanned text, ReplacementSpan replacement, boolean draw) {
+	/* AOSP: the paint of a replaced run with the other MetricAffectingSpans of the run applied, their measure state
+	 * for getSize() (MeasuredParagraph.applyMetricsAffectingSpan()), their draw state for draw() (TextLine.handleRun()) */
+	private TextPaint replacementPaint(int run, boolean draw) {
 		TextPaint wp = new TextPaint();
 		wp.set(paint);
-		for (MetricAffectingSpan span : text.getSpans(text.getSpanStart(replacement), text.getSpanEnd(replacement), MetricAffectingSpan.class)) {
-			if (span instanceof ReplacementSpan)
+		Spanned sp = replacementText;
+		for (MetricAffectingSpan span : sp.getSpans(runStarts[run], runEnds[run], MetricAffectingSpan.class)) {
+			if (span instanceof ReplacementSpan || sp.getSpanStart(span) == sp.getSpanEnd(span))
 				continue;
 			if (draw)
 				span.updateDrawState(wp);
@@ -123,60 +170,84 @@ public class Layout {
 		return wp;
 	}
 
-	private void drawReplacements(Canvas canvas) {
-		if (replacements == null)
-			return;
-		float[] place = new float[4];
-		for (ReplacementSpan span : replacements) {
-			int start = replacementText.getSpanStart(span);
-			int end = replacementText.getSpanEnd(span);
-			if (start < 0 || end <= start || !native_get_placeholder(layout, start, place))
+	/* each replaced run takes the width and the font metrics getSize() gives (AOSP
+	 * MeasuredParagraph.applyReplacementRun(): the line grows to them); Pango leaves a gap of that size */
+	private void applyReplacements(long pango, int base, int from, int to) {
+		for (int i = 0; i < runSpans.length; i++) {
+			if (runStarts[i] < from || runStarts[i] >= to)
 				continue;
-			span.draw(canvas, replacementText, start, end, place[0], Math.round(place[1]), Math.round(place[2]),
-			          Math.round(place[3]), replacementPaint(replacementText, span, true));
+			TextPaint wp = replacementPaint(i, false);
+			Paint.FontMetricsInt fm = wp.getFontMetricsInt();
+			int size = runSpans[i].getSize(wp, replacementText, runStarts[i], runEnds[i], fm);
+			native_add_placeholder(pango, runStarts[i] - base, size, fm.ascent, fm.descent);
 		}
 	}
 
-	/* the character spans that change how the text looks become Pango attributes */
-	private void applySpans(Spanned text) {
-		for (CharacterStyle span : text.getSpans(0, text.length(), CharacterStyle.class)) {
-			int start = text.getSpanStart(span);
-			int end = text.getSpanEnd(span);
+	private void drawReplacements(Canvas canvas) {
+		float[] place = new float[4];
+		for (int i = 0; i < runSpans.length; i++) {
+			int start = runStarts[i];
+			if (paras == null) {
+				if (!native_get_placeholder(layout, start - textStart, place))
+					continue;
+			} else {
+				Para p = paraOfOffset(start);
+				if (!native_get_placeholder(p.layout, start - p.start, place))
+					continue;
+				int line = getLineForOffset(start);
+				place[0] += p.x;
+				place[1] = getLineTop(line);
+				place[2] = getLineBaseline(line);
+				place[3] = getLineTop(line + 1);
+			}
+			runSpans[i].draw(canvas, replacementText, start, runEnds[i], place[0], Math.round(place[1]),
+			                 Math.round(place[2]), Math.round(place[3]), replacementPaint(i, true));
+		}
+	}
+
+	/* the character spans that change how the text looks become Pango attributes of the text [from, to) of
+	 * replacementText, which starts at base in the Pango layout; then the placeholders of the replaced runs */
+	private void applySpans(long pango, int base, int from, int to) {
+		Spanned text = replacementText;
+		for (CharacterStyle span : text.getSpans(from, to, CharacterStyle.class)) {
+			int start = Math.max(text.getSpanStart(span), from) - base;
+			int end = Math.min(text.getSpanEnd(span), to) - base;
 			if (start < 0 || end <= start)
 				continue;
 			if (span instanceof AbsoluteSizeSpan) {
 				AbsoluteSizeSpan size = (AbsoluteSizeSpan)span;
 				float px = size.getDip() ? size.getSize() * paint.density : size.getSize();
-				native_add_attribute(layout, ATTR_SIZE, start, end, 0, px);
+				native_add_attribute(pango, ATTR_SIZE, start, end, 0, px);
 			} else if (span instanceof RelativeSizeSpan) {
-				native_add_attribute(layout, ATTR_SCALE, start, end, 0, ((RelativeSizeSpan)span).getSizeChange());
+				native_add_attribute(pango, ATTR_SCALE, start, end, 0, ((RelativeSizeSpan)span).getSizeChange());
 			} else if (span instanceof ForegroundColorSpan) {
-				native_add_attribute(layout, ATTR_FOREGROUND, start, end, ((ForegroundColorSpan)span).getForegroundColor(), 0);
+				native_add_attribute(pango, ATTR_FOREGROUND, start, end, ((ForegroundColorSpan)span).getForegroundColor(), 0);
 			} else if (span instanceof BackgroundColorSpan) {
-				native_add_attribute(layout, ATTR_BACKGROUND, start, end, ((BackgroundColorSpan)span).getBackgroundColor(), 0);
+				native_add_attribute(pango, ATTR_BACKGROUND, start, end, ((BackgroundColorSpan)span).getBackgroundColor(), 0);
 			} else if (span instanceof StyleSpan) {
 				int style = ((StyleSpan)span).getStyle();
 				if ((style & Typeface.BOLD) != 0)
-					native_add_attribute(layout, ATTR_BOLD, start, end, 0, 0);
+					native_add_attribute(pango, ATTR_BOLD, start, end, 0, 0);
 				if ((style & Typeface.ITALIC) != 0)
-					native_add_attribute(layout, ATTR_ITALIC, start, end, 0, 0);
+					native_add_attribute(pango, ATTR_ITALIC, start, end, 0, 0);
 			} else if (span instanceof TextAppearanceSpan) {
 				/* AOSP TextAppearanceSpan.updateDrawState(): colour, size and style of the appearance */
 				TextAppearanceSpan appearance = (TextAppearanceSpan)span;
 				if (appearance.getTextColor() != null)
-					native_add_attribute(layout, ATTR_FOREGROUND, start, end, appearance.getTextColor().getDefaultColor(), 0);
+					native_add_attribute(pango, ATTR_FOREGROUND, start, end, appearance.getTextColor().getDefaultColor(), 0);
 				if (appearance.getTextSize() > 0)
-					native_add_attribute(layout, ATTR_SIZE, start, end, 0, appearance.getTextSize());
+					native_add_attribute(pango, ATTR_SIZE, start, end, 0, appearance.getTextSize());
 				if ((appearance.getTextStyle() & Typeface.BOLD) != 0)
-					native_add_attribute(layout, ATTR_BOLD, start, end, 0, 0);
+					native_add_attribute(pango, ATTR_BOLD, start, end, 0, 0);
 				if ((appearance.getTextStyle() & Typeface.ITALIC) != 0)
-					native_add_attribute(layout, ATTR_ITALIC, start, end, 0, 0);
+					native_add_attribute(pango, ATTR_ITALIC, start, end, 0, 0);
 			} else if (span instanceof UnderlineSpan) {
-				native_add_attribute(layout, ATTR_UNDERLINE, start, end, 0, 0);
+				native_add_attribute(pango, ATTR_UNDERLINE, start, end, 0, 0);
 			} else if (span instanceof StrikethroughSpan) {
-				native_add_attribute(layout, ATTR_STRIKETHROUGH, start, end, 0, 0);
+				native_add_attribute(pango, ATTR_STRIKETHROUGH, start, end, 0, 0);
 			}
 		}
+		applyReplacements(pango, base, from, to);
 	}
 
 	private static final int ATTR_SIZE = 0;
@@ -189,42 +260,308 @@ public class Layout {
 	private static final int ATTR_STRIKETHROUGH = 7;
 	private static final int ATTR_HYPHENS = 8;
 
+	/* --- paragraph mode ---
+	 * AOSP StaticLayout lays out each paragraph on its own: its LeadingMarginSpans narrow it and Layout.drawText()
+	 * has them draw their margin per line, its LineHeightSpans choose the height of each line (StaticLayout.out()),
+	 * its last AlignmentSpan aligns it, and LineBackgroundSpans draw behind each line (Layout.drawBackground()).
+	 * Pango has one width, indent and alignment per layout, so a text with such spans gets one Pango layout per
+	 * paragraph, placed by the line table below, which StaticLayout.out() fills the same way. */
+	private static final class Para {
+		long layout;
+		int start; // offset of the paragraph in the text
+		int end;   // after its line break, if it has one
+		int x;     // the leading margin both of its first and its other lines have (Pango indents the rest)
+		int firstIndent, restIndent; // the rest of the margin of the first and of the other lines
+		int firstLine;
+		int lineCount;
+		Alignment align;
+	}
+
+	private Para[] paras; // null: one Pango layout for the whole text
+	private boolean measureOnly; // getDesiredWidth(): no line table
+	private int lineCount;
+	private int[] lineTops;     // lineCount + 1 entries, the last is the height
+	private int[] lineAscents;  // negative, as getLineAscent()
+	private int[] lineDescents; // with the extra space
+	private int[] lineExtras;
+	private int[] lineShifts;   // how far each line is moved down from where Pango put it in its paragraph
+	private float[] paraSpacing = {1, 0};
+	private boolean justify;
+
+	/* AOSP Layout.getParagraphSpans(): the spans of the paragraph, none for an empty range but at the start */
+	private static <T> T[] getParagraphSpans(Spanned text, int start, int end, Class<T> type) {
+		if (start == end && start > 0)
+			return (T[])java.lang.reflect.Array.newInstance(type, 0);
+		return text.getSpans(start, end, type);
+	}
+
+	private static boolean hasParagraphSpans(Spanned text, int start, int end) {
+		return text.getSpans(start, end, LeadingMarginSpan.class).length > 0 || text.getSpans(start, end, LineHeightSpan.class).length > 0
+		    || text.getSpans(start, end, LineBackgroundSpan.class).length > 0 || text.getSpans(start, end, AlignmentSpan.class).length > 0;
+	}
+
+	private void buildParagraphs(int start, int end) {
+		Spanned sp = replacementText;
+		ArrayList<Para> list = new ArrayList<>();
+		for (int p = start, pend; p <= end; p = pend) {
+			int nl = TextUtils.indexOf(sp, '\n', p, end);
+			pend = nl < 0 ? end : nl + 1;
+			Para para = new Para();
+			para.start = p;
+			para.end = pend;
+			int textEnd = nl < 0 ? end : nl;
+			int first = 0, rest = 0;
+			for (LeadingMarginSpan margin : getParagraphSpans(sp, p, pend, LeadingMarginSpan.class)) {
+				first += margin.getLeadingMargin(true);
+				rest += margin.getLeadingMargin(false);
+			}
+			para.x = Math.min(first, rest);
+			para.layout = native_constructor(pangoText(sp, p, textEnd), paint.paint, width == -1 ? -1 : Math.max(0, width - para.x));
+			applySpans(para.layout, p, p, textEnd);
+			para.firstIndent = first - para.x;
+			para.restIndent = rest - para.x;
+			native_set_paragraph_style(para.layout, 1, 0, justify, para.firstIndent, para.restIndent);
+			list.add(para);
+			if (nl < 0)
+				break; // a text that ends in a line break has an empty last paragraph, as in AOSP
+		}
+		paras = list.toArray(new Para[0]);
+		layout = paras[0].layout;
+		setAlignment(align);
+		if (!measureOnly)
+			buildLines();
+	}
+
+	/* StaticLayout.out(): line by line the height Pango gives the line, changed by the LineHeightSpans of the
+	 * paragraph, then the line spacing below every line but the last */
+	private void buildLines() {
+		Spanned sp = replacementText;
+		int n = 0;
+		for (Para p : paras) {
+			p.firstLine = n;
+			p.lineCount = native_get_line_count(p.layout);
+			n += p.lineCount;
+		}
+		lineCount = n;
+		lineTops = new int[n + 1];
+		lineAscents = new int[n];
+		lineDescents = new int[n];
+		lineExtras = new int[n];
+		lineShifts = new int[n];
+		float mult = paraSpacing[0], add = paraSpacing[1];
+		boolean needMultiply = mult != 1 || add != 0;
+		Paint.FontMetricsInt fm = new Paint.FontMetricsInt();
+		int[] metrics = new int[3];
+		int v = 0;
+		for (Para p : paras) {
+			LineHeightSpan[] chooseHt = getParagraphSpans(sp, p.start, p.end, LineHeightSpan.class);
+			int[] chooseHtv = new int[chooseHt.length];
+			for (int i = 0; i < chooseHt.length; i++) {
+				int o = sp.getSpanStart(chooseHt[i]);
+				chooseHtv[i] = o < p.start ? lineTops[getLineForOffset(o)] : v;
+			}
+			for (int l = 0; l < p.lineCount; l++) {
+				int line = p.firstLine + l;
+				native_get_line_metrics(p.layout, l, metrics);
+				int above = metrics[0];
+				int below = metrics[1];
+				if (chooseHt.length > 0) {
+					fm.ascent = fm.top = above;
+					fm.descent = fm.bottom = below;
+					int start = lineStart(p, l), end = lineEnd(p, l);
+					for (int i = 0; i < chooseHt.length; i++) {
+						if (chooseHt[i] instanceof LineHeightSpan.WithDensity)
+							((LineHeightSpan.WithDensity)chooseHt[i]).chooseHeight(sp, start, end, chooseHtv[i], v, fm, paint);
+						else
+							chooseHt[i].chooseHeight(sp, start, end, chooseHtv[i], v, fm);
+					}
+					above = fm.ascent;
+					below = fm.descent;
+				}
+				int extra = 0;
+				if (needMultiply && line != n - 1) {
+					double ex = (below - above) * (mult - 1) + add;
+					extra = ex >= 0 ? (int)(ex + 0.5) : -(int)(-ex + 0.5);
+				}
+				lineTops[line] = v;
+				lineAscents[line] = above;
+				lineDescents[line] = below + extra;
+				lineExtras[line] = extra;
+				lineShifts[line] = v - above - metrics[2];
+				v += below - above + extra;
+			}
+		}
+		lineTops[n] = v;
+	}
+
+	/* the offsets in the text of the start and the end of line l of the paragraph (the last ends after the line break) */
+	private int lineStart(Para p, int l) {
+		return p.start + native_get_line_start(p.layout, l);
+	}
+
+	private int lineEnd(Para p, int l) {
+		return l == p.lineCount - 1 ? p.end : p.start + native_get_line_end(p.layout, l);
+	}
+
+	/* AOSP Layout.getLineVisibleEnd(line, start, end, true): without the line break and the spaces at the end of the
+	 * line, but the last line */
+	private int visibleEnd(int line, int start, int end) {
+		if (line == getLineCount() - 1)
+			return end;
+		for (; end > start; end--) {
+			char ch = replacementText.charAt(end - 1);
+			if (ch == '\n')
+				return end - 1;
+			if (ch != ' ' && ch != '\t' && ch != 0x1680 && (ch < 0x2000 || ch > 0x200A || ch == 0x2007) && ch != 0x205F && ch != 0x3000)
+				break;
+		}
+		return end;
+	}
+
+	private Para paraOfLine(int line) {
+		for (int i = paras.length - 1; i > 0; i--) {
+			if (paras[i].firstLine <= line)
+				return paras[i];
+		}
+		return paras[0];
+	}
+
+	private Para paraOfOffset(int offset) {
+		for (int i = paras.length - 1; i > 0; i--) {
+			if (paras[i].start <= offset)
+				return paras[i];
+		}
+		return paras[0];
+	}
+
+	/* AOSP Layout.drawBackground() and the leading margins of Layout.drawText(), then each paragraph's text moved to
+	 * its margin and its lines moved to where the line table has them */
+	private void drawParagraphs(Canvas canvas) {
+		Spanned sp = replacementText;
+		TextPaint wp = new TextPaint();
+		wp.set(paint);
+		LineBackgroundSpan[] backgrounds = sp.getSpans(0, sp.length(), LineBackgroundSpan.class);
+		int count = getLineCount();
+		for (int line = 0; line < count; line++) {
+			Para p = paraOfLine(line);
+			int start = lineStart(p, line - p.firstLine), end = lineEnd(p, line - p.firstLine);
+			int top = lineTops[line], bottom = lineTops[line + 1], baseline = bottom - lineDescents[line];
+			if (start != end || start == 0) {
+				for (LineBackgroundSpan background : backgrounds) {
+					if (sp.getSpanStart(background) < end && sp.getSpanEnd(background) > start)
+						background.drawBackground(canvas, paint, 0, getWidth(), top, baseline, bottom, sp, start, end, line);
+				}
+			}
+		}
+		for (Para p : paras) {
+			LeadingMarginSpan[] margins = getParagraphSpans(sp, p.start, p.end, LeadingMarginSpan.class);
+			int lines = Math.min(p.lineCount, count - p.firstLine);
+			if (lines <= 0)
+				break;
+			for (int l = 0; l < lines && margins.length > 0; l++) {
+				int line = p.firstLine + l;
+				boolean useFirstLineMargin = l == 0;
+				for (LeadingMarginSpan margin : margins) {
+					if (margin instanceof LeadingMarginSpan.LeadingMarginSpan2 && line < getLineForOffset(sp.getSpanStart(margin)) + ((LeadingMarginSpan.LeadingMarginSpan2)margin).getLeadingMarginLineCount()) {
+						useFirstLineMargin = true;
+						break;
+					}
+				}
+				int left = 0;
+				int bottom = lineTops[line + 1];
+				for (LeadingMarginSpan margin : margins) {
+					margin.drawLeadingMargin(canvas, wp, left, DIR_LEFT_TO_RIGHT, lineTops[line], bottom - lineDescents[line], bottom,
+					                         sp, lineStart(p, l), visibleEnd(line, lineStart(p, l), lineEnd(p, l)), l == 0, this);
+					left += margin.getLeadingMargin(useFirstLineMargin);
+				}
+			}
+			boolean moved = false;
+			for (int l = 1; l < lines; l++)
+				moved |= lineShifts[p.firstLine + l] != lineShifts[p.firstLine];
+			if (!moved) {
+				drawPango(canvas, p.layout, p.x, lineShifts[p.firstLine], lines < p.lineCount ? native_get_line_bottom(p.layout, lines - 1) : -1);
+			} else {
+				for (int l = 0; l < lines; l++) {
+					/* each line on its own: cut to its band, the first from the top and the last to the bottom */
+					canvas.save();
+					canvas.clipRect(-1e6f, l == 0 ? -1e6f : native_get_line_top(p.layout, l) + lineShifts[p.firstLine + l],
+					                1e6f, l == p.lineCount - 1 ? 1e6f : native_get_line_bottom(p.layout, l) + lineShifts[p.firstLine + l]);
+					drawPango(canvas, p.layout, p.x, lineShifts[p.firstLine + l], -1);
+					canvas.restore();
+				}
+			}
+		}
+	}
+
+	/* the Pango layout at (x, y); with a bottom >= 0 only the lines above it (maxLines) */
+	private void drawPango(Canvas canvas, long pango, int x, int y, int bottom) {
+		canvas.save();
+		canvas.translate(x, y);
+		if (bottom >= 0)
+			canvas.clipRect(-1e6f, -1e6f, 1e6f, bottom);
+		if (canvas instanceof GskCanvas)
+			native_draw(pango, ((GskCanvas)canvas).snapshot, paint.paint);
+		else
+			native_draw_custom_canvas(pango, canvas, paint);
+		canvas.restore();
+	}
+
 	/* for DynamicLayout (AOSP reflow()): the text changed; build the Pango layout again at the same width with
 	 * the alignment and the line spacing this layout has, and the spans of the new text */
 	void reflow(CharSequence source) {
-		String str = source != null ? source.toString() : "";
-		int width = native_get_width(layout);
 		long old = layout;
-		this.text = str;
-		replacements = null;
-		layout = native_constructor(pangoText(source), paint.paint, width);
-		if (source instanceof Spanned) {
-			applySpans((Spanned)source);
-			applyReplacements((Spanned)source);
-		}
-		setAlignment(align);
-		if (spacing_mult != 1 || spacing_add != 0)
+		Para[] oldParas = paras;
+		build(source, 0, source != null ? source.length() : 0, width);
+		if (paras != null)
+			setParagraphStyle(spacing_mult, spacing_add, justify, 0, 0);
+		else if (spacing_mult != 1 || spacing_add != 0)
 			native_set_paragraph_style(layout, spacing_mult, spacing_add, false, 0, 0);
-		native_free(old);
+		if (oldParas == null) {
+			native_free(old);
+		} else {
+			for (Para p : oldParas)
+				native_free(p.layout);
+		}
 	}
 
 	/* StaticLayout.Builder.setHyphenationFrequency(): HYPHENATION_FREQUENCY_NONE (0) breaks a word that
 	 * does not fit without a hyphen; Pango has no hyphenation dictionary, so normal and full both leave
 	 * the hyphen it inserts where it has to break a word */
 	void setHyphenation(boolean hyphens) {
-		if (text.length() > 0)
-			native_add_attribute(layout, ATTR_HYPHENS, 0, text.length(), 0, hyphens ? 1 : 0);
+		if (paras == null) {
+			if (text.length() > 0)
+				native_add_attribute(layout, ATTR_HYPHENS, 0, text.length(), 0, hyphens ? 1 : 0);
+			return;
+		}
+		for (Para p : paras) {
+			if (p.end > p.start)
+				native_add_attribute(p.layout, ATTR_HYPHENS, 0, p.end - p.start, 0, hyphens ? 1 : 0);
+		}
+		buildLines();
 	}
 
 	/* for StaticLayout.Builder, which builds the layout before its setters are called */
 	void setAlignment(Alignment align) {
 		this.align = align;
+		if (paras == null) {
+			native_set_alignment(layout, pangoAlignment(align));
+			return;
+		}
+		/* AOSP Layout.drawText(): the last AlignmentSpan of a paragraph aligns it */
+		for (Para p : paras) {
+			AlignmentSpan[] spans = getParagraphSpans(replacementText, p.start, p.end, AlignmentSpan.class);
+			p.align = spans.length > 0 ? spans[spans.length - 1].getAlignment() : align;
+			native_set_alignment(p.layout, pangoAlignment(p.align));
+		}
+	}
+
+	private static int pangoAlignment(Alignment align) {
 		if (align == Alignment.ALIGN_CENTER)
-			native_set_alignment(layout, 1);
+			return 1;
 		else if (align == Alignment.ALIGN_OPPOSITE || align == Alignment.ALIGN_RIGHT)
-			native_set_alignment(layout, 2);
+			return 2;
 		else
-			native_set_alignment(layout, 0);
+			return 0;
 	}
 
 	/* StaticLayout.Builder: line spacing as AOSP (extra space between lines, not after the last),
@@ -232,15 +569,33 @@ public class Layout {
 	void setParagraphStyle(float spacingMult, float spacingAdd, boolean justify, int firstIndent, int restIndent) {
 		spacing_mult = spacingMult;
 		spacing_add = spacingAdd;
-		native_set_paragraph_style(layout, spacingMult, spacingAdd, justify, firstIndent, restIndent);
+		this.justify = justify;
+		if (paras == null) {
+			native_set_paragraph_style(layout, spacingMult, spacingAdd, justify, firstIndent, restIndent);
+			return;
+		}
+		/* paragraph mode: the spacing is in the line table; the indents of the leading margins stay (the
+		 * Builder's indents are not applied, Pango has one indent per layout) */
+		paraSpacing = new float[] {spacingMult, spacingAdd};
+		for (Para p : paras)
+			native_set_paragraph_style(p.layout, 1, 0, justify, p.firstIndent, p.restIndent);
+		buildLines();
 	}
 
 	/* StaticLayout.Builder: like AOSP only the first maxLines lines exist; with ellipsize the last of
 	 * them ends in an ellipsis (Pango does that natively), without it the rest is cut off */
 	void setMaxLines(int maxLines, TextUtils.TruncateAt ellipsize) {
 		this.maxLines = maxLines;
-		if (ellipsize != null && ellipsize != TextUtils.TruncateAt.MARQUEE)
+		if (ellipsize == null || ellipsize == TextUtils.TruncateAt.MARQUEE)
+			return;
+		if (paras == null) {
 			native_set_max_lines(layout, maxLines, ellipsize.ordinal() + 1);
+		} else if (maxLines > 0 && lineCount > maxLines) {
+			/* the paragraph with the last line ends in the ellipsis */
+			Para p = paraOfLine(maxLines - 1);
+			native_set_max_lines(p.layout, maxLines - p.firstLine, ellipsize.ordinal() + 1);
+			buildLines();
+		}
 	}
 
 	/* StaticLayout.Builder.setUseBoundsForWidth() */
@@ -251,12 +606,16 @@ public class Layout {
 	}
 
 	public int getLineCount() {
-		return Math.min(native_get_line_count(layout), maxLines);
+		return Math.min(paras == null ? native_get_line_count(layout) : lineCount, maxLines);
 	}
 
 	public float getLineWidth(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null) {
+			Para p = paraOfLine(line);
+			return native_get_line_width(p.layout, line - p.firstLine);
+		}
 		return native_get_line_width(layout, line);
 	}
 
@@ -269,23 +628,32 @@ public class Layout {
 		 * (VLC asks for line -1 of an empty text) */
 		if (line < 0 || line >= getLineCount())
 			return 0;
+		if (paras != null) {
+			Para p = paraOfLine(line);
+			return native_get_ellipsis_count(p.layout, line - p.firstLine);
+		}
 		return native_get_ellipsis_count(layout, line);
 	}
 
 	public CharSequence getText() { return text; }
 
 	public int getWidth() {
-		return native_get_width(layout);
+		return paras == null ? native_get_width(layout) : width;
 	}
 
 	public int getHeight() {
+		if (paras != null)
+			return lineTops[getLineCount()];
 		if (native_get_line_count(layout) > maxLines)
 			return getLineBottom(maxLines - 1);
 		return native_get_height(layout);
 	}
 
 	public void draw(Canvas canvas) {
-		if (native_get_line_count(layout) > maxLines) {
+		if (paras != null) {
+			drawParagraphs(canvas);
+			drawReplacements(canvas);
+		} else if (native_get_line_count(layout) > maxLines) {
 			canvas.save();
 			canvas.clipRect(-1e6f, 0, 1e6f, getHeight()); // only the lines below the last are cut
 			drawLayout(canvas);
@@ -344,35 +712,54 @@ public class Layout {
 	public int getParagraphDirection(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
-		return /*DIR_LEFT_TO_RIGHT*/ 1;
+		return DIR_LEFT_TO_RIGHT;
 	}
 
-	public static float getDesiredWidth(CharSequence source, int start, int end, TextPaint paint) {
-		return getDesiredWidth(source.subSequence(start, end), paint);
-	}
+	public static final int DIR_LEFT_TO_RIGHT = 1;
+	public static final int DIR_RIGHT_TO_LEFT = -1;
 
 	public static float getDesiredWidth(CharSequence source, TextPaint paint) {
-		long layout = native_constructor(source != null ? source.toString() : "", paint.paint, -1);
-		float width = native_get_desired_width(layout);
-		native_free(layout);
+		return getDesiredWidth(source, 0, source.length(), paint);
+	}
+
+	/* AOSP getDesiredWidthWithLimit(): the widest paragraph, each measured with its spans (TextLine.metrics()) and
+	 * with its leading margin; unwrapped each paragraph is one line, which starts at the margin */
+	public static float getDesiredWidth(CharSequence source, int start, int end, TextPaint paint) {
+		Layout measure = new Layout(source, start, end, paint);
+		float width = 0;
+		if (measure.paras == null) {
+			width = native_get_desired_width(measure.layout);
+			native_free(measure.layout);
+			return width;
+		}
+		for (Para p : measure.paras) {
+			width = Math.max(width, p.x + p.firstIndent + native_get_desired_width(p.layout)); // Pango ignores the indent without a width
+			native_free(p.layout);
+		}
 		return width;
 	}
 
 	public int getLineBaseline(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null)
+			return lineTops[line + 1] - lineDescents[line];
 		return native_get_line_baseline(layout, line);
 	}
 
 	public int getLineAscent(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null)
+			return lineAscents[line];
 		return native_get_line_ascent(layout, line);
 	}
 
 	public int getLineDescent(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null)
+			return lineDescents[line];
 		return native_get_line_descent(layout, line);
 	}
 
@@ -385,6 +772,10 @@ public class Layout {
 	public float getSecondaryHorizontal(int offset) {
 		if (getLineDirections(0) == null)
 			throw new NullPointerException();
+		if (paras != null) {
+			Para p = paraOfOffset(offset);
+			return p.x + native_get_secondary_horizontal(p.layout, offset - p.start);
+		}
 		return native_get_secondary_horizontal(layout, offset);
 	}
 
@@ -400,39 +791,61 @@ public class Layout {
 	}
 
 	public int getLineForVertical(int y) {
+		if (paras != null) {
+			int line = 0;
+			while (line < getLineCount() - 1 && lineTops[line + 1] <= y)
+				line++;
+			return line;
+		}
 		return native_get_line_for_vertical(layout, y);
 	}
 
 	public int getOffsetForHorizontal(int line, float x) {
 		if (getLineDirections(0) == null)
 			throw new NullPointerException();
+		if (paras != null) {
+			Para p = paraOfLine(line);
+			return p.start + native_get_offset_for_horizontal(p.layout, line - p.firstLine, x - p.x);
+		}
 		return native_get_offset_for_horizontal(layout, line, x);
 	}
 
 	public float getPrimaryHorizontal(int offset) {
 		if (getLineDirections(0) == null)
 			throw new NullPointerException();
+		if (paras != null) {
+			Para p = paraOfOffset(offset);
+			return p.x + native_get_primary_horizontal(p.layout, offset - p.start);
+		}
 		return native_get_primary_horizontal(layout, offset);
 	}
 
 	public int getLineForOffset(int offset) {
+		if (paras != null) {
+			Para p = paraOfOffset(offset);
+			return p.firstLine + native_get_line_for_offset(p.layout, Math.min(offset, p.end) - p.start);
+		}
 		return native_get_line_for_offset(layout, offset);
 	}
 
 	public int getLineTop(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null)
+			return lineTops[line];
 		return native_get_line_top(layout, line);
 	}
 
 	/* AOSP Layout.getLineExtra(): the line spacing added below the line; the base class has none */
 	public int getLineExtra(int line) {
-		return 0;
+		return paras != null && line >= 0 && line < lineCount ? lineExtras[line] : 0;
 	}
 
 	public int getLineBottom(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null)
+			return lineTops[line + 1];
 		return native_get_line_bottom(layout, line);
 	}
 
@@ -447,33 +860,59 @@ public class Layout {
 	}
 
 	/* AOSP Layout.getLineMax(): the width of the line without trailing whitespace plus the paragraph's leading
-	 * margin. ATL's lines have no leading margins and count trailing whitespace as visible (getLineVisibleEnd() ==
-	 * getLineEnd()), so this is the Pango line width */
+	 * margin. ATL counts trailing whitespace as visible (getLineVisibleEnd() == getLineEnd()), so this is the Pango
+	 * line width and, in paragraph mode, the margin of the line */
 	public float getLineMax(int line) {
+		if (paras != null) {
+			Para p = paraOfLine(line);
+			return p.x + (line == p.firstLine ? p.firstIndent : p.restIndent) + getLineWidth(line);
+		}
 		return getLineWidth(line);
 	}
 
 	public float getLineLeft(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null) {
+			/* AOSP: 0 for a left aligned line, otherwise where the alignment puts it after the margin */
+			Para p = paraOfLine(line);
+			if (p.align == null || p.align == Alignment.ALIGN_NORMAL || p.align == Alignment.ALIGN_LEFT)
+				return 0;
+			return p.x + native_get_line_left(p.layout, line - p.firstLine);
+		}
 		return native_get_line_left(layout, line);
 	}
 
 	public float getLineRight(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null) {
+			/* AOSP: getLineMax() (margin and text) for a left aligned line */
+			Para p = paraOfLine(line);
+			if (p.align == null || p.align == Alignment.ALIGN_NORMAL || p.align == Alignment.ALIGN_LEFT)
+				return getLineMax(line);
+			return p.x + native_get_line_right(p.layout, line - p.firstLine);
+		}
 		return native_get_line_right(layout, line);
 	}
 
 	public int getLineStart(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null) {
+			Para p = paraOfLine(line);
+			return lineStart(p, line - p.firstLine);
+		}
 		return native_get_line_start(layout, line);
 	}
 
 	public int getLineEnd(int line) {
 		if (line < 0 || line >= getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
+		if (paras != null) {
+			Para p = paraOfLine(line);
+			return lineEnd(p, line - p.firstLine);
+		}
 		return native_get_line_end(layout, line);
 	}
 
@@ -484,6 +923,13 @@ public class Layout {
 	public void increaseWidthTo(int width) {
 		if (width < getWidth())
 			throw new RuntimeException("cannot decrease width");
+		if (paras != null) {
+			this.width = width;
+			for (Para p : paras)
+				native_set_width(p.layout, width - p.x);
+			buildLines();
+			return;
+		}
 		native_set_width(layout, width);
 	}
 
@@ -879,6 +1325,7 @@ public class Layout {
 	private static native void native_add_attribute(long layout, int type, int start, int end, int color, float value);
 	private static native void native_add_placeholder(long layout, int offset, int width, int ascent, int descent);
 	private static native boolean native_get_placeholder(long layout, int offset, float[] place);
+	private static native void native_get_line_metrics(long layout, int line, int[] metrics);
 	protected native void native_set_width(long layout, int width);
 	/* 0 left, 1 center, 2 right (the layout direction is always LTR) */
 	private static native void native_set_alignment(long layout, int alignment);
