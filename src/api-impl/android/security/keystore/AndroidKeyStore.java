@@ -11,13 +11,21 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.io.ByteArrayInputStream;
 import java.security.Key;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.KeyStoreException;
 import java.security.KeyStoreSpi;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
@@ -43,6 +51,12 @@ public class AndroidKeyStore extends KeyStoreSpi {
 		return new File(dir, Base64.getUrlEncoder().withoutPadding().encodeToString(alias.getBytes(StandardCharsets.UTF_8)));
 	}
 
+	/* the entry's certificate, beside the key; base64url has no '.', so this cannot be another alias's key file */
+	private static File certificateFile(String alias) {
+		File key = keyFile(alias);
+		return new File(key.getParentFile(), key.getName() + ".crt");
+	}
+
 	private static byte[] readKey(String alias) {
 		File file = keyFile(alias);
 		if (file.exists()) {
@@ -65,7 +79,10 @@ public class AndroidKeyStore extends KeyStoreSpi {
 	}
 
 	private static void writeKey(String alias, byte[] data) throws IOException {
-		File file = keyFile(alias);
+		writeFile(keyFile(alias), data);
+	}
+
+	private static void writeFile(File file, byte[] data) throws IOException {
 		File tmp = new File(file.getPath() + ".tmp");
 		file.getParentFile().mkdirs();
 		Files.write(tmp.toPath(), data);
@@ -84,19 +101,37 @@ public class AndroidKeyStore extends KeyStoreSpi {
 		buffer.get(algorithmBytes);
 		byte[] keyBytes = new byte[buffer.remaining()];
 		buffer.get(keyBytes);
-		return new AndroidKeyStoreSecretKey(keyBytes, new String(algorithmBytes, StandardCharsets.UTF_8));
+		String algorithm = new String(algorithmBytes, StandardCharsets.UTF_8);
+		if ("RSA".equals(algorithm) || "EC".equals(algorithm)) {
+			// a private key entry, kept in PKCS#8
+			try {
+				PrivateKey key = KeyFactory.getInstance(algorithm).generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
+				return key instanceof RSAPrivateKey ? new AndroidKeyStoreRSAPrivateKey((RSAPrivateKey)key) : new AndroidKeyStorePrivateKey(key);
+			} catch (InvalidKeySpecException e) {
+				throw (UnrecoverableKeyException)new UnrecoverableKeyException("cannot load key " + alias).initCause(e);
+			}
+		}
+		return new AndroidKeyStoreSecretKey(keyBytes, algorithm);
 	}
 
 	@Override
 	public Certificate[] engineGetCertificateChain(String alias) {
-		Slog.i(TAG, "engineGetCertificateChain(" + alias + ") called");
-		return new Certificate[0];
+		// like AndroidKeyStoreSpi: the leaf certificate, or null for an entry without one
+		Certificate leaf = engineGetCertificate(alias);
+		return leaf != null ? new Certificate[] {leaf} : null;
 	}
 
 	@Override
 	public Certificate engineGetCertificate(String alias) {
-		Slog.i(TAG, "engineGetCertificate(" + alias + ") called");
-		return null;
+		File file = certificateFile(alias);
+		if (!file.exists())
+			return null;
+		try {
+			return CertificateFactory.getInstance("X.509").generateCertificate(new ByteArrayInputStream(Files.readAllBytes(file.toPath())));
+		} catch (IOException | CertificateException e) {
+			Slog.w(TAG, "cannot read the certificate of " + alias, e);
+			return null;
+		}
 	}
 
 	@Override
@@ -107,6 +142,19 @@ public class AndroidKeyStore extends KeyStoreSpi {
 
 	@Override
 	public void engineSetKeyEntry(String alias, Key key, char[] password, Certificate[] chain) throws KeyStoreException {
+		byte[] certificate = null;
+		if (key instanceof PrivateKey) {
+			// AndroidKeyStoreSpi.setPrivateKeyEntry(): the entry keeps the key's certificate
+			if (chain == null || chain.length == 0)
+				throw new KeyStoreException("Must supply at least one Certificate with PrivateKey");
+			try {
+				certificate = chain[0].getEncoded();
+			} catch (CertificateEncodingException e) {
+				throw new KeyStoreException("Failed to encode certificate #0", e);
+			}
+			if (key instanceof AndroidKeyStorePrivateKey)
+				key = ((AndroidKeyStorePrivateKey)key).key;
+		}
 		byte[] algorithm = key.getAlgorithm().getBytes(StandardCharsets.UTF_8);
 		byte[] encoded = key.getEncoded();
 		ByteBuffer buffer = ByteBuffer.allocate(4 + algorithm.length + encoded.length);
@@ -115,6 +163,10 @@ public class AndroidKeyStore extends KeyStoreSpi {
 		buffer.put(encoded);
 		try {
 			writeKey(alias, buffer.array());
+			if (certificate != null)
+				writeFile(certificateFile(alias), certificate);
+			else
+				Files.deleteIfExists(certificateFile(alias).toPath());
 		} catch (IOException e) {
 			throw new KeyStoreException("cannot store key " + alias, e);
 		}
@@ -157,6 +209,7 @@ public class AndroidKeyStore extends KeyStoreSpi {
 		// like keystore2: an unknown alias is not an error, any other failure is a KeyStoreException
 		try {
 			Files.deleteIfExists(keyFile(alias).toPath());
+			Files.deleteIfExists(certificateFile(alias).toPath());
 		} catch (IOException e) {
 			throw new KeyStoreException("Failed to delete entry: " + alias, e);
 		}

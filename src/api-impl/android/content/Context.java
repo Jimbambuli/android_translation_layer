@@ -196,6 +196,7 @@ public abstract class Context {
 		provider.put("KeyStore.AndroidCAStore", "android.security.keystore.AndroidCAStore");
 		provider.put("KeyGenerator.AES", "android.security.keystore.KeyGenerator$AES");
 		provider.put("KeyGenerator.HmacSHA512", "android.security.keystore.KeyGenerator$HmacSHA512");
+		provider.put("KeyPairGenerator.RSA", "android.security.keystore.AndroidKeyStoreKeyPairGeneratorSpi$RSA");
 		Security.addProvider(provider);
 		// like AndroidKeyStoreProvider.install(): ciphers for AndroidKeyStore keys come from their own provider,
 		// which takes only those keys (SupportedKeyClasses). AOSP puts it after Bouncy Castle, which cannot use
@@ -203,6 +204,23 @@ public abstract class Context {
 		Provider workaround = new Provider("AndroidKeyStoreBCWorkaround", 1.0, "Android KeyStore security provider to work around Bouncy Castle") {};
 		workaround.put("Cipher.AES/GCM/NoPadding", "android.security.keystore.AndroidKeyStoreAuthenticatedAESCipherSpi$GCM");
 		workaround.put("Cipher.AES/GCM/NoPadding SupportedKeyClasses", "android.security.keystore.AndroidKeyStoreSecretKey");
+		// AndroidKeyStoreBCWorkaroundProvider's RSA ciphers, for AndroidKeyStore private keys
+		String rsa = "android.security.keystore.AndroidKeyStoreRSACipherSpi$";
+		String[][] rsaCiphers = {
+		    {"NoPadding", "NoPadding"},
+		    {"PKCS1Padding", "PKCS1Padding"},
+		    {"OAEPPadding", "OAEPWithSHA1AndMGF1Padding"},
+		    {"OAEPWithSHA-1AndMGF1Padding", "OAEPWithSHA1AndMGF1Padding"},
+		    {"OAEPWithSHA-224AndMGF1Padding", "OAEPWithSHA224AndMGF1Padding"},
+		    {"OAEPWithSHA-256AndMGF1Padding", "OAEPWithSHA256AndMGF1Padding"},
+		    {"OAEPWithSHA-384AndMGF1Padding", "OAEPWithSHA384AndMGF1Padding"},
+		    {"OAEPWithSHA-512AndMGF1Padding", "OAEPWithSHA512AndMGF1Padding"}};
+		for (String[] cipher : rsaCiphers) {
+			workaround.put("Cipher.RSA/ECB/" + cipher[0], rsa + cipher[1]);
+			workaround.put("Cipher.RSA/ECB/" + cipher[0] + " SupportedKeyClasses", "android.security.keystore.AndroidKeyStorePrivateKey");
+			// AOSP maps RSA/None/OAEPWithSHA-224AndMGF1Padding to the SHA-256 one
+			workaround.put("Alg.Alias.Cipher.RSA/None/" + cipher[0], "RSA/ECB/" + (cipher[0].contains("SHA-224") ? "OAEPWithSHA-256AndMGF1Padding" : cipher[0]));
+		}
 		Security.insertProviderAt(workaround, 1);
 
 		for (PackageParser.Activity receiver : primary_application.pkg.receivers) {

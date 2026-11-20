@@ -5,6 +5,11 @@ import java.util.Date;
 import javax.security.auth.x500.X500Principal;
 
 public final class KeyGenParameterSpec implements java.security.spec.AlgorithmParameterSpec {
+	private static final X500Principal DEFAULT_ATTESTATION_CERT_SUBJECT = new X500Principal("CN=Android Keystore Key");
+	private static final X500Principal DEFAULT_SELF_SIGNED_CERT_SUBJECT = new X500Principal("CN=Fake");
+	private static final BigInteger DEFAULT_CERT_SERIAL_NUMBER = new BigInteger("1");
+	private static final Date DEFAULT_CERT_NOT_BEFORE = new Date(0L); // Jan 1 1970
+	private static final Date DEFAULT_CERT_NOT_AFTER = new Date(2461449600000L); // Jan 1 2048
 
 	private String keystoreAlias;
 	private int purposes;
@@ -214,7 +219,20 @@ public final class KeyGenParameterSpec implements java.security.spec.AlgorithmPa
 			return this;
 		}
 
+		/* like AOSP's KeyGenParameterSpec constructor: the certificate defaults and its checks */
 		public KeyGenParameterSpec build() {
+			if (spec.keystoreAlias == null || spec.keystoreAlias.isEmpty())
+				throw new IllegalArgumentException("keyStoreAlias must not be empty");
+			if (spec.certificateSubject == null)
+				spec.certificateSubject = spec.attestationChallenge == null ? DEFAULT_SELF_SIGNED_CERT_SUBJECT : DEFAULT_ATTESTATION_CERT_SUBJECT;
+			if (spec.certificateNotBefore == null)
+				spec.certificateNotBefore = DEFAULT_CERT_NOT_BEFORE;
+			if (spec.certificateNotAfter == null)
+				spec.certificateNotAfter = DEFAULT_CERT_NOT_AFTER;
+			if (spec.certificateSerialNumber == null)
+				spec.certificateSerialNumber = DEFAULT_CERT_SERIAL_NUMBER;
+			if (spec.certificateNotAfter.before(spec.certificateNotBefore))
+				throw new IllegalArgumentException("certificateNotAfter < certificateNotBefore");
 			return spec;
 		}
 	}
