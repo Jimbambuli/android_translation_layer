@@ -40,9 +40,11 @@ public class Application extends ContextWrapper implements ComponentCallbacks2 {
 		return getPackageManager().getApplicationIcon(this.get_atl_loaded_app().pkg.applicationInfo).paintable;
 	}
 
+	/* the application's label as AOSP shows it (PackageManager.getApplicationLabel(): the label resource, a
+	 * plain-text android:label, else the package name) */
 	@Export
 	String get_app_label() {
-		return getString(this.get_atl_loaded_app().pkg.applicationInfo.labelRes);
+		return getPackageManager().getApplicationLabel(this.get_atl_loaded_app().pkg.applicationInfo).toString();
 	}
 
 	@Export

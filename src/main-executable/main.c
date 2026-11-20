@@ -1057,8 +1057,10 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	else if (app_label_jstr)
 		g_set_application_name(_CSTRING(app_label_jstr));
 
+	/* until the activity sets its title: the application's label, as the caption of a desktop window in AOSP
+	 * (WindowDecorTaskResourceLoader: pm.getApplicationLabel()) */
 	if (!d->apk_instrumentation_class)
-		gtk_window_set_title(GTK_WINDOW(window), package_name);
+		gtk_window_set_title(GTK_WINDOW(window), app_label_jstr ? _CSTRING(app_label_jstr) : package_name);
 	gtk_window_set_default_size(GTK_WINDOW(window), d->window_width, d->window_height);
 	g_signal_connect(window, "close-request", G_CALLBACK(app_exit), env);
 
