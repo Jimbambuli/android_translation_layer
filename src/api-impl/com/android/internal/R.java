@@ -23366,44 +23366,44 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int accessibility_window_magnifier_min_size = 0x01050125;
 		/**  Space between a button and another button or screen edge
          */
-		public static final int action_bar_button_margin = 0x01050258;
-		public static final int action_bar_button_max_width = 0x01050259;
+		public static final int action_bar_button_margin = 0x01050259;
+		public static final int action_bar_button_max_width = 0x0105025a;
 		/**  Default content inset of an action bar.
          */
-		public static final int action_bar_content_inset_material = 0x01050288;
+		public static final int action_bar_content_inset_material = 0x01050289;
 		/**  Default content inset of an action bar when a navigation button is present.
          */
-		public static final int action_bar_content_inset_with_nav = 0x01050289;
+		public static final int action_bar_content_inset_with_nav = 0x0105028a;
 		/**  Default height of an action bar.
          */
 		public static final int action_bar_default_height = 0x010500e1;
 		/**  Default height of an action bar.
          */
-		public static final int action_bar_default_height_material = 0x01050285;
+		public static final int action_bar_default_height_material = 0x01050286;
 		/**  Default end padding of an action bar.
          */
-		public static final int action_bar_default_padding_end_material = 0x01050287;
+		public static final int action_bar_default_padding_end_material = 0x01050288;
 		/**  Default start padding of an action bar.
          */
-		public static final int action_bar_default_padding_start_material = 0x01050286;
-		public static final int action_bar_elevation_material = 0x01050292;
+		public static final int action_bar_default_padding_start_material = 0x01050287;
+		public static final int action_bar_elevation_material = 0x01050293;
 		/**  Vertical padding around action bar icons.
          */
 		public static final int action_bar_icon_vertical_padding = 0x010500e2;
 		/**  Vertical padding around action bar icons.
          */
-		public static final int action_bar_icon_vertical_padding_material = 0x0105028a;
+		public static final int action_bar_icon_vertical_padding_material = 0x0105028b;
 		/**  Action bar
          */
-		public static final int action_bar_margin = 0x01050255;
-		public static final int action_bar_margin_end = 0x01050257;
-		public static final int action_bar_margin_start = 0x01050256;
+		public static final int action_bar_margin = 0x01050256;
+		public static final int action_bar_margin_end = 0x01050258;
+		public static final int action_bar_margin_start = 0x01050257;
 		/**  Padding to add to the end of the overflow action button.
          */
-		public static final int action_bar_overflow_padding_end_material = 0x01050291;
+		public static final int action_bar_overflow_padding_end_material = 0x01050292;
 		/**  Padding to add to the start of the overflow action button.
          */
-		public static final int action_bar_overflow_padding_start_material = 0x01050290;
+		public static final int action_bar_overflow_padding_start_material = 0x01050291;
 		/**  Maximum height for a stacked tab bar as part of an action bar
          */
 		public static final int action_bar_stacked_max_height = 0x010500f9;
@@ -23417,7 +23417,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int action_bar_subtitle_bottom_margin = 0x010500e6;
 		/**  Bottom margin for action bar subtitles
          */
-		public static final int action_bar_subtitle_bottom_margin_material = 0x0105028c;
+		public static final int action_bar_subtitle_bottom_margin_material = 0x0105028d;
 		/**  Text size for action bar subtitles
          */
 		public static final int action_bar_subtitle_text_size = 0x010500e4;
@@ -23426,17 +23426,17 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int action_bar_subtitle_top_margin = 0x010500e5;
 		/**  Top margin for action bar subtitles
          */
-		public static final int action_bar_subtitle_top_margin_material = 0x0105028b;
+		public static final int action_bar_subtitle_top_margin_material = 0x0105028c;
 		/**  Text size for action bar titles
          */
 		public static final int action_bar_title_text_size = 0x010500e3;
-		public static final int action_bar_toggle_internal_padding = 0x0105025a;
-		public static final int action_button_min_height_material = 0x01050295;
+		public static final int action_bar_toggle_internal_padding = 0x0105025b;
+		public static final int action_button_min_height_material = 0x01050296;
 		/**  Minimum width for an action button in the menu area of an action bar
          */
 		public static final int action_button_min_width = 0x010500f8;
-		public static final int action_button_min_width_material = 0x01050294;
-		public static final int action_button_min_width_overflow_material = 0x01050293;
+		public static final int action_button_min_width_material = 0x01050295;
+		public static final int action_button_min_width_overflow_material = 0x01050294;
 		/**  Minimum popup width for selecting an activity in ActivityChooserDialog/ActivityChooserView.
          */
 		public static final int activity_chooser_popup_min_width = 0x010500ee;
@@ -23452,7 +23452,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int activity_embedding_divider_touch_target_width = 0x010501fb;
 		/**  AppErrorDialog's list item height
          */
-		public static final int aerr_list_item_height = 0x01050203;
+		public static final int aerr_list_item_height = 0x01050204;
 		public static final int aerr_padding_list_bottom = 0x0105015b;
 		public static final int aerr_padding_list_top = 0x0105015a;
 		/**  Dialog button bar height
@@ -23512,49 +23512,49 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
  20.83% of display size
  36.46% of display size
          */
-		public static final int base_error_dialog_bottom_padding = 0x01050209;
+		public static final int base_error_dialog_bottom_padding = 0x0105020a;
 		/**  Padding for contents in a view of BaseErrorDialog such as a title and buttons
          */
-		public static final int base_error_dialog_contents_padding = 0x01050204;
+		public static final int base_error_dialog_contents_padding = 0x01050205;
 		/**  2.8% of display size
  5.2% of display size
  5.2% of display size
          */
-		public static final int base_error_dialog_padding = 0x01050208;
+		public static final int base_error_dialog_padding = 0x01050209;
 		/**  14.4% of display size
  16.7% of display size
  16.7% of display size
          */
-		public static final int base_error_dialog_top_padding = 0x01050207;
+		public static final int base_error_dialog_top_padding = 0x01050208;
 		/**  Dialog end padding for button bar layout
          */
-		public static final int button_bar_layout_end_padding = 0x01050249;
+		public static final int button_bar_layout_end_padding = 0x0105024a;
 		/**  Dialog start padding for button bar layout
          */
-		public static final int button_bar_layout_start_padding = 0x01050248;
+		public static final int button_bar_layout_start_padding = 0x01050249;
 		/**  Dialog top padding for button bar layout
          */
-		public static final int button_bar_layout_top_padding = 0x0105024a;
+		public static final int button_bar_layout_top_padding = 0x0105024b;
 		/**  Elevation when button is pressed
          */
-		public static final int button_elevation_material = 0x010502b0;
+		public static final int button_elevation_material = 0x010502b1;
 		/**  Dialog button end margin
          */
-		public static final int button_end_margin = 0x0105024c;
-		public static final int button_inset_horizontal_material = 0x010502b3;
+		public static final int button_end_margin = 0x0105024d;
+		public static final int button_inset_horizontal_material = 0x010502b4;
 		/**  Default insets (outer padding) around buttons
          */
-		public static final int button_inset_vertical_material = 0x010502b2;
+		public static final int button_inset_vertical_material = 0x010502b3;
 		/**  Dialog button layout height
          */
-		public static final int button_layout_height = 0x0105024b;
-		public static final int button_padding_horizontal_material = 0x010502b5;
+		public static final int button_layout_height = 0x0105024c;
+		public static final int button_padding_horizontal_material = 0x010502b6;
 		/**  Default inner padding within buttons
          */
-		public static final int button_padding_vertical_material = 0x010502b4;
+		public static final int button_padding_vertical_material = 0x010502b5;
 		/**  Z translation to apply when button is pressed
          */
-		public static final int button_pressed_z_material = 0x010502b1;
+		public static final int button_pressed_z_material = 0x010502b2;
 		/**  The start padding to optionally use (e.g. if there's extra space) for CallStyle
          notification actions.
          this = conversation_content_start (80dp) - button inset (4dp) - action padding (12dp)
@@ -23563,112 +23563,112 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  The minimum width of the system actions added to the CallStyle notifications.
          */
 		public static final int call_notification_system_action_min_width = 0x010500ae;
-		public static final int car_action1_size = 0x01050220;
-		public static final int car_action2_size = 0x01050221;
-		public static final int car_activity_resolver_corner_radius = 0x0105025e;
-		public static final int car_activity_resolver_list_item_height = 0x0105025c;
-		public static final int car_activity_resolver_list_max_height = 0x0105025d;
+		public static final int car_action1_size = 0x01050221;
+		public static final int car_action2_size = 0x01050222;
+		public static final int car_activity_resolver_corner_radius = 0x0105025f;
+		public static final int car_activity_resolver_list_item_height = 0x0105025d;
+		public static final int car_activity_resolver_list_max_height = 0x0105025e;
 		/**  Intent Resolver
          */
-		public static final int car_activity_resolver_width = 0x0105025b;
+		public static final int car_activity_resolver_width = 0x0105025c;
 		/**  Application Bar
          */
-		public static final int car_app_bar_height = 0x0105020c;
-		public static final int car_body1_size = 0x01050219;
-		public static final int car_body2_size = 0x0105021a;
-		public static final int car_body3_size = 0x0105021b;
-		public static final int car_body4_size = 0x0105021c;
+		public static final int car_app_bar_height = 0x0105020d;
+		public static final int car_body1_size = 0x0105021a;
+		public static final int car_body2_size = 0x0105021b;
+		public static final int car_body3_size = 0x0105021c;
+		public static final int car_body4_size = 0x0105021d;
 		/**  car_body5_size is deprecated
          */
-		public static final int car_body5_size = 0x0105021d;
-		public static final int car_borderless_button_horizontal_padding = 0x01050239;
+		public static final int car_body5_size = 0x0105021e;
+		public static final int car_borderless_button_horizontal_padding = 0x0105023a;
 		/**  Buttons
          */
-		public static final int car_button_height = 0x01050236;
-		public static final int car_button_horizontal_padding = 0x01050238;
-		public static final int car_button_min_width = 0x01050237;
-		public static final int car_button_radius = 0x0105023a;
-		public static final int car_card_action_bar_height = 0x01050226;
-		public static final int car_card_header_height = 0x01050225;
-		public static final int car_dialog_action_bar_height = 0x01050212;
-		public static final int car_double_line_list_item_height = 0x0105020f;
-		public static final int car_headline1_size = 0x01050215;
-		public static final int car_headline2_size = 0x01050216;
-		public static final int car_headline3_size = 0x01050217;
-		public static final int car_headline4_size = 0x01050218;
+		public static final int car_button_height = 0x01050237;
+		public static final int car_button_horizontal_padding = 0x01050239;
+		public static final int car_button_min_width = 0x01050238;
+		public static final int car_button_radius = 0x0105023b;
+		public static final int car_card_action_bar_height = 0x01050227;
+		public static final int car_card_header_height = 0x01050226;
+		public static final int car_dialog_action_bar_height = 0x01050213;
+		public static final int car_double_line_list_item_height = 0x01050210;
+		public static final int car_headline1_size = 0x01050216;
+		public static final int car_headline2_size = 0x01050217;
+		public static final int car_headline3_size = 0x01050218;
+		public static final int car_headline4_size = 0x01050219;
 		/**  Common icon size for car app
          */
-		public static final int car_icon_size = 0x01050222;
+		public static final int car_icon_size = 0x01050223;
 		/**  Keylines for content.
          */
-		public static final int car_keyline_1 = 0x01050232;
+		public static final int car_keyline_1 = 0x01050233;
 		/**  The diff between keyline 1 and keyline 3.
          */
-		public static final int car_keyline_1_keyline_3_diff = 0x01050211;
-		public static final int car_keyline_2 = 0x01050233;
-		public static final int car_keyline_3 = 0x01050234;
-		public static final int car_keyline_4 = 0x01050235;
-		public static final int car_label1_size = 0x0105021e;
-		public static final int car_label2_size = 0x0105021f;
-		public static final int car_large_avatar_badge_size = 0x0105020b;
-		public static final int car_large_avatar_size = 0x0105020a;
-		public static final int car_list_divider_height = 0x01050210;
+		public static final int car_keyline_1_keyline_3_diff = 0x01050212;
+		public static final int car_keyline_2 = 0x01050234;
+		public static final int car_keyline_3 = 0x01050235;
+		public static final int car_keyline_4 = 0x01050236;
+		public static final int car_label1_size = 0x0105021f;
+		public static final int car_label2_size = 0x01050220;
+		public static final int car_large_avatar_badge_size = 0x0105020c;
+		public static final int car_large_avatar_size = 0x0105020b;
+		public static final int car_list_divider_height = 0x01050211;
 		/**  Margin
          */
-		public static final int car_margin = 0x0105020d;
+		public static final int car_margin = 0x0105020e;
 		/**  Paddings
          */
-		public static final int car_padding_0 = 0x01050227;
-		public static final int car_padding_1 = 0x01050228;
-		public static final int car_padding_2 = 0x01050229;
-		public static final int car_padding_3 = 0x0105022a;
-		public static final int car_padding_4 = 0x0105022b;
-		public static final int car_padding_5 = 0x0105022c;
-		public static final int car_padding_6 = 0x0105022d;
-		public static final int car_pill_button_size = 0x0105023b;
-		public static final int car_preference_category_icon_size = 0x01050253;
-		public static final int car_preference_icon_size = 0x01050252;
-		public static final int car_preference_row_vertical_margin = 0x01050254;
-		public static final int car_primary_icon_size = 0x01050223;
+		public static final int car_padding_0 = 0x01050228;
+		public static final int car_padding_1 = 0x01050229;
+		public static final int car_padding_2 = 0x0105022a;
+		public static final int car_padding_3 = 0x0105022b;
+		public static final int car_padding_4 = 0x0105022c;
+		public static final int car_padding_5 = 0x0105022d;
+		public static final int car_padding_6 = 0x0105022e;
+		public static final int car_pill_button_size = 0x0105023c;
+		public static final int car_preference_category_icon_size = 0x01050254;
+		public static final int car_preference_icon_size = 0x01050253;
+		public static final int car_preference_row_vertical_margin = 0x01050255;
+		public static final int car_primary_icon_size = 0x01050224;
 		/**  Progress Bar
          */
-		public static final int car_progress_bar_height = 0x01050246;
+		public static final int car_progress_bar_height = 0x01050247;
 		/**  Radius
          */
-		public static final int car_radius_1 = 0x0105022e;
-		public static final int car_radius_2 = 0x0105022f;
-		public static final int car_radius_3 = 0x01050230;
-		public static final int car_radius_5 = 0x01050231;
-		public static final int car_secondary_icon_size = 0x01050224;
+		public static final int car_radius_1 = 0x0105022f;
+		public static final int car_radius_2 = 0x01050230;
+		public static final int car_radius_3 = 0x01050231;
+		public static final int car_radius_5 = 0x01050232;
+		public static final int car_secondary_icon_size = 0x01050225;
 		/**  Seekbar
          */
-		public static final int car_seekbar_height = 0x01050241;
-		public static final int car_seekbar_padding = 0x01050242;
+		public static final int car_seekbar_height = 0x01050242;
+		public static final int car_seekbar_padding = 0x01050243;
 		/**  The space between seekbar and text in ListItem. This value is based on car_seekbar_padding.
          It brings seekbar and text closer for visual balance while maintaining touch area.
          */
-		public static final int car_seekbar_text_overlap = 0x01050245;
-		public static final int car_seekbar_thumb_size = 0x01050243;
-		public static final int car_seekbar_thumb_stroke = 0x01050244;
+		public static final int car_seekbar_text_overlap = 0x01050246;
+		public static final int car_seekbar_thumb_size = 0x01050244;
+		public static final int car_seekbar_thumb_stroke = 0x01050245;
 		/**  Lists
          */
-		public static final int car_single_line_list_item_height = 0x0105020e;
-		public static final int car_switch_thumb_margin_size = 0x0105023f;
+		public static final int car_single_line_list_item_height = 0x0105020f;
+		public static final int car_switch_thumb_margin_size = 0x01050240;
 		/**  Switch.
  Thumb size + 2*thumb margin size must equal car_touch_target_size
  2 * Thumb size + 2*track margin size must equal car_touch_target_size
          */
-		public static final int car_switch_thumb_size = 0x0105023e;
-		public static final int car_switch_track_margin_size = 0x01050240;
+		public static final int car_switch_thumb_size = 0x0105023f;
+		public static final int car_switch_track_margin_size = 0x01050241;
 		/**  TextView
          */
-		public static final int car_textview_fading_edge_length = 0x01050247;
-		public static final int car_title2_size = 0x01050214;
+		public static final int car_textview_fading_edge_length = 0x01050248;
+		public static final int car_title2_size = 0x01050215;
 		/**  Text size for car
          */
-		public static final int car_title_size = 0x01050213;
-		public static final int car_touch_target_size = 0x0105023c;
-		public static final int car_touch_target_size_minus_one = 0x0105023d;
+		public static final int car_title_size = 0x01050214;
+		public static final int car_touch_target_size = 0x0105023d;
+		public static final int car_touch_target_size_minus_one = 0x0105023e;
 		/**  Minimum "smallest width" of the display for cascading menus to be enabled.
          */
 		public static final int cascading_menus_min_smallest_width = 0x0105015e;
@@ -24038,13 +24038,13 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int content_rect_bottom_clip_allowance = 0x01050151;
 		/**  Default rounded corner for controls
          */
-		public static final int control_corner_material = 0x010502b8;
+		public static final int control_corner_material = 0x010502b9;
 		/**  Default insets (outer padding) around controls
          */
-		public static final int control_inset_material = 0x010502b6;
+		public static final int control_inset_material = 0x010502b7;
 		/**  Default inner padding within controls
          */
-		public static final int control_padding_material = 0x010502b7;
+		public static final int control_padding_material = 0x010502b8;
 		/**  The maximum height of a thumbnail in a ThumbnailTemplate. The image will be reduced to that height in case they are bigger.
          */
 		public static final int controls_thumbnail_image_max_height = 0x010501e3;
@@ -24112,34 +24112,34 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Size of thumbnail used in the cross profile apps animation
          */
 		public static final int cross_profile_apps_thumbnail_size = 0x010501af;
-		public static final int date_picker_date_label_size = 0x010502e6;
-		public static final int date_picker_day_height = 0x010502ec;
-		public static final int date_picker_day_of_week_height = 0x010502eb;
-		public static final int date_picker_day_of_week_text_size = 0x010502e8;
-		public static final int date_picker_day_selector_radius = 0x010502ee;
-		public static final int date_picker_day_text_size = 0x010502e9;
-		public static final int date_picker_day_width = 0x010502ed;
-		public static final int date_picker_month_height = 0x010502ea;
+		public static final int date_picker_date_label_size = 0x010502e7;
+		public static final int date_picker_day_height = 0x010502ed;
+		public static final int date_picker_day_of_week_height = 0x010502ec;
+		public static final int date_picker_day_of_week_text_size = 0x010502e9;
+		public static final int date_picker_day_selector_radius = 0x010502ef;
+		public static final int date_picker_day_text_size = 0x010502ea;
+		public static final int date_picker_day_width = 0x010502ee;
+		public static final int date_picker_month_height = 0x010502eb;
 		/**  Used by Material-style SimpleMonthView
          */
-		public static final int date_picker_month_text_size = 0x010502e7;
-		public static final int date_picker_year_label_size = 0x010502e5;
-		public static final int datepicker_component_width = 0x010502dc;
-		public static final int datepicker_dialog_width = 0x010502dd;
-		public static final int datepicker_header_height = 0x010502e1;
-		public static final int datepicker_header_text_size = 0x010502e2;
-		public static final int datepicker_list_year_activated_label_size = 0x010502e4;
-		public static final int datepicker_list_year_label_size = 0x010502e3;
-		public static final int datepicker_selected_date_day_size = 0x010502de;
-		public static final int datepicker_selected_date_month_size = 0x010502df;
-		public static final int datepicker_selected_date_year_size = 0x010502e0;
-		public static final int datepicker_view_animator_height = 0x010502f2;
+		public static final int date_picker_month_text_size = 0x010502e8;
+		public static final int date_picker_year_label_size = 0x010502e6;
+		public static final int datepicker_component_width = 0x010502dd;
+		public static final int datepicker_dialog_width = 0x010502de;
+		public static final int datepicker_header_height = 0x010502e2;
+		public static final int datepicker_header_text_size = 0x010502e3;
+		public static final int datepicker_list_year_activated_label_size = 0x010502e5;
+		public static final int datepicker_list_year_label_size = 0x010502e4;
+		public static final int datepicker_selected_date_day_size = 0x010502df;
+		public static final int datepicker_selected_date_month_size = 0x010502e0;
+		public static final int datepicker_selected_date_year_size = 0x010502e1;
+		public static final int datepicker_view_animator_height = 0x010502f3;
 		/**  Material date picker dimensions.
          */
-		public static final int datepicker_year_label_height = 0x010502db;
-		public static final int day_picker_button_margin_top = 0x010502f1;
-		public static final int day_picker_padding_horizontal = 0x010502ef;
-		public static final int day_picker_padding_top = 0x010502f0;
+		public static final int datepicker_year_label_height = 0x010502dc;
+		public static final int day_picker_button_margin_top = 0x010502f2;
+		public static final int day_picker_padding_horizontal = 0x010502f0;
+		public static final int day_picker_padding_top = 0x010502f1;
 		public static final int default_app_widget_padding_bottom = 0x010500f7;
 		/**  Default padding to apply to AppWidgetHostViews containing widgets targeting API level 14 and up.
          */
@@ -24185,8 +24185,8 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          (the screen is in portrait). This may be either a fraction or a dimension.
          */
 		public static final int dialog_fixed_width_minor = 0x0105009c;
-		public static final int dialog_list_padding_bottom_no_buttons = 0x010502c1;
-		public static final int dialog_list_padding_top_no_title = 0x010502c0;
+		public static final int dialog_list_padding_bottom_no_buttons = 0x010502c2;
+		public static final int dialog_list_padding_top_no_title = 0x010502c1;
 		/**  The platform's desired minimum size for a dialog's width when it
          is along the major axis (that is the screen is landscape).  This may
          be either a fraction or a dimension.
@@ -24199,16 +24199,16 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int dialog_min_width_minor = 0x01050004;
 		/**  Dialog top padding when there is no title
          */
-		public static final int dialog_no_title_padding_top = 0x0105024d;
+		public static final int dialog_no_title_padding_top = 0x0105024e;
 		/**  Default padding for dialogs.
          */
 		public static final int dialog_padding = 0x010500a4;
-		public static final int dialog_padding_material = 0x010502bd;
-		public static final int dialog_padding_top_material = 0x010502be;
-		public static final int dialog_title_divider_material = 0x010502bf;
+		public static final int dialog_padding_material = 0x010502be;
+		public static final int dialog_padding_top_material = 0x010502bf;
+		public static final int dialog_title_divider_material = 0x010502c0;
 		/**  Default alpha value for disabled elements.
          */
-		public static final int disabled_alpha_leanback_formwizard = 0x0105025f;
+		public static final int disabled_alpha_leanback_formwizard = 0x01050260;
 		public static final int disabled_alpha_material_dark = 0x0105000f;
 		public static final int disabled_alpha_material_light = 0x0105000e;
 		/**  How much we expand the touchable region of the status bar below the notch to catch touches
@@ -24235,9 +24235,9 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Text padding for dropdown items
          */
 		public static final int dropdownitem_text_padding_right = 0x010500f1;
-		public static final int edit_text_inset_bottom_material = 0x010502bc;
-		public static final int edit_text_inset_horizontal_material = 0x010502ba;
-		public static final int edit_text_inset_top_material = 0x010502bb;
+		public static final int edit_text_inset_bottom_material = 0x010502bd;
+		public static final int edit_text_inset_horizontal_material = 0x010502bb;
+		public static final int edit_text_inset_top_material = 0x010502bc;
 		/**  Size of the stroke with for the emphasized notification button style
          */
 		public static final int emphasized_button_stroke_width = 0x010500b2;
@@ -24267,13 +24267,13 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int floating_toolbar_preferred_width = 0x0105014c;
 		public static final int floating_toolbar_text_size = 0x0105014a;
 		public static final int floating_toolbar_vertical_margin = 0x01050150;
-		public static final int floating_window_margin_bottom = 0x010502af;
-		public static final int floating_window_margin_left = 0x010502ac;
-		public static final int floating_window_margin_right = 0x010502ae;
-		public static final int floating_window_margin_top = 0x010502ad;
+		public static final int floating_window_margin_bottom = 0x010502b0;
+		public static final int floating_window_margin_left = 0x010502ad;
+		public static final int floating_window_margin_right = 0x010502af;
+		public static final int floating_window_margin_top = 0x010502ae;
 		/**  dialog elevation [overrides 18dp]
          */
-		public static final int floating_window_z = 0x010502ab;
+		public static final int floating_window_z = 0x010502ac;
 		public static final int handwriting_bounds_offset_bottom = 0x01050200;
 		/**  Default handwriting bounds offsets for editors.
          */
@@ -24318,10 +24318,10 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int highlight_alpha_material_light = 0x01050014;
 		/**  Dialog image margin start
          */
-		public static final int image_margin_start = 0x01050251;
+		public static final int image_margin_start = 0x01050252;
 		/**  Dialog image size
          */
-		public static final int image_size = 0x01050250;
+		public static final int image_size = 0x01050251;
 		/**  width of ImmersiveModeConfirmation (-1 for match_parent)
          */
 		public static final int immersive_mode_cling_width = 0x01050133;
@@ -24336,7 +24336,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int importance_ring_stroke_width = 0x01050192;
 		/**  Specifies height of the divider in the input method chooser
          */
-		public static final int input_method_divider_height = 0x01050205;
+		public static final int input_method_divider_height = 0x01050206;
 		/**  Copied from SysUI's @dimen/nav_content_padding for the embedded nav bar in the IME.
          */
 		public static final int input_method_nav_content_padding = 0x01050084;
@@ -24466,70 +24466,70 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int kg_widget_view_width = 0x0105010d;
 		/**  Button dimens
          */
-		public static final int leanback_button_height = 0x01050278;
-		public static final int leanback_button_padding_horizontal = 0x0105027a;
-		public static final int leanback_button_padding_vertical = 0x0105027b;
-		public static final int leanback_button_radius = 0x01050279;
-		public static final int leanback_dialog_corner_radius = 0x0105027c;
+		public static final int leanback_button_height = 0x01050279;
+		public static final int leanback_button_padding_horizontal = 0x0105027b;
+		public static final int leanback_button_padding_vertical = 0x0105027c;
+		public static final int leanback_button_radius = 0x0105027a;
+		public static final int leanback_dialog_corner_radius = 0x0105027d;
 		/**  The opacity of the background of the new activity background when the alpha animation ends
          */
-		public static final int leanback_setup_alpha_activity_in_bkg_end = 0x01050265;
+		public static final int leanback_setup_alpha_activity_in_bkg_end = 0x01050266;
 		/**  Opacity animation for activity background
  The opacity of the background of the new activity background when the alpha animation starts
          */
-		public static final int leanback_setup_alpha_activity_in_bkg_start = 0x01050264;
+		public static final int leanback_setup_alpha_activity_in_bkg_start = 0x01050265;
 		/**  The opacity of the background of the new activity background when the alpha animation ends
          */
-		public static final int leanback_setup_alpha_activity_out_bkg_end = 0x01050267;
-		public static final int leanback_setup_alpha_activity_out_bkg_start = 0x01050266;
-		public static final int leanback_setup_alpha_animiation_max_opacity = 0x01050260;
-		public static final int leanback_setup_alpha_animiation_min_opacity = 0x01050261;
-		public static final int leanback_setup_alpha_backward_in_content_end = 0x01050271;
+		public static final int leanback_setup_alpha_activity_out_bkg_end = 0x01050268;
+		public static final int leanback_setup_alpha_activity_out_bkg_start = 0x01050267;
+		public static final int leanback_setup_alpha_animiation_max_opacity = 0x01050261;
+		public static final int leanback_setup_alpha_animiation_min_opacity = 0x01050262;
+		public static final int leanback_setup_alpha_backward_in_content_end = 0x01050272;
 		/**  Content backward animation configuration values
  Alpha animation values for the content that will be displayed after the transition is complete, this is the content coming in.
          */
-		public static final int leanback_setup_alpha_backward_in_content_start = 0x01050270;
-		public static final int leanback_setup_alpha_backward_out_content_end = 0x01050273;
+		public static final int leanback_setup_alpha_backward_in_content_start = 0x01050271;
+		public static final int leanback_setup_alpha_backward_out_content_end = 0x01050274;
 		/**  Alpha animiation values for the content that is displayed when the transition starts, this is the content going away.
          */
-		public static final int leanback_setup_alpha_backward_out_content_start = 0x01050272;
-		public static final int leanback_setup_alpha_forward_in_content_end = 0x01050269;
+		public static final int leanback_setup_alpha_backward_out_content_start = 0x01050273;
+		public static final int leanback_setup_alpha_forward_in_content_end = 0x0105026a;
 		/**  Content forward animation configuration values
  Parameter for alpha animation of new content coming on to the screen when we're moving "forward"
   Initial opacity of the new content that is coming on to the screen
          */
-		public static final int leanback_setup_alpha_forward_in_content_start = 0x01050268;
-		public static final int leanback_setup_alpha_forward_out_content_end = 0x0105026b;
-		public static final int leanback_setup_alpha_forward_out_content_start = 0x0105026a;
-		public static final int leanback_setup_translation_backward_out_content_end = 0x01050276;
-		public static final int leanback_setup_translation_backward_out_content_end_v4 = 0x01050277;
+		public static final int leanback_setup_alpha_forward_in_content_start = 0x01050269;
+		public static final int leanback_setup_alpha_forward_out_content_end = 0x0105026c;
+		public static final int leanback_setup_alpha_forward_out_content_start = 0x0105026b;
+		public static final int leanback_setup_translation_backward_out_content_end = 0x01050277;
+		public static final int leanback_setup_translation_backward_out_content_end_v4 = 0x01050278;
 		/**  Position animation for content that is displayed when the transition starts, this is the content going away.
          */
-		public static final int leanback_setup_translation_backward_out_content_start = 0x01050274;
-		public static final int leanback_setup_translation_backward_out_content_start_v4 = 0x01050275;
+		public static final int leanback_setup_translation_backward_out_content_start = 0x01050275;
+		public static final int leanback_setup_translation_backward_out_content_start_v4 = 0x01050276;
 		/**  The screen position at which content enters/exits. If you're over the edge of the cliff, we can't see you.
          */
-		public static final int leanback_setup_translation_content_cliff = 0x01050263;
+		public static final int leanback_setup_translation_content_cliff = 0x01050264;
 		/**  Where stable, on-screen content rests
          */
-		public static final int leanback_setup_translation_content_resting_point = 0x01050262;
-		public static final int leanback_setup_translation_forward_in_content_end = 0x0105026e;
-		public static final int leanback_setup_translation_forward_in_content_end_v4 = 0x0105026f;
+		public static final int leanback_setup_translation_content_resting_point = 0x01050263;
+		public static final int leanback_setup_translation_forward_in_content_end = 0x0105026f;
+		public static final int leanback_setup_translation_forward_in_content_end_v4 = 0x01050270;
 		/**  Position animation of incoming content during a "forward" transition
          */
-		public static final int leanback_setup_translation_forward_in_content_start = 0x0105026c;
-		public static final int leanback_setup_translation_forward_in_content_start_v4 = 0x0105026d;
+		public static final int leanback_setup_translation_forward_in_content_start = 0x0105026d;
+		public static final int leanback_setup_translation_forward_in_content_start_v4 = 0x0105026e;
 		public static final int light_radius = 0x01050140;
 		/**  Lighting and shadow properties
          */
 		public static final int light_y = 0x0105013e;
 		public static final int light_z = 0x0105013f;
-		public static final int list_item_padding_end_material = 0x0105028f;
+		public static final int list_item_padding_end_material = 0x01050290;
 		/**  Default padding for list items. This should match the action bar
          content inset so that ListActivity items line up correctly.
          */
-		public static final int list_item_padding_horizontal_material = 0x0105028d;
-		public static final int list_item_padding_start_material = 0x0105028e;
+		public static final int list_item_padding_horizontal_material = 0x0105028e;
+		public static final int list_item_padding_start_material = 0x0105028f;
 		/**  How much of the cell space is classified as hit areas [0..1] where 1 means that hit area is
          a circle with diameter equals to cell minimum side min(width, height).
          */
@@ -24555,14 +24555,14 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  The absolute height for the header in a media notification.
          */
 		public static final int media_notification_header_height = 0x010500d3;
-		public static final int message_progress_dialog_bottom_padding = 0x010502fa;
-		public static final int message_progress_dialog_end_padding = 0x010502fd;
-		public static final int message_progress_dialog_letter_spacing = 0x010502fe;
-		public static final int message_progress_dialog_start_padding = 0x010502fc;
+		public static final int message_progress_dialog_bottom_padding = 0x010502fb;
+		public static final int message_progress_dialog_end_padding = 0x010502fe;
+		public static final int message_progress_dialog_letter_spacing = 0x010502ff;
+		public static final int message_progress_dialog_start_padding = 0x010502fd;
 		/**  Progress bar message dimens
          */
-		public static final int message_progress_dialog_text_size = 0x010502f9;
-		public static final int message_progress_dialog_top_padding = 0x010502fb;
+		public static final int message_progress_dialog_text_size = 0x010502fa;
+		public static final int message_progress_dialog_top_padding = 0x010502fc;
 		public static final int messaging_avatar_size = 0x0105017f;
 		public static final int messaging_group_sending_progress_size = 0x0105019a;
 		/**  Padding between text and sender when singleline
@@ -24877,7 +24877,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int notification_verification_icon_size = 0x01050106;
 		/**  keyboardHeight = key_height*4 + key_bottom_gap*3
          */
-		public static final int password_keyboard_height = 0x01050206;
+		public static final int password_keyboard_height = 0x01050207;
 		/**  Default horizontal gap between keys in the password keyboard (used by keyguard)
          */
 		public static final int password_keyboard_horizontalGap = 0x0105008e;
@@ -24896,11 +24896,11 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Default vertical gap between keys in the password keyboard (used by keyguard)
          */
 		public static final int password_keyboard_verticalGap = 0x0105008f;
-		public static final int picker_bottom_margin = 0x010502f4;
+		public static final int picker_bottom_margin = 0x010502f5;
 		/**  Date and time picker legacy dimens
  Date and time picker legacy dimens
          */
-		public static final int picker_top_margin = 0x010502f3;
+		public static final int picker_top_margin = 0x010502f4;
 		/**  The amount to leave on-screen when the PIP is minimized.
          */
 		public static final int pip_minimized_visible_size = 0x01050089;
@@ -24916,10 +24916,10 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int preference_breadcrumb_paddingRight = 0x01050099;
 		/**  Preference breadcrumbs padding, end padding
          */
-		public static final int preference_breadcrumbs_padding_end_material = 0x01050283;
+		public static final int preference_breadcrumbs_padding_end_material = 0x01050284;
 		/**  Preference breadcrumbs padding, start padding
          */
-		public static final int preference_breadcrumbs_padding_start_material = 0x01050282;
+		public static final int preference_breadcrumbs_padding_start_material = 0x01050283;
 		public static final int preference_child_padding_side = 0x010500a3;
 		/**  Preference fragment padding, bottom
          */
@@ -24929,10 +24929,10 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int preference_fragment_padding_side = 0x01050097;
 		/**  Preference fragment padding, sides
          */
-		public static final int preference_fragment_padding_side_material = 0x01050280;
+		public static final int preference_fragment_padding_side_material = 0x01050281;
 		/**  Preference fragment padding, vertical
          */
-		public static final int preference_fragment_padding_vertical_material = 0x01050281;
+		public static final int preference_fragment_padding_vertical_material = 0x01050282;
 		/**  Minimum space to allocate to the left of a preference item for an icon.
         This helps in aligning titles when some items have icons and some don't. When space is
         at a premium, we don't pre-allocate any space.
@@ -24946,25 +24946,25 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          */
 		public static final int preference_screen_bottom_margin = 0x01050094;
 		public static final int preference_screen_header_padding_side = 0x010500a0;
-		public static final int preference_screen_header_padding_side_material = 0x01050284;
+		public static final int preference_screen_header_padding_side_material = 0x01050285;
 		/**  Preference activity, vertical padding for the header list
          */
 		public static final int preference_screen_header_vertical_padding = 0x0105009f;
 		/**  Preference activity, vertical padding for the header list
          */
-		public static final int preference_screen_header_vertical_padding_material = 0x0105027d;
+		public static final int preference_screen_header_vertical_padding_material = 0x0105027e;
 		/**  Preference activity side margins
          */
 		public static final int preference_screen_side_margin = 0x01050091;
 		/**  Preference activity side margins
          */
-		public static final int preference_screen_side_margin_material = 0x0105027e;
+		public static final int preference_screen_side_margin_material = 0x0105027f;
 		/**  Preference activity side margins negative
          */
 		public static final int preference_screen_side_margin_negative = 0x01050092;
 		/**  Preference activity side margins negative
          */
-		public static final int preference_screen_side_margin_negative_material = 0x0105027f;
+		public static final int preference_screen_side_margin_negative_material = 0x01050280;
 		/**  Preference activity top margin
          */
 		public static final int preference_screen_top_margin = 0x01050093;
@@ -24973,15 +24973,15 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int preference_widget_width = 0x01050095;
 		public static final int primary_content_alpha_material_dark = 0x01050010;
 		public static final int primary_content_alpha_material_light = 0x01050011;
-		public static final int progress_bar_corner_material = 0x010502c7;
-		public static final int progress_bar_height = 0x010502f8;
-		public static final int progress_bar_height_material = 0x010502c6;
-		public static final int progress_bar_size_large = 0x010502f7;
-		public static final int progress_bar_size_medium = 0x010502f6;
+		public static final int progress_bar_corner_material = 0x010502c8;
+		public static final int progress_bar_height = 0x010502f9;
+		public static final int progress_bar_height_material = 0x010502c7;
+		public static final int progress_bar_size_large = 0x010502f8;
+		public static final int progress_bar_size_medium = 0x010502f7;
 		/**  Progress bar dimens
  Progress bar dimens
          */
-		public static final int progress_bar_size_small = 0x010502f5;
+		public static final int progress_bar_size_small = 0x010502f6;
 		/**  Height of area above QQS where battery/time go.
          Do not read this dimen directly. Use {@link SystemBarUtils#getQuickQsOffsetHeight} instead.
 
@@ -25008,7 +25008,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int resolver_title_padding_bottom = 0x010501d9;
 		/**  Size of icon shown beside a preference locked by admin
          */
-		public static final int restricted_icon_size_material = 0x010502b9;
+		public static final int restricted_icon_size_material = 0x010502ba;
 		/**  Default paddings for content around the corners.
          */
 		public static final int rounded_corner_content_padding = 0x01050081;
@@ -25045,10 +25045,10 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int rounded_corner_radius_top_adjustment = 0x0105007f;
 		/**  fallback for screen percentage widths
          */
-		public static final int screen_percentage_05 = 0x010502ff;
-		public static final int screen_percentage_10 = 0x01050300;
-		public static final int screen_percentage_12 = 0x01050301;
-		public static final int screen_percentage_15 = 0x01050302;
+		public static final int screen_percentage_05 = 0x01050300;
+		public static final int screen_percentage_10 = 0x01050301;
+		public static final int screen_percentage_12 = 0x01050302;
+		public static final int screen_percentage_15 = 0x01050303;
 		public static final int search_view_preferred_height = 0x010500dc;
 		/**  Preferred width and height of the search view.
          */
@@ -25070,12 +25070,12 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int secondary_waterfall_display_right_edge_size = 0x010501ea;
 		public static final int secondary_waterfall_display_top_edge_size = 0x010501e9;
 		public static final int seekbar_thumb_exclusion_max_size = 0x010501bb;
-		public static final int seekbar_track_background_height_material = 0x010502c4;
-		public static final int seekbar_track_progress_height_material = 0x010502c5;
-		public static final int select_dialog_drawable_padding_start_material = 0x010502c3;
+		public static final int seekbar_track_background_height_material = 0x010502c5;
+		public static final int seekbar_track_progress_height_material = 0x010502c6;
+		public static final int select_dialog_drawable_padding_start_material = 0x010502c4;
 		/**  Dialog padding minus control padding, used to fix alignment.
          */
-		public static final int select_dialog_padding_start_material = 0x010502c2;
+		public static final int select_dialog_padding_start_material = 0x010502c3;
 		/**  Size of action icons in a slice
          */
 		public static final int slice_icon_size = 0x010501ac;
@@ -25167,34 +25167,34 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Height of the bottom taskbar not including decorations like rounded corners.
          */
 		public static final int taskbar_frame_height = 0x0105006a;
-		public static final int text_edit_floating_toolbar_elevation = 0x010502a9;
-		public static final int text_edit_floating_toolbar_margin = 0x010502aa;
+		public static final int text_edit_floating_toolbar_elevation = 0x010502aa;
+		public static final int text_edit_floating_toolbar_margin = 0x010502ab;
 		public static final int text_handle_min_size = 0x0105013d;
-		public static final int text_line_spacing_multiplier_material = 0x010502a8;
-		public static final int text_size_body_1_material = 0x010502a2;
-		public static final int text_size_body_2_material = 0x010502a1;
-		public static final int text_size_button_material = 0x010502a4;
-		public static final int text_size_caption_material = 0x010502a3;
-		public static final int text_size_display_1_material = 0x01050299;
-		public static final int text_size_display_2_material = 0x01050298;
-		public static final int text_size_display_3_material = 0x01050297;
-		public static final int text_size_display_4_material = 0x01050296;
-		public static final int text_size_headline_material = 0x0105029a;
-		public static final int text_size_large_material = 0x010502a5;
-		public static final int text_size_medium_material = 0x010502a6;
-		public static final int text_size_menu_header_material = 0x010502a0;
-		public static final int text_size_menu_material = 0x0105029f;
-		public static final int text_size_small_material = 0x010502a7;
-		public static final int text_size_subhead_material = 0x0105029c;
-		public static final int text_size_subtitle_material_toolbar = 0x0105029e;
-		public static final int text_size_title_material = 0x0105029b;
-		public static final int text_size_title_material_toolbar = 0x0105029d;
+		public static final int text_line_spacing_multiplier_material = 0x010502a9;
+		public static final int text_size_body_1_material = 0x010502a3;
+		public static final int text_size_body_2_material = 0x010502a2;
+		public static final int text_size_button_material = 0x010502a5;
+		public static final int text_size_caption_material = 0x010502a4;
+		public static final int text_size_display_1_material = 0x0105029a;
+		public static final int text_size_display_2_material = 0x01050299;
+		public static final int text_size_display_3_material = 0x01050298;
+		public static final int text_size_display_4_material = 0x01050297;
+		public static final int text_size_headline_material = 0x0105029b;
+		public static final int text_size_large_material = 0x010502a6;
+		public static final int text_size_medium_material = 0x010502a7;
+		public static final int text_size_menu_header_material = 0x010502a1;
+		public static final int text_size_menu_material = 0x010502a0;
+		public static final int text_size_small_material = 0x010502a8;
+		public static final int text_size_subhead_material = 0x0105029d;
+		public static final int text_size_subtitle_material_toolbar = 0x0105029f;
+		public static final int text_size_title_material = 0x0105029c;
+		public static final int text_size_title_material_toolbar = 0x0105029e;
 		/**  Dialog end margin for text view
          */
-		public static final int text_view_end_margin = 0x0105024f;
+		public static final int text_view_end_margin = 0x01050250;
 		/**  Dialog start margin for text view
          */
-		public static final int text_view_start_margin = 0x0105024e;
+		public static final int text_view_start_margin = 0x0105024f;
 		/**  Default width for a textview error popup
          */
 		public static final int textview_error_popup_default_width = 0x010500f3;
@@ -25204,31 +25204,31 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  The width that is used when creating thumbnails of applications.
          */
 		public static final int thumbnail_width = 0x01050002;
-		public static final int timepicker_am_top_padding = 0x010502cb;
-		public static final int timepicker_ampm_horizontal_padding = 0x010502ca;
-		public static final int timepicker_ampm_label_size = 0x010502c9;
-		public static final int timepicker_center_dot_radius = 0x010502d5;
-		public static final int timepicker_edit_text_size = 0x010502d2;
-		public static final int timepicker_header_height = 0x010502ce;
-		public static final int timepicker_pm_top_padding = 0x010502cc;
-		public static final int timepicker_radial_picker_dimen = 0x010502cf;
-		public static final int timepicker_radial_picker_horizontal_margin = 0x010502d1;
-		public static final int timepicker_radial_picker_top_margin = 0x010502d0;
-		public static final int timepicker_selector_dot_radius = 0x010502d6;
+		public static final int timepicker_am_top_padding = 0x010502cc;
+		public static final int timepicker_ampm_horizontal_padding = 0x010502cb;
+		public static final int timepicker_ampm_label_size = 0x010502ca;
+		public static final int timepicker_center_dot_radius = 0x010502d6;
+		public static final int timepicker_edit_text_size = 0x010502d3;
+		public static final int timepicker_header_height = 0x010502cf;
+		public static final int timepicker_pm_top_padding = 0x010502cd;
+		public static final int timepicker_radial_picker_dimen = 0x010502d0;
+		public static final int timepicker_radial_picker_horizontal_margin = 0x010502d2;
+		public static final int timepicker_radial_picker_top_margin = 0x010502d1;
+		public static final int timepicker_selector_dot_radius = 0x010502d7;
 		/**  Used by RadialTimePicker in clock-style TimePicker.
          */
-		public static final int timepicker_selector_radius = 0x010502d3;
-		public static final int timepicker_selector_stroke = 0x010502d4;
-		public static final int timepicker_separator_padding = 0x010502cd;
-		public static final int timepicker_text_inset_inner = 0x010502d8;
-		public static final int timepicker_text_inset_normal = 0x010502d7;
-		public static final int timepicker_text_size_inner = 0x010502da;
-		public static final int timepicker_text_size_normal = 0x010502d9;
+		public static final int timepicker_selector_radius = 0x010502d4;
+		public static final int timepicker_selector_stroke = 0x010502d5;
+		public static final int timepicker_separator_padding = 0x010502ce;
+		public static final int timepicker_text_inset_inner = 0x010502d9;
+		public static final int timepicker_text_inset_normal = 0x010502d8;
+		public static final int timepicker_text_size_inner = 0x010502db;
+		public static final int timepicker_text_size_normal = 0x010502da;
 		/**  Material time picker dimensions.
  Text size for the time picker header HH:MM label. This value is large
          enough that we don't need to use scaled pixels, dp is fine.
          */
-		public static final int timepicker_time_label_size = 0x010502c8;
+		public static final int timepicker_time_label_size = 0x010502c9;
 		/**  Elevation of toast view
          */
 		public static final int toast_elevation = 0x01050061;
@@ -25276,6 +25276,7 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int waterfall_display_left_edge_size = 0x010501de;
 		public static final int waterfall_display_right_edge_size = 0x010501e0;
 		public static final int waterfall_display_top_edge_size = 0x010501df;
+		public static final int list_menu_item_icon_max_width = 0x01050203;
 	}
 	public static final class drawable {
 		public static final int ab_bottom_solid_dark_holo = 0x0108009e;
@@ -26920,319 +26921,319 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int thumbnail_fullscreen_scale = 0x01130008;
 	}
 	public static final class id {
-		public static final int ALT = 0x01020306;
-		public static final int CTRL = 0x01020307;
-		public static final int FUNCTION = 0x01020308;
-		public static final int KEYCODE_0 = 0x010200f5;
-		public static final int KEYCODE_1 = 0x010200f6;
-		public static final int KEYCODE_11 = 0x010200f7;
-		public static final int KEYCODE_12 = 0x010200f8;
-		public static final int KEYCODE_2 = 0x010200f9;
-		public static final int KEYCODE_3 = 0x010200fa;
-		public static final int KEYCODE_3D_MODE = 0x010200fb;
-		public static final int KEYCODE_4 = 0x010200fc;
-		public static final int KEYCODE_5 = 0x010200fd;
-		public static final int KEYCODE_6 = 0x010200fe;
-		public static final int KEYCODE_7 = 0x010200ff;
-		public static final int KEYCODE_8 = 0x01020100;
-		public static final int KEYCODE_9 = 0x01020101;
-		public static final int KEYCODE_A = 0x01020102;
-		public static final int KEYCODE_ALL_APPS = 0x01020103;
-		public static final int KEYCODE_ALT_LEFT = 0x01020104;
-		public static final int KEYCODE_ALT_RIGHT = 0x01020105;
-		public static final int KEYCODE_APOSTROPHE = 0x01020106;
-		public static final int KEYCODE_APP_SWITCH = 0x01020107;
-		public static final int KEYCODE_ASSIST = 0x01020108;
-		public static final int KEYCODE_AT = 0x01020109;
-		public static final int KEYCODE_AVR_INPUT = 0x0102010a;
-		public static final int KEYCODE_AVR_POWER = 0x0102010b;
-		public static final int KEYCODE_B = 0x0102010c;
-		public static final int KEYCODE_BACK = 0x0102010d;
-		public static final int KEYCODE_BACKSLASH = 0x0102010e;
-		public static final int KEYCODE_BOOKMARK = 0x0102010f;
-		public static final int KEYCODE_BREAK = 0x01020110;
-		public static final int KEYCODE_BRIGHTNESS_DOWN = 0x01020111;
-		public static final int KEYCODE_BRIGHTNESS_UP = 0x01020112;
-		public static final int KEYCODE_BUTTON_1 = 0x01020113;
-		public static final int KEYCODE_BUTTON_10 = 0x01020114;
-		public static final int KEYCODE_BUTTON_11 = 0x01020115;
-		public static final int KEYCODE_BUTTON_12 = 0x01020116;
-		public static final int KEYCODE_BUTTON_13 = 0x01020117;
-		public static final int KEYCODE_BUTTON_14 = 0x01020118;
-		public static final int KEYCODE_BUTTON_15 = 0x01020119;
-		public static final int KEYCODE_BUTTON_16 = 0x0102011a;
-		public static final int KEYCODE_BUTTON_2 = 0x0102011b;
-		public static final int KEYCODE_BUTTON_3 = 0x0102011c;
-		public static final int KEYCODE_BUTTON_4 = 0x0102011d;
-		public static final int KEYCODE_BUTTON_5 = 0x0102011e;
-		public static final int KEYCODE_BUTTON_6 = 0x0102011f;
-		public static final int KEYCODE_BUTTON_7 = 0x01020120;
-		public static final int KEYCODE_BUTTON_8 = 0x01020121;
-		public static final int KEYCODE_BUTTON_9 = 0x01020122;
-		public static final int KEYCODE_BUTTON_A = 0x01020123;
-		public static final int KEYCODE_BUTTON_B = 0x01020124;
-		public static final int KEYCODE_BUTTON_C = 0x01020125;
-		public static final int KEYCODE_BUTTON_L1 = 0x01020126;
-		public static final int KEYCODE_BUTTON_L2 = 0x01020127;
-		public static final int KEYCODE_BUTTON_MODE = 0x01020128;
-		public static final int KEYCODE_BUTTON_R1 = 0x01020129;
-		public static final int KEYCODE_BUTTON_R2 = 0x0102012a;
-		public static final int KEYCODE_BUTTON_SELECT = 0x0102012b;
-		public static final int KEYCODE_BUTTON_START = 0x0102012c;
-		public static final int KEYCODE_BUTTON_THUMBL = 0x0102012d;
-		public static final int KEYCODE_BUTTON_THUMBR = 0x0102012e;
-		public static final int KEYCODE_BUTTON_X = 0x0102012f;
-		public static final int KEYCODE_BUTTON_Y = 0x01020130;
-		public static final int KEYCODE_BUTTON_Z = 0x01020131;
-		public static final int KEYCODE_C = 0x01020132;
-		public static final int KEYCODE_CALCULATOR = 0x01020133;
-		public static final int KEYCODE_CALENDAR = 0x01020134;
-		public static final int KEYCODE_CALL = 0x01020135;
-		public static final int KEYCODE_CAMERA = 0x01020136;
-		public static final int KEYCODE_CAPS_LOCK = 0x01020137;
-		public static final int KEYCODE_CAPTIONS = 0x01020138;
-		public static final int KEYCODE_CHANNEL_DOWN = 0x01020139;
-		public static final int KEYCODE_CHANNEL_UP = 0x0102013a;
-		public static final int KEYCODE_CLEAR = 0x0102013b;
-		public static final int KEYCODE_COMMA = 0x0102013c;
-		public static final int KEYCODE_CONTACTS = 0x0102013d;
-		public static final int KEYCODE_COPY = 0x0102013e;
-		public static final int KEYCODE_CTRL_LEFT = 0x0102013f;
-		public static final int KEYCODE_CTRL_RIGHT = 0x01020140;
-		public static final int KEYCODE_CUT = 0x01020141;
-		public static final int KEYCODE_D = 0x01020142;
-		public static final int KEYCODE_DEL = 0x01020143;
-		public static final int KEYCODE_DEMO_APP_1 = 0x01020144;
-		public static final int KEYCODE_DEMO_APP_2 = 0x01020145;
-		public static final int KEYCODE_DEMO_APP_3 = 0x01020146;
-		public static final int KEYCODE_DEMO_APP_4 = 0x01020147;
-		public static final int KEYCODE_DPAD_CENTER = 0x01020148;
-		public static final int KEYCODE_DPAD_DOWN = 0x01020149;
-		public static final int KEYCODE_DPAD_DOWN_LEFT = 0x0102014a;
-		public static final int KEYCODE_DPAD_DOWN_RIGHT = 0x0102014b;
-		public static final int KEYCODE_DPAD_LEFT = 0x0102014c;
-		public static final int KEYCODE_DPAD_RIGHT = 0x0102014d;
-		public static final int KEYCODE_DPAD_UP = 0x0102014e;
-		public static final int KEYCODE_DPAD_UP_LEFT = 0x0102014f;
-		public static final int KEYCODE_DPAD_UP_RIGHT = 0x01020150;
-		public static final int KEYCODE_DVR = 0x01020151;
-		public static final int KEYCODE_E = 0x01020152;
-		public static final int KEYCODE_EISU = 0x01020153;
-		public static final int KEYCODE_ENDCALL = 0x01020154;
-		public static final int KEYCODE_ENTER = 0x01020155;
-		public static final int KEYCODE_ENVELOPE = 0x01020156;
-		public static final int KEYCODE_EQUALS = 0x01020157;
-		public static final int KEYCODE_ESCAPE = 0x01020158;
-		public static final int KEYCODE_EXPLORER = 0x01020159;
-		public static final int KEYCODE_F = 0x0102015a;
-		public static final int KEYCODE_F1 = 0x0102015b;
-		public static final int KEYCODE_F10 = 0x0102015c;
-		public static final int KEYCODE_F11 = 0x0102015d;
-		public static final int KEYCODE_F12 = 0x0102015e;
-		public static final int KEYCODE_F2 = 0x0102015f;
-		public static final int KEYCODE_F3 = 0x01020160;
-		public static final int KEYCODE_F4 = 0x01020161;
-		public static final int KEYCODE_F5 = 0x01020162;
-		public static final int KEYCODE_F6 = 0x01020163;
-		public static final int KEYCODE_F7 = 0x01020164;
-		public static final int KEYCODE_F8 = 0x01020165;
-		public static final int KEYCODE_F9 = 0x01020166;
-		public static final int KEYCODE_FEATURED_APP_1 = 0x01020167;
-		public static final int KEYCODE_FEATURED_APP_2 = 0x01020168;
-		public static final int KEYCODE_FEATURED_APP_3 = 0x01020169;
-		public static final int KEYCODE_FEATURED_APP_4 = 0x0102016a;
-		public static final int KEYCODE_FOCUS = 0x0102016b;
-		public static final int KEYCODE_FORWARD = 0x0102016c;
-		public static final int KEYCODE_FORWARD_DEL = 0x0102016d;
-		public static final int KEYCODE_FUNCTION = 0x0102016e;
-		public static final int KEYCODE_G = 0x0102016f;
-		public static final int KEYCODE_GRAVE = 0x01020170;
-		public static final int KEYCODE_GUIDE = 0x01020171;
-		public static final int KEYCODE_H = 0x01020172;
-		public static final int KEYCODE_HEADSETHOOK = 0x01020173;
-		public static final int KEYCODE_HELP = 0x01020174;
-		public static final int KEYCODE_HENKAN = 0x01020175;
-		public static final int KEYCODE_HOME = 0x01020176;
-		public static final int KEYCODE_I = 0x01020177;
-		public static final int KEYCODE_INFO = 0x01020178;
-		public static final int KEYCODE_INSERT = 0x01020179;
-		public static final int KEYCODE_J = 0x0102017a;
-		public static final int KEYCODE_K = 0x0102017b;
-		public static final int KEYCODE_KANA = 0x0102017c;
-		public static final int KEYCODE_KATAKANA_HIRAGANA = 0x0102017d;
-		public static final int KEYCODE_L = 0x0102017e;
-		public static final int KEYCODE_LANGUAGE_SWITCH = 0x0102017f;
-		public static final int KEYCODE_LAST_CHANNEL = 0x01020180;
-		public static final int KEYCODE_LEFT_BRACKET = 0x01020181;
-		public static final int KEYCODE_M = 0x01020182;
-		public static final int KEYCODE_MANNER_MODE = 0x01020183;
-		public static final int KEYCODE_MEDIA_AUDIO_TRACK = 0x01020184;
-		public static final int KEYCODE_MEDIA_CLOSE = 0x01020185;
-		public static final int KEYCODE_MEDIA_EJECT = 0x01020186;
-		public static final int KEYCODE_MEDIA_FAST_FORWARD = 0x01020187;
-		public static final int KEYCODE_MEDIA_NEXT = 0x01020188;
-		public static final int KEYCODE_MEDIA_PAUSE = 0x01020189;
-		public static final int KEYCODE_MEDIA_PLAY = 0x0102018a;
-		public static final int KEYCODE_MEDIA_PLAY_PAUSE = 0x0102018b;
-		public static final int KEYCODE_MEDIA_PREVIOUS = 0x0102018c;
-		public static final int KEYCODE_MEDIA_RECORD = 0x0102018d;
-		public static final int KEYCODE_MEDIA_REWIND = 0x0102018e;
-		public static final int KEYCODE_MEDIA_SKIP_BACKWARD = 0x0102018f;
-		public static final int KEYCODE_MEDIA_SKIP_FORWARD = 0x01020190;
-		public static final int KEYCODE_MEDIA_SLEEP = 0x01020191;
-		public static final int KEYCODE_MEDIA_STEP_BACKWARD = 0x01020192;
-		public static final int KEYCODE_MEDIA_STEP_FORWARD = 0x01020193;
-		public static final int KEYCODE_MEDIA_STOP = 0x01020194;
-		public static final int KEYCODE_MEDIA_TOP_MENU = 0x01020195;
-		public static final int KEYCODE_MEDIA_WAKEUP = 0x01020196;
-		public static final int KEYCODE_MENU = 0x01020197;
-		public static final int KEYCODE_META_LEFT = 0x01020198;
-		public static final int KEYCODE_META_RIGHT = 0x01020199;
-		public static final int KEYCODE_MINUS = 0x0102019a;
-		public static final int KEYCODE_MOVE_END = 0x0102019b;
-		public static final int KEYCODE_MOVE_HOME = 0x0102019c;
-		public static final int KEYCODE_MUHENKAN = 0x0102019d;
-		public static final int KEYCODE_MUSIC = 0x0102019e;
-		public static final int KEYCODE_MUTE = 0x0102019f;
-		public static final int KEYCODE_N = 0x010201a0;
-		public static final int KEYCODE_NAVIGATE_IN = 0x010201a1;
-		public static final int KEYCODE_NAVIGATE_NEXT = 0x010201a2;
-		public static final int KEYCODE_NAVIGATE_OUT = 0x010201a3;
-		public static final int KEYCODE_NAVIGATE_PREVIOUS = 0x010201a4;
-		public static final int KEYCODE_NOTIFICATION = 0x010201a5;
-		public static final int KEYCODE_NUM = 0x010201a6;
-		public static final int KEYCODE_NUMPAD_0 = 0x010201a7;
-		public static final int KEYCODE_NUMPAD_1 = 0x010201a8;
-		public static final int KEYCODE_NUMPAD_2 = 0x010201a9;
-		public static final int KEYCODE_NUMPAD_3 = 0x010201aa;
-		public static final int KEYCODE_NUMPAD_4 = 0x010201ab;
-		public static final int KEYCODE_NUMPAD_5 = 0x010201ac;
-		public static final int KEYCODE_NUMPAD_6 = 0x010201ad;
-		public static final int KEYCODE_NUMPAD_7 = 0x010201ae;
-		public static final int KEYCODE_NUMPAD_8 = 0x010201af;
-		public static final int KEYCODE_NUMPAD_9 = 0x010201b0;
-		public static final int KEYCODE_NUMPAD_ADD = 0x010201b1;
-		public static final int KEYCODE_NUMPAD_COMMA = 0x010201b2;
-		public static final int KEYCODE_NUMPAD_DIVIDE = 0x010201b3;
-		public static final int KEYCODE_NUMPAD_DOT = 0x010201b4;
-		public static final int KEYCODE_NUMPAD_ENTER = 0x010201b5;
-		public static final int KEYCODE_NUMPAD_EQUALS = 0x010201b6;
-		public static final int KEYCODE_NUMPAD_LEFT_PAREN = 0x010201b7;
-		public static final int KEYCODE_NUMPAD_MULTIPLY = 0x010201b8;
-		public static final int KEYCODE_NUMPAD_RIGHT_PAREN = 0x010201b9;
-		public static final int KEYCODE_NUMPAD_SUBTRACT = 0x010201ba;
-		public static final int KEYCODE_NUM_LOCK = 0x010201bb;
-		public static final int KEYCODE_O = 0x010201bc;
-		public static final int KEYCODE_P = 0x010201bd;
-		public static final int KEYCODE_PAGE_DOWN = 0x010201be;
-		public static final int KEYCODE_PAGE_UP = 0x010201bf;
-		public static final int KEYCODE_PAIRING = 0x010201c0;
-		public static final int KEYCODE_PASTE = 0x010201c1;
-		public static final int KEYCODE_PERIOD = 0x010201c2;
-		public static final int KEYCODE_PICTSYMBOLS = 0x010201c3;
-		public static final int KEYCODE_PLUS = 0x010201c4;
-		public static final int KEYCODE_POUND = 0x010201c5;
-		public static final int KEYCODE_POWER = 0x010201c6;
-		public static final int KEYCODE_PROFILE_SWITCH = 0x010201c7;
-		public static final int KEYCODE_PROG_BLUE = 0x010201c8;
-		public static final int KEYCODE_PROG_GRED = 0x010201c9;
-		public static final int KEYCODE_PROG_GREEN = 0x010201ca;
-		public static final int KEYCODE_PROG_YELLOW = 0x010201cb;
-		public static final int KEYCODE_Q = 0x010201cc;
-		public static final int KEYCODE_R = 0x010201cd;
-		public static final int KEYCODE_REFRESH = 0x010201ce;
-		public static final int KEYCODE_RIGHT_BRACKET = 0x010201cf;
-		public static final int KEYCODE_RO = 0x010201d0;
-		public static final int KEYCODE_S = 0x010201d1;
-		public static final int KEYCODE_SCROLL_LOCK = 0x010201d2;
-		public static final int KEYCODE_SEARCH = 0x010201d3;
-		public static final int KEYCODE_SEMICOLON = 0x010201d4;
-		public static final int KEYCODE_SETTINGS = 0x010201d5;
-		public static final int KEYCODE_SHIFT_LEFT = 0x010201d6;
-		public static final int KEYCODE_SHIFT_RIGHT = 0x010201d7;
-		public static final int KEYCODE_SLASH = 0x010201d8;
-		public static final int KEYCODE_SOFT_LEFT = 0x010201d9;
-		public static final int KEYCODE_SOFT_RIGHT = 0x010201da;
-		public static final int KEYCODE_SOFT_SLEEP = 0x010201db;
-		public static final int KEYCODE_SPACE = 0x010201dc;
-		public static final int KEYCODE_STAR = 0x010201dd;
-		public static final int KEYCODE_STB_INPUT = 0x010201de;
-		public static final int KEYCODE_STB_POWER = 0x010201df;
-		public static final int KEYCODE_STEM_1 = 0x010201e0;
-		public static final int KEYCODE_STEM_2 = 0x010201e1;
-		public static final int KEYCODE_STEM_3 = 0x010201e2;
-		public static final int KEYCODE_STEM_PRIMARY = 0x010201e3;
-		public static final int KEYCODE_SWITCH_CHARSET = 0x010201e4;
-		public static final int KEYCODE_SYM = 0x010201e5;
-		public static final int KEYCODE_SYSRQ = 0x010201e6;
-		public static final int KEYCODE_SYSTEM_NAVIGATION_DOWN = 0x010201e7;
-		public static final int KEYCODE_SYSTEM_NAVIGATION_LEFT = 0x010201e8;
-		public static final int KEYCODE_SYSTEM_NAVIGATION_RIGHT = 0x010201e9;
-		public static final int KEYCODE_SYSTEM_NAVIGATION_UP = 0x010201ea;
-		public static final int KEYCODE_T = 0x010201eb;
-		public static final int KEYCODE_TAB = 0x010201ec;
-		public static final int KEYCODE_THUMBS_DOWN = 0x010201ed;
-		public static final int KEYCODE_THUMBS_UP = 0x010201ee;
-		public static final int KEYCODE_TV = 0x010201ef;
-		public static final int KEYCODE_TV_ANTENNA_CABLE = 0x010201f0;
-		public static final int KEYCODE_TV_AUDIO_DESCRIPTION = 0x010201f1;
-		public static final int KEYCODE_TV_AUDIO_DESCRIPTION_MIX_DOWN = 0x010201f2;
-		public static final int KEYCODE_TV_AUDIO_DESCRIPTION_MIX_UP = 0x010201f3;
-		public static final int KEYCODE_TV_CONTENTS_MENU = 0x010201f4;
-		public static final int KEYCODE_TV_DATA_SERVICE = 0x010201f5;
-		public static final int KEYCODE_TV_INPUT = 0x010201f6;
-		public static final int KEYCODE_TV_INPUT_COMPONENT_1 = 0x010201f7;
-		public static final int KEYCODE_TV_INPUT_COMPONENT_2 = 0x010201f8;
-		public static final int KEYCODE_TV_INPUT_COMPOSITE_1 = 0x010201f9;
-		public static final int KEYCODE_TV_INPUT_COMPOSITE_2 = 0x010201fa;
-		public static final int KEYCODE_TV_INPUT_HDMI_1 = 0x010201fb;
-		public static final int KEYCODE_TV_INPUT_HDMI_2 = 0x010201fc;
-		public static final int KEYCODE_TV_INPUT_HDMI_3 = 0x010201fd;
-		public static final int KEYCODE_TV_INPUT_HDMI_4 = 0x010201fe;
-		public static final int KEYCODE_TV_INPUT_VGA_1 = 0x010201ff;
-		public static final int KEYCODE_TV_MEDIA_CONTEXT_MENU = 0x01020200;
-		public static final int KEYCODE_TV_NETWORK = 0x01020201;
-		public static final int KEYCODE_TV_NUMBER_ENTRY = 0x01020202;
-		public static final int KEYCODE_TV_POWER = 0x01020203;
-		public static final int KEYCODE_TV_RADIO_SERVICE = 0x01020204;
-		public static final int KEYCODE_TV_SATELLITE = 0x01020205;
-		public static final int KEYCODE_TV_SATELLITE_BS = 0x01020206;
-		public static final int KEYCODE_TV_SATELLITE_CS = 0x01020207;
-		public static final int KEYCODE_TV_SATELLITE_SERVICE = 0x01020208;
-		public static final int KEYCODE_TV_TELETEXT = 0x01020209;
-		public static final int KEYCODE_TV_TERRESTRIAL_ANALOG = 0x0102020a;
-		public static final int KEYCODE_TV_TERRESTRIAL_DIGITAL = 0x0102020b;
-		public static final int KEYCODE_TV_TIMER_PROGRAMMING = 0x0102020c;
-		public static final int KEYCODE_TV_ZOOM_MODE = 0x0102020d;
-		public static final int KEYCODE_U = 0x0102020e;
-		public static final int KEYCODE_UNKNOWN = 0x0102020f;
-		public static final int KEYCODE_V = 0x01020210;
-		public static final int KEYCODE_VIDEO_APP_1 = 0x01020211;
-		public static final int KEYCODE_VIDEO_APP_2 = 0x01020212;
-		public static final int KEYCODE_VIDEO_APP_3 = 0x01020213;
-		public static final int KEYCODE_VIDEO_APP_4 = 0x01020214;
-		public static final int KEYCODE_VIDEO_APP_5 = 0x01020215;
-		public static final int KEYCODE_VIDEO_APP_6 = 0x01020216;
-		public static final int KEYCODE_VIDEO_APP_7 = 0x01020217;
-		public static final int KEYCODE_VIDEO_APP_8 = 0x01020218;
-		public static final int KEYCODE_VOICE_ASSIST = 0x01020219;
-		public static final int KEYCODE_VOLUME_DOWN = 0x0102021a;
-		public static final int KEYCODE_VOLUME_MUTE = 0x0102021b;
-		public static final int KEYCODE_VOLUME_UP = 0x0102021c;
-		public static final int KEYCODE_W = 0x0102021d;
-		public static final int KEYCODE_WINDOW = 0x0102021e;
-		public static final int KEYCODE_X = 0x0102021f;
-		public static final int KEYCODE_Y = 0x01020220;
-		public static final int KEYCODE_YEN = 0x01020221;
-		public static final int KEYCODE_Z = 0x01020222;
-		public static final int KEYCODE_ZENKAKU_HANKAKU = 0x01020223;
-		public static final int KEYCODE_ZOOM_IN = 0x01020224;
-		public static final int KEYCODE_ZOOM_OUT = 0x01020225;
-		public static final int META = 0x01020309;
-		public static final int SHIFT = 0x0102030a;
-		public static final int SYM = 0x0102030b;
-		public static final int aboveThumb = 0x010200a4;
-		public static final int accessibility = 0x0102039a;
+		public static final int ALT = 0x01020308;
+		public static final int CTRL = 0x01020309;
+		public static final int FUNCTION = 0x0102030a;
+		public static final int KEYCODE_0 = 0x010200f7;
+		public static final int KEYCODE_1 = 0x010200f8;
+		public static final int KEYCODE_11 = 0x010200f9;
+		public static final int KEYCODE_12 = 0x010200fa;
+		public static final int KEYCODE_2 = 0x010200fb;
+		public static final int KEYCODE_3 = 0x010200fc;
+		public static final int KEYCODE_3D_MODE = 0x010200fd;
+		public static final int KEYCODE_4 = 0x010200fe;
+		public static final int KEYCODE_5 = 0x010200ff;
+		public static final int KEYCODE_6 = 0x01020100;
+		public static final int KEYCODE_7 = 0x01020101;
+		public static final int KEYCODE_8 = 0x01020102;
+		public static final int KEYCODE_9 = 0x01020103;
+		public static final int KEYCODE_A = 0x01020104;
+		public static final int KEYCODE_ALL_APPS = 0x01020105;
+		public static final int KEYCODE_ALT_LEFT = 0x01020106;
+		public static final int KEYCODE_ALT_RIGHT = 0x01020107;
+		public static final int KEYCODE_APOSTROPHE = 0x01020108;
+		public static final int KEYCODE_APP_SWITCH = 0x01020109;
+		public static final int KEYCODE_ASSIST = 0x0102010a;
+		public static final int KEYCODE_AT = 0x0102010b;
+		public static final int KEYCODE_AVR_INPUT = 0x0102010c;
+		public static final int KEYCODE_AVR_POWER = 0x0102010d;
+		public static final int KEYCODE_B = 0x0102010e;
+		public static final int KEYCODE_BACK = 0x0102010f;
+		public static final int KEYCODE_BACKSLASH = 0x01020110;
+		public static final int KEYCODE_BOOKMARK = 0x01020111;
+		public static final int KEYCODE_BREAK = 0x01020112;
+		public static final int KEYCODE_BRIGHTNESS_DOWN = 0x01020113;
+		public static final int KEYCODE_BRIGHTNESS_UP = 0x01020114;
+		public static final int KEYCODE_BUTTON_1 = 0x01020115;
+		public static final int KEYCODE_BUTTON_10 = 0x01020116;
+		public static final int KEYCODE_BUTTON_11 = 0x01020117;
+		public static final int KEYCODE_BUTTON_12 = 0x01020118;
+		public static final int KEYCODE_BUTTON_13 = 0x01020119;
+		public static final int KEYCODE_BUTTON_14 = 0x0102011a;
+		public static final int KEYCODE_BUTTON_15 = 0x0102011b;
+		public static final int KEYCODE_BUTTON_16 = 0x0102011c;
+		public static final int KEYCODE_BUTTON_2 = 0x0102011d;
+		public static final int KEYCODE_BUTTON_3 = 0x0102011e;
+		public static final int KEYCODE_BUTTON_4 = 0x0102011f;
+		public static final int KEYCODE_BUTTON_5 = 0x01020120;
+		public static final int KEYCODE_BUTTON_6 = 0x01020121;
+		public static final int KEYCODE_BUTTON_7 = 0x01020122;
+		public static final int KEYCODE_BUTTON_8 = 0x01020123;
+		public static final int KEYCODE_BUTTON_9 = 0x01020124;
+		public static final int KEYCODE_BUTTON_A = 0x01020125;
+		public static final int KEYCODE_BUTTON_B = 0x01020126;
+		public static final int KEYCODE_BUTTON_C = 0x01020127;
+		public static final int KEYCODE_BUTTON_L1 = 0x01020128;
+		public static final int KEYCODE_BUTTON_L2 = 0x01020129;
+		public static final int KEYCODE_BUTTON_MODE = 0x0102012a;
+		public static final int KEYCODE_BUTTON_R1 = 0x0102012b;
+		public static final int KEYCODE_BUTTON_R2 = 0x0102012c;
+		public static final int KEYCODE_BUTTON_SELECT = 0x0102012d;
+		public static final int KEYCODE_BUTTON_START = 0x0102012e;
+		public static final int KEYCODE_BUTTON_THUMBL = 0x0102012f;
+		public static final int KEYCODE_BUTTON_THUMBR = 0x01020130;
+		public static final int KEYCODE_BUTTON_X = 0x01020131;
+		public static final int KEYCODE_BUTTON_Y = 0x01020132;
+		public static final int KEYCODE_BUTTON_Z = 0x01020133;
+		public static final int KEYCODE_C = 0x01020134;
+		public static final int KEYCODE_CALCULATOR = 0x01020135;
+		public static final int KEYCODE_CALENDAR = 0x01020136;
+		public static final int KEYCODE_CALL = 0x01020137;
+		public static final int KEYCODE_CAMERA = 0x01020138;
+		public static final int KEYCODE_CAPS_LOCK = 0x01020139;
+		public static final int KEYCODE_CAPTIONS = 0x0102013a;
+		public static final int KEYCODE_CHANNEL_DOWN = 0x0102013b;
+		public static final int KEYCODE_CHANNEL_UP = 0x0102013c;
+		public static final int KEYCODE_CLEAR = 0x0102013d;
+		public static final int KEYCODE_COMMA = 0x0102013e;
+		public static final int KEYCODE_CONTACTS = 0x0102013f;
+		public static final int KEYCODE_COPY = 0x01020140;
+		public static final int KEYCODE_CTRL_LEFT = 0x01020141;
+		public static final int KEYCODE_CTRL_RIGHT = 0x01020142;
+		public static final int KEYCODE_CUT = 0x01020143;
+		public static final int KEYCODE_D = 0x01020144;
+		public static final int KEYCODE_DEL = 0x01020145;
+		public static final int KEYCODE_DEMO_APP_1 = 0x01020146;
+		public static final int KEYCODE_DEMO_APP_2 = 0x01020147;
+		public static final int KEYCODE_DEMO_APP_3 = 0x01020148;
+		public static final int KEYCODE_DEMO_APP_4 = 0x01020149;
+		public static final int KEYCODE_DPAD_CENTER = 0x0102014a;
+		public static final int KEYCODE_DPAD_DOWN = 0x0102014b;
+		public static final int KEYCODE_DPAD_DOWN_LEFT = 0x0102014c;
+		public static final int KEYCODE_DPAD_DOWN_RIGHT = 0x0102014d;
+		public static final int KEYCODE_DPAD_LEFT = 0x0102014e;
+		public static final int KEYCODE_DPAD_RIGHT = 0x0102014f;
+		public static final int KEYCODE_DPAD_UP = 0x01020150;
+		public static final int KEYCODE_DPAD_UP_LEFT = 0x01020151;
+		public static final int KEYCODE_DPAD_UP_RIGHT = 0x01020152;
+		public static final int KEYCODE_DVR = 0x01020153;
+		public static final int KEYCODE_E = 0x01020154;
+		public static final int KEYCODE_EISU = 0x01020155;
+		public static final int KEYCODE_ENDCALL = 0x01020156;
+		public static final int KEYCODE_ENTER = 0x01020157;
+		public static final int KEYCODE_ENVELOPE = 0x01020158;
+		public static final int KEYCODE_EQUALS = 0x01020159;
+		public static final int KEYCODE_ESCAPE = 0x0102015a;
+		public static final int KEYCODE_EXPLORER = 0x0102015b;
+		public static final int KEYCODE_F = 0x0102015c;
+		public static final int KEYCODE_F1 = 0x0102015d;
+		public static final int KEYCODE_F10 = 0x0102015e;
+		public static final int KEYCODE_F11 = 0x0102015f;
+		public static final int KEYCODE_F12 = 0x01020160;
+		public static final int KEYCODE_F2 = 0x01020161;
+		public static final int KEYCODE_F3 = 0x01020162;
+		public static final int KEYCODE_F4 = 0x01020163;
+		public static final int KEYCODE_F5 = 0x01020164;
+		public static final int KEYCODE_F6 = 0x01020165;
+		public static final int KEYCODE_F7 = 0x01020166;
+		public static final int KEYCODE_F8 = 0x01020167;
+		public static final int KEYCODE_F9 = 0x01020168;
+		public static final int KEYCODE_FEATURED_APP_1 = 0x01020169;
+		public static final int KEYCODE_FEATURED_APP_2 = 0x0102016a;
+		public static final int KEYCODE_FEATURED_APP_3 = 0x0102016b;
+		public static final int KEYCODE_FEATURED_APP_4 = 0x0102016c;
+		public static final int KEYCODE_FOCUS = 0x0102016d;
+		public static final int KEYCODE_FORWARD = 0x0102016e;
+		public static final int KEYCODE_FORWARD_DEL = 0x0102016f;
+		public static final int KEYCODE_FUNCTION = 0x01020170;
+		public static final int KEYCODE_G = 0x01020171;
+		public static final int KEYCODE_GRAVE = 0x01020172;
+		public static final int KEYCODE_GUIDE = 0x01020173;
+		public static final int KEYCODE_H = 0x01020174;
+		public static final int KEYCODE_HEADSETHOOK = 0x01020175;
+		public static final int KEYCODE_HELP = 0x01020176;
+		public static final int KEYCODE_HENKAN = 0x01020177;
+		public static final int KEYCODE_HOME = 0x01020178;
+		public static final int KEYCODE_I = 0x01020179;
+		public static final int KEYCODE_INFO = 0x0102017a;
+		public static final int KEYCODE_INSERT = 0x0102017b;
+		public static final int KEYCODE_J = 0x0102017c;
+		public static final int KEYCODE_K = 0x0102017d;
+		public static final int KEYCODE_KANA = 0x0102017e;
+		public static final int KEYCODE_KATAKANA_HIRAGANA = 0x0102017f;
+		public static final int KEYCODE_L = 0x01020180;
+		public static final int KEYCODE_LANGUAGE_SWITCH = 0x01020181;
+		public static final int KEYCODE_LAST_CHANNEL = 0x01020182;
+		public static final int KEYCODE_LEFT_BRACKET = 0x01020183;
+		public static final int KEYCODE_M = 0x01020184;
+		public static final int KEYCODE_MANNER_MODE = 0x01020185;
+		public static final int KEYCODE_MEDIA_AUDIO_TRACK = 0x01020186;
+		public static final int KEYCODE_MEDIA_CLOSE = 0x01020187;
+		public static final int KEYCODE_MEDIA_EJECT = 0x01020188;
+		public static final int KEYCODE_MEDIA_FAST_FORWARD = 0x01020189;
+		public static final int KEYCODE_MEDIA_NEXT = 0x0102018a;
+		public static final int KEYCODE_MEDIA_PAUSE = 0x0102018b;
+		public static final int KEYCODE_MEDIA_PLAY = 0x0102018c;
+		public static final int KEYCODE_MEDIA_PLAY_PAUSE = 0x0102018d;
+		public static final int KEYCODE_MEDIA_PREVIOUS = 0x0102018e;
+		public static final int KEYCODE_MEDIA_RECORD = 0x0102018f;
+		public static final int KEYCODE_MEDIA_REWIND = 0x01020190;
+		public static final int KEYCODE_MEDIA_SKIP_BACKWARD = 0x01020191;
+		public static final int KEYCODE_MEDIA_SKIP_FORWARD = 0x01020192;
+		public static final int KEYCODE_MEDIA_SLEEP = 0x01020193;
+		public static final int KEYCODE_MEDIA_STEP_BACKWARD = 0x01020194;
+		public static final int KEYCODE_MEDIA_STEP_FORWARD = 0x01020195;
+		public static final int KEYCODE_MEDIA_STOP = 0x01020196;
+		public static final int KEYCODE_MEDIA_TOP_MENU = 0x01020197;
+		public static final int KEYCODE_MEDIA_WAKEUP = 0x01020198;
+		public static final int KEYCODE_MENU = 0x01020199;
+		public static final int KEYCODE_META_LEFT = 0x0102019a;
+		public static final int KEYCODE_META_RIGHT = 0x0102019b;
+		public static final int KEYCODE_MINUS = 0x0102019c;
+		public static final int KEYCODE_MOVE_END = 0x0102019d;
+		public static final int KEYCODE_MOVE_HOME = 0x0102019e;
+		public static final int KEYCODE_MUHENKAN = 0x0102019f;
+		public static final int KEYCODE_MUSIC = 0x010201a0;
+		public static final int KEYCODE_MUTE = 0x010201a1;
+		public static final int KEYCODE_N = 0x010201a2;
+		public static final int KEYCODE_NAVIGATE_IN = 0x010201a3;
+		public static final int KEYCODE_NAVIGATE_NEXT = 0x010201a4;
+		public static final int KEYCODE_NAVIGATE_OUT = 0x010201a5;
+		public static final int KEYCODE_NAVIGATE_PREVIOUS = 0x010201a6;
+		public static final int KEYCODE_NOTIFICATION = 0x010201a7;
+		public static final int KEYCODE_NUM = 0x010201a8;
+		public static final int KEYCODE_NUMPAD_0 = 0x010201a9;
+		public static final int KEYCODE_NUMPAD_1 = 0x010201aa;
+		public static final int KEYCODE_NUMPAD_2 = 0x010201ab;
+		public static final int KEYCODE_NUMPAD_3 = 0x010201ac;
+		public static final int KEYCODE_NUMPAD_4 = 0x010201ad;
+		public static final int KEYCODE_NUMPAD_5 = 0x010201ae;
+		public static final int KEYCODE_NUMPAD_6 = 0x010201af;
+		public static final int KEYCODE_NUMPAD_7 = 0x010201b0;
+		public static final int KEYCODE_NUMPAD_8 = 0x010201b1;
+		public static final int KEYCODE_NUMPAD_9 = 0x010201b2;
+		public static final int KEYCODE_NUMPAD_ADD = 0x010201b3;
+		public static final int KEYCODE_NUMPAD_COMMA = 0x010201b4;
+		public static final int KEYCODE_NUMPAD_DIVIDE = 0x010201b5;
+		public static final int KEYCODE_NUMPAD_DOT = 0x010201b6;
+		public static final int KEYCODE_NUMPAD_ENTER = 0x010201b7;
+		public static final int KEYCODE_NUMPAD_EQUALS = 0x010201b8;
+		public static final int KEYCODE_NUMPAD_LEFT_PAREN = 0x010201b9;
+		public static final int KEYCODE_NUMPAD_MULTIPLY = 0x010201ba;
+		public static final int KEYCODE_NUMPAD_RIGHT_PAREN = 0x010201bb;
+		public static final int KEYCODE_NUMPAD_SUBTRACT = 0x010201bc;
+		public static final int KEYCODE_NUM_LOCK = 0x010201bd;
+		public static final int KEYCODE_O = 0x010201be;
+		public static final int KEYCODE_P = 0x010201bf;
+		public static final int KEYCODE_PAGE_DOWN = 0x010201c0;
+		public static final int KEYCODE_PAGE_UP = 0x010201c1;
+		public static final int KEYCODE_PAIRING = 0x010201c2;
+		public static final int KEYCODE_PASTE = 0x010201c3;
+		public static final int KEYCODE_PERIOD = 0x010201c4;
+		public static final int KEYCODE_PICTSYMBOLS = 0x010201c5;
+		public static final int KEYCODE_PLUS = 0x010201c6;
+		public static final int KEYCODE_POUND = 0x010201c7;
+		public static final int KEYCODE_POWER = 0x010201c8;
+		public static final int KEYCODE_PROFILE_SWITCH = 0x010201c9;
+		public static final int KEYCODE_PROG_BLUE = 0x010201ca;
+		public static final int KEYCODE_PROG_GRED = 0x010201cb;
+		public static final int KEYCODE_PROG_GREEN = 0x010201cc;
+		public static final int KEYCODE_PROG_YELLOW = 0x010201cd;
+		public static final int KEYCODE_Q = 0x010201ce;
+		public static final int KEYCODE_R = 0x010201cf;
+		public static final int KEYCODE_REFRESH = 0x010201d0;
+		public static final int KEYCODE_RIGHT_BRACKET = 0x010201d1;
+		public static final int KEYCODE_RO = 0x010201d2;
+		public static final int KEYCODE_S = 0x010201d3;
+		public static final int KEYCODE_SCROLL_LOCK = 0x010201d4;
+		public static final int KEYCODE_SEARCH = 0x010201d5;
+		public static final int KEYCODE_SEMICOLON = 0x010201d6;
+		public static final int KEYCODE_SETTINGS = 0x010201d7;
+		public static final int KEYCODE_SHIFT_LEFT = 0x010201d8;
+		public static final int KEYCODE_SHIFT_RIGHT = 0x010201d9;
+		public static final int KEYCODE_SLASH = 0x010201da;
+		public static final int KEYCODE_SOFT_LEFT = 0x010201db;
+		public static final int KEYCODE_SOFT_RIGHT = 0x010201dc;
+		public static final int KEYCODE_SOFT_SLEEP = 0x010201dd;
+		public static final int KEYCODE_SPACE = 0x010201de;
+		public static final int KEYCODE_STAR = 0x010201df;
+		public static final int KEYCODE_STB_INPUT = 0x010201e0;
+		public static final int KEYCODE_STB_POWER = 0x010201e1;
+		public static final int KEYCODE_STEM_1 = 0x010201e2;
+		public static final int KEYCODE_STEM_2 = 0x010201e3;
+		public static final int KEYCODE_STEM_3 = 0x010201e4;
+		public static final int KEYCODE_STEM_PRIMARY = 0x010201e5;
+		public static final int KEYCODE_SWITCH_CHARSET = 0x010201e6;
+		public static final int KEYCODE_SYM = 0x010201e7;
+		public static final int KEYCODE_SYSRQ = 0x010201e8;
+		public static final int KEYCODE_SYSTEM_NAVIGATION_DOWN = 0x010201e9;
+		public static final int KEYCODE_SYSTEM_NAVIGATION_LEFT = 0x010201ea;
+		public static final int KEYCODE_SYSTEM_NAVIGATION_RIGHT = 0x010201eb;
+		public static final int KEYCODE_SYSTEM_NAVIGATION_UP = 0x010201ec;
+		public static final int KEYCODE_T = 0x010201ed;
+		public static final int KEYCODE_TAB = 0x010201ee;
+		public static final int KEYCODE_THUMBS_DOWN = 0x010201ef;
+		public static final int KEYCODE_THUMBS_UP = 0x010201f0;
+		public static final int KEYCODE_TV = 0x010201f1;
+		public static final int KEYCODE_TV_ANTENNA_CABLE = 0x010201f2;
+		public static final int KEYCODE_TV_AUDIO_DESCRIPTION = 0x010201f3;
+		public static final int KEYCODE_TV_AUDIO_DESCRIPTION_MIX_DOWN = 0x010201f4;
+		public static final int KEYCODE_TV_AUDIO_DESCRIPTION_MIX_UP = 0x010201f5;
+		public static final int KEYCODE_TV_CONTENTS_MENU = 0x010201f6;
+		public static final int KEYCODE_TV_DATA_SERVICE = 0x010201f7;
+		public static final int KEYCODE_TV_INPUT = 0x010201f8;
+		public static final int KEYCODE_TV_INPUT_COMPONENT_1 = 0x010201f9;
+		public static final int KEYCODE_TV_INPUT_COMPONENT_2 = 0x010201fa;
+		public static final int KEYCODE_TV_INPUT_COMPOSITE_1 = 0x010201fb;
+		public static final int KEYCODE_TV_INPUT_COMPOSITE_2 = 0x010201fc;
+		public static final int KEYCODE_TV_INPUT_HDMI_1 = 0x010201fd;
+		public static final int KEYCODE_TV_INPUT_HDMI_2 = 0x010201fe;
+		public static final int KEYCODE_TV_INPUT_HDMI_3 = 0x010201ff;
+		public static final int KEYCODE_TV_INPUT_HDMI_4 = 0x01020200;
+		public static final int KEYCODE_TV_INPUT_VGA_1 = 0x01020201;
+		public static final int KEYCODE_TV_MEDIA_CONTEXT_MENU = 0x01020202;
+		public static final int KEYCODE_TV_NETWORK = 0x01020203;
+		public static final int KEYCODE_TV_NUMBER_ENTRY = 0x01020204;
+		public static final int KEYCODE_TV_POWER = 0x01020205;
+		public static final int KEYCODE_TV_RADIO_SERVICE = 0x01020206;
+		public static final int KEYCODE_TV_SATELLITE = 0x01020207;
+		public static final int KEYCODE_TV_SATELLITE_BS = 0x01020208;
+		public static final int KEYCODE_TV_SATELLITE_CS = 0x01020209;
+		public static final int KEYCODE_TV_SATELLITE_SERVICE = 0x0102020a;
+		public static final int KEYCODE_TV_TELETEXT = 0x0102020b;
+		public static final int KEYCODE_TV_TERRESTRIAL_ANALOG = 0x0102020c;
+		public static final int KEYCODE_TV_TERRESTRIAL_DIGITAL = 0x0102020d;
+		public static final int KEYCODE_TV_TIMER_PROGRAMMING = 0x0102020e;
+		public static final int KEYCODE_TV_ZOOM_MODE = 0x0102020f;
+		public static final int KEYCODE_U = 0x01020210;
+		public static final int KEYCODE_UNKNOWN = 0x01020211;
+		public static final int KEYCODE_V = 0x01020212;
+		public static final int KEYCODE_VIDEO_APP_1 = 0x01020213;
+		public static final int KEYCODE_VIDEO_APP_2 = 0x01020214;
+		public static final int KEYCODE_VIDEO_APP_3 = 0x01020215;
+		public static final int KEYCODE_VIDEO_APP_4 = 0x01020216;
+		public static final int KEYCODE_VIDEO_APP_5 = 0x01020217;
+		public static final int KEYCODE_VIDEO_APP_6 = 0x01020218;
+		public static final int KEYCODE_VIDEO_APP_7 = 0x01020219;
+		public static final int KEYCODE_VIDEO_APP_8 = 0x0102021a;
+		public static final int KEYCODE_VOICE_ASSIST = 0x0102021b;
+		public static final int KEYCODE_VOLUME_DOWN = 0x0102021c;
+		public static final int KEYCODE_VOLUME_MUTE = 0x0102021d;
+		public static final int KEYCODE_VOLUME_UP = 0x0102021e;
+		public static final int KEYCODE_W = 0x0102021f;
+		public static final int KEYCODE_WINDOW = 0x01020220;
+		public static final int KEYCODE_X = 0x01020221;
+		public static final int KEYCODE_Y = 0x01020222;
+		public static final int KEYCODE_YEN = 0x01020223;
+		public static final int KEYCODE_Z = 0x01020224;
+		public static final int KEYCODE_ZENKAKU_HANKAKU = 0x01020225;
+		public static final int KEYCODE_ZOOM_IN = 0x01020226;
+		public static final int KEYCODE_ZOOM_OUT = 0x01020227;
+		public static final int META = 0x0102030b;
+		public static final int SHIFT = 0x0102030c;
+		public static final int SYM = 0x0102030d;
+		public static final int aboveThumb = 0x010200a6;
+		public static final int accessibility = 0x0102039c;
 		public static final int accessibilityActionClickOnClickableSpan = 0x0102007e;
 		/**  Accessibility action identifier for {@link android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction#ACTION_CONTEXT_CLICK}.
          */
@@ -27328,106 +27329,106 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
          */
 		public static final int accessibilitySystemActionToggleSplitScreen = 0x01020051;
 		public static final int accountPreferences = 0x01020061;
-		public static final int actionDone = 0x010200d1;
-		public static final int actionGo = 0x010200d2;
-		public static final int actionNext = 0x010200d3;
-		public static final int actionNone = 0x010200d4;
-		public static final int actionPrevious = 0x010200d5;
-		public static final int actionSearch = 0x010200d6;
-		public static final int actionSend = 0x010200d7;
-		public static final int actionUnspecified = 0x010200d8;
-		public static final int action_bar = 0x0102040f;
-		public static final int action_bar_container = 0x0102040e;
+		public static final int actionDone = 0x010200d3;
+		public static final int actionGo = 0x010200d4;
+		public static final int actionNext = 0x010200d5;
+		public static final int actionNone = 0x010200d6;
+		public static final int actionPrevious = 0x010200d7;
+		public static final int actionSearch = 0x010200d8;
+		public static final int actionSend = 0x010200d9;
+		public static final int actionUnspecified = 0x010200da;
+		public static final int action_bar = 0x01020417;
+		public static final int action_bar_container = 0x01020416;
 		public static final int action_bar_spinner = 0x0102006c;
-		public static final int action_context_bar = 0x01020410;
+		public static final int action_context_bar = 0x01020418;
 		public static final int action_menu_divider = 0x01020066;
 		public static final int action_menu_presenter = 0x01020069;
-		public static final int action_mode_close_button = 0x010203db;
-		public static final int add = 0x0102024b;
+		public static final int action_mode_close_button = 0x010203df;
+		public static final int add = 0x0102024d;
 		/**  Menu ID to perform a "add to dictionary" operation.
          */
 		public static final int addToDictionary = 0x0102002a;
-		public static final int addToDictionaryButton = 0x01020421;
-		public static final int adjustNothing = 0x0102009a;
-		public static final int adjustPan = 0x0102009b;
-		public static final int adjustResize = 0x0102009c;
-		public static final int adjustUnspecified = 0x0102009d;
-		public static final int afterDescendants = 0x01020269;
-		public static final int alarm = 0x0102030f;
-		public static final int alertTitle = 0x010203e2;
-		public static final int alias = 0x01020253;
-		public static final int alignBounds = 0x010200f3;
-		public static final int alignMargins = 0x010200f4;
-		public static final int all = 0x010200ed;
-		public static final int all_scroll = 0x01020254;
-		public static final int allowed = 0x010203a3;
-		public static final int alternative = 0x01020302;
-		public static final int always = 0x01020226;
-		public static final int alwaysScroll = 0x0102029f;
-		public static final int amPm = 0x0102042d;
-		public static final int am_label = 0x01020427;
-		public static final int ampm_layout = 0x01020428;
-		public static final int animation = 0x01020267;
-		public static final int animator = 0x010203f8;
-		public static final int anyRtl = 0x0102023f;
-		public static final int appPredictor = 0x0102032d;
+		public static final int addToDictionaryButton = 0x01020429;
+		public static final int adjustNothing = 0x0102009c;
+		public static final int adjustPan = 0x0102009d;
+		public static final int adjustResize = 0x0102009e;
+		public static final int adjustUnspecified = 0x0102009f;
+		public static final int afterDescendants = 0x0102026b;
+		public static final int alarm = 0x01020311;
+		public static final int alertTitle = 0x010203e6;
+		public static final int alias = 0x01020255;
+		public static final int alignBounds = 0x010200f5;
+		public static final int alignMargins = 0x010200f6;
+		public static final int all = 0x010200ef;
+		public static final int all_scroll = 0x01020256;
+		public static final int allowed = 0x010203a5;
+		public static final int alternative = 0x01020304;
+		public static final int always = 0x01020228;
+		public static final int alwaysScroll = 0x010202a1;
+		public static final int amPm = 0x01020435;
+		public static final int am_label = 0x0102042f;
+		public static final int ampm_layout = 0x01020430;
+		public static final int animation = 0x01020269;
+		public static final int animator = 0x010203ff;
+		public static final int anyRtl = 0x01020241;
+		public static final int appPredictor = 0x0102032f;
 		public static final int app_ops = 0x01020079;
-		public static final int appop = 0x0102032e;
-		public static final int arrow = 0x01020255;
-		public static final int assertive = 0x01020249;
-		public static final int async = 0x01020397;
-		public static final int atThumb = 0x010200a5;
-		public static final int audio = 0x0102039b;
-		public static final int auto = 0x01020229;
-		public static final int auto_fit = 0x010202a9;
+		public static final int appop = 0x01020330;
+		public static final int arrow = 0x01020257;
+		public static final int assertive = 0x0102024b;
+		public static final int async = 0x01020399;
+		public static final int atThumb = 0x010200a7;
+		public static final int audio = 0x0102039d;
+		public static final int auto = 0x0102022b;
+		public static final int auto_fit = 0x010202ab;
 		/**  Action used to manually trigger an autofill request
          */
 		public static final int autofill = 0x01020043;
-		public static final int azerty = 0x010203c6;
-		public static final int back_button = 0x01020409;
+		public static final int azerty = 0x010203c8;
+		public static final int back_button = 0x01020411;
 		public static final int background = 0x01020000;
-		public static final int balanced = 0x010202bd;
-		public static final int beforeDescendants = 0x0102026a;
-		public static final int beginning = 0x010202b1;
-		public static final int behind = 0x01020357;
-		public static final int bevel = 0x010202e1;
-		public static final int blocksDescendants = 0x0102026b;
-		public static final int body = 0x0102040c;
+		public static final int balanced = 0x010202bf;
+		public static final int beforeDescendants = 0x0102026c;
+		public static final int beginning = 0x010202b3;
+		public static final int behind = 0x01020359;
+		public static final int bevel = 0x010202e3;
+		public static final int blocksDescendants = 0x0102026d;
+		public static final int body = 0x01020414;
 		/**  Editor action that makes selected text bold.
          */
 		public static final int bold = 0x0102005e;
-		public static final int bool = 0x01020326;
-		public static final int bottom = 0x010200e1;
-		public static final int bottom_to_top = 0x010202e9;
-		public static final int bounds = 0x01020251;
-		public static final int breadcrumb_section = 0x010203ee;
-		public static final int bundle = 0x01020327;
-		public static final int bundle_array = 0x01020328;
-		public static final int butt = 0x010202de;
+		public static final int bool = 0x01020328;
+		public static final int bottom = 0x010200e3;
+		public static final int bottom_to_top = 0x010202eb;
+		public static final int bounds = 0x01020253;
+		public static final int breadcrumb_section = 0x010203f2;
+		public static final int bundle = 0x01020329;
+		public static final int bundle_array = 0x0102032a;
+		public static final int butt = 0x010202e0;
 		public static final int button1 = 0x01020019;
 		public static final int button2 = 0x0102001a;
 		public static final int button3 = 0x0102001b;
-		public static final int buttonPanel = 0x010203dc;
-		public static final int button_bar = 0x01020408;
-		public static final int calendar = 0x010202c8;
-		public static final int calendar_view = 0x010203f7;
+		public static final int buttonPanel = 0x010203e0;
+		public static final int button_bar = 0x01020410;
+		public static final int calendar = 0x010202ca;
+		public static final int calendar_view = 0x010203fe;
 		public static final int camera = 0x01020076;
 		/**  The part of the UI shown by an
        {@link android.inputmethodservice.InputMethodService} that contains the
        views for displaying candidates for what the user has entered.
          */
 		public static final int candidatesArea = 0x0102001d;
-		public static final int cell = 0x01020256;
-		public static final int center = 0x010200e2;
-		public static final int centerCrop = 0x010202aa;
-		public static final int centerInside = 0x010202ab;
-		public static final int center_horizontal = 0x010200e3;
-		public static final int center_vertical = 0x010200e4;
-		public static final int challenge = 0x010203ce;
-		public static final int characters = 0x010202b9;
+		public static final int cell = 0x01020258;
+		public static final int center = 0x010200e4;
+		public static final int centerCrop = 0x010202ac;
+		public static final int centerInside = 0x010202ad;
+		public static final int center_horizontal = 0x010200e5;
+		public static final int center_vertical = 0x010200e6;
+		public static final int challenge = 0x010203d0;
+		public static final int characters = 0x010202bb;
 		public static final int checkbox = 0x01020001;
-		public static final int checked = 0x01020435;
-		public static final int choice = 0x01020329;
+		public static final int checked = 0x0102043d;
+		public static final int choice = 0x0102032b;
 		/**  Marks the "copy to clipboard" button in the ChooserActivity
          */
 		public static final int chooser_copy_button = 0x0102008f;
@@ -27437,38 +27438,38 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  Marks the "nearby" button in the ChooserActivity
          */
 		public static final int chooser_nearby_button = 0x01020090;
-		public static final int clamp = 0x010202dc;
-		public static final int clipBounds = 0x0102026c;
+		public static final int clamp = 0x010202de;
+		public static final int clipBounds = 0x0102026e;
 		/**  A tag used to save the set of deactivated children that clip
          */
 		public static final int clip_children_set_tag = 0x01020086;
 		/**  A tag used to save the clip children in a tag
          */
 		public static final int clip_children_tag = 0x01020085;
-		public static final int clip_horizontal = 0x010200e5;
+		public static final int clip_horizontal = 0x010200e7;
 		/**  A tag used to save the clip to padding in a tag
          */
 		public static final int clip_to_padding_tag = 0x01020087;
-		public static final int clip_vertical = 0x010200e6;
-		public static final int clock = 0x010202cf;
+		public static final int clip_vertical = 0x010200e8;
+		public static final int clock = 0x010202d1;
 		/**  View ID of a {@link android.view.View} to close a popup keyboard
          */
 		public static final int closeButton = 0x01020027;
-		public static final int colemak = 0x010203c7;
-		public static final int collapseActionView = 0x0102030c;
-		public static final int collapsing = 0x010202ca;
-		public static final int colorMode = 0x01020368;
-		public static final int colorType = 0x010202f6;
-		public static final int column = 0x010202ed;
-		public static final int columnWidth = 0x010202a6;
-		public static final int companion = 0x0102032f;
-		public static final int configuration_optional = 0x01020317;
-		public static final int configurator = 0x01020330;
-		public static final int connectedDevice = 0x0102038a;
-		public static final int container = 0x01020303;
+		public static final int colemak = 0x010203c9;
+		public static final int collapseActionView = 0x0102030e;
+		public static final int collapsing = 0x010202cc;
+		public static final int colorMode = 0x0102036a;
+		public static final int colorType = 0x010202f8;
+		public static final int column = 0x010202ef;
+		public static final int columnWidth = 0x010202a8;
+		public static final int companion = 0x01020331;
+		public static final int configuration_optional = 0x01020319;
+		public static final int configurator = 0x01020332;
+		public static final int connectedDevice = 0x0102038c;
+		public static final int container = 0x01020305;
 		public static final int content = 0x01020002;
-		public static final int contentPanel = 0x010203e4;
-		public static final int context_menu = 0x01020257;
+		public static final int contentPanel = 0x010203e8;
+		public static final int context_menu = 0x01020259;
 		/**  Context menu ID for the "Copy" menu item to copy the currently
        selected (or all) text in a text view to the clipboard.
          */
@@ -27477,164 +27478,164 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
        selected URL from the text view to the clipboard.
          */
 		public static final int copyUrl = 0x01020023;
-		public static final int costsMoney = 0x01020348;
+		public static final int costsMoney = 0x0102034a;
 		public static final int cross_task_transition = 0x0102007d;
-		public static final int crossfade = 0x0102034e;
-		public static final int crosshair = 0x01020258;
+		public static final int crossfade = 0x01020350;
+		public static final int crosshair = 0x0102025a;
 		public static final int current_scene = 0x0102006d;
 		public static final int custom = 0x0102002b;
-		public static final int customPanel = 0x010203e6;
+		public static final int customPanel = 0x010203ea;
 		/**  Context menu ID for the "Cut" menu item to copy and delete the currently
        selected (or all) text in a text view to the clipboard.
          */
 		public static final int cut = 0x01020020;
-		public static final int cycle = 0x010202b2;
-		public static final int dangerous = 0x01020331;
-		public static final int dataSync = 0x0102038b;
-		public static final int date = 0x010200b1;
-		public static final int date_picker_day_picker = 0x010203f9;
-		public static final int date_picker_header = 0x010203ef;
-		public static final int date_picker_header_date = 0x010203f2;
-		public static final int date_picker_header_year = 0x010203f0;
-		public static final int date_picker_year_picker = 0x010203fa;
-		public static final int datetime = 0x010200b2;
-		public static final int day = 0x010203f5;
-		public static final int decimal = 0x010202b6;
-		public static final int decor_content_parent = 0x0102040d;
-		public static final int decrement = 0x01020400;
-		public static final int defaultPosition = 0x01020238;
-		public static final int deleteButton = 0x01020422;
-		public static final int density = 0x01020369;
-		public static final int development = 0x01020332;
-		public static final int dialog = 0x010202c6;
-		public static final int disableHome = 0x0102031e;
-		public static final int disabled = 0x010202a0;
-		public static final int disallowed = 0x010203a4;
-		public static final int discouraged = 0x010203a5;
-		public static final int divider = 0x0102042e;
-		public static final int dpad = 0x0102037e;
-		public static final int dropdown = 0x010202c7;
-		public static final int dvorak = 0x010203c8;
+		public static final int cycle = 0x010202b4;
+		public static final int dangerous = 0x01020333;
+		public static final int dataSync = 0x0102038d;
+		public static final int date = 0x010200b3;
+		public static final int date_picker_day_picker = 0x01020400;
+		public static final int date_picker_header = 0x010203f6;
+		public static final int date_picker_header_date = 0x010203f9;
+		public static final int date_picker_header_year = 0x010203f7;
+		public static final int date_picker_year_picker = 0x01020401;
+		public static final int datetime = 0x010200b4;
+		public static final int day = 0x010203fc;
+		public static final int decimal = 0x010202b8;
+		public static final int decor_content_parent = 0x01020415;
+		public static final int decrement = 0x01020408;
+		public static final int defaultPosition = 0x0102023a;
+		public static final int deleteButton = 0x0102042a;
+		public static final int density = 0x0102036b;
+		public static final int development = 0x01020334;
+		public static final int dialog = 0x010202c8;
+		public static final int disableHome = 0x01020320;
+		public static final int disabled = 0x010202a2;
+		public static final int disallowed = 0x010203a6;
+		public static final int discouraged = 0x010203a7;
+		public static final int divider = 0x01020436;
+		public static final int dpad = 0x01020380;
+		public static final int dropdown = 0x010202c9;
+		public static final int dvorak = 0x010203ca;
 		public static final int edit = 0x01020003;
-		public static final int edit_query = 0x01020412;
-		public static final int editable = 0x010202b4;
-		public static final int edittext_container = 0x01020401;
-		public static final int email = 0x010200ee;
+		public static final int edit_query = 0x0102041a;
+		public static final int editable = 0x010202b6;
+		public static final int edittext_container = 0x01020409;
+		public static final int email = 0x010200f0;
 		public static final int empty = 0x01020004;
-		public static final int end = 0x010200ac;
-		public static final int evenOdd = 0x010202e3;
-		public static final int exclude = 0x010203b7;
-		public static final int excludeDescendants = 0x010203b8;
-		public static final int expandChallengeHandle = 0x010203cf;
-		public static final int extended = 0x010203c9;
+		public static final int end = 0x010200ae;
+		public static final int evenOdd = 0x010202e5;
+		public static final int exclude = 0x010203b9;
+		public static final int excludeDescendants = 0x010203ba;
+		public static final int expandChallengeHandle = 0x010203d1;
+		public static final int extended = 0x010203cb;
 		/**  The part of the UI shown by an
        {@link android.inputmethodservice.InputMethodService} that contains the
        views for interacting with the user in extraction mode.
          */
 		public static final int extractArea = 0x0102001c;
-		public static final int fade_in = 0x010202ef;
-		public static final int fade_in_out = 0x010202f0;
-		public static final int fade_out = 0x010202f1;
-		public static final int feedbackAllMask = 0x0102028a;
-		public static final int feedbackAudible = 0x0102028b;
-		public static final int feedbackGeneric = 0x0102028c;
-		public static final int feedbackHaptic = 0x0102028d;
-		public static final int feedbackSpoken = 0x0102028e;
-		public static final int feedbackVisual = 0x0102028f;
-		public static final int fill = 0x010200e7;
+		public static final int fade_in = 0x010202f1;
+		public static final int fade_in_out = 0x010202f2;
+		public static final int fade_out = 0x010202f3;
+		public static final int feedbackAllMask = 0x0102028c;
+		public static final int feedbackAudible = 0x0102028d;
+		public static final int feedbackGeneric = 0x0102028e;
+		public static final int feedbackHaptic = 0x0102028f;
+		public static final int feedbackSpoken = 0x01020290;
+		public static final int feedbackVisual = 0x01020291;
+		public static final int fill = 0x010200e9;
 		public static final int fillInIntent = 0x01020063;
-		public static final int fill_horizontal = 0x010200e8;
-		public static final int fill_parent = 0x0102026e;
-		public static final int fill_vertical = 0x010200e9;
-		public static final int find = 0x0102043c;
-		public static final int find_next = 0x0102043f;
-		public static final int find_prev = 0x0102043e;
-		public static final int finger = 0x01020377;
-		public static final int firstStrong = 0x01020240;
-		public static final int firstStrongLtr = 0x01020241;
-		public static final int firstStrongRtl = 0x01020242;
-		public static final int fitCenter = 0x010202ac;
-		public static final int fitEnd = 0x010202ad;
-		public static final int fitStart = 0x010202ae;
-		public static final int fitXY = 0x010202af;
-		public static final int flagDefault = 0x01020290;
-		public static final int flagEnableAccessibilityVolume = 0x01020291;
-		public static final int flagForceAscii = 0x010200d9;
-		public static final int flagIncludeNotImportantViews = 0x01020292;
-		public static final int flagInputMethodEditor = 0x01020293;
-		public static final int flagNavigateNext = 0x010200da;
-		public static final int flagNavigatePrevious = 0x010200db;
-		public static final int flagNoAccessoryAction = 0x010200dc;
-		public static final int flagNoEnterAction = 0x010200dd;
-		public static final int flagNoExtractUi = 0x010200de;
-		public static final int flagNoFullscreen = 0x010200df;
-		public static final int flagNoPersonalizedLearning = 0x010200e0;
-		public static final int flagReportViewIds = 0x01020294;
-		public static final int flagRequestAccessibilityButton = 0x01020295;
-		public static final int flagRequestEnhancedWebAccessibility = 0x01020296;
-		public static final int flagRequestFilterKeyEvents = 0x01020297;
-		public static final int flagRequestFingerprintGestures = 0x01020298;
-		public static final int flagRequestMultiFingerGestures = 0x01020299;
-		public static final int flagRequestShortcutWarningDialogSpokenFeedback = 0x0102029a;
-		public static final int flagRequestTouchExplorationMode = 0x0102029b;
-		public static final int flagRetrieveInteractiveWindows = 0x0102029c;
-		public static final int flagSendMotionEvents = 0x0102029d;
-		public static final int flagServiceHandlesDoubleTap = 0x0102029e;
-		public static final int floatType = 0x010202f7;
-		public static final int floating = 0x010200a6;
+		public static final int fill_horizontal = 0x010200ea;
+		public static final int fill_parent = 0x01020270;
+		public static final int fill_vertical = 0x010200eb;
+		public static final int find = 0x01020444;
+		public static final int find_next = 0x01020447;
+		public static final int find_prev = 0x01020446;
+		public static final int finger = 0x01020379;
+		public static final int firstStrong = 0x01020242;
+		public static final int firstStrongLtr = 0x01020243;
+		public static final int firstStrongRtl = 0x01020244;
+		public static final int fitCenter = 0x010202ae;
+		public static final int fitEnd = 0x010202af;
+		public static final int fitStart = 0x010202b0;
+		public static final int fitXY = 0x010202b1;
+		public static final int flagDefault = 0x01020292;
+		public static final int flagEnableAccessibilityVolume = 0x01020293;
+		public static final int flagForceAscii = 0x010200db;
+		public static final int flagIncludeNotImportantViews = 0x01020294;
+		public static final int flagInputMethodEditor = 0x01020295;
+		public static final int flagNavigateNext = 0x010200dc;
+		public static final int flagNavigatePrevious = 0x010200dd;
+		public static final int flagNoAccessoryAction = 0x010200de;
+		public static final int flagNoEnterAction = 0x010200df;
+		public static final int flagNoExtractUi = 0x010200e0;
+		public static final int flagNoFullscreen = 0x010200e1;
+		public static final int flagNoPersonalizedLearning = 0x010200e2;
+		public static final int flagReportViewIds = 0x01020296;
+		public static final int flagRequestAccessibilityButton = 0x01020297;
+		public static final int flagRequestEnhancedWebAccessibility = 0x01020298;
+		public static final int flagRequestFilterKeyEvents = 0x01020299;
+		public static final int flagRequestFingerprintGestures = 0x0102029a;
+		public static final int flagRequestMultiFingerGestures = 0x0102029b;
+		public static final int flagRequestShortcutWarningDialogSpokenFeedback = 0x0102029c;
+		public static final int flagRequestTouchExplorationMode = 0x0102029d;
+		public static final int flagRetrieveInteractiveWindows = 0x0102029e;
+		public static final int flagSendMotionEvents = 0x0102029f;
+		public static final int flagServiceHandlesDoubleTap = 0x010202a0;
+		public static final int floatType = 0x010202f9;
+		public static final int floating = 0x010200a8;
 		public static final int floating_toolbar_menu_item_image_button = 0x01020075;
-		public static final int fontScale = 0x0102036a;
-		public static final int fontWeightAdjustment = 0x0102036b;
-		public static final int full = 0x010202c0;
-		public static final int fullFast = 0x010202c1;
-		public static final int fullSensor = 0x01020358;
-		public static final int fullUser = 0x01020359;
-		public static final int game = 0x0102039c;
-		public static final int gone = 0x0102022e;
-		public static final int grab = 0x01020259;
-		public static final int grabbing = 0x0102025a;
-		public static final int grammaticalGender = 0x0102036c;
-		public static final int gravity = 0x01020243;
-		public static final int hand = 0x0102025b;
-		public static final int handwriting = 0x0102025c;
-		public static final int hardRestricted = 0x01020349;
-		public static final int hardware = 0x01020239;
-		public static final int hdpi = 0x010203af;
-		public static final int hdr = 0x010203aa;
-		public static final int headers = 0x01020404;
-		public static final int health = 0x0102038c;
-		public static final int help = 0x0102025d;
-		public static final int hidden = 0x0102032a;
-		public static final int hide_from_picker = 0x01020318;
-		public static final int high = 0x01020235;
-		public static final int high_quality = 0x010202be;
+		public static final int fontScale = 0x0102036c;
+		public static final int fontWeightAdjustment = 0x0102036d;
+		public static final int full = 0x010202c2;
+		public static final int fullFast = 0x010202c3;
+		public static final int fullSensor = 0x0102035a;
+		public static final int fullUser = 0x0102035b;
+		public static final int game = 0x0102039e;
+		public static final int gone = 0x01020230;
+		public static final int grab = 0x0102025b;
+		public static final int grabbing = 0x0102025c;
+		public static final int grammaticalGender = 0x0102036e;
+		public static final int gravity = 0x01020245;
+		public static final int hand = 0x0102025d;
+		public static final int handwriting = 0x0102025e;
+		public static final int hardRestricted = 0x0102034b;
+		public static final int hardware = 0x0102023b;
+		public static final int hdpi = 0x010203b1;
+		public static final int hdr = 0x010203ac;
+		public static final int headers = 0x0102040c;
+		public static final int health = 0x0102038e;
+		public static final int help = 0x0102025f;
+		public static final int hidden = 0x0102032c;
+		public static final int hide_from_picker = 0x0102031a;
+		public static final int high = 0x01020237;
+		public static final int high_quality = 0x010202c0;
 		public static final int hint = 0x01020005;
-		public static final int holo = 0x010203c2;
+		public static final int holo = 0x010203c4;
 		public static final int home = 0x0102002c;
-		public static final int homeAsUp = 0x0102031f;
-		public static final int home_panel = 0x010203c4;
-		public static final int home_screen = 0x01020314;
-		public static final int horizontal = 0x010200f1;
-		public static final int horizontal_double_arrow = 0x0102025e;
-		public static final int hour = 0x0102042b;
-		public static final int hours = 0x01020424;
+		public static final int homeAsUp = 0x01020321;
+		public static final int home_panel = 0x010203c6;
+		public static final int home_screen = 0x01020316;
+		public static final int horizontal = 0x010200f3;
+		public static final int horizontal_double_arrow = 0x01020260;
+		public static final int hour = 0x01020433;
+		public static final int hours = 0x0102042c;
 		public static final int icon = 0x01020006;
 		public static final int icon1 = 0x01020007;
 		public static final int icon2 = 0x01020008;
 		public static final int icon_badge = 0x01020055;
 		public static final int icon_frame = 0x0102003e;
 		public static final int icon_menu_presenter = 0x01020067;
-		public static final int icon_preferred = 0x010203b5;
-		public static final int ifContentScrolls = 0x01020237;
-		public static final int ifRoom = 0x0102030d;
-		public static final int if_whitelisted = 0x01020389;
-		public static final int image = 0x0102039d;
-		public static final int immutablyRestricted = 0x0102034a;
-		public static final int incidentReportApprover = 0x01020333;
-		public static final int include = 0x010203b9;
-		public static final int increment = 0x010203fe;
-		public static final int infinite = 0x010202e5;
-		public static final int inherit = 0x0102023b;
+		public static final int icon_preferred = 0x010203b7;
+		public static final int ifContentScrolls = 0x01020239;
+		public static final int ifRoom = 0x0102030f;
+		public static final int if_whitelisted = 0x0102038b;
+		public static final int image = 0x0102039f;
+		public static final int immutablyRestricted = 0x0102034c;
+		public static final int incidentReportApprover = 0x01020335;
+		public static final int include = 0x010203bb;
+		public static final int increment = 0x01020406;
+		public static final int infinite = 0x010202e7;
+		public static final int inherit = 0x0102023d;
 		public static final int input = 0x01020009;
 		/**  The part of the UI shown by an
        {@link android.inputmethodservice.InputMethodService} that contains the
@@ -27653,207 +27654,207 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  View ID of the text editor inside of an extracted text layout.
          */
 		public static final int inputExtractEditText = 0x01020025;
-		public static final int input_header = 0x01020430;
-		public static final int input_mode = 0x01020431;
+		public static final int input_header = 0x01020438;
+		public static final int input_mode = 0x01020439;
 		public static final int insertion_handle = 0x01020074;
-		public static final int inside = 0x010202a4;
-		public static final int insideInset = 0x01020231;
-		public static final int insideOverlay = 0x01020232;
-		public static final int installer = 0x01020334;
-		public static final int installerExemptIgnored = 0x0102034b;
-		public static final int instant = 0x01020335;
-		public static final int intType = 0x010202f8;
-		public static final int integer = 0x010202b7;
-		public static final int inter_character = 0x010202c4;
-		public static final int inter_word = 0x010202c5;
-		public static final int internal = 0x01020336;
-		public static final int internalEmpty = 0x010203fd;
-		public static final int internalOnly = 0x01020382;
-		public static final int intoExisting = 0x01020388;
-		public static final int invisible = 0x0102022f;
+		public static final int inside = 0x010202a6;
+		public static final int insideInset = 0x01020233;
+		public static final int insideOverlay = 0x01020234;
+		public static final int installer = 0x01020336;
+		public static final int installerExemptIgnored = 0x0102034d;
+		public static final int instant = 0x01020337;
+		public static final int intType = 0x010202fa;
+		public static final int integer = 0x010202b9;
+		public static final int inter_character = 0x010202c6;
+		public static final int inter_word = 0x010202c7;
+		public static final int internal = 0x01020338;
+		public static final int internalEmpty = 0x01020404;
+		public static final int internalOnly = 0x01020384;
+		public static final int intoExisting = 0x0102038a;
+		public static final int invisible = 0x01020231;
 		/**  Editor action that makes selected text italic.
          */
 		public static final int italic = 0x0102005f;
 		/**  ItemTouchHelper uses this id to save a View's original elevation.
          */
 		public static final int item_touch_helper_previous_elevation = 0x0102007f;
-		public static final int jumpcut = 0x0102034f;
-		public static final int keyboard = 0x0102036d;
-		public static final int keyboardHidden = 0x0102036e;
+		public static final int jumpcut = 0x01020351;
+		public static final int keyboard = 0x0102036f;
+		public static final int keyboardHidden = 0x01020370;
 		/**  View ID of the {@link android.inputmethodservice.KeyboardView} within
        an input method's input area.
        {@deprecated Use Copy this definition into your own application project.}
          */
 		@Deprecated
 		public static final int keyboardView = 0x01020026;
-		public static final int keyguard = 0x01020315;
-		public static final int knownSigner = 0x01020337;
-		public static final int landscape = 0x0102035a;
-		public static final int large = 0x010203ac;
-		public static final int launchRecognizer = 0x010202ff;
-		public static final int launchWebSearch = 0x01020300;
-		public static final int layoutDirection = 0x0102036f;
-		public static final int ldpi = 0x010203b0;
-		public static final int left = 0x010200ea;
-		public static final int leftPanel = 0x010203e9;
+		public static final int keyguard = 0x01020317;
+		public static final int knownSigner = 0x01020339;
+		public static final int landscape = 0x0102035c;
+		public static final int large = 0x010203ae;
+		public static final int launchRecognizer = 0x01020301;
+		public static final int launchWebSearch = 0x01020302;
+		public static final int layoutDirection = 0x01020371;
+		public static final int ldpi = 0x010203b2;
+		public static final int left = 0x010200ec;
+		public static final int leftPanel = 0x010203ed;
 		public static final int left_icon = 0x01020056;
-		public static final int left_to_right = 0x010202ea;
-		public static final int line = 0x010202d0;
+		public static final int left_to_right = 0x010202ec;
+		public static final int line = 0x010202d2;
 		public static final int line1 = 0x01020057;
-		public static final int linear = 0x010202d4;
+		public static final int linear = 0x010202d6;
 		public static final int list = 0x0102000a;
-		public static final int listContainer = 0x010203fc;
-		public static final int listMode = 0x0102031c;
+		public static final int listContainer = 0x01020403;
+		public static final int listMode = 0x0102031e;
 		public static final int list_container = 0x0102003f;
-		public static final int list_footer = 0x01020405;
+		public static final int list_footer = 0x0102040d;
 		public static final int list_menu_presenter = 0x01020068;
-		public static final int liveAudio = 0x01020324;
-		public static final int locale = 0x0102023c;
-		public static final int location = 0x0102038d;
+		public static final int liveAudio = 0x01020326;
+		public static final int locale = 0x0102023e;
+		public static final int location = 0x0102038f;
 		public static final int lock_screen = 0x0102005b;
-		public static final int locked = 0x0102035b;
-		public static final int loose = 0x010203bc;
-		public static final int low = 0x01020236;
-		public static final int low_light = 0x010203c5;
-		public static final int ltr = 0x0102023d;
-		public static final int map = 0x010200ef;
-		public static final int maps = 0x0102039e;
-		public static final int marquee = 0x010200ad;
-		public static final int marquee_forever = 0x010202bc;
+		public static final int locked = 0x0102035d;
+		public static final int loose = 0x010203be;
+		public static final int low = 0x01020238;
+		public static final int low_light = 0x010203c7;
+		public static final int ltr = 0x0102023f;
+		public static final int map = 0x010200f1;
+		public static final int maps = 0x010203a0;
+		public static final int marquee = 0x010200af;
+		public static final int marquee_forever = 0x010202be;
 		public static final int mask = 0x0102002e;
-		public static final int match_parent = 0x0102026f;
-		public static final int material = 0x010203c3;
-		public static final int matrix = 0x010202b0;
-		public static final int mcc = 0x01020366;
-		public static final int mdpi = 0x010203b1;
-		public static final int mediaPlayback = 0x0102038e;
-		public static final int mediaProcessing = 0x0102038f;
-		public static final int mediaProjection = 0x01020390;
+		public static final int match_parent = 0x01020271;
+		public static final int material = 0x010203c5;
+		public static final int matrix = 0x010202b2;
+		public static final int mcc = 0x01020368;
+		public static final int mdpi = 0x010203b3;
+		public static final int mediaPlayback = 0x01020390;
+		public static final int mediaProcessing = 0x01020391;
+		public static final int mediaProjection = 0x01020392;
 		public static final int menu = 0x01020058;
 		public static final int message = 0x0102000b;
 		public static final int mic = 0x01020077;
-		public static final int micro = 0x010203b6;
-		public static final int microphone = 0x01020391;
-		public static final int middle = 0x010200ae;
-		public static final int midpoint = 0x010202a5;
-		public static final int minute = 0x0102042c;
-		public static final int minutes = 0x01020426;
-		public static final int mirror = 0x010202dd;
-		public static final int miter = 0x010202e2;
-		public static final int mnc = 0x01020367;
-		public static final int modeLarge = 0x010203bf;
-		public static final int modeMedium = 0x010203c0;
-		public static final int modeSmall = 0x010203c1;
-		public static final int mode_in = 0x010202f2;
-		public static final int mode_normal = 0x01020434;
-		public static final int mode_out = 0x010202f3;
-		public static final int module = 0x01020338;
-		public static final int monospace = 0x010200a8;
-		public static final int month = 0x010203f4;
-		public static final int multi_select = 0x0102032b;
-		public static final int multiple = 0x010202cd;
-		public static final int multipleChoice = 0x010202a1;
-		public static final int multipleChoiceModal = 0x010202a2;
-		public static final int multiply = 0x0102024c;
-		public static final int music = 0x01020312;
-		public static final int navigation = 0x01020370;
+		public static final int micro = 0x010203b8;
+		public static final int microphone = 0x01020393;
+		public static final int middle = 0x010200b0;
+		public static final int midpoint = 0x010202a7;
+		public static final int minute = 0x01020434;
+		public static final int minutes = 0x0102042e;
+		public static final int mirror = 0x010202df;
+		public static final int miter = 0x010202e4;
+		public static final int mnc = 0x01020369;
+		public static final int modeLarge = 0x010203c1;
+		public static final int modeMedium = 0x010203c2;
+		public static final int modeSmall = 0x010203c3;
+		public static final int mode_in = 0x010202f4;
+		public static final int mode_normal = 0x0102043c;
+		public static final int mode_out = 0x010202f5;
+		public static final int module = 0x0102033a;
+		public static final int monospace = 0x010200aa;
+		public static final int month = 0x010203fb;
+		public static final int multi_select = 0x0102032d;
+		public static final int multiple = 0x010202cf;
+		public static final int multipleChoice = 0x010202a3;
+		public static final int multipleChoiceModal = 0x010202a4;
+		public static final int multiply = 0x0102024e;
+		public static final int music = 0x01020314;
+		public static final int navigation = 0x01020372;
 		public static final int navigationBarBackground = 0x01020030;
-		public static final int nest = 0x010202da;
-		public static final int never = 0x01020227;
-		public static final int neverForLocation = 0x010203a9;
-		public static final int news = 0x0102039f;
-		public static final int next_button = 0x0102040b;
-		public static final int no = 0x0102022a;
-		public static final int noExcludeDescendants = 0x0102022b;
-		public static final int noHideDescendants = 0x01020248;
-		public static final int no_drop = 0x0102025f;
-		public static final int nokeys = 0x0102037b;
-		public static final int nonZero = 0x010202e4;
-		public static final int nonav = 0x0102037f;
-		public static final int none = 0x010200af;
-		public static final int normal = 0x010200a9;
-		public static final int normalFast = 0x010202c2;
-		public static final int nosensor = 0x0102035c;
-		public static final int notSensitive = 0x010203ba;
-		public static final int notification = 0x01020310;
+		public static final int nest = 0x010202dc;
+		public static final int never = 0x01020229;
+		public static final int neverForLocation = 0x010203ab;
+		public static final int news = 0x010203a1;
+		public static final int next_button = 0x01020413;
+		public static final int no = 0x0102022c;
+		public static final int noExcludeDescendants = 0x0102022d;
+		public static final int noHideDescendants = 0x0102024a;
+		public static final int no_drop = 0x01020261;
+		public static final int nokeys = 0x0102037d;
+		public static final int nonZero = 0x010202e6;
+		public static final int nonav = 0x01020381;
+		public static final int none = 0x010200b1;
+		public static final int normal = 0x010200ab;
+		public static final int normalFast = 0x010202c4;
+		public static final int nosensor = 0x0102035e;
+		public static final int notSensitive = 0x010203bc;
+		public static final int notification = 0x01020312;
 		/**  A tag used to save the notification action object
          */
 		public static final int notification_action_index_tag = 0x01020089;
 		/**  A tag used to save the index where the custom view is stored
          */
 		public static final int notification_custom_view_index_tag = 0x0102008a;
-		public static final int notouch = 0x01020378;
-		public static final int number = 0x010200b3;
-		public static final int numberDecimal = 0x010200b4;
-		public static final int numberPassword = 0x010200b5;
-		public static final int numberSigned = 0x010200b6;
-		public static final int numberpicker_input = 0x010203ff;
-		public static final int oem = 0x01020339;
-		public static final int off = 0x01020398;
-		public static final int on = 0x01020437;
-		public static final int oneLine = 0x010202cb;
-		public static final int opaque = 0x010202d7;
-		public static final int opticalBounds = 0x0102026d;
-		public static final int orientation = 0x01020371;
-		public static final int outsideInset = 0x01020233;
-		public static final int outsideOverlay = 0x01020234;
-		public static final int oval = 0x010202d1;
+		public static final int notouch = 0x0102037a;
+		public static final int number = 0x010200b5;
+		public static final int numberDecimal = 0x010200b6;
+		public static final int numberPassword = 0x010200b7;
+		public static final int numberSigned = 0x010200b8;
+		public static final int numberpicker_input = 0x01020407;
+		public static final int oem = 0x0102033b;
+		public static final int off = 0x0102039a;
+		public static final int on = 0x0102043f;
+		public static final int oneLine = 0x010202cd;
+		public static final int opaque = 0x010202d9;
+		public static final int opticalBounds = 0x0102026f;
+		public static final int orientation = 0x01020373;
+		public static final int outsideInset = 0x01020235;
+		public static final int outsideOverlay = 0x01020236;
+		public static final int oval = 0x010202d3;
 		public static final int overflow_menu_presenter = 0x0102006a;
 		public static final int overlay = 0x01020078;
-		public static final int paddedBounds = 0x01020252;
-		public static final int pageDeleteDropTarget = 0x010203d0;
+		public static final int paddedBounds = 0x01020254;
+		public static final int pageDeleteDropTarget = 0x010203d2;
 		public static final int parentMatrix = 0x01020071;
-		public static final int parentPanel = 0x010203de;
+		public static final int parentPanel = 0x010203e2;
 		/**  Context menu ID for the "Paste" menu item to copy the current contents
        of the clipboard into the text view.
          */
 		public static final int paste = 0x01020022;
 		public static final int pasteAsPlainText = 0x01020031;
-		public static final int pathType = 0x010202f9;
+		public static final int pathType = 0x010202fb;
 		public static final int pending_intent_tag = 0x0102007b;
-		public static final int persistAcrossReboots = 0x01020385;
-		public static final int persistNever = 0x01020386;
-		public static final int persistRootOnly = 0x01020387;
-		public static final int personalInfo = 0x01020347;
-		public static final int phone = 0x010200b7;
-		public static final int phoneCall = 0x01020392;
-		public static final int phrase = 0x010203be;
-		public static final int pickers = 0x010203f3;
-		public static final int pm_label = 0x01020429;
-		public static final int polite = 0x0102024a;
+		public static final int persistAcrossReboots = 0x01020387;
+		public static final int persistNever = 0x01020388;
+		public static final int persistRootOnly = 0x01020389;
+		public static final int personalInfo = 0x01020349;
+		public static final int phone = 0x010200b9;
+		public static final int phoneCall = 0x01020394;
+		public static final int phrase = 0x010203c0;
+		public static final int pickers = 0x010203fa;
+		public static final int pm_label = 0x01020431;
+		public static final int polite = 0x0102024c;
 		public static final int popup_submenu_presenter = 0x0102006b;
-		public static final int portrait = 0x0102035d;
-		public static final int pre23 = 0x0102033a;
-		public static final int preferExternal = 0x01020383;
-		public static final int prefs = 0x01020407;
-		public static final int prefs_container = 0x01020403;
-		public static final int prefs_frame = 0x01020406;
-		public static final int preinstalled = 0x0102033b;
-		public static final int pressed = 0x01020438;
-		public static final int prev = 0x010203f1;
+		public static final int portrait = 0x0102035f;
+		public static final int pre23 = 0x0102033c;
+		public static final int preferExternal = 0x01020385;
+		public static final int prefs = 0x0102040f;
+		public static final int prefs_container = 0x0102040b;
+		public static final int prefs_frame = 0x0102040e;
+		public static final int preinstalled = 0x0102033d;
+		public static final int pressed = 0x01020440;
+		public static final int prev = 0x010203f8;
 		public static final int primary = 0x0102000c;
-		public static final int privileged = 0x0102033c;
-		public static final int productivity = 0x010203a0;
+		public static final int privileged = 0x0102033e;
+		public static final int productivity = 0x010203a2;
 		public static final int progress = 0x0102000d;
-		public static final int progressContainer = 0x010203fb;
-		public static final int progress_dialog_message = 0x010203ec;
-		public static final int progress_number = 0x010203eb;
-		public static final int progress_percent = 0x010203ea;
-		public static final int queryRewriteFromData = 0x010202fb;
-		public static final int queryRewriteFromText = 0x010202fc;
-		public static final int qwerty = 0x0102037c;
-		public static final int qwertz = 0x010203ca;
-		public static final int radial = 0x010202d5;
-		public static final int radial_picker = 0x0102042f;
-		public static final int random = 0x010202e8;
-		public static final int read = 0x010203d7;
-		public static final int readAndWrite = 0x010203d8;
-		public static final int readOrWrite = 0x010203d9;
-		public static final int recents = 0x0102033d;
-		public static final int reconfigurable = 0x01020319;
-		public static final int rectangle = 0x010202d2;
+		public static final int progressContainer = 0x01020402;
+		public static final int progress_dialog_message = 0x010203f0;
+		public static final int progress_number = 0x010203ef;
+		public static final int progress_percent = 0x010203ee;
+		public static final int queryRewriteFromData = 0x010202fd;
+		public static final int queryRewriteFromText = 0x010202fe;
+		public static final int qwerty = 0x0102037e;
+		public static final int qwertz = 0x010203cc;
+		public static final int radial = 0x010202d7;
+		public static final int radial_picker = 0x01020437;
+		public static final int random = 0x010202ea;
+		public static final int read = 0x010203d9;
+		public static final int readAndWrite = 0x010203da;
+		public static final int readOrWrite = 0x010203db;
+		public static final int recents = 0x0102033f;
+		public static final int reconfigurable = 0x0102031b;
+		public static final int rectangle = 0x010202d4;
 		public static final int redo = 0x01020033;
-		public static final int remoteMessaging = 0x01020393;
+		public static final int remoteMessaging = 0x01020395;
 		public static final int remote_checked_change_listener_tag = 0x0102007c;
 		public static final int remote_input_tag = 0x0102007a;
 		/**  View tag for remote views to store the index of the next child when adding nested remote views dynamically.
@@ -27865,51 +27866,51 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  View tag associating a view with its stable id for potential recycling.
          */
 		public static final int remote_views_stable_id = 0x01020098;
-		public static final int removed = 0x0102034c;
-		public static final int repeat = 0x010202b3;
+		public static final int removed = 0x0102034e;
+		public static final int repeat = 0x010202b5;
 		public static final int replaceText = 0x01020034;
-		public static final int restart = 0x010202e6;
-		public static final int restore = 0x010203a6;
-		public static final int retailDemo = 0x0102033e;
-		public static final int retain = 0x010203a7;
-		public static final int reverse = 0x010202e7;
-		public static final int reverseLandscape = 0x0102035e;
-		public static final int reversePortrait = 0x0102035f;
-		public static final int right = 0x010200eb;
+		public static final int restart = 0x010202e8;
+		public static final int restore = 0x010203a8;
+		public static final int retailDemo = 0x01020340;
+		public static final int retain = 0x010203a9;
+		public static final int reverse = 0x010202e9;
+		public static final int reverseLandscape = 0x01020360;
+		public static final int reversePortrait = 0x01020361;
+		public static final int right = 0x010200ed;
 		public static final int right_icon = 0x01020059;
-		public static final int right_to_left = 0x010202eb;
-		public static final int ring = 0x010202d3;
-		public static final int ringtone = 0x01020311;
-		public static final int role = 0x0102033f;
-		public static final int rotate = 0x01020350;
-		public static final int round = 0x010202df;
-		public static final int row = 0x010202ee;
+		public static final int right_to_left = 0x010202ed;
+		public static final int ring = 0x010202d5;
+		public static final int ringtone = 0x01020313;
+		public static final int role = 0x01020341;
+		public static final int rotate = 0x01020352;
+		public static final int round = 0x010202e1;
+		public static final int row = 0x010202f0;
 		public static final int rowTypeId = 0x01020064;
-		public static final int rtl = 0x0102023e;
-		public static final int runtime = 0x01020340;
-		public static final int sans = 0x010200aa;
+		public static final int rtl = 0x01020240;
+		public static final int runtime = 0x01020342;
+		public static final int sans = 0x010200ac;
 		public static final int scene_layoutid_cache = 0x0102006e;
-		public static final int screen = 0x0102024d;
-		public static final int screenLayout = 0x01020372;
-		public static final int screenSize = 0x01020373;
-		public static final int scrim = 0x010203d1;
-		public static final int scrollView = 0x010203e5;
-		public static final int scrolling = 0x01020268;
-		public static final int seamless = 0x01020351;
-		public static final int search_badge = 0x01020414;
-		public static final int search_bar = 0x01020413;
-		public static final int search_button = 0x01020415;
-		public static final int search_close_btn = 0x0102041a;
-		public static final int search_edit_frame = 0x01020416;
-		public static final int search_go_btn = 0x0102041c;
-		public static final int search_mag_icon = 0x01020417;
-		public static final int search_plate = 0x01020418;
-		public static final int search_src_text = 0x01020419;
-		public static final int search_voice_btn = 0x0102041d;
-		public static final int searchbox = 0x01020316;
-		public static final int secondary = 0x01020304;
+		public static final int screen = 0x0102024f;
+		public static final int screenLayout = 0x01020374;
+		public static final int screenSize = 0x01020375;
+		public static final int scrim = 0x010203d3;
+		public static final int scrollView = 0x010203e9;
+		public static final int scrolling = 0x0102026a;
+		public static final int seamless = 0x01020353;
+		public static final int search_badge = 0x0102041c;
+		public static final int search_bar = 0x0102041b;
+		public static final int search_button = 0x0102041d;
+		public static final int search_close_btn = 0x01020422;
+		public static final int search_edit_frame = 0x0102041e;
+		public static final int search_go_btn = 0x01020424;
+		public static final int search_mag_icon = 0x0102041f;
+		public static final int search_plate = 0x01020420;
+		public static final int search_src_text = 0x01020421;
+		public static final int search_voice_btn = 0x01020425;
+		public static final int searchbox = 0x01020318;
+		public static final int secondary = 0x01020306;
 		public static final int secondaryProgress = 0x0102000f;
-		public static final int seekbar = 0x01020402;
+		public static final int seekbar = 0x0102040a;
 		/**  Context menu ID for the "Select All" menu item to select all text
        in a text view.
          */
@@ -27918,95 +27919,95 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
        selection context mode in text views.
          */
 		public static final int selectTextMode = 0x0102002d;
-		public static final int select_all = 0x0102043a;
-		public static final int select_dialog_listview = 0x0102041e;
+		public static final int select_all = 0x01020442;
+		public static final int select_dialog_listview = 0x01020426;
 		public static final int selectedIcon = 0x0102000e;
 		public static final int selection_end_handle = 0x01020073;
 		public static final int selection_start_handle = 0x01020072;
-		public static final int sensitive = 0x010203bb;
-		public static final int sensor = 0x01020360;
-		public static final int sensorLandscape = 0x01020361;
-		public static final int sensorPortrait = 0x01020362;
-		public static final int sentences = 0x010202ba;
-		public static final int separator = 0x01020425;
-		public static final int sequential = 0x010202f4;
-		public static final int sequentially = 0x010202fa;
-		public static final int serif = 0x010200ab;
-		public static final int setup = 0x01020341;
-		public static final int share = 0x0102043b;
+		public static final int sensitive = 0x010203bd;
+		public static final int sensor = 0x01020362;
+		public static final int sensorLandscape = 0x01020363;
+		public static final int sensorPortrait = 0x01020364;
+		public static final int sentences = 0x010202bc;
+		public static final int separator = 0x0102042d;
+		public static final int sequential = 0x010202f6;
+		public static final int sequentially = 0x010202fc;
+		public static final int serif = 0x010200ad;
+		public static final int setup = 0x01020343;
+		public static final int share = 0x01020443;
 		public static final int shareText = 0x01020035;
-		public static final int shortEdges = 0x01020228;
-		public static final int shortService = 0x01020394;
-		public static final int showCustom = 0x01020320;
-		public static final int showHome = 0x01020321;
-		public static final int showSearchIconAsBadge = 0x010202fd;
-		public static final int showSearchLabelAsBadge = 0x010202fe;
-		public static final int showTitle = 0x01020322;
-		public static final int showVoiceSearchButton = 0x01020301;
-		public static final int signature = 0x01020342;
-		public static final int signatureOrSystem = 0x01020343;
-		public static final int signed = 0x010202b8;
-		public static final int simple = 0x010202bf;
-		public static final int single = 0x010202ce;
-		public static final int singleChoice = 0x010202a3;
-		public static final int singleInstance = 0x01020352;
-		public static final int singleInstancePerTask = 0x01020353;
-		public static final int singleTask = 0x01020354;
-		public static final int singleTop = 0x01020355;
-		public static final int skip_button = 0x0102040a;
-		public static final int small = 0x010203ad;
+		public static final int shortEdges = 0x0102022a;
+		public static final int shortService = 0x01020396;
+		public static final int showCustom = 0x01020322;
+		public static final int showHome = 0x01020323;
+		public static final int showSearchIconAsBadge = 0x010202ff;
+		public static final int showSearchLabelAsBadge = 0x01020300;
+		public static final int showTitle = 0x01020324;
+		public static final int showVoiceSearchButton = 0x01020303;
+		public static final int signature = 0x01020344;
+		public static final int signatureOrSystem = 0x01020345;
+		public static final int signed = 0x010202ba;
+		public static final int simple = 0x010202c1;
+		public static final int single = 0x010202d0;
+		public static final int singleChoice = 0x010202a5;
+		public static final int singleInstance = 0x01020354;
+		public static final int singleInstancePerTask = 0x01020355;
+		public static final int singleTask = 0x01020356;
+		public static final int singleTop = 0x01020357;
+		public static final int skip_button = 0x01020412;
+		public static final int small = 0x010203af;
 		public static final int smallIcon = 0x01020062;
-		public static final int smallestScreenSize = 0x01020374;
-		public static final int social = 0x010203a1;
-		public static final int softRestricted = 0x0102034d;
-		public static final int software = 0x0102023a;
-		public static final int spacer = 0x010203dd;
-		public static final int spacingWidth = 0x010202a7;
-		public static final int spacingWidthUniform = 0x010202a8;
-		public static final int spannable = 0x010202b5;
-		public static final int specialUse = 0x01020395;
-		public static final int spinner = 0x010202c9;
-		public static final int splitActionBarWhenNarrow = 0x01020384;
-		public static final int split_action_bar = 0x01020411;
-		public static final int square = 0x010202e0;
-		public static final int src_atop = 0x0102024e;
-		public static final int src_in = 0x0102024f;
-		public static final int src_over = 0x01020250;
-		public static final int stack = 0x010202db;
-		public static final int standard = 0x01020356;
-		public static final int start = 0x010200b0;
+		public static final int smallestScreenSize = 0x01020376;
+		public static final int social = 0x010203a3;
+		public static final int softRestricted = 0x0102034f;
+		public static final int software = 0x0102023c;
+		public static final int spacer = 0x010203e1;
+		public static final int spacingWidth = 0x010202a9;
+		public static final int spacingWidthUniform = 0x010202aa;
+		public static final int spannable = 0x010202b7;
+		public static final int specialUse = 0x01020397;
+		public static final int spinner = 0x010202cb;
+		public static final int splitActionBarWhenNarrow = 0x01020386;
+		public static final int split_action_bar = 0x01020419;
+		public static final int square = 0x010202e2;
+		public static final int src_atop = 0x01020250;
+		public static final int src_in = 0x01020251;
+		public static final int src_over = 0x01020252;
+		public static final int stack = 0x010202dd;
+		public static final int standard = 0x01020358;
+		public static final int start = 0x010200b2;
 		/**  Menu ID to perform a "start selecting text" operation.
          */
 		public static final int startSelectingText = 0x01020028;
-		public static final int stateAlwaysHidden = 0x0102009e;
-		public static final int stateAlwaysVisible = 0x0102009f;
-		public static final int stateHidden = 0x010200a0;
-		public static final int stateUnchanged = 0x010200a1;
-		public static final int stateUnspecified = 0x010200a2;
-		public static final int stateVisible = 0x010200a3;
+		public static final int stateAlwaysHidden = 0x010200a0;
+		public static final int stateAlwaysVisible = 0x010200a1;
+		public static final int stateHidden = 0x010200a2;
+		public static final int stateUnchanged = 0x010200a3;
+		public static final int stateUnspecified = 0x010200a4;
+		public static final int stateVisible = 0x010200a5;
 		public static final int statusBarBackground = 0x0102002f;
 		/**  Menu ID to perform a "stop selecting text" operation.
          */
 		public static final int stopSelectingText = 0x01020029;
-		public static final int strict = 0x010203bd;
-		public static final int string = 0x0102032c;
-		public static final int stylus = 0x01020379;
-		public static final int submit_area = 0x0102041b;
-		public static final int suggestionContainer = 0x01020420;
-		public static final int suggestionWindowContainer = 0x0102041f;
+		public static final int strict = 0x010203bf;
+		public static final int string = 0x0102032e;
+		public static final int stylus = 0x0102037b;
+		public static final int submit_area = 0x01020423;
+		public static final int suggestionContainer = 0x01020428;
+		public static final int suggestionWindowContainer = 0x01020427;
 		public static final int summary = 0x01020010;
-		public static final int surfaceView = 0x010203d5;
-		public static final int sweep = 0x010202d6;
+		public static final int surfaceView = 0x010203d7;
+		public static final int sweep = 0x010202d8;
 		/**  Context menu ID for the "Input Method" menu item to being up the
        input method picker dialog, allowing the user to switch to another
        input method.
          */
 		public static final int switchInputMethod = 0x01020024;
 		public static final int switch_widget = 0x01020040;
-		public static final int sync = 0x01020399;
-		public static final int system = 0x01020305;
-		public static final int systemExempted = 0x01020396;
-		public static final int tabMode = 0x0102031d;
+		public static final int sync = 0x0102039b;
+		public static final int system = 0x01020307;
+		public static final int systemExempted = 0x01020398;
+		public static final int tabMode = 0x0102031f;
 		public static final int tabcontent = 0x01020011;
 		public static final int tabhost = 0x01020012;
 		public static final int tabs = 0x01020013;
@@ -28037,147 +28038,155 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		/**  A tag used on the notification @id/left_icon to indicate that this view should be pupulated with the drawable from @id/right_icon when visible.
          */
 		public static final int tag_uses_right_icon_drawable = 0x0102008d;
-		public static final int text = 0x010200b8;
+		public static final int text = 0x010200ba;
 		public static final int text1 = 0x01020014;
 		public static final int text2 = 0x01020015;
 		public static final int textAssist = 0x01020041;
-		public static final int textAutoComplete = 0x010200b9;
-		public static final int textAutoCorrect = 0x010200ba;
-		public static final int textCapCharacters = 0x010200bb;
-		public static final int textCapSentences = 0x010200bc;
-		public static final int textCapWords = 0x010200bd;
-		public static final int textClassifier = 0x01020344;
-		public static final int textEmailAddress = 0x010200be;
-		public static final int textEmailSubject = 0x010200bf;
-		public static final int textEnableTextConversionSuggestions = 0x010200c0;
-		public static final int textEnd = 0x01020244;
-		public static final int textFilter = 0x010200c1;
-		public static final int textImeMultiLine = 0x010200c2;
-		public static final int textLongMessage = 0x010200c3;
-		public static final int textMultiLine = 0x010200c4;
-		public static final int textNoSuggestions = 0x010200c5;
-		public static final int textPassword = 0x010200c6;
-		public static final int textPersonName = 0x010200c7;
-		public static final int textPhonetic = 0x010200c8;
-		public static final int textPostalAddress = 0x010200c9;
-		public static final int textShortMessage = 0x010200ca;
-		public static final int textSpacerNoButtons = 0x010203e8;
-		public static final int textSpacerNoTitle = 0x010203e7;
-		public static final int textStart = 0x01020245;
-		public static final int textUri = 0x010200cb;
-		public static final int textVisiblePassword = 0x010200cc;
-		public static final int textWebEditText = 0x010200cd;
-		public static final int textWebEmailAddress = 0x010200ce;
-		public static final int textWebPassword = 0x010200cf;
-		public static final int textureView = 0x010203d6;
-		public static final int time = 0x010200d0;
-		public static final int timePickerLayout = 0x0102042a;
-		public static final int time_header = 0x01020423;
-		public static final int time_layout = 0x01020433;
+		public static final int textAutoComplete = 0x010200bb;
+		public static final int textAutoCorrect = 0x010200bc;
+		public static final int textCapCharacters = 0x010200bd;
+		public static final int textCapSentences = 0x010200be;
+		public static final int textCapWords = 0x010200bf;
+		public static final int textClassifier = 0x01020346;
+		public static final int textEmailAddress = 0x010200c0;
+		public static final int textEmailSubject = 0x010200c1;
+		public static final int textEnableTextConversionSuggestions = 0x010200c2;
+		public static final int textEnd = 0x01020246;
+		public static final int textFilter = 0x010200c3;
+		public static final int textImeMultiLine = 0x010200c4;
+		public static final int textLongMessage = 0x010200c5;
+		public static final int textMultiLine = 0x010200c6;
+		public static final int textNoSuggestions = 0x010200c7;
+		public static final int textPassword = 0x010200c8;
+		public static final int textPersonName = 0x010200c9;
+		public static final int textPhonetic = 0x010200ca;
+		public static final int textPostalAddress = 0x010200cb;
+		public static final int textShortMessage = 0x010200cc;
+		public static final int textSpacerNoButtons = 0x010203ec;
+		public static final int textSpacerNoTitle = 0x010203eb;
+		public static final int textStart = 0x01020247;
+		public static final int textUri = 0x010200cd;
+		public static final int textVisiblePassword = 0x010200ce;
+		public static final int textWebEditText = 0x010200cf;
+		public static final int textWebEmailAddress = 0x010200d0;
+		public static final int textWebPassword = 0x010200d1;
+		public static final int textureView = 0x010203d8;
+		public static final int time = 0x010200d2;
+		public static final int timePickerLayout = 0x01020432;
+		public static final int time_header = 0x0102042b;
+		public static final int time_layout = 0x0102043b;
 		public static final int title = 0x01020016;
-		public static final int titleDivider = 0x010203e3;
-		public static final int titleDividerNoCustom = 0x010203ed;
-		public static final int titleDividerTop = 0x010203e0;
+		public static final int titleDivider = 0x010203e7;
+		public static final int titleDividerNoCustom = 0x010203f1;
+		public static final int titleDividerTop = 0x010203e4;
 		public static final int title_container = 0x0102005a;
-		public static final int title_template = 0x010203e1;
-		public static final int together = 0x010202f5;
+		public static final int title_template = 0x010203e5;
+		public static final int together = 0x010202f7;
 		public static final int toggle = 0x01020017;
-		public static final int toggle_mode = 0x01020432;
-		public static final int top = 0x010200ec;
-		public static final int topPanel = 0x010203df;
-		public static final int top_left_diagonal_double_arrow = 0x01020260;
-		public static final int top_right_diagonal_double_arrow = 0x01020261;
-		public static final int top_to_bottom = 0x010202ec;
-		public static final int touchscreen = 0x01020375;
-		public static final int trackball = 0x01020380;
+		public static final int toggle_mode = 0x0102043a;
+		public static final int top = 0x010200ee;
+		public static final int topPanel = 0x010203e3;
+		public static final int top_left_diagonal_double_arrow = 0x01020262;
+		public static final int top_right_diagonal_double_arrow = 0x01020263;
+		public static final int top_to_bottom = 0x010202ee;
+		public static final int touchscreen = 0x01020377;
+		public static final int trackball = 0x01020382;
 		public static final int transitionPosition = 0x0102006f;
 		public static final int transitionTransform = 0x01020070;
 		/**  A tag used to save the view added to a transition overlay
          */
 		public static final int transition_overlay_view_tag = 0x01020088;
-		public static final int translucent = 0x010202d8;
-		public static final int transparent = 0x010202d9;
-		public static final int turkish_f = 0x010203cb;
-		public static final int turkish_q = 0x010203cc;
-		public static final int twelvekey = 0x0102037d;
-		public static final int twoLine = 0x010202cc;
-		public static final int typeAllMask = 0x01020270;
-		public static final int typeAnnouncement = 0x01020271;
-		public static final int typeAssistReadingContext = 0x01020272;
-		public static final int typeContextClicked = 0x01020273;
-		public static final int typeGestureDetectionEnd = 0x01020274;
-		public static final int typeGestureDetectionStart = 0x01020275;
-		public static final int typeNotificationStateChanged = 0x01020276;
-		public static final int typeTouchExplorationGestureEnd = 0x01020277;
-		public static final int typeTouchExplorationGestureStart = 0x01020278;
-		public static final int typeTouchInteractionEnd = 0x01020279;
-		public static final int typeTouchInteractionStart = 0x0102027a;
-		public static final int typeViewAccessibilityFocusCleared = 0x0102027b;
-		public static final int typeViewAccessibilityFocused = 0x0102027c;
-		public static final int typeViewClicked = 0x0102027d;
-		public static final int typeViewFocused = 0x0102027e;
-		public static final int typeViewHoverEnter = 0x0102027f;
-		public static final int typeViewHoverExit = 0x01020280;
-		public static final int typeViewLongClicked = 0x01020281;
-		public static final int typeViewScrolled = 0x01020282;
-		public static final int typeViewSelected = 0x01020283;
-		public static final int typeViewTextChanged = 0x01020284;
-		public static final int typeViewTextSelectionChanged = 0x01020285;
-		public static final int typeViewTextTraversedAtMovementGranularity = 0x01020286;
-		public static final int typeWindowContentChanged = 0x01020287;
-		public static final int typeWindowStateChanged = 0x01020288;
-		public static final int typeWindowsChanged = 0x01020289;
-		public static final int uiMode = 0x01020376;
-		public static final int unchecked = 0x01020436;
-		public static final int undefined = 0x0102037a;
+		public static final int translucent = 0x010202da;
+		public static final int transparent = 0x010202db;
+		public static final int turkish_f = 0x010203cd;
+		public static final int turkish_q = 0x010203ce;
+		public static final int twelvekey = 0x0102037f;
+		public static final int twoLine = 0x010202ce;
+		public static final int typeAllMask = 0x01020272;
+		public static final int typeAnnouncement = 0x01020273;
+		public static final int typeAssistReadingContext = 0x01020274;
+		public static final int typeContextClicked = 0x01020275;
+		public static final int typeGestureDetectionEnd = 0x01020276;
+		public static final int typeGestureDetectionStart = 0x01020277;
+		public static final int typeNotificationStateChanged = 0x01020278;
+		public static final int typeTouchExplorationGestureEnd = 0x01020279;
+		public static final int typeTouchExplorationGestureStart = 0x0102027a;
+		public static final int typeTouchInteractionEnd = 0x0102027b;
+		public static final int typeTouchInteractionStart = 0x0102027c;
+		public static final int typeViewAccessibilityFocusCleared = 0x0102027d;
+		public static final int typeViewAccessibilityFocused = 0x0102027e;
+		public static final int typeViewClicked = 0x0102027f;
+		public static final int typeViewFocused = 0x01020280;
+		public static final int typeViewHoverEnter = 0x01020281;
+		public static final int typeViewHoverExit = 0x01020282;
+		public static final int typeViewLongClicked = 0x01020283;
+		public static final int typeViewScrolled = 0x01020284;
+		public static final int typeViewSelected = 0x01020285;
+		public static final int typeViewTextChanged = 0x01020286;
+		public static final int typeViewTextSelectionChanged = 0x01020287;
+		public static final int typeViewTextTraversedAtMovementGranularity = 0x01020288;
+		public static final int typeWindowContentChanged = 0x01020289;
+		public static final int typeWindowStateChanged = 0x0102028a;
+		public static final int typeWindowsChanged = 0x0102028b;
+		public static final int uiMode = 0x01020378;
+		public static final int unchecked = 0x0102043e;
+		public static final int undefined = 0x0102037c;
 		/**  Editor action that makes selected text underline.
          */
 		public static final int underline = 0x01020060;
 		public static final int undo = 0x01020032;
-		public static final int uniform = 0x010202c3;
-		public static final int unpressed = 0x01020439;
-		public static final int unspecified = 0x01020363;
+		public static final int uniform = 0x010202c5;
+		public static final int unpressed = 0x01020441;
+		public static final int unspecified = 0x01020365;
 		public static final int up = 0x01020065;
-		public static final int useLogo = 0x01020323;
-		public static final int user = 0x01020325;
-		public static final int userIdentification = 0x0102031a;
-		public static final int userLandscape = 0x01020364;
-		public static final int userPortrait = 0x01020365;
-		public static final int userSwitcher = 0x010203d2;
-		public static final int vendorPrivileged = 0x01020345;
-		public static final int verifier = 0x01020346;
-		public static final int vertical = 0x010200f2;
-		public static final int vertical_double_arrow = 0x01020262;
-		public static final int vertical_text = 0x01020263;
-		public static final int video = 0x010203a2;
-		public static final int viewEnd = 0x01020246;
-		public static final int viewStart = 0x01020247;
-		public static final int visible = 0x01020230;
-		public static final int voice = 0x01020313;
-		public static final int voiceTrigger = 0x0102031b;
-		public static final int wait = 0x01020264;
-		public static final int web = 0x010200f0;
-		public static final int websearch = 0x0102043d;
-		public static final int wheel = 0x01020381;
-		public static final int wideColorGamut = 0x010203ab;
-		public static final int widget = 0x010203d3;
+		public static final int useLogo = 0x01020325;
+		public static final int user = 0x01020327;
+		public static final int userIdentification = 0x0102031c;
+		public static final int userLandscape = 0x01020366;
+		public static final int userPortrait = 0x01020367;
+		public static final int userSwitcher = 0x010203d4;
+		public static final int vendorPrivileged = 0x01020347;
+		public static final int verifier = 0x01020348;
+		public static final int vertical = 0x010200f4;
+		public static final int vertical_double_arrow = 0x01020264;
+		public static final int vertical_text = 0x01020265;
+		public static final int video = 0x010203a4;
+		public static final int viewEnd = 0x01020248;
+		public static final int viewStart = 0x01020249;
+		public static final int visible = 0x01020232;
+		public static final int voice = 0x01020315;
+		public static final int voiceTrigger = 0x0102031d;
+		public static final int wait = 0x01020266;
+		public static final int web = 0x010200f2;
+		public static final int websearch = 0x01020445;
+		public static final int wheel = 0x01020383;
+		public static final int wideColorGamut = 0x010203ad;
+		public static final int widget = 0x010203d5;
 		public static final int widget_frame = 0x01020018;
-		public static final int widgets = 0x010203d4;
-		public static final int wipe = 0x010203a8;
-		public static final int withText = 0x0102030e;
-		public static final int words = 0x010202bb;
-		public static final int workman = 0x010203cd;
-		public static final int wrap_content = 0x010200a7;
-		public static final int write = 0x010203da;
-		public static final int xhdpi = 0x010203b2;
-		public static final int xlarge = 0x010203ae;
-		public static final int xxhdpi = 0x010203b3;
-		public static final int xxxhdpi = 0x010203b4;
-		public static final int year = 0x010203f6;
-		public static final int yes = 0x0102022c;
-		public static final int yesExcludeDescendants = 0x0102022d;
-		public static final int zoom_in = 0x01020265;
-		public static final int zoom_out = 0x01020266;
+		public static final int widgets = 0x010203d6;
+		public static final int wipe = 0x010203aa;
+		public static final int withText = 0x01020310;
+		public static final int words = 0x010202bd;
+		public static final int workman = 0x010203cf;
+		public static final int wrap_content = 0x010200a9;
+		public static final int write = 0x010203dc;
+		public static final int xhdpi = 0x010203b4;
+		public static final int xlarge = 0x010203b0;
+		public static final int xxhdpi = 0x010203b5;
+		public static final int xxxhdpi = 0x010203b6;
+		public static final int year = 0x010203fd;
+		public static final int yes = 0x0102022e;
+		public static final int yesExcludeDescendants = 0x0102022f;
+		public static final int zoom_in = 0x01020267;
+		public static final int zoom_out = 0x01020268;
+		public static final int action_bar_subtitle = 0x010203de;
+		public static final int action_bar_title = 0x010203dd;
+		public static final int group_divider = 0x010203f3;
+		public static final int progress_circular = 0x0102009a;
+		public static final int progress_horizontal = 0x0102009b;
+		public static final int radio = 0x01020405;
+		public static final int shortcut = 0x010203f4;
+		public static final int submenuarrow = 0x010203f5;
 	}
 	public static final class integer {
 		/**  Define the bar of considering the availability of a subscription is stable in milliseconds,
@@ -29998,40 +30007,40 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 	public static final class layout {
 		public static final int action_bar_home = 0x01090018;
 		public static final int action_bar_home_material = 0x01090019;
-		public static final int action_mode_close_item_material = 0x0109001a;
+		public static final int action_mode_close_item_material = 0x0109001f;
 		public static final int activity_list_item = 0x01090000;
-		public static final int alert_dialog_button_bar_leanback = 0x0109001b;
-		public static final int alert_dialog_button_bar_material = 0x0109001c;
-		public static final int alert_dialog_holo = 0x0109001d;
-		public static final int alert_dialog_leanback = 0x0109001e;
-		public static final int alert_dialog_leanback_button_panel_side = 0x0109001f;
-		public static final int alert_dialog_material = 0x01090020;
-		public static final int alert_dialog_progress = 0x01090021;
-		public static final int alert_dialog_progress_holo = 0x01090022;
-		public static final int alert_dialog_progress_material = 0x01090023;
-		public static final int alert_dialog_title_material = 0x01090024;
-		public static final int breadcrumbs_in_fragment = 0x01090025;
-		public static final int breadcrumbs_in_fragment_material = 0x01090026;
+		public static final int alert_dialog_button_bar_leanback = 0x01090020;
+		public static final int alert_dialog_button_bar_material = 0x01090021;
+		public static final int alert_dialog_holo = 0x01090022;
+		public static final int alert_dialog_leanback = 0x01090023;
+		public static final int alert_dialog_leanback_button_panel_side = 0x01090024;
+		public static final int alert_dialog_material = 0x01090025;
+		public static final int alert_dialog_progress = 0x01090026;
+		public static final int alert_dialog_progress_holo = 0x01090027;
+		public static final int alert_dialog_progress_material = 0x01090028;
+		public static final int alert_dialog_title_material = 0x01090029;
+		public static final int breadcrumbs_in_fragment = 0x0109002a;
+		public static final int breadcrumbs_in_fragment_material = 0x0109002b;
 		public static final int browser_link_context_header = 0x0109000e;
-		public static final int date_picker_header_material = 0x01090027;
-		public static final int date_picker_legacy = 0x01090028;
-		public static final int date_picker_legacy_holo = 0x01090029;
-		public static final int date_picker_material = 0x0109002a;
-		public static final int date_picker_view_animator_material = 0x0109002b;
-		public static final int dialog_custom_title = 0x0109002c;
-		public static final int dialog_custom_title_holo = 0x0109002d;
-		public static final int dialog_custom_title_material = 0x0109002e;
-		public static final int dialog_title = 0x0109002f;
-		public static final int dialog_title_holo = 0x01090030;
-		public static final int dialog_title_icons = 0x01090031;
-		public static final int dialog_title_icons_holo = 0x01090032;
-		public static final int dialog_title_icons_material = 0x01090033;
-		public static final int dialog_title_material = 0x01090034;
+		public static final int date_picker_header_material = 0x0109002d;
+		public static final int date_picker_legacy = 0x0109002e;
+		public static final int date_picker_legacy_holo = 0x0109002f;
+		public static final int date_picker_material = 0x01090030;
+		public static final int date_picker_view_animator_material = 0x01090031;
+		public static final int dialog_custom_title = 0x01090032;
+		public static final int dialog_custom_title_holo = 0x01090033;
+		public static final int dialog_custom_title_material = 0x01090034;
+		public static final int dialog_title = 0x01090035;
+		public static final int dialog_title_holo = 0x01090036;
+		public static final int dialog_title_icons = 0x01090037;
+		public static final int dialog_title_icons_holo = 0x01090038;
+		public static final int dialog_title_icons_material = 0x01090039;
+		public static final int dialog_title_material = 0x0109003a;
 		public static final int expandable_list_content = 0x01090001;
-		public static final int fragment_bread_crumb_item = 0x01090035;
-		public static final int fragment_bread_crumb_item_material = 0x01090036;
-		public static final int keyboard_key_preview = 0x01090037;
-		public static final int keyboard_popup_keyboard = 0x01090038;
+		public static final int fragment_bread_crumb_item = 0x0109003b;
+		public static final int fragment_bread_crumb_item_material = 0x0109003c;
+		public static final int keyboard_key_preview = 0x0109003d;
+		public static final int keyboard_popup_keyboard = 0x0109003e;
 		/**  Standard content view for a {@link android.app.ListFragment}.
        If you are implementing a subclass of ListFragment with your
        own customized content, you can include this layout in that
@@ -30039,55 +30048,55 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
        the base class.
          */
 		public static final int list_content = 0x01090014;
-		public static final int list_content_simple = 0x01090039;
-		public static final int number_picker = 0x0109003a;
-		public static final int number_picker_material = 0x0109003b;
-		public static final int number_picker_with_selector_wheel = 0x0109003c;
-		public static final int preference = 0x0109003d;
+		public static final int list_content_simple = 0x0109003f;
+		public static final int number_picker = 0x01090044;
+		public static final int number_picker_material = 0x01090045;
+		public static final int number_picker_with_selector_wheel = 0x01090046;
+		public static final int preference = 0x0109004a;
 		public static final int preference_category = 0x01090002;
-		public static final int preference_category_holo = 0x0109003e;
-		public static final int preference_category_material = 0x0109003f;
-		public static final int preference_child = 0x01090040;
-		public static final int preference_child_holo = 0x01090041;
-		public static final int preference_child_material = 0x01090042;
-		public static final int preference_dialog_edittext = 0x01090043;
-		public static final int preference_dialog_edittext_material = 0x01090044;
-		public static final int preference_dialog_seekbar = 0x01090045;
-		public static final int preference_dialog_seekbar_material = 0x01090046;
-		public static final int preference_header_item = 0x01090047;
-		public static final int preference_header_item_material = 0x01090048;
-		public static final int preference_holo = 0x01090049;
-		public static final int preference_information = 0x0109004a;
-		public static final int preference_information_holo = 0x0109004b;
-		public static final int preference_information_material = 0x0109004c;
-		public static final int preference_list_content = 0x0109004d;
-		public static final int preference_list_content_material = 0x0109004e;
-		public static final int preference_list_fragment = 0x0109004f;
-		public static final int preference_list_fragment_material = 0x01090050;
-		public static final int preference_material = 0x01090051;
-		public static final int preference_widget_checkbox = 0x01090052;
-		public static final int preference_widget_seekbar = 0x01090053;
-		public static final int preference_widget_seekbar_material = 0x01090054;
-		public static final int preference_widget_switch = 0x01090055;
-		public static final int progress_dialog = 0x01090056;
-		public static final int progress_dialog_holo = 0x01090057;
-		public static final int progress_dialog_material = 0x01090058;
-		public static final int screen_action_bar = 0x01090059;
-		public static final int screen_toolbar = 0x0109005a;
-		public static final int search_dropdown_item_icons_2line = 0x0109005b;
-		public static final int search_view = 0x0109005c;
-		public static final int select_dialog_holo = 0x0109005d;
+		public static final int preference_category_holo = 0x0109004b;
+		public static final int preference_category_material = 0x0109004c;
+		public static final int preference_child = 0x0109004d;
+		public static final int preference_child_holo = 0x0109004e;
+		public static final int preference_child_material = 0x0109004f;
+		public static final int preference_dialog_edittext = 0x01090050;
+		public static final int preference_dialog_edittext_material = 0x01090051;
+		public static final int preference_dialog_seekbar = 0x01090052;
+		public static final int preference_dialog_seekbar_material = 0x01090053;
+		public static final int preference_header_item = 0x01090054;
+		public static final int preference_header_item_material = 0x01090055;
+		public static final int preference_holo = 0x01090056;
+		public static final int preference_information = 0x01090057;
+		public static final int preference_information_holo = 0x01090058;
+		public static final int preference_information_material = 0x01090059;
+		public static final int preference_list_content = 0x0109005a;
+		public static final int preference_list_content_material = 0x0109005b;
+		public static final int preference_list_fragment = 0x0109005c;
+		public static final int preference_list_fragment_material = 0x0109005d;
+		public static final int preference_material = 0x0109005e;
+		public static final int preference_widget_checkbox = 0x0109005f;
+		public static final int preference_widget_seekbar = 0x01090060;
+		public static final int preference_widget_seekbar_material = 0x01090061;
+		public static final int preference_widget_switch = 0x01090062;
+		public static final int progress_dialog = 0x01090063;
+		public static final int progress_dialog_holo = 0x01090064;
+		public static final int progress_dialog_material = 0x01090065;
+		public static final int screen_action_bar = 0x01090066;
+		public static final int screen_toolbar = 0x01090067;
+		public static final int search_dropdown_item_icons_2line = 0x01090068;
+		public static final int search_view = 0x01090069;
+		public static final int select_dialog_holo = 0x0109006a;
 		public static final int select_dialog_item = 0x01090011;
-		public static final int select_dialog_item_holo = 0x0109005e;
-		public static final int select_dialog_item_material = 0x0109005f;
-		public static final int select_dialog_material = 0x01090060;
+		public static final int select_dialog_item_holo = 0x0109006b;
+		public static final int select_dialog_item_material = 0x0109006c;
+		public static final int select_dialog_material = 0x0109006d;
 		public static final int select_dialog_multichoice = 0x01090013;
-		public static final int select_dialog_multichoice_holo = 0x01090061;
-		public static final int select_dialog_multichoice_material = 0x01090062;
+		public static final int select_dialog_multichoice_holo = 0x0109006e;
+		public static final int select_dialog_multichoice_material = 0x0109006f;
 		public static final int select_dialog_singlechoice = 0x01090012;
-		public static final int select_dialog_singlechoice_holo = 0x01090063;
-		public static final int select_dialog_singlechoice_material = 0x01090064;
-		public static final int simple_dropdown_hint = 0x01090065;
+		public static final int select_dialog_singlechoice_holo = 0x01090070;
+		public static final int select_dialog_singlechoice_material = 0x01090071;
+		public static final int simple_dropdown_hint = 0x01090072;
 		public static final int simple_dropdown_item_1line = 0x0109000a;
 		public static final int simple_expandable_list_item_1 = 0x01090006;
 		public static final int simple_expandable_list_item_2 = 0x01090007;
@@ -30112,26 +30121,39 @@ Support decoding the user data payload as pack GSM 8-bit (a GSM alphabet
 		public static final int simple_selectable_list_item = 0x01090015;
 		public static final int simple_spinner_dropdown_item = 0x01090009;
 		public static final int simple_spinner_item = 0x01090008;
-		public static final int tab_indicator = 0x01090066;
-		public static final int tab_indicator_holo = 0x01090067;
-		public static final int tab_indicator_material = 0x01090068;
-		public static final int tab_indicator_resolver = 0x01090069;
+		public static final int tab_indicator = 0x01090073;
+		public static final int tab_indicator_holo = 0x01090074;
+		public static final int tab_indicator_material = 0x01090075;
+		public static final int tab_indicator_resolver = 0x01090076;
 		public static final int test_list_item = 0x0109000c;
-		public static final int text_edit_no_paste_window = 0x0109006a;
-		public static final int text_edit_paste_window = 0x0109006b;
-		public static final int text_edit_side_no_paste_window = 0x0109006c;
-		public static final int text_edit_side_paste_window = 0x0109006d;
-		public static final int text_edit_suggestion_container = 0x0109006e;
-		public static final int text_edit_suggestion_item = 0x0109006f;
-		public static final int text_edit_suggestion_item_material = 0x01090070;
-		public static final int text_edit_suggestions_window = 0x01090071;
-		public static final int time_picker_header_material = 0x01090072;
-		public static final int time_picker_legacy = 0x01090073;
-		public static final int time_picker_legacy_material = 0x01090074;
-		public static final int time_picker_material = 0x01090075;
+		public static final int text_edit_no_paste_window = 0x01090077;
+		public static final int text_edit_paste_window = 0x01090078;
+		public static final int text_edit_side_no_paste_window = 0x01090079;
+		public static final int text_edit_side_paste_window = 0x0109007a;
+		public static final int text_edit_suggestion_container = 0x0109007b;
+		public static final int text_edit_suggestion_item = 0x0109007c;
+		public static final int text_edit_suggestion_item_material = 0x0109007d;
+		public static final int text_edit_suggestions_window = 0x0109007e;
+		public static final int time_picker_header_material = 0x0109007f;
+		public static final int time_picker_legacy = 0x01090080;
+		public static final int time_picker_legacy_material = 0x01090081;
+		public static final int time_picker_material = 0x01090082;
 		public static final int two_line_list_item = 0x0109000d;
-		public static final int watch_base_error_dialog = 0x01090076;
-		public static final int watch_base_error_dialog_title = 0x01090077;
+		public static final int watch_base_error_dialog = 0x01090083;
+		public static final int watch_base_error_dialog_title = 0x01090084;
+		public static final int action_bar_title_item = 0x0109001a;
+		public static final int action_bar_up_container = 0x0109001b;
+		public static final int action_menu_item_layout = 0x0109001c;
+		public static final int action_menu_layout = 0x0109001d;
+		public static final int action_mode_close_item = 0x0109001e;
+		public static final int cascading_menu_item_layout_material = 0x0109002c;
+		public static final int list_menu_item_checkbox = 0x01090040;
+		public static final int list_menu_item_icon = 0x01090041;
+		public static final int list_menu_item_layout = 0x01090042;
+		public static final int list_menu_item_radio = 0x01090043;
+		public static final int popup_menu_header_item_layout = 0x01090047;
+		public static final int popup_menu_item_layout = 0x01090048;
+		public static final int popup_menu_item_layout_material = 0x01090049;
 	}
 	public static final class menu {
 		public static final int webview_copy = 0x01150000;

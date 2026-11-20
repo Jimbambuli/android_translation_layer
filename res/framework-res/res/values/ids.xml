@@ -290,4 +290,9 @@
 
   <!-- View tag associating a view with its overridden id, to ensure valid recycling only. -->
   <item type="id" name="remote_views_override_id" />
+
+  <!-- AOSP defines these in the window title layouts (screen_progress.xml and others), which ATL leaves out;
+       ActionBarView gives its progress bars these ids -->
+  <item type="id" name="progress_circular" />
+  <item type="id" name="progress_horizontal" />
 </resources>
