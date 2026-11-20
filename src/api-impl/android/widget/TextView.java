@@ -1,5 +1,6 @@
 package android.widget;
 
+import android.atl.annotation.Export;
 import android.annotation.UnsupportedAppUsage;
 import android.content.Context;
 import android.content.res.ColorStateList;
@@ -55,6 +56,7 @@ import android.text.style.StrikethroughSpan;
 import android.text.style.StyleSpan;
 import android.text.style.URLSpan;
 import android.text.style.UnderlineSpan;
+import android.text.util.Linkify;
 import android.util.SparseIntArray;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -127,6 +129,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.TextView, defStyleAttr, defStyleRes);
 		try {
+			/* AOSP's attribute loop reads these before the text is set at its end */
+			mAutoLinkMask = a.getInt(com.android.internal.R.styleable.TextView_autoLink, 0);
+			mLinksClickable = a.getBoolean(com.android.internal.R.styleable.TextView_linksClickable, true);
 			if (a.hasValue(com.android.internal.R.styleable.TextView_text)) {
 				setText(a.getText(com.android.internal.R.styleable.TextView_text));
 			}
@@ -288,8 +293,21 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		final boolean needEditableForNotification = notify && mWatchers != null && mWatchers.size() != 0;
 		if (notify)
 			sendBeforeTextChanged(oldText, 0, oldLength, text.length());
+		/* as AOSP's setText(): the links of the autoLink mask, LinkMovementMethod for them unless the text can be
+		 * selected (ATL's selectable text has no movement method, the label selects) */
+		if (mAutoLinkMask != 0) {
+			Spannable s2 = (type == BufferType.EDITABLE || text instanceof Spannable) ? (Spannable)text : mSpannableFactory.newSpannable(text);
+			if (Linkify.addLinks(s2, mAutoLinkMask)) {
+				text = s2;
+				type = (type == BufferType.EDITABLE) ? BufferType.EDITABLE : BufferType.SPANNABLE;
+				mBufferType = type;
+				this.text = text;
+				if (mLinksClickable && !(mTextIsSelectable && isEnabled()))
+					setMovementMethod(LinkMovementMethod.getInstance());
+			}
+		}
 		/* as AOSP's setText(): the buffer type (or a movement method, which needs spans) decides what getText()
-		 * returns; the Editor, PrecomputedText and autoLink parts of AOSP do not apply here */
+		 * returns; the Editor and PrecomputedText parts of AOSP do not apply here */
 		if (type == BufferType.EDITABLE || needEditableForNotification) {
 			text = mEditableFactory.newEditable(text);
 		} else if (type == BufferType.SPANNABLE || mMovement != null) {
@@ -327,8 +345,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	 * AOSP's TextView lays out and draws its text with a StaticLayout. The GtkLabel of ATL's TextView knows no
 	 * paragraph spans (leading margins and what they draw, line heights, line backgrounds, the alignment of a
 	 * paragraph), so a text with such spans is laid out and drawn like AOSP with android.text.StaticLayout (which
-	 * handles them, see Layout) on the canvas of the view, and the label stays empty. Links of such a text are not
-	 * clickable and it cannot be selected (both are the label's). */
+	 * handles them, see Layout) on the canvas of the view, and the label stays empty. Touches on such a text go to
+	 * the movement method like in AOSP (onTouchEvent()), so its links are clickable; it cannot be selected (AOSP's
+	 * Editor does that, ATL's label does it for other texts). */
 	private Layout mParagraphLayout;
 	private ParagraphLayoutDrawable mParagraphOverlay;
 	private boolean mParagraphText;
@@ -355,6 +374,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			if (mParagraphOverlay == null)
 				mParagraphOverlay = new ParagraphLayoutDrawable();
 			getOverlay().add(mParagraphOverlay);
+			nativeSetOnTouchListener(widget); // the touches for onTouchEvent(), also inside a GTK scroll view
 			invalidate();
 		} else if (mParagraphOverlay != null) {
 			getOverlay().remove(mParagraphOverlay);
@@ -663,9 +683,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return String.format("foreground=\"#%06x\" fgalpha=\"%d\"", color & 0xffffff, Math.max(1, (color >>> 24) * 65535 / 255));
 	}
 
-	/* called when a link of the markup is activated; like LinkMovementMethod, only then do links react */
+	/* called when a link of the markup is activated; like LinkMovementMethod, only then do links react, and like
+	 * AOSP's onTouchEvent() the autoLink links of a selectable text */
 	private boolean onLinkActivated(String uri) {
-		if (!(mMovement instanceof LinkMovementMethod))
+		if (!(mMovement instanceof LinkMovementMethod) && !(mLinksClickable && mAutoLinkMask != 0 && mTextIsSelectable))
 			return true;
 		try {
 			linkSpans[Integer.parseInt(uri)].onClick(this);
@@ -2074,8 +2095,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		return getCompoundPaddingBottom();
 	}
 
+	/* AOSP: with getVerticalOffset(true), which only the StaticLayout of a paragraph text has here */
 	public int getTotalPaddingTop() {
-		return getExtendedPaddingTop();
+		return getExtendedPaddingTop() + (mParagraphText ? paragraphVerticalOffset(paragraphLayout()) : 0);
 	}
 
 	public int getTotalPaddingBottom() {
@@ -3036,7 +3058,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		setText(getText()); // not the field: Button keeps its text in the native widget
 	}
 
-	/* as AOSP; Linkify is a stub here, so the mask is kept (getAutoLinkMask()) but no links are added to the text */
+	/* as AOSP; setText() adds the links of the mask */
 	private int mAutoLinkMask;
 	private boolean mLinksClickable = true;
 
@@ -3534,6 +3556,20 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			}
 			return baseline + voffset;
 		}
+	}
+
+	/* AOSP TextView.onTouchEvent() for a paragraph text, which this view lays out itself: the movement method gets
+	 * the touch (LinkMovementMethod clicks its links). Other texts are the label's (its links, its selection), as
+	 * are the Editor parts of AOSP. */
+	@Export
+	@Override
+	public boolean onTouchEvent(MotionEvent event) {
+		final boolean superResult = super.onTouchEvent(event);
+		if (mParagraphText && mMovement != null && isEnabled() && text instanceof Spannable) {
+			if (mMovement.onTouchEvent(this, (Spannable)text, event))
+				return true;
+		}
+		return superResult;
 	}
 
 	/* AOSP TextView.getOffsetForPosition(): the character offset closest to the point, -1 without a layout */
