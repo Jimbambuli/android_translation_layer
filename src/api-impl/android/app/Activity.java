@@ -3,6 +3,8 @@ package android.app;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActionBar;
+import com.android.internal.app.ToolbarActionBar;
+import com.android.internal.app.WindowDecorActionBar;
 import android.atl.ATLLoadedApp;
 import android.atl.annotation.Export;
 import android.content.BroadcastReceiver;
@@ -40,6 +42,7 @@ import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.widget.Toolbar;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.SearchEvent;
@@ -349,6 +352,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		if (mLastNonConfigurationInstances != null) {
 			mFragments.restoreLoaderNonConfig(mLastNonConfigurationInstances.loaders);
 		}
+		/* AOSP: an activity with a parent activity shows Up in its action bar */
+		final ActivityInfo activityInfo = getActivityInfo();
+		if (activityInfo != null && activityInfo.parentActivityName != null) {
+			if (mActionBar == null)
+				mEnableDefaultActionBarUp = true;
+			else
+				mActionBar.setDefaultDisplayHomeAsUpEnabled(true);
+		}
 		if (savedInstanceState != null) {
 			Parcelable p = savedInstanceState.getParcelable(FRAGMENTS_TAG);
 			mFragments.restoreAllState(p, mLastNonConfigurationInstances != null ? mLastNonConfigurationInstances.fragments : null);
@@ -472,6 +483,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		root_view = getLayoutInflater().inflate(layoutResID, null, false);
 
 		window.setContentView(root_view);
+		initWindowDecorActionBar();
 		onContentChanged();
 	}
 
@@ -481,6 +493,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public void setContentView(View view) {
 		window.setContentView(view);
+		initWindowDecorActionBar();
 		onContentChanged();
 	}
 
@@ -490,8 +503,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return (T)view;
 	}
 
+	/* AOSP Activity.invalidateOptionsMenu(): the action bar makes its menu again (ToolbarActionBar), or the
+	 * window does it for the decor action bar */
 	public void invalidateOptionsMenu() {
-		Slog.i(TAG, "invalidateOptionsMenu() called, should we do something?");
+		if (window.hasFeature(Window.FEATURE_OPTIONS_PANEL) && (mActionBar == null || !mActionBar.invalidateOptionsMenu()))
+			window.invalidatePanelMenu(Window.FEATURE_OPTIONS_PANEL);
 	}
 
 	public Window getWindow() {
@@ -1052,8 +1068,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return null;
 	}
 
+	/* AOSP Activity.getMenuInflater(): with an action bar, its themed context inflates the menu */
+	private MenuInflater mMenuInflater;
+
 	public MenuInflater getMenuInflater() {
-		return new MenuInflater(this);
+		if (mMenuInflater == null) {
+			initWindowDecorActionBar();
+			if (mActionBar != null)
+				mMenuInflater = new MenuInflater(mActionBar.getThemedContext(), this);
+			else
+				mMenuInflater = new MenuInflater(this);
+		}
+		return mMenuInflater;
 	}
 
 	public boolean onPrepareOptionsMenu(Menu menu) {
@@ -1070,10 +1096,23 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return true;
 	}
 
+	/* AOSP Activity.onMenuItemSelected(): an options item goes to the activity, then its fragments; Home of an
+	 * action bar that shows Up navigates up */
 	@Override
 	public boolean onMenuItemSelected(int featureId, MenuItem item) {
 		if (featureId == Window.FEATURE_OPTIONS_PANEL) {
-			return onOptionsItemSelected(item) || mFragments.dispatchOptionsItemSelected(item);
+			if (onOptionsItemSelected(item))
+				return true;
+			if (mFragments.dispatchOptionsItemSelected(item))
+				return true;
+			if (item.getItemId() == android.R.id.home && mActionBar != null
+			    && (mActionBar.getDisplayOptions() & ActionBar.DISPLAY_HOME_AS_UP) != 0) {
+				if (getParent() == null)
+					return onNavigateUp();
+				else
+					return getParent().onNavigateUpFromChild(this);
+			}
+			return false;
 		}
 		return false;
 	}
@@ -1084,11 +1123,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public void onOptionsMenuClosed(Menu menu) {}
 
+	/* AOSP Activity.onPanelClosed() */
 	@Override
 	public void onPanelClosed(int featureId, Menu menu) {
-		if (featureId == Window.FEATURE_OPTIONS_PANEL) {
-			onOptionsMenuClosed(menu);
-			mFragments.dispatchOptionsMenuClosed(menu);
+		switch (featureId) {
+			case Window.FEATURE_OPTIONS_PANEL:
+				mFragments.dispatchOptionsMenuClosed(menu);
+				onOptionsMenuClosed(menu);
+				break;
+			case Window.FEATURE_ACTION_BAR:
+				initWindowDecorActionBar();
+				mActionBar.dispatchMenuVisibilityChanged(false);
+				break;
 		}
 	}
 
@@ -1116,16 +1162,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return mTitleColor;
 	}
 
-	/* AOSP Activity.onTitleChanged(): the window gets the title (and the action bar, which keeps it) */
+	/* AOSP Activity.onTitleChanged(): the window and the action bar get the title */
 	protected void onTitleChanged(CharSequence title, int color) {
-		if (mActionBar != null)
-			mActionBar.setWindowTitle(title);
 		if (mTitleReady) {
 			final Window win = getWindow();
-			if (win != null) {
-				/* the title of an action bar that was given one stays the title of the window */
-				win.setTitle(mActionBar != null ? mActionBar.getTitle() : title);
-			}
+			if (win != null)
+				win.setTitle(title);
+			if (mActionBar != null)
+				mActionBar.setWindowTitle(title);
 		}
 	}
 
@@ -1225,10 +1269,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		}
 	}
 
+	/* AOSP Activity.onMenuOpened() */
 	@Override
 	public boolean onMenuOpened(int featureId, Menu menu) {
-		Slog.i(TAG, "onMenuOpened(" + featureId + ", " + menu + ") called");
-		return false;
+		if (featureId == Window.FEATURE_ACTION_BAR) {
+			initWindowDecorActionBar();
+			if (mActionBar != null)
+				mActionBar.dispatchMenuVisibilityChanged(true);
+			else
+				Log.e(TAG, "Tried to open action bar menu with no action bar");
+		}
+		return true;
 	}
 
 	/* like AOSP: the activity is stopped, saves its state and is destroyed, a new instance of
@@ -2398,7 +2449,10 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public void setFinishOnTouchOutside(boolean finish) {
 	}
 
+	/* AOSP Activity.closeOptionsMenu() */
 	public void closeOptionsMenu() {
+		if (window.hasFeature(Window.FEATURE_OPTIONS_PANEL) && (mActionBar == null || !mActionBar.closeOptionsMenu()))
+			window.closePanel(Window.FEATURE_OPTIONS_PANEL);
 	}
 
 	public void finishActivity(int requestCode) {
@@ -2412,10 +2466,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	/* AOSP Activity.dispatchKeyEvent(): the window's views (Window.superDispatchKeyEvent()), then the activity
 	 * itself (KeyEvent.dispatch() to onKeyDown() etc.). Called for the keys the views did not consume on their
-	 * way through GTK (WrapperWidget.c), see Window.dispatchKeyEventFromNative(). ATL has no action bar that
-	 * would take the menu key first. */
+	 * way through GTK (WrapperWidget.c), see Window.dispatchKeyEventFromNative(). The action bar takes the menu
+	 * key first. */
 	public boolean dispatchKeyEvent(KeyEvent event) {
 		onUserInteraction();
+
+		if (event.getKeyCode() == KeyEvent.KEYCODE_MENU && mActionBar != null && mActionBar.onMenuKeyEvent(event))
+			return true;
 
 		Window win = getWindow();
 		if (win.superDispatchKeyEvent(event)) {
@@ -2726,16 +2783,52 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	/* AOSP Activity.getActionBar()/initWindowDecorActionBar(): there is an action bar when the window has the feature
-	 * (its theme has windowActionBar and not windowNoTitle, or the app asked for it) and the activity is no child;
-	 * with a theme without action bar (AppCompat's, dialogs, NoActionBar) it is null as in AOSP.
-	 * ATL's window has no decor bar widget: ActivityActionBar keeps the state and runs the callbacks. */
+	 * (its theme has windowActionBar and not windowNoTitle, or the app asked for it) and the activity is no child:
+	 * the WindowDecorActionBar of the window's decor layout. With a theme without action bar (AppCompat's, dialogs,
+	 * NoActionBar) it is null as in AOSP, unless the app sets a Toolbar as its action bar. */
 	private ActionBar mActionBar;
+	private boolean mEnableDefaultActionBarUp;
+
+	private void initWindowDecorActionBar() {
+		Window window = getWindow();
+		window.getDecorView(); // initializing the decor can change the window's features
+		if (isChild() || !window.hasFeature(Window.FEATURE_ACTION_BAR) || mActionBar != null)
+			return;
+		mActionBar = new WindowDecorActionBar(this);
+		mActionBar.setDefaultDisplayHomeAsUpEnabled(mEnableDefaultActionBarUp);
+		final ActivityInfo activityInfo = getActivityInfo();
+		if (activityInfo != null) {
+			window.setDefaultIcon(activityInfo.getIconResource());
+			window.setDefaultLogo(activityInfo.getLogoResource());
+		}
+	}
 
 	public ActionBar getActionBar() {
-		window.getDecorView(); // initializing the decor can change the window's features
-		if (!isChild() && mActionBar == null && window.hasFeature(Window.FEATURE_ACTION_BAR))
-			mActionBar = new ActivityActionBar(this);
+		initWindowDecorActionBar();
 		return mActionBar;
+	}
+
+	/* AOSP Activity.setActionBar(): the Toolbar becomes the action bar (ToolbarActionBar), which takes the
+	 * window's callback to make the options menu; not with the decor action bar of the window */
+	public void setActionBar(Toolbar toolbar) {
+		final ActionBar ab = getActionBar();
+		if (ab instanceof WindowDecorActionBar) {
+			throw new IllegalStateException("This Activity already has an action bar supplied "
+			                                + "by the window decor. Do not request Window.FEATURE_ACTION_BAR and set "
+			                                + "android:windowActionBar to false in your theme to use a Toolbar instead.");
+		}
+		mMenuInflater = null;
+		if (ab != null)
+			ab.onDestroy();
+		if (toolbar != null) {
+			final ToolbarActionBar tbab = new ToolbarActionBar(toolbar, getTitle(), this);
+			mActionBar = tbab;
+			window.setCallback(tbab.getWrappedWindowCallback());
+		} else {
+			mActionBar = null;
+			window.setCallback(this);
+		}
+		invalidateOptionsMenu();
 	}
 
 	/* ---- AOSP Activity members that the apps call and that had no counterpart here ---- */
@@ -2777,10 +2870,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		}
 	}
 
-	/* AOSP Activity.openOptionsMenu(): the options menu in the window's panel. ATL's options menu is the desktop
-	 * header bar's, which the user opens; nothing in the window can be opened from here, so this changes
-	 * nothing (AOSP does the same when the window has no options panel) */
+	/* AOSP Activity.openOptionsMenu(): the action bar's overflow menu (ATL has no panel window for a window
+	 * without action bar, see Window.openPanel()) */
 	public void openOptionsMenu() {
+		if (window.hasFeature(Window.FEATURE_OPTIONS_PANEL) && (mActionBar == null || !mActionBar.openOptionsMenu()))
+			window.openPanel(Window.FEATURE_OPTIONS_PANEL, null);
 	}
 
 	/* AOSP Activity.createPendingResult(): a PendingIntent whose sending delivers onActivityResult() to this

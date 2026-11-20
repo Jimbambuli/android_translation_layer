@@ -239,6 +239,7 @@ public class Window {
 		// DecorView grabs all touch events and propagates them in Java
 		decorView.native_registerTouchEventPropagation(decorView.widget);
 		decorView.setId(android.R.id.content);
+		mContentParent = decorView;
 		// files dragged from the desktop come as drag events (handleDragEvent())
 		native_set_drop_target(decorView.widget);
 	}
@@ -470,7 +471,50 @@ public class Window {
 		/* AOSP PhoneWindow.generateLayout() */
 		mEnsureStatusBarContrastWhenTransparent = a.getBoolean(com.android.internal.R.styleable.Window_enforceStatusBarContrast, false);
 		mEnsureNavigationBarContrastWhenTransparent = a.getBoolean(com.android.internal.R.styleable.Window_enforceNavigationBarContrast, true);
+		/* AOSP PhoneWindow.generateLayout(): a window that is not floating and has the action bar (and none of the
+		 * title features that come first) gets the theme's decor layout (screen_toolbar, screen_action_bar), and its
+		 * content goes into that layout's content view (DecorView.onResourcesLoaded()). ATL leaves out the other
+		 * title layouts; the title of such a window is the desktop's (setTitle()). */
+		if (!floating && (mFeatures & (1 << FEATURE_ACTION_BAR)) != 0
+		    && (mFeatures & ((1 << FEATURE_LEFT_ICON) | (1 << FEATURE_RIGHT_ICON) | (1 << FEATURE_CUSTOM_TITLE))) == 0) {
+			final int layoutResource = a.getResourceId(com.android.internal.R.styleable.Window_windowActionBarFullscreenDecorLayout,
+			                                           com.android.internal.R.layout.screen_action_bar);
+			decorView.setId(View.NO_ID);
+			final View root = LayoutInflater.from(context).inflate(layoutResource, null);
+			decorView.addView(root, 0, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+			mContentParent = decorView.findViewById(android.R.id.content);
+			installDecorContentParent();
+		}
 		a.recycle();
+	}
+
+	/* AOSP PhoneWindow.installDecor(): the decor layout's action bar gets the window's callback, title, features
+	 * and icons; the options menu is made after the activity's onCreate() (invalidatePanelMenu()) */
+	private void installDecorContentParent() {
+		mDecorContentParent = decorView.findViewById(com.android.internal.R.id.decor_content_parent);
+		if (mDecorContentParent == null)
+			return;
+		mDecorContentParent.setWindowCallback(getCallback());
+		if (mDecorContentParent.getTitle() == null)
+			mDecorContentParent.setWindowTitle(mTitle);
+		final int localFeatures = getLocalFeatures();
+		for (int i = 0; i < FEATURE_MAX; i++) {
+			if ((localFeatures & (1 << i)) != 0)
+				mDecorContentParent.initFeature(i);
+		}
+		mDecorContentParent.setUiOptions(mUiOptions);
+		if ((mResourcesSetFlags & FLAG_RESOURCE_SET_ICON) != 0 || (mIconRes != 0 && !mDecorContentParent.hasIcon())) {
+			mDecorContentParent.setIcon(mIconRes);
+		} else if ((mResourcesSetFlags & FLAG_RESOURCE_SET_ICON) == 0 && mIconRes == 0 && !mDecorContentParent.hasIcon()) {
+			mDecorContentParent.setIcon(getContext().getPackageManager().getDefaultActivityIcon());
+			mResourcesSetFlags |= FLAG_RESOURCE_SET_ICON_FALLBACK;
+		}
+		if ((mResourcesSetFlags & FLAG_RESOURCE_SET_LOGO) != 0 || (mLogoRes != 0 && !mDecorContentParent.hasLogo()))
+			mDecorContentParent.setLogo(mLogoRes);
+		/* deferred so that the app's onCreateOptionsMenu() does not run in the middle of its onCreate() */
+		PanelFeatureState st = getPanelState(FEATURE_OPTIONS_PANEL, false);
+		if (st == null || st.menu == null)
+			invalidatePanelMenu(FEATURE_ACTION_BAR);
 	}
 
 	private void setThemeFlag(TypedArray a, int attr, boolean defValue, int flag) {
@@ -498,8 +542,8 @@ public class Window {
 				setBackgroundDrawable(ta.getDrawable(0));
 			ta.recycle();
 		}
-		decorView.removeAllViews();
-		decorView.addView(view);
+		mContentParent.removeAllViews();
+		mContentParent.addView(view);
 	}
 
 	/* AOSP PhoneWindow.addContentView(): the view is added to the content next to what is there, with the given
@@ -507,7 +551,7 @@ public class Window {
 	public void addContentView(View view, ViewGroup.LayoutParams params) {
 		installDecor();
 		mContentParentExplicitlySet = true;
-		decorView.addView(view, params);
+		mContentParent.addView(view, params);
 	}
 
 	public OnBackInvokedDispatcher getOnBackInvokedDispatcher() {
@@ -806,9 +850,10 @@ public class Window {
 	}
 
 	public View findViewById(int id) {
-		if (id == com.android.internal.R.id.action_bar)
+		View view = decorView.findViewById(id);
+		if (view == null && id == com.android.internal.R.id.action_bar)
 			return new Toolbar(context);
-		return decorView.findViewById(id);
+		return view;
 	}
 
 	public View peekDecorView() {
@@ -936,6 +981,10 @@ public class Window {
 	/* the desktop's window title. Without a title (Activity.setTitle(null)) it is the application's label, like the
 	 * caption of a desktop window in AOSP (WindowDecorTaskResourceLoader: pm.getApplicationLabel()) */
 	public void setTitle(CharSequence title) {
+		/* AOSP PhoneWindow.setTitle(): the decor layout's action bar shows it too */
+		if (mDecorContentParent != null)
+			mDecorContentParent.setWindowTitle(title);
+		mTitle = title;
 		if (title == null)
 			title = context.getPackageManager().getApplicationLabel(context.getApplicationInfo());
 		set_title(native_window, title.toString());
@@ -1199,4 +1248,365 @@ public class Window {
 	private native void remove_gtk_background(long native_window);
 	private native void set_screen_brightness(float brightness);
 	private native void native_set_drop_target(long decor_widget);
+
+	/* ---- AOSP PhoneWindow: the options menu of the decor layout's action bar ---- */
+
+	/* AOSP PhoneWindow.mContentParent: the view the content goes into, the decor view itself unless the window
+	 * has the decor layout of the action bar */
+	private ViewGroup mContentParent;
+	private com.android.internal.widget.DecorContentParent mDecorContentParent;
+	private CharSequence mTitle;
+	private int mUiOptions;
+
+	private static final int FLAG_RESOURCE_SET_ICON = 1 << 0;
+	private static final int FLAG_RESOURCE_SET_LOGO = 1 << 1;
+	private static final int FLAG_RESOURCE_SET_ICON_FALLBACK = 1 << 2;
+	private int mResourcesSetFlags;
+	private int mIconRes;
+	private int mLogoRes;
+
+	/* AOSP Window.getLocalFeatures(): the features of this window; ATL's windows have no container window, so
+	 * they are all of its features */
+	protected final int getLocalFeatures() {
+		return mFeatures;
+	}
+
+	/* AOSP PhoneWindow.setUiOptions() */
+	public void setUiOptions(int uiOptions) {
+		mUiOptions = uiOptions;
+	}
+
+	public void setUiOptions(int uiOptions, int mask) {
+		mUiOptions = (mUiOptions & ~mask) | (uiOptions & mask);
+	}
+
+	/* AOSP PhoneWindow.setIcon()/setDefaultIcon()/setLogo()/setDefaultLogo(): the icon and logo of the decor
+	 * layout's action bar */
+	public void setIcon(int resId) {
+		mIconRes = resId;
+		mResourcesSetFlags |= FLAG_RESOURCE_SET_ICON;
+		mResourcesSetFlags &= ~FLAG_RESOURCE_SET_ICON_FALLBACK;
+		if (mDecorContentParent != null)
+			mDecorContentParent.setIcon(resId);
+	}
+
+	/** @hide */
+	public void setDefaultIcon(int resId) {
+		if ((mResourcesSetFlags & FLAG_RESOURCE_SET_ICON) != 0)
+			return;
+		mIconRes = resId;
+		if (mDecorContentParent != null && (!mDecorContentParent.hasIcon() || (mResourcesSetFlags & FLAG_RESOURCE_SET_ICON_FALLBACK) != 0)) {
+			if (resId != 0) {
+				mDecorContentParent.setIcon(resId);
+				mResourcesSetFlags &= ~FLAG_RESOURCE_SET_ICON_FALLBACK;
+			} else {
+				mDecorContentParent.setIcon(getContext().getPackageManager().getDefaultActivityIcon());
+				mResourcesSetFlags |= FLAG_RESOURCE_SET_ICON_FALLBACK;
+			}
+		}
+	}
+
+	public void setLogo(int resId) {
+		mLogoRes = resId;
+		mResourcesSetFlags |= FLAG_RESOURCE_SET_LOGO;
+		if (mDecorContentParent != null)
+			mDecorContentParent.setLogo(resId);
+	}
+
+	/** @hide */
+	public void setDefaultLogo(int resId) {
+		if ((mResourcesSetFlags & FLAG_RESOURCE_SET_LOGO) != 0)
+			return;
+		mLogoRes = resId;
+		if (mDecorContentParent != null && !mDecorContentParent.hasLogo())
+			mDecorContentParent.setLogo(resId);
+	}
+
+	/* AOSP PhoneWindow.PanelFeatureState, the part the action bar's menu uses (ATL has no panel windows) */
+	private static final class PanelFeatureState {
+		final int featureId;
+		com.android.internal.view.menu.MenuBuilder menu;
+		View createdPanelView;
+		boolean isPrepared;
+		boolean isHandled;
+		boolean refreshMenuContent;
+		boolean refreshDecorView;
+		boolean qwertyMode;
+		Bundle frozenActionViewState;
+
+		PanelFeatureState(int featureId) {
+			this.featureId = featureId;
+			refreshDecorView = false;
+		}
+
+		void setMenu(com.android.internal.view.menu.MenuBuilder menu) {
+			this.menu = menu;
+		}
+	}
+
+	private PanelFeatureState[] mPanels;
+	private PanelFeatureState mPreparedPanel;
+	private int mInvalidatePanelMenuFeatures;
+	private boolean mInvalidatePanelMenuPosted;
+	private boolean mClosingActionMenu;
+	private ActionMenuPresenterCallback mActionMenuPresenterCallback;
+
+	/* AOSP PhoneWindow.getPanelState() */
+	private PanelFeatureState getPanelState(int featureId, boolean required) {
+		if ((getFeatures() & (1 << featureId)) == 0) {
+			if (!required)
+				return null;
+			throw new RuntimeException("The feature has not been requested");
+		}
+		PanelFeatureState[] ar;
+		if ((ar = mPanels) == null || ar.length <= featureId) {
+			PanelFeatureState[] nar = new PanelFeatureState[featureId + 1];
+			if (ar != null)
+				System.arraycopy(ar, 0, nar, 0, ar.length);
+			mPanels = ar = nar;
+		}
+		PanelFeatureState st = ar[featureId];
+		if (st == null)
+			ar[featureId] = st = new PanelFeatureState(featureId);
+		return st;
+	}
+
+	/* AOSP PhoneWindow.findMenuPanel() */
+	private PanelFeatureState findMenuPanel(Menu menu) {
+		final PanelFeatureState[] panels = mPanels;
+		final int N = panels != null ? panels.length : 0;
+		for (int i = 0; i < N; i++) {
+			final PanelFeatureState panel = panels[i];
+			if (panel != null && panel.menu == menu)
+				return panel;
+		}
+		return null;
+	}
+
+	/* AOSP PhoneWindow.openPanel(int, KeyEvent): the options menu of the decor action bar is its overflow menu.
+	 * ATL has no panel windows (the options menu at the bottom of a window without action bar), so there is
+	 * nothing else to open. */
+	public void openPanel(int featureId, KeyEvent event) {
+		if (featureId == FEATURE_OPTIONS_PANEL && mDecorContentParent != null && mDecorContentParent.canShowOverflowMenu()
+		    && !ViewConfiguration.get(getContext()).hasPermanentMenuKey()) {
+			mDecorContentParent.showOverflowMenu();
+		}
+	}
+
+	/* AOSP PhoneWindow.closePanel(int), with the same limit as openPanel() */
+	public void closePanel(int featureId) {
+		if (featureId == FEATURE_OPTIONS_PANEL && mDecorContentParent != null && mDecorContentParent.canShowOverflowMenu()
+		    && !ViewConfiguration.get(getContext()).hasPermanentMenuKey()) {
+			mDecorContentParent.hideOverflowMenu();
+		}
+	}
+
+	/* AOSP PhoneWindow.invalidatePanelMenu(): the menu is made again on the next animation frame */
+	public void invalidatePanelMenu(int featureId) {
+		mInvalidatePanelMenuFeatures |= 1 << featureId;
+		if (!mInvalidatePanelMenuPosted && decorView != null) {
+			decorView.postOnAnimation(mInvalidatePanelMenuRunnable);
+			mInvalidatePanelMenuPosted = true;
+		}
+	}
+
+	private final Runnable mInvalidatePanelMenuRunnable = new Runnable() {
+		@Override
+		public void run() {
+			for (int i = 0; i <= FEATURE_MAX; i++) {
+				if ((mInvalidatePanelMenuFeatures & 1 << i) != 0)
+					doInvalidatePanelMenu(i);
+			}
+			mInvalidatePanelMenuPosted = false;
+			mInvalidatePanelMenuFeatures = 0;
+		}
+	};
+
+	/* AOSP PhoneWindow.doInvalidatePanelMenu() */
+	private void doInvalidatePanelMenu(int featureId) {
+		PanelFeatureState st = getPanelState(featureId, false);
+		if (st == null)
+			return;
+		Bundle savedActionViewStates = null;
+		if (st.menu != null) {
+			savedActionViewStates = new Bundle();
+			st.menu.saveActionViewStates(savedActionViewStates);
+			if (savedActionViewStates.size() > 0)
+				st.frozenActionViewState = savedActionViewStates;
+			st.menu.stopDispatchingItemsChanged();
+			st.menu.clear();
+		}
+		st.refreshMenuContent = true;
+		st.refreshDecorView = true;
+		if ((featureId == FEATURE_ACTION_BAR || featureId == FEATURE_OPTIONS_PANEL) && mDecorContentParent != null) {
+			st = getPanelState(FEATURE_OPTIONS_PANEL, false);
+			if (st != null) {
+				st.isPrepared = false;
+				preparePanel(st, null);
+			}
+		}
+	}
+
+	/* AOSP PhoneWindow.preparePanel(): the Window.Callback creates (onCreatePanelMenu()) and prepares
+	 * (onPreparePanel()) the menu, which the decor action bar shows */
+	private boolean preparePanel(PanelFeatureState st, KeyEvent event) {
+		if (st.isPrepared)
+			return true;
+		if ((mPreparedPanel != null) && (mPreparedPanel != st))
+			mPreparedPanel.isPrepared = false; // AOSP closePanel(mPreparedPanel, false); ATL has no panel to close
+		final Callback cb = getCallback();
+		if (cb != null)
+			st.createdPanelView = cb.onCreatePanelView(st.featureId);
+		final boolean isActionBarMenu = (st.featureId == FEATURE_OPTIONS_PANEL || st.featureId == FEATURE_ACTION_BAR);
+		if (isActionBarMenu && mDecorContentParent != null)
+			mDecorContentParent.setMenuPrepared();
+		if (st.createdPanelView == null) {
+			if (st.menu == null || st.refreshMenuContent) {
+				if (st.menu == null) {
+					if (!initializePanelMenu(st) || (st.menu == null))
+						return false;
+				}
+				if (isActionBarMenu && mDecorContentParent != null) {
+					if (mActionMenuPresenterCallback == null)
+						mActionMenuPresenterCallback = new ActionMenuPresenterCallback();
+					mDecorContentParent.setMenu(st.menu, mActionMenuPresenterCallback);
+				}
+				st.menu.stopDispatchingItemsChanged();
+				if ((cb == null) || !cb.onCreatePanelMenu(st.featureId, st.menu)) {
+					st.setMenu(null);
+					if (isActionBarMenu && mDecorContentParent != null)
+						mDecorContentParent.setMenu(null, mActionMenuPresenterCallback);
+					return false;
+				}
+				st.refreshMenuContent = false;
+			}
+			st.menu.stopDispatchingItemsChanged();
+			if (st.frozenActionViewState != null) {
+				st.menu.restoreActionViewStates(st.frozenActionViewState);
+				st.frozenActionViewState = null;
+			}
+			if (!cb.onPreparePanel(st.featureId, st.createdPanelView, st.menu)) {
+				if (isActionBarMenu && mDecorContentParent != null)
+					mDecorContentParent.setMenu(null, mActionMenuPresenterCallback);
+				st.menu.startDispatchingItemsChanged();
+				return false;
+			}
+			KeyCharacterMap kmap = KeyCharacterMap.load(event != null ? event.getDeviceId() : KeyCharacterMap.VIRTUAL_KEYBOARD);
+			st.qwertyMode = kmap.getKeyboardType() != KeyCharacterMap.NUMERIC;
+			st.menu.setQwertyMode(st.qwertyMode);
+			st.menu.startDispatchingItemsChanged();
+		}
+		st.isPrepared = true;
+		st.isHandled = false;
+		mPreparedPanel = st;
+		return true;
+	}
+
+	/* AOSP PhoneWindow.initializePanelMenu(): the menu of the action bar is themed with actionBarTheme and
+	 * actionBarWidgetTheme */
+	private boolean initializePanelMenu(final PanelFeatureState st) {
+		Context context = getContext();
+		if ((st.featureId == FEATURE_OPTIONS_PANEL || st.featureId == FEATURE_ACTION_BAR) && mDecorContentParent != null) {
+			final TypedValue outValue = new TypedValue();
+			final Resources.Theme baseTheme = context.getTheme();
+			baseTheme.resolveAttribute(com.android.internal.R.attr.actionBarTheme, outValue, true);
+			Resources.Theme widgetTheme = null;
+			if (outValue.resourceId != 0) {
+				widgetTheme = context.getResources().newTheme();
+				widgetTheme.setTo(baseTheme);
+				widgetTheme.applyStyle(outValue.resourceId, true);
+				widgetTheme.resolveAttribute(com.android.internal.R.attr.actionBarWidgetTheme, outValue, true);
+			} else {
+				baseTheme.resolveAttribute(com.android.internal.R.attr.actionBarWidgetTheme, outValue, true);
+			}
+			if (outValue.resourceId != 0) {
+				if (widgetTheme == null) {
+					widgetTheme = context.getResources().newTheme();
+					widgetTheme.setTo(baseTheme);
+				}
+				widgetTheme.applyStyle(outValue.resourceId, true);
+			}
+			if (widgetTheme != null) {
+				context = new ContextThemeWrapper(context, 0);
+				context.getTheme().setTo(widgetTheme);
+			}
+		}
+		final com.android.internal.view.menu.MenuBuilder menu = new com.android.internal.view.menu.MenuBuilder(context);
+		menu.setCallback(mMenuBuilderCallback);
+		st.setMenu(menu);
+		return true;
+	}
+
+	/* the MenuBuilder.Callback that AOSP's PhoneWindow is itself */
+	private final com.android.internal.view.menu.MenuBuilder.Callback mMenuBuilderCallback = new com.android.internal.view.menu.MenuBuilder.Callback() {
+		/* AOSP PhoneWindow.onMenuItemSelected(MenuBuilder, MenuItem) */
+		@Override
+		public boolean onMenuItemSelected(com.android.internal.view.menu.MenuBuilder menu, MenuItem item) {
+			final Callback cb = getCallback();
+			if (cb != null) {
+				final PanelFeatureState panel = findMenuPanel(menu.getRootMenu());
+				if (panel != null)
+					return cb.onMenuItemSelected(panel.featureId, item);
+			}
+			return false;
+		}
+
+		/* AOSP PhoneWindow.onMenuModeChange(): reopenMenu(true), the part for the decor action bar */
+		@Override
+		public void onMenuModeChange(com.android.internal.view.menu.MenuBuilder menu) {
+			if (mDecorContentParent == null || !mDecorContentParent.canShowOverflowMenu()
+			    || (ViewConfiguration.get(getContext()).hasPermanentMenuKey() && !mDecorContentParent.isOverflowMenuShowPending()))
+				return;
+			final Callback cb = getCallback();
+			if (!mDecorContentParent.isOverflowMenuShowing()) {
+				if (cb != null) {
+					if (mInvalidatePanelMenuPosted && (mInvalidatePanelMenuFeatures & (1 << FEATURE_OPTIONS_PANEL)) != 0) {
+						decorView.removeCallbacks(mInvalidatePanelMenuRunnable);
+						mInvalidatePanelMenuRunnable.run();
+					}
+					final PanelFeatureState st = getPanelState(FEATURE_OPTIONS_PANEL, false);
+					if (st != null && st.menu != null && !st.refreshMenuContent
+					    && cb.onPreparePanel(FEATURE_OPTIONS_PANEL, st.createdPanelView, st.menu)) {
+						cb.onMenuOpened(FEATURE_ACTION_BAR, st.menu);
+						mDecorContentParent.showOverflowMenu();
+					}
+				}
+			} else {
+				mDecorContentParent.hideOverflowMenu();
+				final PanelFeatureState st = getPanelState(FEATURE_OPTIONS_PANEL, false);
+				if (st != null && cb != null)
+					cb.onPanelClosed(FEATURE_ACTION_BAR, st.menu);
+			}
+		}
+	};
+
+	/* AOSP PhoneWindow.ActionMenuPresenterCallback */
+	private final class ActionMenuPresenterCallback implements com.android.internal.view.menu.MenuPresenter.Callback {
+		@Override
+		public boolean onOpenSubMenu(com.android.internal.view.menu.MenuBuilder subMenu) {
+			Callback cb = getCallback();
+			if (cb != null) {
+				cb.onMenuOpened(FEATURE_ACTION_BAR, subMenu);
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public void onCloseMenu(com.android.internal.view.menu.MenuBuilder menu, boolean allMenusAreClosing) {
+			checkCloseActionMenu(menu);
+		}
+	}
+
+	/* AOSP PhoneWindow.checkCloseActionMenu() */
+	private void checkCloseActionMenu(Menu menu) {
+		if (mClosingActionMenu)
+			return;
+		mClosingActionMenu = true;
+		mDecorContentParent.dismissPopups();
+		Callback cb = getCallback();
+		if (cb != null)
+			cb.onPanelClosed(FEATURE_ACTION_BAR, menu);
+		mClosingActionMenu = false;
+	}
 }
