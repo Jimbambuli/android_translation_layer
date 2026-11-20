@@ -1013,6 +1013,31 @@ JNIEXPORT jbyteArray JNICALL Java_android_webkit_WebView_native_1getCertificate(
 	return result;
 }
 
+/* capturePicture(): the page's visible part as WebKit last drew it (the widget's render node) is drawn into the
+ * Bitmap (its snapshot, see Bitmap.getSnapshot()); false when there is no such drawing */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1capturePicture(JNIEnv *env, jobject this, jlong widget_ptr, jobject bitmap)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return JNI_FALSE;
+	int width = gtk_widget_get_width(webview);
+	int height = gtk_widget_get_height(webview);
+	if (width <= 0 || height <= 0)
+		return JNI_FALSE;
+	GdkPaintable *paintable = gtk_widget_paintable_new(webview);
+	GtkSnapshot *snapshot = gtk_snapshot_new();
+	gdk_paintable_snapshot(paintable, snapshot, width, height);
+	g_object_unref(paintable);
+	GskRenderNode *node = gtk_snapshot_free_to_node(snapshot);
+	if (!node)
+		return JNI_FALSE;
+	jclass bitmap_class = (*env)->GetObjectClass(env, bitmap);
+	GtkSnapshot *target = _PTR((*env)->CallLongMethod(env, bitmap, (*env)->GetMethodID(env, bitmap_class, "getSnapshot", "()J")));
+	gtk_snapshot_append_node(target, node);
+	gsk_render_node_unref(node);
+	return JNI_TRUE;
+}
+
 /* findAllAsync(): Chromium's find in page is case insensitive and wraps around; the result comes to
  * internalFindResult() */
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1findAll(JNIEnv *env, jobject this, jlong widget_ptr, jstring text)

@@ -549,6 +549,14 @@ JNIEXPORT jbyteArray JNICALL Java_android_webkit_WebView_native_1getCertificate
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_capturePicture
+ * Signature: (JLandroid/graphics/Bitmap;)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1capturePicture
+  (JNIEnv *, jobject, jlong, jobject);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_findAll
  * Signature: (JLjava/lang/String;)V
  */

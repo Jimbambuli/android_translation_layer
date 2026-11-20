@@ -41,6 +41,10 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public static final String SCHEME_TEL = "tel:";
 	public static final String SCHEME_MAILTO = "mailto:";
 	public static final String SCHEME_GEO = "geo:0,0?q=";
+	// AOSP WebView: the renderer priorities of setRendererPriorityPolicy()
+	public static final int RENDERER_PRIORITY_WAIVED = 0;
+	public static final int RENDERER_PRIORITY_BOUND = 1;
+	public static final int RENDERER_PRIORITY_IMPORTANT = 2;
 
 	private WebViewClient webViewClient;
 	private String url;
@@ -62,6 +66,16 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private int progress = 100;
 	// whether a WebView was made in this process (WebViewFactory.sProviderInstance != null)
 	private static boolean providerInitialized;
+	// WebViewFactory.sWebViewDisabled, see disableWebView()
+	private static boolean webViewDisabled;
+	// AwContents.mRendererPriority (as the WebView constant) and mRendererPriorityWaivedWhenNotVisible
+	private int rendererRequestedPriority = RENDERER_PRIORITY_IMPORTANT;
+	private boolean rendererPriorityWaivedWhenNotVisible;
+	// the TextClassifier set by setTextClassifier(), Chromium's SmartSelectionProvider.mTextClassifier
+	private android.view.textclassifier.TextClassifier textClassifier;
+	// WebViewContentsClientAdapter.mPictureListener and mPictureListenerInvalidateOnly
+	private PictureListener pictureListener;
+	private boolean pictureListenerInvalidateOnly;
 	private boolean horizontalScrollBarEnabled = true;
 	// AwContents.mPossiblyStaleHitTestData: what was under the pointer last, see internalHitTest()
 	private int hitTestType = HitTestResult.UNKNOWN_TYPE;
@@ -108,13 +122,14 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		super(context, attrs, defStyleAttr, defStyleRes);
 		if (context == null)
 			throw new IllegalArgumentException("Invalid context argument");
+		// AOSP WebView constructor: ensureProviderCreated(), then the provider's init()
+		getFactory();
 		if (privateBrowsing) {
 			final String msg = "Private browsing is not supported in WebView.";
 			if (context.getApplicationInfo().targetSdkVersion >= 19)
 				throw new IllegalArgumentException(msg);
 			android.util.Log.w("WebView", msg);
 		}
-		providerInitialized = true;
 		// AOSP WebView constructor: a WebView allows CookieSyncManager.getInstance()
 		CookieSyncManager.setGetInstanceIsAllowed();
 		// like Chromium's AwContents: the page shows the focus itself (focus rings, the caret)
@@ -283,7 +298,9 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	 * to set. enableSlowWholeDocumentDraw(): Chromium-only drawing mode, WebKit always paints the whole page. */
 	public void setNetworkAvailable(boolean networkUp) {}
 
-	public static void enableSlowWholeDocumentDraw() {}
+	public static void enableSlowWholeDocumentDraw() {
+		getFactory();
+	}
 
 	/* AOSP WebView.postVisualStateCallback(): onComplete(requestId) once the content as of this call is drawn.
 	 * Approximated by the next main-looper turn: WebKit gives no draw-completion event to wait for */
@@ -301,19 +318,55 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		return false;
 	}
 
+	/* AOSP WebView.canZoomIn()/canZoomOut() (deprecated): AwContents compares the page scale with its minimum and
+	 * maximum; ATL's page scale stays at its only value (see zoomIn()), so neither way is open */
+	@Deprecated
+	public boolean canZoomIn() {
+		return false;
+	}
+
+	@Deprecated
+	public boolean canZoomOut() {
+		return false;
+	}
+
+	/* AOSP WebView.invokeZoomPicker(): AwZoomControls shows the zoom buttons; ATL has no page zoom to offer
+	 * (see zoomIn()) and no zoom buttons, so nothing is shown */
+	public void invokeZoomPicker() {}
+
 	/* AOSP WebView.getFavicon() is the provider's page icon, null until one was received; ATL does not deliver
 	 * page icons. */
 	public android.graphics.Bitmap getFavicon() {
 		return null;
 	}
 
-	/* AOSP WebView.setRendererPriorityPolicy(): only stored by the provider; ATL has no renderer process to
-	 * rank, getRendererRequestedPriority()/getRendererPriorityWaivedWhenNotVisible() are not implemented. */
-	public void setRendererPriorityPolicy(int rendererRequestedPriority, boolean waivedWhenNotVisible) {}
+	/* AOSP WebView.setRendererPriorityPolicy(): WebViewChromium maps the priority to AwContents' (an unknown one
+	 * counts as RENDERER_PRIORITY_IMPORTANT), which stores it for its renderer process; ATL has no renderer process
+	 * to rank, so it is only stored, and read back as Chromium does */
+	public void setRendererPriorityPolicy(int rendererRequestedPriority, boolean waivedWhenNotVisible) {
+		switch (rendererRequestedPriority) {
+			case RENDERER_PRIORITY_WAIVED:
+			case RENDERER_PRIORITY_BOUND:
+				this.rendererRequestedPriority = rendererRequestedPriority;
+				break;
+			default:
+				this.rendererRequestedPriority = RENDERER_PRIORITY_IMPORTANT;
+		}
+		rendererPriorityWaivedWhenNotVisible = waivedWhenNotVisible;
+	}
+
+	public int getRendererRequestedPriority() {
+		return rendererRequestedPriority;
+	}
+
+	public boolean getRendererPriorityWaivedWhenNotVisible() {
+		return rendererPriorityWaivedWhenNotVisible;
+	}
 
 	/* AOSP WebView.clearClientCertPreferences(): clears the remembered client certificate choices, then runs the
 	 * callback on the UI thread. ATL keeps none (no ClientCertRequest persistence), so only the callback. */
 	public static void clearClientCertPreferences(Runnable onCleared) {
+		getFactory();
 		if (onCleared != null)
 			new android.os.Handler(Looper.getMainLooper()).post(onCleared);
 	}
@@ -321,13 +374,25 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	/* AOSP WebView.startSafeBrowsing()/setSafeBrowsingWhitelist() hand over to the provider's statics. WebKit has
 	 * no Safe Browsing: a provider without it reports false (not enabled / list not applied). */
 	public static void startSafeBrowsing(Context context, ValueCallback<Boolean> callback) {
+		getFactory();
 		if (callback != null)
 			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
 	}
 
 	public static void setSafeBrowsingWhitelist(List<String> hosts, ValueCallback<Boolean> callback) {
+		getFactory();
 		if (callback != null)
 			new android.os.Handler(Looper.getMainLooper()).post(() -> callback.onReceiveValue(false));
+	}
+
+	/* AOSP WebView.getSafeBrowsingPrivacyPolicyUrl(): Chromium's AwContentsStatics answers with the Safe Browsing
+	 * privacy policy and the app's language as "hl" (google_util::AppendGoogleLocaleParam(), "nb" as "no") */
+	public static android.net.Uri getSafeBrowsingPrivacyPolicyUrl() {
+		getFactory();
+		String locale = java.util.Locale.getDefault().toLanguageTag();
+		if (locale.equals("nb"))
+			locale = "no";
+		return android.net.Uri.parse("https://www.google.com/chrome/browser/privacy/?hl=" + android.net.Uri.encode(locale) + "#safe-browsing-policies");
 	}
 
 	/* AOSP WebView.createPrintDocumentAdapter(): always an adapter (the provider's AwPrintDocumentAdapter). WebKitGTK prints only
@@ -550,12 +615,43 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public void findAllAsync(String find) {
 		if (isDestroyed())
 			return;
+		// AwContents.findAllAsync()
+		if (find == null)
+			throw new IllegalArgumentException("Search string shouldn't be null");
 		boolean empty = find.isEmpty();
 		findActiveMatch = 0;
 		findMatchCount = 0;
 		native_findAll(widget, find);
 		if (empty && findListener != null)
 			findListener.onFindResultReceived(0, 0, true);
+	}
+
+	/* AOSP WebView.findAll() (deprecated): WebViewChromium starts findAllAsync() and returns 0, the FindListener
+	 * hears of the matches */
+	@Deprecated
+	public int findAll(String find) {
+		android.os.StrictMode.noteSlowCall("findAll blocks UI: prefer findAllAsync");
+		findAllAsync(find);
+		return 0;
+	}
+
+	/* AOSP WebView.showFindDialog() (deprecated), WebViewChromium: false without a parent; otherwise it starts the
+	 * find action mode (FindActionModeCallback), puts the text in and searches it as the action mode's findAll()
+	 * does, and returns true. ATL's windows start no action modes (Activity.onWindowStartingActionMode() returns
+	 * null), so the find bar itself does not appear; the search runs. */
+	@Deprecated
+	public boolean showFindDialog(String text, boolean showIme) {
+		if (getParent() == null)
+			return false;
+		if (text != null) {
+			if (text.isEmpty()) {
+				clearMatches();
+				findAll(null);
+			} else {
+				findAllAsync(text);
+			}
+		}
+		return true;
 	}
 
 	/* AOSP WebView.findNext(): selects the next match, wrapping around; nothing before findAllAsync() */
@@ -705,6 +801,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 				webChromeClient.onProgressChanged(this, 100);
 			if (webViewClient != null)
 				webViewClient.onPageFinished(this, url);
+			newPicture();
 		}
 	}
 
@@ -773,6 +870,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		// AwLayoutSizer.onContentSizeChanged(): a size that follows the page is measured again
 		if ((contentHeightCss != oldHeightCss && !heightMeasurementIsFixed) || (contentWidthCss != oldWidthCss && !widthMeasurementIsFixed))
 			requestLayout();
+		if (contentHeightCss != oldHeightCss || contentWidthCss != oldWidthCss)
+			newPicture();
 	}
 
 	/* AwLayoutSizer.onMeasure(): where the parent leaves the size open, the WebView takes the page's size,
@@ -829,6 +928,175 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		return Math.max(getHeight(), (int)Math.ceil(contentHeightCss * getScale()));
 	}
 	public void setVerticalScrollbarOverlay(boolean overlay) {}
+
+	/* AOSP WebView (deprecated): the scrollbar overlay setters do nothing, the getters answer what the old
+	 * implementation defaulted to */
+	@Deprecated
+	public void setHorizontalScrollbarOverlay(boolean overlay) {}
+
+	@Deprecated
+	public boolean overlayHorizontalScrollbar() {
+		return true;
+	}
+
+	@Deprecated
+	public boolean overlayVerticalScrollbar() {
+		return false;
+	}
+
+	/* AwScrollOffsetManager.pageUp()/pageDown(): a page (the view's height less PAGE_SCROLL_OVERLAP, half of it
+	 * for a low view) up or down, or to the top or bottom; true when the page is to move. It moves with a smooth
+	 * scroll, as the renderer's SmoothScroll() does in Chromium. */
+	private static final int PAGE_SCROLL_OVERLAP = 24;
+
+	public boolean pageUp(boolean top) {
+		if (isDestroyed())
+			return false;
+		if (top)
+			return animateScrollTo(getScrollX(), 0);
+		int height = getHeight();
+		int dy = height > 2 * PAGE_SCROLL_OVERLAP ? -height + PAGE_SCROLL_OVERLAP : -height / 2;
+		return animateScrollTo(getScrollX(), getScrollY() + dy);
+	}
+
+	public boolean pageDown(boolean bottom) {
+		if (isDestroyed())
+			return false;
+		if (bottom)
+			return animateScrollTo(getScrollX(), computeVerticalScrollRange());
+		int height = getHeight();
+		int dy = height > 2 * PAGE_SCROLL_OVERLAP ? height - PAGE_SCROLL_OVERLAP : height / 2;
+		return animateScrollTo(getScrollX(), getScrollY() + dy);
+	}
+
+	/* AwScrollOffsetManager.animateScrollTo(): clamped to the scrollable range, false if that is where the page is */
+	private boolean animateScrollTo(int x, int y) {
+		x = Math.max(0, Math.min(x, computeHorizontalScrollRange() - getWidth()));
+		y = Math.max(0, Math.min(y, computeVerticalScrollRange() - getHeight()));
+		if (x == getScrollX() && y == getScrollY())
+			return false;
+		smoothScrollTo(x, y);
+		return true;
+	}
+
+	// the page scrolls smoothly to (x, y) in View pixels; it reports its new offset (internalScrollChanged())
+	private void smoothScrollTo(int x, int y) {
+		float scale = getScale();
+		native_evaluateJavascript(widget, "scrollTo({left:" + (x / scale) + ",top:" + (y / scale) + ",behavior:'smooth'})", null);
+	}
+
+	/* AOSP WebView.flingScroll(): AwContents starts a fling of the page with this velocity (pixels per second, a
+	 * positive one towards larger offsets). WebKit has no fling to start: the page moves smoothly to where an
+	 * Android fling (OverScroller) with this velocity ends. */
+	public void flingScroll(int vx, int vy) {
+		if (isDestroyed())
+			return;
+		android.widget.OverScroller scroller = new android.widget.OverScroller(getContext());
+		scroller.fling(getScrollX(), getScrollY(), vx, vy, 0, Math.max(0, computeHorizontalScrollRange() - getWidth()),
+		               0, Math.max(0, computeVerticalScrollRange() - getHeight()));
+		if (scroller.getFinalX() != getScrollX() || scroller.getFinalY() != getScrollY())
+			smoothScrollTo(scroller.getFinalX(), scroller.getFinalY());
+	}
+
+	/* AOSP WebView.shouldDelayChildPressedState() (deprecated): WebViewChromium answers true */
+	@Deprecated
+	@Override
+	public boolean shouldDelayChildPressedState() {
+		return true;
+	}
+
+	/* AOSP WebView.clearView() (deprecated): AwContents shows only the background until the next page draws.
+	 * WebKitGTK has no call to blank its drawing, so the page stays visible. */
+	@Deprecated
+	public void clearView() {}
+
+	/* AOSP WebView.freeMemory() (deprecated): WebViewChromium does nothing, the engine manages its memory */
+	@Deprecated
+	public void freeMemory() {}
+
+	/* AOSP WebView.setCertificate() and setMapTrackballToArrowKeys() (deprecated): WebViewChromium does nothing */
+	@Deprecated
+	public void setCertificate(android.net.http.SslCertificate certificate) {}
+
+	@Deprecated
+	public void setMapTrackballToArrowKeys(boolean setMap) {}
+
+	/* AOSP WebView.get/setHttpAuthUsernamePassword() (deprecated): WebViewChromium keeps them in its
+	 * WebViewDatabase */
+	@Deprecated
+	public String[] getHttpAuthUsernamePassword(String host, String realm) {
+		return WebViewDatabase.getInstance(getContext()).getHttpAuthUsernamePassword(host, realm);
+	}
+
+	@Deprecated
+	public void setHttpAuthUsernamePassword(String host, String realm, String username, String password) {
+		WebViewDatabase.getInstance(getContext()).setHttpAuthUsernamePassword(host, realm, username, password);
+	}
+
+	/* AOSP WebView.get/setTextClassifier(): Chromium's selection keeps the classifier set, else it takes the one
+	 * of the TextClassificationManager (SmartSelectionProvider.getTextClassifier()) */
+	public android.view.textclassifier.TextClassifier getTextClassifier() {
+		if (textClassifier != null)
+			return textClassifier;
+		android.view.textclassifier.TextClassificationManager manager = (android.view.textclassifier.TextClassificationManager)getContext().getSystemService(Context.TEXT_CLASSIFICATION_SERVICE);
+		return manager != null ? manager.getTextClassifier() : android.view.textclassifier.TextClassifier.NO_OP;
+	}
+
+	public void setTextClassifier(android.view.textclassifier.TextClassifier textClassifier) {
+		this.textClassifier = textClassifier;
+	}
+
+	/* AOSP WebView.documentHasImages(): AwContents asks the page whether it has an <img> element
+	 * (GetImgChild() of aw_render_frame_ext.cc) and sends response with arg1 1 or 0 */
+	public void documentHasImages(android.os.Message response) {
+		if (isDestroyed())
+			return;
+		native_evaluateJavascript(widget, "document.getElementsByTagName('img').length>0", new ValueCallback<String>() {
+			@Override
+			public void onReceiveValue(String value) {
+				response.arg1 = "true".equals(value) ? 1 : 0;
+				response.sendToTarget();
+			}
+		});
+	}
+
+	/* AOSP WebView.capturePicture() (deprecated): AwContents records the page in its whole scroll range, null
+	 * once destroyed. WebKitGTK only has the drawing of the visible part at hand (its widget), so the picture
+	 * has the page's size and holds that part where it is on the page; the rest stays transparent. */
+	@Deprecated
+	public android.graphics.Picture capturePicture() {
+		if (isDestroyed())
+			return null;
+		android.graphics.Picture picture = new android.graphics.Picture();
+		android.graphics.Canvas canvas = picture.beginRecording(computeHorizontalScrollRange(), computeVerticalScrollRange());
+		android.graphics.Bitmap visible = android.graphics.Bitmap.createBitmap(Math.max(getWidth(), 1), Math.max(getHeight(), 1), android.graphics.Bitmap.Config.ARGB_8888);
+		if (native_capturePicture(widget, visible))
+			canvas.drawBitmap(visible, getScrollX(), getScrollY(), null);
+		picture.endRecording();
+		return picture;
+	}
+
+	/* AOSP WebView.PictureListener (deprecated) */
+	@Deprecated
+	public interface PictureListener {
+		@Deprecated
+		void onNewPicture(WebView view, android.graphics.Picture picture);
+	}
+
+	/* AOSP WebView.setPictureListener() (deprecated): WebViewChromium tells the listener of each new picture of
+	 * the page, without the picture (null) for apps targeting API 18 or later. Chromium's renderer reports every
+	 * content update; WebKitGTK has no such event, so here a new picture is a finished load or a new page size. */
+	@Deprecated
+	public void setPictureListener(PictureListener listener) {
+		pictureListener = listener;
+		pictureListenerInvalidateOnly = getContext().getApplicationInfo().targetSdkVersion >= 18;
+	}
+
+	// WebViewContentsClientAdapter.onNewPicture()
+	private void newPicture() {
+		if (pictureListener != null)
+			pictureListener.onNewPicture(this, pictureListenerInvalidateOnly ? null : capturePicture());
+	}
 	public void setInitialScale(int scaleInPercent) {}
 
 	private final Map<String, Object> javascriptInterfaces = new HashMap<>();
@@ -1225,7 +1493,9 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		native_evaluateJavascript(widget, script, resultCallback);
 	}
 
-	public static void setWebContentsDebuggingEnabled(boolean enabled) {}
+	public static void setWebContentsDebuggingEnabled(boolean enabled) {
+		getFactory();
+	}
 
 	/* AOSP WebView.findAddress(): the address finder is plain Java (android.webkit.FindAddress) */
 	@Deprecated
@@ -1250,6 +1520,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	 * implementation is WebView itself, so it is the loader of this class; androidx.webkit finds the support-library
 	 * glue (org.chromium.support_lib_glue.SupportLibReflectionUtil) in it. */
 	public static ClassLoader getWebViewClassLoader() {
+		getFactory();
 		return WebView.class.getClassLoader();
 	}
 
@@ -1272,9 +1543,23 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		native_clearCache(widget, includeDiskFiles);
 	}
 
-	// directly accessed by androidx WebViewGlueCommunicator to get ClassLoader
-	private static Object getFactory() {
+	/* AOSP WebView.getFactory() = WebViewFactory.getProvider(): fails once disableWebView() was called, otherwise the
+	 * provider exists from then on. Also directly accessed by androidx WebViewGlueCommunicator to get ClassLoader */
+	private static synchronized Object getFactory() {
+		if (webViewDisabled)
+			throw new IllegalStateException("WebView.disableWebView() was called: WebView is disabled");
+		providerInitialized = true;
 		return new Object();
+	}
+
+	/* AOSP WebView.disableWebView() = WebViewFactory.disableWebView(): no WebView can be used in this process
+	 * from now on, which is too late once one was */
+	public static void disableWebView() {
+		synchronized (WebView.class) {
+			if (providerInitialized)
+				throw new IllegalStateException("Can't disable WebView: WebView already initialized");
+			webViewDisabled = true;
+		}
 	}
 
 	public void removeJavascriptInterface(String name) {
@@ -1314,6 +1599,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private native String native_getTitle(long widget);
 	private native String native_getOriginalUrl(long widget);
 	private native byte[] native_getCertificate(long widget);
+	private native boolean native_capturePicture(long widget, android.graphics.Bitmap bitmap);
 	private native void native_findAll(long widget, String find);
 	private native void native_findNext(long widget, boolean forward);
 	private native void native_clearMatches(long widget);
