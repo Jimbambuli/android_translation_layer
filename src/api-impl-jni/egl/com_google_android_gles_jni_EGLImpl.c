@@ -104,6 +104,11 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreateWindowSurface(JNIEnv *env, jobject this, jlong display, jlong config, jobject surface, jintArray _attrib_list)
 {
 	struct ANativeWindow *native_window = ANativeWindow_fromSurface(env, surface);
+	/* AOSP jni_eglCreateWindowSurface(): a Surface without a native window */
+	if (!native_window) {
+		(*env)->ThrowNew(env, (*env)->FindClass(env, "java/lang/IllegalArgumentException"), "Make sure the SurfaceView or associated SurfaceHolder has a valid Surface");
+		return 0;
+	}
 	EGLint *attrib_list = get_int_array_crit(env, _attrib_list);
 	EGLSurface ret = bionic_eglCreateWindowSurface(_PTR(display), _PTR(config), native_window, attrib_list);
 	release_int_array_crit(env, _attrib_list, attrib_list);
