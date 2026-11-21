@@ -232,6 +232,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_Drawable.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_DrawableContainer.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_NinePatchDrawable.c',
+                                                                  	'src/api-impl-jni/hardware/android_hardware_camera2_impl_ExternalCameraDevice.c',
                                                                   	'src/api-impl-jni/location/android_location_LocationManager.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaRecorder.c',
@@ -294,7 +295,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
+                                                                  	dependency('libportal'), dependency('libpipewire-0.3'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('libsecret-1'), dependency('fontconfig'), dependency('pangoft2'), dependency('libwebp'),
                                                                         libart_dep, wayland_protos_dep, upcalls_header
                                                                   ],

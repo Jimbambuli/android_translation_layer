@@ -8,10 +8,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-/* AOSP core/java/android/hardware/camera2/CaptureRequest.java, reduced. ATL has no camera service, so
- * CameraDevice.createCaptureRequest() is never reachable and no request is built for a camera; the
- * request and its Builder keep their settings, targets and tag in plain maps as AOSP's
- * CameraMetadataNative does. The public keys keep AOSP's names and value types (types still missing in
+/* AOSP core/java/android/hardware/camera2/CaptureRequest.java, reduced. CameraDevice.createCaptureRequest()
+ * hands out a Builder over the template of ATL's camera HAL; the request and its Builder keep their settings,
+ * targets and tag in plain maps where AOSP has CameraMetadataNative. The public keys keep AOSP's names and value types (types still missing in
  * ATL are typed Object); Key follows AOSP Key/CameraMetadataNative.Key. */
 @SuppressWarnings("unchecked")
 public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> {
@@ -94,6 +93,29 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 		return mUserTag;
 	}
 
+	/** @hide AOSP getTargets(): the Surfaces the request sends its frames to */
+	public java.util.Collection<Surface> getTargets() {
+		return Collections.unmodifiableCollection(mSurfaceSet);
+	}
+
+	/** @hide the public keys with these names (AOSP CameraCharacteristics.getAvailableKeyList() reflects over the
+	 * key fields the same way) */
+	public static List<Key<?>> keysNamed(String[] names) {
+		java.util.Set<String> wanted = new HashSet<String>(java.util.Arrays.asList(names));
+		List<Key<?>> keys = new ArrayList<Key<?>>();
+		for (java.lang.reflect.Field field : CaptureRequest.class.getDeclaredFields()) {
+			if (field.getType() != Key.class || !java.lang.reflect.Modifier.isStatic(field.getModifiers()) || !java.lang.reflect.Modifier.isPublic(field.getModifiers()))
+				continue;
+			try {
+				Key<?> key = (Key<?>)field.get(null);
+				if (wanted.contains(key.getName()))
+					keys.add(key);
+			} catch (IllegalAccessException e) {
+			}
+		}
+		return Collections.unmodifiableList(keys);
+	}
+
 	public boolean isReprocess() {
 		return mIsReprocess;
 	}
@@ -117,6 +139,12 @@ public final class CaptureRequest extends CameraMetadata<CaptureRequest.Key<?>> 
 
 		Builder(boolean reprocess) {
 			mRequest = new CaptureRequest(reprocess);
+		}
+
+		/** @hide AOSP Builder(CameraMetadataNative template, ...): a request starting from a template */
+		public Builder(Map<Key<?>, Object> template, boolean reprocess) {
+			mRequest = new CaptureRequest(reprocess);
+			mRequest.mSettings.putAll(template);
 		}
 
 		public void addTarget(Surface outputTarget) {

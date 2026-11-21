@@ -5,8 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/* AOSP core/java/android/hardware/camera2/TotalCaptureResult.java, reduced like CaptureResult: ATL has no
- * camera service, so no result is ever produced. */
+/* AOSP core/java/android/hardware/camera2/TotalCaptureResult.java, reduced like CaptureResult. */
 public final class TotalCaptureResult extends CaptureResult {
 	private final List<CaptureResult> mPartialResults;
 	private final int mSessionId;
@@ -14,6 +13,14 @@ public final class TotalCaptureResult extends CaptureResult {
 
 	TotalCaptureResult(CaptureRequest parent, int sequenceId, long frameNumber, List<CaptureResult> partials, int sessionId) {
 		super(parent, sequenceId, frameNumber);
+		mPartialResults = partials;
+		mSessionId = sessionId;
+	}
+
+	/** @hide AOSP TotalCaptureResult(logicalCameraId, CameraMetadataNative results, parent, extras, partials,
+	 * sessionId, physicalResults) */
+	public TotalCaptureResult(Map<CaptureResult.Key<?>, Object> results, CaptureRequest parent, int sequenceId, long frameNumber, List<CaptureResult> partials, int sessionId) {
+		super(results, parent, sequenceId, frameNumber);
 		mPartialResults = partials;
 		mSessionId = sessionId;
 	}

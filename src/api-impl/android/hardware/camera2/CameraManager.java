@@ -1,5 +1,7 @@
 package android.hardware.camera2;
 
+import android.hardware.camera2.impl.CameraDeviceImpl;
+import android.hardware.camera2.impl.ExternalCameraDevice;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -9,59 +11,84 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 
-/* AOSP core/java/android/hardware/camera2/CameraManager.java on a device whose camera service is
- * disabled (CameraManagerGlobal.sCameraServiceDisabled, config.disable_cameraservice): ATL has no
- * camera service. The id list is empty, getCameraCharacteristics()/openCamera()/setTorchMode() throw
- * IllegalArgumentException("No cameras available on device") after AOSP's argument checks, and
- * availability callbacks are kept but never called, as there is no device to report. */
+/* AOSP core/java/android/hardware/camera2/CameraManager.java over ATL's camera HAL (impl.ExternalCameraDevice,
+ * the cameras of PipeWire) in place of the camera service: the cameras the HAL reports, their characteristics,
+ * and openCamera() connecting a CameraDeviceImpl to the HAL. A camera that appears or goes away while the app
+ * runs is not reported (the list is read once). Errors the service would report keep AOSP's exceptions:
+ * IllegalArgumentException for an unknown camera id. */
 public class CameraManager {
 
 	private final Map<AvailabilityCallback, Executor> mCallbackMap = new HashMap<AvailabilityCallback, Executor>();
 
 	public String[] getCameraIdList() throws CameraAccessException {
-		return new String[] {};
+		java.util.List<ExternalCameraDevice> devices = ExternalCameraDevice.getDevices();
+		String[] ids = new String[devices.size()];
+		for (int i = 0; i < ids.length; i++)
+			ids[i] = devices.get(i).getId();
+		return ids;
 	}
 
+	/* AOSP: the HAL lists no concurrent camera combinations */
 	public Set<Set<String>> getConcurrentCameraIds() throws CameraAccessException {
 		return new HashSet<Set<String>>();
 	}
 
-	public CameraCharacteristics getCameraCharacteristics(String cameraId) throws CameraAccessException {
-		throw new IllegalArgumentException("No cameras available on device");
+	/* the service's ERROR_ILLEGAL_ARGUMENT for an unknown camera */
+	private static ExternalCameraDevice getDevice(String cameraId) {
+		if (cameraId == null) {
+			throw new IllegalArgumentException("cameraId was null");
+		}
+		ExternalCameraDevice device = ExternalCameraDevice.get(cameraId);
+		if (device == null) {
+			throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+		}
+		return device;
 	}
 
-	/* AOSP isCameraDeviceSetupSupported()/getCameraDeviceSetup(): the id is checked against the (empty)
-	 * camera id list first */
+	public CameraCharacteristics getCameraCharacteristics(String cameraId) throws CameraAccessException {
+		return getDevice(cameraId).getCharacteristics();
+	}
+
+	/* AOSP isCameraDeviceSetupSupported(): the external HAL has no CameraDeviceSetup (AIDL device version
+	 * below 1.3) */
 	public boolean isCameraDeviceSetupSupported(String cameraId) throws CameraAccessException {
 		if (cameraId == null) {
 			throw new IllegalArgumentException("Camera ID was null");
 		}
-		throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+		if (ExternalCameraDevice.get(cameraId) == null) {
+			throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+		}
+		return false;
 	}
 
 	public CameraDevice.CameraDeviceSetup getCameraDeviceSetup(String cameraId) throws CameraAccessException {
-		isCameraDeviceSetupSupported(cameraId); /* throws, see above */
-		throw new UnsupportedOperationException("CameraDeviceSetup is not supported for Camera ID: " + cameraId);
+		if (!isCameraDeviceSetupSupported(cameraId))
+			throw new UnsupportedOperationException("CameraDeviceSetup is not supported for Camera ID: " + cameraId);
+		return null;
 	}
 
 	public void openCamera(String cameraId, CameraDevice.StateCallback callback, Handler handler) throws CameraAccessException {
-		openCameraForUid(cameraId, callback);
+		openCameraImpl(cameraId, callback, checkAndWrapHandler(handler));
 	}
 
 	public void openCamera(String cameraId, Executor executor, CameraDevice.StateCallback callback) throws CameraAccessException {
 		if (executor == null) {
 			throw new IllegalArgumentException("executor was null");
 		}
-		openCameraForUid(cameraId, callback);
+		openCameraImpl(cameraId, callback, executor);
 	}
 
-	private void openCameraForUid(String cameraId, CameraDevice.StateCallback callback) {
+	/* AOSP openCameraImpl() -> openCameraDeviceUserAsync(): the device reports onOpened (or onError) on the
+	 * executor once it is connected */
+	private void openCameraImpl(String cameraId, CameraDevice.StateCallback callback, Executor executor) throws CameraAccessException {
 		if (cameraId == null) {
 			throw new IllegalArgumentException("cameraId was null");
 		} else if (callback == null) {
 			throw new IllegalArgumentException("callback was null");
 		}
-		throw new IllegalArgumentException("No cameras available on device");
+		ExternalCameraDevice hal = getDevice(cameraId);
+		CameraDeviceImpl device = new CameraDeviceImpl(cameraId, callback, executor, hal.getCharacteristics(), hal);
+		device.connect();
 	}
 
 	/* AOSP CameraManagerGlobal.registerTorchCallback(): stored; with the service disabled there is no torch
@@ -88,15 +115,15 @@ public class CameraManager {
 		}
 	}
 
-	/* AOSP: sCameraServiceDisabled -> IllegalArgumentException (AOSP's wording here is "No camera available") */
+	/* AOSP: the service's ERROR_ILLEGAL_ARGUMENT for a camera without a flash unit (FLASH_INFO_AVAILABLE false) */
 	public void turnOnTorchWithStrengthLevel(String cameraId, int torchStrength) throws CameraAccessException {
-		throw new IllegalArgumentException("No camera available on device");
+		getDevice(cameraId);
+		throw new IllegalArgumentException("Camera \"" + cameraId + "\" has no flash unit");
 	}
 
-	/* AOSP getCameraExtensionCharacteristics(): starts with getCameraCharacteristics(), which fails */
 	public CameraExtensionCharacteristics getCameraExtensionCharacteristics(String cameraId) throws CameraAccessException {
 		getCameraCharacteristics(cameraId);
-		return null;
+		return new CameraExtensionCharacteristics();
 	}
 
 	/* AOSP CameraManager.TorchCallback */
@@ -109,21 +136,31 @@ public class CameraManager {
 	}
 
 	public void setTorchMode(String cameraId, boolean enabled) throws CameraAccessException {
-		throw new IllegalArgumentException("No cameras available on device");
+		getDevice(cameraId);
+		throw new IllegalArgumentException("Camera \"" + cameraId + "\" has no flash unit");
 	}
 
 	public void registerAvailabilityCallback(AvailabilityCallback callback, Handler handler) {
-		synchronized (mCallbackMap) {
-			mCallbackMap.put(callback, checkAndWrapHandler(handler));
-		}
+		registerAvailabilityCallbackImpl(callback, checkAndWrapHandler(handler));
 	}
 
 	public void registerAvailabilityCallback(Executor executor, AvailabilityCallback callback) {
 		if (executor == null) {
 			throw new IllegalArgumentException("executor was null");
 		}
+		registerAvailabilityCallbackImpl(callback, executor);
+	}
+
+	/* AOSP CameraManagerGlobal.registerAvailabilityCallback() -> updateCallbackLocked(): the new callback hears
+	 * of each present camera */
+	private void registerAvailabilityCallbackImpl(AvailabilityCallback callback, Executor executor) {
 		synchronized (mCallbackMap) {
-			mCallbackMap.put(callback, executor);
+			if (mCallbackMap.put(callback, executor) != null)
+				return;
+		}
+		for (ExternalCameraDevice device : ExternalCameraDevice.getDevices()) {
+			String id = device.getId();
+			executor.execute(() -> callback.onCameraAvailable(id));
 		}
 	}
 

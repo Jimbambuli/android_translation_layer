@@ -7,10 +7,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-/* AOSP core/java/android/hardware/camera2/CameraExtensionCharacteristics.java (android-16). ATL has no
- * camera service, so CameraManager.getCameraExtensionCharacteristics() fails before creating one. The
- * query methods behave as on a device without the camera extensions proxy service: registerClient()
- * fails, so there are no extensions and the per-extension queries throw "Unsupported extensions". */
+/* AOSP core/java/android/hardware/camera2/CameraExtensionCharacteristics.java (android-16). The query methods
+ * behave as on a device without the camera extensions proxy service: registerClient() fails, so there are no
+ * extensions and the per-extension queries throw "Unsupported extensions". */
 public final class CameraExtensionCharacteristics {
 	public static final int EXTENSION_AUTOMATIC = 0;
 	public static final int EXTENSION_FACE_RETOUCH = 1;
@@ -20,7 +19,8 @@ public final class CameraExtensionCharacteristics {
 	public static final int EXTENSION_HDR = 3;
 	public static final int EXTENSION_NIGHT = 4;
 
-	private CameraExtensionCharacteristics() {
+	/* AOSP CameraExtensionCharacteristics(Context, cameraId, chars), made by CameraManager */
+	CameraExtensionCharacteristics() {
 	}
 
 	public List<Integer> getSupportedExtensions() {

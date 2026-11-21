@@ -8,9 +8,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-/* AOSP core/java/android/hardware/camera2/CaptureResult.java, reduced. ATL has no camera service, so no
- * capture ever produces a result; the class keeps AOSP's keys (types still missing in ATL are typed
- * Object) and answers from its own result map. */
+/* AOSP core/java/android/hardware/camera2/CaptureResult.java, reduced. A capture of ATL's camera HAL gives its
+ * result as a map of the public keys (AOSP: CameraMetadataNative); the class keeps AOSP's keys (types still
+ * missing in ATL are typed Object). */
 @SuppressWarnings("unchecked")
 public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 
@@ -73,6 +73,12 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 		mFrameNumber = frameNumber;
 	}
 
+	/** @hide AOSP CaptureResult(cameraId, CameraMetadataNative results, parent, extras) */
+	public CaptureResult(Map<Key<?>, Object> results, CaptureRequest parent, int sequenceId, long frameNumber) {
+		this(parent, sequenceId, frameNumber);
+		mResults.putAll(results);
+	}
+
 	public <T> T get(Key<T> key) {
 		return (T) mResults.get(key);
 	}
@@ -91,6 +97,24 @@ public class CaptureResult extends CameraMetadata<CaptureResult.Key<?>> {
 
 	public int getSequenceId() {
 		return mSequenceId;
+	}
+
+	/** @hide the public keys with these names (AOSP CameraCharacteristics.getAvailableKeyList() reflects over the
+	 * key fields the same way) */
+	public static List<Key<?>> keysNamed(String[] names) {
+		java.util.Set<String> wanted = new HashSet<String>(java.util.Arrays.asList(names));
+		List<Key<?>> keys = new ArrayList<Key<?>>();
+		for (java.lang.reflect.Field field : CaptureResult.class.getDeclaredFields()) {
+			if (field.getType() != Key.class || !java.lang.reflect.Modifier.isStatic(field.getModifiers()) || !java.lang.reflect.Modifier.isPublic(field.getModifiers()))
+				continue;
+			try {
+				Key<?> key = (Key<?>)field.get(null);
+				if (wanted.contains(key.getName()))
+					keys.add(key);
+			} catch (IllegalAccessException e) {
+			}
+		}
+		return Collections.unmodifiableList(keys);
 	}
 
 	public static final Key<Integer> COLOR_CORRECTION_MODE = new Key<Integer>("android.colorCorrection.mode", (Class<Integer>) (Class<?>) int.class);

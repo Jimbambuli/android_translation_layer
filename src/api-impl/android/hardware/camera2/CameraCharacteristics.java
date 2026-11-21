@@ -1,6 +1,7 @@
 package android.hardware.camera2;
 
 import android.graphics.Rect;
+import android.hardware.camera2.params.StreamConfigurationMap;
 import android.util.Range;
 import android.util.Rational;
 import android.util.Size;
@@ -15,10 +16,10 @@ import java.util.Map;
 import java.util.Set;
 
 /* AOSP core/java/android/hardware/camera2/CameraCharacteristics.java, reduced to the members the corpus
- * references. ATL has no camera service: CameraManager lists no camera and getCameraCharacteristics()
- * throws, so no instance is created and get() answers from an empty property map. The keys keep AOSP's
- * names and value types (keys whose value type is still missing in ATL are typed Object); Key follows
- * AOSP Key/CameraMetadataNative.Key (equality by name and type). */
+ * references. The static metadata of a camera comes from ATL's camera HAL (impl.ExternalCameraDevice) as a map
+ * of the public keys, in place of AOSP's CameraMetadataNative. The keys keep AOSP's names and value types (keys
+ * whose value type is still missing in ATL are typed Object); Key follows AOSP Key/CameraMetadataNative.Key
+ * (equality by name and type). */
 @SuppressWarnings("unchecked")
 public final class CameraCharacteristics extends CameraMetadata<CameraCharacteristics.Key<?>> {
 
@@ -72,7 +73,9 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 
 	private final Map<Key<?>, Object> mProperties = new HashMap<Key<?>, Object>();
 
-	CameraCharacteristics() {
+	/** @hide AOSP CameraCharacteristics(CameraMetadataNative): the camera's static metadata */
+	public CameraCharacteristics(Map<Key<?>, Object> properties) {
+		mProperties.putAll(properties);
 	}
 
 	public <T> T get(Key<T> key) {
@@ -125,32 +128,48 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	public static final Key<Long> REQUEST_RECOMMENDED_TEN_BIT_DYNAMIC_RANGE_PROFILE = new Key<Long>("android.request.recommendedTenBitDynamicRangeProfile", (Class<Long>) (Class<?>) long.class);
 	public static final Key<Float> SCALER_AVAILABLE_MAX_DIGITAL_ZOOM = new Key<Float>("android.scaler.availableMaxDigitalZoom", (Class<Float>) (Class<?>) float.class);
 	public static final Key<long[]> SCALER_AVAILABLE_STREAM_USE_CASES = new Key<long[]>("android.scaler.availableStreamUseCases", long[].class);
-	/* value type StreamConfigurationMap does not exist in ATL yet */
-	public static final Key<Object> SCALER_STREAM_CONFIGURATION_MAP = new Key<Object>("android.scaler.streamConfigurationMap", Object.class);
-	/* value type StreamConfigurationMap does not exist in ATL yet */
-	public static final Key<Object> SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION = new Key<Object>("android.scaler.streamConfigurationMapMaximumResolution", Object.class);
+	public static final Key<StreamConfigurationMap> SCALER_STREAM_CONFIGURATION_MAP = new Key<StreamConfigurationMap>("android.scaler.streamConfigurationMap", StreamConfigurationMap.class);
+	public static final Key<StreamConfigurationMap> SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION = new Key<StreamConfigurationMap>("android.scaler.streamConfigurationMapMaximumResolution", StreamConfigurationMap.class);
 	public static final Key<Rect> SENSOR_INFO_ACTIVE_ARRAY_SIZE = new Key<Rect>("android.sensor.info.activeArraySize", Rect.class);
 	public static final Key<SizeF> SENSOR_INFO_PHYSICAL_SIZE = new Key<SizeF>("android.sensor.info.physicalSize", SizeF.class);
 	public static final Key<Size> SENSOR_INFO_PIXEL_ARRAY_SIZE = new Key<Size>("android.sensor.info.pixelArraySize", Size.class);
 	public static final Key<Integer> SENSOR_INFO_TIMESTAMP_SOURCE = new Key<Integer>("android.sensor.info.timestampSource", (Class<Integer>) (Class<?>) int.class);
 	public static final Key<Integer> SENSOR_ORIENTATION = new Key<Integer>("android.sensor.orientation", (Class<Integer>) (Class<?>) int.class);
 
-	/* AOSP getAvailable*Keys(): read from the request keys of the property map, which is empty in ATL (no
-	 * instance is ever created): null for the optional lists, AOSP's AssertionError for the mandatory ones */
+	/** @hide AOSP's android.request.availableRequestKeys/availableResultKeys/availableSessionKeys/
+	 * availablePhysicalCameraRequestKeys, by key name (AOSP: by metadata tag, which ATL's keys do not have) */
+	public static final Key<String[]> REQUEST_AVAILABLE_REQUEST_KEYS = new Key<String[]>("android.request.availableRequestKeys", String[].class);
+	/** @hide */
+	public static final Key<String[]> REQUEST_AVAILABLE_RESULT_KEYS = new Key<String[]>("android.request.availableResultKeys", String[].class);
+	/** @hide */
+	public static final Key<String[]> REQUEST_AVAILABLE_SESSION_KEYS = new Key<String[]>("android.request.availableSessionKeys", String[].class);
+	/** @hide */
+	public static final Key<String[]> REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS = new Key<String[]>("android.request.availablePhysicalCameraRequestKeys", String[].class);
+
+	/* AOSP getAvailable*Keys() -> getAvailableKeyList(): the public keys of the metadata class whose names the
+	 * list holds; null for a missing optional list, AssertionError for a missing mandatory one */
 	public List<CaptureRequest.Key<?>> getAvailableSessionKeys() {
-		return null;
+		String[] names = get(REQUEST_AVAILABLE_SESSION_KEYS);
+		return names == null ? null : CaptureRequest.keysNamed(names);
 	}
 
 	public List<CaptureRequest.Key<?>> getAvailablePhysicalCameraRequestKeys() {
-		return null;
+		String[] names = get(REQUEST_AVAILABLE_PHYSICAL_CAMERA_REQUEST_KEYS);
+		return names == null ? null : CaptureRequest.keysNamed(names);
 	}
 
 	public List<CaptureRequest.Key<?>> getAvailableCaptureRequestKeys() {
-		throw new AssertionError("android.request.availableRequestKeys must be non-null in the characteristics");
+		String[] names = get(REQUEST_AVAILABLE_REQUEST_KEYS);
+		if (names == null)
+			throw new AssertionError("android.request.availableRequestKeys must be non-null in the characteristics");
+		return CaptureRequest.keysNamed(names);
 	}
 
 	public List<CaptureResult.Key<?>> getAvailableCaptureResultKeys() {
-		throw new AssertionError("android.request.availableResultKeys must be non-null in the characteristics");
+		String[] names = get(REQUEST_AVAILABLE_RESULT_KEYS);
+		if (names == null)
+			throw new AssertionError("android.request.availableResultKeys must be non-null in the characteristics");
+		return CaptureResult.keysNamed(names);
 	}
 
 	public static final Key<int[]> COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES = new Key<int[]>("android.colorCorrection.availableAberrationModes", int[].class);
