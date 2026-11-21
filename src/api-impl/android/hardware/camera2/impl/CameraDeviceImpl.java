@@ -93,7 +93,7 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 	}
 
 	/* AOSP setRemoteDevice(): connected, onOpened; setRemoteFailure(): onError */
-	void connect() {
+	public void connect() {
 		if (mHal.open(this)) {
 			mDeviceExecutor.execute(() -> mDeviceCallback.onOpened(this));
 		} else {
