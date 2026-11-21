@@ -20,12 +20,13 @@ public class CameraManager {
 
 	private final Map<AvailabilityCallback, Executor> mCallbackMap = new HashMap<AvailabilityCallback, Executor>();
 
+	/* without asking the user (inside a Flatpak the portal's IsCameraPresent stands in, see ExternalCameraDevice) */
 	public String[] getCameraIdList() throws CameraAccessException {
-		java.util.List<ExternalCameraDevice> devices = ExternalCameraDevice.getDevices();
-		String[] ids = new String[devices.size()];
-		for (int i = 0; i < ids.length; i++)
-			ids[i] = devices.get(i).getId();
-		return ids;
+		return ExternalCameraDevice.getCameraIds();
+	}
+
+	private static boolean isKnownId(String cameraId) {
+		return java.util.Arrays.asList(ExternalCameraDevice.getCameraIds()).contains(cameraId);
 	}
 
 	/* AOSP: the HAL lists no concurrent camera combinations */
@@ -33,7 +34,8 @@ public class CameraManager {
 		return new HashSet<Set<String>>();
 	}
 
-	/* the service's ERROR_ILLEGAL_ARGUMENT for an unknown camera */
+	/* the service's ERROR_ILLEGAL_ARGUMENT for an unknown camera; inside a Flatpak the camera portal asks the user
+	 * here if needed (the camera's data comes only through it) */
 	private static ExternalCameraDevice getDevice(String cameraId) {
 		if (cameraId == null) {
 			throw new IllegalArgumentException("cameraId was null");
@@ -55,7 +57,7 @@ public class CameraManager {
 		if (cameraId == null) {
 			throw new IllegalArgumentException("Camera ID was null");
 		}
-		if (ExternalCameraDevice.get(cameraId) == null) {
+		if (!isKnownId(cameraId)) {
 			throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
 		}
 		return false;
@@ -86,7 +88,14 @@ public class CameraManager {
 		} else if (callback == null) {
 			throw new IllegalArgumentException("callback was null");
 		}
-		ExternalCameraDevice hal = getDevice(cameraId);
+		ExternalCameraDevice hal = ExternalCameraDevice.get(cameraId);
+		if (hal == null && ExternalCameraDevice.accessDenied()) {
+			/* the service's ERROR_PERMISSION_DENIED: the user refused the camera (portal) */
+			throw new SecurityException("Caller cannot open camera \"" + cameraId + "\" without camera permission");
+		}
+		if (hal == null) {
+			throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+		}
 		CameraDeviceImpl device = new CameraDeviceImpl(cameraId, callback, executor, hal.getCharacteristics(), hal);
 		device.connect();
 	}
@@ -115,9 +124,16 @@ public class CameraManager {
 		}
 	}
 
+	private static void checkTorchCamera(String cameraId) {
+		if (cameraId == null)
+			throw new IllegalArgumentException("cameraId was null");
+		if (!isKnownId(cameraId))
+			throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+	}
+
 	/* AOSP: the service's ERROR_ILLEGAL_ARGUMENT for a camera without a flash unit (FLASH_INFO_AVAILABLE false) */
 	public void turnOnTorchWithStrengthLevel(String cameraId, int torchStrength) throws CameraAccessException {
-		getDevice(cameraId);
+		checkTorchCamera(cameraId);
 		throw new IllegalArgumentException("Camera \"" + cameraId + "\" has no flash unit");
 	}
 
@@ -136,7 +152,7 @@ public class CameraManager {
 	}
 
 	public void setTorchMode(String cameraId, boolean enabled) throws CameraAccessException {
-		getDevice(cameraId);
+		checkTorchCamera(cameraId);
 		throw new IllegalArgumentException("Camera \"" + cameraId + "\" has no flash unit");
 	}
 
@@ -158,10 +174,8 @@ public class CameraManager {
 			if (mCallbackMap.put(callback, executor) != null)
 				return;
 		}
-		for (ExternalCameraDevice device : ExternalCameraDevice.getDevices()) {
-			String id = device.getId();
+		for (String id : ExternalCameraDevice.getCameraIds())
 			executor.execute(() -> callback.onCameraAvailable(id));
-		}
 	}
 
 	public void unregisterAvailabilityCallback(AvailabilityCallback callback) {

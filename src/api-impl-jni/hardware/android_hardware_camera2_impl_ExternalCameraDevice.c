@@ -255,21 +255,28 @@ static void camera_access_done(GObject *source, GAsyncResult *result, gpointer d
 	}
 }
 
-/* the PipeWire remote of the camera portal: asks for camera access (the desktop's dialog, unless the user
- * already answered), then opens the remote that shows the cameras only; -1 without access */
-static int portal_camera_remote(void)
+/* the PipeWire remote of the camera portal (org.freedesktop.portal.Camera). OpenPipeWireRemote succeeds without a
+ * dialog once the user has allowed the app (the portal's permission store says yes) and fails otherwise; only
+ * with request_access, ATL asks with AccessCamera first, which shows the desktop's dialog if the user has not
+ * answered yet. -1 without a remote */
+static int portal_camera_remote(gboolean request_access, gboolean *denied)
 {
 	GMainContext *ctx = g_main_context_new();
 	g_main_context_push_thread_default(ctx);
 	XdpPortal *portal = xdp_portal_new();
 	int fd = -1;
 	if (xdp_portal_is_camera_present(portal)) {
-		int state = 0;
-		xdp_portal_access_camera(portal, NULL, XDP_CAMERA_FLAG_NONE, NULL, camera_access_done, &state);
-		while (!state)
-			g_main_context_iteration(ctx, TRUE);
-		if (state == 1)
-			fd = xdp_portal_open_pipewire_remote_for_camera(portal);
+		fd = xdp_portal_open_pipewire_remote_for_camera(portal);
+		if (fd < 0 && request_access) {
+			int state = 0;
+			xdp_portal_access_camera(portal, NULL, XDP_CAMERA_FLAG_NONE, NULL, camera_access_done, &state);
+			while (!state)
+				g_main_context_iteration(ctx, TRUE);
+			if (state == 1)
+				fd = xdp_portal_open_pipewire_remote_for_camera(portal);
+			else
+				*denied = TRUE;
+		}
 	}
 	g_object_unref(portal);
 	g_main_context_pop_thread_default(ctx);
@@ -277,37 +284,61 @@ static int portal_camera_remote(void)
 	return fd;
 }
 
-/* connects once; later calls only report what is known (cameras PipeWire announced since are appended) */
-JNIEXPORT jint JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeInit(JNIEnv *env, jclass klass)
+/* the portal's IsCameraPresent property: whether there is a camera, without asking the user */
+JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeIsCameraPresent(JNIEnv *env, jclass klass)
+{
+	GMainContext *ctx = g_main_context_new();
+	g_main_context_push_thread_default(ctx);
+	XdpPortal *portal = xdp_portal_new();
+	gboolean present = xdp_portal_is_camera_present(portal);
+	g_object_unref(portal);
+	g_main_context_pop_thread_default(ctx);
+	g_main_context_unref(ctx);
+	return present;
+}
+
+/* connects to PipeWire (outside a Flatpak directly; inside one through the camera portal, asking the user only with
+ * request_access) and reads the cameras; once connected, later calls only report what is known (cameras PipeWire
+ * announced since are appended). The number of cameras, or -1 without a connection, -2 if the user refused */
+JNIEXPORT jint JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeInit(JNIEnv *env, jclass klass, jboolean request_access)
 {
 	static gsize initialized = 0;
+	static GMutex connect_lock;
 	if (g_once_init_enter(&initialized)) {
 		pw_init(NULL, NULL);
 		nodes = g_ptr_array_new();
 		loop = pw_thread_loop_new("atl-camera", NULL);
 		context = pw_context_new(pw_thread_loop_get_loop(loop), NULL, 0);
 		pw_thread_loop_start(loop);
+		g_once_init_leave(&initialized, 1);
+	}
+	gboolean denied = FALSE;
+	g_mutex_lock(&connect_lock);
+	if (!core) {
+		/* the portal is asked without the loop's lock: the dialog may take long */
+		int fd = -1;
+		gboolean flatpak = g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS);
+		if (flatpak)
+			fd = portal_camera_remote(request_access, &denied);
 		pw_thread_loop_lock(loop);
-		if (g_file_test("/.flatpak-info", G_FILE_TEST_EXISTS)) {
-			int fd = portal_camera_remote();
-			core = fd >= 0 ? pw_context_connect_fd(context, fd, NULL, 0) : NULL;
-		} else {
+		if (!flatpak)
 			core = pw_context_connect(context, NULL, 0);
-		}
+		else if (fd >= 0)
+			core = pw_context_connect_fd(context, fd, NULL, 0);
 		if (core) {
 			pw_core_add_listener(core, &core_listener, &core_events, NULL);
 			registry = pw_core_get_registry(core, PW_VERSION_REGISTRY, 0);
 			pw_registry_add_listener(registry, &registry_listener, &registry_events, NULL);
 			roundtrip(); /* the globals, and with them the EnumFormat requests */
 			roundtrip(); /* the formats */
-		} else {
+		} else if (!flatpak || request_access) {
 			fprintf(stderr, "camera: no PipeWire connection\n");
 		}
 		pw_thread_loop_unlock(loop);
-		g_once_init_leave(&initialized, 1);
 	}
+	g_mutex_unlock(&connect_lock);
 	if (!core)
-		return 0;
+		return denied ? -2 : -1;
 	pw_thread_loop_lock(loop);
 	jint count = nodes->len;
 	pw_thread_loop_unlock(loop);

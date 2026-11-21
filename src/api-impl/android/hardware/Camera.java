@@ -103,23 +103,18 @@ public class Camera {
 
 	/* AOSP: the API 1 cameras are the camera service's cameras, here those of ATL's camera HAL */
 	public static int getNumberOfCameras() {
-		return android.hardware.camera2.impl.ExternalCameraDevice.getDevices().size();
+		return android.hardware.camera2.impl.ExternalCameraDevice.getCameraIds().length;
 	}
 
 	/* AOSP _getCameraInfo() -> CameraProviderManager getCameraInfo(): an external camera is reported as front
-	 * facing to API 1; the orientation is SENSOR_ORIENTATION; ro.camera.sound.forced is unset, so the shutter
-	 * sound can be turned off */
+	 * facing to API 1; the orientation is SENSOR_ORIENTATION (the HAL's, the same for every camera, so the camera
+	 * portal need not be asked); ro.camera.sound.forced is unset, so the shutter sound can be turned off */
 	public static void getCameraInfo(int cameraId, CameraInfo cameraInfo) {
-		java.util.List<android.hardware.camera2.impl.ExternalCameraDevice> devices = android.hardware.camera2.impl.ExternalCameraDevice.getDevices();
-		if (cameraId < 0 || cameraId >= devices.size())
+		if (cameraId < 0 || cameraId >= getNumberOfCameras())
 			throw new RuntimeException("Unknown camera ID");
-		android.hardware.camera2.CameraCharacteristics info = devices.get(cameraId).getCharacteristics();
-		Integer facing = info.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING);
-		Integer orientation = info.get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION);
-		if (facing == null || orientation == null)
-			throw new RuntimeException("Fail to get camera info");
+		int facing = android.hardware.camera2.impl.ExternalCameraDevice.getLensFacing();
 		cameraInfo.facing = facing == android.hardware.camera2.CameraMetadata.LENS_FACING_BACK ? CameraInfo.CAMERA_FACING_BACK : CameraInfo.CAMERA_FACING_FRONT;
-		cameraInfo.orientation = orientation;
+		cameraInfo.orientation = android.hardware.camera2.impl.ExternalCameraDevice.getSensorOrientation();
 		cameraInfo.canDisableShutterSound = true;
 	}
 
@@ -202,8 +197,9 @@ public class Camera {
 	private boolean mManualCameraCallbackSet;
 	private final java.util.ArrayDeque<byte[]> mCallbackBuffers = new java.util.ArrayDeque<byte[]>();
 
+	/* inside a Flatpak the camera portal asks the user here if needed */
 	private int native_setup(int cameraId) {
-		java.util.List<android.hardware.camera2.impl.ExternalCameraDevice> devices = android.hardware.camera2.impl.ExternalCameraDevice.getDevices();
+		java.util.List<android.hardware.camera2.impl.ExternalCameraDevice> devices = android.hardware.camera2.impl.ExternalCameraDevice.getDevices(true);
 		if (cameraId < 0 || cameraId >= devices.size())
 			return -EACCES; /* Camera::connect() fails for an unknown camera */
 		Camera2Client client = new Camera2Client(devices.get(cameraId), new Camera2Client.Callbacks() {

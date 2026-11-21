@@ -9,11 +9,19 @@ extern "C" {
 #endif
 /*
  * Class:     android_hardware_camera2_impl_ExternalCameraDevice
+ * Method:    nativeIsCameraPresent
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeIsCameraPresent
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_hardware_camera2_impl_ExternalCameraDevice
  * Method:    nativeInit
- * Signature: ()I
+ * Signature: (Z)I
  */
 JNIEXPORT jint JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeInit
-  (JNIEnv *, jclass);
+  (JNIEnv *, jclass, jboolean);
 
 /*
  * Class:     android_hardware_camera2_impl_ExternalCameraDevice

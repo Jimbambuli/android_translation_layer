@@ -28,7 +28,13 @@ import java.util.TreeSet;
  * Differences to the HAL, as the HAL's device configuration (external_camera_config.xml) is ATL's to choose:
  * no frame rate limits per size (the HAL's built-in defaults stop at 1920x1080), and every format ATL can read
  * (MJPEG and raw YUV/RGB) counts, where the HAL reads MJPEG only. Camera ids are the HAL's: the id offset 100
- * plus the camera's number (PipeWire's order, in place of the V4L2 node number). */
+ * plus the camera's number (its place among the usable cameras in PipeWire's order, in place of the V4L2 node
+ * number).
+ *
+ * Inside a Flatpak the cameras come through the camera portal, which asks the user. Without the user's answer ATL
+ * knows only the portal's IsCameraPresent property: then it reports one camera (id 100, with the HAL's fixed facing
+ * and orientation) and asks the portal when the app needs the camera itself, i.e. its characteristics (the stream
+ * configurations come only through the portal's PipeWire remote) or a connection (openCamera(), Camera.open()). */
 public final class ExternalCameraDevice {
 	/* ExternalCameraUtils.cpp kDefaultCameraIdOffset, kDefaultJpegBufSize, kDefaultOrientation */
 	private static final int CAMERA_ID_OFFSET = 100;
@@ -71,7 +77,9 @@ public final class ExternalCameraDevice {
 		}
 	}
 
-	private static List<ExternalCameraDevice> sDevices;
+	private static List<ExternalCameraDevice> sDevices; /* null until PipeWire is connected */
+	private static Boolean sPresent;                    /* the portal's IsCameraPresent, read once */
+	private static boolean sDenied;                     /* the user refused the camera portal */
 
 	private final int mIndex;
 	private final String mId;
@@ -81,39 +89,77 @@ public final class ExternalCameraDevice {
 	private volatile long mHandle;
 	private FrameListener mListener;
 
-	private ExternalCameraDevice(int index, List<SupportedFormat> formats) {
+	private ExternalCameraDevice(int index, int number, List<SupportedFormat> formats) {
 		mIndex = index;
-		mId = String.valueOf(CAMERA_ID_OFFSET + index);
+		mId = String.valueOf(CAMERA_ID_OFFSET + number);
 		mSupportedFormats = formats;
 		mCharacteristics = new CameraCharacteristics(initCameraCharacteristics());
 		initDefaultRequests();
 	}
 
 	/** the cameras with a color stream, in id order (AOSP ExternalCameraProvider skips a camera whose
-	 * characteristics fail, i.e. one without supported formats) */
-	public static synchronized List<ExternalCameraDevice> getDevices() {
-		if (sDevices == null) {
-			sDevices = new ArrayList<ExternalCameraDevice>();
-			int count = nativeInit();
-			for (int i = 0; i < count; i++) {
-				List<SupportedFormat> formats = initSupportedFormats(nativeGetModes(i));
-				if (!formats.isEmpty())
-					sDevices.add(new ExternalCameraDevice(i, formats));
+	 * characteristics fail, i.e. one without supported formats); with requestAccess, inside a Flatpak the camera
+	 * portal asks the user if needed. Empty without a connection */
+	public static synchronized List<ExternalCameraDevice> getDevices(boolean requestAccess) {
+		if (sDevices == null && !(sDenied && requestAccess)) {
+			int count = nativeInit(requestAccess);
+			if (count == -2)
+				sDenied = true;
+			if (count == -1 && !new java.io.File("/.flatpak-info").exists())
+				count = 0; /* no PipeWire to connect to: no camera (asked once) */
+			if (count >= 0) {
+				sDevices = new ArrayList<ExternalCameraDevice>();
+				for (int i = 0; i < count; i++) {
+					List<SupportedFormat> formats = initSupportedFormats(nativeGetModes(i));
+					if (!formats.isEmpty())
+						sDevices.add(new ExternalCameraDevice(i, sDevices.size(), formats));
+				}
 			}
 		}
-		return sDevices;
+		return sDevices != null ? sDevices : java.util.Collections.<ExternalCameraDevice>emptyList();
+	}
+
+	/** the camera ids without asking the user: the cameras if PipeWire is connected, else, inside a Flatpak, one
+	 * camera (the first id) if the portal's IsCameraPresent says there is one and the user did not refuse */
+	public static synchronized String[] getCameraIds() {
+		List<ExternalCameraDevice> devices = getDevices(false);
+		if (sDevices == null && !sDenied && new java.io.File("/.flatpak-info").exists()) {
+			if (sPresent == null)
+				sPresent = nativeIsCameraPresent();
+			if (sPresent)
+				return new String[] {String.valueOf(CAMERA_ID_OFFSET)};
+		}
+		String[] ids = new String[devices.size()];
+		for (int i = 0; i < ids.length; i++)
+			ids[i] = devices.get(i).mId;
+		return ids;
+	}
+
+	/** the user refused the camera portal (inside a Flatpak) */
+	public static synchronized boolean accessDenied() {
+		return sDenied;
 	}
 
 	/** a camera can be used: one is present and the user did not switch the camera off for the app */
 	public static boolean available() {
-		return !android.content.pm.PackageManager.deniedByUser("android.permission.CAMERA") && !getDevices().isEmpty();
+		return !android.content.pm.PackageManager.deniedByUser("android.permission.CAMERA") && getCameraIds().length > 0;
 	}
 
+	/** the camera with this id (null if there is none); asks the camera portal if needed */
 	public static ExternalCameraDevice get(String cameraId) {
-		for (ExternalCameraDevice device : getDevices())
+		for (ExternalCameraDevice device : getDevices(true))
 			if (device.mId.equals(cameraId))
 				return device;
 		return null;
+	}
+
+	/** android.lens.facing and android.sensor.orientation of every camera of the HAL (initDefaultCharsKeys()) */
+	public static int getLensFacing() {
+		return CameraMetadata.LENS_FACING_EXTERNAL;
+	}
+
+	public static int getSensorOrientation() {
+		return ORIENTATION;
 	}
 
 	public String getId() {
@@ -225,7 +271,7 @@ public final class ExternalCameraDevice {
 		md.put(CameraCharacteristics.JPEG_AVAILABLE_THUMBNAIL_SIZES, new Size[] {new Size(0, 0), new Size(176, 144), new Size(240, 144), new Size(256, 144), new Size(240, 160), new Size(256, 154), new Size(240, 180)});
 		md.put(CameraCharacteristics.LENS_INFO_FOCUS_DISTANCE_CALIBRATION, CameraMetadata.LENS_INFO_FOCUS_DISTANCE_CALIBRATION_UNCALIBRATED);
 		md.put(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION, new int[] {CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_OFF});
-		md.put(CameraCharacteristics.LENS_FACING, CameraMetadata.LENS_FACING_EXTERNAL);
+		md.put(CameraCharacteristics.LENS_FACING, getLensFacing());
 		md.put(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES, new int[] {CameraMetadata.NOISE_REDUCTION_MODE_OFF});
 		md.put(CameraCharacteristics.REQUEST_PARTIAL_RESULT_COUNT, 1);
 		md.put(CameraCharacteristics.REQUEST_PIPELINE_MAX_DEPTH, (byte)4);
@@ -544,7 +590,8 @@ public final class ExternalCameraDevice {
 			listener.onStreamError(message);
 	}
 
-	private static native int nativeInit();
+	private static native boolean nativeIsCameraPresent();
+	private static native int nativeInit(boolean requestAccess);
 	private static native String nativeGetName(int index);
 	private static native int[] nativeGetModes(int index);
 	private native long nativeOpen(int index);
