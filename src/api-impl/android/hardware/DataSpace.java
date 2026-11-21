@@ -428,6 +428,20 @@ public final class DataSpace {
 	 */
 	public static final int DATASPACE_JPEG_R = 4101;
 
+	/**
+	 * ISO/IEC 23008-12:2024
+	 *
+	 * High Efficiency Image File Format (HEIF) with embedded HDR gain map
+	 *
+	 * <p>This value is valid with formats:</p>
+	 * <ul>
+	 *    <li>HAL_PIXEL_FORMAT_BLOB: A HEIC image encoded by HEVC encoder
+	 *    according to ISO/IEC 23008-12:2024 that includes an HDR gain map and
+	 *    metadata according to ISO/CD 21496-1.</li>
+	 * </ul>
+	 */
+	public static final int DATASPACE_HEIF_ULTRAHDR = 4102;
+
 	/** @hide */
 	@Retention(RetentionPolicy.SOURCE)
 	@IntDef(flag = true, value = {
@@ -644,6 +658,7 @@ public final class DataSpace {
 				     DATASPACE_DEPTH,
 				     DATASPACE_DYNAMIC_DEPTH,
 				     DATASPACE_HEIF,
+				     DATASPACE_HEIF_ULTRAHDR,
 				     DATASPACE_JPEG_R,
 				     DATASPACE_UNKNOWN,
 				     DATASPACE_SCRGB_LINEAR,

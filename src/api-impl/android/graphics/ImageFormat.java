@@ -62,6 +62,7 @@ public class ImageFormat {
 			RAW_DEPTH10,
 			PRIVATE,
 			HEIC,
+			HEIC_ULTRAHDR,
 			JPEG_R})
 	public @interface Format {
 	}
@@ -810,6 +811,15 @@ public class ImageFormat {
 	public static final int HEIC = 0x48454946;
 
 	/**
+	 * High Efficiency Image File Format (HEIF) with embedded HDR gain map
+	 *
+	 * <p>This format defines the HEIC brand of High Efficiency Image File
+	 * Format as described in ISO/IEC 23008-12:2024 with HDR gain map according
+	 * to ISO/CD 21496-1.</p>
+	 */
+	public static final int HEIC_ULTRAHDR = 0x1006;
+
+	/**
 	 * Use this function to retrieve the number of bits per pixel of an
 	 * ImageFormat.
 	 *
@@ -897,6 +907,7 @@ public class ImageFormat {
 			case DEPTH_JPEG:
 			case HEIC:
 			case JPEG_R:
+			case HEIC_ULTRAHDR:
 				return true;
 		}
 
