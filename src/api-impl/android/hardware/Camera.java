@@ -26,6 +26,9 @@ import java.util.List;
 public class Camera {
 	private static final String TAG = "Camera";
 
+	public static final String ACTION_NEW_PICTURE = "android.hardware.action.NEW_PICTURE";
+	public static final String ACTION_NEW_VIDEO = "android.hardware.action.NEW_VIDEO";
+
 	public static final int CAMERA_ERROR_UNKNOWN = 1;
 	public static final int CAMERA_ERROR_EVICTED = 2;
 	public static final int CAMERA_ERROR_DISABLED = 3;

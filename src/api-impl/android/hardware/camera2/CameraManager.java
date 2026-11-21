@@ -16,7 +16,7 @@ import java.util.concurrent.Executor;
  * and openCamera() connecting a CameraDeviceImpl to the HAL. A camera that appears or goes away while the app
  * runs is not reported (the list is read once). Errors the service would report keep AOSP's exceptions:
  * IllegalArgumentException for an unknown camera id. */
-public class CameraManager {
+public final class CameraManager {
 
 	private final Map<AvailabilityCallback, Executor> mCallbackMap = new HashMap<AvailabilityCallback, Executor>();
 
@@ -124,17 +124,46 @@ public class CameraManager {
 		}
 	}
 
+	/* CameraService::setTorchMode()/turnOnTorchWithStrengthLevel(): an unknown id, then no flash unit, are its
+	 * ERROR_ILLEGAL_ARGUMENT */
 	private static void checkTorchCamera(String cameraId) {
 		if (cameraId == null)
 			throw new IllegalArgumentException("cameraId was null");
 		if (!isKnownId(cameraId))
-			throw new IllegalArgumentException("Camera ID '" + cameraId + "' not available on device.");
+			throw new IllegalArgumentException("Camera ID \"" + cameraId + "\" is a not valid camera ID");
+		throw new IllegalArgumentException("Camera \"" + cameraId + "\" does not have a flash unit");
+	}
+
+	/* CameraService::getTorchStrengthLevel(): the external HAL cannot report one, which the service gives as
+	 * ERROR_INVALID_OPERATION, i.e. CameraAccessException(CAMERA_ERROR) */
+	public int getTorchStrengthLevel(String cameraId) throws CameraAccessException {
+		if (cameraId == null)
+			throw new IllegalArgumentException("cameraId was null");
+		if (!isKnownId(cameraId))
+			throw new IllegalArgumentException("Camera ID \"" + cameraId + "\" is a not valid camera ID");
+		throw new CameraAccessException(CameraAccessException.CAMERA_ERROR, "Unable to retrieve torch strength level for device " + cameraId);
+	}
+
+	/* AOSP CameraManagerGlobal.isConcurrentSessionConfigurationSupported(): the ids must form one of the concurrent
+	 * combinations, of which the HAL has none */
+	public boolean isConcurrentSessionConfigurationSupported(java.util.Map<String, android.hardware.camera2.params.SessionConfiguration> cameraIdAndSessionConfig) throws CameraAccessException {
+		if (cameraIdAndSessionConfig == null) {
+			throw new IllegalArgumentException("cameraIdsAndSessionConfigurations was null");
+		}
+		if (cameraIdAndSessionConfig.size() == 0) {
+			throw new IllegalArgumentException("camera id and session combination is empty");
+		}
+		boolean subsetFound = false;
+		for (Set<String> combination : getConcurrentCameraIds()) {
+			if (combination.containsAll(cameraIdAndSessionConfig.keySet()))
+				subsetFound = true;
+		}
+		return subsetFound;
 	}
 
 	/* AOSP: the service's ERROR_ILLEGAL_ARGUMENT for a camera without a flash unit (FLASH_INFO_AVAILABLE false) */
 	public void turnOnTorchWithStrengthLevel(String cameraId, int torchStrength) throws CameraAccessException {
 		checkTorchCamera(cameraId);
-		throw new IllegalArgumentException("Camera \"" + cameraId + "\" has no flash unit");
 	}
 
 	public CameraExtensionCharacteristics getCameraExtensionCharacteristics(String cameraId) throws CameraAccessException {
@@ -153,7 +182,6 @@ public class CameraManager {
 
 	public void setTorchMode(String cameraId, boolean enabled) throws CameraAccessException {
 		checkTorchCamera(cameraId);
-		throw new IllegalArgumentException("Camera \"" + cameraId + "\" has no flash unit");
 	}
 
 	public void registerAvailabilityCallback(AvailabilityCallback callback, Handler handler) {

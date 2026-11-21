@@ -248,6 +248,16 @@ public class CameraCaptureSessionImpl extends CameraCaptureSession {
 		throw new IllegalArgumentException("The output configuration is not part of the session's deferred or shared outputs");
 	}
 
+	/* AOSP switchToOffline() -> CameraDeviceImpl.switchToOffline(): the surfaces must be the session's and support
+	 * offline processing, which no stream of the external HAL does */
+	@Override
+	public android.hardware.camera2.CameraOfflineSession switchToOffline(java.util.Collection<Surface> offlineOutputs, Executor executor, android.hardware.camera2.CameraOfflineSession.CameraOfflineSessionCallback listener) throws CameraAccessException {
+		synchronized (this) {
+			checkNotClosed();
+		}
+		return mDeviceImpl.switchToOffline(offlineOutputs);
+	}
+
 	/* AOSP: the camera service answers whether the HAL can keep processing a stream offline; the external HAL
 	 * cannot */
 	@Override

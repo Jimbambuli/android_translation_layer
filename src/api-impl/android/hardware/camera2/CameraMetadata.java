@@ -1,18 +1,63 @@
 package android.hardware.camera2;
 
+import android.hardware.camera2.impl.PublicKey;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /* AOSP frameworks/base core/java/android/hardware/camera2/CameraMetadata.java (Android 16): the base of
  * CameraCharacteristics, CaptureRequest and CaptureResult with the enum value constants (taken from
- * api/current.txt). AOSP's getKeys() reflects over the subclass's Key fields through the hidden
- * getProtected()/getKeyClass(); ATL's subclasses keep their values in a map and each implements
- * getKeys() itself, so it is abstract here. The hidden constructor is not public, as in AOSP. */
+ * api/current.txt). getKeys() reflects over the subclass's public key fields marked @PublicKey whose value is
+ * set, as AOSP's does (ATL has no vendor keys and no native metadata). The hidden constructor is not public,
+ * as in AOSP. */
 public abstract class CameraMetadata<TKey> {
 	/** @hide */
 	protected CameraMetadata() {
 	}
 
-	public abstract List<TKey> getKeys();
+	/** @hide the value of a key, or null */
+	protected abstract <T> T getProtected(TKey key);
+
+	/** @hide */
+	protected abstract Class<TKey> getKeyClass();
+
+	@SuppressWarnings("unchecked")
+	public List<TKey> getKeys() {
+		return Collections.unmodifiableList(getKeys(getClass(), getKeyClass(), this));
+	}
+
+	/* AOSP getKeys(type, keyClass, instance, filterTags null, includeSynthetic true) */
+	@SuppressWarnings("unchecked")
+	/*package*/ <K> ArrayList<K> getKeys(Class<?> type, Class<K> keyClass, CameraMetadata<K> instance) {
+		/* TotalCaptureResult does not have any of the keys on it, use CaptureResult instead */
+		if (type.equals(TotalCaptureResult.class)) {
+			type = CaptureResult.class;
+		}
+		ArrayList<K> keyList = new ArrayList<K>();
+		for (Field field : type.getDeclaredFields()) {
+			if (field.getType().isAssignableFrom(keyClass) && (field.getModifiers() & Modifier.PUBLIC) != 0) {
+				K key;
+				try {
+					key = (K)field.get(instance);
+				} catch (IllegalAccessException e) {
+					throw new AssertionError("Can't get IllegalAccessException", e);
+				} catch (IllegalArgumentException e) {
+					throw new AssertionError("Can't get IllegalArgumentException", e);
+				}
+				if (instance == null || instance.getProtected(key) != null) {
+					if (key == null) {
+						throw new NullPointerException("key must not be null");
+					}
+					if (field.getAnnotation(PublicKey.class) != null)
+						keyList.add(key);
+				}
+			}
+		}
+		return keyList;
+	}
+
 
 	public static final int AUTOMOTIVE_LENS_FACING_EXTERIOR_FRONT = 1;
 	public static final int AUTOMOTIVE_LENS_FACING_EXTERIOR_LEFT = 3;

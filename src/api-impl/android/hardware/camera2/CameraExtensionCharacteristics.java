@@ -68,4 +68,30 @@ public final class CameraExtensionCharacteristics {
 		unsupported();
 		return null;
 	}
+
+	public <T> T get(int extension, CameraCharacteristics.Key<T> key) {
+		unsupported();
+		return null;
+	}
+
+	public Set<CameraCharacteristics.Key> getKeys(int extension) {
+		unsupported();
+		return null;
+	}
+
+	/* AOSP: the format is checked before the extensions service */
+	public android.util.Range<Long> getEstimatedCaptureLatencyRangeMillis(int extension, Size captureOutputSize, int format) {
+		switch (format) {
+			case android.graphics.ImageFormat.YUV_420_888:
+			case android.graphics.ImageFormat.JPEG:
+			case android.graphics.ImageFormat.JPEG_R:
+			case android.graphics.ImageFormat.DEPTH_JPEG:
+			case android.graphics.ImageFormat.YCBCR_P010:
+				break;
+			default:
+				throw new IllegalArgumentException("Unsupported format: " + format);
+		}
+		unsupported();
+		return null;
+	}
 }

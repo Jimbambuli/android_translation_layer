@@ -288,7 +288,7 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 					throw new IllegalStateException("Physical id matches the logical id!");
 				}
 			}
-			return new CaptureRequest.Builder(defaultRequest(templateType), false);
+			return new CaptureRequest.Builder(defaultRequest(templateType), false, CameraCaptureSession.SESSION_ID_NONE, getId(), physicalCameraIdSet);
 		}
 	}
 
@@ -296,7 +296,7 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 	public CaptureRequest.Builder createCaptureRequest(int templateType) throws CameraAccessException {
 		synchronized (mInterfaceLock) {
 			checkIfCameraClosedOrInError();
-			return new CaptureRequest.Builder(defaultRequest(templateType), false);
+			return new CaptureRequest.Builder(defaultRequest(templateType), false, CameraCaptureSession.SESSION_ID_NONE, getId(), null);
 		}
 	}
 
@@ -370,6 +370,10 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 	private int submitLocked(List<CaptureRequest> requestList, CameraCaptureSession.CaptureCallback callback, Executor executor, boolean repeating) throws CameraAccessException {
 		checkIfCameraClosedOrInError();
 		for (CaptureRequest request : requestList) {
+			/* the service: settings for physical cameras need a logical multi-camera, which the HAL is not */
+			if (request.getPhysicalCameraSettings().size() > 1) {
+				throw new IllegalArgumentException("Camera " + mCameraId + " has no physical cameras");
+			}
 			if (request.getTargets().isEmpty()) {
 				throw new IllegalArgumentException("Each request must have at least one Surface target");
 			}
@@ -444,6 +448,23 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 			else
 				holder.executor.execute(() -> holder.callback.onCaptureSequenceCompleted(session, holder.sequenceId, holder.lastFrameNumber));
 		}
+	}
+
+	/* AOSP switchToOffline(): the checks up to the offline support of each stream, which the HAL has for none */
+	android.hardware.camera2.CameraOfflineSession switchToOffline(java.util.Collection<Surface> offlineOutputs) throws CameraAccessException {
+		if (offlineOutputs.isEmpty()) {
+			throw new IllegalArgumentException("Invalid offline surfaces!");
+		}
+		synchronized (mInterfaceLock) {
+			checkIfCameraClosedOrInError();
+			for (Surface surface : offlineOutputs) {
+				if (!mConfiguredOutputs.contains(surface)) {
+					throw new IllegalArgumentException("Offline surface is not part of this session");
+				}
+				throw new IllegalArgumentException("Surface: " + surface + " does not  support offline mode");
+			}
+		}
+		throw new IllegalArgumentException("Invalid offline surfaces!");
 	}
 
 	/* AOSP flush(): the pending captures fail as flushed, the repeating request ends */
@@ -573,7 +594,7 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 			session = mCurrentSession;
 		}
 		if (holder.callback != null) {
-			TotalCaptureResult result = new TotalCaptureResult(mHal.fillCaptureResult(request, timestampNs), request, holder.sequenceId, frameNumber, new ArrayList<>(), session != null ? session.getSessionId() : CameraCaptureSession.SESSION_ID_NONE);
+			TotalCaptureResult result = new TotalCaptureResult(mCameraId, mHal.fillCaptureResult(request, timestampNs), request, holder.sequenceId, frameNumber, new ArrayList<>(), session != null ? session.getSessionId() : CameraCaptureSession.SESSION_ID_NONE);
 			final RequestHolder h = holder;
 			final boolean sequenceDone = last;
 			h.executor.execute(() -> {

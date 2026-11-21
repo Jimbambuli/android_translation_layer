@@ -79,6 +79,12 @@ public final class OutputConfiguration implements android.os.Parcelable {
 	}
 
 	public OutputConfiguration(int surfaceGroupId, Surface surface, int rotation) {
+		this(surfaceGroupId, surface, rotation, null);
+	}
+
+	/* the size AOSP reads from the surface (SurfaceUtils.getSurfaceSize()), where ATL knows it: the size of an
+	 * ImageReader's surface */
+	private OutputConfiguration(int surfaceGroupId, Surface surface, int rotation, Size surfaceSize) {
 		checkNotNull(surface, "Surface must not be null");
 		checkArgumentInRange(rotation, ROTATION_0, ROTATION_270, "Rotation constant");
 		mSurfaceGroupId = surfaceGroupId;
@@ -86,7 +92,7 @@ public final class OutputConfiguration implements android.os.Parcelable {
 		mSurfaces.add(surface);
 		mMirrorModeForSurfaces.add(mMirrorMode);
 		mRotation = rotation;
-		mConfiguredSize = null;
+		mConfiguredSize = surfaceSize;
 		mIsDeferredConfig = false;
 	}
 
@@ -347,6 +353,39 @@ public final class OutputConfiguration implements android.os.Parcelable {
 
 	private static final java.util.concurrent.atomic.AtomicInteger sNextMultiResolutionGroupId =
 	    new java.util.concurrent.atomic.AtomicInteger(0);
+
+	/* AOSP createInstancesForMultiResolutionOutput(MultiResolutionImageReader) */
+	public static java.util.Collection<OutputConfiguration> createInstancesForMultiResolutionOutput(android.hardware.camera2.MultiResolutionImageReader multiResolutionImageReader) {
+		checkNotNull(multiResolutionImageReader, "Multi-resolution image reader must not be null");
+		int groupId = sNextMultiResolutionGroupId.getAndIncrement();
+		android.media.ImageReader[] imageReaders = multiResolutionImageReader.getReaders();
+		ArrayList<OutputConfiguration> configs = new ArrayList<OutputConfiguration>();
+		for (int i = 0; i < imageReaders.length; i++) {
+			MultiResolutionStreamInfo streamInfo = multiResolutionImageReader.getStreamInfoForImageReader(imageReaders[i]);
+			OutputConfiguration config = new OutputConfiguration(groupId, imageReaders[i].getSurface(), ROTATION_0, new Size(imageReaders[i].getWidth(), imageReaders[i].getHeight()));
+			config.setPhysicalCameraId(streamInfo.getPhysicalCameraId());
+			config.mIsMultiResolution = true;
+			configs.add(config);
+		}
+		return configs;
+	}
+
+	/* AOSP setSurfacesForMultiResolutionOutput() */
+	public static void setSurfacesForMultiResolutionOutput(java.util.Collection<OutputConfiguration> outputConfigurations, android.hardware.camera2.MultiResolutionImageReader multiResolutionImageReader) {
+		checkNotNull(outputConfigurations, "outputConfigurations must not be null");
+		checkNotNull(multiResolutionImageReader, "multiResolutionImageReader must not be null");
+		if (outputConfigurations.size() != multiResolutionImageReader.getReaders().length) {
+			throw new IllegalArgumentException("outputConfigurations and multiResolutionImageReader sizes must match");
+		}
+		for (OutputConfiguration config : outputConfigurations) {
+			String physicalCameraId = config.mPhysicalCameraId;
+			if (physicalCameraId == null) {
+				physicalCameraId = "";
+			}
+			Surface surface = multiResolutionImageReader.getSurface(config.getConfiguredSize(), physicalCameraId);
+			config.addSurface(surface);
+		}
+	}
 
 	/* AOSP createInstancesForMultiResolutionOutput(Collection<MultiResolutionStreamInfo>, int) */
 	public static List<OutputConfiguration> createInstancesForMultiResolutionOutput(
