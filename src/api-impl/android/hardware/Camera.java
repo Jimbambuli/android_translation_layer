@@ -4,8 +4,12 @@ import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,11 +17,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-/* AOSP core/java/android/hardware/Camera.java. ATL has no camera service: getNumberOfCameras() is 0 and
- * open() connects to nothing, so a Camera only exists as the unconnected object behind
- * getEmptyParameters(). Its instance methods act like AOSP's JNI (core/jni/android_hardware_Camera.cpp)
- * without a native context: release() does nothing, everything else throws get_native_camera()'s
- * RuntimeException. Parameters, Size and Area are AOSP's Java code (comments and annotations removed). */
+/* AOSP core/java/android/hardware/Camera.java. The cameras are those of ATL's camera HAL (the PipeWire cameras,
+ * camera2.impl.ExternalCameraDevice); a Camera's native context, AOSP's JNI (core/jni/android_hardware_Camera.cpp)
+ * with the camera service's API 1 client, is Camera2Client over that HAL, as AOSP runs API 1 over the camera2
+ * HAL. Preview to a SurfaceView/SurfaceTexture and preview callbacks work; takePicture() fails like a client
+ * without a still capture stream (not there yet). Parameters, Size and Area are AOSP's Java code (comments and
+ * annotations removed). */
 public class Camera {
 	private static final String TAG = "Camera";
 
@@ -78,22 +83,80 @@ public class Camera {
 		public boolean canDisableShutterSound;
 	}
 
-	public static int getNumberOfCameras() { return 0; }
+	/* AOSP Camera's messages (CAMERA_MSG_*), the API 1 client's callbacks to the app */
+	private static final int CAMERA_MSG_ERROR = 0x001;
+	private static final int CAMERA_MSG_SHUTTER = 0x002;
+	private static final int CAMERA_MSG_FOCUS = 0x004;
+	private static final int CAMERA_MSG_ZOOM = 0x008;
+	private static final int CAMERA_MSG_PREVIEW_FRAME = 0x010;
+	private static final int CAMERA_MSG_POSTVIEW_FRAME = 0x040;
+	private static final int CAMERA_MSG_RAW_IMAGE = 0x080;
+	private static final int CAMERA_MSG_COMPRESSED_IMAGE = 0x100;
+	private static final int CAMERA_MSG_PREVIEW_METADATA = 0x400;
+	private static final int CAMERA_MSG_FOCUS_MOVE = 0x800;
+	private static final int CAMERA_FACE_DETECTION_HW = 0;
+	/* errno values of native_setup() and the client's status codes */
+	private static final int NO_ERROR = 0;
+	private static final int EACCES = 13;
+	private static final int BAD_VALUE = -22;
+	private static final int INVALID_OPERATION = -38;
 
-	/* ATL has no camera, so this fails like AOSP's native _getCameraInfo() for an unknown camera id */
+	/* AOSP: the API 1 cameras are the camera service's cameras, here those of ATL's camera HAL */
+	public static int getNumberOfCameras() {
+		return android.hardware.camera2.impl.ExternalCameraDevice.getDevices().size();
+	}
+
+	/* AOSP _getCameraInfo() -> CameraProviderManager getCameraInfo(): an external camera is reported as front
+	 * facing to API 1; the orientation is SENSOR_ORIENTATION; ro.camera.sound.forced is unset, so the shutter
+	 * sound can be turned off */
 	public static void getCameraInfo(int cameraId, CameraInfo cameraInfo) {
-		throw new RuntimeException("Fail to get camera info");
+		java.util.List<android.hardware.camera2.impl.ExternalCameraDevice> devices = android.hardware.camera2.impl.ExternalCameraDevice.getDevices();
+		if (cameraId < 0 || cameraId >= devices.size())
+			throw new RuntimeException("Unknown camera ID");
+		android.hardware.camera2.CameraCharacteristics info = devices.get(cameraId).getCharacteristics();
+		Integer facing = info.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING);
+		Integer orientation = info.get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION);
+		if (facing == null || orientation == null)
+			throw new RuntimeException("Fail to get camera info");
+		cameraInfo.facing = facing == android.hardware.camera2.CameraMetadata.LENS_FACING_BACK ? CameraInfo.CAMERA_FACING_BACK : CameraInfo.CAMERA_FACING_FRONT;
+		cameraInfo.orientation = orientation;
+		cameraInfo.canDisableShutterSound = true;
 	}
 
 	/* AOSP open(): the first back-facing camera, null when there is none */
 	public static Camera open() {
+		int numberOfCameras = getNumberOfCameras();
+		CameraInfo cameraInfo = new CameraInfo();
+		for (int i = 0; i < numberOfCameras; i++) {
+			getCameraInfo(i, cameraInfo);
+			if (cameraInfo.facing == CameraInfo.CAMERA_FACING_BACK) {
+				return open(i);
+			}
+		}
 		return null;
 	}
 
-	/* AOSP open(int) is new Camera(cameraId): without a camera service Camera::connect() returns NULL,
-	 * native_setup() reports -EACCES (core/jni/android_hardware_Camera.cpp) and the constructor throws */
 	public static Camera open(int cameraId) {
-		throw new RuntimeException("Fail to connect to camera service");
+		return new Camera(cameraId);
+	}
+
+	/* AOSP Camera(int) -> cameraInit() -> native_setup(); the errors as AOSP reports them */
+	Camera(int cameraId) {
+		Looper looper;
+		if ((looper = Looper.myLooper()) != null) {
+			mEventHandler = new EventHandler(this, looper);
+		} else if ((looper = Looper.getMainLooper()) != null) {
+			mEventHandler = new EventHandler(this, looper);
+		} else {
+			mEventHandler = null;
+		}
+		int err = native_setup(cameraId);
+		if (err != NO_ERROR) {
+			if (err == -EACCES) {
+				throw new RuntimeException("Fail to connect to camera service");
+			}
+			throw new RuntimeException("Unknown camera error");
+		}
 	}
 
 	/* AOSP Camera(): an unconnected camera, used by getEmptyParameters() */
@@ -115,63 +178,381 @@ public class Camera {
 		return p;
 	}
 
-	private ErrorCallback mErrorCallback;
+	private EventHandler mEventHandler;
+	private ShutterCallback mShutterCallback;
+	private PictureCallback mRawImageCallback;
+	private PictureCallback mJpegCallback;
+	private PreviewCallback mPreviewCallback;
+	private PictureCallback mPostviewCallback;
+	private AutoFocusCallback mAutoFocusCallback;
+	private AutoFocusMoveCallback mAutoFocusMoveCallback;
+	private final Object mAutoFocusCallbackLock = new Object();
 	private OnZoomChangeListener mZoomListener;
 	private FaceDetectionListener mFaceListener;
+	private ErrorCallback mErrorCallback;
+	private boolean mOneShot;
+	private boolean mWithBuffer;
+	private boolean mFaceDetectionRunning = false;
 
-	/* get_native_camera() without a native context */
-	private static RuntimeException notConnected() {
-		return new RuntimeException("Camera is being used after Camera.release() was called");
+	/* --- AOSP's JNI (core/jni/android_hardware_Camera.cpp): the native context is the API 1 client and the
+	 * JNICameraContext state below --- */
+	private Camera2Client mClient;
+	private final Object mContextLock = new Object();
+	private boolean mManualBufferMode;
+	private boolean mManualCameraCallbackSet;
+	private final java.util.ArrayDeque<byte[]> mCallbackBuffers = new java.util.ArrayDeque<byte[]>();
+
+	private int native_setup(int cameraId) {
+		java.util.List<android.hardware.camera2.impl.ExternalCameraDevice> devices = android.hardware.camera2.impl.ExternalCameraDevice.getDevices();
+		if (cameraId < 0 || cameraId >= devices.size())
+			return -EACCES; /* Camera::connect() fails for an unknown camera */
+		Camera2Client client = new Camera2Client(devices.get(cameraId), new Camera2Client.Callbacks() {
+			@Override
+			public void onPreviewFrame(Camera2Client c, int size) {
+				copyAndPost(c, size);
+			}
+
+			@Override
+			public void onError(int error) {
+				postEventFromNative(CAMERA_MSG_ERROR, error, 0, null);
+			}
+		});
+		if (!client.initialize())
+			return -EACCES;
+		synchronized (mContextLock) {
+			mClient = client;
+		}
+		return NO_ERROR;
 	}
 
-	/* AOSP release(): native_release() of a camera without a context only clears it */
+	/* get_native_camera() */
+	private Camera2Client client() {
+		synchronized (mContextLock) {
+			if (mClient == null)
+				throw new RuntimeException("Camera is being used after Camera.release() was called");
+			return mClient;
+		}
+	}
+
+	private void postEventFromNative(int what, int arg1, int arg2, Object obj) {
+		if (mEventHandler != null) {
+			Message m = mEventHandler.obtainMessage(what, arg1, arg2, obj);
+			mEventHandler.sendMessage(m);
+		}
+	}
+
+	/* JNICameraContext::copyAndPost() for CAMERA_MSG_PREVIEW_FRAME, on the stream's thread */
+	private void copyAndPost(Camera2Client client, int size) {
+		byte[] obj;
+		synchronized (mContextLock) {
+			if (mClient != client)
+				return;
+			if (mManualBufferMode) {
+				obj = mCallbackBuffers.poll();
+				if (obj != null && obj.length < size) {
+					Log.e(TAG, "Callback buffer was too small! Expected " + size + " bytes, but got " + obj.length + " bytes!");
+					obj = null;
+				}
+				if (mCallbackBuffers.isEmpty()) {
+					client.setPreviewCallbackFlag(0);
+					mManualCameraCallbackSet = false;
+					if (obj == null)
+						return;
+				}
+			} else {
+				obj = new byte[size];
+			}
+		}
+		if (obj != null && !client.copyFrame(obj))
+			Log.e(TAG, "preview frame does not fit the callback buffer");
+		postEventFromNative(CAMERA_MSG_PREVIEW_FRAME, 0, 0, obj);
+	}
+
+	/* AOSP release() -> native_release(): the client disconnects; release() of a released camera does nothing */
 	public final void release() {
+		Camera2Client client;
+		synchronized (mContextLock) {
+			client = mClient;
+			mClient = null;
+			mCallbackBuffers.clear();
+		}
+		if (client != null) {
+			client.setPreviewCallbackFlag(0);
+			client.disconnect();
+		}
+		mFaceDetectionRunning = false;
 	}
 
-	public final void unlock() { throw notConnected(); }
+	@Override
+	protected void finalize() {
+		release();
+	}
 
-	public final void lock() { throw notConnected(); }
+	/* Camera2Client::lock()/unlock(): ATL's single process always holds the lock */
+	public final void unlock() {
+		client();
+	}
 
-	public final void reconnect() throws IOException { throw notConnected(); }
+	public final void lock() {
+		client();
+	}
 
-	public final void setPreviewDisplay(SurfaceHolder holder) throws IOException { throw notConnected(); }
+	public final void reconnect() throws IOException {
+		client();
+	}
 
-	public final void setPreviewTexture(SurfaceTexture surfaceTexture) throws IOException { throw notConnected(); }
+	public final void setPreviewDisplay(SurfaceHolder holder) throws IOException {
+		if (holder != null) {
+			setPreviewSurface(holder.getSurface());
+		} else {
+			setPreviewSurface(null);
+		}
+	}
 
-	public final void startPreview() { throw notConnected(); }
+	private void setPreviewSurface(Surface surface) throws IOException {
+		if (!client().setPreviewTarget(surface))
+			throw new IOException("setPreviewTexture failed");
+	}
 
-	public final void stopPreview() { throw notConnected(); }
+	/* AOSP: a Surface on the SurfaceTexture's buffer queue */
+	public final void setPreviewTexture(SurfaceTexture surfaceTexture) throws IOException {
+		Camera2Client client = client();
+		if (surfaceTexture != null && surfaceTexture.isReleased())
+			throw new IllegalArgumentException("SurfaceTexture already released in setPreviewTexture");
+		if (!client.setPreviewTarget(surfaceTexture != null ? new Surface(surfaceTexture) : null))
+			throw new IOException("setPreviewTexture failed");
+	}
 
-	/* AOSP enableShutterSound(): false if the sound is forced (AudioService.isCameraSoundForced(), see
-	 * MediaActionSound.mustPlayShutterSound(): false), else native _enableShutterSound() of a camera without a
-	 * context */
+	public final void startPreview() {
+		if (!client().startPreview())
+			throw new RuntimeException("startPreview failed");
+	}
+
+	public final void stopPreview() {
+		client().stopPreview();
+		mFaceDetectionRunning = false;
+		mShutterCallback = null;
+		mRawImageCallback = null;
+		mPostviewCallback = null;
+		mJpegCallback = null;
+		synchronized (mAutoFocusCallbackLock) {
+			mAutoFocusCallback = null;
+		}
+		mAutoFocusMoveCallback = null;
+	}
+
+	public final boolean previewEnabled() {
+		return client().previewEnabled();
+	}
+
+	/* AOSP enableShutterSound(): AudioService.isCameraSoundForced() is false (no forced camera sound), so the
+	 * client's _enableShutterSound() answers */
 	public final boolean enableShutterSound(boolean enabled) {
-		throw notConnected();
+		client().enableShutterSound(enabled);
+		return true;
 	}
 
-	public final void setPreviewCallback(PreviewCallback cb) { throw notConnected(); }
+	public final void setPreviewCallback(PreviewCallback cb) {
+		mPreviewCallback = cb;
+		mOneShot = false;
+		mWithBuffer = false;
+		setHasPreviewCallback(cb != null, false);
+	}
 
-	public final void setOneShotPreviewCallback(PreviewCallback cb) { throw notConnected(); }
+	public final void setOneShotPreviewCallback(PreviewCallback cb) {
+		mPreviewCallback = cb;
+		mOneShot = true;
+		mWithBuffer = false;
+		setHasPreviewCallback(cb != null, false);
+	}
 
-	public final void setPreviewCallbackWithBuffer(PreviewCallback cb) { throw notConnected(); }
+	public final void setPreviewCallbackWithBuffer(PreviewCallback cb) {
+		mPreviewCallback = cb;
+		mOneShot = false;
+		mWithBuffer = true;
+		setHasPreviewCallback(cb != null, true);
+	}
 
-	public final void addCallbackBuffer(byte[] callbackBuffer) { throw notConnected(); }
+	/* JNICameraContext::setCallbackMode(): plain callbacks one frame at a time (CAMERA_FRAME_CALLBACK_FLAG_
+	 * BARCODE_SCANNER, renewed after each delivery), manual buffers continuously while buffers last */
+	private void setHasPreviewCallback(boolean installed, boolean manualBuffer) {
+		Camera2Client client = client();
+		synchronized (mContextLock) {
+			mManualBufferMode = manualBuffer;
+			mManualCameraCallbackSet = false;
+			if (!installed) {
+				client.setPreviewCallbackFlag(0);
+				mCallbackBuffers.clear();
+			} else if (mManualBufferMode) {
+				if (!mCallbackBuffers.isEmpty()) {
+					client.setPreviewCallbackFlag(Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_ENABLE_MASK | Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_COPY_OUT_MASK);
+					mManualCameraCallbackSet = true;
+				}
+			} else {
+				client.setPreviewCallbackFlag(Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_ENABLE_MASK | Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_ONE_SHOT_MASK | Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_COPY_OUT_MASK);
+				mCallbackBuffers.clear();
+			}
+		}
+	}
 
-	public final void autoFocus(AutoFocusCallback cb) { throw notConnected(); }
+	/* JNICameraContext::addCallbackBuffer() (without a native context the buffer is dropped) */
+	public final void addCallbackBuffer(byte[] callbackBuffer) {
+		Camera2Client client;
+		synchronized (mContextLock) {
+			client = mClient;
+		}
+		if (client == null || callbackBuffer == null)
+			return;
+		synchronized (mContextLock) {
+			mCallbackBuffers.add(callbackBuffer);
+			if (mManualBufferMode && !mManualCameraCallbackSet) {
+				client.setPreviewCallbackFlag(Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_ENABLE_MASK | Camera2Client.CAMERA_FRAME_CALLBACK_FLAG_COPY_OUT_MASK);
+				mManualCameraCallbackSet = true;
+			}
+		}
+	}
 
-	public final void cancelAutoFocus() { throw notConnected(); }
+	/* AOSP Camera.EventHandler: the client's messages on the looper of the thread that opened the camera */
+	private class EventHandler extends Handler {
+		private final Camera mCamera;
 
-	public void setAutoFocusMoveCallback(AutoFocusMoveCallback cb) { throw notConnected(); }
+		public EventHandler(Camera c, Looper looper) {
+			super(looper);
+			mCamera = c;
+		}
 
-	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback jpeg) { throw notConnected(); }
+		@Override
+		public void handleMessage(Message msg) {
+			switch (msg.what) {
+				case CAMERA_MSG_SHUTTER:
+					if (mShutterCallback != null) {
+						mShutterCallback.onShutter();
+					}
+					return;
+				case CAMERA_MSG_RAW_IMAGE:
+					if (mRawImageCallback != null) {
+						mRawImageCallback.onPictureTaken((byte[])msg.obj, mCamera);
+					}
+					return;
+				case CAMERA_MSG_COMPRESSED_IMAGE:
+					if (mJpegCallback != null) {
+						mJpegCallback.onPictureTaken((byte[])msg.obj, mCamera);
+					}
+					return;
+				case CAMERA_MSG_PREVIEW_FRAME:
+					PreviewCallback pCb = mPreviewCallback;
+					if (pCb != null) {
+						if (mOneShot) {
+							mPreviewCallback = null;
+						} else if (!mWithBuffer) {
+							setHasPreviewCallback(true, false);
+						}
+						pCb.onPreviewFrame((byte[])msg.obj, mCamera);
+					}
+					return;
+				case CAMERA_MSG_POSTVIEW_FRAME:
+					if (mPostviewCallback != null) {
+						mPostviewCallback.onPictureTaken((byte[])msg.obj, mCamera);
+					}
+					return;
+				case CAMERA_MSG_FOCUS:
+					AutoFocusCallback cb = null;
+					synchronized (mAutoFocusCallbackLock) {
+						cb = mAutoFocusCallback;
+					}
+					if (cb != null) {
+						boolean success = msg.arg1 == 0 ? false : true;
+						cb.onAutoFocus(success, mCamera);
+					}
+					return;
+				case CAMERA_MSG_ZOOM:
+					if (mZoomListener != null) {
+						mZoomListener.onZoomChange(msg.arg1, msg.arg2 != 0, mCamera);
+					}
+					return;
+				case CAMERA_MSG_PREVIEW_METADATA:
+					if (mFaceListener != null) {
+						mFaceListener.onFaceDetection((Face[])msg.obj, mCamera);
+					}
+					return;
+				case CAMERA_MSG_ERROR:
+					Log.e(TAG, "Error " + msg.arg1);
+					if (mErrorCallback != null) {
+						if (msg.arg1 == CAMERA_ERROR_DISABLED) {
+							mErrorCallback.onError(CAMERA_ERROR_EVICTED, mCamera);
+						} else {
+							mErrorCallback.onError(msg.arg1, mCamera);
+						}
+					}
+					return;
+				case CAMERA_MSG_FOCUS_MOVE:
+					if (mAutoFocusMoveCallback != null) {
+						mAutoFocusMoveCallback.onAutoFocusMoving(msg.arg1 == 0 ? false : true, mCamera);
+					}
+					return;
+				default:
+					Log.e(TAG, "Unknown message type " + msg.what);
+					return;
+			}
+		}
+	}
 
-	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback postview, PictureCallback jpeg) { throw notConnected(); }
+	/* Camera2Client::autoFocus(): a fixed focus reports success at once */
+	public final void autoFocus(AutoFocusCallback cb) {
+		synchronized (mAutoFocusCallbackLock) {
+			mAutoFocusCallback = cb;
+		}
+		int res = client().autoFocus();
+		if (res < 0)
+			throw new RuntimeException("autoFocus failed");
+		if (res > 0)
+			postEventFromNative(CAMERA_MSG_FOCUS, 1, 0, null);
+	}
 
-	public final void startSmoothZoom(int value) { throw notConnected(); }
+	/* Camera2Client::cancelAutoFocus(): nothing to cancel for a fixed focus */
+	public final void cancelAutoFocus() {
+		synchronized (mAutoFocusCallbackLock) {
+			mAutoFocusCallback = null;
+		}
+		client();
+		mEventHandler.removeMessages(CAMERA_MSG_FOCUS);
+	}
 
-	public final void stopSmoothZoom() { throw notConnected(); }
+	/* Camera2Client::commandEnableFocusMoveMsgL(): kept; a fixed focus never moves */
+	public void setAutoFocusMoveCallback(AutoFocusMoveCallback cb) {
+		mAutoFocusMoveCallback = cb;
+		client();
+	}
 
-	public final void setDisplayOrientation(int degrees) { throw notConnected(); }
+	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback jpeg) {
+		takePicture(shutter, raw, null, jpeg);
+	}
+
+	/* the still capture of the API 1 client (Camera2Client::takePicture() -> CaptureSequencer, JPEG stream) is
+	 * not there yet: the client fails as AOSP's does without a JPEG stream */
+	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback postview, PictureCallback jpeg) {
+		mShutterCallback = shutter;
+		mRawImageCallback = raw;
+		mPostviewCallback = postview;
+		mJpegCallback = jpeg;
+		client();
+		mFaceDetectionRunning = false;
+		throw new RuntimeException("takePicture failed");
+	}
+
+	/* Camera2Client::commandStartSmoothZoomL()/commandStopSmoothZoomL(): "Unimplemented!", OK */
+	public final void startSmoothZoom(int value) {
+		client();
+	}
+
+	public final void stopSmoothZoom() {
+		client();
+	}
+
+	public final void setDisplayOrientation(int degrees) {
+		if (!client().setDisplayOrientation(degrees))
+			throw new RuntimeException("set display orientation failed");
+	}
 
 	public final void setZoomChangeListener(OnZoomChangeListener listener) {
 		mZoomListener = listener;
@@ -181,17 +562,40 @@ public class Camera {
 		mFaceListener = listener;
 	}
 
-	public final void startFaceDetection() { throw notConnected(); }
+	/* Camera2Client::commandStartFaceDetectionL(): the HAL has no face detection (BAD_VALUE) */
+	public final void startFaceDetection() {
+		if (mFaceDetectionRunning) {
+			throw new RuntimeException("Face detection is already running");
+		}
+		int rc = client().startFaceDetection();
+		if (rc == BAD_VALUE)
+			throw new IllegalArgumentException("invalid face detection type=" + CAMERA_FACE_DETECTION_HW);
+		else if (rc != NO_ERROR)
+			throw new RuntimeException("start face detection failed");
+		mFaceDetectionRunning = true;
+	}
 
-	public final void stopFaceDetection() { throw notConnected(); }
+	/* Camera2Client::commandStopFaceDetectionL(): nothing running is fine */
+	public final void stopFaceDetection() {
+		client();
+		mFaceDetectionRunning = false;
+	}
 
 	public final void setErrorCallback(ErrorCallback cb) {
 		mErrorCallback = cb;
 	}
 
-	public void setParameters(Parameters params) { throw notConnected(); }
+	public void setParameters(Parameters params) {
+		if (!client().setParameters(params.flatten()))
+			throw new RuntimeException("setParameters failed");
+	}
 
-	public Parameters getParameters() { throw notConnected(); }
+	public Parameters getParameters() {
+		Parameters p = new Parameters();
+		String s = client().getParameters();
+		p.unflatten(s);
+		return p;
+	}
 
 	public class Size {
 		

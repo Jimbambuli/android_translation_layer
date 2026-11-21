@@ -650,6 +650,7 @@ srcs = [
 	'android/graphics/text/PositionedGlyphs.java',
 	'android/graphics/text/TextRunShaper.java',
 	'android/hardware/Camera.java',
+	'android/hardware/Camera2Client.java',
 	'android/hardware/ConsumerIrManager.java',
 	'android/hardware/DataSpace.java',
 	'android/hardware/GeomagneticField.java',
