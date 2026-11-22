@@ -229,6 +229,26 @@ public final class ATLLoadedAppManager {
 	}
 
 	/**
+	 * The package that installed `packageName` (AOSP InstallSource.mInstallerPackageName): the starter keeps it as
+	 * "installer" in the PACKAGE.json next to the APK when an app store installed the app through ATL's
+	 * PackageInstaller (ATL_INSTALLER_PACKAGE of ATL_INSTALL_COMMAND); null if it did not record one.
+	 */
+	public static String recordedInstaller(String packageName) {
+		File meta = new File(ATLPaths.installed_apks_dir, packageName + ".json");
+		if (!meta.isFile())
+			return null;
+		try {
+			org.json.JSONObject json = new org.json.JSONObject(new String(java.nio.file.Files.readAllBytes(meta.toPath()),
+			                                                              java.nio.charset.StandardCharsets.UTF_8));
+			String installer = json.optString("installer", "");
+			return installer.isEmpty() ? null : installer;
+		} catch (IOException | org.json.JSONException e) {
+			Slog.w(TAG, "cannot read " + meta + ": " + e);
+			return null;
+		}
+	}
+
+	/**
 	 * The other installed apps that take `type` shared (SEND/SEND_MULTIPLE), for the share sheet, which is system UI
 	 * and sees every app: {package, label, icon file}. The starter keeps the types each app takes in "share_types"
 	 * of the PACKAGE.json next to its APK (from the app's filters in CATEGORY_DEFAULT); apps installed before it

@@ -3931,7 +3931,10 @@ public class PackageManager {
 	 * @param packageName The name of the package to query
 	 */
 	public String getInstallerPackageName(String packageName) {
-		return "com.example.installer";
+		/* the store that installed the app (as on Android, e.g. com.aurora.store, or com.android.vending when
+		 * microG Companion installed it for Aurora); apps the starter installed itself keep ATL's placeholder */
+		String installer = android.atl.ATLLoadedAppManager.recordedInstaller(packageName);
+		return installer != null ? installer : "com.example.installer";
 	}
 
 	/**
