@@ -11,18 +11,27 @@ import java.util.ArrayList;
 public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
 	private final ArrayList<OnBackInvokedCallback> callbacks = new ArrayList<>();
 	private final ArrayList<Integer> priorities = new ArrayList<>();
+	/* PRIORITY_SYSTEM_NAVIGATION_OBSERVER: on API level 36 one callback, which only observes a system back navigation */
+	private OnBackInvokedCallback systemNavigationObserverCallback;
 
 	@Override
 	public void registerOnBackInvokedCallback(int priority, OnBackInvokedCallback callback) {
-		if (priority < 0)
+		if (priority < 0 && priority != PRIORITY_SYSTEM_NAVIGATION_OBSERVER)
 			throw new IllegalArgumentException("Application registered OnBackInvokedCallback cannot have negative priority. Priority: " + priority);
+		java.util.Objects.requireNonNull(callback);
 		unregisterOnBackInvokedCallback(callback);
+		if (priority == PRIORITY_SYSTEM_NAVIGATION_OBSERVER) {
+			systemNavigationObserverCallback = callback;
+			return;
+		}
 		callbacks.add(callback);
 		priorities.add(priority);
 	}
 
 	@Override
 	public void unregisterOnBackInvokedCallback(OnBackInvokedCallback callback) {
+		if (systemNavigationObserverCallback == callback)
+			systemNavigationObserverCallback = null;
 		int i = callbacks.indexOf(callback);
 		if (i >= 0) {
 			callbacks.remove(i);
@@ -38,7 +47,8 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
 	/**
 	 * @hide
 	 * Invokes the topmost callback. Returns false when there is none, and the
-	 * caller falls back to the classic onBackPressed().
+	 * caller falls back to the classic onBackPressed(), the system back navigation,
+	 * which the system navigation observer callback observes (AOSP dispatchOnBackInvoked()).
 	 */
 	public boolean dispatchOnBackInvoked() {
 		int top = -1;
@@ -46,8 +56,11 @@ public class WindowOnBackInvokedDispatcher implements OnBackInvokedDispatcher {
 			if (top < 0 || priorities.get(i) >= priorities.get(top))
 				top = i;
 		}
-		if (top < 0)
+		if (top < 0) {
+			if (systemNavigationObserverCallback != null)
+				systemNavigationObserverCallback.onBackInvoked();
 			return false;
+		}
 		callbacks.get(top).onBackInvoked();
 		return true;
 	}

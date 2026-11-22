@@ -43,6 +43,7 @@ public interface OnBackInvokedDispatcher {
     @IntDef({
             PRIORITY_DEFAULT,
             PRIORITY_OVERLAY,
+            PRIORITY_SYSTEM_NAVIGATION_OBSERVER,
     })
     @Retention(RetentionPolicy.SOURCE)
     @interface Priority{}
@@ -65,6 +66,12 @@ public interface OnBackInvokedDispatcher {
      * @hide
      */
     int PRIORITY_SYSTEM = -1;
+
+    /**
+     * Priority level of {@link OnBackInvokedCallback}s that only observe a system back
+     * navigation (API level 36); they do not consume the back event.
+     */
+    int PRIORITY_SYSTEM_NAVIGATION_OBSERVER = -2;
 
     /**
      * Registers a {@link OnBackInvokedCallback}.
