@@ -2190,6 +2190,7 @@ srcs = [
 	'com/android/internal/widget/ToolbarWidgetWrapper.java',
 	'com/android/location/provider/ProviderPropertiesUnbundled.java',
 	'com/android/net/module/util/HexDump.java',
+	'com/android/net/module/util/Inet4AddressUtils.java',
 	'com/android/net/module/util/InetAddressUtils.java',
 	'com/android/net/module/util/MacAddressUtils.java',
 	'com/android/net/module/util/NetUtils.java',
