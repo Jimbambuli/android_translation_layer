@@ -151,8 +151,12 @@ void widget_set_needs_allocation(GtkWidget *widget)
 {
 	if (ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget))) {
 		AndroidLayout *layout = ATL_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget));
-		if (!layout->needs_allocation && (layout->real_width || layout->real_height))
-			gtk_widget_size_allocate(widget, &(GtkAllocation){.x = 0, .y = 0, .width = layout->real_width, .height = layout->real_height}, 0);
+		if (layout->needs_allocation)
+			return;
+		/* set before allocating: the allocation runs View.onLayout(), which may come back here
+		 * (setBackgroundColor() in onLayout(): Amaze GestureExclusionView) */
 		layout->needs_allocation = true;
+		if (layout->real_width || layout->real_height)
+			gtk_widget_size_allocate(widget, &(GtkAllocation){.x = 0, .y = 0, .width = layout->real_width, .height = layout->real_height}, 0);
 	}
 }
