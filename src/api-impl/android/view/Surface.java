@@ -120,8 +120,11 @@ public class Surface implements android.os.Parcelable {
 		}
 	}
 
-	/* called from ANativeWindow_fromSurface() for a Surface of another process: the socket to its widget, or -1 */
+	/* called from ANativeWindow_fromSurface() for a Surface without a widget of this process: the socket to the widget
+	 * of another process or to the SurfaceTexture (its consumer), or -1 (a released Surface) */
 	private int atl_connect() {
+		if (atl_endpoint == null)
+			return surfaceTexture != null && !surfaceTexture.isReleased() ? SurfaceView.native_connectRemoteTexture(surfaceTexture) : -1;
 		android.os.Parcel data = android.os.Parcel.obtain();
 		android.os.Parcel reply = android.os.Parcel.obtain();
 		try {

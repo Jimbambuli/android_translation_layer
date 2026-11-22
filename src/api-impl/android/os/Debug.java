@@ -1034,6 +1034,14 @@ public final class Debug {
 		return VMDebug.threadCpuTimeNanos();
 	}
 
+	/**
+	 * AOSP (@hide, @UnsupportedAppUsage): dumps the VM's reference tables (JNI locals and globals) to the log.
+	 * @hide
+	 */
+	public static final void dumpReferenceTables() {
+		VMDebug.dumpReferenceTables();
+	}
+
 	public static void getMemoryInfo(MemoryInfo memoryInfo) {}
 
 	public static void stopAllocCounting() {}

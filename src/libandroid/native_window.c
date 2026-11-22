@@ -304,7 +304,7 @@ static ANativeWindow *remote_window_fromSurface(JNIEnv *env, jobject surface)
 		ANativeWindow_release(native_window);
 		return NULL;
 	}
-	fprintf(stderr, "ANativeWindow_fromSurface: surface of another process, %dx%d\n", native_window->width, native_window->height);
+	fprintf(stderr, "ANativeWindow_fromSurface: surface of another process or of a SurfaceTexture, %dx%d\n", native_window->width, native_window->height);
 	return native_window;
 }
 
@@ -436,7 +436,10 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 		.global_remove = wl_registry_global_remove_handler
 	};
 
-	if (!_GET_LONG_FIELD(surface, "widget") && _GET_OBJ_FIELD(surface, "atl_endpoint", "Landroid/os/IBinder;"))
+	/* no SurfaceView widget of this process: a Surface of another process or of a SurfaceTexture, whose buffers go
+	 * over a socket to the consumer (Surface.atl_connect()); a released Surface has neither (AOSP: no native object,
+	 * NULL). Waiting below for a widget to get mapped would spin forever on a NULL widget. */
+	if (!_GET_LONG_FIELD(surface, "widget"))
 		return remote_window_fromSurface(env, surface);
 
 	/* AOSP android_view_Surface_getNativeWindow(): a Surface without a native surface (released, or of a

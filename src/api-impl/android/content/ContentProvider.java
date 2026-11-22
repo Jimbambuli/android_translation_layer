@@ -7,6 +7,7 @@ import android.atl.ATLProcess;
 import android.atl.ATLProvider;
 import android.atl.ATLRemoteContentProvider;
 import android.atl.annotation.Export;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.pm.ProviderInfo;
 import android.content.res.AssetFileDescriptor;
@@ -35,12 +36,18 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 
 
 	static final HashMap<String, ATLProvider> atl_providers = new HashMap<>();
+	/* the providers createContentProviders() installed (also those that failed to load) */
+	private static final java.util.HashSet<PackageParser.Provider> installed_at_start = new java.util.HashSet<>();
 
 	@Export
 	static void createContentProviders() {
 		atl_providers.put("media", new ATLProvider(new ATLMediaContentProvider()));
 		ATLLoadedApp primary = ATLLoadedApp.getPrimaryApplication();
 		for (PackageParser.Provider provider_parsed : primary.pkg.providers) {
+			/* like ComputerEngine.queryContentProviders() for AMS.generateApplicationProvidersLocked(): a disabled
+			 * provider is not installed (android:enabled="false" in the manifest, unless the app enabled it) */
+			if (!PackageManager.atlIsComponentEnabled(provider_parsed.info, 0))
+				continue;
 			String process_name = provider_parsed.info.processName;
 			if (ATLProcess.isSecondary()) {
 				/* like AMS.generateApplicationProvidersLocked(): a process gets the providers that run in it */
@@ -50,6 +57,7 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 				/* it runs in its own process, which atl_get_content_provider() starts on first use */
 				continue;
 			}
+			installed_at_start.add(provider_parsed);
 			atl_providers.put(provider_parsed.info.authority,
 			                  new ATLProvider(primary, provider_parsed));
 		}
@@ -72,6 +80,19 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 		return atlProvider == null ? null : atlProvider.getContentProvider();
 	}
 
+	/* an enabled provider of the app with this authority that runs in this process */
+	private static PackageParser.Provider ownEnabledProvider(String authority) {
+		for (PackageParser.Provider p : ATLLoadedApp.getPrimaryApplication().pkg.providers) {
+			if (p.info.authority == null || !java.util.Arrays.asList(p.info.authority.split(";")).contains(authority))
+				continue;
+			String process_name = p.info.processName != null ? p.info.processName : ATLProcess.mainProcessName();
+			if (process_name.equals(ATLProcess.myProcessName()) && !installed_at_start.contains(p)
+			    && PackageManager.atlIsComponentEnabled(p.info, 0))
+				return p;
+		}
+		return null;
+	}
+
 	/* the process an own provider of the app runs in, if that is another process */
 	private static String otherProviderProcess(String authority) {
 		for (PackageParser.Provider p : ATLLoadedApp.getPrimaryApplication().pkg.providers) {
@@ -92,6 +113,15 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 				// a provider of the app in another of its processes
 				atlProvider = new ATLProvider(new ATLRemoteContentProvider(process_name, authority));
 				atl_providers.put(authority, atlProvider);
+			}
+			if (atlProvider == null && authority != null) {
+				// an own provider of this process that was disabled at start and has been enabled since:
+				// AMS.getContentProviderImpl() resolves it now, and the client installs it (canRunHere)
+				PackageParser.Provider own = ownEnabledProvider(authority);
+				if (own != null) {
+					atlProvider = new ATLProvider(ATLLoadedApp.getPrimaryApplication(), own);
+					atl_providers.put(authority, atlProvider);
+				}
 			}
 			if (atlProvider == null && authority != null) {
 				// a provider of another package (Play Services), loaded into this process on first use
