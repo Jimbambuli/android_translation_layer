@@ -249,6 +249,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
                                                                   	'src/api-impl-jni/text/android_text_Layout.c',
                                                                   	'src/api-impl-jni/util.c',
+                                                                  	'src/api-impl-jni/android_runtime_AndroidRuntime.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/opengl_poly_clip.c',
                                                                   	'src/api-impl-jni/etc1.c',
