@@ -16,6 +16,17 @@ struct ANativeWindow {
 	gulong resize_handler;
 	int refcount;
 	jobject surface; /* the android.view.Surface of this window (a global reference) */
+	struct { /* ANativeWindow_setBuffersGeometry() and the buffer of ANativeWindow_lock() */
+		int width;
+		int height;
+		int format;
+		void *bits;
+		size_t size;
+		gboolean locked;
+		int locked_width;
+		int locked_height;
+		int locked_format;
+	} cpu;
 	int width;
 	int height;
 	/* a Surface of another process of the app (Surface.Endpoint): the socket to its widget, else -1 */

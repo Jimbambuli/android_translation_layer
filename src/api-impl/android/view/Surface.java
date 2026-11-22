@@ -32,6 +32,9 @@ public class Surface implements android.os.Parcelable {
 	/* a Surface read in another process of the app (Surface.CREATOR there): the endpoint in the process that
 	 * shows it, through which that process gets the buffers drawn here (atl_connect()) */
 	public android.os.IBinder atl_endpoint;
+	/* the PixelFormat of the buffers (AOSP: the format of the surface's BufferQueue); a SurfaceView sets its own,
+	 * the native ANativeWindow_getFormat() reads it */
+	int atl_format = android.graphics.PixelFormat.RGBA_8888;
 	private Endpoint endpoint;
 
 	/* AOSP Surface.writeToParcel()/readFromParcel()/CREATOR: a Surface travels as the binder of its buffer queue

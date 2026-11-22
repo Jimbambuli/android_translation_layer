@@ -131,6 +131,7 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 		JNIEnv *env = ndk_jni_env();
 		(*env)->DeleteGlobalRef(env, native_window->surface);
 	}
+	g_free(native_window->cpu.bits);
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
 		/* a unix socket closed with unread messages (the consumer's FRAME/RELEASE) gives the other end
@@ -361,9 +362,22 @@ static ANativeWindow *remote_window_fromSurface(JNIEnv *env, jobject surface)
  *
  * \return a negative value on error.
  */
+enum { /* ANativeWindow_LegacyFormat */
+	WINDOW_FORMAT_RGBA_8888 = 1,
+	WINDOW_FORMAT_RGBX_8888 = 2,
+	WINDOW_FORMAT_RGB_565 = 4,
+};
+
+/* AOSP: the format of the window's buffers: the one given to ANativeWindow_setBuffersGeometry(), else the
+ * surface's (a SurfaceView's is RGB_565 until SurfaceHolder.setFormat(), Surface.atl_format) */
 int32_t ANativeWindow_getFormat(ANativeWindow *window)
 {
-	return -1;
+	if (window->cpu.format)
+		return window->cpu.format;
+	if (!window->surface)
+		return WINDOW_FORMAT_RGBA_8888;
+	JNIEnv *env = ndk_jni_env();
+	return (*env)->GetIntField(env, window->surface, (*env)->GetFieldID(env, (*env)->GetObjectClass(env, window->surface), "atl_format", "I"));
 }
 
 /**
@@ -383,10 +397,18 @@ int32_t ANativeWindow_getFormat(ANativeWindow *window)
  * \param format one of AHARDWAREBUFFER_FORMAT_* constants.
  * \return 0 for success, or a negative value on error.
  */
+/* AOSP: the size and format of the buffers from now on; 0 for width and height means the window's size, 0 for the
+ * format keeps the current one */
 int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
                                          int32_t width, int32_t height, int32_t format)
 {
-	return -1;
+	if (!window || (width == 0) != (height == 0) || width < 0 || height < 0)
+		return -EINVAL;
+	window->cpu.width = width;
+	window->cpu.height = height;
+	if (format)
+		window->cpu.format = format;
+	return 0;
 }
 
 /**
@@ -400,12 +422,51 @@ int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
  * \return 0 for success, or a negative value on error.
  */
 
-typedef void ARect;
+typedef struct ARect {
+	int32_t left;
+	int32_t top;
+	int32_t right;
+	int32_t bottom;
+} ARect;
 
+/* AOSP ANativeWindow_lock(): a CPU buffer of the window's geometry for the app to draw into; the buffer is kept
+ * between frames, so it holds the previous frame like the one AOSP copies back */
 int32_t ANativeWindow_lock(ANativeWindow *window, ANativeWindow_Buffer *outBuffer,
                            ARect *inOutDirtyBounds)
 {
-	return -1;
+	if (window->cpu.locked)
+		return -EINVAL;
+	int width = window->cpu.width ?: ANativeWindow_getWidth(window);
+	int height = window->cpu.height ?: ANativeWindow_getHeight(window);
+	int format = ANativeWindow_getFormat(window);
+	if (width <= 0 || height <= 0)
+		return -EINVAL;
+	int bpp;
+	switch (format) {
+		case WINDOW_FORMAT_RGBA_8888:
+		case WINDOW_FORMAT_RGBX_8888:
+			bpp = 4;
+			break;
+		case WINDOW_FORMAT_RGB_565:
+			bpp = 2;
+			break;
+		default:
+			return -EINVAL;
+	}
+	size_t size = (size_t)width * height * bpp;
+	if (window->cpu.size != size) {
+		g_free(window->cpu.bits);
+		window->cpu.bits = g_malloc0(size);
+		window->cpu.size = size;
+	}
+	window->cpu.locked = TRUE;
+	window->cpu.locked_width = width;
+	window->cpu.locked_height = height;
+	window->cpu.locked_format = format;
+	*outBuffer = (ANativeWindow_Buffer){.width = width, .height = height, .stride = width, .format = format, .bits = window->cpu.bits};
+	if (inOutDirtyBounds) /* the whole buffer is to be drawn */
+		*inOutDirtyBounds = (ARect){.left = 0, .top = 0, .right = width, .bottom = height};
+	return 0;
 }
 
 /**
@@ -414,9 +475,63 @@ int32_t ANativeWindow_lock(ANativeWindow *window, ANativeWindow_Buffer *outBuffe
  *
  * \return 0 for success, or a negative value on error.
  */
+struct cpu_frame {
+	GtkWidget *widget;
+	GdkTexture *texture;
+};
+
+static gboolean present_cpu_frame(void *data)
+{
+	struct cpu_frame *f = data;
+	surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(f->widget), f->texture, FALSE);
+	g_object_unref(f->texture);
+	g_object_unref(f->widget);
+	free(f);
+	return G_SOURCE_REMOVE;
+}
+
+/* AOSP: the drawn buffer goes to the window's consumer; here as a texture to the SurfaceView widget (on the main
+ * thread) or to the widget of another process */
 int32_t ANativeWindow_unlockAndPost(ANativeWindow *window)
 {
-	return -1;
+	if (!window->cpu.locked)
+		return -EINVAL;
+	window->cpu.locked = FALSE;
+	int width = window->cpu.locked_width;
+	int height = window->cpu.locked_height;
+	GBytes *bytes;
+	GdkMemoryFormat format;
+	size_t stride;
+	if (window->cpu.locked_format == WINDOW_FORMAT_RGB_565) { /* GDK has no 16-bit format */
+		uint8_t *rgb = g_malloc((size_t)width * height * 3);
+		const uint16_t *src = window->cpu.bits;
+		for (size_t i = 0; i < (size_t)width * height; i++) {
+			uint16_t p = src[i];
+			rgb[3 * i] = ((p >> 11) & 0x1f) * 255 / 31;
+			rgb[3 * i + 1] = ((p >> 5) & 0x3f) * 255 / 63;
+			rgb[3 * i + 2] = (p & 0x1f) * 255 / 31;
+		}
+		bytes = g_bytes_new_take(rgb, (size_t)width * height * 3);
+		format = GDK_MEMORY_R8G8B8;
+		stride = (size_t)width * 3;
+	} else {
+		bytes = g_bytes_new(window->cpu.bits, window->cpu.size);
+		/* Android's RGBA_8888 buffers are premultiplied */
+		format = window->cpu.locked_format == WINDOW_FORMAT_RGBX_8888 ? GDK_MEMORY_R8G8B8X8 : GDK_MEMORY_R8G8B8A8_PREMULTIPLIED;
+		stride = (size_t)width * 4;
+	}
+	GdkTexture *texture = gdk_memory_texture_new(width, height, format, bytes, stride);
+	g_bytes_unref(bytes);
+	if (window->remote_fd >= 0) {
+		ANativeWindow_remotePresentTexture(window, texture, FALSE);
+		g_object_unref(texture);
+	} else {
+		struct cpu_frame *f = malloc(sizeof(*f));
+		f->widget = g_object_ref(window->surface_view_widget);
+		f->texture = texture;
+		g_idle_add(present_cpu_frame, f);
+	}
+	return 0;
 }
 
 int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_t compatibility)
