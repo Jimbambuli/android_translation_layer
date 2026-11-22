@@ -244,10 +244,13 @@ public class GskCanvas extends DisplayListCanvas {
 			throw new RuntimeException("Canvas: trying to use a non-premultiplied bitmap " + bitmap);
 		if (drawComposited(paint, p -> native_drawRect(snapshot, dst.left, dst.top, dst.right, dst.bottom, p.paint), p -> drawBitmap(bitmap, src, dst, p)))
 			return;
-		if (src == null)
-			native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
-		else
-			native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), src.left, src.top, src.width(), src.height(), paint != null ? paint.paint : default_paint.paint);
+		/* under the bitmap's lock: another thread's setPixels() would free the texture (see Bitmap) */
+		synchronized (bitmap) {
+			if (src == null)
+				native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
+			else
+				native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), src.left, src.top, src.width(), src.height(), paint != null ? paint.paint : default_paint.paint);
+		}
 	}
 
 	/**
@@ -274,8 +277,10 @@ public class GskCanvas extends DisplayListCanvas {
 				inverse.mapRect(area);
 				concat(local);
 			}
-			native_fillBitmapShader(snapshot, shader.bitmap.getTexture(), area.left, area.top, area.right, area.bottom,
-			                        tileModeInt(shader.tileX), tileModeInt(shader.tileY), paint.paint);
+			synchronized (shader.bitmap) {
+				native_fillBitmapShader(snapshot, shader.bitmap.getTexture(), area.left, area.top, area.right, area.bottom,
+				                        tileModeInt(shader.tileX), tileModeInt(shader.tileY), paint.paint);
+			}
 			restore();
 			return true;
 		}
