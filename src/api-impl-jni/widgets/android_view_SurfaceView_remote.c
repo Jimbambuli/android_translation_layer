@@ -42,6 +42,10 @@ struct texture_data {
 	uint32_t index;
 };
 
+/* the consumers of SurfaceTextures, for setDefaultBufferSize() */
+static GMutex texture_consumers_lock;
+static GList *texture_consumers;
+
 static void consumer_unref(struct remote_consumer *consumer)
 {
 	if (!g_atomic_ref_count_dec(&consumer->ref))
@@ -54,10 +58,14 @@ static void consumer_unref(struct remote_consumer *consumer)
 		if (consumer->buffers[i].fd1 >= 0)
 			close(consumer->buffers[i].fd1);
 	}
-	if (consumer->widget)
+	if (consumer->widget) {
 		g_object_unref(consumer->widget);
-	else
+	} else {
+		g_mutex_lock(&texture_consumers_lock);
+		texture_consumers = g_list_remove(texture_consumers, consumer);
+		g_mutex_unlock(&texture_consumers_lock);
 		(*get_jni_env())->DeleteGlobalRef(get_jni_env(), consumer->surface_texture);
+	}
 	g_free(consumer);
 }
 
@@ -293,6 +301,22 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemoteTextur
 	int width = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferWidth", "()I"));
 	int height = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferHeight", "()I"));
 	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, width > 0 ? width : 1, height > 0 ? height : 1);
+	g_mutex_lock(&texture_consumers_lock);
+	texture_consumers = g_list_prepend(texture_consumers, consumer);
+	g_mutex_unlock(&texture_consumers_lock);
 	g_main_context_invoke(NULL, G_SOURCE_FUNC(start), consumer);
 	return fds[1];
+}
+
+/* SurfaceTexture.setDefaultBufferSize(): the producers' next buffers have the new size (AOSP: the BufferQueue's
+ * default size, which the next dequeueBuffer() of a producer without a size of its own takes) */
+JNIEXPORT void JNICALL Java_android_view_SurfaceView_native_1resizeRemoteTexture(JNIEnv *env, jclass class, jobject surface_texture, jint width, jint height)
+{
+	g_mutex_lock(&texture_consumers_lock);
+	for (GList *l = texture_consumers; l; l = l->next) {
+		struct remote_consumer *consumer = l->data;
+		if ((*env)->IsSameObject(env, consumer->surface_texture, surface_texture))
+			consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, width > 0 ? width : 1, height > 0 ? height : 1);
+	}
+	g_mutex_unlock(&texture_consumers_lock);
 }

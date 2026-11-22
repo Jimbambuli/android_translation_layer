@@ -63,8 +63,11 @@ public class SurfaceTexture {
 	}
 
 	public void setDefaultBufferSize(int width, int height) {
+		if (width == defaultWidth && height == defaultHeight)
+			return;
 		defaultWidth = width;
 		defaultHeight = height;
+		android.view.SurfaceView.native_resizeRemoteTexture(this, width, height);
 	}
 
 	/** @hide the size Surface.lockCanvas() draws in */

@@ -103,6 +103,8 @@ public class SurfaceView extends View {
 	static native int native_connectRemote(long surfaceView);
 	/* the same for a SurfaceTexture: its frames are queued to it (SurfaceTexture.queueBuffer()) */
 	static native int native_connectRemoteTexture(android.graphics.SurfaceTexture surfaceTexture);
+	/** @hide SurfaceTexture.setDefaultBufferSize(): tells the producers of the SurfaceTexture the new size */
+	public static native void native_resizeRemoteTexture(android.graphics.SurfaceTexture surfaceTexture, int width, int height);
 
 	public SurfaceHolder getHolder() {
 		return mSurfaceHolder;
