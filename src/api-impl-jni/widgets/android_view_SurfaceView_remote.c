@@ -21,6 +21,7 @@
 
 struct remote_buffer {
 	int fd;
+	int fd1; /* the second plane of a YUV dmabuf (atl_surface_msg.n_planes 2), else -1 */
 	struct atl_surface_msg desc;
 	void *map; /* memory buffers */
 	size_t size;
@@ -50,6 +51,8 @@ static void consumer_unref(struct remote_consumer *consumer)
 			munmap(consumer->buffers[i].map, consumer->buffers[i].size);
 		if (consumer->buffers[i].fd >= 0)
 			close(consumer->buffers[i].fd);
+		if (consumer->buffers[i].fd1 >= 0)
+			close(consumer->buffers[i].fd1);
 	}
 	if (consumer->widget)
 		g_object_unref(consumer->widget);
@@ -104,12 +107,26 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 		gdk_dmabuf_texture_builder_set_fourcc(builder, buffer->desc.fourcc);
 		gdk_dmabuf_texture_builder_set_modifier(builder, buffer->desc.modifier);
 		gdk_dmabuf_texture_builder_set_premultiplied(builder, TRUE);
-		gdk_dmabuf_texture_builder_set_n_planes(builder, 1);
+		gdk_dmabuf_texture_builder_set_n_planes(builder, buffer->desc.n_planes == 2 ? 2 : 1);
 		gdk_dmabuf_texture_builder_set_fd(builder, 0, buffer->fd);
 		gdk_dmabuf_texture_builder_set_stride(builder, 0, buffer->desc.stride);
 		gdk_dmabuf_texture_builder_set_offset(builder, 0, buffer->desc.offset);
+		if (buffer->desc.n_planes == 2) {
+			gdk_dmabuf_texture_builder_set_fd(builder, 1, buffer->fd1);
+			gdk_dmabuf_texture_builder_set_stride(builder, 1, buffer->desc.stride1);
+			gdk_dmabuf_texture_builder_set_offset(builder, 1, buffer->desc.offset1);
+		}
 		texture = gdk_dmabuf_texture_builder_build(builder, texture_released, d, &error);
 		g_object_unref(builder);
+		/* a decoder's YUV frame: SurfaceTexture.updateTexImage() samples its planes (struct atl_dmabuf) */
+		if (texture && buffer->desc.n_planes == 2) {
+			struct atl_dmabuf *dmabuf = g_new0(struct atl_dmabuf, 1);
+			*dmabuf = (struct atl_dmabuf){.fourcc = buffer->desc.fourcc, .modifier = buffer->desc.modifier, .width = buffer->desc.width,
+			                              .height = buffer->desc.height, .n_planes = 2, .fd = {buffer->fd, buffer->fd1},
+			                              .offset = {buffer->desc.offset, buffer->desc.offset1}, .stride = {buffer->desc.stride, buffer->desc.stride1},
+			                              .matrix = buffer->desc.matrix, .full_range = buffer->desc.full_range};
+			g_object_set_data_full(G_OBJECT(texture), "atl-dmabuf", dmabuf, g_free);
+		}
 		if (!texture) {
 			fprintf(stderr, "SurfaceView: a dmabuf of another process can't be shown: %s\n", error->message);
 			g_error_free(error);
@@ -139,7 +156,7 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 	surface_view_widget_set_texture(consumer->widget, texture, !buffer->desc.top_first); // GL rows: bottom first
 }
 
-static void add_buffer(struct remote_consumer *consumer, const struct atl_surface_msg *msg, int fd)
+static void add_buffer(struct remote_consumer *consumer, const struct atl_surface_msg *msg, int fd, int fd1)
 {
 	struct remote_buffer *buffer = &consumer->buffers[msg->index];
 	/* a buffer replaced by the producer stays mapped by the textures still made from it */
@@ -147,7 +164,10 @@ static void add_buffer(struct remote_consumer *consumer, const struct atl_surfac
 		munmap(buffer->map, buffer->size);
 	if (buffer->fd >= 0)
 		close(buffer->fd);
+	if (buffer->fd1 >= 0)
+		close(buffer->fd1);
 	buffer->fd = fd;
+	buffer->fd1 = fd1;
 	buffer->desc = *msg;
 	buffer->map = NULL;
 	buffer->size = 0;
@@ -183,30 +203,39 @@ static void disconnect(struct remote_consumer *consumer, gboolean keep_frame)
 static gboolean on_message(int fd, GIOCondition condition, struct remote_consumer *consumer)
 {
 	struct atl_surface_msg msg;
-	char control[CMSG_SPACE(sizeof(int))];
+	char control[CMSG_SPACE(2 * sizeof(int))];
 	struct iovec iov = {.iov_base = &msg, .iov_len = sizeof(msg)};
 	struct msghdr hdr = {.msg_iov = &iov, .msg_iovlen = 1, .msg_control = control, .msg_controllen = sizeof(control)};
-	int buffer_fd = -1;
+	int buffer_fd = -1, buffer_fd1 = -1;
 
 	ssize_t len = recvmsg(fd, &hdr, MSG_CMSG_CLOEXEC | MSG_DONTWAIT);
 	if (len < 0 && (errno == EAGAIN || errno == EINTR))
 		return G_SOURCE_CONTINUE;
 	for (struct cmsghdr *cmsg = CMSG_FIRSTHDR(&hdr); cmsg; cmsg = CMSG_NXTHDR(&hdr, cmsg))
-		if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS)
+		if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS) {
 			memcpy(&buffer_fd, CMSG_DATA(cmsg), sizeof(int));
+			if (cmsg->cmsg_len >= CMSG_LEN(2 * sizeof(int)))
+				memcpy(&buffer_fd1, CMSG_DATA(cmsg) + sizeof(int), sizeof(int));
+		}
 	if (len != sizeof(msg) || msg.index >= ATL_SURFACE_MAX_BUFFERS || msg.type == ATL_SURFACE_MSG_DISCONNECT) {
 		if (buffer_fd >= 0)
 			close(buffer_fd);
+		if (buffer_fd1 >= 0)
+			close(buffer_fd1);
 		if (len > 0 && len != sizeof(msg))
 			fprintf(stderr, "SurfaceView: broken message from the process drawing the surface (%zd bytes)\n", len);
 		/* EOF without DISCONNECT: the process drawing the surface ended */
 		disconnect(consumer, len == sizeof(msg) && msg.type == ATL_SURFACE_MSG_DISCONNECT);
 		return G_SOURCE_REMOVE;
 	}
-	if (msg.type == ATL_SURFACE_MSG_BUFFER && buffer_fd >= 0)
-		add_buffer(consumer, &msg, buffer_fd);
-	else if (buffer_fd >= 0)
-		close(buffer_fd);
+	if (msg.type == ATL_SURFACE_MSG_BUFFER && buffer_fd >= 0 && (msg.n_planes != 2 || buffer_fd1 >= 0)) {
+		add_buffer(consumer, &msg, buffer_fd, buffer_fd1);
+	} else {
+		if (buffer_fd >= 0)
+			close(buffer_fd);
+		if (buffer_fd1 >= 0)
+			close(buffer_fd1);
+	}
 	if (msg.type == ATL_SURFACE_MSG_PRESENT) {
 		if (consumer->buffers[msg.index].fd >= 0 && (consumer->buffers[msg.index].map || consumer->buffers[msg.index].desc.fourcc)) {
 			if (consumer->widget)
@@ -240,7 +269,7 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemote(JNIEn
 	consumer->widget = SURFACE_VIEW_WIDGET(g_object_ref(gtk_widget_get_first_child(GTK_WIDGET(_PTR(surface_view)))));
 	consumer->fd = fds[0];
 	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
-		consumer->buffers[i].fd = -1;
+		consumer->buffers[i].fd = consumer->buffers[i].fd1 = -1;
 	/* the producer may be waiting for its size inside a call the main thread waits for: read here, not there */
 	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, gtk_widget_get_width(GTK_WIDGET(consumer->widget)), gtk_widget_get_height(GTK_WIDGET(consumer->widget)));
 	g_main_context_invoke(NULL, G_SOURCE_FUNC(start), consumer);
@@ -260,7 +289,7 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemoteTextur
 	consumer->surface_texture = (*env)->NewGlobalRef(env, surface_texture);
 	consumer->fd = fds[0];
 	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
-		consumer->buffers[i].fd = -1;
+		consumer->buffers[i].fd = consumer->buffers[i].fd1 = -1;
 	int width = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferWidth", "()I"));
 	int height = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferHeight", "()I"));
 	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, width > 0 ? width : 1, height > 0 ? height : 1);

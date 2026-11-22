@@ -15,6 +15,18 @@ struct ANativeWindow {
 	Display *x11_display;
 	gulong resize_handler;
 	int refcount;
+	jobject surface; /* the android.view.Surface of this window (a global reference) */
+	struct { /* ANativeWindow_setBuffersGeometry() and the buffer of ANativeWindow_lock() */
+		int width;
+		int height;
+		int format;
+		void *bits;
+		size_t size;
+		gboolean locked;
+		int locked_width;
+		int locked_height;
+		int locked_format;
+	} cpu;
 	int width;
 	int height;
 	int32_t dataspace; // ANativeWindow_setBuffersDataSpace(), ADATASPACE_UNKNOWN (0) until set
@@ -31,12 +43,15 @@ struct ANativeWindow {
 		int width;
 		int height;
 		gboolean busy;
+		GdkTexture *held; /* ANativeWindow_remotePresentDmabuf(): the frame the other process shows from this buffer */
 	} remote_memory[3];
 };
 
 gboolean ANativeWindow_remoteRead(struct ANativeWindow *native_window, int timeout_ms);
 void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd);
+void ANativeWindow_remoteSendFds(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, const int *fds, int n_fds);
 gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop);
+gboolean ANativeWindow_remotePresentDmabuf(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop);
 void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data);
 
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);

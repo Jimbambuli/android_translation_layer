@@ -71,6 +71,12 @@ static int64_t fd_region_seek(void *opaque, int64_t offset, int whence)
 /* opens the file at path, or the fd region if path is NULL; *io is the region's AVIOContext */
 AVFormatContext *open_input(const char *path, struct fd_region *region, AVIOContext **io)
 {
+	return open_input_options(path, region, io, NULL);
+}
+
+/* the same with options of avformat_open_input() (e.g. "headers" of http), may be NULL */
+AVFormatContext *open_input_options(const char *path, struct fd_region *region, AVIOContext **io, AVDictionary **options)
+{
 	AVFormatContext *format = avformat_alloc_context();
 
 	*io = NULL;
@@ -79,7 +85,7 @@ AVFormatContext *open_input(const char *path, struct fd_region *region, AVIOCont
 		format->pb = *io;
 	}
 	/* avformat_open_input() frees the context on failure */
-	if (avformat_open_input(&format, path, NULL, NULL) < 0)
+	if (avformat_open_input(&format, path, NULL, options) < 0)
 		return NULL;
 	if (avformat_find_stream_info(format, NULL) < 0)
 		avformat_close_input(&format);

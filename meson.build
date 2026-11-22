@@ -54,6 +54,10 @@ if layer_shell_dep.found()
   add_project_arguments('-DATL_HAS_OSK', language: 'c')
 endif
 
+# MediaCodecList's hardware codecs: the VA-API profiles FFmpeg's decoders can use
+libva_dep = dependency('libva', required : false)
+add_project_arguments('-DHAVE_LIBVA=' + (libva_dep.found() ? '1' : '0'), language: 'c')
+
 # hax.jar
 subdir('src/api-impl')
 
@@ -112,6 +116,11 @@ install_data([
 install_subdir('res/keyboards/keylayout', install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/usr')
 install_subdir('res/keyboards/keychars', install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/usr')
 install_subdir('res/keyboards/idc', install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/usr')
+# bionic_translation reads the cfg.d files of the data directories: dlopen("libmediandk.so") gets libandroid
+install_data([
+             	'res/bionic_translation/android_translation_layer.cfg'
+             ],
+             install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/bionic_translation/cfg.d')
 
 # Roboto (Apache-2.0, AOSP external/roboto-fonts android-14), see add_android_fonts() in main.c
 install_data([
@@ -136,11 +145,18 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/choreographer.c',
                                           	'src/libandroid/configuration.c',
                                           	'src/libandroid/egl.c',
+                                          	'src/libandroid/image_reader.c',
                                           	'src/libandroid/input.c',
                                           	'src/libandroid/looper.c',
-                                          	'src/libandroid/media.c',
+                                          	'src/libandroid/media_codec.c',
+                                          	'src/libandroid/media_codec_info.c',
+                                          	'src/libandroid/media_drm.c',
+                                          	'src/libandroid/media_extractor.c',
+                                          	'src/libandroid/media_format.c',
+                                          	'src/libandroid/media_muxer.c',
                                           	'src/libandroid/native_window.c',
                                           	'src/libandroid/net.c',
+                                          	'src/libandroid/ndk_jni.c',
                                           	'src/libandroid/sensor.c',
                                           	'src/libandroid/sharedmem.c',
                                           	'src/libandroid/surface_texture.c',
@@ -258,6 +274,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/bluetooth/com_android_bluetooth_bluez_BluezBus.c',
                                                                   	'src/api-impl-jni/telephony/com_android_internal_telephony_ModemManagerPhone.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
+                                                                  	'src/api-impl-jni/media/android_media_MediaExtractor.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaRecorder.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaMetadataRetriever.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',
@@ -324,7 +341,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
+                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'), libva_dep,
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('libsecret-1'), dependency('fontconfig'), dependency('pangoft2'), dependency('libwebp'),
                                                                         libart_dep, libc_bio_dep, wayland_protos_dep, upcalls_header
                                                                   ],

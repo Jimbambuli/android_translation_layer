@@ -61,6 +61,7 @@
 
 #include "../api-impl-jni/widgets/android_view_SurfaceView.h"
 #include "native_window.h"
+#include "ndk_jni.h"
 
 /**
  * Transforms that can be applied to buffers as they are displayed to a window.
@@ -125,6 +126,11 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 {
 	if (!g_atomic_int_dec_and_test(&native_window->refcount))
 		return;
+	if (native_window->surface) {
+		JNIEnv *env = ndk_jni_env();
+		(*env)->DeleteGlobalRef(env, native_window->surface);
+	}
+	g_free(native_window->cpu.bits);
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
 		/* a unix socket closed with unread messages (the consumer's FRAME/RELEASE) gives the other end
@@ -139,6 +145,7 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 				munmap(native_window->remote_memory[i].map, native_window->remote_memory[i].size);
 			if (native_window->remote_memory[i].fd > 0)
 				close(native_window->remote_memory[i].fd);
+			g_clear_object(&native_window->remote_memory[i].held);
 		}
 		g_mutex_clear(&native_window->remote_lock);
 		free(native_window);
@@ -198,39 +205,43 @@ gboolean ANativeWindow_remoteRead(struct ANativeWindow *native_window, int timeo
 	return !native_window->remote_gone;
 }
 
-void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd)
+/* a message with up to two file descriptors (SCM_RIGHTS) */
+void ANativeWindow_remoteSendFds(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, const int *fds, int n_fds)
 {
-	char control[CMSG_SPACE(sizeof(int))] = {0};
+	char control[CMSG_SPACE(2 * sizeof(int))] = {0};
 	struct iovec iov = {.iov_base = (void *)msg, .iov_len = sizeof(*msg)};
 	struct msghdr hdr = {.msg_iov = &iov, .msg_iovlen = 1};
-	if (fd >= 0) {
+	if (n_fds > 0 && n_fds <= 2) {
 		hdr.msg_control = control;
-		hdr.msg_controllen = sizeof(control);
+		hdr.msg_controllen = CMSG_SPACE(n_fds * sizeof(int));
 		struct cmsghdr *cmsg = CMSG_FIRSTHDR(&hdr);
 		cmsg->cmsg_level = SOL_SOCKET;
 		cmsg->cmsg_type = SCM_RIGHTS;
-		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-		memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+		cmsg->cmsg_len = CMSG_LEN(n_fds * sizeof(int));
+		memcpy(CMSG_DATA(cmsg), fds, n_fds * sizeof(int));
 	}
 	if (!native_window->remote_gone && sendmsg(native_window->remote_fd, &hdr, MSG_NOSIGNAL) < 0)
 		native_window->remote_gone = TRUE;
+}
+
+void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd)
+{
+	ANativeWindow_remoteSendFds(native_window, msg, &fd, fd >= 0 ? 1 : 0);
 }
 
 /* ANativeWindow_remoteRead(), with remote_lock held: a buffer of ANativeWindow_remotePresentTexture() is free again */
 static void remote_memory_message(void *data, const struct atl_surface_msg *msg)
 {
 	struct ANativeWindow *native_window = data;
-	if (msg->type == ATL_SURFACE_MSG_RELEASE && msg->index < G_N_ELEMENTS(native_window->remote_memory))
+	if (msg->type == ATL_SURFACE_MSG_RELEASE && msg->index < G_N_ELEMENTS(native_window->remote_memory)) {
 		native_window->remote_memory[msg->index].busy = FALSE;
+		g_clear_object(&native_window->remote_memory[msg->index].held);
+	}
 }
 
-/* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
- * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
- * frame is dropped (FALSE, as when that process is gone); crop: the scaling mode SCALE_TO_FIT_WITH_CROPPING */
-gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
+/* a free buffer of the window of a Surface of another process, waiting at most 100 ms; -1 if there is none */
+static int remote_free_buffer(struct ANativeWindow *native_window)
 {
-	int width = gdk_texture_get_width(texture);
-	int height = gdk_texture_get_height(texture);
 	gint64 end = g_get_monotonic_time() + 100000;
 	int i = -1;
 	if (!native_window->remote_handler)
@@ -241,8 +252,44 @@ gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window,
 				i = k;
 		int left = (end - g_get_monotonic_time()) / 1000;
 		if (i < 0 && (left <= 0 || !ANativeWindow_remoteRead(native_window, left)))
-			return FALSE;
+			return -1;
 	}
+	return i;
+}
+
+/* a frame of a hardware decoder (MediaCodec) to the window of a Surface of another process: its dmabuf planes go
+ * there as they are (as AOSP's BufferQueue hands the decoder's buffer to the consumer); the texture, which owns
+ * the frame, is held until that process releases the buffer */
+gboolean ANativeWindow_remotePresentDmabuf(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
+{
+	const struct atl_dmabuf *dmabuf = g_object_get_data(G_OBJECT(texture), "atl-dmabuf");
+	int i = remote_free_buffer(native_window);
+	if (i < 0)
+		return FALSE;
+	typeof(native_window->remote_memory[0]) *buffer = &native_window->remote_memory[i];
+	/* the memory buffer of this index is replaced there: a memory frame later sends a new one */
+	buffer->width = buffer->height = 0;
+	buffer->busy = TRUE;
+	buffer->held = g_object_ref(texture);
+	struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_BUFFER, .index = i, .width = dmabuf->width, .height = dmabuf->height,
+	                              .stride = dmabuf->stride[0], .offset = dmabuf->offset[0], .fourcc = dmabuf->fourcc, .top_first = 1,
+	                              .modifier = dmabuf->modifier, .n_planes = dmabuf->n_planes, .stride1 = dmabuf->stride[1],
+	                              .offset1 = dmabuf->offset[1], .matrix = dmabuf->matrix, .full_range = dmabuf->full_range};
+	ANativeWindow_remoteSendFds(native_window, &msg, dmabuf->fd, dmabuf->n_planes);
+	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i, .crop = crop}, -1);
+	return !native_window->remote_gone;
+}
+
+/* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
+ * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
+ * frame is dropped (FALSE, as when that process is gone); crop: the scaling mode SCALE_TO_FIT_WITH_CROPPING */
+gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
+{
+	int width = gdk_texture_get_width(texture);
+	int height = gdk_texture_get_height(texture);
+	int i = remote_free_buffer(native_window);
+	if (i < 0)
+		return FALSE;
 	typeof(native_window->remote_memory[0]) *buffer = &native_window->remote_memory[i];
 	if (buffer->width != width || buffer->height != height) {
 		if (buffer->map)
@@ -305,6 +352,7 @@ static ANativeWindow *remote_window_fromSurface(JNIEnv *env, jobject surface)
 		return NULL;
 	}
 	fprintf(stderr, "ANativeWindow_fromSurface: surface of another process or of a SurfaceTexture, %dx%d\n", native_window->width, native_window->height);
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
 	return native_window;
 }
 
@@ -313,9 +361,22 @@ static ANativeWindow *remote_window_fromSurface(JNIEnv *env, jobject surface)
  *
  * \return a negative value on error.
  */
+enum { /* ANativeWindow_LegacyFormat */
+	WINDOW_FORMAT_RGBA_8888 = 1,
+	WINDOW_FORMAT_RGBX_8888 = 2,
+	WINDOW_FORMAT_RGB_565 = 4,
+};
+
+/* AOSP: the format of the window's buffers: the one given to ANativeWindow_setBuffersGeometry(), else the
+ * surface's (a SurfaceView's is RGB_565 until SurfaceHolder.setFormat(), Surface.atl_format) */
 int32_t ANativeWindow_getFormat(ANativeWindow *window)
 {
-	return -1;
+	if (window->cpu.format)
+		return window->cpu.format;
+	if (!window->surface)
+		return WINDOW_FORMAT_RGBA_8888;
+	JNIEnv *env = ndk_jni_env();
+	return (*env)->GetIntField(env, window->surface, (*env)->GetFieldID(env, (*env)->GetObjectClass(env, window->surface), "atl_format", "I"));
 }
 
 /**
@@ -335,10 +396,18 @@ int32_t ANativeWindow_getFormat(ANativeWindow *window)
  * \param format one of AHARDWAREBUFFER_FORMAT_* constants.
  * \return 0 for success, or a negative value on error.
  */
+/* AOSP: the size and format of the buffers from now on; 0 for width and height means the window's size, 0 for the
+ * format keeps the current one */
 int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
                                          int32_t width, int32_t height, int32_t format)
 {
-	return -1;
+	if (!window || (width == 0) != (height == 0) || width < 0 || height < 0)
+		return -EINVAL;
+	window->cpu.width = width;
+	window->cpu.height = height;
+	if (format)
+		window->cpu.format = format;
+	return 0;
 }
 
 /**
@@ -352,12 +421,51 @@ int32_t ANativeWindow_setBuffersGeometry(ANativeWindow *window,
  * \return 0 for success, or a negative value on error.
  */
 
-typedef void ARect;
+typedef struct ARect {
+	int32_t left;
+	int32_t top;
+	int32_t right;
+	int32_t bottom;
+} ARect;
 
+/* AOSP ANativeWindow_lock(): a CPU buffer of the window's geometry for the app to draw into; the buffer is kept
+ * between frames, so it holds the previous frame like the one AOSP copies back */
 int32_t ANativeWindow_lock(ANativeWindow *window, ANativeWindow_Buffer *outBuffer,
                            ARect *inOutDirtyBounds)
 {
-	return -1;
+	if (window->cpu.locked)
+		return -EINVAL;
+	int width = window->cpu.width ?: ANativeWindow_getWidth(window);
+	int height = window->cpu.height ?: ANativeWindow_getHeight(window);
+	int format = ANativeWindow_getFormat(window);
+	if (width <= 0 || height <= 0)
+		return -EINVAL;
+	int bpp;
+	switch (format) {
+		case WINDOW_FORMAT_RGBA_8888:
+		case WINDOW_FORMAT_RGBX_8888:
+			bpp = 4;
+			break;
+		case WINDOW_FORMAT_RGB_565:
+			bpp = 2;
+			break;
+		default:
+			return -EINVAL;
+	}
+	size_t size = (size_t)width * height * bpp;
+	if (window->cpu.size != size) {
+		g_free(window->cpu.bits);
+		window->cpu.bits = g_malloc0(size);
+		window->cpu.size = size;
+	}
+	window->cpu.locked = TRUE;
+	window->cpu.locked_width = width;
+	window->cpu.locked_height = height;
+	window->cpu.locked_format = format;
+	*outBuffer = (ANativeWindow_Buffer){.width = width, .height = height, .stride = width, .format = format, .bits = window->cpu.bits};
+	if (inOutDirtyBounds) /* the whole buffer is to be drawn */
+		*inOutDirtyBounds = (ARect){.left = 0, .top = 0, .right = width, .bottom = height};
+	return 0;
 }
 
 /**
@@ -366,23 +474,68 @@ int32_t ANativeWindow_lock(ANativeWindow *window, ANativeWindow_Buffer *outBuffe
  *
  * \return 0 for success, or a negative value on error.
  */
+struct cpu_frame {
+	GtkWidget *widget;
+	GdkTexture *texture;
+};
+
+static gboolean present_cpu_frame(void *data)
+{
+	struct cpu_frame *f = data;
+	surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(f->widget), f->texture, FALSE);
+	g_object_unref(f->texture);
+	g_object_unref(f->widget);
+	free(f);
+	return G_SOURCE_REMOVE;
+}
+
+/* AOSP: the drawn buffer goes to the window's consumer; here as a texture to the SurfaceView widget (on the main
+ * thread) or to the widget of another process */
 int32_t ANativeWindow_unlockAndPost(ANativeWindow *window)
 {
-	return -1;
+	if (!window->cpu.locked)
+		return -EINVAL;
+	window->cpu.locked = FALSE;
+	int width = window->cpu.locked_width;
+	int height = window->cpu.locked_height;
+	GBytes *bytes;
+	GdkMemoryFormat format;
+	size_t stride;
+	if (window->cpu.locked_format == WINDOW_FORMAT_RGB_565) { /* GDK has no 16-bit format */
+		uint8_t *rgb = g_malloc((size_t)width * height * 3);
+		const uint16_t *src = window->cpu.bits;
+		for (size_t i = 0; i < (size_t)width * height; i++) {
+			uint16_t p = src[i];
+			rgb[3 * i] = ((p >> 11) & 0x1f) * 255 / 31;
+			rgb[3 * i + 1] = ((p >> 5) & 0x3f) * 255 / 63;
+			rgb[3 * i + 2] = (p & 0x1f) * 255 / 31;
+		}
+		bytes = g_bytes_new_take(rgb, (size_t)width * height * 3);
+		format = GDK_MEMORY_R8G8B8;
+		stride = (size_t)width * 3;
+	} else {
+		bytes = g_bytes_new(window->cpu.bits, window->cpu.size);
+		/* Android's RGBA_8888 buffers are premultiplied */
+		format = window->cpu.locked_format == WINDOW_FORMAT_RGBX_8888 ? GDK_MEMORY_R8G8B8X8 : GDK_MEMORY_R8G8B8A8_PREMULTIPLIED;
+		stride = (size_t)width * 4;
+	}
+	GdkTexture *texture = gdk_memory_texture_new(width, height, format, bytes, stride);
+	g_bytes_unref(bytes);
+	if (window->remote_fd >= 0) {
+		ANativeWindow_remotePresentTexture(window, texture, FALSE);
+		g_object_unref(texture);
+	} else {
+		struct cpu_frame *f = malloc(sizeof(*f));
+		f->widget = g_object_ref(window->surface_view_widget);
+		f->texture = texture;
+		g_idle_add(present_cpu_frame, f);
+	}
+	return 0;
 }
 
 int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_t compatibility)
 {
 	return 0; // success
-}
-
-/* AOSP ANativeWindow.cpp: -EINVAL without a window. The data space is a hint for the composer; ATL
- * composes with GTK and has nothing to pass it to. */
-int32_t ANativeWindow_setBuffersDataSpace(ANativeWindow *window, int32_t dataSpace)
-{
-	if (!window)
-		return -EINVAL;
-	return 0;
 }
 
 /**
@@ -508,6 +661,7 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	native_window->refcount = 1; // probably, 0 doesn't work
 	native_window->remote_fd = -1;
 	native_window->surface_view_widget = surface_view_widget;
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
 	native_window->width = width;
 	native_window->height = height;
 
@@ -606,6 +760,12 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 		native_window->resize_handler = g_signal_connect(surface_view_widget, "resize", G_CALLBACK(on_resize), native_window);
 
 	return native_window;
+}
+
+/* AOSP native_window_jni: the Surface the window belongs to (every ATL window comes from one) */
+jobject ANativeWindow_toSurface(JNIEnv *env, ANativeWindow *window)
+{
+	return window && window->surface ? (*env)->NewLocalRef(env, window->surface) : NULL;
 }
 
 ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceTexture)

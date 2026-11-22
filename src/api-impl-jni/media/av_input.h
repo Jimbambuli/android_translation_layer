@@ -18,6 +18,8 @@ struct fd_region {
 
 /* opens the file at path, or the fd region if path is NULL; *io is the region's AVIOContext */
 AVFormatContext *open_input(const char *path, struct fd_region *region, AVIOContext **io);
+/* the same with options of avformat_open_input() (e.g. "headers" of http), may be NULL */
+AVFormatContext *open_input_options(const char *path, struct fd_region *region, AVIOContext **io, AVDictionary **options);
 /* format may be NULL (open failed), the region's io is freed anyway */
 void close_input(AVFormatContext *format, AVIOContext *io);
 

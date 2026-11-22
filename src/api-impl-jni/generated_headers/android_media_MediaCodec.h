@@ -14,10 +14,18 @@ extern "C" {
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_constructor
- * Signature: (Ljava/lang/String;)J
+ * Signature: (Ljava/lang/String;Z)J
  */
 JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor
-  (JNIEnv *, jobject, jstring);
+  (JNIEnv *, jobject, jstring, jboolean);
+
+/*
+ * Class:     android_media_MediaCodec
+ * Method:    native_hardwareProfiles
+ * Signature: ()[I
+ */
+JNIEXPORT jintArray JNICALL Java_android_media_MediaCodec_native_1hardwareProfiles
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_media_MediaCodec
@@ -38,10 +46,10 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_configure_video
- * Signature: (JLjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Landroid/view/Surface;I)V
+ * Signature: (JLjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Landroid/view/Surface;II)V
  */
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video
-  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jint);
+  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jint, jint);
 
 /*
  * Class:     android_media_MediaCodec

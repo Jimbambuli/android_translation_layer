@@ -11,6 +11,32 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 
 public class MediaCodec {
+	public static final int BUFFER_FLAG_SYNC_FRAME = 1;
+	public static final int BUFFER_FLAG_KEY_FRAME = 1;
+	public static final int BUFFER_FLAG_CODEC_CONFIG = 2;
+	public static final int BUFFER_FLAG_PARTIAL_FRAME = 8;
+	public static final int BUFFER_FLAG_DECODE_ONLY = 32;
+	public static final int CONFIGURE_FLAG_ENCODE = 1;
+	public static final int CONFIGURE_FLAG_USE_BLOCK_MODEL = 2;
+	public static final int CONFIGURE_FLAG_USE_CRYPTO_ASYNC = 4;
+	public static final int CRYPTO_MODE_UNENCRYPTED = 0;
+	public static final int CRYPTO_MODE_AES_CTR = 1;
+	public static final int CRYPTO_MODE_AES_CBC = 2;
+	public static final int INFO_TRY_AGAIN_LATER = -1;
+	public static final int INFO_OUTPUT_FORMAT_CHANGED = -2;
+	public static final int INFO_OUTPUT_BUFFERS_CHANGED = -3;
+	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT = 1;
+	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING = 2;
+	public static final String PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
+	public static final String PARAMETER_KEY_SUSPEND = "drop-input-frames";
+	public static final String PARAMETER_KEY_SUSPEND_TIME = "drop-start-time-us";
+	public static final String PARAMETER_KEY_OFFSET_TIME = "time-offset-us";
+	public static final String PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
+	public static final String PARAMETER_KEY_HDR10_PLUS_INFO = MediaFormat.KEY_HDR10_PLUS_INFO;
+	public static final String PARAMETER_KEY_LOW_LATENCY = MediaFormat.KEY_LOW_LATENCY;
+	public static final String PARAMETER_KEY_TUNNEL_PEEK = "tunnel-peek";
+	public static final String PARAMETER_KEY_QP_OFFSET_MAP = "qp-offset-map";
+	public static final String PARAMETER_KEY_QP_OFFSET_RECTS = "qp-offset-rects";
 
 	public static final int BUFFER_FLAG_END_OF_STREAM = 0x4;
 
@@ -23,15 +49,36 @@ public class MediaCodec {
 	private MediaFormat mediaFormat;
 
 	private Queue<Integer> freeOutputBuffers;
+	private Queue<Integer> readyOutputBuffers; // decoded, not yet dequeued by the app
+	private BufferInfo[] outputInfos;
+	private boolean outputEos;
+	private Thread decodeThread;
+	private boolean decoding;
 	private Queue<Integer> queuedInputBuffers;
 	private Queue<Integer> freeInputBuffers;
 
+	private final MediaCodecInfo info;
+
+	/* AOSP native_setup(): a name MediaCodecList does not list fails with NAME_NOT_FOUND, an IllegalArgumentException;
+	 * other failures are IOExceptions */
 	private MediaCodec(String codecName) throws IOException {
 		this.codecName = codecName;
-		native_codec = native_constructor(codecName);
+		info = MediaCodecList.getInfoByName(codecName);
+		if (info == null)
+			throw new IllegalArgumentException("Failed to initialize " + codecName + ", error 0xfffffffe (NAME_NOT_FOUND)");
+		native_codec = native_constructor(info.getDecoder(), info.isHardwareAccelerated());
 		if (native_codec == 0) {
 			throw new IOException("Unable to create MediaCodec: " + codecName);
 		}
+	}
+
+	/* AOSP C2SoftAvcDec/C2SoftHevcDec/C2SoftVpxDec/C2SoftDav1dDec MaxInputSizeSetter: room for a frame at a
+	 * compression ratio of 2 of the largest picture (16x16 blocks of 192 bytes for AVC, 64x64 blocks of 3072
+	 * bytes otherwise), at least 2 MiB */
+	private static int recommendedInputSize(String mime, int maxWidth, int maxHeight) {
+		long size = "video/avc".equalsIgnoreCase(mime) ? (long)((maxWidth + 15) / 16) * ((maxHeight + 15) / 16) * 192
+		                                               : (long)((maxWidth + 63) / 64) * ((maxHeight + 63) / 64) * 3072;
+		return (int)Math.min(Math.max(size, 2 * 1024 * 1024), Integer.MAX_VALUE);
 	}
 
 	public static MediaCodec createByCodecName(String codecName) throws IOException {
@@ -46,22 +93,34 @@ public class MediaCodec {
 	}
 
 	public MediaCodecInfo getCodecInfo() {
-		for (int i = 0; i < MediaCodecList.getCodecCount(); i++)
-			if (MediaCodecList.getCodecInfoAt(i).getName().equals(codecName))
-				return MediaCodecList.getCodecInfoAt(i);
-		return null;
+		return info;
 	}
 
 	public void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags) {
 		System.out.println("MediaCodec.configure(" + format + ", " + surface + ", " + crypto + ", " + flags + "): codecName=" + codecName);
 		this.mediaFormat = format;
 		mHasSurface = surface != null;
+		String mime = info.getSupportedTypes()[0];
 
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
 			maxInputSize = format.getInteger("max-input-size");
 		}
-		inputBuffers = new ByteBuffer[1];
+		/* AOSP CCodec::configure(): a video decoder's input buffers have the size its component recommends; the
+		 * client's max-input-size only makes them larger */
+		if (mime.startsWith("video/")) {
+			int recommended = recommendedInputSize(mime, Math.max(format.getInteger(MediaFormat.KEY_WIDTH, 0), format.getInteger(MediaFormat.KEY_MAX_WIDTH, 0)),
+			                                       Math.max(format.getInteger(MediaFormat.KEY_HEIGHT, 0), format.getInteger(MediaFormat.KEY_MAX_HEIGHT, 0)));
+			if (!format.containsKey("max-input-size") || maxInputSize < recommended)
+				maxInputSize = recommended;
+		}
+		/* AOSP CCodecBufferChannel::start(): numInputSlots = inputDelay + pipelineDelay + kSmoothnessFactor (4),
+		 * numOutputSlots = outputDelay + kSmoothnessFactor, where the output delay of AOSP's video decoders is 8
+		 * (C2SoftAvcDec, C2SoftHevcDec), 4 (C2SoftDav1dDec) or none (C2SoftVpxDec). A player like VLC holds
+		 * decoded frames until their display time and needs these slots. */
+		boolean video = mime.startsWith("video/");
+		int outputDelay = !video ? 0 : (mime.equals("video/avc") || mime.equals("video/hevc")) ? 8 : mime.equals("video/av01") ? 4 : 0;
+		inputBuffers = new ByteBuffer[video ? 4 : 1];
 		inputBufferTimestamps = new long[inputBuffers.length];
 		freeInputBuffers = new ArrayDeque<>(inputBuffers.length);
 		queuedInputBuffers = new ArrayDeque<>(inputBuffers.length);
@@ -69,22 +128,28 @@ public class MediaCodec {
 			inputBuffers[i] = ByteBuffer.allocateDirect(maxInputSize).order(ByteOrder.LITTLE_ENDIAN);
 			freeInputBuffers.add(i);
 		}
-		outputBuffers = new ByteBuffer[4];
+		outputBuffers = new ByteBuffer[outputDelay + 4];
 		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		readyOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		outputEos = false;
+		outputInfos = new BufferInfo[outputBuffers.length];
 		for (int i = 0; i < outputBuffers.length; i++) {
 			outputBuffers[i] = ByteBuffer.allocateDirect(16384).order(ByteOrder.LITTLE_ENDIAN);
+			outputInfos[i] = new BufferInfo();
 			freeOutputBuffers.add(i);
 		}
 
-		if ("aac".equals(codecName) || "mp3".equals(codecName) || "opus".equals(codecName)) {
+		if (mime.startsWith("audio/")) {
 			native_configure_audio(native_codec, format.getByteBuffer("csd-0"), format.getInteger("sample-rate"), format.getInteger("channel-count"));
-		} else if ("h264".equals(codecName) || "vp8".equals(codecName) || "vp9".equals(codecName)) {
+		} else if (mime.startsWith("video/")) {
 			/* the output format (here the configured one) names the color format, which Gecko requires; frames
 			 * go to the Surface: COLOR_FormatSurface */
 			if (surface != null && !format.containsKey("color-format"))
 				format.setInteger("color-format", 0x7F000789);
+			/* the frames the app holds come on top of the decoder's own; AOSP lets a Surface's consumer hold
+			 * mRenderingDepth (3) more */
 			native_configure_video(native_codec, format.getByteBuffer("csd-0"), format.getByteBuffer("csd-1"), surface,
-			                       format.getInteger("rotation-degrees", 0));
+			                       format.getInteger("rotation-degrees", 0), outputBuffers.length + 3);
 		} else {
 			System.out.println("configure: format " + format + " not implemented");
 			Thread.dumpStack();
@@ -95,6 +160,7 @@ public class MediaCodec {
 	public void start() {
 		System.out.println("MediaCodec.start(): codecName=" + codecName);
 		native_start(native_codec);
+		startDecoding();
 		if (callback != null && !pumping) {
 			pumping = true;
 			callbackHandler.post(pump);
@@ -124,6 +190,9 @@ public class MediaCodec {
 	}
 
 	public static final class CodecException extends IllegalStateException {
+		public static final int ERROR_INSUFFICIENT_RESOURCE = 1100;
+		public static final int ERROR_RECLAIMED = 1101;
+
 		private final int errorCode;
 
 		public CodecException(int errorCode, String detailMessage) {
@@ -216,33 +285,133 @@ public class MediaCodec {
 		return outputBuffers[index];
 	}
 
-	public synchronized int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
+	/* AOSP dequeueInputBuffer()/dequeueOutputBuffer(): wait up to timeoutUs (without end if negative) for a
+	 * buffer. ATL's FFmpeg codec only works inside these calls, so the wait repeats the attempt; queuing input or
+	 * releasing output on another thread wakes it early. A codec released meanwhile is IllegalStateException. */
+	private interface Attempt {
+		int run();
+	}
+
+	private synchronized int waitForBuffer(long timeoutUs, Attempt attempt) {
+		long deadline = System.nanoTime() + timeoutUs * 1000;
+		while (true) {
+			if (native_codec == 0)
+				throw new IllegalStateException();
+			int ret = attempt.run();
+			if (ret != /*INFO_TRY_AGAIN_LATER*/ -1 || timeoutUs == 0)
+				return ret;
+			long waitNs = timeoutUs < 0 ? 10000000 : Math.min(deadline - System.nanoTime(), 10000000);
+			if (waitNs <= 0)
+				return ret;
+			try {
+				wait(waitNs / 1000000, (int)(waitNs % 1000000));
+			} catch (InterruptedException e) {
+				return ret;
+			}
+		}
+	}
+
+	/* AOSP CCodec: the component decodes on threads of its own as long as it has input and free output slots, and
+	 * the app only takes the finished output buffers. ATL's FFmpeg codec works on this thread of the codec, from
+	 * start() until stop(), release() or reset(), each step under the codec's lock. */
+	private synchronized void startDecoding() {
+		if (decodeThread != null)
+			return;
+		decoding = true;
+		decodeThread = new Thread(() -> {
+			while (decodeStep())
+				;
+		}, "MediaCodec " + codecName);
+		decodeThread.setDaemon(true);
+		decodeThread.start();
+	}
+
+	private void stopDecoding() {
+		Thread thread;
+		synchronized (this) {
+			decoding = false;
+			thread = decodeThread;
+			decodeThread = null;
+			notifyAll();
+		}
+		if (thread != null && thread != Thread.currentThread()) {
+			boolean interrupted = false;
+			while (thread.isAlive()) {
+				try {
+					thread.join();
+				} catch (InterruptedException e) {
+					interrupted = true;
+				}
+			}
+			if (interrupted)
+				Thread.currentThread().interrupt();
+		}
+	}
+
+	/* one step: hand a queued input buffer to the codec, take a decoded frame into a free output slot; without
+	 * progress wait until the app queues input or releases output */
+	private synchronized boolean decodeStep() {
+		if (!decoding || native_codec == 0)
+			return false;
+		int queued = queuedInputBuffers.size();
+		tryProcessInputBuffer();
+		boolean progress = queuedInputBuffers.size() != queued;
+		Integer index = freeOutputBuffers.peek();
+		if (index != null && !outputEos) {
+			outputBuffers[index].clear();
+			if (native_dequeueOutputBuffer(native_codec, outputBuffers[index], outputInfos[index]) == 0) {
+				freeOutputBuffers.remove();
+				readyOutputBuffers.add(index);
+				outputEos = (outputInfos[index].flags & BUFFER_FLAG_END_OF_STREAM) != 0;
+				progress = true;
+			}
+		}
+		if (progress) {
+			notifyAll();
+		} else {
+			try {
+				wait(10);
+			} catch (InterruptedException e) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
+		return waitForBuffer(timeoutUs, () -> tryDequeueOutputBuffer(info));
+	}
+
+	private int tryDequeueOutputBuffer(BufferInfo info) {
 		if (!outputFormatSet) {
 			outputFormatSet = true;
 			return /*INFO_OUTPUT_FORMAT_CHANGED*/ -2;
 		}
-		Integer index = freeOutputBuffers.poll();
-		if (index == null) {
+		Integer index = readyOutputBuffers.poll();
+		if (index == null)
 			return /*INFO_TRY_AGAIN_LATER*/ -1;
-		}
-		outputBuffers[index].clear();
-		int ret = native_dequeueOutputBuffer(native_codec, outputBuffers[index], info);
-		if (ret == 0) {
-			ret = index;
-		} else {
-			freeOutputBuffers.add(index);
-			ret = /*INFO_TRY_AGAIN_LATER*/ -1;
-		}
-		return ret;
+		BufferInfo ready = outputInfos[index];
+		info.set(ready.offset, ready.size, ready.presentationTimeUs, ready.flags);
+		return index;
+	}
+
+	/* AOSP MediaCodec::onReleaseOutputBuffer(): -EACCES for an index the app does not hold */
+	private void checkHeldOutput(int index) {
+		if (outputBuffers == null || index < 0 || index >= outputBuffers.length || freeOutputBuffers.contains(index) || readyOutputBuffers.contains(index))
+			throw new IllegalStateException("output buffer " + index + " is not held by the app");
 	}
 
 	public synchronized void releaseOutputBuffer(int index, boolean render) {
+		checkHeldOutput(index);
+		notifyAll();
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], render, 0);
 		freeOutputBuffers.add(index);
 	}
 
 	// AOSP calls the parameter `presentationTimeUs`, but actually it is nanoseconds
 	public synchronized void releaseOutputBuffer(int index, long releaseTimeNs) {
+		checkHeldOutput(index);
+		notifyAll();
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], true, releaseTimeNs);
 		freeOutputBuffers.add(index);
 	}
@@ -261,14 +430,16 @@ public class MediaCodec {
 	/* AOSP MediaCodec.getOutputFormat(int): the format of a dequeued output buffer (IllegalStateException for an
 	 * index the app does not hold); ATL's output buffers all have the codec's output format */
 	public synchronized MediaFormat getOutputFormat(int index) {
-		if (outputBuffers == null || index < 0 || index >= outputBuffers.length || freeOutputBuffers.contains(index))
-			throw new IllegalStateException();
+		checkHeldOutput(index);
 		return getOutputFormat();
 	}
 
 	public synchronized void flush() {
+		notifyAll();
 		// in asynchronous mode the codec waits for start() after a flush, as in AOSP
 		pumping = false;
+		/* AOSP: a flush returns all buffers to the codec; the frames in them are dropped */
+		releaseAllOutput();
 		native_flush(native_codec);
 		freeInputBuffers.clear();
 		for (int i = 0; i < inputBuffers.length; i++)
@@ -277,8 +448,21 @@ public class MediaCodec {
 		freeOutputBuffers.clear();
 		for (int i = 0; i < outputBuffers.length; i++)
 			freeOutputBuffers.add(i);
+		outputEos = false;
 		outputFormatSet = false;
 	}
+
+	private void releaseAllOutput() {
+		if (outputBuffers == null)
+			return;
+		for (int i = 0; i < outputBuffers.length; i++) {
+			if (!freeOutputBuffers.contains(i))
+				native_releaseOutputBuffer(native_codec, outputBuffers[i], false, 0);
+		}
+		readyOutputBuffers.clear();
+	}
+
+	private static final int AVERROR_EAGAIN = -11; // AVERROR(EAGAIN) on Linux
 
 	private void tryProcessInputBuffer() {
 		Integer index = queuedInputBuffers.peek();
@@ -289,7 +473,10 @@ public class MediaCodec {
 			} else {
 				ret = native_queueInputBuffer(native_codec, inputBuffers[index], inputBufferTimestamps[index]);
 			}
-			if (ret == 0) {
+			/* the codec takes the buffer unless it is full (EAGAIN); like AOSP's decoders it also takes one it cannot
+			 * decode (FFmpeg's H.264 decoder refuses a codec-config buffer with only SPS/PPS as "no frame", but keeps
+			 * the parameter sets), instead of offering it again for ever */
+			if (ret != AVERROR_EAGAIN) {
 				queuedInputBuffers.remove(index);
 				if (index != -1)
 					freeInputBuffers.add(index);
@@ -297,7 +484,11 @@ public class MediaCodec {
 		}
 	}
 
-	public synchronized int dequeueInputBuffer(long timeoutUs) {
+	public int dequeueInputBuffer(long timeoutUs) {
+		return waitForBuffer(timeoutUs, this::tryDequeueInputBuffer);
+	}
+
+	private int tryDequeueInputBuffer() {
 		tryProcessInputBuffer();
 		Integer index = freeInputBuffers.poll();
 		if (index == null) {
@@ -315,6 +506,7 @@ public class MediaCodec {
 	}
 
 	public synchronized void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags) {
+		notifyAll();
 		if ((flags & BUFFER_FLAG_END_OF_STREAM) != 0) {
 			queuedInputBuffers.add(-1);
 			tryProcessInputBuffer();
@@ -340,33 +532,40 @@ public class MediaCodec {
 
 	public void stop() {
 		stopPumping();
+		stopDecoding();
 	}
 
-	public synchronized void release() {
+	/* not synchronized: the codec's thread finishes its step under the lock before it ends */
+	public void release() {
 		System.out.println("MediaCodec.release(): codecName=" + codecName);
 		stopPumping();
-		if (native_codec != 0) {
-			if (outputBuffers != null) {
-				for (int i = 0; i < outputBuffers.length; i++) {
-					if (!freeOutputBuffers.contains(i))
-						releaseOutputBuffer(i, false);
-				}
+		stopDecoding();
+		synchronized (this) {
+			if (native_codec != 0) {
+				releaseAllOutput();
+				native_release(native_codec);
 			}
-			native_release(native_codec);
+			native_codec = 0;
+			notifyAll();
 		}
-		native_codec = 0;
 	}
 
 	/* AOSP MediaCodec.reset(): back to the Uninitialized state of a freshly created codec. The FFmpeg
 	 * codec is released and created anew; if that fails, android_media_MediaCodec_reset() reports
 	 * UNKNOWN_ERROR, which throwExceptionAsNecessary() throws as CodecException. */
-	public final synchronized void reset() {
+	public final void reset() {
 		release();
+		synchronized (this) {
+			resetState();
+		}
+	}
+
+	private void resetState() {
 		inputBuffers = null;
 		outputBuffers = null;
 		mediaFormat = null;
 		outputFormatSet = false;
-		native_codec = native_constructor(codecName);
+		native_codec = native_constructor(info.getDecoder(), info.isHardwareAccelerated());
 		if (native_codec == 0)
 			throw new CodecException(0x80000000, "reset: failed to create " + codecName);
 	}
@@ -473,10 +672,11 @@ public class MediaCodec {
 		}
 	}
 
-	private native long native_constructor(String codecName);
+	private native long native_constructor(String decoder, boolean hardware);
+	static native int[] native_hardwareProfiles();
 	private native void native_setOutputSurface(long codec, Surface surface);
 	private native void native_configure_audio(long codec, ByteBuffer extradata, int sampleRate, int channelCount);
-	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface, int rotation);
+	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface, int rotation, int heldFrames);
 	private native void native_setVideoScalingMode(long codec, boolean crop);
 	private native void native_start(long codec);
 	private native int native_queueInputBuffer(long codec, ByteBuffer buffer, long presentationTimeUs);

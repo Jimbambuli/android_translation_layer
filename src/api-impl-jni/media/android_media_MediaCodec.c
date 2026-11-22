@@ -17,6 +17,10 @@
 #include <libavutil/hwcontext_drm.h>
 #include <libavutil/pixdesc.h>
 #include <libswresample/swresample.h>
+#if HAVE_LIBVA
+#include <libavutil/hwcontext_vaapi.h>
+#include <va/va.h>
+#endif
 #include <libswscale/swscale.h>
 
 #include <stdlib.h>
@@ -31,6 +35,7 @@
 
 struct ATL_codec_context {
 	AVCodecContext *codec;
+	gboolean hardware; // a hardware codec of MediaCodecList: video frames are decoded with VA-API where it can
 	union {
 		struct {
 			SwrContext *swr;
@@ -49,22 +54,110 @@ struct ATL_codec_context {
 	};
 };
 
-JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor(JNIEnv *env, jobject this, jstring codec_name)
+/* decoder: FFmpeg's decoder of the codec; 0 if FFmpeg has none (MediaCodec throws then) */
+JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor(JNIEnv *env, jobject this, jstring decoder, jboolean hardware)
 {
-	const char *name = (*env)->GetStringUTFChars(env, codec_name, NULL);
+	const char *name = (*env)->GetStringUTFChars(env, decoder, NULL);
 	const AVCodec *codec = avcodec_find_decoder_by_name(name);
-	if (!codec) {
-		printf("Codec %s not found\n", name);
-		exit(0);
-	}
-	(*env)->ReleaseStringUTFChars(env, codec_name, name);
+	if (!codec)
+		fprintf(stderr, "MediaCodec: FFmpeg has no decoder %s\n", name);
+	(*env)->ReleaseStringUTFChars(env, decoder, name);
 	if (!codec)
 		return 0;
 	AVCodecContext *codec_ctx = avcodec_alloc_context3(codec);
 
 	struct ATL_codec_context *ctx = calloc(1, sizeof(struct ATL_codec_context));
 	ctx->codec = codec_ctx;
+	ctx->hardware = hardware;
 	return _INTPTR(ctx);
+}
+
+/* whether FFmpeg's decoder can decode with a VA-API device */
+static gboolean decoder_has_vaapi(const char *name)
+{
+	const AVCodec *codec = avcodec_find_decoder_by_name(name);
+	const AVCodecHWConfig *config;
+	for (int i = 0; codec && (config = avcodec_get_hw_config(codec, i)); i++) {
+		if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) && config->device_type == AV_HWDEVICE_TYPE_VAAPI)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+/* MediaCodecList's hardware codecs (the index of the type in MediaCodecList.HARDWARE_TYPES), the VA-API profile
+ * FFmpeg decodes a stream of the Android profile (MediaCodecInfo.CodecProfileLevel) with, and FFmpeg's decoder */
+#if HAVE_LIBVA
+static const struct {
+	int type;
+	const char *decoder;
+	VAProfile va_profile;
+	int android_profile;
+} hardware_profiles[] = {
+	{0, "h264", VAProfileH264ConstrainedBaseline, 0x10000}, // AVCProfileConstrainedBaseline
+	{0, "h264", VAProfileH264ConstrainedBaseline, 0x01},    // AVCProfileBaseline: FFmpeg takes it for VA-API
+	{0, "h264", VAProfileH264Main, 0x02},                   // AVCProfileMain
+	{0, "h264", VAProfileH264High, 0x08},                   // AVCProfileHigh
+	{0, "h264", VAProfileH264High, 0x80000},                // AVCProfileConstrainedHigh
+	{1, "hevc", VAProfileHEVCMain, 0x01},                   // HEVCProfileMain
+	{1, "hevc", VAProfileHEVCMain10, 0x02},                 // HEVCProfileMain10
+	{2, "vp8", VAProfileVP8Version0_3, 0x01},               // VP8ProfileMain
+	{3, "vp9", VAProfileVP9Profile0, 0x01},                 // VP9Profile0
+	{3, "vp9", VAProfileVP9Profile1, 0x02},                 // VP9Profile1
+	{3, "vp9", VAProfileVP9Profile2, 0x04},                 // VP9Profile2
+	{3, "vp9", VAProfileVP9Profile3, 0x08},                 // VP9Profile3
+	{4, "av1", VAProfileAV1Profile0, 0x01},                 // AV1ProfileMain8
+	{4, "av1", VAProfileAV1Profile0, 0x02},                 // AV1ProfileMain10
+};
+#endif
+
+/* the profiles the VA-API device decodes (VAEntrypointVLD), four values each: the type, the Android profile and the
+ * largest frame (FFmpeg's frame constraints of that profile, the limit its VA-API decoding checks); empty without
+ * a VA-API device */
+JNIEXPORT jintArray JNICALL Java_android_media_MediaCodec_native_1hardwareProfiles(JNIEnv *env, jclass klass)
+{
+	int n = 0;
+#if HAVE_LIBVA
+	jint values[ARRAY_SIZE(hardware_profiles) * 4];
+	AVBufferRef *device = NULL;
+	if (av_hwdevice_ctx_create(&device, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0) < 0) {
+		fprintf(stderr, "MediaCodec: no VA-API device, the video codecs decode in software\n");
+		return (*env)->NewIntArray(env, 0);
+	}
+	VADisplay display = ((AVVAAPIDeviceContext *)((AVHWDeviceContext *)device->data)->hwctx)->display;
+	int nb_profiles = vaMaxNumProfiles(display);
+	VAProfile *profiles = calloc(nb_profiles, sizeof(VAProfile));
+	if (vaQueryConfigProfiles(display, profiles, &nb_profiles) != VA_STATUS_SUCCESS)
+		nb_profiles = 0;
+	for (int i = 0; i < ARRAY_SIZE(hardware_profiles); i++) {
+		VAProfile profile = hardware_profiles[i].va_profile;
+		gboolean listed = FALSE;
+		for (int j = 0; j < nb_profiles; j++)
+			listed |= profiles[j] == profile;
+		VAConfigID config;
+		if (!listed || !decoder_has_vaapi(hardware_profiles[i].decoder) ||
+		    vaCreateConfig(display, profile, VAEntrypointVLD, NULL, 0, &config) != VA_STATUS_SUCCESS)
+			continue;
+		AVVAAPIHWConfig *hwconfig = av_hwdevice_hwconfig_alloc(device);
+		hwconfig->config_id = config;
+		AVHWFramesConstraints *constraints = av_hwdevice_get_hwframe_constraints(device, hwconfig);
+		if (constraints && constraints->max_width > 0 && constraints->max_height > 0) {
+			values[n++] = hardware_profiles[i].type;
+			values[n++] = hardware_profiles[i].android_profile;
+			values[n++] = constraints->max_width;
+			values[n++] = constraints->max_height;
+		}
+		av_hwframe_constraints_free(&constraints);
+		av_free(hwconfig);
+		vaDestroyConfig(display, config);
+	}
+	free(profiles);
+	av_buffer_unref(&device);
+	jintArray array = (*env)->NewIntArray(env, n);
+	(*env)->SetIntArrayRegion(env, array, 0, n, values);
+	return array;
+#else
+	return (*env)->NewIntArray(env, n);
+#endif
 }
 
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio(JNIEnv *env, jobject this, jlong codec, jobject extradata, jint sample_rate, jint nb_channels)
@@ -111,6 +204,7 @@ static const struct {
 	uint32_t layers[AV_DRM_MAX_PLANES];
 } drm_format_map[] = {
 	{DRM_FORMAT_NV12, 2, {DRM_FORMAT_R8, DRM_FORMAT_GR88}},
+	{DRM_FORMAT_P010, 2, {DRM_FORMAT_R16, DRM_FORMAT_GR1616}}, // 10 bit (HEVC Main10, VP9 Profile2, AV1 Main10)
 };
 
 static uint32_t get_drm_frame_format(const AVDRMFrameDescriptor *drm_frame_desc)
@@ -168,7 +262,10 @@ struct render_frame_data {
 static void deliver_texture(struct render_frame_data *d, GdkTexture *texture)
 {
 	if (d->remote) {
-		ANativeWindow_remotePresentTexture(d->remote, texture, d->crop);
+		if (g_object_get_data(G_OBJECT(texture), "atl-dmabuf"))
+			ANativeWindow_remotePresentDmabuf(d->remote, texture, d->crop);
+		else
+			ANativeWindow_remotePresentTexture(d->remote, texture, d->crop);
 		g_object_unref(texture);
 		ANativeWindow_release(d->remote);
 	} else if (d->surface_texture) {
@@ -260,6 +357,28 @@ static GdkTexture *import_drm_frame_desc_as_texture(const AVDRMFrameDescriptor *
 	gdk_dmabuf_texture_builder_set_fourcc(builder, drm_format);
 	GError *error = NULL;
 	GdkTexture *texture = gdk_dmabuf_texture_builder_build(builder, handle_dmabuftexture_destroy, drm_frame, &error);
+	/* the planes for SurfaceTexture.updateTexImage() and a Surface of another process (struct atl_dmabuf); the file
+	 * descriptors belong to drm_frame, which lives as long as the texture */
+	if (texture && k <= ATL_DMABUF_MAX_PLANES && (drm_format == DRM_FORMAT_NV12 || drm_format == DRM_FORMAT_P010)) {
+		struct atl_dmabuf *dmabuf = g_new0(struct atl_dmabuf, 1);
+		dmabuf->fourcc = drm_format;
+		dmabuf->width = width;
+		dmabuf->height = height;
+		for (int i = 0; i < drm_frame_desc->nb_layers; i++) {
+			for (int j = 0; j < drm_frame_desc->layers[i].nb_planes; j++) {
+				const AVDRMPlaneDescriptor *plane = &drm_frame_desc->layers[i].planes[j];
+				const AVDRMObjectDescriptor *object = &drm_frame_desc->objects[plane->object_index];
+				dmabuf->modifier = object->format_modifier;
+				dmabuf->fd[dmabuf->n_planes] = object->fd;
+				dmabuf->offset[dmabuf->n_planes] = plane->offset;
+				dmabuf->stride[dmabuf->n_planes] = plane->pitch;
+				dmabuf->n_planes++;
+			}
+		}
+		dmabuf->matrix = drm_frame->colorspace == AVCOL_SPC_BT709 ? 709 : (drm_frame->colorspace == AVCOL_SPC_BT2020_NCL || drm_frame->colorspace == AVCOL_SPC_BT2020_CL) ? 2020 : 601;
+		dmabuf->full_range = drm_frame->color_range == AVCOL_RANGE_JPEG;
+		g_object_set_data_full(G_OBJECT(texture), "atl-dmabuf", dmabuf, g_free);
+	}
 	if (error) {
 		fprintf(stderr, "Failed to build texture: %s\n", error->message);
 		exit(1);
@@ -268,7 +387,7 @@ static GdkTexture *import_drm_frame_desc_as_texture(const AVDRMFrameDescriptor *
 	return texture;
 }
 
-JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JNIEnv *env, jobject this, jlong codec, jobject csd0, jobject csd1, jobject surface_obj, jint rotation)
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JNIEnv *env, jobject this, jlong codec, jobject csd0, jobject csd1, jobject surface_obj, jint rotation, jint held_frames)
 {
 	struct ATL_codec_context *ctx = _PTR(codec);
 	AVCodecContext *codec_ctx = ctx->codec;
@@ -305,7 +424,7 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 	ctx->video.extradata_size = extradata_size;
 
 	int i = 0;
-	while (1) {
+	while (ctx->hardware) {
 		const AVCodecHWConfig *config = avcodec_get_hw_config(codec_ctx->codec, i);
 		if (!config) {
 			fprintf(stderr, "Decoder %s doesn't support pixel format VAAPI or DRM_PRIME\n",
@@ -316,6 +435,8 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 		if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) && (config->pix_fmt == AV_PIX_FMT_VAAPI || config->pix_fmt == AV_PIX_FMT_DRM_PRIME)) {
 			fprintf(stderr, "Selected pixel format %s\n", av_get_pix_fmt_name(config->pix_fmt));
 			codec_ctx->get_format = get_hw_format;
+			/* the hardware frame pool also holds the frames the app has as output buffers and the Surface shows */
+			codec_ctx->extra_hw_frames = held_frames;
 
 			AVBufferRef *hw_device_ctx = NULL;
 			int ret = av_hwdevice_ctx_create(&hw_device_ctx, config->device_type, NULL, NULL, 0);
@@ -478,6 +599,9 @@ static gboolean render_frame(void *data)
 			fprintf(stderr, "Failed to map frame: %s\n", av_err2str(ret));
 			exit(1);
 		}
+		/* the YUV matrix and range for a consumer that samples the planes (struct atl_dmabuf) */
+		drm_frame->colorspace = frame->colorspace;
+		drm_frame->color_range = frame->color_range;
 		av_frame_free(&frame);
 	} else {
 		drm_frame = frame;
@@ -524,9 +648,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 			return;
 		}
 
-		/* a SurfaceTexture's consumer may read the pixels (updateTexImage()), and a frame to be turned is turned
-		 * in memory: a hardware frame is copied to memory first */
-		if (frame->hw_frames_ctx && (ctx->video.surface_texture || ctx->video.rotation)) {
+		/* a frame to be turned is turned in memory: a hardware frame is copied to memory first; a SurfaceTexture
+		 * gets the hardware frame itself (as a dmabuf, like AOSP's BufferQueue gets the decoder's buffer) */
+		if (frame->hw_frames_ctx && ctx->video.rotation) {
 			AVFrame *sw_frame = av_frame_alloc();
 			if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0 || av_frame_copy_props(sw_frame, frame) < 0) {
 				fprintf(stderr, "skipping %dx%d frame: can't copy it from the hardware\n", frame->width, frame->height);
@@ -596,8 +720,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		struct render_frame_data *data = malloc(sizeof(struct render_frame_data));
 		data->frame = frame;
 		data->release_time_ns = presentationTimeNs;
+		data->timestamp_ns = timestamp_ns;
 		data->surface_view_widget = ctx->video.surface_view_widget;
-		data->surface_texture = NULL;
+		data->surface_texture = ctx->video.surface_texture ? (*env)->NewGlobalRef(env, ctx->video.surface_texture) : NULL;
 		data->crop = ctx->video.crop;
 		data->remote = ctx->video.remote;
 		if (data->remote)
