@@ -1,4 +1,5 @@
 #include <gdk/wayland/gdkwayland.h>
+#include <glib-unix.h>
 #include <gtk/gtk.h>
 #include <string.h>
 #include <wayland-client.h>
@@ -11,7 +12,10 @@
 /* The rotation of the display (Display.getRotation()) is the transform the compositor gives the monitor the
  * window is on: when a phone shell turns the screen (Phosh with iio-sensor-proxy, the rotation button), the
  * output's wl_output transform changes. GDK does not tell the transform, so ATL binds the wl_outputs itself
- * and matches them to GDK's monitors by their name (the connector). */
+ * and matches them to GDK's monitors by their name (the connector). It binds them on a Wayland connection of
+ * its own: the compositor sends wl_surface.enter for every wl_output the client has bound, and GDK turns the
+ * enter for an output it does not know into enter-monitor with a NULL monitor (gdksurface-wayland.c
+ * surface_enter()), which WebKit's ToplevelWindow does not survive (it adds the monitor to a HashSet). */
 
 struct output {
 	struct wl_output *wl_output;
@@ -22,6 +26,7 @@ struct output {
 };
 
 static GPtrArray *outputs = NULL;
+static struct wl_display *output_display = NULL;
 static GdkSurface *window_surface = NULL;
 static int current_rotation = 0;
 
@@ -149,6 +154,14 @@ static const struct wl_registry_listener registry_listener = {
 	.global_remove = registry_global_remove,
 };
 
+/* the events of the own connection (transform changes, outputs coming and going) */
+static gboolean output_display_dispatch(gint fd, GIOCondition condition, gpointer user_data)
+{
+	if ((condition & (G_IO_HUP | G_IO_ERR)) || wl_display_dispatch(output_display) < 0)
+		return G_SOURCE_REMOVE;
+	return G_SOURCE_CONTINUE;
+}
+
 static void enter_monitor_cb(GdkSurface *surface, GdkMonitor *monitor, gpointer user_data)
 {
 	update_rotation();
@@ -167,11 +180,15 @@ void display_track_rotation(GtkWindow *window)
 	}
 	if (!outputs) {
 		outputs = g_ptr_array_new();
-		struct wl_registry *registry = wl_display_get_registry(gdk_wayland_display_get_wl_display(display));
-		wl_registry_add_listener(registry, &registry_listener, NULL);
-		/* the outputs and their transforms before the app asks */
-		wl_display_roundtrip(gdk_wayland_display_get_wl_display(display));
-		wl_display_roundtrip(gdk_wayland_display_get_wl_display(display));
+		output_display = wl_display_connect(gdk_display_get_name(display));
+		if (output_display) {
+			struct wl_registry *registry = wl_display_get_registry(output_display);
+			wl_registry_add_listener(registry, &registry_listener, NULL);
+			/* the outputs and their transforms before the app asks */
+			wl_display_roundtrip(output_display);
+			wl_display_roundtrip(output_display);
+			g_unix_fd_add(wl_display_get_fd(output_display), G_IO_IN | G_IO_HUP | G_IO_ERR, output_display_dispatch, NULL);
+		}
 	}
 	update_rotation();
 }
