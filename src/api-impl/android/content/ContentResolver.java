@@ -293,25 +293,15 @@ public class ContentResolver {
 		}
 	}
 
+	/* AOSP ContentResolver: the SQL-style forms go through the Bundle form, so a provider that only knows that one
+	 * (DocumentsProvider: "Pre-Android-O query format not supported.") answers them */
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
-		if (provider != null) {
-			return provider.query(uri, projection, selection, selectionArgs, sortOrder);
-		} else if (filePath(uri) != null) {
-			if (projection == null)
-				projection = new String[] {"_display_name", "_size", "mime_type"};
-			MatrixCursor cursor = new MatrixCursor(projection);
-			Object[] row = new Object[projection.length];
-			native_query_file_info(filePath(uri), projection, row);
-			cursor.addRow(row);
-			return cursor;
-		} else {
-			return null;
-		}
+		return query(uri, projection, selection, selectionArgs, sortOrder, null);
 	}
 
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) {
-		return query(uri, projection, selection, selectionArgs, sortOrder);
+		Bundle queryArgs = createSqlQueryBundle(selection, selectionArgs, sortOrder);
+		return query(uri, projection, queryArgs, cancellationSignal);
 	}
 
 	/* AOSP ContentResolver: the SQL-style calls go through the Bundle forms, which reach the provider's
