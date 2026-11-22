@@ -651,7 +651,9 @@ static int64_t pcm_delay(AAudioStream *stream)
  * Playback starts by hand (start_threshold is the boundary), like AudioFlinger's Track::isReady():
  * an active track is mixed once min(start threshold = frame count, buffer size) frames are ready,
  * so the device starts with a primed buffer. ALSA can't take more than fits, so a chunk that no
- * longer fits starts it as well.
+ * longer fits starts it as well. So does a chunk that would go beyond the buffer size: AudioTrack's
+ * client fills the buffer up to its size with part of a chunk, which reaches the threshold; here
+ * the callback thread waits for room for a whole chunk, which a device that is not started never makes.
  */
 static void start_if_primed(AAudioStream *stream, int32_t next_frames)
 {
@@ -660,7 +662,7 @@ static void start_if_primed(AAudioStream *stream, int32_t next_frames)
 	snd_pcm_sframes_t avail = snd_pcm_avail_update(stream->pcm);
 	int32_t queued = stream->buffer_capacity - (avail < 0 ? 0 : avail);
 	int32_t threshold = atomic_load(&stream->buffer_size);
-	if (queued >= threshold || (queued > 0 && avail < next_frames))
+	if (queued >= threshold || (queued > 0 && (avail < next_frames || queued + next_frames > threshold)))
 		snd_pcm_start(stream->pcm);
 }
 
