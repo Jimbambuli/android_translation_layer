@@ -2048,6 +2048,7 @@ srcs = [
 	'android/widget/MultiAutoCompleteTextView.java',
 	'android/widget/NumberPicker.java',
 	'android/widget/OverScroller.java',
+	'android/widget/ParagraphTextSelection.java',
 	'android/widget/PopupMenu.java',
 	'android/widget/PopupWindow.java',
 	'android/widget/ProgressBar.java',

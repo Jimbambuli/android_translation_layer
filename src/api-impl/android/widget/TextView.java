@@ -259,6 +259,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 				setAllCaps(allCaps);
 			}
 
+			// AOSP attribute loop: the selection handles, loaded when first asked for
+			mTextSelectHandleLeftRes = a.getResourceId(com.android.internal.R.styleable.TextView_textSelectHandleLeft, 0);
+			mTextSelectHandleRightRes = a.getResourceId(com.android.internal.R.styleable.TextView_textSelectHandleRight, 0);
+			mTextSelectHandleRes = a.getResourceId(com.android.internal.R.styleable.TextView_textSelectHandle, 0);
 			// AOSP attribute loop: TextView_textIsSelectable -> setTextIsSelectable()
 			if (a.getBoolean(com.android.internal.R.styleable.TextView_textIsSelectable, false))
 				setTextIsSelectable(true);
@@ -329,6 +333,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	private void updateNativeText() {
+		if (mParagraphSelection != null)
+			mParagraphSelection.onTextChanged();
 		/* (Button and EditText have widgets of their own, not the label) */
 		if (mTransformed instanceof Spanned && !(this instanceof Button || this instanceof EditText) && hasParagraphSpans((Spanned)mTransformed)) {
 			showParagraphLayout(true);
@@ -452,6 +458,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	/* AOSP TextView.onDraw(): the paint gets the current colours, the layout is drawn inside the paddings */
+	private final Paint mHighlightPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
 	private final class ParagraphLayoutDrawable extends Drawable {
 		@Override
 		public void draw(Canvas canvas) {
@@ -462,6 +470,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			textPaint.drawableState = getDrawableState();
 			canvas.save();
 			canvas.translate(getCompoundPaddingLeft(), getExtendedPaddingTop() + paragraphVerticalOffset(layout));
+			ParagraphTextSelection selection = paragraphSelection();
+			if (selection != null && mMovement != null)
+				selection.drawHighlight(canvas, layout, mHighlightPaint);
 			layout.draw(canvas);
 			canvas.restore();
 		}
@@ -1395,8 +1406,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	private boolean mTextIsSelectable;
 
-	/** AOSP TextView.setTextIsSelectable(): focusable in touch mode, clickable and long-clickable as selectable;
-	 * the selection itself is made by the GtkLabel */
+	/** AOSP TextView.setTextIsSelectable(): focusable in touch mode, clickable and long-clickable as selectable,
+	 * ArrowKeyMovementMethod and a spannable text; the selection of a paragraph text is made like AOSP's Editor
+	 * (ParagraphTextSelection), that of other texts by the GtkLabel */
 	public void setTextIsSelectable(boolean selectable) {
 		if (mTextIsSelectable == selectable)
 			return;
@@ -1406,6 +1418,20 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		setClickable(selectable);
 		setLongClickable(selectable);
 		native_setSelectable(widget, selectable);
+		setMovementMethod(selectable ? android.text.method.ArrowKeyMovementMethod.getInstance() : null);
+		setText(getText(), selectable ? BufferType.SPANNABLE : BufferType.NORMAL);
+	}
+
+	/* the parts of AOSP's Editor that select a paragraph text, made when first needed */
+	private ParagraphTextSelection mParagraphSelection;
+
+	private ParagraphTextSelection paragraphSelection() {
+		if (mParagraphText && mTextIsSelectable && text instanceof Spannable) {
+			if (mParagraphSelection == null)
+				mParagraphSelection = new ParagraphTextSelection(this);
+			return mParagraphSelection;
+		}
+		return null;
 	}
 	private native void native_setSelectable(long widget, boolean selectable);
 
@@ -1426,7 +1452,14 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		setTextSelectHandle(getContext().getDrawable(textSelectHandle));
 	}
 
+	/* AOSP: the drawable of the theme's attribute until one is set */
+	private int mTextSelectHandleRes;
+	private int mTextSelectHandleLeftRes;
+	private int mTextSelectHandleRightRes;
+
 	public Drawable getTextSelectHandle() {
+		if (mTextSelectHandle == null && mTextSelectHandleRes != 0)
+			mTextSelectHandle = getContext().getDrawable(mTextSelectHandleRes);
 		return mTextSelectHandle;
 	}
 
@@ -1442,6 +1475,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	public Drawable getTextSelectHandleLeft() {
+		if (mTextSelectHandleLeft == null && mTextSelectHandleLeftRes != 0)
+			mTextSelectHandleLeft = getContext().getDrawable(mTextSelectHandleLeftRes);
 		return mTextSelectHandleLeft;
 	}
 
@@ -1457,6 +1492,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	public Drawable getTextSelectHandleRight() {
+		if (mTextSelectHandleRight == null && mTextSelectHandleRightRes != 0)
+			mTextSelectHandleRight = getContext().getDrawable(mTextSelectHandleRightRes);
 		return mTextSelectHandleRight;
 	}
 
@@ -3564,12 +3601,110 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	@Export
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
+		final int action = event.getActionMasked();
+		final ParagraphTextSelection selection = paragraphSelection();
+		if (selection != null) {
+			selection.onTouchEvent(event);
+		}
 		final boolean superResult = super.onTouchEvent(event);
+		/* AOSP: the up after a long press or double tap belongs to the selection */
+		if (selection != null && selection.mDiscardNextActionUp && action == MotionEvent.ACTION_UP) {
+			selection.mDiscardNextActionUp = false;
+			return superResult;
+		}
+		final boolean touchIsFinished = (action == MotionEvent.ACTION_UP) && isFocused();
 		if (mParagraphText && mMovement != null && isEnabled() && text instanceof Spannable) {
-			if (mMovement.onTouchEvent(this, (Spannable)text, event))
+			boolean handled = mMovement.onTouchEvent(this, (Spannable)text, event);
+			if (touchIsFinished && selection != null) {
+				selection.onTouchUpEvent(event);
+				handled = true;
+			}
+			if (handled)
 				return true;
 		}
 		return superResult;
+	}
+
+	/* AOSP TextView.performLongClick(): the Editor selects the word of a selectable paragraph text unless a long
+	 * click listener took the click; the up that ends the press is discarded */
+	@Override
+	public boolean performLongClick() {
+		boolean handled = false;
+		boolean performedHapticFeedback = false;
+		final ParagraphTextSelection selection = paragraphSelection();
+		if (selection != null)
+			selection.mIsBeingLongClicked = true;
+		if (super.performLongClick()) {
+			handled = true;
+			performedHapticFeedback = true;
+		}
+		if (selection != null) {
+			handled |= selection.performLongClick(handled);
+			selection.mIsBeingLongClicked = false;
+		}
+		if (handled) {
+			if (!performedHapticFeedback)
+				performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+			if (selection != null)
+				selection.mDiscardNextActionUp = true;
+		}
+		return handled;
+	}
+
+	/* AOSP TextView.getLineAtCoordinate() */
+	int getLineAtCoordinate(float y) {
+		y -= getTotalPaddingTop();
+		// Clamp the position to inside of the view.
+		y = Math.max(0.0f, y);
+		y = Math.min(getHeight() - getTotalPaddingBottom() - 1, y);
+		y += getScrollY();
+		return getLayout().getLineForVertical((int)y);
+	}
+
+	/* AOSP TextView.convertToLocalHorizontalCoordinate() */
+	float convertToLocalHorizontalCoordinate(float x) {
+		x -= getTotalPaddingLeft();
+		// Clamp the position to inside of the view.
+		x = Math.max(0.0f, x);
+		x = Math.min(getWidth() - getTotalPaddingRight() - 1, x);
+		x += getScrollX();
+		return x;
+	}
+
+	/* AOSP TextView.canCopy()/canShare()/canSelectAllText()/canSelectText(); ATL's mEditor is the selection of a
+	 * paragraph text (or an EditText's GtkText), there are no password transformations of a label */
+	boolean canCopy() {
+		return text.length() > 0 && hasSelection() && (this instanceof EditText || paragraphSelection() != null);
+	}
+
+	boolean canShare() {
+		if (!getContext().getResources().getBoolean(com.android.internal.R.bool.config_textShareSupported))
+			return false;
+		return canCopy();
+	}
+
+	boolean canSelectText() {
+		return text.length() != 0 && (this instanceof EditText || paragraphSelection() != null);
+	}
+
+	boolean canSelectAllText() {
+		return canSelectText() && !(getSelectionStart() == 0 && getSelectionEnd() == text.length());
+	}
+
+	/* AOSP TextView.shareSelectedText() */
+	private void shareSelectedText() {
+		final int start = Math.max(0, Math.min(getSelectionStart(), getSelectionEnd()));
+		final int end = Math.max(0, Math.max(getSelectionStart(), getSelectionEnd()));
+		String selectedText = start == end ? null : String.valueOf(text.subSequence(start, end));
+		if (selectedText != null && !selectedText.isEmpty()) {
+			android.content.Intent sharingIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+			sharingIntent.setType("text/plain");
+			sharingIntent.removeExtra(android.content.Intent.EXTRA_TEXT);
+			selectedText = (String)TextUtils.trimToParcelableSize(selectedText);
+			sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, selectedText);
+			getContext().startActivity(android.content.Intent.createChooser(sharingIntent, null));
+			setSelection(getSelectionEnd());
+		}
 	}
 
 	/* AOSP TextView.getOffsetForPosition(): the character offset closest to the point, -1 without a layout */
@@ -3700,6 +3835,18 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 				setSelection(0, text.length());
 				return true;
 			}
+			if (paragraphSelection() != null) {
+				/* AOSP selectAllText(), the Editor's action mode follows */
+				setSelection(0, text.length());
+				mParagraphSelection.onSelectionChangedByMenu();
+				return true;
+			}
+			return false;
+		case com.android.internal.R.id.shareText:
+			if (paragraphSelection() != null) {
+				shareSelectedText();
+				return true;
+			}
 			return false;
 		case android.R.id.cut:
 			if (this instanceof EditText && clipboard != null) {
@@ -3711,6 +3858,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		case android.R.id.copy:
 			if (clipboard != null && max > min) {
 				clipboard.setPrimaryClip(android.content.ClipData.newPlainText(null, getTransformedText(min, max)));
+				/* AOSP: the copy ends the text action mode */
+				if (mParagraphSelection != null)
+					mParagraphSelection.stopTextActionMode();
 				return true;
 			}
 			return false;
