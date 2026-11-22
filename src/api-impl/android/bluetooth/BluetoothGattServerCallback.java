@@ -204,6 +204,6 @@ public abstract class BluetoothGattServerCallback {
      */
     public void onSubrateChange(
             @NonNull BluetoothDevice device,
-            int subrateMode,
-            int status) {}
+            @BluetoothGatt.OnSubrateChangeModeValues int subrateMode,
+            @BluetoothGatt.OnSubrateChangeStatusValues int status) {}
 }

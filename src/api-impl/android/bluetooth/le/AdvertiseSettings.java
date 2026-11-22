@@ -18,6 +18,7 @@ package android.bluetooth.le;
 
 import android.annotation.NonNull;
 import android.annotation.RequiresNoPermission;
+import android.annotation.SystemApi;
 import android.bluetooth.le.AdvertisingSetParameters.AddressTypeStatus;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -135,6 +136,7 @@ public final class AdvertiseSettings implements Parcelable {
      * @return the own address type for advertising
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public @AddressTypeStatus int getOwnAddressType() {
         return mOwnAddressType;
@@ -286,6 +288,7 @@ public final class AdvertiseSettings implements Parcelable {
          * @throws IllegalArgumentException If the {@code ownAddressType} is invalid
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setOwnAddressType(@AddressTypeStatus int ownAddressType) {
             if (ownAddressType < AdvertisingSetParameters.ADDRESS_TYPE_DEFAULT

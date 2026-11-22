@@ -3,6 +3,8 @@ package android.media;
 import android.os.Handler;
 
 public class AudioManager {
+	/* AOSP AudioManager.ACTION_AUDIO_BECOMING_NOISY */
+	public static final String ACTION_AUDIO_BECOMING_NOISY = "android.media.AUDIO_BECOMING_NOISY";
 	public static final String PROPERTY_OUTPUT_FRAMES_PER_BUFFER = "android.media.property.OUTPUT_FRAMES_PER_BUFFER";
 	public static final String PROPERTY_OUTPUT_SAMPLE_RATE = "android.media.property.OUTPUT_SAMPLE_RATE";
 
@@ -24,8 +26,14 @@ public class AudioManager {
 	private native int nativeGetStreamVolume();
 	private native boolean nativeIsStreamMute();
 
+	public AudioManager() {
+		BluetoothRoutes.start();
+	}
+
+	/* AOSP: AudioSystem.getDeviceConnectionState(DEVICE_OUT_BLUETOOTH_A2DP) is AVAILABLE, i.e. an A2DP sink is
+	 * connected; ATL asks BlueZ (BluetoothRoutes) */
 	public boolean isBluetoothA2dpOn() {
-		return false;
+		return !BluetoothRoutes.a2dpSinks().isEmpty();
 	}
 
 	public String getProperty(String name) {
@@ -98,11 +106,17 @@ public class AudioManager {
 		return 100;
 	}
 
+	/* who holds audio focus (MediaFocusControl's stack, for AudioDeviceInventory's hasAudioFocusUsers()); ATL grants
+	 * every request and never takes focus away */
+	static final java.util.Set<Object> sFocusHolders = java.util.Collections.synchronizedSet(new java.util.HashSet<Object>());
+
 	public int requestAudioFocus(OnAudioFocusChangeListener listener, int streamType, int durationHint) {
+		sFocusHolders.add(listener != null ? listener : this);
 		return /*AUDIOFOCUS_REQUEST_GRANTED*/ 1;
 	}
 
 	public int abandonAudioFocus(OnAudioFocusChangeListener listener) {
+		sFocusHolders.remove(listener != null ? listener : this);
 		return /*AUDIOFOCUS_REQUEST_GRANTED*/ 1;
 	}
 
@@ -110,6 +124,7 @@ public class AudioManager {
 		if (focusRequest == null) {
 			throw new NullPointerException("Illegal null AudioFocusRequest");
 		}
+		sFocusHolders.add(focusRequest);
 		return AUDIOFOCUS_REQUEST_GRANTED;
 	}
 
@@ -117,6 +132,7 @@ public class AudioManager {
 		if (focusRequest == null) {
 			throw new IllegalArgumentException("Illegal null AudioFocusRequest");
 		}
+		sFocusHolders.remove(focusRequest);
 		return AUDIOFOCUS_REQUEST_GRANTED;
 	}
 
@@ -311,14 +327,22 @@ public class AudioManager {
 	}
 
 	/* AOSP AudioManager.getDevices(): the audio devices of the requested direction. ATL has no audio policy, the
-	 * devices are the default ALSA output (speaker) and input (microphone) the app plays on and records from */
+	 * devices are the default output (speaker) and input (microphone) the app plays on and records from, and the
+	 * connected Bluetooth audio devices (AudioDeviceInventory): an A2DP output per A2DP sink, SCO output and input
+	 * per connected headset */
 	public AudioDeviceInfo[] getDevices(int flags) {
 		java.util.ArrayList<AudioDeviceInfo> devices = new java.util.ArrayList<>();
 		if ((flags & GET_DEVICES_OUTPUTS) != 0) {
 			devices.add(new AudioDeviceInfo(1, AudioDeviceInfo.TYPE_BUILTIN_SPEAKER, "default", true));
+			for (String[] d : BluetoothRoutes.a2dpSinks())
+				devices.add(new AudioDeviceInfo(BluetoothRoutes.id(AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, d[0]), AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, d[1], true, d[0]));
+			for (String[] d : BluetoothRoutes.headsets())
+				devices.add(new AudioDeviceInfo(BluetoothRoutes.id(AudioDeviceInfo.TYPE_BLUETOOTH_SCO, d[0]), AudioDeviceInfo.TYPE_BLUETOOTH_SCO, d[1], true, d[0]));
 		}
 		if ((flags & GET_DEVICES_INPUTS) != 0) {
 			devices.add(new AudioDeviceInfo(2, AudioDeviceInfo.TYPE_BUILTIN_MIC, "default", false));
+			for (String[] d : BluetoothRoutes.headsets())
+				devices.add(new AudioDeviceInfo(BluetoothRoutes.id(AudioDeviceInfo.TYPE_BLUETOOTH_SCO, d[0]) + 1, AudioDeviceInfo.TYPE_BLUETOOTH_SCO, d[1], false, d[0]));
 		}
 		return devices.toArray(new AudioDeviceInfo[0]);
 	}
@@ -337,8 +361,8 @@ public class AudioManager {
 	}
 
 	/* AOSP AudioManager.registerAudioDeviceCallback(): a new callback hears of the devices that are there
-	 * (onAudioDevicesAdded() on the handler's thread, else the main thread); ATL's devices never change, so
-	 * nothing follows */
+	 * (onAudioDevicesAdded() on the handler's thread, else the main thread), then of Bluetooth audio devices that
+	 * come and go (BluetoothRoutes); the speaker and microphone never change */
 	private final java.util.HashSet<AudioDeviceCallback> mDeviceCallbacks = new java.util.HashSet<>();
 
 	public void registerAudioDeviceCallback(final AudioDeviceCallback callback, Handler handler) {
@@ -347,7 +371,9 @@ public class AudioManager {
 				return;
 		}
 		final AudioDeviceInfo[] devices = getDevices(GET_DEVICES_ALL);
-		(handler != null ? handler : new Handler(android.os.Looper.getMainLooper())).post(new Runnable() {
+		final Handler h = handler != null ? handler : new Handler(android.os.Looper.getMainLooper());
+		BluetoothRoutes.addCallback(callback, h);
+		h.post(new Runnable() {
 			@Override
 			public void run() {
 				callback.onAudioDevicesAdded(devices);
@@ -360,6 +386,7 @@ public class AudioManager {
 		synchronized (mDeviceCallbacks) {
 			mDeviceCallbacks.remove(callback);
 		}
+		BluetoothRoutes.removeCallback(callback);
 	}
 
 	/* AOSP AudioManager.AudioRecordingCallback */

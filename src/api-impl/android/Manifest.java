@@ -253,6 +253,9 @@ public final class Manifest {
 		 Allows applications to pair bluetooth devices without user interaction.
 		 This is not available to third party applications.
 		 */
+		public static final String BLUETOOTH_ADVERTISE = "android.permission.BLUETOOTH_ADVERTISE";
+		public static final String BLUETOOTH_CONNECT = "android.permission.BLUETOOTH_CONNECT";
+		public static final String BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN";
 		public static final String BLUETOOTH_PRIVILEGED = "android.permission.BLUETOOTH_PRIVILEGED";
 		/**
 		 Allows bluetooth stack to access files

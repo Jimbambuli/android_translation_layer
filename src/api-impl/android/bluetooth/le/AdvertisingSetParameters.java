@@ -22,8 +22,10 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
+import android.annotation.SystemApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothDevice.AddressType;
 import android.os.Parcel;
 import android.os.Parcelable;
 
@@ -103,28 +105,28 @@ public final class AdvertisingSetParameters implements Parcelable {
      *
      * @hide
      */
-    public static final int ADDRESS_TYPE_DEFAULT = -1;
+    @SystemApi public static final int ADDRESS_TYPE_DEFAULT = -1;
 
     /**
      * Advertise own public address type.
      *
      * @hide
      */
-    public static final int ADDRESS_TYPE_PUBLIC = 0;
+    @SystemApi public static final int ADDRESS_TYPE_PUBLIC = 0;
 
     /**
      * Generate and advertise own resolvable private address.
      *
      * @hide
      */
-    public static final int ADDRESS_TYPE_RANDOM = 1;
+    @SystemApi public static final int ADDRESS_TYPE_RANDOM = 1;
 
     /**
      * Generate and advertise on non-resolvable private address.
      *
      * @hide
      */
-    public static final int ADDRESS_TYPE_RANDOM_NON_RESOLVABLE = 2;
+    @SystemApi public static final int ADDRESS_TYPE_RANDOM_NON_RESOLVABLE = 2;
 
     private final boolean mIsLegacy;
     private final boolean mIsAnonymous;
@@ -140,7 +142,7 @@ public final class AdvertisingSetParameters implements Parcelable {
     private final boolean mIsDirected;
     private final boolean mIsHighDutyCycle;
     private final String mPeerAddress;
-    private final int mPeerAddressType;
+    private final @AddressType int mPeerAddressType;
 
     private AdvertisingSetParameters(
             boolean connectable,
@@ -157,7 +159,7 @@ public final class AdvertisingSetParameters implements Parcelable {
             boolean isDirected,
             boolean isHighDutyCycle,
             String peerAddress,
-            int peerAddressType) {
+            @AddressType int peerAddressType) {
         mConnectable = connectable;
         mDiscoverable = discoverable;
         mScannable = scannable;
@@ -257,6 +259,7 @@ public final class AdvertisingSetParameters implements Parcelable {
      * @return the own address type for advertising
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public @AddressTypeStatus int getOwnAddressType() {
         return mOwnAddressType;
@@ -267,6 +270,7 @@ public final class AdvertisingSetParameters implements Parcelable {
      * @hide This API is not publicly available as it is mainly intended for accessory devices
      *     running Android to broadcast their availability and which can thus leverage system APIs.
      */
+    @SystemApi
     @RequiresNoPermission
     public boolean isDirected() {
         return mIsDirected;
@@ -277,6 +281,7 @@ public final class AdvertisingSetParameters implements Parcelable {
      * @hide This API is not publicly available as it is mainly intended for accessory devices
      *     running Android to broadcast their availability and which can thus leverage system APIs.
      */
+    @SystemApi
     @RequiresNoPermission
     public boolean isHighDutyCycle() {
         return mIsHighDutyCycle;
@@ -287,6 +292,7 @@ public final class AdvertisingSetParameters implements Parcelable {
      * @hide This API is not publicly available as it is mainly intended for accessory devices
      *     running Android to broadcast their availability and which can thus leverage system APIs.
      */
+    @SystemApi
     @RequiresNoPermission
     public @Nullable String getPeerAddress() {
         return mPeerAddress;
@@ -297,8 +303,9 @@ public final class AdvertisingSetParameters implements Parcelable {
      * @hide This API is not publicly available as it is mainly intended for accessory devices
      *     running Android to broadcast their availability and which can thus leverage system APIs.
      */
+    @SystemApi
     @RequiresNoPermission
-    public int getPeerAddressType() {
+    public @AddressType int getPeerAddressType() {
         return mPeerAddressType;
     }
 
@@ -388,7 +395,7 @@ public final class AdvertisingSetParameters implements Parcelable {
         private boolean mIsDirected = false;
         private boolean mIsHighDutyCycle = false;
         private String mPeerAddress = null;
-        private int mPeerAddressType = BluetoothDevice.ADDRESS_TYPE_PUBLIC;
+        private @AddressType int mPeerAddressType = BluetoothDevice.ADDRESS_TYPE_PUBLIC;
 
         /**
          * Set whether the advertisement type should be connectable or non-connectable. Legacy
@@ -565,6 +572,7 @@ public final class AdvertisingSetParameters implements Parcelable {
          * @throws IllegalArgumentException If the {@code ownAddressType} is invalid
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setOwnAddressType(@AddressTypeStatus int ownAddressType) {
             if (ownAddressType < AdvertisingSetParameters.ADDRESS_TYPE_DEFAULT
@@ -584,6 +592,7 @@ public final class AdvertisingSetParameters implements Parcelable {
          *     running Android to broadcast their availability and which can thus leverage system
          *     APIs.
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setDirected(boolean isDirected) {
             mIsDirected = isDirected;
@@ -598,6 +607,7 @@ public final class AdvertisingSetParameters implements Parcelable {
          *     running Android to broadcast their availability and which can thus leverage system
          *     APIs.
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setHighDutyCycle(boolean isHighDutyCycle) {
             mIsHighDutyCycle = isHighDutyCycle;
@@ -613,6 +623,7 @@ public final class AdvertisingSetParameters implements Parcelable {
          *     running Android to broadcast their availability and which can thus leverage system
          *     APIs.
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setPeerAddress(@NonNull String peerAddress) {
             requireNonNull(peerAddress);
@@ -633,8 +644,9 @@ public final class AdvertisingSetParameters implements Parcelable {
          *     running Android to broadcast their availability and which can thus leverage system
          *     APIs.
          */
+        @SystemApi
         @RequiresNoPermission
-        public @NonNull Builder setPeerAddressType(int peerAddressType) {
+        public @NonNull Builder setPeerAddressType(@AddressType int peerAddressType) {
             if (!List.of(BluetoothDevice.ADDRESS_TYPE_PUBLIC, BluetoothDevice.ADDRESS_TYPE_RANDOM)
                     .contains(peerAddressType)) {
                 throw new IllegalArgumentException("Invalid peer address type " + peerAddressType);

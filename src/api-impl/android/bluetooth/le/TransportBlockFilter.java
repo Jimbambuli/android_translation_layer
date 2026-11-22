@@ -21,6 +21,7 @@ import static java.util.Objects.requireNonNull;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
+import android.annotation.SystemApi;
 import android.bluetooth.BluetoothAssignedNumbers.OrganizationId;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -35,6 +36,7 @@ import java.util.Objects;
  * @see ScanFilter
  * @hide
  */
+@SystemApi
 public final class TransportBlockFilter implements Parcelable {
 
     private final int mOrgId;
@@ -49,7 +51,7 @@ public final class TransportBlockFilter implements Parcelable {
      *
      * @hide
      */
-    public static final int WIFI_NAN_HASH_LENGTH_BYTES = 8;
+    @SystemApi public static final int WIFI_NAN_HASH_LENGTH_BYTES = 8;
 
     private TransportBlockFilter(
             int orgId,
@@ -103,6 +105,7 @@ public final class TransportBlockFilter implements Parcelable {
      *
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public int getOrgId() {
         return mOrgId;
@@ -113,6 +116,7 @@ public final class TransportBlockFilter implements Parcelable {
      *
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public int getTdsFlags() {
         return mTdsFlags;
@@ -125,6 +129,7 @@ public final class TransportBlockFilter implements Parcelable {
      *     tdsFlags will be used for matching
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public int getTdsFlagsMask() {
         return mTdsFlagsMask;
@@ -139,6 +144,7 @@ public final class TransportBlockFilter implements Parcelable {
      * @return Data to filter Transport Discovery Blocks, null if not used
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public @Nullable byte[] getTransportData() {
         return mTransportData;
@@ -154,6 +160,7 @@ public final class TransportBlockFilter implements Parcelable {
      *     in filter, null is not used
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public @Nullable byte[] getTransportDataMask() {
         return mTransportDataMask;
@@ -170,6 +177,7 @@ public final class TransportBlockFilter implements Parcelable {
      * @return 8 octets Wi-Fi NAN defined bloom filter hash, null if not used
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public @Nullable byte[] getWifiNanHash() {
         return mWifiNanHash;
@@ -230,6 +238,7 @@ public final class TransportBlockFilter implements Parcelable {
      *
      * @hide
      */
+    @SystemApi
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
         dest.writeInt(mOrgId);
@@ -303,7 +312,7 @@ public final class TransportBlockFilter implements Parcelable {
      *
      * @hide
      */
-    @NonNull
+    @SystemApi @NonNull
     public static final Creator<TransportBlockFilter> CREATOR =
             new Creator<TransportBlockFilter>() {
                 @Override
@@ -343,6 +352,7 @@ public final class TransportBlockFilter implements Parcelable {
      *
      * @hide
      */
+    @SystemApi
     public static final class Builder {
 
         private final int mOrgId;
@@ -363,6 +373,7 @@ public final class TransportBlockFilter implements Parcelable {
          * @see OrganizationId
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public Builder(int orgId) {
             if (orgId < 1) {
@@ -385,6 +396,7 @@ public final class TransportBlockFilter implements Parcelable {
          * @return this builder
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setTdsFlags(int tdsFlags, int tdsFlagsMask) {
             if (tdsFlags < 0) {
@@ -419,6 +431,7 @@ public final class TransportBlockFilter implements Parcelable {
          * @return this builder
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setTransportData(
                 @NonNull byte[] transportData, @NonNull byte[] transportDataMask) {
@@ -462,6 +475,7 @@ public final class TransportBlockFilter implements Parcelable {
          * @return this builder
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setWifiNanHash(@NonNull byte[] wifiNanHash) {
             if (mOrgId != OrganizationId.WIFI_ALLIANCE_NEIGHBOR_AWARENESS_NETWORKING) {
@@ -484,6 +498,7 @@ public final class TransportBlockFilter implements Parcelable {
          * @throws IllegalStateException if the filter cannot be built
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull TransportBlockFilter build() {
             return new TransportBlockFilter(

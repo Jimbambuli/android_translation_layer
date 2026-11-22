@@ -445,6 +445,9 @@ public class PackageParser {
 					if (p.requestedPermissionsRequired.get(i)) {
 						pi.requestedPermissionsFlags[i] |= PackageInfo.REQUESTED_PERMISSION_REQUIRED;
 					}
+					if (p.requestedPermissionsNeverForLocation.contains(perm)) {
+						pi.requestedPermissionsFlags[i] |= PackageInfo.REQUESTED_PERMISSION_NEVER_FOR_LOCATION;
+					}
 					if (grantedPermissions != null && grantedPermissions.contains(perm)) {
 						pi.requestedPermissionsFlags[i] |= PackageInfo.REQUESTED_PERMISSION_GRANTED;
 					}
@@ -1439,6 +1442,10 @@ public class PackageParser {
 		*/
 		boolean required = true; // Optional <uses-permission> not supported
 
+		/* AOSP ParsingPackageUtils.parseUsesPermission(): usesPermissionFlags, only neverForLocation is defined */
+		final int usesPermissionFlags = sa.getInt(
+		    com.android.internal.R.styleable.AndroidManifestUsesPermission_usesPermissionFlags, 0);
+
 		int maxSdkVersion = 0;
 		TypedValue val = sa.peekValue(
 		    com.android.internal.R.styleable.AndroidManifestUsesPermission_maxSdkVersion);
@@ -1456,6 +1463,8 @@ public class PackageParser {
 				if (index == -1) {
 					pkg.requestedPermissions.add(name.intern());
 					pkg.requestedPermissionsRequired.add(required ? Boolean.TRUE : Boolean.FALSE);
+					if ((usesPermissionFlags & PackageInfo.REQUESTED_PERMISSION_NEVER_FOR_LOCATION) != 0)
+						pkg.requestedPermissionsNeverForLocation.add(name.intern());
 				} else {
 					if (pkg.requestedPermissionsRequired.get(index) != required) {
 						outError[0] = "conflicting <uses-permission> entries";
@@ -3400,6 +3409,8 @@ public class PackageParser {
 
 		public final ArrayList<String> requestedPermissions = new ArrayList<String>();
 		public final ArrayList<Boolean> requestedPermissionsRequired = new ArrayList<Boolean>();
+		/* requested with usesPermissionFlags="neverForLocation" */
+		public final java.util.HashSet<String> requestedPermissionsNeverForLocation = new java.util.HashSet<String>();
 
 		public ArrayList<String> protectedBroadcasts;
 

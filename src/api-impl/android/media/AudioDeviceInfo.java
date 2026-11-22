@@ -74,13 +74,20 @@ public final class AudioDeviceInfo {
 	private final int mType;
 	private final String mName;
 	private final boolean mIsSink;
+	private final String mAddress;
 
 	/** @hide */
 	AudioDeviceInfo(int id, int type, String name, boolean isSink) {
+		this(id, type, name, isSink, "");
+	}
+
+	/** @hide address: the Bluetooth address for Bluetooth devices (AudioDevicePort.address()) */
+	AudioDeviceInfo(int id, int type, String name, boolean isSink, String address) {
 		mId = id;
 		mType = type;
 		mName = name;
 		mIsSink = isSink;
+		mAddress = address;
 	}
 
 	/**
@@ -102,7 +109,7 @@ public final class AudioDeviceInfo {
 	 * parameters.
 	 */
 	public @NonNull String getAddress() {
-		return "";
+		return mAddress;
 	}
 
 	/**
