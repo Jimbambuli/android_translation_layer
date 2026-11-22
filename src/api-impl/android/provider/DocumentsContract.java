@@ -50,6 +50,17 @@ public final class DocumentsContract {
 	public static final String EXTRA_ERROR = "error";
 	public static final String EXTRA_RESULT = "result";
 	public static final String EXTRA_ORIENTATION = "android.provider.extra.ORIENTATION";
+	public static final String EXTRA_EXCLUDE_SELF = "android.provider.extra.EXCLUDE_SELF";
+	public static final String EXTRA_PROMPT = "android.provider.extra.PROMPT";
+	public static final String ACTION_DOCUMENT_SETTINGS = "android.provider.action.DOCUMENT_SETTINGS";
+	public static final String METADATA_TYPES = "android:documentMetadataTypes";
+	public static final String METADATA_EXIF = "android:documentExif";
+	public static final String METADATA_TREE_COUNT = "android:metadataTreeCount";
+	public static final String METADATA_TREE_SIZE = "android:metadataTreeSize";
+	/** @hide */
+	public static final String METHOD_TRASH_DOCUMENT = "android:trashDocument";
+	/** @hide */
+	public static final String METHOD_RESTORE_DOCUMENT_FROM_TRASH = "android:restoreDocumentFromTrash";
 	public static final String METHOD_CREATE_DOCUMENT = "android:createDocument";
 	public static final String METHOD_RENAME_DOCUMENT = "android:renameDocument";
 	public static final String METHOD_DELETE_DOCUMENT = "android:deleteDocument";
@@ -68,6 +79,7 @@ public final class DocumentsContract {
 	/* seems these are not supposed to be ABI but some apps disagree */
 	private static final String PATH_ROOT = "root";
 	private static final String PATH_RECENT = "recent";
+	private static final String PATH_TRASH = "trash";
 	private static final String PATH_DOCUMENT = "document";
 	private static final String PATH_CHILDREN = "children";
 	private static final String TAG = "DocumentsContract";
@@ -166,6 +178,25 @@ public final class DocumentsContract {
 			} else if (paths.size() == 4) {
 				return PATH_TREE.equals(paths.get(0)) && PATH_DOCUMENT.equals(paths.get(2));
 			}
+		}
+		return false;
+	}
+
+	/* AOSP DocumentsContract.isRootsUri()/isRootUri() */
+	public static boolean isRootsUri(Context context, Uri uri) {
+		Preconditions.checkNotNull(context, "context can not be null");
+		return isRootUri(context, uri, 1 /* pathSize */);
+	}
+
+	public static boolean isRootUri(Context context, Uri uri) {
+		Preconditions.checkNotNull(context, "context can not be null");
+		return isRootUri(context, uri, 2 /* pathSize */);
+	}
+
+	private static boolean isRootUri(Context context, Uri uri, int pathSize) {
+		if (isContentUri(uri) && isDocumentsProvider(context, uri.getAuthority())) {
+			final List<String> paths = uri.getPathSegments();
+			return (paths.size() == pathSize && PATH_ROOT.equals(paths.get(0)));
 		}
 		return false;
 	}
@@ -316,6 +347,101 @@ public final class DocumentsContract {
 		}
 	}
 
+	/* AOSP DocumentsContract.trashDocument() */
+	public static Uri trashDocument(ContentResolver content, Uri documentUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, documentUri);
+
+			final Bundle out = content.call(documentUri.getAuthority(), METHOD_TRASH_DOCUMENT, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_URI, android.net.Uri.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to trash document", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
+	/* AOSP DocumentsContract.restoreDocumentFromTrash() */
+	public static Uri restoreDocumentFromTrash(ContentResolver content, Uri sourceDocumentUri, Uri targetParentDocumentUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, sourceDocumentUri);
+			in.putParcelable(DocumentsContract.EXTRA_TARGET_URI, targetParentDocumentUri);
+
+			final Bundle out = content.call(sourceDocumentUri.getAuthority(), METHOD_RESTORE_DOCUMENT_FROM_TRASH, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_URI, android.net.Uri.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to restore document", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
+	/* AOSP DocumentsContract.ejectRoot() */
+	public static void ejectRoot(ContentResolver content, Uri rootUri) {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, rootUri);
+
+			content.call(rootUri.getAuthority(), METHOD_EJECT_ROOT, null, in);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to eject", e);
+		}
+	}
+
+	/* AOSP DocumentsContract.getDocumentMetadata() */
+	public static Bundle getDocumentMetadata(ContentResolver content, Uri documentUri) throws FileNotFoundException {
+		Preconditions.checkNotNull(content, "content can not be null");
+		Preconditions.checkNotNull(documentUri, "documentUri can not be null");
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(EXTRA_URI, documentUri);
+
+			return content.call(documentUri.getAuthority(), METHOD_GET_DOCUMENT_METADATA, null, in);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to get document metadata");
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
+	/* AOSP DocumentsContract.findDocumentPath() */
+	public static Path findDocumentPath(ContentResolver content, Uri treeUri) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, treeUri);
+
+			final Bundle out = content.call(treeUri.getAuthority(), METHOD_FIND_DOCUMENT_PATH, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_RESULT, android.provider.DocumentsContract.Path.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to find path", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
+	/* AOSP DocumentsContract.createWebLinkIntent() */
+	public static android.content.IntentSender createWebLinkIntent(ContentResolver content, Uri uri, Bundle options) throws FileNotFoundException {
+		try {
+			final Bundle in = new Bundle();
+			in.putParcelable(DocumentsContract.EXTRA_URI, uri);
+
+			// Options may be provider specific, so put them in a separate bundle to
+			// avoid overriding the Uri.
+			if (options != null) {
+				in.putBundle(EXTRA_OPTIONS, options);
+			}
+
+			final Bundle out = content.call(uri.getAuthority(), METHOD_CREATE_WEB_LINK_INTENT, null, in);
+			return out.getParcelable(DocumentsContract.EXTRA_RESULT, android.content.IntentSender.class);
+		} catch (Exception e) {
+			Log.w(TAG, "Failed to create a web link intent", e);
+			rethrowIfNecessary(e);
+			return null;
+		}
+	}
+
 	/* AOSP rethrowIfNecessary; a provider in ATL runs in the same process, so its FileNotFoundException
 	 * arrives as such instead of wrapped in a ParcelableException */
 	private static void rethrowIfNecessary(Exception e) throws FileNotFoundException {
@@ -337,6 +463,12 @@ public final class DocumentsContract {
 		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT)
 		    .authority(authority).appendPath(PATH_ROOT).appendPath(rootId)
 		    .appendPath(PATH_RECENT).build();
+	}
+
+	/* AOSP DocumentsContract.buildTrashDocumentsUri() */
+	public static Uri buildTrashDocumentsUri(String authority) {
+		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT)
+				.authority(authority).appendPath(PATH_TRASH).build();
 	}
 
 	/* AOSP buildSearchDocumentsUri() */
@@ -397,6 +529,8 @@ public final class DocumentsContract {
 		public static final int FLAG_PARTIAL = 1 << 13;
 		public static final int FLAG_SUPPORTS_METADATA = 1 << 14;
 		public static final int FLAG_DIR_BLOCKS_OPEN_DOCUMENT_TREE = 1 << 15;
+		public static final int FLAG_SUPPORTS_TRASH = 1 << 16;
+		public static final int FLAG_SUPPORTS_RESTORE = 1 << 17;
 	}
 
 	/* from AOSP android-14 for DocumentsProvider */

@@ -1,11 +1,12 @@
 package android.app;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.util.TypedValue;
 import android.widget.DatePicker;
 import com.android.internal.R;
 
-public class DatePickerDialog extends AlertDialog implements DatePicker.OnDateChangedListener {
+public class DatePickerDialog extends AlertDialog implements DialogInterface.OnClickListener, DatePicker.OnDateChangedListener {
 
 	private DatePicker date_picker;
 	private OnDateSetListener date_set_listener = null;
@@ -35,6 +36,26 @@ public class DatePickerDialog extends AlertDialog implements DatePicker.OnDateCh
 
 	public DatePicker getDatePicker() {
 		return date_picker;
+	}
+
+	/* AOSP DatePickerDialog.onClick(): the positive button reports the picked date, the negative one cancels */
+	@Override
+	public void onClick(DialogInterface dialog, int which) {
+		switch (which) {
+			case BUTTON_POSITIVE:
+				if (date_set_listener != null) {
+					date_picker.clearFocus();
+					date_set_listener.onDateSet(date_picker, date_picker.getYear(), date_picker.getMonth(), date_picker.getDayOfMonth());
+				}
+				break;
+			case BUTTON_NEGATIVE:
+				cancel();
+				break;
+		}
+	}
+
+	public void updateDate(int year, int month, int dayOfMonth) {
+		date_picker.updateDate(year, month, dayOfMonth);
 	}
 
 	public interface OnDateSetListener {

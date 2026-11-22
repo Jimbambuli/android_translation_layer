@@ -27,6 +27,8 @@ import static android.provider.DocumentsContract.METHOD_IS_CHILD_DOCUMENT;
 import static android.provider.DocumentsContract.METHOD_MOVE_DOCUMENT;
 import static android.provider.DocumentsContract.METHOD_REMOVE_DOCUMENT;
 import static android.provider.DocumentsContract.METHOD_RENAME_DOCUMENT;
+import static android.provider.DocumentsContract.METHOD_RESTORE_DOCUMENT_FROM_TRASH;
+import static android.provider.DocumentsContract.METHOD_TRASH_DOCUMENT;
 import static android.provider.DocumentsContract.buildDocumentUri;
 import static android.provider.DocumentsContract.buildDocumentUriMaybeUsingTree;
 import static android.provider.DocumentsContract.buildTreeDocumentUri;
@@ -152,6 +154,7 @@ public abstract class DocumentsProvider extends ContentProvider {
 	private static final int MATCH_CHILDREN = 6;
 	private static final int MATCH_DOCUMENT_TREE = 7;
 	private static final int MATCH_CHILDREN_TREE = 8;
+	private static final int MATCH_TRASH = 9;
 
 	private String mAuthority;
 
@@ -191,6 +194,7 @@ public abstract class DocumentsProvider extends ContentProvider {
 		mMatcher.addURI(mAuthority, "document/*/children", MATCH_CHILDREN);
 		mMatcher.addURI(mAuthority, "tree/*/document/*", MATCH_DOCUMENT_TREE);
 		mMatcher.addURI(mAuthority, "tree/*/document/*/children", MATCH_CHILDREN_TREE);
+		mMatcher.addURI(mAuthority, "trash", MATCH_TRASH);
 	}
 
 	/**
@@ -421,6 +425,18 @@ public abstract class DocumentsProvider extends ContentProvider {
 	 * @see DocumentsContract.Document#FLAG_WEB_LINKABLE
 	 * @see android.app.PendingIntent#getIntentSender
 	 */
+	public String trashDocument(String documentId) throws FileNotFoundException {
+		throw new UnsupportedOperationException("Trash not supported");
+	}
+
+	public Cursor queryTrashDocuments(@Nullable String[] projection) throws FileNotFoundException {
+		throw new UnsupportedOperationException("Query Trash not supported");
+	}
+
+	public String restoreDocumentFromTrash(String documentId, @Nullable String targetParentDocumentId) throws FileNotFoundException {
+		throw new UnsupportedOperationException("Restore not supported");
+	}
+
 	public IntentSender createWebLinkIntent(String documentId, @Nullable Bundle options)
 			throws FileNotFoundException {
 		throw new UnsupportedOperationException("createWebLink is not supported.");
@@ -907,6 +923,8 @@ public abstract class DocumentsProvider extends ContentProvider {
 				case MATCH_RECENT:
 					return queryRecentDocuments(
 							getRootId(uri), projection, queryArgs, cancellationSignal);
+				case MATCH_TRASH:
+					return queryTrashDocuments(projection);
 				case MATCH_SEARCH:
 					return querySearchDocuments(getRootId(uri), projection, queryArgs);
 				case MATCH_DOCUMENT:
@@ -1283,6 +1301,35 @@ public abstract class DocumentsProvider extends ContentProvider {
 			out.putParcelable(DocumentsContract.EXTRA_RESULT, path);
 		} else if (METHOD_GET_DOCUMENT_METADATA.equals(method)) {
 			return getDocumentMetadata(documentId);
+		} else if (METHOD_TRASH_DOCUMENT.equals(method)) {
+			enforceWritePermissionInner(documentUri);
+			final String newDocumentId = trashDocument(documentId);
+
+			if (newDocumentId != null) {
+				final Uri newDocumentUri = buildDocumentUriMaybeUsingTree(documentUri,
+						newDocumentId);
+
+				out.putParcelable(DocumentsContract.EXTRA_URI, newDocumentUri);
+			}
+
+			// Document moved to trash, clean up any grants.
+			revokeDocumentPermission(documentId);
+		} else if (METHOD_RESTORE_DOCUMENT_FROM_TRASH.equals(method)) {
+			enforceReadPermissionInner(documentUri);
+
+			String targetId = null;
+			if (extraTargetUri != null) {
+				enforceWritePermissionInner(extraTargetUri);
+				targetId = DocumentsContract.getDocumentId(extraTargetUri);
+			}
+
+			final String newDocumentId = restoreDocumentFromTrash(documentId, targetId);
+			if (newDocumentId != null) {
+				final Uri newDocumentUri = buildDocumentUriMaybeUsingTree(documentUri,
+						newDocumentId);
+
+				out.putParcelable(DocumentsContract.EXTRA_URI, newDocumentUri);
+			}
 		} else {
 			throw new UnsupportedOperationException("Method not supported " + method);
 		}

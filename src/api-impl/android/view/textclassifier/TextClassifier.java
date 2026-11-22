@@ -24,7 +24,7 @@ import java.util.Set;
  *
  * ATL has no text classification service, so this interface has the constants and AOSP's (android-16.0.0_r4)
  * default methods for selection, classification, link generation, language detection and conversation actions;
- * the result classes of the other features (SelectionEvent) are not in ATL. NO_OP is AOSP's TextClassifier whose methods
+ * onSelectionEvent() takes ATL's SelectionEvent; TextClassifierEvent is not in ATL (it needs android.icu.util.ULocale). NO_OP is AOSP's TextClassifier whose methods
  * all keep their defaults.
  */
 public interface TextClassifier {
@@ -42,6 +42,7 @@ public interface TextClassifier {
 	String TYPE_DATE_TIME = "datetime";
 	String TYPE_FLIGHT_NUMBER = "flight";
 	String TYPE_OTP_CODE = "otp_code";
+	String TYPE_OTP = "otp";
 	String TYPE_DICTIONARY = "dictionary";
 	/* ATL: AOSP TYPE_SMS_RETRIEVER_OTP and CLASSIFIER_TYPE_ANDROID_DEFAULT, needed by the telephony provider */
 	String TYPE_SMS_RETRIEVER_OTP = "sms_retriever_otp";
@@ -60,6 +61,7 @@ public interface TextClassifier {
 	String WIDGET_TYPE_CLIPBOARD = "clipboard";
 	String WIDGET_TYPE_UNKNOWN = "unknown";
 	String EXTRA_FROM_TEXT_CLASSIFIER = "android.view.textclassifier.extra.FROM_TEXT_CLASSIFIER";
+	String EXTRA_TEXT_ORIGIN_PACKAGE = "android.view.textclassifier.extra.TEXT_ORIGIN_PACKAGE";
 
 	/** No-op TextClassifier (AOSP: an instance whose methods all have their default behavior). */
 	TextClassifier NO_OP = new TextClassifier() {
@@ -124,6 +126,9 @@ public interface TextClassifier {
 		return 0;
 	}
 
+	/** AOSP default: the event is not reported to anything */
+	default void onSelectionEvent(@NonNull SelectionEvent event) {}
+
 	/** AOSP default: a classifier that is not destroyed */
 	default boolean isDestroyed() {
 		return false;
@@ -135,8 +140,17 @@ public interface TextClassifier {
 	/** @hide */
 	@Retention(RetentionPolicy.SOURCE)
 	@StringDef(prefix = {"TYPE_"}, value = {TYPE_UNKNOWN, TYPE_OTHER, TYPE_EMAIL, TYPE_PHONE, TYPE_ADDRESS, TYPE_URL,
-	                                         TYPE_DATE, TYPE_DATE_TIME, TYPE_FLIGHT_NUMBER, TYPE_DICTIONARY})
+	                                         TYPE_DATE, TYPE_DATE_TIME, TYPE_FLIGHT_NUMBER, TYPE_DICTIONARY, TYPE_OTP,
+	                                         TYPE_SMS_RETRIEVER_OTP})
 	@interface EntityType {}
+
+	/** @hide */
+	@Retention(RetentionPolicy.SOURCE)
+	@StringDef({WIDGET_TYPE_TEXTVIEW, WIDGET_TYPE_EDITTEXT, WIDGET_TYPE_UNSELECTABLE_TEXTVIEW,
+	            WIDGET_TYPE_WEBVIEW, WIDGET_TYPE_EDIT_WEBVIEW, WIDGET_TYPE_CUSTOM_TEXTVIEW,
+	            WIDGET_TYPE_CUSTOM_EDITTEXT, WIDGET_TYPE_CUSTOM_UNSELECTABLE_TEXTVIEW,
+	            WIDGET_TYPE_NOTIFICATION, WIDGET_TYPE_CLIPBOARD, WIDGET_TYPE_UNKNOWN })
+	@interface WidgetType {}
 
 	/**
 	 * Configuration object for specifying what entity types to identify.

@@ -96,9 +96,111 @@ public class ContentResolver {
 	}
 
 	private final Context mContext;
+	/* AOSP mWrapped (ContentInterface): the provider every call of a wrap()ped resolver goes to, whatever the authority */
+	private final ContentProvider mWrapped;
 
 	public ContentResolver(Context context) {
 		mContext = context;
+		mWrapped = null;
+	}
+
+	private ContentResolver(Context context, ContentProvider wrapped) {
+		mContext = context != null ? context : android.app.ActivityThread.currentApplication();
+		mWrapped = wrapped;
+	}
+
+	private ContentProvider providerFor(String authority) {
+		return mWrapped != null ? mWrapped : ContentProvider.atl_get_content_provider(authority);
+	}
+
+	public static ContentResolver wrap(ContentProvider wrapped) {
+		Objects.requireNonNull(wrapped);
+		return new ContentResolver(null, wrapped);
+	}
+
+	/* AOSP wraps the client as a ContentInterface; ATL's client calls its provider directly, so that provider is wrapped */
+	public static ContentResolver wrap(ContentProviderClient wrapped) {
+		Objects.requireNonNull(wrapped);
+		return wrap(wrapped.getLocalContentProvider());
+	}
+
+	/* AOSP ContentResolver.canonicalize()/uncanonicalize()/refresh(): the provider's answer, null/false without one */
+	public final Uri canonicalize(Uri url) {
+		Objects.requireNonNull(url, "url");
+		ContentProvider provider = providerFor(url.getAuthority());
+		if (provider == null)
+			return null;
+		return provider.canonicalize(url);
+	}
+
+	public final Uri uncanonicalize(Uri url) {
+		Objects.requireNonNull(url, "url");
+		ContentProvider provider = providerFor(url.getAuthority());
+		if (provider == null)
+			return null;
+		return provider.uncanonicalize(url);
+	}
+
+	public final boolean refresh(Uri url, Bundle extras, CancellationSignal cancellationSignal) {
+		Objects.requireNonNull(url, "url");
+		ContentProvider provider = providerFor(url.getAuthority());
+		if (provider == null)
+			return false;
+		if (cancellationSignal != null)
+			cancellationSignal.throwIfCanceled();
+		return provider.refresh(url, extras, cancellationSignal);
+	}
+
+	/* AOSP ContentResolver.openFile()/openAssetFile(): the open*Descriptor() forms */
+	public final ParcelFileDescriptor openFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
+		return openFileDescriptor(uri, mode, signal);
+	}
+
+	public final AssetFileDescriptor openAssetFile(Uri uri, String mode, CancellationSignal signal) throws FileNotFoundException {
+		return openAssetFileDescriptor(uri, mode, signal);
+	}
+
+	public static final String CURSOR_ITEM_BASE_TYPE = "vnd.android.cursor.item";
+	public static final String CURSOR_DIR_BASE_TYPE = "vnd.android.cursor.dir";
+	public static final String ANY_CURSOR_ITEM_TYPE = "vnd.android.cursor.item/*";
+	public static final String EXTRA_TOTAL_COUNT = "android.content.extra.TOTAL_COUNT";
+	public static final String EXTRA_REFRESH_SUPPORTED = "android.content.extra.REFRESH_SUPPORTED";
+	public static final String QUERY_ARG_SORT_LOCALE = "android:query-arg-sort-locale";
+	/** @deprecated */
+	@Deprecated
+	public static final String SYNC_EXTRAS_ACCOUNT = "account";
+	public static final String SYNC_EXTRAS_UPLOAD = "upload";
+	public static final String SYNC_EXTRAS_OVERRIDE_TOO_MANY_DELETIONS = "deletions_override";
+	public static final String SYNC_EXTRAS_DISCARD_LOCAL_DELETIONS = "discard_deletions";
+
+	/* AOSP ContentResolver.getTypeInfo() and MimeTypeInfo, with the labels and icons of com.android.internal.util.MimeIconUtils */
+	public final MimeTypeInfo getTypeInfo(String mimeType) {
+		Objects.requireNonNull(mimeType);
+		return com.android.internal.util.MimeIconUtils.getTypeInfo(mimeType);
+	}
+
+	public static final class MimeTypeInfo {
+		private final android.graphics.drawable.Icon mIcon;
+		private final CharSequence mLabel;
+		private final CharSequence mContentDescription;
+
+		public MimeTypeInfo(android.graphics.drawable.Icon icon, CharSequence label, CharSequence contentDescription) {
+			mIcon = Objects.requireNonNull(icon);
+			mLabel = Objects.requireNonNull(label);
+			mContentDescription = Objects.requireNonNull(contentDescription);
+		}
+
+		public android.graphics.drawable.Icon getIcon() {
+			return mIcon;
+		}
+
+		public CharSequence getLabel() {
+			return mLabel;
+		}
+
+		public CharSequence getContentDescription() {
+			return mContentDescription;
+		}
 	}
 
 	public static final String SYNC_EXTRAS_IGNORE_SETTINGS = "ignore_settings";
@@ -217,11 +319,11 @@ public class ContentResolver {
 	}
 
 	public ParcelFileDescriptor openFileDescriptor(Uri uri, String mode) throws FileNotFoundException {
-		String path = filePath(uri);
+		String path = mWrapped != null ? null : filePath(uri);
 		if (path != null) {
 			return ParcelFileDescriptor.open(new File(path), ParcelFileDescriptor.parseMode(mode));
 		} else {
-			ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+			ContentProvider provider = providerFor(uri.getAuthority());
 			if (provider != null)
 				return provider.openFile(uri, mode);
 			else
@@ -234,11 +336,11 @@ public class ContentResolver {
 	}
 
 	public AssetFileDescriptor openAssetFileDescriptor(Uri uri, String mode) throws FileNotFoundException {
-		String path = filePath(uri);
+		String path = mWrapped != null ? null : filePath(uri);
 		if (path != null) {
 			return new AssetFileDescriptor(ParcelFileDescriptor.open(new File(path), ParcelFileDescriptor.parseMode(mode)), 0, AssetFileDescriptor.UNKNOWN_LENGTH);
 		} else {
-			ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+			ContentProvider provider = providerFor(uri.getAuthority());
 			if (provider != null)
 				return provider.openAssetFile(uri, mode);
 			else
@@ -279,8 +381,8 @@ public class ContentResolver {
 	}
 
 	public Cursor query(Uri uri, String[] projection, Bundle queryArgs, CancellationSignal cancellationSignal) {
-		String path = filePath(uri);
-		ContentProvider provider = path == null ? ContentProvider.atl_get_content_provider(uri.getAuthority()) : null;
+		String path = mWrapped != null ? null : filePath(uri);
+		ContentProvider provider = path == null ? providerFor(uri.getAuthority()) : null;
 		if (provider != null) {
 			// as AOSP: the provider gets the arguments, so one that knows them (MediaStore) honours limits
 			return provider.query(uri, projection, queryArgs, cancellationSignal);
@@ -317,7 +419,7 @@ public class ContentResolver {
 
 	public final int delete(Uri uri, Bundle extras) {
 		Objects.requireNonNull(uri, "url");
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		ContentProvider provider = providerFor(uri.getAuthority());
 		if (provider != null)
 			return provider.delete(uri, extras);
 		else
@@ -330,7 +432,7 @@ public class ContentResolver {
 
 	public final Uri insert(Uri uri, ContentValues values, Bundle extras) {
 		Objects.requireNonNull(uri, "url");
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		ContentProvider provider = providerFor(uri.getAuthority());
 		if (provider != null)
 			return provider.insert(uri, values, extras);
 		else
@@ -340,7 +442,7 @@ public class ContentResolver {
 	public final int bulkInsert(Uri uri, ContentValues[] values) {
 		Objects.requireNonNull(uri, "url");
 		Objects.requireNonNull(values, "values");
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		ContentProvider provider = providerFor(uri.getAuthority());
 		if (provider != null)
 			return provider.bulkInsert(uri, values);
 		else
@@ -418,14 +520,14 @@ public class ContentResolver {
 	public String[] getStreamTypes(Uri url, String mimeTypeFilter) {
 		Objects.requireNonNull(url, "url");
 		Objects.requireNonNull(mimeTypeFilter, "mimeTypeFilter");
-		ContentProvider provider = ContentProvider.atl_get_content_provider(url.getAuthority());
+		ContentProvider provider = providerFor(url.getAuthority());
 		if (provider == null)
 			return null;
 		return provider.getStreamTypes(url, mimeTypeFilter);
 	}
 
 	public String getType(Uri uri) {
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		ContentProvider provider = providerFor(uri.getAuthority());
 		if (provider != null)
 			return provider.getType(uri);
 		else
@@ -438,7 +540,7 @@ public class ContentResolver {
 
 	public final int update(Uri uri, ContentValues values, Bundle extras) {
 		Objects.requireNonNull(uri, "uri");
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
+		ContentProvider provider = providerFor(uri.getAuthority());
 		if (provider != null)
 			return provider.update(uri, values, extras);
 		else
@@ -450,14 +552,14 @@ public class ContentResolver {
 	}
 
 	public final Bundle call(String authority, String method, String arg, Bundle extras) {
-		ContentProvider provider = ContentProvider.atl_get_content_provider(authority);
+		ContentProvider provider = providerFor(authority);
 		if (provider == null)
 			throw new IllegalArgumentException("Unknown authority " + authority);
 		return provider.call(authority, method, arg, extras);
 	}
 
 	public ContentProviderResult[] applyBatch(String authority, ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
-		ContentProvider provider = ContentProvider.atl_get_content_provider(authority);
+		ContentProvider provider = providerFor(authority);
 		if (provider == null)
 			throw new IllegalArgumentException("Unknown authority " + authority);
 		return provider.applyBatch(authority, operations);
@@ -516,11 +618,20 @@ public class ContentResolver {
 		return result;
 	}
 
+	/* AOSP: what UriGrantsManagerService keeps of the persisted grants this package gave others; ATL records no
+	 * grant (grantUriPermission() does nothing), so there is none */
+	public List<UriPermission> getOutgoingPersistedUriPermissions() {
+		return new ArrayList<>();
+	}
+
 	public final ContentProviderClient acquireContentProviderClient(Uri uri) {
 		return acquireContentProviderClient(uri.getAuthority());
 	}
 
 	public final ContentProviderClient acquireContentProviderClient(String name) {
+		/* AOSP: acquireProvider() of a wrap()ped resolver throws */
+		if (mWrapped != null)
+			throw new UnsupportedOperationException();
 		ContentProvider provider = ContentProvider.atl_get_content_provider(name);
 		return provider != null ? new ContentProviderClient(provider, name) : null;
 	}
@@ -567,6 +678,20 @@ public class ContentResolver {
 	}
 
 	public static void cancelSync(Account account, String authority) {
+	}
+
+	/* AOSP ContentResolver.startSync() (deprecated) */
+	@Deprecated
+	public void startSync(Uri uri, Bundle extras) {
+		Account account = null;
+		if (extras != null) {
+			String accountName = extras.getString(SYNC_EXTRAS_ACCOUNT);
+			if (!TextUtils.isEmpty(accountName)) {
+				account = new Account(accountName, "com.google");
+			}
+			extras.remove(SYNC_EXTRAS_ACCOUNT);
+		}
+		requestSync(account, uri != null ? uri.getAuthority() : null, extras);
 	}
 
 	/* AOSP ContentService.cancelRequest(): a periodic request is removed, a one-off request cancels the sync of the
@@ -663,6 +788,16 @@ public class ContentResolver {
 
 	public static List<SyncInfo> getCurrentSyncs() {
 		return new ArrayList<SyncInfo>();
+	}
+
+	/* AOSP ContentResolver.getCurrentSync() (deprecated): the first of getCurrentSyncs() */
+	@Deprecated
+	public static SyncInfo getCurrentSync() {
+		final List<SyncInfo> syncs = getCurrentSyncs();
+		if (syncs.isEmpty()) {
+			return null;
+		}
+		return syncs.get(0);
 	}
 
 	public static SyncAdapterType[] getSyncAdapterTypes() {

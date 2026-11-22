@@ -16,12 +16,15 @@
 
 package android.view;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Common base class for input events.
  */
-public abstract class InputEvent {
+public abstract class InputEvent implements Parcelable {
 	/**
 	 * @hide
 	 */
@@ -222,4 +225,22 @@ public abstract class InputEvent {
 
 	/* AOSP InputEvent.getEventTimeNanos() (@hide) */
 	public abstract long getEventTimeNanos();
+
+	/* AOSP InputEvent.CREATOR: the parcel starts with the token of the event's class */
+	public static final Parcelable.Creator<InputEvent> CREATOR = new Parcelable.Creator<InputEvent>() {
+		public InputEvent createFromParcel(Parcel in) {
+			int token = in.readInt();
+			if (token == PARCEL_TOKEN_KEY_EVENT) {
+				return KeyEvent.createFromParcelBody(in);
+			} else if (token == PARCEL_TOKEN_MOTION_EVENT) {
+				return MotionEvent.createFromParcelBody(in);
+			} else {
+				throw new IllegalStateException("Unexpected input event type token in parcel.");
+			}
+		}
+
+		public InputEvent[] newArray(int size) {
+			return new InputEvent[size];
+		}
+	};
 }

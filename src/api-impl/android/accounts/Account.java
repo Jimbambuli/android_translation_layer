@@ -36,6 +36,11 @@ public class Account implements Parcelable {
 		this.accessId = in.readString();
 	}
 
+	/* AOSP Account.describeContents() */
+	public int describeContents() {
+		return 0;
+	}
+
 	@Override
 	public void writeToParcel(Parcel dest, int flags) {
 		dest.writeString(name);

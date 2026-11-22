@@ -1,11 +1,12 @@
 package android.app;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.util.TypedValue;
 import android.widget.TimePicker;
 import com.android.internal.R;
 
-public class TimePickerDialog extends AlertDialog implements TimePicker.OnTimeChangedListener {
+public class TimePickerDialog extends AlertDialog implements DialogInterface.OnClickListener, TimePicker.OnTimeChangedListener {
 
 	private TimePicker time_picker;
 	private OnTimeSetListener time_set_listener = null;
@@ -24,6 +25,21 @@ public class TimePickerDialog extends AlertDialog implements TimePicker.OnTimeCh
 		time_picker.setMinute(minute);
 		time_picker.setOnTimeChangedListener(this);
 		setView(time_picker);
+	}
+
+	/* AOSP TimePickerDialog.onClick(): the positive button reports the last valid time, the negative one cancels */
+	@Override
+	public void onClick(DialogInterface dialog, int which) {
+		switch (which) {
+			case BUTTON_POSITIVE:
+				if (time_set_listener != null) {
+					time_set_listener.onTimeSet(time_picker, time_picker.getCurrentHour(), time_picker.getCurrentMinute());
+				}
+				break;
+			case BUTTON_NEGATIVE:
+				cancel();
+				break;
+		}
 	}
 
 	public void updateTime(int hourOfDay, int minuteOfHour) {

@@ -943,6 +943,44 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 	/* AOSP Dialog members: the window of ATL has no options panel/action bar of its own, so the dialog has none
 	 * (mActionBar, mSearchEvent stay null); the volume control stream is the one PhoneWindow keeps */
 
+	public void openOptionsMenu() {
+		if (getWindow().hasFeature(Window.FEATURE_OPTIONS_PANEL)) {
+			getWindow().openPanel(Window.FEATURE_OPTIONS_PANEL, null);
+		}
+	}
+
+	public void closeOptionsMenu() {
+		if (getWindow().hasFeature(Window.FEATURE_OPTIONS_PANEL)) {
+			getWindow().closePanel(Window.FEATURE_OPTIONS_PANEL);
+		}
+	}
+
+	public void invalidateOptionsMenu() {
+		if (getWindow().hasFeature(Window.FEATURE_OPTIONS_PANEL)) {
+			getWindow().invalidatePanelMenu(Window.FEATURE_OPTIONS_PANEL);
+		}
+	}
+
+	public void takeKeyEvents(boolean get) {
+		getWindow().takeKeyEvents(get);
+	}
+
+	public final void setFeatureDrawableResource(int featureId, int resId) {
+		getWindow().setFeatureDrawableResource(featureId, resId);
+	}
+
+	public final void setFeatureDrawableUri(int featureId, android.net.Uri uri) {
+		getWindow().setFeatureDrawableUri(featureId, uri);
+	}
+
+	public final void setFeatureDrawable(int featureId, android.graphics.drawable.Drawable drawable) {
+		getWindow().setFeatureDrawable(featureId, drawable);
+	}
+
+	public final void setFeatureDrawableAlpha(int featureId, int alpha) {
+		getWindow().setFeatureDrawableAlpha(featureId, alpha);
+	}
+
 	public android.app.ActionBar getActionBar() { return null; }
 	public final android.view.SearchEvent getSearchEvent() { return null; }
 	public final int getVolumeControlStream() { return getWindow().getVolumeControlStream(); }

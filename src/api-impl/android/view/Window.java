@@ -1138,6 +1138,17 @@ public class Window {
 
 	public void setFeatureDrawableResource(int featureId, int resId) {}
 
+	public void setFeatureDrawableUri(int featureId, android.net.Uri uri) {}
+
+	public void setFeatureDrawable(int featureId, Drawable drawable) {}
+
+	public void setFeatureDrawableAlpha(int featureId, int alpha) {}
+
+	/* AOSP PhoneWindow.takeKeyEvents() */
+	public void takeKeyEvents(boolean get) {
+		getDecorView().setFocusable(get);
+	}
+
 	/* AOSP 16 Window.setDesiredHdrHeadroom()/getDesiredHdrHeadroom(): stored in the LayoutParams */
 	public void setDesiredHdrHeadroom(float desiredHeadroom) {
 		final WindowManager.LayoutParams attrs = getAttributes();
