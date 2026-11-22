@@ -522,12 +522,16 @@ public class PackageInstaller {
 		return false;
 	}
 
-	/* the installed app (not the caller) with an activity whose filter takes the market: link, e.g. Aurora Store */
+	/* the installed app (not the caller) with an activity whose filter takes the market: link, e.g. Aurora Store;
+	 * of several, the one whose filter has the highest priority, as the resolver orders them (microG Companion's
+	 * MarketIntentRedirect has priority -100, so a store comes first) */
 	private static String marketApp(Intent intent) {
 		String[] files = android.atl.ATLPaths.installed_apks_dir.list();
 		if (files == null)
 			return null;
 		Arrays.sort(files);
+		String best = null;
+		int bestPriority = Integer.MIN_VALUE;
 		for (String file : files) {
 			if (!file.endsWith(".apk"))
 				continue;
@@ -539,11 +543,13 @@ public class PackageInstaller {
 				continue;
 			for (PackageParser.Activity activity : pkg.activities)
 				for (PackageParser.IntentInfo filter : activity.intents)
-					if (filter.hasCategory(Intent.CATEGORY_DEFAULT) &&
-					    filter.match(intent.getAction(), null, "market", intent.getData(), intent.getCategories(), TAG) > 0)
-						return name;
+					if (filter.hasCategory(Intent.CATEGORY_DEFAULT) && filter.priority > bestPriority &&
+					    filter.match(intent.getAction(), null, "market", intent.getData(), intent.getCategories(), TAG) > 0) {
+						best = name;
+						bestPriority = filter.priority;
+					}
 		}
-		return null;
+		return best;
 	}
 
 	/* AOSP requestUnarchive(): PackageInstallerService checks the package: unknown -> NameNotFoundException (as
