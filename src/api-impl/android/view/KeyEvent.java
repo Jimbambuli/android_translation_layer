@@ -1981,6 +1981,11 @@ public class KeyEvent extends InputEvent implements Parcelable {
 		}
 	};
 
+	/* AOSP KeyEvent.createFromParcelBody() (@hide): the part of the parcel after the token, for InputEvent.CREATOR */
+	static KeyEvent createFromParcelBody(Parcel in) {
+		return new KeyEvent(in);
+	}
+
 	private KeyEvent(Parcel in) {
 		in.readInt(); // id
 		mDeviceId = in.readInt();
