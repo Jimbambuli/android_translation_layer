@@ -139,6 +139,17 @@ public class PendingIntent implements Parcelable {
 		return getIntentSender(2, requestCode, intent, flags);
 	}
 
+	/** @hide AOSP ActivityManagerService.isIntentSenderTargetedToPackage(): no intent may name both a package
+	 * and a component */
+	public boolean isTargetedToPackage() {
+		return intent != null && !(intent.getPackage() != null && intent.getComponent() != null);
+	}
+
+	/* AOSP: getCachedInfo().isImmutable(), the record's FLAG_IMMUTABLE */
+	public boolean isImmutable() {
+		return key != null && (key.flags & FLAG_IMMUTABLE) != 0;
+	}
+
 	/** @hide AOSP asks the system server for it, ATL holds it */
 	public Intent getIntent() {
 		return intent;
