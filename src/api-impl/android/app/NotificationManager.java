@@ -3,15 +3,12 @@ package android.app;
 import android.app.Notification.MediaStyle;
 import android.atl.ATLLoadedApp;
 import android.content.Context;
-import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.notification.StatusBarNotification;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
 
 public class NotificationManager {
 
@@ -57,15 +54,12 @@ public class NotificationManager {
 	private static int mpris_notification_id = -1;
 
 	public void cancelAll() {
+		StatusBarNotification[] all;
 		synchronized (posted) {
-			posted.clear();
+			all = posted.values().toArray(new StatusBarNotification[0]);
 		}
-		Integer[] ids;
-		synchronized (active) {
-			ids = active.toArray(new Integer[0]);
-		}
-		for (int id : ids)
-			cancel(id);
+		for (StatusBarNotification sbn : all)
+			cancel(sbn.getTag(), sbn.getId());
 	}
 
 	/* AOSP keeps the delegate per package in the NotificationManagerService; ATL runs one app */
@@ -84,8 +78,16 @@ public class NotificationManager {
 		if (android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS")
 		    && !(notification.style instanceof MediaStyle))
 			return;
+		/* AOSP NotificationManagerService.enqueueNotificationInternal(): an app that targets O or later has no
+		 * default channel, a notification without one of its channels is not posted */
+		if (!hasChannel(notification)) {
+			System.out.println("No Channel found for pkg=" + ATLLoadedApp.getPrimaryApplication().getApplication().getPackageName()
+			                   + ", channelId=" + notification.channelId + ", id=" + id + ", tag=" + tag);
+			return;
+		}
 		if (desktopPriority(notification) >= 0 || notification.style instanceof MediaStyle)
 			post(tag, id, notification);
+		scheduleTimeout(tag, id, notification);
 		if (notification.style instanceof MediaStyle) { // MPRIS content is handled by MediaSession implementation
 			if (mpris_notification_id == -1) {
 				Application application = ATLLoadedApp.getPrimaryApplication().getApplication();
@@ -99,34 +101,87 @@ public class NotificationManager {
 		int priority = desktopPriority(notification);
 		if (priority < 0)
 			return;
+		String key = postedKey(tag, id);
 		long builder = nativeInitBuilder();
-		for (Notification.Action action : notification.actions != null ? notification.actions : new Notification.Action[0]) {
-			int intentType = -1;
-			Intent intent = null;
-			PendingIntent pendingIntent = buttonIntent(notification, action);
-			if (pendingIntent != null) {
-				intentType = pendingIntent.type;
-				intent = pendingIntent.intent;
-			}
-			nativeAddAction(builder, String.valueOf(action.title), intentType, intent);
-		}
-		int intentType = -1;
-		Intent intent = null;
-		if (notification.contentIntent != null) {
-			intentType = notification.contentIntent.type;
-			intent = notification.contentIntent.intent;
-		}
+		Notification.Action[] actions = notification.actions != null ? notification.actions : new Notification.Action[0];
+		for (int i = 0; i < actions.length; i++)
+			if (buttonIntent(notification, actions[i]) != null)
+				nativeAddAction(builder, String.valueOf(actions[i].title), key, i);
 		String iconPath = notification.iconPath == null || notification.iconPath.endsWith(".xml") ? null : notification.iconPath;
 		/* the desktop notification has no expanded form: the text of a style (big text, lines, latest message) */
 		CharSequence styleText = notification.style != null ? notification.style.desktopText() : null;
 		String text = styleText != null ? styleText.toString() : notification.text;
-		nativeShowNotification(builder, id, notification.title, text, iconPath, notification.ongoing, priority, intentType, intent);
-		synchronized (active) {
-			active.add(id);
+		nativeShowNotification(builder, key, notification.title, text, iconPath, notification.ongoing, priority, notification.contentIntent != null);
+	}
+
+	/* AOSP: an app that targets O or later posts only to a channel it created; older apps post to the default channel */
+	private static boolean hasChannel(Notification notification) {
+		if (ATLLoadedApp.getPrimaryApplication().getApplication().getApplicationInfo().targetSdkVersion < android.os.Build.VERSION_CODES.O)
+			return true;
+		synchronized (channels) {
+			return notification.channelId != null && channels.containsKey(notification.channelId);
 		}
 	}
 
-	private static final Set<Integer> active = new HashSet<>();
+	/* AOSP NotificationManagerService: setTimeoutAfter() cancels the notification after the duration (REASON_TIMEOUT);
+	 * an update or cancel of the notification ends the old timeout */
+	private static final java.util.HashMap<String, Runnable> timeouts = new java.util.HashMap<>();
+
+	private void scheduleTimeout(final String tag, final int id, Notification notification) {
+		final String key = postedKey(tag, id);
+		Handler handler = new Handler(Looper.getMainLooper());
+		synchronized (timeouts) {
+			Runnable old = timeouts.remove(key);
+			if (old != null)
+				handler.removeCallbacks(old);
+			if (notification.getTimeoutAfter() <= 0)
+				return;
+			Runnable timeout = new Runnable() {
+				@Override
+				public void run() {
+					synchronized (timeouts) {
+						if (timeouts.get(key) != this)
+							return;
+					}
+					cancel(tag, id);
+				}
+			};
+			timeouts.put(key, timeout);
+			handler.postDelayed(timeout, notification.getTimeoutAfter());
+		}
+	}
+
+	/**
+	 * A click at the desktop on the notification (actionIndex -1) or one of its buttons, called by the native code on
+	 * the main thread. Like SystemUI and AOSP NotificationManagerService.onNotificationClick()/onNotificationActionClick():
+	 * the PendingIntent of the posted notification is sent; a click on the notification cancels it when it has
+	 * FLAG_AUTO_CANCEL (not one of a foreground service). Returns whether an activity was started.
+	 */
+	static boolean desktopAction(String key, int actionIndex) {
+		StatusBarNotification sbn;
+		synchronized (posted) {
+			sbn = posted.get(key);
+		}
+		if (sbn == null) {
+			System.out.println("No notification with key: " + key);
+			return false;
+		}
+		Notification notification = sbn.getNotification();
+		PendingIntent intent;
+		if (actionIndex < 0)
+			intent = notification.contentIntent;
+		else if (notification.actions != null && actionIndex < notification.actions.length)
+			intent = buttonIntent(notification, notification.actions[actionIndex]);
+		else
+			intent = null;
+		if (actionIndex < 0 && (notification.flags & Notification.FLAG_AUTO_CANCEL) != 0
+		    && (notification.flags & (Notification.FLAG_FOREGROUND_SERVICE | Notification.FLAG_BUBBLE)) == 0)
+			new NotificationManager().cancel(sbn.getTag(), sbn.getId());
+		if (intent == null)
+			return false;
+		intent.send();
+		return intent.isActivity();
+	}
 
 	/* AOSP NotificationManagerService keeps the posted notifications of the app for
 	 * getActiveNotifications() until the app cancels them. ATL does not learn when the user closes
@@ -151,9 +206,15 @@ public class NotificationManager {
 		notify(null, id, notification);
 	}
 
-	public void cancel(String tag, final int id) {
+	public void cancel(final String tag, final int id) {
+		final String key = postedKey(tag, id);
 		synchronized (posted) {
-			posted.remove(postedKey(tag, id));
+			posted.remove(key);
+		}
+		synchronized (timeouts) {
+			Runnable old = timeouts.remove(key);
+			if (old != null)
+				new Handler(Looper.getMainLooper()).removeCallbacks(old);
 		}
 		// remove_notification doesn't work reliably when sent directly after add_notification in GNOME session.
 		// So we give some extra delay here.
@@ -164,10 +225,7 @@ public class NotificationManager {
 					mpris_notification_id = -1;
 					nativeCancelMPRIS();
 				} else {
-					nativeCancel(id);
-				}
-				synchronized (active) {
-					active.remove(id);
+					nativeCancel(key);
 				}
 			}
 		}, 100);
@@ -183,7 +241,8 @@ public class NotificationManager {
 	/**
 	 * Creates a notification channel that notifications can be posted to. Creating an existing
 	 * channel with its original values performs no operation; only its name, description and
-	 * group are updated, as in AOSP.
+	 * group are updated and its importance lowered, as in AOSP (PreferencesHelper.createNotificationChannel(): the
+	 * app may lower it while the user has changed nothing of the channel, which ATL's user cannot).
 	 */
 	public void createNotificationChannel(NotificationChannel channel) {
 		synchronized (channels) {
@@ -194,16 +253,18 @@ public class NotificationManager {
 			}
 			existing.setName(channel.getName());
 			existing.setDescription(channel.getDescription());
-			if (channel.getGroup() != null)
+			if (channel.getGroup() != null && existing.getGroup() == null)
 				existing.setGroup(channel.getGroup());
+			if (channel.getImportance() < existing.getImportance())
+				existing.setImportance(channel.getImportance());
 		}
 	}
 
 	protected native long nativeInitBuilder();
-	protected native void nativeAddAction(long builder, String title, int intentType, Intent intent);
-	protected native void nativeShowNotification(long builder, int id, String title, String text, String iconPath, boolean ongoing, int priority, int intentType, Intent intent);
+	protected native void nativeAddAction(long builder, String title, String key, int actionIndex);
+	protected native void nativeShowNotification(long builder, String key, String title, String text, String iconPath, boolean ongoing, int priority, boolean hasContentIntent);
 	protected native void nativeShowMPRIS(String packageName, String identiy);
-	protected native void nativeCancel(int id);
+	protected native void nativeCancel(String key);
 	protected native void nativeCancelMPRIS();
 
 	/* AOSP keeps the groups with the channels in the NotificationManagerService */
@@ -527,7 +588,15 @@ public class NotificationManager {
 		return !android.content.pm.PackageManager.deniedByUser("android.permission.POST_NOTIFICATIONS");
 	}
 
+	/* AOSP NotificationManagerService.deleteNotificationChannel(): the notifications of the channel go with it */
 	public void deleteNotificationChannel(String channelId) {
+		StatusBarNotification[] all;
+		synchronized (posted) {
+			all = posted.values().toArray(new StatusBarNotification[0]);
+		}
+		for (StatusBarNotification sbn : all)
+			if (channelId.equals(sbn.getNotification().getChannelId()))
+				cancel(sbn.getTag(), sbn.getId());
 		synchronized (channels) {
 			channels.remove(channelId);
 		}

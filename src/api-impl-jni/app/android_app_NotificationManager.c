@@ -26,10 +26,38 @@ static GMutex pending_notifications_mutex = {0};
 static GSource *send_notifcation_timer = NULL;
 
 /* The notification's id at the desktop: the portal keeps one list per Flatpak, which every app of the
-   APK Starter shares, so the id names the app (its GApplication id) besides Android's id. */
-static char *desktop_id(int id)
+   APK Starter shares, so the id names the app (its GApplication id) besides Android's key (id and tag). */
+static char *desktop_id(const char *key)
 {
-	return g_strdup_printf("%s.%d", g_application_get_application_id(g_application_get_default()), id);
+	return g_strdup_printf("%s.%s", g_application_get_application_id(g_application_get_default()), key);
+}
+
+/* The desktop's click on a notification or one of its buttons: the action "notification" with the target
+   (key, button index or -1, GApplication id of the app). NotificationManager.desktopAction() sends the
+   PendingIntent of the posted notification, as SystemUI does. */
+#define NOTIFICATION_ACTION_TYPE "(sis)"
+static jclass notification_manager_class = NULL;
+static jmethodID desktop_action_method = NULL;
+
+static void notification_action_activate(GSimpleAction *action, GVariant *parameter, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	const char *key;
+	gint32 index;
+	g_variant_get(parameter, "(&sis)", &key, &index, NULL);
+	jboolean activity = (*env)->CallStaticBooleanMethod(env, notification_manager_class, desktop_action_method, _JSTRING(key), index);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	/* to the front, with the activation token GtkApplication took from the call's platform data */
+	if (activity)
+		activity_window_present();
+}
+
+static GVariant *notification_target(const char *key, int index)
+{
+	return g_variant_new(NOTIFICATION_ACTION_TYPE, key, index, g_application_get_application_id(g_application_get_default()));
 }
 
 /* GIO's portal backend sends notifications but leaves the clicks (ActionInvoked) to the app: activate the
@@ -68,7 +96,7 @@ static void portal_action_invoked(GDBusConnection *connection, const char *sende
 /* GNOME's and KDE's portal backends activate a notification's action with org.freedesktop.Application
    ActivateAction on the bus name of the Flatpak, not of the app (each app of the APK Starter has its own
    GApplication id under it). One running app owns the Flatpak's name and passes the call on to the app the
-   action's intent names (its last field), which answers ActivateAction on its own name. */
+   action's target names (its last field), which answers ActivateAction on its own name. */
 static const char application_xml[] =
     "<node><interface name='org.freedesktop.Application'>"
     "<method name='Activate'><arg type='a{sv}' direction='in'/></method>"
@@ -92,9 +120,9 @@ static void flatpak_application_call(GDBusConnection *connection, const char *se
 		g_autoptr(GVariant) args = g_variant_get_child_value(parameters, 1);
 		if (g_variant_n_children(args) > 0) {
 			g_autoptr(GVariant) arg = g_variant_get_child_value(args, 0);
-			g_autoptr(GVariant) intent = g_variant_get_variant(arg);
-			if (g_variant_is_of_type(intent, G_VARIANT_TYPE(INTENT_G_VARIANT_TYPE_STRING)))
-				g_variant_get_child(intent, 4, "&s", &target);
+			g_autoptr(GVariant) target_value = g_variant_get_variant(arg);
+			if (g_variant_is_of_type(target_value, G_VARIANT_TYPE(NOTIFICATION_ACTION_TYPE)))
+				g_variant_get_child(target_value, 2, "&s", &target);
 		}
 	}
 	if (target && *target) {
@@ -131,7 +159,7 @@ static gboolean send_notifcation_func(GSource *send_notifcation_timer, GSourceFu
 	g_mutex_lock(&pending_notifications_mutex);
 	g_hash_table_iter_init(&iter, pending_notifications);
 	while (g_hash_table_iter_next(&iter, &key, &value)) {
-		char *id_string = desktop_id(GPOINTER_TO_INT(key));
+		char *id_string = desktop_id(key);
 		if (value)
 			g_application_send_notification(app, id_string, value);
 		else
@@ -160,14 +188,16 @@ static void unref_nullsafe(void *data)
 
 void remove_app_notifications(void);
 
-static void queue_notification(int id, GNotification *notification)
+static void queue_notification(const char *key, GNotification *notification)
 {
 	g_mutex_lock(&pending_notifications_mutex);
 	if (!pending_notifications) {
-		pending_notifications = g_hash_table_new_full(NULL, NULL, NULL, unref_nullsafe);
+		pending_notifications = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, unref_nullsafe);
 		send_notifcation_timer = g_source_new(&send_notifcation_funcs, sizeof(GSource));
 		g_source_attach(send_notifcation_timer, NULL);
 		GApplication *app = g_application_get_default();
+		static const GActionEntry entries[] = {{"notification", notification_action_activate, NOTIFICATION_ACTION_TYPE}};
+		g_action_map_add_action_entries(G_ACTION_MAP(app), entries, G_N_ELEMENTS(entries), NULL);
 		gchar *desktop_id = g_strdup_printf("%s.desktop", g_application_get_application_id(app));
 		GDesktopAppInfo *info = g_desktop_app_info_new(desktop_id);
 		/* Some desktop environments don't allow XDG-portal notifications without a desktop file.
@@ -187,15 +217,15 @@ static void queue_notification(int id, GNotification *notification)
 		if (info)
 			g_object_unref(info);
 		g_free(desktop_id);
-		posted_notifications = g_hash_table_new(NULL, NULL);
+		posted_notifications = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 		/* also when the app ends with System.exit() */
 		atexit(remove_app_notifications);
 	}
-	g_hash_table_insert(pending_notifications, GINT_TO_POINTER(id), notification);
+	g_hash_table_insert(pending_notifications, g_strdup(key), notification);
 	if (notification)
-		g_hash_table_add(posted_notifications, GINT_TO_POINTER(id));
+		g_hash_table_add(posted_notifications, g_strdup(key));
 	else
-		g_hash_table_remove(posted_notifications, GINT_TO_POINTER(id));
+		g_hash_table_remove(posted_notifications, key);
 	g_mutex_unlock(&pending_notifications_mutex);
 	if (g_source_get_ready_time(send_notifcation_timer) == -1)
 		g_source_set_ready_time(send_notifcation_timer, 0); // immediately
@@ -203,23 +233,27 @@ static void queue_notification(int id, GNotification *notification)
 
 JNIEXPORT jlong JNICALL Java_android_app_NotificationManager_nativeInitBuilder(JNIEnv *env, jobject this)
 {
+	if (!notification_manager_class) {
+		notification_manager_class = _REF((*env)->GetObjectClass(env, this));
+		desktop_action_method = (*env)->GetStaticMethodID(env, notification_manager_class, "desktopAction", "(Ljava/lang/String;I)Z");
+	}
 	return _INTPTR(g_notification_new(""));
 }
 
-JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeAddAction(JNIEnv *env, jobject this, jlong builder_ptr, jstring name_jstr, jint type, jobject intent)
+JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeAddAction(JNIEnv *env, jobject this, jlong builder_ptr, jstring name_jstr, jstring key_jstr, jint index)
 {
 	GNotification *notification = _PTR(builder_ptr);
 	const char *name = "";
 	if (name_jstr)
 		name = (*env)->GetStringUTFChars(env, name_jstr, NULL);
-	const char *action = intent_actionname_from_type(type);
-	if (action)
-		g_notification_add_button_with_target_value(notification, name, action, intent_serialize(env, intent));
+	const char *key = (*env)->GetStringUTFChars(env, key_jstr, NULL);
+	g_notification_add_button_with_target_value(notification, name, "app.notification", notification_target(key, index));
+	(*env)->ReleaseStringUTFChars(env, key_jstr, key);
 	if (name_jstr)
 		(*env)->ReleaseStringUTFChars(env, name_jstr, name);
 }
 
-JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotification(JNIEnv *env, jobject this, jlong builder_ptr, jint id, jstring title_jstr, jstring text_jstr, jstring icon_jstr, jboolean ongoing, jint priority, jint type, jobject intent)
+JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotification(JNIEnv *env, jobject this, jlong builder_ptr, jstring key_jstr, jstring title_jstr, jstring text_jstr, jstring icon_jstr, jboolean ongoing, jint priority, jboolean has_content_intent)
 {
 	GNotification *notification = _PTR(builder_ptr);
 
@@ -251,20 +285,23 @@ JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeShowNotificati
 		g_free(icon_path_full);
 		(*env)->ReleaseStringUTFChars(env, icon_jstr, icon_path);
 	}
-	const char *action = intent_actionname_from_type(type);
-	if (action)
-		g_notification_set_default_action_and_target_value(notification, action, intent_serialize(env, intent));
-	queue_notification(id, notification);
+	const char *key = (*env)->GetStringUTFChars(env, key_jstr, NULL);
+	if (has_content_intent)
+		g_notification_set_default_action_and_target_value(notification, "app.notification", notification_target(key, -1));
+	queue_notification(key, notification);
+	(*env)->ReleaseStringUTFChars(env, key_jstr, key);
 }
 
-JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeCancel(JNIEnv *env, jobject this, jint id)
+JNIEXPORT void JNICALL Java_android_app_NotificationManager_nativeCancel(JNIEnv *env, jobject this, jstring key_jstr)
 {
-	queue_notification(id, NULL);
+	const char *key = (*env)->GetStringUTFChars(env, key_jstr, NULL);
+	queue_notification(key, NULL);
+	(*env)->ReleaseStringUTFChars(env, key_jstr, key);
 }
 
 static void remove_app_notification(gpointer key, gpointer value, gpointer user_data)
 {
-	char *id_string = desktop_id(GPOINTER_TO_INT(key));
+	char *id_string = desktop_id(key);
 	g_application_withdraw_notification(user_data, id_string);
 	g_free(id_string);
 }

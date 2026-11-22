@@ -681,20 +681,6 @@ jobject intent_deserialize(JNIEnv *env, GVariant *variant)
 	return intent;
 }
 
-const char *intent_actionname_from_type(int type)
-{
-	switch (type) {
-		case 0:
-			return "app.startActivity";
-		case 1:
-			return "app.startService";
-		case 2:
-			return "app.sendBroadcast";
-		default:
-			return NULL;
-	}
-}
-
 /* a point of the widget in the surface of its window; a widget in a popup (a popover has a surface
  * of its own) is placed by the popup's position on its parent's surface, like a view in a popup
  * window on Android, whose location on screen includes the position of the popup */
