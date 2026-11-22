@@ -138,8 +138,9 @@ void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, Gdk
  * here would keep the view, and with it its activity, alive forever (the widget only goes away
  * when the view is garbage collected). The idle sources hold a reference on the widget. */
 struct jni_callback_data {
-	gint resize_width;
-	gint resize_height;
+	gboolean created;
+	gint width;
+	gint height;
 };
 
 static jobject surface_view_get_view(JNIEnv *env, GtkWidget *dummy)
@@ -148,13 +149,31 @@ static jobject surface_view_get_view(JNIEnv *env, GtkWidget *dummy)
 	return WRAPPER_IS_WIDGET(wrapper) ? (*env)->NewLocalRef(env, WRAPPER_WIDGET(wrapper)->jobj) : NULL;
 }
 
-static gboolean on_resize_delayed(GtkWidget *dummy)
+/* AOSP SurfaceView.updateSurface(): there is no surface before the view has a frame; it is created
+ * once the view is laid out, and surfaceCreated() is followed right away by surfaceChanged() with
+ * the size; surfaceChanged() comes again only when the size changes. Creating the surface before
+ * the widget has a size would make ANativeWindow_fromSurface() run the main loop until it has one,
+ * i.e. run the app's other callbacks from within surfaceCreated(). */
+static gboolean update_surface(GtkWidget *dummy)
 {
-	JNIEnv *env = get_jni_env();
 	struct jni_callback_data *d = g_object_get_data(G_OBJECT(dummy), "atl-callback-data");
+	int width = gtk_widget_get_width(dummy);
+	int height = gtk_widget_get_height(dummy);
+	if (!gtk_widget_get_realized(dummy) || width == 0)
+		return G_SOURCE_REMOVE;
+
+	JNIEnv *env = get_jni_env();
 	jobject view = surface_view_get_view(env, dummy);
 	if (view) {
-		J__SurfaceView__surfaceChanged(env, view, 1 /*RGBA_8888*/, d->resize_width, d->resize_height);
+		if (!d->created) {
+			d->created = TRUE;
+			J__SurfaceView__surfaceCreated(env, view);
+		}
+		if (d->width != width || d->height != height) {
+			d->width = width;
+			d->height = height;
+			J__SurfaceView__surfaceChanged(env, view, 1 /*RGBA_8888*/, width, height);
+		}
 		(*env)->DeleteLocalRef(env, view);
 	}
 
@@ -163,27 +182,19 @@ static gboolean on_resize_delayed(GtkWidget *dummy)
 
 static void on_resize(GtkWidget *self, gint width, gint height, struct jni_callback_data *d)
 {
-	d->resize_width = width;
-	d->resize_height = height;
-
-	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_resize_delayed), g_object_ref(self), g_object_unref);
-}
-
-static gboolean on_realize_delayed(GtkWidget *dummy)
-{
-	JNIEnv *env = get_jni_env();
-	jobject view = surface_view_get_view(env, dummy);
-	if (view) {
-		J__SurfaceView__surfaceCreated(env, view);
-		(*env)->DeleteLocalRef(env, view);
-	}
-
-	return G_SOURCE_REMOVE;
+	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(update_surface), g_object_ref(self), g_object_unref);
 }
 
 static void on_realize(GtkWidget *self, struct jni_callback_data *d)
 {
-	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_realize_delayed), g_object_ref(self), g_object_unref);
+	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(update_surface), g_object_ref(self), g_object_unref);
+}
+
+/* a new realize creates the surface again, as before */
+static void on_unrealize(GtkWidget *self, struct jni_callback_data *d)
+{
+	d->created = FALSE;
+	d->width = d->height = 0;
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
@@ -202,6 +213,7 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv
 
 	g_signal_connect(dummy, "resize", G_CALLBACK(on_resize), callback_data);
 	g_signal_connect(dummy, "realize", G_CALLBACK(on_realize), callback_data);
+	g_signal_connect(dummy, "unrealize", G_CALLBACK(on_unrealize), callback_data);
 
 	return _INTPTR(graphics_offload);
 }
