@@ -7,9 +7,10 @@ import android.text.style.ClickableSpan;
 import android.view.MotionEvent;
 import android.widget.TextView;
 
-/* AOSP core/java/android/text/method/LinkMovementMethod.java: getInstance() and onTouchEvent(). ATL's TextView
- * activates the links of its text itself (Pango markup links, TextView.onLinkActivated()) and does not pass
- * touches here; onTouchEvent() is for apps that call it, e.g. from their own OnTouchListener. */
+/* AOSP core/java/android/text/method/LinkMovementMethod.java (Android 16): getInstance() and onTouchEvent(). ATL's
+ * TextView activates the links of a label text itself (Pango markup links, TextView.onLinkActivated()); the touches
+ * of a text it lays out with a StaticLayout (paragraph spans) come here from TextView.onTouchEvent(), as do those
+ * of apps that call it, e.g. from their own OnTouchListener. */
 public class LinkMovementMethod extends ScrollingMovementMethod {
 
 	private static LinkMovementMethod sInstance;
@@ -29,12 +30,20 @@ public class LinkMovementMethod extends ScrollingMovementMethod {
 			y += widget.getScrollY();
 
 			Layout layout = widget.getLayout();
-			int line = layout.getLineForVertical(y);
-			int off = layout.getOffsetForHorizontal(line, x);
+			ClickableSpan[] links;
+			if (y < 0 || y > layout.getHeight()) {
+				links = null;
+			} else {
+				int line = layout.getLineForVertical(y);
+				if (x < layout.getLineLeft(line) || x > layout.getLineRight(line)) {
+					links = null;
+				} else {
+					int off = layout.getOffsetForHorizontal(line, x);
+					links = buffer.getSpans(off, off, ClickableSpan.class);
+				}
+			}
 
-			ClickableSpan[] links = buffer.getSpans(off, off, ClickableSpan.class);
-
-			if (links.length != 0) {
+			if (links != null && links.length != 0) {
 				ClickableSpan link = links[0];
 				if (action == MotionEvent.ACTION_UP) {
 					// AOSP: a TextLinkSpan gets onClick(widget, INVOCATION_METHOD_TOUCH); ATL has no TextLinkSpan

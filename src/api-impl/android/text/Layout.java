@@ -245,6 +245,20 @@ public class Layout {
 				native_add_attribute(pango, ATTR_UNDERLINE, start, end, 0, 0);
 			} else if (span instanceof StrikethroughSpan) {
 				native_add_attribute(pango, ATTR_STRIKETHROUGH, start, end, 0, 0);
+			} else if (!(span instanceof ReplacementSpan)) {
+				/* any other span draws through updateDrawState() as in AOSP's TextLine (a ClickableSpan: the link
+				 * colour of the paint and an underline); what it changes of the paint becomes an attribute */
+				TextPaint wp = new TextPaint();
+				wp.set(paint);
+				span.updateDrawState(wp);
+				if (wp.getColor() != paint.getColor())
+					native_add_attribute(pango, ATTR_FOREGROUND, start, end, wp.getColor(), 0);
+				if (wp.bgColor != 0)
+					native_add_attribute(pango, ATTR_BACKGROUND, start, end, wp.bgColor, 0);
+				if (wp.isUnderlineText() && !paint.isUnderlineText())
+					native_add_attribute(pango, ATTR_UNDERLINE, start, end, 0, 0);
+				if (wp.isStrikeThruText() && !paint.isStrikeThruText())
+					native_add_attribute(pango, ATTR_STRIKETHROUGH, start, end, 0, 0);
 			}
 		}
 		applyReplacements(pango, base, from, to);

@@ -1145,7 +1145,9 @@ void wrapper_widget_set_jobject(WrapperWidget *wrapper, JNIEnv *env, jobject job
 	jmethodID ontouchevent_method = _METHOD(_CLASS(jobj), "onTouchEvent", "(Landroid/view/MotionEvent;)Z");
 	jmethodID dispatchtouchevent_method = _METHOD(_CLASS(jobj), "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z");
 	wrapper->custom_dispatch_touch = (dispatchtouchevent_method != _CACHED_METHOD(View__dispatchTouchEvent) && dispatchtouchevent_method != _CACHED_METHOD(ViewGroup__dispatchTouchEvent));
-	if (ontouchevent_method != _CACHED_METHOD(View__onTouchEvent) || wrapper->custom_dispatch_touch) {
+	/* TextView's onTouchEvent() only serves the texts it lays out itself; it asks for the controller then
+	 * (TextView.showParagraphLayout()), the label of the other texts takes their touches */
+	if ((ontouchevent_method != _CACHED_METHOD(View__onTouchEvent) && ontouchevent_method != _CACHED_METHOD(TextView__onTouchEvent)) || wrapper->custom_dispatch_touch) {
 		_setOnTouchListener(env, jobj, GTK_WIDGET(wrapper));
 	}
 
