@@ -135,7 +135,7 @@ public final class UserHandle implements Parcelable {
 	 * @hide
 	 */
 	public static final int getCallingUserId() {
-		return 1000; // FIXME
+		return getUserId(Binder.getCallingUid());
 	}
 
 	/**
