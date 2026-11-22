@@ -20,6 +20,17 @@ import java.util.function.IntConsumer;
 
 public class WifiManager {
 
+	/* AOSP WifiManager(Context, IWifiManager): the service runs in the app's process (WifiServiceImpl) */
+	private final android.content.Context mContext;
+	private final com.android.server.wifi.WifiServiceImpl mService;
+
+	/** @hide */
+	public WifiManager(android.content.Context context) {
+		mContext = context;
+		mService = com.android.server.wifi.WifiServiceImpl.get();
+		mService.start();
+	}
+
 	public static final int WIFI_STATE_DISABLED = 1;
 	public static final int WIFI_STATE_DISABLING = 0;
 	public static final int WIFI_STATE_ENABLED = 3;
@@ -273,7 +284,8 @@ public class WifiManager {
 		void onWifiStateChanged();
 	}
 
-	/* AOSP WifiManager.ScanResultsCallback (the binder proxy of AOSP is left out: no scan results ever arrive) */
+	/* AOSP WifiManager.ScanResultsCallback (the binder proxy of AOSP is left out: WifiServiceImpl runs in the app's
+	 * process and calls onScanResultsAvailable() on the callback's executor) */
 	public abstract static class ScanResultsCallback {
 		public ScanResultsCallback() {}
 
@@ -361,8 +373,9 @@ public class WifiManager {
 		return new WifiLock();
 	}
 
+	@Deprecated
 	public WifiInfo getConnectionInfo() {
-		return new WifiInfo();
+		return mService.getConnectionInfo(mContext);
 	}
 
 	/* like WifiServiceImpl without a DHCP lease: all fields 0 */
@@ -372,11 +385,11 @@ public class WifiManager {
 	}
 
 	public int getWifiState() {
-		return WIFI_STATE_UNKNOWN;
+		return mService.getWifiEnabledState(mContext);
 	}
 
 	public boolean isWifiEnabled() {
-		return false;
+		return getWifiState() == WIFI_STATE_ENABLED;
 	}
 
 	/* no Wi-Fi control from inside the sandbox: AOSP returns false when the request is not carried out */
@@ -384,24 +397,35 @@ public class WifiManager {
 		return false;
 	}
 
+	/* AOSP startScan() -> startScan(null) */
+	@Deprecated
 	public boolean startScan() {
-		return false;
+		return startScan(null);
 	}
 
-	public java.util.List getScanResults() {
-		return new java.util.ArrayList();
+	/* @SystemApi; the work source only attributes the scan for battery statistics */
+	@Deprecated
+	public boolean startScan(WorkSource workSource) {
+		return mService.startScan(mContext);
+	}
+
+	public List<ScanResult> getScanResults() {
+		List<ScanResult> results = mService.getScanResults(mContext);
+		if (results == null)
+			return Collections.emptyList();
+		return results;
 	}
 
 	public boolean is5GHzBandSupported() {
-		return false;
+		return mService.isBandSupported(com.android.server.wifi.NetworkManagerWifi.NM_WIFI_DEVICE_CAP_FREQ_5GHZ);
 	}
 
 	public boolean is6GHzBandSupported() {
-		return false;
+		return mService.isBandSupported(com.android.server.wifi.NetworkManagerWifi.NM_WIFI_DEVICE_CAP_FREQ_6GHZ);
 	}
 
 	public boolean isScanThrottleEnabled() {
-		return false;
+		return mService.isScanThrottleEnabled();
 	}
 
 	/* hidden constants of AOSP WifiManager.java */
@@ -496,7 +520,7 @@ public class WifiManager {
 	 * and no band, so everything is false (as is5GHzBandSupported() above). */
 
 	public boolean is24GHzBandSupported() {
-		return false;
+		return mService.isBandSupported(com.android.server.wifi.NetworkManagerWifi.NM_WIFI_DEVICE_CAP_FREQ_2GHZ);
 	}
 
 	public boolean is60GHzBandSupported() {
@@ -633,7 +657,8 @@ public class WifiManager {
 		return false;
 	}
 
-	/* AOSP WifiServiceImpl: settings of the Wi-Fi service, which is off (isWifiEnabled() == false) here */
+	/* AOSP WifiServiceImpl: settings of the Wi-Fi service. No scan-only mode: NetworkManager does not scan with the
+	 * radio off; the others are features ATL's Wi-Fi does not have */
 	@Deprecated
 	public boolean isScanAlwaysAvailable() {
 		return false;
@@ -833,11 +858,13 @@ public class WifiManager {
 			throw new IllegalArgumentException("executor cannot be null");
 		if (callback == null)
 			throw new IllegalArgumentException("callback cannot be null");
+		mService.registerScanResultsCallback(mContext, executor, callback);
 	}
 
 	public void unregisterScanResultsCallback(ScanResultsCallback callback) {
 		if (callback == null)
 			throw new IllegalArgumentException("callback cannot be null");
+		mService.unregisterScanResultsCallback(callback);
 	}
 
 	public void registerSubsystemRestartTrackingCallback(Executor executor, SubsystemRestartTrackingCallback callback) {

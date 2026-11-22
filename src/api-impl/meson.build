@@ -2206,6 +2206,8 @@ srcs = [
 	'com/android/server/location/fudger/LocationFudger.java',
 	'com/android/server/location/provider/DesktopLocationProvider.java',
 	'com/android/server/location/provider/LocationProviderManager.java',
+	'com/android/server/wifi/NetworkManagerWifi.java',
+	'com/android/server/wifi/WifiServiceImpl.java',
 	'com/android/systemui/monet/ColorScheme.java',
 	'com/android/systemui/monet/Shades.java',
 	'com/android/systemui/monet/contrast/Contrast.java',
