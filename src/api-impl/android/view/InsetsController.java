@@ -31,12 +31,26 @@ public class InsetsController implements WindowInsetsController {
 		return behavior;
 	}
 
+	/* AOSP InsetsController.show()/hide(): the IME is requested from InputMethodManager for the focused editor
+	 * of the window (ImeInsetsSourceConsumer.requestShow()) or hidden for the window; its visibility in the
+	 * insets is what the keyboard does (Window.getWindowInsets()) */
 	public void show(@InsetsType int types) {
-		window.setInsetsVisible(types, true);
+		if ((types & WindowInsets.Type.ime()) != 0) {
+			View focus = window.getDecorView().findFocus();
+			if (focus != null && focus.onCheckIsTextEditor())
+				getImm().showSoftInput(focus, 0);
+		}
+		window.setInsetsVisible(types & ~WindowInsets.Type.ime(), true);
 	}
 
 	public void hide(@InsetsType int types) {
-		window.setInsetsVisible(types, false);
+		if ((types & WindowInsets.Type.ime()) != 0)
+			getImm().hideSoftInputFromWindow(window.getDecorView().getWindowToken(), 0);
+		window.setInsetsVisible(types & ~WindowInsets.Type.ime(), false);
+	}
+
+	private android.view.inputmethod.InputMethodManager getImm() {
+		return (android.view.inputmethod.InputMethodManager)window.getContext().getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
 	}
 
 	/* AOSP InsetsController.controlWindowInsetsAnimation(): uncontrollable types (and no types) cancel the request

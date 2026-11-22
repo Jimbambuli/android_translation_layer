@@ -218,6 +218,8 @@ public class Window {
 			private final Runnable configurationFollowsSize = new Runnable() {
 				@Override
 				public void run() {
+					if (updateImeOverlap())
+						return;
 					((android.app.Activity)callback).internalWindowSizeChanged();
 				}
 			};
@@ -1077,6 +1079,57 @@ public class Window {
 		return insetsController;
 	}
 
+	/* The shell's on-screen keyboard is shown and the compositor made the window lower to keep it free (Phosh):
+	 * that is the IME, not a new window size. As for a window that fits the IME (AOSP ViewRootImpl.
+	 * adjustLayoutParamsForCompatibility(): fitInsetsTypes with ime() for SOFT_INPUT_ADJUST_RESIZE), the
+	 * window frame ends above the IME; the configuration stays and WindowInsets has the IME visible, with no
+	 * overlap of the window. The size of the window without the keyboard is kept to tell the two apart. */
+	private int mFullWidth = -1;
+	private int mFullHeight = -1;
+	private boolean mImeShown;
+
+	private static final java.util.ArrayList<java.lang.ref.WeakReference<Window>> sWindows = new java.util.ArrayList<>();
+
+	{
+		synchronized (sWindows) {
+			sWindows.add(new java.lang.ref.WeakReference<>(this));
+		}
+	}
+
+	/** @hide the on-screen keyboard was shown or hidden (InputMethodManager.oskVisibleChanged()) */
+	public static void imeVisibilityChanged() {
+		java.util.ArrayList<Window> windows = new java.util.ArrayList<>();
+		synchronized (sWindows) {
+			for (java.util.Iterator<java.lang.ref.WeakReference<Window>> it = sWindows.iterator(); it.hasNext();) {
+				Window w = it.next().get();
+				if (w == null)
+					it.remove();
+				else
+					windows.add(w);
+			}
+		}
+		for (Window w : windows)
+			w.updateImeOverlap();
+	}
+
+	/* TRUE if the window is lower only because of the on-screen keyboard */
+	private boolean updateImeOverlap() {
+		int w = decorView.getWidth();
+		int h = decorView.getHeight();
+		boolean osk = android.view.inputmethod.InputMethodManager.isOskVisible();
+		boolean byIme = osk && mFullWidth == w && h < mFullHeight;
+		if (!byIme && w > 0 && h > 0 && (!osk || mFullWidth != w)) {
+			mFullWidth = w;
+			mFullHeight = h;
+		}
+		boolean shown = osk && (byIme || mFullWidth == w);
+		if (shown != mImeShown) {
+			mImeShown = shown;
+			requestApplyInsets();
+		}
+		return byIme;
+	}
+
 	/** @hide */
 	public WindowInsets getWindowInsets() {
 		/* like InsetsState.calculateInsets() for a window without any insets source: a desktop window has no
@@ -1085,6 +1138,8 @@ public class Window {
 		boolean[] typeVisibilityMap = new boolean[WindowInsets.Type.SIZE];
 		for (int type = WindowInsets.Type.FIRST; type <= WindowInsets.Type.LAST; type <<= 1)
 			typeVisibilityMap[WindowInsets.Type.indexOf(type)] = (visibleInsetTypes & type) != 0;
+		/* the IME source is visible while the on-screen keyboard is shown, it does not overlap the window */
+		typeVisibilityMap[WindowInsets.Type.indexOf(WindowInsets.Type.ime())] = mImeShown;
 		return new WindowInsets(new Insets[WindowInsets.Type.SIZE], new Insets[WindowInsets.Type.SIZE], typeVisibilityMap,
 		                        false, false, 0, DisplayCutout.NO_CUTOUT, RoundedCorners.NO_ROUNDED_CORNERS,
 		                        new PrivacyIndicatorBounds(), DisplayShape.NONE,
