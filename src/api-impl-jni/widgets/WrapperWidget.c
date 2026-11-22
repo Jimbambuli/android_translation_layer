@@ -986,6 +986,12 @@ static gboolean on_key_released(GtkEventControllerKey *controller, guint keyval,
 
 	if (g_object_get_data(G_OBJECT(wrapper), "key-focus-only") && !gtk_widget_has_focus(GTK_WIDGET(wrapper)))
 		return FALSE;
+	/* an EditText's GtkText sent Enter down and up already (android_widget_EditText.c) */
+	if (wrapper->child && g_object_get_data(G_OBJECT(wrapper->child), "atl-enter-sent") &&
+	    (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter || keyval == GDK_KEY_ISO_Enter)) {
+		g_object_set_data(G_OBJECT(wrapper->child), "atl-enter-sent", NULL);
+		return FALSE;
+	}
 	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, ACTION_UP, atl_android_key_code(controller, keyval, keycode), 0, atl_android_meta_state(state));
 	_SET_INT_FIELD(key_event, "unicodeValue", atl_android_unicode_char(keyval));
 	gboolean ret = J__View__dispatchKeyEvent(env, wrapper->jobj, key_event);

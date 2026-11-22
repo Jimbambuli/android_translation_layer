@@ -832,7 +832,7 @@ public class AutoCompleteTextView extends EditText implements Filter.FilterListe
 			return true;
 		}
 
-		return false; // super.onKeyUp(keyCode, event);
+		return super.onKeyUp(keyCode, event);
 	}
 
 	public boolean onKeyDown(int keyCode, KeyEvent event) {
