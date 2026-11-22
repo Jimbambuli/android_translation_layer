@@ -232,6 +232,19 @@ JNIEXPORT void JNICALL Java_android_content_Context_native_1updateConfig(JNIEnv 
 	GdkMonitor *monitor = g_list_model_get_item(gdk_display_get_monitors(display), 0);
 	monitor_changed_cb(NULL, monitor, config);
 
+	/* DisplayContent.computeScreenConfiguration() and PhoneWindowManager.adjustConfigurationLw(): a keyboard
+	 * makes the configuration QWERTY with the hard keyboard not hidden, without one it is NOKEYS with the hard
+	 * keyboard hidden (the soft input stays, ATL shows GTK's). Navigation is DPAD only for a device with
+	 * DPAD_CENTER as well (EventHub's DPAD_REQUIRED_KEYCODES), which a PC keyboard has not (KEY_SELECT in
+	 * Generic.kl): NONAV, so navigation is hidden. */
+	GdkSeat *seat = gdk_display_get_default_seat(display);
+	gboolean keyboard = seat && (gdk_seat_get_capabilities(seat) & GDK_SEAT_CAPABILITY_KEYBOARD);
+	_SET_INT_FIELD(config, "keyboard", keyboard ? /*KEYBOARD_QWERTY*/ 2 : /*KEYBOARD_NOKEYS*/ 1);
+	_SET_INT_FIELD(config, "keyboardHidden", /*KEYBOARDHIDDEN_NO*/ 1);
+	_SET_INT_FIELD(config, "hardKeyboardHidden", keyboard ? /*HARDKEYBOARDHIDDEN_NO*/ 1 : /*HARDKEYBOARDHIDDEN_YES*/ 2);
+	_SET_INT_FIELD(config, "navigation", /*NAVIGATION_NONAV*/ 1);
+	_SET_INT_FIELD(config, "navigationHidden", /*NAVIGATIONHIDDEN_YES*/ 2);
+
 #ifdef XDP_TYPE_INPUT_CAPTURE_SESSION // libportal >= 0.8
 	if (!xdp_settings) {
 		GError *error = NULL;

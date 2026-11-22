@@ -10,9 +10,16 @@ import android.text.InputFilter;
 import android.text.SpannableStringBuilder;
 import android.text.SpannedString;
 import android.text.TextWatcher;
+import android.text.method.PasswordTransformationMethod;
+import android.text.method.TransformationMethod;
 import android.util.AttributeSet;
+import android.os.SystemClock;
+import android.view.InputDevice;
+import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import java.util.ArrayList;
 
 public class EditText extends TextView {
@@ -36,7 +43,6 @@ public class EditText extends TextView {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 	protected native String native_getText(long widget);
 	protected native void native_addTextChangedListener(long widget, TextWatcher watcher);
-	protected native void native_setOnEditorActionListener(long widget, OnEditorActionListener l);
 	protected native void native_setText(long widget, String text);
 	protected native void native_setHint(long widget, CharSequence s);
 	protected native CharSequence native_getHint(long widget); // gtk_entry_set_placeholder_text
@@ -55,6 +61,11 @@ public class EditText extends TextView {
 	 * app sets another type; ATL cannot tell an explicit TYPE_NULL from "not set" (0), so only that case differs */
 	@Override
 	public boolean onCheckIsTextEditor() {
+		return true;
+	}
+
+	@Override
+	protected boolean getDefaultEditable() {
 		return true;
 	}
 
@@ -131,7 +142,6 @@ public class EditText extends TextView {
 
 	/* like on AOSP, the view keeps its listeners, the GtkText calls back the view (see native code) */
 	private ArrayList<TextWatcher> listeners;
-	private OnEditorActionListener editor_action_listener;
 
 	@Override
 	public void removeTextChangedListener(TextWatcher watcher) {
@@ -145,12 +155,6 @@ public class EditText extends TextView {
 			listeners = new ArrayList<TextWatcher>();
 		listeners.add(watcher);
 		native_addTextChangedListener(widget, watcher);
-	}
-
-	@Override
-	public void setOnEditorActionListener(OnEditorActionListener l) {
-		editor_action_listener = l;
-		native_setOnEditorActionListener(widget, l);
 	}
 
 	/* the text is being set by the app, not typed (InputTrace) */
@@ -186,16 +190,99 @@ public class EditText extends TextView {
 	 * so null is the empty text from before it */
 	private String mPreviousText;
 
-	/* called from native code when Enter was pressed */
+	/* called from native code when the GtkText took Enter: like a hardware Enter on AOSP, the key goes down and up
+	 * through dispatchKeyEvent(), to the OnKeyListener and to onKeyDown()/onKeyUp() (a subclass's first:
+	 * AutoCompleteTextView completes the item selected in its drop-down) */
 	@Export
-	private void sendEditorAction(KeyEvent event) {
-		/* like AOSP, where the editor action comes from TextView.onKeyDown(): a subclass's onKeyDown()
-		 * sees Enter first (AutoCompleteTextView completes the item selected in its drop-down) */
-		if (onKeyDown(KeyEvent.KEYCODE_ENTER, new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER)))
-			return;
-		if (editor_action_listener != null)
-			editor_action_listener.onEditorAction(this, 0, event);
+	private void sendEnterKey(int metaState) {
+		long now = SystemClock.uptimeMillis();
+		dispatchKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 0, metaState,
+		                              KeyCharacterMap.VIRTUAL_KEYBOARD, 0, KeyEvent.FLAG_FROM_SYSTEM, InputDevice.SOURCE_KEYBOARD));
+		dispatchKeyEvent(new KeyEvent(now, SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0, metaState,
+		                              KeyCharacterMap.VIRTUAL_KEYBOARD, 0, KeyEvent.FLAG_FROM_SYSTEM, InputDevice.SOURCE_KEYBOARD));
 	}
+
+	/* AOSP InputContentType.enterDown: the editor action listener took Enter down */
+	private boolean mEnterDown;
+
+	/* AOSP TextView.getActionIdForEnterEvent() */
+	private int getActionIdForEnterEvent() {
+		if (!isSingleLine())
+			return EditorInfo.IME_NULL;
+		return getImeOptions() & EditorInfo.IME_MASK_ACTION;
+	}
+
+	/* AOSP TextView.shouldAdvanceFocusOnEnter(); an EditText always has its key listener here */
+	private boolean shouldAdvanceFocusOnEnter() {
+		if (isSingleLine())
+			return true;
+		int type = getInputType();
+		if ((type & EditorInfo.TYPE_MASK_CLASS) == EditorInfo.TYPE_CLASS_TEXT) {
+			int variation = type & EditorInfo.TYPE_MASK_VARIATION;
+			if (variation == EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS || variation == EditorInfo.TYPE_TEXT_VARIATION_EMAIL_SUBJECT)
+				return true;
+		}
+		return false;
+	}
+
+	private static boolean isEnter(int keyCode) {
+		return keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER;
+	}
+
+	/* AOSP TextView.onKeyDown() -> doKeyDown() for Enter: the editor action listener may take it; a single line
+	 * editor does not take it as text. Otherwise AOSP's key listener types a new line, which the single line of the
+	 * GtkText cannot show: Enter is taken all the same. */
+	@Override
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (!isEnter(keyCode) || !isEnabled())
+			return super.onKeyDown(keyCode, event);
+		if (event.hasNoModifiers()) {
+			if (mOnEditorActionListener != null && mOnEditorActionListener.onEditorAction(this, getActionIdForEnterEvent(), event)) {
+				mEnterDown = true;
+				return true;
+			}
+			if ((event.getFlags() & KeyEvent.FLAG_EDITOR_ACTION) != 0 || shouldAdvanceFocusOnEnter()) {
+				if (hasOnClickListeners())
+					return super.onKeyDown(keyCode, event);
+				return true;
+			}
+		}
+		return true;
+	}
+
+	/* AOSP TextView.onKeyUp() for Enter: the editor action listener that took Enter down gets it up as well; a
+	 * single line editor moves the focus down */
+	@Override
+	public boolean onKeyUp(int keyCode, KeyEvent event) {
+		if (!isEnter(keyCode) || !isEnabled() || !event.hasNoModifiers())
+			return super.onKeyUp(keyCode, event);
+		if (mOnEditorActionListener != null && mEnterDown) {
+			mEnterDown = false;
+			if (mOnEditorActionListener.onEditorAction(this, getActionIdForEnterEvent(), event))
+				return true;
+		}
+		if ((event.getFlags() & KeyEvent.FLAG_EDITOR_ACTION) != 0 || shouldAdvanceFocusOnEnter()) {
+			if (!hasOnClickListeners()) {
+				View v = focusSearch(FOCUS_DOWN);
+				if (v != null) {
+					if (!v.requestFocus(FOCUS_DOWN))
+						throw new IllegalStateException("focus search returned a view that wasn't able to take focus!");
+					super.onKeyUp(keyCode, event);
+					return true;
+				}
+			}
+		}
+		return super.onKeyUp(keyCode, event);
+	}
+
+	/* the GtkText shows the text itself, without the transformation: the password transformation is its invisible
+	 * mode (and the password purpose for the input method) */
+	@Override
+	void setTransformationMethodInternal(TransformationMethod method) {
+		super.setTransformationMethodInternal(method);
+		native_setPassword(widget, method instanceof PasswordTransformationMethod);
+	}
+	private native void native_setPassword(long widget, boolean password);
 
 	/* the GtkText has no room for compound drawables: they are kept (getCompoundDrawablesRelative() is how
 	 * TextInputLayout finds its icons) but not drawn */

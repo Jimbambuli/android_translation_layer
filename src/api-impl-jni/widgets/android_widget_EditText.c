@@ -9,11 +9,15 @@
 
 static void changed_cb(GtkEditable *self, gpointer user_data);
 static void selection_changed_cb(GObject *self, GParamSpec *pspec, gpointer user_data);
+static void on_activate(GtkText *gtk_text, gpointer user_data);
 
 JNIEXPORT jlong JNICALL Java_android_widget_EditText_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *gtk_text = gtk_text_new();
+	/* GTK selects the whole text when the keyboard focuses a GtkText; AOSP's Editor keeps the selection (only
+	 * setSelectAllOnFocus() selects all, ArrowKeyMovementMethod.onTakeFocus() leaves it for Tab and Down) */
+	g_object_set(gtk_widget_get_settings(gtk_text), "gtk-entry-select-on-focus", FALSE, NULL);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), gtk_text);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	/* InputTrace: the text the user types, whether or not the app has a TextWatcher */
@@ -21,6 +25,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_EditText_native_1constructor(JNIEnv 
 	/* TextView.onSelectionChanged(): the cursor or the selection moved */
 	g_signal_connect(gtk_text, "notify::cursor-position", G_CALLBACK(selection_changed_cb), NULL);
 	g_signal_connect(gtk_text, "notify::selection-bound", G_CALLBACK(selection_changed_cb), NULL);
+	g_signal_connect(gtk_text, "activate", G_CALLBACK(on_activate), NULL);
 	wrapper_widget_register_invalidation_listener(WRAPPER_WIDGET(wrapper));
 	return _INTPTR(gtk_text);
 }
@@ -137,17 +142,19 @@ JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setFiltered(JNIEnv *
 		g_signal_handlers_disconnect_by_func(editable, insert_text_cb, NULL);
 }
 
-#define IME_ACTION_SEARCH 3
-#define KEYCODE_ENTER     66
-
+/* GtkText takes Enter as its activate signal (unless the input method took it). On AOSP a hardware Enter goes down
+ * and up through View.dispatchKeyEvent() of the focused EditText: the OnKeyListener, then TextView.onKeyDown() and
+ * onKeyUp(), which run the editor action (EditText.sendEnterKey()) */
 static void on_activate(GtkText *gtk_text, gpointer user_data)
 {
 	JNIEnv *env = get_jni_env();
 	jobject this = get_edit_text(env, GTK_WIDGET(gtk_text));
 	if (!this)
 		return;
-	jobject key_event = J_new__KeyEvent(env, (jlong)0, (jlong)0, IME_ACTION_SEARCH, KEYCODE_ENTER, 0, 0);
-	J__EditText__sendEditorAction(env, this, key_event);
+	GdkDevice *keyboard = gdk_seat_get_keyboard(gdk_display_get_default_seat(gtk_widget_get_display(GTK_WIDGET(gtk_text))));
+	/* the release of Enter still comes to the wrapper's key controller: it has been sent already */
+	g_object_set_data(G_OBJECT(gtk_text), "atl-enter-sent", GINT_TO_POINTER(1));
+	J__EditText__sendEnterKey(env, this, keyboard ? atl_android_meta_state(gdk_device_get_modifier_state(keyboard)) : 0);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
@@ -155,11 +162,11 @@ static void on_activate(GtkText *gtk_text, gpointer user_data)
 	(*env)->DeleteLocalRef(env, this);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setOnEditorActionListener(JNIEnv *env, jobject this, jlong widget_ptr, jobject listener)
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setPassword(JNIEnv *env, jobject this, jlong widget_ptr, jboolean password)
 {
 	GtkText *gtk_text = GTK_TEXT(_PTR(widget_ptr));
-	if (!g_signal_handler_find(gtk_text, G_SIGNAL_MATCH_FUNC, 0, 0, NULL, on_activate, NULL))
-		g_signal_connect(gtk_text, "activate", G_CALLBACK(on_activate), NULL);
+	gtk_text_set_visibility(gtk_text, !password);
+	gtk_text_set_input_purpose(gtk_text, password ? GTK_INPUT_PURPOSE_PASSWORD : GTK_INPUT_PURPOSE_FREE_FORM);
 }
 
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setText(JNIEnv *env, jobject this, jlong widget_ptr, jstring text_jstr)
