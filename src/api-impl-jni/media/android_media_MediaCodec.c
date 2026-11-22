@@ -173,14 +173,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio(JN
 
 	ctx->audio.sample_rate = sample_rate;
 	codec_ctx->sample_rate = sample_rate;
-	if (nb_channels == 1)
-		codec_ctx->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_MONO;
-	else if (nb_channels == 2)
-		codec_ctx->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO;
-	else {
-		printf("MediaCodec: Unsupported number of channels %d\n", nb_channels);
-		exit(0);
-	}
+	/* AOSP's audio decoders take multichannel streams too (C2SoftAacDec up to 8 channels): FFmpeg's default layout of
+	 * the count, whose order (FL FR FC LFE BL BR ...) is that of Android's channel masks */
+	av_channel_layout_default(&codec_ctx->ch_layout, nb_channels);
 
 	if (extradata) {
 		codec_ctx->extradata_size = get_nio_buffer_size(env, extradata);
