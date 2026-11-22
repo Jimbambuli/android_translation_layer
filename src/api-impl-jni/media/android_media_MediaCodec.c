@@ -31,6 +31,7 @@
 #include "../../libandroid/native_window.h"
 #include "../widgets/android_view_SurfaceView.h"
 #include "jni.h"
+#include "sws_cache.h"
 #include "video_rotate.h"
 
 struct ATL_codec_context {
@@ -42,7 +43,7 @@ struct ATL_codec_context {
 			int sample_rate;
 		} audio;
 		struct {
-			struct SwsContext *sws; // for software decoding
+			struct sws_cache sws; // for software decoding
 			SurfaceViewWidget *surface_view_widget;
 			jobject surface_texture; // global ref: the SurfaceTexture of a Surface(SurfaceTexture)
 			int rotation;            // degrees clockwise (the format's rotation-degrees), the frames are turned
@@ -679,10 +680,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 			}
 
 			// use swscale to convert YUV to RGB
-			ctx->video.sws = sws_getCachedContext(ctx->video.sws, frame->width, frame->height, frame->format,
-			                                      frame->width, frame->height, gdk_pix_fmt, 0, NULL, NULL, NULL);
+			struct SwsContext *sws = sws_cached(&ctx->video.sws, frame, frame->width, frame->height, gdk_pix_fmt, 0);
 			guchar *data_rgb = g_try_malloc0(frame->height * stride);
-			sws_scale(ctx->video.sws, (const uint8_t *const *)frame->data, frame->linesize, 0,
+			sws_scale(sws, (const uint8_t *const *)frame->data, frame->linesize, 0,
 			          frame->height, (uint8_t *[1]){data_rgb}, (int[1]){stride});
 
 			int width = frame->width, height = frame->height;
@@ -740,8 +740,8 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1flush(JNIEnv *env, 
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1release(JNIEnv *env, jobject this, jlong codec)
 {
 	struct ATL_codec_context *ctx = _PTR(codec);
-	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.sws) {
-		sws_freeContext(ctx->video.sws);
+	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.sws.ctx) {
+		sws_freeContext(ctx->video.sws.ctx);
 	}
 	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.surface_texture)
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
