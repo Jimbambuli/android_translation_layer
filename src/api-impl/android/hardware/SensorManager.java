@@ -2,6 +2,7 @@ package android.hardware;
 
 import android.atl.annotation.Export;
 import android.os.Handler;
+import android.os.MemoryFile;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.util.SparseArray;
@@ -16,7 +17,72 @@ import java.util.List;
 
 public class SensorManager {
 
-	public static float GRAVITY_EARTH = 9.81f;
+	/* AOSP SensorManager constants */
+	@Deprecated
+	public static final int SENSOR_ORIENTATION = 1 << 0;
+	@Deprecated
+	public static final int SENSOR_ACCELEROMETER = 1 << 1;
+	@Deprecated
+	public static final int SENSOR_TEMPERATURE = 1 << 2;
+	@Deprecated
+	public static final int SENSOR_MAGNETIC_FIELD = 1 << 3;
+	@Deprecated
+	public static final int SENSOR_LIGHT = 1 << 4;
+	@Deprecated
+	public static final int SENSOR_PROXIMITY = 1 << 5;
+	@Deprecated
+	public static final int SENSOR_TRICORDER = 1 << 6;
+	@Deprecated
+	public static final int SENSOR_ORIENTATION_RAW = 1 << 7;
+	@Deprecated
+	public static final int SENSOR_ALL = 0x7F;
+	@Deprecated
+	public static final int SENSOR_MIN = SENSOR_ORIENTATION;
+	@Deprecated
+	public static final int SENSOR_MAX = ((SENSOR_ALL + 1) >> 1);
+	@Deprecated
+	public static final int DATA_X = 0;
+	@Deprecated
+	public static final int DATA_Y = 1;
+	@Deprecated
+	public static final int DATA_Z = 2;
+	@Deprecated
+	public static final int RAW_DATA_INDEX = 3;
+	@Deprecated
+	public static final int RAW_DATA_X = 3;
+	@Deprecated
+	public static final int RAW_DATA_Y = 4;
+	@Deprecated
+	public static final int RAW_DATA_Z = 5;
+	public static final float STANDARD_GRAVITY = 9.80665f;
+	public static final float GRAVITY_SUN = 275.0f;
+	public static final float GRAVITY_MERCURY = 3.70f;
+	public static final float GRAVITY_VENUS = 8.87f;
+	public static final float GRAVITY_EARTH = 9.80665f;
+	public static final float GRAVITY_MOON = 1.6f;
+	public static final float GRAVITY_MARS = 3.71f;
+	public static final float GRAVITY_JUPITER = 23.12f;
+	public static final float GRAVITY_SATURN = 8.96f;
+	public static final float GRAVITY_URANUS = 8.69f;
+	public static final float GRAVITY_NEPTUNE = 11.0f;
+	public static final float GRAVITY_PLUTO = 0.6f;
+	public static final float GRAVITY_DEATH_STAR_I = 0.000000353036145f;
+	public static final float GRAVITY_THE_ISLAND = 4.815162342f;
+	public static final float MAGNETIC_FIELD_EARTH_MAX = 60.0f;
+	public static final float MAGNETIC_FIELD_EARTH_MIN = 30.0f;
+	public static final float LIGHT_SUNLIGHT_MAX = 120000.0f;
+	public static final float LIGHT_SUNLIGHT = 110000.0f;
+	public static final float LIGHT_SHADE = 20000.0f;
+	public static final float LIGHT_OVERCAST = 10000.0f;
+	public static final float LIGHT_SUNRISE = 400.0f;
+	public static final float LIGHT_CLOUDY = 100.0f;
+	public static final float LIGHT_FULLMOON = 0.25f;
+	public static final float LIGHT_NO_MOON = 0.001f;
+	public static final int SENSOR_STATUS_NO_CONTACT = -1;
+	public static final int SENSOR_STATUS_UNRELIABLE = 0;
+	public static final int SENSOR_STATUS_ACCURACY_LOW = 1;
+	public static final int SENSOR_STATUS_ACCURACY_MEDIUM = 2;
+	public static final int SENSOR_STATUS_ACCURACY_HIGH = 3;
 
 	/* AOSP SensorManager.SENSOR_DELAY_* */
 	public static final int SENSOR_DELAY_FASTEST = 0;
@@ -150,6 +216,26 @@ public class SensorManager {
 	public void unregisterListener(SensorListener listener, int sensors) {
 	}
 
+	/* AOSP SensorManager.getSensors() -> LegacySensorManager.getSensors(): the legacy sensors of the full list */
+	@Deprecated
+	public int getSensors() {
+		int result = 0;
+		for (Sensor i : getFullSensorList()) {
+			switch (i.getType()) {
+				case Sensor.TYPE_ACCELEROMETER:
+					result |= SENSOR_ACCELEROMETER;
+					break;
+				case Sensor.TYPE_MAGNETIC_FIELD:
+					result |= SENSOR_MAGNETIC_FIELD;
+					break;
+				case Sensor.TYPE_ORIENTATION:
+					result |= SENSOR_ORIENTATION | SENSOR_ORIENTATION_RAW;
+					break;
+			}
+		}
+		return result;
+	}
+
 	/* AOSP SensorManager.registerListener() variants: the rate goes through getDelay(); the events are not
 	 * batched (no sensor has a FIFO), so maxReportLatencyUs only has to be valid */
 	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs) {
@@ -250,6 +336,19 @@ public class SensorManager {
 		}
 	}
 
+	/* AOSP SensorManager.flush() -> SystemSensorManager.flushImpl() */
+	public boolean flush(SensorEventListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("listener cannot be null");
+		synchronized (mSensorListeners) {
+			Queue queue = mSensorListeners.get(listener);
+			if (queue == null)
+				return false;
+			queue.flush();
+			return true;
+		}
+	}
+
 	/* AOSP SystemSensorManager.SensorEventQueue: the sensors of one listener; the events are dispatched on its
 	 * looper (dispatchSensorEvent(), onAccuracyChanged() when the accuracy changes) */
 	private static final class Queue {
@@ -292,6 +391,22 @@ public class SensorManager {
 				mActiveSensors.valueAt(i).source.disable(mActiveSensors.valueAt(i));
 			mActiveSensors.clear();
 			return true;
+		}
+
+		/* SensorService.flushSensor(): no sensor of ATL has a FIFO, so as for HAL 1.0 and virtual sensors each
+		 * active sensor gets a trivial flush complete event, dispatched on the queue's looper
+		 * (SensorEventQueue.dispatchFlushCompleteEvent()) */
+		void flush() {
+			for (int i = 0; i < mActiveSensors.size(); i++) {
+				final Registration registration = mActiveSensors.valueAt(i);
+				mHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						if (registration.active && mListener instanceof SensorEventListener2)
+							((SensorEventListener2) mListener).onFlushCompleted(registration.source.sensor);
+					}
+				});
+			}
 		}
 
 		/* AOSP SensorEventQueue.dispatchSensorEvent(), on the queue's looper */
@@ -741,6 +856,81 @@ public class SensorManager {
 		return 44330.0f * (1.0f - (float) Math.pow(p / p0, coef));
 	}
 
+	/* AOSP SensorManager.getInclination() */
+	public static float getInclination(float[] I) {
+		if (I.length == 9) {
+			return (float) Math.atan2(I[5], I[4]);
+		} else {
+			return (float) Math.atan2(I[6], I[5]);
+		}
+	}
+
+	/* AOSP SensorManager.getAngleChange() */
+	public static void getAngleChange(float[] angleChange, float[] R, float[] prevR) {
+		float rd1 = 0, rd4 = 0, rd6 = 0, rd7 = 0, rd8 = 0;
+		float ri0 = 0, ri1 = 0, ri2 = 0, ri3 = 0, ri4 = 0, ri5 = 0, ri6 = 0, ri7 = 0, ri8 = 0;
+		float pri0 = 0, pri1 = 0, pri2 = 0, pri3 = 0, pri4 = 0;
+		float pri5 = 0, pri6 = 0, pri7 = 0, pri8 = 0;
+
+		if (R.length == 9) {
+			ri0 = R[0];
+			ri1 = R[1];
+			ri2 = R[2];
+			ri3 = R[3];
+			ri4 = R[4];
+			ri5 = R[5];
+			ri6 = R[6];
+			ri7 = R[7];
+			ri8 = R[8];
+		} else if (R.length == 16) {
+			ri0 = R[0];
+			ri1 = R[1];
+			ri2 = R[2];
+			ri3 = R[4];
+			ri4 = R[5];
+			ri5 = R[6];
+			ri6 = R[8];
+			ri7 = R[9];
+			ri8 = R[10];
+		}
+
+		if (prevR.length == 9) {
+			pri0 = prevR[0];
+			pri1 = prevR[1];
+			pri2 = prevR[2];
+			pri3 = prevR[3];
+			pri4 = prevR[4];
+			pri5 = prevR[5];
+			pri6 = prevR[6];
+			pri7 = prevR[7];
+			pri8 = prevR[8];
+		} else if (prevR.length == 16) {
+			pri0 = prevR[0];
+			pri1 = prevR[1];
+			pri2 = prevR[2];
+			pri3 = prevR[4];
+			pri4 = prevR[5];
+			pri5 = prevR[6];
+			pri6 = prevR[8];
+			pri7 = prevR[9];
+			pri8 = prevR[10];
+		}
+
+		// calculate the parts of the rotation difference matrix we need
+		// rd[i][j] = pri[0][i] * ri[0][j] + pri[1][i] * ri[1][j] + pri[2][i] * ri[2][j];
+
+		rd1 = pri0 * ri1 + pri3 * ri4 + pri6 * ri7; //rd[0][1]
+		rd4 = pri1 * ri1 + pri4 * ri4 + pri7 * ri7; //rd[1][1]
+		rd6 = pri2 * ri0 + pri5 * ri3 + pri8 * ri6; //rd[2][0]
+		rd7 = pri2 * ri1 + pri5 * ri4 + pri8 * ri7; //rd[2][1]
+		rd8 = pri2 * ri2 + pri5 * ri5 + pri8 * ri8; //rd[2][2]
+
+		angleChange[0] = (float) Math.atan2(rd1, rd4);
+		angleChange[1] = (float) Math.asin(-rd7);
+		angleChange[2] = (float) Math.atan2(-rd6, rd8);
+
+	}
+
 	/* AOSP SensorManager.getQuaternionFromVector() */
 	public static void getQuaternionFromVector(float[] Q, float[] rv) {
 		if (rv.length >= 4) {
@@ -890,6 +1080,124 @@ public class SensorManager {
 			R[12] = R[13] = R[14] = 0.0f;
 			R[15] = 1.0f;
 		}
+	}
+
+	/* AOSP SensorManager.getDynamicSensorList(): SystemSensorManager.mFullDynamicSensorsList is filled from
+	 * the dynamic sensor meta sensor (Sensor.TYPE_DYNAMIC_SENSOR_META); ATL has none, so the list is empty */
+	private static final List<Sensor> sFullDynamicSensorsList = Collections.emptyList();
+
+	public List<Sensor> getDynamicSensorList(int type) {
+		final List<Sensor> fullList = sFullDynamicSensorsList;
+		if (type == Sensor.TYPE_ALL) {
+			return Collections.unmodifiableList(fullList);
+		} else {
+			List<Sensor> list = new ArrayList<Sensor>();
+			for (Sensor i : fullList) {
+				if (i.getType() == type)
+					list.add(i);
+			}
+			return Collections.unmodifiableList(list);
+		}
+	}
+
+	/* AOSP SensorManager.DynamicSensorCallback */
+	public abstract static class DynamicSensorCallback {
+		public void onDynamicSensorConnected(Sensor sensor) {}
+
+		public void onDynamicSensorDisconnected(Sensor sensor) {}
+	}
+
+	/* AOSP SensorManager.registerDynamicSensorCallback() -> SystemSensorManager.registerDynamicSensorCallbackImpl():
+	 * the callbacks are kept; without a dynamic sensor meta sensor no connection change is ever reported */
+	private final HashMap<DynamicSensorCallback, Handler> mDynamicSensorCallbacks = new HashMap<>();
+
+	public void registerDynamicSensorCallback(DynamicSensorCallback callback) {
+		registerDynamicSensorCallback(callback, null);
+	}
+
+	public void registerDynamicSensorCallback(DynamicSensorCallback callback, Handler handler) {
+		if (callback == null)
+			throw new IllegalArgumentException("callback cannot be null");
+		synchronized (mDynamicSensorCallbacks) {
+			if (mDynamicSensorCallbacks.containsKey(callback))
+				return; // has been already registered, ignore
+			mDynamicSensorCallbacks.put(callback, handler);
+		}
+	}
+
+	public void unregisterDynamicSensorCallback(DynamicSensorCallback callback) {
+		synchronized (mDynamicSensorCallbacks) {
+			mDynamicSensorCallbacks.remove(callback);
+		}
+	}
+
+	/* AOSP SensorManager.isDynamicSensorDiscoverySupported() */
+	public boolean isDynamicSensorDiscoverySupported() {
+		List<Sensor> sensors = getSensorList(Sensor.TYPE_DYNAMIC_SENSOR_META);
+		return sensors.size() > 0;
+	}
+
+	/* AOSP SensorManager.createDirectChannel() -> SystemSensorManager.createDirectChannelImpl(): the arguments
+	 * are checked as there; then SensorService has no sensor with direct report (no ATL sensor has the
+	 * direct channel flags), so nativeCreateDirectChannel() fails and AOSP throws UncheckedIOException */
+	private static final int MIN_DIRECT_CHANNEL_BUFFER_SIZE = 104;
+
+	public SensorDirectChannel createDirectChannel(MemoryFile mem) {
+		return createDirectChannelImpl(mem, null);
+	}
+
+	public SensorDirectChannel createDirectChannel(HardwareBuffer mem) {
+		return createDirectChannelImpl(null, mem);
+	}
+
+	private SensorDirectChannel createDirectChannelImpl(MemoryFile memoryFile, HardwareBuffer hardwareBuffer) {
+		if (memoryFile != null) {
+			try {
+				memoryFile.getFileDescriptor();
+			} catch (IOException e) {
+				throw new IllegalArgumentException("MemoryFile object is not valid");
+			}
+			if (memoryFile.length() < MIN_DIRECT_CHANNEL_BUFFER_SIZE) {
+				throw new IllegalArgumentException("Size of MemoryFile has to be greater than " + MIN_DIRECT_CHANNEL_BUFFER_SIZE);
+			}
+			throw new java.io.UncheckedIOException(new IOException("create MemoryFile direct channel failed"));
+		} else if (hardwareBuffer != null) {
+			if (hardwareBuffer.getFormat() != HardwareBuffer.BLOB) {
+				throw new IllegalArgumentException("Format of HardwareBuffer must be BLOB");
+			}
+			if (hardwareBuffer.getHeight() != 1) {
+				throw new IllegalArgumentException("Height of HardwareBuffer must be 1");
+			}
+			if (hardwareBuffer.getWidth() < MIN_DIRECT_CHANNEL_BUFFER_SIZE) {
+				throw new IllegalArgumentException("Width if HardwareBuffer must be greater than " + MIN_DIRECT_CHANNEL_BUFFER_SIZE);
+			}
+			if ((hardwareBuffer.getUsage() & HardwareBuffer.USAGE_SENSOR_DIRECT_DATA) == 0) {
+				throw new IllegalArgumentException("HardwareBuffer must set usage flag USAGE_SENSOR_DIRECT_DATA");
+			}
+			throw new java.io.UncheckedIOException(new IOException("create HardwareBuffer direct channel failed"));
+		} else {
+			throw new NullPointerException("shared memory object cannot be null");
+		}
+	}
+
+	/* AOSP SystemSensorManager.destroyDirectChannelImpl(): there is no SensorService channel to destroy */
+	void destroyDirectChannel(SensorDirectChannel channel) {
+	}
+
+	/* AOSP SystemSensorManager.configureDirectChannelImpl(); nativeConfigDirectChannel() fails (no sensor
+	 * with direct report), so the result is 0 as in AOSP when the configuration fails */
+	int configureDirectChannelImpl(SensorDirectChannel channel, Sensor sensor, int rate) {
+		if (!channel.isOpen()) {
+			throw new IllegalStateException("channel is closed");
+		}
+		if (rate < SensorDirectChannel.RATE_STOP || rate > SensorDirectChannel.RATE_VERY_FAST) {
+			throw new IllegalArgumentException("rate parameter invalid");
+		}
+		if (sensor == null && rate != SensorDirectChannel.RATE_STOP) {
+			// the stop all sensors case
+			throw new IllegalArgumentException("when sensor is null, rate can only be DIRECT_RATE_STOP");
+		}
+		return 0;
 	}
 
 	/* AOSP SensorManager.requestTriggerSensor() -> SystemSensorManager.requestTriggerSensorImpl(): only one-shot

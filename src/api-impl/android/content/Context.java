@@ -99,6 +99,8 @@ public abstract class Context {
 	public static final String VIBRATOR_MANAGER_SERVICE = "vibrator_manager";
 	public static final String WINDOW_SERVICE = "window";
 	public static final String SENSOR_SERVICE = "sensor";
+	/** @hide */
+	public static final String SENSOR_PRIVACY_SERVICE = "sensor_privacy";
 	public static final String CONNECTIVITY_SERVICE = "connectivity";
 	public static final String KEYGUARD_SERVICE = "keyguard";
 	public static final String TELEPHONY_SERVICE = "phone";
