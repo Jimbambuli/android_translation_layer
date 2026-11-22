@@ -150,7 +150,7 @@ public class SubscriptionManager {
 			if (subscriptionId != ModemManagerPhone.SUB_ID || modemSubId() != ModemManagerPhone.SUB_ID)
 				return "";
 			/* SubscriptionManagerService: TelephonyPermissions.checkReadPhoneNumber() */
-			android.telephony.TelephonyManager tm = new android.telephony.TelephonyManager();
+			android.telephony.TelephonyManager tm = android.telephony.TelephonyManager.getDefault();
 			String number = tm.getLine1Number();
 			return number != null ? number : "";
 		}

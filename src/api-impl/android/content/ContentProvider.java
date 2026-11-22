@@ -161,11 +161,6 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 
 	public abstract boolean onCreate();
 
-	/* ATL: AOSP ContentProvider.dump(), the telephony providers override it */
-	public void dump(java.io.FileDescriptor fd, java.io.PrintWriter writer, String[] args) {
-		writer.println("nothing to dump");
-	}
-
 	public Bundle call(String method, String arg, Bundle extras) {
 		return null;
 	}

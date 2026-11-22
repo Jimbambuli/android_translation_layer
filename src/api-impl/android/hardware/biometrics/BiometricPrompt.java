@@ -534,7 +534,7 @@ public class BiometricPrompt implements BiometricConstants {
 		}
 
 		void start(CancellationSignal cancel) {
-			mDialog = new android.app.AlertDialog(mContext);
+			mDialog = new android.app.AlertDialog.Builder(mContext).create(); // the constructors are protected like AOSP
 			mDialog.setTitle(mPromptInfo.useDefaultTitle
 			                     ? mContext.getString(com.android.internal.R.string.biometric_dialog_default_title)
 			                     : mPromptInfo.title);
