@@ -100,8 +100,62 @@ public final class DocumentsContract {
 		return uri != null && ContentResolver.SCHEME_CONTENT.equals(uri.getScheme());
 	}
 
-	private static boolean isDocumentsProvider(Context context, String authority) {
+	public static final String PROVIDER_INTERFACE = "android.content.action.DOCUMENTS_PROVIDER";
+
+	private static boolean isDocumentsProvider(Context context, @Nullable String authority) {
+		if (authority == null) {
+			return false;
+		}
+		final Intent intent = new Intent(PROVIDER_INTERFACE);
+		final List<ResolveInfo> infos = context.getPackageManager()
+		    .queryIntentContentProviders(intent, 0);
+		for (ResolveInfo info : infos) {
+			if (authority.equals(info.providerInfo.authority)) {
+				return true;
+			}
+		}
 		return false;
+	}
+
+	/**
+	 * Open the given image for thumbnail purposes, using any embedded EXIF
+	 * thumbnail if available, and providing orientation hints from the parent
+	 * image.
+	 *
+	 * @hide
+	 */
+	public static android.content.res.AssetFileDescriptor openImageThumbnail(java.io.File file) throws FileNotFoundException {
+		final android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
+		    file, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+		try {
+			final android.media.ExifInterface exif = new android.media.ExifInterface(file.getAbsolutePath());
+
+			final long[] thumb = exif.getThumbnailRange();
+			if (thumb != null) {
+				// If we use thumb to decode, we need to handle the rotation by ourselves.
+				Bundle extras = null;
+				switch (exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, -1)) {
+					case android.media.ExifInterface.ORIENTATION_ROTATE_90:
+						extras = new Bundle(1);
+						extras.putInt(EXTRA_ORIENTATION, 90);
+						break;
+					case android.media.ExifInterface.ORIENTATION_ROTATE_180:
+						extras = new Bundle(1);
+						extras.putInt(EXTRA_ORIENTATION, 180);
+						break;
+					case android.media.ExifInterface.ORIENTATION_ROTATE_270:
+						extras = new Bundle(1);
+						extras.putInt(EXTRA_ORIENTATION, 270);
+						break;
+				}
+
+				return new android.content.res.AssetFileDescriptor(pfd, thumb[0], thumb[1], extras);
+			}
+		} catch (java.io.IOException e) {
+		}
+
+		// Do full file decoding, we don't need to handle the orientation
+		return new android.content.res.AssetFileDescriptor(pfd, 0, android.content.res.AssetFileDescriptor.UNKNOWN_LENGTH, null);
 	}
 
 	public static boolean isDocumentUri(Context context, Uri uri) {

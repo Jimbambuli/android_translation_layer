@@ -180,10 +180,10 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeOpenURI
 /*
  * Class:     android_app_Activity
  * Method:    nativeFileChooser
- * Signature: (ILjava/lang/String;Ljava/lang/String;I)V
+ * Signature: (I[Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZI)V
  */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeFileChooser
-  (JNIEnv *, jobject, jint, jstring, jstring, jint);
+  (JNIEnv *, jobject, jint, jobjectArray, jstring, jstring, jboolean, jint);
 
 /*
  * Class:     android_app_Activity

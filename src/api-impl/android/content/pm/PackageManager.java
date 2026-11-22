@@ -3085,8 +3085,17 @@ public class PackageManager {
 	 */
 	public List<ResolveInfo> queryIntentContentProvidersAsUser(
 	    Intent intent, int flags, int userId) {
-		/* AOSP: ParceledListSlice.getList(), unparceled into an ArrayList (here no provider declares intent filters) */
-		return new ArrayList<ResolveInfo>();
+		/* AOSP: ParceledListSlice.getList(), unparceled into an ArrayList. The system's documents provider that ATL
+		 * has (DownloadProvider's, ATLRawDocumentsProvider) declares DocumentsContract.PROVIDER_INTERFACE; the intent
+		 * filters of an app's providers are not parsed here */
+		ArrayList<ResolveInfo> list = new ArrayList<ResolveInfo>();
+		if (android.provider.DocumentsContract.PROVIDER_INTERFACE.equals(intent.getAction())
+		    && (intent.getPackage() == null || "com.android.providers.downloads".equals(intent.getPackage()))) {
+			ResolveInfo ri = new ResolveInfo();
+			ri.providerInfo = android.atl.ATLRawDocumentsProvider.providerInfo();
+			list.add(ri);
+		}
+		return list;
 	}
 
 	/**

@@ -198,27 +198,18 @@ public class ContentResolver {
 		registerContentObserver(uri, notifyForDescendants, observer);
 	}
 
-	/* ATL: the content URI of a file the desktop handed to the app (dropped or pasted), which names the file by its
-	 * path like AOSP's DownloadsProvider ("raw:" document ID, DocumentsContract.buildDocumentUri()); the app reads
-	 * it through the path, which it may read already */
-	private static final String RAW_DOCUMENTS_AUTHORITY = "com.android.providers.downloads.documents";
-
+	/* ATL: the content URI of a file the desktop handed to the app (file dialog, dropped or pasted), a "raw:"
+	 * document of the documents provider ATL has like AOSP's DownloadStorageProvider (ATLRawDocumentsProvider) */
 	/** @hide */
 	public static Uri atlUriForFile(String path) {
-		return new Uri.Builder().scheme(SCHEME_CONTENT).authority(RAW_DOCUMENTS_AUTHORITY)
-		    .appendPath("document").appendPath("raw:" + path).build();
+		return android.atl.ATLRawDocumentsProvider.documentUri(new File(path));
 	}
 
-	/* the path of a file:// URI or of a URI from atlUriForFile(), else null */
+	/* the path of a file:// URI, else null */
 	private static String filePath(Uri uri) {
 		if (SCHEME_FILE.equals(uri.getScheme()))
 			return uri.getPath();
-		if (!SCHEME_CONTENT.equals(uri.getScheme()) || !RAW_DOCUMENTS_AUTHORITY.equals(uri.getAuthority()))
-			return null;
-		List<String> segments = uri.getPathSegments();
-		if (segments.size() != 2 || !"document".equals(segments.get(0)) || !segments.get(1).startsWith("raw:/"))
-			return null;
-		return segments.get(1).substring(4);
+		return null;
 	}
 
 	public ParcelFileDescriptor openFileDescriptor(Uri uri, String mode) throws FileNotFoundException {
@@ -302,25 +293,15 @@ public class ContentResolver {
 		}
 	}
 
+	/* AOSP ContentResolver: the SQL-style forms go through the Bundle form, so a provider that only knows that one
+	 * (DocumentsProvider: "Pre-Android-O query format not supported.") answers them */
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
-		if (provider != null) {
-			return provider.query(uri, projection, selection, selectionArgs, sortOrder);
-		} else if (filePath(uri) != null) {
-			if (projection == null)
-				projection = new String[] {"_display_name", "_size", "mime_type"};
-			MatrixCursor cursor = new MatrixCursor(projection);
-			Object[] row = new Object[projection.length];
-			native_query_file_info(filePath(uri), projection, row);
-			cursor.addRow(row);
-			return cursor;
-		} else {
-			return null;
-		}
+		return query(uri, projection, selection, selectionArgs, sortOrder, null);
 	}
 
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder, CancellationSignal cancellationSignal) {
-		return query(uri, projection, selection, selectionArgs, sortOrder);
+		Bundle queryArgs = createSqlQueryBundle(selection, selectionArgs, sortOrder);
+		return query(uri, projection, queryArgs, cancellationSignal);
 	}
 
 	/* AOSP ContentResolver: the SQL-style calls go through the Bundle forms, which reach the provider's
@@ -441,14 +422,9 @@ public class ContentResolver {
 
 	public String getType(Uri uri) {
 		ContentProvider provider = ContentProvider.atl_get_content_provider(uri.getAuthority());
-		String path;
 		if (provider != null)
 			return provider.getType(uri);
-		else if (SCHEME_CONTENT.equals(uri.getScheme()) && (path = filePath(uri)) != null) {
-			Object[] row = new Object[1];
-			native_query_file_info(path, new String[] {"mime_type"}, row);
-			return (String)row[0];
-		} else
+		else
 			return null;
 	}
 
