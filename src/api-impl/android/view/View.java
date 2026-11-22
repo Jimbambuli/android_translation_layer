@@ -1301,7 +1301,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_visibility)) {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+			/* the flag, not the overridable isEnabled(): AOSP's constructor calls no View method here, and a
+			 * subclass's isEnabled() would run before its fields are set (YouTube's InlineTimeBarWrapper) */
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, (mViewFlags & ENABLED_MASK) == ENABLED);
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_alpha))
 			setAlpha(a.getFloat(com.android.internal.R.styleable.View_alpha, 1f));
@@ -2205,7 +2207,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			if ((mViewFlags & ENABLED_MASK) != ENABLED) {
 				if (isFocused()) clearFocus();
 			}
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, (mViewFlags & ENABLED_MASK) == ENABLED);
 		}
 	}
 	/**
