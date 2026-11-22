@@ -30,6 +30,9 @@ import java.util.TreeSet;
  * (MJPEG and raw YUV/RGB) counts, where the HAL reads MJPEG only. Camera ids are the HAL's: the id offset 100
  * plus the camera's number (its place among the usable cameras in PipeWire's order, in place of the V4L2 node
  * number).
+ * A camera whose sizes are all larger than 1280x720 also gets its smallest size halved until it fits, streamed at
+ * that smallest size and scaled like the HAL's outputs: apps such as Open Camera drop preview sizes larger than
+ * the window (and 1280x720), and an ATL window is smaller than a phone's display.
  *
  * Inside a Flatpak the cameras come through the camera portal, which asks the user. Without the user's answer ATL
  * knows only the portal's IsCameraPresent property: then it reports one camera (id 100, with the HAL's fixed facing
@@ -66,10 +69,18 @@ public final class ExternalCameraDevice {
 		final int width;
 		final int height;
 		final List<int[]> frameRates = new ArrayList<int[]>(); /* {numerator, denominator} of frames per second */
+		final SupportedFormat source; /* the camera's size this one is scaled from, or null */
 
 		SupportedFormat(int width, int height) {
+			this(width, height, null);
+		}
+
+		SupportedFormat(int width, int height, SupportedFormat source) {
 			this.width = width;
 			this.height = height;
+			this.source = source;
+			if (source != null)
+				frameRates.addAll(source.frameRates);
 		}
 
 		float aspectRatio() {
@@ -196,8 +207,33 @@ public final class ExternalCameraDevice {
 			if (!known)
 				format.frameRates.add(new int[] {num, den});
 		}
-		List<SupportedFormat> horizontal = trimSupportedFormats(false, bySize.values());
-		List<SupportedFormat> vertical = trimSupportedFormats(true, bySize.values());
+		return addScaledFormats(chooseSupportedFormats(bySize.values()));
+	}
+
+	/* see the class comment: the smallest size halved (even sizes) until it fits into 1280x720, if none fits */
+	private static List<SupportedFormat> addScaledFormats(List<SupportedFormat> formats) {
+		if (formats.isEmpty())
+			return formats;
+		for (SupportedFormat format : formats)
+			if (format.width <= 1280 && format.height <= 720)
+				return formats;
+		SupportedFormat smallest = formats.get(0);
+		List<SupportedFormat> scaled = new ArrayList<SupportedFormat>();
+		int width = smallest.width, height = smallest.height;
+		while (width > 1280 || height > 720) {
+			width = (width / 2) & ~1;
+			height = (height / 2) & ~1;
+			if (width <= 0 || height <= 0)
+				return formats;
+			scaled.add(0, new SupportedFormat(width, height, smallest));
+		}
+		scaled.addAll(formats);
+		return scaled;
+	}
+
+	private static List<SupportedFormat> chooseSupportedFormats(Collection<SupportedFormat> sizes) {
+		List<SupportedFormat> horizontal = trimSupportedFormats(false, sizes);
+		List<SupportedFormat> vertical = trimSupportedFormats(true, sizes);
 		if (horizontal.isEmpty())
 			return vertical;
 		if (vertical.isEmpty())
@@ -535,6 +571,10 @@ public final class ExternalCameraDevice {
 		for (SupportedFormat format : mSupportedFormats) {
 			if (format.width != width || format.height != height)
 				continue;
+			if (format.source != null) { /* streamed at the camera's size, the targets are scaled */
+				width = format.source.width;
+				height = format.source.height;
+			}
 			for (int[] rate : format.frameRates) {
 				if (fps(rate) <= maxFps + 0.01 && (best == null || fps(rate) > fps(best)))
 					best = rate;
