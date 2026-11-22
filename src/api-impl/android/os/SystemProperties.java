@@ -19,6 +19,8 @@ public class SystemProperties {
 		if (SDK_INT_str == null)
 			SDK_INT_str = "" + Build.VERSION_CODES.GINGERBREAD;
 		properties.put("ro.build.version.sdk", SDK_INT_str);
+		// a release build, like a device ATL stands in for: AOSP's ro.build.version.codename is "REL"
+		properties.put("ro.build.version.codename", "REL");
 		properties.put("ro.product.brand", "google");
 		properties.put("ro.build.tags", "release-keys");
 		properties.put("ro.build.type", "user");
@@ -45,6 +47,9 @@ public class SystemProperties {
 		if (timezone != null)
 			properties.put("persist.sys.timezone", timezone);
 	}
+
+	/** Publishes a property to native code (libc_bio's __system_property_get() and android_get_device_api_level()). */
+	static native void publishToNative(String name, String value);
 
 	private static void putIfNamed(String property, String... files) {
 		for (String file : files) {
