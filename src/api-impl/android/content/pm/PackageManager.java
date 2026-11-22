@@ -3162,6 +3162,8 @@ public class PackageManager {
 				if (processName != null && (!processName.equals(p.info.processName)
 				                            || p.info.applicationInfo == null || p.info.applicationInfo.uid != uid))
 					continue;
+				if (!atlIsComponentEnabled(p.info, flags))
+					continue;
 				list.add(p.info);
 			}
 		}
@@ -4346,6 +4348,38 @@ public class PackageManager {
 
 	private static synchronized int getEnabledState(String key) {
 		return Integer.parseInt(enabledStates().getProperty(key, String.valueOf(COMPONENT_ENABLED_STATE_DEFAULT)));
+	}
+
+	/**
+	 * AOSP PackageUserStateUtils.isEnabled(state, componentInfo, flags): the state set for the package, then the one
+	 * set for the component, else the manifest (android:enabled of the application and of the component).
+	 * @hide
+	 */
+	public static boolean atlIsComponentEnabled(ComponentInfo info, int flags) {
+		if ((flags & GET_DISABLED_COMPONENTS) != 0)
+			return true;
+		switch (getEnabledState("package:" + info.packageName)) {
+			case COMPONENT_ENABLED_STATE_DISABLED:
+			case COMPONENT_ENABLED_STATE_DISABLED_USER:
+				return false;
+			case COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED:
+				if ((flags & GET_DISABLED_UNTIL_USED_COMPONENTS) == 0)
+					return false;
+				// fallthrough
+			case COMPONENT_ENABLED_STATE_DEFAULT:
+				if (info.applicationInfo != null && !info.applicationInfo.enabled)
+					return false;
+				// fallthrough
+			case COMPONENT_ENABLED_STATE_ENABLED:
+				break;
+		}
+		switch (getEnabledState(new ComponentName(info.packageName, info.name).flattenToString())) {
+			case COMPONENT_ENABLED_STATE_ENABLED:
+				return true;
+			case COMPONENT_ENABLED_STATE_DISABLED:
+				return false;
+		}
+		return info.enabled;
 	}
 
 	/**
