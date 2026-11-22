@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.util.TypedValue;
 import android.widget.DatePicker;
+import java.util.Calendar;
 import com.android.internal.R;
 
 public class DatePickerDialog extends AlertDialog implements DialogInterface.OnClickListener, DatePicker.OnDateChangedListener {
@@ -16,7 +17,7 @@ public class DatePickerDialog extends AlertDialog implements DialogInterface.OnC
 	}
 
 	public DatePickerDialog(Context context, int themeResId) {
-		this(context, themeResId, null, -1, -1, -1);
+		this(context, themeResId, null, Calendar.getInstance(), -1, -1, -1);
 	}
 
 	public DatePickerDialog(Context context, DatePickerDialog.OnDateSetListener listener, int year, int month, int dayOfMonth) {
@@ -24,14 +25,31 @@ public class DatePickerDialog extends AlertDialog implements DialogInterface.OnC
 	}
 
 	public DatePickerDialog(Context context, int themeResId, DatePickerDialog.OnDateSetListener listener, int year, int monthOfYear, int dayOfMonth) {
+		this(context, themeResId, listener, null, year, monthOfYear, dayOfMonth);
+	}
+
+	/* AOSP: the picker with OK and Cancel beside it; only OK reports the date (onClick()). ATL's DatePicker is GTK's
+	 * calendar instead of AOSP's layout date_picker_dialog */
+	private DatePickerDialog(Context context, int themeResId, DatePickerDialog.OnDateSetListener listener, Calendar calendar, int year, int monthOfYear, int dayOfMonth) {
 		super(context, resolveDialogTheme(context, themeResId));
 
-		date_set_listener = listener;
-		setTitle(R.string.date_picker_dialog_title);
-		date_picker = new DatePicker(context);
-		date_picker.setOnDateChangedListener(this);
-		date_picker.updateDate(year, monthOfYear, dayOfMonth);
+		final Context themeContext = getContext();
+		date_picker = new DatePicker(themeContext);
 		setView(date_picker);
+
+		setButton(BUTTON_POSITIVE, themeContext.getString(R.string.ok), this);
+		setButton(BUTTON_NEGATIVE, themeContext.getString(R.string.cancel), this);
+		setButtonPanelLayoutHint(LAYOUT_HINT_SIDE);
+
+		if (calendar != null) {
+			year = calendar.get(Calendar.YEAR);
+			monthOfYear = calendar.get(Calendar.MONTH);
+			dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
+		}
+
+		date_picker.init(year, monthOfYear, dayOfMonth, this);
+
+		date_set_listener = listener;
 	}
 
 	public DatePicker getDatePicker() {
@@ -62,10 +80,9 @@ public class DatePickerDialog extends AlertDialog implements DialogInterface.OnC
 		public abstract void onDateSet(DatePicker view, int year, int month, int dayOfMonth);
 	}
 
+	/* AOSP: only puts the date into the picker again (mDatePicker.init()), the listener hears of it with OK; ATL's
+	 * GTK calendar shows the date already */
 	public void onDateChanged(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
-		if (date_set_listener != null) {
-			date_set_listener.onDateSet(date_picker, year, monthOfYear, dayOfMonth);
-		}
 	}
 
 	public void setOnDateSetListener(DatePickerDialog.OnDateSetListener listener) {

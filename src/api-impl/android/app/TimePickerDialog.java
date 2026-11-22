@@ -19,12 +19,20 @@ public class TimePickerDialog extends AlertDialog implements DialogInterface.OnC
 		super(context, resolveDialogTheme(context, themeResId));
 
 		time_set_listener = listener;
-		setTitle(R.string.time_picker_dialog_title);
-		time_picker = new TimePicker(context);
-		time_picker.setHour(hourOfDay);
-		time_picker.setMinute(minute);
-		time_picker.setOnTimeChangedListener(this);
+
+		/* AOSP: the picker with OK and Cancel beside it; only OK reports the time (onClick()). ATL's TimePicker is
+		 * GTK's instead of AOSP's layout time_picker_dialog */
+		final Context themeContext = getContext();
+		time_picker = new TimePicker(themeContext);
 		setView(time_picker);
+		setButton(BUTTON_POSITIVE, themeContext.getString(R.string.ok), this);
+		setButton(BUTTON_NEGATIVE, themeContext.getString(R.string.cancel), this);
+		setButtonPanelLayoutHint(LAYOUT_HINT_SIDE);
+
+		time_picker.setIs24HourView(is24HourView);
+		time_picker.setCurrentHour(hourOfDay);
+		time_picker.setCurrentMinute(minute);
+		time_picker.setOnTimeChangedListener(this);
 	}
 
 	/* AOSP TimePickerDialog.onClick(): the positive button reports the last valid time, the negative one cancels */
@@ -47,10 +55,8 @@ public class TimePickerDialog extends AlertDialog implements DialogInterface.OnC
 		time_picker.setMinute(minuteOfHour);
 	}
 
+	/* AOSP: does nothing, the listener hears of the time with OK */
 	public void onTimeChanged(TimePicker view, int hourOfDay, int minute) {
-		if (time_set_listener != null) {
-			time_set_listener.onTimeSet(time_picker, time_picker.getHour(), time_picker.getMinute());
-		}
 	}
 
 	public static interface OnTimeSetListener {
