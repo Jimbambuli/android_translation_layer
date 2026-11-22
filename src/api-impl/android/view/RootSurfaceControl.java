@@ -69,10 +69,14 @@ final class RootSurfaceControl implements AttachedSurfaceControl {
 		mChildBoundingInsets.set(insets);
 	}
 
-	/* AOSP ViewRootImpl.getInputTransferToken(): the window's input token; a window with no input channel throws */
+	/* AOSP ViewRootImpl.getInputTransferToken(): a new InputTransferToken of the window's input token (the token of
+	 * its InputEventReceiver's channel). ATL's windows get their input from GTK; the window's input token is this
+	 * Binder, the same for the life of the window. */
+	private final android.os.Binder mInputToken = new android.os.Binder();
+
 	@Override
 	public InputTransferToken getInputTransferToken() {
-		throw new IllegalStateException("Called getInputTransferToken for Window with no input channel");
+		return new InputTransferToken(mInputToken);
 	}
 
 	/* AOSP ViewRootImpl.registerOnJankDataListener(): mSurfaceControl.addOnJankDataListener(); SurfaceFlinger has
