@@ -161,9 +161,6 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_openAssetFd(JNIEnv 
 
 JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_getAssetLength(JNIEnv *env, jobject this, jlong _asset)
 {
-	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
-	AM_SCOPEDLOCK(asset_manager)
-
 	struct Asset *asset = _PTR(_asset);
 	return Asset_getLength(asset);
 }
@@ -177,9 +174,6 @@ JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_getAssetRemainingL
 JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_readAsset(JNIEnv *env, jobject this, jlong _asset, jbyteArray b, jlong offset, jlong length)
 {
 	int ret;
-	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
-	AM_SCOPEDLOCK(asset_manager)
-
 	struct Asset *asset = _PTR(_asset);
 	jbyte *array = _GET_BYTE_ARRAY_ELEMENTS(b);
 	ret = Asset_read(asset, &array[offset], length);
@@ -192,9 +186,6 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_readAssetChar(JNIEn
 {
 	int ret;
 	uint8_t byte;
-	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
-	AM_SCOPEDLOCK(asset_manager)
-
 	struct Asset *asset = _PTR(_asset);
 	ret = Asset_read(asset, &byte, 1);
 	return (ret == 1) ? byte : -1;
@@ -202,18 +193,12 @@ JNIEXPORT jint JNICALL Java_android_content_res_AssetManager_readAssetChar(JNIEn
 
 JNIEXPORT jlong JNICALL Java_android_content_res_AssetManager_seekAsset(JNIEnv *env, jobject this, jlong _asset, jlong offset, jint whence)
 {
-	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
-	AM_SCOPEDLOCK(asset_manager)
-
 	struct Asset *asset = _PTR(_asset);
 	return Asset_seek(asset, offset, whence > 0 ? SEEK_END : (whence < 0 ? SEEK_SET : SEEK_CUR));
 }
 
 JNIEXPORT void JNICALL Java_android_content_res_AssetManager_destroyAsset(JNIEnv *env, jobject this, jlong _asset)
 {
-	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
-	AM_SCOPEDLOCK(asset_manager)
-
 	struct Asset *asset = _PTR(_asset);
 	Asset_delete(asset);
 }
@@ -227,6 +212,15 @@ JNIEXPORT void JNICALL Java_android_content_res_AssetManager_init(JNIEnv *env, j
 	};
 	AssetManager_setConfiguration(asset_manager, &config);
 	_SET_LONG_FIELD(this, "mObject", _INTPTR(asset_manager));
+}
+
+/* AOSP NativeDestroy(): deletes the AssetManager; the ApkAssets stay in load_apk_assets()' cache. The asset
+ * streams do not need it (they use only their Asset, as AOSP's nativeAsset*() functions do) */
+JNIEXPORT void JNICALL Java_android_content_res_AssetManager_destroy(JNIEnv *env, jobject this)
+{
+	struct AssetManager *asset_manager = _PTR(_GET_LONG_FIELD(this, "mObject"));
+	_SET_LONG_FIELD(this, "mObject", 0);
+	AssetManager_delete(asset_manager);
 }
 
 /* Like ResourcesManager.loadApkAssets(), reuse the ApkAssets of a path in every AssetManager: the

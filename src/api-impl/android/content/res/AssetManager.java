@@ -24,7 +24,6 @@ import android.os.Environment;
 import android.os.ParcelFileDescriptor;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.Slog;
 import android.util.TypedValue;
 import java.io.*;
 import java.net.URL;
@@ -374,10 +373,14 @@ public final class AssetManager implements AutoCloseable {
 	 * @see #list
 	 */
 	public final InputStream open(String fileName, int accessMode) throws IOException {
-		long asset = openAsset("assets/" + fileName, accessMode);
-		if (asset == 0)
-			throw new FileNotFoundException("file: " + fileName);
-		return new AssetInputStream(asset);
+		synchronized (this) {
+			long asset = openAsset("assets/" + fileName, accessMode);
+			if (asset == 0)
+				throw new FileNotFoundException("file: " + fileName);
+			AssetInputStream assetInputStream = new AssetInputStream(asset);
+			incRefsLocked(assetInputStream.hashCode()); // AOSP: AssetInputStream.close() gives the reference back
+			return assetInputStream;
+		}
 	}
 
 	public final AssetFileDescriptor openFd(String fileName) throws IOException {
@@ -447,10 +450,14 @@ public final class AssetManager implements AutoCloseable {
 	 * @param accessMode Desired access mode for retrieving the data.
 	 */
 	public final InputStream openNonAsset(int cookie, String fileName, int accessMode) throws IOException {
-		long asset = openAsset(fileName, accessMode);
-		if (asset == 0)
-			throw new FileNotFoundException("file: " + fileName);
-		return new AssetInputStream(asset);
+		synchronized (this) {
+			long asset = openAsset(fileName, accessMode);
+			if (asset == 0)
+				throw new FileNotFoundException("file: " + fileName);
+			AssetInputStream assetInputStream = new AssetInputStream(asset);
+			incRefsLocked(assetInputStream.hashCode());
+			return assetInputStream;
+		}
 	}
 
 	public final AssetFileDescriptor openNonAssetFd(String fileName)
@@ -582,7 +589,11 @@ public final class AssetManager implements AutoCloseable {
 					}
 				}
 			}
-			destroy();
+			synchronized (this) {
+				if (mObject != 0) {
+					destroy();
+				}
+			}
 		} finally {
 			super.finalize();
 		}
@@ -885,9 +896,8 @@ public final class AssetManager implements AutoCloseable {
 	}
 
 	private native final void init(int sdk_version);
-	private /*native*/ final void destroy() {
-		Slog.w(TAG, "AssetManager.destroy(): STUB");
-	}
+	/* AOSP nativeDestroy(): frees the native AssetManager and sets mObject to 0 */
+	private native final void destroy();
 
 	private final void incRefsLocked(int id) {
 		if (DEBUG_REFS) {
@@ -908,7 +918,7 @@ public final class AssetManager implements AutoCloseable {
 		mNumRefs--;
 		// System.out.println("Dec streams: mNumRefs=" + mNumRefs
 		//                    + " mReleased=" + mReleased);
-		if (mNumRefs == 0) {
+		if (mNumRefs == 0 && mObject != 0) {
 			destroy();
 		}
 	}
