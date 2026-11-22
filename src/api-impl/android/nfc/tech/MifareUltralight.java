@@ -67,14 +67,14 @@ public final class MifareUltralight extends BasicTagTechnology {
 		return getMaxTransceiveLengthInternal();
 	}
 
-	/* AOSP setTimeout(): mTag.getTagService() is null on a mock tag, NullPointerException */
+	/* AOSP setTimeout(): INfcTag.setTimeout(); NullPointerException for a mock tag (no service) */
 	public void setTimeout(int timeout) {
-		throw new NullPointerException();
+		setTimeoutInternal(TagTechnology.MIFARE_ULTRALIGHT, timeout);
 	}
 
 	/* AOSP getTimeout(): see setTimeout() */
 	public int getTimeout() {
-		throw new NullPointerException();
+		return getTimeoutInternal(TagTechnology.MIFARE_ULTRALIGHT);
 	}
 
 	private static void validatePageIndex(int pageIndex) {

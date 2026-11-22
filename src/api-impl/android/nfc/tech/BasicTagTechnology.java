@@ -2,6 +2,7 @@ package android.nfc.tech;
 
 import android.nfc.Tag;
 import java.io.IOException;
+import java.util.HashMap;
 
 /* AOSP BasicTagTechnology (modules/Nfc). Mock tags have no INfcTag service (Tag.getTagService() is null in
  * AOSP, here there is no such member); a neard tag (Tag.getNeardPath()) is served by neard, which reads the NDEF
@@ -61,6 +62,47 @@ abstract class BasicTagTechnology implements TagTechnology {
 		mTag.setTechnologyDisconnected();
 		if (mTag.getNeardPath() == null)
 			throw new NullPointerException();
+		/* INfcTag.resetTimeouts() */
+		synchronized (sTimeouts) {
+			sTimeouts.clear();
+		}
+	}
+
+	/* the controller's transceive timeouts per technology (AOSP NfcTag::resetAllTransceiveTimeouts() defaults);
+	 * neard transceives nothing, so they are only kept */
+	private static final HashMap<Integer, Integer> sTimeouts = new HashMap<>();
+
+	private static int defaultTimeout(int tech) {
+		switch (tech) {
+			case TagTechnology.NFC_F:
+				return 255;
+			case TagTechnology.NFC_A:
+			case TagTechnology.ISO_DEP:
+			case TagTechnology.MIFARE_CLASSIC:
+			case TagTechnology.MIFARE_ULTRALIGHT:
+				return 618;
+			default:
+				return 1000;
+		}
+	}
+
+	/* AOSP setTimeout() of the technologies: INfcTag.setTimeout(); the null service of a mock tag */
+	void setTimeoutInternal(int tech, int timeout) {
+		if (mTag.getNeardPath() == null)
+			throw new NullPointerException();
+		synchronized (sTimeouts) {
+			sTimeouts.put(tech, timeout);
+		}
+	}
+
+	/* AOSP getTimeout() of the technologies: INfcTag.getTimeout() */
+	int getTimeoutInternal(int tech) {
+		if (mTag.getNeardPath() == null)
+			throw new NullPointerException();
+		synchronized (sTimeouts) {
+			Integer timeout = sTimeouts.get(tech);
+			return timeout != null ? timeout : defaultTimeout(tech);
+		}
 	}
 
 	/* AOSP isConnected(): false until connect() succeeded, then whether the tag is still in range */

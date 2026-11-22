@@ -27,14 +27,14 @@ public final class IsoDep extends BasicTagTechnology {
 		}
 	}
 
-	/* AOSP setTimeout(): mTag.getTagService() is null on a mock tag, NullPointerException */
+	/* AOSP setTimeout(): INfcTag.setTimeout(); NullPointerException for a mock tag (no service) */
 	public void setTimeout(int timeout) {
-		throw new NullPointerException();
+		setTimeoutInternal(TagTechnology.ISO_DEP, timeout);
 	}
 
 	/* AOSP getTimeout(): see setTimeout() */
 	public int getTimeout() {
-		throw new NullPointerException();
+		return getTimeoutInternal(TagTechnology.ISO_DEP);
 	}
 
 	public byte[] getHistoricalBytes() {
@@ -53,8 +53,10 @@ public final class IsoDep extends BasicTagTechnology {
 		return getMaxTransceiveLengthInternal();
 	}
 
-	/* AOSP isExtendedLengthApduSupported(): null service of a mock tag, NullPointerException */
+	/* AOSP isExtendedLengthApduSupported(): null service of a mock tag, NullPointerException; neard sends no APDUs */
 	public boolean isExtendedLengthApduSupported() {
-		throw new NullPointerException();
+		if (mTag.getNeardPath() == null)
+			throw new NullPointerException();
+		return false;
 	}
 }
