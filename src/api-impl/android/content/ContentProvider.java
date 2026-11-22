@@ -3,6 +3,7 @@ package android.content;
 import android.atl.ATLLoadedApp;
 import android.atl.ATLLoadedAppManager;
 import android.atl.ATLMediaContentProvider;
+import android.atl.ATLRawDocumentsProvider;
 import android.atl.ATLProcess;
 import android.atl.ATLProvider;
 import android.atl.ATLRemoteContentProvider;
@@ -39,6 +40,7 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 	@Export
 	static void createContentProviders() {
 		atl_providers.put("media", new ATLProvider(new ATLMediaContentProvider()));
+		atl_providers.put(ATLRawDocumentsProvider.AUTHORITY, new ATLProvider(ATLRawDocumentsProvider.create(ATLLoadedApp.getPrimaryApplication().getApplication())));
 		ATLLoadedApp primary = ATLLoadedApp.getPrimaryApplication();
 		for (PackageParser.Provider provider_parsed : primary.pkg.providers) {
 			String process_name = provider_parsed.info.processName;
