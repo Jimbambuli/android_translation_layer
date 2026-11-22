@@ -177,6 +177,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/system_health.c',
                                           	'src/libandroid/thermal.c',
                                           	'src/libandroid/trace.c',
+                                          	'src/libandroid/surface_control.c',
                                           	'src/libandroid/unsupported_ndk.c',
                                           	'src/libandroid/vulkan_swapchain.c',
                                           ],
