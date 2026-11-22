@@ -76,6 +76,7 @@ import android.view.WindowManagerImpl;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.CaptioningManager;
 import android.view.autofill.AutofillManager;
+import android.view.contentcapture.ContentCaptureManager;
 import android.view.inputmethod.InputMethodManager;
 import android.view.textclassifier.TextClassificationManager;
 import android.view.textservice.TextServicesManager;
@@ -543,6 +544,14 @@ public final class SystemServiceRegistry {
             @Override
             public AutofillManager createService(ContextImpl ctx) {
                 return new AutofillManager();
+            }});
+
+        registerService(Context.CONTENT_CAPTURE_MANAGER_SERVICE, ContentCaptureManager.class,
+                new CachedServiceFetcher<ContentCaptureManager>() {
+            @Override
+            public ContentCaptureManager createService(ContextImpl ctx) {
+                // AOSP: no manager when the content capture service is absent (ATL has none)
+                return null;
             }});
 
         registerService(Context.TELEPHONY_SUBSCRIPTION_SERVICE, SubscriptionManager.class,

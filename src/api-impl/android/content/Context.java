@@ -144,6 +144,7 @@ public abstract class Context {
 	public static final String APPWIDGET_SERVICE = "appwidget";
 	public static final String SHORTCUT_SERVICE = "shortcut";
 	public static final String AUTOFILL_MANAGER_SERVICE = "autofill";
+	public static final String CONTENT_CAPTURE_MANAGER_SERVICE = "content_capture";
 	public static final String TEXT_CLASSIFICATION_SERVICE = "textclassification";
 	public static final String LOCALE_SERVICE = "locale";
 	public static final String GRAMMATICAL_INFLECTION_SERVICE = "grammatical_inflection";
