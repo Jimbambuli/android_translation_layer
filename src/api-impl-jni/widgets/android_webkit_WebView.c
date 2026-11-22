@@ -358,6 +358,7 @@ static void post_set_stage(WebKitWebView *web_view, int stage)
 static void app_load_begin(WebKitWebView *web_view)
 {
 	g_object_set_data(G_OBJECT(web_view), "atl-app-load", GINT_TO_POINTER(1));
+	g_object_set_data(G_OBJECT(web_view), "atl-data-pending", NULL);
 }
 
 static gboolean app_load_take(WebKitWebView *web_view)
@@ -367,12 +368,66 @@ static gboolean app_load_take(WebKitWebView *web_view)
 	return app_load;
 }
 
+/* The page of WebView.loadDataWithBaseURL() (not a data: base URL): Chromium's history entry has the data (a data:
+ * URL, NavigationEntry DataURLAsString), so reload() shows it again. WebKit's data load has no history entry
+ * (WebPageProxy::loadData(): SessionHistoryVisibility::Hidden, DocumentLoader::urlForHistory()) and reload()
+ * loads the base URL (FrameLoader::reload() has no substitute data). So the data of the page shown is kept with the
+ * WebKitWebView ("atl-data", from the commit of its load to the commit of the next one); "atl-data-pending" is
+ * the one of the app's load until it commits. */
+struct data_load {
+	GBytes *data;
+	char *mime_type;
+	char *base_url;
+	char *history_url; // Chromium's virtual URL: WebView.getUrl()
+	char *entry_url; // Chromium's NavigationEntry URL: WebView.getOriginalUrl()
+	char *uri; // WebKit's URI of the page once committed
+};
+
+static void data_load_free(struct data_load *load)
+{
+	g_bytes_unref(load->data);
+	g_free(load->mime_type);
+	g_free(load->base_url);
+	g_free(load->history_url);
+	g_free(load->entry_url);
+	g_free(load->uri);
+	g_free(load);
+}
+
+static struct data_load *data_load_copy(struct data_load *load)
+{
+	struct data_load *copy = g_new(struct data_load, 1);
+	*copy = (struct data_load){g_bytes_ref(load->data), g_strdup(load->mime_type), g_strdup(load->base_url), g_strdup(load->history_url), g_strdup(load->entry_url), NULL};
+	return copy;
+}
+
+// the data of the page shown, NULL if it is not one of loadDataWithBaseURL()
+static struct data_load *data_load_shown(WebKitWebView *web_view)
+{
+	return g_object_get_data(G_OBJECT(web_view), "atl-data");
+}
+
+// the app's load (app_load_begin()), and with a data load: its data until it commits
+static void data_load_start(WebKitWebView *web_view, struct data_load *load)
+{
+	g_object_set_data_full(G_OBJECT(web_view), "atl-data-pending", load, load ? (GDestroyNotify)data_load_free : NULL);
+	if (load)
+		webkit_web_view_load_bytes(web_view, load->data, load->mime_type, "utf-8", load->base_url);
+}
+
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
 {
 	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
 	// the app's load started without a policy decision (e.g. loadData*()): later navigations are the page's
 	if (load_event == WEBKIT_LOAD_STARTED)
 		app_load_take(web_view);
+	// the page committed is the data load's, or another one (see struct data_load)
+	if (load_event == WEBKIT_LOAD_COMMITTED) {
+		struct data_load *pending = g_object_steal_data(G_OBJECT(web_view), "atl-data-pending");
+		if (pending)
+			pending->uri = g_strdup(webkit_web_view_get_uri(web_view));
+		g_object_set_data_full(G_OBJECT(web_view), "atl-data", pending, pending ? (GDestroyNotify)data_load_free : NULL);
+	}
 	JNIEnv *env = get_jni_env();
 	jobject this = webview_jobject(env, wrapper);
 	if (!this)
@@ -603,6 +658,8 @@ static void park_web_view(WebKitWebView *webview, gpointer wrapper)
 	webkit_user_content_manager_remove_all_style_sheets(content_manager);
 	g_signal_handlers_disconnect_by_func(webview, web_view_load_changed, NULL);
 	app_load_take(webview);
+	g_object_set_data(G_OBJECT(webview), "atl-data-pending", NULL);
+	g_object_set_data(G_OBJECT(webview), "atl-data", NULL);
 	g_signal_handlers_disconnect_by_func(webview, web_view_uri_changed, NULL);
 	g_signal_handlers_disconnect_by_func(webview, context_menu_cb, NULL);
 	g_signal_handlers_disconnect_by_data(webview, wrapper);
@@ -899,7 +956,12 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1reload(JNIEnv *env, j
 		return;
 	WebKitWebView *webview = _PTR(widget_ptr);
 	app_load_begin(webview);
-	webkit_web_view_reload(webview);
+	// Chromium reloads the entry, for a data load its data: the same load again (see struct data_load)
+	struct data_load *load = data_load_shown(webview);
+	if (load)
+		data_load_start(webview, data_load_copy(load));
+	else
+		webkit_web_view_reload(webview);
 }
 
 /* WebView.loadUrl(String, Map): the additional headers go with the request of the page */
@@ -981,7 +1043,8 @@ JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getTitle(JNIEnv *e
 	if (title && *title)
 		return _JSTRING(title);
 	WebKitBackForwardListItem *current = webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview)));
-	const char *uri = current ? webkit_back_forward_list_item_get_uri(current) : NULL;
+	struct data_load *load = data_load_shown(WEBKIT_WEB_VIEW(webview)); // its virtual URL
+	const char *uri = load ? load->history_url : current ? webkit_back_forward_list_item_get_uri(current) : NULL;
 	return _JSTRING(uri ? uri : "");
 }
 
@@ -992,7 +1055,8 @@ JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getOriginalUrl(JNI
 	if (!WEBKIT_IS_WEB_VIEW(webview))
 		return NULL;
 	WebKitBackForwardListItem *current = webkit_back_forward_list_get_current_item(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(webview)));
-	const char *uri = current ? webkit_back_forward_list_item_get_original_uri(current) : NULL;
+	struct data_load *load = data_load_shown(WEBKIT_WEB_VIEW(webview));
+	const char *uri = load ? load->entry_url : current ? webkit_back_forward_list_item_get_original_uri(current) : NULL;
 	return uri ? _JSTRING(uri) : NULL;
 }
 
@@ -1084,18 +1148,80 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1clearCache(JNIEnv *en
 	webkit_website_data_manager_clear(manager, types, 0, NULL, NULL, NULL);
 }
 
-JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(JNIEnv *env, jobject this, jlong widget_ptr, jstring base_url, jstring data_jstr, jstring mime_type, jstring encoding)
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadDataWithBaseURL(JNIEnv *env, jobject this, jlong widget_ptr, jstring base_url, jbyteArray data, jstring mime_type, jstring history_url, jstring entry_url)
 {
 	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
 		return;
 
 	WebKitWebView *webview = _PTR(widget_ptr);
-	jsize data_len = (*env)->GetStringUTFLength(env, data_jstr);
-	jsize data_jlen = (*env)->GetStringLength(env, data_jstr);
-	char *data = malloc(data_len + 1); // + 1 for NUL
-	(*env)->GetStringUTFRegion(env, data_jstr, 0, data_jlen, data);
+	struct data_load *load = g_new(struct data_load, 1);
+	jsize length = (*env)->GetArrayLength(env, data);
+	jbyte *bytes = (*env)->GetByteArrayElements(env, data, NULL);
+	load->data = g_bytes_new(bytes, length);
+	(*env)->ReleaseByteArrayElements(env, data, bytes, JNI_ABORT);
+	jstring strings[] = {mime_type, base_url, history_url, entry_url};
+	char **copies[] = {&load->mime_type, &load->base_url, &load->history_url, &load->entry_url};
+	for (uint32_t i = 0; i < 4; i++) {
+		const char *string = (*env)->GetStringUTFChars(env, strings[i], NULL);
+		*copies[i] = g_strdup(string);
+		(*env)->ReleaseStringUTFChars(env, strings[i], string);
+	}
 	app_load_begin(webview);
-	webkit_web_view_load_bytes(webview, g_bytes_new(data, data_len), mime_type ? _CSTRING(mime_type) : "text/html", encoding ? _CSTRING(encoding) : NULL, base_url ? _CSTRING(base_url) : NULL);
+	data_load_start(webview, load);
+}
+
+/* WebView.getUrl(): the history URL while the page of a data load is shown (no other load has started), NULL
+ * otherwise */
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getDataHistoryUrl(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return NULL;
+	struct data_load *load = data_load_shown(WEBKIT_WEB_VIEW(webview));
+	if (!load || g_strcmp0(webkit_web_view_get_uri(WEBKIT_WEB_VIEW(webview)), load->uri))
+		return NULL;
+	return _JSTRING(load->history_url);
+}
+
+/* WebView.copyBackForwardList(): URL, original URL and title of each entry of this WebView's history
+ * (history_can_go(), so the list agrees with canGoBack()/canGoForward()), the index of the current one in
+ * current_index[0]; none before the first page. A page of loadDataWithBaseURL() has no entry (see struct data_load) */
+JNIEXPORT jobjectArray JNICALL Java_android_webkit_WebView_native_1getHistory(JNIEnv *env, jobject this, jlong widget_ptr, jintArray current_index)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	GPtrArray *entries = g_ptr_array_new();
+	jint index = -1;
+	if (WEBKIT_IS_WEB_VIEW(webview)) {
+		WebKitWebView *web_view = WEBKIT_WEB_VIEW(webview);
+		WebKitBackForwardList *list = webkit_web_view_get_back_forward_list(web_view);
+		WebKitBackForwardListItem *current = webkit_back_forward_list_get_current_item(list);
+		// the entry before the floor (exclusive) is not this WebView's: a parked view's about:blank
+		gboolean own = current && !(current == g_object_get_data(G_OBJECT(web_view), "atl-history-floor") && g_object_get_data(G_OBJECT(web_view), "atl-history-floor-excl"));
+		g_autoptr(GList) back_list = own ? webkit_back_forward_list_get_back_list(list) : NULL;
+		g_autoptr(GList) forward_list = own ? webkit_back_forward_list_get_forward_list(list) : NULL;
+		int32_t back = g_list_length(back_list);
+		int32_t forward = g_list_length(forward_list);
+		for (int32_t i = -back; own && i <= forward; i++) {
+			if (i != 0 && !history_can_go(web_view, i))
+				continue;
+			if (i == 0)
+				index = entries->len / 3;
+			WebKitBackForwardListItem *item = webkit_back_forward_list_get_nth_item(list, i);
+			const char *title = webkit_back_forward_list_item_get_title(item);
+			g_ptr_array_add(entries, (gpointer)webkit_back_forward_list_item_get_uri(item));
+			g_ptr_array_add(entries, (gpointer)webkit_back_forward_list_item_get_original_uri(item));
+			g_ptr_array_add(entries, (gpointer)(title ? title : ""));
+		}
+	}
+	jobjectArray array = (*env)->NewObjectArray(env, entries->len, (*env)->FindClass(env, "java/lang/String"), NULL);
+	for (uint32_t i = 0; i < entries->len; i++) {
+		jstring string = _JSTRING(g_ptr_array_index(entries, i));
+		(*env)->SetObjectArrayElement(env, array, i, string);
+		(*env)->DeleteLocalRef(env, string);
+	}
+	g_ptr_array_free(entries, TRUE);
+	(*env)->SetIntArrayRegion(env, current_index, 0, 1, &index);
+	return array;
 }
 
 struct get_cookies_data {

@@ -4,6 +4,7 @@ import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Base64;
 import android.view.MotionEvent;
@@ -248,35 +249,96 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		return null;
 	}
 
-	/* AOSP WebView.copyBackForwardList(): never null; an empty list (size 0, index -1, no items) as for a
-	 * WebView without history. The WebKit history is not read here: approximation. */
+	/* AOSP WebView.copyBackForwardList() as Chromium's WebBackForwardListChromium: never null, a copy of this
+	 * WebView's history (empty, index -1, before the first page); the items as WebHistoryItemChromium: URL and
+	 * original URL of the entry, its title, no favicon (ATL receives none, see getFavicon()) */
 	public WebBackForwardList copyBackForwardList() {
-		return new WebBackForwardList() {
-			@Override
-			public WebHistoryItem getCurrentItem() {
-				return null;
-			}
+		int[] currentIndex = {-1};
+		String[] entries = isDestroyed() ? new String[0] : native_getHistory(widget, currentIndex);
+		List<WebHistoryItem> items = new ArrayList<>();
+		for (int i = 0; i + 2 < entries.length; i += 3)
+			items.add(new HistoryItem(internalToAppUrl(entries[i]), internalToAppUrl(entries[i + 1]), entries[i + 2]));
+		return new BackForwardList(items, items.isEmpty() ? -1 : currentIndex[0]);
+	}
 
-			@Override
-			public int getCurrentIndex() {
-				return -1;
-			}
+	private static class BackForwardList extends WebBackForwardList {
+		private final List<WebHistoryItem> items;
+		private final int currentIndex;
 
-			@Override
-			public WebHistoryItem getItemAtIndex(int index) {
-				return null;
-			}
+		BackForwardList(List<WebHistoryItem> items, int currentIndex) {
+			this.items = items;
+			this.currentIndex = currentIndex;
+		}
 
-			@Override
-			public int getSize() {
-				return 0;
-			}
+		@Override
+		public synchronized WebHistoryItem getCurrentItem() {
+			return getSize() == 0 ? null : getItemAtIndex(getCurrentIndex());
+		}
 
-			@Override
-			protected WebBackForwardList clone() {
-				return this;
-			}
-		};
+		@Override
+		public synchronized int getCurrentIndex() {
+			return currentIndex;
+		}
+
+		@Override
+		public synchronized WebHistoryItem getItemAtIndex(int index) {
+			return index < 0 || index >= getSize() ? null : items.get(index);
+		}
+
+		@Override
+		public synchronized int getSize() {
+			return items.size();
+		}
+
+		@Override
+		protected synchronized WebBackForwardList clone() {
+			List<WebHistoryItem> copy = new ArrayList<>();
+			for (WebHistoryItem item : items)
+				copy.add(((HistoryItem)item).clone());
+			return new BackForwardList(copy, currentIndex);
+		}
+	}
+
+	private static class HistoryItem extends WebHistoryItem {
+		private final String url;
+		private final String originalUrl;
+		private final String title;
+
+		HistoryItem(String url, String originalUrl, String title) {
+			this.url = url;
+			this.originalUrl = originalUrl;
+			this.title = title;
+		}
+
+		@Override
+		public int getId() {
+			return -1;
+		}
+
+		@Override
+		public String getUrl() {
+			return url;
+		}
+
+		@Override
+		public String getOriginalUrl() {
+			return originalUrl;
+		}
+
+		@Override
+		public String getTitle() {
+			return title;
+		}
+
+		@Override
+		public android.graphics.Bitmap getFavicon() {
+			return null;
+		}
+
+		@Override
+		protected synchronized HistoryItem clone() {
+			return new HistoryItem(url, originalUrl, title);
+		}
 	}
 
 	/* AOSP WebView.getWebViewRenderProcess(): null when the WebView does not run its renderer in a separate
@@ -1295,21 +1357,51 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		return destroyed;
 	}
 
+	/* AOSP WebView.loadDataWithBaseURL() as Chromium's AwContents.loadDataWithBaseURL(): empty arguments become
+	 * text/html and about:blank. A data: base URL makes it loadData(). Otherwise the data is the page as a plain
+	 * string (encoding is not applied, the String is the content in UTF-8), the document has the base URL; the
+	 * entry's URL is "data:<mimeType>;charset=utf-8;base64," (getOriginalUrl()), its virtual URL historyUrl
+	 * (getUrl()). WebKit's reload of loaded data loads the base URL instead, so the native side keeps the data for
+	 * reload() (struct data_load) */
 	public void loadDataWithBaseURL(String baseUrl, String data, String mimeType, String encoding, String historyUrl) {
 		if (isDestroyed())
 			return;
-		if ("base64".equals(encoding)) {
-			data = new String(Base64.decode(data, 0));
+		data = TextUtils.isEmpty(data) ? "" : data;
+		mimeType = TextUtils.isEmpty(mimeType) ? "text/html" : mimeType;
+		baseUrl = TextUtils.isEmpty(baseUrl) ? "about:blank" : baseUrl;
+		historyUrl = TextUtils.isEmpty(historyUrl) ? "about:blank" : historyUrl;
+		if (baseUrl.startsWith("data:")) {
+			boolean isBase64 = "base64".equals(encoding);
+			loadDataUrl(buildDataUri(data, mimeType, isBase64, isBase64 ? null : encoding));
+			return;
 		}
-		if (mimeType != null && mimeType.contains(";")) {
+		String entryUrl = buildDataUri("", mimeType, true, "utf-8");
+		if (mimeType.contains(";")) {
 			mimeType = mimeType.substring(0, mimeType.indexOf(";"));
 		}
 		// webkit doesn't allow overwriting the file:// uri scheme. So we replace it with the android-asset:// scheme
 		data = data.replace("file:///android_asset/", "android-asset:///assets/");
 		// relative URLs in the document are resolved against the base URL, so it needs the same treatment
-		if (baseUrl != null)
-			baseUrl = baseUrl.replace("file:///android_asset/", "android-asset:///assets/");
-		native_loadDataWithBaseURL(widget, baseUrl, data, mimeType, encoding);
+		baseUrl = baseUrl.replace("file:///android_asset/", "android-asset:///assets/");
+		native_loadDataWithBaseURL(widget, baseUrl, data.getBytes(java.nio.charset.StandardCharsets.UTF_8), mimeType, historyUrl, entryUrl);
+	}
+
+	/* Chromium's LoadUrlParams.buildDataUri() */
+	private static String buildDataUri(String data, String mimeType, boolean isBase64Encoded, String charset) {
+		StringBuilder dataUrl = new StringBuilder("data:");
+		dataUrl.append(mimeType);
+		if (charset != null && !charset.isEmpty())
+			dataUrl.append(";charset=" + charset);
+		if (isBase64Encoded)
+			dataUrl.append(";base64");
+		dataUrl.append(",");
+		dataUrl.append(data);
+		return dataUrl.toString();
+	}
+
+	// a data: URL of loadData(): an ordinary URL load for WebKit, as for Chromium (LoadURLType.DATA)
+	private void loadDataUrl(String dataUrl) {
+		native_loadUrl(widget, dataUrl);
 	}
 
 	public void loadUrl(String url) {
@@ -1389,8 +1481,12 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		native_loadUrlWithHeaders(widget, url, headers);
 	}
 
+	/* Chromium (AwContents.getUrl()): the visible URL, for a page of loadDataWithBaseURL() its history URL */
 	public String getUrl() {
-		return url;
+		if (isDestroyed())
+			return null;
+		String historyUrl = native_getDataHistoryUrl(widget);
+		return historyUrl != null ? historyUrl : url;
 	}
 
 	/* AOSP WebView.getOriginalUrl(): the URL asked for the current page, before redirects */
@@ -1460,6 +1556,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	public void reload() {
+		if (isDestroyed())
+			return;
 		native_reload(widget);
 	}
 
@@ -1483,8 +1581,25 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 
 	public void resumeTimers() {}
 
+	/* AOSP WebView.loadData() as Chromium's AwContents.loadData(): a data: URL of the data (LoadUrlParams.
+	 * createLoadDataParams(), no charset), base64 only for encoding "base64"; for apps targeting below Q unencoded
+	 * '#' are fixed up (CompatQuirks FIXUP_OCTOTHORPES_IN_LOAD_DATA) */
 	public void loadData(String data, String mimeType, String encoding) {
-		loadDataWithBaseURL("about:blank", data, mimeType, encoding, "about:blank");
+		if (isDestroyed())
+			return;
+		boolean isBase64 = "base64".equals(encoding);
+		if (data != null && data.contains("#") && !isBase64 && getContext().getApplicationInfo().targetSdkVersion < android.os.Build.VERSION_CODES.Q)
+			data = fixupOctothorpesInLoadDataContent(data);
+		loadDataUrl(buildDataUri(TextUtils.isEmpty(data) ? "" : data, TextUtils.isEmpty(mimeType) ? "text/html" : mimeType, isBase64, null));
+	}
+
+	private static final java.util.regex.Pattern dataUrlWithSelectorPattern = java.util.regex.Pattern.compile("^[^#]*(#[A-Za-z][A-Za-z0-9\\-_:.]*)$");
+
+	// Chromium's AwContents.fixupOctothorpesInLoadDataContent()
+	private static String fixupOctothorpesInLoadDataContent(String data) {
+		java.util.regex.Matcher matcher = dataUrlWithSelectorPattern.matcher(data);
+		String suffix = matcher.matches() ? matcher.group(1) : "";
+		return data.replace("#", "%23") + suffix;
 	}
 
 	public void evaluateJavascript(String script, ValueCallback<String> resultCallback) {
@@ -1580,7 +1695,9 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 
 	@Override
 	protected native long native_constructor(Context context, AttributeSet attrs);
-	private native void native_loadDataWithBaseURL(long widget, String baseUrl, String data, String mimeType, String encoding);
+	private native void native_loadDataWithBaseURL(long widget, String baseUrl, byte[] data, String mimeType, String historyUrl, String entryUrl);
+	private native String native_getDataHistoryUrl(long widget);
+	private native String[] native_getHistory(long widget, int[] currentIndex);
 	private native void native_loadUrl(long widget, String url);
 	private native void native_postUrl(long widget, String url, byte[] form, String formId);
 	private native void native_reload(long widget);
