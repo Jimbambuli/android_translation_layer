@@ -1556,4 +1556,44 @@ public abstract class Context {
 	public abstract int getThemeResId();
 
 	public abstract ATLLoadedApp get_atl_loaded_app();
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.telephony.CarrierConfigManager} for reading carrier configuration values.
+     *
+     * @see #getSystemService(String)
+     * @see android.telephony.CarrierConfigManager
+     */
+    public static final String CARRIER_CONFIG_SERVICE = "carrier_config";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.telephony.satellite.SatelliteManager} for accessing satellite functionality.
+     *
+     * @see #getSystemService(String)
+     * @see android.telephony.satellite.SatelliteManager
+     */
+    public static final String SATELLITE_SERVICE = "satellite";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.telephony.euicc.EuiccManager} to manage the device eUICC (embedded SIM).
+     *
+     * @see #getSystemService(String)
+     * @see android.telephony.euicc.EuiccManager
+     */
+    public static final String EUICC_SERVICE = "euicc";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve an
+     * {@link android.telephony.ims.ImsManager}.
+     */
+    public static final String TELEPHONY_IMS_SERVICE = "telephony_ims";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve an
+     * {@link TelephonyRegistryManager}.
+     * @hide
+     */
+    public static final String TELEPHONY_REGISTRY_SERVICE = "telephony_registry";
 }

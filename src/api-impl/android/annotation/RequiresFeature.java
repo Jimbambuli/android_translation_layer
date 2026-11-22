@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,55 @@
  */
 package android.annotation;
 
-import static java.lang.annotation.ElementType.*;
-import static java.lang.annotation.RetentionPolicy.*;
+import static java.lang.annotation.ElementType.CONSTRUCTOR;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.SOURCE;
 
-import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
+ * Denotes that the annotated element requires one or more device features. This
+ * is used to auto-generate documentation.
+ *
  * @hide
- * Denotes that the annotated element requires the named system feature (PackageManager.FEATURE_*).
  */
 @Retention(SOURCE)
-@Target({TYPE, FIELD, METHOD, CONSTRUCTOR})
+@Target({TYPE,FIELD,METHOD,CONSTRUCTOR})
 public @interface RequiresFeature {
-	String value();
+    /**
+     * The name of the device feature that is required, if precisely one feature
+     * is required. If more than one feature is required, specify either
+     * {@link #allOf()} or {@link #anyOf()} instead.
+     * <p>
+     * If specified, {@link #anyOf()} and {@link #allOf()} must both be null.
+     */
+    String value() default "";
+
+    /**
+     * Specifies a list of feature names that are all required.
+     * <p>
+     * If specified, {@link #anyOf()} and {@link #value()} must both be null.
+     */
+    String[] allOf() default {};
+
+    /**
+     * Specifies a list of permission names where at least one is required
+     * <p>
+     * If specified, {@link #allOf()} and {@link #value()} must both be null.
+     */
+    String[] anyOf() default {};
+
+    /**
+     * Defines the name of the method that should be called to check whether the feature is
+     * available, using the same signature format as javadoc. The feature checking method can have
+     * multiple parameters, but the feature name parameter must be of type String and must also be
+     * the first String-type parameter.
+     * <p>
+     * By default, the enforcement is
+     * {@link android.content.pm.PackageManager#hasSystemFeature(String)}.
+     */
+    String enforcement() default("android.content.pm.PackageManager#hasSystemFeature");
 }

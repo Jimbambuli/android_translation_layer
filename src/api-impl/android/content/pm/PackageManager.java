@@ -17,6 +17,7 @@
 package android.content.pm;
 
 import android.annotation.NonNull;
+import android.annotation.SystemApi;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.atl.ATLLoadedApp;
@@ -4684,4 +4685,81 @@ public class PackageManager {
 	/* AOSP PackageManager.VERSION_CODE_HIGHEST, FEATURE_TELEPHONY_RADIO_ACCESS */
 	public static final int VERSION_CODE_HIGHEST = -1;
 	public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports embedded subscriptions on eUICCs.
+     *
+     * This feature should only be defined if {@link #FEATURE_TELEPHONY_SUBSCRIPTION}
+     * has been defined.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_EUICC = "android.hardware.telephony.euicc";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports attaching to IMS implementations using the ImsService API in telephony.
+     *
+     * <p>This feature should only be defined if {@link #FEATURE_TELEPHONY_DATA} has been defined.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_IMS = "android.hardware.telephony.ims";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports a single IMS registration as defined by carrier networks in the IMS service
+     * implementation using the {@link ImsService} API, {@link GbaService} API, and IRadio 1.6 HAL.
+     * <p>
+     * When set, the device must fully support the following APIs for an application to implement
+     * IMS single registration:
+     * <ul>
+     * <li> Updating RCS provisioning status using the {@link ProvisioningManager} API to supply an
+     * RCC.14 defined XML and notify IMS applications of Auto Configuration Server (ACS) or
+     * proprietary server provisioning updates.</li>
+     * <li>Opening a delegate in the device IMS service to forward SIP traffic to the carrier's
+     * network using the {@link SipDelegateManager} API</li>
+     * <li>Listening to EPS dedicated bearer establishment via the
+     * {@link ConnectivityManager#registerQosCallback}
+     * API to indicate to the application when to start/stop media traffic.</li>
+     * <li>Implementing Generic Bootstrapping Architecture (GBA) and providing the associated
+     * authentication keys to applications
+     * requesting this information via the {@link TelephonyManager#bootstrapAuthenticationRequest}
+     * API</li>
+     * <li>Implementing RCS User Capability Exchange using the {@link RcsUceAdapter} API</li>
+     * </ul>
+     * <p>
+     * This feature should only be defined if {@link #FEATURE_TELEPHONY_IMS} is also defined.
+     * @hide
+     */
+    @SystemApi
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_IMS_SINGLE_REGISTRATION =
+            "android.hardware.telephony.ims.singlereg";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:
+     * The device supports Telephony APIs for Satellite communication.
+     *
+     * <p>This feature should only be defined if {@link #FEATURE_TELEPHONY_MESSAGING}
+     * has been defined.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_SATELLITE = "android.hardware.telephony.satellite";
+
+    /**
+     * Querying flag: if set and if the platform is doing any filtering of the
+     * results, then the filtering will not happen. This is a synonym for saying
+     * that all results should be returned.
+     * <p>
+     * <em>This flag should be used with extreme care.</em>
+     */
+    public static final int MATCH_ALL = 0x00020000;
+
+    /**
+     * Querying flag: include only components from applications that are marked
+     * with {@link ApplicationInfo#FLAG_SYSTEM}.
+     */
+    public static final int MATCH_SYSTEM_ONLY = 0x00100000;
 }
