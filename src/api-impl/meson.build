@@ -2188,6 +2188,7 @@ srcs = [
 	'com/android/org/conscrypt/SSLParametersImpl.java',
 	'com/android/server/am/DumpHeapProvider.java',
 	'com/android/server/biometrics/FprintdSensor.java',
+	'com/android/server/nfc/NeardAdapter.java',
 	'com/android/systemui/monet/ColorScheme.java',
 	'com/android/systemui/monet/Shades.java',
 	'com/android/systemui/monet/contrast/Contrast.java',

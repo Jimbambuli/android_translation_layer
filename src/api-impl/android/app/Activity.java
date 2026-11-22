@@ -2290,6 +2290,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mFragments.execPendingActions();
 		onPostResume();
 		dispatchActivityPostResumed();
+		/* AOSP's NfcService polls while the screen is on; ATL's NFC adapter while the app is in front */
+		com.android.server.nfc.NeardAdapter.onActivityResumed(this);
 	}
 
 	@Export
@@ -2298,6 +2300,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mFragments.dispatchPause();
 		onPause();
 		dispatchActivityPostPaused();
+		com.android.server.nfc.NeardAdapter.onActivityPaused(this);
 	}
 
 	/* like AOSP's callActivityOnStop(): unless it is finishing, the activity saves its state when it is

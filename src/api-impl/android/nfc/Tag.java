@@ -17,9 +17,9 @@ import android.nfc.tech.TagTechnology;
 import java.io.IOException;
 import java.util.Arrays;
 
-/* AOSP Tag (modules/Nfc), reduced to the mock tag (mTagService == null, the only kind AOSP's createMockTag()
- * builds). ATL has no NFC service, NfcAdapter.getDefaultAdapter() is null, so the system never delivers a Tag;
- * apps can only build mock tags. No INfcTag: getTagService()/rediscover() are not carried. */
+/* AOSP Tag (modules/Nfc). A mock tag (createMockTag()) has no service (mTagService == null). A tag in range of
+ * neard (com.android.server.nfc.NeardAdapter) has the neard object of the tag in the place of AOSP's INfcTag
+ * binder: BasicTagTechnology asks neard through it. getTagService() is not carried. */
 public final class Tag implements Parcelable {
 	final byte[] mId;
 	final int[] mTechList;
@@ -28,8 +28,13 @@ public final class Tag implements Parcelable {
 	final int mServiceHandle;
 	final long mCookie;
 	int mConnectedTechnology;
+	final String mNeardPath;
 
 	private Tag(byte[] id, int[] techList, Bundle[] techListExtras, int serviceHandle, long cookie) {
+		this(id, techList, techListExtras, serviceHandle, cookie, null);
+	}
+
+	private Tag(byte[] id, int[] techList, Bundle[] techListExtras, int serviceHandle, long cookie, String neardPath) {
 		if (techList == null) {
 			throw new IllegalArgumentException("rawTargets cannot be null");
 		}
@@ -40,6 +45,17 @@ public final class Tag implements Parcelable {
 		mServiceHandle = serviceHandle;
 		mCookie = cookie;
 		mConnectedTechnology = -1;
+		mNeardPath = neardPath;
+	}
+
+	/** A tag of neard (object path neardPath). @hide */
+	public static Tag createNeardTag(byte[] id, int[] techList, Bundle[] techListExtras, String neardPath) {
+		return new Tag(id, techList, techListExtras, 0, 0, neardPath);
+	}
+
+	/** The neard object of the tag, null for a mock tag. @hide */
+	public String getNeardPath() {
+		return mNeardPath;
 	}
 
 	public static Tag createMockTag(byte[] id, int[] techList, Bundle[] techListExtras, long cookie) {
@@ -101,11 +117,14 @@ public final class Tag implements Parcelable {
 		return mTechList;
 	}
 
-	/* AOSP Tag.rediscover(): a mock tag has no service */
+	/* AOSP Tag.rediscover(): a mock tag has no service; neard cannot read a tag again on request
+	 * (INfcTag.rediscover() returning null) */
 	public Tag rediscover() throws IOException {
 		if (getConnectedTechnology() != -1) {
 			throw new IllegalStateException("Close connection to the technology first!");
 		}
+		if (mNeardPath != null)
+			throw new IOException("Failed to rediscover tag");
 		throw new IOException("Mock tags don't support this operation.");
 	}
 
@@ -169,7 +188,8 @@ public final class Tag implements Parcelable {
 		return 0;
 	}
 
-	/* AOSP Tag.writeToParcel() for a mock tag (isMock == 1, no binder follows) */
+	/* AOSP Tag.writeToParcel(): isMock == 1 for a mock tag; a neard tag (isMock == 0) carries its object path where
+	 * AOSP writes the INfcTag binder */
 	@Override
 	public void writeToParcel(Parcel dest, int flags) {
 		if (mId == null) {
@@ -183,11 +203,12 @@ public final class Tag implements Parcelable {
 		dest.writeTypedArray(mTechExtras, 0);
 		dest.writeInt(mServiceHandle);
 		dest.writeLong(mCookie);
-		dest.writeInt(1);
+		dest.writeInt(mNeardPath == null ? 1 : 0);
+		if (mNeardPath != null)
+			dest.writeString(mNeardPath);
 	}
 
-	/* AOSP Tag.CREATOR; a parcel from a real tag (isMock == 0) carries a binder to INfcTag, which ATL has none of,
-	 * so it is read as a mock tag as well */
+	/* AOSP Tag.CREATOR */
 	public static final Parcelable.Creator<Tag> CREATOR = new Parcelable.Creator<Tag>() {
 		@Override
 		public Tag createFromParcel(Parcel in) {
@@ -202,8 +223,8 @@ public final class Tag implements Parcelable {
 			Bundle[] techExtras = in.createTypedArray(Bundle.CREATOR);
 			int serviceHandle = in.readInt();
 			long cookie = in.readLong();
-			in.readInt();
-			return new Tag(id, techList, techExtras, serviceHandle, cookie);
+			String neardPath = in.readInt() == 0 ? in.readString() : null;
+			return new Tag(id, techList, techExtras, serviceHandle, cookie, neardPath);
 		}
 
 		@Override

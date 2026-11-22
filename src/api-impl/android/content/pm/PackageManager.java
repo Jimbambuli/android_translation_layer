@@ -2703,6 +2703,9 @@ public class PackageManager {
 			/* the activity's own window on the desktop, see Activity.enterPictureInPictureMode() */
 			case FEATURE_PICTURE_IN_PICTURE:
 				return true;
+			/* the neard NFC adapter (com.android.server.nfc.NeardAdapter) */
+			case FEATURE_NFC:
+				return com.android.server.nfc.NeardAdapter.isPresent();
 			/* the fprintd fingerprint sensor (com.android.server.biometrics.FprintdSensor) */
 			case FEATURE_FINGERPRINT:
 				return com.android.server.biometrics.FprintdSensor.isPresent();

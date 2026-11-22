@@ -245,6 +245,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/os/android_atl_GVariantIterParcel.c',
                                                                   	'src/api-impl-jni/os/android_os_Process.c',
                                                                   	'src/api-impl-jni/hardware/com_android_server_biometrics_FprintdSensor.c',
+                                                                  	'src/api-impl-jni/nfc/com_android_server_nfc_NeardAdapter.c',
                                                                   	'src/api-impl-jni/security/android_atl_crypto_NativeCrypto.c',
                                                                   	'src/api-impl-jni/security/android_security_keystore_AndroidKeyStore.c',
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',

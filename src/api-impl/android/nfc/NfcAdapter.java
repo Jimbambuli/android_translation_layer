@@ -3,21 +3,65 @@ package android.nfc;
 import android.content.Context;
 
 public class NfcAdapter {
+	/* AOSP public constants (modules/Nfc framework NfcAdapter) */
+	public static final String ACTION_NDEF_DISCOVERED = "android.nfc.action.NDEF_DISCOVERED";
+	public static final String ACTION_TECH_DISCOVERED = "android.nfc.action.TECH_DISCOVERED";
+	public static final String ACTION_TAG_DISCOVERED = "android.nfc.action.TAG_DISCOVERED";
+	public static final String ACTION_ADAPTER_STATE_CHANGED = "android.nfc.action.ADAPTER_STATE_CHANGED";
+	public static final String EXTRA_TAG = "android.nfc.extra.TAG";
+	public static final String EXTRA_NDEF_MESSAGES = "android.nfc.extra.NDEF_MESSAGES";
+	public static final String EXTRA_ID = "android.nfc.extra.ID";
+	public static final String EXTRA_ADAPTER_STATE = "android.nfc.extra.ADAPTER_STATE";
+	public static final int STATE_OFF = 1;
+	public static final int STATE_TURNING_ON = 2;
+	public static final int STATE_ON = 3;
+	public static final int STATE_TURNING_OFF = 4;
+
+	/* the adapter of the app: AOSP NfcAdapter.getNfcAdapter() keeps one per application context; ATL has one
+	 * process and one application */
+	private static NfcAdapter sAdapter;
 
 	NfcAdapter() {}
 
-	/* getDefaultAdapter() is null (device without NFC), so no instance exists; the method is here for linking. */
+	/* AOSP isEnabled() -> NfcService.getState() == STATE_ON: neard's adapter is powered */
 	public boolean isEnabled() {
-		return false;
+		return com.android.server.nfc.NeardAdapter.isEnabled();
+	}
+
+	/* AOSP getNfcAdapter(): UnsupportedOperationException without FEATURE_NFC (and the card emulation features),
+	 * which NfcManager and getDefaultAdapter() turn into null */
+	static synchronized NfcAdapter getNfcAdapter() {
+		if (!com.android.server.nfc.NeardAdapter.isPresent())
+			throw new UnsupportedOperationException();
+		if (sAdapter == null)
+			sAdapter = new NfcAdapter();
+		return sAdapter;
 	}
 
 	//@UnsupportedAppUsage
+	@Deprecated
 	public static NfcAdapter getDefaultAdapter() {
-		return null;
+		try {
+			return getNfcAdapter();
+		} catch (UnsupportedOperationException e) {
+			return null;
+		}
 	}
 
+	/* AOSP getDefaultAdapter(Context): through the NfcManager of the application context */
 	public static NfcAdapter getDefaultAdapter(Context context) {
-		return null;
+		if (context == null) {
+			throw new IllegalArgumentException("context cannot be null");
+		}
+		context = context.getApplicationContext();
+		if (context == null) {
+			throw new IllegalArgumentException("context not associated with any application (using a mock context?)");
+		}
+		NfcManager manager = (NfcManager)context.getSystemService(Context.NFC_SERVICE);
+		if (manager == null) {
+			return null;
+		}
+		return manager.getDefaultAdapter();
 	}
 
 	/* NfcAdapter.java (modules/Nfc): reader mode flags and extras */
@@ -30,16 +74,19 @@ public class NfcAdapter {
 	public static final int FLAG_READER_NO_PLATFORM_SOUNDS = 0x100;
 	public static final String EXTRA_READER_PRESENCE_CHECK_DELAY = "presence";
 
-	/* NfcAdapter.enableForegroundDispatch()/disableForegroundDispatch(): without FEATURE_NFC (sHasNfcFeature false)
-	 * both throw UnsupportedOperationException, before any argument check. No instance exists here
-	 * (getDefaultAdapter() is null); enable/disableReaderMode need android.nfc.Tag and are not implemented. */
+	/* AOSP enableForegroundDispatch()/disableForegroundDispatch(): NfcService.setForegroundDispatch(); an instance
+	 * exists only with FEATURE_NFC */
 	public void enableForegroundDispatch(android.app.Activity activity, android.app.PendingIntent intent,
 	                                     android.content.IntentFilter[] filters, String[][] techLists) {
-		throw new UnsupportedOperationException();
+		if (activity == null || intent == null) {
+			throw new NullPointerException();
+		}
+		com.android.server.nfc.NeardAdapter.setForegroundDispatch(intent, filters,
+		                                                          techLists != null && techLists.length > 0 ? techLists : null);
 	}
 
 	public void disableForegroundDispatch(android.app.Activity activity) {
-		throw new UnsupportedOperationException();
+		com.android.server.nfc.NeardAdapter.setForegroundDispatch(null, null, null);
 	}
 
 	/* NfcAdapter.callService()/callServiceReturn(): sService is null and getServiceInterface() finds no NFC service,
@@ -48,14 +95,14 @@ public class NfcAdapter {
 		return new RuntimeException(new android.os.RemoteException("NFC Service is null"));
 	}
 
-	/* NfcAdapter.enableReaderMode()/disableReaderMode(): UnsupportedOperationException without FEATURE_NFC */
+	/* AOSP enableReaderMode()/disableReaderMode(): NfcActivityManager, reader mode while the activity is resumed */
 	public void enableReaderMode(android.app.Activity activity, ReaderCallback callback, int flags,
 	                             android.os.Bundle extras) {
-		throw new UnsupportedOperationException();
+		com.android.server.nfc.NeardAdapter.setReaderMode(activity, callback, flags);
 	}
 
 	public void disableReaderMode(android.app.Activity activity) {
-		throw new UnsupportedOperationException();
+		com.android.server.nfc.NeardAdapter.setReaderMode(activity, null, 0);
 	}
 
 	public boolean disable() {
