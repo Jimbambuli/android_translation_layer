@@ -371,32 +371,31 @@ public final class BluetoothA2dp implements BluetoothProfile {
     @Override
     @RequiresPermission("android.permission.BLUETOOTH_CONNECT")
     public List<BluetoothDevice> getConnectedDevices() {
-        if (VDBG) log("getConnectedDevices()");
-        Log.w(TAG, "Proxy not attached to service");
-        log(Log.getStackTraceString(new Throwable()));
-
-        return Collections.emptyList();
+        /* ATL: the devices BlueZ has connected that have the profile's role (AdapterService.profileDevices) */
+        if (!BluetoothDevice.isBluetoothEnabled()) return Collections.emptyList();
+        return com.android.bluetooth.btservice.AdapterService.get()
+                .profileDevices(BluetoothProfile.A2DP, new int[] {STATE_CONNECTED});
     }
 
     /** {@inheritDoc} */
     @Override
     @RequiresPermission("android.permission.BLUETOOTH_CONNECT")
     public List<BluetoothDevice> getDevicesMatchingConnectionStates(int[] states) {
-        if (VDBG) log("getDevicesMatchingStates()");
-        Log.w(TAG, "Proxy not attached to service");
-        log(Log.getStackTraceString(new Throwable()));
-
-        return Collections.emptyList();
+        if (!BluetoothDevice.isBluetoothEnabled()) return Collections.emptyList();
+        return com.android.bluetooth.btservice.AdapterService.get()
+                .profileDevices(BluetoothProfile.A2DP, states);
     }
 
     /** {@inheritDoc} */
     @Override
     @RequiresPermission("android.permission.BLUETOOTH_CONNECT")
     public @BtProfileState int getConnectionState(BluetoothDevice device) {
-        Log.w(TAG, "Proxy not attached to service");
-        log(Log.getStackTraceString(new Throwable()));
-
-        return STATE_DISCONNECTED;
+        if (!BluetoothDevice.isBluetoothEnabled() || device == null
+                || !BluetoothAdapter.checkBluetoothAddress(device.getAddress())) {
+            return STATE_DISCONNECTED;
+        }
+        return com.android.bluetooth.btservice.AdapterService.get()
+                .profileConnectionState(BluetoothProfile.A2DP, device.getAddress());
     }
 
     /**

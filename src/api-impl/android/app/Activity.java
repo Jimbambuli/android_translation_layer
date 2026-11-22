@@ -632,6 +632,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			    }
 		    }))
 			return;
+		/* AOSP: Settings' RequestPermissionActivity answers ACTION_REQUEST_ENABLE/ACTION_REQUEST_DISCOVERABLE */
+		if (android.bluetooth.BluetoothAdapter.handleRequestIntent(intent, new java.util.function.IntConsumer() {
+			    @Override
+			    public void accept(int resultCode) {
+				    deliverActivityResult(requestCode, resultCode, new Intent());
+			    }
+		    }))
+			return;
 		String process;
 		if (intent.getComponent() != null && android.atl.ATLLoadedAppManager.startInstalledApp(getPackageName(), intent.getComponent().getPackageName())) {
 			return;
