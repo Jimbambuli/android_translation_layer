@@ -3286,6 +3286,11 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mFragments.getFragmentManager().dump(innerPrefix, fd, writer, args);
 	}
 
+	/** @hide AOSP Activity.attach(): the title is set without onTitleChanged(), which onPostCreate() calls */
+	public void atl_attach_title(CharSequence title) {
+		this.title = title;
+	}
+
 	@Override
 	public void atl_attach_base_context(Context baseContext) {
 		super.atl_attach_base_context(baseContext);

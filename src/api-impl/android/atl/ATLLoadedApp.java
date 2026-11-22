@@ -324,7 +324,9 @@ public final class ATLLoadedApp {
 		activity.setTheme(theme_res);
 		// ActivityThread.performLaunchActivity(): the title is r.activityInfo.loadLabel(), i.e. the activity's label,
 		// else the application's, a literal android:label (nonLocalizedLabel) as well as a string resource
-		activity.setTitle(info != null ? info.loadLabel(activity.getPackageManager()) : pkg.applicationInfo.loadLabel(activity.getPackageManager()));
+		// Activity.attach() sets it without onTitleChanged() (an activity's override may need its views, which
+		// onCreate() makes; microG's AssistantActivity does)
+		activity.atl_attach_title(info != null ? info.loadLabel(activity.getPackageManager()) : pkg.applicationInfo.loadLabel(activity.getPackageManager()));
 		return activity;
 	}
 
