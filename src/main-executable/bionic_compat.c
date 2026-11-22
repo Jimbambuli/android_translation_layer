@@ -161,3 +161,22 @@ _Thread_local uintptr_t TLS[] = {
 	 */
 #endif
 /* clang-format on */
+
+#if defined(__i386__) || defined(__x86_64__)
+/* android_get_device_api_level() (bionic's api-level.h, libc.so since Android 10) for libraries built for
+ * Android 10 or later (Google Maps' libgoogle3.so needs it), but not in libc_bio: Go's cgo runtime
+ * (runtime/cgo/gcc_android.c, inittls()) looks it up with dlsym(dlopen("libc.so")) and, when it is there,
+ * keeps g in TLS_SLOT_APP, (tp + 2), which on x86 is glibc's tcbhead_t.self (see the layout above). The
+ * program exports it (-rdynamic): relocations, which fall back to dlsym(RTLD_DEFAULT), find it here, a lookup
+ * in libc.so's own scope does not, and Go takes its pthread key path (bionic_translation libpthread.c). */
+int __system_property_get(const char *name, char *value);
+
+int android_get_device_api_level(void)
+{
+	char value[92] = { 0 }; /* PROP_VALUE_MAX */
+	if (__system_property_get("ro.build.version.sdk", value) < 1)
+		return -1;
+	int api_level = atoi(value);
+	return (api_level > 0) ? api_level : -1;
+}
+#endif
