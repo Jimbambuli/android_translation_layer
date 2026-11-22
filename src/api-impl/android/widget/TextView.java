@@ -383,6 +383,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 	/* AOSP TextView.makeNewLayout() for the text at the width (without the paddings) */
 	private Layout makeParagraphLayout(int width) {
+		/* AOSP updateTextColors() keeps the link colour in the paint; the layout takes the spans' look when built */
+		getPaint().linkColor = getLinkTextColors().getColorForState(getDrawableState(), getLinkTextColors().getDefaultColor());
 		mParagraphLayout = StaticLayout.Builder.obtain(mTransformed, 0, mTransformed.length(), getPaint(), Math.max(0, width))
 		    .setAlignment(getLayoutAlignment())
 		    .setLineSpacing(mSpacingAdd, mSpacingMult)
