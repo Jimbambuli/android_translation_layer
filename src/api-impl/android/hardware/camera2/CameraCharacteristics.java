@@ -80,13 +80,84 @@ public final class CameraCharacteristics extends CameraMetadata<CameraCharacteri
 	}
 
 	public <T> T get(Key<T> key) {
-		return (T) mProperties.get(key);
+		Object value = mProperties.get(key);
+		if (value == null)
+			value = getSynthetic(key);
+		return (T) value;
 	}
 
 	/** @hide AOSP getProtected() */
 	@Override
 	protected <T> T getProtected(Key<?> key) {
-		return (T) mProperties.get(key);
+		return (T) get(key);
+	}
+
+	/* AOSP CameraMetadataNative's display size (CameraManager.getDisplaySize(): the default display, landscape) and
+	 * camera id (setCameraId()), for the mandatory stream combinations */
+	private Size mDisplaySize = new Size(0, 0);
+	private int mCameraId = -1;
+
+	/** @hide */
+	public void setDisplaySize(Size displaySize) {
+		mDisplaySize = displaySize;
+	}
+
+	/** @hide */
+	public void setCameraId(int cameraId) {
+		mCameraId = cameraId;
+	}
+
+	/* AOSP CameraMetadataNative's GetCommands for the synthetic keys of the mandatory stream combinations:
+	 * getMandatoryStreamCombinationsHelper() with MandatoryStreamCombination.Builder; null where AOSP's is (no
+	 * concurrent streams, no ultra high resolution sensor, an empty list) */
+	private Object getSynthetic(Key<?> key) {
+		int type;
+		if (key.equals(SCALER_MANDATORY_STREAM_COMBINATIONS))
+			type = 0;
+		else if (key.equals(SCALER_MANDATORY_TEN_BIT_OUTPUT_STREAM_COMBINATIONS))
+			type = 1;
+		else if (key.equals(SCALER_MANDATORY_USE_CASE_STREAM_COMBINATIONS))
+			type = 2;
+		else if (key.equals(SCALER_MANDATORY_PREVIEW_STABILIZATION_OUTPUT_STREAM_COMBINATIONS))
+			type = 3;
+		else
+			return null; /* concurrent: the HAL has no concurrent cameras; maximum resolution: no ultra high resolution sensor */
+		int[] capabilities = (int[]) mProperties.get(REQUEST_AVAILABLE_CAPABILITIES);
+		Integer hwLevel = (Integer) mProperties.get(INFO_SUPPORTED_HARDWARE_LEVEL);
+		StreamConfigurationMap map = (StreamConfigurationMap) mProperties.get(SCALER_STREAM_CONFIGURATION_MAP);
+		if (capabilities == null || hwLevel == null || map == null)
+			return null;
+		List<Integer> caps = new ArrayList<Integer>();
+		for (int c : capabilities)
+			caps.add(c);
+		boolean previewStabilization = false;
+		int[] stabilizationModes = (int[]) mProperties.get(CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES);
+		for (int i = 0; stabilizationModes != null && i < stabilizationModes.length; i++)
+			previewStabilization |= stabilizationModes[i] == CameraMetadata.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION;
+		boolean croppedRaw = false;
+		long[] useCases = (long[]) mProperties.get(SCALER_AVAILABLE_STREAM_USE_CASES);
+		for (int i = 0; useCases != null && i < useCases.length; i++)
+			croppedRaw |= useCases[i] == CameraMetadata.SCALER_AVAILABLE_STREAM_USE_CASES_CROPPED_RAW;
+		android.hardware.camera2.params.MandatoryStreamCombination.Builder build = new android.hardware.camera2.params.MandatoryStreamCombination.Builder(
+				mCameraId, hwLevel, mDisplaySize, caps, map, (StreamConfigurationMap) mProperties.get(SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION),
+				previewStabilization, croppedRaw);
+		List<android.hardware.camera2.params.MandatoryStreamCombination> combs;
+		switch (type) {
+			case 1:
+				combs = build.getAvailableMandatory10BitStreamCombinations();
+				break;
+			case 2:
+				combs = build.getAvailableMandatoryStreamUseCaseCombinations();
+				break;
+			case 3:
+				combs = build.getAvailableMandatoryPreviewStabilizedStreamCombinations();
+				break;
+			default:
+				combs = build.getAvailableMandatoryStreamCombinations();
+		}
+		if (combs != null && !combs.isEmpty())
+			return combs.toArray(new android.hardware.camera2.params.MandatoryStreamCombination[combs.size()]);
+		return null;
 	}
 
 	/** @hide */

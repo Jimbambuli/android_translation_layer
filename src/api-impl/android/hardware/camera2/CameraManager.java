@@ -47,8 +47,29 @@ public final class CameraManager {
 		return device;
 	}
 
+	/* AOSP getCameraCharacteristics() -> prepareCameraCharacteristics(): the camera id and the display size go into
+	 * the metadata for the mandatory stream combinations */
 	public CameraCharacteristics getCameraCharacteristics(String cameraId) throws CameraAccessException {
-		return getDevice(cameraId).getCharacteristics();
+		CameraCharacteristics characteristics = getDevice(cameraId).getCharacteristics();
+		try {
+			characteristics.setCameraId(Integer.parseInt(cameraId));
+		} catch (NumberFormatException e) {
+		}
+		characteristics.setDisplaySize(getDisplaySize());
+		return characteristics;
+	}
+
+	/* AOSP getDisplaySize(): the default display's real size, landscape */
+	private static android.util.Size getDisplaySize() {
+		android.graphics.Point sz = new android.graphics.Point();
+		new android.hardware.display.DisplayManager().getDisplay(android.view.Display.DEFAULT_DISPLAY).getRealSize(sz);
+		int width = sz.x;
+		int height = sz.y;
+		if (height > width) {
+			height = width;
+			width = sz.y;
+		}
+		return new android.util.Size(width, height);
 	}
 
 	/* AOSP isCameraDeviceSetupSupported(): the external HAL has no CameraDeviceSetup (AIDL device version
