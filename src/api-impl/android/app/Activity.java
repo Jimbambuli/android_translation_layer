@@ -632,6 +632,13 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
 		Slog.i(TAG, "startActivityForResult(" + intent + ", " + requestCode + "," + options + ") called");
+		/* AOSP: ACTION_CHOOSER starts the ChooserActivity, which starts the chosen target with
+		 * FLAG_ACTIVITY_FORWARD_RESULT, so its result reaches this activity. ATL has no chooser list: the target is
+		 * the wrapped EXTRA_INTENT (EXTRA_INITIAL_INTENTS, further targets such as a camera, are not offered) */
+		if (Intent.ACTION_CHOOSER.equals(intent.getAction()) && intent.getParcelableExtra(Intent.EXTRA_INTENT) instanceof Intent) {
+			startActivityForResult((Intent)intent.getParcelableExtra(Intent.EXTRA_INTENT), requestCode, options);
+			return;
+		}
 		/* AOSP: the system's PackageInstallerActivity confirms a PackageInstaller session */
 		if (android.content.pm.PackageInstaller.handleConfirmIntent(intent))
 			return;
