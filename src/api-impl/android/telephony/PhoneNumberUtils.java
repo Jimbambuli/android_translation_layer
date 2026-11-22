@@ -2331,7 +2331,8 @@ public class PhoneNumberUtils {
             ps = NANP_IDP_STRING;
         } else {
             // in case, there is no IDD is found, we shouldn't convert it.
-            ps = android.os.SystemProperties.get("gsm.operator.idp_string", PLUS_SIGN_STRING);
+            // TelephonyProperties.operator_idp_string(), prop_name from system/libsysprop TelephonyProperties.sysprop
+            ps = android.os.SystemProperties.get("gsm.operator.idpstring", PLUS_SIGN_STRING);
         }
         return ps;
     }
