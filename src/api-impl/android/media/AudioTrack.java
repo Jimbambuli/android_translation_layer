@@ -398,6 +398,53 @@ public class AudioTrack implements AudioRouting {
 		return channelCount * bytesPerSample(encoding);
 	}
 
+	/* for native code's use: the enabled Dynamics Processing of the track's session (AudioFlinger applies a session's
+	 * effect chain to the mix of its tracks), see updateEffect() */
+	float[] effect;
+	float[] effectState = new float[2]; // the limiter's envelope per output channel
+
+	private static final java.util.UUID DYNAMICS_PROCESSING = android.media.audiofx.AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING;
+
+	/* the parameters of the enabled Dynamics Processing effect on the track's session, as its engine uses them
+	 * (EffectDynamicsProcessing.cpp): the preferred frame duration of the engine architecture, then for each output
+	 * channel the input gain (dB) and the limiter (applies: 1/0, attack ms, release ms, ratio, threshold dB, post gain
+	 * dB); null without such an effect */
+	private void updateEffect() {
+		float[] params = null;
+		for (android.media.audiofx.AudioEffect e : android.media.audiofx.AudioEffect.enabledEffects(sessionId)) {
+			if (!DYNAMICS_PROCESSING.equals(e.typeOf()))
+				continue;
+			java.nio.ByteBuffer arch = value(e, 0x30);
+			params = new float[1 + 2 * 7];
+			boolean limiterInUse = arch != null && arch.capacity() >= 36 && arch.getInt(32) != 0;
+			params[0] = arch != null && arch.capacity() >= 8 ? arch.getFloat(4) : 10.f;
+			for (int ch = 0; ch < 2; ch++) {
+				java.nio.ByteBuffer gain = value(e, 0x20, ch);
+				java.nio.ByteBuffer lim = value(e, 0x70, ch);
+				int o = 1 + ch * 7;
+				params[o] = gain != null && gain.capacity() >= 4 ? gain.getFloat(0) : 0.f;
+				if (limiterInUse && lim != null && lim.capacity() >= 32 && lim.getInt(0) != 0 && lim.getInt(4) != 0) {
+					params[o + 1] = 1.f;
+					params[o + 2] = lim.getFloat(12);
+					params[o + 3] = lim.getFloat(16);
+					params[o + 4] = lim.getFloat(20);
+					params[o + 5] = lim.getFloat(24);
+					params[o + 6] = lim.getFloat(28);
+				}
+			}
+			break;
+		}
+		effect = params;
+	}
+
+	private static java.nio.ByteBuffer value(android.media.audiofx.AudioEffect e, int... param) {
+		java.nio.ByteBuffer p = java.nio.ByteBuffer.allocate(param.length * 4).order(java.nio.ByteOrder.nativeOrder());
+		for (int v : param)
+			p.putInt(v);
+		byte[] v = e.parameter(p.array());
+		return v == null ? null : java.nio.ByteBuffer.wrap(v).order(java.nio.ByteOrder.nativeOrder());
+	}
+
 	private int writeBytes(byte[] audioData, int offsetInBytes, int sizeInBytes, int writeMode) {
 		if ((writeMode != WRITE_BLOCKING) && (writeMode != WRITE_NON_BLOCKING)) {
 			return ERROR_BAD_VALUE;
@@ -411,6 +458,7 @@ public class AudioTrack implements AudioRouting {
 		}
 
 		int framesToWrite = sizeInBytes / frameSize();
+		updateEffect();
 		int ret = native_write(audioData, offsetInBytes, framesToWrite, volume, blocking(writeMode));
 		if (ret > 0) {
 			playbackHeadPosition += ret;
@@ -466,6 +514,7 @@ public class AudioTrack implements AudioRouting {
 			return ERROR_BAD_VALUE;
 		}
 		int framesToWrite = sizeInFloats / channelCount;
+		updateEffect();
 		int ret = native_write(audioData, offsetInFloats, framesToWrite, volume, blocking(writeMode));
 		if (ret > 0) {
 			playbackHeadPosition += ret;
@@ -492,6 +541,7 @@ public class AudioTrack implements AudioRouting {
 		}
 
 		int framesToWrite = sizeInShorts * 2 / frameSize();
+		updateEffect();
 		int ret = native_write(audioData, offsetInShorts, framesToWrite, volume, blocking(writeMode));
 		if (ret > 0) {
 			playbackHeadPosition += ret;

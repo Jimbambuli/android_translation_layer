@@ -331,10 +331,70 @@ static float sample_to_float(const void *data, int encoding, int i)
 	}
 }
 
+static float db_to_linear(float db)
+{
+	return powf(10.f, db / 20.f);
+}
+
+/* AOSP libdynproc (EffectDynamicsProcessing.cpp, DPFrequency.cpp) on the output mix, with the parameters from
+ * AudioTrack.updateEffect(): the input gain of each channel, then the limiter: an envelope of the level per block
+ * (attack and release as theta = exp(-1 / (time * blocks per second))), above the threshold a gain of
+ * (1 / ratio - 1) * (envelope - threshold) dB, the smallest of the linked channels (link group 0), and the post gain.
+ * The block hop is half the power of two the preferred frame duration gives (DP_configureVariant()). The level is the
+ * RMS of the block's samples where DPFrequency takes the energy of its FFT bins; the equalizers and the multi-band
+ * compressor are not computed (their defaults, 0 dB gains and ratio 1, leave the signal as it is). */
+static void dynamics_processing(float *buf, int channels, int frames, int rate, const float *fx, float *envelope)
+{
+	int block = fx[0] * rate / 1000.f;
+	if (block < 8)
+		block = 8;
+	else if (block & (block - 1))
+		block = 1 << (32 - __builtin_clz(block));
+	int hop = block / 2;
+	float blocks_per_second = (float)rate / hop;
+	for (int c = 0; c < channels; c++) {
+		float gain = db_to_linear(fx[1 + c * 7]);
+		for (int f = 0; f < frames; f++)
+			buf[f * channels + c] *= gain;
+	}
+	for (int start = 0; start < frames; start += hop) {
+		int n = MIN(hop, frames - start);
+		float factor = 1.f;
+		gboolean limiting = FALSE;
+		for (int c = 0; c < channels; c++) {
+			const float *l = fx + 1 + c * 7;
+			if (l[1] == 0.f)
+				continue;
+			limiting = TRUE;
+			float energy = 0.f;
+			for (int f = start; f < start + n; f++)
+				energy += buf[f * channels + c] * buf[f * channels + c];
+			energy = sqrtf(energy / n);
+			float theta = expf(-1.f / ((energy > envelope[c] ? l[2] : l[3]) / 1000.f * blocks_per_second));
+			envelope[c] = (1.f - theta) * energy + theta * envelope[c];
+			float env_db = 20.f * log10f(fmaxf(envelope[c], 1e-10f));
+			float factor_db = env_db > l[5] ? (1.f / l[4] - 1.f) * (env_db - l[5]) : 0.f;
+			factor = fminf(factor, db_to_linear(factor_db));
+		}
+		if (!limiting)
+			continue;
+		for (int c = 0; c < channels; c++) {
+			const float *l = fx + 1 + c * 7;
+			if (l[1] == 0.f)
+				continue;
+			float g = factor * db_to_linear(l[6]);
+			for (int f = start; f < start + n; f++)
+				buf[f * channels + c] *= g;
+		}
+	}
+}
+
 /* AOSP AudioMixer: the track's samples in float, a multichannel track downmixed to the stereo output by the matrix of
- * ChannelMix (clamped to +3 dB like ChannelMix's clamp()), the volume applied, then PCM16 of the output (clamp16_from_float). A mono or stereo track keeps its channels (the ALSA stream has
+ * ChannelMix (clamped to +3 dB like ChannelMix's clamp()), the volume applied, the effect of the session (fx, else
+ * NULL), then PCM16 of the output (clamp16_from_float). A mono or stereo track keeps its channels (the ALSA stream has
  * as many). */
-static void mix_to_output(jshort *out, int out_channels, const void *data, int encoding, int track_channels, int mask, int frames, float volume)
+static void mix_to_output(jshort *out, int out_channels, const void *data, int encoding, int track_channels, int mask, int frames, float volume,
+                          const float *fx, float *envelope, int rate)
 {
 	float *mixed = malloc(frames * out_channels * sizeof(float));
 	if (!mixed) {
@@ -367,6 +427,8 @@ static void mix_to_output(jshort *out, int out_channels, const void *data, int e
 			mixed[f * out_channels + c] = v * volume;
 		}
 	}
+	if (fx)
+		dynamics_processing(mixed, out_channels, frames, rate, fx, envelope);
 	for (int i = 0; i < frames * out_channels; i++) {
 		float v = mixed[i];
 		out[i] = v >= 1.f ? 32767 : v <= -1.f ? -32768 : (jshort)lrintf(v * 32768.f);
@@ -400,11 +462,22 @@ static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const 
 	int encoding = _GET_INT_FIELD(this, "encoding");
 	int track_channels = _GET_INT_FIELD(this, "channelCount");
 	int out_channels = _GET_INT_FIELD(this, "channels");
-	if (volume != 1.f || encoding != 2 /* ENCODING_PCM_16BIT */ || track_channels != out_channels) {
+	jfloatArray effect = _GET_OBJ_FIELD(this, "effect", "[F");
+	if (volume != 1.f || encoding != 2 /* ENCODING_PCM_16BIT */ || track_channels != out_channels || effect) {
 		scaled = malloc(frames_to_write * out_channels * sizeof(jshort));
 		if (!scaled)
 			return 0;
-		mix_to_output(scaled, out_channels, buffer, encoding, track_channels, _GET_INT_FIELD(this, "channelMask"), frames_to_write, volume);
+		float fx[15], envelope[2] = {0.f, 0.f};
+		jfloatArray state = _GET_OBJ_FIELD(this, "effectState", "[F");
+		if (effect) {
+			(*env)->GetFloatArrayRegion(env, effect, 0, 15, fx);
+			if (state)
+				(*env)->GetFloatArrayRegion(env, state, 0, 2, envelope);
+		}
+		mix_to_output(scaled, out_channels, buffer, encoding, track_channels, _GET_INT_FIELD(this, "channelMask"), frames_to_write, volume,
+		              effect ? fx : NULL, envelope, _GET_INT_FIELD(this, "sampleRateInHz"));
+		if (effect && state)
+			(*env)->SetFloatArrayRegion(env, state, 0, 2, envelope);
 		buffer = scaled;
 	}
 	/* AOSP AudioTrack::write(): a blocking write waits for room until all is queued, but pause(), stop() or
