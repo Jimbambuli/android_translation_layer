@@ -2442,6 +2442,7 @@ srcs = [
 	'com/android/internal/util/DataClass.java',
 	'com/android/internal/util/FastXmlSerializer.java',
 	'com/android/internal/util/GrowingArrayUtils.java',
+	'com/android/internal/util/MimeIconUtils.java',
 	'com/android/internal/util/Preconditions.java',
 	'com/android/internal/util/XmlUtils.java',
 	'com/android/internal/util/CharSequences.java',
