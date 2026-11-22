@@ -64,6 +64,7 @@ media_status_t AImageReader_newWithUsage(int32_t width, int32_t height, int32_t 
 void AImageReader_delete(void *reader) {}
 media_status_t AImageReader_getWindow(void *reader, void **window) { return AMEDIA_ERROR_INVALID_PARAMETER; }
 media_status_t AImageReader_setImageListener(void *reader, void *listener) { return AMEDIA_ERROR_INVALID_PARAMETER; }
+media_status_t AImageReader_setBufferRemovedListener(void *reader, void *listener) { return AMEDIA_ERROR_INVALID_PARAMETER; }
 media_status_t AImageReader_acquireNextImageAsync(void *reader, void **image, int *acquireFenceFd) { return AMEDIA_ERROR_INVALID_PARAMETER; }
 void AImage_delete(void *image) {}
 void AImage_deleteAsync(void *image, int releaseFenceFd) {}

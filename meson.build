@@ -124,6 +124,12 @@ shared_includes_dir = include_directories('src/api-impl-jni/')
 # libandroid
 libandroid_so = shared_library('android', [
                                           	'src/libandroid/aaudio.c',
+                                          	'src/libandroid/amidi.c',
+                                          	'src/libandroid/camera_ndk.c',
+                                          	'src/libandroid/choreographer.c',
+                                          	'src/libandroid/image_decoder.c',
+                                          	'src/libandroid/native_activity.c',
+                                          	'src/libandroid/storage_manager.c',
                                           	'src/libandroid/asset_manager.c',
                                           	'src/libandroid/bitmap.c',
                                           	'src/libandroid/configuration.c',

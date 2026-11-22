@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 /*
  * Copyright (C) 2014 The Android Open Source Project
@@ -580,4 +581,78 @@ media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo *, 
 void *AMediaExtractor_new(void)
 {
 	return NULL;
+}
+
+/* NdkMediaDataSource (AOSP media/ndk/NdkMediaDataSource.cpp): a data source the app implements with callbacks.
+ * A source for a URI needs the media framework's HTTP/file data sources, which ATL does not have: newUri gives
+ * NULL as when CreateFromURI() finds nothing. */
+typedef ssize_t (*AMediaDataSourceReadAt)(void *userdata, off64_t offset, void *buffer, size_t size);
+typedef ssize_t (*AMediaDataSourceGetSize)(void *userdata);
+typedef void (*AMediaDataSourceClose)(void *userdata);
+typedef ssize_t (*AMediaDataSourceGetAvailableSize)(void *userdata, off64_t offset);
+
+typedef struct AMediaDataSource {
+	void *userdata;
+	AMediaDataSourceReadAt readAt;
+	AMediaDataSourceGetSize getSize;
+	AMediaDataSourceClose close;
+	AMediaDataSourceGetAvailableSize getAvailableSize;
+} AMediaDataSource;
+
+AMediaDataSource *AMediaDataSource_new(void)
+{
+	return calloc(1, sizeof(AMediaDataSource));
+}
+
+AMediaDataSource *AMediaDataSource_newUri(const char *uri, int numheaders, const char *const *key_values)
+{
+	return NULL;
+}
+
+void AMediaDataSource_delete(AMediaDataSource *source)
+{
+	free(source);
+}
+
+void AMediaDataSource_setUserdata(AMediaDataSource *source, void *userdata)
+{
+	source->userdata = userdata;
+}
+
+void AMediaDataSource_setReadAt(AMediaDataSource *source, AMediaDataSourceReadAt readAt)
+{
+	source->readAt = readAt;
+}
+
+void AMediaDataSource_setGetSize(AMediaDataSource *source, AMediaDataSourceGetSize getSize)
+{
+	source->getSize = getSize;
+}
+
+void AMediaDataSource_setClose(AMediaDataSource *source, AMediaDataSourceClose close)
+{
+	source->close = close;
+}
+
+void AMediaDataSource_close(AMediaDataSource *source)
+{
+	source->close(source->userdata);
+}
+
+void AMediaDataSource_setGetAvailableSize(AMediaDataSource *source, AMediaDataSourceGetAvailableSize getAvailableSize)
+{
+	source->getAvailableSize = getAvailableSize;
+}
+
+/* ATL has no codecs (AMediaCodec_create* give NULL), so there is no codec to put into asynchronous mode */
+typedef struct {
+	void *onAsyncInputAvailable;
+	void *onAsyncOutputAvailable;
+	void *onAsyncFormatChanged;
+	void *onAsyncError;
+} AMediaCodecOnAsyncNotifyCallback;
+
+media_status_t AMediaCodec_setAsyncNotifyCallback(AMediaCodec *codec, AMediaCodecOnAsyncNotifyCallback callback, void *userdata)
+{
+	return AMEDIA_ERROR_INVALID_OBJECT;
 }
