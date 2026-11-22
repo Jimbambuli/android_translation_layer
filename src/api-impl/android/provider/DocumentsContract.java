@@ -278,6 +278,13 @@ public final class DocumentsContract {
 		}
 	}
 
+	/* AOSP buildRecentDocumentsUri() */
+	public static Uri buildRecentDocumentsUri(String authority, String rootId) {
+		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT)
+		    .authority(authority).appendPath(PATH_ROOT).appendPath(rootId)
+		    .appendPath(PATH_RECENT).build();
+	}
+
 	/* AOSP buildSearchDocumentsUri() */
 	public static Uri buildSearchDocumentsUri(String authority, String rootId, String query) {
 		return new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(authority)
