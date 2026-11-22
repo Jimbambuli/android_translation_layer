@@ -33,6 +33,9 @@ public class Surface implements android.os.Parcelable {
 	 * shows it, through which that process gets the buffers drawn here (atl_connect()) */
 	public android.os.IBinder atl_endpoint;
 	private Endpoint endpoint;
+	/* the Surface of an ImageReader (AOSP: the producer side of the reader's BufferQueue): the camera queues its
+	 * images there */
+	public android.media.ImageReader atl_imageReader;
 
 	/* AOSP Surface.writeToParcel()/readFromParcel()/CREATOR: a Surface travels as the binder of its buffer queue
 	 * (IGraphicBufferProducer). Here it is the binder of an Endpoint for the widget or SurfaceTexture it draws
@@ -151,12 +154,13 @@ public class Surface implements android.os.Parcelable {
 	}
 
 	public boolean isValid() {
-		return widget != 0 || (surfaceTexture != null && !surfaceTexture.isReleased()) || (atl_endpoint != null && atl_endpoint.isBinderAlive());
+		return widget != 0 || (surfaceTexture != null && !surfaceTexture.isReleased()) || (atl_endpoint != null && atl_endpoint.isBinderAlive()) || (atl_imageReader != null && atl_imageReader.isValidReader());
 	}
 
 	public void release() {
 		surfaceTexture = null;
 		atl_endpoint = null;
+		atl_imageReader = null;
 	}
 
 	/* AOSP Surface.lockCanvas()/lockHardwareCanvas()/unlockCanvasAndPost(): the canvas draws into a snapshot, which

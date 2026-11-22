@@ -33,7 +33,8 @@ import java.util.concurrent.Executor;
  * The HAL gives one stream: its size is the nearest supported size to the largest SurfaceTexture output of the
  * session (AOSP's camera service rounds the size of a preview Surface to the nearest supported one), else the
  * largest supported preview size up to 1920x1080 (an ATL SurfaceView keeps no buffer size). Frames go to the
- * SurfaceView/SurfaceTexture targets of the request; ImageReader targets get no frames yet.
+ * SurfaceView/SurfaceTexture targets of the request; an ImageReader target gets the frame as an image of its size and
+ * format (YUV_420_888, JPEG, PRIVATE), as the external HAL scales and encodes its outputs from the frame.
  *
  * Locking: the HAL's stream thread holds the native loop's lock while it calls onFrame(), which takes
  * mInterfaceLock; so the HAL is only called outside mInterfaceLock, serialized by mHalLock. */
@@ -526,9 +527,13 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 		Size[] sizes = mCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(SurfaceTexture.class);
 		Size wanted = null;
 		for (Surface surface : mConfiguredOutputs) {
-			SurfaceTexture texture = surface.surfaceTexture;
-			if (texture != null && (wanted == null || texture.getDefaultBufferWidth() * texture.getDefaultBufferHeight() > wanted.getWidth() * wanted.getHeight()))
-				wanted = new Size(texture.getDefaultBufferWidth(), texture.getDefaultBufferHeight());
+			Size size = null;
+			if (surface.surfaceTexture != null)
+				size = new Size(surface.surfaceTexture.getDefaultBufferWidth(), surface.surfaceTexture.getDefaultBufferHeight());
+			else if (surface.atl_imageReader != null)
+				size = new Size(surface.atl_imageReader.getWidth(), surface.atl_imageReader.getHeight());
+			if (size != null && (wanted == null || size.getWidth() * size.getHeight() > wanted.getWidth() * wanted.getHeight()))
+				wanted = size;
 		}
 		Size best = null;
 		for (Size size : sizes) {
@@ -593,6 +598,12 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 			holder.lastFrameNumber = frameNumber;
 			session = mCurrentSession;
 		}
+		for (Surface target : request.getTargets()) {
+			if (target.atl_imageReader != null && !queueImage(target.atl_imageReader, request, timestampNs) && holder.callback != null) {
+				final RequestHolder h = holder;
+				h.executor.execute(() -> h.callback.onCaptureBufferLost(session, request, target, frameNumber));
+			}
+		}
 		if (holder.callback != null) {
 			TotalCaptureResult result = new TotalCaptureResult(mCameraId, mHal.fillCaptureResult(request, timestampNs), request, holder.sequenceId, frameNumber, new ArrayList<>(), session != null ? session.getSessionId() : CameraCaptureSession.SESSION_ID_NONE);
 			final RequestHolder h = holder;
@@ -611,6 +622,39 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 				targets = targetsLocked();
 			}
 			mHal.setTargets(this, targets); /* on the stream's thread, which holds the loop's lock already */
+		}
+	}
+
+	/* the frame for an ImageReader output, on the stream's thread: false if the reader takes no image now */
+	private boolean queueImage(android.media.ImageReader reader, CaptureRequest request, long timestampNs) {
+		int w = reader.getWidth(), h = reader.getHeight();
+		switch (reader.getImageFormat()) {
+			case android.graphics.ImageFormat.YUV_420_888: {
+				int ySize = w * h, cSize = (w / 2) * (h / 2);
+				byte[] i420 = new byte[ySize + 2 * cSize];
+				if (!mHal.copyFrame(i420, android.graphics.ImageFormat.YUV_420_888, w, h))
+					return false;
+				java.nio.ByteBuffer[] planes = {
+					java.nio.ByteBuffer.allocateDirect(ySize).put(i420, 0, ySize),
+					java.nio.ByteBuffer.allocateDirect(cSize).put(i420, ySize, cSize),
+					java.nio.ByteBuffer.allocateDirect(cSize).put(i420, ySize + cSize, cSize)};
+				for (java.nio.ByteBuffer plane : planes)
+					plane.rewind();
+				return reader.queueImage(timestampNs, planes, new int[] {w, w / 2, w / 2}, new int[] {1, 1, 1});
+			}
+			case android.graphics.ImageFormat.JPEG: {
+				Byte quality = request.get(CaptureRequest.JPEG_QUALITY);
+				byte[] jpeg = mHal.encodeJpeg(w, h, quality != null ? quality & 0xff : 90);
+				if (jpeg == null)
+					return false;
+				java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocateDirect(jpeg.length).put(jpeg);
+				buffer.rewind();
+				return reader.queueImage(timestampNs, new java.nio.ByteBuffer[] {buffer}, new int[] {0}, new int[] {0});
+			}
+			case android.graphics.ImageFormat.PRIVATE:
+				return reader.queueImage(timestampNs, new java.nio.ByteBuffer[0], new int[0], new int[0]);
+			default:
+				return false;
 		}
 	}
 
