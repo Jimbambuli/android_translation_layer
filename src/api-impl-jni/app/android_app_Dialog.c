@@ -168,12 +168,6 @@ JNIEXPORT void JNICALL Java_android_app_Dialog_nativeSetTitle(JNIEnv *env, jobje
 	GtkWindow *dialog = GTK_WINDOW(_PTR(ptr));
 	const char *nativeTitle = (*env)->GetStringUTFChars(env, title, NULL);
 	gtk_window_set_title(dialog, nativeTitle);
-	/* ATL's AlertDialog shows its title in its content, the dialog window has no title bar */
-	GtkWidget *title_label = g_object_get_data(G_OBJECT(dialog), "title-label");
-	if (title_label) {
-		gtk_label_set_text(GTK_LABEL(title_label), nativeTitle);
-		gtk_widget_set_visible(title_label, *nativeTitle != '\0');
-	}
 	(*env)->ReleaseStringUTFChars(env, title, nativeTitle);
 }
 
