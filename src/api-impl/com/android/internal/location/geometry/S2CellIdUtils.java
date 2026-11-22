@@ -362,7 +362,11 @@ public final class S2CellIdUtils {
         if (string.length() >= 16) {
             return string;
         }
-        return "0".repeat(16 - string.length()) + string;
+        StringBuilder sb = new StringBuilder(16);
+        for (int i = string.length(); i < 16; i++) {
+            sb.append('0');
+        }
+        return sb.append(string).toString();
     }
 
     /** Returns the leaf S2 cell ID of the specified (x, y, z) coordinate. */
