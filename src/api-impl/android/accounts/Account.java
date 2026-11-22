@@ -48,4 +48,29 @@ public class Account implements Parcelable {
 		result = 31 * result + type.hashCode();
 		return result;
 	}
+
+	private String mSafeName;
+
+	/* AOSP Account.toSafeString(): the account for logs, with letters and digits of the name replaced */
+	public String toSafeString() {
+		if (mSafeName == null) {
+			mSafeName = toSafeName(name, 'x');
+		}
+		return "Account {name=" + mSafeName + ", type=" + type + "}";
+	}
+
+	/* AOSP Account.toSafeName() */
+	public static String toSafeName(String name, char replacement) {
+		final StringBuilder builder = new StringBuilder(64);
+		final int len = name.length();
+		for (int i = 0; i < len; i++) {
+			final char c = name.charAt(i);
+			if (Character.isLetterOrDigit(c)) {
+				builder.append(replacement);
+			} else {
+				builder.append(c);
+			}
+		}
+		return builder.toString();
+	}
 }
