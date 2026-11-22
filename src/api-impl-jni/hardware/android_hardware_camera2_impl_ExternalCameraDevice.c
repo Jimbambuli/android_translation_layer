@@ -56,6 +56,25 @@ struct camera_node {
 	gboolean removed;
 };
 
+/* a scaler for one conversion, made again only when the conversion changes. sws_getCachedContext() cannot be used:
+ * the scaler stores a decoded MJPEG frame's full range format (AV_PIX_FMT_YUVJ*) as the limited range one plus
+ * the range, so the cached scaler never matched and was made anew for every frame */
+struct sws_cache {
+	struct SwsContext *ctx;
+	int src_w, src_h, src_format, dst_w, dst_h, dst_format, flags;
+};
+
+static struct SwsContext *sws_cached(struct sws_cache *c, const AVFrame *src, int dst_w, int dst_h, enum AVPixelFormat dst_format, int flags)
+{
+	if (c->ctx && c->src_w == src->width && c->src_h == src->height && c->src_format == src->format &&
+	    c->dst_w == dst_w && c->dst_h == dst_h && c->dst_format == dst_format && c->flags == flags)
+		return c->ctx;
+	sws_freeContext(c->ctx);
+	c->ctx = sws_getContext(src->width, src->height, src->format, dst_w, dst_h, dst_format, flags, NULL, NULL, NULL);
+	*c = (struct sws_cache){c->ctx, src->width, src->height, src->format, dst_w, dst_h, dst_format, flags};
+	return c->ctx;
+}
+
 struct camera_stream {
 	struct camera_node *node;
 	jobject java;  /* global ref to the ExternalCameraDevice */
@@ -68,9 +87,9 @@ struct camera_stream {
 	AVCodecContext *decoder;    /* of an MJPEG stream */
 	AVFrame *decoded;
 	AVPacket *packet;
-	struct SwsContext *sws_rgb;
-	struct SwsContext *sws_cpu;
-	struct SwsContext *sws_jpeg;
+	struct sws_cache sws_rgb;
+	struct sws_cache sws_cpu;
+	struct sws_cache sws_jpeg;
 	struct surface_target *targets;
 	int n_targets;
 	AVFrame *current; /* the frame during onFrame() */
@@ -559,10 +578,9 @@ static void on_stream_process(void *data)
 		(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
 		if (s->n_targets) {
 			int stride = frame->width * 3;
-			s->sws_rgb = sws_getCachedContext(s->sws_rgb, frame->width, frame->height, frame->format,
-			                                  frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
+			struct SwsContext *sws = sws_cached(&s->sws_rgb, frame, frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR);
 			guchar *rgb = g_malloc(frame->height * stride);
-			sws_scale(s->sws_rgb, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
+			sws_scale(sws, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
 			int width = frame->width, height = frame->height;
 			if (s->flip_h) {
 				for (int y = 0; y < height; y++) {
@@ -730,9 +748,9 @@ JNIEXPORT void JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_n
 	struct camera_stream *s = _PTR(handle);
 	Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeSetTargets(env, klass, handle, NULL);
 	Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeStop(env, klass, handle);
-	sws_freeContext(s->sws_rgb);
-	sws_freeContext(s->sws_cpu);
-	sws_freeContext(s->sws_jpeg);
+	sws_freeContext(s->sws_rgb.ctx);
+	sws_freeContext(s->sws_cpu.ctx);
+	sws_freeContext(s->sws_jpeg.ctx);
 	g_free(s->targets);
 	(*env)->DeleteGlobalRef(env, s->java);
 	g_free(s);
@@ -774,7 +792,7 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevi
 	}
 	if ((size_t)(*env)->GetArrayLength(env, dst) < size)
 		return JNI_FALSE;
-	s->sws_cpu = sws_getCachedContext(s->sws_cpu, frame->width, frame->height, frame->format, w, h, dst_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+	struct SwsContext *sws = sws_cached(&s->sws_cpu, frame, w, h, dst_fmt, SWS_BILINEAR);
 	uint8_t *out = (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
 	uint8_t *planes[3];
 	int strides[3];
@@ -794,7 +812,7 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevi
 		planes[2] = planes[1] + (size_t)uv_stride * (h / 2);
 		strides[1] = strides[2] = uv_stride;
 	}
-	sws_scale(s->sws_cpu, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, planes, strides);
+	sws_scale(sws, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, planes, strides);
 	(*env)->ReleasePrimitiveArrayCritical(env, dst, out, 0);
 	return JNI_TRUE;
 }
@@ -809,8 +827,8 @@ JNIEXPORT jbyteArray JNICALL Java_android_hardware_camera2_impl_ExternalCameraDe
 		return NULL;
 	int stride = w * 3;
 	guchar *rgb = g_malloc((size_t)h * stride);
-	s->sws_jpeg = sws_getCachedContext(s->sws_jpeg, frame->width, frame->height, frame->format, w, h, AV_PIX_FMT_RGB24, SWS_BICUBIC, NULL, NULL, NULL);
-	sws_scale(s->sws_jpeg, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
+	struct SwsContext *sws = sws_cached(&s->sws_jpeg, frame, w, h, AV_PIX_FMT_RGB24, SWS_BICUBIC);
+	sws_scale(sws, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_data(rgb, GDK_COLORSPACE_RGB, FALSE, 8, w, h, stride, NULL, NULL);
 	gchar *buffer = NULL;
 	gsize size = 0;
