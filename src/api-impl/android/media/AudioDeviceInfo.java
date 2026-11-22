@@ -69,6 +69,8 @@ public final class AudioDeviceInfo {
 	public static final int TYPE_HDMI_EARC = 29;
 	public static final int TYPE_BLE_BROADCAST = 30;
 	public static final int TYPE_DOCK_ANALOG = 31;
+	/* AOSP: @FlaggedApi(FLAG_ENABLE_MULTICHANNEL_GROUP_DEVICE) */
+	public static final int TYPE_MULTICHANNEL_GROUP = 32;
 
 	private final int mId;
 	private final int mType;

@@ -39,6 +39,9 @@ public class WifiManager {
 
 	public static final String UNKNOWN_SSID = "<unknown ssid>";
 
+	/* AOSP @hide */
+	public static final android.net.MacAddress ALL_ZEROS_MAC_ADDRESS = android.net.MacAddress.fromString("00:00:00:00:00:00");
+
 	/* constants of WifiManager in modules_Wifi/framework/api/current.txt (values as there) */
 	public static final String ACTION_PICK_WIFI_NETWORK = "android.net.wifi.PICK_WIFI_NETWORK";
 	public static final int ACTION_REMOVE_SUGGESTION_DISCONNECT = 2;
