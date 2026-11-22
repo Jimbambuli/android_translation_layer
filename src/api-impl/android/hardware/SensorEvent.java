@@ -15,6 +15,9 @@ public class SensorEvent {
 	/* AOSP SensorEvent.timestamp: nanoseconds in the SystemClock.elapsedRealtimeNanos() base */
 	public long timestamp;
 
+	/* AOSP SensorEvent.firstEventAfterDiscontinuity: set only for head tracker sensors, which ATL does not have */
+	public boolean firstEventAfterDiscontinuity;
+
 	@Export
 	public SensorEvent(float[] values, Sensor sensor) {
 		this.values = values;

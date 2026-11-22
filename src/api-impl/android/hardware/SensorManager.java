@@ -1,24 +1,198 @@
 package android.hardware;
 
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
+import android.atl.annotation.Export;
 import android.os.Handler;
+import android.os.MemoryFile;
+import android.os.Looper;
+import android.os.SystemClock;
+import android.util.SparseArray;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
 public class SensorManager {
 
-	public static float GRAVITY_EARTH = 9.81f;
+	/* AOSP SensorManager constants */
+	@Deprecated
+	public static final int SENSOR_ORIENTATION = 1 << 0;
+	@Deprecated
+	public static final int SENSOR_ACCELEROMETER = 1 << 1;
+	@Deprecated
+	public static final int SENSOR_TEMPERATURE = 1 << 2;
+	@Deprecated
+	public static final int SENSOR_MAGNETIC_FIELD = 1 << 3;
+	@Deprecated
+	public static final int SENSOR_LIGHT = 1 << 4;
+	@Deprecated
+	public static final int SENSOR_PROXIMITY = 1 << 5;
+	@Deprecated
+	public static final int SENSOR_TRICORDER = 1 << 6;
+	@Deprecated
+	public static final int SENSOR_ORIENTATION_RAW = 1 << 7;
+	@Deprecated
+	public static final int SENSOR_ALL = 0x7F;
+	@Deprecated
+	public static final int SENSOR_MIN = SENSOR_ORIENTATION;
+	@Deprecated
+	public static final int SENSOR_MAX = ((SENSOR_ALL + 1) >> 1);
+	@Deprecated
+	public static final int DATA_X = 0;
+	@Deprecated
+	public static final int DATA_Y = 1;
+	@Deprecated
+	public static final int DATA_Z = 2;
+	@Deprecated
+	public static final int RAW_DATA_INDEX = 3;
+	@Deprecated
+	public static final int RAW_DATA_X = 3;
+	@Deprecated
+	public static final int RAW_DATA_Y = 4;
+	@Deprecated
+	public static final int RAW_DATA_Z = 5;
+	public static final float STANDARD_GRAVITY = 9.80665f;
+	public static final float GRAVITY_SUN = 275.0f;
+	public static final float GRAVITY_MERCURY = 3.70f;
+	public static final float GRAVITY_VENUS = 8.87f;
+	public static final float GRAVITY_EARTH = 9.80665f;
+	public static final float GRAVITY_MOON = 1.6f;
+	public static final float GRAVITY_MARS = 3.71f;
+	public static final float GRAVITY_JUPITER = 23.12f;
+	public static final float GRAVITY_SATURN = 8.96f;
+	public static final float GRAVITY_URANUS = 8.69f;
+	public static final float GRAVITY_NEPTUNE = 11.0f;
+	public static final float GRAVITY_PLUTO = 0.6f;
+	public static final float GRAVITY_DEATH_STAR_I = 0.000000353036145f;
+	public static final float GRAVITY_THE_ISLAND = 4.815162342f;
+	public static final float MAGNETIC_FIELD_EARTH_MAX = 60.0f;
+	public static final float MAGNETIC_FIELD_EARTH_MIN = 30.0f;
+	public static final float LIGHT_SUNLIGHT_MAX = 120000.0f;
+	public static final float LIGHT_SUNLIGHT = 110000.0f;
+	public static final float LIGHT_SHADE = 20000.0f;
+	public static final float LIGHT_OVERCAST = 10000.0f;
+	public static final float LIGHT_SUNRISE = 400.0f;
+	public static final float LIGHT_CLOUDY = 100.0f;
+	public static final float LIGHT_FULLMOON = 0.25f;
+	public static final float LIGHT_NO_MOON = 0.001f;
+	public static final int SENSOR_STATUS_NO_CONTACT = -1;
+	public static final int SENSOR_STATUS_UNRELIABLE = 0;
+	public static final int SENSOR_STATUS_ACCURACY_LOW = 1;
+	public static final int SENSOR_STATUS_ACCURACY_MEDIUM = 2;
+	public static final int SENSOR_STATUS_ACCURACY_HIGH = 3;
 
+	/* AOSP SensorManager.SENSOR_DELAY_* */
+	public static final int SENSOR_DELAY_FASTEST = 0;
+	public static final int SENSOR_DELAY_GAME = 1;
+	public static final int SENSOR_DELAY_UI = 2;
+	public static final int SENSOR_DELAY_NORMAL = 3;
+
+	/* AOSP SensorManager.getDefaultSensor(int): the first sensor of the type that is a wake-up sensor for the
+	 * types that are wake-up sensors by default, a non-wake-up one for the others */
 	public Sensor getDefaultSensor(int type) {
-		return new Sensor(type);
+		List<Sensor> l = getSensorList(type);
+		boolean wakeUpSensor = false;
+		if (type == Sensor.TYPE_PROXIMITY || type == Sensor.TYPE_SIGNIFICANT_MOTION
+		    || type == Sensor.TYPE_TILT_DETECTOR || type == Sensor.TYPE_WAKE_GESTURE
+		    || type == Sensor.TYPE_GLANCE_GESTURE || type == Sensor.TYPE_PICK_UP_GESTURE
+		    || type == Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT
+		    || type == Sensor.TYPE_WRIST_TILT_GESTURE
+		    || type == Sensor.TYPE_DYNAMIC_SENSOR_META || type == Sensor.TYPE_HINGE_ANGLE) {
+			wakeUpSensor = true;
+		}
+		for (Sensor sensor : l) {
+			if (sensor.isWakeUpSensor() == wakeUpSensor)
+				return sensor;
+		}
+		return null;
 	}
 
-	/* AOSP getDefaultSensor(int, boolean): ATL's sensors are not wake-up sensors, so only wakeUp == false matches */
+	/* AOSP SensorManager.getDefaultSensor(int, boolean) */
 	public Sensor getDefaultSensor(int type, boolean wakeUp) {
-		return wakeUp ? null : getDefaultSensor(type);
+		List<Sensor> l = getSensorList(type);
+		for (Sensor sensor : l) {
+			if (sensor.isWakeUpSensor() == wakeUp)
+				return sensor;
+		}
+		return null;
+	}
+
+	/* AOSP SystemSensorManager.mFullSensorsList: what the sensors HAL of this machine has. ATL's sensors HAL
+	 * are the kernel's IIO devices (sysfs, polled like a HAL for IIO does; accelerometer, gyroscope,
+	 * magnetometer, pressure, ambient light) and iio-sensor-proxy (net.hadess.SensorProxy, which also serves
+	 * the sensors that are not IIO devices, like the hub sensors of Qualcomm phones): ambient light and
+	 * proximity come from there when it has them. SensorService's virtual sensors (SensorFusion: rotation vectors,
+	 * orientation, gravity, linear acceleration) are not there. */
+	private static List<Sensor> sFullSensorsList;
+	private static final SparseArray<Source> sHandleToSource = new SparseArray<>();
+
+	private static synchronized List<Sensor> getFullSensorList() {
+		if (sFullSensorsList != null)
+			return sFullSensorsList;
+		ArrayList<Sensor> list = new ArrayList<>();
+		int proxy = nativeProxySensors();
+		boolean proxyLight = (proxy & PROXY_LIGHT) != 0;
+		boolean accel = false, magn = false;
+		File[] devices = new File("/sys/bus/iio/devices").listFiles();
+		if (devices != null) {
+			Arrays.sort(devices);
+			for (File dev : devices) {
+				String name = readLine(new File(dev, "name"));
+				for (IioSource source : IioSource.probe(dev)) {
+					if (source.type == Sensor.TYPE_LIGHT && proxyLight)
+						continue; // iio-sensor-proxy has it (and holds the device)
+					/* one sensor per type, as the IIO HALs have it */
+					if (source.type == Sensor.TYPE_ACCELEROMETER && accel || source.type == Sensor.TYPE_MAGNETIC_FIELD && magn)
+						continue;
+					accel |= source.type == Sensor.TYPE_ACCELEROMETER;
+					magn |= source.type == Sensor.TYPE_MAGNETIC_FIELD;
+					addSensor(list, source, name != null ? name : dev.getName(), "Linux IIO");
+				}
+			}
+		}
+		if (proxyLight)
+			addSensor(list, new ProxySource(Sensor.TYPE_LIGHT, PROXY_LIGHT), "iio-sensor-proxy light", "iio-sensor-proxy");
+		if ((proxy & PROXY_PROXIMITY) != 0)
+			addSensor(list, new ProxySource(Sensor.TYPE_PROXIMITY, PROXY_PROXIMITY), "iio-sensor-proxy proximity", "iio-sensor-proxy");
+		sFullSensorsList = Collections.unmodifiableList(list);
+		return sFullSensorsList;
+	}
+
+	private static void addSensor(List<Sensor> list, Source source, String name, String vendor) {
+		int handle = list.size() + 1;
+		Sensor sensor = new Sensor(name, vendor, handle, source.type, source.maxRange, source.resolution,
+		                           source.minDelay, source.maxDelay, source.type == Sensor.TYPE_PROXIMITY);
+		source.sensor = sensor;
+		sHandleToSource.put(handle, source);
+		list.add(sensor);
+	}
+
+	/* AOSP SensorManager.getSensorList() */
+	private final SparseArray<List<Sensor>> mSensorListByType = new SparseArray<>();
+
+	public List<Sensor> getSensorList(int type) {
+		List<Sensor> list;
+		final List<Sensor> fullList = getFullSensorList();
+		synchronized (mSensorListByType) {
+			list = mSensorListByType.get(type);
+			if (list == null) {
+				if (type == Sensor.TYPE_ALL) {
+					list = fullList;
+				} else {
+					list = new ArrayList<Sensor>();
+					for (Sensor i : fullList) {
+						if (i.getType() == type)
+							list.add(i);
+					}
+				}
+				list = Collections.unmodifiableList(list);
+				mSensorListByType.append(type, list);
+			}
+		}
+		return list;
 	}
 
 	/* AOSP legacy registerListener(SensorListener, int[, int]) (LegacySensorManager): the legacy
@@ -42,62 +216,95 @@ public class SensorManager {
 	public void unregisterListener(SensorListener listener, int sensors) {
 	}
 
-	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, Handler handler) {
-		return true; // we could try saying that the sensor doesn't exist and hope the app just doesn't use it then, but as long as we never call the handler the app should leave this alone
+	/* AOSP SensorManager.getSensors() -> LegacySensorManager.getSensors(): the legacy sensors of the full list */
+	@Deprecated
+	public int getSensors() {
+		int result = 0;
+		for (Sensor i : getFullSensorList()) {
+			switch (i.getType()) {
+				case Sensor.TYPE_ACCELEROMETER:
+					result |= SENSOR_ACCELEROMETER;
+					break;
+				case Sensor.TYPE_MAGNETIC_FIELD:
+					result |= SENSOR_MAGNETIC_FIELD;
+					break;
+				case Sensor.TYPE_ORIENTATION:
+					result |= SENSOR_ORIENTATION | SENSOR_ORIENTATION_RAW;
+					break;
+			}
+		}
+		return result;
 	}
 
-	/* the sensor events are not batched, maxReportLatencyUs is only a hint (as in AOSP for a
-	 * sensor without a FIFO) */
-	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, int maxReportLatencyUs, Handler handler) {
-		return registerListener(listener, sensor, samplingPeriodUs, handler);
+	/* AOSP SensorManager.registerListener() variants: the rate goes through getDelay(); the events are not
+	 * batched (no sensor has a FIFO), so maxReportLatencyUs only has to be valid */
+	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs) {
+		return registerListener(listener, sensor, samplingPeriodUs, null);
+	}
+
+	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, Handler handler) {
+		return registerListenerImpl(listener, sensor, getDelay(samplingPeriodUs), handler, 0);
 	}
 
 	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, int maxReportLatencyUs) {
-		return registerListener(listener, sensor, samplingPeriodUs);
+		return registerListenerImpl(listener, sensor, getDelay(samplingPeriodUs), null, maxReportLatencyUs);
 	}
 
-	/* AOSP SystemSensorManager.mSensorListeners: the sensors each listener is registered for (its
-	 * SensorEventQueue). ATL has one sensor per type; per type the source of the events: the
-	 * LocationListener (TYPE_ORIENTATION) or the handle of the native accelerometer timer (0: none found) */
-	private final HashMap<SensorEventListener, HashMap<Integer, Object>> mSensorListeners = new HashMap<>();
+	public boolean registerListener(SensorEventListener listener, Sensor sensor, int samplingPeriodUs, int maxReportLatencyUs, Handler handler) {
+		return registerListenerImpl(listener, sensor, getDelay(samplingPeriodUs), handler, maxReportLatencyUs);
+	}
 
-	public boolean registerListener(final SensorEventListener listener, final Sensor sensor, int samplingPeriodUs) {
-		/* AOSP SystemSensorManager.registerListenerImpl(): null arguments and trigger sensors fail */
-		if (listener == null || sensor == null || sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT)
+	/* AOSP SensorManager.getDelay() */
+	private static int getDelay(int rate) {
+		int delay = -1;
+		switch (rate) {
+			case SENSOR_DELAY_FASTEST:
+				delay = 0;
+				break;
+			case SENSOR_DELAY_GAME:
+				delay = 20000;
+				break;
+			case SENSOR_DELAY_UI:
+				delay = 66667;
+				break;
+			case SENSOR_DELAY_NORMAL:
+				delay = 200000;
+				break;
+			default:
+				delay = rate;
+				break;
+		}
+		return delay;
+	}
+
+	/* AOSP SystemSensorManager.mSensorListeners: the SensorEventQueue of each listener, with the looper of the
+	 * first registration (one looper per listener) */
+	private final HashMap<SensorEventListener, Queue> mSensorListeners = new HashMap<>();
+	private final Looper mMainLooper = Looper.getMainLooper();
+
+	/* AOSP SystemSensorManager.registerListenerImpl() and SensorEventQueue.addSensor() */
+	private boolean registerListenerImpl(SensorEventListener listener, Sensor sensor, int delayUs, Handler handler, int maxBatchReportLatencyUs) {
+		if (listener == null || sensor == null)
+			return false;
+		if (sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT)
+			return false; // trigger sensors use requestTriggerSensor()
+		if (maxBatchReportLatencyUs < 0 || delayUs < 0)
+			return false;
+		Source source = sHandleToSource.get(sensor.getHandle());
+		if (source == null || source.sensor != sensor)
 			return false;
 		synchronized (mSensorListeners) {
-			HashMap<Integer, Object> sensors = mSensorListeners.get(listener);
-			if (sensors != null && sensors.containsKey(sensor.getType()))
-				return false; // AOSP SensorEventQueue.addSensor(): already registered
-			Object source;
-			switch (sensor.getType()) {
-				case Sensor.TYPE_ORIENTATION:
-					LocationListener locationListener = new LocationListener() {
-						@Override
-						public void onLocationChanged(Location location) {
-							listener.onSensorChanged(new SensorEvent(new float[] {location.getBearing()}, sensor));
-						}
-					};
-					try { // the bearing of the fused position; without a location permission no events
-						new LocationManager(android.atl.ATLLoadedApp.getPrimaryApplication().getApplication())
-						    .requestLocationUpdates(LocationManager.FUSED_PROVIDER, 0, 0, locationListener);
-					} catch (SecurityException e) {
-					}
-					source = locationListener;
-					break;
-				case Sensor.TYPE_ACCELEROMETER:
-					source = register_accelerometer_listener_native(listener, sensor, samplingPeriodUs);
-					break;
-				default:
+			Queue queue = mSensorListeners.get(listener);
+			if (queue == null) {
+				queue = new Queue(listener, new Handler(handler != null ? handler.getLooper() : mMainLooper));
+				if (!queue.addSensor(source, delayUs))
 					return false;
+				mSensorListeners.put(listener, queue);
+			} else if (!queue.addSensor(source, delayUs)) {
+				return false;
 			}
-			if (sensors == null) {
-				sensors = new HashMap<>();
-				mSensorListeners.put(listener, sensors);
-			}
-			sensors.put(sensor.getType(), source);
-			return true;
 		}
+		return true;
 	}
 
 	/* AOSP SensorManager.unregisterListener(SensorEventListener): from all sensors */
@@ -120,30 +327,432 @@ public class SensorManager {
 		if (sensor != null && sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT)
 			return;
 		synchronized (mSensorListeners) {
-			HashMap<Integer, Object> sensors = mSensorListeners.get(listener);
-			if (sensors == null)
+			Queue queue = mSensorListeners.get(listener);
+			if (queue == null)
 				return;
-			for (Object source : sensor == null ? sensors.values() : Arrays.asList(sensors.get(sensor.getType()))) {
-				if (source instanceof LocationListener)
-					new LocationManager(android.atl.ATLLoadedApp.getPrimaryApplication().getApplication()).removeUpdates((LocationListener)source);
-				else if (source instanceof Long)
-					unregister_accelerometer_listener_native((Long)source);
-			}
-			if (sensor == null)
-				sensors.clear();
-			else
-				sensors.remove(sensor.getType());
-			if (sensors.isEmpty())
+			boolean empty = sensor == null ? queue.removeAllSensors() : queue.removeSensor(sensor);
+			if (empty)
 				mSensorListeners.remove(listener);
 		}
 	}
 
-	native long register_accelerometer_listener_native(SensorEventListener listener, Sensor sensor, int sampling_period);
-	native void unregister_accelerometer_listener_native(long handle);
-
-	public List<Sensor> getSensorList(int type) {
-		return Arrays.asList(getDefaultSensor(type));
+	/* AOSP SensorManager.flush() -> SystemSensorManager.flushImpl() */
+	public boolean flush(SensorEventListener listener) {
+		if (listener == null)
+			throw new IllegalArgumentException("listener cannot be null");
+		synchronized (mSensorListeners) {
+			Queue queue = mSensorListeners.get(listener);
+			if (queue == null)
+				return false;
+			queue.flush();
+			return true;
+		}
 	}
+
+	/* AOSP SystemSensorManager.SensorEventQueue: the sensors of one listener; the events are dispatched on its
+	 * looper (dispatchSensorEvent(), onAccuracyChanged() when the accuracy changes) */
+	private static final class Queue {
+		final SensorEventListener mListener;
+		final Handler mHandler;
+		final SparseArray<Registration> mActiveSensors = new SparseArray<>();
+		final SparseArray<Integer> mSensorAccuracies = new SparseArray<>();
+
+		Queue(SensorEventListener listener, Handler handler) {
+			mListener = listener;
+			mHandler = handler;
+		}
+
+		boolean addSensor(Source source, int delayUs) {
+			int handle = source.sensor.getHandle();
+			if (mActiveSensors.get(handle) != null)
+				return false;
+			/* SensorService: the rate is limited to what the sensor can do */
+			int period = source.minDelay > 0 ? Math.max(delayUs, source.minDelay) : delayUs;
+			if (source.maxDelay > 0)
+				period = Math.min(period, source.maxDelay);
+			Registration registration = new Registration(this, source, period);
+			if (!source.enable(registration))
+				return false;
+			mActiveSensors.put(handle, registration);
+			return true;
+		}
+
+		boolean removeSensor(Sensor sensor) {
+			Registration registration = mActiveSensors.get(sensor.getHandle());
+			if (registration != null) {
+				registration.source.disable(registration);
+				mActiveSensors.remove(sensor.getHandle());
+			}
+			return mActiveSensors.size() == 0;
+		}
+
+		boolean removeAllSensors() {
+			for (int i = 0; i < mActiveSensors.size(); i++)
+				mActiveSensors.valueAt(i).source.disable(mActiveSensors.valueAt(i));
+			mActiveSensors.clear();
+			return true;
+		}
+
+		/* SensorService.flushSensor(): no sensor of ATL has a FIFO, so as for HAL 1.0 and virtual sensors each
+		 * active sensor gets a trivial flush complete event, dispatched on the queue's looper
+		 * (SensorEventQueue.dispatchFlushCompleteEvent()) */
+		void flush() {
+			for (int i = 0; i < mActiveSensors.size(); i++) {
+				final Registration registration = mActiveSensors.valueAt(i);
+				mHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						if (registration.active && mListener instanceof SensorEventListener2)
+							((SensorEventListener2) mListener).onFlushCompleted(registration.source.sensor);
+					}
+				});
+			}
+		}
+
+		/* AOSP SensorEventQueue.dispatchSensorEvent(), on the queue's looper */
+		void dispatchSensorEvent(final Registration registration, final float[] values, final int accuracy, final long timestamp) {
+			if (Looper.myLooper() != mHandler.getLooper()) {
+				mHandler.post(new Runnable() {
+					@Override
+					public void run() {
+						dispatchSensorEvent(registration, values, accuracy, timestamp);
+					}
+				});
+				return;
+			}
+			if (!registration.active)
+				return; // unregistered while the event was pending
+			SensorEvent t = registration.event;
+			System.arraycopy(values, 0, t.values, 0, Math.min(values.length, t.values.length));
+			t.timestamp = timestamp;
+			t.accuracy = accuracy;
+			int handle = t.sensor.getHandle();
+			Integer old = mSensorAccuracies.get(handle);
+			if (t.accuracy >= 0 && (old == null ? 0 : old) != t.accuracy) {
+				mSensorAccuracies.put(handle, t.accuracy);
+				mListener.onAccuracyChanged(t.sensor, t.accuracy);
+			}
+			mListener.onSensorChanged(t);
+		}
+	}
+
+	/* one sensor of one queue */
+	private static final class Registration {
+		final Queue queue;
+		final Source source;
+		final int periodUs;
+		final SensorEvent event;
+		boolean active = true;
+
+		Registration(Queue queue, Source source, int periodUs) {
+			this.queue = queue;
+			this.source = source;
+			this.periodUs = periodUs;
+			/* AOSP SensorEventQueue.addSensorEvent(): one event per sensor, reused for every event */
+			this.event = new SensorEvent(new float[Sensor.getMaxLengthValuesArray(source.sensor, android.os.Build.VERSION.SDK_INT)], source.sensor);
+		}
+
+		void deliver(float[] values, long timestamp) {
+			queue.dispatchSensorEvent(this, values, /*SENSOR_STATUS_ACCURACY_HIGH*/ 3, timestamp);
+		}
+	}
+
+	/* where the events of a sensor come from */
+	private static abstract class Source {
+		final int type;
+		float maxRange;
+		float resolution;
+		int minDelay;
+		int maxDelay;
+		Sensor sensor;
+
+		Source(int type) {
+			this.type = type;
+		}
+
+		abstract boolean enable(Registration registration);
+		abstract void disable(Registration registration);
+	}
+
+	/* A continuous IIO sensor, read from sysfs at the period of each registration (the
+	 * in_<channel>_<axis>_raw values with scale, offset and mount matrix, as iio-sensor-proxy reads them).
+	 * Units as in the IIO ABI: m/s² (accel), rad/s (anglvel), Gauss (magn, Android: µT), kPa (pressure,
+	 * Android: hPa), lux (illuminance). */
+	private static final class IioSource extends Source {
+		static final int MIN_DELAY_US = 10000; // polling sysfs faster than 100 Hz only costs time
+		final File[] files;
+		final float[] scale;
+		final float[] offset;
+		final float[] matrix; // the mount matrix, row-major 3x3, or null
+		final float factor;
+
+		IioSource(int type, File[] files, float[] scale, float[] offset, float[] matrix, float factor) {
+			super(type);
+			this.files = files;
+			this.scale = scale;
+			this.offset = offset;
+			this.matrix = matrix;
+			this.factor = factor;
+			this.minDelay = type == Sensor.TYPE_LIGHT ? 0 : MIN_DELAY_US;
+			this.maxDelay = 1000000;
+			this.resolution = Math.abs(scale[0] * factor);
+		}
+
+		static List<IioSource> probe(File dev) {
+			ArrayList<IioSource> sources = new ArrayList<>();
+			/* accelerometer: Android reports the force that holds the device (+g upwards when it lies flat),
+			 * the IIO acceleration is negated for that, as ATL did before */
+			IioSource s = probe3(dev, "accel", Sensor.TYPE_ACCELEROMETER, -1);
+			if (s != null) {
+				s.maxRange = 4 * GRAVITY_EARTH;
+				sources.add(s);
+			}
+			s = probe3(dev, "anglvel", Sensor.TYPE_GYROSCOPE, 1);
+			if (s != null) {
+				s.maxRange = 35;
+				sources.add(s);
+			}
+			s = probe3(dev, "magn", Sensor.TYPE_MAGNETIC_FIELD, 100);
+			if (s != null) {
+				s.maxRange = 4900;
+				sources.add(s);
+			}
+			s = probe1(dev, "pressure", Sensor.TYPE_PRESSURE, 10);
+			if (s != null) {
+				s.maxRange = 1100;
+				sources.add(s);
+			}
+			s = probe1(dev, "illuminance", Sensor.TYPE_LIGHT, 1);
+			if (s != null) {
+				s.maxRange = 100000;
+				sources.add(s);
+			}
+			return sources;
+		}
+
+		private static File channel(File dev, String name) {
+			File f = new File(dev, name + "_input");
+			if (f.isFile())
+				return f;
+			f = new File(dev, name + "_raw");
+			return f.isFile() ? f : null;
+		}
+
+		private static float attr(File dev, String channel, String prefix, String attr, float def) {
+			for (String n : new String[] {channel + "_" + attr, prefix + "_" + attr}) {
+				String v = readLine(new File(dev, n));
+				if (v != null) {
+					try {
+						return Float.parseFloat(v);
+					} catch (NumberFormatException e) {
+					}
+				}
+			}
+			return def;
+		}
+
+		private static IioSource probe3(File dev, String prefix, int type, float factor) {
+			File[] files = new File[3];
+			float[] scale = new float[3];
+			float[] offset = new float[3];
+			String[] axes = {"x", "y", "z"};
+			for (int i = 0; i < 3; i++) {
+				String ch = "in_" + prefix + "_" + axes[i];
+				files[i] = channel(dev, ch);
+				if (files[i] == null)
+					return null;
+				boolean input = files[i].getName().endsWith("_input");
+				scale[i] = input ? 1 : attr(dev, ch, "in_" + prefix, "scale", 1);
+				offset[i] = input ? 0 : attr(dev, ch, "in_" + prefix, "offset", 0);
+			}
+			float[] matrix = null;
+			for (String n : new String[] {"in_" + prefix + "_mount_matrix", "in_mount_matrix", "mount_matrix"}) {
+				String v = readLine(new File(dev, n));
+				if (v == null)
+					continue;
+				String[] parts = v.split("[,;]");
+				if (parts.length != 9)
+					continue;
+				matrix = new float[9];
+				try {
+					for (int i = 0; i < 9; i++)
+						matrix[i] = Float.parseFloat(parts[i].trim());
+				} catch (NumberFormatException e) {
+					matrix = null;
+				}
+				break;
+			}
+			return new IioSource(type, files, scale, offset, matrix, factor);
+		}
+
+		private static IioSource probe1(File dev, String prefix, int type, float factor) {
+			String ch = "in_" + prefix;
+			File f = channel(dev, ch);
+			if (f == null)
+				return null;
+			boolean input = f.getName().endsWith("_input");
+			return new IioSource(type, new File[] {f}, new float[] {input ? 1 : attr(dev, ch, ch, "scale", 1)},
+			                     new float[] {input ? 0 : attr(dev, ch, ch, "offset", 0)}, null, factor);
+		}
+
+		/* the current values, or null if the device cannot be read */
+		float[] read() {
+			float[] v = new float[files.length];
+			for (int i = 0; i < files.length; i++) {
+				String s = readLine(files[i]);
+				if (s == null)
+					return null;
+				try {
+					v[i] = (Float.parseFloat(s) + offset[i]) * scale[i] * factor;
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+			if (matrix != null) {
+				float[] m = new float[3];
+				for (int r = 0; r < 3; r++)
+					m[r] = matrix[3 * r] * v[0] + matrix[3 * r + 1] * v[1] + matrix[3 * r + 2] * v[2];
+				v = m;
+			}
+			return v;
+		}
+
+		private final HashMap<Registration, Runnable> mPollers = new HashMap<>();
+
+		@Override
+		boolean enable(final Registration registration) {
+			if (read() == null)
+				return false; // like a HAL that cannot activate the sensor
+			Runnable poll = new Runnable() {
+				@Override
+				public void run() {
+					if (!registration.active)
+						return;
+					float[] v = read();
+					if (v != null)
+						registration.deliver(v, SystemClock.elapsedRealtimeNanos());
+					registration.queue.mHandler.postDelayed(this, Math.max(1, registration.periodUs / 1000));
+				}
+			};
+			synchronized (mPollers) {
+				mPollers.put(registration, poll);
+			}
+			registration.queue.mHandler.post(poll);
+			return true;
+		}
+
+		@Override
+		void disable(Registration registration) {
+			registration.active = false;
+			synchronized (mPollers) {
+				Runnable poll = mPollers.remove(registration);
+				if (poll != null)
+					registration.queue.mHandler.removeCallbacks(poll);
+			}
+		}
+	}
+
+	/* An on-change sensor of iio-sensor-proxy: claimed while a listener is registered (ClaimLight/
+	 * ClaimProximity), its property changes are the events; as for an on-change sensor of a HAL, the first
+	 * event is the value at the time it is enabled. Proximity is reported like a binary proximity sensor
+	 * (AOSP: values[0] is maxRange when far, 0 when near). */
+	static final int PROXY_LIGHT = 1;
+	static final int PROXY_PROXIMITY = 2;
+
+	private static final class ProxySource extends Source {
+		final int which;
+		final ArrayList<Registration> registrations = new ArrayList<>();
+
+		ProxySource(int type, int which) {
+			super(type);
+			this.which = which;
+			this.minDelay = 0; // on-change
+			this.maxDelay = 0;
+			if (type == Sensor.TYPE_PROXIMITY) {
+				this.maxRange = 5;
+				this.resolution = 5;
+			} else {
+				this.maxRange = 100000;
+				this.resolution = 1;
+			}
+		}
+
+		@Override
+		boolean enable(Registration registration) {
+			boolean first;
+			synchronized (registrations) {
+				first = registrations.isEmpty();
+				registrations.add(registration);
+			}
+			if (first && !nativeProxyClaim(which, true)) {
+				synchronized (registrations) {
+					registrations.remove(registration);
+				}
+				return false;
+			}
+			float value = nativeProxyValue(which);
+			if (!Float.isNaN(value))
+				registration.deliver(values(value), SystemClock.elapsedRealtimeNanos());
+			return true;
+		}
+
+		@Override
+		void disable(Registration registration) {
+			registration.active = false;
+			boolean last;
+			synchronized (registrations) {
+				last = registrations.remove(registration) && registrations.isEmpty();
+			}
+			if (last)
+				nativeProxyClaim(which, false);
+		}
+
+		float[] values(float value) {
+			if (type == Sensor.TYPE_PROXIMITY)
+				return new float[] {value != 0 ? 0 : maxRange};
+			return new float[] {value};
+		}
+
+		void changed(float value) {
+			Registration[] regs;
+			synchronized (registrations) {
+				regs = registrations.toArray(new Registration[0]);
+			}
+			long now = SystemClock.elapsedRealtimeNanos();
+			for (Registration r : regs)
+				r.deliver(values(value), now);
+		}
+	}
+
+	/* called by the native code when a claimed property of iio-sensor-proxy changed (main thread) */
+	@Export
+	static void onProxyValue(int which, float value) {
+		synchronized (SensorManager.class) {
+			for (int i = 0; i < sHandleToSource.size(); i++) {
+				Source source = sHandleToSource.valueAt(i);
+				if (source instanceof ProxySource && ((ProxySource)source).which == which)
+					((ProxySource)source).changed(value);
+			}
+		}
+	}
+
+	private static String readLine(File f) {
+		try (FileInputStream in = new FileInputStream(f)) {
+			byte[] buf = new byte[256];
+			int n = in.read(buf);
+			if (n <= 0)
+				return null;
+			return new String(buf, 0, n).trim();
+		} catch (IOException | SecurityException e) {
+			return null;
+		}
+	}
+
+	/* the sensors iio-sensor-proxy has (PROXY_* bits), 0 if it does not run */
+	private static native int nativeProxySensors();
+	private static native boolean nativeProxyClaim(int which, boolean claim);
+	/* the current value (light: lux, proximity: 1 near, 0 far), NaN if unknown */
+	private static native float nativeProxyValue(int which);
 
 	/* AOSP SensorManager.AXIS_* and remapCoordinateSystem() */
 	public static final int AXIS_X = 1;
@@ -245,6 +854,81 @@ public class SensorManager {
 	public static float getAltitude(float p0, float p) {
 		final float coef = 1.0f / 5.255f;
 		return 44330.0f * (1.0f - (float) Math.pow(p / p0, coef));
+	}
+
+	/* AOSP SensorManager.getInclination() */
+	public static float getInclination(float[] I) {
+		if (I.length == 9) {
+			return (float) Math.atan2(I[5], I[4]);
+		} else {
+			return (float) Math.atan2(I[6], I[5]);
+		}
+	}
+
+	/* AOSP SensorManager.getAngleChange() */
+	public static void getAngleChange(float[] angleChange, float[] R, float[] prevR) {
+		float rd1 = 0, rd4 = 0, rd6 = 0, rd7 = 0, rd8 = 0;
+		float ri0 = 0, ri1 = 0, ri2 = 0, ri3 = 0, ri4 = 0, ri5 = 0, ri6 = 0, ri7 = 0, ri8 = 0;
+		float pri0 = 0, pri1 = 0, pri2 = 0, pri3 = 0, pri4 = 0;
+		float pri5 = 0, pri6 = 0, pri7 = 0, pri8 = 0;
+
+		if (R.length == 9) {
+			ri0 = R[0];
+			ri1 = R[1];
+			ri2 = R[2];
+			ri3 = R[3];
+			ri4 = R[4];
+			ri5 = R[5];
+			ri6 = R[6];
+			ri7 = R[7];
+			ri8 = R[8];
+		} else if (R.length == 16) {
+			ri0 = R[0];
+			ri1 = R[1];
+			ri2 = R[2];
+			ri3 = R[4];
+			ri4 = R[5];
+			ri5 = R[6];
+			ri6 = R[8];
+			ri7 = R[9];
+			ri8 = R[10];
+		}
+
+		if (prevR.length == 9) {
+			pri0 = prevR[0];
+			pri1 = prevR[1];
+			pri2 = prevR[2];
+			pri3 = prevR[3];
+			pri4 = prevR[4];
+			pri5 = prevR[5];
+			pri6 = prevR[6];
+			pri7 = prevR[7];
+			pri8 = prevR[8];
+		} else if (prevR.length == 16) {
+			pri0 = prevR[0];
+			pri1 = prevR[1];
+			pri2 = prevR[2];
+			pri3 = prevR[4];
+			pri4 = prevR[5];
+			pri5 = prevR[6];
+			pri6 = prevR[8];
+			pri7 = prevR[9];
+			pri8 = prevR[10];
+		}
+
+		// calculate the parts of the rotation difference matrix we need
+		// rd[i][j] = pri[0][i] * ri[0][j] + pri[1][i] * ri[1][j] + pri[2][i] * ri[2][j];
+
+		rd1 = pri0 * ri1 + pri3 * ri4 + pri6 * ri7; //rd[0][1]
+		rd4 = pri1 * ri1 + pri4 * ri4 + pri7 * ri7; //rd[1][1]
+		rd6 = pri2 * ri0 + pri5 * ri3 + pri8 * ri6; //rd[2][0]
+		rd7 = pri2 * ri1 + pri5 * ri4 + pri8 * ri7; //rd[2][1]
+		rd8 = pri2 * ri2 + pri5 * ri5 + pri8 * ri8; //rd[2][2]
+
+		angleChange[0] = (float) Math.atan2(rd1, rd4);
+		angleChange[1] = (float) Math.asin(-rd7);
+		angleChange[2] = (float) Math.atan2(-rd6, rd8);
+
 	}
 
 	/* AOSP SensorManager.getQuaternionFromVector() */
@@ -396,6 +1080,124 @@ public class SensorManager {
 			R[12] = R[13] = R[14] = 0.0f;
 			R[15] = 1.0f;
 		}
+	}
+
+	/* AOSP SensorManager.getDynamicSensorList(): SystemSensorManager.mFullDynamicSensorsList is filled from
+	 * the dynamic sensor meta sensor (Sensor.TYPE_DYNAMIC_SENSOR_META); ATL has none, so the list is empty */
+	private static final List<Sensor> sFullDynamicSensorsList = Collections.emptyList();
+
+	public List<Sensor> getDynamicSensorList(int type) {
+		final List<Sensor> fullList = sFullDynamicSensorsList;
+		if (type == Sensor.TYPE_ALL) {
+			return Collections.unmodifiableList(fullList);
+		} else {
+			List<Sensor> list = new ArrayList<Sensor>();
+			for (Sensor i : fullList) {
+				if (i.getType() == type)
+					list.add(i);
+			}
+			return Collections.unmodifiableList(list);
+		}
+	}
+
+	/* AOSP SensorManager.DynamicSensorCallback */
+	public abstract static class DynamicSensorCallback {
+		public void onDynamicSensorConnected(Sensor sensor) {}
+
+		public void onDynamicSensorDisconnected(Sensor sensor) {}
+	}
+
+	/* AOSP SensorManager.registerDynamicSensorCallback() -> SystemSensorManager.registerDynamicSensorCallbackImpl():
+	 * the callbacks are kept; without a dynamic sensor meta sensor no connection change is ever reported */
+	private final HashMap<DynamicSensorCallback, Handler> mDynamicSensorCallbacks = new HashMap<>();
+
+	public void registerDynamicSensorCallback(DynamicSensorCallback callback) {
+		registerDynamicSensorCallback(callback, null);
+	}
+
+	public void registerDynamicSensorCallback(DynamicSensorCallback callback, Handler handler) {
+		if (callback == null)
+			throw new IllegalArgumentException("callback cannot be null");
+		synchronized (mDynamicSensorCallbacks) {
+			if (mDynamicSensorCallbacks.containsKey(callback))
+				return; // has been already registered, ignore
+			mDynamicSensorCallbacks.put(callback, handler);
+		}
+	}
+
+	public void unregisterDynamicSensorCallback(DynamicSensorCallback callback) {
+		synchronized (mDynamicSensorCallbacks) {
+			mDynamicSensorCallbacks.remove(callback);
+		}
+	}
+
+	/* AOSP SensorManager.isDynamicSensorDiscoverySupported() */
+	public boolean isDynamicSensorDiscoverySupported() {
+		List<Sensor> sensors = getSensorList(Sensor.TYPE_DYNAMIC_SENSOR_META);
+		return sensors.size() > 0;
+	}
+
+	/* AOSP SensorManager.createDirectChannel() -> SystemSensorManager.createDirectChannelImpl(): the arguments
+	 * are checked as there; then SensorService has no sensor with direct report (no ATL sensor has the
+	 * direct channel flags), so nativeCreateDirectChannel() fails and AOSP throws UncheckedIOException */
+	private static final int MIN_DIRECT_CHANNEL_BUFFER_SIZE = 104;
+
+	public SensorDirectChannel createDirectChannel(MemoryFile mem) {
+		return createDirectChannelImpl(mem, null);
+	}
+
+	public SensorDirectChannel createDirectChannel(HardwareBuffer mem) {
+		return createDirectChannelImpl(null, mem);
+	}
+
+	private SensorDirectChannel createDirectChannelImpl(MemoryFile memoryFile, HardwareBuffer hardwareBuffer) {
+		if (memoryFile != null) {
+			try {
+				memoryFile.getFileDescriptor();
+			} catch (IOException e) {
+				throw new IllegalArgumentException("MemoryFile object is not valid");
+			}
+			if (memoryFile.length() < MIN_DIRECT_CHANNEL_BUFFER_SIZE) {
+				throw new IllegalArgumentException("Size of MemoryFile has to be greater than " + MIN_DIRECT_CHANNEL_BUFFER_SIZE);
+			}
+			throw new java.io.UncheckedIOException(new IOException("create MemoryFile direct channel failed"));
+		} else if (hardwareBuffer != null) {
+			if (hardwareBuffer.getFormat() != HardwareBuffer.BLOB) {
+				throw new IllegalArgumentException("Format of HardwareBuffer must be BLOB");
+			}
+			if (hardwareBuffer.getHeight() != 1) {
+				throw new IllegalArgumentException("Height of HardwareBuffer must be 1");
+			}
+			if (hardwareBuffer.getWidth() < MIN_DIRECT_CHANNEL_BUFFER_SIZE) {
+				throw new IllegalArgumentException("Width if HardwareBuffer must be greater than " + MIN_DIRECT_CHANNEL_BUFFER_SIZE);
+			}
+			if ((hardwareBuffer.getUsage() & HardwareBuffer.USAGE_SENSOR_DIRECT_DATA) == 0) {
+				throw new IllegalArgumentException("HardwareBuffer must set usage flag USAGE_SENSOR_DIRECT_DATA");
+			}
+			throw new java.io.UncheckedIOException(new IOException("create HardwareBuffer direct channel failed"));
+		} else {
+			throw new NullPointerException("shared memory object cannot be null");
+		}
+	}
+
+	/* AOSP SystemSensorManager.destroyDirectChannelImpl(): there is no SensorService channel to destroy */
+	void destroyDirectChannel(SensorDirectChannel channel) {
+	}
+
+	/* AOSP SystemSensorManager.configureDirectChannelImpl(); nativeConfigDirectChannel() fails (no sensor
+	 * with direct report), so the result is 0 as in AOSP when the configuration fails */
+	int configureDirectChannelImpl(SensorDirectChannel channel, Sensor sensor, int rate) {
+		if (!channel.isOpen()) {
+			throw new IllegalStateException("channel is closed");
+		}
+		if (rate < SensorDirectChannel.RATE_STOP || rate > SensorDirectChannel.RATE_VERY_FAST) {
+			throw new IllegalArgumentException("rate parameter invalid");
+		}
+		if (sensor == null && rate != SensorDirectChannel.RATE_STOP) {
+			// the stop all sensors case
+			throw new IllegalArgumentException("when sensor is null, rate can only be DIRECT_RATE_STOP");
+		}
+		return 0;
 	}
 
 	/* AOSP SensorManager.requestTriggerSensor() -> SystemSensorManager.requestTriggerSensorImpl(): only one-shot

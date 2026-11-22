@@ -70,8 +70,41 @@ static void delete_surrounding_cb(GtkIMContext *context, gint offset, gint n_cha
 	}
 }
 
+/* The on-screen keyboard of a phone shell: Phosh's keyboards (squeekboard, stevia) tell on the session bus
+ * whether they are shown (sm.puri.OSK0, property Visible). While it is shown, the compositor makes the windows
+ * smaller; Android keeps the configuration and reports the IME as visible (WindowInsets). */
+static void osk_visible_changed(GDBusProxy *proxy)
+{
+	GVariant *v = g_dbus_proxy_get_cached_property(proxy, "Visible");
+	gboolean visible = v && g_variant_is_of_type(v, G_VARIANT_TYPE_BOOLEAN) && g_variant_get_boolean(v);
+	if (v)
+		g_variant_unref(v);
+	JNIEnv *env = get_jni_env();
+	J__InputMethodManager__oskVisibleChanged(env, visible);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
+static void osk_properties_changed_cb(GDBusProxy *proxy, GVariant *changed, GStrv invalidated, gpointer user_data)
+{
+	osk_visible_changed(proxy);
+}
+
+static void osk_proxy_ready_cb(GObject *source, GAsyncResult *res, gpointer user_data)
+{
+	GDBusProxy *proxy = g_dbus_proxy_new_for_bus_finish(res, NULL);
+	if (!proxy)
+		return;
+	g_signal_connect(proxy, "g-properties-changed", G_CALLBACK(osk_properties_changed_cb), NULL);
+	osk_visible_changed(proxy);
+}
+
 JNIEXPORT jlong JNICALL Java_android_view_inputmethod_InputMethodManager_nativeInit(JNIEnv *env, jclass class)
 {
+	g_dbus_proxy_new_for_bus(G_BUS_TYPE_SESSION, G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START, NULL, "sm.puri.OSK0", "/sm/puri/OSK0", "sm.puri.OSK0",
+	                         NULL, osk_proxy_ready_cb, NULL);
 	GtkIMContext *context = gtk_im_multicontext_new();
 	g_signal_connect(context, "commit", G_CALLBACK(commit_cb), NULL);
 	g_signal_connect(context, "preedit-changed", G_CALLBACK(preedit_changed_cb), NULL);

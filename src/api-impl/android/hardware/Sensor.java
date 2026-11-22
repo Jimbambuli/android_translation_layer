@@ -231,16 +231,21 @@ public final class Sensor {
 	 */
 	public static final int TYPE_ALL = -1;
 
-	/* Reporting mode constants for sensors. Each sensor will have exactly one
-	   reporting mode associated with it. */
+	/* AOSP Sensor.TYPE_DEVICE_PRIVATE_BASE: the first type of the device specific sensors */
+	public static final int TYPE_DEVICE_PRIVATE_BASE = 0x10000;
+
+	/* AOSP Sensor.REPORTING_MODE_*: each sensor has exactly one reporting mode */
 	// Events are reported at a constant rate.
-	static int REPORTING_MODE_CONTINUOUS = 1;
+	public static final int REPORTING_MODE_CONTINUOUS = 0;
 
 	// Events are reported only when the value changes.
-	static int REPORTING_MODE_ON_CHANGE = 2;
+	public static final int REPORTING_MODE_ON_CHANGE = 1;
 
 	// Upon detection of an event, the sensor deactivates itself and then sends a single event.
-	static int REPORTING_MODE_ONE_SHOT = 3;
+	public static final int REPORTING_MODE_ONE_SHOT = 2;
+
+	// Events are reported as described in the description of the sensor.
+	public static final int REPORTING_MODE_SPECIAL_TRIGGER = 3;
 
 	// TODO(): The following arrays are fragile and error-prone. This needs to be refactored.
 
@@ -331,9 +336,78 @@ public final class Sensor {
 	private int mMinDelay;
 	private int mFifoReservedEventCount;
 	private int mFifoMaxEventCount;
+	private int mMaxDelay;
+	private int mFlags;
+	/* AOSP Sensor.mId (SensorService.getIdFromUuid()): ATL's sensors have no UUID, which is id 0 */
+	private int mId;
+
+	/* AOSP Sensor.SENSOR_FLAG_WAKE_UP_SENSOR and the masks of mFlags; ATL's sensors set only the wake-up flag */
+	private static final int SENSOR_FLAG_WAKE_UP_SENSOR = 1;
+	private static final int DYNAMIC_SENSOR_MASK = 0x20;
+	private static final int ADDITIONAL_INFO_MASK = 0x40;
+	private static final int DIRECT_REPORT_MASK = 0x380;
+	private static final int DIRECT_REPORT_SHIFT = 7;
+	private static final int DIRECT_CHANNEL_SHIFT = 10;
 
 	Sensor(int type) {
 		mType = type;
+	}
+
+	/* a sensor of SensorManager's sensor list (AOSP: Sensor(InputSensorInfo) from the sensors HAL) */
+	Sensor(String name, String vendor, int handle, int type, float maxRange, float resolution, int minDelay, int maxDelay, boolean wakeUp) {
+		mName = name;
+		mVendor = vendor;
+		mVersion = 1;
+		mHandle = handle;
+		mType = type;
+		mMaxRange = maxRange;
+		mResolution = resolution;
+		mMinDelay = minDelay;
+		mMaxDelay = maxDelay;
+		mFlags = wakeUp ? SENSOR_FLAG_WAKE_UP_SENSOR : 0;
+	}
+
+	/* AOSP Sensor.getMaxDelay() */
+	public int getMaxDelay() {
+		return mMaxDelay;
+	}
+
+	/* AOSP Sensor.getHighestDirectReportRateLevel() */
+	public int getHighestDirectReportRateLevel() {
+		int rateLevel = ((mFlags & DIRECT_REPORT_MASK) >> DIRECT_REPORT_SHIFT);
+		return rateLevel <= SensorDirectChannel.RATE_VERY_FAST ? rateLevel : SensorDirectChannel.RATE_VERY_FAST;
+	}
+
+	/* AOSP Sensor.isDirectChannelTypeSupported() */
+	public boolean isDirectChannelTypeSupported(int sharedMemType) {
+		switch (sharedMemType) {
+			case SensorDirectChannel.TYPE_MEMORY_FILE:
+				return (mFlags & (1 << DIRECT_CHANNEL_SHIFT)) > 0;
+			case SensorDirectChannel.TYPE_HARDWARE_BUFFER:
+				return (mFlags & (1 << DIRECT_CHANNEL_SHIFT + 1)) > 0;
+			default:
+				return false;
+		}
+	}
+
+	/* AOSP Sensor.getId(): 0 means the sensor does not support this function */
+	public int getId() {
+		return mId;
+	}
+
+	/* AOSP Sensor.isDynamicSensor() */
+	public boolean isDynamicSensor() {
+		return (mFlags & DYNAMIC_SENSOR_MASK) != 0;
+	}
+
+	/* AOSP Sensor.isAdditionalInfoSupported() */
+	public boolean isAdditionalInfoSupported() {
+		return (mFlags & ADDITIONAL_INFO_MASK) != 0;
+	}
+
+	/* AOSP Sensor.isWakeUpSensor() */
+	public boolean isWakeUpSensor() {
+		return (mFlags & SENSOR_FLAG_WAKE_UP_SENSOR) != 0;
 	}
 
 	/**
@@ -430,12 +504,18 @@ public final class Sensor {
 	}
 
 	/* AOSP Sensor.TYPE_* missing above */
+	static final int TYPE_TILT_DETECTOR = 22;
 	static final int TYPE_GLANCE_GESTURE = 24;
+	static final int TYPE_WRIST_TILT_GESTURE = 26;
 	public static final int TYPE_HEART_RATE = 21;
 	static final int TYPE_PICK_UP_GESTURE = 25;
 	static final int TYPE_WAKE_GESTURE = 23;
 	static final int TYPE_DEVICE_ORIENTATION = 27;
 	static final int TYPE_DYNAMIC_SENSOR_META = 32;
+	public static final int TYPE_POSE_6DOF = 28;
+	public static final int TYPE_STATIONARY_DETECT = 29;
+	public static final int TYPE_MOTION_DETECT = 30;
+	public static final int TYPE_HEART_BEAT = 31;
 	public static final int TYPE_LOW_LATENCY_OFFBODY_DETECT = 34;
 	public static final int TYPE_ACCELEROMETER_UNCALIBRATED = 35;
 	public static final int TYPE_HINGE_ANGLE = 36;

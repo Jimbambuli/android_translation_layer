@@ -1,174 +1,116 @@
-#include <graphene.h>
-#include <libportal/portal.h>
-#include <sys/param.h>
+#include <gio/gio.h>
+#include <math.h>
+#include <string.h>
 
 #include "../defines.h"
 #include "../util.h"
 #include "../generated_headers/android_hardware_SensorManager.h"
 
-struct iio_accel_files {
-	GString *in_accel_x_raw;
-	GString *in_accel_y_raw;
-	GString *in_accel_z_raw;
-	GString *in_accel_scale;
-	GString *in_mount_matrix;
-};
+/* iio-sensor-proxy (net.hadess.SensorProxy on the system bus): the ambient light and proximity sensors of
+ * SensorManager's list. A sensor is claimed while it has listeners (ClaimLight/ClaimProximity, released with
+ * Release*), the changes of its property are its events. */
 
-struct accel_callback_data {
-	JavaVM *jvm;
-	jobject listener;
-	jclass listener_class;
-	jobject sensor;
-	struct iio_accel_files *iio_accel_files;
-	graphene_matrix_t *matrix;
-};
-gboolean on_accel_data(struct accel_callback_data *d)
+#define PROXY_LIGHT 1
+#define PROXY_PROXIMITY 2
+
+static GDBusProxy *sensor_proxy = NULL;
+static gboolean sensor_proxy_tried = FALSE;
+
+static void proxy_properties_changed_cb(GDBusProxy *proxy, GVariant *changed, GStrv invalidated, gpointer user_data);
+
+static GDBusProxy *get_sensor_proxy(void)
 {
-	JNIEnv *env;
-	(*d->jvm)->GetEnv(d->jvm, (void **)&env, JNI_VERSION_1_6);
-
-	char *x_str;
-	char *y_str;
-	char *z_str;
-	char *scale_str;
-
-	g_file_get_contents(d->iio_accel_files->in_accel_x_raw->str, &x_str, NULL, NULL);
-	g_file_get_contents(d->iio_accel_files->in_accel_y_raw->str, &y_str, NULL, NULL);
-	g_file_get_contents(d->iio_accel_files->in_accel_z_raw->str, &z_str, NULL, NULL);
-	g_file_get_contents(d->iio_accel_files->in_accel_scale->str, &scale_str, NULL, NULL);
-	graphene_vec3_t *vector = graphene_vec3_alloc();
-	graphene_vec3_init(vector, atof(x_str), atof(y_str), atof(z_str));
-	graphene_vec3_scale(vector, (-1) * atof(scale_str), vector); // multiply by -1 to get what android expects
-	graphene_matrix_transform_vec3(d->matrix, vector, vector);
-
-	jfloatArray values = (*env)->NewFloatArray(env, 3);
-	(*env)->SetFloatArrayRegion(env, values, 0, 3, (jfloat[]){graphene_vec3_get_x(vector), graphene_vec3_get_y(vector), graphene_vec3_get_z(vector)});
-	graphene_vec3_free(vector);
-	jobject sensor_event = J_new__SensorEvent(env, values, d->sensor);
-
-	J__SensorEventListener__onSensorChanged(env, d->listener, sensor_event);
-	(*env)->DeleteLocalRef(env, values);
-	(*env)->DeleteLocalRef(env, sensor_event);
-
-	return G_SOURCE_CONTINUE;
-}
-
-graphene_matrix_t *get_mount_matrix(char *mount_matrix_path)
-{
-	graphene_matrix_t *matrix = NULL;
-
-	char *matrix_str;
-	g_file_get_contents(mount_matrix_path, &matrix_str, NULL, NULL);
-
-	float matrix_f[] = {1, 0, 0, 0,
-	                    0, 1, 0, 0,
-	                    0, 0, 1, 0,
-	                    0, 0, 0, 1};
-
-	sscanf(matrix_str, "%f, %f, %f; %f, %f, %f; %f, %f, %f",
-	       &matrix_f[0], &matrix_f[1], &matrix_f[2],
-	       &matrix_f[4], &matrix_f[5], &matrix_f[6],
-	       &matrix_f[8], &matrix_f[9], &matrix_f[10]);
-	matrix = graphene_matrix_alloc();
-	graphene_matrix_init_from_float(matrix, matrix_f);
-
-	return matrix;
-}
-
-struct iio_accel_files *get_iio_accel_files(void)
-{
+	if (sensor_proxy_tried)
+		return sensor_proxy;
+	sensor_proxy_tried = TRUE;
 	GError *error = NULL;
-	const gchar *iio_device_path;
-	bool found_accelerometer = false;
-
-	GDir *iio_dir = g_dir_open("/sys/bus/iio/devices", 0, &error);
-	if (!iio_dir) {
-		g_log(NULL, G_LOG_LEVEL_WARNING, "cannot register accelerometer listener: cannot open /sys/bus/iio/devices (error: %s)", error->message);
+	/* the property changes are signals of the main loop, whichever thread asked first */
+	g_main_context_push_thread_default(g_main_context_default());
+	sensor_proxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM, G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START, NULL,
+	                                             "net.hadess.SensorProxy", "/net/hadess/SensorProxy", "net.hadess.SensorProxy",
+	                                             NULL, &error);
+	g_main_context_pop_thread_default(g_main_context_default());
+	if (!sensor_proxy) {
+		g_error_free(error);
 		return NULL;
 	}
-
-	struct iio_accel_files *iio_accel_files = malloc(sizeof(struct iio_accel_files));
-	iio_accel_files->in_accel_x_raw = g_string_new(NULL);
-	iio_accel_files->in_accel_y_raw = g_string_new(NULL);
-	iio_accel_files->in_accel_z_raw = g_string_new(NULL);
-	iio_accel_files->in_accel_scale = g_string_new(NULL);
-	iio_accel_files->in_mount_matrix = g_string_new(NULL);
-
-	while ((iio_device_path = g_dir_read_name(iio_dir))) {
-		g_string_printf(iio_accel_files->in_accel_x_raw, "/sys/bus/iio/devices/%s/in_accel_x_raw", iio_device_path);
-		g_string_printf(iio_accel_files->in_accel_y_raw, "/sys/bus/iio/devices/%s/in_accel_y_raw", iio_device_path);
-		g_string_printf(iio_accel_files->in_accel_z_raw, "/sys/bus/iio/devices/%s/in_accel_z_raw", iio_device_path);
-		g_string_printf(iio_accel_files->in_accel_scale, "/sys/bus/iio/devices/%s/in_accel_scale", iio_device_path);
-		g_string_printf(iio_accel_files->in_mount_matrix, "/sys/bus/iio/devices/%s/in_mount_matrix", iio_device_path);
-		if (g_file_test(iio_accel_files->in_accel_x_raw->str, G_FILE_TEST_IS_REGULAR)
-		    && g_file_test(iio_accel_files->in_accel_y_raw->str, G_FILE_TEST_IS_REGULAR)
-		    && g_file_test(iio_accel_files->in_accel_z_raw->str, G_FILE_TEST_IS_REGULAR)
-		    && g_file_test(iio_accel_files->in_accel_scale->str, G_FILE_TEST_IS_REGULAR)
-		    && g_file_test(iio_accel_files->in_mount_matrix->str, G_FILE_TEST_IS_REGULAR)) {
-			found_accelerometer = true;
-			break;
-		}
-	}
-
-	g_dir_close(iio_dir);
-
-	if (!found_accelerometer) {
-		g_log(NULL, G_LOG_LEVEL_WARNING, "cannot register accelerometer listener: haven't found an iio accelerometer");
-		g_string_free(iio_accel_files->in_accel_x_raw, true);
-		g_string_free(iio_accel_files->in_accel_y_raw, true);
-		g_string_free(iio_accel_files->in_accel_z_raw, true);
-		g_string_free(iio_accel_files->in_accel_scale, true);
-		g_string_free(iio_accel_files->in_mount_matrix, true);
-		free(iio_accel_files);
+	gchar *owner = g_dbus_proxy_get_name_owner(sensor_proxy);
+	if (!owner) { // iio-sensor-proxy does not run (it quits on a machine without sensors)
+		g_clear_object(&sensor_proxy);
 		return NULL;
 	}
-
-	return iio_accel_files;
+	g_free(owner);
+	g_signal_connect(sensor_proxy, "g-properties-changed", G_CALLBACK(proxy_properties_changed_cb), NULL);
+	return sensor_proxy;
 }
 
-/* the timer's data goes when the timer is removed (after a running on_accel_data() has returned) */
-static void free_accel_data(struct accel_callback_data *d)
+static gboolean proxy_get_boolean(const char *property)
 {
-	JNIEnv *env;
-	(*d->jvm)->GetEnv(d->jvm, (void **)&env, JNI_VERSION_1_6);
-	_UNREF(d->listener);
-	_UNREF(d->listener_class);
-	_UNREF(d->sensor);
-	g_string_free(d->iio_accel_files->in_accel_x_raw, true);
-	g_string_free(d->iio_accel_files->in_accel_y_raw, true);
-	g_string_free(d->iio_accel_files->in_accel_z_raw, true);
-	g_string_free(d->iio_accel_files->in_accel_scale, true);
-	g_string_free(d->iio_accel_files->in_mount_matrix, true);
-	free(d->iio_accel_files);
-	graphene_matrix_free(d->matrix);
-	free(d);
+	GVariant *v = g_dbus_proxy_get_cached_property(sensor_proxy, property);
+	gboolean ret = v && g_variant_is_of_type(v, G_VARIANT_TYPE_BOOLEAN) && g_variant_get_boolean(v);
+	if (v)
+		g_variant_unref(v);
+	return ret;
 }
 
-/* returns the handle for unregister_accelerometer_listener_native(), 0 without an accelerometer */
-JNIEXPORT jlong JNICALL Java_android_hardware_SensorManager_register_1accelerometer_1listener_1native(JNIEnv *env, jobject this, jobject listener, jobject sensor, jint sampling_period)
+/* light: LightLevel (lux when LightLevelUnit is "lux", otherwise the vendor's unit), proximity: ProximityNear */
+static float proxy_value(int which)
 {
-	JavaVM *jvm;
-	(*env)->GetJavaVM(env, &jvm);
+	GVariant *v = g_dbus_proxy_get_cached_property(sensor_proxy, which == PROXY_LIGHT ? "LightLevel" : "ProximityNear");
+	float ret = NAN;
+	if (v && g_variant_is_of_type(v, G_VARIANT_TYPE_DOUBLE))
+		ret = g_variant_get_double(v);
+	else if (v && g_variant_is_of_type(v, G_VARIANT_TYPE_BOOLEAN))
+		ret = g_variant_get_boolean(v) ? 1 : 0;
+	if (v)
+		g_variant_unref(v);
+	return ret;
+}
 
-	struct iio_accel_files *iio_accel_files = get_iio_accel_files();
-	if (!iio_accel_files)
+static void proxy_properties_changed_cb(GDBusProxy *proxy, GVariant *changed, GStrv invalidated, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	GVariant *v;
+	if ((v = g_variant_lookup_value(changed, "LightLevel", G_VARIANT_TYPE_DOUBLE))) {
+		J__SensorManager__onProxyValue(env, PROXY_LIGHT, g_variant_get_double(v));
+		g_variant_unref(v);
+	}
+	if ((v = g_variant_lookup_value(changed, "ProximityNear", G_VARIANT_TYPE_BOOLEAN))) {
+		J__SensorManager__onProxyValue(env, PROXY_PROXIMITY, g_variant_get_boolean(v) ? 1 : 0);
+		g_variant_unref(v);
+	}
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+}
+
+JNIEXPORT jint JNICALL Java_android_hardware_SensorManager_nativeProxySensors(JNIEnv *env, jclass this)
+{
+	if (!get_sensor_proxy())
 		return 0;
-
-	struct accel_callback_data *callback_data = malloc(sizeof(struct accel_callback_data));
-	callback_data->jvm = jvm;
-	callback_data->listener = _REF(listener);
-	callback_data->listener_class = _REF(_CLASS(callback_data->listener));
-	callback_data->sensor = _REF(sensor);
-	callback_data->iio_accel_files = iio_accel_files;
-	callback_data->matrix = get_mount_matrix(iio_accel_files->in_mount_matrix->str);
-
-	/* FIXME: too short of a sampling period can lock up the process */
-	return g_timeout_add_full(G_PRIORITY_DEFAULT, MAX(10, sampling_period), G_SOURCE_FUNC(on_accel_data), callback_data,
-	                          (GDestroyNotify)free_accel_data);
+	return (proxy_get_boolean("HasAmbientLight") ? PROXY_LIGHT : 0) | (proxy_get_boolean("HasProximity") ? PROXY_PROXIMITY : 0);
 }
 
-JNIEXPORT void JNICALL Java_android_hardware_SensorManager_unregister_1accelerometer_1listener_1native(JNIEnv *env, jobject this, jlong handle)
+JNIEXPORT jboolean JNICALL Java_android_hardware_SensorManager_nativeProxyClaim(JNIEnv *env, jclass this, jint which, jboolean claim)
 {
-	if (handle)
-		g_source_remove(handle);
+	if (!get_sensor_proxy())
+		return JNI_FALSE;
+	const char *method = which == PROXY_LIGHT ? (claim ? "ClaimLight" : "ReleaseLight") : (claim ? "ClaimProximity" : "ReleaseProximity");
+	GError *error = NULL;
+	GVariant *ret = g_dbus_proxy_call_sync(sensor_proxy, method, NULL, G_DBUS_CALL_FLAGS_NONE, 2000, NULL, &error);
+	if (!ret) {
+		g_warning("iio-sensor-proxy %s failed: %s", method, error->message);
+		g_error_free(error);
+		return JNI_FALSE;
+	}
+	g_variant_unref(ret);
+	return JNI_TRUE;
+}
+
+JNIEXPORT jfloat JNICALL Java_android_hardware_SensorManager_nativeProxyValue(JNIEnv *env, jclass this, jint which)
+{
+	if (!get_sensor_proxy())
+		return NAN;
+	return proxy_value(which);
 }

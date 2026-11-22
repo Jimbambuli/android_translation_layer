@@ -271,6 +271,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/opengl_poly_clip.c',
                                                                   	'src/api-impl-jni/etc1.c',
                                                                   	'src/api-impl-jni/views/AndroidLayout.c',
+                                                                  	'src/api-impl-jni/views/android_view_Display.c',
                                                                   	'src/api-impl-jni/views/android_view_inputmethod_InputMethodManager.c',
                                                                   	'src/api-impl-jni/views/android_view_VelocityTracker.c',
                                                                   	'src/api-impl-jni/input/VelocityControl.c',

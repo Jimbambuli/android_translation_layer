@@ -10,6 +10,22 @@ import java.util.List;
 public class InputMethodManager {
 
 	private static long im_context = nativeInit();
+
+	/* the on-screen keyboard of the shell is shown (sm.puri.OSK0 of Phosh's keyboards, see nativeInit()) */
+	private static boolean sOskVisible;
+
+	@android.atl.annotation.Export
+	static void oskVisibleChanged(boolean visible) {
+		if (visible == sOskVisible)
+			return;
+		sOskVisible = visible;
+		android.view.Window.imeVisibilityChanged();
+	}
+
+	/** @hide */
+	public static boolean isOskVisible() {
+		return sOskVisible;
+	}
 	private static View activeView = null;
 	private static InputConnection activeConnection = null;
 

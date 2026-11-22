@@ -71,8 +71,23 @@ public final class Display {
 		outLargestSize.y = largest;
 	}
 
+	/* AOSP Display.getRotation(): the rotation of the display from its natural orientation, here the
+	 * transform the compositor gives the monitor of the window (android_view_Display.c) */
+	private static int sRotation = 0 /*ROTATION_0*/;
+
 	public int getRotation() {
-		return 0 /*ROTATION_0*/;
+		return sRotation;
+	}
+
+	/* the compositor turned the monitor: like LogicalDisplay's DisplayInfo change, the display listeners hear
+	 * it (DisplayManagerGlobal.handleDisplayEvent(EVENT_DISPLAY_CHANGED)); the configuration follows the
+	 * window, which the compositor resizes */
+	@Export
+	static void setRotation(int rotation) {
+		if (rotation == sRotation)
+			return;
+		sRotation = rotation;
+		android.hardware.display.DisplayManager.notifyDisplayChanged(DEFAULT_DISPLAY);
 	}
 
 	public float getRefreshRate() {

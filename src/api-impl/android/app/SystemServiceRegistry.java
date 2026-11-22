@@ -31,6 +31,7 @@ import android.content.pm.ShortcutManager;
 import android.content.pm.verify.domain.DomainVerificationManager;
 import android.hardware.ConsumerIrManager;
 import android.hardware.SensorManager;
+import android.hardware.SensorPrivacyManager;
 import android.hardware.camera2.CameraManager;
 import android.hardware.display.ColorDisplayManager;
 import android.hardware.display.DisplayManager;
@@ -141,6 +142,13 @@ public final class SystemServiceRegistry {
             @Override
             public SensorManager createService(ContextImpl ctx) {
                 return new SensorManager();
+            }});
+
+        registerService(Context.SENSOR_PRIVACY_SERVICE, SensorPrivacyManager.class,
+                new CachedServiceFetcher<SensorPrivacyManager>() {
+            @Override
+            public SensorPrivacyManager createService(ContextImpl ctx) {
+                return SensorPrivacyManager.getInstance(ctx);
             }});
 
         registerService(Context.CONNECTIVITY_SERVICE, ConnectivityManager.class,
