@@ -50,12 +50,19 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 	private static final int STOPPED = 1;
 	private static final int WAITING_FOR_PREVIEW_WINDOW = 2;
 	private static final int PREVIEW = 3;
+	private static final int STILL_CAPTURE = 5;
 
 	/** Camera's side (AOSP's JNICameraContext): a preview frame to copy and post, on the stream's thread */
 	interface Callbacks {
 		void onPreviewFrame(Camera2Client client, int size);
 
 		void onError(int error);
+
+		/** CaptureSequencer: the shutter (CAMERA_MSG_SHUTTER and CAMERA_MSG_RAW_IMAGE_NOTIFY), then the JPEG
+		 * (CAMERA_MSG_COMPRESSED_IMAGE; null if it could not be encoded) */
+		void onShutter();
+
+		void onPictureTaken(byte[] jpeg);
 	}
 
 	private final ExternalCameraDevice mHal;
@@ -78,6 +85,13 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 	private boolean mPlayShutterSound = true;
 	private int mPreviewTransform;
 	private boolean mFocusFixed;
+	/* API 1 facing FRONT (an external camera is reported so): the preview transform mirrors */
+	private final boolean mMirror = ExternalCameraDevice.getLensFacing() != CameraMetadata.LENS_FACING_BACK;
+	/* takePicture(): a still capture waits for the next frame of the picture size */
+	private boolean mCapturePending;
+	private boolean mCaptureRestartsStream;
+	private int mJpegQuality = 90;
+	private final java.util.concurrent.Executor mWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
 	/* the HAL is called outside mLock (its stream thread takes mLock in onFrame() while it holds the native
 	 * loop's lock), serialized by mHalLock */
 	private final Object mHalLock = new Object();
@@ -99,6 +113,9 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 			mParamsFlattened = params.flatten();
 			mState = STOPPED;
 		}
+		/* previewTransform = degToTransform(0, cameraFacing == CAMERA_FACING_FRONT): the external camera is front facing
+		 * to API 1, so its preview is mirrored */
+		mHal.setDisplayTransform(this, 0, mMirror);
 		return true;
 	}
 
@@ -569,8 +586,15 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 			mPreviewHeight = previewSize.height;
 			mPreviewFpsRange = range;
 			mPreviewFormat = previewFormat;
+			/* JPEG_QUALITY: 1..100, else BAD_VALUE */
+			String quality = newParams.get("jpeg-quality");
+			int jpegQuality = quality != null ? Integer.parseInt(quality) : mJpegQuality;
+			if (jpegQuality < 1 || jpegQuality > 100)
+				return false;
+
 			mPictureWidth = pictureSize.width;
 			mPictureHeight = pictureSize.height;
+			mJpegQuality = jpegQuality;
 			mParamsFlattened = newParams.flatten();
 			return true;
 		}
@@ -619,6 +643,7 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 				height = mPreviewHeight;
 				maxFps = mPreviewFpsRange[1];
 			}
+			mHal.stopStream(this); /* a still capture's stream (picture size) may still run */
 			mHal.setTargets(this, Collections.singletonList(target));
 			boolean started = mHal.startStream(this, width, height, maxFps);
 			if (!started)
@@ -641,7 +666,8 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 		synchronized (mHalLock) {
 			boolean stop;
 			synchronized (mLock) {
-				stop = mState == PREVIEW;
+				stop = mState == PREVIEW || mState == STILL_CAPTURE;
+				mCapturePending = false;
 				if (mState != DISCONNECTED)
 					mState = STOPPED;
 			}
@@ -679,15 +705,51 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 		}
 	}
 
-	/* commandSetDisplayOrientationL() -> Parameters::degToTransform(); false is BAD_VALUE. The transform is kept;
-	 * ATL's Surface consumers do not turn the frames yet */
+	/* commandSetDisplayOrientationL() -> Parameters::degToTransform(degrees, mirror): false is BAD_VALUE; the stream
+	 * turns the frames for the preview Surface (horizontal flip of a front camera first, then clockwise) */
 	boolean setDisplayOrientation(int degrees) {
 		if (degrees != 0 && degrees != 90 && degrees != 180 && degrees != 270)
 			return false;
-		synchronized (mLock) {
-			mPreviewTransform = degrees;
+		synchronized (mHalLock) {
+			synchronized (mLock) {
+				mPreviewTransform = degrees;
+			}
+			mHal.setDisplayTransform(this, degrees, mMirror);
 		}
 		return true;
+	}
+
+	/* Camera2Client::takePicture() with CaptureSequencer's standard capture (the HAL has no ZSL/reprocessing): only
+	 * with preview running (else INVALID_OPERATION, -38); the JPEG has the picture size (the stream switches to it
+	 * when the preview has another size), afterwards the state is STOPPED as after AOSP's manageDone() */
+	int takePicture() {
+		synchronized (mHalLock) {
+			int width, height, maxFps;
+			boolean restart;
+			synchronized (mLock) {
+				if (mState != PREVIEW)
+					return -38;
+				mState = STILL_CAPTURE;
+				restart = mPictureWidth != mPreviewWidth || mPictureHeight != mPreviewHeight;
+				mCaptureRestartsStream = restart;
+				width = mPictureWidth;
+				height = mPictureHeight;
+				maxFps = mPreviewFpsRange[1];
+				mCapturePending = true;
+			}
+			if (restart) {
+				mHal.stopStream(this);
+				if (!mHal.startStream(this, width, height, maxFps)) {
+					synchronized (mLock) {
+						mCapturePending = false;
+						mState = STOPPED;
+					}
+					mHal.setTargets(this, Collections.<Surface>emptyList());
+					return -38;
+				}
+			}
+			return 0;
+		}
 	}
 
 	void enableShutterSound(boolean enable) {
@@ -718,7 +780,13 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 
 	/** the frame in the preview format, during onPreviewFrame() */
 	boolean copyFrame(byte[] dst) {
-		return mHal.copyFrame(dst, mPreviewFormat == HAL_PIXEL_FORMAT_YV12 ? ImageFormat.YV12 : ImageFormat.NV21);
+		int format, width, height;
+		synchronized (mLock) {
+			format = mPreviewFormat == HAL_PIXEL_FORMAT_YV12 ? ImageFormat.YV12 : ImageFormat.NV21;
+			width = mPreviewWidth;
+			height = mPreviewHeight;
+		}
+		return mHal.copyFrame(dst, format, width, height);
 	}
 
 	/* the size of a preview callback frame: NV21, or YV12 with 16-byte aligned strides */
@@ -735,6 +803,34 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 	 * them off (the FrameListener runs on the stream's thread) */
 	@Override
 	public void onFrame(long timestampNs) {
+		boolean capture;
+		int pictureWidth, pictureHeight, quality;
+		synchronized (mLock) {
+			capture = mCapturePending && mState == STILL_CAPTURE;
+			pictureWidth = mPictureWidth;
+			pictureHeight = mPictureHeight;
+			quality = mJpegQuality;
+			if (capture) {
+				mCapturePending = false;
+				mState = STOPPED;
+			}
+		}
+		if (capture) {
+			mCallbacks.onShutter();
+			byte[] jpeg = mHal.encodeJpeg(pictureWidth, pictureHeight, quality);
+			/* the preview stays stopped after the capture; the stream cannot end on its own thread */
+			mWorker.execute(() -> {
+				synchronized (mHalLock) {
+					synchronized (mLock) {
+						if (mState != STOPPED)
+							return;
+					}
+					stopStream();
+				}
+			});
+			mCallbacks.onPictureTaken(jpeg);
+			return;
+		}
 		int size;
 		synchronized (mLock) {
 			if (mState != PREVIEW || (mPreviewCallbackFlags & CAMERA_FRAME_CALLBACK_FLAG_ENABLE_MASK) == 0)

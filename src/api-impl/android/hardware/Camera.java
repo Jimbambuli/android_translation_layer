@@ -20,8 +20,7 @@ import java.util.List;
 /* AOSP core/java/android/hardware/Camera.java. The cameras are those of ATL's camera HAL (the PipeWire cameras,
  * camera2.impl.ExternalCameraDevice); a Camera's native context, AOSP's JNI (core/jni/android_hardware_Camera.cpp)
  * with the camera service's API 1 client, is Camera2Client over that HAL, as AOSP runs API 1 over the camera2
- * HAL. Preview to a SurfaceView/SurfaceTexture and preview callbacks work; takePicture() fails like a client
- * without a still capture stream (not there yet). Parameters, Size and Area are AOSP's Java code (comments and
+ * HAL. Parameters, Size and Area are AOSP's Java code (comments and
  * annotations removed). */
 public class Camera {
 	private static final String TAG = "Camera";
@@ -214,6 +213,19 @@ public class Camera {
 			@Override
 			public void onError(int error) {
 				postEventFromNative(CAMERA_MSG_ERROR, error, 0, null);
+			}
+
+			/* JNICameraContext::notify(): CAMERA_MSG_RAW_IMAGE_NOTIFY reaches Java as CAMERA_MSG_RAW_IMAGE */
+			@Override
+			public void onShutter() {
+				postEventFromNative(CAMERA_MSG_SHUTTER, 0, 0, null);
+				postEventFromNative(CAMERA_MSG_RAW_IMAGE, 0, 0, null);
+			}
+
+			/* JNICameraContext::copyAndPost(CAMERA_MSG_COMPRESSED_IMAGE) */
+			@Override
+			public void onPictureTaken(byte[] jpeg) {
+				postEventFromNative(CAMERA_MSG_COMPRESSED_IMAGE, 0, 0, jpeg);
 			}
 		});
 		if (!client.initialize())
@@ -527,16 +539,15 @@ public class Camera {
 		takePicture(shutter, raw, null, jpeg);
 	}
 
-	/* the still capture of the API 1 client (Camera2Client::takePicture() -> CaptureSequencer, JPEG stream) is
-	 * not there yet: the client fails as AOSP's does without a JPEG stream */
+	/* AOSP takePicture() -> native_takePicture() -> Camera2Client::takePicture() */
 	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback postview, PictureCallback jpeg) {
 		mShutterCallback = shutter;
 		mRawImageCallback = raw;
 		mPostviewCallback = postview;
 		mJpegCallback = jpeg;
-		client();
+		if (client().takePicture() != NO_ERROR)
+			throw new RuntimeException("takePicture failed");
 		mFaceDetectionRunning = false;
-		throw new RuntimeException("takePicture failed");
 	}
 
 	/* Camera2Client::commandStartSmoothZoomL()/commandStopSmoothZoomL(): "Unimplemented!", OK */
