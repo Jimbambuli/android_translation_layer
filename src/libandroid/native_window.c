@@ -1043,9 +1043,16 @@ XrResult bionic_xrGetInstanceProcAddr(XrInstance instance, const char *name, PFN
 	return xr_lazy_call("xrGetInstanceProcAddr", instance, name, func);
 }
 
-typedef void *ANativeActivity;
-
-void ANativeActivity_setWindowFormat(ANativeActivity *activity, int32_t format)
+/* VK_ANDROID_external_memory_android_hardware_buffer: ATL has no AHardwareBuffer (AHardwareBuffer_allocate()
+ * fails, unsupported_ndk.c), so a buffer given here can only be invalid */
+VkResult bionic_vkGetAndroidHardwareBufferPropertiesANDROID(VkDevice device, const struct AHardwareBuffer *buffer,
+                                                            VkAndroidHardwareBufferPropertiesANDROID *pProperties)
 {
-	printf("STUB: %s called\n", __func__);
+	return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+}
+
+VkResult bionic_vkGetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID *pInfo,
+                                                        struct AHardwareBuffer **pBuffer)
+{
+	return VK_ERROR_INVALID_EXTERNAL_HANDLE;
 }

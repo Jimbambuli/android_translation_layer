@@ -140,6 +140,11 @@ shared_includes_dir = include_directories('src/api-impl-jni/')
 
 # libandroid
 libandroid_so = shared_library('android', [
+                                          	'src/libandroid/amidi.c',
+                                          	'src/libandroid/camera_ndk.c',
+                                          	'src/libandroid/image_decoder.c',
+                                          	'src/libandroid/native_activity.c',
+                                          	'src/libandroid/storage_manager.c',
                                           	'src/libandroid/asset_manager.c',
                                           	'src/libandroid/bitmap.c',
                                           	'src/libandroid/choreographer.c',
@@ -296,6 +301,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
                                                                   	'src/api-impl-jni/text/android_text_Layout.c',
                                                                   	'src/api-impl-jni/util.c',
+                                                                  	'src/api-impl-jni/android_runtime_AndroidRuntime.c',
                                                                   	'src/api-impl-jni/handle_cache.c',
                                                                   	'src/api-impl-jni/opengl_poly_clip.c',
                                                                   	'src/api-impl-jni/etc1.c',
@@ -378,6 +384,7 @@ executable('android-translation-layer', [
                                         	'src/main-executable/navigation_bar.c',
                                         	'src/main-executable/system_theme.c',
                                         	'src/main-executable/zygote.c',
+                                        	'src/main-executable/apk_abi.c',
                                         	resources
                                         ],
                                         include_directories: shared_includes_dir,
@@ -388,11 +395,18 @@ executable('android-translation-layer', [
                                         	librsvg_dep
                                         ],
                                         link_args: [
-                                        	'-rdynamic'
+                                        	'-rdynamic',
+                                        	'-L' + libart_dep.get_variable(pkgconfig: 'libdir') / 'art', '-lnativebridge' # NativeBridge*() for the app's ABI
                                         ],
                                         install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
                                                        get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives',
                                         c_args: [
 						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"',
+						'-DATL_NATIVE_BRIDGE="' + get_option('native_bridge') + '"',
+						'-DATL_NATIVE_BRIDGE_ABI="' + get_option('native_bridge_abi') + '"',
 						librsvg_dep.found() ? '-DHAVE_LIBRSVG' : '-UHAVE_LIBRSVG'
                                         ])
+
+# PackageManager's ABI choice (src/main-executable/apk_abi.c) on APKs made by the test
+apk_abi_test = executable('apk_abi_test', ['tests/apk_abi_test.c', 'src/main-executable/apk_abi.c'])
+test('apk_abi', find_program('python3'), args: [meson.current_source_dir() / 'tests/apk_abi_test.py', apk_abi_test])

@@ -37,6 +37,15 @@ public class SystemProperties {
 			properties.put("ro.product.cpu.abilist", abi);
 			properties.put("ro.product.cpu.abilist64", abi);
 		}
+		// with a native bridge (ATL passes ro.dalvik.vm.native.bridge and the ABI list it makes possible),
+		// the list goes on with the ABIs the bridge translates, as on an Android device with a bridge
+		String nativeBridge = System.getProperty("ro.dalvik.vm.native.bridge");
+		String abiList = System.getProperty("ro.product.cpu.abilist");
+		if (nativeBridge != null && abiList != null) {
+			properties.put("ro.dalvik.vm.native.bridge", nativeBridge);
+			properties.put("ro.product.cpu.abilist", abiList);
+			properties.put("ro.product.cpu.abilist64", abiList);
+		}
 		// a phone names itself (ro.product.manufacturer/model, set by the vendor); the device ATL runs on is
 		// this computer: its firmware names it (DMI, else the device tree); unnamed stays "unknown" as in AOSP
 		putIfNamed("ro.product.manufacturer", "/sys/class/dmi/id/sys_vendor", "/sys/class/dmi/id/board_vendor");

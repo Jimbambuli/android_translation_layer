@@ -122,6 +122,28 @@ static EGLBoolean bionic_eglSwapBuffersWithDamage(EGLDisplay display, EGLSurface
 	return bionic_eglSwapBuffers(display, surface);
 }
 
+/* GL_KHR_debug entry points that OpenGL ES drivers export under their KHR names; Mesa exports only the core
+ * names, so they are taken from the driver by name */
+typedef void (*GLDEBUGPROCKHR_)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
+
+void bionic_glDebugMessageCallbackKHR(GLDEBUGPROCKHR_ callback, const void *userParam)
+{
+	void (*func)(GLDEBUGPROCKHR_, const void *) = (void *)eglGetProcAddress("glDebugMessageCallbackKHR");
+	if (!func)
+		func = (void *)eglGetProcAddress("glDebugMessageCallback");
+	if (func)
+		func(callback, userParam);
+}
+
+void bionic_glGetPointervKHR(GLenum pname, void **params)
+{
+	void (*func)(GLenum, void **) = (void *)eglGetProcAddress("glGetPointervKHR");
+	if (!func)
+		func = (void *)eglGetProcAddress("glGetPointerv");
+	if (func)
+		func(pname, params);
+}
+
 void (*bionic_eglGetProcAddress(char const *procname))(void)
 {
 	if (__unlikely__(!strcmp(procname, "eglPresentationTimeANDROID")))
