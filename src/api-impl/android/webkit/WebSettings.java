@@ -134,7 +134,16 @@ public class WebSettings {
 
 	public void setSavePassword(boolean savePassword) { mSavePassword = savePassword; }
 
-	public void setGeolocationEnabled(boolean enabled) {}
+	/* AwSettings: on by default; off, pages are denied geolocation without asking the WebChromeClient */
+	private boolean geolocationEnabled = true;
+
+	public void setGeolocationEnabled(boolean enabled) {
+		geolocationEnabled = enabled;
+	}
+
+	boolean getGeolocationEnabled() {
+		return geolocationEnabled;
+	}
 
 	public void setCacheMode(int mode) {
 		cacheMode = mode;

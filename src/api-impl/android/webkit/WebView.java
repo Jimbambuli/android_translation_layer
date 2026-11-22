@@ -206,8 +206,11 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		this.webViewClient = webViewClient;
 	}
 
+	/* SharedWebViewChromium: a WebView without client has a default WebViewClient (sNullWebViewClient) */
+	private static final WebViewClient nullWebViewClient = new WebViewClient();
+
 	public WebViewClient getWebViewClient() {
-		return webViewClient;
+		return webViewClient != null ? webViewClient : nullWebViewClient;
 	}
 
 	public WebChromeClient getWebChromeClient() {
@@ -591,7 +594,10 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 			throw new IllegalStateException("Can't set data directory suffix: WebView already initialized");
 		if (suffix.indexOf(java.io.File.separatorChar) >= 0)
 			throw new IllegalArgumentException("Suffix " + suffix + " contains a path separator");
+		dataDirectorySuffix = suffix;
 	}
+
+	private static String dataDirectorySuffix;
 
 	/* AwContents.getLastHitTestResult(): the data of the last hit test, the element under the pointer */
 	public HitTestResult getHitTestResult() {
@@ -1335,6 +1341,301 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		callback.onReceiveValue(result);
 	}
 
+	/* ---- WebChromeClient requests that WebKit raises (Chromium: WebViewContentsClientAdapter, AwContents) ---- */
+
+	/* AwWebContentsDelegate.runFileChooser() -> WebViewContentsClientAdapter.showFileChooser(): the app's
+	 * onShowFileChooser() decides; not handled (or no WebChromeClient) is no file, the legacy openFileChooser() is
+	 * only for apps below Lollipop. The URIs the app returns are files for WebKit: file: URIs as they are,
+	 * content: URIs (what a document picker returns) read through the ContentResolver into the WebView's cache. */
+	@Export
+	void internalShowFileChooser(final long request, boolean multiple, String[] mimeTypes) {
+		if (webChromeClient == null) {
+			native_finishFileChooser(request, null);
+			return;
+		}
+		ValueCallback<android.net.Uri[]> callback = new ValueCallback<android.net.Uri[]>() {
+			private boolean mCompleted;
+
+			@Override
+			public void onReceiveValue(final android.net.Uri[] uriList) {
+				if (mCompleted)
+					throw new IllegalStateException("showFileChooser result was already called");
+				mCompleted = true;
+				if (uriList == null) {
+					native_finishFileChooser(request, null);
+					return;
+				}
+				new Thread("WebView file chooser") {
+					@Override
+					public void run() {
+						native_finishFileChooser(request, filesForUpload(uriList));
+					}
+				}.start();
+			}
+		};
+		String acceptTypes = mimeTypes.length > 0 ? String.join(",", mimeTypes) : null;
+		WebChromeClient.FileChooserParams params = new AtlFileChooserParams(multiple ? WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE : WebChromeClient.FileChooserParams.MODE_OPEN, acceptTypes);
+		if (webChromeClient.onShowFileChooser(this, callback, params))
+			return;
+		if (getContext().getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+			callback.onReceiveValue(null);
+			return;
+		}
+		native_finishFileChooser(request, null);
+	}
+
+	private static int uploadNumber;
+
+	private String[] filesForUpload(android.net.Uri[] uris) {
+		List<String> paths = new ArrayList<>();
+		for (android.net.Uri uri : uris) {
+			if (uri == null)
+				continue;
+			if ("file".equals(uri.getScheme()) || uri.getScheme() == null) {
+				if (uri.getPath() != null)
+					paths.add(uri.getPath());
+				continue;
+			}
+			String name = null; // OpenableColumns.DISPLAY_NAME ("_display_name"; the class is not in ATL)
+			try (android.database.Cursor cursor = getContext().getContentResolver().query(uri, new String[] {"_display_name"}, null, null, null)) {
+				if (cursor != null && cursor.moveToFirst())
+					name = cursor.getString(0);
+			} catch (Exception e) {
+			}
+			if (name == null || name.isEmpty() || name.indexOf('/') >= 0)
+				name = uri.getLastPathSegment() != null && uri.getLastPathSegment().indexOf('/') < 0 ? uri.getLastPathSegment() : "upload";
+			int number;
+			synchronized (WebView.class) {
+				number = ++uploadNumber;
+			}
+			java.io.File dir = new java.io.File(getContext().getCacheDir(), "WebView/upload/" + number);
+			dir.mkdirs();
+			java.io.File file = new java.io.File(dir, name);
+			try (InputStream in = getContext().getContentResolver().openInputStream(uri);
+			     java.io.OutputStream out = new java.io.FileOutputStream(file)) {
+				byte[] buffer = new byte[65536];
+				int count;
+				while ((count = in.read(buffer)) > 0)
+					out.write(buffer, 0, count);
+				paths.add(file.getPath());
+			} catch (Exception e) {
+				Log.w(TAG, "file chooser: can't read " + uri + ": " + e);
+			}
+		}
+		return paths.toArray(new String[0]);
+	}
+
+	/* AwContents.onGeolocationPermissionsShowPrompt(): denied while WebSettings.setGeolocationEnabled(false), a
+	 * retained decision (GeolocationPermissions) answers at once, otherwise the WebChromeClient's
+	 * onGeolocationPermissionsShowPrompt(); without a WebChromeClient it is denied
+	 * (WebViewContentsClientAdapter). An app that never invokes the callback leaves the page waiting, as there. */
+	@Export
+	void internalGeolocationPrompt(final long request, final String origin) {
+		if (!getSettings().getGeolocationEnabled()) {
+			native_finishPermission(request, false);
+			return;
+		}
+		Boolean retained = GeolocationPermissions.getInstance().retained(origin);
+		if (retained != null) {
+			native_finishPermission(request, retained);
+			return;
+		}
+		if (webChromeClient == null) {
+			native_finishPermission(request, false);
+			return;
+		}
+		webChromeClient.onGeolocationPermissionsShowPrompt(origin, new GeolocationPermissions.Callback() {
+			private boolean answered;
+
+			@Override
+			public void invoke(String callbackOrigin, boolean allow, boolean retain) {
+				synchronized (this) {
+					if (answered)
+						return;
+					answered = true;
+				}
+				if (retain) {
+					if (allow)
+						GeolocationPermissions.getInstance().allow(callbackOrigin);
+					else
+						GeolocationPermissions.getInstance().deny(callbackOrigin);
+				}
+				native_finishPermission(request, allow);
+			}
+		});
+	}
+
+	/* AwPermissionRequest through WebViewContentsClientAdapter.onPermissionRequest() (PermissionRequestAdapter):
+	 * the WebChromeClient grants or denies; WebChromeClient's own onPermissionRequest() denies */
+	@Export
+	void internalPermissionRequest(final long request, final String origin, boolean video, boolean audio) {
+		List<String> resources = new ArrayList<>();
+		if (video)
+			resources.add(PermissionRequest.RESOURCE_VIDEO_CAPTURE);
+		if (audio)
+			resources.add(PermissionRequest.RESOURCE_AUDIO_CAPTURE);
+		final String[] requested = resources.toArray(new String[0]);
+		PermissionRequest permissionRequest = new PermissionRequest() {
+			private boolean answered;
+
+			@Override
+			public android.net.Uri getOrigin() {
+				return android.net.Uri.parse(origin);
+			}
+
+			@Override
+			public String[] getResources() {
+				return requested.clone();
+			}
+
+			/* PermissionRequestAdapter.grant(): allowed only if every requested resource is granted */
+			@Override
+			public void grant(String[] granted) {
+				List<String> grantedList = granted != null ? Arrays.asList(granted) : new ArrayList<String>();
+				answer(grantedList.containsAll(Arrays.asList(requested)));
+			}
+
+			@Override
+			public void deny() {
+				answer(false);
+			}
+
+			private void answer(boolean allow) {
+				synchronized (this) {
+					if (answered)
+						return;
+					answered = true;
+				}
+				native_finishPermission(request, allow);
+			}
+		};
+		if (webChromeClient != null)
+			webChromeClient.onPermissionRequest(permissionRequest);
+		else
+			permissionRequest.deny();
+	}
+
+	/* ---- androidx.webkit (org.chromium.support_lib_glue): WebMessageListener, document-start scripts, muting ---- */
+
+	private static final class WebMessageListenerEntry {
+		final String name;
+		final AtlOriginMatcher matcher;
+		final java.lang.reflect.InvocationHandler listener;
+
+		WebMessageListenerEntry(String name, AtlOriginMatcher matcher, java.lang.reflect.InvocationHandler listener) {
+			this.name = name;
+			this.matcher = matcher;
+			this.listener = listener;
+		}
+	}
+
+	private static final class DocumentStartScript {
+		final String script;
+		final AtlOriginMatcher matcher;
+
+		DocumentStartScript(String script, AtlOriginMatcher matcher) {
+			this.script = script;
+			this.matcher = matcher;
+		}
+	}
+
+	/* read on the socket thread of the web process extension (internalFrameScripts()) */
+	private final List<WebMessageListenerEntry> webMessageListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+	private final List<DocumentStartScript> documentStartScripts = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+	/* AwContents.addWebMessageListener(): the name must be a JavaScript identifier, not used twice; invalid rules
+	 * throw IllegalArgumentException. Frames get the object from their next document on. */
+	public void addWebMessageListener(String jsObjectName, String[] allowedOriginRules, java.lang.reflect.InvocationHandler listener) {
+		if (jsObjectName == null || !jsObjectName.matches("[A-Za-z_$][A-Za-z0-9_$]*"))
+			throw new IllegalArgumentException("jsObjectName " + jsObjectName + " is not a valid JavaScript identifier");
+		AtlOriginMatcher matcher = new AtlOriginMatcher(allowedOriginRules);
+		for (WebMessageListenerEntry entry : webMessageListeners) {
+			if (entry.name.equals(jsObjectName))
+				throw new IllegalArgumentException("jsObjectName " + jsObjectName + " was already added.");
+		}
+		webMessageListeners.add(new WebMessageListenerEntry(jsObjectName, matcher, listener));
+	}
+
+	public void removeWebMessageListener(String jsObjectName) {
+		for (WebMessageListenerEntry entry : webMessageListeners) {
+			if (entry.name.equals(jsObjectName))
+				webMessageListeners.remove(entry);
+		}
+	}
+
+	/* AwContents.addDocumentStartJavaScript(): runs as a script of its own in each matching frame before the
+	 * page's scripts, from the next document on; the handle's remove() takes it out again */
+	public Runnable addDocumentStartJavaScript(String script, String[] allowedOriginRules) {
+		if (script == null)
+			throw new IllegalArgumentException("script shouldn't be null.");
+		final DocumentStartScript entry = new DocumentStartScript(script, new AtlOriginMatcher(allowedOriginRules));
+		documentStartScripts.add(entry);
+		return new Runnable() {
+			@Override
+			public void run() {
+				documentStartScripts.remove(entry);
+			}
+		};
+	}
+
+	/* the web process extension asks, on its socket thread, what a new document of a frame gets (see
+	 * atl_webext.c): [0] installs the matching listener objects (Chromium's JsBinding: postMessage(), onmessage,
+	 * add/removeEventListener("message")), then the matching document-start scripts */
+	@Export
+	String[] internalFrameScripts(String origin, boolean mainFrame) {
+		List<String> scripts = new ArrayList<>();
+		StringBuilder names = new StringBuilder();
+		for (WebMessageListenerEntry entry : webMessageListeners) {
+			if (entry.matcher.matches(origin))
+				names.append(names.length() > 0 ? "," : "").append(jsString(entry.name));
+		}
+		scripts.add(names.length() == 0 ? "" : "(function(post){var d={};[" + names + "].forEach(function(name){"
+		    + "var o={},ls=[];o.onmessage=null;"
+		    + "o.postMessage=function(m){if(typeof m!=='string')throw new TypeError('postMessage: only strings are supported');post(name,m);};"
+		    + "o.addEventListener=function(t,f){if(t==='message'&&typeof f==='function'&&ls.indexOf(f)<0)ls.push(f);};"
+		    + "o.removeEventListener=function(t,f){var i=ls.indexOf(f);if(t==='message'&&i>=0)ls.splice(i,1);};"
+		    + "d[name]=function(data){var e=new MessageEvent('message',{data:data});if(typeof o.onmessage==='function')o.onmessage(e);"
+		    + "ls.slice().forEach(function(f){f(e);});};"
+		    + "Object.defineProperty(window,name,{value:o,writable:true,configurable:true});});"
+		    + "return function(name,data){if(d[name])d[name](data);};})");
+		for (DocumentStartScript entry : documentStartScripts) {
+			if (entry.matcher.matches(origin))
+				scripts.add(entry.script);
+		}
+		return scripts.size() == 1 && scripts.get(0).isEmpty() ? null : scripts.toArray(new String[0]);
+	}
+
+	/* a listener object's postMessage(): WebMessageListener.onPostMessage(view, message, sourceOrigin,
+	 * isMainFrame, replyProxy) through the app's boundary interfaces (SupportLibWebMessageListenerAdapter) */
+	@Export
+	void internalWebMessage(String name, String data, String origin, boolean mainFrame, final long frame, final long document) {
+		for (WebMessageListenerEntry entry : webMessageListeners) {
+			if (!entry.name.equals(name))
+				continue;
+			// the rules as the listener has them now (it may have been replaced since the frame got its object)
+			if (!entry.matcher.matches(origin))
+				return;
+			final String jsObjectName = name;
+			org.chromium.support_lib_glue.SupportLibReflectionUtil.postWebMessage(this, entry.listener, data, android.net.Uri.parse(origin), mainFrame, new org.chromium.support_lib_glue.SupportLibReflectionUtil.ReplyTarget() {
+				@Override
+				public void postMessage(String message) {
+					if (!destroyed)
+						native_postToFrame(widget, frame, document, jsObjectName, message);
+				}
+			});
+			return;
+		}
+	}
+
+	/* androidx WebViewCompat.setAudioMuted() / isAudioMuted() (AwContents): WebKit's mute of the page */
+	public void setAudioMuted(boolean muted) {
+		native_setAudioMuted(widget, muted);
+	}
+
+	public boolean isAudioMuted() {
+		return native_isAudioMuted(widget);
+	}
+
 	public void setWebChromeClient(WebChromeClient webChromeClient) {
 		this.webChromeClient = webChromeClient;
 	}
@@ -1660,10 +1961,18 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 
 	/* AOSP WebView.getFactory() = WebViewFactory.getProvider(): fails once disableWebView() was called, otherwise the
 	 * provider exists from then on. Also directly accessed by androidx WebViewGlueCommunicator to get ClassLoader */
-	private static synchronized Object getFactory() {
+	static synchronized Object getFactory() {
 		if (webViewDisabled)
 			throw new IllegalStateException("WebView.disableWebView() was called: WebView is disabled");
-		providerInitialized = true;
+		if (!providerInitialized) {
+			providerInitialized = true;
+			/* AwBrowserProcess / PathUtils: the WebView's data in <data dir>/app_webview[_<suffix>] */
+			Context app = android.app.ActivityThread.currentApplication();
+			if (app != null) {
+				native_setDataDirectory(app.getDataDir() + "/app_webview" + (dataDirectorySuffix != null ? "_" + dataDirectorySuffix : ""));
+				native_setGeolocationProvider(new AtlGeolocationProvider(app));
+			}
+		}
 		return new Object();
 	}
 
@@ -1699,6 +2008,17 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private native String native_getDataHistoryUrl(long widget);
 	private native String[] native_getHistory(long widget, int[] currentIndex);
 	private native void native_loadUrl(long widget, String url);
+	private static native void native_finishFileChooser(long request, String[] paths);
+	private static native void native_finishPermission(long request, boolean allow);
+	static native void native_releaseRequest(long request);
+	private native void native_postToFrame(long widget, long frame, long document, String name, String data);
+	private native void native_setAudioMuted(long widget, boolean muted);
+	private native boolean native_isAudioMuted(long widget);
+	private static native void native_setDataDirectory(String directory);
+	static native void native_setGeolocationProvider(Object provider);
+	static native void native_geolocationUpdate(long manager, long timeMs, double latitude, double longitude, double accuracy,
+	                                            double altitude, double altitudeAccuracy, double heading, double speed);
+	static native void native_geolocationFailed(long manager, String message);
 	private native void native_postUrl(long widget, String url, byte[] form, String formId);
 	private native void native_reload(long widget);
 	private native void native_addJavascriptInterface(long widget, String name, String methodNames);

@@ -173,6 +173,38 @@ static void intercept_set_page(JNIEnv *env, WebKitWebView *webview, jobject this
 	g_mutex_unlock(&intercept_lock);
 }
 
+static gboolean frame_scripts_reply(JNIEnv *env, const char *request, GOutputStream *out)
+{
+	(*env)->PushLocalFrame(env, 16);
+	char **field = g_strsplit(request, "\t", 3);
+	jobjectArray scripts = NULL;
+	if (g_strv_length(field) == 3) {
+		g_mutex_lock(&intercept_lock);
+		jweak weak = g_hash_table_lookup(intercept_pages, GUINT_TO_POINTER(g_ascii_strtoull(field[0], NULL, 10)));
+		jobject this = weak ? (*env)->NewLocalRef(env, weak) : NULL;
+		g_mutex_unlock(&intercept_lock);
+		scripts = this ? J__WebView__internalFrameScripts(env, this, _JSTRING(field[1]), field[2][0] == '1') : NULL;
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			scripts = NULL;
+		}
+	}
+	g_strfreev(field);
+	g_autoptr(GString) reply = g_string_new(NULL);
+	jsize count = scripts ? (*env)->GetArrayLength(env, scripts) : 0;
+	g_string_append_printf(reply, "%d\n", count);
+	for (jsize i = 0; i < count; i++) {
+		jstring script = (*env)->GetObjectArrayElement(env, scripts, i);
+		const char *chars = script ? (*env)->GetStringUTFChars(env, script, NULL) : NULL;
+		g_string_append_printf(reply, "%zu\n%s", chars ? strlen(chars) : 0, chars ? chars : "");
+		if (chars)
+			(*env)->ReleaseStringUTFChars(env, script, chars);
+	}
+	(*env)->PopLocalFrame(env, NULL);
+	return g_output_stream_write_all(out, reply->str, reply->len, NULL, NULL, NULL);
+}
+
 static gboolean intercept_connection_cb(GThreadedSocketService *service, GSocketConnection *connection, GObject *source, gpointer user_data)
 {
 	JNIEnv *env;
@@ -181,6 +213,15 @@ static gboolean intercept_connection_cb(GThreadedSocketService *service, GSocket
 	GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(connection));
 	char *line;
 	while ((line = g_data_input_stream_read_line(in, NULL, NULL, NULL))) {
+		/* "S\t<page id>\t<origin>\t<1 main frame/0>": the frame's scripts (see internalFrameScripts()), answered by
+		 * "<count>\n" and count times "<length>\n<bytes>" */
+		if (g_str_has_prefix(line, "S\t")) {
+			gboolean ok = frame_scripts_reply(env, line + 2, out);
+			g_free(line);
+			if (!ok)
+				break;
+			continue;
+		}
 		char reply[64] = "";
 		(*env)->PushLocalFrame(env, 16); // the thread stays attached: its local references go with each request
 		char **field = g_strsplit(line, "\t", 4);
@@ -747,6 +788,323 @@ static void undo_font_dpi_zoom(GtkSettings *settings, GParamSpec *pspec, WebKitW
 	webkit_web_view_set_zoom_level(webview, fabs(page_scale - 1) > 0.02 ? 1 / page_scale : 1);
 }
 
+/* ---- WebChromeClient requests (Chromium: AwWebContentsDelegate / AwContentsClientBridge) ---- */
+
+/* WebKit's own handling (a GTK dialog, permission dialogs) does not exist on Android: the WebChromeClient decides,
+ * and without one the request is turned down, as by WebViewContentsClientAdapter */
+
+// <input type=file>: WebChromeClient.onShowFileChooser() (AwWebContentsDelegate.runFileChooser())
+static gboolean run_file_chooser_cb(WebKitWebView *web_view, WebKitFileChooserRequest *request, WrapperWidget *wrapper)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = webview_jobject(env, wrapper);
+	if (!this) {
+		webkit_file_chooser_request_cancel(request);
+		return TRUE;
+	}
+	const gchar *const *mime_types = webkit_file_chooser_request_get_mime_types(request);
+	guint count = mime_types ? g_strv_length((gchar **)mime_types) : 0;
+	jobjectArray types = (*env)->NewObjectArray(env, count, (*env)->FindClass(env, "java/lang/String"), NULL);
+	for (guint i = 0; i < count; i++)
+		(*env)->SetObjectArrayElement(env, types, i, _JSTRING(mime_types[i]));
+	J__WebView__internalShowFileChooser(env, this, _INTPTR(g_object_ref(request)), webkit_file_chooser_request_get_select_multiple(request), types);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, this);
+	return TRUE;
+}
+
+struct file_chooser_result {
+	WebKitFileChooserRequest *request;
+	char **files; // NULL: cancelled
+};
+
+static gboolean file_chooser_finish_cb(gpointer user_data)
+{
+	struct file_chooser_result *result = user_data;
+	if (result->files && result->files[0])
+		webkit_file_chooser_request_select_files(result->request, (const gchar *const *)result->files);
+	else
+		webkit_file_chooser_request_cancel(result->request);
+	g_object_unref(result->request);
+	g_strfreev(result->files);
+	g_free(result);
+	return G_SOURCE_REMOVE;
+}
+
+/* the ValueCallback of onShowFileChooser(): local paths of the chosen files, or null; on any thread */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishFileChooser(JNIEnv *env, jclass class, jlong request, jobjectArray paths)
+{
+	struct file_chooser_result *result = g_new0(struct file_chooser_result, 1);
+	result->request = _PTR(request);
+	if (paths) {
+		jsize count = (*env)->GetArrayLength(env, paths);
+		result->files = g_new0(char *, count + 1);
+		for (jsize i = 0; i < count; i++) {
+			jstring path = (*env)->GetObjectArrayElement(env, paths, i);
+			const char *chars = (*env)->GetStringUTFChars(env, path, NULL);
+			result->files[i] = g_strdup(chars);
+			(*env)->ReleaseStringUTFChars(env, path, chars);
+			(*env)->DeleteLocalRef(env, path);
+		}
+	}
+	g_main_context_invoke(NULL, file_chooser_finish_cb, result);
+}
+
+/* the origin of the page that asks, as Chromium reports it (GURL::GetOrigin().spec(): "scheme://host[:port]/");
+ * WebKitGTK's permission requests do not name the frame, so this is the main frame's */
+static char *page_origin(WebKitWebView *web_view)
+{
+	const char *uri = webkit_web_view_get_uri(web_view);
+	g_autoptr(GUri) parsed = uri ? g_uri_parse(uri, G_URI_FLAGS_ENCODED, NULL) : NULL;
+	if (!parsed || !g_uri_get_host(parsed))
+		return g_strdup("");
+	int port = g_uri_get_port(parsed);
+	const char *scheme = g_uri_get_scheme(parsed);
+	gboolean default_port = port < 0 || (port == 80 && !g_ascii_strcasecmp(scheme, "http")) || (port == 443 && !g_ascii_strcasecmp(scheme, "https"));
+	return default_port ? g_strdup_printf("%s://%s/", scheme, g_uri_get_host(parsed)) : g_strdup_printf("%s://%s:%d/", scheme, g_uri_get_host(parsed), port);
+}
+
+/* geolocation: onGeolocationPermissionsShowPrompt(); camera/microphone: onPermissionRequest(); everything
+ * else Android's WebView does not offer to pages (notifications, pointer lock, ...) is denied, as is device
+ * information beyond what getUserMedia() grants (Chromium shows device labels only then) */
+static gboolean permission_request_cb(WebKitWebView *web_view, WebKitPermissionRequest *request, WrapperWidget *wrapper)
+{
+	gboolean geolocation = WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST(request);
+	gboolean media = WEBKIT_IS_USER_MEDIA_PERMISSION_REQUEST(request);
+	JNIEnv *env = get_jni_env();
+	jobject this = (geolocation || media) ? webview_jobject(env, wrapper) : NULL;
+	if (!this) {
+		webkit_permission_request_deny(request);
+		return TRUE;
+	}
+	g_autofree char *origin = page_origin(web_view);
+	if (geolocation) {
+		J__WebView__internalGeolocationPrompt(env, this, _INTPTR(g_object_ref(request)), _JSTRING(origin));
+	} else {
+		WebKitUserMediaPermissionRequest *media_request = WEBKIT_USER_MEDIA_PERMISSION_REQUEST(request);
+		J__WebView__internalPermissionRequest(env, this, _INTPTR(g_object_ref(request)), _JSTRING(origin),
+		                                      webkit_user_media_permission_is_for_video_device(media_request),
+		                                      webkit_user_media_permission_is_for_audio_device(media_request));
+	}
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, this);
+	return TRUE;
+}
+
+static gboolean permission_finish_cb(gpointer user_data)
+{
+	WebKitPermissionRequest *request = WEBKIT_PERMISSION_REQUEST(((gpointer *)user_data)[0]);
+	if (GPOINTER_TO_INT(((gpointer *)user_data)[1]))
+		webkit_permission_request_allow(request);
+	else
+		webkit_permission_request_deny(request);
+	g_object_unref(request);
+	g_free(user_data);
+	return G_SOURCE_REMOVE;
+}
+
+/* the app's answer to a permission request (GeolocationPermissions.Callback, PermissionRequest); on any thread */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishPermission(JNIEnv *env, jclass class, jlong request, jboolean allow)
+{
+	gpointer *data = g_new(gpointer, 2);
+	data[0] = _PTR(request);
+	data[1] = GINT_TO_POINTER(allow);
+	g_main_context_invoke(NULL, permission_finish_cb, data);
+}
+
+static gboolean release_request_cb(gpointer request)
+{
+	g_object_unref(request);
+	return G_SOURCE_REMOVE;
+}
+
+/* a request the app never answered: WebKit turns it down when its last reference goes (permission requests) */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1releaseRequest(JNIEnv *env, jclass class, jlong request)
+{
+	g_main_context_invoke(NULL, release_request_cb, _PTR(request));
+}
+
+/* Chromium feeds the Geolocation API from Android's LocationManager (LocationProviderAndroid), WebKitGTK from
+ * GeoClue; here WebKit's geolocation manager asks the app's LocationManager instead (WebView.GeolocationProvider) */
+static jobject geolocation_provider; // global reference, set once
+
+static gboolean geolocation_start_cb(WebKitGeolocationManager *manager, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	jclass class = (*env)->GetObjectClass(env, geolocation_provider);
+	(*env)->CallVoidMethod(env, geolocation_provider, (*env)->GetMethodID(env, class, "start", "(JZ)V"), _INTPTR(manager),
+	                       webkit_geolocation_manager_get_enable_high_accuracy(manager));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, class);
+	return TRUE;
+}
+
+static void geolocation_stop_cb(WebKitGeolocationManager *manager, gpointer user_data)
+{
+	JNIEnv *env = get_jni_env();
+	jclass class = (*env)->GetObjectClass(env, geolocation_provider);
+	(*env)->CallVoidMethod(env, geolocation_provider, (*env)->GetMethodID(env, class, "stop", "()V"));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, class);
+}
+
+/* WebKit belongs to the main thread; the provider is set up wherever the app first asks for the WebView provider
+ * (CookieManager.getInstance() is used from other threads too) */
+static gboolean connect_geolocation_on_main(gpointer user_data)
+{
+	WebKitGeolocationManager *manager = webkit_web_context_get_geolocation_manager(webkit_web_context_get_default());
+	g_signal_connect(manager, "start", G_CALLBACK(geolocation_start_cb), NULL);
+	g_signal_connect(manager, "stop", G_CALLBACK(geolocation_stop_cb), NULL);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setGeolocationProvider(JNIEnv *env, jclass class, jobject provider)
+{
+	if (geolocation_provider)
+		return;
+	geolocation_provider = (*env)->NewGlobalRef(env, provider);
+	g_main_context_invoke(NULL, connect_geolocation_on_main, NULL);
+}
+
+// a fix from LocationManager (on the main thread, the provider listens on the main looper); NaN: not known
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1geolocationUpdate(JNIEnv *env, jclass class, jlong manager_ptr, jlong time_ms, jdouble latitude, jdouble longitude, jdouble accuracy, jdouble altitude, jdouble altitude_accuracy, jdouble heading, jdouble speed)
+{
+	WebKitGeolocationPosition *position = webkit_geolocation_position_new(latitude, longitude, accuracy);
+	webkit_geolocation_position_set_timestamp(position, time_ms / 1000);
+	if (!isnan(altitude))
+		webkit_geolocation_position_set_altitude(position, altitude);
+	if (!isnan(altitude_accuracy))
+		webkit_geolocation_position_set_altitude_accuracy(position, altitude_accuracy);
+	if (!isnan(heading))
+		webkit_geolocation_position_set_heading(position, heading);
+	if (!isnan(speed))
+		webkit_geolocation_position_set_speed(position, speed);
+	webkit_geolocation_manager_update_position(_PTR(manager_ptr), position);
+	webkit_geolocation_position_free(position);
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1geolocationFailed(JNIEnv *env, jclass class, jlong manager_ptr, jstring message)
+{
+	const char *text = (*env)->GetStringUTFChars(env, message, NULL);
+	webkit_geolocation_manager_failed(_PTR(manager_ptr), text);
+	(*env)->ReleaseStringUTFChars(env, message, text);
+}
+
+/* the WebView's data directory (Chromium: <data dir>/app_webview[_suffix]); its cookies are kept there, as Chromium
+ * keeps them in Default/Cookies, so they last across restarts (WebKit's default session keeps them in memory) */
+static gboolean set_cookie_storage_on_main(gpointer path)
+{
+	WebKitCookieManager *cookie_manager = webkit_network_session_get_cookie_manager(webkit_network_session_get_default());
+	webkit_cookie_manager_set_persistent_storage(cookie_manager, path, WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE);
+	g_free(path);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setDataDirectory(JNIEnv *env, jclass class, jstring directory)
+{
+	if (!getenv("ATL_UGLY_ENABLE_WEBVIEW"))
+		return;
+	const char *dir = (*env)->GetStringUTFChars(env, directory, NULL);
+	g_autofree char *profile = g_build_filename(dir, "Default", NULL);
+	(*env)->ReleaseStringUTFChars(env, directory, dir);
+	g_mkdir_with_parents(profile, 0700);
+	g_main_context_invoke(NULL, set_cookie_storage_on_main, g_build_filename(profile, "Cookies", NULL));
+}
+
+/* ---- androidx.webkit WebViewCompat.addWebMessageListener() / addDocumentStartJavaScript() ---- */
+
+/* Chromium installs the listeners' JavaScript objects and runs the document-start scripts in each frame whose origin
+ * the rules allow (js_java_interaction), the origin as the browser knows it. Here ATL's web process extension asks
+ * for them over the shouldInterceptRequest() socket when a frame's window object is set up (before the page's own
+ * scripts), with the origin it reads from that frame itself (WebView.internalFrameScripts()). A listener object's
+ * postMessage() comes back as the user message "atl-wml"; the JavaScriptReplyProxy answers with "atl-wml-reply" to
+ * the same frame and document. */
+static gboolean user_message_received_cb(WebKitWebView *web_view, WebKitUserMessage *message, WrapperWidget *wrapper)
+{
+	if (g_strcmp0(webkit_user_message_get_name(message), "atl-wml"))
+		return FALSE;
+	GVariant *parameters = webkit_user_message_get_parameters(message);
+	if (!parameters || !g_variant_is_of_type(parameters, G_VARIANT_TYPE("(sssbtt)")))
+		return TRUE;
+	const char *name, *data, *origin;
+	gboolean main_frame;
+	guint64 frame, document;
+	g_variant_get(parameters, "(&s&s&sbtt)", &name, &data, &origin, &main_frame, &frame, &document);
+	JNIEnv *env = get_jni_env();
+	jobject this = webview_jobject(env, wrapper);
+	if (!this)
+		return TRUE;
+	J__WebView__internalWebMessage(env, this, _JSTRING(name), _JSTRING(data), _JSTRING(origin), main_frame, (jlong)frame, (jlong)document);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, this);
+	return TRUE;
+}
+
+struct frame_reply {
+	WebKitWebView *web_view;
+	char *name, *data;
+	guint64 frame, document;
+};
+
+static gboolean frame_reply_cb(gpointer user_data)
+{
+	struct frame_reply *reply = user_data;
+	webkit_web_view_send_message_to_page(reply->web_view, webkit_user_message_new("atl-wml-reply", g_variant_new("(ttss)", reply->frame, reply->document, reply->name, reply->data)), NULL, NULL, NULL);
+	g_object_unref(reply->web_view);
+	g_free(reply->name);
+	g_free(reply->data);
+	g_free(reply);
+	return G_SOURCE_REMOVE;
+}
+
+// JavaScriptReplyProxy.postMessage(): a "message" event at the listener's object in that frame; on any thread
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1postToFrame(JNIEnv *env, jobject this, jlong widget_ptr, jlong frame, jlong document, jstring name, jstring data)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return;
+	struct frame_reply *reply = g_new(struct frame_reply, 1);
+	reply->web_view = g_object_ref(WEBKIT_WEB_VIEW(webview));
+	const char *chars = (*env)->GetStringUTFChars(env, name, NULL);
+	reply->name = g_strdup(chars);
+	(*env)->ReleaseStringUTFChars(env, name, chars);
+	chars = (*env)->GetStringUTFChars(env, data, NULL);
+	reply->data = g_strdup(chars);
+	(*env)->ReleaseStringUTFChars(env, data, chars);
+	reply->frame = frame;
+	reply->document = document;
+	g_main_context_invoke(NULL, frame_reply_cb, reply);
+}
+
+// androidx WebViewCompat.setAudioMuted() (Chromium AwContents.setAudioMuted())
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setAudioMuted(JNIEnv *env, jobject this, jlong widget_ptr, jboolean muted)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (WEBKIT_IS_WEB_VIEW(webview))
+		webkit_web_view_set_is_muted(WEBKIT_WEB_VIEW(webview), muted);
+}
+
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1isAudioMuted(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	return WEBKIT_IS_WEB_VIEW(webview) && webkit_web_view_get_is_muted(WEBKIT_WEB_VIEW(webview));
+}
+
 JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	/*
@@ -781,6 +1139,8 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	}
 	WebKitSettings *settings = webkit_settings_new();
 	webkit_settings_set_enable_smooth_scrolling(settings, FALSE);
+	// getUserMedia() is there in Android's WebView (the page asks, onPermissionRequest() decides)
+	webkit_settings_set_enable_media_stream(settings, TRUE);
 	GtkWidget *webview = GTK_WIDGET(take_parked_web_view());
 	if (webview) {
 		// what a new WebKitWebView has: default settings and background
@@ -907,6 +1267,9 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	g_signal_connect(webview, "decide-policy", G_CALLBACK(decide_policy), wrapper);
 	g_signal_connect(webview, "context-menu", G_CALLBACK(context_menu_cb), NULL);
 	g_signal_connect(webview, "mouse-target-changed", G_CALLBACK(mouse_target_changed_cb), wrapper);
+	g_signal_connect(webview, "run-file-chooser", G_CALLBACK(run_file_chooser_cb), wrapper);
+	g_signal_connect(webview, "permission-request", G_CALLBACK(permission_request_cb), wrapper);
+	g_signal_connect(webview, "user-message-received", G_CALLBACK(user_message_received_cb), wrapper);
 	WebKitFindController *find_controller = webkit_web_view_get_find_controller(WEBKIT_WEB_VIEW(webview));
 	g_signal_connect(find_controller, "found-text", G_CALLBACK(found_text_cb), wrapper);
 	g_signal_connect(find_controller, "failed-to-find-text", G_CALLBACK(failed_to_find_text_cb), wrapper);

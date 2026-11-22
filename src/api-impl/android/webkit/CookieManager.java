@@ -26,6 +26,9 @@ public class CookieManager {
 			throw new RuntimeException("CookieManager not yet fully implemented");
 		} catch (ClassNotFoundException e) {
 		}
+		// AOSP CookieManager.getInstance() = WebViewFactory.getProvider().getCookieManager(): the provider sets up
+		// the WebView's data directory, where the cookies are kept
+		WebView.getFactory();
 		return new CookieManager();
 	}
 
