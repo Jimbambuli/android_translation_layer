@@ -1,5 +1,23 @@
 package android.telephony;
 
+import android.content.res.Resources;
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.annotation.SystemApi;
+import android.compat.annotation.UnsupportedAppUsage;
+import android.content.Context;
+import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
+import android.os.PersistableBundle;
+import android.provider.Contacts;
+import android.provider.ContactsContract;
+import android.text.Editable;
+import android.text.Spannable;
+import android.text.TextUtils;
+import android.text.style.TtsSpan;
+import android.telephony.Rlog;
+import java.util.Locale;
 import android.annotation.IntDef;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -593,4 +611,705 @@ public class PhoneNumberUtils {
 
         return result;
     }
+
+    /** Extracts the phone number from an Intent.
+     *
+     * @param intent the intent to get the number of
+     * @param context a context to use for database access
+     *
+     * @return the phone number that would be called by the intent, or
+     *         <code>null</code> if the number cannot be found.
+     */
+    public static String getNumberFromIntent(Intent intent, Context context) {
+        String number = null;
+
+        Uri uri = intent.getData();
+
+        if (uri == null) {
+            return null;
+        }
+
+        String scheme = uri.getScheme();
+        if (scheme == null) {
+            return null;
+        }
+
+        if (scheme.equals("tel") || scheme.equals("sip")) {
+            return uri.getSchemeSpecificPart();
+        }
+
+        if (context == null) {
+            return null;
+        }
+
+        String type = intent.resolveType(context);
+        String phoneColumn = null;
+
+        // Correctly read out the phone entry based on requested provider
+        final String authority = uri.getAuthority();
+        if (Contacts.AUTHORITY.equals(authority)) {
+            phoneColumn = Contacts.People.Phones.NUMBER;
+        } else if (ContactsContract.AUTHORITY.equals(authority)) {
+            phoneColumn = ContactsContract.CommonDataKinds.Phone.NUMBER;
+        }
+
+        Cursor c = null;
+        try {
+            c = context.getContentResolver().query(uri, new String[] { phoneColumn },
+                    null, null, null);
+            if (c != null) {
+                if (c.moveToFirst()) {
+                    number = c.getString(c.getColumnIndex(phoneColumn));
+                }
+            }
+        } catch (RuntimeException e) {
+            Rlog.e(LOG_TAG, "Error getting phone number.", e);
+        } finally {
+            if (c != null) {
+                c.close();
+            }
+        }
+
+        return number;
+    }
+
+    /**
+     * Returns the rightmost minimum matched characters in the network portion
+     * in *reversed* order
+     *
+     * This can be used to do a database lookup against the column
+     * that stores getStrippedReversed()
+     *
+     * Returns null if phoneNumber == null
+     */
+    public static String
+    toCallerIDMinMatch(String phoneNumber) {
+        String np = extractNetworkPortionAlt(phoneNumber);
+        return internalGetStrippedReversed(np, getMinMatch());
+    }
+
+    /**
+     * Returns the network portion reversed.
+     * This string is intended to go into an index column for a
+     * database lookup.
+     *
+     * Returns null if phoneNumber == null
+     */
+    public static String
+    getStrippedReversed(String phoneNumber) {
+        String np = extractNetworkPortionAlt(phoneNumber);
+
+        if (np == null) return null;
+
+        return internalGetStrippedReversed(np, np.length());
+    }
+
+    //================ Number formatting =========================
+
+    /** The current locale is unknown, look for a country code or don't format */
+    public static final int FORMAT_UNKNOWN = 0;
+
+    /** NANP formatting */
+    public static final int FORMAT_NANP = 1;
+
+    /** Japanese formatting */
+    public static final int FORMAT_JAPAN = 2;
+
+    /**
+     * Returns the phone number formatting type for the given locale.
+     *
+     * @param locale The locale of interest, usually {@link Locale#getDefault()}
+     * @return The formatting type for the given locale, or FORMAT_UNKNOWN if the formatting
+     * rules are not known for the given locale
+     *
+     * @deprecated Use link #formatNumber(String phoneNumber, String defaultCountryIso) instead
+     */
+    @Deprecated
+    public static int getFormatTypeForLocale(Locale locale) {
+        String country = locale.getCountry();
+
+        return getFormatTypeFromCountryCode(country);
+    }
+
+    /**
+     * Formats a phone number in-place using the NANP formatting rules. Numbers will be formatted
+     * as:
+     *
+     * <p><code>
+     * xxxxx
+     * xxx-xxxx
+     * xxx-xxx-xxxx
+     * 1-xxx-xxx-xxxx
+     * +1-xxx-xxx-xxxx
+     * </code></p>
+     *
+     * @param text the number to be formatted, will be modified with the formatting
+     *
+     * @deprecated Use link #formatNumber(String phoneNumber, String defaultCountryIso) instead
+     */
+    @Deprecated
+    public static void formatNanpNumber(Editable text) {
+        int length = text.length();
+        if (length > "+1-nnn-nnn-nnnn".length()) {
+            // The string is too long to be formatted
+            return;
+        } else if (length <= 5) {
+            // The string is either a shortcode or too short to be formatted
+            return;
+        }
+
+        CharSequence saved = text.subSequence(0, length);
+
+        // Strip the dashes first, as we're going to add them back
+        removeDashes(text);
+        length = text.length();
+
+        // When scanning the number we record where dashes need to be added,
+        // if they're non-0 at the end of the scan the dashes will be added in
+        // the proper places.
+        int dashPositions[] = new int[3];
+        int numDashes = 0;
+
+        int state = NANP_STATE_DIGIT;
+        int numDigits = 0;
+        for (int i = 0; i < length; i++) {
+            char c = text.charAt(i);
+            switch (c) {
+                case '1':
+                    if (numDigits == 0 || state == NANP_STATE_PLUS) {
+                        state = NANP_STATE_ONE;
+                        break;
+                    }
+                    // fall through
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                case '0':
+                    if (state == NANP_STATE_PLUS) {
+                        // Only NANP number supported for now
+                        text.replace(0, length, saved);
+                        return;
+                    } else if (state == NANP_STATE_ONE) {
+                        // Found either +1 or 1, follow it up with a dash
+                        dashPositions[numDashes++] = i;
+                    } else if (state != NANP_STATE_DASH && (numDigits == 3 || numDigits == 6)) {
+                        // Found a digit that should be after a dash that isn't
+                        dashPositions[numDashes++] = i;
+                    }
+                    state = NANP_STATE_DIGIT;
+                    numDigits++;
+                    break;
+
+                case '-':
+                    state = NANP_STATE_DASH;
+                    break;
+
+                case '+':
+                    if (i == 0) {
+                        // Plus is only allowed as the first character
+                        state = NANP_STATE_PLUS;
+                        break;
+                    }
+                    // Fall through
+                default:
+                    // Unknown character, bail on formatting
+                    text.replace(0, length, saved);
+                    return;
+            }
+        }
+
+        if (numDigits == 7) {
+            // With 7 digits we want xxx-xxxx, not xxx-xxx-x
+            numDashes--;
+        }
+
+        // Actually put the dashes in place
+        for (int i = 0; i < numDashes; i++) {
+            int pos = dashPositions[i];
+            text.replace(pos + i, pos + i, "-");
+        }
+
+        // Remove trailing dashes
+        int len = text.length();
+        while (len > 0) {
+            if (text.charAt(len - 1) == '-') {
+                text.delete(len - 1, len);
+                len--;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /**
+     * Formats a phone number in-place using the Japanese formatting rules.
+     * Numbers will be formatted as:
+     *
+     * <p><code>
+     * 03-xxxx-xxxx
+     * 090-xxxx-xxxx
+     * 0120-xxx-xxx
+     * +81-3-xxxx-xxxx
+     * +81-90-xxxx-xxxx
+     * </code></p>
+     *
+     * @param text the number to be formatted, will be modified with
+     * the formatting
+     *
+     * @deprecated Use link #formatNumber(String phoneNumber, String defaultCountryIso) instead
+     */
+    @Deprecated
+    public static void formatJapaneseNumber(Editable text) {
+        JapanesePhoneNumberFormatter.format(text);
+    }
+
+    /**
+     * Formats the specified {@code phoneNumber} to the E.164 representation.
+     *
+     * @param phoneNumber the phone number to format.
+     * @param defaultCountryIso the ISO 3166-1 two letters country code in UPPER CASE.
+     * @return the E.164 representation, or null if the given phone number is not valid.
+     */
+    public static String formatNumberToE164(String phoneNumber, String defaultCountryIso) {
+        return formatNumberInternal(phoneNumber, defaultCountryIso, false);
+    }
+
+    /**
+     * Formats the specified {@code phoneNumber} to the RFC3966 representation.
+     *
+     * @param phoneNumber the phone number to format.
+     * @param defaultCountryIso the ISO 3166-1 two letters country code in UPPER CASE.
+     * @return the RFC3966 representation, or null if the given phone number is not valid.
+     */
+    public static String formatNumberToRFC3966(String phoneNumber, String defaultCountryIso) {
+        return formatNumberInternal(phoneNumber, defaultCountryIso, true);
+    }
+
+    /* ATL: AOSP parses with libphonenumber, which needs the number metadata of every country (not in ATL).
+     * An international number (+, 7 to 15 digits, no 0 after the +) is formatted as E.164 (+digits) or as
+     * RFC 3966 (tel:+digits, without the national grouping); a number without + needs its country's
+     * metadata to be told valid and gives null, as AOSP does for a number it cannot parse. */
+    private static String formatNumberInternal(String rawInput, String defaultCountryIso, boolean rfc3966) {
+        if (rawInput == null) {
+            return null;
+        }
+        String network = extractNetworkPortion(rawInput);
+        if (network.matches("\\+[1-9][0-9]{6,14}")) {
+            return rfc3966 ? "tel:" + network : network;
+        }
+        return null;
+    }
+
+    /**
+     * Checks a given number against the list of
+     * emergency numbers provided by the RIL and SIM card.
+     *
+     * @param number the number to look up.
+     * @return true if the number is in the list of emergency numbers
+     *         listed in the RIL / SIM, otherwise return false.
+     *
+     * @deprecated Please use {@link TelephonyManager#isEmergencyNumber(String)} instead.
+     */
+    @Deprecated
+    public static boolean isEmergencyNumber(String number) {
+        return isEmergencyNumber(getDefaultVoiceSubId(), number);
+    }
+
+    /**
+     * Checks a given number against the list of
+     * emergency numbers provided by the RIL and SIM card.
+     *
+     * @param subId the subscription id of the SIM.
+     * @param number the number to look up.
+     * @return true if the number is in the list of emergency numbers
+     *         listed in the RIL / SIM, otherwise return false.
+     *
+     * @deprecated Please use {@link TelephonyManager#isEmergencyNumber(String)}
+     *             instead.
+     *
+     * @hide
+     */
+    @Deprecated
+    @UnsupportedAppUsage
+    public static boolean isEmergencyNumber(int subId, String number) {
+        // Return true only if the specified number *exactly* matches
+        // one of the emergency numbers listed by the RIL / SIM.
+        return isEmergencyNumberInternal(subId, number);
+    }
+
+    /**
+     * Checks if a given number is an emergency number for the country that the user is in.
+     *
+     * @param number the number to look up.
+     * @param context the specific context which the number should be checked against
+     * @return true if the specified number is an emergency number for the country the user
+     * is currently in.
+     *
+     * @deprecated Please use {@link TelephonyManager#isEmergencyNumber(String)}
+     *             instead.
+     */
+    @Deprecated
+    public static boolean isLocalEmergencyNumber(Context context, String number) {
+        return isEmergencyNumberInternal(getDefaultVoiceSubId(), number);
+    }
+
+    /**
+     * isVoiceMailNumber: checks a given number against the voicemail
+     *   number provided by the RIL and SIM card. The caller must have
+     *   the READ_PHONE_STATE credential.
+     *
+     * @param number the number to look up.
+     * @return true if the number is in the list of voicemail. False
+     * otherwise, including if the caller does not have the permission
+     * to read the VM number.
+     */
+    public static boolean isVoiceMailNumber(String number) {
+        return isVoiceMailNumber(SubscriptionManager.getDefaultSubscriptionId(), number);
+    }
+
+    /**
+     * isVoiceMailNumber: checks a given number against the voicemail
+     *   number provided by the RIL and SIM card. The caller must have
+     *   the READ_PHONE_STATE credential.
+     *
+     * @param subId the subscription id of the SIM.
+     * @param number the number to look up.
+     * @return true if the number is in the list of voicemail. False
+     * otherwise, including if the caller does not have the permission
+     * to read the VM number.
+     * @hide
+     */
+    public static boolean isVoiceMailNumber(int subId, String number) {
+        return isVoiceMailNumber(null, subId, number);
+    }
+
+    /**
+     * isVoiceMailNumber: checks a given number against the voicemail
+     *   number provided by the RIL and SIM card. The caller must have
+     *   the READ_PHONE_STATE credential.
+     *
+     * @param context {@link Context}.
+     * @param subId the subscription id of the SIM.
+     * @param number the number to look up.
+     * @return true if the number is in the list of voicemail. False
+     * otherwise, including if the caller does not have the permission
+     * to read the VM number.
+     * @hide
+     */
+    @SystemApi
+    public static boolean isVoiceMailNumber(@NonNull Context context, int subId,
+            @Nullable String number) {
+        String vmNumber, mdn;
+        try {
+            final TelephonyManager tm;
+            if (context == null) {
+                tm = TelephonyManager.getDefault();
+                if (DBG) log("isVoiceMailNumber: default tm");
+            } else {
+                tm = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+                if (DBG) log("isVoiceMailNumber: tm from context");
+            }
+            vmNumber = tm.getVoiceMailNumber();
+            mdn = tm.getLine1Number();
+            if (DBG) log("isVoiceMailNumber: mdn=" + mdn + ", vmNumber=" + vmNumber
+                    + ", number=" + number);
+        } catch (SecurityException ex) {
+            if (DBG) log("isVoiceMailNumber: SecurityExcpetion caught");
+            return false;
+        }
+        // Strip the separators from the number before comparing it
+        // to the list.
+        number = extractNetworkPortionAlt(number);
+        if (TextUtils.isEmpty(number)) {
+            if (DBG) log("isVoiceMailNumber: number is empty after stripping");
+            return false;
+        }
+
+        // check if the carrier considers MDN to be an additional voicemail number
+        boolean compareWithMdn = false;
+        if (context != null) {
+            CarrierConfigManager configManager = (CarrierConfigManager)
+                    context.getSystemService(Context.CARRIER_CONFIG_SERVICE);
+            if (configManager != null) {
+                PersistableBundle b = configManager.getConfigForSubId(subId);
+                if (b != null) {
+                    compareWithMdn = b.getBoolean(CarrierConfigManager.
+                            KEY_MDN_IS_ADDITIONAL_VOICEMAIL_NUMBER_BOOL);
+                    if (DBG) log("isVoiceMailNumber: compareWithMdn=" + compareWithMdn);
+                }
+            }
+        }
+
+        if (compareWithMdn) {
+            if (DBG) log("isVoiceMailNumber: treating mdn as additional vm number");
+            return compare(number, vmNumber) || compare(number, mdn);
+        } else {
+            if (DBG) log("isVoiceMailNumber: returning regular compare");
+            return compare(number, vmNumber);
+        }
+    }
+
+    /**
+     * Wrap the supplied {@code CharSequence} with a {@code TtsSpan}, annotating it as
+     * containing a phone number in its entirety.
+     *
+     * @param phoneNumber A {@code CharSequence} the entirety of which represents a phone number.
+     * @return A {@code CharSequence} with appropriate annotations.
+     */
+    public static CharSequence createTtsSpannable(CharSequence phoneNumber) {
+        if (phoneNumber == null) {
+            return null;
+        }
+        Spannable spannable = Spannable.Factory.getInstance().newSpannable(phoneNumber);
+        PhoneNumberUtils.addTtsSpan(spannable, 0, spannable.length());
+        return spannable;
+    }
+
+    /**
+     * Attach a {@link TtsSpan} to the supplied {@code Spannable} at the indicated location,
+     * annotating that location as containing a phone number.
+     *
+     * @param s A {@code Spannable} to annotate.
+     * @param start The starting character position of the phone number in {@code s}.
+     * @param endExclusive The position after the ending character in the phone number {@code s}.
+     */
+    public static void addTtsSpan(Spannable s, int start, int endExclusive) {
+        s.setSpan(createTtsSpan(s.subSequence(start, endExclusive).toString()),
+                start,
+                endExclusive,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    /**
+     * Create a {@code TtsSpan} for the supplied {@code String}.
+     *
+     * @param phoneNumberString A {@code String} the entirety of which represents a phone number.
+     * @return A {@code TtsSpan} for {@param phoneNumberString}.
+     */
+    public static TtsSpan createTtsSpan(String phoneNumberString) {
+        if (phoneNumberString == null) {
+            return null;
+        }
+
+        // ATL: no libphonenumber to split off a country code; AOSP's path for a number it cannot parse
+        final TtsSpan.TelephoneBuilder builder = new TtsSpan.TelephoneBuilder();
+        // Strip separators otherwise TalkBack will be silent
+        builder.setNumberParts(splitAtNonNumerics(phoneNumberString));
+        return builder.build();
+    }
+
+    /**
+     * Determines if two phone numbers are the same.
+     * <p>
+     * Matching is based on <a href="https://github.com/google/libphonenumber>libphonenumber</a>.
+     * Unlike {@link #compare(String, String)}, matching takes into account national
+     * dialing plans rather than simply matching the last 7 digits of the two phone numbers. As a
+     * result, it is expected that some numbers which would match using the previous method will no
+     * longer match using this new approach.
+     *
+     * @param number1
+     * @param number2
+     * @param defaultCountryIso The lowercase two letter ISO 3166-1 country code. Used when parsing
+     *                          the phone numbers where it is not possible to determine the country
+     *                          associated with a phone number based on the number alone. It
+     *                          is recommended to pass in
+     *                          {@link TelephonyManager#getNetworkCountryIso()}.
+     * @return True if the two given phone number are same.
+     */
+    public static boolean areSamePhoneNumber(@NonNull String number1,
+            @NonNull String number2, @NonNull String defaultCountryIso) {
+        // ATL: AOSP matches with libphonenumber's isNumberMatch(); compare() is the matching of ATL
+        if (number1 == null || number2 == null) {
+            return false;
+        }
+        return compare(number1, number2);
+    }
+
+    static final String LOG_TAG = "PhoneNumberUtils";
+
+    private static final boolean DBG = false;
+
+    private static int getMinMatch() {
+        if (sMinMatch == 0) {
+            sMinMatch = Resources.getSystem().getInteger(
+                    com.android.internal.R.integer.config_phonenumber_compare_min_match);
+        }
+        return sMinMatch;
+    }
+
+    /**
+     * Extracts the network address portion and canonicalize.
+     *
+     * This function is equivalent to extractNetworkPortion(), except
+     * for allowing the PLUS character to occur at arbitrary positions
+     * in the address portion, not just the first position.
+     *
+     * @hide
+     */
+    @UnsupportedAppUsage
+    public static String extractNetworkPortionAlt(String phoneNumber) {
+        if (phoneNumber == null) {
+            return null;
+        }
+
+        int len = phoneNumber.length();
+        StringBuilder ret = new StringBuilder(len);
+        boolean haveSeenPlus = false;
+
+        for (int i = 0; i < len; i++) {
+            char c = phoneNumber.charAt(i);
+            if (c == '+') {
+                if (haveSeenPlus) {
+                    continue;
+                }
+                haveSeenPlus = true;
+            }
+            if (isDialable(c)) {
+                ret.append(c);
+            } else if (isStartsPostDial (c)) {
+                break;
+            }
+        }
+
+        return ret.toString();
+    }
+
+    private static void log(String msg) {
+        Rlog.d(LOG_TAG, msg);
+    }
+
+    /**
+     * Returns the last numDigits of the reversed phone number
+     * Returns null if np == null
+     */
+    private static String
+    internalGetStrippedReversed(String np, int numDigits) {
+        if (np == null) return null;
+
+        StringBuilder ret = new StringBuilder(numDigits);
+        int length = np.length();
+
+        for (int i = length - 1, s = length
+            ; i >= 0 && (s - i) <= numDigits ; i--
+        ) {
+            char c = np.charAt(i);
+
+            ret.append(c);
+        }
+
+        return ret.toString();
+    }
+
+    private static final int NANP_STATE_DIGIT = 1;
+
+    private static final int NANP_STATE_PLUS = 2;
+
+    private static final int NANP_STATE_ONE = 3;
+
+    private static final int NANP_STATE_DASH = 4;
+
+    /**
+     * Removes all dashes from the number.
+     *
+     * @param text the number to clear from dashes
+     */
+    private static void removeDashes(Editable text) {
+        int p = 0;
+        while (p < text.length()) {
+            if (text.charAt(p) == '-') {
+                text.delete(p, p + 1);
+           } else {
+                p++;
+           }
+        }
+    }
+
+    /**
+     * Helper function for isEmergencyNumber(String, String) and.
+     *
+     * @param subId the subscription id of the SIM.
+     * @param number the number to look up.
+     * @return true if the number is an emergency number for the specified country.
+     * @hide
+     */
+    private static boolean isEmergencyNumberInternal(int subId, String number) {
+        //TODO: remove subid later. Keep it for now in case we need it later.
+        try {
+                return TelephonyManager.getDefault().isEmergencyNumber(number);
+        } catch (RuntimeException ex) {
+            Rlog.e(LOG_TAG, "isEmergencyNumberInternal: RuntimeException: " + ex);
+        }
+        return false;
+    }
+
+    // Split a phone number like "+20(123)-456#" using spaces, ignoring anything that is not
+    // a digit or the characters * and #, to produce a result like "20 123 456#".
+    private static String splitAtNonNumerics(CharSequence number) {
+        StringBuilder sb = new StringBuilder(number.length());
+        for (int i = 0; i < number.length(); i++) {
+            sb.append(PhoneNumberUtils.is12Key(number.charAt(i))
+                    ? number.charAt(i)
+                    : " ");
+        }
+        // It is very important to remove extra spaces. At time of writing, any leading or trailing
+        // spaces, or any sequence of more than one space, will confuse TalkBack and cause the TTS
+        // span to be non-functional!
+        return sb.toString().replaceAll(" +", " ").trim();
+    }
+
+    private static int getFormatTypeFromCountryCode (String country) {
+        // Check for the NANP countries
+        int length = NANP_COUNTRIES.length;
+        for (int i = 0; i < length; i++) {
+            if (NANP_COUNTRIES[i].compareToIgnoreCase(country) == 0) {
+                return FORMAT_NANP;
+            }
+        }
+        if ("jp".compareToIgnoreCase(country) == 0) {
+            return FORMAT_JAPAN;
+        }
+        return FORMAT_UNKNOWN;
+    }
+
+    /**
+     * Returns Default voice subscription Id.
+     */
+    private static int getDefaultVoiceSubId() {
+        return SubscriptionManager.getDefaultVoiceSubscriptionId();
+    }
+
+    private static int sMinMatch = 0;
+
+    /** List of country codes for countries that use the NANP */
+    private static final String[] NANP_COUNTRIES = new String[] {
+        "US", // United States
+        "CA", // Canada
+        "AS", // American Samoa
+        "AI", // Anguilla
+        "AG", // Antigua and Barbuda
+        "BS", // Bahamas
+        "BB", // Barbados
+        "BM", // Bermuda
+        "VG", // British Virgin Islands
+        "KY", // Cayman Islands
+        "DM", // Dominica
+        "DO", // Dominican Republic
+        "GD", // Grenada
+        "GU", // Guam
+        "JM", // Jamaica
+        "PR", // Puerto Rico
+        "MS", // Montserrat
+        "MP", // Northern Mariana Islands
+        "KN", // Saint Kitts and Nevis
+        "LC", // Saint Lucia
+        "VC", // Saint Vincent and the Grenadines
+        "TT", // Trinidad and Tobago
+        "TC", // Turks and Caicos Islands
+        "VI", // U.S. Virgin Islands
+    };
 }
