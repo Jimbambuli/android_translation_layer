@@ -345,6 +345,18 @@ JNIEXPORT jint JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_n
 			pw_registry_add_listener(registry, &registry_listener, &registry_events, NULL);
 			roundtrip(); /* the globals, and with them the EnumFormat requests */
 			roundtrip(); /* the formats */
+			/* through the portal the session manager grants the camera nodes after the connection (WirePlumber's
+			 * access-portal): the portal reported a camera, so wait for it, for up to two seconds */
+			for (int i = 0; flatpak && nodes->len == 0 && i < 20; i++) {
+				pw_thread_loop_unlock(loop);
+				g_usleep(100000);
+				pw_thread_loop_lock(loop);
+				roundtrip();
+			}
+			if (flatpak && nodes->len)
+				roundtrip(); /* the formats of the cameras that appeared */
+			if (camera_debug())
+				fprintf(stderr, "camera: connected, %u cameras\n", nodes->len);
 		} else if (!flatpak || request_access) {
 			fprintf(stderr, "camera: no PipeWire connection\n");
 		}
