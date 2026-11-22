@@ -1533,8 +1533,26 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1removeClasses(JNIEnv *env,
 JNIEXPORT void JNICALL Java_android_view_View_native_1setNativeFocusable(JNIEnv *env, jobject this, jlong widget_ptr, jboolean focusable)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
-	gboolean ours = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "atl-not-focusable"));
+	static jclass view_group_class = NULL;
+	if (!view_group_class)
+		view_group_class = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "android/view/ViewGroup"));
 
+	/* AOSP: a ViewGroup that is not focusable leaves its descendants focusable (only FOCUS_BLOCK_DESCENDANTS
+	 * blocks them, see ViewGroup native_setBlockDescendantsFocus()); only the group's own widget (the
+	 * GtkScrolledWindow of a ScrollView) leaves the focus chain. A group around Chromium's url bar is one. */
+	if ((*env)->IsInstanceOf(env, this, view_group_class)) {
+		gboolean ours_self = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "atl-not-focusable-self"));
+		if (!focusable && !ours_self && gtk_widget_get_focusable(widget)) {
+			gtk_widget_set_focusable(widget, FALSE);
+			g_object_set_data(G_OBJECT(widget), "atl-not-focusable-self", GINT_TO_POINTER(1));
+		} else if (focusable && ours_self) {
+			gtk_widget_set_focusable(widget, TRUE);
+			g_object_set_data(G_OBJECT(widget), "atl-not-focusable-self", NULL);
+		}
+		return;
+	}
+
+	gboolean ours = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "atl-not-focusable"));
 	/* can-focus covers the widget and its descendants (GtkSwitch inside the box of a Switch) */
 	if (!focusable && !ours && gtk_widget_get_can_focus(widget)) {
 		gtk_widget_set_can_focus(widget, FALSE);
