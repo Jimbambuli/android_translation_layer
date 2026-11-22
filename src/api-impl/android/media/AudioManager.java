@@ -80,8 +80,10 @@ public class AudioManager {
 	public static final int GET_DEVICES_OUTPUTS = 0x0002;
 	public static final int GET_DEVICES_ALL = GET_DEVICES_OUTPUTS | GET_DEVICES_INPUTS;
 
+	/* AOSP AudioService: the ringer mode persisted in Settings.Global.MODE_RINGER, RINGER_MODE_NORMAL unless
+	 * set; ATL has no ringer (setRingerMode()), so it is RINGER_MODE_NORMAL */
 	public int getRingerMode() {
-		return 0;
+		return RINGER_MODE_NORMAL;
 	}
 
 	/* AOSP AudioManager.getStreamVolume(): the volume index of the stream. ATL has the one volume of the
@@ -186,10 +188,24 @@ public class AudioManager {
 		return false;
 	}
 
-	public void setSpeakerphoneOn(boolean on) {}
+	/* AOSP AudioService.setSpeakerphoneOn() -> AudioDeviceBroker.setSpeakerphoneOn(): the speaker is requested as
+	 * the communication device (on) or the request is withdrawn (off); isSpeakerphoneOn(): the requested
+	 * communication device is the speaker (AudioDeviceBroker.isDeviceOnForCommunication()) */
+	public void setSpeakerphoneOn(boolean on) {
+		if (on) {
+			for (AudioDeviceInfo device : getAvailableCommunicationDevices()) {
+				if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+					setCommunicationDevice(device);
+					return;
+				}
+			}
+		} else if (isSpeakerphoneOn()) {
+			clearCommunicationDevice();
+		}
+	}
 
-	public boolean isSpeakerphoneOn() {
-		return false;
+	public synchronized boolean isSpeakerphoneOn() {
+		return mCommunicationDevice != null && mCommunicationDevice.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER;
 	}
 
 	public void setBluetoothScoOn(boolean on) {}
@@ -220,18 +236,70 @@ public class AudioManager {
 		new android.media.session.MediaSessionManager().dispatchMediaKeyEvent(keyEvent, false);
 	}
 
-	public void setMode(int mode) {}
+	public static final int MODE_INVALID = -2;
+	public static final int MODE_CURRENT = -1;
+	public static final int MODE_NORMAL = 0;
+	public static final int MODE_RINGTONE = 1;
+	public static final int MODE_IN_CALL = 2;
+	public static final int MODE_IN_COMMUNICATION = 3;
+	public static final int MODE_CALL_SCREENING = 4;
+	public static final int MODE_CALL_REDIRECT = 5;
+	public static final int MODE_COMMUNICATION_REDIRECT = 6;
+	public static final int MODE_ASSISTANT_CONVERSATION = 7;
+	private static final int NUM_MODES = 8; // AOSP AudioSystem.NUM_MODES
 
-	public int getMode() {
-		return /*MODE_NORMAL*/ 0;
+	/* AOSP AudioService.setMode()/getMode(): the audio mode of the app (its SetModeDeathHandler), MODE_NORMAL
+	 * without one. Invalid modes are ignored, MODE_CURRENT keeps the mode; MODE_IN_CALL, MODE_CALL_REDIRECT and
+	 * MODE_COMMUNICATION_REDIRECT need MODIFY_PHONE_STATE (system apps only), MODE_CALL_SCREENING a policy
+	 * that supports it (isCallScreeningModeSupported() is false): both are ignored. A change is dispatched to
+	 * the OnModeChangedListeners (AudioService.dispatchMode()). Not done: AudioService's check after 6 s that
+	 * an app in MODE_IN_COMMUNICATION plays or records (MSG_CHECK_MODE_FOR_UID) */
+	private static int sMode = MODE_NORMAL;
+
+	public void setMode(int mode) {
+		if (mode < MODE_CURRENT || mode >= NUM_MODES) {
+			android.util.Log.w("AudioService", "setMode() invalid mode: " + mode);
+			return;
+		}
+		if (mode == MODE_CURRENT || mode == MODE_CALL_SCREENING || mode == MODE_IN_CALL
+		    || mode == MODE_CALL_REDIRECT || mode == MODE_COMMUNICATION_REDIRECT) {
+			return;
+		}
+		java.util.Map<OnModeChangedListener, java.util.concurrent.Executor> listeners;
+		synchronized (AudioManager.class) {
+			if (sMode == mode)
+				return;
+			sMode = mode;
+		}
+		synchronized (mModeChangedListeners) {
+			listeners = new java.util.LinkedHashMap<>(mModeChangedListeners);
+		}
+		final int newMode = mode;
+		for (final java.util.Map.Entry<OnModeChangedListener, java.util.concurrent.Executor> e : listeners.entrySet()) {
+			e.getValue().execute(() -> e.getKey().onModeChanged(newMode));
+		}
 	}
 
+	public int getMode() {
+		synchronized (AudioManager.class) {
+			return sMode;
+		}
+	}
+
+	/* AOSP AudioService.setMicrophoneMute()/isMicrophoneMuted(): the system-wide microphone mute the app set
+	 * (mMicMuteFromApi). ATL's recordings are not silenced by it */
+	private static boolean sMicrophoneMute;
+
 	public boolean isMicrophoneMute() {
-		return false;
+		synchronized (AudioManager.class) {
+			return sMicrophoneMute;
+		}
 	}
 
 	public void setMicrophoneMute(boolean on) {
-		System.out.println("AudioManager.setMicrophoneMute(" + on + ")");
+		synchronized (AudioManager.class) {
+			sMicrophoneMute = on;
+		}
 	}
 	public void unloadSoundEffects() {}
 
@@ -271,9 +339,13 @@ public class AudioManager {
 	/* AOSP AudioManager.registerAudioDeviceCallback(): a new callback hears of the devices that are there
 	 * (onAudioDevicesAdded() on the handler's thread, else the main thread); ATL's devices never change, so
 	 * nothing follows */
+	private final java.util.HashSet<AudioDeviceCallback> mDeviceCallbacks = new java.util.HashSet<>();
+
 	public void registerAudioDeviceCallback(final AudioDeviceCallback callback, Handler handler) {
-		if (callback == null)
-			return;
+		synchronized (mDeviceCallbacks) {
+			if (callback == null || !mDeviceCallbacks.add(callback))
+				return;
+		}
 		final AudioDeviceInfo[] devices = getDevices(GET_DEVICES_ALL);
 		(handler != null ? handler : new Handler(android.os.Looper.getMainLooper())).post(new Runnable() {
 			@Override
@@ -283,7 +355,12 @@ public class AudioManager {
 		});
 	}
 
-	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {}
+	/* AOSP AudioManager.unregisterAudioDeviceCallback(): the callback hears of no further device changes */
+	public void unregisterAudioDeviceCallback(AudioDeviceCallback callback) {
+		synchronized (mDeviceCallbacks) {
+			mDeviceCallbacks.remove(callback);
+		}
+	}
 
 	/* AOSP AudioManager.AudioRecordingCallback */
 	public static abstract class AudioRecordingCallback {
@@ -493,29 +570,29 @@ public class AudioManager {
 	}
 
 	/* AOSP AudioManager.OnModeChangedListener, add/removeOnModeChangedListener() (CallbackUtil.addListener()/
-	 * removeListener()). ATL's mode is always MODE_NORMAL (setMode() changes nothing), so no listener is called */
+	 * removeListener()); setMode() tells them of a change on their executor */
 	public interface OnModeChangedListener {
 		void onModeChanged(int mode);
 	}
 
-	private final java.util.ArrayList<OnModeChangedListener> mModeChangedListeners = new java.util.ArrayList<>();
+	private final java.util.LinkedHashMap<OnModeChangedListener, java.util.concurrent.Executor> mModeChangedListeners = new java.util.LinkedHashMap<>();
 
 	public void addOnModeChangedListener(java.util.concurrent.Executor executor, OnModeChangedListener listener) {
 		java.util.Objects.requireNonNull(executor);
 		java.util.Objects.requireNonNull(listener);
 		synchronized (mModeChangedListeners) {
-			if (mModeChangedListeners.contains(listener)) {
+			if (mModeChangedListeners.containsKey(listener)) {
 				throw new IllegalArgumentException("attempt to call addOnModeChangedListener"
 				                                   + "on a previously registered listener");
 			}
-			mModeChangedListeners.add(listener);
+			mModeChangedListeners.put(listener, executor);
 		}
 	}
 
 	public void removeOnModeChangedListener(OnModeChangedListener listener) {
 		java.util.Objects.requireNonNull(listener);
 		synchronized (mModeChangedListeners) {
-			if (!mModeChangedListeners.remove(listener)) {
+			if (mModeChangedListeners.remove(listener) == null) {
 				throw new IllegalArgumentException("attempt to call removeOnModeChangedListener"
 				                                   + " on an unregistered listener");
 			}
