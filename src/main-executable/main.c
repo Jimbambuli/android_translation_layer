@@ -780,8 +780,14 @@ static void init_native_bridge(JNIEnv *env, const char *instruction_set)
 	if (!instruction_set || !NativeBridgeAvailable() || !NeedsNativeBridge(instruction_set))
 		return;
 	fprintf(stderr, "native bridge: %s runs %s code\n", native_bridge(), instruction_set);
-	if (!PreInitializeNativeBridge(app_data_dir, instruction_set) || !InitializeNativeBridge(env, instruction_set))
+	/* the app's data directory as Android has it, without the trailing '/' (the bridge takes the last part of
+	 * <data dir>/code_cache as the app's name) */
+	char *data_dir = g_strdup(app_data_dir);
+	for (size_t len = strlen(data_dir); len > 1 && data_dir[len - 1] == '/'; len--)
+		data_dir[len - 1] = '\0';
+	if (!PreInitializeNativeBridge(data_dir, instruction_set) || !InitializeNativeBridge(env, instruction_set))
 		fprintf(stderr, "native bridge: initialization for %s failed\n", instruction_set);
+	g_free(data_dir);
 }
 
 static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
