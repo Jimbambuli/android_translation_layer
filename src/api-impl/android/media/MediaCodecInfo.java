@@ -2,12 +2,30 @@ package android.media;
 
 public class MediaCodecInfo {
 
-	private String name;
-	private String mime;
+	private final String name;
+	private final String mime;
+	private final String decoder;
+	private final boolean hardware;
+	private final CodecProfileLevel[] profileLevels;
+	private final int maxWidth;
+	private final int maxHeight;
 
-	public MediaCodecInfo(String name, String mime) {
+	/* a codec of MediaCodecList: FFmpeg's decoder, a hardware (VA-API) or software codec, its profiles and levels
+	 * and its largest frame */
+	MediaCodecInfo(String name, String mime, String decoder, boolean hardware, CodecProfileLevel[] profileLevels,
+	               int maxWidth, int maxHeight) {
 		this.name = name;
 		this.mime = mime;
+		this.decoder = decoder;
+		this.hardware = hardware;
+		this.profileLevels = profileLevels;
+		this.maxWidth = maxWidth;
+		this.maxHeight = maxHeight;
+	}
+
+	/** @hide FFmpeg's decoder of the codec */
+	public String getDecoder() {
+		return decoder;
 	}
 
 	public String getName() {
@@ -24,21 +42,24 @@ public class MediaCodecInfo {
 		return false;
 	}
 
-	/* API 29: the codecs are FFmpeg's software codecs */
+	/* API 29: no codec is listed under a second name */
 	public boolean isAlias() {
 		return false;
 	}
 
+	/* AOSP Codec2InfoBuilder: a software codec of the platform (owner "software") is software only; a vendor codec
+	 * without the software-codec attribute is hardware accelerated. The VA-API codecs are such vendor codecs,
+	 * FFmpeg's decoders the platform's software codecs. */
 	public boolean isHardwareAccelerated() {
-		return false;
+		return hardware;
 	}
 
 	public boolean isSoftwareOnly() {
-		return true;
+		return !hardware;
 	}
 
 	public boolean isVendor() {
-		return false;
+		return hardware;
 	}
 
 	public String[] getSupportedTypes() {
@@ -51,12 +72,10 @@ public class MediaCodecInfo {
 			throw new IllegalArgumentException("codec does not support type");
 		CodecCapabilities caps = new CodecCapabilities();
 		caps.mimeType = type;
-		if ("video/avc".equals(type)) {
-			caps.profileLevels = new CodecProfileLevel[] {
-				new CodecProfileLevel(CodecProfileLevel.AVCProfileBaseline, CodecProfileLevel.AVCLevel61),
-				new CodecProfileLevel(CodecProfileLevel.AVCProfileMain, CodecProfileLevel.AVCLevel61),
-			};
-		}
+		caps.profileLevels = new CodecProfileLevel[profileLevels.length];
+		for (int i = 0; i < profileLevels.length; i++)
+			caps.profileLevels[i] = new CodecProfileLevel(profileLevels[i].profile, profileLevels[i].level);
+		caps.videoCaps = new VideoCapabilities(maxWidth, maxHeight);
 		return caps;
 	}
 
@@ -80,6 +99,7 @@ public class MediaCodecInfo {
 		public CodecProfileLevel[] profileLevels = new CodecProfileLevel[0];
 
 		private String mimeType;
+		private VideoCapabilities videoCaps = new VideoCapabilities(VideoCapabilities.MAX_SIZE, VideoCapabilities.MAX_SIZE);
 
 		public String getMimeType() {
 			return mimeType;
@@ -108,7 +128,7 @@ public class MediaCodecInfo {
 		}
 
 		public VideoCapabilities getVideoCapabilities() {
-			return new VideoCapabilities();
+			return videoCaps;
 		}
 
 		public int getMaxSupportedInstances() {
@@ -135,6 +155,10 @@ public class MediaCodecInfo {
 		public final boolean isFormatSupported(MediaFormat format) {
 			String mime = format.getString(MediaFormat.KEY_MIME);
 			if (mime != null && !mimeType.equalsIgnoreCase(mime))
+				return false;
+			/* AOSP VideoCapabilities.supportsFormat(): the size must be supported */
+			if (mimeType.startsWith("video/") && format.containsKey(MediaFormat.KEY_WIDTH) && format.containsKey(MediaFormat.KEY_HEIGHT)
+			    && !videoCaps.isSizeSupported(format.getInteger(MediaFormat.KEY_WIDTH), format.getInteger(MediaFormat.KEY_HEIGHT)))
 				return false;
 			for (String feature : DECODER_FEATURES) {
 				if (!format.containsKey("feature-" + feature))
@@ -353,29 +377,37 @@ public class MediaCodecInfo {
 	}
 
 	public static class VideoCapabilities {
-		/* AOSP initWithPlatformLimits(): LazyHolder.SIZE_RANGE of a 64-bit process, as no limits are published */
-		private static final android.util.Range<Integer> SIZE_RANGE = new android.util.Range<Integer>(1, 32768);
+		/* AOSP initWithPlatformLimits(): LazyHolder.SIZE_RANGE of a 64-bit process; a software codec publishes no
+		 * smaller limit, a VA-API codec its largest frame */
+		static final int MAX_SIZE = 32768;
+		private final android.util.Range<Integer> widths;
+		private final android.util.Range<Integer> heights;
+
+		VideoCapabilities(int maxWidth, int maxHeight) {
+			widths = new android.util.Range<Integer>(1, maxWidth);
+			heights = new android.util.Range<Integer>(1, maxHeight);
+		}
 
 		public android.util.Range<Integer> getSupportedWidths() {
-			return SIZE_RANGE;
+			return widths;
 		}
 
 		public android.util.Range<Integer> getSupportedHeights() {
-			return SIZE_RANGE;
+			return heights;
 		}
 
 		/* AOSP getSupportedWidthsFor(): with the platform limits' full aspect-ratio and block ranges and
 		 * this alignment of 1 the result is the plain size range */
 		public android.util.Range<Integer> getSupportedWidthsFor(int height) {
-			if (!SIZE_RANGE.contains(height) || (height % getHeightAlignment()) != 0)
+			if (!heights.contains(height) || (height % getHeightAlignment()) != 0)
 				throw new IllegalArgumentException("unsupported height");
-			return SIZE_RANGE;
+			return widths;
 		}
 
 		public android.util.Range<Integer> getSupportedHeightsFor(int width) {
-			if (!SIZE_RANGE.contains(width) || (width % getWidthAlignment()) != 0)
+			if (!widths.contains(width) || (width % getWidthAlignment()) != 0)
 				throw new IllegalArgumentException("unsupported width");
-			return SIZE_RANGE;
+			return heights;
 		}
 
 		/* AOSP FRAME_RATE_RANGE of initWithPlatformLimits() */
@@ -401,11 +433,11 @@ public class MediaCodecInfo {
 		}
 
 		public boolean areSizeAndRateSupported(int width, int height, double frameRate) {
-			return width > 0 && height > 0 && frameRate > 0;
+			return isSizeSupported(width, height) && frameRate > 0;
 		}
 
 		public boolean isSizeSupported(int width, int height) {
-			return width > 0 && height > 0;
+			return widths.contains(width) && heights.contains(height);
 		}
 
 		/* API 23: null, as AOSP's for a codec that published no measured frame rates (FFmpeg's here) */

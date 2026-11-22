@@ -26,9 +26,16 @@ public class MediaCodec {
 	private Queue<Integer> queuedInputBuffers;
 	private Queue<Integer> freeInputBuffers;
 
+	private final MediaCodecInfo info;
+
+	/* AOSP native_setup(): a name MediaCodecList does not list fails with NAME_NOT_FOUND, an IllegalArgumentException;
+	 * other failures are IOExceptions */
 	private MediaCodec(String codecName) throws IOException {
 		this.codecName = codecName;
-		native_codec = native_constructor(codecName);
+		info = MediaCodecList.getInfoByName(codecName);
+		if (info == null)
+			throw new IllegalArgumentException("Failed to initialize " + codecName + ", error 0xfffffffe (NAME_NOT_FOUND)");
+		native_codec = native_constructor(info.getDecoder(), info.isHardwareAccelerated());
 		if (native_codec == 0) {
 			throw new IOException("Unable to create MediaCodec: " + codecName);
 		}
@@ -55,16 +62,14 @@ public class MediaCodec {
 	}
 
 	public MediaCodecInfo getCodecInfo() {
-		for (int i = 0; i < MediaCodecList.getCodecCount(); i++)
-			if (MediaCodecList.getCodecInfoAt(i).getName().equals(codecName))
-				return MediaCodecList.getCodecInfoAt(i);
-		return null;
+		return info;
 	}
 
 	public void configure(MediaFormat format, Surface surface, MediaCrypto crypto, int flags) {
 		System.out.println("MediaCodec.configure(" + format + ", " + surface + ", " + crypto + ", " + flags + "): codecName=" + codecName);
 		this.mediaFormat = format;
 		mHasSurface = surface != null;
+		String mime = info.getSupportedTypes()[0];
 
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
@@ -72,8 +77,7 @@ public class MediaCodec {
 		}
 		/* AOSP CCodec::configure(): a video decoder's input buffers have the size its component recommends; the
 		 * client's max-input-size only makes them larger */
-		String mime = format.getString(MediaFormat.KEY_MIME);
-		if (mime != null && mime.startsWith("video/")) {
+		if (mime.startsWith("video/")) {
 			int recommended = recommendedInputSize(mime, Math.max(format.getInteger(MediaFormat.KEY_WIDTH, 0), format.getInteger(MediaFormat.KEY_MAX_WIDTH, 0)),
 			                                       Math.max(format.getInteger(MediaFormat.KEY_HEIGHT, 0), format.getInteger(MediaFormat.KEY_MAX_HEIGHT, 0)));
 			if (!format.containsKey("max-input-size") || maxInputSize < recommended)
@@ -94,9 +98,9 @@ public class MediaCodec {
 			freeOutputBuffers.add(i);
 		}
 
-		if ("aac".equals(codecName) || "mp3".equals(codecName) || "opus".equals(codecName)) {
+		if (mime.startsWith("audio/")) {
 			native_configure_audio(native_codec, format.getByteBuffer("csd-0"), format.getInteger("sample-rate"), format.getInteger("channel-count"));
-		} else if ("h264".equals(codecName) || "vp8".equals(codecName) || "vp9".equals(codecName)) {
+		} else if (mime.startsWith("video/")) {
 			/* the output format (here the configured one) names the color format, which Gecko requires; frames
 			 * go to the Surface: COLOR_FormatSurface */
 			if (surface != null && !format.containsKey("color-format"))
@@ -384,7 +388,7 @@ public class MediaCodec {
 		outputBuffers = null;
 		mediaFormat = null;
 		outputFormatSet = false;
-		native_codec = native_constructor(codecName);
+		native_codec = native_constructor(info.getDecoder(), info.isHardwareAccelerated());
 		if (native_codec == 0)
 			throw new CodecException(0x80000000, "reset: failed to create " + codecName);
 	}
@@ -491,7 +495,8 @@ public class MediaCodec {
 		}
 	}
 
-	private native long native_constructor(String codecName);
+	private native long native_constructor(String decoder, boolean hardware);
+	static native int[] native_hardwareProfiles();
 	private native void native_setOutputSurface(long codec, Surface surface);
 	private native void native_configure_audio(long codec, ByteBuffer extradata, int sampleRate, int channelCount);
 	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface, int rotation);

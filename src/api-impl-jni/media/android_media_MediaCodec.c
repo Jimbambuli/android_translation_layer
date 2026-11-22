@@ -17,6 +17,10 @@
 #include <libavutil/hwcontext_drm.h>
 #include <libavutil/pixdesc.h>
 #include <libswresample/swresample.h>
+#if HAVE_LIBVA
+#include <libavutil/hwcontext_vaapi.h>
+#include <va/va.h>
+#endif
 #include <libswscale/swscale.h>
 
 #include <stdlib.h>
@@ -31,6 +35,7 @@
 
 struct ATL_codec_context {
 	AVCodecContext *codec;
+	gboolean hardware; // a hardware codec of MediaCodecList: video frames are decoded with VA-API where it can
 	union {
 		struct {
 			SwrContext *swr;
@@ -49,22 +54,110 @@ struct ATL_codec_context {
 	};
 };
 
-JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor(JNIEnv *env, jobject this, jstring codec_name)
+/* decoder: FFmpeg's decoder of the codec; 0 if FFmpeg has none (MediaCodec throws then) */
+JNIEXPORT jlong JNICALL Java_android_media_MediaCodec_native_1constructor(JNIEnv *env, jobject this, jstring decoder, jboolean hardware)
 {
-	const char *name = (*env)->GetStringUTFChars(env, codec_name, NULL);
+	const char *name = (*env)->GetStringUTFChars(env, decoder, NULL);
 	const AVCodec *codec = avcodec_find_decoder_by_name(name);
-	if (!codec) {
-		printf("Codec %s not found\n", name);
-		exit(0);
-	}
-	(*env)->ReleaseStringUTFChars(env, codec_name, name);
+	if (!codec)
+		fprintf(stderr, "MediaCodec: FFmpeg has no decoder %s\n", name);
+	(*env)->ReleaseStringUTFChars(env, decoder, name);
 	if (!codec)
 		return 0;
 	AVCodecContext *codec_ctx = avcodec_alloc_context3(codec);
 
 	struct ATL_codec_context *ctx = calloc(1, sizeof(struct ATL_codec_context));
 	ctx->codec = codec_ctx;
+	ctx->hardware = hardware;
 	return _INTPTR(ctx);
+}
+
+/* whether FFmpeg's decoder can decode with a VA-API device */
+static gboolean decoder_has_vaapi(const char *name)
+{
+	const AVCodec *codec = avcodec_find_decoder_by_name(name);
+	const AVCodecHWConfig *config;
+	for (int i = 0; codec && (config = avcodec_get_hw_config(codec, i)); i++) {
+		if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) && config->device_type == AV_HWDEVICE_TYPE_VAAPI)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+/* MediaCodecList's hardware codecs (the index of the type in MediaCodecList.HARDWARE_TYPES), the VA-API profile
+ * FFmpeg decodes a stream of the Android profile (MediaCodecInfo.CodecProfileLevel) with, and FFmpeg's decoder */
+#if HAVE_LIBVA
+static const struct {
+	int type;
+	const char *decoder;
+	VAProfile va_profile;
+	int android_profile;
+} hardware_profiles[] = {
+	{0, "h264", VAProfileH264ConstrainedBaseline, 0x10000}, // AVCProfileConstrainedBaseline
+	{0, "h264", VAProfileH264ConstrainedBaseline, 0x01},    // AVCProfileBaseline: FFmpeg takes it for VA-API
+	{0, "h264", VAProfileH264Main, 0x02},                   // AVCProfileMain
+	{0, "h264", VAProfileH264High, 0x08},                   // AVCProfileHigh
+	{0, "h264", VAProfileH264High, 0x80000},                // AVCProfileConstrainedHigh
+	{1, "hevc", VAProfileHEVCMain, 0x01},                   // HEVCProfileMain
+	{1, "hevc", VAProfileHEVCMain10, 0x02},                 // HEVCProfileMain10
+	{2, "vp8", VAProfileVP8Version0_3, 0x01},               // VP8ProfileMain
+	{3, "vp9", VAProfileVP9Profile0, 0x01},                 // VP9Profile0
+	{3, "vp9", VAProfileVP9Profile1, 0x02},                 // VP9Profile1
+	{3, "vp9", VAProfileVP9Profile2, 0x04},                 // VP9Profile2
+	{3, "vp9", VAProfileVP9Profile3, 0x08},                 // VP9Profile3
+	{4, "av1", VAProfileAV1Profile0, 0x01},                 // AV1ProfileMain8
+	{4, "av1", VAProfileAV1Profile0, 0x02},                 // AV1ProfileMain10
+};
+#endif
+
+/* the profiles the VA-API device decodes (VAEntrypointVLD), four values each: the type, the Android profile and the
+ * largest frame (FFmpeg's frame constraints of that profile, the limit its VA-API decoding checks); empty without
+ * a VA-API device */
+JNIEXPORT jintArray JNICALL Java_android_media_MediaCodec_native_1hardwareProfiles(JNIEnv *env, jclass klass)
+{
+	int n = 0;
+#if HAVE_LIBVA
+	jint values[ARRAY_SIZE(hardware_profiles) * 4];
+	AVBufferRef *device = NULL;
+	if (av_hwdevice_ctx_create(&device, AV_HWDEVICE_TYPE_VAAPI, NULL, NULL, 0) < 0) {
+		fprintf(stderr, "MediaCodec: no VA-API device, the video codecs decode in software\n");
+		return (*env)->NewIntArray(env, 0);
+	}
+	VADisplay display = ((AVVAAPIDeviceContext *)((AVHWDeviceContext *)device->data)->hwctx)->display;
+	int nb_profiles = vaMaxNumProfiles(display);
+	VAProfile *profiles = calloc(nb_profiles, sizeof(VAProfile));
+	if (vaQueryConfigProfiles(display, profiles, &nb_profiles) != VA_STATUS_SUCCESS)
+		nb_profiles = 0;
+	for (int i = 0; i < ARRAY_SIZE(hardware_profiles); i++) {
+		VAProfile profile = hardware_profiles[i].va_profile;
+		gboolean listed = FALSE;
+		for (int j = 0; j < nb_profiles; j++)
+			listed |= profiles[j] == profile;
+		VAConfigID config;
+		if (!listed || !decoder_has_vaapi(hardware_profiles[i].decoder) ||
+		    vaCreateConfig(display, profile, VAEntrypointVLD, NULL, 0, &config) != VA_STATUS_SUCCESS)
+			continue;
+		AVVAAPIHWConfig *hwconfig = av_hwdevice_hwconfig_alloc(device);
+		hwconfig->config_id = config;
+		AVHWFramesConstraints *constraints = av_hwdevice_get_hwframe_constraints(device, hwconfig);
+		if (constraints && constraints->max_width > 0 && constraints->max_height > 0) {
+			values[n++] = hardware_profiles[i].type;
+			values[n++] = hardware_profiles[i].android_profile;
+			values[n++] = constraints->max_width;
+			values[n++] = constraints->max_height;
+		}
+		av_hwframe_constraints_free(&constraints);
+		av_free(hwconfig);
+		vaDestroyConfig(display, config);
+	}
+	free(profiles);
+	av_buffer_unref(&device);
+	jintArray array = (*env)->NewIntArray(env, n);
+	(*env)->SetIntArrayRegion(env, array, 0, n, values);
+	return array;
+#else
+	return (*env)->NewIntArray(env, n);
+#endif
 }
 
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio(JNIEnv *env, jobject this, jlong codec, jobject extradata, jint sample_rate, jint nb_channels)
@@ -305,7 +398,7 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 	ctx->video.extradata_size = extradata_size;
 
 	int i = 0;
-	while (1) {
+	while (ctx->hardware) {
 		const AVCodecHWConfig *config = avcodec_get_hw_config(codec_ctx->codec, i);
 		if (!config) {
 			fprintf(stderr, "Decoder %s doesn't support pixel format VAAPI or DRM_PRIME\n",

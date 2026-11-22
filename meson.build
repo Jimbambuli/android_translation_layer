@@ -54,6 +54,10 @@ if layer_shell_dep.found()
   add_project_arguments('-DATL_HAS_OSK', language: 'c')
 endif
 
+# MediaCodecList's hardware codecs: the VA-API profiles FFmpeg's decoders can use
+libva_dep = dependency('libva', required : false)
+add_project_arguments('-DHAVE_LIBVA=' + (libva_dep.found() ? '1' : '0'), language: 'c')
+
 # hax.jar
 subdir('src/api-impl')
 
@@ -293,7 +297,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
+                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'), libva_dep,
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('libsecret-1'), dependency('fontconfig'), dependency('pangoft2'), dependency('libwebp'),
                                                                         libart_dep, wayland_protos_dep, upcalls_header
                                                                   ],
