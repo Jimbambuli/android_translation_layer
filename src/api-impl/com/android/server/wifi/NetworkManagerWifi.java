@@ -171,6 +171,9 @@ public final class NetworkManagerWifi {
 		/* LastSeen is in CLOCK_BOOTTIME seconds, ScanResult.timestamp in microseconds since boot */
 		result.timestamp = lastSeen * 1000000L;
 		result.channelWidth = channelWidth(values[AP_BANDWIDTH]);
+		/* ScanDetail always sets the elements parsed from the frame (getInformationElements() needs the array);
+		 * NetworkManager does not pass them on */
+		result.informationElements = new ScanResult.InformationElement[0];
 		return result;
 	}
 
