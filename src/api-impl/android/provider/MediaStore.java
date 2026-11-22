@@ -83,6 +83,18 @@ public class MediaStore {
 		return VOLUME_INTERNAL;
 	}
 
+	/* AOSP MediaStore.setIncludePending() (deprecated, API 29): the query parameter getIncludePending() reads */
+	@Deprecated
+	public static Uri setIncludePending(Uri uri) {
+		return setIncludePending(uri.buildUpon()).build();
+	}
+
+	/** @hide */
+	@Deprecated
+	public static Uri.Builder setIncludePending(Uri.Builder uriBuilder) {
+		return uriBuilder.appendQueryParameter(PARAM_INCLUDE_PENDING, "1");
+	}
+
 	public static boolean getIncludePending(Uri uri) {
 		return uri.getBooleanQueryParameter(PARAM_INCLUDE_PENDING, false);
 	}
