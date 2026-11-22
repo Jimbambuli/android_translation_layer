@@ -6942,11 +6942,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return false;
 	}
 
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_DEFAULT = Float.NaN;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE = -1;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_LOW = -2;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_NORMAL = -3;
+	public static final float REQUESTED_FRAME_RATE_CATEGORY_HIGH = -4;
+
 	private float mFrameContentVelocity = 0;
-	private float mRequestedFrameRate = 0;
+	private float mPreferredFrameRate = REQUESTED_FRAME_RATE_CATEGORY_DEFAULT;
+	/* AOSP PFLAG4_FORCED_OVERRIDE_FRAME_RATE and PFLAG4_SELF_REQUESTED_FRAME_RATE */
+	private boolean mForcedOverrideFrameRate;
+	private boolean mSelfRequestedFrameRate;
 
 	/* AOSP View.setFrameContentVelocity() and setRequestedFrameRate(): hints to the display's frame rate chooser.
-	 * GTK paints at the monitor's rate, the hints are kept and returned */
+	 * GTK paints at the monitor's rate, the hints are kept and returned (AOSP 16 logic with the flags
+	 * toolkit_set_frame_rate_read_only and toolkit_viewgroup_set_requested_frame_rate_api on) */
 	public void setFrameContentVelocity(float pixelsPerSecond) {
 		mFrameContentVelocity = pixelsPerSecond;
 	}
@@ -6956,11 +6966,39 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setRequestedFrameRate(float frameRate) {
-		mRequestedFrameRate = frameRate;
+		// Skip setting the frame rate if it's currently in forced override mode.
+		if (getForcedOverrideFrameRateFlag()) {
+			return;
+		}
+		mPreferredFrameRate = frameRate;
+		setSelfRequestedFrameRateFlag(!Float.isNaN(mPreferredFrameRate));
 	}
 
 	public float getRequestedFrameRate() {
-		return mRequestedFrameRate;
+		return mPreferredFrameRate;
+	}
+
+	void overrideFrameRate(float frameRate, boolean forceOverride) {
+		setForcedOverrideFrameRateFlag(forceOverride);
+		if (forceOverride || !getSelfRequestedFrameRateFlag()) {
+			mPreferredFrameRate = frameRate;
+		}
+	}
+
+	void setForcedOverrideFrameRateFlag(boolean forcedOverride) {
+		mForcedOverrideFrameRate = forcedOverride;
+	}
+
+	boolean getForcedOverrideFrameRateFlag() {
+		return mForcedOverrideFrameRate;
+	}
+
+	void setSelfRequestedFrameRateFlag(boolean selfRequested) {
+		mSelfRequestedFrameRate = selfRequested;
+	}
+
+	boolean getSelfRequestedFrameRateFlag() {
+		return mSelfRequestedFrameRate;
 	}
 
 	public void dispatchStartTemporaryDetach() {
