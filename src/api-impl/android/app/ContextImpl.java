@@ -246,6 +246,17 @@ public final class ContextImpl extends Context {
 		return targetApp.startOrBindService(intent, null);
 	}
 
+	/* AOSP: each context has its ApplicationPackageManager, whose getPackageInstaller() passes the context's package
+	 * as installer. ATL shares one package manager; a context of another loaded package (Play Services, e.g.
+	 * microG Companion installing for a store) gets its own, so that its sessions have that package as installer */
+	@Override
+	public android.content.pm.PackageManager getPackageManager() {
+		if (atl_loaded_app == null || atl_loaded_app == ATLLoadedApp.getPrimaryApplication()
+		    || atl_loaded_app == ATLLoadedApp.getSystemApplication())
+			return super.getPackageManager();
+		return atl_loaded_app.getPackageManager();
+	}
+
 	@Override
 	public boolean bindService(Intent intent, ServiceConnection serviceConnection, int flags) {
 		// Two way Messenger interface for GCM. Request and response are send over Messenger.

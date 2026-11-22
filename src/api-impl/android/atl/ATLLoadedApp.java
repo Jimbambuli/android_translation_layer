@@ -47,6 +47,8 @@ public final class ATLLoadedApp {
 	public final Resources default_resources;
 	public final ClassLoader class_loader;
 	public final PackageParser.Package pkg;
+	/* the package manager of this package's contexts when it is not the primary app (ContextImpl.getPackageManager) */
+	private PackageManager package_manager;
 	public final int effective_sdk_compat;
 	private final Object init_lock;
 	private final HashMap<String, ServiceRecord> running_services;
@@ -356,6 +358,19 @@ public final class ATLLoadedApp {
 		synchronized (running_services) {
 			return !running_services.isEmpty();
 		}
+	}
+
+	public synchronized PackageManager getPackageManager() {
+		if (package_manager == null) {
+			final String packageName = pkg.packageName;
+			package_manager = new PackageManager() {
+				@Override
+				public android.content.pm.PackageInstaller getPackageInstaller() {
+					return new android.content.pm.PackageInstaller(packageName);
+				}
+			};
+		}
+		return package_manager;
 	}
 
 	/* android:isolatedProcess of a service of the app */

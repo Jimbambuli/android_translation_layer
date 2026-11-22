@@ -35,6 +35,7 @@ import java.util.Random;
  * (e.g. the launcher that runs ATL), which asks the user and installs:
  *
  *   $ATL_INSTALL_COMMAND APK... (base and split APKs), environment ATL_INSTALLER_PACKAGE / ATL_INSTALLER_LABEL
+ *   (the installer of the session: the package whose context made it, AOSP's installerPackageName)
  *   exit status = PackageInstaller.STATUS_* (0 installed, 3 aborted by the user, 7 incompatible, others failed),
  *   the last line on stderr = EXTRA_STATUS_MESSAGE
  *
@@ -75,25 +76,40 @@ public class PackageInstaller {
 	private static final Random sRandom = new Random();
 	private static final List<CallbackDelegate> sCallbacks = new ArrayList<>();
 
+	/* AOSP mInstallerPackageName: the package of the context whose package manager made this PackageInstaller
+	 * (ApplicationPackageManager.getPackageInstaller() passes mContext.getPackageName()) */
+	private final String mInstallerPackageName;
+
+	public PackageInstaller() {
+		this(ownPackage());
+	}
+
+	/** @hide */
+	public PackageInstaller(String installerPackageName) {
+		mInstallerPackageName = installerPackageName;
+	}
+
 	private static final class SessionState {
 		final int sessionId;
 		final SessionParams params;
 		final File stageDir;
+		final String installer;
 		float progress;
 		boolean sealed;
 		boolean active;
 		IntentSender statusReceiver;
 
-		SessionState(int sessionId, SessionParams params, File stageDir) {
+		SessionState(int sessionId, SessionParams params, File stageDir, String installer) {
 			this.sessionId = sessionId;
 			this.params = params;
 			this.stageDir = stageDir;
+			this.installer = installer;
 		}
 
 		SessionInfo info() {
 			SessionInfo info = new SessionInfo();
 			info.sessionId = sessionId;
-			info.installerPackageName = params.installerPackageName != null ? params.installerPackageName : ownPackage();
+			info.installerPackageName = params.installerPackageName != null ? params.installerPackageName : installer;
 			info.progress = progress;
 			info.sealed = sealed;
 			info.active = active;
@@ -171,7 +187,7 @@ public class PackageInstaller {
 			File stageDir = new File(new File(appContext().getCacheDir(), "atl_install_sessions"), "vmdl" + sessionId + ".tmp");
 			if (!stageDir.mkdirs() && !stageDir.isDirectory())
 				throw new IOException("Failed to create session directory " + stageDir);
-			state = new SessionState(sessionId, params.copy(), stageDir);
+			state = new SessionState(sessionId, params.copy(), stageDir, mInstallerPackageName);
 			sSessions.put(sessionId, state);
 		}
 		notifyCallbacks(new CallbackCall() {
@@ -343,7 +359,7 @@ public class PackageInstaller {
 				status = STATUS_FAILURE_INCOMPATIBLE;
 				message = "Split APKs need ATL_INSTALL_COMMAND";
 			} else {
-				String[] result = runLauncher(command);
+				String[] result = runLauncher(command, state.installer);
 				status = Integer.parseInt(result[0]);
 				if (status != STATUS_SUCCESS)
 					message = result[1];
@@ -365,13 +381,17 @@ public class PackageInstaller {
 
 	/* Runs the launcher's command (ATL_INSTALL_COMMAND, ATL_UNINSTALL_COMMAND) with the caller as installer:
 	 * { status (exit status as PackageInstaller.STATUS_*), last line on stderr or the exception } */
-	private static String[] runLauncher(List<String> command) {
+	private static String[] runLauncher(List<String> command, String installer) {
 		try {
 			ProcessBuilder pb = new ProcessBuilder(command);
 			Map<String, String> env = pb.environment();
-			env.put("ATL_INSTALLER_PACKAGE", ownPackage());
-			CharSequence label = appContext().getApplicationInfo().loadLabel(appContext().getPackageManager());
-			env.put("ATL_INSTALLER_LABEL", label != null ? label.toString() : ownPackage());
+			env.put("ATL_INSTALLER_PACKAGE", installer);
+			CharSequence label = null;
+			try {
+				label = appContext().getPackageManager().getApplicationInfo(installer, 0).loadLabel(appContext().getPackageManager());
+			} catch (PackageManager.NameNotFoundException e) {
+			}
+			env.put("ATL_INSTALLER_LABEL", label != null ? label.toString() : installer);
 			pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
 			java.lang.Process p = pb.start();
 			String lastLine = null;
@@ -413,7 +433,7 @@ public class PackageInstaller {
 					Slog.w(TAG, "cannot uninstall " + packageName + (command == null ? ": no ATL_UNINSTALL_COMMAND" : ": not installed"));
 					status = STATUS_FAILURE;
 				} else {
-					status = Integer.parseInt(runLauncher(command)[0]);
+					status = Integer.parseInt(runLauncher(command, ownPackage())[0]);
 				}
 				Slog.i(TAG, "uninstall " + packageName + ": status " + status);
 				new Handler(Looper.getMainLooper()).post(new Runnable() {
