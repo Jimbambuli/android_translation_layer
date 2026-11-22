@@ -205,9 +205,7 @@ libaaudio_so = shared_library('aaudio', [
                                         dependencies: [dependency('glib-2.0')],
                                         link_args: ['-lasound'])
 
-# the bionic linker maps the Android library name to ours (see bionic_translation's cfg.d)
-install_data('src/libaaudio/android_translation_layer.cfg',
-             install_dir: get_option('datadir') / 'bionic_translation/cfg.d')
+# the bionic linker maps libaaudio.so to it: res/bionic_translation/android_translation_layer.cfg
 
 wayland_protos_dep = dependency('wayland-protocols', version: '>=1.12')
 
