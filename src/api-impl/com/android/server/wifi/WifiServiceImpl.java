@@ -122,6 +122,7 @@ public final class WifiServiceImpl {
 	public boolean startScan(Context context) {
 		enforceChangePermission(context);
 		String packageName = context.getOpPackageName();
+		Log.i(TAG, "startScan uid=" + android.os.Process.myUid() + " packageName=" + packageName); // mLog.info("startScan uid=%")
 		try {
 			enforceCanAccessScanResults(context);
 		} catch (SecurityException e) {
