@@ -48,7 +48,6 @@
 	#define XR_REFERENCE_SPACE_TYPE_LOCAL_FLOOR_EXT 1000426000
 #endif
 
-#include <assert.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <poll.h>
@@ -440,8 +439,15 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	if (!_GET_LONG_FIELD(surface, "widget") && _GET_OBJ_FIELD(surface, "atl_endpoint", "Landroid/os/IBinder;"))
 		return remote_window_fromSurface(env, surface);
 
-	GtkWidget *surface_view_widget = gtk_widget_get_first_child(_PTR(_GET_LONG_FIELD(surface, "widget")));
-	GtkWidget *window = GTK_WIDGET(gtk_widget_get_native(surface_view_widget));
+	/* AOSP android_view_Surface_getNativeWindow(): a Surface without a native surface (released, or of a
+	 * SurfaceView that is not in a window) gives NULL; here that is a Surface without a widget or a SurfaceView
+	 * widget outside a toplevel window */
+	GtkWidget *wrapper = _PTR(_GET_LONG_FIELD(surface, "widget"));
+	GtkWidget *surface_view_widget = wrapper ? gtk_widget_get_first_child(wrapper) : NULL;
+	GtkNative *native = surface_view_widget ? gtk_widget_get_native(surface_view_widget) : NULL;
+	if (!native)
+		return NULL;
+	GtkWidget *window = GTK_WIDGET(native);
 	while ((width = gtk_widget_get_width(surface_view_widget)) == 0) {
 		// FIXME: UGLY: this loop waits until the SurfaceView widget gets mapped
 		if (g_thread_self() == main_thread_id)
@@ -451,7 +457,8 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 
 	// get position of the SurfaceView widget wrt the toplevel window
 	ret = gtk_widget_compute_point(surface_view_widget, window, &GRAPHENE_POINT_INIT(0, 0), &pos);
-	assert(ret);
+	if (!ret) // the widget left the window while waiting for its size
+		return NULL;
 	// compensate for offset between the widget coordinates and the surface coordinates
 	gtk_native_get_surface_transform(GTK_NATIVE(window), &off_x, &off_y);
 	pos.x += off_x;

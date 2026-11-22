@@ -51,7 +51,10 @@ public class Button extends TextView {
 
 	@Override
 	public void setText(CharSequence text) {
-		native_setText(widget, String.valueOf(text));
+		/* AOSP TextView.setText(): a null text is the empty text (icon-only buttons set null) */
+		if (text == null)
+			text = "";
+		native_setText(widget, text.toString());
 	}
 
 	@Override
