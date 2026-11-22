@@ -19,6 +19,15 @@ typedef void (*AMediaDataSourceClose)(void *userdata);
 typedef ssize_t (*AMediaDataSourceGetAvailableSize)(void *userdata, off64_t offset);
 typedef uint8_t AMediaUUID[16];
 
+/* NdkMediaDataSource.cpp */
+struct AMediaDataSource {
+	void *userdata;
+	AMediaDataSourceReadAt readAt;
+	AMediaDataSourceGetSize getSize;
+	AMediaDataSourceClose close;
+	AMediaDataSourceGetAvailableSize getAvailableSize;
+};
+
 typedef enum {
 	AMEDIAEXTRACTOR_SEEK_PREVIOUS_SYNC,
 	AMEDIAEXTRACTOR_SEEK_NEXT_SYNC,
@@ -38,6 +47,7 @@ typedef struct PsshInfo {
 
 typedef struct AMediaExtractor {
 	jobject extractor; /* android.media.MediaExtractor */
+	AMediaDataSource *source; /* NuMediaExtractor's mDataSource of setDataSourceCustom(), closed on delete */
 } AMediaExtractor;
 
 AMediaFormat *AMediaFormat_new(void);
@@ -51,10 +61,12 @@ static struct {
 	jclass class;
 	jmethodID ctor, release, set_path, set_fd, get_track_count, get_track_format, select_track, unselect_track;
 	jmethodID seek_to, advance, read_sample, get_track_index, get_time, get_size, get_flags, get_cached, get_file_format;
-	jclass fd_class;
-	jmethodID fd_ctor;
-	jfieldID fd_fd;
+	jmethodID set_custom;
+	jclass fd_class, source_class;
+	jmethodID fd_ctor, fd_set, source_ctor;
 } m;
+
+static void register_data_source(JNIEnv *env);
 
 static JNIEnv *env_init(void)
 {
@@ -66,6 +78,7 @@ static JNIEnv *env_init(void)
 	m.release = (*env)->GetMethodID(env, class, "release", "()V");
 	m.set_path = (*env)->GetMethodID(env, class, "setDataSource", "(Ljava/lang/String;)V");
 	m.set_fd = (*env)->GetMethodID(env, class, "setDataSource", "(Ljava/io/FileDescriptor;JJ)V");
+	m.set_custom = (*env)->GetMethodID(env, class, "setDataSource", "(Landroid/media/MediaDataSource;)V");
 	m.get_track_count = (*env)->GetMethodID(env, class, "getTrackCount", "()I");
 	m.get_track_format = (*env)->GetMethodID(env, class, "getTrackFormat", "(I)Landroid/media/MediaFormat;");
 	m.select_track = (*env)->GetMethodID(env, class, "selectTrack", "(I)V");
@@ -81,7 +94,9 @@ static JNIEnv *env_init(void)
 	m.get_file_format = (*env)->GetMethodID(env, class, "getFileFormat", "()Landroid/media/MediaFormat;");
 	m.fd_class = ndk_jni_class(env, "java/io/FileDescriptor");
 	m.fd_ctor = (*env)->GetMethodID(env, m.fd_class, "<init>", "()V");
-	m.fd_fd = (*env)->GetFieldID(env, m.fd_class, "fd", "I");
+	/* libnativehelper's AFileDescriptor_setFd(): FileDescriptor.setInt$() (libcore's field is "descriptor") */
+	m.fd_set = (*env)->GetMethodID(env, m.fd_class, "setInt$", "(I)V");
+	register_data_source(env);
 	m.class = class;
 	return env;
 }
@@ -109,6 +124,11 @@ media_status_t AMediaExtractor_delete(AMediaExtractor *ex)
 	(*env)->CallVoidMethod(env, ex->extractor, m.release);
 	ndk_jni_threw(env, "AMediaExtractor_delete");
 	(*env)->DeleteGlobalRef(env, ex->extractor);
+	if (ex->source) { /* ~NuMediaExtractor(): mDataSource->close(), then ~NdkDataSource() deletes the copy */
+		if (ex->source->close && ex->source->userdata)
+			ex->source->close(ex->source->userdata);
+		free(ex->source);
+	}
 	free(ex);
 	return AMEDIA_OK;
 }
@@ -124,7 +144,7 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor *ex, int fd, off6
 	JNIEnv *env = env_init();
 	/* the descriptor stays the caller's: a plain java.io.FileDescriptor does not close it */
 	jobject jfd = (*env)->NewObject(env, m.fd_class, m.fd_ctor);
-	(*env)->SetIntField(env, jfd, m.fd_fd, fd);
+	(*env)->CallVoidMethod(env, jfd, m.fd_set, fd);
 	(*env)->CallVoidMethod(env, ex->extractor, m.set_fd, jfd, (jlong)offset, (jlong)length);
 	(*env)->DeleteLocalRef(env, jfd);
 	return set_failed(env, "AMediaExtractor_setDataSourceFd");
@@ -139,11 +159,22 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor *ex, const char *lo
 	return set_failed(env, "AMediaExtractor_setDataSource");
 }
 
-/* NuMediaExtractor::setDataSource(NdkDataSource): the Java class has no way to read an AMediaDataSource, so this is
- * the result of a source no extractor accepts, ERROR_UNSUPPORTED */
+/* NuMediaExtractor::setDataSource(new NdkDataSource(src)): NdkDataSource reads a copy of src's callbacks, here through
+ * android.media.NdkMediaDataSource, whose methods are the natives below */
 media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor *ex, AMediaDataSource *src)
 {
-	return AMEDIA_ERROR_UNSUPPORTED;
+	JNIEnv *env = env_init();
+	AMediaDataSource *copy = malloc(sizeof(AMediaDataSource));
+	*copy = *src;
+	jobject source = (*env)->NewObject(env, m.source_class, m.source_ctor, (jlong)(intptr_t)copy);
+	(*env)->CallVoidMethod(env, ex->extractor, m.set_custom, source);
+	(*env)->DeleteLocalRef(env, source);
+	media_status_t status = set_failed(env, "AMediaExtractor_setDataSourceCustom");
+	if (status == AMEDIA_OK && !ex->source)
+		ex->source = copy;
+	else
+		free(copy);
+	return status;
 }
 
 size_t AMediaExtractor_getTrackCount(AMediaExtractor *ex)
@@ -290,14 +321,36 @@ media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex, AMediaFormat
 	return AMEDIA_OK;
 }
 
-/* NdkMediaDataSource.cpp */
-struct AMediaDataSource {
-	void *userdata;
-	AMediaDataSourceReadAt readAt;
-	AMediaDataSourceGetSize getSize;
-	AMediaDataSourceClose close;
-	AMediaDataSourceGetAvailableSize getAvailableSize;
-};
+/* NdkDataSource::readAt(): -1 without a callback or userdata, else the callback's result (-1 at the end) */
+static jint data_source_read_at(JNIEnv *env, jclass class, jlong ptr, jlong position, jbyteArray buffer, jint offset, jint size)
+{
+	AMediaDataSource *src = (AMediaDataSource *)(intptr_t)ptr;
+	if (!src->readAt || !src->userdata)
+		return -1;
+	jbyte *bytes = (*env)->GetByteArrayElements(env, buffer, NULL);
+	ssize_t ret = src->readAt(src->userdata, position, bytes + offset, size);
+	(*env)->ReleaseByteArrayElements(env, buffer, bytes, 0);
+	return ret;
+}
+
+/* NdkDataSource::getSize(): -1 (unknown) without a callback or userdata */
+static jlong data_source_get_size(JNIEnv *env, jclass class, jlong ptr)
+{
+	AMediaDataSource *src = (AMediaDataSource *)(intptr_t)ptr;
+	return src->getSize && src->userdata ? src->getSize(src->userdata) : -1;
+}
+
+static void register_data_source(JNIEnv *env)
+{
+	static const JNINativeMethod methods[] = {
+		{"native_readAt", "(JJ[BII)I", data_source_read_at},
+		{"native_getSize", "(J)J", data_source_get_size},
+	};
+	m.source_class = ndk_jni_class(env, "android/media/NdkMediaDataSource");
+	m.source_ctor = (*env)->GetMethodID(env, m.source_class, "<init>", "(J)V");
+	(*env)->RegisterNatives(env, m.source_class, methods, 2);
+	ndk_jni_threw(env, "NdkMediaDataSource");
+}
 
 AMediaDataSource *AMediaDataSource_new(void)
 {

@@ -907,6 +907,7 @@ srcs = [
 	'android/media/MediaTimestamp.java',
 	'android/media/MicrophoneDirection.java',
 	'android/media/MicrophoneInfo.java',
+	'android/media/NdkMediaDataSource.java',
 	'android/media/NotProvisionedException.java',
 	'android/media/PlaybackParams.java',
 	'android/media/Rating.java',

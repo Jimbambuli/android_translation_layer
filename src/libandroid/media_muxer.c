@@ -41,8 +41,7 @@ static struct {
 	jclass class;
 	jmethodID ctor, set_location, set_orientation, add_track, start, stop, release, write;
 	jclass fd_class, info_class;
-	jmethodID fd_ctor, info_ctor, info_set;
-	jfieldID fd_fd;
+	jmethodID fd_ctor, fd_set, info_ctor, info_set;
 } m;
 
 static JNIEnv *env_init(void)
@@ -61,7 +60,7 @@ static JNIEnv *env_init(void)
 	m.write = (*env)->GetMethodID(env, class, "writeSampleData", "(ILjava/nio/ByteBuffer;Landroid/media/MediaCodec$BufferInfo;)V");
 	m.fd_class = ndk_jni_class(env, "java/io/FileDescriptor");
 	m.fd_ctor = (*env)->GetMethodID(env, m.fd_class, "<init>", "()V");
-	m.fd_fd = (*env)->GetFieldID(env, m.fd_class, "fd", "I");
+	m.fd_set = (*env)->GetMethodID(env, m.fd_class, "setInt$", "(I)V"); /* AFileDescriptor_setFd(); libcore's field is "descriptor" */
 	m.info_class = ndk_jni_class(env, "android/media/MediaCodec$BufferInfo");
 	m.info_ctor = (*env)->GetMethodID(env, m.info_class, "<init>", "()V");
 	m.info_set = (*env)->GetMethodID(env, m.info_class, "set", "(IIJI)V");
@@ -81,7 +80,7 @@ AMediaMuxer *AMediaMuxer_new(int fd, OutputFormat format)
 	if (!env)
 		return NULL;
 	jobject jfd = (*env)->NewObject(env, m.fd_class, m.fd_ctor);
-	(*env)->SetIntField(env, jfd, m.fd_fd, fd);
+	(*env)->CallVoidMethod(env, jfd, m.fd_set, fd);
 	jobject muxer = (*env)->NewObject(env, m.class, m.ctor, jfd, (jint)format);
 	(*env)->DeleteLocalRef(env, jfd);
 	if (ndk_jni_threw_class(env, "java/io/IOException", "AMediaMuxer_new") || !muxer)
