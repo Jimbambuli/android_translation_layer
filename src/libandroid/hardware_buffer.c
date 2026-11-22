@@ -1,8 +1,7 @@
 /*
  * AHardwareBuffer (android/hardware_buffer.h) after AOSP libs/nativewindow/AHardwareBuffer.cpp (android-16.0.0_r4).
- * Where AOSP's gralloc allocates, ATL allocates
- * - a buffer the GPU uses with GBM on the render node (a dma-buf; linear when the CPU uses it too),
- * - a buffer only the CPU uses in a memfd.
+ * Where AOSP's gralloc allocates, ATL allocates a dma-buf with GBM on the render node (linear when the CPU uses
+ * it); a buffer only the CPU uses goes to a memfd when GBM cannot allocate it (BLOB, layers, no render node).
  * isSupported() answers from the format table and a trial with GBM; lock() maps the buffer and brackets the CPU
  * access with DMA_BUF_IOCTL_SYNC; send/recvHandleToUnixSocket() pass the description and the fd (SCM_RIGHTS)
  * between ATL processes. EGL and Vulkan import a dma-buf buffer (egl.c, native_window.c).
@@ -17,6 +16,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -285,6 +285,52 @@ static void cpu_layout(struct AHardwareBuffer *buffer, const struct format_info 
 	buffer->desc.stride = buffer->strides[0] / fi->bpp;
 }
 
+_Static_assert(offsetof(struct AHardwareBuffer, anwb) == 2 * sizeof(void *), "ANativeWindowBuffer offset of GraphicBuffer");
+
+/* the buffer's native_handle_t (cutils/native_handle.h): one fd, the dma-buf or memfd */
+struct native_handle {
+	int version;
+	int numFds;
+	int numInts;
+	int data[1];
+};
+
+void AHardwareBuffer_acquire(struct AHardwareBuffer *buffer);
+void AHardwareBuffer_release(struct AHardwareBuffer *buffer);
+
+static void anwb_inc_ref(struct android_native_base *base)
+{
+	AHardwareBuffer_acquire((struct AHardwareBuffer *)((char *)base - offsetof(struct AHardwareBuffer, anwb)));
+}
+
+static void anwb_dec_ref(struct android_native_base *base)
+{
+	AHardwareBuffer_release((struct AHardwareBuffer *)((char *)base - offsetof(struct AHardwareBuffer, anwb)));
+}
+
+/* the ANativeWindowBuffer of the allocated or received buffer, as GraphicBuffer fills it (format and usage are
+ * the HAL's, which the AHardwareBuffer values equal for the formats and usage bits here) */
+static void fill_anwb(struct AHardwareBuffer *buffer)
+{
+	struct ANativeWindowBuffer_ *w = &buffer->anwb;
+	w->common.magic = ('_' << 24) | ('b' << 16) | ('f' << 8) | 'r'; /* ANDROID_NATIVE_BUFFER_MAGIC */
+	w->common.version = sizeof(*w);
+	w->common.incRef = anwb_inc_ref;
+	w->common.decRef = anwb_dec_ref;
+	w->width = buffer->desc.width;
+	w->height = buffer->desc.height;
+	w->stride = buffer->desc.stride;
+	w->format = buffer->desc.format;
+	w->usage_deprecated = (int)buffer->desc.usage;
+	w->layerCount = buffer->desc.layers;
+	buffer->native_handle = calloc(1, sizeof(struct native_handle));
+	buffer->native_handle->version = 3 * sizeof(int);
+	buffer->native_handle->numFds = 1;
+	buffer->native_handle->data[0] = buffer->fd;
+	w->handle = buffer->native_handle;
+	w->usage = buffer->desc.usage;
+}
+
 static struct AHardwareBuffer *buffer_new(const AHardwareBuffer_Desc *desc)
 {
 	struct AHardwareBuffer *buffer = calloc(1, sizeof(*buffer));
@@ -304,18 +350,13 @@ static int allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **o
 		return BAD_VALUE;
 	struct AHardwareBuffer *buffer = buffer_new(desc);
 	buffer->drm_format = fi->drm_format;
-	if (desc->usage & USAGE_GPU_ANY) {
-		/* GBM knows no layers, data buffers or protected memory */
-		if (desc->layers != 1 || (desc->usage & (USAGE_GPU_DATA_BUFFER | USAGE_PROTECTED_CONTENT | USAGE_GPU_CUBE_MAP)) ||
-		    !gbm_device()) {
-			free(buffer);
-			return INVALID_OPERATION;
-		}
-		struct gbm_bo *bo = gbm.bo_create(gbm.dev, desc->width, desc->height, fi->drm_format, gbm_flags(desc->usage));
-		if (!bo) {
-			free(buffer);
-			return NO_MEMORY;
-		}
+	/* as gralloc's buffers, which every user (CPU, GPU, codecs) can import, a buffer is a dma-buf of GBM when the
+	 * render node can allocate it (linear for the CPU); GBM knows no layers, data buffers or protected memory */
+	bool gpu = desc->usage & USAGE_GPU_ANY;
+	bool gbm_possible = desc->layers == 1 && !(desc->usage & (USAGE_GPU_DATA_BUFFER | USAGE_PROTECTED_CONTENT | USAGE_GPU_CUBE_MAP)) &&
+	                    desc->format != AHARDWAREBUFFER_FORMAT_BLOB && gbm_device();
+	struct gbm_bo *bo = gbm_possible ? gbm.bo_create(gbm.dev, desc->width, desc->height, fi->drm_format, gbm_flags(desc->usage)) : NULL;
+	if (bo) {
 		buffer->fd = gbm.bo_get_fd(bo);
 		buffer->plane_count = gbm.bo_get_plane_count(bo);
 		for (int i = 0; i < buffer->plane_count && i < AHB_MAX_PLANES; i++) {
@@ -331,6 +372,9 @@ static int allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **o
 		buffer->dmabuf = true;
 		buffer->desc.stride = buffer->strides[0] / fi->bpp;
 		buffer->size = lseek(buffer->fd, 0, SEEK_END);
+	} else if (gpu) {
+		free(buffer);
+		return gbm_possible ? NO_MEMORY : INVALID_OPERATION;
 	} else {
 		cpu_layout(buffer, fi);
 		buffer->fd = memfd_create("AHardwareBuffer", MFD_CLOEXEC | MFD_ALLOW_SEALING);
@@ -341,6 +385,7 @@ static int allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **o
 			return NO_MEMORY;
 		}
 	}
+	fill_anwb(buffer);
 	*out = buffer;
 	return NO_ERROR;
 }
@@ -349,6 +394,11 @@ struct AHardwareBuffer *ahb_from_pointer(const void *pointer)
 {
 	struct AHardwareBuffer *buffer = (struct AHardwareBuffer *)pointer;
 	return buffer && buffer->magic == AHB_MAGIC ? buffer : NULL;
+}
+
+struct AHardwareBuffer *ahb_from_client_buffer(const void *client_buffer)
+{
+	return client_buffer ? ahb_from_pointer((const char *)client_buffer - offsetof(struct AHardwareBuffer, anwb)) : NULL;
 }
 
 int AHardwareBuffer_allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **outBuffer)
@@ -635,6 +685,7 @@ int AHardwareBuffer_recvHandleFromUnixSocket(int socketFd, struct AHardwareBuffe
 	buffer->dmabuf = w.dmabuf;
 	memcpy(buffer->offsets, w.offsets, sizeof(w.offsets));
 	memcpy(buffer->strides, w.strides, sizeof(w.strides));
+	fill_anwb(buffer);
 	*outBuffer = buffer;
 	return NO_ERROR;
 }
@@ -647,27 +698,7 @@ int AHardwareBuffer_getId(const struct AHardwareBuffer *buffer, uint64_t *outId)
 	return NO_ERROR;
 }
 
-/* the buffer's native_handle_t (cutils/native_handle.h): one fd, the dma-buf or memfd */
-struct native_handle {
-	int version;
-	int numFds;
-	int numInts;
-	int data[1];
-};
-
 const struct native_handle *AHardwareBuffer_getNativeHandle(const struct AHardwareBuffer *buffer)
 {
-	if (!buffer)
-		return NULL;
-	struct AHardwareBuffer *b = (struct AHardwareBuffer *)buffer;
-	pthread_mutex_lock(&b->lock);
-	if (!b->native_handle) {
-		b->native_handle = calloc(1, sizeof(struct native_handle));
-		b->native_handle->version = 3 * sizeof(int);
-		b->native_handle->numFds = 1;
-		b->native_handle->numInts = 0;
-		b->native_handle->data[0] = b->fd;
-	}
-	pthread_mutex_unlock(&b->lock);
-	return b->native_handle;
+	return buffer ? buffer->native_handle : NULL;
 }

@@ -42,9 +42,37 @@ typedef struct ARect {
 #define AHB_MAGIC 0x41484221 /* "AHB!" */
 #define AHB_MAX_PLANES 4
 
-/* ATL's AHardwareBuffer (hardware_buffer.c): a dma-buf of GBM or a memfd */
+/* system/core/libsystem/include/system/window.h, nativebase/nativebase.h: the ANativeWindowBuffer of a gralloc
+ * buffer, which EGL_ANDROID_image_native_buffer takes as EGLClientBuffer */
+struct android_native_base {
+	int magic;
+	int version;
+	void *reserved[4];
+	void (*incRef)(struct android_native_base *base);
+	void (*decRef)(struct android_native_base *base);
+};
+
+struct ANativeWindowBuffer_ {
+	struct android_native_base common;
+	int width;
+	int height;
+	int stride;
+	int format;
+	int usage_deprecated;
+	uintptr_t layerCount;
+	void *reserved[1];
+	const struct native_handle *handle;
+	uint64_t usage;
+	void *reserved_proc[8 - (sizeof(uint64_t) / sizeof(void *))];
+};
+
+/* ATL's AHardwareBuffer (hardware_buffer.c): a dma-buf of GBM or a memfd. AOSP's AHardwareBuffer is a GraphicBuffer,
+ * whose ANativeWindowBuffer follows two pointers (vtable, RefBase); ANGLE relies on that offset
+ * (kAHardwareBufferToANativeWindowBufferOffset), so the ANativeWindowBuffer is at the same place here. */
 struct AHardwareBuffer {
-	uint32_t magic;
+	uintptr_t magic;
+	uintptr_t unused;
+	struct ANativeWindowBuffer_ anwb;
 	_Atomic int refcount;
 	AHardwareBuffer_Desc desc;
 	int fd;
@@ -63,7 +91,9 @@ struct AHardwareBuffer {
 	struct native_handle *native_handle;
 };
 
-/* the AHardwareBuffer behind a pointer an app passes (EGLClientBuffer, Vulkan), NULL if it is none */
+/* the AHardwareBuffer behind a pointer an app passes (Vulkan), NULL if it is none */
 struct AHardwareBuffer *ahb_from_pointer(const void *pointer);
+/* the AHardwareBuffer of an EGLClientBuffer (its ANativeWindowBuffer), NULL if it is none */
+struct AHardwareBuffer *ahb_from_client_buffer(const void *client_buffer);
 
 #endif

@@ -107,7 +107,9 @@ EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target
  * EGL_BAD_PARAMETER, which the host's eglGetError() does not know about). */
 EGLClientBuffer bionic_eglGetNativeClientBufferANDROID(const struct AHardwareBuffer *buffer)
 {
-	return (EGLClientBuffer)ahb_from_pointer(buffer);
+	struct AHardwareBuffer *ahb = ahb_from_pointer(buffer);
+	/* AOSP: the buffer's ANativeWindowBuffer (AHardwareBuffer_to_ANativeWindowBuffer()) */
+	return ahb ? (EGLClientBuffer)&ahb->anwb : NULL;
 }
 
 /* EGL_KHR_partial_update: the damage region is a hint; a window surface of an ANativeWindow is ATL's own back
@@ -372,7 +374,7 @@ EGLImage bionic_eglCreateImage(EGLDisplay dpy, EGLContext ctx, EGLenum target, E
 	int n = 0;
 	bool native = target == EGL_NATIVE_BUFFER_ANDROID;
 	if (native) {
-		struct AHardwareBuffer *ahb = ahb_from_pointer(buffer);
+		struct AHardwareBuffer *ahb = ahb_from_client_buffer(buffer);
 		if (!ahb || !ahb->dmabuf)
 			return EGL_NO_IMAGE;
 		static const EGLAttrib plane_attribs[3][5] = {
