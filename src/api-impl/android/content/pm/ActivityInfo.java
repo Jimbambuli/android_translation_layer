@@ -436,6 +436,11 @@ public class ActivityInfo extends ComponentInfo implements android.os.Parcelable
 	 * range. Set from the {@link android.R.attr#configChanges} attribute.
 	 */
 	public static final int CONFIG_COLOR_MODE = 0x4000;
+
+	/* AOSP ActivityInfo color modes (android:colorMode) */
+	public static final int COLOR_MODE_DEFAULT = 0;
+	public static final int COLOR_MODE_WIDE_COLOR_GAMUT = 1;
+	public static final int COLOR_MODE_HDR = 2;
 	/** Bit in {@link #configChanges}: the activity handles changes to the grammatical gender (AOSP ActivityInfo) */
 	public static final int CONFIG_GRAMMATICAL_GENDER = 0x8000;
 	/**

@@ -1660,6 +1660,12 @@ public class Window {
 	 * WindowManager.isCrossWindowBlurEnabled() reports off here */
 	public void setBackgroundBlurRadius(int blurRadius) {}
 
+	/* AOSP Window.isWideColorGamut() */
+	public boolean isWideColorGamut() {
+		return getColorMode() == android.content.pm.ActivityInfo.COLOR_MODE_WIDE_COLOR_GAMUT
+		    && context.getResources().getConfiguration().isScreenWideColorGamut();
+	}
+
 	/* AOSP Window.getColorMode() */
 	public int getColorMode() {
 		return getAttributes().getColorMode();
