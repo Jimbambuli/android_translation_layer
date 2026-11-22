@@ -64,6 +64,33 @@ static const char *native_bridge(void)
 	return available ? ATL_NATIVE_BRIDGE : NULL;
 }
 
+/* What Berberis (Digitalis) needs to know about this host, set before ART loads it; settings already in the
+ * environment win. ATL runs on glibc with bionic_translation as the bionic layer, so the guest's thread
+ * records come from the bridge (glibc-host-thread-id-handoff), and the bridge's system tree is where the
+ * bridge lies (<root>/system/lib64/<bridge>), not in /system. */
+static void native_bridge_environment(void)
+{
+	const char *flag = "glibc-host-thread-id-handoff";
+	const char *flags = getenv("BERBERIS_FLAGS");
+	if (!flags || !*flags) {
+		setenv("BERBERIS_FLAGS", flag, 1);
+	} else if (!strstr(flags, flag)) {
+		char *both = g_strdup_printf("%s,%s", flags, flag);
+		setenv("BERBERIS_FLAGS", both, 1);
+		g_free(both);
+	}
+	if (!getenv("BERBERIS_SYSTEM_ROOT")) {
+		char *lib_dir = g_path_get_dirname(native_bridge());
+		if (g_str_has_suffix(lib_dir, "/system/lib64")) {
+			char *root = g_strndup(lib_dir, strlen(lib_dir) - strlen("/system/lib64"));
+			if (strcmp(root, ""))
+				setenv("BERBERIS_SYSTEM_ROOT", root, 1);
+			g_free(root);
+		}
+		g_free(lib_dir);
+	}
+}
+
 /* libnativebridge (art), what the zygote calls for an app that needs the bridge */
 bool NativeBridgeAvailable(void);
 bool NeedsNativeBridge(const char *instruction_set);
@@ -298,6 +325,7 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 	/* like AndroidRuntime::startVm with ro.dalvik.vm.native.bridge set; ART loads the bridge and leaves its
 	 * initialization to us (init_native_bridge()) */
 	if (native_bridge()) {
+		native_bridge_environment();
 		options[option_counter++].optionString = g_strdup_printf("-XX:NativeBridge=%s", native_bridge());
 		options[option_counter++].optionString = g_strdup_printf("-Dro.dalvik.vm.native.bridge=%s", ATL_NATIVE_BRIDGE);
 		options[option_counter++].optionString = "-Dro.product.cpu.abilist=" NATIVE_ARCH "," ATL_NATIVE_BRIDGE_ABI;
