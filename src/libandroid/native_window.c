@@ -482,8 +482,7 @@ struct cpu_frame {
 static gboolean present_cpu_frame(void *data)
 {
 	struct cpu_frame *f = data;
-	surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(f->widget), f->texture, FALSE);
-	g_object_unref(f->texture);
+	surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(f->widget), f->texture, FALSE); // takes the texture's reference
 	g_object_unref(f->widget);
 	free(f);
 	return G_SOURCE_REMOVE;
