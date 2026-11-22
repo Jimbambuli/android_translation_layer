@@ -46,10 +46,10 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio
 /*
  * Class:     android_media_MediaCodec
  * Method:    native_configure_video
- * Signature: (JLjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Landroid/view/Surface;I)V
+ * Signature: (JLjava/nio/ByteBuffer;Ljava/nio/ByteBuffer;Landroid/view/Surface;II)V
  */
 JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video
-  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jint);
+  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jint, jint);
 
 /*
  * Class:     android_media_MediaCodec

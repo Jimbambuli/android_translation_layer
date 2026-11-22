@@ -387,7 +387,7 @@ static GdkTexture *import_drm_frame_desc_as_texture(const AVDRMFrameDescriptor *
 	return texture;
 }
 
-JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JNIEnv *env, jobject this, jlong codec, jobject csd0, jobject csd1, jobject surface_obj, jint rotation)
+JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JNIEnv *env, jobject this, jlong codec, jobject csd0, jobject csd1, jobject surface_obj, jint rotation, jint held_frames)
 {
 	struct ATL_codec_context *ctx = _PTR(codec);
 	AVCodecContext *codec_ctx = ctx->codec;
@@ -435,6 +435,8 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1video(JN
 		if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) && (config->pix_fmt == AV_PIX_FMT_VAAPI || config->pix_fmt == AV_PIX_FMT_DRM_PRIME)) {
 			fprintf(stderr, "Selected pixel format %s\n", av_get_pix_fmt_name(config->pix_fmt));
 			codec_ctx->get_format = get_hw_format;
+			/* the hardware frame pool also holds the frames the app has as output buffers and the Surface shows */
+			codec_ctx->extra_hw_frames = held_frames;
 
 			AVBufferRef *hw_device_ctx = NULL;
 			int ret = av_hwdevice_ctx_create(&hw_device_ctx, config->device_type, NULL, NULL, 0);

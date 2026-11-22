@@ -109,7 +109,13 @@ public class MediaCodec {
 			if (!format.containsKey("max-input-size") || maxInputSize < recommended)
 				maxInputSize = recommended;
 		}
-		inputBuffers = new ByteBuffer[1];
+		/* AOSP CCodecBufferChannel::start(): numInputSlots = inputDelay + pipelineDelay + kSmoothnessFactor (4),
+		 * numOutputSlots = outputDelay + kSmoothnessFactor, where the output delay of AOSP's video decoders is 8
+		 * (C2SoftAvcDec, C2SoftHevcDec), 4 (C2SoftDav1dDec) or none (C2SoftVpxDec). A player like VLC holds
+		 * decoded frames until their display time and needs these slots. */
+		boolean video = mime.startsWith("video/");
+		int outputDelay = !video ? 0 : (mime.equals("video/avc") || mime.equals("video/hevc")) ? 8 : mime.equals("video/av01") ? 4 : 0;
+		inputBuffers = new ByteBuffer[video ? 4 : 1];
 		inputBufferTimestamps = new long[inputBuffers.length];
 		freeInputBuffers = new ArrayDeque<>(inputBuffers.length);
 		queuedInputBuffers = new ArrayDeque<>(inputBuffers.length);
@@ -117,7 +123,7 @@ public class MediaCodec {
 			inputBuffers[i] = ByteBuffer.allocateDirect(maxInputSize).order(ByteOrder.LITTLE_ENDIAN);
 			freeInputBuffers.add(i);
 		}
-		outputBuffers = new ByteBuffer[4];
+		outputBuffers = new ByteBuffer[outputDelay + 4];
 		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
 		for (int i = 0; i < outputBuffers.length; i++) {
 			outputBuffers[i] = ByteBuffer.allocateDirect(16384).order(ByteOrder.LITTLE_ENDIAN);
@@ -131,8 +137,10 @@ public class MediaCodec {
 			 * go to the Surface: COLOR_FormatSurface */
 			if (surface != null && !format.containsKey("color-format"))
 				format.setInteger("color-format", 0x7F000789);
+			/* the frames the app holds come on top of the decoder's own; AOSP lets a Surface's consumer hold
+			 * mRenderingDepth (3) more */
 			native_configure_video(native_codec, format.getByteBuffer("csd-0"), format.getByteBuffer("csd-1"), surface,
-			                       format.getInteger("rotation-degrees", 0));
+			                       format.getInteger("rotation-degrees", 0), outputBuffers.length + 3);
 		} else {
 			System.out.println("configure: format " + format + " not implemented");
 			Thread.dumpStack();
@@ -567,7 +575,7 @@ public class MediaCodec {
 	static native int[] native_hardwareProfiles();
 	private native void native_setOutputSurface(long codec, Surface surface);
 	private native void native_configure_audio(long codec, ByteBuffer extradata, int sampleRate, int channelCount);
-	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface, int rotation);
+	private native void native_configure_video(long codec, ByteBuffer csd0, ByteBuffer csd1, Surface surface, int rotation, int heldFrames);
 	private native void native_setVideoScalingMode(long codec, boolean crop);
 	private native void native_start(long codec);
 	private native int native_queueInputBuffer(long codec, ByteBuffer buffer, long presentationTimeUs);
