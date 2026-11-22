@@ -334,6 +334,7 @@ executable('android-translation-layer', [
                                         	'src/main-executable/navigation_bar.c',
                                         	'src/main-executable/system_theme.c',
                                         	'src/main-executable/zygote.c',
+                                        	'src/main-executable/apk_abi.c',
                                         	resources
                                         ],
                                         include_directories: shared_includes_dir,
@@ -355,3 +356,7 @@ executable('android-translation-layer', [
 						'-DATL_NATIVE_BRIDGE_ABI="' + get_option('native_bridge_abi') + '"',
 						librsvg_dep.found() ? '-DHAVE_LIBRSVG' : '-UHAVE_LIBRSVG'
                                         ])
+
+# PackageManager's ABI choice (src/main-executable/apk_abi.c) on APKs made by the test
+apk_abi_test = executable('apk_abi_test', ['tests/apk_abi_test.c', 'src/main-executable/apk_abi.c'])
+test('apk_abi', find_program('python3'), args: [meson.current_source_dir() / 'tests/apk_abi_test.py', apk_abi_test])

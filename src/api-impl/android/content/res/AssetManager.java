@@ -670,31 +670,6 @@ public final class AssetManager implements AutoCloseable {
 
 	private native final int addAssetPathNative(String path);
 
-	/**
-	 * ATL: the ABI the app's native code is installed for, as PackageManager picks it
-	 * (NativeLibraryHelper.findSupportedAbi): the first of the device's ABIs, in order, that the
-	 * APK has libraries for (lib/<abi>/*.so). Returns its index, or -1 if there is none.
-	 */
-	@Export
-	public static int findSupportedAbi(String apk_resource_path, String[] abis) throws IOException {
-		int best = -1;
-		for (String apk_path : apk_resource_path.split(":")) {
-			try (JarFile apk = new JarFile(apk_path, false)) {
-				Enumeration<JarEntry> entries = apk.entries();
-				while (entries.hasMoreElements()) {
-					String name = entries.nextElement().getName();
-					if (!name.startsWith("lib/") || !name.endsWith(".so"))
-						continue;
-					for (int i = 0; i < abis.length && (best < 0 || i < best); i++) {
-						if (name.startsWith("lib/" + abis[i] + "/") && name.indexOf('/', 5 + abis[i].length()) < 0)
-							best = i;
-					}
-				}
-			}
-		}
-		return best;
-	}
-
 	@Export
 	public static void extractFromAPK(String apk_resource_path, String path, String target) throws IOException {
 		String[] apk_paths = apk_resource_path.split(":");
