@@ -126,14 +126,33 @@ struct iio_accel_files *get_iio_accel_files(void)
 	return iio_accel_files;
 }
 
-JNIEXPORT void JNICALL Java_android_hardware_SensorManager_register_1accelerometer_1listener_1native(JNIEnv *env, jobject this, jobject listener, jobject sensor, jint sampling_period)
+/* the timer's data goes when the timer is removed (after a running on_accel_data() has returned) */
+static void free_accel_data(struct accel_callback_data *d)
+{
+	JNIEnv *env;
+	(*d->jvm)->GetEnv(d->jvm, (void **)&env, JNI_VERSION_1_6);
+	_UNREF(d->listener);
+	_UNREF(d->listener_class);
+	_UNREF(d->sensor);
+	g_string_free(d->iio_accel_files->in_accel_x_raw, true);
+	g_string_free(d->iio_accel_files->in_accel_y_raw, true);
+	g_string_free(d->iio_accel_files->in_accel_z_raw, true);
+	g_string_free(d->iio_accel_files->in_accel_scale, true);
+	g_string_free(d->iio_accel_files->in_mount_matrix, true);
+	free(d->iio_accel_files);
+	graphene_matrix_free(d->matrix);
+	free(d);
+}
+
+/* returns the handle for unregister_accelerometer_listener_native(), 0 without an accelerometer */
+JNIEXPORT jlong JNICALL Java_android_hardware_SensorManager_register_1accelerometer_1listener_1native(JNIEnv *env, jobject this, jobject listener, jobject sensor, jint sampling_period)
 {
 	JavaVM *jvm;
 	(*env)->GetJavaVM(env, &jvm);
 
 	struct iio_accel_files *iio_accel_files = get_iio_accel_files();
 	if (!iio_accel_files)
-		return;
+		return 0;
 
 	struct accel_callback_data *callback_data = malloc(sizeof(struct accel_callback_data));
 	callback_data->jvm = jvm;
@@ -144,5 +163,12 @@ JNIEXPORT void JNICALL Java_android_hardware_SensorManager_register_1acceleromet
 	callback_data->matrix = get_mount_matrix(iio_accel_files->in_mount_matrix->str);
 
 	/* FIXME: too short of a sampling period can lock up the process */
-	g_timeout_add(MAX(10, sampling_period), G_SOURCE_FUNC(on_accel_data), callback_data);
+	return g_timeout_add_full(G_PRIORITY_DEFAULT, MAX(10, sampling_period), G_SOURCE_FUNC(on_accel_data), callback_data,
+	                          (GDestroyNotify)free_accel_data);
+}
+
+JNIEXPORT void JNICALL Java_android_hardware_SensorManager_unregister_1accelerometer_1listener_1native(JNIEnv *env, jobject this, jlong handle)
+{
+	if (handle)
+		g_source_remove(handle);
 }
