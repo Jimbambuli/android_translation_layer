@@ -18,6 +18,10 @@ public class TelephonyCallback {
 		void onCellLocationChanged(CellLocation location);
 	}
 
+	public interface ServiceStateListener {
+		void onServiceStateChanged(ServiceState serviceState);
+	}
+
 	public interface CallStateListener {
 		void onCallStateChanged(int state);
 	}
@@ -56,5 +60,21 @@ public class TelephonyCallback {
 
 	public interface CellInfoListener {
 		void onCellInfoChanged(java.util.List<CellInfo> cellInfo);
+	}
+
+	public interface CallDisconnectCauseListener {
+		void onCallDisconnectCauseChanged(int disconnectCause, int preciseDisconnectCause);
+	}
+
+	public interface DataActivationStateListener {
+		void onDataActivationStateChanged(int state);
+	}
+
+	public interface EmergencyNumberListListener {
+		void onEmergencyNumberListChanged(java.util.Map<Integer, java.util.List<android.telephony.emergency.EmergencyNumber>> emergencyNumberList);
+	}
+
+	public interface RegistrationFailedListener {
+		void onRegistrationFailed(CellIdentity cellIdentity, String chosenPlmn, int domain, int causeCode, int additionalCauseCode);
 	}
 }
