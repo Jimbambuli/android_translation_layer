@@ -234,6 +234,15 @@ public class Resources {
 		     CompatibilityInfo.DEFAULT_COMPATIBILITY_INFO, null);
 	}
 
+	/**
+	 * The app's Resources: AOSP's ResourcesManager creates them with the package's ClassLoader
+	 * (new Resources(classLoader), then setImpl()).
+	 * @hide
+	 */
+	public Resources(ClassLoader classLoader, AssetManager assets, DisplayMetrics metrics, Configuration config) {
+		this(classLoader, assets, metrics, config, CompatibilityInfo.DEFAULT_COMPATIBILITY_INFO, null);
+	}
+
 	private Resources(ClassLoader classLoader, AssetManager assets, DisplayMetrics metrics, Configuration config,
 	                  CompatibilityInfo compatInfo, IBinder token) {
 		mClassLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
