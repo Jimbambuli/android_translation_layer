@@ -1173,7 +1173,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		}
 	}
 
-	public CharSequence getTitle() {
+	public final CharSequence getTitle() {
 		return title;
 	}
 
@@ -3281,6 +3281,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		super.atl_attach_base_context(baseContext);
 		this.window = new Window(this, this);
 		getLayoutInflater().setPrivateFactory(this); /* Activity.attach() */
+	}
+
+	/* AOSP Activity.attach(): the title from the manifest label is stored as mTitle, the overridable setTitle()
+	 * is not called (some activities forbid it, Spotify throws AssertionError "Don't call setTitle() directly") */
+	public void atl_attach_title(CharSequence title) {
+		this.title = title;
 	}
 
 	public void applyOverrideConfiguration(Configuration overrideConfiguration) {}
