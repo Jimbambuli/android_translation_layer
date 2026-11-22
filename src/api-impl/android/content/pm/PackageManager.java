@@ -2948,6 +2948,9 @@ public class PackageManager {
 			ri.activityInfo.exported = true;
 			ri.activityInfo.name = "atl.browser";
 			ri.activityInfo.packageName = "atl";
+			/* as every ActivityInfo of AOSP's PackageManager, it has its ApplicationInfo */
+			ri.activityInfo.applicationInfo = new ApplicationInfo();
+			ri.activityInfo.applicationInfo.packageName = "atl";
 			ri.filter.addAction("android.intent.action.VIEW");
 			ri.filter.addCategory("android.intent.category.BROWSABLE");
 			ri.filter.addDataScheme("http");
