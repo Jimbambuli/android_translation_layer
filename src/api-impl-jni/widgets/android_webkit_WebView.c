@@ -155,13 +155,55 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishJavaBridgeCall(
 /* WebViewClient.shouldInterceptRequest(): ATL's web process extension (src/webext/atl_webext.c) asks over a socket
  * before each subresource request; the answer is WebView.internalShouldInterceptRequest(), called on the socket's
  * thread (Android calls shouldInterceptRequest() off the UI thread too). A response is kept until WebKit fetches
- * it from the atl-intercept: scheme */
+ * it from the atl-intercept: scheme, at the URL's counterpart there: <scheme>://<host>/<path> becomes
+ * atl-intercept://<scheme>.<host>/<path>, so that what the response refers to relatively (a stylesheet's fonts, a
+ * module's imports) resolves to atl-intercept: URLs of the same site, for which the scheme asks the app itself */
 #define INTERCEPT_SCHEME "atl-intercept"
 static GMutex intercept_lock;
 static GHashTable *intercept_pages;     // page id -> weak global reference to the Java WebView
-static GHashTable *intercept_responses; // response number -> GBytes, as internalShouldInterceptRequest() returned it
-static guint intercept_next;
+static GHashTable *intercept_responses; // atl-intercept: URL -> GBytes, as internalShouldInterceptRequest() returned it
 static char *intercept_socket_path;
+
+// the atl-intercept: URL of an http(s) URL, and back (NULL for any other URL)
+static char *intercept_uri(const char *uri)
+{
+	const char *rest = strstr(uri, "://");
+	return rest ? g_strdup_printf(INTERCEPT_SCHEME "://%.*s.%s", (int)(rest - uri), uri, rest + 3) : NULL;
+}
+
+static char *intercept_original_uri(const char *uri)
+{
+	const char *host = g_str_has_prefix(uri, INTERCEPT_SCHEME "://") ? uri + strlen(INTERCEPT_SCHEME "://") : NULL;
+	const char *dot = host ? strchr(host, '.') : NULL;
+	if (!dot || !((dot - host == 4 && !strncmp(host, "http", 4)) || (dot - host == 5 && !strncmp(host, "https", 5))))
+		return NULL;
+	return g_strdup_printf("%.*s://%s", (int)(dot - host), host, dot + 1);
+}
+
+// the app's answer for a subresource, NULL to load it from the network; the calling thread is attached to the VM
+static GBytes *intercept_ask(JNIEnv *env, guint64 page_id, const char *uri, const char *method, const char *headers)
+{
+	(*env)->PushLocalFrame(env, 16);
+	g_mutex_lock(&intercept_lock);
+	jweak weak = g_hash_table_lookup(intercept_pages, GUINT_TO_POINTER(page_id));
+	jobject this = weak ? (*env)->NewLocalRef(env, weak) : NULL;
+	g_mutex_unlock(&intercept_lock);
+	jbyteArray response = this ? J__WebView__internalShouldInterceptRequest(env, this, _JSTRING(uri), _JSTRING(method), _JSTRING(headers), JNI_FALSE) : NULL;
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		response = NULL;
+	}
+	GBytes *bytes = NULL;
+	if (response) {
+		jsize length = (*env)->GetArrayLength(env, response);
+		jbyte *data = (*env)->GetByteArrayElements(env, response, NULL);
+		bytes = g_bytes_new(data, length);
+		(*env)->ReleaseByteArrayElements(env, response, data, JNI_ABORT);
+	}
+	(*env)->PopLocalFrame(env, NULL);
+	return bytes;
+}
 
 static void intercept_set_page(JNIEnv *env, WebKitWebView *webview, jobject this)
 {
@@ -181,36 +223,21 @@ static gboolean intercept_connection_cb(GThreadedSocketService *service, GSocket
 	GOutputStream *out = g_io_stream_get_output_stream(G_IO_STREAM(connection));
 	char *line;
 	while ((line = g_data_input_stream_read_line(in, NULL, NULL, NULL))) {
-		char reply[64] = "";
-		(*env)->PushLocalFrame(env, 16); // the thread stays attached: its local references go with each request
+		g_autofree char *reply = NULL; // the thread stays attached: intercept_ask() frees its local references
 		char **field = g_strsplit(line, "\t", 4);
 		if (g_strv_length(field) == 4) {
-			g_mutex_lock(&intercept_lock);
-			jweak weak = g_hash_table_lookup(intercept_pages, GUINT_TO_POINTER(g_ascii_strtoull(field[0], NULL, 10)));
-			jobject this = weak ? (*env)->NewLocalRef(env, weak) : NULL;
-			g_mutex_unlock(&intercept_lock);
-			jbyteArray response = this ? J__WebView__internalShouldInterceptRequest(env, this, _JSTRING(field[2]), _JSTRING(field[1]), _JSTRING(field[3]), JNI_FALSE) : NULL;
-			if ((*env)->ExceptionCheck(env)) {
-				(*env)->ExceptionDescribe(env);
-				(*env)->ExceptionClear(env);
-				response = NULL;
-			}
-			if (response) {
-				jsize length = (*env)->GetArrayLength(env, response);
-				jbyte *bytes = (*env)->GetByteArrayElements(env, response, NULL);
+			GBytes *bytes = intercept_ask(env, g_ascii_strtoull(field[0], NULL, 10), field[2], field[1], field[3]);
+			if (bytes) {
+				reply = intercept_uri(field[2]);
 				g_mutex_lock(&intercept_lock);
-				guint number = ++intercept_next;
-				g_hash_table_insert(intercept_responses, GUINT_TO_POINTER(number), g_bytes_new(bytes, length));
+				g_hash_table_replace(intercept_responses, g_strdup(reply), bytes);
 				g_mutex_unlock(&intercept_lock);
-				(*env)->ReleaseByteArrayElements(env, response, bytes, JNI_ABORT);
-				snprintf(reply, sizeof(reply), INTERCEPT_SCHEME ":///%u", number);
 			}
 		}
 		g_strfreev(field);
 		g_free(line);
-		(*env)->PopLocalFrame(env, NULL);
-		strcat(reply, "\n");
-		if (!g_output_stream_write_all(out, reply, strlen(reply), NULL, NULL, NULL))
+		g_autofree char *answer = g_strconcat(reply ? reply : "", "\n", NULL);
+		if (!g_output_stream_write_all(out, answer, strlen(answer), NULL, NULL, NULL))
 			break;
 	}
 	(*jvm)->DetachCurrentThread(jvm);
@@ -234,15 +261,8 @@ static char **intercept_parse(GBytes *bytes, GBytes **body)
 	return g_strsplit(head, "\n", -1);
 }
 
-/* WebKit's scheme handler for a response kept by intercept_connection_cb() */
-static void intercept_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
+static void intercept_respond(WebKitURISchemeRequest *request, GBytes *bytes)
 {
-	const char *number = strrchr(webkit_uri_scheme_request_get_uri(request), '/');
-	g_mutex_lock(&intercept_lock);
-	GBytes *bytes = number ? g_hash_table_lookup(intercept_responses, GUINT_TO_POINTER(strtoul(number + 1, NULL, 10))) : NULL;
-	if (bytes)
-		g_hash_table_steal(intercept_responses, GUINT_TO_POINTER(strtoul(number + 1, NULL, 10)));
-	g_mutex_unlock(&intercept_lock);
 	if (!bytes) {
 		g_autoptr(GError) error = g_error_new(G_IO_ERROR, G_IO_ERROR_NOT_FOUND, "no intercepted response");
 		webkit_uri_scheme_request_finish_error(request, error);
@@ -275,6 +295,77 @@ static void intercept_request_cb(WebKitURISchemeRequest *request, gpointer user_
 	webkit_uri_scheme_request_finish_with_response(request, response);
 }
 
+static void append_request_header(const char *name, const char *value, gpointer headers)
+{
+	g_string_append_printf(headers, "%s: %s\x1f", name, value);
+}
+
+/* an atl-intercept: URL that no answer of the app is kept for, e.g. one resolved relative to an intercepted
+ * response: the app is asked for its http(s) URL, on a thread of its own */
+struct intercept_question {
+	WebKitURISchemeRequest *request;
+	guint64 page_id;
+	char *uri;
+	char *method;
+	GString *headers;
+};
+
+static void intercept_question_free(struct intercept_question *question)
+{
+	g_object_unref(question->request);
+	g_free(question->uri);
+	g_free(question->method);
+	g_string_free(question->headers, TRUE);
+	g_free(question);
+}
+
+static void intercept_ask_thread(GTask *task, gpointer source, gpointer task_data, GCancellable *cancellable)
+{
+	struct intercept_question *question = task_data;
+	JNIEnv *env;
+	(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
+	GBytes *bytes = intercept_ask(env, question->page_id, question->uri, question->method, question->headers->str);
+	(*jvm)->DetachCurrentThread(jvm);
+	g_task_return_pointer(task, bytes, (GDestroyNotify)g_bytes_unref);
+}
+
+static void intercept_asked(GObject *source, GAsyncResult *result, gpointer user_data)
+{
+	struct intercept_question *question = g_task_get_task_data(G_TASK(result));
+	intercept_respond(question->request, g_task_propagate_pointer(G_TASK(result), NULL));
+}
+
+// WebKit's handler of the atl-intercept: scheme
+static void intercept_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
+{
+	gpointer key, bytes = NULL;
+	g_mutex_lock(&intercept_lock);
+	if (g_hash_table_steal_extended(intercept_responses, webkit_uri_scheme_request_get_uri(request), &key, &bytes))
+		g_free(key);
+	g_mutex_unlock(&intercept_lock);
+	if (bytes) {
+		intercept_respond(request, bytes);
+		return;
+	}
+	g_autofree char *uri = intercept_original_uri(webkit_uri_scheme_request_get_uri(request));
+	if (!uri) {
+		intercept_respond(request, NULL);
+		return;
+	}
+	struct intercept_question *question = g_new0(struct intercept_question, 1);
+	question->request = g_object_ref(request);
+	question->page_id = webkit_web_view_get_page_id(webkit_uri_scheme_request_get_web_view(request));
+	question->uri = g_steal_pointer(&uri);
+	question->method = g_strdup(webkit_uri_scheme_request_get_http_method(request) ?: "GET");
+	question->headers = g_string_new(NULL);
+	if (webkit_uri_scheme_request_get_http_headers(request))
+		soup_message_headers_foreach(webkit_uri_scheme_request_get_http_headers(request), append_request_header, question->headers);
+	GTask *task = g_task_new(NULL, NULL, intercept_asked, NULL);
+	g_task_set_task_data(task, question, (GDestroyNotify)intercept_question_free);
+	g_task_run_in_thread(task, intercept_ask_thread);
+	g_object_unref(task);
+}
+
 static void intercept_remove_socket(void)
 {
 	g_unlink(intercept_socket_path);
@@ -286,7 +377,7 @@ static void intercept_remove_socket(void)
 static void intercept_setup(WebKitWebContext *web_context)
 {
 	intercept_pages = g_hash_table_new(NULL, NULL);
-	intercept_responses = g_hash_table_new_full(NULL, NULL, NULL, (GDestroyNotify)g_bytes_unref);
+	intercept_responses = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, (GDestroyNotify)g_bytes_unref);
 	/* in the app's own cache directory: the Flatpak portal exposes only the app's directories to the web
 	 * process's sandbox */
 	g_autofree char *dir = g_strdup_printf("%s/atl-webext-%d", g_get_user_cache_dir(), getpid());
@@ -450,11 +541,6 @@ static void main_frame_answered(GObject *source, GAsyncResult *result, gpointer 
 	}
 	g_strfreev(line);
 	webkit_web_view_load_bytes(load->web_view, body, mime_type ? mime_type : "text/html", charset, webkit_uri_request_get_uri(load->request));
-}
-
-static void append_request_header(const char *name, const char *value, gpointer headers)
-{
-	g_string_append_printf(headers, "%s: %s\x1f", name, value);
 }
 
 static void load_request(JNIEnv *env, jobject this, WebKitWebView *web_view, WebKitURIRequest *request)
