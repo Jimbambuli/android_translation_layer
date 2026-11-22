@@ -268,6 +268,17 @@ public class Build {
 
 		public static final String BASE_OS = getString("ro.build.version.base_os");
 
+		/* Native code reads these like on a device (android_get_device_api_level(), __system_property_get()):
+		 * hand it the values this class reports. */
+		static {
+			SystemProperties.publishToNative("ro.build.version.sdk", String.valueOf(SDK_INT));
+			SystemProperties.publishToNative("ro.build.version.sdk_full", (SDK_INT_FULL / 100000) + "." + (SDK_INT_FULL % 100000));
+			SystemProperties.publishToNative("ro.build.version.release", RELEASE);
+			SystemProperties.publishToNative("ro.build.version.codename", CODENAME);
+			SystemProperties.publishToNative("ro.build.version.release_or_codename", "REL".equals(CODENAME) ? RELEASE : CODENAME);
+			SystemProperties.publishToNative("ro.build.version.preview_sdk", String.valueOf(PREVIEW_SDK_INT));
+		}
+
 		static String computeIncremental() {
 			return getString("ro.build.version.incremental");
 		}

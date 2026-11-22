@@ -255,6 +255,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/os/android_atl_GVariantBuilderParcel.c',
                                                                   	'src/api-impl-jni/os/android_atl_GVariantIterParcel.c',
                                                                   	'src/api-impl-jni/os/android_os_Process.c',
+                                                                  	'src/api-impl-jni/os/android_os_SystemProperties.c',
                                                                   	'src/api-impl-jni/security/android_atl_crypto_NativeCrypto.c',
                                                                   	'src/api-impl-jni/security/android_security_keystore_AndroidKeyStore.c',
                                                                   	'src/api-impl-jni/sensors/android_hardware_SensorManager.c',
@@ -306,7 +307,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
                                                                   	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'),
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('libsecret-1'), dependency('fontconfig'), dependency('pangoft2'), dependency('libwebp'),
-                                                                        libart_dep, wayland_protos_dep, upcalls_header
+                                                                        libart_dep, libc_bio_dep, wayland_protos_dep, upcalls_header
                                                                   ],
                                                                   link_with: [ libandroid_so ],
                                                                   link_args: [
