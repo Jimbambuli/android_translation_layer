@@ -644,6 +644,28 @@ public class EuiccManager {
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.TIRAMISU)
     public static final long SWITCH_WITHOUT_PORT_INDEX_EXCEPTION_ON_DISABLE = 218393363L;
 
+    /**
+     * With support for MEP(multiple enabled profile) in Android T, a SIM card can enable multiple
+     * profile on different port. If apps are not target SDK T yet and keep calling the
+     * switchToSubscription or download API without specifying the port index, we should
+     * keep the existing behaviour by always use port index 0 even the device itself has MEP eUICC,
+     * this is for carrier app's backward compatibility.
+     * @hide
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.TIRAMISU)
+    public static final long SHOULD_RESOLVE_PORT_INDEX_FOR_APPS = 224562872L;
+
+    /**
+     * Starting with Android U, a port is available if it is active without an enabled profile
+     * on it or calling app can activate a new profile on the selected port without any user
+     * interaction.
+     * @hide
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    public static final long INACTIVE_PORT_AVAILABILITY_CHECK = 240273417L;
+
     private final Context mContext;
     private int mCardId;
 

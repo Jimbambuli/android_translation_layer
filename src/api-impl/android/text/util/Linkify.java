@@ -19,8 +19,10 @@ package android.text.util;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.ActivityThread;
 import android.content.Context;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.TelephonyManager;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -32,6 +34,10 @@ import android.util.Log;
 import android.util.Patterns;
 import android.widget.TextView;
 
+
+import com.android.i18n.phonenumbers.PhoneNumberMatch;
+import com.android.i18n.phonenumbers.PhoneNumberUtil;
+import com.android.i18n.phonenumbers.PhoneNumberUtil.Leniency;
 
 import libcore.util.EmptyArray;
 
@@ -657,15 +663,28 @@ public class Linkify {
             }
         }
     }
-    /*
-     * ATL: AOSP finds the numbers with libphonenumber (PhoneNumberUtil.findNumbers, region from
-     * the SIM or the locale), which ATL does not ship. This is the pre-libphonenumber AOSP
-     * gathering with Patterns.PHONE and the filters above, which AOSP still exports.
-     */
     private static void gatherTelLinks(ArrayList<LinkSpec> links, Spannable s,
             @Nullable Context context) {
-        gatherLinks(links, s, Patterns.PHONE, new String[] { "tel:" },
-                sPhoneNumberMatchFilter, sPhoneNumberTransformFilter);
+        PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
+        final Context ctx = (context != null) ? context : ActivityThread.currentApplication();
+        String regionCode = Locale.getDefault().getCountry();
+        if (ctx != null) {
+          String simCountryIso = ctx.getSystemService(TelephonyManager.class).getSimCountryIso();
+          if (!TextUtils.isEmpty(simCountryIso)) {
+            // Assign simCountryIso if it is available
+            regionCode = simCountryIso.toUpperCase(Locale.US);
+          }
+        }
+
+        Iterable<PhoneNumberMatch> matches = phoneUtil.findNumbers(s.toString(),
+                regionCode, Leniency.POSSIBLE, Long.MAX_VALUE);
+        for (PhoneNumberMatch match : matches) {
+            LinkSpec spec = new LinkSpec();
+            spec.url = "tel:" + PhoneNumberUtils.normalizeNumber(match.rawString());
+            spec.start = match.start();
+            spec.end = match.end();
+            links.add(spec);
+        }
     }
 
     /*

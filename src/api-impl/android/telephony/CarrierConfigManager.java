@@ -5190,7 +5190,7 @@ public class CarrierConfigManager {
             defaults.putInt(KEY_ES_SUPL_CONTROL_PLANE_SUPPORT_INT,
                     SUPL_EMERGENCY_MODE_TYPE_CP_ONLY);
             defaults.putStringArray(KEY_ES_SUPL_DATA_PLANE_ONLY_ROAMING_PLMN_STRING_ARRAY, null);
-            // ATL: aconfig flag enable_ni_supl_message_injection_by_carrier_config_bugfix: default not checked, taken as enabled
+            // aconfig flag enable_ni_supl_message_injection_by_carrier_config_bugfix: ENABLED, READ_ONLY in build/release/aconfig/bp1a..bp4a of android-16.0.0_r4
             {
                 defaults.putBoolean(KEY_ENABLE_NI_SUPL_MESSAGE_INJECTION_BOOL, false);
             }
@@ -11649,7 +11649,7 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_CARRIER_ROAMING_NTN_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_INT,
                 SatelliteManager.EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911);
         sDefaults.putInt(KEY_CARRIER_SUPPORTED_SATELLITE_NOTIFICATION_HYSTERESIS_SEC_INT, 180);
-        // ATL: aconfig flag starlink_data_bugfix: default not checked (no aconfig file in the sources), taken as enabled
+        // aconfig flag starlink_data_bugfix: ENABLED, READ_ONLY in build/release/aconfig/bp2a..bp4a of android-16.0.0_r4
         {
             sDefaults.putLong(KEY_SATELLITE_CONNECTED_NOTIFICATION_THROTTLE_MILLIS_INT,
                     TimeUnit.DAYS.toMillis(7));
@@ -11755,7 +11755,7 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_WEAR_CONNECTIVITY_BT_TO_CELL_DELAY_MS_INT, -1);
         sDefaults.putInt(KEY_WEAR_CONNECTIVITY_EXTEND_BT_TO_CELL_DELAY_ON_WIFI_MS_INT, -1);
         sDefaults.putInt(KEY_SATELLITE_SOS_MAX_DATAGRAM_SIZE_BYTES_INT, 255);
-        // ATL: aconfig flag avoid_bad_wifi_from_carrier_config: default not checked, taken as enabled
+        // aconfig flag avoid_bad_wifi_from_carrier_config: ENABLED, READ_ONLY in build/release/aconfig/bp4a of android-16.0.0_r4
         {
             sDefaults.putBoolean(KEY_AVOID_BAD_WIFI_BOOL, true);
             sDefaults.putBoolean(KEY_SHOW_AVOID_BAD_WIFI_TOGGLE_BOOL, false);

@@ -133,6 +133,11 @@ public class TelephonyManager {
 	public static final String EXTRA_STATE_RINGING = "RINGING";
 	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
 
+	/** @hide AOSP TelephonyManager.from() */
+	public static TelephonyManager from(android.content.Context context) {
+		return (TelephonyManager) context.getSystemService(android.content.Context.TELEPHONY_SERVICE);
+	}
+
 	public static TelephonyManager getDefault() {
 		return new TelephonyManager();
 	}
@@ -413,6 +418,12 @@ public class TelephonyManager {
 
 	/* AOSP: TelephonyPermissions.checkReadPhoneNumber() (READ_PHONE_NUMBERS or READ_SMS; READ_PHONE_STATE before R),
 	 * else SecurityException; the number the SIM/modem knows (ModemManager OwnNumbers) */
+	/* AOSP getLine1Number(int subId) (@hide): the number of the given subscription, null for a subscription that does not exist;
+	 * ATL has the one ModemManager subscription */
+	public String getLine1Number(int subId) {
+		return SubscriptionManager.isValidSubscriptionId(subId) ? getLine1Number() : null;
+	}
+
 	public String getLine1Number() {
 		ModemManagerPhone phone = ModemManagerPhone.get();
 		if (phone != null) {
@@ -678,6 +689,8 @@ public class TelephonyManager {
 	public String getVisualVoicemailPackageName() { return null; }
 	public String getVoiceMailAlphaTag() { return null; }
 	public String getVoiceMailNumber() { return null; }
+	/* AOSP asks ITelephony for the subscription's voicemail number (SIM EF_MBDN); ATL has no voicemail number source, like getVoiceMailNumber() */
+	public String getVoiceMailNumber(int subId) { return null; }
 	public boolean setVoiceMailNumber(String alphaTag, String number) { return false; }
 	public int getVoiceNetworkType() {
 		ModemManagerPhone phone = ModemManagerPhone.get();
