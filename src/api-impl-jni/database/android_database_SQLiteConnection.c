@@ -36,6 +36,7 @@
 #include "../util.h"
 #include "../generated_headers/android_database_sqlite_SQLiteConnection.h"
 #include "android_database_SQLiteCommon.h"
+#include "sqlite3_android_phone.h"
 
 enum {
 	// Open flags.
@@ -139,7 +140,11 @@ static int register_android_functions(sqlite3 *handle)
 		return -1;
 	}
 
-	return sqlite3_create_collation_v2(handle, "UNICODE", SQLITE_UTF8, collator, collate8, localized_collator_dtor);
+	int err = sqlite3_create_collation_v2(handle, "UNICODE", SQLITE_UTF8, collator, collate8, localized_collator_dtor);
+	if (err != SQLITE_OK)
+		return err;
+	/* sqlite3_android.cpp: PHONE_NUMBERS_EQUAL (telephony and contacts providers) */
+	return register_phone_numbers_equal(handle);
 }
 
 // Called each time a statement begins execution, when tracing is enabled.
