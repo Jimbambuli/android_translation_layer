@@ -11,6 +11,32 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 
 public class MediaCodec {
+	public static final int BUFFER_FLAG_SYNC_FRAME = 1;
+	public static final int BUFFER_FLAG_KEY_FRAME = 1;
+	public static final int BUFFER_FLAG_CODEC_CONFIG = 2;
+	public static final int BUFFER_FLAG_PARTIAL_FRAME = 8;
+	public static final int BUFFER_FLAG_DECODE_ONLY = 32;
+	public static final int CONFIGURE_FLAG_ENCODE = 1;
+	public static final int CONFIGURE_FLAG_USE_BLOCK_MODEL = 2;
+	public static final int CONFIGURE_FLAG_USE_CRYPTO_ASYNC = 4;
+	public static final int CRYPTO_MODE_UNENCRYPTED = 0;
+	public static final int CRYPTO_MODE_AES_CTR = 1;
+	public static final int CRYPTO_MODE_AES_CBC = 2;
+	public static final int INFO_TRY_AGAIN_LATER = -1;
+	public static final int INFO_OUTPUT_FORMAT_CHANGED = -2;
+	public static final int INFO_OUTPUT_BUFFERS_CHANGED = -3;
+	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT = 1;
+	public static final int VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING = 2;
+	public static final String PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
+	public static final String PARAMETER_KEY_SUSPEND = "drop-input-frames";
+	public static final String PARAMETER_KEY_SUSPEND_TIME = "drop-start-time-us";
+	public static final String PARAMETER_KEY_OFFSET_TIME = "time-offset-us";
+	public static final String PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
+	public static final String PARAMETER_KEY_HDR10_PLUS_INFO = MediaFormat.KEY_HDR10_PLUS_INFO;
+	public static final String PARAMETER_KEY_LOW_LATENCY = MediaFormat.KEY_LOW_LATENCY;
+	public static final String PARAMETER_KEY_TUNNEL_PEEK = "tunnel-peek";
+	public static final String PARAMETER_KEY_QP_OFFSET_MAP = "qp-offset-map";
+	public static final String PARAMETER_KEY_QP_OFFSET_RECTS = "qp-offset-rects";
 
 	public static final int BUFFER_FLAG_END_OF_STREAM = 0x4;
 
@@ -146,6 +172,9 @@ public class MediaCodec {
 	}
 
 	public static final class CodecException extends IllegalStateException {
+		public static final int ERROR_INSUFFICIENT_RESOURCE = 1100;
+		public static final int ERROR_RECLAIMED = 1101;
+
 		private final int errorCode;
 
 		public CodecException(int errorCode, String detailMessage) {
