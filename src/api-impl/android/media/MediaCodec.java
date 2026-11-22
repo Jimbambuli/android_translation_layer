@@ -54,6 +54,8 @@ public class MediaCodec {
 	private boolean outputEos;
 	private Thread decodeThread;
 	private boolean decoding;
+	/* AOSP MediaCodec::setState() cancels a pending dequeue on every change of state (flush, stop, release) */
+	private int stateGeneration;
 	private Queue<Integer> queuedInputBuffers;
 	private Queue<Integer> freeInputBuffers;
 
@@ -132,9 +134,14 @@ public class MediaCodec {
 		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
 		readyOutputBuffers = new ArrayDeque<>(outputBuffers.length);
 		outputEos = false;
+		outputFormatSet = false; // AOSP: the first output after configure() and start() is INFO_OUTPUT_FORMAT_CHANGED
 		outputInfos = new BufferInfo[outputBuffers.length];
+		/* a video buffer carries a frame pointer; an audio buffer holds a decoded frame in PCM16, as large as the
+		 * blocks AOSP's C2SoftOpusDec takes for every output (kMaxNumSamplesPerBuffer 960 * 6 frames of up to
+		 * kMaxChannels 8), which also holds a 5.1 AC-3 or HE-AAC frame */
+		int outputSize = video ? 16384 : 960 * 6 * 8 * 2;
 		for (int i = 0; i < outputBuffers.length; i++) {
-			outputBuffers[i] = ByteBuffer.allocateDirect(16384).order(ByteOrder.LITTLE_ENDIAN);
+			outputBuffers[i] = ByteBuffer.allocateDirect(outputSize).order(ByteOrder.LITTLE_ENDIAN);
 			outputInfos[i] = new BufferInfo();
 			freeOutputBuffers.add(i);
 		}
@@ -294,8 +301,11 @@ public class MediaCodec {
 
 	private synchronized int waitForBuffer(long timeoutUs, Attempt attempt) {
 		long deadline = System.nanoTime() + timeoutUs * 1000;
+		int generation = stateGeneration;
 		while (true) {
-			if (native_codec == 0)
+			/* AOSP cancelPendingDequeueOperations(): INVALID_OPERATION, which the JNI layer throws as
+			 * IllegalStateException */
+			if (native_codec == 0 || generation != stateGeneration)
 				throw new IllegalStateException();
 			int ret = attempt.run();
 			if (ret != /*INFO_TRY_AGAIN_LATER*/ -1 || timeoutUs == 0)
@@ -329,6 +339,7 @@ public class MediaCodec {
 	private void stopDecoding() {
 		Thread thread;
 		synchronized (this) {
+			stateGeneration++;
 			decoding = false;
 			thread = decodeThread;
 			decodeThread = null;
@@ -435,6 +446,7 @@ public class MediaCodec {
 	}
 
 	public synchronized void flush() {
+		stateGeneration++;
 		notifyAll();
 		// in asynchronous mode the codec waits for start() after a flush, as in AOSP
 		pumping = false;
@@ -449,7 +461,7 @@ public class MediaCodec {
 		for (int i = 0; i < outputBuffers.length; i++)
 			freeOutputBuffers.add(i);
 		outputEos = false;
-		outputFormatSet = false;
+		/* the output format stays (AOSP reports INFO_OUTPUT_FORMAT_CHANGED again only after stop() or a change) */
 	}
 
 	private void releaseAllOutput() {
