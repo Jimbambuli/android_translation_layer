@@ -137,6 +137,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/system_fonts.c',
                                           	'src/libandroid/trace.c',
                                           	'src/libandroid/unsupported_ndk.c',
+                                          	'src/libandroid/vulkan_swapchain.c',
                                           ],
                                           include_directories: shared_includes_dir,
                                           install: true,
