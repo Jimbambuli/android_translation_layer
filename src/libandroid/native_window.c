@@ -62,6 +62,7 @@
 
 #include "../api-impl-jni/widgets/android_view_SurfaceView.h"
 #include "native_window.h"
+#include "ndk_jni.h"
 
 /**
  * Transforms that can be applied to buffers as they are displayed to a window.
@@ -126,6 +127,10 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 {
 	if (!g_atomic_int_dec_and_test(&native_window->refcount))
 		return;
+	if (native_window->surface) {
+		JNIEnv *env = ndk_jni_env();
+		(*env)->DeleteGlobalRef(env, native_window->surface);
+	}
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_DISCONNECT}, -1);
 		/* a unix socket closed with unread messages (the consumer's FRAME/RELEASE) gives the other end
@@ -347,6 +352,7 @@ static ANativeWindow *remote_window_fromSurface(JNIEnv *env, jobject surface)
 		return NULL;
 	}
 	fprintf(stderr, "ANativeWindow_fromSurface: surface of another process, %dx%d\n", native_window->width, native_window->height);
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
 	return native_window;
 }
 
@@ -506,6 +512,7 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	native_window->refcount = 1; // probably, 0 doesn't work
 	native_window->remote_fd = -1;
 	native_window->surface_view_widget = surface_view_widget;
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
 	native_window->width = width;
 	native_window->height = height;
 
@@ -604,6 +611,12 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 		native_window->resize_handler = g_signal_connect(surface_view_widget, "resize", G_CALLBACK(on_resize), native_window);
 
 	return native_window;
+}
+
+/* AOSP native_window_jni: the Surface the window belongs to (every ATL window comes from one) */
+jobject ANativeWindow_toSurface(JNIEnv *env, ANativeWindow *window)
+{
+	return window && window->surface ? (*env)->NewLocalRef(env, window->surface) : NULL;
 }
 
 ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceTexture)

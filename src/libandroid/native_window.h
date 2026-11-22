@@ -15,6 +15,7 @@ struct ANativeWindow {
 	Display *x11_display;
 	gulong resize_handler;
 	int refcount;
+	jobject surface; /* the android.view.Surface of this window (a global reference) */
 	int width;
 	int height;
 	/* a Surface of another process of the app (Surface.Endpoint): the socket to its widget, else -1 */

@@ -109,6 +109,12 @@ install_data([
              ],
              install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/etc')
 
+# bionic_translation reads the cfg.d files of the data directories: dlopen("libmediandk.so") gets libandroid
+install_data([
+             	'res/bionic_translation/android_translation_layer.cfg'
+             ],
+             install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/bionic_translation/cfg.d')
+
 # Roboto (Apache-2.0, AOSP external/roboto-fonts android-14), see add_android_fonts() in main.c
 install_data([
              	'res/fonts/Roboto-Regular.ttf',
@@ -134,8 +140,10 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/egl.c',
                                           	'src/libandroid/input.c',
                                           	'src/libandroid/looper.c',
-                                          	'src/libandroid/media.c',
+                                          	'src/libandroid/media_codec.c',
+                                          	'src/libandroid/media_format.c',
                                           	'src/libandroid/native_window.c',
+                                          	'src/libandroid/ndk_jni.c',
                                           	'src/libandroid/sensor.c',
                                           	'src/libandroid/sharedmem.c',
                                           	'src/libandroid/system_fonts.c',

@@ -69,8 +69,6 @@ void AImage_delete(void *image) {}
 void AImage_deleteAsync(void *image, int releaseFenceFd) {}
 media_status_t AImage_getHardwareBuffer(const void *image, void **buffer) { return AMEDIA_ERROR_INVALID_PARAMETER; }
 
-/* native_window_jni: only windows of android.view.Surface have one */
-jobject ANativeWindow_toSurface(JNIEnv *env, void *window) { return NULL; }
 
 /* libsync */
 int sync_merge(const char *name, int fd1, int fd2)

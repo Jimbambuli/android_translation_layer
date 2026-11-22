@@ -267,7 +267,37 @@ public class MediaCodec {
 		return outputBuffers[index];
 	}
 
-	public synchronized int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
+	/* AOSP dequeueInputBuffer()/dequeueOutputBuffer(): wait up to timeoutUs (without end if negative) for a
+	 * buffer. ATL's FFmpeg codec only works inside these calls, so the wait repeats the attempt; queuing input or
+	 * releasing output on another thread wakes it early. A codec released meanwhile is IllegalStateException. */
+	private interface Attempt {
+		int run();
+	}
+
+	private synchronized int waitForBuffer(long timeoutUs, Attempt attempt) {
+		long deadline = System.nanoTime() + timeoutUs * 1000;
+		while (true) {
+			if (native_codec == 0)
+				throw new IllegalStateException();
+			int ret = attempt.run();
+			if (ret != /*INFO_TRY_AGAIN_LATER*/ -1 || timeoutUs == 0)
+				return ret;
+			long waitNs = timeoutUs < 0 ? 10000000 : Math.min(deadline - System.nanoTime(), 10000000);
+			if (waitNs <= 0)
+				return ret;
+			try {
+				wait(waitNs / 1000000, (int)(waitNs % 1000000));
+			} catch (InterruptedException e) {
+				return ret;
+			}
+		}
+	}
+
+	public int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
+		return waitForBuffer(timeoutUs, () -> tryDequeueOutputBuffer(info));
+	}
+
+	private int tryDequeueOutputBuffer(BufferInfo info) {
 		if (!outputFormatSet) {
 			outputFormatSet = true;
 			return /*INFO_OUTPUT_FORMAT_CHANGED*/ -2;
@@ -288,12 +318,14 @@ public class MediaCodec {
 	}
 
 	public synchronized void releaseOutputBuffer(int index, boolean render) {
+		notifyAll();
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], render, 0);
 		freeOutputBuffers.add(index);
 	}
 
 	// AOSP calls the parameter `presentationTimeUs`, but actually it is nanoseconds
 	public synchronized void releaseOutputBuffer(int index, long releaseTimeNs) {
+		notifyAll();
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], true, releaseTimeNs);
 		freeOutputBuffers.add(index);
 	}
@@ -318,6 +350,7 @@ public class MediaCodec {
 	}
 
 	public synchronized void flush() {
+		notifyAll();
 		// in asynchronous mode the codec waits for start() after a flush, as in AOSP
 		pumping = false;
 		native_flush(native_codec);
@@ -348,7 +381,11 @@ public class MediaCodec {
 		}
 	}
 
-	public synchronized int dequeueInputBuffer(long timeoutUs) {
+	public int dequeueInputBuffer(long timeoutUs) {
+		return waitForBuffer(timeoutUs, this::tryDequeueInputBuffer);
+	}
+
+	private int tryDequeueInputBuffer() {
 		tryProcessInputBuffer();
 		Integer index = freeInputBuffers.poll();
 		if (index == null) {
@@ -366,6 +403,7 @@ public class MediaCodec {
 	}
 
 	public synchronized void queueInputBuffer(int index, int offset, int size, long presentationTimeUs, int flags) {
+		notifyAll();
 		if ((flags & BUFFER_FLAG_END_OF_STREAM) != 0) {
 			queuedInputBuffers.add(-1);
 			tryProcessInputBuffer();
@@ -406,6 +444,7 @@ public class MediaCodec {
 			native_release(native_codec);
 		}
 		native_codec = 0;
+		notifyAll();
 	}
 
 	/* AOSP MediaCodec.reset(): back to the Uninitialized state of a freshly created codec. The FFmpeg
