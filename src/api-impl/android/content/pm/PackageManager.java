@@ -1218,6 +1218,12 @@ public class PackageManager {
 	@SdkConstant(SdkConstantType.FEATURE)
 	public static final String FEATURE_NFC = "android.hardware.nfc";
 
+	public static final String FEATURE_FINGERPRINT = "android.hardware.fingerprint";
+
+	public static final String FEATURE_FACE = "android.hardware.biometrics.face";
+
+	public static final String FEATURE_IRIS = "android.hardware.biometrics.iris";
+
 	/**
 	 * Feature for {@link #getSystemAvailableFeatures} and
 	 * {@link #hasSystemFeature}: The device supports host-
@@ -2697,6 +2703,9 @@ public class PackageManager {
 			/* the activity's own window on the desktop, see Activity.enterPictureInPictureMode() */
 			case FEATURE_PICTURE_IN_PICTURE:
 				return true;
+			/* the fprintd fingerprint sensor (com.android.server.biometrics.FprintdSensor) */
+			case FEATURE_FINGERPRINT:
+				return com.android.server.biometrics.FprintdSensor.isPresent();
 			/* WebView is WebKitGTK (apps such as Jellyfin refuse to start without the feature) */
 			case "android.software.webview":
 				return true;

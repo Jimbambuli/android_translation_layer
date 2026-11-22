@@ -8,6 +8,8 @@ import android.os.CancellationSignal;
 import android.security.identity.IdentityCredential;
 import android.security.identity.PresentationSession;
 import android.text.TextUtils;
+import android.hardware.fingerprint.FingerprintManager;
+import com.android.server.biometrics.FprintdSensor;
 import java.security.Signature;
 import java.util.concurrent.Executor;
 import javax.crypto.Cipher;
@@ -19,9 +21,10 @@ import javax.crypto.Mac;
  *
  * AOSP hands the prompt to the AuthService (IAuthService.authenticate), which checks the sensors and the
  * device credential before it shows a dialog (the same check as BiometricManager.canAuthenticate()).
- * ATL has no AuthService and no biometric sensors: the check is BiometricManager.canAuthenticate() of
- * this context, and a failed check reaches the callback as the service reports it,
- * BiometricServiceReceiver.onError(TYPE_NONE, error, 0) -> onAuthenticationError(error, message) on the executor.
+ * ATL makes that check in the app process (BiometricManager.preAuthenticateStatus()); a failed check reaches
+ * the callback as the service reports it, BiometricServiceReceiver.onError(modality, error, 0) ->
+ * onAuthenticationError(error, message) on the executor. Otherwise ATL shows the dialog of SystemUI's
+ * AuthContainerView as an AlertDialog of the app and runs the fprintd sensor (FprintdSensor) behind it.
  */
 public class BiometricPrompt implements BiometricConstants {
 
@@ -70,6 +73,7 @@ public class BiometricPrompt implements BiometricConstants {
 	public static class Builder {
 		private final PromptInfo mPromptInfo;
 		private final Context mContext;
+		private ButtonInfo mNegativeButtonInfo;
 
 		public Builder(Context context) {
 			mPromptInfo = new PromptInfo();
@@ -160,6 +164,7 @@ public class BiometricPrompt implements BiometricConstants {
 				throw new IllegalArgumentException("Listener must not be null");
 			}
 			mPromptInfo.negativeButtonText = text;
+			mNegativeButtonInfo = new ButtonInfo(executor, listener);
 			return this;
 		}
 
@@ -204,16 +209,18 @@ public class BiometricPrompt implements BiometricConstants {
 				throw new IllegalArgumentException("Can't have both negative button behavior"
 				                                   + " and device credential enabled");
 			}
-			return new BiometricPrompt(mContext, mPromptInfo);
+			return new BiometricPrompt(mContext, mPromptInfo, mNegativeButtonInfo);
 		}
 	}
 
 	private final Context mContext;
 	private final PromptInfo mPromptInfo;
+	private final ButtonInfo mNegativeButtonInfo;
 
-	private BiometricPrompt(Context context, PromptInfo promptInfo) {
+	private BiometricPrompt(Context context, PromptInfo promptInfo, ButtonInfo negativeButtonInfo) {
 		mContext = context;
 		mPromptInfo = promptInfo;
+		mNegativeButtonInfo = negativeButtonInfo;
 	}
 
 	@NonNull
@@ -373,7 +380,7 @@ public class BiometricPrompt implements BiometricConstants {
 		if ((biometricStrength & ~BiometricManager.Authenticators.BIOMETRIC_STRONG) != 0) {
 			throw new IllegalArgumentException("Only Strong biometrics supported with crypto");
 		}
-		authenticateInternal(authenticators, cancel, executor, callback);
+		authenticateInternal(crypto, authenticators, cancel, executor, callback);
 	}
 
 	/* AOSP BiometricPrompt.authenticate(CancellationSignal, ...) */
@@ -388,13 +395,13 @@ public class BiometricPrompt implements BiometricConstants {
 		if (callback == null) {
 			throw new IllegalArgumentException("Must supply a callback");
 		}
-		authenticateInternal(mPromptInfo.authenticators, cancel, executor, callback);
+		authenticateInternal(null, mPromptInfo.authenticators, cancel, executor, callback);
 	}
 
-	/* AOSP authenticateInternal(); the service's precondition check (canAuthenticate) fails on ATL,
-	 * so the callback gets the error the way BiometricServiceReceiver.onError() delivers it */
-	private void authenticateInternal(int authenticators, CancellationSignal cancel, Executor executor,
-	                                  AuthenticationCallback callback) {
+	/* AOSP authenticateInternal() and BiometricService's handleAuthenticate(): the precondition check
+	 * (PreAuthInfo.getPreAuthenticateStatus()), then the dialog with the sensor */
+	private void authenticateInternal(final CryptoObject crypto, int authenticators, CancellationSignal cancel,
+	                                  final Executor executor, final AuthenticationCallback callback) {
 		if (cancel.isCanceled()) {
 			android.util.Log.w("BiometricPrompt", "Authentication already canceled");
 			return;
@@ -404,29 +411,185 @@ public class BiometricPrompt implements BiometricConstants {
 			                     ? BiometricManager.Authenticators.BIOMETRIC_WEAK | BiometricManager.Authenticators.DEVICE_CREDENTIAL
 			                     : BiometricManager.Authenticators.BIOMETRIC_WEAK;
 		}
-		/* BiometricManager is not registered as a system service in ATL (SystemServiceRegistry), so ask
-		 * it directly; its answer is the one ATL gives for every app */
-		final int error = new BiometricManager().canAuthenticate(authenticators);
-		if (error == BiometricManager.BIOMETRIC_SUCCESS)
-			return;
-		final String message;
-		switch (error) {
-			/* AOSP strings (core/res/res/values/strings.xml) */
-			case BIOMETRIC_ERROR_HW_NOT_PRESENT:
-				message = "Biometric hardware unavailable"; // biometric_error_hw_unavailable
-				break;
-			case BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL:
-				message = "No pin, pattern, or password set"; // biometric_error_device_not_secured
-				break;
-			default:
-				message = "Error authenticating"; // biometric_error_generic
-				break;
-		}
-		executor.execute(new Runnable() {
-			@Override
-			public void run() {
-				callback.onAuthenticationError(error, message);
+		final int error = BiometricManager.preAuthenticateStatus(authenticators);
+		if (error != BIOMETRIC_SUCCESS) {
+			/* the modality of a sensor error is the fingerprint (FingerprintManager.getErrorString()); without
+			 * a sensor it is TYPE_NONE with the generic strings of BiometricServiceReceiver.onError() */
+			final String message;
+			switch (error) {
+				case BIOMETRIC_ERROR_HW_NOT_PRESENT:
+					message = mContext.getString(com.android.internal.R.string.biometric_error_hw_unavailable);
+					break;
+				case BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL:
+					message = mContext.getString(com.android.internal.R.string.biometric_error_device_not_secured);
+					break;
+				default:
+					message = FingerprintManager.getErrorString(mContext, error, 0);
+					break;
 			}
-		});
+			executor.execute(new Runnable() {
+				@Override
+				public void run() {
+					callback.onAuthenticationError(error, message);
+				}
+			});
+			return;
+		}
+		new PromptSession(crypto, executor, callback).start(cancel);
+	}
+
+	/* the dialog (SystemUI AuthContainerView/AuthBiometricView) and the sensor session of one authenticate() */
+	private final class PromptSession implements FprintdSensor.Client {
+		private final CryptoObject mCrypto;
+		private final Executor mExecutor;
+		private final AuthenticationCallback mCallback;
+		private android.app.AlertDialog mDialog;
+		private FprintdSensor.Session mSensor;
+		private boolean mDone;
+
+		PromptSession(CryptoObject crypto, Executor executor, AuthenticationCallback callback) {
+			mCrypto = crypto;
+			mExecutor = executor;
+			mCallback = callback;
+		}
+
+		/* SystemUI's fingerprint_dialog_touch_sensor */
+		private static final String TOUCH_SENSOR = "Touch the fingerprint sensor";
+
+		private String text(String status) {
+			StringBuilder text = new StringBuilder();
+			CharSequence subtitle = mPromptInfo.useDefaultSubtitle
+			                            ? mContext.getString(com.android.internal.R.string.fingerprint_dialog_default_subtitle)
+			                            : mPromptInfo.subtitle;
+			for (CharSequence part : new CharSequence[] {subtitle, mPromptInfo.description}) {
+				if (!TextUtils.isEmpty(part))
+					text.append(part).append("\n\n");
+			}
+			return text.append(status).toString();
+		}
+
+		void start(CancellationSignal cancel) {
+			mDialog = new android.app.AlertDialog(mContext);
+			mDialog.setTitle(mPromptInfo.useDefaultTitle
+			                     ? mContext.getString(com.android.internal.R.string.biometric_dialog_default_title)
+			                     : mPromptInfo.title);
+			mDialog.setMessage(text(TOUCH_SENSOR));
+			mDialog.setCanceledOnTouchOutside(false);
+			if (mNegativeButtonInfo != null) {
+				/* DISMISSED_REASON_NEGATIVE: the app's listener, no callback */
+				mDialog.setButton(DialogInterface.BUTTON_NEGATIVE, mPromptInfo.negativeButtonText, new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						if (end())
+							mNegativeButtonInfo.executor.execute(new Runnable() {
+								@Override
+								public void run() {
+									mNegativeButtonInfo.listener.onClick(null, DialogInterface.BUTTON_NEGATIVE);
+								}
+							});
+					}
+				});
+			} else {
+				/* device credential allowed but not set up: the dialog can only be canceled */
+				mDialog.setButton(DialogInterface.BUTTON_NEGATIVE, mContext.getString(android.R.string.cancel), new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						onUserCancel();
+					}
+				});
+			}
+			/* DISMISSED_REASON_USER_CANCEL (back, Escape, close button) */
+			mDialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+				@Override
+				public void onCancel(DialogInterface dialog) {
+					onUserCancel();
+				}
+			});
+			mDialog.show();
+			mSensor = FprintdSensor.authenticate(this);
+			cancel.setOnCancelListener(new CancellationSignal.OnCancelListener() {
+				@Override
+				public void onCancel() {
+					if (!mDone)
+						mSensor.cancel();
+				}
+			});
+		}
+
+		/* ends the session; false if it had ended */
+		private boolean end() {
+			if (mDone)
+				return false;
+			mDone = true;
+			mSensor.stop();
+			mDialog.dismiss();
+			return true;
+		}
+
+		private void onUserCancel() {
+			if (end())
+				post(new Runnable() {
+					@Override
+					public void run() {
+						mCallback.onAuthenticationError(BIOMETRIC_ERROR_USER_CANCELED,
+						                                FingerprintManager.getErrorString(mContext, BIOMETRIC_ERROR_USER_CANCELED, 0));
+					}
+				});
+		}
+
+		private void post(Runnable runnable) {
+			mExecutor.execute(runnable);
+		}
+
+		@Override
+		public void onAuthenticated() {
+			if (end())
+				post(new Runnable() {
+					@Override
+					public void run() {
+						mCallback.onAuthenticationSucceeded(new AuthenticationResult(mCrypto, AUTHENTICATION_RESULT_TYPE_BIOMETRIC));
+					}
+				});
+		}
+
+		@Override
+		public void onRejected() {
+			if (mDone)
+				return;
+			mDialog.setMessage(text(mContext.getString(com.android.internal.R.string.biometric_not_recognized)));
+			post(new Runnable() {
+				@Override
+				public void run() {
+					mCallback.onAuthenticationFailed();
+				}
+			});
+		}
+
+		@Override
+		public void onAcquired(final int acquiredInfo) {
+			if (mDone)
+				return;
+			final String message = FingerprintManager.getAcquiredString(mContext, acquiredInfo, 0);
+			if (message == null)
+				return;
+			mDialog.setMessage(text(message));
+			post(new Runnable() {
+				@Override
+				public void run() {
+					mCallback.onAuthenticationHelp(acquiredInfo, message);
+				}
+			});
+		}
+
+		@Override
+		public void onError(final int error) {
+			if (end())
+				post(new Runnable() {
+					@Override
+					public void run() {
+						mCallback.onAuthenticationError(error, FingerprintManager.getErrorString(mContext, error, 0));
+					}
+				});
+		}
 	}
 }

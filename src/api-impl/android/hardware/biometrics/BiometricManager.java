@@ -16,11 +16,15 @@
 
 package android.hardware.biometrics;
 
+import com.android.server.biometrics.FprintdSensor;
+
 /**
  * A class that contains biometric utilities. For authentication, see {@link BiometricPrompt}.
  *
- * The public API of AOSP (android-14). ATL has no biometric hardware: like AOSP on such a device,
- * canAuthenticate() answers BIOMETRIC_ERROR_NO_HARDWARE and the strings are null.
+ * The public API of AOSP (android-14). AOSP asks the AuthService, whose BiometricService builds a PreAuthInfo
+ * from the sensors and the device credential; ATL does the same in the app process (preAuthenticateStatus())
+ * with its only sensor, the fprintd fingerprint sensor (com.android.server.biometrics.FprintdSensor), and
+ * without a device credential (KeyguardManager.isDeviceSecure() is false). The strings stay null.
  */
 public class BiometricManager {
 	/**
@@ -105,7 +109,80 @@ public class BiometricManager {
 	 * Determine if any of the provided authenticators can be used.
 	 */
 	public int canAuthenticate(int authenticators) {
-		return BIOMETRIC_ERROR_NO_HARDWARE;
+		/* BiometricService.canAuthenticate() */
+		if (!isValidAuthenticatorConfig(authenticators)) {
+			throw new SecurityException("Invalid authenticator configuration");
+		}
+		/* PreAuthInfo.getCanAuthenticateResult() */
+		return biometricConstantsToBiometricManager(preAuthenticateStatus(authenticators));
+	}
+
+	/* AOSP Utils.isValidAuthenticatorConfig() for the public authenticators */
+	static boolean isValidAuthenticatorConfig(int authenticators) {
+		if (authenticators == 0)
+			return true;
+		if ((authenticators & ~(Authenticators.DEVICE_CREDENTIAL | Authenticators.BIOMETRIC_WEAK)) != 0)
+			return false;
+		final int biometricBits = authenticators & Authenticators.BIOMETRIC_WEAK;
+		return (biometricBits == 0 && (authenticators & Authenticators.DEVICE_CREDENTIAL) != 0)
+		       || biometricBits == Authenticators.BIOMETRIC_STRONG || biometricBits == Authenticators.BIOMETRIC_WEAK;
+	}
+
+	/* AOSP Utils.biometricConstantsToBiometricManager() (flag bp_fallback_options off) */
+	private static int biometricConstantsToBiometricManager(int code) {
+		switch (code) {
+			case BiometricConstants.BIOMETRIC_SUCCESS:
+				return BIOMETRIC_SUCCESS;
+			case BiometricConstants.BIOMETRIC_ERROR_NO_BIOMETRICS:
+			case BiometricConstants.BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL:
+				return BIOMETRIC_ERROR_NONE_ENROLLED;
+			case BiometricConstants.BIOMETRIC_ERROR_HW_NOT_PRESENT:
+				return BIOMETRIC_ERROR_NO_HARDWARE;
+			case BiometricConstants.BIOMETRIC_ERROR_LOCKOUT:
+			case BiometricConstants.BIOMETRIC_ERROR_LOCKOUT_PERMANENT:
+				return BiometricConstants.BIOMETRIC_ERROR_LOCKOUT; // BiometricManager.BIOMETRIC_ERROR_LOCKOUT (@hide)
+			default:
+				return BIOMETRIC_ERROR_HW_UNAVAILABLE;
+		}
+	}
+
+	/**
+	 * AOSP PreAuthInfo.getInternalStatus() and Utils.authenticatorStatusToBiometricConstant() for ATL's sensors
+	 * (the fprintd fingerprint sensor, if present) without a device credential: the BiometricConstants code.
+	 * @hide
+	 */
+	static int preAuthenticateStatus(int authenticators) {
+		final boolean biometricRequested = (authenticators & Authenticators.BIOMETRIC_WEAK) != 0;
+		final boolean credentialRequested = (authenticators & Authenticators.DEVICE_CREDENTIAL) != 0;
+		final boolean credentialAvailable = false; // TrustManager.isDeviceSecure(): ATL has no lock screen
+		if (biometricRequested) {
+			/* the sensor is STRONG, so it is strong enough for any request; then getStatusForBiometricAuthenticator() */
+			final int sensorStatus;
+			if (!FprintdSensor.isPresent()) {
+				sensorStatus = -1; // no sensor at all
+			} else {
+				final int state = FprintdSensor.getState();
+				if (state == FprintdSensor.STATE_NO_HARDWARE)
+					sensorStatus = BiometricConstants.BIOMETRIC_ERROR_HW_UNAVAILABLE; // BIOMETRIC_HARDWARE_NOT_DETECTED
+				else if (state == FprintdSensor.STATE_NOT_ENROLLED)
+					sensorStatus = BiometricConstants.BIOMETRIC_ERROR_NO_BIOMETRICS; // BIOMETRIC_NOT_ENROLLED
+				else if (FprintdSensor.getLockoutMode() == BiometricConstants.BIOMETRIC_LOCKOUT_TIMED)
+					sensorStatus = BiometricConstants.BIOMETRIC_ERROR_LOCKOUT;
+				else if (FprintdSensor.getLockoutMode() == BiometricConstants.BIOMETRIC_LOCKOUT_PERMANENT)
+					sensorStatus = BiometricConstants.BIOMETRIC_ERROR_LOCKOUT_PERMANENT;
+				else
+					sensorStatus = BiometricConstants.BIOMETRIC_SUCCESS;
+			}
+			if (sensorStatus == BiometricConstants.BIOMETRIC_SUCCESS || (credentialRequested && credentialAvailable))
+				return BiometricConstants.BIOMETRIC_SUCCESS;
+			if (sensorStatus != -1)
+				return sensorStatus;
+			return credentialRequested ? BiometricConstants.BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL // CREDENTIAL_NOT_ENROLLED
+			                           : BiometricConstants.BIOMETRIC_ERROR_HW_NOT_PRESENT;    // BIOMETRIC_NO_HARDWARE
+		}
+		if (credentialRequested)
+			return credentialAvailable ? BiometricConstants.BIOMETRIC_SUCCESS : BiometricConstants.BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL;
+		return BiometricConstants.BIOMETRIC_ERROR_HW_NOT_PRESENT; // "No authenticators requested"
 	}
 
 	/**

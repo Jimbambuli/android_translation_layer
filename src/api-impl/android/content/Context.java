@@ -134,6 +134,7 @@ public abstract class Context {
 	public static final String PRINT_SERVICE = "print";
 	public static final String CONSUMER_IR_SERVICE = "consumer_ir";
 	public static final String FINGERPRINT_SERVICE = "fingerprint";
+	public static final String BIOMETRIC_SERVICE = "biometric";
 	public static final String TV_INPUT_SERVICE = "tv_input";
 	public static final String USAGE_STATS_SERVICE = "usagestats";
 	public static final String STORAGE_STATS_SERVICE = "storagestats";
