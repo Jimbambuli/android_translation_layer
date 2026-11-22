@@ -17,6 +17,7 @@
 package android.content.pm;
 
 import android.annotation.NonNull;
+import android.annotation.SystemApi;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.atl.ATLLoadedApp;
@@ -1316,6 +1317,22 @@ public class PackageManager {
 	@SdkConstant(SdkConstantType.FEATURE)
 	public static final String FEATURE_TELEPHONY_CDMA = "android.hardware.telephony.cdma";
 
+	/** AOSP: the device supports circuit-switched calls (TelephonyManager/Telecom) */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_TELEPHONY_CALLING = "android.hardware.telephony.calling";
+
+	/** AOSP: the device supports cellular data */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_TELEPHONY_DATA = "android.hardware.telephony.data";
+
+	/** AOSP: the device supports SMS/MMS */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_TELEPHONY_MESSAGING = "android.hardware.telephony.messaging";
+
+	/** AOSP: the device supports subscriptions (SubscriptionManager) */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_TELEPHONY_SUBSCRIPTION = "android.hardware.telephony.subscription";
+
 	/**
 	 * Feature for {@link #getSystemAvailableFeatures} and
 	 * {@link #hasSystemFeature}: The device has a GSM telephony stack.
@@ -2332,6 +2349,21 @@ public class PackageManager {
 					return PERMISSION_GRANTED;
 				return PERMISSION_DENIED;
 			}
+			/* SMS (runtime permissions in AOSP): granted to the app that requests them when the modem can send SMS, like
+			 * the location permissions when the desktop has a location service */
+			case "android.permission.SEND_SMS":
+			case "android.permission.RECEIVE_SMS":
+			case "android.permission.READ_SMS":
+			case "android.permission.RECEIVE_MMS":
+			case "android.permission.RECEIVE_WAP_PUSH":
+				return ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName) && hasSystemFeature(FEATURE_TELEPHONY_MESSAGING)
+				    ? PERMISSION_GRANTED : PERMISSION_DENIED;
+			case "android.permission.READ_PHONE_NUMBERS":
+				return ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName) && hasSystemFeature(FEATURE_TELEPHONY)
+				    ? PERMISSION_GRANTED : PERMISSION_DENIED;
+			/* calls go to the desktop's dialer (tel: link), which asks the user itself */
+			case "android.permission.CALL_PHONE":
+				return ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName) ? PERMISSION_GRANTED : PERMISSION_DENIED;
 			case "android.permission.RECORD_AUDIO":
 				if (android.media.AudioRecord.microphoneAvailable())
 					return PERMISSION_GRANTED;
@@ -2681,7 +2713,9 @@ public class PackageManager {
 		                  FEATURE_SCREEN_LANDSCAPE, FEATURE_AUDIO_OUTPUT, FEATURE_MICROPHONE, FEATURE_LOCATION,
 		                  FEATURE_LOCATION_NETWORK, FEATURE_WIFI, FEATURE_AUTOMOTIVE,
 		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE,
-		                  FEATURE_BLUETOOTH, FEATURE_BLUETOOTH_LE};
+		                  FEATURE_BLUETOOTH, FEATURE_BLUETOOTH_LE,
+		                  FEATURE_TELEPHONY, FEATURE_TELEPHONY_RADIO_ACCESS, FEATURE_TELEPHONY_SUBSCRIPTION, FEATURE_TELEPHONY_GSM,
+		                  FEATURE_TELEPHONY_CDMA, FEATURE_TELEPHONY_DATA, FEATURE_TELEPHONY_MESSAGING, FEATURE_TELEPHONY_CALLING};
 		List<FeatureInfo> features = new ArrayList<>();
 		for (String name : names) {
 			if (hasSystemFeature(name)) {
@@ -2729,6 +2763,22 @@ public class PackageManager {
 			 * switched off, not one without Wi-Fi: apps written for phones take Wi-Fi for granted */
 			case FEATURE_WIFI:
 				return true;
+			/* telephony: ModemManager's modem (ModemManagerPhone), none without one like a device without a radio;
+			 * the sub-features after what the modem offers (Messaging, Voice, 3GPP/CDMA capabilities) */
+			case FEATURE_TELEPHONY:
+			case FEATURE_TELEPHONY_RADIO_ACCESS:
+			case FEATURE_TELEPHONY_SUBSCRIPTION:
+				return com.android.internal.telephony.ModemManagerPhone.get() != null;
+			case FEATURE_TELEPHONY_GSM:
+				return com.android.internal.telephony.ModemManagerPhone.get() != null && com.android.internal.telephony.ModemManagerPhone.get().isGsm();
+			case FEATURE_TELEPHONY_CDMA:
+				return com.android.internal.telephony.ModemManagerPhone.get() != null && com.android.internal.telephony.ModemManagerPhone.get().isCdma();
+			case FEATURE_TELEPHONY_DATA:
+				return com.android.internal.telephony.ModemManagerPhone.get() != null && com.android.internal.telephony.ModemManagerPhone.get().isDataCapable();
+			case FEATURE_TELEPHONY_MESSAGING:
+				return com.android.internal.telephony.ModemManagerPhone.get() != null && com.android.internal.telephony.ModemManagerPhone.get().hasMessaging();
+			case FEATURE_TELEPHONY_CALLING:
+				return com.android.internal.telephony.ModemManagerPhone.get() != null && com.android.internal.telephony.ModemManagerPhone.get().hasVoice();
 			case FEATURE_AUTOMOTIVE:
 				return System.getenv("ATL_IS_AUTOMOTIVE") != null;
 			case FEATURE_LEANBACK:
@@ -4731,4 +4781,81 @@ public class PackageManager {
 	/* AOSP PackageManager.VERSION_CODE_HIGHEST, FEATURE_TELEPHONY_RADIO_ACCESS */
 	public static final int VERSION_CODE_HIGHEST = -1;
 	public static final String FEATURE_TELEPHONY_RADIO_ACCESS = "android.hardware.telephony.radio.access";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports embedded subscriptions on eUICCs.
+     *
+     * This feature should only be defined if {@link #FEATURE_TELEPHONY_SUBSCRIPTION}
+     * has been defined.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_EUICC = "android.hardware.telephony.euicc";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports attaching to IMS implementations using the ImsService API in telephony.
+     *
+     * <p>This feature should only be defined if {@link #FEATURE_TELEPHONY_DATA} has been defined.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_IMS = "android.hardware.telephony.ims";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: The device
+     * supports a single IMS registration as defined by carrier networks in the IMS service
+     * implementation using the {@link ImsService} API, {@link GbaService} API, and IRadio 1.6 HAL.
+     * <p>
+     * When set, the device must fully support the following APIs for an application to implement
+     * IMS single registration:
+     * <ul>
+     * <li> Updating RCS provisioning status using the {@link ProvisioningManager} API to supply an
+     * RCC.14 defined XML and notify IMS applications of Auto Configuration Server (ACS) or
+     * proprietary server provisioning updates.</li>
+     * <li>Opening a delegate in the device IMS service to forward SIP traffic to the carrier's
+     * network using the {@link SipDelegateManager} API</li>
+     * <li>Listening to EPS dedicated bearer establishment via the
+     * {@link ConnectivityManager#registerQosCallback}
+     * API to indicate to the application when to start/stop media traffic.</li>
+     * <li>Implementing Generic Bootstrapping Architecture (GBA) and providing the associated
+     * authentication keys to applications
+     * requesting this information via the {@link TelephonyManager#bootstrapAuthenticationRequest}
+     * API</li>
+     * <li>Implementing RCS User Capability Exchange using the {@link RcsUceAdapter} API</li>
+     * </ul>
+     * <p>
+     * This feature should only be defined if {@link #FEATURE_TELEPHONY_IMS} is also defined.
+     * @hide
+     */
+    @SystemApi
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_IMS_SINGLE_REGISTRATION =
+            "android.hardware.telephony.ims.singlereg";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:
+     * The device supports Telephony APIs for Satellite communication.
+     *
+     * <p>This feature should only be defined if {@link #FEATURE_TELEPHONY_MESSAGING}
+     * has been defined.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_TELEPHONY_SATELLITE = "android.hardware.telephony.satellite";
+
+    /**
+     * Querying flag: if set and if the platform is doing any filtering of the
+     * results, then the filtering will not happen. This is a synonym for saying
+     * that all results should be returned.
+     * <p>
+     * <em>This flag should be used with extreme care.</em>
+     */
+    public static final int MATCH_ALL = 0x00020000;
+
+    /**
+     * Querying flag: include only components from applications that are marked
+     * with {@link ApplicationInfo#FLAG_SYSTEM}.
+     */
+    public static final int MATCH_SYSTEM_ONLY = 0x00100000;
 }

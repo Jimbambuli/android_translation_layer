@@ -1,7 +1,11 @@
 package android.os;
 
 import android.atl.ATLLoadedApp;
+import android.annotation.NonNull;
 import android.content.Context;
+import android.util.ExceptionUtils;
+import com.android.internal.util.FunctionalUtils.ThrowingRunnable;
+import com.android.internal.util.FunctionalUtils.ThrowingSupplier;
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
@@ -186,4 +190,53 @@ public class Binder implements IBinder {
 	public boolean equals(Object obj) {
 		return obj instanceof Binder;
 	}
+
+    /**
+     * Convenience method for running the provided action enclosed in
+     * {@link #clearCallingIdentity}/{@link #restoreCallingIdentity}.
+     *
+     * <p>Any exception thrown by the given action will be caught and
+     * rethrown after the call to {@link #restoreCallingIdentity}.
+     *
+     * @hide
+     */
+    public static final void withCleanCallingIdentity(@NonNull ThrowingRunnable action) {
+        Throwable throwableToPropagate = null;
+        final long callingIdentity = clearCallingIdentity();
+        try {
+            action.runOrThrow();
+        } catch (Throwable throwable) {
+            throwableToPropagate = throwable;
+        } finally {
+            restoreCallingIdentity(callingIdentity);
+            if (throwableToPropagate != null) {
+                throw ExceptionUtils.propagate(throwableToPropagate);
+            }
+        }
+    }
+
+    /**
+     * Convenience method for running the provided action enclosed in
+     * {@link #clearCallingIdentity}/{@link #restoreCallingIdentity} returning the result.
+     *
+     * <p>Any exception thrown by the given action will be caught and rethrown after
+     * the call to {@link #restoreCallingIdentity}.
+     *
+     * @hide
+     */
+    public static final <T> T withCleanCallingIdentity(@NonNull ThrowingSupplier<T> action) {
+        Throwable throwableToPropagate = null;
+        final long callingIdentity = clearCallingIdentity();
+        try {
+            return action.getOrThrow();
+        } catch (Throwable throwable) {
+            throwableToPropagate = throwable;
+            return null; // overridden by throwing in finally block
+        } finally {
+            restoreCallingIdentity(callingIdentity);
+            if (throwableToPropagate != null) {
+                throw ExceptionUtils.propagate(throwableToPropagate);
+            }
+        }
+    }
 }

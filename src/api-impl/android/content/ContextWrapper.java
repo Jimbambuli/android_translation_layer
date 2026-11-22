@@ -166,6 +166,11 @@ public class ContextWrapper extends Context {
 	}
 
 	@Override
+	public boolean isCredentialProtectedStorage() {
+		return this.baseContext.isCredentialProtectedStorage();
+	}
+
+	@Override
 	public boolean isDeviceProtectedStorage() {
 		return this.baseContext.isDeviceProtectedStorage();
 	}

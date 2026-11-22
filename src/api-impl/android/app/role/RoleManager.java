@@ -22,7 +22,9 @@ import android.text.TextUtils;
 
 /**
  * The public part of AOSP 14 RoleManager (packages/modules/Permission). ATL has no role service and no
- * PermissionController: no role is available on the desktop, so none is held.
+ * PermissionController: of the roles only SMS is available, when the device can send SMS (AOSP roles.xml:
+ * requiredFeature/the SMS capability); it is held by the running app when the app qualifies for it
+ * (SmsApplication), like ATL grants permissions that the manifest asks for. No other role is available.
  */
 public final class RoleManager {
 	public static final String ROLE_ASSISTANT = "android.app.role.ASSISTANT";
@@ -54,12 +56,12 @@ public final class RoleManager {
 	public boolean isRoleAvailable(String roleName) {
 		if (TextUtils.isEmpty(roleName))
 			throw new IllegalArgumentException("roleName cannot be null or empty");
-		return false;
+		return ROLE_SMS.equals(roleName) && mContext.getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_TELEPHONY_MESSAGING);
 	}
 
 	public boolean isRoleHeld(String roleName) {
 		if (TextUtils.isEmpty(roleName))
 			throw new IllegalArgumentException("roleName cannot be null or empty");
-		return false;
+		return ROLE_SMS.equals(roleName) && com.android.internal.telephony.SmsApplication.isDefaultSmsApplication(mContext, mContext.getPackageName());
 	}
 }

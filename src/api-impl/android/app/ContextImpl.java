@@ -470,6 +470,11 @@ public final class ContextImpl extends Context {
 		if (android.content.pm.PackageInstaller.handlePackageIntent(this, intent, null))
 			return;
 
+		/* AOSP ActivityStarter/ActivityTaskManagerService: ACTION_CALL is for apps with CALL_PHONE (Telecom's
+		 * UserCallActivity then places the call; ATL hands the tel: link to the desktop's dialer below) */
+		if (Intent.ACTION_CALL.equals(intent.getAction()) && checkSelfPermission(android.Manifest.permission.CALL_PHONE) != android.content.pm.PackageManager.PERMISSION_GRANTED)
+			throw new SecurityException("Permission Denial: starting " + intent + " from " + getPackageName()
+			                            + " requires android.permission.CALL_PHONE");
 		String className = null;
 		if (intent.getComponent() != null) {
 			if (ATLLoadedAppManager.startInstalledApp(this.atl_loaded_app.pkg.packageName, intent.getComponent().getPackageName()))
@@ -500,7 +505,7 @@ public final class ContextImpl extends Context {
 						e.printStackTrace();
 					}
 				}
-				Activity.nativeOpenURI(String.valueOf(intent.getData()));
+				Activity.nativeOpenURI(desktopUri(intent.getData()));
 				return;
 			}
 			for (PackageParser.Activity activity : this.atl_loaded_app.pkg.activities) {
@@ -679,5 +684,13 @@ public final class ContextImpl extends Context {
 	@Override
 	public ATLLoadedApp get_atl_loaded_app() {
 		return atl_loaded_app;
+	}
+
+	/** @hide a link for the desktop: a tel: number as the dialer reads it (RFC 3966, Android apps percent-encode the
+	 * «+» as Uri.fromParts() does; Telecom decodes it with PhoneNumberUtils.getNumberFromIntent()) */
+	public static String desktopUri(Uri uri) {
+		if (uri != null && "tel".equalsIgnoreCase(uri.getScheme()) && uri.getSchemeSpecificPart() != null)
+			return "tel:" + uri.getSchemeSpecificPart();
+		return String.valueOf(uri);
 	}
 }

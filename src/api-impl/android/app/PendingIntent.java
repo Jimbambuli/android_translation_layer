@@ -254,8 +254,8 @@ public class PendingIntent implements Parcelable {
 			context.startActivity(intent);
 		} else if (type == 1) { // type Service
 			context.startService(intent);
-		} else if (type == 2) { // type Broadcast
-			context.sendBroadcast(intent);
+		} else if (type == 2) { // type Broadcast: AOSP PendingIntentRecord sends it ordered with the code as initial result
+			context.sendBroadcastWithResultCode(intent, resultCode);
 		}
 	}
 

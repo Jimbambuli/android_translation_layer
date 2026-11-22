@@ -36,7 +36,10 @@ public class Intent implements Parcelable {
 	public static final int FLAG_ACTIVITY_RESET_TASK_IF_NEEDED = 0x00200000;
 	public static final int FLAG_RECEIVER_REGISTERED_ONLY = 0x40000000;
 	public static final int FLAG_RECEIVER_REPLACE_PENDING = 0x20000000;
+	/* ATL: AOSP @hide flag, needed by the telephony provider */
+	public static final int FLAG_RECEIVER_INCLUDE_BACKGROUND = 0x01000000;
 	public static final int FLAG_RECEIVER_FOREGROUND = 0x10000000;
+	public static final int FLAG_RECEIVER_NO_ABORT = 0x08000000;
 
 	public static final String ACTION_ACTIVITY_RECOGNIZER = "android.intent.action.ACTIVITY_RECOGNIZER";
 	public static final String ACTION_ADVANCED_SETTINGS_CHANGED = "android.intent.action.ADVANCED_SETTINGS";

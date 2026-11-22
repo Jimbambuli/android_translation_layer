@@ -620,28 +620,34 @@ public final class ATLLoadedApp {
 	}
 
 	public void receiveBroadcast(Context context, Intent intent) {
+		receiveBroadcast(context, intent, -1 /* Activity.RESULT_OK */);
+	}
+
+	/* resultCode: what the receivers' getResultCode() gives (Context.sendBroadcastWithResultCode()) */
+	public void receiveBroadcast(Context context, Intent intent, int resultCode) {
 		ComponentName component = intent.getComponent();
 		for (PackageParser.Activity receiver : pkg.receivers) {
 			// an explicit broadcast goes only to its receiver, whatever its intent filters
 			if (component != null) {
 				if (component.getPackageName().equals(pkg.packageName) && component.getClassName().equals(receiver.className))
-					deliverBroadcast(receiver, context, intent);
+					deliverBroadcast(receiver, context, intent, resultCode);
 				continue;
 			}
 			if (receiver.intents == null)
 				continue;
 			for (PackageParser.IntentInfo intentInfo : receiver.intents) {
 				if (intentInfo.matchAction(intent.getAction())) {
-					deliverBroadcast(receiver, context, intent);
+					deliverBroadcast(receiver, context, intent, resultCode);
 				}
 			}
 		}
 	}
 
-	private void deliverBroadcast(PackageParser.Activity receiver, Context context, Intent intent) {
+	private void deliverBroadcast(PackageParser.Activity receiver, Context context, Intent intent, int resultCode) {
 		try {
 			Class<? extends BroadcastReceiver> cls = this.loadClass(receiver.className).asSubclass(BroadcastReceiver.class);
 			BroadcastReceiver receiverInstance = cls.newInstance();
+			receiverInstance.setResultCode(resultCode);
 			// a receiver of another package runs with that package's context, as in its own process
 			receiverInstance.onReceive(pkg.packageName.equals(context.getPackageName()) ? context : getApplication(), intent);
 		} catch (ReflectiveOperationException e) {

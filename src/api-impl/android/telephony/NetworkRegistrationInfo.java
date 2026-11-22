@@ -16,6 +16,8 @@
 
 package android.telephony;
 
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.EnabledSince;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -45,6 +47,8 @@ public final class NetworkRegistrationInfo implements Parcelable {
      * {@link NetworkRegistrationInfo}. This change will affect the result of getRegistration().
      * @hide
      */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public static final long RETURN_REGISTRATION_STATE_EMERGENCY = 255938466L;
 
     /**

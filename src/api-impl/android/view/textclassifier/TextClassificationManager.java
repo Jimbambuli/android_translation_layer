@@ -68,6 +68,12 @@ public final class TextClassificationManager {
 		}
 	}
 
+	/* ATL: AOSP getTextClassifier(int type); ATL has one classifier whatever the type */
+	@NonNull
+	public TextClassifier getTextClassifier(int type) {
+		return getTextClassifier();
+	}
+
 	/**
 	 * Sets a preferred text classifier.
 	 * This overrides the default text classifier that would be returned by

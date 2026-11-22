@@ -816,4 +816,9 @@ public class DevicePolicyManager {
 	public void uninstallCaCert(android.content.ComponentName p0, byte[] p1) { }
 	public void wipeData(int p0, CharSequence p1) { }
 	public void wipeDevice(int p0) { }
+
+    /* ATL: needed by Telephony.Sms.Intents.isOtpRedactionEnabled; ATL has no device owner */
+    public boolean isDeviceManaged() {
+        return false;
+    }
 }

@@ -9,6 +9,13 @@ package android;
 
 public final class Manifest {
 	public static final class permission {
+		public static final String ACCESS_RCS_USER_CAPABILITY_EXCHANGE = "android.permission.ACCESS_RCS_USER_CAPABILITY_EXCHANGE";
+		public static final String MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS = "android.permission.MANAGE_DEVICE_POLICY_MANAGED_SUBSCRIPTIONS";
+		public static final String PERFORM_IMS_SINGLE_REGISTRATION = "android.permission.PERFORM_IMS_SINGLE_REGISTRATION";
+		public static final String READ_BASIC_PHONE_STATE = "android.permission.READ_BASIC_PHONE_STATE";
+		public static final String READ_PRECISE_PHONE_STATE = "android.permission.READ_PRECISE_PHONE_STATE";
+		public static final String SATELLITE_COMMUNICATION = "android.permission.SATELLITE_COMMUNICATION";
+		public static final String WRITE_EMBEDDED_SUBSCRIPTIONS = "android.permission.WRITE_EMBEDDED_SUBSCRIPTIONS";
 		/**
 		 * Allows an application to access all multi-user external storage @hide
 		 */
@@ -880,6 +887,7 @@ public final class Manifest {
 		 targetSdkVersion}</a> is 4 or higher.
 		 */
 		public static final String READ_PHONE_STATE = "android.permission.READ_PHONE_STATE";
+		public static final String READ_PHONE_NUMBERS = "android.permission.READ_PHONE_NUMBERS";
 		/**
 		 Allows read access to privileged phone state.
 		 @hide Used internally.

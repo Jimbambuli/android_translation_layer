@@ -43,6 +43,9 @@ public interface TextClassifier {
 	String TYPE_FLIGHT_NUMBER = "flight";
 	String TYPE_OTP_CODE = "otp_code";
 	String TYPE_DICTIONARY = "dictionary";
+	/* ATL: AOSP TYPE_SMS_RETRIEVER_OTP and CLASSIFIER_TYPE_ANDROID_DEFAULT, needed by the telephony provider */
+	String TYPE_SMS_RETRIEVER_OTP = "sms_retriever_otp";
+	int CLASSIFIER_TYPE_ANDROID_DEFAULT = DEFAULT_SYSTEM;
 	String HINT_TEXT_IS_EDITABLE = "android.text_is_editable";
 	String HINT_TEXT_IS_NOT_EDITABLE = "android.text_is_not_editable";
 	String WIDGET_TYPE_TEXTVIEW = "textview";

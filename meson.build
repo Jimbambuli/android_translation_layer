@@ -68,10 +68,12 @@ hax_hits_jar = custom_target('hax-stub-hits.jar', input: [hax_jar], output: ['ha
 # not --incremental: hax-stub-hits.jar is written anew each time, and dx's merge with the previous api-impl.jar cannot
 # turn a const-string into a const-string/jumbo once the string ids pass 65535 (DexIndexOverflowException); a full
 # dx run emits the jumbo form itself
+# --multi-dex: the framework has more than 65536 method references (the telephony classes, AOSP's libphonenumber); the
+# runtime loads classes2.dex from the jar like classes.dex
 custom_target('api-impl.jar', build_by_default: true, input: [hax_hits_jar[0]], output: ['api-impl.jar'],
               install: true,
               install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
-              command: ['dx', '--dex', '--min-sdk-version=26', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
+              command: ['dx', '--dex', '--multi-dex', '--min-sdk-version=26', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
 
 # gstub.jar
 subdir('src/gstub')
@@ -222,6 +224,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/content/android_content_res_StringBlock.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteCommon.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteConnection.c',
+                                                                  	'src/api-impl-jni/database/sqlite3_android_phone.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteGlobal.c',
                                                                   	'src/api-impl-jni/database/android_database_SQLiteRawStatement.c',
                                                                   	'src/api-impl-jni/egl/com_google_android_gles_jni_EGLImpl.c',
@@ -247,6 +250,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_NinePatchDrawable.c',
                                                                   	'src/api-impl-jni/location/com_android_server_location_provider_DesktopLocationProvider.c',
                                                                   	'src/api-impl-jni/bluetooth/com_android_bluetooth_bluez_BluezBus.c',
+                                                                  	'src/api-impl-jni/telephony/com_android_internal_telephony_ModemManagerPhone.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaRecorder.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaMetadataRetriever.c',
