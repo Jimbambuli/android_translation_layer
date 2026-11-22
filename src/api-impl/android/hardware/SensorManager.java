@@ -58,12 +58,16 @@ public class SensorManager {
 	public boolean registerListener(final SensorEventListener listener, final Sensor sensor, int samplingPeriodUs) {
 		switch (sensor.getType()) {
 			case Sensor.TYPE_ORIENTATION:
-				new LocationManager().requestLocationUpdates(null, 0, 0, new LocationListener() {
-					@Override
-					public void onLocationChanged(Location location) {
-						listener.onSensorChanged(new SensorEvent(new float[] {location.getBearing()}, sensor));
-					}
-				});
+				try { // the bearing of the fused position; without a location permission no events
+					new LocationManager(android.atl.ATLLoadedApp.getPrimaryApplication().getApplication())
+					    .requestLocationUpdates(LocationManager.FUSED_PROVIDER, 0, 0, new LocationListener() {
+						@Override
+						public void onLocationChanged(Location location) {
+							listener.onSensorChanged(new SensorEvent(new float[] {location.getBearing()}, sensor));
+						}
+					});
+				} catch (SecurityException e) {
+				}
 				return true;
 			case Sensor.TYPE_ACCELEROMETER:
 				register_accelerometer_listener_native(listener, sensor, samplingPeriodUs);
