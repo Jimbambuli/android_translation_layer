@@ -795,6 +795,7 @@ srcs = [
 	'android/media/AudioGainConfig.java',
 	'android/media/AudioHandle.java',
 	'android/media/AudioManager.java',
+	'android/media/BluetoothRoutes.java',
 	'android/media/AudioMetadata.java',
 	'android/media/AudioMetadataMap.java',
 	'android/media/AudioMetadataReadMap.java',

@@ -515,10 +515,12 @@ public final class BluetoothA2dp implements BluetoothProfile {
     @RequiresPermission("android.permission.BLUETOOTH_CONNECT")
     public boolean isA2dpPlaying(BluetoothDevice device) {
         log("isA2dpPlaying(" + device + ")");
-        Log.w(TAG, "Proxy not attached to service");
-        log(Log.getStackTraceString(new Throwable()));
-
-        return false;
+        /* ATL: BlueZ's A2DP transport of the device is streaming (AdapterService) */
+        if (!BluetoothDevice.isBluetoothEnabled() || device == null
+                || !BluetoothAdapter.checkBluetoothAddress(device.getAddress())) {
+            return false;
+        }
+        return com.android.bluetooth.btservice.AdapterService.get().isA2dpPlaying(device.getAddress());
     }
 
     /**

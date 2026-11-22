@@ -69,6 +69,11 @@ public final class AdapterService implements Bluez.Observer {
 		lastName = bluez.isPresent() ? getNameInternal() : null;
 		lastScanMode = getScanModeInternal();
 		bluez.addObserver(this);
+		handler.post(new Runnable() {
+			public void run() {
+				learnProfiles();
+			}
+		});
 	}
 
 	public static synchronized AdapterService get() {
@@ -654,8 +659,53 @@ public final class AdapterService implements Bluez.Observer {
 		}
 	}
 
+	public static final String MEDIA_TRANSPORT = "org.bluez.MediaTransport1";
+	/* A2dpService: this side is the A2DP source; BlueZ has a MediaTransport1 with the source UUID for each connected
+	 * sink (its State: idle, pending, active = streaming) */
+	private static final String A2DP_SOURCE_UUID = "0000110a-0000-1000-8000-00805f9b34fb";
+
+	private String a2dpTransport(String address) {
+		String path = devicePath(address);
+		if (path == null)
+			return null;
+		for (String t : bluez.paths(MEDIA_TRANSPORT, path))
+			if (A2DP_SOURCE_UUID.equalsIgnoreCase((String)bluez.property(t, MEDIA_TRANSPORT, "UUID")))
+				return t;
+		return null;
+	}
+
+	/* the addresses of the A2DP sinks with a transport (no permission check: AudioManager's view) */
+	public List<String> a2dpSinks() {
+		ArrayList<String> list = new ArrayList<>();
+		for (String address : deviceAddresses())
+			if (a2dpTransport(address) != null)
+				list.add(address);
+		return list;
+	}
+
+	public boolean isA2dpPlaying(String address) {
+		AdapterService.checkConnectPermission("BluetoothA2dp", "isA2dpPlaying");
+		String t = a2dpTransport(address);
+		return t != null && "active".equals(bluez.property(t, MEDIA_TRANSPORT, "State"));
+	}
+
+	/* hands-free/headset connected (no permission check: AudioManager's view) */
+	public List<String> headsets() {
+		ArrayList<String> list = new ArrayList<>();
+		for (String address : deviceAddresses())
+			if (profileState(BluetoothProfile.HEADSET, address) == BluetoothProfile.STATE_CONNECTED)
+				list.add(address);
+		return list;
+	}
+
 	public int profileConnectionState(int profile, String address) {
 		AdapterService.checkConnectPermission("BluetoothProfile", "getConnectionState");
+		return profileState(profile, address);
+	}
+
+	private int profileState(int profile, String address) {
+		if (profile == BluetoothProfile.A2DP)
+			return a2dpTransport(address) != null ? BluetoothProfile.STATE_CONNECTED : BluetoothProfile.STATE_DISCONNECTED;
 		if (!isConnected(address))
 			return BluetoothProfile.STATE_DISCONNECTED;
 		ParcelUuid[] uuids = getRemoteUuids(address);
@@ -674,7 +724,7 @@ public final class AdapterService implements Bluez.Observer {
 		if (adapter == null || states == null)
 			return list;
 		for (String address : deviceAddresses()) {
-			int state = profileConnectionState(profile, address);
+			int state = profileState(profile, address);
 			for (int s : states)
 				if (s == state) {
 					list.add(adapter.getRemoteDevice(address));
@@ -688,9 +738,89 @@ public final class AdapterService implements Bluez.Observer {
 	public int getProfileConnectionState(int profile) {
 		int best = BluetoothProfile.STATE_DISCONNECTED;
 		for (String address : deviceAddresses())
-			if (profileConnectionState(profile, address) == BluetoothProfile.STATE_CONNECTED)
+			if (profileState(profile, address) == BluetoothProfile.STATE_CONNECTED)
 				best = BluetoothProfile.STATE_CONNECTED;
 		return best;
+	}
+
+	/* ---- profile connection changes (A2dpService/HeadsetService broadcasts, AdapterProperties
+	 * .sendConnectionStateChange, AudioDeviceInventory) ---- */
+
+	public interface AudioDeviceListener {
+		/* an A2DP sink or a headset came or went (main thread) */
+		void onBluetoothAudioChanged(int profile, String address, boolean connected);
+	}
+
+	private final ArrayList<AudioDeviceListener> audioListeners = new ArrayList<>();
+	private final HashMap<String, Integer> profileStates = new HashMap<>(); /* "profile|address" -> state */
+	private int adapterConnectionState = -1;
+
+	public synchronized void addAudioDeviceListener(AudioDeviceListener l) {
+		audioListeners.add(l);
+	}
+
+	private synchronized AudioDeviceListener[] audioListeners() {
+		return audioListeners.toArray(new AudioDeviceListener[0]);
+	}
+
+	private static String profileAction(int profile) {
+		return profile == BluetoothProfile.A2DP ? android.bluetooth.BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED
+		                                        : android.bluetooth.BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED;
+	}
+
+	private void checkProfiles() {
+		if (getState() != BluetoothAdapter.STATE_ON)
+			return;
+		for (int profile : new int[] {BluetoothProfile.A2DP, BluetoothProfile.HEADSET}) {
+			HashSet<String> seen = new HashSet<>();
+			for (String address : deviceAddresses()) {
+				int state = profileState(profile, address);
+				String key = profile + "|" + address;
+				seen.add(key);
+				Integer old = profileStates.put(key, state);
+				int previous = old == null ? BluetoothProfile.STATE_DISCONNECTED : old;
+				if (previous != state)
+					profileChanged(profile, address, previous, state);
+			}
+			for (String key : new ArrayList<>(profileStates.keySet()))
+				if (key.startsWith(profile + "|") && !seen.contains(key)) {
+					int previous = profileStates.remove(key);
+					if (previous != BluetoothProfile.STATE_DISCONNECTED)
+						profileChanged(profile, key.substring(key.indexOf('|') + 1), previous, BluetoothProfile.STATE_DISCONNECTED);
+				}
+		}
+		/* AdapterProperties.sendConnectionStateChange(): the adapter's connection state over all profiles */
+		int state = BluetoothProfile.STATE_DISCONNECTED;
+		for (int v : profileStates.values())
+			if (v == BluetoothProfile.STATE_CONNECTED)
+				state = BluetoothProfile.STATE_CONNECTED;
+		if (adapterConnectionState >= 0 && state != adapterConnectionState) {
+			Intent intent = new Intent(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
+			intent.putExtra(BluetoothAdapter.EXTRA_CONNECTION_STATE, state);
+			intent.putExtra(BluetoothAdapter.EXTRA_PREVIOUS_CONNECTION_STATE, adapterConnectionState);
+			sendBroadcast(intent, Manifest.permission.BLUETOOTH_CONNECT);
+		}
+		adapterConnectionState = state;
+	}
+
+	private boolean profilesKnown;
+
+	private void profileChanged(int profile, String address, int previous, int state) {
+		if (!profilesKnown)
+			return; /* the first look only learns the state */
+		BluetoothDevice device = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(address);
+		Intent intent = new Intent(profileAction(profile));
+		intent.putExtra(BluetoothProfile.EXTRA_STATE, state);
+		intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, previous);
+		intent.putExtra(BluetoothDevice.EXTRA_DEVICE, device);
+		sendBroadcast(intent, Manifest.permission.BLUETOOTH_CONNECT);
+		for (AudioDeviceListener l : audioListeners())
+			l.onBluetoothAudioChanged(profile, address, state == BluetoothProfile.STATE_CONNECTED);
+	}
+
+	private void learnProfiles() {
+		checkProfiles();
+		profilesKnown = true;
 	}
 
 	/* ---- Bluez.Observer (main thread) ---- */
@@ -763,6 +893,8 @@ public final class AdapterService implements Bluez.Observer {
 
 	@Override
 	public void onInterfaceAdded(String path, String iface, Map<String, Object> properties) {
+		if (MEDIA_TRANSPORT.equals(iface))
+			checkProfiles();
 		if (Bluez.ADAPTER.equals(iface))
 			checkAdapterChanges();
 		else if (Bluez.DEVICE.equals(iface) && isOurDevice(path)) {
@@ -774,6 +906,8 @@ public final class AdapterService implements Bluez.Observer {
 
 	@Override
 	public void onInterfaceRemoved(String path, String iface, Map<String, Object> lastProperties) {
+		if (MEDIA_TRANSPORT.equals(iface) || Bluez.DEVICE.equals(iface))
+			checkProfiles();
 		if (Bluez.ADAPTER.equals(iface))
 			checkAdapterChanges();
 		else if (Bluez.DEVICE.equals(iface) && isOurDevice(path)) {
@@ -814,6 +948,8 @@ public final class AdapterService implements Bluez.Observer {
 		}
 		if (changed.containsKey("Connected"))
 			sendAcl(address, Boolean.TRUE.equals(changed.get("Connected")));
+		if (changed.containsKey("Connected") || changed.containsKey("UUIDs"))
+			checkProfiles();
 		if (changed.containsKey("UUIDs") && getState() == BluetoothAdapter.STATE_ON)
 			sendUuidIntent(address);
 		Object paired = changed.containsKey("Bonded") ? changed.get("Bonded") : changed.get("Paired");
