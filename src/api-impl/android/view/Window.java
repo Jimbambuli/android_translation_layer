@@ -235,6 +235,27 @@ public class Window {
 					postDelayed(configurationFollowsSize, 400);
 				}
 			}
+
+			/* AOSP DecorView: the action modes the views start end here (startActionModeForChild()) */
+			@Override
+			public ActionMode startActionModeForChild(View originalView, ActionMode.Callback callback) {
+				return startActionModeForChild(originalView, callback, ActionMode.TYPE_PRIMARY);
+			}
+
+			@Override
+			public ActionMode startActionModeForChild(View child, ActionMode.Callback callback, int type) {
+				return startDecorActionMode(child, callback, type);
+			}
+
+			@Override
+			public ActionMode startActionMode(ActionMode.Callback callback) {
+				return startActionMode(callback, ActionMode.TYPE_PRIMARY);
+			}
+
+			@Override
+			public ActionMode startActionMode(ActionMode.Callback callback, int type) {
+				return startDecorActionMode(this, callback, type);
+			}
 		};
 		// DecorView grabs all touch events and propagates them in Java
 		decorView.native_registerTouchEventPropagation(decorView.widget);
@@ -409,6 +430,313 @@ public class Window {
 		if (params.windowAnimations == 0)
 			params.windowAnimations = a.getResourceId(com.android.internal.R.styleable.Window_windowAnimationStyle, 0);
 		a.recycle();
+	}
+
+	/* --- action modes, AOSP DecorView.startActionMode() and what it calls ---
+	 * The Window.Callback may start the mode (Activity: a primary mode in its action bar, AppCompat: its own),
+	 * otherwise the decor makes it: a primary mode is a StandaloneActionMode in an ActionBarContextView, a floating
+	 * mode a FloatingActionMode with a FloatingToolbar. ATL's decor has no decor layout with action_mode_bar_stub
+	 * (AOSP's screen_simple), so a primary mode always shows its bar in a popup at the top of the window, as AOSP
+	 * does for a floating window. AOSP's Window.isDestroyed() checks are left out (ATL's window does not track it). */
+	private ActionMode mPrimaryActionMode;
+	private ActionMode mFloatingActionMode;
+	private com.android.internal.widget.ActionBarContextView mPrimaryActionModeView;
+	private android.widget.PopupWindow mPrimaryActionModePopup;
+	private Runnable mShowPrimaryActionModePopup;
+	private ViewTreeObserver.OnPreDrawListener mFloatingToolbarPreDrawListener;
+	private View mFloatingActionModeOriginatingView;
+	private com.android.internal.widget.floatingtoolbar.FloatingToolbar mFloatingToolbar;
+	private android.animation.ObjectAnimator mFadeAnim;
+
+	private ActionMode startDecorActionMode(View originatingView, ActionMode.Callback callback, int type) {
+		ActionMode.Callback2 wrappedCallback = new ActionModeCallback2Wrapper(callback);
+		ActionMode mode = null;
+		if (getCallback() != null) {
+			try {
+				mode = getCallback().onWindowStartingActionMode(wrappedCallback, type);
+			} catch (AbstractMethodError ame) {
+				// Older apps might not implement the typed version of this method.
+				if (type == ActionMode.TYPE_PRIMARY) {
+					try {
+						mode = getCallback().onWindowStartingActionMode(wrappedCallback);
+					} catch (AbstractMethodError ame2) {
+						// Older apps might not implement this callback method at all.
+					}
+				}
+			}
+		}
+		if (mode != null) {
+			if (mode.getType() == ActionMode.TYPE_PRIMARY) {
+				cleanupPrimaryActionMode();
+				mPrimaryActionMode = mode;
+			} else if (mode.getType() == ActionMode.TYPE_FLOATING) {
+				if (mFloatingActionMode != null) {
+					mFloatingActionMode.finish();
+				}
+				mFloatingActionMode = mode;
+			}
+		} else {
+			mode = createActionMode(type, wrappedCallback, originatingView);
+			if (mode != null && wrappedCallback.onCreateActionMode(mode, mode.getMenu())) {
+				setHandledActionMode(mode);
+			} else {
+				mode = null;
+			}
+		}
+		if (mode != null && getCallback() != null) {
+			try {
+				getCallback().onActionModeStarted(mode);
+			} catch (AbstractMethodError ame) {
+				// Older apps might not implement this callback method.
+			}
+		}
+		return mode;
+	}
+
+	private void cleanupPrimaryActionMode() {
+		if (mPrimaryActionMode != null) {
+			mPrimaryActionMode.finish();
+			mPrimaryActionMode = null;
+		}
+		if (mPrimaryActionModeView != null) {
+			mPrimaryActionModeView.killMode();
+		}
+	}
+
+	private void cleanupFloatingActionModeViews() {
+		if (mFloatingToolbar != null) {
+			mFloatingToolbar.dismiss();
+			mFloatingToolbar = null;
+		}
+		if (mFloatingActionModeOriginatingView != null) {
+			if (mFloatingToolbarPreDrawListener != null) {
+				mFloatingActionModeOriginatingView.getViewTreeObserver()
+				    .removeOnPreDrawListener(mFloatingToolbarPreDrawListener);
+				mFloatingToolbarPreDrawListener = null;
+			}
+			mFloatingActionModeOriginatingView = null;
+		}
+	}
+
+	private ActionMode createActionMode(int type, ActionMode.Callback2 callback, View originatingView) {
+		switch (type) {
+			case ActionMode.TYPE_PRIMARY:
+			default:
+				return createStandaloneActionMode(callback);
+			case ActionMode.TYPE_FLOATING:
+				return createFloatingActionMode(originatingView, callback);
+		}
+	}
+
+	private void setHandledActionMode(ActionMode mode) {
+		if (mode.getType() == ActionMode.TYPE_PRIMARY) {
+			setHandledPrimaryActionMode(mode);
+		} else if (mode.getType() == ActionMode.TYPE_FLOATING) {
+			setHandledFloatingActionMode(mode);
+		}
+	}
+
+	/* AOSP DecorView.createStandaloneActionMode(), the branch of a floating window (see above) */
+	private ActionMode createStandaloneActionMode(ActionMode.Callback callback) {
+		endOnGoingFadeAnimation();
+		cleanupPrimaryActionMode();
+		if (mPrimaryActionModeView == null || !mPrimaryActionModeView.isAttachedToWindow()) {
+			// Use the action bar theme.
+			final TypedValue outValue = new TypedValue();
+			final Resources.Theme baseTheme = context.getTheme();
+			baseTheme.resolveAttribute(com.android.internal.R.attr.actionBarTheme, outValue, true);
+
+			final Context actionBarContext;
+			if (outValue.resourceId != 0) {
+				final Resources.Theme actionBarTheme = context.getResources().newTheme();
+				actionBarTheme.setTo(baseTheme);
+				actionBarTheme.applyStyle(outValue.resourceId, true);
+
+				actionBarContext = new ContextThemeWrapper(context, 0);
+				actionBarContext.getTheme().setTo(actionBarTheme);
+			} else {
+				actionBarContext = context;
+			}
+
+			mPrimaryActionModeView = new com.android.internal.widget.ActionBarContextView(actionBarContext);
+			mPrimaryActionModePopup = new android.widget.PopupWindow(actionBarContext, null,
+			    com.android.internal.R.attr.actionModePopupWindowStyle);
+			mPrimaryActionModePopup.setWindowLayoutType(WindowManager.LayoutParams.TYPE_APPLICATION);
+			mPrimaryActionModePopup.setContentView(mPrimaryActionModeView);
+			mPrimaryActionModePopup.setWidth(ViewGroup.LayoutParams.MATCH_PARENT);
+
+			actionBarContext.getTheme().resolveAttribute(com.android.internal.R.attr.actionBarSize, outValue, true);
+			final int height = TypedValue.complexToDimensionPixelSize(outValue.data,
+			    actionBarContext.getResources().getDisplayMetrics());
+			mPrimaryActionModeView.setContentHeight(height);
+			mPrimaryActionModePopup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
+			mShowPrimaryActionModePopup = new Runnable() {
+				public void run() {
+					mPrimaryActionModePopup.showAtLocation(decorView, Gravity.TOP | Gravity.FILL_HORIZONTAL, 0, 0);
+					endOnGoingFadeAnimation();
+
+					if (decorView.isLaidOut()) {
+						mFadeAnim = android.animation.ObjectAnimator.ofFloat(mPrimaryActionModeView, View.ALPHA, 0f, 1f);
+						mFadeAnim.addListener(new android.animation.AnimatorListenerAdapter() {
+							@Override
+							public void onAnimationStart(android.animation.Animator animation) {
+								mPrimaryActionModeView.setVisibility(View.VISIBLE);
+							}
+
+							@Override
+							public void onAnimationEnd(android.animation.Animator animation) {
+								mPrimaryActionModeView.setAlpha(1f);
+								mFadeAnim = null;
+							}
+						});
+						mFadeAnim.start();
+					} else {
+						mPrimaryActionModeView.setAlpha(1f);
+						mPrimaryActionModeView.setVisibility(View.VISIBLE);
+					}
+				}
+			};
+		}
+		if (mPrimaryActionModeView != null) {
+			mPrimaryActionModeView.killMode();
+			ActionMode mode = new com.android.internal.view.StandaloneActionMode(
+			    mPrimaryActionModeView.getContext(), mPrimaryActionModeView,
+			    callback, mPrimaryActionModePopup == null);
+			return mode;
+		}
+		return null;
+	}
+
+	private void endOnGoingFadeAnimation() {
+		if (mFadeAnim != null) {
+			mFadeAnim.end();
+		}
+	}
+
+	private void setHandledPrimaryActionMode(ActionMode mode) {
+		endOnGoingFadeAnimation();
+		mPrimaryActionMode = mode;
+		mPrimaryActionMode.invalidate();
+		mPrimaryActionModeView.initForMode(mPrimaryActionMode);
+		decorView.post(mShowPrimaryActionModePopup);
+	}
+
+	private ActionMode createFloatingActionMode(View originatingView, ActionMode.Callback2 callback) {
+		if (mFloatingActionMode != null) {
+			mFloatingActionMode.finish();
+		}
+		cleanupFloatingActionModeViews();
+		mFloatingToolbar = new com.android.internal.widget.floatingtoolbar.FloatingToolbar(this);
+		final com.android.internal.view.FloatingActionMode mode =
+		    new com.android.internal.view.FloatingActionMode(context, callback, originatingView, mFloatingToolbar);
+		mFloatingActionModeOriginatingView = originatingView;
+		mFloatingToolbarPreDrawListener = new ViewTreeObserver.OnPreDrawListener() {
+			@Override
+			public boolean onPreDraw() {
+				mode.updateViewLocationInWindow();
+				return true;
+			}
+		};
+		return mode;
+	}
+
+	private void setHandledFloatingActionMode(ActionMode mode) {
+		mFloatingActionMode = mode;
+		mFloatingActionMode.invalidate(); // Will show the floating toolbar if necessary.
+		mFloatingActionModeOriginatingView.getViewTreeObserver()
+		    .addOnPreDrawListener(mFloatingToolbarPreDrawListener);
+	}
+
+	/* AOSP DecorView.ActionModeCallback2Wrapper: clears out the references when the action mode is destroyed */
+	private class ActionModeCallback2Wrapper extends ActionMode.Callback2 {
+		private final ActionMode.Callback mWrapped;
+
+		public ActionModeCallback2Wrapper(ActionMode.Callback wrapped) {
+			mWrapped = wrapped;
+		}
+
+		public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+			return mWrapped.onCreateActionMode(mode, menu);
+		}
+
+		public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+			decorView.requestFitSystemWindows();
+			return mWrapped.onPrepareActionMode(mode, menu);
+		}
+
+		public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+			return mWrapped.onActionItemClicked(mode, item);
+		}
+
+		public void onDestroyActionMode(ActionMode mode) {
+			mWrapped.onDestroyActionMode(mode);
+			final boolean isMncApp = context.getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.M;
+			final boolean isPrimary;
+			final boolean isFloating;
+			if (isMncApp) {
+				isPrimary = mode == mPrimaryActionMode;
+				isFloating = mode == mFloatingActionMode;
+				if (!isPrimary && mode.getType() == ActionMode.TYPE_PRIMARY) {
+					android.util.Log.e("DecorView", "Destroying unexpected ActionMode instance of TYPE_PRIMARY; "
+					    + mode + " was not the current primary action mode! Expected " + mPrimaryActionMode);
+				}
+				if (!isFloating && mode.getType() == ActionMode.TYPE_FLOATING) {
+					android.util.Log.e("DecorView", "Destroying unexpected ActionMode instance of TYPE_FLOATING; "
+					    + mode + " was not the current floating action mode! Expected " + mFloatingActionMode);
+				}
+			} else {
+				isPrimary = mode.getType() == ActionMode.TYPE_PRIMARY;
+				isFloating = mode.getType() == ActionMode.TYPE_FLOATING;
+			}
+			if (isPrimary) {
+				if (mPrimaryActionModePopup != null) {
+					decorView.removeCallbacks(mShowPrimaryActionModePopup);
+				}
+				if (mPrimaryActionModeView != null) {
+					endOnGoingFadeAnimation();
+					// Store action mode view reference, so we can access it safely when animation ends.
+					final com.android.internal.widget.ActionBarContextView lastActionModeView = mPrimaryActionModeView;
+					mFadeAnim = android.animation.ObjectAnimator.ofFloat(mPrimaryActionModeView, View.ALPHA, 1f, 0f);
+					mFadeAnim.addListener(new android.animation.AnimatorListenerAdapter() {
+						@Override
+						public void onAnimationEnd(android.animation.Animator animation) {
+							if (lastActionModeView == mPrimaryActionModeView) {
+								lastActionModeView.setVisibility(View.GONE);
+								if (mPrimaryActionModePopup != null) {
+									mPrimaryActionModePopup.dismiss();
+								}
+								lastActionModeView.killMode();
+								mFadeAnim = null;
+								decorView.requestApplyInsets();
+							}
+						}
+					});
+					mFadeAnim.start();
+				}
+
+				mPrimaryActionMode = null;
+			} else if (isFloating) {
+				cleanupFloatingActionModeViews();
+				mFloatingActionMode = null;
+			}
+			if (getCallback() != null) {
+				try {
+					getCallback().onActionModeFinished(mode);
+				} catch (AbstractMethodError ame) {
+					// Older apps might not implement this callback method.
+				}
+			}
+			decorView.requestFitSystemWindows();
+		}
+
+		@Override
+		public void onGetContentRect(ActionMode mode, View view, Rect outRect) {
+			if (mWrapped instanceof ActionMode.Callback2) {
+				((ActionMode.Callback2)mWrapped).onGetContentRect(mode, view, outRect);
+			} else {
+				super.onGetContentRect(mode, view, outRect);
+			}
+		}
 	}
 
 	public final Callback getCallback() {
