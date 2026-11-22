@@ -911,6 +911,12 @@ public abstract class Context {
 
 	@Export
 	public void sendBroadcast(Intent intent) {
+		sendBroadcastWithResultCode(intent, -1 /* Activity.RESULT_OK, as ContextImpl.sendBroadcast() passes it */);
+	}
+
+	/** @hide the broadcast with the result code its receivers see in getResultCode() (AOSP: the initial code of an
+	 * ordered broadcast, e.g. the code of PendingIntent.send() for a broadcast PendingIntent) */
+	public void sendBroadcastWithResultCode(Intent intent, final int resultCode) {
 		if ("org.unifiedpush.android.distributor.REGISTER".equals(intent.getAction())) {
 			nativeRegisterUnifiedPush(intent.getStringExtra("token"), intent.getStringExtra("application"));
 		}
@@ -919,17 +925,21 @@ public abstract class Context {
 				/* the Context it was registered with (LoadedApk.ReceiverDispatcher.mContext), not the sender's */
 				BroadcastReceiver receiver = registration.receiver;
 				Context context = (Context)registration.owner;
-				if (registration.scheduler != null)
-					registration.scheduler.post(() -> receiver.onReceive(context, intent));
-				else
+				Runnable deliver = () -> {
+					receiver.setResultCode(resultCode);
 					receiver.onReceive(context, intent);
+				};
+				if (registration.scheduler != null)
+					registration.scheduler.post(deliver);
+				else
+					deliver.run();
 			}
 		}
 		// a broadcast for another package goes to that package's receivers (loaded into this process)
 		String targetPackage = intent.getComponent() != null ? intent.getComponent().getPackageName() : intent.getPackage();
 		ATLLoadedApp target = targetPackage != null ? ATLLoadedAppManager.getAppFromPackageName(targetPackage) : ATLLoadedApp.getPrimaryApplication();
 		if (target != null)
-			target.receiveBroadcast(this, intent);
+			target.receiveBroadcast(this, intent, resultCode);
 	}
 
 	/* a broadcast of the system: to the receivers registered at run time, on the main thread */
