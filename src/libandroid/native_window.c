@@ -388,6 +388,30 @@ int32_t ANativeWindow_setBuffersTransform(ANativeWindow *window, int32_t transfo
 	return -1;
 }
 
+/* AOSP ANativeWindow.cpp: the dataspace the buffers are to be read with; a Surface starts with ADATASPACE_UNKNOWN */
+int32_t ANativeWindow_setBuffersDataSpace(ANativeWindow *window, int32_t dataSpace)
+{
+	if (!window)
+		return -EINVAL;
+	window->dataspace = dataSpace;
+	return 0;
+}
+
+int32_t ANativeWindow_getBuffersDataSpace(ANativeWindow *window)
+{
+	if (!window)
+		return -EINVAL;
+	return window->dataspace;
+}
+
+/* the dataspace the consumer prefers: ATL's consumers (GTK, SurfaceTexture) don't set one */
+int32_t ANativeWindow_getBuffersDefaultDataSpace(ANativeWindow *window)
+{
+	if (!window)
+		return -EINVAL;
+	return 0; // ADATASPACE_UNKNOWN
+}
+
 void wl_registry_global_handler(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version)
 {
 	struct wl_subcompositor **subcompositor = data;

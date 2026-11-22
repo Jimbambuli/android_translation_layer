@@ -17,6 +17,7 @@ struct ANativeWindow {
 	int refcount;
 	int width;
 	int height;
+	int32_t dataspace; // ANativeWindow_setBuffersDataSpace(), ADATASPACE_UNKNOWN (0) until set
 	/* a Surface of another process of the app (Surface.Endpoint): the socket to its widget, else -1 */
 	int remote_fd;
 	gboolean remote_gone;
