@@ -1,425 +1,169 @@
+/* NDK AConfiguration (android/configuration.h) after AOSP frameworks/base/native/android/configuration.cpp
+ * (android-16.0.0_r4): an AConfiguration is a ResTable_config, the configuration of the AssetManager comes from
+ * AssetManager2::GetConfigurations()[0], diff/match/isBetterThan are ResTable_config's. */
+
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-typedef void AConfiguration;
-typedef void AAssetManager;
+#include <androidfw/androidfw_c_api.h>
 
-/**
- * Create a new AConfiguration, initialized with no values set.
- */
-AConfiguration *AConfiguration_new()
+typedef struct ResTable_config AConfiguration;
+
+/* frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h */
+#define MASK_KEYSHIDDEN 0x0003
+#define MASK_NAVHIDDEN 0x000c
+#define SHIFT_NAVHIDDEN 2
+#define MASK_SCREENSIZE 0x0f
+#define MASK_SCREENLONG 0x30
+#define SHIFT_SCREENLONG 4
+#define MASK_LAYOUTDIR 0xC0
+#define SHIFT_LAYOUTDIR 6
+#define MASK_UI_MODE_TYPE 0x0f
+#define MASK_UI_MODE_NIGHT 0x30
+#define SHIFT_UI_MODE_NIGHT 4
+#define MASK_SCREENROUND 0x03
+#define GRAMMATICAL_INFLECTION_GENDER_MASK 0b11
+/* the C struct calls ResTable_config::grammaticalInflection (the 4th byte of input) inputPad0 */
+#define grammaticalInflection inputPad0
+
+AConfiguration *AConfiguration_new(void)
 {
-	return 0;
+	return calloc(1, sizeof(AConfiguration));
 }
 
-/**
- * Free an AConfiguration that was previously created with
- * AConfiguration_new().
- */
 void AConfiguration_delete(AConfiguration *config)
 {
-	return;
+	free(config);
 }
 
-/**
- * Create and return a new AConfiguration based on the current configuration in
- * use in the given {@link AAssetManager}.
- */
-void AConfiguration_fromAssetManager(AConfiguration *out, AAssetManager *am)
+void AConfiguration_fromAssetManager(AConfiguration *out, struct AssetManager *am)
 {
-	return;
+	AssetManager_getConfiguration(am, out);
 }
 
-/**
- * Copy the contents of 'src' to 'dest'.
- */
 void AConfiguration_copy(AConfiguration *dest, AConfiguration *src)
 {
-	return;
+	*dest = *src;
 }
 
-/**
- * Return the current MCC set in the configuration.  0 if not set.
- */
-int32_t AConfiguration_getMcc(AConfiguration *config)
-{
-	return -1;
-}
+int32_t AConfiguration_getMcc(AConfiguration *config) { return config->mcc; }
+int32_t AConfiguration_getMnc(AConfiguration *config) { return config->mnc; }
 
-/**
- * Set the current MCC in the configuration.  0 to clear.
- */
-void AConfiguration_setMcc(AConfiguration *config, int32_t mcc)
-{
-	return;
-}
-
-/**
- * Return the current MNC set in the configuration.  0 if not set.
- */
-int32_t AConfiguration_getMnc(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current MNC in the configuration.  0 to clear.
- */
-void AConfiguration_setMnc(AConfiguration *config, int32_t mnc)
-{
-	return;
-}
-
-/**
- * Return the current language code set in the configuration.  The output will
- * be filled with an array of two characters.  They are not 0-terminated.  If
- * a language is not set, they will be 0.
- */
 void AConfiguration_getLanguage(AConfiguration *config, char *outLanguage)
 {
-	/* Assume not set. */
-	outLanguage[0] = 0;
-	outLanguage[1] = 0;
+	outLanguage[0] = config->language[0];
+	outLanguage[1] = config->language[1];
 }
 
-/**
- * Set the current language code in the configuration, from the first two
- * characters in the string.
- */
-void AConfiguration_setLanguage(AConfiguration *config, const char *language)
-{
-	return;
-}
-
-/**
- * Return the current country code set in the configuration.  The output will
- * be filled with an array of two characters.  They are not 0-terminated.  If
- * a country is not set, they will be 0.
- */
 void AConfiguration_getCountry(AConfiguration *config, char *outCountry)
 {
-	/* Assume not set. */
-	outCountry[0] = 0;
-	outCountry[1] = 0;
+	outCountry[0] = config->country[0];
+	outCountry[1] = config->country[1];
 }
 
-/**
- * Set the current country code in the configuration, from the first two
- * characters in the string.
- */
+int32_t AConfiguration_getOrientation(AConfiguration *config) { return config->orientation; }
+int32_t AConfiguration_getTouchscreen(AConfiguration *config) { return config->touchscreen; }
+int32_t AConfiguration_getDensity(AConfiguration *config) { return config->density; }
+int32_t AConfiguration_getKeyboard(AConfiguration *config) { return config->keyboard; }
+int32_t AConfiguration_getNavigation(AConfiguration *config) { return config->navigation; }
+int32_t AConfiguration_getKeysHidden(AConfiguration *config) { return config->inputFlags & MASK_KEYSHIDDEN; }
+int32_t AConfiguration_getNavHidden(AConfiguration *config) { return (config->inputFlags & MASK_NAVHIDDEN) >> SHIFT_NAVHIDDEN; }
+int32_t AConfiguration_getSdkVersion(AConfiguration *config) { return config->sdkVersion; }
+int32_t AConfiguration_getScreenSize(AConfiguration *config) { return config->screenLayout & MASK_SCREENSIZE; }
+int32_t AConfiguration_getScreenLong(AConfiguration *config) { return (config->screenLayout & MASK_SCREENLONG) >> SHIFT_SCREENLONG; }
+int32_t AConfiguration_getScreenRound(AConfiguration *config) { return config->screenLayout2 & MASK_SCREENROUND; }
+int32_t AConfiguration_getUiModeType(AConfiguration *config) { return config->uiMode & MASK_UI_MODE_TYPE; }
+int32_t AConfiguration_getUiModeNight(AConfiguration *config) { return (config->uiMode & MASK_UI_MODE_NIGHT) >> SHIFT_UI_MODE_NIGHT; }
+int32_t AConfiguration_getScreenWidthDp(AConfiguration *config) { return config->screenWidthDp; }
+int32_t AConfiguration_getScreenHeightDp(AConfiguration *config) { return config->screenHeightDp; }
+int32_t AConfiguration_getSmallestScreenWidthDp(AConfiguration *config) { return config->smallestScreenWidthDp; }
+int32_t AConfiguration_getLayoutDirection(AConfiguration *config) { return (config->screenLayout & MASK_LAYOUTDIR) >> SHIFT_LAYOUTDIR; }
+int32_t AConfiguration_getGrammaticalGender(AConfiguration *config) { return config->grammaticalInflection; }
+
+void AConfiguration_setMcc(AConfiguration *config, int32_t mcc) { config->mcc = mcc; }
+void AConfiguration_setMnc(AConfiguration *config, int32_t mnc) { config->mnc = mnc; }
+
+void AConfiguration_setLanguage(AConfiguration *config, const char *language)
+{
+	config->language[0] = language[0];
+	config->language[1] = language[1];
+}
+
 void AConfiguration_setCountry(AConfiguration *config, const char *country)
 {
-	return;
+	config->country[0] = country[0];
+	config->country[1] = country[1];
 }
 
-/**
- * Return the current ACONFIGURATION_ORIENTATION_* set in the configuration.
- */
-int32_t AConfiguration_getOrientation(AConfiguration *config)
-{
-	return -1;
-}
+void AConfiguration_setOrientation(AConfiguration *config, int32_t orientation) { config->orientation = orientation; }
+void AConfiguration_setTouchscreen(AConfiguration *config, int32_t touchscreen) { config->touchscreen = touchscreen; }
+void AConfiguration_setDensity(AConfiguration *config, int32_t density) { config->density = density; }
+void AConfiguration_setKeyboard(AConfiguration *config, int32_t keyboard) { config->keyboard = keyboard; }
+void AConfiguration_setNavigation(AConfiguration *config, int32_t navigation) { config->navigation = navigation; }
 
-/**
- * Set the current orientation in the configuration.
- */
-void AConfiguration_setOrientation(AConfiguration *config, int32_t orientation)
-{
-	return;
-}
-
-/**
- * Return the current ACONFIGURATION_TOUCHSCREEN_* set in the configuration.
- */
-int32_t AConfiguration_getTouchscreen(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current touchscreen in the configuration.
- */
-void AConfiguration_setTouchscreen(AConfiguration *config, int32_t touchscreen)
-{
-	return;
-}
-
-/**
- * Return the current ACONFIGURATION_DENSITY_* set in the configuration.
- */
-int32_t AConfiguration_getDensity(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current density in the configuration.
- */
-void AConfiguration_setDensity(AConfiguration *config, int32_t density)
-{
-	return;
-}
-
-/**
- * Return the current ACONFIGURATION_KEYBOARD_* set in the configuration.
- */
-int32_t AConfiguration_getKeyboard(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current keyboard in the configuration.
- */
-void AConfiguration_setKeyboard(AConfiguration *config, int32_t keyboard)
-{
-	return;
-}
-
-/**
- * Return the current ACONFIGURATION_NAVIGATION_* set in the configuration.
- */
-int32_t AConfiguration_getNavigation(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current navigation in the configuration.
- */
-void AConfiguration_setNavigation(AConfiguration *config, int32_t navigation)
-{
-	return;
-}
-
-/**
- * Return the current ACONFIGURATION_KEYSHIDDEN_* set in the configuration.
- */
-int32_t AConfiguration_getKeysHidden(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current keys hidden in the configuration.
- */
 void AConfiguration_setKeysHidden(AConfiguration *config, int32_t keysHidden)
 {
-	return;
+	config->inputFlags = (config->inputFlags & ~MASK_KEYSHIDDEN) | (keysHidden & MASK_KEYSHIDDEN);
 }
 
-/**
- * Return the current ACONFIGURATION_NAVHIDDEN_* set in the configuration.
- */
-int32_t AConfiguration_getNavHidden(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current nav hidden in the configuration.
- */
 void AConfiguration_setNavHidden(AConfiguration *config, int32_t navHidden)
 {
-	return;
+	config->inputFlags = (config->inputFlags & ~MASK_NAVHIDDEN) | ((navHidden << SHIFT_NAVHIDDEN) & MASK_NAVHIDDEN);
 }
 
-/**
- * Return the current SDK (API) version set in the configuration.
- */
-int32_t AConfiguration_getSdkVersion(AConfiguration *config)
-{
-	return -1;
-}
+void AConfiguration_setSdkVersion(AConfiguration *config, int32_t sdkVersion) { config->sdkVersion = sdkVersion; }
 
-/**
- * Set the current SDK version in the configuration.
- */
-void AConfiguration_setSdkVersion(AConfiguration *config, int32_t sdkVersion)
-{
-	return;
-}
-
-/**
- * Return the current ACONFIGURATION_SCREENSIZE_* set in the configuration.
- */
-int32_t AConfiguration_getScreenSize(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current screen size in the configuration.
- */
 void AConfiguration_setScreenSize(AConfiguration *config, int32_t screenSize)
 {
-	return;
+	config->screenLayout = (config->screenLayout & ~MASK_SCREENSIZE) | (screenSize & MASK_SCREENSIZE);
 }
 
-/**
- * Return the current ACONFIGURATION_SCREENLONG_* set in the configuration.
- */
-int32_t AConfiguration_getScreenLong(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current screen long in the configuration.
- */
 void AConfiguration_setScreenLong(AConfiguration *config, int32_t screenLong)
 {
-	return;
+	config->screenLayout = (config->screenLayout & ~MASK_SCREENLONG) | ((screenLong << SHIFT_SCREENLONG) & MASK_SCREENLONG);
 }
 
-/**
- * Return the current ACONFIGURATION_SCREENROUND_* set in the configuration.
- */
-int32_t AConfiguration_getScreenRound(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current screen round in the configuration.
- */
 void AConfiguration_setScreenRound(AConfiguration *config, int32_t screenRound)
 {
-	return;
+	config->screenLayout2 = (config->screenLayout2 & ~MASK_SCREENROUND) | (screenRound & MASK_SCREENROUND);
 }
 
-/**
- * Return the current ACONFIGURATION_UI_MODE_TYPE_* set in the configuration.
- */
-int32_t AConfiguration_getUiModeType(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current UI mode type in the configuration.
- */
 void AConfiguration_setUiModeType(AConfiguration *config, int32_t uiModeType)
 {
-	return;
+	config->uiMode = (config->uiMode & ~MASK_UI_MODE_TYPE) | (uiModeType & MASK_UI_MODE_TYPE);
 }
 
-/**
- * Return the current ACONFIGURATION_UI_MODE_NIGHT_* set in the configuration.
- */
-int32_t AConfiguration_getUiModeNight(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the current UI mode night in the configuration.
- */
 void AConfiguration_setUiModeNight(AConfiguration *config, int32_t uiModeNight)
 {
-	return;
+	config->uiMode = (config->uiMode & ~MASK_UI_MODE_NIGHT) | ((uiModeNight << SHIFT_UI_MODE_NIGHT) & MASK_UI_MODE_NIGHT);
 }
 
-#if __ANDROID_API__ >= 13
-/**
- * Return the current configuration screen width in dp units, or
- * ACONFIGURATION_SCREEN_WIDTH_DP_ANY if not set.
- */
-int32_t AConfiguration_getScreenWidthDp(AConfiguration *config)
-{
-	return -1;
-}
+void AConfiguration_setScreenWidthDp(AConfiguration *config, int32_t value) { config->screenWidthDp = value; }
+void AConfiguration_setScreenHeightDp(AConfiguration *config, int32_t value) { config->screenHeightDp = value; }
+void AConfiguration_setSmallestScreenWidthDp(AConfiguration *config, int32_t value) { config->smallestScreenWidthDp = value; }
 
-/**
- * Set the configuration's current screen width in dp units.
- */
-void AConfiguration_setScreenWidthDp(AConfiguration *config, int32_t value)
-{
-	return;
-}
-
-/**
- * Return the current configuration screen height in dp units, or
- * ACONFIGURATION_SCREEN_HEIGHT_DP_ANY if not set.
- */
-int32_t AConfiguration_getScreenHeightDp(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the configuration's current screen width in dp units.
- */
-void AConfiguration_setScreenHeightDp(AConfiguration *config, int32_t value)
-{
-	return;
-}
-
-/**
- * Return the configuration's smallest screen width in dp units, or
- * ACONFIGURATION_SMALLEST_SCREEN_WIDTH_DP_ANY if not set.
- */
-int32_t AConfiguration_getSmallestScreenWidthDp(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the configuration's smallest screen width in dp units.
- */
-void AConfiguration_setSmallestScreenWidthDp(AConfiguration *config, int32_t value)
-{
-	return;
-}
-#endif /* __ANDROID_API__ >= 13 */
-
-#if __ANDROID_API__ >= 17
-/**
- * Return the configuration's layout direction, or
- * ACONFIGURATION_LAYOUTDIR_ANY if not set.
- */
-int32_t AConfiguration_getLayoutDirection(AConfiguration *config)
-{
-	return -1;
-}
-
-/**
- * Set the configuration's layout direction.
- */
 void AConfiguration_setLayoutDirection(AConfiguration *config, int32_t value)
 {
-	return;
+	config->screenLayout = (config->screenLayout & ~MASK_LAYOUTDIR) | ((value << SHIFT_LAYOUTDIR) & MASK_LAYOUTDIR);
 }
-#endif /* __ANDROID_API__ >= 17 */
 
-/**
- * Perform a diff between two configurations.  Returns a bit mask of
- * ACONFIGURATION_* constants, each bit set meaning that configuration element
- * is different between them.
- */
+void AConfiguration_setGrammaticalGender(AConfiguration *config, int32_t value)
+{
+	config->grammaticalInflection = value & GRAMMATICAL_INFLECTION_GENDER_MASK;
+}
+
 int32_t AConfiguration_diff(AConfiguration *config1, AConfiguration *config2)
 {
-	return -1;
+	return ResTable_config_diff(config1, config2);
 }
 
-/**
- * Determine whether 'base' is a valid configuration for use within the
- * environment 'requested'.  Returns 0 if there are any values in 'base'
- * that conflict with 'requested'.  Returns 1 if it does not conflict.
- */
 int32_t AConfiguration_match(AConfiguration *base, AConfiguration *requested)
 {
-	return -1;
+	return ResTable_config_match(base, requested);
 }
 
-/**
- * Determine whether the configuration in 'test' is better than the existing
- * configuration in 'base'.  If 'requested' is non-NULL, this decision is based
- * on the overall configuration given there.  If it is NULL, this decision is
- * simply based on which configuration is more specific.  Returns non-0 if
- * 'test' is better than 'base'.
- *
- * This assumes you have already filtered the configurations with
- * AConfiguration_match().
- */
-int32_t AConfiguration_isBetterThan(AConfiguration *base, AConfiguration *test,
-                                    AConfiguration *requested);
+int32_t AConfiguration_isBetterThan(AConfiguration *base, AConfiguration *test, AConfiguration *requested)
+{
+	return ResTable_config_isBetterThan(base, test, requested);
+}

@@ -26,6 +26,11 @@ int AAsset_openFileDescriptor(struct Asset *asset, off_t *out_start, off_t *out_
 	return Asset_openFileDescriptor(asset, out_start, out_length);
 }
 
+int AAsset_openFileDescriptor64(struct Asset *asset, off64_t *out_start, off64_t *out_length)
+{
+	return Asset_openFileDescriptor(asset, out_start, out_length);
+}
+
 struct Asset *AAssetManager_open(struct AssetManager *asset_manager, const char *file_name, int mode)
 {
 	char *path = malloc(strlen(ASSET_DIR) + strlen(file_name) + 1);
@@ -120,6 +125,11 @@ const char *AAssetDir_getNextFileName(struct AAssetDir *dir)
 
 	dir->curr_index = index + 1;
 	return AssetDir_getFileName(dir->asset_dir, index);
+}
+
+void AAssetDir_rewind(struct AAssetDir *dir)
+{
+	dir->curr_index = 0;
 }
 
 void AAssetDir_close(struct AAssetDir *dir)
