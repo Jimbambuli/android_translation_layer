@@ -92,7 +92,7 @@ public final class ScanController implements IBluetoothScan, Bluez.Observer {
 			id = nextId++;
 			clients.put(id, new Client(id, callback, null));
 		}
-		handler.post(new Runnable() {
+		com.android.bluetooth.bluez.BinderThread.post(new Runnable() {
 			public void run() {
 				try {
 					callback.onScannerRegistered(ScanCallback.NO_ERROR, id);

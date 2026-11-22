@@ -25,6 +25,7 @@ srcs = [
 	'android/bluetooth/le/IPeriodicAdvertisingCallback.java',
 	'android/bluetooth/le/IScannerCallback.java',
 	'android/bluetooth/le/TruncatedFilter.java',
+	'com/android/bluetooth/bluez/BinderThread.java',
 	'com/android/bluetooth/bluez/Bluez.java',
 	'com/android/bluetooth/bluez/BluezBus.java',
 	'com/android/bluetooth/btservice/AdapterService.java',
