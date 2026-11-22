@@ -121,8 +121,8 @@ public final class ATLProcess {
 				bindings.clear();
 				lost_activities = new ArrayList<>(activities);
 				activities.clear();
+				worker.shutdown();
 			}
-			worker.shutdown();
 			/* like ActivityRecord.finishIfPossible() for the activities of a dead process: RESULT_CANCELED */
 			for (ResultTarget target : lost_activities)
 				target.finished(Activity.RESULT_CANCELED, null);
@@ -219,20 +219,24 @@ public final class ATLProcess {
 	/* runs a call to the process on its worker; the process stays while calls are pending (see MAY_EXIT) */
 	private static void submit(final ProcessRecord r, final Runnable call) {
 		synchronized (processes) {
+			/* the process died meanwhile (onConnectionDied() shuts the worker down under this lock): there is
+			 * nobody to call, as for a dead process in AOSP (unbindService() of its binding just drops it) */
+			if (r.worker.isShutdown())
+				return;
 			r.pending++;
-		}
-		r.worker.execute(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					call.run();
-				} finally {
-					synchronized (processes) {
-						r.pending--;
+			r.worker.execute(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						call.run();
+					} finally {
+						synchronized (processes) {
+							r.pending--;
+						}
 					}
 				}
-			}
-		});
+			});
+		}
 	}
 
 	/** ActiveServices.startServiceLocked() for a service in another process of the app */
