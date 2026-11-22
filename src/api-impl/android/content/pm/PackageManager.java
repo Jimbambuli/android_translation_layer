@@ -2305,6 +2305,21 @@ public class PackageManager {
 					return PERMISSION_GRANTED;
 				else
 					return PERMISSION_DENIED;
+			/* runtime permissions of Android 12 (group NEARBY_DEVICES): granted when the manifest requests them, or,
+			 * for apps targeting below S, the BLUETOOTH or BLUETOOTH_ADMIN permission they split from (platform.xml
+			 * split-permission targetSdk 31); ATL has no dialog, BlueZ and the desktop decide what an app reaches */
+			case "android.permission.BLUETOOTH_SCAN":
+			case "android.permission.BLUETOOTH_CONNECT":
+			case "android.permission.BLUETOOTH_ADVERTISE": {
+				ATLLoadedApp app = ATLLoadedApp.getPrimaryApplication();
+				if (app.pkg.requestedPermissions.contains(permName))
+					return PERMISSION_GRANTED;
+				if (app.pkg.applicationInfo.targetSdkVersion < 31
+				    && (app.pkg.requestedPermissions.contains("android.permission.BLUETOOTH")
+				        || app.pkg.requestedPermissions.contains("android.permission.BLUETOOTH_ADMIN")))
+					return PERMISSION_GRANTED;
+				return PERMISSION_DENIED;
+			}
 			case "android.permission.RECORD_AUDIO":
 				if (android.media.AudioRecord.microphoneAvailable())
 					return PERMISSION_GRANTED;
@@ -2644,7 +2659,8 @@ public class PackageManager {
 		String[] names = {FEATURE_TOUCHSCREEN, "android.hardware.touchscreen.multitouch.distinct", FEATURE_FAKETOUCH, FEATURE_SCREEN_PORTRAIT,
 		                  FEATURE_SCREEN_LANDSCAPE, FEATURE_AUDIO_OUTPUT, FEATURE_MICROPHONE, FEATURE_LOCATION,
 		                  FEATURE_LOCATION_NETWORK, FEATURE_AUTOMOTIVE,
-		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE};
+		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE,
+		                  FEATURE_BLUETOOTH, FEATURE_BLUETOOTH_LE};
 		List<FeatureInfo> features = new ArrayList<>();
 		for (String name : names) {
 			if (hasSystemFeature(name)) {
@@ -2697,6 +2713,11 @@ public class PackageManager {
 			/* the activity's own window on the desktop, see Activity.enterPictureInPictureMode() */
 			case FEATURE_PICTURE_IN_PICTURE:
 				return true;
+			/* the desktop's Bluetooth adapter through BlueZ (com.android.bluetooth.btservice.AdapterService);
+			 * BlueZ adapters do BR/EDR and LE */
+			case FEATURE_BLUETOOTH:
+			case FEATURE_BLUETOOTH_LE:
+				return com.android.bluetooth.btservice.AdapterService.isAvailable();
 			/* WebView is WebKitGTK (apps such as Jellyfin refuse to start without the feature) */
 			case "android.software.webview":
 				return true;
