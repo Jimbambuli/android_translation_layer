@@ -4,6 +4,7 @@ import android.atl.GskCanvas;
 import android.atl.annotation.Export;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import java.util.ArrayList;
@@ -34,19 +35,52 @@ public class SurfaceView extends View {
 		setWillNotDraw(true);
 
 		mSurface.widget = this.widget;
+		mSurface.atl_format = mRequestedFormat;
 	}
 
 	@Export
 	private void surfaceChanged(int format, int width, int height) {
+		/* AOSP reports the surface's format, the one requested with SurfaceHolder.setFormat() */
 		for (SurfaceHolder.Callback c : mCallbacks) {
-			c.surfaceChanged(mSurfaceHolder, format, width, height);
+			c.surfaceChanged(mSurfaceHolder, mRequestedFormat, width, height);
 		}
 	}
 
+	private boolean mSurfaceCreated;
+
+	/* called when the widget is realized, or when the window is visible again (onWindowVisibilityChanged) */
 	@Export
 	private void surfaceCreated() {
+		if (mSurfaceCreated)
+			return;
+		mSurfaceCreated = true;
 		for (SurfaceHolder.Callback c : mCallbacks) {
 			c.surfaceCreated(mSurfaceHolder);
+		}
+	}
+
+	/* AOSP SurfaceView: surfaceDestroyed() before the surface goes away (the view leaves the window or is hidden);
+	 * a later surfaceCreated() follows only after it */
+	@Export
+	private void surfaceDestroyed() {
+		if (!mSurfaceCreated)
+			return;
+		mSurfaceCreated = false;
+		for (SurfaceHolder.Callback c : mCallbacks) {
+			c.surfaceDestroyed(mSurfaceHolder);
+		}
+	}
+
+	/* AOSP SurfaceView.onWindowVisibilityChanged(): the surface exists only while the window is visible; when its
+	 * activity stops the surface is destroyed, when it starts again a new one is created */
+	@Override
+	protected void onWindowVisibilityChanged(int visibility) {
+		super.onWindowVisibilityChanged(visibility);
+		if (visibility != VISIBLE) {
+			surfaceDestroyed();
+		} else if (!mSurfaceCreated && getWidth() > 0 && getHeight() > 0) {
+			surfaceCreated();
+			surfaceChanged(mRequestedFormat, getWidth(), getHeight());
 		}
 	}
 
@@ -74,6 +108,8 @@ public class SurfaceView extends View {
 	}
 
 	final Surface mSurface = new Surface();
+	/* AOSP SurfaceView: RGB_565 until SurfaceHolder.setFormat() */
+	int mRequestedFormat = PixelFormat.RGB_565;
 
 	private final SurfaceHolder mSurfaceHolder = new SurfaceHolder() {
 		private static final String LOG_TAG = "SurfaceHolder";
@@ -119,17 +155,13 @@ public class SurfaceView extends View {
 
 		@Override
 		public void setFormat(int format) {
-			/*
-					// for backward compatibility reason, OPAQUE always
-					// means 565 for SurfaceView
-					if (format == PixelFormat.OPAQUE)
-					format = PixelFormat.RGB_565;
-
-					mRequestedFormat = format;
-					if (mWindow != null) {
-					updateWindow(false, false);
-					}*/
+			// for backward compatibility reason, OPAQUE always means 565 for SurfaceView (AOSP)
+			if (format == PixelFormat.OPAQUE)
+				format = PixelFormat.RGB_565;
+			mRequestedFormat = format;
+			mSurface.atl_format = format;
 		}
+
 
 		/**
 		 * @deprecated setType is now ignored.

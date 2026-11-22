@@ -104,6 +104,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 	private boolean paused = false;
 	private boolean started = false; // between performStart() and performStop()
+	private boolean windowHiddenByStop = false; // performStop() made the window invisible to its views
 	private boolean stopped = false; // stopped and not started again: the next start is a restart
 	private Bundle savedState; // what it saved when it was last stopped, recreate() creates the new instance from it
 	private CharSequence title = null;
@@ -2196,6 +2197,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		mFragments.reportLoaderStart();
 		dispatchActivityPostStarted();
 		started = true;
+		/* AOSP handleStartActivity(): a restarted activity's window is visible again (updateVisibility()) */
+		if (windowHiddenByStop) {
+			windowHiddenByStop = false;
+			if (window != null && window.peekDecorView() != null)
+				window.peekDecorView().dispatchWindowVisibilityChanged(View.VISIBLE);
+		}
 		performPostStart();
 	}
 
@@ -2314,6 +2321,12 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		dispatchActivityPreStopped();
 		mFragments.dispatchStop();
 		onStop();
+		/* AOSP handleStopActivity(): after onStop() the window is made invisible (updateVisibility()), which its views
+		 * see in onWindowVisibilityChanged(): a SurfaceView destroys its surface */
+		if (window != null && window.peekDecorView() != null) {
+			window.peekDecorView().dispatchWindowVisibilityChanged(View.GONE);
+			windowHiddenByStop = true;
+		}
 		/* AOSP performStop(): the cursors managed by the activity are deactivated */
 		synchronized (mManagedCursors) {
 			for (ManagedCursor mc : mManagedCursors) {
