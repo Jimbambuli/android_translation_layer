@@ -89,6 +89,9 @@ public class AudioManager {
 	public static final String PROPERTY_OUTPUT_SAMPLE_RATE = "android.media.property.OUTPUT_SAMPLE_RATE";
 	/* the rate of ATL's output (FIXME arbitrary: PulseAudio resamples any rate); AudioTrack.getNativeOutputSampleRate() too */
 	static final String OUTPUT_SAMPLE_RATE = "44100";
+	/* the frames per buffer and the latency of ATL's output (FIXME arbitrary as well); AudioTrack.getMinBufferSize() too */
+	static final String OUTPUT_FRAMES_PER_BUFFER = "256";
+	static final int OUTPUT_LATENCY_MS = 20;
 
 	public static final int STREAM_MUSIC = 0x3;
 
@@ -121,7 +124,7 @@ public class AudioManager {
 	public String getProperty(String name) {
 		switch (name) {
 			case PROPERTY_OUTPUT_FRAMES_PER_BUFFER:
-				return "256"; // FIXME arbitrary
+				return OUTPUT_FRAMES_PER_BUFFER;
 			case PROPERTY_OUTPUT_SAMPLE_RATE:
 				return OUTPUT_SAMPLE_RATE;
 			default:
@@ -133,7 +136,7 @@ public class AudioManager {
 	/* hidden in AOSP (@UnsupportedAppUsage), used by cubeb (Firefox): the output latency in ms; FIXME arbitrary like
 	 * the properties above (a few buffers of PROPERTY_OUTPUT_FRAMES_PER_BUFFER) */
 	public int getOutputLatency(int streamType) {
-		return 20;
+		return OUTPUT_LATENCY_MS;
 	}
 
 	/* AOSP AudioManager.OnAudioFocusChangeListener */
@@ -395,6 +398,11 @@ public class AudioManager {
 	private static final java.util.concurrent.atomic.AtomicInteger sNextAudioSessionId = new java.util.concurrent.atomic.AtomicInteger(1);
 
 	public int generateAudioSessionId() {
+		return newAudioSessionId();
+	}
+
+	/* AudioSystem.newAudioSessionId(), also for AudioTrack's AUDIO_SESSION_ALLOCATE */
+	static int newAudioSessionId() {
 		return sNextAudioSessionId.getAndIncrement();
 	}
 
