@@ -471,14 +471,18 @@ public class Parcel {
 			p.writeToParcel(this, flags);
 	}
 
+	/* AOSP Parcel.readParcelable(ClassLoader): the type is the caller's; a null loader is the framework's */
 	@Export
-	public Parcelable readParcelable(ClassLoader loader) {
+	@SuppressWarnings("unchecked")
+	public <T extends Parcelable> T readParcelable(ClassLoader loader) {
 		String className = readString();
 		if (className == null)
 			return null;
+		if (loader == null)
+			loader = Parcel.class.getClassLoader();
 		try {
 			Parcelable.Creator<?> creator = (Parcelable.Creator<?>)loader.loadClass(className).getField("CREATOR").get(null);
-			return (Parcelable)creator.createFromParcel(this);
+			return (T)creator.createFromParcel(this);
 		} catch (ReflectiveOperationException | IllegalArgumentException e) {
 			throw new BadParcelableException(e);
 		}
