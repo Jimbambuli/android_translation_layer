@@ -6,8 +6,8 @@ import android.nfc.Tag;
 import android.os.Bundle;
 import java.io.IOException;
 
-/* AOSP Ndef (modules/Nfc), reduced to mock tags (see android.nfc.Tag): ATL has no NFC service, so no Tag from a
- * device exists. Constants and the extras-based getters follow AOSP. */
+/* AOSP Ndef (modules/Nfc) for mock tags and neard tags (see android.nfc.Tag). Constants and the extras-based
+ * getters follow AOSP. */
 public final class Ndef extends BasicTagTechnology {
 	public static final int NDEF_MODE_READ_ONLY = 1;
 	public static final int NDEF_MODE_READ_WRITE = 2;
@@ -95,12 +95,22 @@ public final class Ndef extends BasicTagTechnology {
 	 * operation."), but checkConnected() already throws, as connect() cannot succeed on a mock tag */
 	public void writeNdefMessage(NdefMessage msg) throws IOException, FormatException {
 		checkConnected();
+		/* neard can write records (org.neard.Tag.Write) but not a raw message; INfcTag.ndefWrite() failing */
+		if (mTag.getNeardPath() != null)
+			throw new IOException();
 		throw new IOException("Mock tags don't support this operation.");
 	}
 
 	/* AOSP getNdefMessage(): checkConnected() first, a mock tag has no service */
 	public NdefMessage getNdefMessage() throws IOException, FormatException {
 		checkConnected();
+		if (mTag.getNeardPath() != null) {
+			/* AOSP: ndefRead(), TagLostException when the tag has gone; neard read the message when the tag
+			 * came into range and keeps it while the tag stays */
+			if (!com.android.server.nfc.NeardAdapter.isTagPresent(mTag.getNeardPath()))
+				throw new android.nfc.TagLostException();
+			return mNdefMsg;
+		}
 		throw new IOException("Mock tags don't support this operation.");
 	}
 

@@ -1218,6 +1218,12 @@ public class PackageManager {
 	@SdkConstant(SdkConstantType.FEATURE)
 	public static final String FEATURE_NFC = "android.hardware.nfc";
 
+	public static final String FEATURE_FINGERPRINT = "android.hardware.fingerprint";
+
+	public static final String FEATURE_FACE = "android.hardware.biometrics.face";
+
+	public static final String FEATURE_IRIS = "android.hardware.biometrics.iris";
+
 	/**
 	 * Feature for {@link #getSystemAvailableFeatures} and
 	 * {@link #hasSystemFeature}: The device supports host-
@@ -2738,6 +2744,12 @@ public class PackageManager {
 			case FEATURE_BLUETOOTH:
 			case FEATURE_BLUETOOTH_LE:
 				return com.android.bluetooth.btservice.AdapterService.isAvailable();
+			/* the neard NFC adapter (com.android.server.nfc.NeardAdapter) */
+			case FEATURE_NFC:
+				return com.android.server.nfc.NeardAdapter.isPresent();
+			/* the fprintd fingerprint sensor (com.android.server.biometrics.FprintdSensor) */
+			case FEATURE_FINGERPRINT:
+				return com.android.server.biometrics.FprintdSensor.isPresent();
 			/* WebView is WebKitGTK (apps such as Jellyfin refuse to start without the feature) */
 			case "android.software.webview":
 				return true;

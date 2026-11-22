@@ -34,7 +34,9 @@ import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
 import android.hardware.display.ColorDisplayManager;
 import android.hardware.display.DisplayManager;
+import android.hardware.biometrics.BiometricManager;
 import android.hardware.fingerprint.FingerprintManager;
+import com.android.server.biometrics.FprintdSensor;
 import android.hardware.input.InputManager;
 import android.hardware.usb.UsbManager;
 import android.location.LocationManager;
@@ -458,7 +460,20 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<FingerprintManager>() {
             @Override
             public FingerprintManager createService(ContextImpl ctx) {
-                return new FingerprintManager();
+                /* AOSP: ServiceManager.getServiceOrThrow() for apps targeting O and later; the service runs only
+                 * on a device with FEATURE_FINGERPRINT (SystemServer), here the fprintd sensor */
+                if (!FprintdSensor.isPresent()
+                        && ctx.getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.O)
+                    return null;
+                return new FingerprintManager(ctx);
+            }});
+
+        /* AOSP: the AuthService runs on every device */
+        registerService(Context.BIOMETRIC_SERVICE, BiometricManager.class,
+                new CachedServiceFetcher<BiometricManager>() {
+            @Override
+            public BiometricManager createService(ContextImpl ctx) {
+                return new BiometricManager();
             }});
 
         registerService(Context.TV_INPUT_SERVICE, TvInputManager.class,
