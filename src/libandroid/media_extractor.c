@@ -1,8 +1,7 @@
 /*
- * NdkMediaExtractor and NdkMediaDataSource (libmediandk) on ATL's android.media.MediaExtractor. AOSP's extractor is
- * NuMediaExtractor (frameworks/av/media/ndk/NdkMediaExtractor.cpp); ATL ships no extractor plugin, so the Java class
- * fails every setDataSource() like NuMediaExtractor does when no plugin sniffs the content (initMediaExtractor():
- * ERROR_UNSUPPORTED). An extractor without data then answers as NuMediaExtractor with mImpl == NULL.
+ * NdkMediaExtractor and NdkMediaDataSource (libmediandk) on ATL's android.media.MediaExtractor (FFmpeg's libavformat).
+ * AOSP's extractor is NuMediaExtractor (frameworks/av/media/ndk/NdkMediaExtractor.cpp); a source no demuxer opens
+ * fails like NuMediaExtractor does when no plugin sniffs the content (initMediaExtractor(): ERROR_UNSUPPORTED).
  */
 
 #define _GNU_SOURCE
@@ -51,7 +50,7 @@ bool AMediaFormat_getString(AMediaFormat *format, const char *name, const char *
 static struct {
 	jclass class;
 	jmethodID ctor, release, set_path, set_fd, get_track_count, get_track_format, select_track, unselect_track;
-	jmethodID seek_to, advance, read_sample, get_track_index, get_time, get_size, get_flags, get_cached;
+	jmethodID seek_to, advance, read_sample, get_track_index, get_time, get_size, get_flags, get_cached, get_file_format;
 	jclass fd_class;
 	jmethodID fd_ctor;
 	jfieldID fd_fd;
@@ -79,6 +78,7 @@ static JNIEnv *env_init(void)
 	m.get_size = (*env)->GetMethodID(env, class, "getSampleSize", "()J");
 	m.get_flags = (*env)->GetMethodID(env, class, "getSampleFlags", "()I");
 	m.get_cached = (*env)->GetMethodID(env, class, "getCachedDuration", "()J");
+	m.get_file_format = (*env)->GetMethodID(env, class, "getFileFormat", "()Landroid/media/MediaFormat;");
 	m.fd_class = ndk_jni_class(env, "java/io/FileDescriptor");
 	m.fd_ctor = (*env)->GetMethodID(env, m.fd_class, "<init>", "()V");
 	m.fd_fd = (*env)->GetFieldID(env, m.fd_class, "fd", "I");
@@ -113,7 +113,7 @@ media_status_t AMediaExtractor_delete(AMediaExtractor *ex)
 	return AMEDIA_OK;
 }
 
-/* an IOException is NuMediaExtractor's ERROR_UNSUPPORTED (no extractor plugin accepts the source) */
+/* an IOException is NuMediaExtractor's ERROR_UNSUPPORTED (no demuxer accepts the source) */
 static media_status_t set_failed(JNIEnv *env, const char *what)
 {
 	return ndk_jni_threw_class(env, "java/io/IOException", what) ? AMEDIA_ERROR_UNSUPPORTED : AMEDIA_OK;
@@ -139,7 +139,8 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor *ex, const char *lo
 	return set_failed(env, "AMediaExtractor_setDataSource");
 }
 
-/* NuMediaExtractor::setDataSource(NdkDataSource) ends in initMediaExtractor(): no plugin, ERROR_UNSUPPORTED */
+/* NuMediaExtractor::setDataSource(NdkDataSource): the Java class has no way to read an AMediaDataSource, so this is
+ * the result of a source no extractor accepts, ERROR_UNSUPPORTED */
 media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor *ex, AMediaDataSource *src)
 {
 	return AMEDIA_ERROR_UNSUPPORTED;
@@ -232,11 +233,16 @@ media_status_t AMediaExtractor_seekTo(AMediaExtractor *ex, int64_t seekPosUs, Se
 	return ndk_jni_threw(env, "AMediaExtractor_seekTo") || idx < 0 ? AMEDIA_ERROR_END_OF_STREAM : AMEDIA_OK;
 }
 
-/* the format of the file is the empty one without an extractor (NuMediaExtractor::getFileFormat() fails with -EINVAL,
- * and AOSP ignores that); ATL's Java class has no file format and no extractor, so it is always empty */
+/* the container's "mime"; empty when NuMediaExtractor::getFileFormat() fails (-EINVAL, which AOSP ignores) */
 AMediaFormat *AMediaExtractor_getFileFormat(AMediaExtractor *ex)
 {
-	return AMediaFormat_new();
+	JNIEnv *env = env_init();
+	jobject jformat = (*env)->CallObjectMethod(env, ex->extractor, m.get_file_format);
+	if (ndk_jni_threw(env, "AMediaExtractor_getFileFormat") || !jformat)
+		return AMediaFormat_new();
+	AMediaFormat *format = AMediaFormat_fromJava(env, jformat);
+	(*env)->DeleteLocalRef(env, jformat);
+	return format;
 }
 
 ssize_t AMediaExtractor_getSampleSize(AMediaExtractor *ex)
@@ -246,13 +252,13 @@ ssize_t AMediaExtractor_getSampleSize(AMediaExtractor *ex)
 	return ndk_jni_threw(env, "AMediaExtractor_getSampleSize") ? -1 : size;
 }
 
-/* getFileFormat() fails without an extractor, so there is no "pssh" entry: NULL, as AOSP */
+/* no demuxed file carries a "pssh" entry (no DRM): NULL, as AOSP */
 PsshInfo *AMediaExtractor_getPsshInfo(AMediaExtractor *ex)
 {
 	return NULL;
 }
 
-/* getSampleMeta() fails without a sample (and no sample carries encryption data in ATL): NULL, as AOSP */
+/* no sample carries encryption data (kKeyEncryptedSizes): NULL, as AOSP */
 AMediaCodecCryptoInfo *AMediaExtractor_getSampleCryptoInfo(AMediaExtractor *ex)
 {
 	return NULL;

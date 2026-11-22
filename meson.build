@@ -250,6 +250,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/android_graphics_drawable_NinePatchDrawable.c',
                                                                   	'src/api-impl-jni/location/android_location_LocationManager.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
+                                                                  	'src/api-impl-jni/media/android_media_MediaExtractor.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaRecorder.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaMetadataRetriever.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaPlayer.c',

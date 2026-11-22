@@ -212,6 +212,11 @@ public class MediaFormat {
 	public MediaFormat() {
 	}
 
+	/* AOSP MediaFormat(Map) (hidden): the map of MediaExtractor's formats becomes the format's own */
+	MediaFormat(Map<String, Object> map) {
+		this.map = map;
+	}
+
 	/* AOSP MediaFormat(MediaFormat other): a copy of the key/value map */
 	public MediaFormat(MediaFormat other) {
 		map.putAll(other.map);
