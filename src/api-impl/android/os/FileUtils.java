@@ -31,6 +31,29 @@ import java.util.concurrent.Executor;
  * Only the part of AOSP's FileUtils that other AOSP classes taken over here use.
  */
 public final class FileUtils {
+	/* ATL: AOSP FileUtils.deleteContents() and listFilesOrEmpty() (@hide), needed by the telephony provider */
+	public static boolean deleteContents(File dir) {
+		File[] files = dir.listFiles();
+		boolean success = true;
+		if (files != null) {
+			for (File file : files) {
+				if (file.isDirectory()) {
+					success &= deleteContents(file);
+				}
+				if (!file.delete()) {
+					android.util.Log.w("FileUtils", "Failed to delete " + file);
+					success = false;
+				}
+			}
+		}
+		return success;
+	}
+
+	public static File[] listFilesOrEmpty(File dir) {
+		File[] files = dir != null ? dir.listFiles() : null;
+		return files != null ? files : new File[0];
+	}
+
 	private FileUtils() {
 	}
 

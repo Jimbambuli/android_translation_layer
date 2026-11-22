@@ -19,7 +19,20 @@ public class TelecomManager {
 
 	public void addNewIncomingCall(PhoneAccountHandle phoneAccount, android.os.Bundle extras) {}
 
-	public void placeCall(android.net.Uri address, android.os.Bundle extras) {}
+	/* AOSP placeCall() -> TelecomServiceImpl.placeCall(): CALL_PHONE (or CALL_PRIVILEGED), else SecurityException; then
+	 * Telecom places the call. ATL hands the number to the desktop's dialer (tel: link, OpenURI portal), as an
+	 * ACTION_CALL intent (Context.startActivity()) */
+	public void placeCall(android.net.Uri address, android.os.Bundle extras) {
+		android.content.Context context = android.app.ActivityThread.currentApplication();
+		if (context.checkSelfPermission(android.Manifest.permission.CALL_PHONE) != android.content.pm.PackageManager.PERMISSION_GRANTED
+		    && context.checkSelfPermission("android.permission.CALL_PRIVILEGED") != android.content.pm.PackageManager.PERMISSION_GRANTED)
+			throw new SecurityException("Package " + context.getPackageName() + " is not allowed to place phone calls");
+		if (address == null) {
+			android.util.Log.w("TelecomManager", "Cannot place call to empty address.");
+			return;
+		}
+		android.app.Activity.nativeOpenURI(android.app.ContextImpl.desktopUri(address));
+	}
 
 	/* public extras keys of android.telecom.TelecomManager (values as in the SDK documentation) */
 	public static final String EXTRA_INCOMING_CALL_ADDRESS = "android.telecom.extra.INCOMING_CALL_ADDRESS";

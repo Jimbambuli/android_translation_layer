@@ -1488,6 +1488,11 @@ public abstract class Context {
 	}
 	public abstract boolean isDeviceProtectedStorage();
 
+	/* ATL: AOSP @hide isCredentialProtectedStorage(); ATL storage is never locked, so every context is */
+	public boolean isCredentialProtectedStorage() {
+		return true;
+	}
+
 	public Drawable getWallpaper() {
 		return null;
 	}

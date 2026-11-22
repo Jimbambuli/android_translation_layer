@@ -681,6 +681,21 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			nativePickImages(mimeTypes, maxItems, requestCode);
 		} else if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())) {
 			nativeFileChooser(0 /*GTK_FILE_CHOOSER_ACTION_OPEN*/, intent.getType(), intent.getStringExtra(Intent.EXTRA_TITLE), requestCode);
+		} else if (android.app.role.RoleManager.ACTION_REQUEST_ROLE.equals(intent.getAction())
+		           || android.provider.Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT.equals(intent.getAction())) {
+			/* PermissionController's RequestRoleActivity (and SmsDefaultDialog of the old ACTION_CHANGE_DEFAULT): RESULT_OK
+			 * when the app holds the role, else RESULT_CANCELED. ATL gives the app the roles it qualifies for
+			 * (RoleManager), so there is no dialog */
+			String role = android.provider.Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT.equals(intent.getAction())
+			    ? android.app.role.RoleManager.ROLE_SMS : intent.getStringExtra(Intent.EXTRA_ROLE_NAME);
+			boolean held;
+			try {
+				held = role != null && new android.app.role.RoleManager(this).isRoleHeld(role);
+			} catch (IllegalArgumentException e) {
+				held = false;
+			}
+			Slog.i(TAG, "startActivityForResult: role " + role + (held ? " is held" : " is not available"));
+			deliverActivityResult(requestCode, held ? -1 /*RESULT_OK*/ : 0 /*RESULT_CANCELED*/, new Intent());
 		} else if ("android.intent.action.INSTALL_PACKAGE".equals(intent.getAction())) {
 			try {
 				Process p = new ProcessBuilder("/usr/bin/env", "android-translation-layer", "--install", intent.getData().getPath()).start();

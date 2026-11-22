@@ -1,10 +1,15 @@
 package android.telephony;
 
-/* AOSP android.telephony.TelephonyCallback with the listener interfaces whose arguments ATL has. ATL has no
- * modem, so like on a device without telephony no listener is ever called (TelephonyManager.registerTelephonyCallback()). */
+/* AOSP android.telephony.TelephonyCallback with the listener interfaces whose arguments ATL has.
+ * TelephonyManager.registerTelephonyCallback() calls ServiceStateListener, CallStateListener and
+ * DataConnectionStateListener with ModemManager's modem (ModemManagerPhone); without a modem none is ever called. */
 public class TelephonyCallback {
 
 	public TelephonyCallback() {}
+
+	public interface ServiceStateListener {
+		void onServiceStateChanged(ServiceState serviceState);
+	}
 
 	public interface MessageWaitingIndicatorListener {
 		void onMessageWaitingIndicatorChanged(boolean mwi);

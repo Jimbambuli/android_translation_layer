@@ -17,6 +17,10 @@ import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
+import com.android.providers.telephony.MmsProvider;
+import com.android.providers.telephony.MmsSmsProvider;
+import com.android.providers.telephony.SmsProvider;
+import com.android.providers.telephony.TelephonyProviderContext;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,6 +43,17 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 	@Export
 	static void createContentProviders() {
 		atl_providers.put("media", new ATLProvider(new ATLMediaContentProvider()));
+		/* the SMS/MMS providers of AOSP's com.android.providers.telephony, created with the other built-in ones (ATLProvider
+		 * does not create a given instance lazily); their onCreate() only creates the database helper, the database
+		 * file is opened on first use */
+		Context telephonyContext = new TelephonyProviderContext(ATLLoadedApp.getPrimaryApplication().getApplication());
+		ContentProvider[] telephony = {new SmsProvider(), new MmsProvider(), new MmsSmsProvider()};
+		String[] telephonyAuthorities = {"sms", "mms", "mms-sms"};
+		for (int i = 0; i < telephony.length; i++) {
+			telephony[i].attachInfo(telephonyContext, null);
+			telephony[i].onCreate();
+			atl_providers.put(telephonyAuthorities[i], new ATLProvider(telephony[i]));
+		}
 		ATLLoadedApp primary = ATLLoadedApp.getPrimaryApplication();
 		for (PackageParser.Provider provider_parsed : primary.pkg.providers) {
 			String process_name = provider_parsed.info.processName;
@@ -108,6 +123,11 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 	}
 
 	public boolean onCreate() { return false; }
+
+	/* ATL: AOSP ContentProvider.dump(), the telephony providers override it */
+	public void dump(java.io.FileDescriptor fd, java.io.PrintWriter writer, String[] args) {
+		writer.println("nothing to dump");
+	}
 
 	public Bundle call(String method, String arg, Bundle extras) {
 		return null;

@@ -875,6 +875,7 @@ public final class Manifest {
 		 targetSdkVersion}</a> is 4 or higher.
 		 */
 		public static final String READ_PHONE_STATE = "android.permission.READ_PHONE_STATE";
+		public static final String READ_PHONE_NUMBERS = "android.permission.READ_PHONE_NUMBERS";
 		/**
 		 Allows read access to privileged phone state.
 		 @hide Used internally.

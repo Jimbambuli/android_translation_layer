@@ -154,6 +154,10 @@ public class ContentResolver {
 	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork) {
 		notifyChange(uri, observer, syncToNetwork ? NOTIFY_SYNC_TO_NETWORK : 0);
 	}
+	/* ATL: AOSP @hide notifyChange(Uri, ContentObserver, boolean, int userHandle); there is one user */
+	public void notifyChange(Uri uri, ContentObserver observer, boolean syncToNetwork, int userHandle) {
+		notifyChange(uri, observer, syncToNetwork);
+	}
 	public void notifyChange(Uri uri, ContentObserver observer, int flags) {
 		Objects.requireNonNull(uri, "uri");
 		for (ContentObserver o : matchingObservers(uri, observer, flags))

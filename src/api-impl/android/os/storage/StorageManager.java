@@ -11,6 +11,11 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 
 public class StorageManager {
+	/* ATL: AOSP isFileEncrypted() (@hide) reads ro.crypto.type; ATL has no file-based encryption */
+	public static boolean isFileEncrypted() {
+		return false;
+	}
+
 
 	/* AOSP StorageManager.openProxyFileDescriptor(int, ProxyFileDescriptorCallback, Handler): checkNotNull(handler)
 	 * and the callback, then the AppFuse bridge of the StorageManagerService (mountProxyFileDescriptorBridge()).
