@@ -826,6 +826,16 @@ static void init_native_bridge(JNIEnv *env, const char *instruction_set)
 	g_free(data_dir);
 }
 
+/* The first time the window is on screen: tells whoever started ATL (ATL_READY_FILE, the APK Starter shows
+ * «Starting…» until then) by creating that file. Once only: the window can be hidden and shown again. */
+static void window_first_mapped(GtkWidget *widget, gpointer data)
+{
+	const char *ready_file = getenv("ATL_READY_FILE");
+	if (ready_file && *ready_file)
+		g_file_set_contents(ready_file, "", 0, NULL);
+	g_signal_handlers_disconnect_by_func(widget, G_CALLBACK(window_first_mapped), data);
+}
+
 static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
 {
 	if (window) { // this is not the first launch, but a DBus request to open an URI in the running app
@@ -1194,6 +1204,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 		gtk_window_set_title(GTK_WINDOW(window), app_label_jstr ? _CSTRING(app_label_jstr) : package_name);
 	gtk_window_set_default_size(GTK_WINDOW(window), d->window_width, d->window_height);
 	g_signal_connect(window, "close-request", G_CALLBACK(app_exit), env);
+	g_signal_connect(window, "map", G_CALLBACK(window_first_mapped), NULL);
 
 	/* An Android window has no title bar of its own. ATL draws one with a back button, so that back is at
 	 * hand; the desktop's GTK theme styles it like the title bars of the other windows. With
