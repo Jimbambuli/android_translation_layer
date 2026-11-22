@@ -739,10 +739,11 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	}
 
 	/* to be used by native code, on a thread of its own (as on Android): asked by the web process before each
-	 * subresource request, see intercept_connection_cb(). Returns the app's response for the native side (status
-	 * code, reason phrase, content type and header lines, an empty line, the data), or null to load from the network */
+	 * subresource request, see intercept_connection_cb(), and before the app's own loads of a main frame document,
+	 * see load_request(). Returns the app's response for the native side (status code, reason phrase, content type
+	 * and header lines, an empty line, the data), or null to load from the network */
 	@Export
-	byte[] internalShouldInterceptRequest(String url, String method, String headers) throws java.io.IOException {
+	byte[] internalShouldInterceptRequest(String url, String method, String headers, boolean forMainFrame) throws java.io.IOException {
 		WebViewClient client = webViewClient;
 		if (client == null)
 			return null;
@@ -755,7 +756,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		final android.net.Uri uri = android.net.Uri.parse(url);
 		WebResourceResponse response = client.shouldInterceptRequest(this, new WebResourceRequest() {
 			public android.net.Uri getUrl() { return uri; }
-			public boolean isForMainFrame() { return false; } /* the main frame's document is not asked */
+			public boolean isForMainFrame() { return forMainFrame; }
 			public boolean isRedirect() { return false; }
 			public boolean hasGesture() { return false; }
 			public String getMethod() { return method; }

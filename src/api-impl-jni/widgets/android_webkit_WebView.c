@@ -189,7 +189,7 @@ static gboolean intercept_connection_cb(GThreadedSocketService *service, GSocket
 			jweak weak = g_hash_table_lookup(intercept_pages, GUINT_TO_POINTER(g_ascii_strtoull(field[0], NULL, 10)));
 			jobject this = weak ? (*env)->NewLocalRef(env, weak) : NULL;
 			g_mutex_unlock(&intercept_lock);
-			jbyteArray response = this ? J__WebView__internalShouldInterceptRequest(env, this, _JSTRING(field[2]), _JSTRING(field[1]), _JSTRING(field[3])) : NULL;
+			jbyteArray response = this ? J__WebView__internalShouldInterceptRequest(env, this, _JSTRING(field[2]), _JSTRING(field[1]), _JSTRING(field[3]), JNI_FALSE) : NULL;
 			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
 				(*env)->ExceptionClear(env);
@@ -218,7 +218,23 @@ static gboolean intercept_connection_cb(GThreadedSocketService *service, GSocket
 }
 
 /* the response, as WebView.internalShouldInterceptRequest() wrote it: status code, reason phrase, content type
- * and "Name: value" header lines, an empty line, the data */
+ * and "Name: value" header lines, an empty line, the data. Gives the lines of the head and the data. */
+static char **intercept_parse(GBytes *bytes, GBytes **body)
+{
+	gsize size;
+	const char *data = g_bytes_get_data(bytes, &size);
+	// the end of the head: the empty line after the three fixed lines (whose third, the type, may be empty)
+	const char *end = data;
+	for (int i = 0; i < 3 && end; i++)
+		end = memchr(end, '\n', size - (end - data)), end = end ? end + 1 : NULL;
+	end = end ? g_strstr_len(end - 1, size - (end - 1 - data), "\n\n") : NULL;
+	gsize head_length = end ? end - data : 0;
+	g_autofree char *head = g_strndup(data, head_length);
+	*body = g_bytes_new_from_bytes(bytes, end ? head_length + 2 : size, end ? size - head_length - 2 : 0);
+	return g_strsplit(head, "\n", -1);
+}
+
+/* WebKit's scheme handler for a response kept by intercept_connection_cb() */
 static void intercept_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
 {
 	const char *number = strrchr(webkit_uri_scheme_request_get_uri(request), '/');
@@ -232,17 +248,8 @@ static void intercept_request_cb(WebKitURISchemeRequest *request, gpointer user_
 		webkit_uri_scheme_request_finish_error(request, error);
 		return;
 	}
-	gsize size;
-	const char *data = g_bytes_get_data(bytes, &size);
-	// the end of the head: the empty line after the three fixed lines (whose third, the type, may be empty)
-	const char *end = data;
-	for (int i = 0; i < 3 && end; i++)
-		end = memchr(end, '\n', size - (end - data)), end = end ? end + 1 : NULL;
-	end = end ? g_strstr_len(end - 1, size - (end - 1 - data), "\n\n") : NULL;
-	gsize head_length = end ? end - data : 0;
-	g_autofree char *head = g_strndup(data, head_length);
-	char **line = g_strsplit(head, "\n", -1);
-	g_autoptr(GBytes) body = g_bytes_new_from_bytes(bytes, end ? head_length + 2 : size, end ? size - head_length - 2 : 0);
+	g_autoptr(GBytes) body = NULL;
+	char **line = intercept_parse(bytes, &body);
 	g_bytes_unref(bytes);
 	g_autoptr(GInputStream) stream = g_memory_input_stream_new_from_bytes(body);
 	g_autoptr(WebKitURISchemeResponse) response = webkit_uri_scheme_response_new(stream, g_bytes_get_size(body));
@@ -365,6 +372,114 @@ static gboolean app_load_take(WebKitWebView *web_view)
 	gboolean app_load = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(web_view), "atl-app-load"));
 	g_object_set_data(G_OBJECT(web_view), "atl-app-load", NULL);
 	return app_load;
+}
+
+/* The app's load of a main frame document: as Chromium does for any request, the app's WebViewClient is asked first
+ * (shouldInterceptRequest() with isForMainFrame(), on a thread of its own) and its response is shown with the URL
+ * as the document's own, so the page keeps the app's origin (e.g. https://localhost of Capacitor and
+ * WebViewAssetLoader apps); without a response the URL is loaded as usual. WebKit takes the main document only as
+ * data with a type and charset: the status and headers of the app's response are not the page's. */
+struct main_frame_load {
+	WebKitWebView *web_view;
+	WebKitURIRequest *request;
+	jobject this; // global reference
+	char *method;
+	char *headers;
+	GBytes *response;
+	guint serial;
+};
+
+static void main_frame_load_free(struct main_frame_load *load)
+{
+	JNIEnv *env = get_jni_env();
+	(*env)->DeleteGlobalRef(env, load->this);
+	g_object_unref(load->web_view);
+	g_object_unref(load->request);
+	g_free(load->method);
+	g_free(load->headers);
+	if (load->response)
+		g_bytes_unref(load->response);
+	g_free(load);
+}
+
+static void main_frame_ask(GTask *task, gpointer source, gpointer task_data, GCancellable *cancellable)
+{
+	struct main_frame_load *load = task_data;
+	JNIEnv *env;
+	(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
+	(*env)->PushLocalFrame(env, 16);
+	jbyteArray response = J__WebView__internalShouldInterceptRequest(env, load->this, _JSTRING(webkit_uri_request_get_uri(load->request)), _JSTRING(load->method), _JSTRING(load->headers), JNI_TRUE);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		response = NULL;
+	}
+	if (response) {
+		jsize length = (*env)->GetArrayLength(env, response);
+		jbyte *bytes = (*env)->GetByteArrayElements(env, response, NULL);
+		load->response = g_bytes_new(bytes, length);
+		(*env)->ReleaseByteArrayElements(env, response, bytes, JNI_ABORT);
+	}
+	(*env)->PopLocalFrame(env, NULL);
+	(*jvm)->DetachCurrentThread(jvm);
+	g_task_return_boolean(task, TRUE);
+}
+
+static void main_frame_answered(GObject *source, GAsyncResult *result, gpointer user_data)
+{
+	struct main_frame_load *load = g_task_get_task_data(G_TASK(result));
+	// a later load of the app replaced this one
+	if (GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(load->web_view), "atl-main-frame-load")) != load->serial)
+		return;
+	app_load_begin(load->web_view);
+	if (!load->response) {
+		webkit_web_view_load_request(load->web_view, load->request);
+		return;
+	}
+	g_autoptr(GBytes) body = NULL;
+	char **line = intercept_parse(load->response, &body);
+	// the type line is "<mime type>[; charset=<encoding>]", see internalShouldInterceptRequest()
+	g_autofree char *mime_type = NULL;
+	g_autofree char *charset = NULL;
+	if (g_strv_length(line) >= 3 && line[2][0]) {
+		char *parameters = strchr(line[2], ';');
+		mime_type = g_strstrip(g_strndup(line[2], parameters ? parameters - line[2] : strlen(line[2])));
+		char *charset_start = parameters ? strstr(parameters, "charset=") : NULL;
+		if (charset_start)
+			charset = g_strstrip(g_strdup(charset_start + strlen("charset=")));
+	}
+	g_strfreev(line);
+	webkit_web_view_load_bytes(load->web_view, body, mime_type ? mime_type : "text/html", charset, webkit_uri_request_get_uri(load->request));
+}
+
+static void append_request_header(const char *name, const char *value, gpointer headers)
+{
+	g_string_append_printf(headers, "%s: %s\x1f", name, value);
+}
+
+static void load_request(JNIEnv *env, jobject this, WebKitWebView *web_view, WebKitURIRequest *request)
+{
+	const char *uri = webkit_uri_request_get_uri(request);
+	if (!intercept_pages || !(g_str_has_prefix(uri, "http:") || g_str_has_prefix(uri, "https:"))) {
+		app_load_begin(web_view);
+		webkit_web_view_load_request(web_view, request);
+		return;
+	}
+	struct main_frame_load *load = g_new0(struct main_frame_load, 1);
+	load->web_view = g_object_ref(web_view);
+	load->request = g_object_ref(request);
+	load->this = (*env)->NewGlobalRef(env, this);
+	load->method = g_strdup(webkit_uri_request_get_http_method(request) ?: "GET");
+	GString *headers = g_string_new(NULL);
+	if (webkit_uri_request_get_http_headers(request))
+		soup_message_headers_foreach(webkit_uri_request_get_http_headers(request), append_request_header, headers);
+	load->headers = g_string_free(headers, FALSE);
+	load->serial = GPOINTER_TO_UINT(g_object_get_data(G_OBJECT(web_view), "atl-main-frame-load")) + 1;
+	g_object_set_data(G_OBJECT(web_view), "atl-main-frame-load", GUINT_TO_POINTER(load->serial));
+	GTask *task = g_task_new(NULL, NULL, main_frame_answered, NULL);
+	g_task_set_task_data(task, load, (GDestroyNotify)main_frame_load_free);
+	g_task_run_in_thread(task, main_frame_ask);
+	g_object_unref(task);
 }
 
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
@@ -862,8 +977,11 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl(JNIEnv *env, 
 		return;
 
 	WebKitWebView *webview = _PTR(widget_ptr);
-	app_load_begin(webview);
-	webkit_web_view_load_uri(webview, _CSTRING(url));
+	const char *uri = _CSTRING(url);
+	WebKitURIRequest *request = webkit_uri_request_new(uri);
+	(*env)->ReleaseStringUTFChars(env, url, uri);
+	load_request(env, this, webview, request);
+	g_object_unref(request);
 }
 
 /* WebView.postUrl(): the form page (from Java) is loaded with the URL as its own; a script in a world of its own
@@ -928,8 +1046,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrlWithHeaders(JN
 		if (jvalue)
 			(*env)->DeleteLocalRef(env, jvalue);
 	}
-	app_load_begin(WEBKIT_WEB_VIEW(webview));
-	webkit_web_view_load_request(WEBKIT_WEB_VIEW(webview), request);
+	load_request(env, this, WEBKIT_WEB_VIEW(webview), request);
 	g_object_unref(request);
 }
 
