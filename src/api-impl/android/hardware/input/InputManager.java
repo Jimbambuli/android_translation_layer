@@ -8,6 +8,9 @@ import android.view.InputDevice;
 public final class InputManager {
 	private final InputManagerGlobal mGlobal = InputManagerGlobal.getInstance();
 
+	public static final String ACTION_QUERY_KEYBOARD_LAYOUTS = "android.hardware.input.action.QUERY_KEYBOARD_LAYOUTS";
+	public static final String META_DATA_KEYBOARD_LAYOUTS = "android.hardware.input.metadata.KEYBOARD_LAYOUTS";
+
 	public static interface InputDeviceListener {
 		abstract void onInputDeviceAdded(int deviceId);
 		abstract void onInputDeviceChanged(int deviceId);
@@ -30,5 +33,10 @@ public final class InputManager {
 
 	public InputDevice getInputDevice(int id) {
 		return mGlobal.getInputDevice(id);
+	}
+
+	public InputDevice.ViewBehavior getInputDeviceViewBehavior(int deviceId) {
+		InputDevice device = getInputDevice(deviceId);
+		return device == null ? null : device.getViewBehavior();
 	}
 }

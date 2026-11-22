@@ -525,6 +525,11 @@ public final class InputDevice implements Parcelable {
         }
     }
 
+    /* AOSP getBatteryState(): the battery of the device (InputManagerGlobal) */
+    public android.hardware.BatteryState getBatteryState() {
+        return InputManagerGlobal.getInstance().getInputDeviceBatteryState(mId, mHasBattery);
+    }
+
     /* AOSP getLightsManager(): the lights of the device (InputManagerGlobal) */
     public LightsManager getLightsManager() {
         synchronized (mMotionRanges) {

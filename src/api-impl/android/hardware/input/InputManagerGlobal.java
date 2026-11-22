@@ -1,5 +1,6 @@
 package android.hardware.input;
 
+import android.hardware.BatteryState;
 import android.hardware.input.InputManager.InputDeviceListener;
 import android.hardware.lights.Light;
 import android.hardware.lights.LightState;
@@ -149,6 +150,43 @@ public final class InputManagerGlobal {
 	/* InputManagerService.setLightStates() of the session's request */
 	void requestLights(int deviceId, LightsRequest request) {
 		Objects.requireNonNull(request, "request must not be null");
+	}
+
+	/* the battery of an input device: AOSP reads it from the power supply in the sysfs of the associated device;
+	 * ATL does not (the game controllers have hasBattery() false), so the state is that of a device without one */
+	public BatteryState getInputDeviceBatteryState(int deviceId, boolean hasBattery) {
+		return new LocalBatteryState();
+	}
+
+	private static final class LocalBatteryState extends BatteryState {
+		private final boolean mIsPresent;
+		private final int mStatus;
+		private final float mCapacity;
+
+		LocalBatteryState() {
+			this(false /*isPresent*/, BatteryState.STATUS_UNKNOWN, Float.NaN /*capacity*/);
+		}
+
+		LocalBatteryState(boolean isPresent, int status, float capacity) {
+			mIsPresent = isPresent;
+			mStatus = status;
+			mCapacity = capacity;
+		}
+
+		@Override
+		public boolean isPresent() {
+			return mIsPresent;
+		}
+
+		@Override
+		public int getStatus() {
+			return mStatus;
+		}
+
+		@Override
+		public float getCapacity() {
+			return mCapacity;
+		}
 	}
 
 	public Vibrator getInputDeviceVibrator(int deviceId, int vibratorId) {

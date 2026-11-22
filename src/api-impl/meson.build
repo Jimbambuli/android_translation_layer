@@ -66,6 +66,7 @@ srcs = [
 	'android/gesture/OrientedBoundingBox.java',
 	'android/gesture/Prediction.java',
 	'android/Manifest.java',
+	'android/hardware/BatteryState.java',
 	'android/hardware/camera2/params/DeviceStateSensorOrientationMap.java',
 	'android/hardware/camera2/params/StreamConfigurationMap.java',
 	'android/media/AudioPlaybackCaptureConfiguration.java',
