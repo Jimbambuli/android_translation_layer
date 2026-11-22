@@ -14,7 +14,9 @@ typedef int (*Looper_callbackFunc)(int fd, int events, void *data);
 
 extern ALooper *main_thread_looper;
 
+ALooper *ALooper_forThread(void);
 ALooper *ALooper_prepare(int opts);
+void ALooper_acquire(ALooper *looper);
 void ALooper_wake(ALooper *looper);
 bool ALooper_isPolling(ALooper *looper);
 int ALooper_pollOnce(int timeoutMillis, int *outFd, int *outEvents, void **outData);
