@@ -669,8 +669,10 @@ public class AudioTrack implements AudioRouting {
 	private native int native_write(short[] audioData, int offsetInShorts, int framesToWrite, float volume, boolean blocking);
 	public native void native_release();
 
-	public static int getNativeOutputSampleRate(int i) {
-		return -1;
+	/* AOSP: the sampling rate of the output the stream type plays on (AudioSystem::getOutputSamplingRate()), the
+	 * rate AudioManager reports as PROPERTY_OUTPUT_SAMPLE_RATE */
+	public static int getNativeOutputSampleRate(int streamType) {
+		return Integer.parseInt(AudioManager.OUTPUT_SAMPLE_RATE);
 	}
 
 	// nested classes

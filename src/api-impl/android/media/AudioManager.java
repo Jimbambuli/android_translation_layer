@@ -87,6 +87,8 @@ public class AudioManager {
 
 	public static final String PROPERTY_OUTPUT_FRAMES_PER_BUFFER = "android.media.property.OUTPUT_FRAMES_PER_BUFFER";
 	public static final String PROPERTY_OUTPUT_SAMPLE_RATE = "android.media.property.OUTPUT_SAMPLE_RATE";
+	/* the rate of ATL's output (FIXME arbitrary: PulseAudio resamples any rate); AudioTrack.getNativeOutputSampleRate() too */
+	static final String OUTPUT_SAMPLE_RATE = "44100";
 
 	public static final int STREAM_MUSIC = 0x3;
 
@@ -115,7 +117,7 @@ public class AudioManager {
 			case PROPERTY_OUTPUT_FRAMES_PER_BUFFER:
 				return "256"; // FIXME arbitrary
 			case PROPERTY_OUTPUT_SAMPLE_RATE:
-				return "44100"; // FIXME arbitrary
+				return OUTPUT_SAMPLE_RATE;
 			default:
 				System.out.println("AudioManager.getProperty: >" + name + "< not handled");
 				return "";
