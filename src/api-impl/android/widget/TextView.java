@@ -33,6 +33,7 @@ import android.text.TextWatcher;
 import android.text.method.KeyListener;
 import android.text.method.LinkMovementMethod;
 import android.text.method.MovementMethod;
+import android.text.method.PasswordTransformationMethod;
 import android.text.method.SingleLineTransformationMethod;
 import android.text.method.TransformationMethod;
 import android.text.style.AlignmentSpan;
@@ -67,6 +68,7 @@ import android.view.View;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.autofill.AutofillValue;
+import android.view.inputmethod.EditorInfo;
 import android.view.textclassifier.TextClassificationManager;
 import android.view.textclassifier.TextClassifier;
 import android.text.Selection;
@@ -153,6 +155,21 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 
 			int ellipsize = a.getInt(com.android.internal.R.styleable.TextView_ellipsize, ELLIPSIZE_NOT_SET);
 			boolean singleLine = a.getBoolean(com.android.internal.R.styleable.TextView_singleLine, false);
+			/* AOSP: an input type makes the Editor (here mInputType) and overrides the deprecated singleLine; without
+			 * one an editable view (EditText) gets TYPE_CLASS_TEXT. The IME options go with the Editor's
+			 * InputContentType (getImeOptions(), the action of Enter). ATL leaves out the key listeners of
+			 * inputMethod, digits, phoneNumber, numeric, autoText and capitalize. */
+			int inputType = a.getInt(com.android.internal.R.styleable.TextView_inputType, EditorInfo.TYPE_NULL);
+			if (inputType != EditorInfo.TYPE_NULL) {
+				setRawInputType(inputType);
+				singleLine = !isMultilineInputType(inputType);
+			} else if (a.getBoolean(com.android.internal.R.styleable.TextView_editable, getDefaultEditable())) {
+				setRawInputType(EditorInfo.TYPE_CLASS_TEXT);
+			}
+			setImeOptions(a.getInt(com.android.internal.R.styleable.TextView_imeOptions, mImeOptions));
+			if (a.hasValue(com.android.internal.R.styleable.TextView_imeActionLabel) || a.hasValue(com.android.internal.R.styleable.TextView_imeActionId))
+				setImeActionLabel(a.getText(com.android.internal.R.styleable.TextView_imeActionLabel),
+				                  a.getInt(com.android.internal.R.styleable.TextView_imeActionId, mImeActionId));
 			/* in the order of the AOSP attribute loop (styleable index): maxHeight, minHeight, maxLines, lines,
 			 * height, minLines */
 			if (a.hasValue(com.android.internal.R.styleable.TextView_maxHeight))
@@ -225,6 +242,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			                // Does not apply automated max length filter since length filter will be resolved
 			                // later in this function.
 			                false);
+			if (a.getBoolean(com.android.internal.R.styleable.TextView_password, false) || isPasswordInputType(inputType))
+				setTransformationMethod(PasswordTransformationMethod.getInstance());
 
 			if (singleLine && getKeyListener() == null && ellipsize == ELLIPSIZE_NOT_SET) {
 				ellipsize = ELLIPSIZE_END;
@@ -834,8 +853,36 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	 * of TextView.setInputType(type, direct) are not reproduced. */
 	private int mInputType;
 
+	/* AOSP TextView.setInputType(): a password type shows the text through the password transformation, and the
+	 * type decides whether the view has a single line (without AOSP's monospace typeface for passwords) */
 	public void setInputType(int type) {
+		final boolean wasPassword = isPasswordInputType(getInputType());
+		final boolean wasVisiblePassword = isVisiblePasswordInputType(getInputType());
 		setRawInputType(type);
+		final boolean isPassword = isPasswordInputType(type);
+		boolean forceUpdate = false;
+		if (isPassword) {
+			setTransformationMethod(PasswordTransformationMethod.getInstance());
+		} else if (isVisiblePasswordInputType(type) || wasPassword || wasVisiblePassword) {
+			if (mTransformation == PasswordTransformationMethod.getInstance())
+				forceUpdate = true;
+		}
+		boolean singleLine = !isMultilineInputType(type);
+		if (mSingleLine != singleLine || forceUpdate)
+			applySingleLine(singleLine, !isPassword, true, true);
+	}
+
+	/* AOSP TextView.isPasswordInputType(), isVisiblePasswordInputType() */
+	static boolean isPasswordInputType(int inputType) {
+		final int variation = inputType & (EditorInfo.TYPE_MASK_CLASS | EditorInfo.TYPE_MASK_VARIATION);
+		return variation == (EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_PASSWORD)
+		    || variation == (EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_WEB_PASSWORD)
+		    || variation == (EditorInfo.TYPE_CLASS_NUMBER | EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD);
+	}
+
+	private static boolean isVisiblePasswordInputType(int inputType) {
+		final int variation = inputType & (EditorInfo.TYPE_MASK_CLASS | EditorInfo.TYPE_MASK_VARIATION);
+		return variation == (EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
 	}
 	private static final Spanned EMPTY_SPANNED = new SpannedString("");
 	private static final InputFilter[] NO_FILTERS = new InputFilter[0];
@@ -3128,6 +3175,16 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	private int mImeOptions = 0; // EditorInfo.IME_NULL
+
+	/* AOSP TextView.isMultilineInputType() */
+	private static boolean isMultilineInputType(int type) {
+		return (type & (EditorInfo.TYPE_MASK_CLASS | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE)) == (EditorInfo.TYPE_CLASS_TEXT | EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE);
+	}
+
+	/* AOSP: whether the view is editable without the editable attribute (EditText: yes) */
+	protected boolean getDefaultEditable() {
+		return false;
+	}
 
 	public void setImeOptions(int imeOptions) {
 		mImeOptions = imeOptions;

@@ -162,6 +162,13 @@ JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setOnEditorActionLis
 		g_signal_connect(gtk_text, "activate", G_CALLBACK(on_activate), NULL);
 }
 
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setPassword(JNIEnv *env, jobject this, jlong widget_ptr, jboolean password)
+{
+	GtkText *gtk_text = GTK_TEXT(_PTR(widget_ptr));
+	gtk_text_set_visibility(gtk_text, !password);
+	gtk_text_set_input_purpose(gtk_text, password ? GTK_INPUT_PURPOSE_PASSWORD : GTK_INPUT_PURPOSE_FREE_FORM);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setText(JNIEnv *env, jobject this, jlong widget_ptr, jstring text_jstr)
 {
 	const char *gtk_text = (*env)->GetStringUTFChars(env, text_jstr, NULL);

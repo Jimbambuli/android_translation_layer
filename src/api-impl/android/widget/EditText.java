@@ -10,6 +10,8 @@ import android.text.InputFilter;
 import android.text.SpannableStringBuilder;
 import android.text.SpannedString;
 import android.text.TextWatcher;
+import android.text.method.PasswordTransformationMethod;
+import android.text.method.TransformationMethod;
 import android.util.AttributeSet;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -55,6 +57,11 @@ public class EditText extends TextView {
 	 * app sets another type; ATL cannot tell an explicit TYPE_NULL from "not set" (0), so only that case differs */
 	@Override
 	public boolean onCheckIsTextEditor() {
+		return true;
+	}
+
+	@Override
+	protected boolean getDefaultEditable() {
 		return true;
 	}
 
@@ -196,6 +203,15 @@ public class EditText extends TextView {
 		if (editor_action_listener != null)
 			editor_action_listener.onEditorAction(this, 0, event);
 	}
+
+	/* the GtkText shows the text itself, without the transformation: the password transformation is its invisible
+	 * mode (and the password purpose for the input method) */
+	@Override
+	void setTransformationMethodInternal(TransformationMethod method) {
+		super.setTransformationMethodInternal(method);
+		native_setPassword(widget, method instanceof PasswordTransformationMethod);
+	}
+	private native void native_setPassword(long widget, boolean password);
 
 	/* the GtkText has no room for compound drawables: they are kept (getCompoundDrawablesRelative() is how
 	 * TextInputLayout finds its icons) but not drawn */
