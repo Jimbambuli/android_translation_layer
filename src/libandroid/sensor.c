@@ -1,4 +1,5 @@
 #include <aio.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,6 +16,10 @@ struct AHardwareBuffer;
 struct ASensorEvent;
 
 typedef void *ALooper_callbackFunc;
+typedef struct ASensor const *ASensorRef;
+typedef ASensorRef const *ASensorList_t; /* NDK ASensorList */
+
+#define ASENSOR_INVALID (-1)
 
 struct ASensorManager a_sensor_manager;
 
@@ -38,6 +43,22 @@ struct ASensor const *ASensorManager_getDefaultSensor(struct ASensorManager *man
 int ASensorManager_getSensorList(struct ASensorManager *manager, struct ASensorList *list)
 {
 	return 0; // the number of sensors - any sane app should see this and stop messing with sensors
+}
+
+/* NDK: the dynamic sensors (none: nullptr in list, count 0); BAD_VALUE (-EINVAL) for a NULL manager */
+ssize_t ASensorManager_getDynamicSensorList(struct ASensorManager *manager, ASensorList_t *list)
+{
+	if (!manager)
+		return -EINVAL;
+	if (list)
+		*list = NULL;
+	return 0;
+}
+
+/* NDK: the first sensor of the type with the wakeUp property; there are no sensors (see getSensorList) */
+struct ASensor const *ASensorManager_getDefaultSensorEx(struct ASensorManager *manager, int type, bool wakeUp)
+{
+	return NULL;
 }
 
 int ASensorManager_destroyEventQueue(struct ASensorManager *manager, struct ASensorEventQueue *queue)
@@ -97,6 +118,15 @@ int ASensorEventQueue_hasEvents(struct ASensorEventQueue *queue)
 	return 0;
 }
 
+/* NDK: BAD_VALUE (-EINVAL) for a NULL queue, else OK; ASensorManager_createEventQueue() never returns a
+ * queue, and without sensors there are no additional info events */
+int ASensorEventQueue_requestAdditionalInfoEvents(struct ASensorEventQueue *queue, bool enable)
+{
+	if (!queue)
+		return -EINVAL;
+	return 0;
+}
+
 ssize_t ASensorEventQueue_getEvents(struct ASensorEventQueue *queue, struct ASensorEvent *events, size_t count)
 {
 	return 0;
@@ -153,4 +183,9 @@ bool ASensor_isDirectChannelTypeSupported(struct ASensor const *sensor, int chan
 int ASensor_getHighestDirectReportRateLevel(struct ASensor const *sensor)
 {
 	return 1;
+}
+/* NDK: the handle of the sensor, ASENSOR_INVALID for NULL; there are no sensors, so no ASensor is valid */
+int ASensor_getHandle(struct ASensor const *sensor)
+{
+	return ASENSOR_INVALID;
 }
