@@ -1561,6 +1561,7 @@ srcs = [
 	'android/telephony/NetworkRegistrationInfo.java',
 	'android/telephony/PhoneNumberFormattingTextWatcher.java',
 	'android/telephony/TelephonyManager.java',
+	'android/text/AndroidCharacter.java',
 	'android/text/Annotation.java',
 	'android/text/AutoText.java',
 	'android/text/CharSequenceCharacterIterator.java',
