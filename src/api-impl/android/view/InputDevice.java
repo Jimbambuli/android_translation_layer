@@ -5,8 +5,11 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.hardware.input.HostUsiVersion;
 import android.hardware.input.InputDeviceIdentifier;
+import android.hardware.input.InputManagerGlobal;
+import android.hardware.lights.LightsManager;
 import android.os.NullVibrator;
 import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.os.Parcel;
 import android.os.Parcelable;
 import java.lang.annotation.Retention;
@@ -43,6 +46,8 @@ public final class InputDevice implements Parcelable {
     private final ArrayList<MotionRange> mMotionRanges = new ArrayList<MotionRange>();
     private final ViewBehavior mViewBehavior = new ViewBehavior(this);
     private Vibrator mVibrator; // guarded by mMotionRanges during initialization
+    private VibratorManager mVibratorManager; // guarded by mMotionRanges during initialization
+    private LightsManager mLightsManager; // guarded by mMotionRanges during initialization
     public static final int SOURCE_CLASS_MASK = 0x000000ff;
     public static final int SOURCE_CLASS_NONE = 0x00000000;
     public static final int SOURCE_CLASS_BUTTON = 0x00000001;
@@ -365,8 +370,9 @@ public final class InputDevice implements Parcelable {
             return device;
         }
     }
-    /* ATL has one input device (the GDK seat: touchscreen, mouse and keyboard in one); its events carry
-     * other device ids than the id of the device (MotionEvent.getDeviceId()), so every id gets it */
+    /* ATL's own input device (the GDK seat: touchscreen, mouse and keyboard in one); its events carry
+     * other device ids than the id of the device (MotionEvent.getDeviceId()), so every id that is not one of
+     * the game controllers that ATL reads itself (InputManagerGlobal) gets it */
     private static final InputDevice sDevice = createDevice();
 
     private static InputDevice createDevice() {
@@ -387,11 +393,16 @@ public final class InputDevice implements Parcelable {
 
     @Nullable
     public static InputDevice getDevice(int id) {
-        return sDevice;
+        return InputManagerGlobal.getInstance().getInputDevice(id);
     }
 
     public static int[] getDeviceIds() {
-        return new int[] {sDevice.getId()};
+        return InputManagerGlobal.getInstance().getInputDeviceIds();
+    }
+
+    /** @hide ATL's own input device, for every id that no game controller has */
+    public static InputDevice getAtlDevice(int id) {
+        return sDevice;
     }
 
     public int getId() {
@@ -456,10 +467,7 @@ public final class InputDevice implements Parcelable {
         return mKeyboardLayoutType;
     }
     public boolean[] hasKeys(int... keys) {
-        /* ATL pretends the device has every key */
-        boolean[] ret = new boolean[keys.length];
-        java.util.Arrays.fill(ret, true);
-        return ret;
+        return InputManagerGlobal.getInstance().deviceHasKeys(mId, keys);
     }
     public int getKeyCodeForKeyLocation(int locationKeyCode) {
         /* the key layout of ATL's keyboard is the one of the location (US QWERTY) */
@@ -507,11 +515,33 @@ public final class InputDevice implements Parcelable {
     public Vibrator getVibrator() {
         synchronized (mMotionRanges) {
             if (mVibrator == null) {
-                /* ATL's input device has no vibrator, so AOSP's NullVibrator */
-                mVibrator = new NullVibrator();
+                if (mHasVibrator) {
+                    mVibrator = InputManagerGlobal.getInstance().getInputDeviceVibrator(mId, VIBRATOR_ID_ALL);
+                } else {
+                    mVibrator = new NullVibrator();
+                }
             }
             return mVibrator;
         }
+    }
+
+    /* AOSP getLightsManager(): the lights of the device (InputManagerGlobal) */
+    public LightsManager getLightsManager() {
+        synchronized (mMotionRanges) {
+            if (mLightsManager == null) {
+                mLightsManager = InputManagerGlobal.getInstance().getInputDeviceLightsManager(mId);
+            }
+        }
+        return mLightsManager;
+    }
+
+    public VibratorManager getVibratorManager() {
+        synchronized (mMotionRanges) {
+            if (mVibratorManager == null) {
+                mVibratorManager = InputManagerGlobal.getInstance().getInputDeviceVibratorManager(mId);
+            }
+        }
+        return mVibratorManager;
     }
 
     public boolean isEnabled() {

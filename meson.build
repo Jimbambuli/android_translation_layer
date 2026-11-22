@@ -105,6 +105,12 @@ install_data([
              ],
              install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/etc')
 
+# the key layouts, key character maps and input device configurations of AOSP (Apache-2.0,
+# frameworks/base/data/keyboards android-16.0.0_r4), for the game controllers (com.android.server.input.EventHub)
+install_subdir('res/keyboards/keylayout', install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/usr')
+install_subdir('res/keyboards/keychars', install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/usr')
+install_subdir('res/keyboards/idc', install_dir: join_paths(get_option('prefix'), get_option('datadir')) + '/atl/system/usr')
+
 # Roboto (Apache-2.0, AOSP external/roboto-fonts android-14), see add_android_fonts() in main.c
 install_data([
              	'res/fonts/Roboto-Regular.ttf',
@@ -257,6 +263,8 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/views/android_view_VelocityTracker.c',
                                                                   	'src/api-impl-jni/input/VelocityControl.c',
                                                                   	'src/api-impl-jni/input/VelocityTracker.c',
+                                                                  	'src/api-impl-jni/input/com_android_server_input_EventHub.c',
+                                                                  	'src/api-impl-jni/input/com_android_server_input_InputDispatcher.c',
                                                                   	'src/api-impl-jni/views/android_view_View.c',
                                                                   	'src/api-impl-jni/views/android_view_ViewGroup.c',
                                                                   	'src/api-impl-jni/views/android_view_ViewTreeObserver.c',
@@ -304,6 +312,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   c_args: [
                                                                   	'-D_LARGEFILE64_SOURCE',
                                                                   	'-DATL_WEBEXT_DIR="' + get_option('prefix') / webext_dir + '"',
+                                                                  	'-DINSTALL_DATADIR="' + join_paths(get_option('prefix'), get_option('datadir')) + '"',
                                                                   ])
 
 # the web process extension of WebView (shouldInterceptRequest), loaded by WebKit's web process

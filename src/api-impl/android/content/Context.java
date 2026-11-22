@@ -262,6 +262,8 @@ public abstract class Context {
 
 	@Export
 	static Application createApplication(long native_window) throws Exception {
+		/* the input devices that ATL reads itself (game controllers), there before the app starts like on Android */
+		com.android.server.input.EventHub.start();
 		Application application = ATLLoadedApp.getPrimaryApplication().getApplication();
 		application.native_window = native_window;
 		this_application = application;

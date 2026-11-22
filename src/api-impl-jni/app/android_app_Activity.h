@@ -16,6 +16,12 @@ GtkWidget *activity_pages_stack(void);
 void current_activity_back_pressed(void);
 /* the keys that reach the app's window go to the shown activity (Window.dispatchKeyEventFromNative()) */
 void activity_window_add_key_controller(GtkWindow *window);
+/* keys and joystick motion of the input devices ATL reads itself, to the focused window: 1 handled, 0 not,
+ * -1 no window of the app has the focus */
+int activity_dispatch_device_key(JNIEnv *env, jobject event);
+int activity_dispatch_device_motion(JNIEnv *env, jobject event);
+/* the Java Dialog of a dialog's GtkWindow (a local reference), NULL if it is none */
+jobject dialog_get_jobj(GtkWindow *dialog);
 /* for the navigation bar: the activities from the shown one (index 0) down to the first one */
 int activity_count(void);
 char *activity_title(int index);
