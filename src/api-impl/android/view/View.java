@@ -2243,9 +2243,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private native void nativeSetFullscreen(long widget, boolean fullscreen);
 
 	public void setSystemUiVisibility(int visibility) {
-		/* LAYOUT_FULLSCREEN mode would make the app window continue behind semi-transparent status bar.
-		   Such a mode doesn't exist on desktop Linux, so we just use normal fullscreen for both modes. */
-		nativeSetFullscreen(widget, (visibility & (View.SYSTEM_UI_FLAG_FULLSCREEN | SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN)) != 0);
+		/* like ViewRootImpl.controlInsetsForCompatibility(): only SYSTEM_UI_FLAG_FULLSCREEN hides the status bar
+		   and the caption bar; LAYOUT_FULLSCREEN only lays the content out behind the status bar
+		   (adjustLayoutParamsForCompatibility()), which ATL's window does not have (e.g. CoordinatorLayout
+		   sets it for fitsSystemWindows) */
+		nativeSetFullscreen(widget, (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
 		system_ui_visibility = visibility;
 		final View root = getRootView();
 		final int clearable = visibility & SYSTEM_UI_CLEARABLE_FLAGS;
