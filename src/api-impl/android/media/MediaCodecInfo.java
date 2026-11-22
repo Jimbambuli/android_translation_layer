@@ -175,6 +175,7 @@ public class MediaCodecInfo {
 			this.level = level;
 		}
 
+		/* AOSP 16 CodecProfileLevel constants of the video codecs */
 		// AVC profiles
 		public static final int AVCProfileBaseline = 0x01;
 		public static final int AVCProfileMain = 0x02;
@@ -183,6 +184,8 @@ public class MediaCodecInfo {
 		public static final int AVCProfileHigh10 = 0x10;
 		public static final int AVCProfileHigh422 = 0x20;
 		public static final int AVCProfileHigh444 = 0x40;
+		public static final int AVCProfileConstrainedBaseline = 0x10000;
+		public static final int AVCProfileConstrainedHigh = 0x80000;
 
 		// AVC levels
 		public static final int AVCLevel1 = 0x01;
@@ -206,13 +209,22 @@ public class MediaCodecInfo {
 		public static final int AVCLevel61 = 0x40000;
 		public static final int AVCLevel62 = 0x80000;
 
+		// VP8 profiles and levels
+		public static final int VP8Level_Version0 = 0x01;
+		public static final int VP8Level_Version1 = 0x02;
+		public static final int VP8Level_Version2 = 0x04;
+		public static final int VP8Level_Version3 = 0x08;
+		public static final int VP8ProfileMain = 0x01;
+
 		// VP9 profiles
 		public static final int VP9Profile0 = 0x01;
 		public static final int VP9Profile1 = 0x02;
 		public static final int VP9Profile2 = 0x04;
 		public static final int VP9Profile3 = 0x08;
-		public static final int VP9Profile2HDR10Plus = 0x1000;
-		public static final int VP9Profile3HDR10Plus = 0x2000;
+		public static final int VP9Profile2HDR = 0x1000;
+		public static final int VP9Profile3HDR = 0x2000;
+		public static final int VP9Profile2HDR10Plus = 0x4000;
+		public static final int VP9Profile3HDR10Plus = 0x8000;
 
 		// VP9 levels
 		public static final int VP9Level1 = 0x1;
@@ -230,44 +242,72 @@ public class MediaCodecInfo {
 		public static final int VP9Level61 = 0x1000;
 		public static final int VP9Level62 = 0x2000;
 
-		// VP8 profile/level
-		public static final int VP8ProfileMain = 0x01;
-		public static final int VP8LevelMain = 0x01;
-
 		// HEVC profiles
 		public static final int HEVCProfileMain = 0x01;
 		public static final int HEVCProfileMain10 = 0x02;
-		public static final int HEVCProfileMain10HDR10 = 0x1000;
 		public static final int HEVCProfileMainStill = 0x04;
+		public static final int HEVCProfileMain10HDR10 = 0x1000;
+		public static final int HEVCProfileMain10HDR10Plus = 0x2000;
 
 		// HEVC levels
 		public static final int HEVCMainTierLevel1 = 0x1;
-		public static final int HEVCMainTierLevel2 = 0x2;
-		public static final int HEVCMainTierLevel21 = 0x4;
-		public static final int HEVCMainTierLevel3 = 0x8;
-		public static final int HEVCMainTierLevel31 = 0x10;
-		public static final int HEVCMainTierLevel4 = 0x20;
-		public static final int HEVCMainTierLevel41 = 0x40;
-		public static final int HEVCMainTierLevel5 = 0x80;
-		public static final int HEVCMainTierLevel51 = 0x100;
-		public static final int HEVCMainTierLevel52 = 0x200;
-		public static final int HEVCMainTierLevel6 = 0x400;
-		public static final int HEVCMainTierLevel61 = 0x800;
-		public static final int HEVCMainTierLevel62 = 0x1000;
-		public static final int HEVCHighTierLevel1 = 0x1;
-		public static final int HEVCHighTierLevel2 = 0x2;
-		public static final int HEVCHighTierLevel21 = 0x4;
-		public static final int HEVCHighTierLevel3 = 0x8;
-		public static final int HEVCHighTierLevel31 = 0x10;
-		public static final int HEVCHighTierLevel4 = 0x20;
-		public static final int HEVCHighTierLevel41 = 0x40;
-		public static final int HEVCHighTierLevel5 = 0x80;
-		public static final int HEVCHighTierLevel51 = 0x100;
-		public static final int HEVCHighTierLevel52 = 0x200;
-		public static final int HEVCHighTierLevel6 = 0x400;
-		public static final int HEVCHighTierLevel61 = 0x800;
-		public static final int HEVCHighTierLevel62 = 0x1000;
+		public static final int HEVCHighTierLevel1 = 0x2;
+		public static final int HEVCMainTierLevel2 = 0x4;
+		public static final int HEVCHighTierLevel2 = 0x8;
+		public static final int HEVCMainTierLevel21 = 0x10;
+		public static final int HEVCHighTierLevel21 = 0x20;
+		public static final int HEVCMainTierLevel3 = 0x40;
+		public static final int HEVCHighTierLevel3 = 0x80;
+		public static final int HEVCMainTierLevel31 = 0x100;
+		public static final int HEVCHighTierLevel31 = 0x200;
+		public static final int HEVCMainTierLevel4 = 0x400;
+		public static final int HEVCHighTierLevel4 = 0x800;
+		public static final int HEVCMainTierLevel41 = 0x1000;
+		public static final int HEVCHighTierLevel41 = 0x2000;
+		public static final int HEVCMainTierLevel5 = 0x4000;
+		public static final int HEVCHighTierLevel5 = 0x8000;
+		public static final int HEVCMainTierLevel51 = 0x10000;
+		public static final int HEVCHighTierLevel51 = 0x20000;
+		public static final int HEVCMainTierLevel52 = 0x40000;
+		public static final int HEVCHighTierLevel52 = 0x80000;
+		public static final int HEVCMainTierLevel6 = 0x100000;
+		public static final int HEVCHighTierLevel6 = 0x200000;
+		public static final int HEVCMainTierLevel61 = 0x400000;
+		public static final int HEVCHighTierLevel61 = 0x800000;
+		public static final int HEVCMainTierLevel62 = 0x1000000;
+		public static final int HEVCHighTierLevel62 = 0x2000000;
 
+		// AV1 profiles
+		public static final int AV1ProfileMain8 = 0x1;
+		public static final int AV1ProfileMain10 = 0x2;
+		public static final int AV1ProfileMain10HDR10 = 0x1000;
+		public static final int AV1ProfileMain10HDR10Plus = 0x2000;
+
+		// AV1 levels
+		public static final int AV1Level2 = 0x1;
+		public static final int AV1Level21 = 0x2;
+		public static final int AV1Level22 = 0x4;
+		public static final int AV1Level23 = 0x8;
+		public static final int AV1Level3 = 0x10;
+		public static final int AV1Level31 = 0x20;
+		public static final int AV1Level32 = 0x40;
+		public static final int AV1Level33 = 0x80;
+		public static final int AV1Level4 = 0x100;
+		public static final int AV1Level41 = 0x200;
+		public static final int AV1Level42 = 0x400;
+		public static final int AV1Level43 = 0x800;
+		public static final int AV1Level5 = 0x1000;
+		public static final int AV1Level51 = 0x2000;
+		public static final int AV1Level52 = 0x4000;
+		public static final int AV1Level53 = 0x8000;
+		public static final int AV1Level6 = 0x10000;
+		public static final int AV1Level61 = 0x20000;
+		public static final int AV1Level62 = 0x40000;
+		public static final int AV1Level63 = 0x80000;
+		public static final int AV1Level7 = 0x100000;
+		public static final int AV1Level71 = 0x200000;
+		public static final int AV1Level72 = 0x400000;
+		public static final int AV1Level73 = 0x800000;
 		// AAC profiles
 		public static final int AACObjectMain = 1;
 		public static final int AACObjectLC = 2;
