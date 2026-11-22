@@ -43,8 +43,15 @@ final class InputDispatcher {
 		return sHandler;
 	}
 
-	/* InputDispatcher::notifyKey() and dispatchKeyLocked(): the key repeat */
+	/* InputDispatcher::notifyKey() and dispatchKeyLocked(): the key repeat. HOME never reaches the app: the policy
+	 * intercepts it before dispatching (PhoneWindowManager.interceptKeyBeforeDispatching() -> handleHomeButton(),
+	 * which goes home on the up key that was not canceled) */
 	static void notifyKey(KeyEvent entry) {
+		if (entry.getKeyCode() == KeyEvent.KEYCODE_HOME) {
+			if (entry.getAction() == KeyEvent.ACTION_UP && !entry.isCanceled())
+				nativeGoHome();
+			return;
+		}
 		if (entry.getAction() == KeyEvent.ACTION_DOWN) {
 			if (sLastKeyEntry != null && sLastKeyEntry.getKeyCode() == entry.getKeyCode()
 			    && sLastKeyEntry.getDeviceId() == entry.getDeviceId()) {
@@ -163,9 +170,12 @@ final class InputDispatcher {
 		if (fallbackAction == null)
 			return null;
 		KeyEvent fallbackEvent = copyWithFlags(event, fallbackAction.keyCode, fallbackAction.metaState, event.getFlags() | KeyEvent.FLAG_FALLBACK);
-		/* interceptFallback(): the policy keeps HOME for itself */
-		if (fallbackAction.keyCode == KeyEvent.KEYCODE_HOME)
+		/* interceptFallback(): the policy keeps HOME for itself and goes home on its up key (handleHomeButton()) */
+		if (fallbackAction.keyCode == KeyEvent.KEYCODE_HOME) {
+			if (event.getAction() == KeyEvent.ACTION_UP && !event.isCanceled())
+				nativeGoHome();
 			fallbackEvent = null;
+		}
 		if (initialDown) {
 			sFallbackActions.put(keyCode, fallbackAction);
 		} else if (event.getAction() == KeyEvent.ACTION_UP) {
@@ -348,4 +358,5 @@ final class InputDispatcher {
 
 	private static native int nativeDispatchKey(KeyEvent event);
 	private static native int nativeDispatchMotion(MotionEvent event);
+	private static native void nativeGoHome();
 }

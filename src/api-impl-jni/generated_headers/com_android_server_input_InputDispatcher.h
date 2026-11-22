@@ -27,6 +27,14 @@ JNIEXPORT jint JNICALL Java_com_android_server_input_InputDispatcher_nativeDispa
 JNIEXPORT jint JNICALL Java_com_android_server_input_InputDispatcher_nativeDispatchMotion
   (JNIEnv *, jclass, jobject);
 
+/*
+ * Class:     com_android_server_input_InputDispatcher
+ * Method:    nativeGoHome
+ * Signature: ()V
+ */
+JNIEXPORT void JNICALL Java_com_android_server_input_InputDispatcher_nativeGoHome
+  (JNIEnv *, jclass);
+
 #ifdef __cplusplus
 }
 #endif

@@ -20,6 +20,8 @@ void activity_window_add_key_controller(GtkWindow *window);
  * -1 no window of the app has the focus */
 int activity_dispatch_device_key(JNIEnv *env, jobject event);
 int activity_dispatch_device_motion(JNIEnv *env, jobject event);
+/* KEYCODE_HOME of those devices: the system's home action instead of a key for the app */
+void activity_go_home(JNIEnv *env);
 /* the Java Dialog of a dialog's GtkWindow (a local reference), NULL if it is none */
 jobject dialog_get_jobj(GtkWindow *dialog);
 /* for the navigation bar: the activities from the shown one (index 0) down to the first one */

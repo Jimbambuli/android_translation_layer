@@ -19,3 +19,8 @@ JNIEXPORT jint JNICALL Java_com_android_server_input_InputDispatcher_nativeDispa
 {
 	return activity_dispatch_device_motion(env, event);
 }
+
+JNIEXPORT void JNICALL Java_com_android_server_input_InputDispatcher_nativeGoHome(JNIEnv *env, jclass class)
+{
+	activity_go_home(env);
+}

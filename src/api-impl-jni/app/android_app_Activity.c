@@ -926,6 +926,26 @@ int activity_dispatch_device_key(JNIEnv *env, jobject event)
 	return handled;
 }
 
+/* KEYCODE_HOME of those devices: AOSP's PhoneWindowManager keeps HOME from the apps and, on its up key, starts the
+ * home screen (handleHomeButton(), launchHomeFromHotKey()): the shown activity is told the user leaves it
+ * (onUserLeaveHint(), as when the home activity starts on a user action) and stops behind the home screen. ATL has
+ * no home screen; for the app's window that is minimizing it (as moveTaskToBack()), which stops the shown activity
+ * (window_set_hidden()). Only while a window of the app has the focus: HOME of another window is not the app's. */
+void activity_go_home(JNIEnv *env)
+{
+	if (!window || !activity_current)
+		return;
+	GtkWindow *target = g_object_get_data(G_OBJECT(window), "key-window");
+	if (!gtk_window_is_active(target ? target : window))
+		return;
+	J__Activity__performUserLeaving(env, activity_current);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	gtk_window_minimize(window);
+}
+
 /* the generic motion events of those devices (joysticks): like ViewRootImpl, to the focused window's
  * DecorView through its Window.Callback (Activity.dispatchGenericMotionEvent()) */
 int activity_dispatch_device_motion(JNIEnv *env, jobject event)
