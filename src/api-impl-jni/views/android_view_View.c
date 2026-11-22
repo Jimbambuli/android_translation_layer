@@ -193,6 +193,20 @@ static int32_t meta_state(GdkEvent *event)
 	return (state & GDK_SHIFT_MASK ? 0x1 /* META_SHIFT_ON */ : 0) | (state & GDK_ALT_MASK ? 0x2 /* META_ALT_ON */ : 0) | (state & GDK_CONTROL_MASK ? 0x1000 /* META_CTRL_ON */ : 0) | (state & GDK_SUPER_MASK ? 0x10000 /* META_META_ON */ : 0) | (state & GDK_LOCK_MASK ? 0x100000 /* META_CAPS_LOCK_ON */ : 0);
 }
 
+/* ATL_MOUSE_AS_TOUCH (APK Starter: «Mouse as touch», per app): the primary mouse button is a finger on a
+ * touchscreen (SOURCE_TOUCHSCREEN, TOOL_TYPE_FINGER, pointer id 0, no button state), for apps that only take
+ * touches: Unity games ignore drags of SOURCE_MOUSE on Android 16 too (Waydroid: persist.waydroid.fake_touch).
+ * A finger that does not touch is no pointer on Android (TouchInputMapper, TouchButtonAccumulator::isHovering()
+ * is for tools with BTN_TOUCH), so there are no ACTION_HOVER_* events either. The other buttons and the wheel
+ * stay those of the mouse. */
+static bool mouse_as_touch(void)
+{
+	static int on = -1;
+	if (on < 0)
+		on = getenv("ATL_MOUSE_AS_TOUCH") != NULL;
+	return on;
+}
+
 static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct pointer pointers[MAX_POINTERS], GPtrArray *pointer_indices, GtkPropagationPhase phase, guint32 timestamp, GdkEvent *event, int32_t source, int32_t button_state)
 {
 	bool ret;
@@ -203,7 +217,9 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
 	jfloatArray coords = (*env)->NewFloatArray(env, num_pointers * 4);
 	for (int i = 0; i < num_pointers; i++) {
 		struct pointer *pointer = (struct pointer *)g_ptr_array_index(pointer_indices, i);
-		(*env)->SetIntArrayRegion(env, ids, i, 1, &pointer->id);
+		/* the mouse's slot 1 (on_pointer_event()) is the first finger, id 0, when it acts as a touch */
+		jint id = source == SOURCE_TOUCHSCREEN && pointer->id == 1 && mouse_as_touch() ? 0 : pointer->id;
+		(*env)->SetIntArrayRegion(env, ids, i, 1, &id);
 		/* put in all four float values starting at coord_x */
 		(*env)->SetFloatArrayRegion(env, coords, 4 * i, 4, &pointer->coord_x);
 	}
@@ -229,6 +245,8 @@ static guint32 hover_event_time(GtkEventController *controller)
 
 static void call_hover_callback(jobject this, int action, float x, float y, float raw_x, float raw_y, guint32 timestamp)
 {
+	if (mouse_as_touch()) // a finger does not hover
+		return;
 	JNIEnv *env = get_jni_env();
 	/* the pointer id of the mouse's presses (see on_pointer_event()): hover and press are one pointer, as on
 	 * Android, so that the hovering pointer turns into the pressed one instead of staying behind */
@@ -359,6 +377,9 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 	GdkInputSource input_source = gdk_device_get_source(gdk_event_get_device(event));
 	bool is_mouse = event_type != GDK_TOUCH_BEGIN && event_type != GDK_TOUCH_UPDATE && event_type != GDK_TOUCH_END &&
 	                input_source != GDK_SOURCE_PEN && input_source != GDK_SOURCE_TOUCHSCREEN;
+	if (is_mouse && mouse_as_touch() &&
+	    (event_type == GDK_MOTION_NOTIFY ? gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK : gdk_button_event_get_button(event) == GDK_BUTTON_PRIMARY))
+		is_mouse = false;
 	int32_t button_state = is_mouse ? mouse_button_state(event) : 0;
 	int32_t action_button = 0;
 	switch (event_type) {

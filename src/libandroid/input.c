@@ -539,6 +539,11 @@ static gboolean on_event(GtkEventControllerLegacy *self, GdkEvent *event, int in
 		case GDK_BUTTON_PRESS:
 		case GDK_BUTTON_RELEASE:
 		case GDK_MOTION_NOTIFY:
+			/* ATL_MOUSE_AS_TOUCH (as android_view_View.c): only the primary button is the finger, and a finger
+			 * that does not touch sends nothing (no ACTION_MOVE without ACTION_DOWN) */
+			if (getenv("ATL_MOUSE_AS_TOUCH") &&
+			    !(gdk_event_get_event_type(event) == GDK_MOTION_NOTIFY ? gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK : gdk_button_event_get_button(event) == GDK_BUTTON_PRIMARY))
+				return false;
 		// touchscreen
 		case GDK_TOUCH_BEGIN:
 		case GDK_TOUCH_END:
