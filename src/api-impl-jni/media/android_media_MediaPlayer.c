@@ -17,6 +17,7 @@
 #include "../audio/audio.h"
 #include "../widgets/android_view_SurfaceView.h"
 #include "av_input.h"
+#include "sws_cache.h"
 #include "video_rotate.h"
 
 #include "../generated_headers/android_media_MediaPlayer.h"
@@ -45,7 +46,7 @@ struct video {
 	AVIOContext *io;
 	AVFormatContext *format; /* NULL without a video stream */
 	AVCodecContext *codec;
-	struct SwsContext *sws;
+	struct sws_cache sws;
 	AVPacket *packet;
 	AVFrame *frame; /* the frame decoded last */
 	int stream_index;
@@ -98,7 +99,7 @@ static void video_free(struct video *v)
 {
 	if (v->color_state)
 		gdk_color_state_unref(v->color_state);
-	sws_freeContext(v->sws);
+	sws_freeContext(v->sws.ctx);
 	avcodec_free_context(&v->codec);
 	av_packet_free(&v->packet);
 	av_frame_free(&v->frame);
@@ -729,14 +730,14 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture(JNIE
 	if (yuv)
 		return _INTPTR(yuv);
 #endif
-	v->sws = sws_getCachedContext(v->sws, frame->width, frame->height, frame->format, frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
-	if (!v->sws)
+	struct SwsContext *sws = sws_cached(&v->sws, frame, frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR);
+	if (!sws)
 		return 0;
-	sws_setColorspaceDetails(v->sws, sws_getCoefficients(frame->colorspace), frame->color_range == AVCOL_RANGE_JPEG, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
+	sws_setColorspaceDetails(sws, sws_getCoefficients(frame->colorspace), frame->color_range == AVCOL_RANGE_JPEG, sws_getCoefficients(SWS_CS_DEFAULT), 1, 0, 1 << 16, 1 << 16);
 	int width = frame->width, height = frame->height;
 	int stride = width * 3;
 	guchar *rgb = g_malloc(stride * height);
-	sws_scale(v->sws, (const uint8_t *const *)frame->data, frame->linesize, 0, height, (uint8_t *[1]){rgb}, (int[1]){stride});
+	sws_scale(sws, (const uint8_t *const *)frame->data, frame->linesize, 0, height, (uint8_t *[1]){rgb}, (int[1]){stride});
 	if (v->rotation) {
 		guchar *turned = g_malloc(stride * height);
 		rotate_plane(turned, rgb, stride, width, height, 3, v->rotation);

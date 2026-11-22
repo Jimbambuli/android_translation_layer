@@ -29,6 +29,7 @@
 #include "../defines.h"
 #include "../util.h"
 #include "../graphics/surface_target.h"
+#include "../media/sws_cache.h"
 #include "../media/video_rotate.h"
 #include "../generated_headers/android_hardware_camera2_impl_ExternalCameraDevice.h"
 
@@ -55,25 +56,6 @@ struct camera_node {
 	struct spa_hook listener;
 	gboolean removed;
 };
-
-/* a scaler for one conversion, made again only when the conversion changes. sws_getCachedContext() cannot be used:
- * the scaler stores a decoded MJPEG frame's full range format (AV_PIX_FMT_YUVJ*) as the limited range one plus
- * the range, so the cached scaler never matched and was made anew for every frame */
-struct sws_cache {
-	struct SwsContext *ctx;
-	int src_w, src_h, src_format, dst_w, dst_h, dst_format, flags;
-};
-
-static struct SwsContext *sws_cached(struct sws_cache *c, const AVFrame *src, int dst_w, int dst_h, enum AVPixelFormat dst_format, int flags)
-{
-	if (c->ctx && c->src_w == src->width && c->src_h == src->height && c->src_format == src->format &&
-	    c->dst_w == dst_w && c->dst_h == dst_h && c->dst_format == dst_format && c->flags == flags)
-		return c->ctx;
-	sws_freeContext(c->ctx);
-	c->ctx = sws_getContext(src->width, src->height, src->format, dst_w, dst_h, dst_format, flags, NULL, NULL, NULL);
-	*c = (struct sws_cache){c->ctx, src->width, src->height, src->format, dst_w, dst_h, dst_format, flags};
-	return c->ctx;
-}
 
 struct camera_stream {
 	struct camera_node *node;
