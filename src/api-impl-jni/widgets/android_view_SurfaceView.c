@@ -140,7 +140,6 @@ void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, Gdk
 struct jni_callback_data {
 	gint resize_width;
 	gint resize_height;
-	jweak created; /* the view after surfaceCreated(), until surfaceDestroyed() */
 };
 
 static jobject surface_view_get_view(JNIEnv *env, GtkWidget *dummy)
@@ -173,13 +172,12 @@ static void on_resize(GtkWidget *self, gint width, gint height, struct jni_callb
 static gboolean on_realize_delayed(GtkWidget *dummy)
 {
 	JNIEnv *env = get_jni_env();
-	struct jni_callback_data *d = g_object_get_data(G_OBJECT(dummy), "atl-callback-data");
-	/* the surface may be gone again before this runs, or exist already */
-	if (!gtk_widget_get_realized(dummy) || d->created)
+	/* the widget may be gone again before this runs; SurfaceView.surfaceCreated() itself ignores a surface that
+	 * exists already */
+	if (!gtk_widget_get_realized(dummy))
 		return G_SOURCE_REMOVE;
 	jobject view = surface_view_get_view(env, dummy);
 	if (view) {
-		d->created = (*env)->NewWeakGlobalRef(env, view);
 		J__SurfaceView__surfaceCreated(env, view);
 		(*env)->DeleteLocalRef(env, view);
 	}
@@ -190,22 +188,6 @@ static gboolean on_realize_delayed(GtkWidget *dummy)
 static void on_realize(GtkWidget *self, struct jni_callback_data *d)
 {
 	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(on_realize_delayed), g_object_ref(self), g_object_unref);
-}
-
-/* AOSP: surfaceDestroyed() while the surface still exists, so it is called at once */
-static void on_unrealize(GtkWidget *self, struct jni_callback_data *d)
-{
-	if (!d->created)
-		return;
-	/* the view itself, not the wrapper's reference: the wrapper may already be torn down with its window */
-	JNIEnv *env = get_jni_env();
-	jobject view = (*env)->NewLocalRef(env, d->created);
-	(*env)->DeleteWeakGlobalRef(env, d->created);
-	d->created = NULL;
-	if (view) {
-		J__SurfaceView__surfaceDestroyed(env, view);
-		(*env)->DeleteLocalRef(env, view);
-	}
 }
 
 JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
@@ -224,7 +206,6 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv
 
 	g_signal_connect(dummy, "resize", G_CALLBACK(on_resize), callback_data);
 	g_signal_connect(dummy, "realize", G_CALLBACK(on_realize), callback_data);
-	g_signal_connect(dummy, "unrealize", G_CALLBACK(on_unrealize), callback_data);
 
 	return _INTPTR(graphics_offload);
 }
