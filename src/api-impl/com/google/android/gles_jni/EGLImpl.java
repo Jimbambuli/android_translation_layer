@@ -16,6 +16,7 @@
 
 package com.google.android.gles_jni;
 
+import android.graphics.SurfaceTexture;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -67,17 +68,17 @@ public class EGLImpl implements EGL10 {
 			sur = (Surface)native_window;
 		}
 
+		/* AOSP _eglCreateWindowSurfaceTexture(): a new Surface on the SurfaceTexture's producer side */
+		if (sur == null && native_window instanceof SurfaceTexture)
+			sur = new Surface((SurfaceTexture)native_window);
+
 		long eglSurfaceId;
 		if (sur != null) {
 			eglSurfaceId = native_eglCreateWindowSurface(display.native_egl_display, config.native_egl_config, sur, attrib_list);
-		} /*else if (native_window instanceof SurfaceTexture) {
-			eglSurfaceId = native_eglCreateWindowSurfaceTexture(display, config,
-								      native_window, attrib_list);
-		}*/
-		else {
+		} else {
 			throw new java.lang.UnsupportedOperationException(
 			    "eglCreateWindowSurface() can only be called with an instance of "
-			    + "Surface, SurfaceView, SurfaceHolder or [FIXME]SurfaceTexture at the moment.");
+			    + "Surface, SurfaceView, SurfaceHolder or SurfaceTexture at the moment.");
 		}
 
 		if (eglSurfaceId == 0) {

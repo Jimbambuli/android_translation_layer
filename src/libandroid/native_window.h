@@ -39,6 +39,14 @@ gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window,
 void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data);
 
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);
+
+#ifdef VULKAN_CORE_H_
+/* vulkan_swapchain.c: Vulkan on a window with remote_fd */
+VkResult atl_vk_create_remote_surface(VkInstance instance, struct ANativeWindow *window, VkSurfaceKHR *out_surface);
+gboolean atl_vk_destroy_remote_surface(VkSurfaceKHR surface);
+gboolean atl_vk_remote_surface_capabilities(VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *capabilities);
+PFN_vkVoidFunction atl_vk_remote_proc(VkInstance instance, const char *name);
+#endif
 EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, struct ANativeWindow *native_window, EGLint const *attrib_list);
 EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface);
 EGLDisplay bionic_eglGetDisplay(NativeDisplayType native_display);
@@ -49,3 +57,5 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 void bionic_glBindFramebuffer(GLenum target, GLuint framebuffer);
 void ANativeWindow_acquire(struct ANativeWindow *native_window);
 void ANativeWindow_release(struct ANativeWindow *native_window);
+int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window);
+int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window);

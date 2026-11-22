@@ -587,10 +587,8 @@ static GHashTable *vk_surface_native_windows;
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
 	VkResult ret;
-	if (pCreateInfo->window->remote_fd >= 0) {
-		fprintf(stderr, "bionic_vkCreateAndroidSurfaceKHR: Vulkan on a surface of another process is not implemented\n");
-		return VK_ERROR_INITIALIZATION_FAILED;
-	}
+	if (pCreateInfo->window->remote_fd >= 0)
+		return atl_vk_create_remote_surface(instance, pCreateInfo->window, pSurface);
 	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
 
 	if (GDK_IS_WAYLAND_DISPLAY(display)) {
@@ -623,6 +621,8 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 
 void bionic_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *pAllocator)
 {
+	if (atl_vk_destroy_remote_surface(surface))
+		return;
 	if (vk_surface_native_windows)
 		g_hash_table_remove(vk_surface_native_windows, surface);
 	vkDestroySurfaceKHR(instance, surface, pAllocator);
@@ -645,6 +645,8 @@ VkResult bionic_vkCreateInstance(VkInstanceCreateInfo *pCreateInfo, const VkAllo
 
 VkResult bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities)
 {
+	if (atl_vk_remote_surface_capabilities(surface, pSurfaceCapabilities))
+		return VK_SUCCESS;
 	VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, pSurfaceCapabilities);
 	if (res == VK_SUCCESS && pSurfaceCapabilities && vk_surface_native_windows) {
 		struct ANativeWindow *native_window = g_hash_table_lookup(vk_surface_native_windows, surface);
@@ -662,6 +664,10 @@ VkResult bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physi
 
 PFN_vkVoidFunction bionic_vkGetInstanceProcAddr(VkInstance instance, const char *pName)
 {
+	/* as AOSP's loader: the functions it returns go through it too (Vulkan-Hpp asks for it again) */
+	if (__unlikely__(!strcmp(pName, "vkGetInstanceProcAddr")))
+		return (PFN_vkVoidFunction)bionic_vkGetInstanceProcAddr;
+
 	if (__unlikely__(!strcmp(pName, "vkCreateInstance")))
 		return (PFN_vkVoidFunction)bionic_vkCreateInstance;
 
@@ -673,6 +679,10 @@ PFN_vkVoidFunction bionic_vkGetInstanceProcAddr(VkInstance instance, const char 
 
 	if (__unlikely__(!strcmp(pName, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR")))
 		return (PFN_vkVoidFunction)bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
+
+	PFN_vkVoidFunction remote = atl_vk_remote_proc(instance, pName);
+	if (remote)
+		return remote;
 
 	return vkGetInstanceProcAddr(instance, pName);
 }
