@@ -15,6 +15,9 @@ JNIEXPORT jlong JNICALL Java_android_widget_EditText_native_1constructor(JNIEnv 
 {
 	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
 	GtkWidget *gtk_text = gtk_text_new();
+	/* GTK selects the whole text when the keyboard focuses a GtkText; AOSP's Editor keeps the selection (only
+	 * setSelectAllOnFocus() selects all, ArrowKeyMovementMethod.onTakeFocus() leaves it for Tab and Down) */
+	g_object_set(gtk_widget_get_settings(gtk_text), "gtk-entry-select-on-focus", FALSE, NULL);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), gtk_text);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	/* InputTrace: the text the user types, whether or not the app has a TextWatcher */
