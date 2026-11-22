@@ -1166,6 +1166,14 @@ public class PackageManager {
 
 	/**
 	 * Feature for {@link #getSystemAvailableFeatures} and
+	 * {@link #hasSystemFeature}: The device can support having an external camera connected to it.
+	 * The external camera may not always be connected or available to applications to use.
+	 */
+	@SdkConstant(SdkConstantType.FEATURE)
+	public static final String FEATURE_CAMERA_EXTERNAL = "android.hardware.camera.external";
+
+	/**
+	 * Feature for {@link #getSystemAvailableFeatures} and
 	 * {@link #hasSystemFeature}: The device has a front facing camera.
 	 */
 	@SdkConstant(SdkConstantType.FEATURE)
@@ -2364,6 +2372,12 @@ public class PackageManager {
 			/* calls go to the desktop's dialer (tel: link), which asks the user itself */
 			case "android.permission.CALL_PHONE":
 				return ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName) ? PERMISSION_GRANTED : PERMISSION_DENIED;
+			// the camera of PipeWire; in a Flatpak the camera portal asks the user
+			case "android.permission.CAMERA":
+				if (android.hardware.camera2.impl.ExternalCameraDevice.available())
+					return PERMISSION_GRANTED;
+				else
+					return PERMISSION_DENIED;
 			case "android.permission.RECORD_AUDIO":
 				if (android.media.AudioRecord.microphoneAvailable())
 					return PERMISSION_GRANTED;
@@ -2800,6 +2814,11 @@ public class PackageManager {
 			/* the fprintd fingerprint sensor (com.android.server.biometrics.FprintdSensor) */
 			case FEATURE_FINGERPRINT:
 				return com.android.server.biometrics.FprintdSensor.isPresent();
+			/* a PipeWire camera is an external camera (AOSP external camera HAL: LENS_FACING_EXTERNAL); AOSP
+			 * devices with one declare android.hardware.camera.external, and camera.any for any camera */
+			case FEATURE_CAMERA_ANY:
+			case FEATURE_CAMERA_EXTERNAL:
+				return android.hardware.camera2.impl.ExternalCameraDevice.available();
 			/* WebView is WebKitGTK (apps such as Jellyfin refuse to start without the feature) */
 			case "android.software.webview":
 				return true;

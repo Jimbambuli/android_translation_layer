@@ -260,6 +260,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/graphics/android_graphics_BitmapFactory.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Matrix.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_SurfaceTexture.c',
+                                                                  	'src/api-impl-jni/graphics/surface_target.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Paint.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_text_TextRunShaper.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Path.c',
@@ -273,6 +274,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/location/com_android_server_location_provider_DesktopLocationProvider.c',
                                                                   	'src/api-impl-jni/bluetooth/com_android_bluetooth_bluez_BluezBus.c',
                                                                   	'src/api-impl-jni/telephony/com_android_internal_telephony_ModemManagerPhone.c',
+                                                                  	'src/api-impl-jni/hardware/android_hardware_camera2_impl_ExternalCameraDevice.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaExtractor.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaRecorder.c',
@@ -341,7 +343,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   dependencies: [
                                                                         extra_deps,
                                                                   	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'), libva_dep,
+                                                                  	dependency('libportal'), dependency('libpipewire-0.3'), dependency('sqlite3'), dependency('libcrypto'), dependency('icu-i18n'), dependency('icu-uc'), dependency('libavcodec', version: '>=59'), dependency('libavfilter'), dependency('libavformat'), dependency('libavutil'), dependency('libdrm'), libva_dep,
                                                                   	dependency('gudev-1.0'), dependency('libswscale'), dependency('webkitgtk-6.0'), dependency('libsecret-1'), dependency('fontconfig'), dependency('pangoft2'), dependency('libwebp'),
                                                                         libart_dep, libc_bio_dep, wayland_protos_dep, upcalls_header
                                                                   ],

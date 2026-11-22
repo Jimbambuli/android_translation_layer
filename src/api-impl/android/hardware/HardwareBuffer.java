@@ -52,6 +52,9 @@ public final class HardwareBuffer implements Parcelable, AutoCloseable {
 	public static final long USAGE_GPU_MIPMAP_COMPLETE = 1 << 26;
 	public static final long USAGE_FRONT_BUFFER = 1L << 32;
 
+	/** @hide AOSP: @Retention(SOURCE) @LongDef(flag = true, value = {USAGE_*}) */
+	public @interface Usage {};
+
 	private long mNativeObject;
 
 	private HardwareBuffer() {

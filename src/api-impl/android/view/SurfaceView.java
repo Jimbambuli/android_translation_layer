@@ -307,6 +307,30 @@ public class SurfaceView extends View {
 		return mRequestedSubLayer > 0;
 	}
 
+	/* AOSP isAboveParent(): mSubLayer >= 0 */
+	private boolean isAboveParent() {
+		return mRequestedSubLayer >= 0;
+	}
+
+	/* AOSP SurfaceView.draw(): the surface is a layer of its own, below the window (where draw() clears a hole for
+	 * it) or above it; what the view draws (background, onDraw(), children, foreground) is on the window. When ATL
+	 * draws the view through Java (it draws something itself, e.g. after setWillNotDraw(false)), the surface's
+	 * widget goes into the same drawing: before the view's own drawing, or after it for a surface above the window */
+	@Override
+	public void draw(android.graphics.Canvas canvas) {
+		boolean surface = canvas instanceof android.atl.GskCanvas;
+		if (surface && !isAboveParent())
+			native_drawContent(widget, ((android.atl.GskCanvas)canvas).snapshot);
+		super.draw(canvas);
+		if (surface && isAboveParent())
+			native_drawContent(widget, ((android.atl.GskCanvas)canvas).snapshot);
+	}
+
+	/* AOSP: View.onDraw() draws nothing; the surface is drawn in draw() */
+	@Override
+	public void onDraw(android.graphics.Canvas canvas) {
+	}
+
 	public void setZOrderMediaOverlay(boolean mediaOverlay) {
 		mRequestedSubLayer = mediaOverlay ? APPLICATION_MEDIA_OVERLAY_SUBLAYER : APPLICATION_MEDIA_SUBLAYER;
 	}

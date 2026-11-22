@@ -73,6 +73,10 @@ public abstract class CameraCaptureSession implements AutoCloseable {
 		throw new UnsupportedOperationException("Subclasses must override this method");
 	}
 
+	public CameraOfflineSession switchToOffline(java.util.Collection<Surface> offlineSurfaces, Executor executor, CameraOfflineSession.CameraOfflineSessionCallback listener) throws CameraAccessException {
+		throw new UnsupportedOperationException("Subclasses must override this method");
+	}
+
 	public boolean supportsOfflineProcessing(Surface surface) {
 		throw new UnsupportedOperationException("Subclasses must override this method");
 	}

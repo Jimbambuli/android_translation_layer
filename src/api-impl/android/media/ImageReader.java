@@ -11,10 +11,11 @@ import android.view.Surface;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 
-/* AOSP frameworks/base/core/java/android/media/ImageReader.java: the argument checks, the formats and the state. ATL has no
- * BufferQueue whose producer could fill the images (camera, MediaProjection and VirtualDisplay are not backed), so like
- * the native reader of a Surface nothing writes to, acquireNextImage() has no buffer (null) and the listener is never
- * called. */
+/* AOSP frameworks/base/core/java/android/media/ImageReader.java: the argument checks, the formats and the state. In place
+ * of the BufferQueue, the reader's Surface (Surface.atl_imageReader) takes the images a producer queues: so far the
+ * camera (camera2.impl.CameraDeviceImpl), with YUV_420_888 (three planes, I420), JPEG (one plane) and PRIVATE (no
+ * planes) images. As a BufferQueue whose consumer holds all buffers, a full reader (maxImages acquired or queued)
+ * takes no more images; the producer drops them. */
 public class ImageReader implements AutoCloseable {
 	private final int mWidth;
 	private final int mHeight;
@@ -113,6 +114,7 @@ public class ImageReader implements AutoCloseable {
 		}
 		mIsReaderValid = true;
 		mSurface = new Surface();
+		mSurface.atl_imageReader = this;
 	}
 
 	private ImageReader(int width, int height, int imageFormat, int maxImages, long usage) {
@@ -169,18 +171,191 @@ public class ImageReader implements AutoCloseable {
 		return mSurface;
 	}
 
+	/* AOSP acquireLatestImage(): the newest image, the older ones closed */
 	public Image acquireLatestImage() {
-		return acquireNextImage();
+		Image image = acquireNextImage();
+		if (image == null) {
+			return null;
+		}
+		try {
+			for (;;) {
+				Image next = acquireNextImageNoThrowISE();
+				if (next == null) {
+					Image result = image;
+					image = null;
+					return result;
+				}
+				image.close();
+				image = next;
+			}
+		} finally {
+			if (image != null) {
+				image.close();
+			}
+		}
 	}
 
-	/* AOSP: nativeImageSetup() reports ACQUIRE_NO_BUFS when the producer queued nothing (null), ACQUIRE_MAX_IMAGES
-	 * when maxImages are acquired (IllegalStateException); ATL's reader never gets a buffer */
+	private static final int ACQUIRE_SUCCESS = 0;
+	private static final int ACQUIRE_NO_BUFS = 1;
+	private static final int ACQUIRE_MAX_IMAGES = 2;
+
+	private final java.util.ArrayDeque<SurfaceImage> mQueuedImages = new java.util.ArrayDeque<SurfaceImage>();
+
+	/* AOSP acquireNextSurfaceImage() -> nativeImageSetup(): the oldest queued image, ACQUIRE_NO_BUFS without one,
+	 * ACQUIRE_MAX_IMAGES when maxImages are acquired */
+	private int acquireNextSurfaceImage(SurfaceImage[] out) {
+		synchronized (mCloseLock) {
+			if (!mIsReaderValid)
+				return ACQUIRE_NO_BUFS;
+			if (mAcquiredImages.size() >= mMaxImages)
+				return ACQUIRE_MAX_IMAGES;
+			SurfaceImage si = mQueuedImages.poll();
+			if (si == null)
+				return ACQUIRE_NO_BUFS;
+			si.mIsImageValid = true;
+			mAcquiredImages.add(si);
+			out[0] = si;
+			return ACQUIRE_SUCCESS;
+		}
+	}
+
 	public Image acquireNextImage() {
-		return null;
+		SurfaceImage[] si = new SurfaceImage[1];
+		int status = acquireNextSurfaceImage(si);
+		switch (status) {
+			case ACQUIRE_SUCCESS:
+				return si[0];
+			case ACQUIRE_NO_BUFS:
+				return null;
+			case ACQUIRE_MAX_IMAGES:
+				throw new IllegalStateException(String.format("maxImages (%d) has already been acquired, call #close before acquiring more.", mMaxImages));
+			default:
+				throw new AssertionError("Unknown nativeImageSetup return code " + status);
+		}
 	}
 
+	/** @hide */
 	public Image acquireNextImageNoThrowISE() {
-		return null;
+		SurfaceImage[] si = new SurfaceImage[1];
+		return acquireNextSurfaceImage(si) == ACQUIRE_SUCCESS ? si[0] : null;
+	}
+
+	/** @hide the reader is open */
+	public boolean isValidReader() {
+		synchronized (mCloseLock) {
+			return mIsReaderValid;
+		}
+	}
+
+	/** @hide the producer side: an image of the reader's format and size (planes as {buffer, row stride, pixel
+	 * stride}); false, and the image dropped, while the reader is full or closed. The listener hears of it on its
+	 * executor, as AOSP's ListenerHandler posts onImageAvailable(). */
+	public boolean queueImage(long timestampNs, java.nio.ByteBuffer[] buffers, int[] rowStrides, int[] pixelStrides) {
+		synchronized (mCloseLock) {
+			if (!mIsReaderValid || mAcquiredImages.size() + mQueuedImages.size() >= mMaxImages)
+				return false;
+			mQueuedImages.add(new SurfaceImage(timestampNs, buffers, rowStrides, pixelStrides));
+		}
+		OnImageAvailableListener listener;
+		Executor executor;
+		synchronized (mListenerLock) {
+			listener = mListener;
+			executor = mListenerExecutor;
+		}
+		if (listener != null && executor != null) {
+			executor.execute(() -> {
+				synchronized (mCloseLock) {
+					if (!mIsReaderValid)
+						return;
+				}
+				listener.onImageAvailable(ImageReader.this);
+			});
+		}
+		return true;
+	}
+
+	/* AOSP ImageReader.SurfaceImage: an image of this reader */
+	private class SurfaceImage extends Image {
+		private final long mTimestamp;
+		private final SurfacePlane[] mPlanes;
+
+		SurfaceImage(long timestampNs, java.nio.ByteBuffer[] buffers, int[] rowStrides, int[] pixelStrides) {
+			mTimestamp = timestampNs;
+			mPlanes = new SurfacePlane[buffers.length];
+			for (int i = 0; i < buffers.length; i++)
+				mPlanes[i] = new SurfacePlane(buffers[i], rowStrides[i], pixelStrides[i]);
+		}
+
+		@Override
+		public int getFormat() {
+			throwISEIfImageIsInvalid();
+			return mFormat;
+		}
+
+		@Override
+		public int getWidth() {
+			throwISEIfImageIsInvalid();
+			return mWidth;
+		}
+
+		@Override
+		public int getHeight() {
+			throwISEIfImageIsInvalid();
+			return mHeight;
+		}
+
+		@Override
+		public long getTimestamp() {
+			throwISEIfImageIsInvalid();
+			return mTimestamp;
+		}
+
+		@Override
+		public Plane[] getPlanes() {
+			throwISEIfImageIsInvalid();
+			return mPlanes.clone();
+		}
+
+		/* AOSP SurfaceImage.close() -> ImageReader.releaseImage() */
+		@Override
+		public void close() {
+			synchronized (mCloseLock) {
+				if (!mIsImageValid)
+					return;
+				mIsImageValid = false;
+				mAcquiredImages.remove(this);
+			}
+		}
+
+		private class SurfacePlane extends Image.Plane {
+			private final java.nio.ByteBuffer mBuffer;
+			private final int mRowStride;
+			private final int mPixelStride;
+
+			SurfacePlane(java.nio.ByteBuffer buffer, int rowStride, int pixelStride) {
+				mBuffer = buffer;
+				mRowStride = rowStride;
+				mPixelStride = pixelStride;
+			}
+
+			@Override
+			public int getRowStride() {
+				throwISEIfImageIsInvalid();
+				return mRowStride;
+			}
+
+			@Override
+			public int getPixelStride() {
+				throwISEIfImageIsInvalid();
+				return mPixelStride;
+			}
+
+			@Override
+			public java.nio.ByteBuffer getBuffer() {
+				throwISEIfImageIsInvalid();
+				return mBuffer;
+			}
+		}
 	}
 
 	public void setOnImageAvailableListener(OnImageAvailableListener listener, Handler handler) {
@@ -217,6 +392,7 @@ public class ImageReader implements AutoCloseable {
 				image.close();
 			}
 			mAcquiredImages.clear();
+			mQueuedImages.clear();
 		}
 	}
 
