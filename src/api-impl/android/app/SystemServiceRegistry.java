@@ -159,7 +159,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<TelephonyManager>() {
             @Override
             public TelephonyManager createService(ContextImpl ctx) {
-                return new TelephonyManager();
+                return new TelephonyManager(ctx);
             }});
 
         registerService(Context.AUDIO_SERVICE, AudioManager.class,
