@@ -1318,6 +1318,8 @@ srcs = [
 	'android/security/keystore/AndroidCAStore.java',
 	'android/security/keystore/AndroidKeyStore.java',
 	'android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java',
+	'android/security/keystore/AndroidKeyStoreECDSASignatureSpi.java',
+	'android/security/keystore/AndroidKeyStoreECPrivateKey.java',
 	'android/security/keystore/AndroidKeyStoreKeyPairGeneratorSpi.java',
 	'android/security/keystore/AndroidKeyStorePrivateKey.java',
 	'android/security/keystore/AndroidKeyStoreRSACipherSpi.java',
