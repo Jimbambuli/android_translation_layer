@@ -25,6 +25,12 @@ extern GtkWindow *window; // TODO: how do we get rid of this? the app won't pass
 
 static GHashTable *egl_surface_hashtable;
 
+/* the ANativeWindow of an EGL window surface ATL made, or NULL (also before the first one: no table yet) */
+static struct ANativeWindow *surface_native_window(EGLSurface surface)
+{
+	return egl_surface_hashtable ? g_hash_table_lookup(egl_surface_hashtable, surface) : NULL;
+}
+
 // temporary for debugging
 static void PrintConfigAttributes(EGLDisplay display, EGLConfig config)
 {
@@ -91,11 +97,20 @@ EGLBoolean bionic_eglPresentationTimeANDROID(EGLDisplay dpy, EGLSurface surface,
 
 EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface);
 
+/* EGL_ANDROID_get_native_client_buffer (eglGetNativeClientBufferANDROIDImpl()): the EGLClientBuffer of an
+ * AHardwareBuffer, for eglCreateImageKHR(EGL_NATIVE_BUFFER_ANDROID). There is no AHardwareBuffer here
+ * (AHardwareBuffer_allocate() fails), so there is no client buffer either; AOSP gives NULL for a NULL buffer too
+ * (with EGL_BAD_PARAMETER, which the host's eglGetError() does not know about). */
+EGLClientBuffer bionic_eglGetNativeClientBufferANDROID(const struct AHardwareBuffer *buffer)
+{
+	return NULL;
+}
+
 /* EGL_KHR_partial_update: the damage region is a hint; a window surface of an ANativeWindow is ATL's own back
  * buffer, which the host EGL does not know, so it is only accepted there */
 static EGLBoolean bionic_eglSetDamageRegionKHR(EGLDisplay display, EGLSurface surface, EGLint *rects, EGLint n_rects)
 {
-	if (g_hash_table_lookup(egl_surface_hashtable, surface))
+	if (surface_native_window(surface))
 		return EGL_TRUE;
 	EGLBoolean (*host)(EGLDisplay, EGLSurface, EGLint *, EGLint) = (void *)eglGetProcAddress("eglSetDamageRegionKHR");
 	return host ? host(display, surface, rects, n_rects) : EGL_FALSE;
@@ -111,6 +126,8 @@ void (*bionic_eglGetProcAddress(char const *procname))(void)
 {
 	if (__unlikely__(!strcmp(procname, "eglPresentationTimeANDROID")))
 		return (void (*)(void))bionic_eglPresentationTimeANDROID;
+	if (!strcmp(procname, "eglGetNativeClientBufferANDROID"))
+		return (void (*)(void))bionic_eglGetNativeClientBufferANDROID;
 	if (!getenv("ATL_DIRECT_EGL")) {
 		if (!strcmp(procname, "eglSetDamageRegionKHR"))
 			return (void (*)(void))bionic_eglSetDamageRegionKHR;
@@ -389,7 +406,7 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 {
 	if (wayland_pbuffers)
 		g_hash_table_remove(wayland_pbuffers, surface);
-	struct ANativeWindow *native_window = g_hash_table_lookup(egl_surface_hashtable, surface);
+	struct ANativeWindow *native_window = surface_native_window(surface);
 
 	if (!native_window)
 		return eglDestroySurface(display, surface);
@@ -545,7 +562,7 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 {
 	if (getenv("ATL_DIRECT_EGL"))
 		return eglMakeCurrent(display, draw, read, context);
-	struct ANativeWindow *native_window = g_hash_table_lookup(egl_surface_hashtable, draw);
+	struct ANativeWindow *native_window = surface_native_window(draw);
 	if (!native_window) {
 		return eglMakeCurrent(display, draw, read, context);
 	}
@@ -666,7 +683,7 @@ EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 		return EGL_TRUE;
 	if (getenv("ATL_DIRECT_EGL"))
 		return eglSwapBuffers(display, surface);
-	struct ANativeWindow *native_window = g_hash_table_lookup(egl_surface_hashtable, surface);
+	struct ANativeWindow *native_window = surface_native_window(surface);
 	if (!native_window) {
 		return eglSwapBuffers(display, surface);
 	}
@@ -695,7 +712,7 @@ EGLBoolean bionic_eglQuerySurface(EGLDisplay display, EGLSurface surface, EGLint
 {
 	if (getenv("ATL_DIRECT_EGL"))
 		return eglQuerySurface(display, surface, attribute, value);
-	struct ANativeWindow *native_window = g_hash_table_lookup(egl_surface_hashtable, surface);
+	struct ANativeWindow *native_window = surface_native_window(surface);
 	if (!native_window)
 		return eglQuerySurface(display, surface, attribute, value);
 	if (attribute == EGL_WIDTH) {
