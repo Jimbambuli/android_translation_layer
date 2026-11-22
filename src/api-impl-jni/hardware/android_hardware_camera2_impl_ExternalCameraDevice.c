@@ -10,6 +10,8 @@
  */
 
 #include <fcntl.h>
+#include <linux/dma-buf.h>
+#include <sys/ioctl.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -456,6 +458,15 @@ static void on_stream_param_changed(void *data, uint32_t id, const struct spa_po
 			s->packet = av_packet_alloc();
 		}
 	}
+	/* the buffers must be shareable with this process: a camera of PipeWire's V4L2 plugin exports them
+	 * (VIDIOC_EXPBUF) only when the consumer takes DMA-BUF or memfd; its in-process mmap (MemPtr) cannot reach
+	 * another process (the daemon's client-node refuses it: "use input buffers: -22") */
+	uint8_t buffer[256];
+	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
+	const struct spa_pod *params[1];
+	params[0] = spa_pod_builder_add_object(&b, SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
+	                                       SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int((1 << SPA_DATA_MemFd) | (1 << SPA_DATA_DmaBuf)));
+	pw_stream_update_params(s->stream, params, 1);
 }
 
 struct deliver_data {
@@ -532,6 +543,11 @@ static void on_stream_process(void *data)
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now); /* AOSP SENSOR_INFO_TIMESTAMP_SOURCE_UNKNOWN: the time of arrival */
 	gint64 timestamp_ns = now.tv_sec * 1000000000LL + now.tv_nsec;
+	/* a DMA-BUF is read by the CPU between the sync calls of the dma-buf API */
+	struct spa_data *d0 = &b->buffer->datas[0];
+	gboolean dmabuf = d0->type == SPA_DATA_DmaBuf && d0->fd >= 0;
+	if (dmabuf)
+		ioctl(d0->fd, DMA_BUF_IOCTL_SYNC, &(struct dma_buf_sync){DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ});
 	AVFrame raw = {0};
 	AVFrame *frame = buffer_frame(s, b->buffer, &raw);
 	static unsigned frames;
@@ -588,6 +604,8 @@ static void on_stream_process(void *data)
 			(*env)->ExceptionDescribe(env);
 		s->current = NULL;
 	}
+	if (dmabuf)
+		ioctl(d0->fd, DMA_BUF_IOCTL_SYNC, &(struct dma_buf_sync){DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ});
 	pw_stream_queue_buffer(s->stream, b);
 }
 
