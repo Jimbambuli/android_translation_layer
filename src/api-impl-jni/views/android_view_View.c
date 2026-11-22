@@ -1416,6 +1416,7 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetFullscreen(JNIEnv *env, j
 	if (fullscreen) {
 		if (gtk_window_is_maximized(window)) {
 			gtk_window_fullscreen(window);
+			g_object_set_data(G_OBJECT(window), "atl-fullscreen-by-flags", GINT_TO_POINTER(1));
 			// Android apps expect the fullscreen to happen immediately, so we need to mock the fullscreened window size
 			if (ATL_IS_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget))) {
 				AndroidLayout *layout = ATL_ANDROID_LAYOUT(gtk_widget_get_layout_manager(widget));
@@ -1435,7 +1436,10 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetFullscreen(JNIEnv *env, j
 		} else {
 			printf("blocking fullscreen request, because window is not maximized\n");
 		}
-	} else if (!getenv("ATL_FORCE_FULLSCREEN")) {
+	} else if (g_object_get_data(G_OBJECT(window), "atl-fullscreen-by-flags") && !getenv("ATL_FORCE_FULLSCREEN")) {
+		/* like ViewRootImpl.controlInsetsForCompatibility(): the bars come back only when the flags hid them
+		 * (mTypesHiddenByFlags), so a window that the flags did not make fullscreen is left alone */
+		g_object_set_data(G_OBJECT(window), "atl-fullscreen-by-flags", NULL);
 		gtk_window_unfullscreen(window);
 	}
 }
