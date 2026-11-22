@@ -116,7 +116,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	private SizeConfigurationBuckets mSizeConfigurations;
 
 	public static Activity internalCreateActivity(String className, long native_window, Intent intent) throws ReflectiveOperationException {
-		Activity activity = ATLLoadedApp.getPrimaryApplication().createActivity(className, intent);
+		/* like AOSP, the activity of the component's package: the app's own, or one of a package that runs in the
+		 * app's process (Play Services, e.g. microG's sign-in from AccountManager); the system's (package "android")
+		 * are created as before */
+		ATLLoadedApp app = ATLLoadedApp.getPrimaryApplication();
+		String packageName = intent != null && intent.getComponent() != null ? intent.getComponent().getPackageName() : null;
+		if (packageName != null && !packageName.equals(app.pkg.packageName) && ATLLoadedApp.play_services.contains(packageName)) {
+			ATLLoadedApp target = android.atl.ATLLoadedAppManager.getAppFromPackageName(packageName);
+			if (target != null)
+				app = target;
+		}
+		Activity activity = app.createActivity(className, intent);
 		activity.window.set_native_window(native_window);
 		return activity;
 	}
