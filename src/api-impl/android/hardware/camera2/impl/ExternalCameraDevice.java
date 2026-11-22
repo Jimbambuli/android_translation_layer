@@ -80,6 +80,7 @@ public final class ExternalCameraDevice {
 	private static List<ExternalCameraDevice> sDevices; /* null until PipeWire is connected */
 	private static Boolean sPresent;                    /* the portal's IsCameraPresent, read once */
 	private static boolean sDenied;                     /* the user refused the camera portal */
+	private static boolean sTriedSilently;
 
 	private final int mIndex;
 	private final String mId;
@@ -101,7 +102,9 @@ public final class ExternalCameraDevice {
 	 * characteristics fail, i.e. one without supported formats); with requestAccess, inside a Flatpak the camera
 	 * portal asks the user if needed. Empty without a connection */
 	public static synchronized List<ExternalCameraDevice> getDevices(boolean requestAccess) {
-		if (sDevices == null && !(sDenied && requestAccess)) {
+		/* without access: one silent try (the portal's remote opens without a dialog once the user allowed the app) */
+		if (sDevices == null && !(sDenied && requestAccess) && (requestAccess || !sTriedSilently)) {
+			sTriedSilently = true;
 			int count = nativeInit(requestAccess);
 			if (count == -2)
 				sDenied = true;

@@ -24,6 +24,8 @@ import java.util.List;
  * annotations removed). */
 public class Camera {
 	private static final String TAG = "Camera";
+	/* ATL_CAMERA_DEBUG: the API 1 calls in the log */
+	static final boolean DEBUG = System.getenv("ATL_CAMERA_DEBUG") != null;
 
 	public static final String ACTION_NEW_PICTURE = "android.hardware.action.NEW_PICTURE";
 	public static final String ACTION_NEW_VIDEO = "android.hardware.action.NEW_VIDEO";
@@ -139,6 +141,8 @@ public class Camera {
 
 	/* AOSP Camera(int) -> cameraInit() -> native_setup(); the errors as AOSP reports them */
 	Camera(int cameraId) {
+		if (DEBUG)
+			Log.i(TAG, "open " + cameraId);
 		Looper looper;
 		if ((looper = Looper.myLooper()) != null) {
 			mEventHandler = new EventHandler(this, looper);
@@ -281,6 +285,8 @@ public class Camera {
 
 	/* AOSP release() -> native_release(): the client disconnects; release() of a released camera does nothing */
 	public final void release() {
+		if (DEBUG)
+			Log.i(TAG, "release");
 		Camera2Client client;
 		synchronized (mContextLock) {
 			client = mClient;
@@ -313,6 +319,8 @@ public class Camera {
 	}
 
 	public final void setPreviewDisplay(SurfaceHolder holder) throws IOException {
+		if (DEBUG)
+			Log.i(TAG, "setPreviewDisplay");
 		if (holder != null) {
 			setPreviewSurface(holder.getSurface());
 		} else {
@@ -327,6 +335,8 @@ public class Camera {
 
 	/* AOSP: a Surface on the SurfaceTexture's buffer queue */
 	public final void setPreviewTexture(SurfaceTexture surfaceTexture) throws IOException {
+		if (DEBUG)
+			Log.i(TAG, "setPreviewTexture");
 		Camera2Client client = client();
 		if (surfaceTexture != null && surfaceTexture.isReleased())
 			throw new IllegalArgumentException("SurfaceTexture already released in setPreviewTexture");
@@ -335,11 +345,15 @@ public class Camera {
 	}
 
 	public final void startPreview() {
+		if (DEBUG)
+			Log.i(TAG, "startPreview");
 		if (!client().startPreview())
 			throw new RuntimeException("startPreview failed");
 	}
 
 	public final void stopPreview() {
+		if (DEBUG)
+			Log.i(TAG, "stopPreview");
 		client().stopPreview();
 		mFaceDetectionRunning = false;
 		mShutterCallback = null;
@@ -364,6 +378,8 @@ public class Camera {
 	}
 
 	public final void setPreviewCallback(PreviewCallback cb) {
+		if (DEBUG)
+			Log.i(TAG, "setPreviewCallback");
 		mPreviewCallback = cb;
 		mOneShot = false;
 		mWithBuffer = false;
@@ -371,6 +387,8 @@ public class Camera {
 	}
 
 	public final void setOneShotPreviewCallback(PreviewCallback cb) {
+		if (DEBUG)
+			Log.i(TAG, "setOneShotPreviewCallback");
 		mPreviewCallback = cb;
 		mOneShot = true;
 		mWithBuffer = false;
@@ -378,6 +396,8 @@ public class Camera {
 	}
 
 	public final void setPreviewCallbackWithBuffer(PreviewCallback cb) {
+		if (DEBUG)
+			Log.i(TAG, "setPreviewCallbackWithBuffer");
 		mPreviewCallback = cb;
 		mOneShot = false;
 		mWithBuffer = true;
@@ -541,6 +561,8 @@ public class Camera {
 
 	/* AOSP takePicture() -> native_takePicture() -> Camera2Client::takePicture() */
 	public final void takePicture(ShutterCallback shutter, PictureCallback raw, PictureCallback postview, PictureCallback jpeg) {
+		if (DEBUG)
+			Log.i(TAG, "takePicture");
 		mShutterCallback = shutter;
 		mRawImageCallback = raw;
 		mPostviewCallback = postview;
@@ -560,6 +582,8 @@ public class Camera {
 	}
 
 	public final void setDisplayOrientation(int degrees) {
+		if (DEBUG)
+			Log.i(TAG, "setDisplayOrientation");
 		if (!client().setDisplayOrientation(degrees))
 			throw new RuntimeException("set display orientation failed");
 	}
@@ -596,6 +620,8 @@ public class Camera {
 	}
 
 	public void setParameters(Parameters params) {
+		if (DEBUG)
+			Log.i(TAG, "setParameters");
 		if (!client().setParameters(params.flatten()))
 			throw new RuntimeException("setParameters failed");
 	}

@@ -504,18 +504,34 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 		synchronized (mLock) {
 			Camera.Size previewSize = newParams.getPreviewSize();
 			if (previewSize == null)
-				return false;
+				{
+					if (Camera.DEBUG)
+						android.util.Log.i("Camera", "setParameters: check at line 507 fails");
+					return false;
+				}
 			if (previewSize.width != mPreviewWidth || previewSize.height != mPreviewHeight) {
 				if (mState >= PREVIEW)
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 510 fails");
+						return false;
+					}
 				if (!mAvailablePreviewSizes.contains(new Size(previewSize.width, previewSize.height)))
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 512 fails");
+						return false;
+					}
 			}
 			boolean recordingHint = "true".equals(newParams.get("recording-hint"));
 			String fpsSingle = newParams.get("preview-frame-rate");
 			String fpsRange = newParams.get("preview-fps-range");
 			if (fpsRange == null && fpsSingle == null)
-				return false;
+				{
+					if (Camera.DEBUG)
+						android.util.Log.i("Camera", "setParameters: check at line 518 fails");
+					return false;
+				}
 			/* CameraParameters2::compareSetOrder(): the key set later comes later in the string */
 			boolean fpsUseSingleValue = fpsRange == null || (fpsSingle != null && flattened.indexOf("preview-frame-rate=") > flattened.indexOf("preview-fps-range="));
 			int[] range = new int[2];
@@ -528,7 +544,11 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 				for (Range<Integer> r : available)
 					found |= r.getLower() == range[0] && r.getUpper() == range[1];
 				if (!found)
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 531 fails");
+						return false;
+					}
 			} else {
 				int previewFps = newParams.getPreviewFrameRate();
 				List<Range<Integer>> candidates = new ArrayList<Range<Integer>>();
@@ -540,7 +560,11 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 						(r.getUpper() <= MAX_DEFAULT_FPS ? candidates : fastCandidates).add(r);
 				}
 				if (candidates.isEmpty() && fastCandidates.isEmpty())
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 543 fails");
+						return false;
+					}
 				List<Range<Integer>> ranges = candidates.isEmpty() ? fastCandidates : candidates;
 				Range<Integer> best = ranges.get(0);
 				for (Range<Integer> r : ranges) {
@@ -565,21 +589,37 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 			int previewFormat = "yuv420sp".equals(formatName) ? HAL_PIXEL_FORMAT_YCRCB_420_SP : "yuv420p".equals(formatName) ? HAL_PIXEL_FORMAT_YV12 : -1;
 			if (previewFormat != mPreviewFormat) {
 				if (mState >= PREVIEW)
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 568 fails");
+						return false;
+					}
 				/* useFlexibleYuv: NV21 and YV12 from YCbCr_420_888; nothing else */
 				if (previewFormat == -1)
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 571 fails");
+						return false;
+					}
 			}
 
 			Camera.Size pictureSize = newParams.getPictureSize();
 			if (pictureSize == null)
-				return false;
+				{
+					if (Camera.DEBUG)
+						android.util.Log.i("Camera", "setParameters: check at line 576 fails");
+					return false;
+				}
 			if (pictureSize.width != mPictureWidth || pictureSize.height != mPictureHeight) {
 				boolean found = false;
 				for (Size size : jpegSizes())
 					found |= size.getWidth() == pictureSize.width && size.getHeight() == pictureSize.height;
 				if (!found)
-					return false;
+					{
+						if (Camera.DEBUG)
+							android.util.Log.i("Camera", "setParameters: check at line 582 fails");
+						return false;
+					}
 			}
 
 			mPreviewWidth = previewSize.width;
@@ -590,7 +630,11 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 			String quality = newParams.get("jpeg-quality");
 			int jpegQuality = quality != null ? Integer.parseInt(quality) : mJpegQuality;
 			if (jpegQuality < 1 || jpegQuality > 100)
-				return false;
+				{
+					if (Camera.DEBUG)
+						android.util.Log.i("Camera", "setParameters: check at line 593 fails");
+					return false;
+				}
 
 			mPictureWidth = pictureSize.width;
 			mPictureHeight = pictureSize.height;
@@ -635,6 +679,8 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 				if (mState == PREVIEW)
 					return true;
 				if (mPreviewSurface == null) {
+					if (Camera.DEBUG)
+						android.util.Log.i("Camera", "startPreview: waiting for a preview window");
 					mState = WAITING_FOR_PREVIEW_WINDOW;
 					return true;
 				}
@@ -646,6 +692,8 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 			mHal.stopStream(this); /* a still capture's stream (picture size) may still run */
 			mHal.setTargets(this, Collections.singletonList(target));
 			boolean started = mHal.startStream(this, width, height, maxFps);
+			if (Camera.DEBUG)
+				android.util.Log.i("Camera", "startPreview " + width + "x" + height + " @" + maxFps + " target " + target + ": " + started);
 			if (!started)
 				mHal.setTargets(this, Collections.<Surface>emptyList());
 			synchronized (mLock) {

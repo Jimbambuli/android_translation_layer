@@ -87,6 +87,15 @@ static GPtrArray *nodes; /* struct camera_node, in the order PipeWire announced 
 static int pending_seq;
 static gboolean synced;
 
+/* ATL_CAMERA_DEBUG: the stream's steps on stderr */
+static gboolean camera_debug(void)
+{
+	static int debug = -1;
+	if (debug < 0)
+		debug = getenv("ATL_CAMERA_DEBUG") != NULL;
+	return debug;
+}
+
 static enum AVPixelFormat raw_pix_fmt(uint32_t format)
 {
 	switch (format) {
@@ -400,6 +409,8 @@ static void stream_error(struct camera_stream *s, const char *message)
 static void on_stream_state_changed(void *data, enum pw_stream_state old, enum pw_stream_state state, const char *error)
 {
 	struct camera_stream *s = data;
+	if (camera_debug())
+		fprintf(stderr, "camera: stream %s -> %s %s\n", pw_stream_state_as_string(old), pw_stream_state_as_string(state), error ? error : "");
 	if (state == PW_STREAM_STATE_ERROR || (state == PW_STREAM_STATE_UNCONNECTED && old >= PW_STREAM_STATE_PAUSED))
 		stream_error(s, error);
 }
@@ -411,6 +422,8 @@ static void on_stream_param_changed(void *data, uint32_t id, const struct spa_po
 	if (id != SPA_PARAM_Format || !param || spa_format_parse(param, &media_type, &media_subtype) < 0)
 		return;
 	s->subtype = media_subtype;
+	if (camera_debug())
+		fprintf(stderr, "camera: format negotiated, subtype %u\n", media_subtype);
 	if (media_subtype == SPA_MEDIA_SUBTYPE_raw) {
 		struct spa_video_info_raw info;
 		if (spa_format_video_raw_parse(param, &info) < 0)
@@ -442,6 +455,9 @@ struct deliver_data {
 static gboolean deliver(void *data)
 {
 	struct deliver_data *d = data;
+	static unsigned delivered;
+	if (camera_debug() && delivered++ % 60 == 0)
+		fprintf(stderr, "camera: delivered %u: widget %p texture-target %p remote %p\n", delivered, (void *)d->target.surface_view_widget, (void *)d->target.surface_texture, (void *)d->target.remote);
 	surface_target_deliver(&d->target, d->texture, d->timestamp_ns, FALSE);
 	g_free(d);
 	return G_SOURCE_REMOVE;
@@ -506,6 +522,10 @@ static void on_stream_process(void *data)
 	gint64 timestamp_ns = now.tv_sec * 1000000000LL + now.tv_nsec;
 	AVFrame raw = {0};
 	AVFrame *frame = buffer_frame(s, b->buffer, &raw);
+	static unsigned frames;
+	if (camera_debug() && frames++ % 30 == 0)
+		fprintf(stderr, "camera: buffer %u: %s %dx%d, %d targets, data %p size %u\n", frames, frame ? "frame" : "no frame",
+		        frame ? frame->width : 0, frame ? frame->height : 0, s->n_targets, b->buffer->datas[0].data, b->buffer->datas[0].chunk ? b->buffer->datas[0].chunk->size : 0);
 	if (frame) {
 		JNIEnv *env;
 		(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
@@ -625,6 +645,8 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevi
 
 	int ret = pw_stream_connect(s->stream, PW_DIRECTION_INPUT, PW_ID_ANY,
 	                            PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS, params, 1);
+	if (camera_debug())
+		fprintf(stderr, "camera: connect %s %dx%d %d/%d (subtype %u): %d\n", s->node->serial, mode->width, mode->height, mode->fps_num, mode->fps_den, mode->subtype, ret);
 	pw_thread_loop_unlock(loop);
 	return ret >= 0;
 }
@@ -643,6 +665,8 @@ JNIEXPORT void JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_n
 			count++;
 		(*env)->DeleteLocalRef(env, surface);
 	}
+	if (camera_debug())
+		fprintf(stderr, "camera: %d of %d surfaces are targets\n", count, n);
 	pw_thread_loop_lock(loop);
 	struct surface_target *old = s->targets;
 	int n_old = s->n_targets;
