@@ -958,6 +958,9 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	 * @see #getAxisValue(int, int)
 	 */
 	public static final int AXIS_SCROLL = 26;
+	/* the axes of AOSP 16 that ATL did not have (core/java/android/view/MotionEvent.java) */
+	public static final int AXIS_RELATIVE_X = 27;
+	public static final int AXIS_RELATIVE_Y = 28;
 
 	/**
 	 * Axis constant: Generic 1 axis of a motion event.
@@ -1134,6 +1137,12 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	 * @see InputDevice#getMotionRange
 	 */
 	public static final int AXIS_GENERIC_16 = 47;
+	public static final int AXIS_GESTURE_X_OFFSET = 48;
+	public static final int AXIS_GESTURE_Y_OFFSET = 49;
+	public static final int AXIS_GESTURE_SCROLL_X_DISTANCE = 50;
+	public static final int AXIS_GESTURE_SCROLL_Y_DISTANCE = 51;
+	public static final int AXIS_GESTURE_PINCH_SCALE_FACTOR = 52;
+	public static final int AXIS_GESTURE_SWIPE_FINGER_COUNT = 53;
 
 	// NOTE: If you add a new axis here you must also add it to:
 	//  native/include/android/input.h
@@ -1170,6 +1179,8 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		names.append(AXIS_DISTANCE, "AXIS_DISTANCE");
 		names.append(AXIS_TILT, "AXIS_TILT");
 		names.append(AXIS_SCROLL, "AXIS_SCROLL");
+		names.append(AXIS_RELATIVE_X, "AXIS_RELATIVE_X");
+		names.append(AXIS_RELATIVE_Y, "AXIS_RELATIVE_Y");
 		names.append(AXIS_GENERIC_1, "AXIS_GENERIC_1");
 		names.append(AXIS_GENERIC_2, "AXIS_GENERIC_2");
 		names.append(AXIS_GENERIC_3, "AXIS_GENERIC_3");
@@ -1186,6 +1197,12 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		names.append(AXIS_GENERIC_14, "AXIS_GENERIC_14");
 		names.append(AXIS_GENERIC_15, "AXIS_GENERIC_15");
 		names.append(AXIS_GENERIC_16, "AXIS_GENERIC_16");
+		names.append(AXIS_GESTURE_X_OFFSET, "AXIS_GESTURE_X_OFFSET");
+		names.append(AXIS_GESTURE_Y_OFFSET, "AXIS_GESTURE_Y_OFFSET");
+		names.append(AXIS_GESTURE_SCROLL_X_DISTANCE, "AXIS_GESTURE_SCROLL_X_DISTANCE");
+		names.append(AXIS_GESTURE_SCROLL_Y_DISTANCE, "AXIS_GESTURE_SCROLL_Y_DISTANCE");
+		names.append(AXIS_GESTURE_PINCH_SCALE_FACTOR, "AXIS_GESTURE_PINCH_SCALE_FACTOR");
+		names.append(AXIS_GESTURE_SWIPE_FINGER_COUNT, "AXIS_GESTURE_SWIPE_FINGER_COUNT");
 	}
 
 	/**
@@ -1438,6 +1455,11 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	/* the edges of the screen the event touched (EDGE_*), as given to obtain() or setEdgeFlags() */
 	private int mEdgeFlags;
 	float[] coords;
+	/* the device (getDeviceId()): given to obtain(); the pointer events of GTK keep 1 */
+	int deviceId = 1;
+	/* the axes of the pointers as given to obtain(..., PointerCoords[], ...), beyond x and y (the joysticks of
+	 * game controllers: AXIS_Z, AXIS_HAT_X, ...); null for the events of GTK */
+	PointerCoords[] axes;
 
 	/* probably don't need multitouch handling for this...? */
 	float scroll_dx;
@@ -1642,6 +1664,8 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		ev.buttonState = 0;
 		ev.actionButton = 0;
 		ev.metaState = 0;
+		ev.deviceId = 1;
+		ev.axes = null;
 		return ev;
 	}
 
@@ -1690,9 +1714,12 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		ev.eventTime = eventTime;
 		ev.buttonState = buttonState;
 		ev.metaState = metaState;
+		ev.deviceId = deviceId;
 		ev.ids = new int[pointerCount];
 		ev.coords = new float[pointerCount * 4];
+		ev.axes = new PointerCoords[pointerCount];
 		for (int i = 0; i < pointerCount; i++) {
+			ev.axes[i] = new PointerCoords(pointerCoords[i]);
 			ev.ids[i] = pointerProperties[i].id;
 			ev.coords[i * 4] = pointerCoords[i].x;
 			ev.coords[i * 4 + 1] = pointerCoords[i].y;
@@ -1908,6 +1935,12 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		ev.mEdgeFlags = other.mEdgeFlags;
 		ev.coords = other.coords.clone();
 		ev.eventTime = other.eventTime;
+		ev.deviceId = other.deviceId;
+		if (other.axes != null) {
+			ev.axes = new PointerCoords[other.axes.length];
+			for (int i = 0; i < other.axes.length; i++)
+				ev.axes[i] = new PointerCoords(other.axes[i]);
+		}
 
 		return ev;
 	}
@@ -1973,8 +2006,7 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	 */
 	@Override
 	public final int getDeviceId() {
-		return 1; // FIXME: implement this properly
-			  //return nativeGetDeviceId(mNativePtr);
+		return deviceId;
 	}
 
 	/**
@@ -2279,11 +2311,7 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	 * @see #AXIS_Y
 	 */
 	public final float getAxisValue(int axis) {
-		if (axis == AXIS_HSCROLL)
-			return scroll_dx;
-		else if (axis == AXIS_VSCROLL)
-			return scroll_dy;
-		return nativeGetAxisValue(mNativePtr, axis, 0, HISTORY_CURRENT);
+		return getAxisValue(axis, 0);
 	}
 
 	/**
@@ -2520,7 +2548,25 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	 * @see #AXIS_Y
 	 */
 	@Export("getAxisValueAt")
+	/* AOSP: the axis of the pointer's PointerCoords; x and y are ATL's coordinates (with the offset of
+	 * offsetLocation()), the scroll axes those of a scroll event, the others those given to obtain() */
 	public final float getAxisValue(int axis, int pointerIndex) {
+		switch (axis) {
+			case AXIS_X:
+				return getX(pointerIndex);
+			case AXIS_Y:
+				return getY(pointerIndex);
+			case AXIS_HSCROLL:
+				if (axes == null)
+					return pointerIndex == 0 ? scroll_dx : 0;
+				break;
+			case AXIS_VSCROLL:
+				if (axes == null)
+					return pointerIndex == 0 ? scroll_dy : 0;
+				break;
+		}
+		if (axes != null)
+			return axes[pointerIndex].getAxisValue(axis);
 		return nativeGetAxisValue(mNativePtr, axis, pointerIndex, HISTORY_CURRENT);
 	}
 
@@ -2537,6 +2583,8 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	public final void getPointerCoords(int pointerIndex, PointerCoords outPointerCoords) {
 		// nativeGetPointerCoords(mNativePtr, pointerIndex, HISTORY_CURRENT, outPointerCoords);
 		outPointerCoords.clear();
+		if (axes != null)
+			outPointerCoords.copyFrom(axes[pointerIndex]);
 		outPointerCoords.x = getX(pointerIndex);
 		outPointerCoords.y = getY(pointerIndex);
 	}
@@ -3518,18 +3566,16 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 	 * @return The axis or -1 if not found.
 	 * @see KeyEvent#keyCodeToString(int)
 	 */
+	/* AOSP 16 axisFromString(): a label with "AXIS_" (InputEventLabels.cpp), else the number */
 	public static int axisFromString(String symbolicName) {
-		if (symbolicName == null) {
-			throw new IllegalArgumentException("symbolicName must not be null");
-		}
-
-		final int count = AXIS_SYMBOLIC_NAMES.size();
-		for (int i = 0; i < count; i++) {
-			if (symbolicName.equals(AXIS_SYMBOLIC_NAMES.valueAt(i))) {
-				return i;
+		if (symbolicName.startsWith("AXIS_")) {
+			final int count = AXIS_SYMBOLIC_NAMES.size();
+			for (int i = 0; i < count; i++) {
+				if (symbolicName.equals(AXIS_SYMBOLIC_NAMES.valueAt(i))) {
+					return AXIS_SYMBOLIC_NAMES.keyAt(i);
+				}
 			}
 		}
-
 		try {
 			return Integer.parseInt(symbolicName, 10);
 		} catch (NumberFormatException ex) {
