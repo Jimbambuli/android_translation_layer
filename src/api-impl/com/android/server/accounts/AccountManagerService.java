@@ -12,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Binder;
 import android.os.Bundle;
@@ -20,6 +21,8 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.Slog;
+import com.android.internal.util.Preconditions;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -351,6 +354,168 @@ public final class AccountManagerService {
 		}.bind();
 	}
 
+	/* AOSP checkPermissionAndNote(callerPkg, uid, GET_PASSWORD): GET_PASSWORD is a signature permission, so only
+	 * the system gets the password at the end of an add-account or update-credentials session */
+	private boolean isPasswordForwardingAllowed() {
+		return mContext.checkCallingOrSelfPermission("android.permission.GET_PASSWORD") == PackageManager.PERMISSION_GRANTED;
+	}
+
+	public void startAddAccountSession(IAccountManagerResponse response, final String accountType, final String authTokenType,
+	                                   final String[] requiredFeatures, boolean expectActivityLaunch, Bundle optionsIn) {
+		Preconditions.checkArgument(response != null, "response cannot be null");
+		Preconditions.checkArgument(accountType != null, "accountType cannot be null");
+		final Bundle options = (optionsIn == null) ? new Bundle() : optionsIn;
+		options.putInt(AccountManager.KEY_CALLER_UID, Binder.getCallingUid());
+		options.putInt(AccountManager.KEY_CALLER_PID, Binder.getCallingPid());
+		new StartAccountSession(response, accountType, expectActivityLaunch, null, isPasswordForwardingAllowed()) {
+			@Override
+			public void run() throws RemoteException {
+				mAuthenticator.startAddAccountSession(this, mAccountType, authTokenType, requiredFeatures, options);
+			}
+		}.bind();
+	}
+
+	public void startUpdateCredentialsSession(IAccountManagerResponse response, final Account account, final String authTokenType,
+	                                          boolean expectActivityLaunch, final Bundle loginOptions) {
+		if (response == null)
+			throw new IllegalArgumentException("response is null");
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		new StartAccountSession(response, account.type, expectActivityLaunch, account.name, isPasswordForwardingAllowed()) {
+			@Override
+			public void run() throws RemoteException {
+				mAuthenticator.startUpdateCredentialsSession(this, account, authTokenType, loginOptions);
+			}
+		}.bind();
+	}
+
+	/* finishSessionAsUser(): the session bundle is the one StartAccountSession encrypted; its account type picks the
+	 * authenticator, appInfo and the caller's uid/pid are added for the add-account or update-credentials flow */
+	public void finishSession(IAccountManagerResponse response, Bundle sessionBundle, boolean expectActivityLaunch, Bundle appInfo) {
+		Preconditions.checkArgument(response != null, "response cannot be null");
+		if (sessionBundle == null || sessionBundle.size() == 0)
+			throw new IllegalArgumentException("sessionBundle is empty");
+		final Bundle decryptedBundle;
+		final String accountType;
+		try {
+			decryptedBundle = CryptoHelper.getInstance().decryptBundle(sessionBundle);
+			if (decryptedBundle == null) {
+				onError(response, AccountManager.ERROR_CODE_BAD_REQUEST, "failed to decrypt session bundle");
+				return;
+			}
+			accountType = decryptedBundle.getString(AccountManager.KEY_ACCOUNT_TYPE);
+			if (TextUtils.isEmpty(accountType)) {
+				onError(response, AccountManager.ERROR_CODE_BAD_ARGUMENTS, "accountType is empty");
+				return;
+			}
+			if (appInfo != null)
+				decryptedBundle.putAll(appInfo);
+			decryptedBundle.putInt(AccountManager.KEY_CALLER_UID, Binder.getCallingUid());
+			decryptedBundle.putInt(AccountManager.KEY_CALLER_PID, Binder.getCallingPid());
+		} catch (GeneralSecurityException e) {
+			onError(response, AccountManager.ERROR_CODE_BAD_REQUEST, "failed to decrypt session bundle");
+			return;
+		}
+		new Session(response, accountType, expectActivityLaunch, true, null) {
+			@Override
+			public void run() throws RemoteException {
+				mAuthenticator.finishSession(this, mAccountType, decryptedBundle);
+			}
+		}.bind();
+	}
+
+	public void isCredentialsUpdateSuggested(IAccountManagerResponse response, final Account account, final String statusToken) {
+		if (response == null)
+			throw new IllegalArgumentException("response is null");
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (TextUtils.isEmpty(statusToken))
+			throw new IllegalArgumentException("status token is empty");
+		new Session(response, account.type, false, false, account.name) {
+			@Override
+			public void run() throws RemoteException {
+				mAuthenticator.isCredentialsUpdateSuggested(this, account, statusToken);
+			}
+
+			@Override
+			public void onResult(Bundle result) {
+				IAccountManagerResponse response = getResponseAndClose();
+				if (response == null)
+					return;
+				if (result == null) {
+					AccountManagerService.onError(response, AccountManager.ERROR_CODE_INVALID_RESPONSE, "null bundle");
+					return;
+				}
+				if (result.getInt(AccountManager.KEY_ERROR_CODE, -1) > 0) {
+					AccountManagerService.onError(response, result.getInt(AccountManager.KEY_ERROR_CODE),
+					                              result.getString(AccountManager.KEY_ERROR_MESSAGE));
+					return;
+				}
+				if (!result.containsKey(AccountManager.KEY_BOOLEAN_RESULT)) {
+					AccountManagerService.onError(response, AccountManager.ERROR_CODE_INVALID_RESPONSE, "no result in response");
+					return;
+				}
+				final Bundle newResult = new Bundle();
+				newResult.putBoolean(AccountManager.KEY_BOOLEAN_RESULT, result.getBoolean(AccountManager.KEY_BOOLEAN_RESULT, false));
+				AccountManagerService.onResult(response, newResult);
+			}
+		}.bind();
+	}
+
+	/* StartAccountSession: a Session whose KEY_ACCOUNT_SESSION_BUNDLE is encrypted (CryptoHelper) before it goes to
+	 * the caller, without the password unless the caller may have it, and never with the auth token */
+	private abstract class StartAccountSession extends Session {
+		private final boolean mIsPasswordForwardingAllowed;
+
+		StartAccountSession(IAccountManagerResponse response, String accountType, boolean expectActivityLaunch,
+		                    String accountName, boolean isPasswordForwardingAllowed) {
+			super(response, accountType, expectActivityLaunch, true, accountName);
+			mIsPasswordForwardingAllowed = isPasswordForwardingAllowed;
+		}
+
+		@Override
+		public void onResult(Bundle result) {
+			if (result != null && !checkKeyIntent(result)) {
+				onError(AccountManager.ERROR_CODE_INVALID_RESPONSE, "invalid intent in bundle returned");
+				return;
+			}
+			IAccountManagerResponse response;
+			if (mExpectActivityLaunch && result != null && result.containsKey(AccountManager.KEY_INTENT)) {
+				response = mResponse;
+			} else {
+				response = getResponseAndClose();
+			}
+			if (response == null)
+				return;
+			if (result == null) {
+				AccountManagerService.onError(response, AccountManager.ERROR_CODE_INVALID_RESPONSE, "null bundle returned");
+				return;
+			}
+			if (result.getInt(AccountManager.KEY_ERROR_CODE, -1) > 0) {
+				AccountManagerService.onError(response, result.getInt(AccountManager.KEY_ERROR_CODE),
+				                              result.getString(AccountManager.KEY_ERROR_MESSAGE));
+				return;
+			}
+			if (!mIsPasswordForwardingAllowed)
+				result.remove(AccountManager.KEY_PASSWORD);
+			result.remove(AccountManager.KEY_AUTHTOKEN);
+			Bundle sessionBundle = result.getBundle(AccountManager.KEY_ACCOUNT_SESSION_BUNDLE);
+			if (sessionBundle != null) {
+				String accountType = sessionBundle.getString(AccountManager.KEY_ACCOUNT_TYPE);
+				if (TextUtils.isEmpty(accountType) || !mAccountType.equalsIgnoreCase(accountType))
+					Slog.w(TAG, "Account type in session bundle doesn't match request.");
+				sessionBundle.putString(AccountManager.KEY_ACCOUNT_TYPE, mAccountType);
+				try {
+					result.putBundle(AccountManager.KEY_ACCOUNT_SESSION_BUNDLE, CryptoHelper.getInstance().encryptBundle(sessionBundle));
+				} catch (GeneralSecurityException e) {
+					AccountManagerService.onError(response, AccountManager.ERROR_CODE_INVALID_RESPONSE, "failed to encrypt session bundle");
+					return;
+				}
+			}
+			AccountManagerService.onResult(response, result);
+		}
+	}
+
 	/* Session: binds the authenticator, runs the request and answers the caller */
 	private abstract class Session extends IAccountAuthenticatorResponse.Stub implements ServiceConnection {
 		private final Object mSessionLock = new Object();
@@ -434,7 +599,7 @@ public final class AccountManagerService {
 
 		/* checkKeyIntent(): an intent in the result must start an activity of the authenticator's package (AOSP: of
 		 * a package with the authenticator's signature) or an exported activity of the system */
-		private boolean checkKeyIntent(Bundle bundle) {
+		boolean checkKeyIntent(Bundle bundle) {
 			Intent intent = bundle.getParcelable(AccountManager.KEY_INTENT, Intent.class);
 			if (intent == null)
 				return true;

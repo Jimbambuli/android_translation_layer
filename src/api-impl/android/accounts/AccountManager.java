@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.RemoteException;
+import android.text.TextUtils;
 import com.android.server.accounts.AccountManagerService;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,10 +60,21 @@ public class AccountManager {
 	public static final int ERROR_CODE_MANAGEMENT_DISABLED_FOR_ACCOUNT_TYPE = 101;
 	public static final String KEY_ACCOUNTS = "accounts";
 	public static final String KEY_ACCOUNT_SESSION_BUNDLE = "accountSessionBundle";
+	public static final String KEY_ACCOUNT_STATUS_TOKEN = "accountStatusToken";
+	public static final String KEY_AUTHENTICATOR_TYPES = "authenticator_types";
+	public static final String KEY_LAST_AUTHENTICATED_TIME = "lastAuthenticatedTime";
+	public static final String ACTION_ACCOUNT_REMOVED = "android.accounts.action.ACCOUNT_REMOVED";
+	public static final String PACKAGE_NAME_KEY_LEGACY_VISIBLE = "android:accounts:key_legacy_visible";
+	public static final String PACKAGE_NAME_KEY_LEGACY_NOT_VISIBLE = "android:accounts:key_legacy_not_visible";
 	public static final String ACTION_AUTHENTICATOR_INTENT = "android.accounts.AccountAuthenticator";
 	public static final String AUTHENTICATOR_META_DATA_NAME = "android.accounts.AccountAuthenticator";
 	public static final String AUTHENTICATOR_ATTRIBUTES_NAME = "account-authenticator";
 	public static final String LOGIN_ACCOUNTS_CHANGED_ACTION = "android.accounts.LOGIN_ACCOUNTS_CHANGED";
+
+	/**
+	 * Package was not specified as visible or not visible for the account.
+	 */
+	public static final int VISIBILITY_UNDEFINED = 0;
 
 	/**
 	 * Account is always visible to given application and only authenticator can revoke visibility.
@@ -318,6 +330,8 @@ public class AccountManager {
 				if (!nativeSet(renamed.type, renamed.name, "account", ""))
 					return account;
 				setPassword(renamed, getPassword(account));
+				/* AOSP keeps the old name for getPreviousName() */
+				nativeSet(renamed.type, renamed.name, "previousname", account.name);
 				String keys = keyringGet(account.type, account.name, "userdatakeys");
 				if (keys != null && !keys.isEmpty())
 					for (String key : keys.split("\n"))
@@ -330,6 +344,13 @@ public class AccountManager {
 				return renamed;
 			}
 		}, callback, handler);
+	}
+
+	/* AOSP getPreviousName(): the name the account had before renameAccount() last renamed it, null if it never was */
+	public String getPreviousName(final Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return keyringGet(account.type, account.name, "previousname");
 	}
 
 	/* AOSP blockingGetAuthToken() */
@@ -751,6 +772,82 @@ public class AccountManager {
 		}.start();
 	}
 
+	/* AOSP startAddAccountSession(): like addAccount(), but the authenticator returns the account in an
+	 * encrypted KEY_ACCOUNT_SESSION_BUNDLE for finishSession() instead of adding it */
+	public AccountManagerFuture<Bundle> startAddAccountSession(final String accountType, final String authTokenType,
+	                                                           final String[] requiredFeatures, final Bundle options,
+	                                                           final Activity activity, AccountManagerCallback<Bundle> callback,
+	                                                           Handler handler) {
+		if (accountType == null)
+			throw new IllegalArgumentException("accountType is null");
+		final Bundle optionsIn = new Bundle();
+		if (options != null)
+			optionsIn.putAll(options);
+		optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
+		return new AmsTask(activity, handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().startAddAccountSession(mResponse, accountType, authTokenType, requiredFeatures, activity != null, optionsIn);
+			}
+		}.start();
+	}
+
+	/* AOSP startUpdateCredentialsSession() */
+	public AccountManagerFuture<Bundle> startUpdateCredentialsSession(final Account account, final String authTokenType,
+	                                                                  final Bundle options, final Activity activity,
+	                                                                  final AccountManagerCallback<Bundle> callback,
+	                                                                  final Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		final Bundle optionsIn = new Bundle();
+		if (options != null)
+			optionsIn.putAll(options);
+		optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
+		return new AmsTask(activity, handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().startUpdateCredentialsSession(mResponse, account, authTokenType, activity != null, optionsIn);
+			}
+		}.start();
+	}
+
+	/* AOSP finishSession() (finishSessionAsUser() for the caller's user, the only one here) */
+	public AccountManagerFuture<Bundle> finishSession(final Bundle sessionBundle, final Activity activity,
+	                                                  AccountManagerCallback<Bundle> callback, Handler handler) {
+		if (sessionBundle == null)
+			throw new IllegalArgumentException("sessionBundle is null");
+		final Bundle appInfo = new Bundle();
+		appInfo.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
+		return new AmsTask(activity, handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().finishSession(mResponse, sessionBundle, activity != null, appInfo);
+			}
+		}.start();
+	}
+
+	/* AOSP isCredentialsUpdateSuggested(): asks the authenticator of the account type */
+	public AccountManagerFuture<Boolean> isCredentialsUpdateSuggested(final Account account, final String statusToken,
+	                                                                 AccountManagerCallback<Boolean> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (TextUtils.isEmpty(statusToken))
+			throw new IllegalArgumentException("status token is empty");
+		return new Future2Task<Boolean>(handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().isCredentialsUpdateSuggested(mResponse, account, statusToken);
+			}
+
+			@Override
+			public Boolean bundleToResult(Bundle bundle) throws AuthenticatorException {
+				if (!bundle.containsKey(KEY_BOOLEAN_RESULT))
+					throw new AuthenticatorException("no result in response");
+				return bundle.getBoolean(KEY_BOOLEAN_RESULT);
+			}
+		}.start();
+	}
+
 	public String getPassword(Account account) {
 		return keyringGet(account.type, account.name, "password");
 	}
@@ -874,6 +971,14 @@ public class AccountManager {
 	}
 
 	public void removeOnAccountsUpdatedListener(OnAccountsUpdateListener listener) {
+	}
+
+	/* AOSP getPackagesAndVisibilityForAccount(): the packages whose visibility was set explicitly for the account;
+	 * setAccountVisibility() keeps none (one desktop user, every app sees every account), so the map is empty */
+	public Map<String, Integer> getPackagesAndVisibilityForAccount(Account account) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return new HashMap<String, Integer>();
 	}
 
 	public Map<Account, Integer> getAccountsAndVisibilityForPackage(String packageName,

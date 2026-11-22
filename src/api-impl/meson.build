@@ -2207,6 +2207,7 @@ srcs = [
 	'com/android/org/conscrypt/SSLParametersImpl.java',
 	'com/android/server/accounts/AccountAuthenticatorCache.java',
 	'com/android/server/accounts/AccountManagerService.java',
+	'com/android/server/accounts/CryptoHelper.java',
 	'com/android/server/am/DumpHeapProvider.java',
 	'com/android/server/location/LocationManagerService.java',
 	'com/android/server/location/fudger/LocationFudger.java',
