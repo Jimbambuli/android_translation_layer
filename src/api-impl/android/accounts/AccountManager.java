@@ -80,17 +80,19 @@ public class AccountManager {
 	public static final int VISIBILITY_NOT_VISIBLE = 3;
 	public static final int VISIBILITY_USER_MANAGED_NOT_VISIBLE = 4;
 
-	private static final AccountManager instance = new AccountManager();
+	/* the caller's context, as AOSP's (SystemServiceRegistry makes one AccountManager per context): its package
+	 * is the caller (KEY_ANDROID_PACKAGE_NAME) */
+	private final Context mContext;
 
-	/* the app's context: the caller package (KEY_ANDROID_PACKAGE_NAME) and the binding to the authenticators */
-	private Context mContext;
+	/** @hide */
+	public AccountManager(Context context) {
+		mContext = context;
+	}
 
 	public static AccountManager get(Context context) {
-		synchronized (instance) {
-			if (instance.mContext == null && context != null)
-				instance.mContext = context.getApplicationContext() != null ? context.getApplicationContext() : context;
-		}
-		return instance;
+		if (context == null)
+			throw new IllegalArgumentException("context is null");
+		return (AccountManager)context.getSystemService(Context.ACCOUNT_SERVICE);
 	}
 
 	private AccountManagerService service() {

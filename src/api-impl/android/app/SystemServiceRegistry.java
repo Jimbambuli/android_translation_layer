@@ -391,7 +391,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<AccountManager>() {
             @Override
             public AccountManager createService(ContextImpl ctx) {
-                return AccountManager.get(ctx);
+                return new AccountManager(ctx);
             }});
 
         registerService(Context.DEVICE_POLICY_SERVICE, DevicePolicyManager.class,
