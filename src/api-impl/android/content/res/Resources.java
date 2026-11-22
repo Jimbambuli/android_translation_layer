@@ -135,6 +135,8 @@ public class Resources {
 	private final XmlBlock[] mCachedXmlBlocks = new XmlBlock[4];
 
 	/*package*/ final AssetManager mAssets;
+	/* AOSP 16: Resources.mClassLoader (apps read it by reflection, Instagram does) */
+	final ClassLoader mClassLoader;
 	private final Configuration mConfiguration = new Configuration();
 	/*package*/ final DisplayMetrics mMetrics = new DisplayMetrics();
 	private PluralRules mPluralRule;
@@ -220,6 +222,21 @@ public class Resources {
 	 */
 	public Resources(AssetManager assets, DisplayMetrics metrics, Configuration config,
 	                 CompatibilityInfo compatInfo, IBinder token) {
+		this(null, assets, metrics, config, compatInfo, token);
+	}
+
+	/**
+	 * Resources(ClassLoader): AOSP 16 has no AssetManager yet at this point, ATL needs one.
+	 * @hide
+	 */
+	public Resources(ClassLoader classLoader) {
+		this(classLoader, new AssetManager(), new DisplayMetrics(), null,
+		     CompatibilityInfo.DEFAULT_COMPATIBILITY_INFO, null);
+	}
+
+	private Resources(ClassLoader classLoader, AssetManager assets, DisplayMetrics metrics, Configuration config,
+	                  CompatibilityInfo compatInfo, IBinder token) {
+		mClassLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
 		mAssets = assets;
 		mMetrics.setToDefaults();
 		if (compatInfo != null) {
@@ -2192,6 +2209,13 @@ public class Resources {
 		}
 
 		sa.recycle();
+	}
+
+	/**
+	 * @hide
+	 */
+	public ClassLoader getClassLoader() {
+		return mClassLoader;
 	}
 
 	/**
