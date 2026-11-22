@@ -438,10 +438,21 @@ public final class AccountManagerService {
 			Intent intent = bundle.getParcelable(AccountManager.KEY_INTENT, Intent.class);
 			if (intent == null)
 				return true;
-			ResolveInfo resolveInfo = mContext.getPackageManager().resolveActivity(intent, 0);
-			if (resolveInfo == null || resolveInfo.activityInfo == null)
-				return false;
-			ActivityInfo targetActivityInfo = resolveInfo.activityInfo;
+			/* AOSP resolveActivityAsUser(); ATL's resolveActivity() looks only at the app's own activities, so an
+			 * explicit intent is resolved by its component */
+			ActivityInfo targetActivityInfo;
+			if (intent.getComponent() != null) {
+				try {
+					targetActivityInfo = mContext.getPackageManager().getActivityInfo(intent.getComponent(), 0);
+				} catch (android.content.pm.PackageManager.NameNotFoundException e) {
+					return false;
+				}
+			} else {
+				ResolveInfo resolveInfo = mContext.getPackageManager().resolveActivity(intent, 0);
+				if (resolveInfo == null || resolveInfo.activityInfo == null)
+					return false;
+				targetActivityInfo = resolveInfo.activityInfo;
+			}
 			if ("android".equals(targetActivityInfo.packageName) && targetActivityInfo.exported)
 				return true;
 			if (!targetActivityInfo.packageName.equals(mAuthenticatorPackage)) {
