@@ -2223,6 +2223,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 	/* AOSP: whether the view took the focus; ATL: whether GTK gave it to the view's widget */
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
+		/* AOSP handleFocusGainInternal(): a focused view stays as it is (GTK would grab the focus again, and a
+		 * GtkText then selects all of its text) */
+		if (isFocused())
+			return true;
 		if (isEnabled() && isFocusable() && visibility == VISIBLE) {
 			return nativeRequestFocus(widget, direction);
 		}
@@ -2638,8 +2642,21 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return root.windowToken;
 	}
 
+	/* AOSP: the location in the window, whose origin is that of the root view. ATL's getLocationOnScreen() is in
+	 * the surface of the toplevel (with the window frame and the header bar), so the root view's location there
+	 * comes off; popups placed with showAtLocation() take window coordinates */
 	public void getLocationInWindow(int[] location) {
 		getLocationOnScreen(location);
+		final View root = getRootView();
+		if (root == this) {
+			location[0] = 0;
+			location[1] = 0;
+			return;
+		}
+		final int[] rootLocation = new int[2];
+		root.getLocationOnScreen(rootLocation);
+		location[0] -= rootLocation[0];
+		location[1] -= rootLocation[1];
 	}
 
 	/* AOSP View.addOnAttachStateChangeListener() */

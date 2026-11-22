@@ -12222,6 +12222,7 @@ public final class R {
 		public static final int tabs = 0x01020013;
 		public static final int text1 = 0x01020014;
 		public static final int text2 = 0x01020015;
+		public static final int textAssist = 0x01020041;
 		public static final int title = 0x01020016;
 		public static final int toggle = 0x01020017;
 		public static final int widget_frame = 0x01020018;
@@ -12294,10 +12295,13 @@ public final class R {
 		 * Acceleration curve matching a quint ease in function.
 		 */
 		public static final int decelerate_quint = 0x010c0005;
+		public static final int fast_out_linear_in = 0x010c000f;
+		public static final int fast_out_slow_in = 0x010c000d;
 		/**
 		 * An interpolator where the rate of change is constant.
 		 */
 		public static final int linear = 0x010c000b;
+		public static final int linear_out_slow_in = 0x010c000e;
 		/**
 	       An interpolator where the change flings forward and overshoots the last
 	       value then comes back.

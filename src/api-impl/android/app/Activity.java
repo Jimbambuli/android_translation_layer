@@ -2618,14 +2618,28 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	@Override
 	public void onDetachedFromWindow() {}
 
+	/* AOSP Activity.onWindowStartingActionMode(): only a primary action mode is shown in the action bar */
+	private int mActionModeTypeStarting = ActionMode.TYPE_PRIMARY;
+
 	@Override
 	public ActionMode onWindowStartingActionMode(ActionMode.Callback callback) {
+		if (mActionModeTypeStarting == ActionMode.TYPE_PRIMARY) {
+			initWindowDecorActionBar();
+			if (mActionBar != null) {
+				return mActionBar.startActionMode(callback);
+			}
+		}
 		return null;
 	}
 
 	@Override
 	public ActionMode onWindowStartingActionMode(ActionMode.Callback callback, int type) {
-		return null;
+		try {
+			mActionModeTypeStarting = type;
+			return onWindowStartingActionMode(callback);
+		} finally {
+			mActionModeTypeStarting = ActionMode.TYPE_PRIMARY;
+		}
 	}
 
 	@Override
@@ -3046,8 +3060,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	public void setLocusContext(@Nullable LocusId locusId, @Nullable Bundle bundle) {
 	}
 
-	/* AOSP Activity.startActionMode(): the decor view starts it; ATL has no action mode (View.startActionMode()
-	 * answers null) */
+	/* AOSP Activity.startActionMode(): the decor view starts it */
 	public ActionMode startActionMode(ActionMode.Callback callback) {
 		return window.getDecorView().startActionMode(callback);
 	}

@@ -26,7 +26,7 @@ import java.util.Iterator;
  * through WindowManager are then written to <dir>/<name>.xml in the form of `uiautomator dump`
  * (node class/resource-id/text/content-desc/bounds), plus ATL-only attributes: real class,
  * visibility, alpha, isShown, Java bounds, and which ancestor hides a view. Popups that GTK shows
- * without Android views (PopupMenu, a Spinner's list) and toplevels that show GTK widgets instead of
+ * without Android views (a Spinner's list) and toplevels that show GTK widgets instead of
  * views (ATL's AlertDialog) follow as "gtk" windows of GTK widgets. Each
  * window names the GTK toplevel whose surface its bounds are in (atl-toplevel, 0: the activity's
  * window) and that surface's size and widget origin. <dir>/request is deleted when done. Only if a

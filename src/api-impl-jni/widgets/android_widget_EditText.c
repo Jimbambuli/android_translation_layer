@@ -177,6 +177,18 @@ JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setText(JNIEnv *env,
 	(*env)->ReleaseStringUTFChars(env, text_jstr, gtk_text);
 }
 
+/* replace the characters [start, end) by text as an edit of the user would, the cursor after it */
+JNIEXPORT void JNICALL Java_android_widget_EditText_native_1replaceText(JNIEnv *env, jobject this, jlong widget_ptr, jint start, jint end, jstring text_jstr)
+{
+	GtkEditable *editable = GTK_EDITABLE(_PTR(widget_ptr));
+	const char *text = (*env)->GetStringUTFChars(env, text_jstr, NULL);
+	int position = start;
+	gtk_editable_delete_text(editable, start, end);
+	gtk_editable_insert_text(editable, text, -1, &position);
+	gtk_editable_set_position(editable, position);
+	(*env)->ReleaseStringUTFChars(env, text_jstr, text);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_EditText_native_1setHint(JNIEnv *env, jobject this, jlong widget_ptr, jstring text_jstr)
 {
 	const char *text = (*env)->GetStringUTFChars(env, text_jstr, NULL);

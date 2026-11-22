@@ -281,6 +281,9 @@ public abstract class Context {
 		Application application = ATLLoadedApp.getPrimaryApplication().getApplication();
 		application.native_window = native_window;
 		this_application = application;
+		/* AOSP's ClipboardService knows the clipboard before an app asks (TextView.canPaste() for the floating
+		 * toolbar); ATL's ClipboardManager reads the desktop's clipboard asynchronously, so it starts with the app */
+		application.getSystemService(CLIPBOARD_SERVICE);
 		return application;
 	}
 

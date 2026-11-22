@@ -25,6 +25,7 @@ import java.util.ArrayList;
 public class EditText extends TextView {
 	public EditText(Context context) {
 		super(context);
+		nativeSetOnLongClickListener(widget);
 	}
 
 	public EditText(Context context, AttributeSet attrs) {
@@ -37,6 +38,8 @@ public class EditText extends TextView {
 
 	public EditText(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		super(context, attrs, defStyle, defStyleRes);
+		/* the long press of the GtkText reaches performLongClick(), which selects a word like AOSP's Editor */
+		nativeSetOnLongClickListener(widget);
 	}
 
 	@Override
@@ -184,6 +187,21 @@ public class EditText extends TextView {
 			mSelectionChangePending = false;
 			onSelectionChanged(getSelectionStart(), getSelectionEnd());
 		}
+		/* AOSP Editor.sendOnTextChanged(): a change of the text ends the text action mode */
+		if (mParagraphSelection != null)
+			mParagraphSelection.onTextChanged();
+	}
+
+	/* AOSP TextView.performLongClick() with Editor.performLongClick(): unless a long click listener takes the
+	 * press, the word at the touch is selected and the floating toolbar of the selection starts */
+	@Override
+	public boolean performLongClick() {
+		if (super.performLongClick())
+			return true;
+		if (!editTextSelection().performLongClickAtCursor())
+			return false;
+		performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+		return true;
 	}
 
 	/* no initializer: TextView's constructor sets the first text before EditText's field initializers run,
@@ -372,6 +390,8 @@ public class EditText extends TextView {
 			return;
 		}
 		onSelectionChanged(getSelectionStart(), getSelectionEnd());
+		if (mParagraphSelection != null)
+			mParagraphSelection.onEditTextSelectionChanged();
 	}
 
 	@Override
@@ -379,14 +399,15 @@ public class EditText extends TextView {
 		return true;
 	}
 
-	/* the paste, cut and typed replacement of the range [min, max) by new text: the cursor is after it */
+	/* the paste, cut and typed replacement of the range [min, max) by new text: the cursor is after it. Like
+	 * AOSP's Editable.replace() it is an edit of the text (the GtkText's, with its filters and the change
+	 * reported to the TextWatchers as typing is), not a new text */
 	@Override
 	void replaceText_internal(int min, int max, CharSequence newText) {
-		StringBuilder sb = new StringBuilder(native_getText(widget));
-		sb.replace(min, max, newText.toString());
-		setText(sb);
-		setSelection(min + newText.length());
+		String s = native_getText(widget);
+		native_replaceText(widget, s.codePointCount(0, min), s.codePointCount(0, max), newText.toString());
 	}
+	private native void native_replaceText(long widget, int start, int end, String text);
 
 	@Override
 	public CharSequence getAccessibilityClassName() {

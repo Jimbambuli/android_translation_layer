@@ -34,6 +34,7 @@ import android.util.SparseBooleanArray;
 import android.util.StateSet;
 import android.view.ActionMode;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
 import android.view.KeyEvent;
 import android.view.Menu;
@@ -961,7 +962,7 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 				                                + "for CHOICE_MODE_MULTIPLE_MODAL but no choice mode callback was "
 				                                + "supplied. Call setMultiChoiceModeListener to set a callback.");
 			}
-			mChoiceActionMode = null; // startActionMode(mMultiChoiceModeCallback);
+			mChoiceActionMode = startActionMode(mMultiChoiceModeCallback);
 		}
 
 		if (mChoiceMode == CHOICE_MODE_MULTIPLE || mChoiceMode == CHOICE_MODE_MULTIPLE_MODAL) {
@@ -2376,10 +2377,11 @@ public abstract class AbsListView extends AdapterView<ListAdapter> implements Te
 	                         final int longPressPosition, final long longPressId) {
 		// CHOICE_MODE_MULTIPLE_MODAL takes over long press.
 		if (mChoiceMode == CHOICE_MODE_MULTIPLE_MODAL) {
-			// if (mChoiceActionMode == null
-			//     && (mChoiceActionMode = startActionMode(mMultiChoiceModeCallback)) != null) {
-			setItemChecked(longPressPosition, true);
-			// }
+			if (mChoiceActionMode == null
+			    && (mChoiceActionMode = startActionMode(mMultiChoiceModeCallback)) != null) {
+				setItemChecked(longPressPosition, true);
+				performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+			}
 			return true;
 		}
 

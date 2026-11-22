@@ -1332,6 +1332,18 @@ static void on_long_click(GtkGestureLongPress *gesture, double x, double y, gpoi
 
 	if (ret)
 		gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+	/* AOSP: the rest of a touch whose long press selected (Editor) belongs to the selection. A GtkText would go on
+	 * with its drag from the press and move the selection's end to the pointer: its drag gesture stops here */
+	if (ret && GTK_IS_TEXT(widget)) {
+		GListModel *controllers = gtk_widget_observe_controllers(widget);
+		for (guint i = 0; i < g_list_model_get_n_items(controllers); i++) {
+			GtkEventController *other = g_list_model_get_item(controllers, i);
+			if (GTK_IS_GESTURE_DRAG(other))
+				gtk_event_controller_reset(other);
+			g_object_unref(other);
+		}
+		g_object_unref(controllers);
+	}
 }
 
 static void on_long_click_update(GtkGesture *gesture, GdkEventSequence *sequence, gpointer user_data)
@@ -1354,6 +1366,18 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnLongClickListener(JNIEn
 	g_signal_connect(controller, "pressed", G_CALLBACK(on_long_click), NULL);
 	g_signal_connect(controller, "update", G_CALLBACK(on_long_click_update), NULL);
 	gtk_widget_add_controller(widget, controller);
+	/* an EditText's GtkText claims the press with its click gesture (cursor, selection), which denies the
+	 * sequence to the other gestures of the widget: grouped with it, the long press sees the press as well */
+	if (GTK_IS_TEXT(widget)) {
+		GListModel *controllers = gtk_widget_observe_controllers(widget);
+		for (guint i = 0; i < g_list_model_get_n_items(controllers); i++) {
+			GtkEventController *other = g_list_model_get_item(controllers, i);
+			if (GTK_IS_GESTURE_CLICK(other))
+				gtk_gesture_group(GTK_GESTURE(other), GTK_GESTURE(controller));
+			g_object_unref(other);
+		}
+		g_object_unref(controllers);
+	}
 	g_object_set_data(G_OBJECT(widget), "on_long_click_listener", controller);
 }
 
