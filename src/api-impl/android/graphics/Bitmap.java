@@ -12,6 +12,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 /*
  * Bitmap is implemented as GdkTexture or GtkSnapshot. It can only be one of the two at a time.
  * The methods getTexture() and getSnapshot() automatically convert between the two as needed.
+ * Android lets any thread read and write a bitmap's pixels (e.g. several threads setPixels() into disjoint rows);
+ * a GtkSnapshot must not be used by two threads at once and a conversion frees the other handle, so each native
+ * pixel access holds the bitmap's lock together with the handle it uses.
  */
 public final class Bitmap implements Parcelable {
 
@@ -271,7 +274,9 @@ public final class Bitmap implements Parcelable {
 	}
 
 	public static Bitmap createBitmap(Bitmap src) {
-		return new Bitmap(native_ref_texture(src.getTexture()));
+		synchronized (src) {
+			return new Bitmap(native_ref_texture(src.getTexture()));
+		}
 	}
 
 	public static Bitmap createScaledBitmap(Bitmap src, int dstWidth, int dstHeight, boolean filter) {
@@ -340,9 +345,11 @@ public final class Bitmap implements Parcelable {
 
 	public void eraseColor(int color) {
 		if (color == Color.TRANSPARENT) {
-			native_recycle(texture, snapshot);
-			snapshot = native_erase_color(color, width, height);
-			texture = 0;
+			synchronized (this) {
+				native_recycle(texture, snapshot);
+				snapshot = native_erase_color(color, width, height);
+				texture = 0;
+			}
 			notifyPixelsChanged();
 		} else {
 			Paint paint = new Paint();
@@ -358,9 +365,11 @@ public final class Bitmap implements Parcelable {
 
 	@Export
 	public void recycle() {
-		native_recycle(texture, snapshot);
-		texture = 0;
-		snapshot = 0;
+		synchronized (this) {
+			native_recycle(texture, snapshot);
+			texture = 0;
+			snapshot = 0;
+		}
 		recycled = true;
 		notifyPixelsChanged();
 	}
@@ -514,7 +523,9 @@ public final class Bitmap implements Parcelable {
 			}
 			bitmap.setPixels(colors, 0, width, 0, 0, width, height);
 		} else {
-			bitmap.texture = native_ref_texture(getTexture());
+			synchronized (this) {
+				bitmap.texture = native_ref_texture(getTexture());
+			}
 			bitmap.hasAlpha = hasAlpha;
 		}
 		bitmap.mutable = isMutable;
@@ -536,7 +547,9 @@ public final class Bitmap implements Parcelable {
 		if (width == 0 || height == 0)
 			return; // nothing to do
 		checkPixelsAccess(x, y, width, height, offset, stride, pixels);
-		native_get_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
+		synchronized (this) {
+			native_get_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
+		}
 	}
 
 	private void checkRecycled(String errorMessage) {
@@ -603,7 +616,9 @@ public final class Bitmap implements Parcelable {
 		checkHardware("unable to getPixel(), pixel access is not supported on Config#HARDWARE bitmaps");
 		checkPixelAccess(x, y);
 		int[] pixels = new int[1];
-		native_get_pixels(getTexture(), pixels, 0, 1, x, y, 1, 1);
+		synchronized (this) {
+			native_get_pixels(getTexture(), pixels, 0, 1, x, y, 1, 1);
+		}
 		return pixels[0];
 	}
 
@@ -616,7 +631,9 @@ public final class Bitmap implements Parcelable {
 			System.out.println("copyPixelsToBuffer: format " + config.name() + " not implemented");
 			System.exit(1);
 		}
-		native_copy_to_buffer(getTexture(), buffer, rawMemoryFormat(), getRowBytes());
+		synchronized (this) {
+			native_copy_to_buffer(getTexture(), buffer, rawMemoryFormat(), getRowBytes());
+		}
 		buffer.position(buffer.position() + getByteCount());
 	}
 
@@ -782,7 +799,10 @@ public final class Bitmap implements Parcelable {
 			throw new IllegalArgumentException("quality must be 0..100");
 		}
 		/* AOSP's nativeCompress() writes to the stream and returns false when that fails */
-		byte[] data = native_compress(getTexture(), format.nativeInt, quality);
+		byte[] data;
+		synchronized (this) {
+			data = native_compress(getTexture(), format.nativeInt, quality);
+		}
 		if (data == null)
 			return false;
 		try {
@@ -793,11 +813,11 @@ public final class Bitmap implements Parcelable {
 		return true;
 	}
 
-	public void setPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
+	public synchronized void setPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
 		native_set_pixels(getSnapshot(), pixels, offset, stride, x, y, width, height);
 	}
 
-	public void setPixel(int x, int y, int color) {
+	public synchronized void setPixel(int x, int y, int color) {
 		int[] pixels = new int[] {color};
 		native_set_pixels(getSnapshot(), pixels, 0, 1, x, y, 1, 1);
 	}
