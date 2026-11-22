@@ -52,12 +52,13 @@ void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct 
 void ANativeWindow_remoteSendFds(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, const int *fds, int n_fds);
 gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop);
 gboolean ANativeWindow_remotePresentDmabuf(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop);
+void ANativeWindow_localPresentTexture(struct ANativeWindow *native_window, GdkTexture *texture);
 void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data);
 
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);
 
 #ifdef VULKAN_CORE_H_
-/* vulkan_swapchain.c: Vulkan on a window with remote_fd */
+/* vulkan_swapchain.c: Vulkan on a window with remote_fd or without a Wayland/X11 surface of its own */
 VkResult atl_vk_create_remote_surface(VkInstance instance, struct ANativeWindow *window, VkSurfaceKHR *out_surface);
 gboolean atl_vk_destroy_remote_surface(VkSurfaceKHR surface);
 gboolean atl_vk_remote_surface_capabilities(VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *capabilities);

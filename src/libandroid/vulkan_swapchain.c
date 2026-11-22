@@ -1,7 +1,9 @@
 /*
  * VK_KHR_android_surface and VK_KHR_swapchain on the window of a Surface without a SurfaceView widget of this
  * process: the Surface of a SurfaceTexture (TextureView, new Surface(SurfaceTexture)) or of another process
- * (ANativeWindow.remote_fd), whose buffers go over a socket to the consumer (android_view_SurfaceView.h).
+ * (ANativeWindow.remote_fd), whose buffers go over a socket to the consumer (android_view_SurfaceView.h); and on the
+ * window of a SurfaceView widget of this process without a Wayland/X11 surface of its own (all but ATL_DIRECT_EGL),
+ * whose frames go to that widget as textures, like those of ANativeWindow_unlockAndPost().
  *
  * AOSP: frameworks/native/vulkan/libvulkan/swapchain.cpp builds the swapchain on top of the ANativeWindow; its images
  * are the window's buffers, vkAcquireNextImageKHR() dequeues one, vkQueuePresentKHR() queues it. Here each image is a
@@ -358,6 +360,8 @@ static VkResult create_image(struct remote_swapchain *swapchain, VkPhysicalDevic
 	uint32_t width = create_info->imageExtent.width;
 	uint32_t height = create_info->imageExtent.height;
 	image->size = (size_t)width * 4 * height;
+	if (swapchain->surface->window->remote_fd < 0)
+		return VK_SUCCESS; // no buffer to share (present_one())
 	image->fd = memfd_create("atl-surface", MFD_CLOEXEC);
 	if (image->fd < 0 || ftruncate(image->fd, image->size) < 0 ||
 	    (image->buffer = mmap(NULL, image->size, PROT_READ | PROT_WRITE, MAP_SHARED, image->fd, 0)) == MAP_FAILED) {
@@ -397,7 +401,8 @@ static VkResult atl_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreat
 	if (old)
 		old->surface = NULL; // orphaned (AOSP OrphanSwapchain())
 	surface->swapchain = VK_NULL_HANDLE;
-	ANativeWindow_remoteSetHandler(surface->window, NULL, NULL);
+	if (surface->window->remote_fd >= 0)
+		ANativeWindow_remoteSetHandler(surface->window, NULL, NULL);
 
 	struct remote_swapchain *swapchain = g_new0(struct remote_swapchain, 1);
 	swapchain->device = device;
@@ -413,11 +418,13 @@ static VkResult atl_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreat
 		free_swapchain(swapchain, allocator);
 		return ret;
 	}
-	ANativeWindow_remoteSetHandler(surface->window, remote_message, swapchain);
+	if (surface->window->remote_fd >= 0)
+		ANativeWindow_remoteSetHandler(surface->window, remote_message, swapchain);
 	table_set(&swapchains, swapchain, swapchain);
 	surface->swapchain = (VkSwapchainKHR)swapchain;
 	*out_swapchain = (VkSwapchainKHR)swapchain;
-	fprintf(stderr, "vkCreateSwapchainKHR: %u images %ux%u on the window of a SurfaceTexture or of another process\n", swapchain->num_images, swapchain->extent.width, swapchain->extent.height);
+	fprintf(stderr, "vkCreateSwapchainKHR: %u images %ux%u on the window of %s\n", swapchain->num_images, swapchain->extent.width, swapchain->extent.height,
+	        surface->window->remote_fd >= 0 ? "a SurfaceTexture or of another process" : "a SurfaceView");
 	return VK_SUCCESS;
 }
 
@@ -431,7 +438,8 @@ static void atl_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR handle, co
 	table_set(&swapchains, swapchain, NULL);
 	if (swapchain->surface && swapchain->surface->swapchain == handle) {
 		swapchain->surface->swapchain = VK_NULL_HANDLE;
-		ANativeWindow_remoteSetHandler(swapchain->surface->window, NULL, NULL);
+		if (swapchain->surface->window->remote_fd >= 0)
+			ANativeWindow_remoteSetHandler(swapchain->surface->window, NULL, NULL);
 	}
 	free_swapchain(swapchain, allocator);
 }
@@ -479,8 +487,9 @@ static VkResult atl_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR handle
 	gint64 start = g_get_monotonic_time();
 	gint64 end = timeout >= G_MAXINT64 / 1000 ? G_MAXINT64 : start + (gint64)(timeout / 1000);
 	int i = -1;
+	gboolean local = window->remote_fd < 0; // its images are never busy (present_one())
 	for (;;) {
-		gboolean alive = ANativeWindow_remoteRead(window, 0);
+		gboolean alive = local || ANativeWindow_remoteRead(window, 0);
 		for (uint32_t k = 0; k < swapchain->num_images && i < 0; k++)
 			if (!swapchain->images[k].acquired && !g_atomic_int_get(&swapchain->images[k].busy))
 				i = k;
@@ -504,7 +513,10 @@ static VkResult atl_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR handle
 		}
 		if (now >= end)
 			return VK_TIMEOUT;
-		ANativeWindow_remoteRead(window, MAX(1, (MIN(end, start + 100000) - now) / 1000));
+		if (local)
+			g_usleep(MAX(1, MIN(end, start + 100000) - now)); // all images are acquired: none comes back
+		else
+			ANativeWindow_remoteRead(window, MAX(1, (MIN(end, start + 100000) - now) / 1000));
 	}
 	VkResult ret = signal_acquired(device, semaphore, fence);
 	if (ret != VK_SUCCESS)
@@ -529,6 +541,20 @@ static VkResult present_one(struct remote_swapchain *swapchain, VkSwapchainKHR h
 	if (!swapchain->surface || swapchain->surface->swapchain != handle)
 		return VK_ERROR_OUT_OF_DATE_KHR; // AOSP
 	struct ANativeWindow *window = swapchain->surface->window;
+	if (window->remote_fd < 0) {
+		if (!image->coherent)
+			vkInvalidateMappedMemoryRanges(swapchain->device, 1, &(VkMappedMemoryRange){.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, .memory = image->memory, .size = VK_WHOLE_SIZE});
+		size_t row = (size_t)swapchain->extent.width * 4;
+		char *bits = g_malloc(image->size);
+		for (uint32_t y = 0; y < swapchain->extent.height; y++)
+			memcpy(bits + y * row, (char *)image->map + image->layout.offset + y * image->layout.rowPitch, row);
+		GBytes *bytes = g_bytes_new_take(bits, image->size);
+		/* as ANativeWindow_unlockAndPost(): Android's RGBA_8888 buffers are premultiplied */
+		GdkTexture *texture = gdk_memory_texture_new(swapchain->extent.width, swapchain->extent.height, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, bytes, row);
+		g_bytes_unref(bytes);
+		ANativeWindow_localPresentTexture(window, texture);
+		return VK_SUCCESS;
+	}
 	if (!g_atomic_int_get(&image->busy)) {
 		if (!image->coherent)
 			vkInvalidateMappedMemoryRanges(swapchain->device, 1, &(VkMappedMemoryRange){.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, .memory = image->memory, .size = VK_WHOLE_SIZE});
