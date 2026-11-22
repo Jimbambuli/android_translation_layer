@@ -1249,6 +1249,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		native_setLines(limited ? mMaximum : -1, limited ? mode : 0);
 	}
 	private native void native_setLines(int lines, int ellipsize_mode);
+	private native void native_setWrap(boolean wrap);
 
 	// there is no input method connection to batch or configure
 	public void beginBatchEdit() {}
@@ -2943,6 +2944,9 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setHorizontallyScrolling(boolean whether) {
 		if (mHorizontallyScrolling != whether) {
 			mHorizontallyScrolling = whether;
+			/* AOSP lays out a horizontally scrolling text (singleLine) in one line as wide as the text: the label
+			 * does not wrap, so that it measures that width */
+			native_setWrap(!whether);
 
 			requestLayout();
 			invalidate();

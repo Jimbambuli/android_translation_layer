@@ -155,6 +155,16 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setPaintFlags(JNIEnv
 	pango_attr_list_unref(attrs);
 }
 
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setWrap(JNIEnv *env, jobject this, jboolean wrap)
+{
+	GtkWidget *box = _PTR(_GET_LONG_FIELD(this, "widget"));
+	if (!GTK_IS_BOX(box)) // EditText (GtkText) and Button have widgets of their own
+		return;
+	GtkLabel *label = box_get_label(env, box);
+	if (label)
+		gtk_label_set_wrap(label, wrap);
+}
+
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLines(JNIEnv *env, jobject this, jint lines, jint ellipsize_mode)
 {
 	GtkLabel *label = box_get_label(env, _PTR(_GET_LONG_FIELD(this, "widget")));
