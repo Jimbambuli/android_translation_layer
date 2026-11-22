@@ -1015,11 +1015,6 @@ public class PackageParser {
 
 		pkg.applicationInfo.installLocation = pkg.installLocation;
 
-		/* Set the global "forward lock" flag */
-		if ((flags & PARSE_FORWARD_LOCK) != 0) {
-			pkg.applicationInfo.flags |= ApplicationInfo.FLAG_FORWARD_LOCK;
-		}
-
 		/* Set the global "on SD card" flag */
 		if ((flags & PARSE_ON_SDCARD) != 0) {
 			pkg.applicationInfo.flags |= ApplicationInfo.FLAG_EXTERNAL_STORAGE;
@@ -2016,6 +2011,11 @@ public class PackageParser {
 		}
 		ai.taskAffinity = buildTaskAffinityName(ai.packageName, ai.packageName,
 		                                        str, outError);
+		String factory = sa.getNonResourceString(
+		    com.android.internal.R.styleable.AndroidManifestApplication_appComponentFactory);
+		if (factory != null) {
+			ai.appComponentFactory = buildClassName(ai.packageName, factory, outError);
+		}
 
 		if (outError[0] == null) {
 			CharSequence pname;
@@ -2045,7 +2045,7 @@ public class PackageParser {
 				if (sa.getBoolean(
 					com.android.internal.R.styleable.AndroidManifestApplication_cantSaveState,
 					false)) {
-					ai.flags |= ApplicationInfo.FLAG_CANT_SAVE_STATE;
+					ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE;
 
 					// A heavy-weight application can not be in a custom process.
 					// We can do direct compare because we intern all strings.
@@ -2515,6 +2515,10 @@ public class PackageParser {
 			a.info.launchMode = ActivityInfo.LAUNCH_MULTIPLE;
 			a.info.configChanges = 0;
 		}
+		/* AOSP PackageParser.parseActivity(): both branches read android:directBootAware */
+		a.info.directBootAware = sa.getBoolean(
+		    com.android.internal.R.styleable.AndroidManifestActivity_directBootAware,
+		    false);
 
 		if (receiver) {
 			if (sa.getBoolean(
@@ -2536,7 +2540,7 @@ public class PackageParser {
 
 		sa.recycle();
 
-		if (receiver && (owner.applicationInfo.flags & ApplicationInfo.FLAG_CANT_SAVE_STATE) != 0) {
+		if (receiver && (owner.applicationInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0) {
 			// A heavy-weight application can not have receives in its main process
 			// We can do direct compare because we intern all strings.
 			if (a.info.processName == owner.packageName) {
@@ -2676,6 +2680,7 @@ public class PackageParser {
 		info.softInputMode = target.info.softInputMode;
 		info.uiOptions = target.info.uiOptions;
 		info.parentActivityName = target.info.parentActivityName;
+		info.directBootAware = target.info.directBootAware;
 
 		Activity a = new Activity(mParseActivityAliasArgs, info);
 		if (outError[0] != null) {
@@ -2858,9 +2863,13 @@ public class PackageParser {
 			}
 		}
 
+		p.info.directBootAware = sa.getBoolean(
+		    com.android.internal.R.styleable.AndroidManifestProvider_directBootAware,
+		    false);
+
 		sa.recycle();
 
-		if ((owner.applicationInfo.flags & ApplicationInfo.FLAG_CANT_SAVE_STATE) != 0) {
+		if ((owner.applicationInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0) {
 			// A heavy-weight application can not have providers in its main process
 			// We can do direct compare because we intern all strings.
 			if (p.info.processName == owner.packageName) {
@@ -3115,9 +3124,13 @@ public class PackageParser {
 			setExported = true;
 		}
 
+		s.info.directBootAware = sa.getBoolean(
+		    com.android.internal.R.styleable.AndroidManifestService_directBootAware,
+		    false);
+
 		sa.recycle();
 
-		if ((owner.applicationInfo.flags & ApplicationInfo.FLAG_CANT_SAVE_STATE) != 0) {
+		if ((owner.applicationInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_CANT_SAVE_STATE) != 0) {
 			// A heavy-weight application can not have services in its main process
 			// We can do direct compare because we intern all strings.
 			if (s.info.processName == owner.packageName) {
@@ -3755,9 +3768,9 @@ public class PackageParser {
 			ai.flags &= ~ApplicationInfo.FLAG_INSTALLED;
 		}
 		if (state.blocked) {
-			ai.flags |= ApplicationInfo.FLAG_BLOCKED;
+			ai.privateFlags |= ApplicationInfo.PRIVATE_FLAG_HIDDEN;
 		} else {
-			ai.flags &= ~ApplicationInfo.FLAG_BLOCKED;
+			ai.privateFlags &= ~ApplicationInfo.PRIVATE_FLAG_HIDDEN;
 		}
 		if (state.enabled == PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
 			ai.enabled = true;

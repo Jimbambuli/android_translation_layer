@@ -320,43 +320,32 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 	 */
 	public static final int FLAG_IS_DATA_ONLY = 1 << 24;
 
-	/**
-	 * Value for {@link #flags}: set to {@code true} if the application
-	 * is permitted to hold privileged permissions.
-	 *
-	 * {@hide}
-	 */
-	public static final int FLAG_PRIVILEGED = 1 << 30;
+	/* AOSP ApplicationInfo (Android 16): flags bits 25..31. ATL's old hidden flags FLAG_PRIVILEGED (1<<30),
+	 * FLAG_FORWARD_LOCK (1<<29), FLAG_CANT_SAVE_STATE (1<<28) and FLAG_BLOCKED (1<<27) took these bits; Android
+	 * moved them to privateFlags (PRIVATE_FLAG_PRIVILEGED, PRIVATE_FLAG_CANT_SAVE_STATE, PRIVATE_FLAG_HIDDEN)
+	 * and dropped forward locking. */
 
-	/**
-	 * Value for {@link #flags}: Set to true if the application has been
-	 * installed using the forward lock option.
-	 *
-	 * NOTE: DO NOT CHANGE THIS VALUE!  It is saved in packages.xml.
-	 *
-	 * {@hide}
-	 */
-	public static final int FLAG_FORWARD_LOCK = 1 << 29;
+	/** Value for {@link #flags}: the application is a game (deprecated: use {@link #category}). */
+	@Deprecated
+	public static final int FLAG_IS_GAME = 1 << 25;
 
-	/**
-	 * Value for {@link #flags}: set to <code>true</code> if the application
-	 * has reported that it is heavy-weight, and thus can not participate in
-	 * the normal application lifecycle.
-	 *
-	 * <p>Comes from the
-	 * {@link android.R.styleable#AndroidManifestApplication_cantSaveState android:cantSaveState}
-	 * attribute of the &lt;application&gt; tag.
-	 *
-	 * {@hide}
-	 */
-	public static final int FLAG_CANT_SAVE_STATE = 1 << 28;
+	/** Value for {@link #flags}: android:fullBackupOnly of the &lt;application&gt; tag. */
+	public static final int FLAG_FULL_BACKUP_ONLY = 1 << 26;
 
-	/**
-	 * Value for {@link #flags}: true if the application is blocked via restrictions and for
-	 * most purposes is considered as not installed.
-	 * {@hide}
-	 */
-	public static final int FLAG_BLOCKED = 1 << 27;
+	/** Value for {@link #flags}: android:usesCleartextTraffic of the &lt;application&gt; tag. */
+	public static final int FLAG_USES_CLEARTEXT_TRAFFIC = 1 << 27;
+
+	/** Value for {@link #flags}: android:extractNativeLibs of the &lt;application&gt; tag. */
+	public static final int FLAG_EXTRACT_NATIVE_LIBS = 1 << 28;
+
+	/** Value for {@link #flags}: android:hardwareAccelerated of the &lt;application&gt; tag. */
+	public static final int FLAG_HARDWARE_ACCELERATED = 1 << 29;
+
+	/** Value for {@link #flags}: the application is suspended. */
+	public static final int FLAG_SUSPENDED = 1 << 30;
+
+	/** Value for {@link #flags}: android:multiArch of the &lt;application&gt; tag. */
+	public static final int FLAG_MULTIARCH = 1 << 31;
 
 	/**
 	 * Flags associated with the application.  Any combination of
@@ -378,6 +367,15 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 	 * @hide
 	 */
 	public static final int PRIVATE_FLAG_IS_RESOURCE_OVERLAY = 1 << 28;
+
+	/** Value for {@link #privateFlags}: the application is hidden via restrictions. @hide */
+	public static final int PRIVATE_FLAG_HIDDEN = 1 << 0;
+
+	/** Value for {@link #privateFlags}: the application is heavy-weight (android:cantSaveState). @hide */
+	public static final int PRIVATE_FLAG_CANT_SAVE_STATE = 1 << 1;
+
+	/** Value for {@link #privateFlags}: the application may hold privileged permissions. @hide */
+	public static final int PRIVATE_FLAG_PRIVILEGED = 1 << 3;
 
 	/**
 	 * Private/hidden flags. See {@code PRIVATE_FLAG_...} constants.
@@ -609,6 +607,29 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 	public String compileSdkVersionCodename;
 	public String zygotePreloadName;
 
+	/**
+	 * The factory of this package, as specified by the &lt;manifest&gt;
+	 * tag's {@link android.R.styleable#AndroidManifestApplication_appComponentFactory}
+	 * attribute.
+	 */
+	public String appComponentFactory;
+
+	/* AOSP ApplicationInfo (Android 16): values of android:gwpAsanMode, android:memtagMode,
+	 * android:nativeHeapZeroInitialized and android:requestRawExternalStorageAccess */
+	public static final int GWP_ASAN_DEFAULT = -1;
+	public static final int GWP_ASAN_NEVER = 0;
+	public static final int GWP_ASAN_ALWAYS = 1;
+	public static final int MEMTAG_DEFAULT = -1;
+	public static final int MEMTAG_OFF = 0;
+	public static final int MEMTAG_ASYNC = 1;
+	public static final int MEMTAG_SYNC = 2;
+	public static final int ZEROINIT_DEFAULT = -1;
+	public static final int ZEROINIT_DISABLED = 0;
+	public static final int ZEROINIT_ENABLED = 1;
+	public static final int RAW_EXTERNAL_STORAGE_ACCESS_DEFAULT = 0;
+	public static final int RAW_EXTERNAL_STORAGE_ACCESS_REQUESTED = 1;
+	public static final int RAW_EXTERNAL_STORAGE_ACCESS_NOT_REQUESTED = 2;
+
 	public static final int CATEGORY_UNDEFINED = -1;
 	public static final int CATEGORY_GAME = 0;
 	public static final int CATEGORY_AUDIO = 1;
@@ -683,6 +704,7 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 		compileSdkVersion = orig.compileSdkVersion;
 		compileSdkVersionCodename = orig.compileSdkVersionCodename;
 		zygotePreloadName = orig.zygotePreloadName;
+		appComponentFactory = orig.appComponentFactory;
 		category = orig.category;
 		mHiddenApiPolicy = orig.mHiddenApiPolicy;
 	}
@@ -750,7 +772,7 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 	public String[] splitPublicSourceDirs = new String[0];
 
 	/* AOSP ApplicationInfo.writeToParcel()/ApplicationInfo(Parcel)/CREATOR (Android 16): the fields ATL has, in AOSP order.
-	 * Not parcelled (no such field or helper in ATL): if (dest.maybeWriteSquashed(this)) { ..., privateFlagsExt, if (storageUuid != null) { dest.write..., scanSourceDir, scanPublicSourceDir, SparseArray, secondaryNativeLibraryDir, nativeLibraryRootDir, nativeLibraryRootRequiresIsa, overlayPaths, sharedLibraryInfos, optionalSharedLibraryInfos, credentialProtectedDataDir, longVersionCode, fullBackupContent, dataExtractionRulesRes, crossProfile, networkSecurityConfigRes, targetSandboxVersion, classLoaderName, splitClassLoaderNames, appComponentFactory, iconRes, roundIconRes, hiddenUntilInstalled, gwpAsanMode, memtagMode, nativeHeapZeroInitialized, sForBoolean.parcel(requestRawExternal..., createTimestamp, if (mAppClassNamesByProcess == null) ..., allowCrossUidActivitySwitchFromBelow, mPageSizeAppCompatFlags, unalignedNativeLibraries, sForStringSet.parcel(mKnownActivityEm... */
+	 * Not parcelled (no such field or helper in ATL): if (dest.maybeWriteSquashed(this)) { ..., privateFlagsExt, if (storageUuid != null) { dest.write..., scanSourceDir, scanPublicSourceDir, SparseArray, secondaryNativeLibraryDir, nativeLibraryRootDir, nativeLibraryRootRequiresIsa, overlayPaths, sharedLibraryInfos, optionalSharedLibraryInfos, credentialProtectedDataDir, longVersionCode, fullBackupContent, dataExtractionRulesRes, crossProfile, networkSecurityConfigRes, targetSandboxVersion, classLoaderName, splitClassLoaderNames, appComponentFactory (ATL parcels no fields after targetSandboxVersion), iconRes, roundIconRes, hiddenUntilInstalled, gwpAsanMode, memtagMode, nativeHeapZeroInitialized, sForBoolean.parcel(requestRawExternal..., createTimestamp, if (mAppClassNamesByProcess == null) ..., allowCrossUidActivitySwitchFromBelow, mPageSizeAppCompatFlags, unalignedNativeLibraries, sForStringSet.parcel(mKnownActivityEm... */
 	public int describeContents() {
 		return 0;
 	}

@@ -42,6 +42,18 @@ public class ComponentInfo extends PackageItemInfo {
 	public String processName;
 
 	/**
+	 * The name of the split in which this component is declared.
+	 * Null if the component was declared in the base APK.
+	 */
+	public String splitName;
+
+	/**
+	 * Set of attribution tags that should be automatically applied to this
+	 * component.
+	 */
+	public String[] attributionTags;
+
+	/**
 	 * A string resource identifier (in the package's resources) containing
 	 * a user-readable description of the component.  From the "description"
 	 * attribute or, if not set, 0.
@@ -62,6 +74,13 @@ public class ComponentInfo extends PackageItemInfo {
 	 */
 	public boolean exported = false;
 
+	/**
+	 * Indicates if this component is aware of direct boot lifecycle, and can be
+	 * safely run before the user has entered their credentials (such as a lock
+	 * pattern or PIN).
+	 */
+	public boolean directBootAware = false;
+
 	public ComponentInfo() {
 	}
 
@@ -69,9 +88,12 @@ public class ComponentInfo extends PackageItemInfo {
 		super(orig);
 		applicationInfo = orig.applicationInfo;
 		processName = orig.processName;
+		splitName = orig.splitName;
+		attributionTags = orig.attributionTags;
 		descriptionRes = orig.descriptionRes;
 		enabled = orig.enabled;
 		exported = orig.exported;
+		directBootAware = orig.directBootAware;
 	}
 
 	/* AOSP ComponentInfo.loadUnsafeLabel(): the component's label, else the application's, else the class name.
@@ -130,9 +152,36 @@ public class ComponentInfo extends PackageItemInfo {
 		return logo; // != 0 ? logo : applicationInfo.logo;
 	}
 
+	/**
+	 * Return the banner resource identifier to use for this component. If the
+	 * component defines a banner, that is used; else, the application banner is
+	 * used.
+	 *
+	 * @return The banner associated with this component.
+	 */
+	public final int getBannerResource() {
+		return banner != 0 ? banner : applicationInfo.banner;
+	}
+
 	protected void dumpFront(Printer pw, String prefix) {
 		super.dumpFront(pw, prefix);
-		pw.println(prefix + "enabled=" + enabled + " exported=" + exported + " processName=" + processName);
+		if (processName != null && !packageName.equals(processName)) {
+			pw.println(prefix + "processName=" + processName);
+		}
+		if (splitName != null) {
+			pw.println(prefix + "splitName=" + splitName);
+		}
+		if (attributionTags != null && attributionTags.length > 0) {
+			StringBuilder tags = new StringBuilder();
+			tags.append(attributionTags[0]);
+			for (int i = 1; i < attributionTags.length; i++) {
+				tags.append(", ");
+				tags.append(attributionTags[i]);
+			}
+			pw.println(prefix + "attributionTags=[" + tags + "]");
+		}
+		pw.println(prefix + "enabled=" + enabled + " exported=" + exported
+				+ " directBootAware=" + directBootAware);
 		if (descriptionRes != 0) {
 			pw.println(prefix + "description=" + descriptionRes);
 		}
@@ -172,23 +221,28 @@ public class ComponentInfo extends PackageItemInfo {
 		return applicationInfo;
 	}
 
-	/* AOSP ComponentInfo.writeToParcel()/ComponentInfo(Parcel) (Android 16): the fields ATL has, in AOSP order.
-	 * Not parcelled (no such field or helper in ATL): splitName, attributionTags, directBootAware */
+	/* AOSP ComponentInfo.writeToParcel()/ComponentInfo(Parcel) (Android 16) */
 	public void writeToParcel(android.os.Parcel dest, int parcelableFlags) {
 		super.writeToParcel(dest, parcelableFlags);
 		applicationInfo.writeToParcel(dest, parcelableFlags);
 		dest.writeString8(processName);
+		dest.writeString8(splitName);
+		dest.writeString8Array(attributionTags);
 		dest.writeInt(descriptionRes);
 		dest.writeInt(enabled ? 1 : 0);
 		dest.writeInt(exported ? 1 : 0);
+		dest.writeInt(directBootAware ? 1 : 0);
 	}
 
 	protected ComponentInfo(android.os.Parcel source) {
 		super(source);
 		applicationInfo = ApplicationInfo.CREATOR.createFromParcel(source);
 		processName = source.readString8();
+		splitName = source.readString8();
+		attributionTags = source.createString8Array();
 		descriptionRes = source.readInt();
 		enabled = (source.readInt() != 0);
 		exported = (source.readInt() != 0);
+		directBootAware = (source.readInt() != 0);
 	}
 }
