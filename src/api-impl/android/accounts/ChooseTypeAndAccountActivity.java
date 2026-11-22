@@ -197,7 +197,7 @@ public class ChooseTypeAndAccountActivity extends Activity
         if (mPossiblyVisibleAccounts.isEmpty() && mDisallowAddAccounts) {
             requestWindowFeature(Window.FEATURE_NO_TITLE);
 
-            setContentView(R.layout.app_not_authorized);
+            atlSetContentView(R.layout.app_not_authorized);
             TextView view = findViewById(R.id.description);
             // ATL: no device policy resource overrides, so the default string of the supplier
             String text = getString(R.string.error_message_change_not_allowed);
@@ -235,7 +235,7 @@ public class ChooseTypeAndAccountActivity extends Activity
                 mSelectedAddNewAccount);
 
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.choose_type_and_account);
+        atlSetContentView(R.layout.choose_type_and_account);
         overrideDescriptionIfSupplied(mDescriptionOverride);
         populateUIAccountList(listItems);
 
@@ -615,5 +615,16 @@ public class ChooseTypeAndAccountActivity extends Activity
               Log.v(TAG, "List item " + mSelectedItemIndex + " should be selected");
           }
       }
+    }
+
+    /* ATL's Activity.setContentView(int) declares Exception; AOSP's throws only unchecked inflation errors */
+    private void atlSetContentView(int layoutResID) {
+        try {
+            setContentView(layoutResID);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

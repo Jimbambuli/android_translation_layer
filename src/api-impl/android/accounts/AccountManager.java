@@ -10,6 +10,8 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.RemoteException;
+import com.android.server.accounts.AccountManagerService;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,6 +55,10 @@ public class AccountManager {
 	public static final int ERROR_CODE_BAD_ARGUMENTS = 7;
 	public static final int ERROR_CODE_BAD_REQUEST = 8;
 	public static final int ERROR_CODE_BAD_AUTHENTICATION = 9;
+	public static final int ERROR_CODE_USER_RESTRICTED = 100;
+	public static final int ERROR_CODE_MANAGEMENT_DISABLED_FOR_ACCOUNT_TYPE = 101;
+	public static final String KEY_ACCOUNTS = "accounts";
+	public static final String KEY_ACCOUNT_SESSION_BUNDLE = "accountSessionBundle";
 	public static final String ACTION_AUTHENTICATOR_INTENT = "android.accounts.AccountAuthenticator";
 	public static final String AUTHENTICATOR_META_DATA_NAME = "android.accounts.AccountAuthenticator";
 	public static final String AUTHENTICATOR_ATTRIBUTES_NAME = "account-authenticator";
@@ -72,11 +78,28 @@ public class AccountManager {
 	 * Account is not visible to given application and only authenticator can grant visibility.
 	 */
 	public static final int VISIBILITY_NOT_VISIBLE = 3;
+	public static final int VISIBILITY_USER_MANAGED_NOT_VISIBLE = 4;
 
 	private static final AccountManager instance = new AccountManager();
 
+	/* the app's context: the caller package (KEY_ANDROID_PACKAGE_NAME) and the binding to the authenticators */
+	private Context mContext;
+
 	public static AccountManager get(Context context) {
+		synchronized (instance) {
+			if (instance.mContext == null && context != null)
+				instance.mContext = context.getApplicationContext() != null ? context.getApplicationContext() : context;
+		}
 		return instance;
+	}
+
+	private AccountManagerService service() {
+		return AccountManagerService.get(mContext);
+	}
+
+	/** @hide AOSP getAccountsForPackage(): the accounts the package may see, all of them here (visibility is not kept) */
+	public Account[] getAccountsForPackage(String packageName, int uid) {
+		return getAccounts();
 	}
 
 	public Account[] getAccounts() {
@@ -93,21 +116,29 @@ public class AccountManager {
 		return accounts.toArray(new Account[0]);
 	}
 
-	/* AOSP getAccountsByTypeAndFeatures(): the accounts of the type whose authenticator has all the features. ATL's
-	 * accounts come from the keyring, their authenticators (microG) are not asked: no feature is known, so a
-	 * request with features finds none */
+	/* AOSP getAccountsByTypeAndFeatures(): the accounts of the type whose authenticator says it has all the
+	 * features (GetAccountsByTypeAndFeatureSession) */
 	public AccountManagerFuture<Account[]> getAccountsByTypeAndFeatures(final String type, final String[] features,
 	                                                                  AccountManagerCallback<Account[]> callback, Handler handler) {
 		if (type == null)
 			throw new IllegalArgumentException("type is null");
-		return runAsync(new Callable<Account[]>() {
+		return new Future2Task<Account[]>(handler, callback) {
 			@Override
-			public Account[] call() {
-				if (features != null && features.length > 0)
-					return new Account[0];
-				return getAccountsByType(type);
+			public void doWork() throws RemoteException {
+				service().getAccountsByFeatures(mResponse, type, features);
 			}
-		}, callback, handler);
+
+			@Override
+			public Account[] bundleToResult(Bundle bundle) throws AuthenticatorException {
+				if (!bundle.containsKey(KEY_ACCOUNTS))
+					throw new AuthenticatorException("no result in response");
+				final android.os.Parcelable[] parcelables = bundle.getParcelableArray(KEY_ACCOUNTS);
+				Account[] descs = new Account[parcelables.length];
+				for (int i = 0; i < parcelables.length; i++)
+					descs[i] = (Account)parcelables[i];
+				return descs;
+			}
+		}.start();
 	}
 
 	public Account[] getAccountsByTypeForPackage(String type, String packageName) {
@@ -144,37 +175,42 @@ public class AccountManager {
 		return true;
 	}
 
-	/* AOSP: AccountManagerService binds the authenticator of the account type, which adds the account (usually with
-	 * its own activity). ATL knows no authenticators (see getAccountsByTypeAndFeatures), so the bind fails as for a
-	 * type without one: onError(ERROR_CODE_REMOTE_EXCEPTION, "bind failure") -> AuthenticatorException */
+	/* AOSP addAccount(): AccountManagerService binds the authenticator of the account type, which adds the account
+	 * (usually with its own activity, returned as KEY_INTENT or started with the given activity) */
 	public AccountManagerFuture<Bundle> addAccount(final String accountType, final String authTokenType,
 	                                               final String[] requiredFeatures, final Bundle addAccountOptions,
 	                                               final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
 		if (accountType == null)
 			throw new IllegalArgumentException("accountType is null");
-		return runAsync(new Callable<Bundle>() {
+		final Bundle optionsIn = new Bundle();
+		if (addAccountOptions != null)
+			optionsIn.putAll(addAccountOptions);
+		optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
+		return new AmsTask(activity, handler, callback) {
 			@Override
-			public Bundle call() throws Exception {
-				throw new AuthenticatorException("bind failure");
+			public void doWork() throws RemoteException {
+				service().addAccount(mResponse, accountType, authTokenType, requiredFeatures, activity != null, optionsIn);
 			}
-		}, callback, handler);
+		}.start();
 	}
 
-	/* AOSP getAuthToken() (all three overloads): AccountManagerService asks the authenticator of the account type
-	 * for the token. ATL knows no authenticators (see addAccount), so the bind fails as for a type without one:
-	 * AuthenticatorException "bind failure" from the future. The argument checks are AOSP's. */
+	/* AOSP getAuthToken(): AccountManagerService asks the authenticator of the account type for the token */
 	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType, final Bundle options,
 	                                                 final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
 		if (account == null)
 			throw new IllegalArgumentException("account is null");
 		if (authTokenType == null)
 			throw new IllegalArgumentException("authTokenType is null");
-		return runAsync(new Callable<Bundle>() {
+		final Bundle optionsIn = new Bundle();
+		if (options != null)
+			optionsIn.putAll(options);
+		optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
+		return new AmsTask(activity, handler, callback) {
 			@Override
-			public Bundle call() throws Exception {
-				throw new AuthenticatorException("bind failure");
+			public void doWork() throws RemoteException {
+				service().getAuthToken(mResponse, account, authTokenType, false /* notifyOnAuthFailure */, true /* expectActivityLaunch */, optionsIn);
 			}
-		}, callback, handler);
+		}.start();
 	}
 
 	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType,
@@ -184,7 +220,46 @@ public class AccountManager {
 
 	public AccountManagerFuture<Bundle> getAuthToken(final Account account, final String authTokenType, final Bundle options,
 	                                                 final boolean notifyAuthFailure, AccountManagerCallback<Bundle> callback, Handler handler) {
-		return getAuthToken(account, authTokenType, options, (Activity)null, callback, handler);
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (authTokenType == null)
+			throw new IllegalArgumentException("authTokenType is null");
+		final Bundle optionsIn = new Bundle();
+		if (options != null)
+			optionsIn.putAll(options);
+		optionsIn.putString(KEY_ANDROID_PACKAGE_NAME, mContext.getPackageName());
+		return new AmsTask(null, handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().getAuthToken(mResponse, account, authTokenType, notifyAuthFailure, false /* expectActivityLaunch */, optionsIn);
+			}
+		}.start();
+	}
+
+	/* AOSP confirmCredentials() */
+	public AccountManagerFuture<Bundle> confirmCredentials(final Account account, final Bundle options, final Activity activity,
+	                                                       final AccountManagerCallback<Bundle> callback, final Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		return new AmsTask(activity, handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().confirmCredentials(mResponse, account, options, activity != null);
+			}
+		}.start();
+	}
+
+	/* AOSP editProperties() */
+	public AccountManagerFuture<Bundle> editProperties(final String accountType, final Activity activity,
+	                                                   final AccountManagerCallback<Bundle> callback, final Handler handler) {
+		if (accountType == null)
+			throw new IllegalArgumentException("accountType is null");
+		return new AmsTask(activity, handler, callback) {
+			@Override
+			public void doWork() throws RemoteException {
+				service().editProperties(mResponse, accountType, activity != null);
+			}
+		}.start();
 	}
 
 	/* AOSP GetAuthTokenByTypeAndFeaturesTask: the accounts of the type with the features; none -> addAccount(), one ->
@@ -299,6 +374,267 @@ public class AccountManager {
 		}, callback, handler);
 	}
 
+	/* AOSP ensureNotOnMainThread(): waiting for a result on the main thread would deadlock */
+	private void ensureNotOnMainThread() {
+		final Looper looper = Looper.myLooper();
+		if (looper != null && looper == mContext.getMainLooper()) {
+			final IllegalStateException exception = new IllegalStateException("calling this from your main thread can lead to deadlock");
+			android.util.Log.e("AccountManager", "calling this from your main thread can lead to deadlock and/or ANRs", exception);
+			if (mContext.getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.FROYO)
+				throw exception;
+		}
+	}
+
+	private static <T> void postToHandler(Handler handler, final AccountManagerCallback<T> callback, final AccountManagerFuture<T> future) {
+		(handler != null ? handler : new Handler(Looper.getMainLooper())).post(new Runnable() {
+			@Override
+			public void run() {
+				callback.run(future);
+			}
+		});
+	}
+
+	/* AOSP convertErrorToException() */
+	private static Exception convertErrorToException(int code, String message) {
+		if (code == ERROR_CODE_NETWORK_ERROR)
+			return new IOException(message);
+		if (code == ERROR_CODE_UNSUPPORTED_OPERATION)
+			return new UnsupportedOperationException(message);
+		if (code == ERROR_CODE_INVALID_RESPONSE)
+			return new AuthenticatorException(message);
+		if (code == ERROR_CODE_BAD_ARGUMENTS)
+			return new IllegalArgumentException(message);
+		return new AuthenticatorException(message);
+	}
+
+	/* AOSP AmsTask: a request to the account manager service whose answer is a Bundle; an intent in the answer is
+	 * started with the caller's activity, if it gave one, and the task waits for the real answer */
+	private abstract class AmsTask extends FutureTask<Bundle> implements AccountManagerFuture<Bundle> {
+		final IAccountManagerResponse mResponse;
+		final Handler mHandler;
+		final AccountManagerCallback<Bundle> mCallback;
+		final Activity mActivity;
+
+		public AmsTask(Activity activity, Handler handler, AccountManagerCallback<Bundle> callback) {
+			super(new Callable<Bundle>() {
+				@Override
+				public Bundle call() throws Exception {
+					throw new IllegalStateException("this should never be called");
+				}
+			});
+			mHandler = handler;
+			mCallback = callback;
+			mActivity = activity;
+			mResponse = new Response();
+		}
+
+		public final AccountManagerFuture<Bundle> start() {
+			try {
+				doWork();
+			} catch (RemoteException e) {
+				setException(e);
+			}
+			return this;
+		}
+
+		@Override
+		protected void set(Bundle bundle) {
+			if (bundle == null)
+				android.util.Log.e("AccountManager", "the bundle must not be null", new Exception());
+			super.set(bundle);
+		}
+
+		public abstract void doWork() throws RemoteException;
+
+		private Bundle internalGetResult(Long timeout, TimeUnit unit) throws OperationCanceledException, IOException, AuthenticatorException {
+			if (!isDone())
+				ensureNotOnMainThread();
+			try {
+				if (timeout == null)
+					return get();
+				else
+					return get(timeout, unit);
+			} catch (CancellationException | TimeoutException | InterruptedException e) {
+				throw new OperationCanceledException(e);
+			} catch (ExecutionException e) {
+				final Throwable cause = e.getCause();
+				if (cause instanceof IOException)
+					throw (IOException)cause;
+				else if (cause instanceof UnsupportedOperationException)
+					throw new AuthenticatorException(cause);
+				else if (cause instanceof AuthenticatorException)
+					throw (AuthenticatorException)cause;
+				else if (cause instanceof RuntimeException)
+					throw (RuntimeException)cause;
+				else if (cause instanceof Error)
+					throw (Error)cause;
+				else
+					throw new IllegalStateException(cause);
+			} finally {
+				cancel(true /* interrupt if running */);
+			}
+		}
+
+		@Override
+		public Bundle getResult() throws OperationCanceledException, IOException, AuthenticatorException {
+			return internalGetResult(null, null);
+		}
+
+		@Override
+		public Bundle getResult(long timeout, TimeUnit unit) throws OperationCanceledException, IOException, AuthenticatorException {
+			return internalGetResult(timeout, unit);
+		}
+
+		@Override
+		protected void done() {
+			if (mCallback != null)
+				postToHandler(mHandler, mCallback, this);
+		}
+
+		/* Handles the responses from the AccountManager */
+		private class Response extends IAccountManagerResponse.Stub {
+			@Override
+			public void onResult(Bundle bundle) {
+				if (bundle == null) {
+					onError(ERROR_CODE_INVALID_RESPONSE, "null bundle returned");
+					return;
+				}
+				Intent intent = bundle.getParcelable(KEY_INTENT, Intent.class);
+				if (intent != null && mActivity != null) {
+					// since the user provided an Activity we will silently start intents that we see
+					mActivity.startActivity(intent);
+					// leave the Future running to wait for the real response to this request
+				} else if (bundle.getBoolean("retry")) {
+					try {
+						doWork();
+					} catch (RemoteException e) {
+						throw new RuntimeException(e);
+					}
+				} else {
+					set(bundle);
+				}
+			}
+
+			@Override
+			public void onError(int code, String message) {
+				if (code == ERROR_CODE_CANCELED || code == ERROR_CODE_USER_RESTRICTED || code == ERROR_CODE_MANAGEMENT_DISABLED_FOR_ACCOUNT_TYPE) {
+					// the authenticator indicated that this request was canceled or we were forbidden to fulfill;
+					// cancel now
+					cancel(true /* mayInterruptIfRunning */);
+					return;
+				}
+				setException(convertErrorToException(code, message));
+			}
+		}
+	}
+
+	/* AOSP BaseFutureTask/Future2Task: a request whose answer Bundle becomes a result of type T */
+	private abstract class Future2Task<T> extends FutureTask<T> implements AccountManagerFuture<T> {
+		final IAccountManagerResponse mResponse;
+		final Handler mHandler;
+		final AccountManagerCallback<T> mCallback;
+
+		public Future2Task(Handler handler, AccountManagerCallback<T> callback) {
+			super(new Callable<T>() {
+				@Override
+				public T call() throws Exception {
+					throw new IllegalStateException("this should never be called");
+				}
+			});
+			mHandler = handler;
+			mCallback = callback;
+			mResponse = new Response();
+		}
+
+		public abstract void doWork() throws RemoteException;
+
+		public abstract T bundleToResult(Bundle bundle) throws AuthenticatorException;
+
+		@Override
+		protected void done() {
+			if (mCallback != null)
+				postToHandler(mHandler, mCallback, this);
+		}
+
+		public Future2Task<T> start() {
+			try {
+				doWork();
+			} catch (RemoteException e) {
+				setException(e);
+			}
+			return this;
+		}
+
+		private T internalGetResult(Long timeout, TimeUnit unit) throws OperationCanceledException, IOException, AuthenticatorException {
+			if (!isDone())
+				ensureNotOnMainThread();
+			try {
+				if (timeout == null)
+					return get();
+				else
+					return get(timeout, unit);
+			} catch (InterruptedException | TimeoutException | CancellationException e) {
+				// fall through and cancel
+			} catch (ExecutionException e) {
+				final Throwable cause = e.getCause();
+				if (cause instanceof IOException)
+					throw (IOException)cause;
+				else if (cause instanceof UnsupportedOperationException)
+					throw new AuthenticatorException(cause);
+				else if (cause instanceof AuthenticatorException)
+					throw (AuthenticatorException)cause;
+				else if (cause instanceof RuntimeException)
+					throw (RuntimeException)cause;
+				else if (cause instanceof Error)
+					throw (Error)cause;
+				else
+					throw new IllegalStateException(cause);
+			} finally {
+				cancel(true /* interrupt if running */);
+			}
+			throw new OperationCanceledException();
+		}
+
+		@Override
+		public T getResult() throws OperationCanceledException, IOException, AuthenticatorException {
+			return internalGetResult(null, null);
+		}
+
+		@Override
+		public T getResult(long timeout, TimeUnit unit) throws OperationCanceledException, IOException, AuthenticatorException {
+			return internalGetResult(timeout, unit);
+		}
+
+		private class Response extends IAccountManagerResponse.Stub {
+			@Override
+			public void onResult(Bundle bundle) {
+				try {
+					T result = bundleToResult(bundle);
+					if (result == null)
+						return;
+					set(result);
+					return;
+				} catch (ClassCastException e) {
+					// we will set the exception below
+				} catch (AuthenticatorException e) {
+					// we will set the exception below
+				}
+				onError(ERROR_CODE_INVALID_RESPONSE, "no result in response");
+			}
+
+			@Override
+			public void onError(int code, String message) {
+				if (code == ERROR_CODE_CANCELED || code == ERROR_CODE_USER_RESTRICTED || code == ERROR_CODE_MANAGEMENT_DISABLED_FOR_ACCOUNT_TYPE) {
+					// the authenticator indicated that this request was canceled or we were forbidden to fulfill;
+					// cancel now
+					cancel(true /* mayInterruptIfRunning */);
+					return;
+				}
+				setException(convertErrorToException(code, message));
+			}
+		}
+	}
+
 	/*
 	 * Runs work off the calling thread like AOSP does, so native keyring calls don't block the UI.
 	 * The callback is invoked on the handler's thread (main thread if null) once the work is done.
@@ -381,37 +717,36 @@ public class AccountManager {
 			setPassword(account, null);
 	}
 
-	/* AOSP getAuthenticatorTypes(): the authenticators the AccountManagerService knows; ATL registers none
-	 * (see getAccountsByTypeAndFeatures) */
+	/* AOSP getAuthenticatorTypes(): the authenticators the AccountManagerService knows (AccountAuthenticatorCache) */
 	public AuthenticatorDescription[] getAuthenticatorTypes() {
-		return new AuthenticatorDescription[0];
+		return service().getAuthenticatorTypes();
 	}
 
-	/* AOSP removeAccount(Account, Activity, ...): AccountManagerService binds the authenticator of the account type to
-	 * remove the account (RemoveAccountSession); ATL knows no authenticators (see addAccount), so the bind fails */
+	/* AOSP removeAccount(Account, Activity, ...): AccountManagerService asks the authenticator of the account type
+	 * (getAccountRemovalAllowed) and removes the account when it allows it */
 	public AccountManagerFuture<Bundle> removeAccount(final Account account, final Activity activity,
 	                                                  AccountManagerCallback<Bundle> callback, Handler handler) {
 		if (account == null)
 			throw new IllegalArgumentException("account is null");
-		return runAsync(new Callable<Bundle>() {
+		return new AmsTask(activity, handler, callback) {
 			@Override
-			public Bundle call() throws Exception {
-				throw new AuthenticatorException("bind failure");
+			public void doWork() throws RemoteException {
+				service().removeAccount(mResponse, account, activity != null);
 			}
-		}, callback, handler);
+		}.start();
 	}
 
-	/* AOSP updateCredentials(): asks the authenticator of the account type; none is bound here (see addAccount) */
+	/* AOSP updateCredentials(): asks the authenticator of the account type */
 	public AccountManagerFuture<Bundle> updateCredentials(final Account account, final String authTokenType, final Bundle options,
 	                                                      final Activity activity, AccountManagerCallback<Bundle> callback, Handler handler) {
 		if (account == null)
 			throw new IllegalArgumentException("account is null");
-		return runAsync(new Callable<Bundle>() {
+		return new AmsTask(activity, handler, callback) {
 			@Override
-			public Bundle call() throws Exception {
-				throw new AuthenticatorException("bind failure");
+			public void doWork() throws RemoteException {
+				service().updateCredentials(mResponse, account, authTokenType, activity != null, options);
 			}
-		}, callback, handler);
+		}.start();
 	}
 
 	public String getPassword(Account account) {
@@ -454,6 +789,7 @@ public class AccountManager {
 			throw new IllegalArgumentException("accountType is null");
 		if (authToken == null)
 			return;
+		service().invalidateCachedToken(accountType, authToken);
 		for (Account account : getAccountsByType(accountType)) {
 			String types = keyringGet(account.type, account.name, "authtokentypes");
 			if (types == null)
@@ -548,13 +884,26 @@ public class AccountManager {
 		return result;
 	}
 
-	public AccountManagerFuture<Boolean> hasFeatures(Account account, String[] features, AccountManagerCallback<Boolean> callback, Handler handler) {
-		return runAsync(new Callable<Boolean>() {
+	/* AOSP hasFeatures(): asks the authenticator of the account type */
+	public AccountManagerFuture<Boolean> hasFeatures(final Account account, final String[] features,
+	                                                 AccountManagerCallback<Boolean> callback, Handler handler) {
+		if (account == null)
+			throw new IllegalArgumentException("account is null");
+		if (features == null)
+			throw new IllegalArgumentException("features is null");
+		return new Future2Task<Boolean>(handler, callback) {
 			@Override
-			public Boolean call() throws Exception {
-				return false;
+			public void doWork() throws RemoteException {
+				service().hasFeatures(mResponse, account, features);
 			}
-		}, callback, handler);
+
+			@Override
+			public Boolean bundleToResult(Bundle bundle) throws AuthenticatorException {
+				if (!bundle.containsKey(KEY_BOOLEAN_RESULT))
+					throw new AuthenticatorException("no result in response");
+				return bundle.getBoolean(KEY_BOOLEAN_RESULT);
+			}
+		}.start();
 	}
 
 	/* nothing to read before the keyring file exists (ATLSecrets), and asking would show the desktop's dialog */

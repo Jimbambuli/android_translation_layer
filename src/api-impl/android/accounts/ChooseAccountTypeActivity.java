@@ -99,7 +99,7 @@ public class ChooseAccountTypeActivity extends Activity {
             return;
         }
 
-        setContentView(R.layout.choose_account_type);
+        atlSetContentView(R.layout.choose_account_type);
         // Setup the list
         ListView list = findViewById(android.R.id.list);
         // Use an existing ListAdapter that will map an array of strings to TextViews
@@ -136,11 +136,7 @@ public class ChooseAccountTypeActivity extends Activity {
                 if (sequence != null) {
                     name = sequence.toString();
                 }
-            } catch (PackageManager.NameNotFoundException e) {
-                // Nothing we can do much here, just log
-                if (Log.isLoggable(TAG, Log.WARN)) {
-                    Log.w(TAG, "No icon name for account type " + desc.type);
-                }
+            // AOSP also catches NameNotFoundException, which ATL's createPackageContext() does not declare
             } catch (Resources.NotFoundException e) {
                 // Nothing we can do much here, just log
                 if (Log.isLoggable(TAG, Log.WARN)) {
@@ -199,6 +195,17 @@ public class ChooseAccountTypeActivity extends Activity {
             holder.icon.setImageDrawable(mInfos.get(position).drawable);
 
             return convertView;
+        }
+    }
+
+    /* ATL's Activity.setContentView(int) declares Exception; AOSP's throws only unchecked inflation errors */
+    private void atlSetContentView(int layoutResID) {
+        try {
+            setContentView(layoutResID);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }
