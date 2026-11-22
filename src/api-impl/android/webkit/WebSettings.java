@@ -26,13 +26,22 @@ public class WebSettings {
 	private int forceDark = FORCE_DARK_AUTO;
 	private int disabledActionModeMenuItems = MENU_ITEM_NONE;
 	private boolean offscreenPreRaster;
-	private int cacheMode = -1; // LOAD_DEFAULT, the documented default
+	private int cacheMode = LOAD_DEFAULT; // the documented default
 	private boolean useWideViewPort; // documented default false
 	private boolean blockNetworkImage; // documented default false
 
 	public static final int FORCE_DARK_OFF = 0;
 	public static final int FORCE_DARK_AUTO = 1;
 	public static final int FORCE_DARK_ON = 2;
+	public static final int LOAD_DEFAULT = -1;
+	@Deprecated
+	public static final int LOAD_NORMAL = 0;
+	public static final int LOAD_CACHE_ELSE_NETWORK = 1;
+	public static final int LOAD_NO_CACHE = 2;
+	public static final int LOAD_CACHE_ONLY = 3;
+	public static final int MIXED_CONTENT_ALWAYS_ALLOW = 0;
+	public static final int MIXED_CONTENT_NEVER_ALLOW = 1;
+	public static final int MIXED_CONTENT_COMPATIBILITY_MODE = 2;
 	public static final int MENU_ITEM_NONE = 0;
 	public static final int MENU_ITEM_SHARE = 1 << 0;
 	public static final int MENU_ITEM_WEB_SEARCH = 1 << 1;
@@ -76,8 +85,11 @@ public class WebSettings {
 		OFF
 	}
 
+	@Deprecated
 	public static enum RenderPriority {
+		NORMAL,
 		HIGH,
+		LOW
 	}
 
 	/* the string of an Android System WebView, built from what ATL reports as android.os.Build. Apps read the Chrome

@@ -14,6 +14,32 @@ public class WebStorage {
 		public void updateQuota(long newQuota);
 	};
 
+	/* AOSP WebStorage.Origin (Android 16): one origin's quota and usage, as getOrigins() reports them */
+	public static class Origin {
+		private String mOrigin = null;
+		private long mQuota = 0;
+		private long mUsage = 0;
+
+		/** @hide */
+		protected Origin(String origin, long quota, long usage) {
+			mOrigin = origin;
+			mQuota = quota;
+			mUsage = usage;
+		}
+
+		public String getOrigin() {
+			return mOrigin;
+		}
+
+		public long getQuota() {
+			return mQuota;
+		}
+
+		public long getUsage() {
+			return mUsage;
+		}
+	}
+
 	public static WebStorage getInstance() {
 		return new WebStorage();
 	}

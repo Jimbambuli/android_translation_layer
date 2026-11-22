@@ -554,6 +554,11 @@ public class WebChromeClient {
         /**  Allows picking a nonexistent file and saving it. */
         public static final int MODE_SAVE = 3;
 
+        /** File or directory should be opened for reading only. */
+        public static final int PERMISSION_MODE_READ = 0;
+        /** File or directory should be opened for read and write. */
+        public static final int PERMISSION_MODE_READ_WRITE = 1;
+
         /**
          * Parse the result returned by the file picker activity. This method should be used with
          * {@link #createIntent}. Refer to {@link #createIntent} for how to use it.
@@ -608,6 +613,15 @@ public class WebChromeClient {
          */
         @Nullable
         public abstract CharSequence getTitle();
+
+        /**
+         * Returns permission mode {@link #PERMISSION_MODE_READ} or
+         * {@link #PERMISSION_MODE_READ_WRITE} which indicates the intended mode for opening a file
+         * or directory (AOSP 16: the base class answers PERMISSION_MODE_READ).
+         */
+        public int getPermissionMode() {
+            return PERMISSION_MODE_READ;
+        }
 
         /**
          * The file name of a default selection if specified, or {@code null}.
