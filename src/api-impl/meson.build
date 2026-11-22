@@ -658,6 +658,7 @@ srcs = [
 	'android/hardware/Sensor.java',
 	'android/hardware/SensorEvent.java',
 	'android/hardware/SensorEventListener.java',
+	'android/hardware/SensorEventListener2.java',
 	'android/hardware/SensorManager.java',
 	'android/hardware/SyncFence.java',
 	'android/hardware/TriggerEvent.java',
