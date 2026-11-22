@@ -58,7 +58,12 @@ import android.os.VibratorManager;
 import android.os.storage.StorageManager;
 import android.print.PrintManager;
 import android.telecom.TelecomManager;
+import android.telephony.CarrierConfigManager;
 import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyRegistryManager;
+import android.telephony.euicc.EuiccManager;
+import android.telephony.ims.ImsManager;
+import android.telephony.satellite.SatelliteManager;
 import android.telephony.TelephonyManager;
 import android.util.ArrayMap;
 import android.util.Log;
@@ -518,6 +523,41 @@ public final class SystemServiceRegistry {
             @Override
             public SubscriptionManager createService(ContextImpl ctx) {
                 return new SubscriptionManager();
+            }});
+
+        registerService(Context.CARRIER_CONFIG_SERVICE, CarrierConfigManager.class,
+                new CachedServiceFetcher<CarrierConfigManager>() {
+            @Override
+            public CarrierConfigManager createService(ContextImpl ctx) {
+                return new CarrierConfigManager(ctx);
+            }});
+
+        registerService(Context.EUICC_SERVICE, EuiccManager.class,
+                new CachedServiceFetcher<EuiccManager>() {
+            @Override
+            public EuiccManager createService(ContextImpl ctx) {
+                return new EuiccManager(ctx);
+            }});
+
+        registerService(Context.TELEPHONY_IMS_SERVICE, ImsManager.class,
+                new CachedServiceFetcher<ImsManager>() {
+            @Override
+            public ImsManager createService(ContextImpl ctx) {
+                return new ImsManager(ctx);
+            }});
+
+        registerService(Context.SATELLITE_SERVICE, SatelliteManager.class,
+                new CachedServiceFetcher<SatelliteManager>() {
+            @Override
+            public SatelliteManager createService(ContextImpl ctx) {
+                return new SatelliteManager(ctx);
+            }});
+
+        registerService(Context.TELEPHONY_REGISTRY_SERVICE, TelephonyRegistryManager.class,
+                new CachedServiceFetcher<TelephonyRegistryManager>() {
+            @Override
+            public TelephonyRegistryManager createService(ContextImpl ctx) {
+                return new TelephonyRegistryManager(ctx);
             }});
 
         registerService(Context.NSD_SERVICE, NsdManager.class,
