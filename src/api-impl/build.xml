@@ -10,7 +10,10 @@
 	</target>
 
 	<target name="dist" depends="compile">
-		<jar jarfile="${jarfile}" basedir="${build}"/>
+		<jar jarfile="${jarfile}" basedir="${build}">
+			<!-- libphonenumber's number metadata, loaded as class path resources -->
+			<fileset dir="${srcdir}" includes="com/android/i18n/phonenumbers/data/*"/>
+		</jar>
 	</target>
 
 	<target name="clean">

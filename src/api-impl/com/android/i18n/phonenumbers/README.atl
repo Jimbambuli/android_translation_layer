@@ -1,0 +1,6 @@
+libphonenumber as repackaged by AOSP (package com.android.i18n.phonenumbers), copied unchanged from
+platform/external/libphonenumber, tag android-16.0.0_r4 (libphonenumber 9.0.10), directories
+repackaged/libphonenumber/src and repackaged/internal/prefixmapper/src (the "libphonenumber-platform-nogeocoder"
+module AOSP builds; the offline geocoder is left out, nothing in the framework uses it).
+Licence: Apache-2.0, see NOTICE in this directory. The data/ files are the binary number metadata, loaded as
+class path resources of api-impl.jar (build.xml adds them to the jar).

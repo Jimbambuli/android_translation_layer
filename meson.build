@@ -68,10 +68,12 @@ hax_hits_jar = custom_target('hax-stub-hits.jar', input: [hax_jar], output: ['ha
 # not --incremental: hax-stub-hits.jar is written anew each time, and dx's merge with the previous api-impl.jar cannot
 # turn a const-string into a const-string/jumbo once the string ids pass 65535 (DexIndexOverflowException); a full
 # dx run emits the jumbo form itself
+# --multi-dex: the framework has more than 65536 method references (the telephony classes, AOSP's libphonenumber); the
+# runtime loads classes2.dex from the jar like classes.dex
 custom_target('api-impl.jar', build_by_default: true, input: [hax_hits_jar[0]], output: ['api-impl.jar'],
               install: true,
               install_dir : get_option('libdir') / 'java/dex/android_translation_layer',
-              command: ['dx', '--dex', '--min-sdk-version=26', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
+              command: ['dx', '--dex', '--multi-dex', '--min-sdk-version=26', '--output='+join_paths(builddir_base, 'api-impl.jar'), '@INPUT@'])
 
 # gstub.jar
 subdir('src/gstub')
