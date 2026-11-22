@@ -5,6 +5,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Handler;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 public class SensorManager {
@@ -55,33 +56,86 @@ public class SensorManager {
 		return registerListener(listener, sensor, samplingPeriodUs);
 	}
 
+	/* AOSP SystemSensorManager.mSensorListeners: the sensors each listener is registered for (its
+	 * SensorEventQueue). ATL has one sensor per type; per type the source of the events: the
+	 * LocationListener (TYPE_ORIENTATION) or the handle of the native accelerometer timer (0: none found) */
+	private final HashMap<SensorEventListener, HashMap<Integer, Object>> mSensorListeners = new HashMap<>();
+
 	public boolean registerListener(final SensorEventListener listener, final Sensor sensor, int samplingPeriodUs) {
-		switch (sensor.getType()) {
-			case Sensor.TYPE_ORIENTATION:
-				new LocationManager().requestLocationUpdates(null, 0, 0, new LocationListener() {
-					@Override
-					public void onLocationChanged(Location location) {
-						listener.onSensorChanged(new SensorEvent(new float[] {location.getBearing()}, sensor));
-					}
-				});
-				return true;
-			case Sensor.TYPE_ACCELEROMETER:
-				register_accelerometer_listener_native(listener, sensor, samplingPeriodUs);
-				return true;
-			default:
-				return false;
+		/* AOSP SystemSensorManager.registerListenerImpl(): null arguments and trigger sensors fail */
+		if (listener == null || sensor == null || sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT)
+			return false;
+		synchronized (mSensorListeners) {
+			HashMap<Integer, Object> sensors = mSensorListeners.get(listener);
+			if (sensors != null && sensors.containsKey(sensor.getType()))
+				return false; // AOSP SensorEventQueue.addSensor(): already registered
+			Object source;
+			switch (sensor.getType()) {
+				case Sensor.TYPE_ORIENTATION:
+					LocationListener locationListener = new LocationListener() {
+						@Override
+						public void onLocationChanged(Location location) {
+							listener.onSensorChanged(new SensorEvent(new float[] {location.getBearing()}, sensor));
+						}
+					};
+					new LocationManager().requestLocationUpdates(null, 0, 0, locationListener);
+					source = locationListener;
+					break;
+				case Sensor.TYPE_ACCELEROMETER:
+					source = register_accelerometer_listener_native(listener, sensor, samplingPeriodUs);
+					break;
+				default:
+					return false;
+			}
+			if (sensors == null) {
+				sensors = new HashMap<>();
+				mSensorListeners.put(listener, sensors);
+			}
+			sensors.put(sensor.getType(), source);
+			return true;
 		}
 	}
 
+	/* AOSP SensorManager.unregisterListener(SensorEventListener): from all sensors */
 	public void unregisterListener(final SensorEventListener listener) {
-		unregisterListener(listener, null);
+		if (listener == null)
+			return;
+		unregisterListenerImpl(listener, null);
 	}
 
+	/* AOSP SensorManager.unregisterListener(SensorEventListener, Sensor) */
 	public void unregisterListener(final SensorEventListener listener, Sensor sensor) {
-		System.out.println("STUB: andoroid.hw.SensorManager.unregisterListener");
+		if (listener == null || sensor == null)
+			return;
+		unregisterListenerImpl(listener, sensor);
 	}
 
-	native void register_accelerometer_listener_native(SensorEventListener listener, Sensor sensor, int sampling_period);
+	/* AOSP SystemSensorManager.unregisterListenerImpl(): trigger sensors are cancelled with
+	 * cancelTriggerSensor(); else the listener's registration for the sensor (null: all) ends */
+	private void unregisterListenerImpl(SensorEventListener listener, Sensor sensor) {
+		if (sensor != null && sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT)
+			return;
+		synchronized (mSensorListeners) {
+			HashMap<Integer, Object> sensors = mSensorListeners.get(listener);
+			if (sensors == null)
+				return;
+			for (Object source : sensor == null ? sensors.values() : Arrays.asList(sensors.get(sensor.getType()))) {
+				if (source instanceof LocationListener)
+					new LocationManager().removeUpdates((LocationListener)source);
+				else if (source instanceof Long)
+					unregister_accelerometer_listener_native((Long)source);
+			}
+			if (sensor == null)
+				sensors.clear();
+			else
+				sensors.remove(sensor.getType());
+			if (sensors.isEmpty())
+				mSensorListeners.remove(listener);
+		}
+	}
+
+	native long register_accelerometer_listener_native(SensorEventListener listener, Sensor sensor, int sampling_period);
+	native void unregister_accelerometer_listener_native(long handle);
 
 	public List<Sensor> getSensorList(int type) {
 		return Arrays.asList(getDefaultSensor(type));
