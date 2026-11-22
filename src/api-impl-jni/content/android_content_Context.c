@@ -21,6 +21,7 @@
 
 #include "android_content_Context.h"
 #include "../app/android_app_Activity.h"
+#include "../views/android_view_Display.h"
 
 static void monitor_changed_cb(GdkSurface *surface, GdkMonitor *monitor, jobject configuration)
 {
@@ -260,6 +261,7 @@ void update_config_for_window(GtkWindow *window)
 	GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
 	monitor_changed_cb(surface, gdk_display_get_monitor_at_surface(gdk_display_get_default(), surface), NULL);
 	g_signal_connect(surface, "enter-monitor", G_CALLBACK(monitor_changed_cb), NULL);
+	display_track_rotation(window);
 }
 
 JNIEXPORT void JNICALL Java_android_content_Context_nativeOpenFile(JNIEnv *env, jclass class, jint fd)

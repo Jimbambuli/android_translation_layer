@@ -1,6 +1,7 @@
 package android.hardware.display;
 
 import android.os.Handler;
+import android.os.Looper;
 import android.view.Display;
 
 public final class DisplayManager {
@@ -17,17 +18,53 @@ public final class DisplayManager {
 		return new Display();
 	}
 
-	/* AOSP DisplayManagerGlobal.registerDisplayListener(): the listener is kept until it is unregistered; ATL has
-	 * one display that is never added or removed, so no event is sent */
-	private final java.util.ArrayList<DisplayListener> mDisplayListeners = new java.util.ArrayList<>();
+	/* AOSP DisplayManagerGlobal.mDisplayListeners: the listeners of all DisplayManagers with the looper or
+	 * executor their events go to (DisplayListenerDelegate); ATL has one display that is never added or
+	 * removed, it only changes when the compositor rotates it */
+	private static final class Delegate {
+		final DisplayListener listener;
+		final Handler handler;
+		final java.util.concurrent.Executor executor;
+		final long eventFilter;
 
+		Delegate(DisplayListener listener, Handler handler, java.util.concurrent.Executor executor, long eventFilter) {
+			this.listener = listener;
+			this.handler = handler;
+			this.executor = executor;
+			this.eventFilter = eventFilter;
+		}
+	}
+
+	/* AOSP DisplayManager.EVENT_TYPE_* */
+	public static final long EVENT_TYPE_DISPLAY_ADDED = 1L << 0;
+	public static final long EVENT_TYPE_DISPLAY_REMOVED = 1L << 1;
+	public static final long EVENT_TYPE_DISPLAY_CHANGED = 1L << 2;
+	public static final long EVENT_TYPE_DISPLAY_REFRESH_RATE = 1L << 3;
+	public static final long EVENT_TYPE_DISPLAY_STATE = 1L << 4;
+	public static final long EVENT_TYPE_DISPLAY_BRIGHTNESS = 1L << 5;
+
+	private static final java.util.ArrayList<Delegate> sDisplayListeners = new java.util.ArrayList<>();
+
+	private static int findDisplayListenerLocked(DisplayListener listener) {
+		for (int i = 0; i < sDisplayListeners.size(); i++) {
+			if (sDisplayListeners.get(i).listener == listener)
+				return i;
+		}
+		return -1;
+	}
+
+	/* AOSP DisplayManager.registerDisplayListener(DisplayListener, Handler): the events go to the handler's
+	 * looper, without one to the looper of the calling thread (DisplayManagerGlobal.getLooperForHandler()) */
 	public void registerDisplayListener(DisplayListener listener, Handler handler) {
 		if (listener == null) {
 			throw new IllegalArgumentException("listener must not be null");
 		}
-		synchronized (mDisplayListeners) {
-			if (!mDisplayListeners.contains(listener))
-				mDisplayListeners.add(listener);
+		Looper looper = handler != null ? handler.getLooper() : Looper.myLooper();
+		if (looper == null)
+			looper = Looper.getMainLooper();
+		synchronized (sDisplayListeners) {
+			if (findDisplayListenerLocked(listener) < 0)
+				sDisplayListeners.add(new Delegate(listener, new Handler(looper), null, EVENT_TYPE_DISPLAY_ADDED | EVENT_TYPE_DISPLAY_CHANGED | EVENT_TYPE_DISPLAY_REMOVED));
 		}
 	}
 
@@ -36,15 +73,48 @@ public final class DisplayManager {
 		if (listener == null) {
 			throw new IllegalArgumentException("listener must not be null");
 		}
-		synchronized (mDisplayListeners) {
-			mDisplayListeners.remove(listener);
+		synchronized (sDisplayListeners) {
+			int index = findDisplayListenerLocked(listener);
+			if (index >= 0)
+				sDisplayListeners.remove(index);
 		}
 	}
 
-	/* AOSP DisplayManager.registerDisplayListener(Executor, long, DisplayListener): kept like the Handler variant;
-	 * ATL sends no display events, so the event filter and the executor are not needed */
+	/* AOSP DisplayManager.registerDisplayListener(Executor, long, DisplayListener): the events of the filter go
+	 * to the executor */
 	public void registerDisplayListener(java.util.concurrent.Executor executor, long eventFilter, DisplayListener listener) {
-		registerDisplayListener(listener, null);
+		if (listener == null) {
+			throw new IllegalArgumentException("listener must not be null");
+		}
+		if (executor == null) {
+			throw new IllegalArgumentException("executor must not be null");
+		}
+		synchronized (sDisplayListeners) {
+			if (findDisplayListenerLocked(listener) < 0)
+				sDisplayListeners.add(new Delegate(listener, null, executor, eventFilter));
+		}
+	}
+
+	/** @hide DisplayManagerGlobal.handleDisplayEvent(displayId, EVENT_DISPLAY_CHANGED) */
+	public static void notifyDisplayChanged(final int displayId) {
+		Delegate[] delegates;
+		synchronized (sDisplayListeners) {
+			delegates = sDisplayListeners.toArray(new Delegate[0]);
+		}
+		for (final Delegate d : delegates) {
+			if ((d.eventFilter & EVENT_TYPE_DISPLAY_CHANGED) == 0)
+				continue;
+			Runnable r = new Runnable() {
+				@Override
+				public void run() {
+					d.listener.onDisplayChanged(displayId);
+				}
+			};
+			if (d.executor != null)
+				d.executor.execute(r);
+			else
+				d.handler.post(r);
+		}
 	}
 
 	/* AOSP DisplayManager.getDisplays(String): the categories select from the displays; ATL's only display is
