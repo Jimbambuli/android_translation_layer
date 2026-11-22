@@ -588,35 +588,46 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		}
 	}
 
-	// the order must match GtkFileChooserAction enum
-	private static final List<String> FILE_CHOOSER_ACTIONS = Arrays.asList(
-	    "android.intent.action.OPEN_DOCUMENT",     // (0) GTK_FILE_CHOOSER_ACTION_OPEN
-	    "android.intent.action.CREATE_DOCUMENT",   // (1) GTK_FILE_CHOOSER_ACTION_SAVE
-	    "android.intent.action.OPEN_DOCUMENT_TREE" // (2) GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER
-	);
+	/* the requests the file dialog answers for DocumentsUI (DocumentsPicker), by request code */
+	private final android.util.SparseArray<Intent> fileChooserRequests = new android.util.SparseArray<>();
 
-	// callback from native code
+	// callback from native code; no uris: the user cancelled (DocumentsUI: RESULT_CANCELED without data)
 	@Export
-	protected void fileChooserResultCallback(int requestCode, int resultCode, int action, String uri) {
-		Uri result = uri != null ? Uri.parse(uri) : null;
-		/* AOSP's DocumentsUI answers OPEN_DOCUMENT/GET_CONTENT and CREATE_DOCUMENT with a document's content URI
-		 * (apps check the scheme, use DocumentFile); ATL's names the file the dialog chose (in a Flatpak the file
-		 * chooser portal's document, writable for a file to save) like DownloadsProvider's "raw:" documents */
-		if (result != null && action != 2 && "file".equals(result.getScheme()))
-			result = android.content.ContentResolver.atlUriForFile(result.getPath());
-		Intent data = new Intent(FILE_CHOOSER_ACTIONS.get(action), result);
-		if (result != null)
-			data.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | (action == 1 ? Intent.FLAG_GRANT_WRITE_URI_PERMISSION : 0));
-		dispatchActivityResult(null, requestCode, resultCode, data, "fileChooserResult");
+	protected void fileChooserResultCallback(int requestCode, String[] uris) {
+		Intent request = fileChooserRequests.get(requestCode);
+		fileChooserRequests.remove(requestCode);
+		Intent data = (request == null || uris == null || uris.length == 0) ? null : DocumentsPicker.getPickResult(request, uris);
+		dispatchActivityResult(null, requestCode, data != null ? RESULT_OK : RESULT_CANCELED, data, "fileChooserResult");
 	}
 
 	// callback from native code; no uris: the user cancelled
 	@Export
 	protected void pickImagesResultCallback(int requestCode, int maxItems, String[] uris) {
-		if (uris == null || uris.length == 0)
+		if (uris == null || uris.length == 0) {
 			dispatchActivityResult(null, requestCode, RESULT_CANCELED, null, "pickImagesResult");
-		else
-			dispatchActivityResult(null, requestCode, RESULT_OK, PhotoPicker.getPickerResponseIntent(maxItems, uris), "pickImagesResult");
+			return;
+		}
+		/* the picker's content URIs: here the documents of the chosen files (ATLRawDocumentsProvider) */
+		for (int i = 0; i < uris.length; i++)
+			uris[i] = android.content.ContentResolver.atlUriForFile(Uri.parse(uris[i]).getPath()).toString();
+		dispatchActivityResult(null, requestCode, RESULT_OK, PhotoPicker.getPickerResponseIntent(maxItems, uris), "pickImagesResult");
+	}
+
+	/* MediaStore.ACTION_PICK_IMAGES and ACTION_GET_CONTENT for images and videos: MediaProvider's photo picker
+	 * (PhotoPickerActivity); ATL shows the file dialog */
+	private void startPhotoPicker(Intent intent, int requestCode) {
+		String[] mimeTypes;
+		int maxItems;
+		try {
+			mimeTypes = PhotoPicker.getMimeTypeFilters(intent);
+			maxItems = PhotoPicker.getMaxSelectionLimit(intent);
+		} catch (IllegalArgumentException e) {
+			// PhotoPickerActivity.onCreate(): finish with RESULT_CANCELED
+			Slog.e(TAG, "Finish activity due to an exception while parsing extras: " + e);
+			dispatchActivityResult(null, requestCode, RESULT_CANCELED, null, "pickImagesResult");
+			return;
+		}
+		nativePickImages(mimeTypes, maxItems, requestCode);
 	}
 
 	public void startActivityForResult(Intent intent, int requestCode, Bundle options) {
@@ -663,24 +674,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 					nativeStartActivity(activity);
 				}
 			});
-		} else if (FILE_CHOOSER_ACTIONS.contains(intent.getAction())) {
-			nativeFileChooser(FILE_CHOOSER_ACTIONS.indexOf(intent.getAction()), intent.getType(), intent.getStringExtra("android.intent.extra.TITLE"), requestCode);
-		} else if (MediaStore.ACTION_PICK_IMAGES.equals(intent.getAction())) {
-			/* on Android, MediaProvider's photo picker (PhotoPickerActivity) answers it; ATL shows the file dialog */
-			String[] mimeTypes;
-			int maxItems;
-			try {
-				mimeTypes = PhotoPicker.getMimeTypeFilters(intent);
-				maxItems = PhotoPicker.getMaxSelectionLimit(intent);
-			} catch (IllegalArgumentException e) {
-				// PhotoPickerActivity.onCreate(): finish with RESULT_CANCELED
-				Slog.e(TAG, "Finish activity due to an exception while parsing extras: " + e);
-				dispatchActivityResult(null, requestCode, RESULT_CANCELED, null, "pickImagesResult");
-				return;
-			}
-			nativePickImages(mimeTypes, maxItems, requestCode);
-		} else if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())) {
-			nativeFileChooser(0 /*GTK_FILE_CHOOSER_ACTION_OPEN*/, intent.getType(), intent.getStringExtra(Intent.EXTRA_TITLE), requestCode);
+		} else if (MediaStore.ACTION_PICK_IMAGES.equals(intent.getAction())
+		           || (Intent.ACTION_GET_CONTENT.equals(intent.getAction()) && PhotoPicker.handlesGetContent(intent))) {
+			startPhotoPicker(intent, requestCode);
+		} else if (DocumentsPicker.ACTIONS.contains(intent.getAction())) {
+			/* on Android, DocumentsUI answers them; ATL shows the file dialog */
+			fileChooserRequests.put(requestCode, intent);
+			nativeFileChooser(DocumentsPicker.dialogAction(intent), DocumentsPicker.dialogMimeTypes(intent), DocumentsPicker.initialName(intent),
+			                  DocumentsPicker.initialFolder(intent), DocumentsPicker.allowMultiple(intent), requestCode);
 		} else if ("android.intent.action.INSTALL_PACKAGE".equals(intent.getAction())) {
 			try {
 				Process p = new ProcessBuilder("/usr/bin/env", "android-translation-layer", "--install", intent.getData().getPath()).start();
@@ -1625,7 +1626,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	static native void nativeClearTaskFinish(boolean finish);
 	private native void nativeFinishTask();
 	public static native void nativeOpenURI(String uri);
-	public native void nativeFileChooser(int action, String type, String title, int requestCode);
+	public native void nativeFileChooser(int action, String[] mimeTypes, String initialName, String initialFolder, boolean multiple, int requestCode);
 	public native void nativePickImages(String[] mimeTypes, int maxItems, int requestCode);
 	public void reportFullyDrawn() {}
 	public void setVisible(boolean visible) {}

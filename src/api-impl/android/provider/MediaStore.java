@@ -568,6 +568,9 @@ public class MediaStore {
 	 */
 	public final static String EXTRA_PICK_IMAGES_MAX = "android.provider.extra.PICK_IMAGES_MAX";
 
+	/* AOSP 16: the picked items in the order the user selected them (ACTION_PICK_IMAGES) */
+	public static final String EXTRA_PICK_IMAGES_IN_ORDER = "android.provider.extra.PICK_IMAGES_IN_ORDER";
+
 	/**
 	 * The maximum limit for the number of items that can be selected using
 	 * {@link MediaStore#ACTION_PICK_IMAGES} when launched in multiple selection mode.

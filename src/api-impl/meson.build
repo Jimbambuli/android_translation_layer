@@ -217,6 +217,7 @@ srcs = [
 	'android/app/ContextImpl.java',
 	'android/app/DatePickerDialog.java',
 	'android/app/Dialog.java',
+	'android/app/DocumentsPicker.java',
 	'android/app/DownloadManager.java',
 	'android/app/DialogFragment.java',
 	'android/app/Fragment.java',

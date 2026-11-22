@@ -1730,78 +1730,137 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeOpenURI(JNIEnv *env, jcla
 
 extern GtkWindow *window; // TODO: get this in a better way
 
+#define RESULT_OK       -1
+#define RESULT_CANCELED 0
+
+/* the files a dialog returned as a String[] of their URIs; NULL for none */
+static jobjectArray file_uris(JNIEnv *env, GListModel *files)
+{
+	if (!files)
+		return NULL;
+	guint n = g_list_model_get_n_items(files);
+	jobjectArray uris = (*env)->NewObjectArray(env, n, (*env)->FindClass(env, "java/lang/String"), NULL);
+	for (guint i = 0; i < n; i++) {
+		GFile *file = g_list_model_get_item(files, i);
+		char *uri = g_file_get_uri(file);
+		(*env)->SetObjectArrayElement(env, uris, i, _JSTRING(uri));
+		g_free(uri);
+		g_object_unref(file);
+	}
+	return uris;
+}
+
+/* a single file as a list, so both kinds of dialog answer alike */
+static GListModel *file_list(GFile *file)
+{
+	if (!file)
+		return NULL;
+	GListStore *store = g_list_store_new(G_TYPE_FILE);
+	g_list_store_append(store, file);
+	g_object_unref(file);
+	return G_LIST_MODEL(store);
+}
+
+/* one filter for the MIME types the app accepts (DocumentsUI's State.acceptMimes); none for all files */
+static void set_mime_filter(JNIEnv *env, GtkFileDialog *dialog, jobjectArray mime_types, const char *name)
+{
+	if (!mime_types)
+		return;
+	GtkFileFilter *filter = gtk_file_filter_new();
+	GString *names = g_string_new(NULL);
+	jsize n = (*env)->GetArrayLength(env, mime_types);
+	for (jsize i = 0; i < n; i++) {
+		jstring type_jstring = (*env)->GetObjectArrayElement(env, mime_types, i);
+		const char *type = (*env)->GetStringUTFChars(env, type_jstring, NULL);
+		gtk_file_filter_add_mime_type(filter, type);
+		g_string_append_printf(names, "%s%s", i ? ", " : "", type);
+		(*env)->ReleaseStringUTFChars(env, type_jstring, type);
+		(*env)->DeleteLocalRef(env, type_jstring);
+	}
+	gtk_file_filter_set_name(filter, name ? name : names->str);
+	g_string_free(names, TRUE);
+	GListStore *filters = g_list_store_new(GTK_TYPE_FILE_FILTER);
+	g_list_store_append(filters, filter);
+	gtk_file_dialog_set_filters(dialog, G_LIST_MODEL(filters));
+	gtk_file_dialog_set_default_filter(dialog, filter);
+	g_object_unref(filters);
+	g_object_unref(filter);
+}
+
 struct filechooser_callback_data {
 	jobject activity;
 	jint request_code;
 	jint action;
+	jboolean multiple;
 };
-
-#define RESULT_OK       -1
-#define RESULT_CANCELED 0
 
 static void file_dialog_callback(GObject *source_object, GAsyncResult *res, gpointer data)
 {
 	struct filechooser_callback_data *d = data;
 	GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
-	GFile *(*const finish_functions[])(GtkFileDialog *, GAsyncResult *, GError **) = {
-		gtk_file_dialog_open_finish,
-		gtk_file_dialog_save_finish,
-		gtk_file_dialog_select_folder_finish,
-	};
-
-	GFile *file = finish_functions[d->action](dialog, res, NULL);
 	JNIEnv *env = get_jni_env();
+	GListModel *files;
 
-	if (file) {
-		char *uri = g_file_get_uri(file);
+	if (d->action == 0 && d->multiple)
+		files = gtk_file_dialog_open_multiple_finish(dialog, res, NULL);
+	else if (d->action == 0)
+		files = file_list(gtk_file_dialog_open_finish(dialog, res, NULL));
+	else if (d->action == 1)
+		files = file_list(gtk_file_dialog_save_finish(dialog, res, NULL));
+	else
+		files = file_list(gtk_file_dialog_select_folder_finish(dialog, res, NULL));
 
-		J__Activity__fileChooserResultCallback(env, d->activity, d->request_code, RESULT_OK, d->action, _JSTRING(uri));
-		if ((*env)->ExceptionCheck(env)) {
-			(*env)->ExceptionDescribe(env);
-			(*env)->ExceptionClear(env);
-		}
-
-		g_free(uri);
-		g_object_unref(file);
-	} else {
-		J__Activity__fileChooserResultCallback(env, d->activity, d->request_code, RESULT_CANCELED, d->action, NULL);
+	jobjectArray uris = file_uris(env, files);
+	if (files)
+		g_object_unref(files);
+	J__Activity__fileChooserResultCallback(env, d->activity, d->request_code, uris);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
 	}
+	_UNREF(d->activity);
 	free(d);
 }
 
-JNIEXPORT void JNICALL Java_android_app_Activity_nativeFileChooser(JNIEnv *env, jobject this, jint action, jstring type_jstring, jstring filename_jstring, jint request_code)
+/* action: 0 open, 1 save, 2 select a folder (the GtkFileChooserAction values); mime_types: null for all files */
+JNIEXPORT void JNICALL Java_android_app_Activity_nativeFileChooser(JNIEnv *env, jobject this, jint action, jobjectArray mime_types, jstring filename_jstring, jstring folder_jstring, jboolean multiple, jint request_code)
 {
 	/* GTK's own titles and buttons for these dialogs, in the user's language */
 	static const char *const titles[] = {"Pick a File", "Save a File", "Select a Folder"};
 	static const char *const accept_labels[] = {"_Open", "_Save", "_Select"};
 	GtkFileDialog *dialog = gtk_file_dialog_new();
-	gtk_file_dialog_set_title(GTK_FILE_DIALOG(dialog), atl_gtk_text(titles[action]));
-	gtk_file_dialog_set_accept_label(GTK_FILE_DIALOG(dialog), atl_gtk_text(accept_labels[action]));
+	gtk_file_dialog_set_title(dialog, atl_gtk_text(action == 0 && multiple ? "Pick Files" : titles[action]));
+	gtk_file_dialog_set_accept_label(dialog, atl_gtk_text(accept_labels[action]));
 
-	const char *type = type_jstring ? (*env)->GetStringUTFChars(env, type_jstring, NULL) : NULL;
-	if (type && !strchr(type, '*')) {
-		GtkFileFilter *filter = gtk_file_filter_new();
-		gtk_file_filter_add_mime_type(filter, type);
-		gtk_file_filter_set_name(filter, type);
-		gtk_file_dialog_set_default_filter(GTK_FILE_DIALOG(dialog), filter);
-		(*env)->ReleaseStringUTFChars(env, type_jstring, type);
-	}
-	const char *filename = filename_jstring ? (*env)->GetStringUTFChars(env, filename_jstring, NULL) : NULL;
-	if (filename) {
-		gtk_file_dialog_set_initial_name(GTK_FILE_DIALOG(dialog), filename);
+	if (action != 2)
+		set_mime_filter(env, dialog, mime_types, NULL);
+	if (filename_jstring) {
+		const char *filename = (*env)->GetStringUTFChars(env, filename_jstring, NULL);
+		gtk_file_dialog_set_initial_name(dialog, filename);
 		(*env)->ReleaseStringUTFChars(env, filename_jstring, filename);
+	}
+	if (folder_jstring) {
+		const char *folder_path = (*env)->GetStringUTFChars(env, folder_jstring, NULL);
+		GFile *folder = g_file_new_for_path(folder_path);
+		gtk_file_dialog_set_initial_folder(dialog, folder);
+		g_object_unref(folder);
+		(*env)->ReleaseStringUTFChars(env, folder_jstring, folder_path);
 	}
 
 	struct filechooser_callback_data *callback_data = malloc(sizeof(struct filechooser_callback_data));
 	callback_data->activity = _REF(this);
 	callback_data->request_code = request_code;
 	callback_data->action = action;
-	void (*const file_dialog_functions[])(GtkFileDialog *, GtkWindow *, GCancellable *, GAsyncReadyCallback, gpointer) = {
-		gtk_file_dialog_open,
-		gtk_file_dialog_save,
-		gtk_file_dialog_select_folder,
-	};
-	file_dialog_functions[action](dialog, window, NULL, file_dialog_callback, callback_data);
+	callback_data->multiple = multiple;
+	if (action == 0 && multiple)
+		gtk_file_dialog_open_multiple(dialog, window, NULL, file_dialog_callback, callback_data);
+	else if (action == 0)
+		gtk_file_dialog_open(dialog, window, NULL, file_dialog_callback, callback_data);
+	else if (action == 1)
+		gtk_file_dialog_save(dialog, window, NULL, file_dialog_callback, callback_data);
+	else
+		gtk_file_dialog_select_folder(dialog, window, NULL, file_dialog_callback, callback_data);
+	g_object_unref(dialog);
 }
 
 /* MediaStore.ACTION_PICK_IMAGES: the GTK file dialog stands in for the photo picker of MediaProvider */
@@ -1816,32 +1875,15 @@ static void pick_images_callback(GObject *source_object, GAsyncResult *res, gpoi
 	struct pick_images_callback_data *d = data;
 	GtkFileDialog *dialog = GTK_FILE_DIALOG(source_object);
 	JNIEnv *env = get_jni_env();
-	GListModel *files = NULL;
-	jobjectArray uris = NULL;
+	GListModel *files;
 
-	if (d->max_items > 1) {
+	if (d->max_items > 1)
 		files = gtk_file_dialog_open_multiple_finish(dialog, res, NULL);
-	} else {
-		GFile *file = gtk_file_dialog_open_finish(dialog, res, NULL);
-		if (file) {
-			GListStore *store = g_list_store_new(G_TYPE_FILE);
-			g_list_store_append(store, file);
-			g_object_unref(file);
-			files = G_LIST_MODEL(store);
-		}
-	}
-	if (files) {
-		guint n = g_list_model_get_n_items(files);
-		uris = (*env)->NewObjectArray(env, n, (*env)->FindClass(env, "java/lang/String"), NULL);
-		for (guint i = 0; i < n; i++) {
-			GFile *file = g_list_model_get_item(files, i);
-			char *uri = g_file_get_uri(file);
-			(*env)->SetObjectArrayElement(env, uris, i, _JSTRING(uri));
-			g_free(uri);
-			g_object_unref(file);
-		}
+	else
+		files = file_list(gtk_file_dialog_open_finish(dialog, res, NULL));
+	jobjectArray uris = file_uris(env, files);
+	if (files)
 		g_object_unref(files);
-	}
 	J__Activity__pickImagesResultCallback(env, d->activity, d->request_code, d->max_items, uris);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);

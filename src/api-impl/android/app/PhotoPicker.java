@@ -63,12 +63,45 @@ class PhotoPicker {
 		return false;
 	}
 
-	/* photopicker/data/Selection.parseSelectionValuesFromIntent() for ACTION_PICK_IMAGES: how many items
-	 * may be picked, 1 is single selection */
+	/* ACTION_GET_CONTENT goes to the picker (MediaProvider's PhotoPickerGetContentActivity, intent filter for
+	 * image/* and video/*, which "*\/*" matches too) unless PhotoPickerActivity.rerouteGetContentRequestIfRequired()
+	 * sends it on to DocumentsUI: android-16 MimeFilterUtils.requiresUnsupportedFilters(Intent) */
+	static boolean handlesGetContent(Intent intent) {
+		final String type = intent.getType();
+		if (type == null || !(type.equals("*/*") || isMimeTypeMedia(type)))
+			return false;
+		// EXTRA_MIME_TYPES has higher priority over getType() filter.
+		if (intent.hasExtra(Intent.EXTRA_MIME_TYPES)) {
+			return !requiresUnsupportedFilters(intent.getStringArrayExtra(Intent.EXTRA_MIME_TYPES));
+		}
+
+		// GET_CONTENT intent filter catches "images/*", "video/*" and "*/*" mimeTypes only
+		// No need to check for other types like "audio/*" etc as they never reach PhotoPicker
+		return !type.equals("*/*");
+	}
+
+	/* photopicker/data/Selection.parseSelectionValuesFromIntent() for ACTION_PICK_IMAGES and (android-16)
+	 * ACTION_GET_CONTENT: how many items may be picked, 1 is single selection */
 	static int getMaxSelectionLimit(Intent intent) throws IllegalArgumentException {
 		final Bundle extras = intent.getExtras();
 		final boolean isExtraPickImagesMaxSet =
 		    extras != null && extras.containsKey(MediaStore.EXTRA_PICK_IMAGES_MAX);
+		final boolean isExtraOrderedSelectionSet =
+		    extras != null && extras.containsKey(MediaStore.EXTRA_PICK_IMAGES_IN_ORDER);
+
+		if (Intent.ACTION_GET_CONTENT.equals(intent.getAction())) {
+			if (isExtraPickImagesMaxSet) {
+				throw new IllegalArgumentException(
+				    "EXTRA_PICK_IMAGES_MAX is not supported for " + "ACTION_GET_CONTENT");
+			}
+
+			if (isExtraOrderedSelectionSet) {
+				throw new IllegalArgumentException(
+				    "EXTRA_PICK_IMAGES_IN_ORDER is not supported for ACTION_GET_CONTENT");
+			}
+
+			return intent.getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false) ? MediaStore.getPickImagesMaxLimit() : 1;
+		}
 
 		// Check EXTRA_PICK_IMAGES_MAX value only if the flag is set.
 		if (isExtraPickImagesMaxSet) {
