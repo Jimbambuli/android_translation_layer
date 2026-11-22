@@ -1281,8 +1281,69 @@ public class Window {
 		dispatchWindowAttributesChanged(params);
 	}
 
+	/* AOSP Window: the container of an embedded window and the active window */
+	private Window mContainer;
+	private Window mActiveChild;
+	private boolean mIsActive;
+	private boolean mHasChildren;
+
+	public void setContainer(Window container) {
+		mContainer = container;
+		if (container != null) {
+			// Embedded screens never have a title.
+			mFeatures |= 1 << FEATURE_NO_TITLE;
+			container.mHasChildren = true;
+		}
+	}
+
+	public final Window getContainer() {
+		return mContainer;
+	}
+
+	public final boolean hasChildren() {
+		return mHasChildren;
+	}
+
+	public final void makeActive() {
+		if (mContainer != null) {
+			if (mContainer.mActiveChild != null)
+				mContainer.mActiveChild.mIsActive = false;
+			mContainer.mActiveChild = this;
+		}
+		mIsActive = true;
+		onActive();
+	}
+
+	public final boolean isActive() {
+		return mIsActive;
+	}
+
+	/* PhoneWindow.onActive() does nothing */
+	protected void onActive() {
+	}
+
+	/* AOSP setWindowManager(): ATL's WindowManagerImpl has no per-window instance (createLocalWindowManager()),
+	 * the window keeps the given one or the context's */
+	private WindowManager windowManager;
+	private android.os.IBinder appToken;
+	private String appName;
+	private boolean hardwareAccelerated;
+
+	public void setWindowManager(WindowManager wm, android.os.IBinder appToken, String appName) {
+		setWindowManager(wm, appToken, appName, false);
+	}
+
+	public void setWindowManager(WindowManager wm, android.os.IBinder appToken, String appName, boolean hardwareAccelerated) {
+		this.appToken = appToken;
+		this.appName = appName;
+		this.hardwareAccelerated = hardwareAccelerated;
+		if (wm == null)
+			wm = (WindowManager)context.getSystemService(Context.WINDOW_SERVICE);
+		windowManager = wm;
+	}
+
 	public WindowManager getWindowManager() {
-		return new WindowManagerImpl();
+		return windowManager != null ? windowManager : new WindowManagerImpl();
 	}
 
 	public void setSoftInputMode(int mode) {

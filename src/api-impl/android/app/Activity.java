@@ -421,7 +421,9 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 
 	protected void onPostResume() {
 		Slog.i(TAG, "- onPostResume - yay!");
-		return;
+		final Window win = getWindow();
+		if (win != null)
+			win.makeActive();
 	}
 
 	protected void onPause() {
