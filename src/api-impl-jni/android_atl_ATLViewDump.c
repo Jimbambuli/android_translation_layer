@@ -235,7 +235,7 @@ static void gtk_window(GString *out, GtkWidget *window, GtkWidget *native, guint
 
 /* <window atl-what="gtk TYPE"> for each mapped GtkPopover of the app that is not the native of one of the
  * given widgets (whose views ATLViewDump writes itself): a Spinner's list; and
- * for each further toplevel that none of the widgets is in (ATL's AlertDialog shows GTK widgets) */
+ * for each further toplevel that none of the widgets is in */
 JNIEXPORT jstring JNICALL Java_android_atl_ATLViewDump_native_1gtkPopups(JNIEnv *env, jclass this, jlong window_ptr, jlongArray roots_jarr)
 {
 	GtkWidget *window = GTK_WIDGET(_PTR(window_ptr));

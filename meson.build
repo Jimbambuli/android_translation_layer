@@ -203,7 +203,6 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/android_view_Window.c',
                                                                   	'src/api-impl-jni/accounts/android_accounts_AccountManager.c',
                                                                   	'src/api-impl-jni/app/android_app_Activity.c',
-                                                                  	'src/api-impl-jni/app/android_app_AlertDialog.c',
                                                                   	'src/api-impl-jni/app/android_app_Dialog.c',
                                                                   	'src/api-impl-jni/app/android_app_NotificationManager.c',
                                                                   	'src/api-impl-jni/app/android_app_WallpaperManager.c',
