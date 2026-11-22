@@ -49,6 +49,11 @@ public class MediaCodec {
 	private MediaFormat mediaFormat;
 
 	private Queue<Integer> freeOutputBuffers;
+	private Queue<Integer> readyOutputBuffers; // decoded, not yet dequeued by the app
+	private BufferInfo[] outputInfos;
+	private boolean outputEos;
+	private Thread decodeThread;
+	private boolean decoding;
 	private Queue<Integer> queuedInputBuffers;
 	private Queue<Integer> freeInputBuffers;
 
@@ -125,8 +130,12 @@ public class MediaCodec {
 		}
 		outputBuffers = new ByteBuffer[outputDelay + 4];
 		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		readyOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		outputEos = false;
+		outputInfos = new BufferInfo[outputBuffers.length];
 		for (int i = 0; i < outputBuffers.length; i++) {
 			outputBuffers[i] = ByteBuffer.allocateDirect(16384).order(ByteOrder.LITTLE_ENDIAN);
+			outputInfos[i] = new BufferInfo();
 			freeOutputBuffers.add(i);
 		}
 
@@ -151,6 +160,7 @@ public class MediaCodec {
 	public void start() {
 		System.out.println("MediaCodec.start(): codecName=" + codecName);
 		native_start(native_codec);
+		startDecoding();
 		if (callback != null && !pumping) {
 			pumping = true;
 			callbackHandler.post(pump);
@@ -301,6 +311,73 @@ public class MediaCodec {
 		}
 	}
 
+	/* AOSP CCodec: the component decodes on threads of its own as long as it has input and free output slots, and
+	 * the app only takes the finished output buffers. ATL's FFmpeg codec works on this thread of the codec, from
+	 * start() until stop(), release() or reset(), each step under the codec's lock. */
+	private synchronized void startDecoding() {
+		if (decodeThread != null)
+			return;
+		decoding = true;
+		decodeThread = new Thread(() -> {
+			while (decodeStep())
+				;
+		}, "MediaCodec " + codecName);
+		decodeThread.setDaemon(true);
+		decodeThread.start();
+	}
+
+	private void stopDecoding() {
+		Thread thread;
+		synchronized (this) {
+			decoding = false;
+			thread = decodeThread;
+			decodeThread = null;
+			notifyAll();
+		}
+		if (thread != null && thread != Thread.currentThread()) {
+			boolean interrupted = false;
+			while (thread.isAlive()) {
+				try {
+					thread.join();
+				} catch (InterruptedException e) {
+					interrupted = true;
+				}
+			}
+			if (interrupted)
+				Thread.currentThread().interrupt();
+		}
+	}
+
+	/* one step: hand a queued input buffer to the codec, take a decoded frame into a free output slot; without
+	 * progress wait until the app queues input or releases output */
+	private synchronized boolean decodeStep() {
+		if (!decoding || native_codec == 0)
+			return false;
+		int queued = queuedInputBuffers.size();
+		tryProcessInputBuffer();
+		boolean progress = queuedInputBuffers.size() != queued;
+		Integer index = freeOutputBuffers.peek();
+		if (index != null && !outputEos) {
+			outputBuffers[index].clear();
+			if (native_dequeueOutputBuffer(native_codec, outputBuffers[index], outputInfos[index]) == 0) {
+				freeOutputBuffers.remove();
+				readyOutputBuffers.add(index);
+				outputEos = (outputInfos[index].flags & BUFFER_FLAG_END_OF_STREAM) != 0;
+				progress = true;
+			}
+		}
+		if (progress) {
+			notifyAll();
+		} else {
+			try {
+				wait(10);
+			} catch (InterruptedException e) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	public int dequeueOutputBuffer(BufferInfo info, long timeoutUs) {
 		return waitForBuffer(timeoutUs, () -> tryDequeueOutputBuffer(info));
 	}
@@ -310,22 +387,22 @@ public class MediaCodec {
 			outputFormatSet = true;
 			return /*INFO_OUTPUT_FORMAT_CHANGED*/ -2;
 		}
-		Integer index = freeOutputBuffers.poll();
-		if (index == null) {
+		Integer index = readyOutputBuffers.poll();
+		if (index == null)
 			return /*INFO_TRY_AGAIN_LATER*/ -1;
-		}
-		outputBuffers[index].clear();
-		int ret = native_dequeueOutputBuffer(native_codec, outputBuffers[index], info);
-		if (ret == 0) {
-			ret = index;
-		} else {
-			freeOutputBuffers.add(index);
-			ret = /*INFO_TRY_AGAIN_LATER*/ -1;
-		}
-		return ret;
+		BufferInfo ready = outputInfos[index];
+		info.set(ready.offset, ready.size, ready.presentationTimeUs, ready.flags);
+		return index;
+	}
+
+	/* AOSP MediaCodec::onReleaseOutputBuffer(): -EACCES for an index the app does not hold */
+	private void checkHeldOutput(int index) {
+		if (outputBuffers == null || index < 0 || index >= outputBuffers.length || freeOutputBuffers.contains(index) || readyOutputBuffers.contains(index))
+			throw new IllegalStateException("output buffer " + index + " is not held by the app");
 	}
 
 	public synchronized void releaseOutputBuffer(int index, boolean render) {
+		checkHeldOutput(index);
 		notifyAll();
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], render, 0);
 		freeOutputBuffers.add(index);
@@ -333,6 +410,7 @@ public class MediaCodec {
 
 	// AOSP calls the parameter `presentationTimeUs`, but actually it is nanoseconds
 	public synchronized void releaseOutputBuffer(int index, long releaseTimeNs) {
+		checkHeldOutput(index);
 		notifyAll();
 		native_releaseOutputBuffer(native_codec, outputBuffers[index], true, releaseTimeNs);
 		freeOutputBuffers.add(index);
@@ -352,8 +430,7 @@ public class MediaCodec {
 	/* AOSP MediaCodec.getOutputFormat(int): the format of a dequeued output buffer (IllegalStateException for an
 	 * index the app does not hold); ATL's output buffers all have the codec's output format */
 	public synchronized MediaFormat getOutputFormat(int index) {
-		if (outputBuffers == null || index < 0 || index >= outputBuffers.length || freeOutputBuffers.contains(index))
-			throw new IllegalStateException();
+		checkHeldOutput(index);
 		return getOutputFormat();
 	}
 
@@ -361,6 +438,8 @@ public class MediaCodec {
 		notifyAll();
 		// in asynchronous mode the codec waits for start() after a flush, as in AOSP
 		pumping = false;
+		/* AOSP: a flush returns all buffers to the codec; the frames in them are dropped */
+		releaseAllOutput();
 		native_flush(native_codec);
 		freeInputBuffers.clear();
 		for (int i = 0; i < inputBuffers.length; i++)
@@ -369,8 +448,21 @@ public class MediaCodec {
 		freeOutputBuffers.clear();
 		for (int i = 0; i < outputBuffers.length; i++)
 			freeOutputBuffers.add(i);
+		outputEos = false;
 		outputFormatSet = false;
 	}
+
+	private void releaseAllOutput() {
+		if (outputBuffers == null)
+			return;
+		for (int i = 0; i < outputBuffers.length; i++) {
+			if (!freeOutputBuffers.contains(i))
+				native_releaseOutputBuffer(native_codec, outputBuffers[i], false, 0);
+		}
+		readyOutputBuffers.clear();
+	}
+
+	private static final int AVERROR_EAGAIN = -11; // AVERROR(EAGAIN) on Linux
 
 	private void tryProcessInputBuffer() {
 		Integer index = queuedInputBuffers.peek();
@@ -381,7 +473,10 @@ public class MediaCodec {
 			} else {
 				ret = native_queueInputBuffer(native_codec, inputBuffers[index], inputBufferTimestamps[index]);
 			}
-			if (ret == 0) {
+			/* the codec takes the buffer unless it is full (EAGAIN); like AOSP's decoders it also takes one it cannot
+			 * decode (FFmpeg's H.264 decoder refuses a codec-config buffer with only SPS/PPS as "no frame", but keeps
+			 * the parameter sets), instead of offering it again for ever */
+			if (ret != AVERROR_EAGAIN) {
 				queuedInputBuffers.remove(index);
 				if (index != -1)
 					freeInputBuffers.add(index);
@@ -437,29 +532,35 @@ public class MediaCodec {
 
 	public void stop() {
 		stopPumping();
+		stopDecoding();
 	}
 
-	public synchronized void release() {
+	/* not synchronized: the codec's thread finishes its step under the lock before it ends */
+	public void release() {
 		System.out.println("MediaCodec.release(): codecName=" + codecName);
 		stopPumping();
-		if (native_codec != 0) {
-			if (outputBuffers != null) {
-				for (int i = 0; i < outputBuffers.length; i++) {
-					if (!freeOutputBuffers.contains(i))
-						releaseOutputBuffer(i, false);
-				}
+		stopDecoding();
+		synchronized (this) {
+			if (native_codec != 0) {
+				releaseAllOutput();
+				native_release(native_codec);
 			}
-			native_release(native_codec);
+			native_codec = 0;
+			notifyAll();
 		}
-		native_codec = 0;
-		notifyAll();
 	}
 
 	/* AOSP MediaCodec.reset(): back to the Uninitialized state of a freshly created codec. The FFmpeg
 	 * codec is released and created anew; if that fails, android_media_MediaCodec_reset() reports
 	 * UNKNOWN_ERROR, which throwExceptionAsNecessary() throws as CodecException. */
-	public final synchronized void reset() {
+	public final void reset() {
 		release();
+		synchronized (this) {
+			resetState();
+		}
+	}
+
+	private void resetState() {
 		inputBuffers = null;
 		outputBuffers = null;
 		mediaFormat = null;
