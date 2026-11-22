@@ -6,14 +6,55 @@ public class VibrationEffect implements Parcelable {
 	 * alternating off and on durations in milliseconds (starting with off) and the index to repeat from */
 	final long[] timings;
 	final int repeat;
+	/* the amplitude of each step (0 for the off steps, DEFAULT_AMPLITUDE or 1-255 for the on steps), for the
+	 * vibrators that have amplitude control (those of game controllers, InputDeviceVibrator) */
+	final int[] amplitudes;
 
 	private VibrationEffect(long[] timings, int repeat) {
+		this(timings, defaultAmplitudes(timings.length), repeat);
+	}
+
+	private VibrationEffect(long[] timings, int[] amplitudes, int repeat) {
 		this.timings = timings;
+		this.amplitudes = amplitudes;
 		this.repeat = repeat;
 	}
 
+	private static int[] defaultAmplitudes(int steps) {
+		int[] amplitudes = new int[steps];
+		for (int i = 1; i < steps; i += 2)
+			amplitudes[i] = DEFAULT_AMPLITUDE;
+		return amplitudes;
+	}
+
+	/* AOSP createOneShot(): createWaveform() of one step, with amplitude DEFAULT_AMPLITUDE or 1-255 */
 	public static VibrationEffect createOneShot(long milliseconds, int amplitude) {
-		return new VibrationEffect(new long[] {0, milliseconds}, -1);
+		if (amplitude == 0) {
+			throw new IllegalArgumentException(
+			    "amplitude must either be DEFAULT_AMPLITUDE, "
+			    + "or between 1 and 255 inclusive (amplitude=" + amplitude + ")");
+		}
+		return createWaveform(new long[] {milliseconds}, new int[] {amplitude}, -1);
+	}
+
+	/* the steps as InputManagerService's VibrationInfo takes them from the StepSegments: durations, amplitudes
+	 * (DEFAULT_AMPLITUDE as defaultAmplitude, else the 0-255 amplitude through AOSP's float amplitude), repeat */
+	/** @hide */
+	public long[] getAtlTimings() {
+		return timings.clone();
+	}
+
+	/** @hide */
+	public int[] getAtlAmplitudes(int defaultAmplitude) {
+		int[] result = new int[amplitudes.length];
+		for (int i = 0; i < amplitudes.length; i++)
+			result[i] = amplitudes[i] == DEFAULT_AMPLITUDE ? defaultAmplitude : (int)(((float)amplitudes[i] / MAX_AMPLITUDE) * MAX_AMPLITUDE);
+		return result;
+	}
+
+	/** @hide */
+	public int getAtlRepeatIndex() {
+		return repeat;
 	}
 
 	public static final int EFFECT_CLICK = 0;
@@ -58,13 +99,15 @@ public class VibrationEffect implements Parcelable {
 	@Override
 	public void writeToParcel(Parcel out, int flags) {
 		out.writeLongArray(timings);
+		out.writeIntArray(amplitudes);
 		out.writeInt(repeat);
 	}
 
 	public static final Parcelable.Creator<VibrationEffect> CREATOR = new Parcelable.Creator<VibrationEffect>() {
 		public VibrationEffect createFromParcel(Parcel in) {
 			long[] timings = in.createLongArray();
-			return new VibrationEffect(timings, in.readInt());
+			int[] amplitudes = in.createIntArray();
+			return new VibrationEffect(timings, amplitudes, in.readInt());
 		}
 
 		public VibrationEffect[] newArray(int size) {
@@ -77,7 +120,7 @@ public class VibrationEffect implements Parcelable {
 	public static VibrationEffect createRepeatingEffect(VibrationEffect effect) {
 		com.android.internal.util.Preconditions.checkArgument(effect.repeat < 0,
 		    "Can't repeat an indefinitely repeating effect. Consider addEffect instead.");
-		return new VibrationEffect(effect.timings, 0);
+		return new VibrationEffect(effect.timings, effect.amplitudes, 0);
 	}
 
 	/* AOSP createRepeatingEffect(preamble, repeatingEffect): addEffect(preamble).repeatEffectIndefinitely(repeating).
@@ -93,7 +136,11 @@ public class VibrationEffect implements Parcelable {
 		System.arraycopy(preamble.timings, 0, timings, 0, preamble.timings.length);
 		System.arraycopy(repeatingEffect.timings, 0, timings, preamble.timings.length + pad,
 		    repeatingEffect.timings.length);
-		return new VibrationEffect(timings, preamble.timings.length + pad);
+		int[] amplitudes = new int[timings.length];
+		System.arraycopy(preamble.amplitudes, 0, amplitudes, 0, preamble.amplitudes.length);
+		System.arraycopy(repeatingEffect.amplitudes, 0, amplitudes, preamble.amplitudes.length + pad,
+		    repeatingEffect.amplitudes.length);
+		return new VibrationEffect(timings, amplitudes, preamble.timings.length + pad);
 	}
 
 	/**
@@ -199,8 +246,8 @@ public class VibrationEffect implements Parcelable {
 
 	/* AOSP VibrationEffect.createWaveform(long[], int[], int): one step per timing, amplitude 0 is off.
 	 * ATL's off/on list gets a zero-length step where two steps of the same kind follow each other,
-	 * so the repeat index still points at the same step. The strength itself is dropped (no amplitude
-	 * control, see Vibrator.hasAmplitudeControl). */
+	 * so the repeat index still points at the same step. The strength is kept for the vibrators with
+	 * amplitude control (game controllers); ATL's own vibrator only switches on and off. */
 	public static VibrationEffect createWaveform(long[] timings, int[] amplitudes, int repeat) {
 		if (timings.length != amplitudes.length) {
 			throw new IllegalArgumentException(
@@ -218,6 +265,7 @@ public class VibrationEffect implements Parcelable {
 		if (!hasNonZeroDuration)
 			throw new IllegalArgumentException("at least one timing must be non-zero");
 		long[] steps = new long[2 * timings.length + 1];
+		int[] stepAmplitudes = new int[2 * timings.length + 1];
 		int n = 0;
 		int newRepeat = -1;
 		for (int i = 0; i < timings.length; i++) {
@@ -230,9 +278,10 @@ public class VibrationEffect implements Parcelable {
 				steps[n++] = 0; // even slots are off, odd slots are on
 			if (i == repeat)
 				newRepeat = n;
+			stepAmplitudes[n] = amplitudes[i];
 			steps[n++] = timings[i];
 		}
-		return new VibrationEffect(java.util.Arrays.copyOf(steps, n), newRepeat);
+		return new VibrationEffect(java.util.Arrays.copyOf(steps, n), java.util.Arrays.copyOf(stepAmplitudes, n), newRepeat);
 	}
 
 	/**

@@ -107,14 +107,6 @@ JNIEXPORT jchar JNICALL Java_android_view_KeyCharacterMap_nativeGetCharacter
 
 /*
  * Class:     android_view_KeyCharacterMap
- * Method:    nativeGetFallbackAction
- * Signature: (IIILandroid/view/KeyCharacterMap/FallbackAction;)Z
- */
-JNIEXPORT jboolean JNICALL Java_android_view_KeyCharacterMap_nativeGetFallbackAction
-  (JNIEnv *, jclass, jint, jint, jint, jobject);
-
-/*
- * Class:     android_view_KeyCharacterMap
  * Method:    nativeGetNumber
  * Signature: (II)C
  */

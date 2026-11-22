@@ -14,6 +14,11 @@ public class Vibrator {
 		this.fd = fd;
 	}
 
+	/* AOSP @hide: a vibrator that is not the device's own (InputDeviceVibrator of a game controller) */
+	protected Vibrator(android.content.Context context) {
+		this(-1);
+	}
+
 	public boolean hasVibrator() {
 		return true;
 	}

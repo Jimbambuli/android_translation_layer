@@ -870,6 +870,106 @@ void current_activity_back_pressed(void)
 	dispatch_window_key(env, ACTION_UP, KEYCODE_BACK, 0, 0, 0, FLAG_FROM_SYSTEM | FLAG_VIRTUAL_HARD_KEY, 0, now);
 }
 
+/* ---- keys of the input devices that ATL reads itself (com.android.server.input.InputReader: game controllers) ----
+ * They take the way of a keyboard key (see above), as InputDispatcher sends the keys of all devices to the focused
+ * window: the focused view, the wrappers above it that take keys (wrapper_widget_add_key_controller(): their views
+ * have a dispatchKeyEvent() or onKeyDown() of their own), then the window, which is the shown activity's Window
+ * (dispatchKeyEventFromNative()) or the dialog that has the keyboard focus (atl_window_set_key_window()). While
+ * the app's window is not the active one, no window of the app has the focus and nothing gets the key. */
+int activity_dispatch_device_key(JNIEnv *env, jobject event)
+{
+	if (!window || !activity_current)
+		return -1;
+	GtkWindow *target = g_object_get_data(G_OBJECT(window), "key-window");
+	if (!target)
+		target = window;
+	if (!gtk_window_is_active(target))
+		return -1;
+
+	gboolean first = TRUE;
+	for (GtkWidget *widget = gtk_root_get_focus(GTK_ROOT(target)); widget; widget = gtk_widget_get_parent(widget)) {
+		if (!WRAPPER_IS_WIDGET(widget))
+			continue;
+		WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
+		gboolean takes_keys = first || (g_object_get_data(G_OBJECT(wrapper), "key-controller")
+		                                && !g_object_get_data(G_OBJECT(wrapper), "key-focus-only"));
+		first = FALSE;
+		if (!takes_keys)
+			continue;
+		gboolean handled = J__View__dispatchKeyEvent(env, wrapper->jobj, event);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			handled = FALSE;
+		}
+		if (handled)
+			return TRUE;
+	}
+
+	gboolean handled;
+	if (target == window) {
+		jobject window_jobj = _GET_OBJ_FIELD(activity_current, "window", "Landroid/view/Window;");
+		handled = J__Window__dispatchKeyEventFromNative(env, window_jobj, event);
+		(*env)->DeleteLocalRef(env, window_jobj);
+	} else {
+		jobject dialog = dialog_get_jobj(target);
+		if (!dialog)
+			return FALSE;
+		handled = (*env)->CallBooleanMethod(env, dialog, _METHOD(_CLASS(dialog), "dispatchKeyEvent", "(Landroid/view/KeyEvent;)Z"), event);
+		(*env)->DeleteLocalRef(env, dialog);
+	}
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		handled = FALSE;
+	}
+	return handled;
+}
+
+/* KEYCODE_HOME of those devices: AOSP's PhoneWindowManager keeps HOME from the apps and, on its up key, starts the
+ * home screen (handleHomeButton(), launchHomeFromHotKey()): the shown activity is told the user leaves it
+ * (onUserLeaveHint(), as when the home activity starts on a user action) and stops behind the home screen. ATL has
+ * no home screen; for the app's window that is minimizing it (as moveTaskToBack()), which stops the shown activity
+ * (window_set_hidden()). Only while a window of the app has the focus: HOME of another window is not the app's. */
+void activity_go_home(JNIEnv *env)
+{
+	if (!window || !activity_current)
+		return;
+	GtkWindow *target = g_object_get_data(G_OBJECT(window), "key-window");
+	if (!gtk_window_is_active(target ? target : window))
+		return;
+	J__Activity__performUserLeaving(env, activity_current);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	gtk_window_minimize(window);
+}
+
+/* the generic motion events of those devices (joysticks): like ViewRootImpl, to the focused window's
+ * DecorView through its Window.Callback (Activity.dispatchGenericMotionEvent()) */
+int activity_dispatch_device_motion(JNIEnv *env, jobject event)
+{
+	if (!window || !activity_current)
+		return -1;
+	GtkWindow *target = g_object_get_data(G_OBJECT(window), "key-window");
+	if (!target)
+		target = window;
+	if (!gtk_window_is_active(target))
+		return -1;
+	jobject callback = target == window ? (*env)->NewLocalRef(env, activity_current) : dialog_get_jobj(target);
+	if (!callback)
+		return FALSE;
+	gboolean handled = (*env)->CallBooleanMethod(env, callback, _METHOD(_CLASS(callback), "dispatchGenericMotionEvent", "(Landroid/view/MotionEvent;)Z"), event);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		handled = FALSE;
+	}
+	(*env)->DeleteLocalRef(env, callback);
+	return handled;
+}
+
 int activity_count(void)
 {
 	return g_list_length(activity_backlog);

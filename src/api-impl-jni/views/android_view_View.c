@@ -1543,14 +1543,36 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnKeyListener(JNIEnv *env
 		wrapper_widget_add_key_controller(WRAPPER_WIDGET(wrapper), FALSE);
 }
 
+/* AOSP keeps the focus of a view that is not in a window yet (View.handleFocusGainInternal() without a parent;
+ * ViewGroup.addViewInner() passes it on to the new parents): libGDX's AndroidInput requests the focus for its
+ * view before setContentView(), and the view gets the keys and joystick events from then on. GTK can only focus
+ * a widget that is in a window, so the last such request waits until its widget is mapped. */
+static GtkWidget *pending_focus = NULL;
+
+static void on_pending_focus_map(GtkWidget *widget, gpointer user_data)
+{
+	g_signal_handlers_disconnect_by_func(widget, on_pending_focus_map, user_data);
+	if (pending_focus != widget)
+		return;
+	g_clear_weak_pointer(&pending_focus);
+	gtk_widget_grab_focus(widget);
+}
+
 JNIEXPORT jboolean JNICALL Java_android_view_View_nativeRequestFocus(JNIEnv *env, jobject this, jlong widget_ptr, jint direction)
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	GtkWidget *wrapper = gtk_widget_get_parent(widget);
-	if (gtk_widget_get_focusable(widget))
-		return gtk_widget_grab_focus(widget);
-	else
-		return gtk_widget_grab_focus(wrapper);
+	GtkWidget *target = gtk_widget_get_focusable(widget) ? widget : wrapper;
+	if (pending_focus) {
+		g_signal_handlers_disconnect_by_func(pending_focus, on_pending_focus_map, NULL);
+		g_clear_weak_pointer(&pending_focus);
+	}
+	if (!gtk_widget_get_root(target)) {
+		g_set_weak_pointer(&pending_focus, target);
+		g_signal_connect(target, "map", G_CALLBACK(on_pending_focus_map), NULL);
+		return TRUE;
+	}
+	return gtk_widget_grab_focus(target);
 }
 
 JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsFocused(JNIEnv *env, jobject this, jlong widget_ptr)
@@ -1565,6 +1587,10 @@ JNIEXPORT void JNICALL Java_android_view_View_nativeClearFocus(JNIEnv *env, jobj
 {
 	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
 	GtkRoot *root = gtk_widget_get_root(widget);
+	if (pending_focus && (pending_focus == widget || pending_focus == gtk_widget_get_parent(widget))) {
+		g_signal_handlers_disconnect_by_func(pending_focus, on_pending_focus_map, NULL);
+		g_clear_weak_pointer(&pending_focus);
+	}
 	if (root)
 		gtk_root_set_focus(root, NULL);
 }

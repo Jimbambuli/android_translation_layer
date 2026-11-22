@@ -5,6 +5,7 @@
 #include "../util.h"
 #include "../generated_headers/android_app_Dialog.h"
 #include "../widgets/android_widget_PopupWindow.h"
+#include "android_app_Activity.h"
 
 /* main app window */
 extern GtkWindow *window;
@@ -122,6 +123,14 @@ static void add_touch_outside(GtkWindow *dialog, jobject jobj)
 	g_object_set_data(G_OBJECT(dialog), "touch-outside", outside);
 	/* the dialog has the input focus: the back button of a mouse is its back key wherever the pointer is */
 	atl_window_set_key_window(window, dialog);
+}
+
+/* the Dialog of a shown dialog's window (for the keys of game controllers, activity_dispatch_device_key()) */
+jobject dialog_get_jobj(GtkWindow *dialog)
+{
+	JNIEnv *env = get_jni_env();
+	struct touch_outside *outside = g_object_get_data(G_OBJECT(dialog), "touch-outside");
+	return outside ? (*env)->NewLocalRef(env, outside->jobj) : NULL;
 }
 
 static void remove_touch_outside(GtkWindow *dialog)

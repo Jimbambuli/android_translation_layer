@@ -131,6 +131,10 @@ extern "C" {
 #define android_view_MotionEvent_AXIS_TILT 25L
 #undef android_view_MotionEvent_AXIS_SCROLL
 #define android_view_MotionEvent_AXIS_SCROLL 26L
+#undef android_view_MotionEvent_AXIS_RELATIVE_X
+#define android_view_MotionEvent_AXIS_RELATIVE_X 27L
+#undef android_view_MotionEvent_AXIS_RELATIVE_Y
+#define android_view_MotionEvent_AXIS_RELATIVE_Y 28L
 #undef android_view_MotionEvent_AXIS_GENERIC_1
 #define android_view_MotionEvent_AXIS_GENERIC_1 32L
 #undef android_view_MotionEvent_AXIS_GENERIC_2
@@ -163,6 +167,18 @@ extern "C" {
 #define android_view_MotionEvent_AXIS_GENERIC_15 46L
 #undef android_view_MotionEvent_AXIS_GENERIC_16
 #define android_view_MotionEvent_AXIS_GENERIC_16 47L
+#undef android_view_MotionEvent_AXIS_GESTURE_X_OFFSET
+#define android_view_MotionEvent_AXIS_GESTURE_X_OFFSET 48L
+#undef android_view_MotionEvent_AXIS_GESTURE_Y_OFFSET
+#define android_view_MotionEvent_AXIS_GESTURE_Y_OFFSET 49L
+#undef android_view_MotionEvent_AXIS_GESTURE_SCROLL_X_DISTANCE
+#define android_view_MotionEvent_AXIS_GESTURE_SCROLL_X_DISTANCE 50L
+#undef android_view_MotionEvent_AXIS_GESTURE_SCROLL_Y_DISTANCE
+#define android_view_MotionEvent_AXIS_GESTURE_SCROLL_Y_DISTANCE 51L
+#undef android_view_MotionEvent_AXIS_GESTURE_PINCH_SCALE_FACTOR
+#define android_view_MotionEvent_AXIS_GESTURE_PINCH_SCALE_FACTOR 52L
+#undef android_view_MotionEvent_AXIS_GESTURE_SWIPE_FINGER_COUNT
+#define android_view_MotionEvent_AXIS_GESTURE_SWIPE_FINGER_COUNT 53L
 #undef android_view_MotionEvent_BUTTON_PRIMARY
 #define android_view_MotionEvent_BUTTON_PRIMARY 1L
 #undef android_view_MotionEvent_BUTTON_SECONDARY
@@ -173,6 +189,10 @@ extern "C" {
 #define android_view_MotionEvent_BUTTON_BACK 8L
 #undef android_view_MotionEvent_BUTTON_FORWARD
 #define android_view_MotionEvent_BUTTON_FORWARD 16L
+#undef android_view_MotionEvent_BUTTON_STYLUS_PRIMARY
+#define android_view_MotionEvent_BUTTON_STYLUS_PRIMARY 32L
+#undef android_view_MotionEvent_BUTTON_STYLUS_SECONDARY
+#define android_view_MotionEvent_BUTTON_STYLUS_SECONDARY 64L
 #undef android_view_MotionEvent_TOOL_TYPE_UNKNOWN
 #define android_view_MotionEvent_TOOL_TYPE_UNKNOWN 0L
 #undef android_view_MotionEvent_TOOL_TYPE_FINGER
@@ -195,6 +215,10 @@ extern "C" {
 #define android_view_MotionEvent_RAW_X_OFFSET 2L
 #undef android_view_MotionEvent_RAW_Y_OFFSET
 #define android_view_MotionEvent_RAW_Y_OFFSET 3L
+#undef android_view_MotionEvent_MAX_POINTERS
+#define android_view_MotionEvent_MAX_POINTERS 16L
+#undef android_view_MotionEvent_MAX_SAMPLES
+#define android_view_MotionEvent_MAX_SAMPLES 65535L
 #undef android_view_MotionEvent_CLASSIFICATION_NONE
 #define android_view_MotionEvent_CLASSIFICATION_NONE 0L
 #undef android_view_MotionEvent_CLASSIFICATION_AMBIGUOUS_GESTURE

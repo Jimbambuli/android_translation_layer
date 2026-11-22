@@ -274,8 +274,6 @@ public class KeyCharacterMap {
 	private static native void nativeDispose(int ptr);
 
 	private static native char nativeGetCharacter(int ptr, int keyCode, int metaState);
-	private static native boolean nativeGetFallbackAction(int ptr, int keyCode, int metaState,
-	                                                      FallbackAction outFallbackAction);
 	private static native char nativeGetNumber(int ptr, int keyCode);
 	private static native char nativeGetMatch(int ptr, int keyCode, char[] chars, int metaState);
 	private static native char nativeGetDisplayLabel(int ptr, int keyCode);
@@ -364,12 +362,176 @@ public class KeyCharacterMap {
 	public FallbackAction getFallbackAction(int keyCode, int metaState) {
 		FallbackAction action = FallbackAction.obtain();
 		metaState = KeyEvent.normalizeMetaState(metaState);
-		if (nativeGetFallbackAction(mPtr, keyCode, metaState, action)) {
+		if (Behaviors.getFallbackAction(keyCode, metaState, action)) {
 			action.metaState = KeyEvent.normalizeMetaState(action.metaState);
 			return action;
 		}
 		action.recycle();
 		return null;
+	}
+
+	/* The key behaviors of AOSP's Generic.kcm, the key character map of every device of ATL, for the fallback
+	 * keys (KeyCharacterMap.cpp: Parser::parseKey()/parseKeyProperty(), getKeyBehavior(), matchesMetaState(),
+	 * getFallbackAction()). The characters are not read from it: ATL takes them from GTK (KeyEvent's
+	 * unicodeValue). Generic.kcm has no "map" and no "replace" lines. */
+	private static final class Behaviors {
+		private static final String[] MODIFIER_NAMES = {"shift", "lshift", "rshift", "alt", "lalt", "ralt",
+			"ctrl", "lctrl", "rctrl", "meta", "lmeta", "rmeta", "sym", "fn", "capslock", "numlock", "scrolllock"};
+		private static final int[] MODIFIER_STATES = {KeyEvent.META_SHIFT_ON, KeyEvent.META_SHIFT_LEFT_ON,
+			KeyEvent.META_SHIFT_RIGHT_ON, KeyEvent.META_ALT_ON, KeyEvent.META_ALT_LEFT_ON, KeyEvent.META_ALT_RIGHT_ON,
+			KeyEvent.META_CTRL_ON, KeyEvent.META_CTRL_LEFT_ON, KeyEvent.META_CTRL_RIGHT_ON, KeyEvent.META_META_ON,
+			KeyEvent.META_META_LEFT_ON, KeyEvent.META_META_RIGHT_ON, KeyEvent.META_SYM_ON, KeyEvent.META_FUNCTION_ON,
+			KeyEvent.META_CAPS_LOCK_ON, KeyEvent.META_NUM_LOCK_ON, KeyEvent.META_SCROLL_LOCK_ON};
+
+		/* per key code: {metaState, fallbackKeyCode} pairs, the last parsed first (push_front) */
+		private static android.util.SparseArray<int[]> sKeys;
+
+		static synchronized boolean getFallbackAction(int keyCode, int metaState, FallbackAction outFallbackAction) {
+			if (sKeys == null)
+				sKeys = load(com.android.server.input.EventHub.getSystemUsrDir() + "keychars/Generic.kcm");
+			outFallbackAction.keyCode = 0;
+			outFallbackAction.metaState = 0;
+			int[] behaviors = sKeys.get(keyCode);
+			if (behaviors == null)
+				return false;
+			for (int i = 0; i < behaviors.length; i += 2) {
+				if (matchesMetaState(metaState, behaviors[i])) {
+					if (behaviors[i + 1] == 0)
+						return false;
+					outFallbackAction.keyCode = behaviors[i + 1];
+					outFallbackAction.metaState = metaState & ~behaviors[i];
+					return true;
+				}
+			}
+			return false;
+		}
+
+		private static boolean matchesMetaState(int eventMetaState, int behaviorMetaState) {
+			if ((eventMetaState & behaviorMetaState) != behaviorMetaState)
+				return false;
+			final int EXACT_META_STATES = KeyEvent.META_CTRL_ON | KeyEvent.META_CTRL_LEFT_ON | KeyEvent.META_CTRL_RIGHT_ON
+				| KeyEvent.META_ALT_ON | KeyEvent.META_ALT_LEFT_ON | KeyEvent.META_ALT_RIGHT_ON
+				| KeyEvent.META_META_ON | KeyEvent.META_META_LEFT_ON | KeyEvent.META_META_RIGHT_ON;
+			int unmatchedMetaState = eventMetaState & ~behaviorMetaState & EXACT_META_STATES;
+			if ((behaviorMetaState & KeyEvent.META_CTRL_ON) != 0)
+				unmatchedMetaState &= ~(KeyEvent.META_CTRL_LEFT_ON | KeyEvent.META_CTRL_RIGHT_ON);
+			else if ((behaviorMetaState & (KeyEvent.META_CTRL_LEFT_ON | KeyEvent.META_CTRL_RIGHT_ON)) != 0)
+				unmatchedMetaState &= ~KeyEvent.META_CTRL_ON;
+			if ((behaviorMetaState & KeyEvent.META_ALT_ON) != 0)
+				unmatchedMetaState &= ~(KeyEvent.META_ALT_LEFT_ON | KeyEvent.META_ALT_RIGHT_ON);
+			else if ((behaviorMetaState & (KeyEvent.META_ALT_LEFT_ON | KeyEvent.META_ALT_RIGHT_ON)) != 0)
+				unmatchedMetaState &= ~KeyEvent.META_ALT_ON;
+			if ((behaviorMetaState & KeyEvent.META_META_ON) != 0)
+				unmatchedMetaState &= ~(KeyEvent.META_META_LEFT_ON | KeyEvent.META_META_RIGHT_ON);
+			else if ((behaviorMetaState & (KeyEvent.META_META_LEFT_ON | KeyEvent.META_META_RIGHT_ON)) != 0)
+				unmatchedMetaState &= ~KeyEvent.META_META_ON;
+			return unmatchedMetaState == 0;
+		}
+
+		/* the property line "<modifiers>, <modifiers>: <behavior>..." of a key; -1 for label and number */
+		private static int[] parseProperties(String properties) {
+			String[] parts = properties.split(",");
+			int[] metaStates = new int[parts.length];
+			for (int i = 0; i < parts.length; i++) {
+				String part = parts[i].trim();
+				if (part.equals("label") || part.equals("number")) {
+					metaStates[i] = -1;
+					continue;
+				}
+				if (part.equals("base"))
+					continue;
+				for (String modifier : part.split("\\+")) {
+					int index = java.util.Arrays.asList(MODIFIER_NAMES).indexOf(modifier.trim());
+					if (index < 0)
+						throw new IllegalArgumentException("Expected modifier name, got '" + modifier + "'");
+					metaStates[i] |= MODIFIER_STATES[index];
+				}
+			}
+			return metaStates;
+		}
+
+		/* the fallback key code of a behavior list ("'a' fallback X", "none", ...), 0 if it has none */
+		private static int parseFallback(String behaviors) {
+			int fallback = 0;
+			int i = 0;
+			while (i < behaviors.length()) {
+				char c = behaviors.charAt(i);
+				if (Character.isWhitespace(c)) {
+					i++;
+				} else if (c == '\'') { /* a character literal, with escapes */
+					i++;
+					while (i < behaviors.length() && behaviors.charAt(i) != '\'')
+						i += behaviors.charAt(i) == '\\' ? 2 : 1;
+					i++;
+				} else if (c == '#') {
+					break;
+				} else {
+					int end = i;
+					while (end < behaviors.length() && !Character.isWhitespace(behaviors.charAt(end)))
+						end++;
+					String token = behaviors.substring(i, end);
+					i = end;
+					if (token.equals("fallback") || token.equals("replace")) {
+						while (i < behaviors.length() && Character.isWhitespace(behaviors.charAt(i)))
+							i++;
+						end = i;
+						while (end < behaviors.length() && !Character.isWhitespace(behaviors.charAt(end)))
+							end++;
+						int keyCode = KeyEvent.keyCodeFromString(behaviors.substring(i, end));
+						i = end;
+						if (token.equals("fallback"))
+							fallback = keyCode;
+					}
+				}
+			}
+			return fallback;
+		}
+
+		private static android.util.SparseArray<int[]> load(String path) {
+			android.util.SparseArray<int[]> keys = new android.util.SparseArray<>();
+			try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(path))) {
+				int keyCode = -1;
+				java.util.ArrayList<int[]> behaviors = null;
+				String line;
+				while ((line = reader.readLine()) != null) {
+					String trimmed = line.trim();
+					if (trimmed.isEmpty() || trimmed.startsWith("#"))
+						continue;
+					if (keyCode < 0) {
+						if (trimmed.startsWith("key ") && trimmed.endsWith("{")) {
+							String name = trimmed.substring(4, trimmed.length() - 1).trim();
+							keyCode = KeyEvent.keyCodeFromString(name);
+							behaviors = new java.util.ArrayList<>();
+						}
+						continue;
+					}
+					if (trimmed.startsWith("}")) {
+						int[] list = new int[behaviors.size() * 2];
+						for (int i = 0; i < behaviors.size(); i++) {
+							/* push_front: the behavior parsed last comes first */
+							int[] behavior = behaviors.get(behaviors.size() - 1 - i);
+							list[2 * i] = behavior[0];
+							list[2 * i + 1] = behavior[1];
+						}
+						if (keyCode != KeyEvent.KEYCODE_UNKNOWN)
+							keys.put(keyCode, list);
+						keyCode = -1;
+						continue;
+					}
+					int colon = trimmed.indexOf(':');
+					if (colon < 0)
+						continue;
+					int fallback = parseFallback(trimmed.substring(colon + 1));
+					for (int metaState : parseProperties(trimmed.substring(0, colon))) {
+						if (metaState >= 0)
+							behaviors.add(new int[] {metaState, fallback});
+					}
+				}
+			} catch (java.io.IOException | RuntimeException e) {
+				android.util.Log.w("KeyCharacterMap", "could not load the key behaviors of " + path, e);
+			}
+			return keys;
+		}
 	}
 
 	/**

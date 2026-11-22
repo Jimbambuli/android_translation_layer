@@ -1079,8 +1079,125 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 * Switches the audio tracks.
 	 */
 	public static final int KEYCODE_MEDIA_AUDIO_TRACK = 222;
+	/* the key codes of AOSP 16 after KEYCODE_MEDIA_AUDIO_TRACK (core/java/android/view/KeyEvent.java) */
+	public static final int KEYCODE_SLEEP = 223;
+	public static final int KEYCODE_WAKEUP = 224;
+	public static final int KEYCODE_PAIRING = 225;
+	public static final int KEYCODE_MEDIA_TOP_MENU = 226;
+	public static final int KEYCODE_11 = 227;
+	public static final int KEYCODE_12 = 228;
+	public static final int KEYCODE_LAST_CHANNEL = 229;
+	public static final int KEYCODE_TV_DATA_SERVICE = 230;
+	public static final int KEYCODE_VOICE_ASSIST = 231;
+	public static final int KEYCODE_TV_RADIO_SERVICE = 232;
+	public static final int KEYCODE_TV_TELETEXT = 233;
+	public static final int KEYCODE_TV_NUMBER_ENTRY = 234;
+	public static final int KEYCODE_TV_TERRESTRIAL_ANALOG = 235;
+	public static final int KEYCODE_TV_TERRESTRIAL_DIGITAL = 236;
+	public static final int KEYCODE_TV_SATELLITE = 237;
+	public static final int KEYCODE_TV_SATELLITE_BS = 238;
+	public static final int KEYCODE_TV_SATELLITE_CS = 239;
+	public static final int KEYCODE_TV_SATELLITE_SERVICE = 240;
+	public static final int KEYCODE_TV_NETWORK = 241;
+	public static final int KEYCODE_TV_ANTENNA_CABLE = 242;
+	public static final int KEYCODE_TV_INPUT_HDMI_1 = 243;
+	public static final int KEYCODE_TV_INPUT_HDMI_2 = 244;
+	public static final int KEYCODE_TV_INPUT_HDMI_3 = 245;
+	public static final int KEYCODE_TV_INPUT_HDMI_4 = 246;
+	public static final int KEYCODE_TV_INPUT_COMPOSITE_1 = 247;
+	public static final int KEYCODE_TV_INPUT_COMPOSITE_2 = 248;
+	public static final int KEYCODE_TV_INPUT_COMPONENT_1 = 249;
+	public static final int KEYCODE_TV_INPUT_COMPONENT_2 = 250;
+	public static final int KEYCODE_TV_INPUT_VGA_1 = 251;
+	public static final int KEYCODE_TV_AUDIO_DESCRIPTION = 252;
+	public static final int KEYCODE_TV_AUDIO_DESCRIPTION_MIX_UP = 253;
+	public static final int KEYCODE_TV_AUDIO_DESCRIPTION_MIX_DOWN = 254;
+	public static final int KEYCODE_TV_ZOOM_MODE = 255;
+	public static final int KEYCODE_TV_CONTENTS_MENU = 256;
+	public static final int KEYCODE_TV_MEDIA_CONTEXT_MENU = 257;
+	public static final int KEYCODE_TV_TIMER_PROGRAMMING = 258;
+	public static final int KEYCODE_HELP = 259;
+	public static final int KEYCODE_NAVIGATE_PREVIOUS = 260;
+	public static final int KEYCODE_NAVIGATE_NEXT = 261;
+	public static final int KEYCODE_NAVIGATE_IN = 262;
+	public static final int KEYCODE_NAVIGATE_OUT = 263;
+	public static final int KEYCODE_STEM_PRIMARY = 264;
+	public static final int KEYCODE_STEM_1 = 265;
+	public static final int KEYCODE_STEM_2 = 266;
+	public static final int KEYCODE_STEM_3 = 267;
+	public static final int KEYCODE_DPAD_UP_LEFT = 268;
+	public static final int KEYCODE_DPAD_DOWN_LEFT = 269;
+	public static final int KEYCODE_DPAD_UP_RIGHT = 270;
+	public static final int KEYCODE_DPAD_DOWN_RIGHT = 271;
+	public static final int KEYCODE_MEDIA_SKIP_FORWARD = 272;
+	public static final int KEYCODE_MEDIA_SKIP_BACKWARD = 273;
+	public static final int KEYCODE_MEDIA_STEP_FORWARD = 274;
+	public static final int KEYCODE_MEDIA_STEP_BACKWARD = 275;
+	public static final int KEYCODE_SOFT_SLEEP = 276;
+	public static final int KEYCODE_CUT = 277;
+	public static final int KEYCODE_COPY = 278;
+	public static final int KEYCODE_PASTE = 279;
+	public static final int KEYCODE_SYSTEM_NAVIGATION_UP = 280;
+	public static final int KEYCODE_SYSTEM_NAVIGATION_DOWN = 281;
+	public static final int KEYCODE_SYSTEM_NAVIGATION_LEFT = 282;
+	public static final int KEYCODE_SYSTEM_NAVIGATION_RIGHT = 283;
+	public static final int KEYCODE_ALL_APPS = 284;
+	public static final int KEYCODE_REFRESH = 285;
+	public static final int KEYCODE_THUMBS_UP = 286;
+	public static final int KEYCODE_THUMBS_DOWN = 287;
+	public static final int KEYCODE_PROFILE_SWITCH = 288;
+	public static final int KEYCODE_VIDEO_APP_1 = 289;
+	public static final int KEYCODE_VIDEO_APP_2 = 290;
+	public static final int KEYCODE_VIDEO_APP_3 = 291;
+	public static final int KEYCODE_VIDEO_APP_4 = 292;
+	public static final int KEYCODE_VIDEO_APP_5 = 293;
+	public static final int KEYCODE_VIDEO_APP_6 = 294;
+	public static final int KEYCODE_VIDEO_APP_7 = 295;
+	public static final int KEYCODE_VIDEO_APP_8 = 296;
+	public static final int KEYCODE_FEATURED_APP_1 = 297;
+	public static final int KEYCODE_FEATURED_APP_2 = 298;
+	public static final int KEYCODE_FEATURED_APP_3 = 299;
+	public static final int KEYCODE_FEATURED_APP_4 = 300;
+	public static final int KEYCODE_DEMO_APP_1 = 301;
+	public static final int KEYCODE_DEMO_APP_2 = 302;
+	public static final int KEYCODE_DEMO_APP_3 = 303;
+	public static final int KEYCODE_DEMO_APP_4 = 304;
+	public static final int KEYCODE_KEYBOARD_BACKLIGHT_DOWN = 305;
+	public static final int KEYCODE_KEYBOARD_BACKLIGHT_UP = 306;
+	public static final int KEYCODE_KEYBOARD_BACKLIGHT_TOGGLE = 307;
+	public static final int KEYCODE_STYLUS_BUTTON_PRIMARY = 308;
+	public static final int KEYCODE_STYLUS_BUTTON_SECONDARY = 309;
+	public static final int KEYCODE_STYLUS_BUTTON_TERTIARY = 310;
+	public static final int KEYCODE_STYLUS_BUTTON_TAIL = 311;
+	public static final int KEYCODE_RECENT_APPS = 312;
+	public static final int KEYCODE_MACRO_1 = 313;
+	public static final int KEYCODE_MACRO_2 = 314;
+	public static final int KEYCODE_MACRO_3 = 315;
+	public static final int KEYCODE_MACRO_4 = 316;
+	public static final int KEYCODE_EMOJI_PICKER = 317;
+	public static final int KEYCODE_SCREENSHOT = 318;
+	public static final int KEYCODE_DICTATE = 319;
+	public static final int KEYCODE_NEW = 320;
+	public static final int KEYCODE_CLOSE = 321;
+	public static final int KEYCODE_DO_NOT_DISTURB = 322;
+	public static final int KEYCODE_PRINT = 323;
+	public static final int KEYCODE_LOCK = 324;
+	public static final int KEYCODE_FULLSCREEN = 325;
+	public static final int KEYCODE_F13 = 326;
+	public static final int KEYCODE_F14 = 327;
+	public static final int KEYCODE_F15 = 328;
+	public static final int KEYCODE_F16 = 329;
+	public static final int KEYCODE_F17 = 330;
+	public static final int KEYCODE_F18 = 331;
+	public static final int KEYCODE_F19 = 332;
+	public static final int KEYCODE_F20 = 333;
+	public static final int KEYCODE_F21 = 334;
+	public static final int KEYCODE_F22 = 335;
+	public static final int KEYCODE_F23 = 336;
+	public static final int KEYCODE_F24 = 337;
 
-	private static final int LAST_KEYCODE = KEYCODE_MEDIA_AUDIO_TRACK;
+	private static final int LAST_KEYCODE = KEYCODE_F24;
+	private static final String LABEL_PREFIX = "KEYCODE_";
 
 	// NOTE: If you add a new keycode here you must also add it to:
 	//  isSystem()
@@ -1325,6 +1442,121 @@ public class KeyEvent extends InputEvent implements Parcelable {
 		names.append(KEYCODE_BRIGHTNESS_DOWN, "KEYCODE_BRIGHTNESS_DOWN");
 		names.append(KEYCODE_BRIGHTNESS_UP, "KEYCODE_BRIGHTNESS_UP");
 		names.append(KEYCODE_MEDIA_AUDIO_TRACK, "KEYCODE_MEDIA_AUDIO_TRACK");
+		names.append(KEYCODE_SLEEP, "KEYCODE_SLEEP");
+		names.append(KEYCODE_WAKEUP, "KEYCODE_WAKEUP");
+		names.append(KEYCODE_PAIRING, "KEYCODE_PAIRING");
+		names.append(KEYCODE_MEDIA_TOP_MENU, "KEYCODE_MEDIA_TOP_MENU");
+		names.append(KEYCODE_11, "KEYCODE_11");
+		names.append(KEYCODE_12, "KEYCODE_12");
+		names.append(KEYCODE_LAST_CHANNEL, "KEYCODE_LAST_CHANNEL");
+		names.append(KEYCODE_TV_DATA_SERVICE, "KEYCODE_TV_DATA_SERVICE");
+		names.append(KEYCODE_VOICE_ASSIST, "KEYCODE_VOICE_ASSIST");
+		names.append(KEYCODE_TV_RADIO_SERVICE, "KEYCODE_TV_RADIO_SERVICE");
+		names.append(KEYCODE_TV_TELETEXT, "KEYCODE_TV_TELETEXT");
+		names.append(KEYCODE_TV_NUMBER_ENTRY, "KEYCODE_TV_NUMBER_ENTRY");
+		names.append(KEYCODE_TV_TERRESTRIAL_ANALOG, "KEYCODE_TV_TERRESTRIAL_ANALOG");
+		names.append(KEYCODE_TV_TERRESTRIAL_DIGITAL, "KEYCODE_TV_TERRESTRIAL_DIGITAL");
+		names.append(KEYCODE_TV_SATELLITE, "KEYCODE_TV_SATELLITE");
+		names.append(KEYCODE_TV_SATELLITE_BS, "KEYCODE_TV_SATELLITE_BS");
+		names.append(KEYCODE_TV_SATELLITE_CS, "KEYCODE_TV_SATELLITE_CS");
+		names.append(KEYCODE_TV_SATELLITE_SERVICE, "KEYCODE_TV_SATELLITE_SERVICE");
+		names.append(KEYCODE_TV_NETWORK, "KEYCODE_TV_NETWORK");
+		names.append(KEYCODE_TV_ANTENNA_CABLE, "KEYCODE_TV_ANTENNA_CABLE");
+		names.append(KEYCODE_TV_INPUT_HDMI_1, "KEYCODE_TV_INPUT_HDMI_1");
+		names.append(KEYCODE_TV_INPUT_HDMI_2, "KEYCODE_TV_INPUT_HDMI_2");
+		names.append(KEYCODE_TV_INPUT_HDMI_3, "KEYCODE_TV_INPUT_HDMI_3");
+		names.append(KEYCODE_TV_INPUT_HDMI_4, "KEYCODE_TV_INPUT_HDMI_4");
+		names.append(KEYCODE_TV_INPUT_COMPOSITE_1, "KEYCODE_TV_INPUT_COMPOSITE_1");
+		names.append(KEYCODE_TV_INPUT_COMPOSITE_2, "KEYCODE_TV_INPUT_COMPOSITE_2");
+		names.append(KEYCODE_TV_INPUT_COMPONENT_1, "KEYCODE_TV_INPUT_COMPONENT_1");
+		names.append(KEYCODE_TV_INPUT_COMPONENT_2, "KEYCODE_TV_INPUT_COMPONENT_2");
+		names.append(KEYCODE_TV_INPUT_VGA_1, "KEYCODE_TV_INPUT_VGA_1");
+		names.append(KEYCODE_TV_AUDIO_DESCRIPTION, "KEYCODE_TV_AUDIO_DESCRIPTION");
+		names.append(KEYCODE_TV_AUDIO_DESCRIPTION_MIX_UP, "KEYCODE_TV_AUDIO_DESCRIPTION_MIX_UP");
+		names.append(KEYCODE_TV_AUDIO_DESCRIPTION_MIX_DOWN, "KEYCODE_TV_AUDIO_DESCRIPTION_MIX_DOWN");
+		names.append(KEYCODE_TV_ZOOM_MODE, "KEYCODE_TV_ZOOM_MODE");
+		names.append(KEYCODE_TV_CONTENTS_MENU, "KEYCODE_TV_CONTENTS_MENU");
+		names.append(KEYCODE_TV_MEDIA_CONTEXT_MENU, "KEYCODE_TV_MEDIA_CONTEXT_MENU");
+		names.append(KEYCODE_TV_TIMER_PROGRAMMING, "KEYCODE_TV_TIMER_PROGRAMMING");
+		names.append(KEYCODE_HELP, "KEYCODE_HELP");
+		names.append(KEYCODE_NAVIGATE_PREVIOUS, "KEYCODE_NAVIGATE_PREVIOUS");
+		names.append(KEYCODE_NAVIGATE_NEXT, "KEYCODE_NAVIGATE_NEXT");
+		names.append(KEYCODE_NAVIGATE_IN, "KEYCODE_NAVIGATE_IN");
+		names.append(KEYCODE_NAVIGATE_OUT, "KEYCODE_NAVIGATE_OUT");
+		names.append(KEYCODE_STEM_PRIMARY, "KEYCODE_STEM_PRIMARY");
+		names.append(KEYCODE_STEM_1, "KEYCODE_STEM_1");
+		names.append(KEYCODE_STEM_2, "KEYCODE_STEM_2");
+		names.append(KEYCODE_STEM_3, "KEYCODE_STEM_3");
+		names.append(KEYCODE_DPAD_UP_LEFT, "KEYCODE_DPAD_UP_LEFT");
+		names.append(KEYCODE_DPAD_DOWN_LEFT, "KEYCODE_DPAD_DOWN_LEFT");
+		names.append(KEYCODE_DPAD_UP_RIGHT, "KEYCODE_DPAD_UP_RIGHT");
+		names.append(KEYCODE_DPAD_DOWN_RIGHT, "KEYCODE_DPAD_DOWN_RIGHT");
+		names.append(KEYCODE_MEDIA_SKIP_FORWARD, "KEYCODE_MEDIA_SKIP_FORWARD");
+		names.append(KEYCODE_MEDIA_SKIP_BACKWARD, "KEYCODE_MEDIA_SKIP_BACKWARD");
+		names.append(KEYCODE_MEDIA_STEP_FORWARD, "KEYCODE_MEDIA_STEP_FORWARD");
+		names.append(KEYCODE_MEDIA_STEP_BACKWARD, "KEYCODE_MEDIA_STEP_BACKWARD");
+		names.append(KEYCODE_SOFT_SLEEP, "KEYCODE_SOFT_SLEEP");
+		names.append(KEYCODE_CUT, "KEYCODE_CUT");
+		names.append(KEYCODE_COPY, "KEYCODE_COPY");
+		names.append(KEYCODE_PASTE, "KEYCODE_PASTE");
+		names.append(KEYCODE_SYSTEM_NAVIGATION_UP, "KEYCODE_SYSTEM_NAVIGATION_UP");
+		names.append(KEYCODE_SYSTEM_NAVIGATION_DOWN, "KEYCODE_SYSTEM_NAVIGATION_DOWN");
+		names.append(KEYCODE_SYSTEM_NAVIGATION_LEFT, "KEYCODE_SYSTEM_NAVIGATION_LEFT");
+		names.append(KEYCODE_SYSTEM_NAVIGATION_RIGHT, "KEYCODE_SYSTEM_NAVIGATION_RIGHT");
+		names.append(KEYCODE_ALL_APPS, "KEYCODE_ALL_APPS");
+		names.append(KEYCODE_REFRESH, "KEYCODE_REFRESH");
+		names.append(KEYCODE_THUMBS_UP, "KEYCODE_THUMBS_UP");
+		names.append(KEYCODE_THUMBS_DOWN, "KEYCODE_THUMBS_DOWN");
+		names.append(KEYCODE_PROFILE_SWITCH, "KEYCODE_PROFILE_SWITCH");
+		names.append(KEYCODE_VIDEO_APP_1, "KEYCODE_VIDEO_APP_1");
+		names.append(KEYCODE_VIDEO_APP_2, "KEYCODE_VIDEO_APP_2");
+		names.append(KEYCODE_VIDEO_APP_3, "KEYCODE_VIDEO_APP_3");
+		names.append(KEYCODE_VIDEO_APP_4, "KEYCODE_VIDEO_APP_4");
+		names.append(KEYCODE_VIDEO_APP_5, "KEYCODE_VIDEO_APP_5");
+		names.append(KEYCODE_VIDEO_APP_6, "KEYCODE_VIDEO_APP_6");
+		names.append(KEYCODE_VIDEO_APP_7, "KEYCODE_VIDEO_APP_7");
+		names.append(KEYCODE_VIDEO_APP_8, "KEYCODE_VIDEO_APP_8");
+		names.append(KEYCODE_FEATURED_APP_1, "KEYCODE_FEATURED_APP_1");
+		names.append(KEYCODE_FEATURED_APP_2, "KEYCODE_FEATURED_APP_2");
+		names.append(KEYCODE_FEATURED_APP_3, "KEYCODE_FEATURED_APP_3");
+		names.append(KEYCODE_FEATURED_APP_4, "KEYCODE_FEATURED_APP_4");
+		names.append(KEYCODE_DEMO_APP_1, "KEYCODE_DEMO_APP_1");
+		names.append(KEYCODE_DEMO_APP_2, "KEYCODE_DEMO_APP_2");
+		names.append(KEYCODE_DEMO_APP_3, "KEYCODE_DEMO_APP_3");
+		names.append(KEYCODE_DEMO_APP_4, "KEYCODE_DEMO_APP_4");
+		names.append(KEYCODE_KEYBOARD_BACKLIGHT_DOWN, "KEYCODE_KEYBOARD_BACKLIGHT_DOWN");
+		names.append(KEYCODE_KEYBOARD_BACKLIGHT_UP, "KEYCODE_KEYBOARD_BACKLIGHT_UP");
+		names.append(KEYCODE_KEYBOARD_BACKLIGHT_TOGGLE, "KEYCODE_KEYBOARD_BACKLIGHT_TOGGLE");
+		names.append(KEYCODE_STYLUS_BUTTON_PRIMARY, "KEYCODE_STYLUS_BUTTON_PRIMARY");
+		names.append(KEYCODE_STYLUS_BUTTON_SECONDARY, "KEYCODE_STYLUS_BUTTON_SECONDARY");
+		names.append(KEYCODE_STYLUS_BUTTON_TERTIARY, "KEYCODE_STYLUS_BUTTON_TERTIARY");
+		names.append(KEYCODE_STYLUS_BUTTON_TAIL, "KEYCODE_STYLUS_BUTTON_TAIL");
+		names.append(KEYCODE_RECENT_APPS, "KEYCODE_RECENT_APPS");
+		names.append(KEYCODE_MACRO_1, "KEYCODE_MACRO_1");
+		names.append(KEYCODE_MACRO_2, "KEYCODE_MACRO_2");
+		names.append(KEYCODE_MACRO_3, "KEYCODE_MACRO_3");
+		names.append(KEYCODE_MACRO_4, "KEYCODE_MACRO_4");
+		names.append(KEYCODE_EMOJI_PICKER, "KEYCODE_EMOJI_PICKER");
+		names.append(KEYCODE_SCREENSHOT, "KEYCODE_SCREENSHOT");
+		names.append(KEYCODE_DICTATE, "KEYCODE_DICTATE");
+		names.append(KEYCODE_NEW, "KEYCODE_NEW");
+		names.append(KEYCODE_CLOSE, "KEYCODE_CLOSE");
+		names.append(KEYCODE_DO_NOT_DISTURB, "KEYCODE_DO_NOT_DISTURB");
+		names.append(KEYCODE_PRINT, "KEYCODE_PRINT");
+		names.append(KEYCODE_LOCK, "KEYCODE_LOCK");
+		names.append(KEYCODE_FULLSCREEN, "KEYCODE_FULLSCREEN");
+		names.append(KEYCODE_F13, "KEYCODE_F13");
+		names.append(KEYCODE_F14, "KEYCODE_F14");
+		names.append(KEYCODE_F15, "KEYCODE_F15");
+		names.append(KEYCODE_F16, "KEYCODE_F16");
+		names.append(KEYCODE_F17, "KEYCODE_F17");
+		names.append(KEYCODE_F18, "KEYCODE_F18");
+		names.append(KEYCODE_F19, "KEYCODE_F19");
+		names.append(KEYCODE_F20, "KEYCODE_F20");
+		names.append(KEYCODE_F21, "KEYCODE_F21");
+		names.append(KEYCODE_F22, "KEYCODE_F22");
+		names.append(KEYCODE_F23, "KEYCODE_F23");
+		names.append(KEYCODE_F24, "KEYCODE_F24");
 	};
 
 	// Symbolic names of all metakeys in bit order from least significant to most significant.
@@ -1701,6 +1933,14 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 * @see #setTainted
 	 */
 	public static final int FLAG_TAINTED = 0x80000000;
+
+	/**
+	 * This flag indicates that this event was injected by an accessibility service.
+	 * Value = 0x800 (IInputConstants.INPUT_EVENT_FLAG_IS_ACCESSIBILITY_EVENT)
+	 *
+	 * @hide
+	 */
+	public static final int FLAG_IS_ACCESSIBILITY_EVENT = 0x800;
 
 	/**
 	 * Returns the maximum keycode.
@@ -3399,23 +3639,32 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	 * @return The keycode or {@link #KEYCODE_UNKNOWN} if not found.
 	 * @see #keycodeToString(int)
 	 */
+	/* AOSP 16 keyCodeFromString(): a number of a valid key code, or the label with or without "KEYCODE_" */
 	public static int keyCodeFromString(String symbolicName) {
-		if (symbolicName == null) {
-			throw new IllegalArgumentException("symbolicName must not be null");
+		try {
+			int keyCode = Integer.parseInt(symbolicName);
+			if (keyCodeIsValid(keyCode)) {
+				return keyCode;
+			}
+		} catch (NumberFormatException ex) {
 		}
 
+		if (symbolicName.startsWith(LABEL_PREFIX)) {
+			symbolicName = symbolicName.substring(LABEL_PREFIX.length());
+		}
+		/* AOSP: nativeKeyCodeFromString(), the labels of InputEventLabels.cpp */
+		final String name = LABEL_PREFIX + symbolicName;
 		final int count = KEYCODE_SYMBOLIC_NAMES.size();
 		for (int i = 0; i < count; i++) {
-			if (symbolicName.equals(KEYCODE_SYMBOLIC_NAMES.valueAt(i))) {
-				return i;
+			if (name.equals(KEYCODE_SYMBOLIC_NAMES.valueAt(i))) {
+				return KEYCODE_SYMBOLIC_NAMES.keyAt(i);
 			}
 		}
+		return KEYCODE_UNKNOWN;
+	}
 
-		try {
-			return Integer.parseInt(symbolicName, 10);
-		} catch (NumberFormatException ex) {
-			return KEYCODE_UNKNOWN;
-		}
+	private static boolean keyCodeIsValid(int keyCode) {
+		return keyCode >= KEYCODE_UNKNOWN && keyCode <= LAST_KEYCODE;
 	}
 
 	/**
