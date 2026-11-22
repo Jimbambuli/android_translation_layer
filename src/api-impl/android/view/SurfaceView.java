@@ -41,9 +41,19 @@ public class SurfaceView extends View {
 	@Export
 	private void surfaceChanged(int format, int width, int height) {
 		/* AOSP reports the surface's format, the one requested with SurfaceHolder.setFormat() */
-		for (SurfaceHolder.Callback c : mCallbacks) {
+		for (SurfaceHolder.Callback c : getSurfaceCallbacks()) {
 			c.surfaceChanged(mSurfaceHolder, mRequestedFormat, width, height);
 		}
+	}
+
+	/* AOSP: a copy, a callback may add or remove callbacks (SurfaceHolder.removeCallback() in surfaceDestroyed()) */
+	private SurfaceHolder.Callback[] getSurfaceCallbacks() {
+		SurfaceHolder.Callback[] callbacks;
+		synchronized (mCallbacks) {
+			callbacks = new SurfaceHolder.Callback[mCallbacks.size()];
+			mCallbacks.toArray(callbacks);
+		}
+		return callbacks;
 	}
 
 	private boolean mSurfaceCreated;
@@ -54,7 +64,7 @@ public class SurfaceView extends View {
 		if (mSurfaceCreated)
 			return;
 		mSurfaceCreated = true;
-		for (SurfaceHolder.Callback c : mCallbacks) {
+		for (SurfaceHolder.Callback c : getSurfaceCallbacks()) {
 			c.surfaceCreated(mSurfaceHolder);
 		}
 	}
@@ -66,7 +76,7 @@ public class SurfaceView extends View {
 		if (!mSurfaceCreated)
 			return;
 		mSurfaceCreated = false;
-		for (SurfaceHolder.Callback c : mCallbacks) {
+		for (SurfaceHolder.Callback c : getSurfaceCallbacks()) {
 			c.surfaceDestroyed(mSurfaceHolder);
 		}
 	}
@@ -131,9 +141,9 @@ public class SurfaceView extends View {
 
 		@Override
 		public void removeCallback(Callback callback) {
-			/*		synchronized (mCallbacks) {
-					mCallbacks.remove(callback);
-					}*/
+			synchronized (mCallbacks) {
+				mCallbacks.remove(callback);
+			}
 		}
 
 		@Override
