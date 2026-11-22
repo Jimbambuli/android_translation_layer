@@ -226,7 +226,9 @@ public class Resources {
 			mCompatibilityInfo = compatInfo;
 		}
 		mToken = new WeakReference<IBinder>(token);
-		updateConfiguration(config, metrics);
+		/* AOSP 16: the constructors set up the ResourcesImpl without calling overridable methods, a subclass is not
+		 * constructed yet here (Instagram's Resources subclass overrides updateConfiguration()) */
+		applyConfiguration(config, metrics, null);
 		//        assets.ensureStringBlocks();
 	}
 
@@ -1750,6 +1752,14 @@ public class Resources {
 	 * @hide
 	 */
 	public void updateConfiguration(Configuration config,
+	                                DisplayMetrics metrics, CompatibilityInfo compat) {
+		applyConfiguration(config, metrics, compat);
+	}
+
+	/**
+	 * The work of updateConfiguration(), not overridable: the constructors use it as well.
+	 */
+	private void applyConfiguration(Configuration config,
 	                                DisplayMetrics metrics, CompatibilityInfo compat) {
 		synchronized (mAccessLock) {
 			if (DEBUG_CONFIG) {
