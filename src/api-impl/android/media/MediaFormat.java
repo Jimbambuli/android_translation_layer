@@ -33,6 +33,8 @@ public class MediaFormat {
 	public static final String KEY_CHANNEL_COUNT = "channel-count";
 	public static final String KEY_WIDTH = "width";
 	public static final String KEY_HEIGHT = "height";
+	public static final String KEY_MAX_WIDTH = "max-width";
+	public static final String KEY_MAX_HEIGHT = "max-height";
 
 	private Map<String, Object> map = new HashMap<>();
 

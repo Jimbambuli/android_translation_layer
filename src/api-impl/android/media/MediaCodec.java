@@ -34,6 +34,15 @@ public class MediaCodec {
 		}
 	}
 
+	/* AOSP C2SoftAvcDec/C2SoftHevcDec/C2SoftVpxDec/C2SoftDav1dDec MaxInputSizeSetter: room for a frame at a
+	 * compression ratio of 2 of the largest picture (16x16 blocks of 192 bytes for AVC, 64x64 blocks of 3072
+	 * bytes otherwise), at least 2 MiB */
+	private static int recommendedInputSize(String mime, int maxWidth, int maxHeight) {
+		long size = "video/avc".equalsIgnoreCase(mime) ? (long)((maxWidth + 15) / 16) * ((maxHeight + 15) / 16) * 192
+		                                               : (long)((maxWidth + 63) / 64) * ((maxHeight + 63) / 64) * 3072;
+		return (int)Math.min(Math.max(size, 2 * 1024 * 1024), Integer.MAX_VALUE);
+	}
+
 	public static MediaCodec createByCodecName(String codecName) throws IOException {
 		return new MediaCodec(codecName);
 	}
@@ -60,6 +69,15 @@ public class MediaCodec {
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
 			maxInputSize = format.getInteger("max-input-size");
+		}
+		/* AOSP CCodec::configure(): a video decoder's input buffers have the size its component recommends; the
+		 * client's max-input-size only makes them larger */
+		String mime = format.getString(MediaFormat.KEY_MIME);
+		if (mime != null && mime.startsWith("video/")) {
+			int recommended = recommendedInputSize(mime, Math.max(format.getInteger(MediaFormat.KEY_WIDTH, 0), format.getInteger(MediaFormat.KEY_MAX_WIDTH, 0)),
+			                                       Math.max(format.getInteger(MediaFormat.KEY_HEIGHT, 0), format.getInteger(MediaFormat.KEY_MAX_HEIGHT, 0)));
+			if (!format.containsKey("max-input-size") || maxInputSize < recommended)
+				maxInputSize = recommended;
 		}
 		inputBuffers = new ByteBuffer[1];
 		inputBufferTimestamps = new long[inputBuffers.length];
