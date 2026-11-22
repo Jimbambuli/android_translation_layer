@@ -521,15 +521,22 @@ public class Drawable {
 			}
 		}
 
-		/* like AOSP's DrawableInflater.inflateFromClass(): a tag with dots names a Drawable class
-		 * (AnimationScaleListDrawable in the framework's progress drawables) */
+		/* like AOSP's DrawableInflater.inflateFromXmlForDensity()/inflateFromClass(): <drawable class="…"> or a
+		 * tag with dots names a Drawable class (AnimationScaleListDrawable in the framework's progress
+		 * drawables), loaded by the ClassLoader of the Resources (Resources.getDrawableInflater()) */
 		String name = parser.getName();
+		if (name.equals("drawable")) {
+			name = attrs.getAttributeValue(null, "class");
+			if (name == null)
+				throw new XmlPullParserException("<drawable> tag must specify class attribute", parser, null);
+		}
 		if (name.indexOf('.') > 0) {
+			ClassLoader classLoader = resources != null ? resources.getClassLoader() : Drawable.class.getClassLoader();
 			try {
-				Drawable drawable = (Drawable)Class.forName(name).getConstructor().newInstance();
+				Drawable drawable = classLoader.loadClass(name).asSubclass(Drawable.class).getConstructor().newInstance();
 				drawable.inflate(resources, parser, attrs, theme);
 				return drawable;
-			} catch (ReflectiveOperationException e) {
+			} catch (ReflectiveOperationException | ClassCastException e) {
 				throw new XmlPullParserException("Error inflating class " + name + ": " + e, parser, e);
 			}
 		}

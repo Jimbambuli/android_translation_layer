@@ -170,7 +170,7 @@ public final class ATLLoadedApp {
 		    classLoaderPath, nativePath, ATLLoadedApp.class.getClassLoader());
 		AssetManager assetManager = new AssetManager(classLoaderPath + ":" + System.getProperty("java.class.path"));
 		PackageParser packageParser = new PackageParser(mainApk);
-		Resources resources = new Resources(assetManager, new DisplayMetrics(), Context.sys_config);
+		Resources resources = new Resources(classLoader, assetManager, new DisplayMetrics(), Context.sys_config);
 		String[] outError = new String[1];
 		PackageParser.Package pkg;
 		try {
@@ -217,7 +217,7 @@ public final class ATLLoadedApp {
 			config = new Configuration(Context.sys_config);
 			config.updateFrom(overrideConfiguration);
 		}
-		return track(new Resources(assets, displayMetrics, config),
+		return track(new Resources(this.class_loader, assets, displayMetrics, config),
 		             config == Context.sys_config ? null : new Configuration(overrideConfiguration));
 	}
 

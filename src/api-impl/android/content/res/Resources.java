@@ -135,6 +135,8 @@ public class Resources {
 	private final XmlBlock[] mCachedXmlBlocks = new XmlBlock[4];
 
 	/*package*/ final AssetManager mAssets;
+	/* AOSP 16: Resources.mClassLoader (apps read it by reflection, Instagram does) */
+	final ClassLoader mClassLoader;
 	private final Configuration mConfiguration = new Configuration();
 	/*package*/ final DisplayMetrics mMetrics = new DisplayMetrics();
 	private PluralRules mPluralRule;
@@ -220,13 +222,39 @@ public class Resources {
 	 */
 	public Resources(AssetManager assets, DisplayMetrics metrics, Configuration config,
 	                 CompatibilityInfo compatInfo, IBinder token) {
+		this(null, assets, metrics, config, compatInfo, token);
+	}
+
+	/**
+	 * Resources(ClassLoader): AOSP 16 has no AssetManager yet at this point, ATL needs one.
+	 * @hide
+	 */
+	public Resources(ClassLoader classLoader) {
+		this(classLoader, new AssetManager(), new DisplayMetrics(), null,
+		     CompatibilityInfo.DEFAULT_COMPATIBILITY_INFO, null);
+	}
+
+	/**
+	 * The app's Resources: AOSP's ResourcesManager creates them with the package's ClassLoader
+	 * (new Resources(classLoader), then setImpl()).
+	 * @hide
+	 */
+	public Resources(ClassLoader classLoader, AssetManager assets, DisplayMetrics metrics, Configuration config) {
+		this(classLoader, assets, metrics, config, CompatibilityInfo.DEFAULT_COMPATIBILITY_INFO, null);
+	}
+
+	private Resources(ClassLoader classLoader, AssetManager assets, DisplayMetrics metrics, Configuration config,
+	                  CompatibilityInfo compatInfo, IBinder token) {
+		mClassLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
 		mAssets = assets;
 		mMetrics.setToDefaults();
 		if (compatInfo != null) {
 			mCompatibilityInfo = compatInfo;
 		}
 		mToken = new WeakReference<IBinder>(token);
-		updateConfiguration(config, metrics);
+		/* AOSP 16: the constructors set up the ResourcesImpl without calling overridable methods, a subclass is not
+		 * constructed yet here (Instagram's Resources subclass overrides updateConfiguration()) */
+		applyConfiguration(config, metrics, null);
 		//        assets.ensureStringBlocks();
 	}
 
@@ -1751,6 +1779,14 @@ public class Resources {
 	 */
 	public void updateConfiguration(Configuration config,
 	                                DisplayMetrics metrics, CompatibilityInfo compat) {
+		applyConfiguration(config, metrics, compat);
+	}
+
+	/**
+	 * The work of updateConfiguration(), not overridable: the constructors use it as well.
+	 */
+	private void applyConfiguration(Configuration config,
+	                                DisplayMetrics metrics, CompatibilityInfo compat) {
 		synchronized (mAccessLock) {
 			if (DEBUG_CONFIG) {
 				Slog.i(TAG, "**** Updating config of " + this + ": old config is " + mConfiguration + " old compat is " + mCompatibilityInfo);
@@ -2182,6 +2218,13 @@ public class Resources {
 		}
 
 		sa.recycle();
+	}
+
+	/**
+	 * @hide
+	 */
+	public ClassLoader getClassLoader() {
+		return mClassLoader;
 	}
 
 	/**
