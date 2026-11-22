@@ -262,7 +262,10 @@ struct render_frame_data {
 static void deliver_texture(struct render_frame_data *d, GdkTexture *texture)
 {
 	if (d->remote) {
-		ANativeWindow_remotePresentTexture(d->remote, texture, d->crop);
+		if (g_object_get_data(G_OBJECT(texture), "atl-dmabuf"))
+			ANativeWindow_remotePresentDmabuf(d->remote, texture, d->crop);
+		else
+			ANativeWindow_remotePresentTexture(d->remote, texture, d->crop);
 		g_object_unref(texture);
 		ANativeWindow_release(d->remote);
 	} else if (d->surface_texture) {

@@ -140,6 +140,7 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 				munmap(native_window->remote_memory[i].map, native_window->remote_memory[i].size);
 			if (native_window->remote_memory[i].fd > 0)
 				close(native_window->remote_memory[i].fd);
+			g_clear_object(&native_window->remote_memory[i].held);
 		}
 		g_mutex_clear(&native_window->remote_lock);
 		free(native_window);
@@ -199,39 +200,43 @@ gboolean ANativeWindow_remoteRead(struct ANativeWindow *native_window, int timeo
 	return !native_window->remote_gone;
 }
 
-void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd)
+/* a message with up to two file descriptors (SCM_RIGHTS) */
+void ANativeWindow_remoteSendFds(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, const int *fds, int n_fds)
 {
-	char control[CMSG_SPACE(sizeof(int))] = {0};
+	char control[CMSG_SPACE(2 * sizeof(int))] = {0};
 	struct iovec iov = {.iov_base = (void *)msg, .iov_len = sizeof(*msg)};
 	struct msghdr hdr = {.msg_iov = &iov, .msg_iovlen = 1};
-	if (fd >= 0) {
+	if (n_fds > 0 && n_fds <= 2) {
 		hdr.msg_control = control;
-		hdr.msg_controllen = sizeof(control);
+		hdr.msg_controllen = CMSG_SPACE(n_fds * sizeof(int));
 		struct cmsghdr *cmsg = CMSG_FIRSTHDR(&hdr);
 		cmsg->cmsg_level = SOL_SOCKET;
 		cmsg->cmsg_type = SCM_RIGHTS;
-		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-		memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+		cmsg->cmsg_len = CMSG_LEN(n_fds * sizeof(int));
+		memcpy(CMSG_DATA(cmsg), fds, n_fds * sizeof(int));
 	}
 	if (!native_window->remote_gone && sendmsg(native_window->remote_fd, &hdr, MSG_NOSIGNAL) < 0)
 		native_window->remote_gone = TRUE;
+}
+
+void ANativeWindow_remoteSend(struct ANativeWindow *native_window, const struct atl_surface_msg *msg, int fd)
+{
+	ANativeWindow_remoteSendFds(native_window, msg, &fd, fd >= 0 ? 1 : 0);
 }
 
 /* ANativeWindow_remoteRead(), with remote_lock held: a buffer of ANativeWindow_remotePresentTexture() is free again */
 static void remote_memory_message(void *data, const struct atl_surface_msg *msg)
 {
 	struct ANativeWindow *native_window = data;
-	if (msg->type == ATL_SURFACE_MSG_RELEASE && msg->index < G_N_ELEMENTS(native_window->remote_memory))
+	if (msg->type == ATL_SURFACE_MSG_RELEASE && msg->index < G_N_ELEMENTS(native_window->remote_memory)) {
 		native_window->remote_memory[msg->index].busy = FALSE;
+		g_clear_object(&native_window->remote_memory[msg->index].held);
+	}
 }
 
-/* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
- * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
- * frame is dropped (FALSE, as when that process is gone); crop: the scaling mode SCALE_TO_FIT_WITH_CROPPING */
-gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
+/* a free buffer of the window of a Surface of another process, waiting at most 100 ms; -1 if there is none */
+static int remote_free_buffer(struct ANativeWindow *native_window)
 {
-	int width = gdk_texture_get_width(texture);
-	int height = gdk_texture_get_height(texture);
 	gint64 end = g_get_monotonic_time() + 100000;
 	int i = -1;
 	if (!native_window->remote_handler)
@@ -242,8 +247,44 @@ gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window,
 				i = k;
 		int left = (end - g_get_monotonic_time()) / 1000;
 		if (i < 0 && (left <= 0 || !ANativeWindow_remoteRead(native_window, left)))
-			return FALSE;
+			return -1;
 	}
+	return i;
+}
+
+/* a frame of a hardware decoder (MediaCodec) to the window of a Surface of another process: its dmabuf planes go
+ * there as they are (as AOSP's BufferQueue hands the decoder's buffer to the consumer); the texture, which owns
+ * the frame, is held until that process releases the buffer */
+gboolean ANativeWindow_remotePresentDmabuf(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
+{
+	const struct atl_dmabuf *dmabuf = g_object_get_data(G_OBJECT(texture), "atl-dmabuf");
+	int i = remote_free_buffer(native_window);
+	if (i < 0)
+		return FALSE;
+	typeof(native_window->remote_memory[0]) *buffer = &native_window->remote_memory[i];
+	/* the memory buffer of this index is replaced there: a memory frame later sends a new one */
+	buffer->width = buffer->height = 0;
+	buffer->busy = TRUE;
+	buffer->held = g_object_ref(texture);
+	struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_BUFFER, .index = i, .width = dmabuf->width, .height = dmabuf->height,
+	                              .stride = dmabuf->stride[0], .offset = dmabuf->offset[0], .fourcc = dmabuf->fourcc, .top_first = 1,
+	                              .modifier = dmabuf->modifier, .n_planes = dmabuf->n_planes, .stride1 = dmabuf->stride[1],
+	                              .offset1 = dmabuf->offset[1], .matrix = dmabuf->matrix, .full_range = dmabuf->full_range};
+	ANativeWindow_remoteSendFds(native_window, &msg, dmabuf->fd, dmabuf->n_planes);
+	ANativeWindow_remoteSend(native_window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = i, .crop = crop}, -1);
+	return !native_window->remote_gone;
+}
+
+/* a frame drawn on the CPU (MediaCodec) to the window of a Surface of another process: the texture is copied into
+ * one of three memfd buffers that process shows (rows top first); waits at most 100 ms for a free one, else the
+ * frame is dropped (FALSE, as when that process is gone); crop: the scaling mode SCALE_TO_FIT_WITH_CROPPING */
+gboolean ANativeWindow_remotePresentTexture(struct ANativeWindow *native_window, GdkTexture *texture, gboolean crop)
+{
+	int width = gdk_texture_get_width(texture);
+	int height = gdk_texture_get_height(texture);
+	int i = remote_free_buffer(native_window);
+	if (i < 0)
+		return FALSE;
 	typeof(native_window->remote_memory[0]) *buffer = &native_window->remote_memory[i];
 	if (buffer->width != width || buffer->height != height) {
 		if (buffer->map)
