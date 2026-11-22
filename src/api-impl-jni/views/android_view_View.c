@@ -693,7 +693,7 @@ static gboolean on_scroll_event(WrapperWidget *wrapper, GdkEvent *event)
  * crossing signals without an event (when a widget appears under the pointer, for instance) */
 static void get_raw_position(GtkEventControllerMotion *controller, WrapperWidget *wrapper, double x, double y, double *raw_x, double *raw_y)
 {
-	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
+	GdkEvent *event = controller ? gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller)) : NULL;
 	if (event) {
 		gdk_event_get_position(event, raw_x, raw_y);
 		return;
@@ -709,6 +709,44 @@ static void get_raw_position(GtkEventControllerMotion *controller, WrapperWidget
 	*raw_y = p.y + off_y;
 }
 
+/* The pointer moving into a window is a motion for Android's InputDispatcher, which hands it to the window as
+ * ACTION_HOVER_ENTER (getHoveringWindowsLocked(), DispatchMode::HOVER_ENTER). GDK reports that move as an enter
+ * of the surface without a motion (Wayland's wl_pointer.enter), and GTK turns it into crossings only. The views
+ * GTK's crossing enters while it handles that event get their ACTION_HOVER_ENTER right after it, the deepest
+ * first, as the motion would have reached them; the window gets no ACTION_HOVER_MOVE for it, like on Android. */
+static GPtrArray *surface_enter_views; /* the views entered while GTK handles a GDK_ENTER_NOTIFY, outermost first */
+static guint32 surface_enter_time;
+
+static gboolean deliver_surface_enter(gpointer data)
+{
+	GPtrArray *views = surface_enter_views;
+	surface_enter_views = NULL;
+	for (guint i = views->len; i-- > 0;) {
+		WrapperWidget *wrapper = views->pdata[i];
+		if (wrapper->hover_enter_pending && wrapper->jobj && !(pointer_indices && pointer_indices->len)) {
+			double raw_x;
+			double raw_y;
+			get_raw_position(NULL, wrapper, wrapper->hover_x, wrapper->hover_y, &raw_x, &raw_y);
+			wrapper->hover_enter_pending = FALSE;
+			call_hover_callback(wrapper->jobj, ACTION_HOVER_ENTER, wrapper->hover_x, wrapper->hover_y, raw_x, raw_y, surface_enter_time);
+		}
+	}
+	g_ptr_array_unref(views);
+	return G_SOURCE_REMOVE;
+}
+
+/* emission hook of GdkSurface::event, which runs before GTK handles the event */
+static gboolean surface_event_hook(GSignalInvocationHint *hint, guint n_params, const GValue *params, gpointer data)
+{
+	GdkEvent *event = g_value_get_pointer(&params[1]);
+	if (gdk_event_get_event_type(event) == GDK_ENTER_NOTIFY && !surface_enter_views) {
+		surface_enter_views = g_ptr_array_new_with_free_func(g_object_unref);
+		surface_enter_time = gdk_event_get_time(event) ?: hover_event_time(NULL);
+		g_idle_add_full(G_PRIORITY_HIGH, deliver_surface_enter, NULL, NULL);
+	}
+	return TRUE;
+}
+
 static void hover_enter_cb(GtkEventControllerMotion *controller, double x, double y, WrapperWidget *wrapper)
 {
 	double raw_x;
@@ -717,9 +755,12 @@ static void hover_enter_cb(GtkEventControllerMotion *controller, double x, doubl
 	wrapper->hover_exit_pending = FALSE;
 	wrapper->hover_x = x;
 	wrapper->hover_y = y;
-	/* like Android's InputDispatcher, enter on the first motion: GTK also sends crossings without one, e.g.
-	 * when a popup closes on a press outside of it, and with that hover Compose lost the next mouse press */
+	/* like Android's InputDispatcher, enter on a motion: on the first one, or on the pointer's move into the window
+	 * (see deliver_surface_enter()). GTK also sends crossings without one, e.g. when a popup closes on a press
+	 * outside of it, and with that hover Compose lost the next mouse press. */
 	wrapper->hover_enter_pending = TRUE;
+	if (surface_enter_views)
+		g_ptr_array_add(surface_enter_views, g_object_ref(wrapper));
 }
 
 static void hover_leave_cb(GtkEventControllerMotion *controller, WrapperWidget *wrapper)
@@ -954,6 +995,12 @@ static void add_hover_controller(WrapperWidget *wrapper)
 {
 	if (g_object_get_data(G_OBJECT(wrapper), "hover_controller"))
 		return;
+	static gboolean surface_hook_added;
+	if (!surface_hook_added) {
+		g_type_class_ref(GDK_TYPE_SURFACE); // the signal exists once the class does
+		g_signal_add_emission_hook(g_signal_lookup("event", GDK_TYPE_SURFACE), 0, surface_event_hook, NULL, NULL);
+		surface_hook_added = TRUE;
+	}
 	GtkEventController *controller = gtk_event_controller_motion_new();
 
 	g_signal_connect(controller, "enter", G_CALLBACK(hover_enter_cb), wrapper);

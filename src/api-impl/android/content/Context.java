@@ -197,6 +197,7 @@ public abstract class Context {
 		provider.put("KeyGenerator.AES", "android.security.keystore.KeyGenerator$AES");
 		provider.put("KeyGenerator.HmacSHA512", "android.security.keystore.KeyGenerator$HmacSHA512");
 		provider.put("KeyPairGenerator.RSA", "android.security.keystore.AndroidKeyStoreKeyPairGeneratorSpi$RSA");
+		provider.put("KeyPairGenerator.EC", "android.security.keystore.AndroidKeyStoreKeyPairGeneratorSpi$EC");
 		Security.addProvider(provider);
 		// like AndroidKeyStoreProvider.install(): ciphers for AndroidKeyStore keys come from their own provider,
 		// which takes only those keys (SupportedKeyClasses). AOSP puts it after Bouncy Castle, which cannot use
@@ -220,6 +221,21 @@ public abstract class Context {
 			workaround.put("Cipher.RSA/ECB/" + cipher[0] + " SupportedKeyClasses", "android.security.keystore.AndroidKeyStorePrivateKey");
 			// AOSP maps RSA/None/OAEPWithSHA-224AndMGF1Padding to the SHA-256 one
 			workaround.put("Alg.Alias.Cipher.RSA/None/" + cipher[0], "RSA/ECB/" + (cipher[0].contains("SHA-224") ? "OAEPWithSHA-256AndMGF1Padding" : cipher[0]));
+		}
+		// AndroidKeyStoreBCWorkaroundProvider's ECDSA signatures and their aliases (Ed25519: ATL has no such keys)
+		String ecdsa = "android.security.keystore.AndroidKeyStoreECDSASignatureSpi$";
+		String[][] ecdsaSignatures = {
+		    {"NONEwithECDSA", "NONE"},
+		    {"SHA1withECDSA", "SHA1", "ECDSA", "ECDSAwithSHA1", "1.2.840.10045.4.1", "1.3.14.3.2.26with1.2.840.10045.2.1"},
+		    {"SHA224withECDSA", "SHA224", "1.2.840.10045.4.3.1", "2.16.840.1.101.3.4.2.4with1.2.840.10045.2.1"},
+		    {"SHA256withECDSA", "SHA256", "1.2.840.10045.4.3.2", "2.16.840.1.101.3.4.2.1with1.2.840.10045.2.1"},
+		    {"SHA384withECDSA", "SHA384", "1.2.840.10045.4.3.3", "2.16.840.1.101.3.4.2.2with1.2.840.10045.2.1"},
+		    {"SHA512withECDSA", "SHA512", "1.2.840.10045.4.3.4", "2.16.840.1.101.3.4.2.3with1.2.840.10045.2.1"}};
+		for (String[] signature : ecdsaSignatures) {
+			workaround.put("Signature." + signature[0], ecdsa + signature[1]);
+			workaround.put("Signature." + signature[0] + " SupportedKeyClasses", "android.security.keystore.AndroidKeyStorePrivateKey");
+			for (int i = 2; i < signature.length; i++)
+				workaround.put("Alg.Alias.Signature." + signature[i], signature[0]);
 		}
 		Security.insertProviderAt(workaround, 1);
 

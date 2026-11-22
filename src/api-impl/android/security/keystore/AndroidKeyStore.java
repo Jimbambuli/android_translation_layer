@@ -15,6 +15,7 @@ import java.io.ByteArrayInputStream;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
+import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -106,7 +107,11 @@ public class AndroidKeyStore extends KeyStoreSpi {
 			// a private key entry, kept in PKCS#8
 			try {
 				PrivateKey key = KeyFactory.getInstance(algorithm).generatePrivate(new PKCS8EncodedKeySpec(keyBytes));
-				return key instanceof RSAPrivateKey ? new AndroidKeyStoreRSAPrivateKey((RSAPrivateKey)key) : new AndroidKeyStorePrivateKey(key);
+				if (key instanceof RSAPrivateKey)
+					return new AndroidKeyStoreRSAPrivateKey((RSAPrivateKey)key);
+				if (key instanceof ECPrivateKey)
+					return new AndroidKeyStoreECPrivateKey((ECPrivateKey)key);
+				return new AndroidKeyStorePrivateKey(key);
 			} catch (InvalidKeySpecException e) {
 				throw (UnrecoverableKeyException)new UnrecoverableKeyException("cannot load key " + alias).initCause(e);
 			}
