@@ -8,17 +8,22 @@ import android.atl.ATLProvider;
 import android.atl.ATLRemoteContentProvider;
 import android.atl.annotation.Export;
 import android.content.pm.PackageParser;
+import android.content.pm.PathPermission;
 import android.content.pm.ProviderInfo;
 import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Binder;
 import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.ParcelFileDescriptor;
+import android.os.Process;
 import android.util.Log;
+import java.io.FileDescriptor;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -107,7 +112,7 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 		return atlProvider == null ? null : atlProvider.getContentProvider();
 	}
 
-	public boolean onCreate() { return false; }
+	public abstract boolean onCreate();
 
 	public Bundle call(String method, String arg, Bundle extras) {
 		return null;
@@ -120,8 +125,119 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 	private Context mContext;
 
 	/* as AOSP, the context given to attachInfo(); ATL's own providers are not attached and run as the app */
-	public Context getContext() {
+	public final Context getContext() {
 		return mContext != null ? mContext : ATLLoadedApp.getPrimaryApplication().getApplication();
+	}
+
+	/* AOSP ContentProvider.requireContext() */
+	public final Context requireContext() {
+		final Context ctx = getContext();
+		if (ctx == null) {
+			throw new IllegalStateException("Cannot find context from the provider.");
+		}
+		return ctx;
+	}
+
+	/* AOSP keeps the AttributionSource of the binder caller per thread while a call runs. In ATL the app itself
+	 * is the only caller, so that is the default; clearCallingIdentity() clears it as in AOSP. */
+	private final ThreadLocal<AttributionSource> mCallingAttributionSource = new ThreadLocal<AttributionSource>() {
+		@Override
+		protected AttributionSource initialValue() {
+			return new AttributionSource(Process.myUid(), ATLLoadedApp.getPrimaryApplication().pkg.packageName, null);
+		}
+	};
+
+	private AttributionSource setCallingAttributionSource(AttributionSource attributionSource) {
+		final AttributionSource original = mCallingAttributionSource.get();
+		mCallingAttributionSource.set(attributionSource);
+		onCallingPackageChanged();
+		return original;
+	}
+
+	/* AOSP ContentProvider.getCallingAttributionSource() (ATL has no AppOpsManager.checkPackage() to run) */
+	public final AttributionSource getCallingAttributionSource() {
+		return mCallingAttributionSource.get();
+	}
+
+	public final String getCallingAttributionTag() {
+		final AttributionSource attributionSource = mCallingAttributionSource.get();
+		if (attributionSource != null) {
+			return attributionSource.getAttributionTag();
+		}
+		return null;
+	}
+
+	public final String getCallingPackageUnchecked() {
+		final AttributionSource attributionSource = mCallingAttributionSource.get();
+		if (attributionSource != null) {
+			return attributionSource.getPackageName();
+		}
+		return null;
+	}
+
+	public void onCallingPackageChanged() {
+	}
+
+	/* AOSP ContentProvider.CallingIdentity, clearCallingIdentity(), restoreCallingIdentity() */
+	public final class CallingIdentity {
+		/** @hide */
+		public final long binderToken;
+		/** @hide */
+		public final AttributionSource callingAttributionSource;
+
+		/** @hide */
+		public CallingIdentity(long binderToken, AttributionSource attributionSource) {
+			this.binderToken = binderToken;
+			this.callingAttributionSource = attributionSource;
+		}
+	}
+
+	public final CallingIdentity clearCallingIdentity() {
+		return new CallingIdentity(Binder.clearCallingIdentity(), setCallingAttributionSource(null));
+	}
+
+	public final void restoreCallingIdentity(CallingIdentity identity) {
+		Binder.restoreCallingIdentity(identity.binderToken);
+		mCallingAttributionSource.set(identity.callingAttributionSource);
+	}
+
+	/* AOSP ContentProvider: the permissions from the manifest, set by attachInfo(); ATL enforces none of them */
+	private String mReadPermission;
+	private String mWritePermission;
+	private PathPermission[] mPathPermissions;
+
+	protected final void setReadPermission(String permission) {
+		mReadPermission = permission;
+	}
+
+	public final String getReadPermission() {
+		return mReadPermission;
+	}
+
+	protected final void setWritePermission(String permission) {
+		mWritePermission = permission;
+	}
+
+	public final String getWritePermission() {
+		return mWritePermission;
+	}
+
+	protected final void setPathPermissions(PathPermission[] permissions) {
+		mPathPermissions = permissions;
+	}
+
+	public final PathPermission[] getPathPermissions() {
+		return mPathPermissions;
+	}
+
+	/* AOSP ContentProvider.refresh(): not supported by default */
+	public boolean refresh(Uri uri, Bundle extras, CancellationSignal cancellationSignal) {
+		return false;
+	}
+
+	/* AOSP ContentProvider.dump() */
+	public void dump(FileDescriptor fd, PrintWriter writer, String[] args) {
+		writer.println("nothing to dump");
 	}
 
 	public ContentProviderResult[] applyBatch(String authority, ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
@@ -194,6 +310,11 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 		// only allow it to be set once, as AOSP
 		if (mContext == null) {
 			mContext = context;
+			if (provider != null) {
+				setReadPermission(provider.readPermission);
+				setWritePermission(provider.writePermission);
+				setPathPermissions(provider.pathPermissions);
+			}
 		}
 	}
 
@@ -308,8 +429,11 @@ public abstract class ContentProvider implements ComponentCallbacks2 {
 		return 0; // AppOpsManager.MODE_ALLOWED
 	}
 
-	public String getCallingPackage() {
-		return ATLLoadedApp.getPrimaryApplication().pkg.packageName;
+	/* AOSP ContentProvider.getCallingPackage() */
+	public final String getCallingPackage() {
+		final AttributionSource callingAttributionSource = getCallingAttributionSource();
+		return (callingAttributionSource != null)
+		    ? callingAttributionSource.getPackageName() : null;
 	}
 
 	/* AOSP ContentProvider.PipeDataWriter and openPipeHelper() */

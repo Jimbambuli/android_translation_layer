@@ -45,6 +45,12 @@ public final class ATLRemoteContentProvider extends ContentProvider {
 		this.authority = authority;
 	}
 
+	/* ContentProvider.onCreate(): nothing to set up, the provider is ready */
+	@Override
+	public boolean onCreate() {
+		return true;
+	}
+
 	private abstract static class Call {
 		abstract void write(Parcel data);
 	}
