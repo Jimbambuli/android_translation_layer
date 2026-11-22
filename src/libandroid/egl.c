@@ -12,6 +12,8 @@
 #include <GL/gl.h>
 #include <GLES2/gl2.h>
 
+#include <drm/drm_fourcc.h>
+#include <stdbool.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
@@ -19,6 +21,7 @@
 #include "../api-impl-jni/defines.h"
 #include "../api-impl-jni/widgets/android_view_SurfaceView.h"
 
+#include "hardware_buffer.h"
 #include "native_window.h"
 
 extern GtkWindow *window; // TODO: how do we get rid of this? the app won't pass anything useful to eglGetDisplay
@@ -96,14 +99,15 @@ EGLBoolean bionic_eglPresentationTimeANDROID(EGLDisplay dpy, EGLSurface surface,
 }
 
 EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface);
+EGLImage bionic_eglCreateImage(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list);
+EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list);
 
 /* EGL_ANDROID_get_native_client_buffer (eglGetNativeClientBufferANDROIDImpl()): the EGLClientBuffer of an
- * AHardwareBuffer, for eglCreateImageKHR(EGL_NATIVE_BUFFER_ANDROID). There is no AHardwareBuffer here
- * (AHardwareBuffer_allocate() fails), so there is no client buffer either; AOSP gives NULL for a NULL buffer too
- * (with EGL_BAD_PARAMETER, which the host's eglGetError() does not know about). */
+ * AHardwareBuffer, for eglCreateImageKHR(EGL_NATIVE_BUFFER_ANDROID); AOSP gives NULL for a NULL buffer (with
+ * EGL_BAD_PARAMETER, which the host's eglGetError() does not know about). */
 EGLClientBuffer bionic_eglGetNativeClientBufferANDROID(const struct AHardwareBuffer *buffer)
 {
-	return NULL;
+	return (EGLClientBuffer)ahb_from_pointer(buffer);
 }
 
 /* EGL_KHR_partial_update: the damage region is a hint; a window surface of an ANativeWindow is ATL's own back
@@ -150,6 +154,10 @@ void (*bionic_eglGetProcAddress(char const *procname))(void)
 		return (void (*)(void))bionic_eglPresentationTimeANDROID;
 	if (!strcmp(procname, "eglGetNativeClientBufferANDROID"))
 		return (void (*)(void))bionic_eglGetNativeClientBufferANDROID;
+	if (!strcmp(procname, "eglCreateImageKHR"))
+		return (void (*)(void))bionic_eglCreateImageKHR;
+	if (!strcmp(procname, "eglCreateImage"))
+		return (void (*)(void))bionic_eglCreateImage;
 	if (!getenv("ATL_DIRECT_EGL")) {
 		if (!strcmp(procname, "eglSetDamageRegionKHR"))
 			return (void (*)(void))bionic_eglSetDamageRegionKHR;
@@ -352,9 +360,70 @@ G_DEFINE_TYPE(ATLSurface, atl_surface, G_TYPE_OBJECT)
  * while Mesa exports the core EGL 1.5 function eglCreateImage as its linkable entry
  * point instead. The wrappers bridge this ABI naming difference.
  */
-EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list)
+/* EGL_NATIVE_BUFFER_ANDROID (an AHardwareBuffer, EGL_ANDROID_image_native_buffer) becomes the EGL_LINUX_DMA_BUF_EXT
+ * image of its dma-buf; EGL_IMAGE_PRESERVED_KHR (the only attribute of a native buffer image) is passed on.
+ * eglCreateImageKHR() takes EGLint attributes, eglCreateImage() EGLAttrib ones. */
+#ifndef EGL_NATIVE_BUFFER_ANDROID
+#define EGL_NATIVE_BUFFER_ANDROID 0x3140
+#endif
+EGLImage bionic_eglCreateImage(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list)
 {
-	return eglCreateImage(dpy, ctx, target, buffer, attrib_list);
+	EGLAttrib attribs[64];
+	int n = 0;
+	bool native = target == EGL_NATIVE_BUFFER_ANDROID;
+	if (native) {
+		struct AHardwareBuffer *ahb = ahb_from_pointer(buffer);
+		if (!ahb || !ahb->dmabuf)
+			return EGL_NO_IMAGE;
+		static const EGLAttrib plane_attribs[3][5] = {
+			{EGL_DMA_BUF_PLANE0_FD_EXT, EGL_DMA_BUF_PLANE0_OFFSET_EXT, EGL_DMA_BUF_PLANE0_PITCH_EXT, EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT},
+			{EGL_DMA_BUF_PLANE1_FD_EXT, EGL_DMA_BUF_PLANE1_OFFSET_EXT, EGL_DMA_BUF_PLANE1_PITCH_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE1_MODIFIER_HI_EXT},
+			{EGL_DMA_BUF_PLANE2_FD_EXT, EGL_DMA_BUF_PLANE2_OFFSET_EXT, EGL_DMA_BUF_PLANE2_PITCH_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_LO_EXT, EGL_DMA_BUF_PLANE2_MODIFIER_HI_EXT},
+		};
+		attribs[n++] = EGL_WIDTH;
+		attribs[n++] = ahb->desc.width;
+		attribs[n++] = EGL_HEIGHT;
+		attribs[n++] = ahb->desc.height;
+		attribs[n++] = EGL_LINUX_DRM_FOURCC_EXT;
+		attribs[n++] = ahb->drm_format;
+		for (int i = 0; i < ahb->plane_count && i < 3; i++) {
+			attribs[n++] = plane_attribs[i][0];
+			attribs[n++] = ahb->fd;
+			attribs[n++] = plane_attribs[i][1];
+			attribs[n++] = ahb->offsets[i];
+			attribs[n++] = plane_attribs[i][2];
+			attribs[n++] = ahb->strides[i];
+			if (ahb->modifier != DRM_FORMAT_MOD_INVALID) {
+				attribs[n++] = plane_attribs[i][3];
+				attribs[n++] = (EGLAttrib)(ahb->modifier & 0xffffffff);
+				attribs[n++] = plane_attribs[i][4];
+				attribs[n++] = (EGLAttrib)(ahb->modifier >> 32);
+			}
+		}
+		target = EGL_LINUX_DMA_BUF_EXT;
+		buffer = NULL;
+		ctx = EGL_NO_CONTEXT;
+	}
+	for (; attrib_list && attrib_list[0] != EGL_NONE && n < 62; attrib_list += 2) {
+		if (native && attrib_list[0] != EGL_IMAGE_PRESERVED_KHR)
+			continue;
+		attribs[n++] = attrib_list[0];
+		attribs[n++] = attrib_list[1];
+	}
+	attribs[n] = EGL_NONE;
+	return eglCreateImage(dpy, ctx, target, buffer, attribs);
+}
+
+EGLImage bionic_eglCreateImageKHR(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list)
+{
+	EGLAttrib attribs[64];
+	int n = 0;
+	for (; attrib_list && attrib_list[0] != EGL_NONE && n < 62; attrib_list += 2) {
+		attribs[n++] = attrib_list[0];
+		attribs[n++] = attrib_list[1];
+	}
+	attribs[n] = EGL_NONE;
+	return bionic_eglCreateImage(dpy, ctx, target, buffer, attribs);
 }
 
 EGLBoolean bionic_eglDestroyImageKHR(EGLDisplay dpy, EGLImage image)

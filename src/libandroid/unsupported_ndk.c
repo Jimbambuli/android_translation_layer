@@ -1,7 +1,7 @@
 /*
  * NDK functions of features ATL does not have, answering like an Android device without them:
- * no DRM scheme (libmediandk NdkMediaCrypto), no gralloc buffers (AHardwareBuffer), no SurfaceFlinger
- * (ASurfaceControl). Firefox's libxul and YouTube's
+ * no DRM scheme (libmediandk NdkMediaCrypto), no SurfaceFlinger (ASurfaceControl), no parceling of
+ * AHardwareBuffers (hardware_buffer_aidl.h). Firefox's libxul and YouTube's
  * libgoogle3 link them and check the results.
  */
 
@@ -32,34 +32,7 @@ static void fatal(const char *msg)
 	if (!(name))         \
 		fatal("nullptr passed as " #name " argument");
 
-/* AHardwareBuffer: no allocator, so no buffer ever exists */
-int AHardwareBuffer_allocate(const void *desc, void **outBuffer)
-{
-	if (outBuffer)
-		*outBuffer = NULL;
-	return INVALID_OPERATION;
-}
-void AHardwareBuffer_release(void *buffer) {}
-void AHardwareBuffer_describe(const void *buffer, void *outDesc) {}
-int AHardwareBuffer_lock(void *buffer, uint64_t usage, int32_t fence, const void *rect, void **outVirtualAddress) { return BAD_VALUE; }
-int AHardwareBuffer_unlock(void *buffer, int32_t *fence) { return BAD_VALUE; }
-int AHardwareBuffer_sendHandleToUnixSocket(const void *buffer, int socketFd) { return BAD_VALUE; }
-int AHardwareBuffer_recvHandleFromUnixSocket(int socketFd, void **outBuffer) { return INVALID_OPERATION; }
-/* AOSP AHardwareBuffer.cpp: isSupported() asks the allocator; a trial allocation fails here */
-int AHardwareBuffer_isSupported(const void *desc) { return 0; }
-void AHardwareBuffer_acquire(void *buffer) {}
-int AHardwareBuffer_lockPlanes(void *buffer, uint64_t usage, int32_t fence, const void *rect, void *outPlanes) { return BAD_VALUE; }
-int AHardwareBuffer_lockAndGetInfo(void *buffer, uint64_t usage, int32_t fence, const void *rect, void **outVirtualAddress,
-                                   int32_t *outBytesPerPixel, int32_t *outBytesPerStride)
-{
-	if (outBytesPerPixel)
-		*outBytesPerPixel = -1;
-	if (outBytesPerStride)
-		*outBytesPerStride = -1;
-	return BAD_VALUE;
-}
-int AHardwareBuffer_getId(const void *buffer, uint64_t *outId) { return BAD_VALUE; }
-const void *AHardwareBuffer_getNativeHandle(const void *buffer) { return NULL; }
+/* AHardwareBuffer: hardware_buffer.c */
 /* hardware_buffer_aidl.h; AHardwareBuffer.cpp: writing needs a buffer. Reading imports the parceled handle
  * into gralloc (GraphicBuffer::unflatten()), which does not exist here */
 int AHardwareBuffer_readFromParcel(const void *parcel, void **outBuffer)

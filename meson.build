@@ -153,6 +153,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/choreographer.c',
                                           	'src/libandroid/configuration.c',
                                           	'src/libandroid/egl.c',
+                                          	'src/libandroid/hardware_buffer.c',
                                           	'src/libandroid/image_reader.c',
                                           	'src/libandroid/input.c',
                                           	'src/libandroid/looper.c',
