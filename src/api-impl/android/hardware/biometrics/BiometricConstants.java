@@ -1,6 +1,6 @@
 package android.hardware.biometrics;
 
-/** AOSP android.hardware.biometrics.BiometricConstants (android-14, hidden): the values BiometricPrompt exposes */
+/** AOSP android.hardware.biometrics.BiometricConstants (android-16, hidden): the values BiometricPrompt exposes */
 public interface BiometricConstants {
 	int BIOMETRIC_SUCCESS = 0;
 	int BIOMETRIC_ERROR_HW_UNAVAILABLE = 1;
@@ -21,6 +21,8 @@ public interface BiometricConstants {
 	int BIOMETRIC_ERROR_RE_ENROLL = 16;
 	int BIOMETRIC_ERROR_SENSOR_PRIVACY_ENABLED = 18;
 	int BIOMETRIC_ERROR_POWER_PRESSED = 19;
+	int BIOMETRIC_ERROR_IDENTITY_CHECK_NOT_ACTIVE = 20;
+	int BIOMETRIC_ERROR_NOT_ENABLED_FOR_APPS = 21;
 	int BIOMETRIC_PAUSED_REJECTED = 100;
 	int BIOMETRIC_ERROR_VENDOR_BASE = 1000;
 	int BIOMETRIC_ACQUIRED_GOOD = 0;
@@ -35,4 +37,5 @@ public interface BiometricConstants {
 	int BIOMETRIC_LOCKOUT_NONE = 0;
 	int BIOMETRIC_LOCKOUT_TIMED = 1;
 	int BIOMETRIC_LOCKOUT_PERMANENT = 2;
+	long BIOMETRIC_NO_AUTHENTICATION = -1;
 }

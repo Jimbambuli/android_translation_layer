@@ -667,6 +667,7 @@ srcs = [
 	'android/hardware/biometrics/BiometricManager.java',
 	'android/hardware/biometrics/BiometricPrompt.java',
 	'android/hardware/biometrics/CryptoObject.java',
+	'android/hardware/biometrics/FallbackOption.java',
 	'android/hardware/biometrics/PromptContentItem.java',
 	'android/hardware/biometrics/PromptContentItemBulletedText.java',
 	'android/hardware/biometrics/PromptContentItemParcelable.java',

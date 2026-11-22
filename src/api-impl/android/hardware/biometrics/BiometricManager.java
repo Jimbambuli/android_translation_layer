@@ -54,6 +54,32 @@ public class BiometricManager {
 	public static final int BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED = 15;
 
 	/**
+	 * Identity Check is currently not active.
+	 */
+	public static final int BIOMETRIC_ERROR_IDENTITY_CHECK_NOT_ACTIVE = BiometricConstants.BIOMETRIC_ERROR_IDENTITY_CHECK_NOT_ACTIVE;
+
+	/**
+	 * Biometrics is not allowed to verify the user in apps.
+	 */
+	public static final int BIOMETRIC_ERROR_NOT_ENABLED_FOR_APPS = BiometricConstants.BIOMETRIC_ERROR_NOT_ENABLED_FOR_APPS;
+
+	/**
+	 * Returned from {@link #getLastAuthenticationTime(int)} when no matching successful authentication has
+	 * been performed since boot.
+	 */
+	public static final long BIOMETRIC_NO_AUTHENTICATION = BiometricConstants.BIOMETRIC_NO_AUTHENTICATION;
+
+	private static final int GET_LAST_AUTH_TIME_ALLOWED_AUTHENTICATORS =
+		Authenticators.DEVICE_CREDENTIAL | Authenticators.BIOMETRIC_STRONG;
+
+	/* icon types of a BiometricPrompt fallback option (FallbackOption) */
+	public static final int ICON_TYPE_PASSWORD = 0;
+	public static final int ICON_TYPE_QR_CODE = 1;
+	public static final int ICON_TYPE_ACCOUNT = 2;
+	public static final int ICON_TYPE_GENERIC = 3;
+	public static final int ICON_TYPE_SETTING = 4;
+
+	/**
 	 * Types of authenticators, defined at a level of granularity supported by
 	 * {@link BiometricManager} and {@link BiometricPrompt}.
 	 */
@@ -61,6 +87,7 @@ public class BiometricManager {
 		int BIOMETRIC_STRONG = 0x000F;
 		int BIOMETRIC_WEAK = 0x00FF;
 		int DEVICE_CREDENTIAL = 1 << 15;
+		int IDENTITY_CHECK = 1 << 16;
 	}
 
 	/**
@@ -121,7 +148,7 @@ public class BiometricManager {
 	static boolean isValidAuthenticatorConfig(int authenticators) {
 		if (authenticators == 0)
 			return true;
-		if ((authenticators & ~(Authenticators.DEVICE_CREDENTIAL | Authenticators.BIOMETRIC_WEAK)) != 0)
+		if ((authenticators & ~(Authenticators.DEVICE_CREDENTIAL | Authenticators.BIOMETRIC_WEAK | Authenticators.IDENTITY_CHECK)) != 0)
 			return false;
 		final int biometricBits = authenticators & Authenticators.BIOMETRIC_WEAK;
 		return (biometricBits == 0 && (authenticators & Authenticators.DEVICE_CREDENTIAL) != 0)
@@ -138,6 +165,8 @@ public class BiometricManager {
 				return BIOMETRIC_ERROR_NONE_ENROLLED;
 			case BiometricConstants.BIOMETRIC_ERROR_HW_NOT_PRESENT:
 				return BIOMETRIC_ERROR_NO_HARDWARE;
+			case BiometricConstants.BIOMETRIC_ERROR_IDENTITY_CHECK_NOT_ACTIVE:
+				return BIOMETRIC_ERROR_IDENTITY_CHECK_NOT_ACTIVE;
 			case BiometricConstants.BIOMETRIC_ERROR_LOCKOUT:
 			case BiometricConstants.BIOMETRIC_ERROR_LOCKOUT_PERMANENT:
 				return BiometricConstants.BIOMETRIC_ERROR_LOCKOUT; // BiometricManager.BIOMETRIC_ERROR_LOCKOUT (@hide)
@@ -152,6 +181,9 @@ public class BiometricManager {
 	 * @hide
 	 */
 	static int preAuthenticateStatus(int authenticators) {
+		/* Identity Check needs a settings toggle and a trusted-places signal; ATL has neither, so it is never active */
+		if ((authenticators & Authenticators.IDENTITY_CHECK) != 0)
+			return BiometricConstants.BIOMETRIC_ERROR_IDENTITY_CHECK_NOT_ACTIVE;
 		final boolean biometricRequested = (authenticators & Authenticators.BIOMETRIC_WEAK) != 0;
 		final boolean credentialRequested = (authenticators & Authenticators.DEVICE_CREDENTIAL) != 0;
 		final boolean credentialAvailable = false; // TrustManager.isDeviceSecure(): ATL has no lock screen
@@ -183,6 +215,20 @@ public class BiometricManager {
 		if (credentialRequested)
 			return credentialAvailable ? BiometricConstants.BIOMETRIC_SUCCESS : BiometricConstants.BIOMETRIC_ERROR_NO_DEVICE_CREDENTIAL;
 		return BiometricConstants.BIOMETRIC_ERROR_HW_NOT_PRESENT; // "No authenticators requested"
+	}
+
+	/**
+	 * Gets the last time (SystemClock.elapsedRealtime()) the user successfully authenticated using one of the
+	 * given authenticators. AOSP returns BIOMETRIC_NO_AUTHENTICATION when the device has no secure lock screen,
+	 * whatever was authenticated before; ATL has no lock screen (see preAuthenticateStatus()).
+	 */
+	public long getLastAuthenticationTime(int authenticators) {
+		if (authenticators == 0
+		    || (GET_LAST_AUTH_TIME_ALLOWED_AUTHENTICATORS & authenticators) != authenticators) {
+			throw new IllegalArgumentException(
+				"Only BIOMETRIC_STRONG and DEVICE_CREDENTIAL authenticators may be used.");
+		}
+		return BIOMETRIC_NO_AUTHENTICATION;
 	}
 
 	/**

@@ -11,13 +11,16 @@ import android.text.TextUtils;
 import android.hardware.fingerprint.FingerprintManager;
 import com.android.server.biometrics.FprintdSensor;
 import java.security.Signature;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.Executor;
 import javax.crypto.Cipher;
 import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
 
 /**
- * AOSP android.hardware.biometrics.BiometricPrompt (android-14), public API.
+ * AOSP android.hardware.biometrics.BiometricPrompt (android-16), public API.
  *
  * AOSP hands the prompt to the AuthService (IAuthService.authenticate), which checks the sensors and the
  * device credential before it shows a dialog (the same check as BiometricManager.canAuthenticate()).
@@ -55,6 +58,7 @@ public class BiometricPrompt implements BiometricConstants {
 		android.graphics.Bitmap logoBitmap;
 		String logoDescription;
 		PromptContentView contentView;
+		final List<FallbackOption> fallbackOptions = new ArrayList<>();
 	}
 
 	/* AOSP BiometricPrompt.ButtonInfo */
@@ -69,11 +73,14 @@ public class BiometricPrompt implements BiometricConstants {
 	}
 
 	static final int MAX_LOGO_DESCRIPTION_CHARACTER_NUMBER = 30;
+	static final int MAX_FALLBACK_OPTIONS = 4;
 
 	public static class Builder {
 		private final PromptInfo mPromptInfo;
 		private final Context mContext;
 		private ButtonInfo mNegativeButtonInfo;
+		private final ButtonInfo[] mFallbackOptions = new ButtonInfo[MAX_FALLBACK_OPTIONS];
+		private int mFallbackOptionCount = 0;
 
 		public Builder(Context context) {
 			mPromptInfo = new PromptInfo();
@@ -168,6 +175,40 @@ public class BiometricPrompt implements BiometricConstants {
 			return this;
 		}
 
+		/* AOSP Builder.addFallbackOption() (android-16) */
+		@NonNull
+		public Builder addFallbackOption(@NonNull CharSequence text, int iconType, @NonNull Executor executor,
+		                                 @NonNull DialogInterface.OnClickListener listener) {
+			if (TextUtils.isEmpty(text)) {
+				throw new IllegalArgumentException("Text must be set and non-empty");
+			}
+			if (executor == null) {
+				throw new IllegalArgumentException("Executor must not be null");
+			}
+			if (listener == null) {
+				throw new IllegalArgumentException("Listener must not be null");
+			}
+			if (!isValidIconType(iconType)) {
+				throw new IllegalArgumentException("Invalid icon type");
+			}
+			if (mFallbackOptionCount >= getMaxFallbackOptions()) {
+				throw new IllegalArgumentException(
+					"Maximum fallback option count of " + MAX_FALLBACK_OPTIONS + " exceeded");
+			}
+			mPromptInfo.fallbackOptions.add(new FallbackOption(text, iconType));
+			mFallbackOptions[mFallbackOptionCount] = new ButtonInfo(executor, listener);
+			mFallbackOptionCount++;
+			return this;
+		}
+
+		private static boolean isValidIconType(int iconType) {
+			return iconType == BiometricManager.ICON_TYPE_PASSWORD
+			       || iconType == BiometricManager.ICON_TYPE_QR_CODE
+			       || iconType == BiometricManager.ICON_TYPE_ACCOUNT
+			       || iconType == BiometricManager.ICON_TYPE_GENERIC
+			       || iconType == BiometricManager.ICON_TYPE_SETTING;
+		}
+
 		@NonNull
 		public Builder setConfirmationRequired(boolean requireConfirmation) {
 			mPromptInfo.confirmationRequested = requireConfirmation;
@@ -193,34 +234,44 @@ public class BiometricPrompt implements BiometricConstants {
 			return this;
 		}
 
-		/* AOSP Builder.build(): title is required; a negative button only without device credential */
+		/* AOSP Builder.build() (android-16): only the title is required; without a negative button the prompt
+		 * shows the fallback options or "Cancel" */
 		@NonNull
 		public BiometricPrompt build() {
 			final CharSequence title = mPromptInfo.title;
 			final boolean useDefaultTitle = mPromptInfo.useDefaultTitle;
-			final CharSequence negative = mPromptInfo.negativeButtonText;
-			final boolean isCredentialAllowed = mPromptInfo.deviceCredentialAllowed
-			                                    || (mPromptInfo.authenticators & BiometricManager.Authenticators.DEVICE_CREDENTIAL) != 0;
 			if (TextUtils.isEmpty(title) && !useDefaultTitle) {
 				throw new IllegalArgumentException("Title must be set and non-empty");
-			} else if (TextUtils.isEmpty(negative) && !isCredentialAllowed) {
-				throw new IllegalArgumentException("Negative text must be set and non-empty");
-			} else if (!TextUtils.isEmpty(negative) && isCredentialAllowed) {
-				throw new IllegalArgumentException("Can't have both negative button behavior"
-				                                   + " and device credential enabled");
 			}
-			return new BiometricPrompt(mContext, mPromptInfo, mNegativeButtonInfo);
+			return new BiometricPrompt(mContext, mPromptInfo, mNegativeButtonInfo, mFallbackOptions);
 		}
 	}
 
 	private final Context mContext;
 	private final PromptInfo mPromptInfo;
 	private final ButtonInfo mNegativeButtonInfo;
+	private final ButtonInfo[] mFallbackOptions;
 
-	private BiometricPrompt(Context context, PromptInfo promptInfo, ButtonInfo negativeButtonInfo) {
+	private BiometricPrompt(Context context, PromptInfo promptInfo, ButtonInfo negativeButtonInfo,
+	                        ButtonInfo[] fallbackOptions) {
 		mContext = context;
 		mPromptInfo = promptInfo;
 		mNegativeButtonInfo = negativeButtonInfo;
+		mFallbackOptions = fallbackOptions;
+	}
+
+	public int getLogoRes() {
+		return mPromptInfo.logoRes;
+	}
+
+	@Nullable
+	public android.graphics.Bitmap getLogoBitmap() {
+		return mPromptInfo.logoBitmap;
+	}
+
+	@Nullable
+	public String getLogoDescription() {
+		return mPromptInfo.logoDescription;
 	}
 
 	@NonNull
@@ -247,8 +298,22 @@ public class BiometricPrompt implements BiometricConstants {
 	}
 
 	@Nullable
+	public PromptContentView getContentView() {
+		return mPromptInfo.contentView;
+	}
+
+	@Nullable
 	public CharSequence getNegativeButtonText() {
 		return mPromptInfo.negativeButtonText;
+	}
+
+	@NonNull
+	public List<FallbackOption> getFallbackOptions() {
+		return Collections.unmodifiableList(mPromptInfo.fallbackOptions);
+	}
+
+	public static int getMaxFallbackOptions() {
+		return MAX_FALLBACK_OPTIONS;
 	}
 
 	public boolean isConfirmationRequired() {
@@ -489,8 +554,41 @@ public class BiometricPrompt implements BiometricConstants {
 							});
 					}
 				});
+			} else if (mFallbackOptions[0] != null) {
+				/* the fallback options are shown only without a negative button: a single one as the negative
+				 * button, several behind it in a list (SystemUI's fallback options page) */
+				final boolean single = mFallbackOptions[1] == null;
+				mDialog.setButton(DialogInterface.BUTTON_NEGATIVE,
+				                  single ? mPromptInfo.fallbackOptions.get(0).getText()
+				                         : mContext.getString(com.android.internal.R.string.more_item_label),
+				                  new DialogInterface.OnClickListener() {
+					@Override
+					public void onClick(DialogInterface dialog, int which) {
+						if (single) {
+							onFallbackOption(0);
+							return;
+						}
+						final CharSequence[] texts = new CharSequence[mPromptInfo.fallbackOptions.size()];
+						for (int i = 0; i < texts.length; i++)
+							texts[i] = mPromptInfo.fallbackOptions.get(i).getText();
+						new android.app.AlertDialog.Builder(mContext)
+							.setItems(texts, new DialogInterface.OnClickListener() {
+								@Override
+								public void onClick(DialogInterface list, int index) {
+									onFallbackOption(index);
+								}
+							})
+							.setOnCancelListener(new DialogInterface.OnCancelListener() {
+								@Override
+								public void onCancel(DialogInterface list) {
+									onUserCancel();
+								}
+							})
+							.show();
+					}
+				});
 			} else {
-				/* device credential allowed but not set up: the dialog can only be canceled */
+				/* no negative button and no fallback option ("Cancel"; device credential is never set up) */
 				mDialog.setButton(DialogInterface.BUTTON_NEGATIVE, mContext.getString(android.R.string.cancel), new DialogInterface.OnClickListener() {
 					@Override
 					public void onClick(DialogInterface dialog, int which) {
@@ -524,6 +622,17 @@ public class BiometricPrompt implements BiometricConstants {
 			mSensor.stop();
 			mDialog.dismiss();
 			return true;
+		}
+
+		/* DISMISSED_REASON_FALLBACK_OPTION_BASE + index: the option's listener, no callback */
+		private void onFallbackOption(final int index) {
+			if (end())
+				mFallbackOptions[index].executor.execute(new Runnable() {
+					@Override
+					public void run() {
+						mFallbackOptions[index].listener.onClick(null, DialogInterface.BUTTON_NEGATIVE);
+					}
+				});
 		}
 
 		private void onUserCancel() {
