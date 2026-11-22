@@ -377,6 +377,15 @@ int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_
 	return 0; // success
 }
 
+/* AOSP ANativeWindow.cpp: -EINVAL without a window. The data space is a hint for the composer; ATL
+ * composes with GTK and has nothing to pass it to. */
+int32_t ANativeWindow_setBuffersDataSpace(ANativeWindow *window, int32_t dataSpace)
+{
+	if (!window)
+		return -EINVAL;
+	return 0;
+}
+
 /**
  * Set a transform that will be applied to future buffers posted to the window.
  *

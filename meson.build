@@ -132,6 +132,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/looper.c',
                                           	'src/libandroid/media.c',
                                           	'src/libandroid/native_window.c',
+                                          	'src/libandroid/net.c',
                                           	'src/libandroid/sensor.c',
                                           	'src/libandroid/sharedmem.c',
                                           	'src/libandroid/system_fonts.c',
