@@ -36,7 +36,9 @@ import java.text.BreakIterator;
  * (the handles move by character). */
 final class ParagraphTextSelection {
 	// Editor.ACTION_MODE_MENU_ITEM_ORDER_*
+	private static final int ACTION_MODE_MENU_ITEM_ORDER_CUT = 4;
 	private static final int ACTION_MODE_MENU_ITEM_ORDER_COPY = 5;
+	private static final int ACTION_MODE_MENU_ITEM_ORDER_PASTE = 6;
 	private static final int ACTION_MODE_MENU_ITEM_ORDER_SHARE = 7;
 	private static final int ACTION_MODE_MENU_ITEM_ORDER_SELECT_ALL = 8;
 
@@ -155,6 +157,25 @@ final class ParagraphTextSelection {
 		return handled;
 	}
 
+	/* Editor.performLongClick() and the up that ends the press (startSelectionActionMode()) for an EditText: the
+	 * GtkText has put the cursor at the touch on the press, which is the touch offset */
+	boolean performLongClickAtCursor() {
+		mMinTouchOffset = mTextView.getSelectionStart();
+		mMaxTouchOffset = mTextView.getSelectionEnd();
+		if (!performLongClick(false))
+			return false;
+		mDragAcceleratorActive = false; // no drag: the GtkText gets the moves of the touch
+		startSelectionActionMode();
+		return true;
+	}
+
+	/* the GtkText moved the cursor (a tap) or changed the text: Editor.onTouchUpEvent() and sendOnTextChanged()
+	 * stop the text action mode */
+	void onEditTextSelectionChanged() {
+		if (mTextActionMode != null && !mTextView.hasSelection())
+			stopTextActionMode();
+	}
+
 	/* Editor.onTouchUpEvent(): a tap ends the selection; the cursor of a selectable text is the collapsed
 	 * selection, which is not drawn */
 	void onTouchUpEvent(MotionEvent event) {
@@ -211,7 +232,7 @@ final class ParagraphTextSelection {
 
 	/* Editor.checkField() */
 	private boolean checkField() {
-		if (!mTextView.isTextSelectable() || !mTextView.requestFocus()) {
+		if (!mTextView.canSelectText() || !mTextView.requestFocus()) {
 			android.util.Log.w("TextView", "TextView does not support text selection. Selection cancelled.");
 			return false;
 		}
@@ -335,6 +356,10 @@ final class ParagraphTextSelection {
 	}
 
 	private void setSelection(int start, int end) {
+		if (mTextView instanceof EditText) { // the GtkText holds the selection
+			mTextView.setSelection(start, end);
+			return;
+		}
 		Selection.setSelection(text(), start, end);
 		mTextView.onSelectionChanged(start, end);
 		mTextView.invalidate();
@@ -382,6 +407,9 @@ final class ParagraphTextSelection {
 
 	/* SelectionModifierCursorController.show()/initHandles() */
 	private void showHandles() {
+		// the GtkText of an EditText has no Layout to place the handles at; its selection is moved by its own drag
+		if (mTextView instanceof EditText)
+			return;
 		if (mStartHandle == null) {
 			mStartHandle = new SelectionHandleView(mTextView.getTextSelectHandleLeft(), true);
 			mEndHandle = new SelectionHandleView(mTextView.getTextSelectHandleRight(), false);
@@ -429,10 +457,24 @@ final class ParagraphTextSelection {
 		}
 
 		private void populateMenuWithItems(Menu menu) {
+			if (mTextView.canCut()) {
+				menu.add(Menu.NONE, android.R.id.cut, ACTION_MODE_MENU_ITEM_ORDER_CUT,
+				    com.android.internal.R.string.cut)
+				    .setAlphabeticShortcut('x')
+				    .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+			}
+
 			if (mTextView.canCopy()) {
 				menu.add(Menu.NONE, android.R.id.copy, ACTION_MODE_MENU_ITEM_ORDER_COPY,
 				    com.android.internal.R.string.copy)
 				    .setAlphabeticShortcut('c')
+				    .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+			}
+
+			if (mTextView.canPaste()) {
+				menu.add(Menu.NONE, android.R.id.paste, ACTION_MODE_MENU_ITEM_ORDER_PASTE,
+				    com.android.internal.R.string.paste)
+				    .setAlphabeticShortcut('v')
 				    .setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
 			}
 
@@ -496,7 +538,8 @@ final class ParagraphTextSelection {
 
 		@Override
 		public void onGetContentRect(ActionMode mode, View view, Rect outRect) {
-			if (!view.equals(mTextView) || mTextView.getLayout() == null) {
+			// an EditText's text is laid out by its GtkText, which has no Layout: the rect of the view
+			if (!view.equals(mTextView) || mTextView.getLayout() == null || mTextView instanceof EditText) {
 				super.onGetContentRect(mode, view, outRect);
 				return;
 			}

@@ -2223,6 +2223,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 	/* AOSP: whether the view took the focus; ATL: whether GTK gave it to the view's widget */
 	public boolean requestFocus(int direction, Rect previouslyFocusedRect) {
+		/* AOSP handleFocusGainInternal(): a focused view stays as it is (GTK would grab the focus again, and a
+		 * GtkText then selects all of its text) */
+		if (isFocused())
+			return true;
 		if (isEnabled() && isFocusable() && visibility == VISIBLE) {
 			return nativeRequestFocus(widget, direction);
 		}
