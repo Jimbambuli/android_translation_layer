@@ -842,11 +842,14 @@ public class Layout {
 		return native_get_line_for_offset(layout, offset);
 	}
 
+	/* AOSP: line may be getLineCount(), then it is the bottom of the last line (getLineBounds() asks for line + 1) */
 	public int getLineTop(int line) {
-		if (line < 0 || line >= getLineCount())
+		if (line < 0 || line > getLineCount())
 			throw new ArrayIndexOutOfBoundsException();
 		if (paras != null)
 			return lineTops[line];
+		if (line == getLineCount())
+			return line > 0 ? native_get_line_bottom(layout, line - 1) : 0;
 		return native_get_line_top(layout, line);
 	}
 
