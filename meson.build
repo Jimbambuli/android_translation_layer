@@ -123,7 +123,6 @@ shared_includes_dir = include_directories('src/api-impl-jni/')
 
 # libandroid
 libandroid_so = shared_library('android', [
-                                          	'src/libandroid/aaudio.c',
                                           	'src/libandroid/asset_manager.c',
                                           	'src/libandroid/bitmap.c',
                                           	'src/libandroid/configuration.c',
@@ -153,8 +152,20 @@ libandroid_so = shared_library('android', [
                                           ],
                                           link_args : [
                                           	'-Wl,-z,lazy',  # outdated Nvidia driver version 340 lacks EGL symbols
-                                          	'-lasound',
                                           ])
+
+# libaaudio: a library of its own like on Android, so that apps which dlopen("libaaudio.so") (Oboe, SDL) find it
+libaaudio_so = shared_library('aaudio', [
+                                        	'src/libaaudio/aaudio.c',
+                                        ],
+                                        install: true,
+                                        soversion: 0,
+                                        dependencies: [dependency('glib-2.0')],
+                                        link_args: ['-lasound'])
+
+# the bionic linker maps the Android library name to ours (see bionic_translation's cfg.d)
+install_data('src/libaaudio/android_translation_layer.cfg',
+             install_dir: get_option('datadir') / 'bionic_translation/cfg.d')
 
 wayland_protos_dep = dependency('wayland-protocols', version: '>=1.12')
 
