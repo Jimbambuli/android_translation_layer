@@ -99,6 +99,72 @@ static int tile_segments(int mode, float size, float a0, float a1, struct tile_s
 	return count;
 }
 
+/* the source coordinate of v along an axis of the given size: REPEAT wraps, MIRROR wraps with every
+ * second copy mirrored, the other modes stay inside the bitmap */
+static int32_t tile_source(int32_t mode, int32_t size, int64_t v)
+{
+	if (mode == TILE_REPEAT)
+		return ((v % size) + size) % size;
+	if (mode == TILE_MIRROR) {
+		int64_t m = ((v % (2 * size)) + 2 * size) % (2 * size);
+		return m < size ? m : 2 * size - 1 - m;
+	}
+	return v;
+}
+
+struct tiled_texture {
+	int32_t tile_x, tile_y;
+	int64_t x0, y0;
+	int32_t w, h;
+	GdkTexture *texture;
+};
+
+static void tiled_texture_free(struct tiled_texture *tiled)
+{
+	g_object_unref(tiled->texture);
+	g_free(tiled);
+}
+
+/* the bitmap repeated along each REPEAT/MIRROR axis over [x0, x0 + w) x [y0, y0 + h), as one texture; the
+ * other axes keep the bitmap's size. Kept on the bitmap's texture for the next frame. NULL if too large */
+static struct tiled_texture *get_tiled_texture(GdkTexture *texture, int32_t tile_x, int32_t tile_y, int64_t x0, int64_t y0, int32_t w, int32_t h)
+{
+	static GQuark quark;
+	if (!quark)
+		quark = g_quark_from_static_string("atl-tiled-texture");
+	struct tiled_texture *tiled = g_object_get_qdata(G_OBJECT(texture), quark);
+	if (tiled && tiled->tile_x == tile_x && tiled->tile_y == tile_y && tiled->x0 == x0 && tiled->y0 == y0 && tiled->w == w && tiled->h == h)
+		return tiled;
+	int32_t width = gdk_texture_get_width(texture);
+	int32_t height = gdk_texture_get_height(texture);
+	/* an ALPHA_8 bitmap stays a mask (the color filter colors it), all others become 8 bit RGBA */
+	GdkMemoryFormat format = gdk_texture_get_format(texture) == GDK_MEMORY_A8 ? GDK_MEMORY_A8 : GDK_MEMORY_R8G8B8A8_PREMULTIPLIED;
+	gsize bpp = format == GDK_MEMORY_A8 ? 1 : 4;
+	gsize stride = width * bpp;
+	if ((gsize)w * h * bpp > 64 * 1024 * 1024)
+		return NULL;
+	guchar *src = g_malloc(stride * height);
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
+	gdk_texture_downloader_set_format(downloader, format);
+	gdk_texture_downloader_download_into(downloader, src, stride);
+	gdk_texture_downloader_free(downloader);
+	guchar *dst = g_malloc((gsize)w * h * bpp);
+	for (int32_t y = 0; y < h; y++) {
+		const guchar *src_row = src + tile_source(tile_y, height, y0 + y) * stride;
+		guchar *dst_row = dst + (gsize)y * w * bpp;
+		for (int32_t x = 0; x < w; x++)
+			memcpy(dst_row + x * bpp, src_row + tile_source(tile_x, width, x0 + x) * bpp, bpp);
+	}
+	g_free(src);
+	GBytes *tiled_bytes = g_bytes_new_take(dst, (gsize)w * h * bpp);
+	tiled = g_new(struct tiled_texture, 1);
+	*tiled = (struct tiled_texture){tile_x, tile_y, x0, y0, w, h,
+	                                gdk_memory_texture_new(w, h, format, tiled_bytes, w * bpp)};
+	g_bytes_unref(tiled_bytes);
+	g_object_set_qdata_full(G_OBJECT(texture), quark, tiled, (GDestroyNotify)tiled_texture_free);
+	return tiled;
+}
+
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1fillBitmapShader(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jlong texture_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jint tile_x, jint tile_y, jlong paint_ptr)
 {
 	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);
@@ -109,6 +175,27 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1fillBitmapShader(JNIEn
 	struct tile_segment xs[3], ys[3];
 	int nx = tile_segments(tile_x, width, left, right, xs);
 	int ny = tile_segments(tile_y, height, top, bottom, ys);
+	/* Skia samples the shader per device pixel. GSK draws a repeat node whose visible part holds no whole
+	 * tile in bands, one per row or column of tiles, each with antialiased edges
+	 * (gsk_gpu_node_processor_add_repeat_node()); where a band ends inside a pixel (a tile scaled to a
+	 * fractional size) the two bands leave a lighter line. So the repeating axes are tiled into one texture
+	 * that covers the whole area, and GSK draws it in one piece */
+	gboolean repeat_x = tile_x == TILE_REPEAT || tile_x == TILE_MIRROR;
+	gboolean repeat_y = tile_y == TILE_REPEAT || tile_y == TILE_MIRROR;
+	struct tiled_texture *tiled = NULL;
+	if (repeat_x || repeat_y) {
+		/* one pixel more on each side, so that the filtering at the edges of the area sees the next tile */
+		int64_t x0 = repeat_x ? (int64_t)floorf(left) - 1 : 0, y0 = repeat_y ? (int64_t)floorf(top) - 1 : 0;
+		int64_t x1 = repeat_x ? (int64_t)ceilf(right) + 1 : (int64_t)width, y1 = repeat_y ? (int64_t)ceilf(bottom) + 1 : (int64_t)height;
+		if (x1 - x0 <= G_MAXINT && y1 - y0 <= G_MAXINT)
+			tiled = get_tiled_texture(texture, tile_x, tile_y, x0, y0, x1 - x0, y1 - y0);
+		if (tiled) {
+			for (int32_t i = 0; i < nx && repeat_x; i++)
+				xs[i].child_start = x0, xs[i].child_len = x1 - x0;
+			for (int32_t j = 0; j < ny && repeat_y; j++)
+				ys[j].child_start = y0, ys[j].child_len = y1 - y0;
+		}
+	}
 	if (paint->use_color_filter)
 		gtk_snapshot_push_color_matrix(snapshot, &paint->color_matrix, &paint->color_offset);
 	push_paint_alpha(snapshot, paint);
@@ -116,6 +203,11 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1fillBitmapShader(JNIEn
 		for (int i = 0; i < nx; i++) {
 			gtk_snapshot_push_repeat(snapshot, &GRAPHENE_RECT_INIT(xs[i].start, ys[j].start, xs[i].end - xs[i].start, ys[j].end - ys[j].start),
 			                         &GRAPHENE_RECT_INIT(xs[i].child_start, ys[j].child_start, xs[i].child_len, ys[j].child_len));
+			if (tiled) {
+				gtk_snapshot_append_texture(snapshot, tiled->texture, &GRAPHENE_RECT_INIT(tiled->x0, tiled->y0, tiled->w, tiled->h));
+				gtk_snapshot_pop(snapshot);
+				continue;
+			}
 			/* the bitmap, for MIRROR followed by its mirror image right of and below it */
 			for (int my = 0; my <= (tile_y == TILE_MIRROR); my++) {
 				for (int mx = 0; mx <= (tile_x == TILE_MIRROR); mx++) {
