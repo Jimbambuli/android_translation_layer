@@ -1935,6 +1935,14 @@ public class KeyEvent extends InputEvent implements Parcelable {
 	public static final int FLAG_TAINTED = 0x80000000;
 
 	/**
+	 * This flag indicates that this event was injected by an accessibility service.
+	 * Value = 0x800 (IInputConstants.INPUT_EVENT_FLAG_IS_ACCESSIBILITY_EVENT)
+	 *
+	 * @hide
+	 */
+	public static final int FLAG_IS_ACCESSIBILITY_EVENT = 0x800;
+
+	/**
 	 * Returns the maximum keycode.
 	 */
 	public static int getMaxKeyCode() {

@@ -3,6 +3,7 @@ package android.view;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.hardware.SensorManager;
 import android.hardware.input.HostUsiVersion;
 import android.hardware.input.InputDeviceIdentifier;
 import android.hardware.input.InputManagerGlobal;
@@ -48,6 +49,7 @@ public final class InputDevice implements Parcelable {
     private Vibrator mVibrator; // guarded by mMotionRanges during initialization
     private VibratorManager mVibratorManager; // guarded by mMotionRanges during initialization
     private LightsManager mLightsManager; // guarded by mMotionRanges during initialization
+    private SensorManager mSensorManager; // guarded by mMotionRanges during initialization
     public static final int SOURCE_CLASS_MASK = 0x000000ff;
     public static final int SOURCE_CLASS_NONE = 0x00000000;
     public static final int SOURCE_CLASS_BUTTON = 0x00000001;
@@ -538,6 +540,17 @@ public final class InputDevice implements Parcelable {
             }
         }
         return mLightsManager;
+    }
+
+    /* AOSP getSensorManager(): the sensors of the device (InputManagerGlobal), never null */
+    @NonNull
+    public SensorManager getSensorManager() {
+        synchronized (mMotionRanges) {
+            if (mSensorManager == null) {
+                mSensorManager = InputManagerGlobal.getInstance().getInputDeviceSensorManager(mId);
+            }
+        }
+        return mSensorManager;
     }
 
     public VibratorManager getVibratorManager() {

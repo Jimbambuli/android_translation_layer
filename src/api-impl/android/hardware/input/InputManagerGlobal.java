@@ -1,6 +1,8 @@
 package android.hardware.input;
 
 import android.hardware.BatteryState;
+import android.hardware.Sensor;
+import android.hardware.SensorManager;
 import android.hardware.input.InputManager.InputDeviceListener;
 import android.hardware.lights.Light;
 import android.hardware.lights.LightState;
@@ -136,6 +138,37 @@ public final class InputManagerGlobal {
 	 * device without any on Android) and a request has nothing to set */
 	public LightsManager getInputDeviceLightsManager(int deviceId) {
 		return new InputDeviceLightsManager(deviceId);
+	}
+
+	/* AOSP getHostUsiVersion(Display): the first valid USI version of an input device of the display, else the one
+	 * of the display's device config (getHostUsiVersionFromDisplayConfig()); ATL's displays have no display device
+	 * config, so null as for a display without one */
+	HostUsiVersion getHostUsiVersion(android.view.Display display) {
+		Objects.requireNonNull(display, "display should not be null");
+		for (int id : getInputDeviceIds()) {
+			final InputDevice device = getInputDevice(id);
+			if (device != null && device.getAssociatedDisplayId() == display.getDisplayId()) {
+				if (device.getHostUsiVersion() != null)
+					return device.getHostUsiVersion();
+			}
+		}
+		return null;
+	}
+
+	/* AOSP getInputDeviceSensorManager(): one InputDeviceSensorManager for the process, a SensorManager per call */
+	private InputDeviceSensorManager mInputDeviceSensorManager;
+
+	public SensorManager getInputDeviceSensorManager(int deviceId) {
+		synchronized (mInputDeviceListeners) {
+			if (mInputDeviceSensorManager == null)
+				mInputDeviceSensorManager = new InputDeviceSensorManager(this);
+			return mInputDeviceSensorManager.getSensorManager(deviceId);
+		}
+	}
+
+	/* IMS getSensorList(): InputReader reads no motion sensors of the game controllers, so a device has none */
+	List<Sensor> getSensorList(int deviceId) {
+		return new ArrayList<>();
 	}
 
 	List<Light> getLights(int deviceId) {

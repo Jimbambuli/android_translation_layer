@@ -236,7 +236,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<InputManager>() {
             @Override
             public InputManager createService(ContextImpl ctx) {
-                return new InputManager();
+                return new InputManager(ctx);
             }});
 
         registerService(Context.LOCATION_SERVICE, LocationManager.class,
