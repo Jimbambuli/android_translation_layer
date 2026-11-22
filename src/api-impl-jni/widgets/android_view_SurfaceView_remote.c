@@ -97,7 +97,8 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 	g_atomic_ref_count_inc(&consumer->ref);
 	if (buffer->desc.fourcc) {
 		GdkDmabufTextureBuilder *builder = gdk_dmabuf_texture_builder_new();
-		gdk_dmabuf_texture_builder_set_display(builder, gtk_widget_get_display(GTK_WIDGET(consumer->widget)));
+		/* a SurfaceTexture has no widget: its frames are shown on the default display */
+		gdk_dmabuf_texture_builder_set_display(builder, consumer->widget ? gtk_widget_get_display(GTK_WIDGET(consumer->widget)) : gdk_display_get_default());
 		gdk_dmabuf_texture_builder_set_width(builder, buffer->desc.width);
 		gdk_dmabuf_texture_builder_set_height(builder, buffer->desc.height);
 		gdk_dmabuf_texture_builder_set_fourcc(builder, buffer->desc.fourcc);
