@@ -81,11 +81,27 @@ JNIEXPORT void JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_n
 
 /*
  * Class:     android_hardware_camera2_impl_ExternalCameraDevice
+ * Method:    nativeSetDisplayTransform
+ * Signature: (JIZ)V
+ */
+JNIEXPORT void JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeSetDisplayTransform
+  (JNIEnv *, jclass, jlong, jint, jboolean);
+
+/*
+ * Class:     android_hardware_camera2_impl_ExternalCameraDevice
  * Method:    nativeCopyFrame
- * Signature: (J[BI)Z
+ * Signature: (J[BIII)Z
  */
 JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeCopyFrame
-  (JNIEnv *, jclass, jlong, jbyteArray, jint);
+  (JNIEnv *, jclass, jlong, jbyteArray, jint, jint, jint);
+
+/*
+ * Class:     android_hardware_camera2_impl_ExternalCameraDevice
+ * Method:    nativeEncodeJpeg
+ * Signature: (JIII)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeEncodeJpeg
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
 
 #ifdef __cplusplus
 }

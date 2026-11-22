@@ -571,10 +571,25 @@ public final class ExternalCameraDevice {
 			nativeClose(handle);
 	}
 
-	/** during FrameListener.onFrame(): the frame as ImageFormat.NV21 or YV12 in dst; false if it does not fit */
-	public boolean copyFrame(byte[] dst, int imageFormat) {
+	/** during FrameListener.onFrame(): the frame scaled to width x height as ImageFormat.NV21 or YV12 (the layouts
+	 * of Camera's preview callbacks) or YUV_420_888 (I420, packed) in dst; false if it does not fit */
+	public boolean copyFrame(byte[] dst, int imageFormat, int width, int height) {
 		long handle = mHandle;
-		return handle != 0 && nativeCopyFrame(handle, dst, imageFormat);
+		return handle != 0 && nativeCopyFrame(handle, dst, imageFormat, width, height);
+	}
+
+	/** during FrameListener.onFrame(): the frame scaled to width x height as a JPEG (the HAL's BLOB output; AOSP's
+	 * external HAL encodes it from the frame as well); null if it cannot be encoded */
+	public byte[] encodeJpeg(int width, int height, int quality) {
+		long handle = mHandle;
+		return handle != 0 ? nativeEncodeJpeg(handle, width, height, quality) : null;
+	}
+
+	/** the display transform of the stream's Surfaces: horizontal flip first, then turned clockwise */
+	public void setDisplayTransform(FrameListener client, int rotation, boolean flipH) {
+		long handle = handleOf(client);
+		if (handle != 0)
+			nativeSetDisplayTransform(handle, rotation, flipH);
 	}
 
 	/* called by the native stream thread */
@@ -599,5 +614,7 @@ public final class ExternalCameraDevice {
 	private static native void nativeSetTargets(long handle, Surface[] targets);
 	private static native void nativeStop(long handle);
 	private static native void nativeClose(long handle);
-	private static native boolean nativeCopyFrame(long handle, byte[] dst, int format);
+	private static native void nativeSetDisplayTransform(long handle, int rotation, boolean flipH);
+	private static native boolean nativeCopyFrame(long handle, byte[] dst, int format, int width, int height);
+	private static native byte[] nativeEncodeJpeg(long handle, int width, int height, int quality);
 }

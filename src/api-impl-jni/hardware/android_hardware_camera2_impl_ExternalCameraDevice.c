@@ -27,11 +27,13 @@
 #include "../defines.h"
 #include "../util.h"
 #include "../graphics/surface_target.h"
+#include "../media/video_rotate.h"
 #include "../generated_headers/android_hardware_camera2_impl_ExternalCameraDevice.h"
 
 /* android.graphics.ImageFormat */
 #define IMAGE_FORMAT_NV21 0x11
 #define IMAGE_FORMAT_YV12 0x32315659
+#define IMAGE_FORMAT_YUV_420_888 0x23
 
 struct camera_mode {
 	uint32_t subtype; /* SPA_MEDIA_SUBTYPE_raw or SPA_MEDIA_SUBTYPE_mjpg */
@@ -66,10 +68,13 @@ struct camera_stream {
 	AVPacket *packet;
 	struct SwsContext *sws_rgb;
 	struct SwsContext *sws_cpu;
+	struct SwsContext *sws_jpeg;
 	struct surface_target *targets;
 	int n_targets;
 	AVFrame *current; /* the frame during onFrame() */
 	gboolean failed;
+	int rotation;      /* the display transform of the targets: horizontal flip first, then turned clockwise */
+	gboolean flip_h;
 };
 
 static struct pw_thread_loop *loop;
@@ -510,8 +515,31 @@ static void on_stream_process(void *data)
 			                                  frame->width, frame->height, AV_PIX_FMT_RGB24, SWS_BILINEAR, NULL, NULL, NULL);
 			guchar *rgb = g_malloc(frame->height * stride);
 			sws_scale(s->sws_rgb, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
-			GBytes *bytes = g_bytes_new_take(rgb, frame->height * stride);
-			GdkTexture *texture = gdk_memory_texture_new(frame->width, frame->height, GDK_MEMORY_R8G8B8, bytes, stride);
+			int width = frame->width, height = frame->height;
+			if (s->flip_h) {
+				for (int y = 0; y < height; y++) {
+					guchar *row = rgb + y * stride;
+					for (int l = 0, r = width - 1; l < r; l++, r--)
+						for (int c = 0; c < 3; c++) {
+							guchar t = row[l * 3 + c];
+							row[l * 3 + c] = row[r * 3 + c];
+							row[r * 3 + c] = t;
+						}
+				}
+			}
+			if (s->rotation) {
+				guchar *turned = g_malloc(height * stride);
+				rotate_plane(turned, rgb, stride, width, height, 3, s->rotation);
+				g_free(rgb);
+				rgb = turned;
+				if (s->rotation != 180) {
+					width = frame->height;
+					height = frame->width;
+					stride = width * 3;
+				}
+			}
+			GBytes *bytes = g_bytes_new_take(rgb, height * stride);
+			GdkTexture *texture = gdk_memory_texture_new(width, height, GDK_MEMORY_R8G8B8, bytes, stride);
 			g_bytes_unref(bytes);
 			for (int i = 0; i < s->n_targets; i++) {
 				struct deliver_data *d = g_new(struct deliver_data, 1);
@@ -650,20 +678,31 @@ JNIEXPORT void JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_n
 	Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeStop(env, klass, handle);
 	sws_freeContext(s->sws_rgb);
 	sws_freeContext(s->sws_cpu);
+	sws_freeContext(s->sws_jpeg);
 	g_free(s->targets);
 	(*env)->DeleteGlobalRef(env, s->java);
 	g_free(s);
 }
 
-/* during onFrame(): the frame in the layout of an android.hardware.Camera preview callback (NV21, or YV12 with
- * its 16-byte aligned strides) */
-JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeCopyFrame(JNIEnv *env, jclass klass, jlong handle, jbyteArray dst, jint format)
+/* the display transform of the stream's Surfaces (AOSP's preview transform of API 1: HAL_TRANSFORM_FLIP_H, then
+ * turned clockwise by 0/90/180/270 degrees) */
+JNIEXPORT void JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeSetDisplayTransform(JNIEnv *env, jclass klass, jlong handle, jint rotation, jboolean flip_h)
+{
+	struct camera_stream *s = _PTR(handle);
+	pw_thread_loop_lock(loop);
+	s->rotation = rotation;
+	s->flip_h = flip_h;
+	pw_thread_loop_unlock(loop);
+}
+
+/* during onFrame(): the frame scaled to width x height in the layout of an android.hardware.Camera preview callback
+ * (NV21, or YV12 with its 16-byte aligned strides) or of an ImageReader's YUV_420_888 image (I420, packed) */
+JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeCopyFrame(JNIEnv *env, jclass klass, jlong handle, jbyteArray dst, jint format, jint w, jint h)
 {
 	struct camera_stream *s = _PTR(handle);
 	AVFrame *frame = s->current;
-	if (!frame || !dst)
+	if (!frame || !dst || w <= 0 || h <= 0)
 		return JNI_FALSE;
-	int w = frame->width, h = frame->height;
 	int y_stride = w, uv_stride = w;
 	size_t size = (size_t)w * h * 3 / 2;
 	enum AVPixelFormat dst_fmt = AV_PIX_FMT_NV21;
@@ -672,12 +711,16 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevi
 		uv_stride = (y_stride / 2 + 15) & ~15;
 		size = (size_t)y_stride * h + (size_t)uv_stride * (h / 2) * 2;
 		dst_fmt = AV_PIX_FMT_YUV420P;
+	} else if (format == IMAGE_FORMAT_YUV_420_888) {
+		uv_stride = w / 2;
+		size = (size_t)w * h + (size_t)uv_stride * (h / 2) * 2;
+		dst_fmt = AV_PIX_FMT_YUV420P;
 	} else if (format != IMAGE_FORMAT_NV21) {
 		return JNI_FALSE;
 	}
 	if ((size_t)(*env)->GetArrayLength(env, dst) < size)
 		return JNI_FALSE;
-	s->sws_cpu = sws_getCachedContext(s->sws_cpu, w, h, frame->format, w, h, dst_fmt, SWS_BILINEAR, NULL, NULL, NULL);
+	s->sws_cpu = sws_getCachedContext(s->sws_cpu, frame->width, frame->height, frame->format, w, h, dst_fmt, SWS_BILINEAR, NULL, NULL, NULL);
 	uint8_t *out = (*env)->GetPrimitiveArrayCritical(env, dst, NULL);
 	uint8_t *planes[3];
 	int strides[3];
@@ -688,12 +731,47 @@ JNIEXPORT jboolean JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevi
 		strides[1] = w;
 		planes[2] = NULL;
 		strides[2] = 0;
-	} else { /* YV12: Y, then Cr (V), then Cb (U) */
+	} else if (format == IMAGE_FORMAT_YV12) { /* Y, then Cr (V), then Cb (U) */
 		planes[2] = out + (size_t)y_stride * h;
 		planes[1] = planes[2] + (size_t)uv_stride * (h / 2);
 		strides[1] = strides[2] = uv_stride;
+	} else { /* I420: Y, then Cb (U), then Cr (V) */
+		planes[1] = out + (size_t)y_stride * h;
+		planes[2] = planes[1] + (size_t)uv_stride * (h / 2);
+		strides[1] = strides[2] = uv_stride;
 	}
-	sws_scale(s->sws_cpu, (const uint8_t *const *)frame->data, frame->linesize, 0, h, planes, strides);
+	sws_scale(s->sws_cpu, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, planes, strides);
 	(*env)->ReleasePrimitiveArrayCritical(env, dst, out, 0);
 	return JNI_TRUE;
+}
+
+/* during onFrame(): the frame scaled to width x height as a JPEG of that quality (gdk-pixbuf, as Bitmap.compress());
+ * null if it cannot be encoded */
+JNIEXPORT jbyteArray JNICALL Java_android_hardware_camera2_impl_ExternalCameraDevice_nativeEncodeJpeg(JNIEnv *env, jclass klass, jlong handle, jint w, jint h, jint quality)
+{
+	struct camera_stream *s = _PTR(handle);
+	AVFrame *frame = s->current;
+	if (!frame || w <= 0 || h <= 0)
+		return NULL;
+	int stride = w * 3;
+	guchar *rgb = g_malloc((size_t)h * stride);
+	s->sws_jpeg = sws_getCachedContext(s->sws_jpeg, frame->width, frame->height, frame->format, w, h, AV_PIX_FMT_RGB24, SWS_BICUBIC, NULL, NULL, NULL);
+	sws_scale(s->sws_jpeg, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, (uint8_t *[1]){rgb}, (int[1]){stride});
+	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_data(rgb, GDK_COLORSPACE_RGB, FALSE, 8, w, h, stride, NULL, NULL);
+	gchar *buffer = NULL;
+	gsize size = 0;
+	char quality_str[8];
+	snprintf(quality_str, sizeof(quality_str), "%d", CLAMP(quality, 1, 100));
+	g_autoptr(GError) error = NULL;
+	jbyteArray jpeg = NULL;
+	if (gdk_pixbuf_save_to_buffer(pixbuf, &buffer, &size, "jpeg", &error, "quality", quality_str, NULL)) {
+		jpeg = (*env)->NewByteArray(env, size);
+		(*env)->SetByteArrayRegion(env, jpeg, 0, size, (jbyte *)buffer);
+	} else {
+		fprintf(stderr, "camera: JPEG encoding failed: %s\n", error ? error->message : "");
+	}
+	g_free(buffer);
+	g_object_unref(pixbuf);
+	g_free(rgb);
+	return jpeg;
 }
