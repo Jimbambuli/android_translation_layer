@@ -337,11 +337,14 @@ executable('android-translation-layer', [
                                         	librsvg_dep
                                         ],
                                         link_args: [
-                                        	'-rdynamic'
+                                        	'-rdynamic',
+                                        	'-L' + libart_dep.get_variable(pkgconfig: 'libdir') / 'art', '-lnativebridge' # NativeBridge*() for the app's ABI
                                         ],
                                         install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
                                                        get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives',
                                         c_args: [
 						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"',
+						'-DATL_NATIVE_BRIDGE="' + get_option('native_bridge') + '"',
+						'-DATL_NATIVE_BRIDGE_ABI="' + get_option('native_bridge_abi') + '"',
 						librsvg_dep.found() ? '-DHAVE_LIBRSVG' : '-UHAVE_LIBRSVG'
                                         ])

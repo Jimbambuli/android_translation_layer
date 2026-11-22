@@ -46,6 +46,44 @@
 	#error unknown native architecture
 #endif
 
+/* The native bridge: a library that runs native code of another ABI (build options native_bridge and
+ * native_bridge_abi, empty when there is none). AOSP names it in ro.dalvik.vm.native.bridge, AndroidRuntime
+ * passes it as -XX:NativeBridge=, and ro.product.cpu.abilist of such a device goes on with the bridged ABI. */
+#ifndef ATL_NATIVE_BRIDGE
+	#define ATL_NATIVE_BRIDGE ""
+#endif
+#ifndef ATL_NATIVE_BRIDGE_ABI
+	#define ATL_NATIVE_BRIDGE_ABI ""
+#endif
+
+static const char *native_bridge(void)
+{
+	static int available = -1;
+	if (available < 0)
+		available = ATL_NATIVE_BRIDGE[0] && ATL_NATIVE_BRIDGE_ABI[0] && !access(ATL_NATIVE_BRIDGE, R_OK);
+	return available ? ATL_NATIVE_BRIDGE : NULL;
+}
+
+/* libnativebridge (art), what the zygote calls for an app that needs the bridge */
+bool NativeBridgeAvailable(void);
+bool NeedsNativeBridge(const char *instruction_set);
+bool PreInitializeNativeBridge(const char *app_data_dir, const char *instruction_set);
+bool InitializeNativeBridge(JNIEnv *env, const char *instruction_set);
+
+/* AOSP VMRuntime.ABI_TO_INSTRUCTION_SET_MAP */
+static const char *abi_to_instruction_set(const char *abi)
+{
+	static const char *const map[][2] = {
+		{"armeabi", "arm"}, {"armeabi-v7a", "arm"}, {"x86", "x86"}, {"x86_64", "x86_64"},
+		{"arm64-v8a", "arm64"}, {"riscv64", "riscv64"},
+	};
+	for (size_t i = 0; i < G_N_ELEMENTS(map); i++) {
+		if (!strcmp(abi, map[i][0]))
+			return map[i][1];
+	}
+	return NULL;
+}
+
 GtkWidget *window;
 char *apk_path;
 
@@ -209,6 +247,8 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 		args.nOptions += g_strv_length(extra_jvm_options);
 	if (zygote)
 		args.nOptions += 3;
+	if (native_bridge())
+		args.nOptions += 3;
 	options = malloc(sizeof(JavaVMOption) * args.nOptions);
 
 	if (getenv("RUN_FROM_BUILDDIR")) {
@@ -253,6 +293,14 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 		options[option_counter++].optionString = "-Xzygote";
 		options[option_counter++].optionString = "-Xzygote-max-boot-retry=0";
 		options[option_counter++].optionString = "-Xnoimage-dex2oat";
+	}
+
+	/* like AndroidRuntime::startVm with ro.dalvik.vm.native.bridge set; ART loads the bridge and leaves its
+	 * initialization to us (init_native_bridge()) */
+	if (native_bridge()) {
+		options[option_counter++].optionString = g_strdup_printf("-XX:NativeBridge=%s", native_bridge());
+		options[option_counter++].optionString = g_strdup_printf("-Dro.dalvik.vm.native.bridge=%s", ATL_NATIVE_BRIDGE);
+		options[option_counter++].optionString = "-Dro.product.cpu.abilist=" NATIVE_ARCH "," ATL_NATIVE_BRIDGE_ABI;
 	}
 
 	args.options = options;
@@ -676,6 +724,14 @@ static JNIEnv *start_runtime(char *apk_classpath, char *apk_name, struct jni_cal
 	char *ld_path = getenv("BIONIC_LD_LIBRARY_PATH");
 	ld_path = (ld_path ? ld_path : "");
 	ld_path = g_strdup_printf("%s:%s**:%s", app_lib_dir, app_data_dir, ld_path);
+	/* the bridge's own directory, like /system/lib64 on a device, holds the host libraries it loads */
+	if (native_bridge()) {
+		char *bridge_dir = g_path_get_dirname(native_bridge());
+		char *with_bridge = g_strdup_printf("%s:%s", ld_path, bridge_dir);
+		g_free(ld_path);
+		g_free(bridge_dir);
+		ld_path = with_bridge;
+	}
 	// calling directly into the shim bionic linker to whitelist the app's lib dir as containing bionic-linked libraries
 	dl_parse_library_path(ld_path, ":");
 	g_free(ld_path);
@@ -700,6 +756,32 @@ static JNIEnv *start_runtime(char *apk_classpath, char *apk_name, struct jni_cal
 
 	(*env)->GetJavaVM(env, &jvm);
 	return env;
+}
+
+/* the ABI of the app's native code: NATIVE_ARCH, else the bridged ABI; NULL if the app has none of them */
+static const char *app_native_abi(JNIEnv *env)
+{
+	const char *abis[] = {NATIVE_ARCH, ATL_NATIVE_BRIDGE_ABI};
+	int count = native_bridge() ? 2 : 1;
+	jobjectArray abi_array = (*env)->NewObjectArray(env, count, (*env)->FindClass(env, "java/lang/String"), NULL);
+	for (int i = 0; i < count; i++)
+		(*env)->SetObjectArrayElement(env, abi_array, i, _JSTRING(abis[i]));
+	int index = J__AssetManager__findSupportedAbi(env, _JSTRING(apk_path), abi_array);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		index = -1;
+	}
+	return index >= 0 ? abis[index] : NULL;
+}
+
+static void init_native_bridge(JNIEnv *env, const char *instruction_set)
+{
+	if (!instruction_set || !NativeBridgeAvailable() || !NeedsNativeBridge(instruction_set))
+		return;
+	fprintf(stderr, "native bridge: %s runs %s code\n", native_bridge(), instruction_set);
+	if (!PreInitializeNativeBridge(app_data_dir, instruction_set) || !InitializeNativeBridge(env, instruction_set))
+		fprintf(stderr, "native bridge: initialization for %s failed\n", instruction_set);
 }
 
 static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
@@ -842,9 +924,17 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 
 	prepare_main_looper(env);
 
-	/* extract native libraries from apk*/
-	if (!getenv("ATL_SKIP_NATIVES_EXTRACTION"))
-		extract_from_apk("lib/" NATIVE_ARCH "/", "lib/");
+	/* extract native libraries from apk: those of the first ABI of the device's list the app has (as
+	 * PackageManager does), and for an ABI that is not the host's start the native bridge for it (as
+	 * the zygote does for such an app) */
+	const char *app_abi = app_native_abi(env);
+	if (app_abi && !getenv("ATL_SKIP_NATIVES_EXTRACTION")) {
+		char *lib_prefix = g_strdup_printf("lib/%s/", app_abi);
+		extract_from_apk(lib_prefix, "lib/");
+		g_free(lib_prefix);
+	}
+	if (app_abi)
+		init_native_bridge(env, abi_to_instruction_set(app_abi));
 
 	// construct Application
 	application_object = J__Context__createApplication(env, _INTPTR(window));

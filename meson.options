@@ -3,3 +3,7 @@ option('download_tool_deps', type : 'boolean', value : false)
 option('asm_jar_path', type : 'string')
 option('asm_tree_jar_path', type : 'string')
 option('getopt_jar_path', type : 'string')
+# a native bridge for apps whose native code is for another ABI (e.g. Digitalis/Berberis for arm64-v8a on x86_64):
+# the library, loaded through bionic_translation, and the ABI it runs; empty: no bridge
+option('native_bridge', type : 'string', value : '')
+option('native_bridge_abi', type : 'string', value : '')
