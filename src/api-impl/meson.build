@@ -1992,6 +1992,7 @@ srcs = [
 	'android/webkit/WebViewClient.java',
 	'android/webkit/AtlWebMessagePort.java',
 	'android/webkit/AtlFileChooserParams.java',
+	'android/webkit/AtlFullScreenView.java',
 	'android/webkit/AtlGeolocationProvider.java',
 	'android/webkit/AtlOriginMatcher.java',
 	'android/webkit/DateSorter.java',

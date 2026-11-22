@@ -137,6 +137,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		setDefaultFocusHighlightEnabled(false);
 		// the pages load with the user agent that WebSettings reports, not WebKitGTK's own
 		setWebKitSetting("user-agent", WebSettings.defaultUserAgent());
+		// no fullscreen until a WebChromeClient can show it (see setWebChromeClient())
+		setWebKitSetting("enable-fullscreen", false);
 		/* navigator.language and Accept-Language follow the app's locale, as on Android; WebKit would take the
 		 * C locale that ATL sets for the process (LC_ALL=C.UTF-8, navigator.language "c") */
 		String language = java.util.Locale.getDefault().toLanguageTag();
@@ -155,7 +157,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		/* an ancestor took over the touch sequence: the page gets pointercancel, like Chromium's
 		 * WebView (AwContents.onTouchEvent() forwards ACTION_CANCEL to the renderer) */
 		if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
-			native_firePointerCancel(widget);
+			native_firePointerCancel(webkitWidget());
 			return true;
 		}
 		return native_gtkEventPropagation();
@@ -166,7 +168,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	@Override
 	public boolean onGenericMotionEvent(MotionEvent event) {
 		if (event.getActionMasked() == MotionEvent.ACTION_SCROLL)
-			return native_gtkScrollTarget(widget);
+			return native_gtkScrollTarget(webkitWidget());
 		return super.onGenericMotionEvent(event);
 	}
 
@@ -181,12 +183,12 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 
 	void setWebKitSetting(String name, boolean value) {
 		if (!isDestroyed())
-			native_setBooleanSetting(widget, name, value);
+			native_setBooleanSetting(webkitWidget(), name, value);
 	}
 
 	void setWebKitSetting(String name, String value) {
 		if (!isDestroyed())
-			native_setStringSetting(widget, name, value);
+			native_setStringSetting(webkitWidget(), name, value);
 	}
 
 	private native void native_setBooleanSetting(long widget, String name, boolean value);
@@ -257,7 +259,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	 * original URL of the entry, its title, no favicon (ATL receives none, see getFavicon()) */
 	public WebBackForwardList copyBackForwardList() {
 		int[] currentIndex = {-1};
-		String[] entries = isDestroyed() ? new String[0] : native_getHistory(widget, currentIndex);
+		String[] entries = isDestroyed() ? new String[0] : native_getHistory(webkitWidget(), currentIndex);
 		List<WebHistoryItem> items = new ArrayList<>();
 		for (int i = 0; i + 2 < entries.length; i += 3)
 			items.add(new HistoryItem(internalToAppUrl(entries[i]), internalToAppUrl(entries[i + 1]), entries[i + 2]));
@@ -689,7 +691,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		boolean empty = find.isEmpty();
 		findActiveMatch = 0;
 		findMatchCount = 0;
-		native_findAll(widget, find);
+		native_findAll(webkitWidget(), find);
 		if (empty && findListener != null)
 			findListener.onFindResultReceived(0, 0, true);
 	}
@@ -727,14 +729,14 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		if (isDestroyed() || findMatchCount == 0)
 			return;
 		findActiveMatch = (findActiveMatch + (forward ? 1 : findMatchCount - 1)) % findMatchCount;
-		native_findNext(widget, forward);
+		native_findNext(webkitWidget(), forward);
 	}
 
 	public void clearMatches() {
 		if (isDestroyed())
 			return;
 		findMatchCount = 0;
-		native_clearMatches(widget);
+		native_clearMatches(webkitWidget());
 	}
 
 	// to be used by native code: the number of matches of the last search
@@ -906,7 +908,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		if (verticalScrollBarEnabled == enabled || isDestroyed())
 			return;
 		verticalScrollBarEnabled = enabled;
-		native_setVerticalScrollBarEnabled(widget, enabled);
+		native_setVerticalScrollBarEnabled(webkitWidget(), enabled);
 	}
 
 	// WebKit can only hide both scrollbars of a page together, so this one stays
@@ -982,7 +984,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 			return;
 		nativeScrollX = x;
 		nativeScrollY = y;
-		native_scrollTo(widget, x / getScale(), y / getScale());
+		native_scrollTo(webkitWidget(), x / getScale(), y / getScale());
 	}
 
 	// AwScrollOffsetManager: the View's size plus the maximum scroll offset
@@ -1050,7 +1052,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	// the page scrolls smoothly to (x, y) in View pixels; it reports its new offset (internalScrollChanged())
 	private void smoothScrollTo(int x, int y) {
 		float scale = getScale();
-		native_evaluateJavascript(widget, "scrollTo({left:" + (x / scale) + ",top:" + (y / scale) + ",behavior:'smooth'})", null);
+		native_evaluateJavascript(webkitWidget(), "scrollTo({left:" + (x / scale) + ",top:" + (y / scale) + ",behavior:'smooth'})", null);
 	}
 
 	/* AOSP WebView.flingScroll(): AwContents starts a fling of the page with this velocity (pixels per second, a
@@ -1119,7 +1121,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public void documentHasImages(android.os.Message response) {
 		if (isDestroyed())
 			return;
-		native_evaluateJavascript(widget, "document.getElementsByTagName('img').length>0", new ValueCallback<String>() {
+		native_evaluateJavascript(webkitWidget(), "document.getElementsByTagName('img').length>0", new ValueCallback<String>() {
 			@Override
 			public void onReceiveValue(String value) {
 				response.arg1 = "true".equals(value) ? 1 : 0;
@@ -1138,7 +1140,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		android.graphics.Picture picture = new android.graphics.Picture();
 		android.graphics.Canvas canvas = picture.beginRecording(computeHorizontalScrollRange(), computeVerticalScrollRange());
 		android.graphics.Bitmap visible = android.graphics.Bitmap.createBitmap(Math.max(getWidth(), 1), Math.max(getHeight(), 1), android.graphics.Bitmap.Config.ARGB_8888);
-		if (native_capturePicture(widget, visible))
+		if (native_capturePicture(webkitWidget(), visible))
 			canvas.drawBitmap(visible, getScrollX(), getScrollY(), null);
 		picture.endRecording();
 		return picture;
@@ -1180,7 +1182,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		Set<String> methodNames = new LinkedHashSet<>();
 		for (Method method : getJavascriptInterfaceMethods(object))
 			methodNames.add(method.getName());
-		native_addJavascriptInterface(widget, name, String.join(",", methodNames));
+		native_addJavascriptInterface(webkitWidget(), name, String.join(",", methodNames));
 	}
 
 	private List<Method> getJavascriptInterfaceMethods(Object object) {
@@ -1620,7 +1622,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 				@Override
 				public void postMessage(String message) {
 					if (!destroyed)
-						native_postToFrame(widget, frame, document, jsObjectName, message);
+						native_postToFrame(webkitWidget(), frame, document, jsObjectName, message);
 				}
 			});
 			return;
@@ -1629,16 +1631,104 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 
 	/* androidx WebViewCompat.setAudioMuted() / isAudioMuted() (AwContents): WebKit's mute of the page */
 	public void setAudioMuted(boolean muted) {
-		native_setAudioMuted(widget, muted);
+		native_setAudioMuted(webkitWidget(), muted);
 	}
 
 	public boolean isAudioMuted() {
-		return native_isAudioMuted(widget);
+		return native_isAudioMuted(webkitWidget());
 	}
 
 	public void setWebChromeClient(WebChromeClient webChromeClient) {
 		this.webChromeClient = webChromeClient;
+		/* WebViewChromium.setWebChromeClient(): fullscreen is supported (AwSettings.setFullscreenSupported()) only
+		 * with a client that overrides both onShowCustomView(View, CustomViewCallback) and onHideCustomView() */
+		setWebKitSetting("enable-fullscreen", doesSupportFullscreen(webChromeClient));
 	}
+
+	private static boolean doesSupportFullscreen(WebChromeClient client) {
+		if (client == null)
+			return false;
+		Class<?> clientClass = client.getClass();
+		boolean foundShowMethod = false;
+		boolean foundHideMethod = false;
+		while (clientClass != WebChromeClient.class && (!foundShowMethod || !foundHideMethod)) {
+			if (!foundShowMethod) {
+				try {
+					clientClass.getDeclaredMethod("onShowCustomView", android.view.View.class, WebChromeClient.CustomViewCallback.class);
+					foundShowMethod = true;
+				} catch (NoSuchMethodException e) {
+				}
+			}
+			if (!foundHideMethod) {
+				try {
+					clientClass.getDeclaredMethod("onHideCustomView");
+					foundHideMethod = true;
+				} catch (NoSuchMethodException e) {
+				}
+			}
+			clientClass = clientClass.getSuperclass();
+		}
+		return foundShowMethod && foundHideMethod;
+	}
+
+	/* ---- fullscreen (Chromium AwWebContentsDelegateAdapter, AwContents.FullScreenState) ---- */
+	private AtlFullScreenView fullScreenView; // holds the page while it is in fullscreen
+	private android.widget.FrameLayout customView;
+
+	/* the WebKitWebView: the WebView's own widget, or the full screen view's while the page is there */
+	private long webkitWidget() {
+		return fullScreenView != null ? fullScreenView.widget : widget;
+	}
+
+	/* WebKit's enter-fullscreen/leave-fullscreen (an element's requestFullscreen(), e.g. the fullscreen button of a
+	 * <video>, and its end) */
+	@Export
+	void internalFullscreen(boolean enter) {
+		if (enter) {
+			if (customView != null || destroyed)
+				return;
+			fullScreenView = new AtlFullScreenView(getContext(), this);
+			long placeholder = native_enterFullscreen(widget, fullScreenView.widget);
+			fullScreenView.widget = widget;
+			widget = placeholder;
+			customView = new android.widget.FrameLayout(getContext());
+			customView.addView(fullScreenView);
+			WebChromeClient.CustomViewCallback callback = new WebChromeClient.CustomViewCallback() {
+				@Override
+				public void onCustomViewHidden() {
+					if (customView != null)
+						requestExitFullscreen();
+				}
+			};
+			if (webChromeClient != null)
+				webChromeClient.onShowCustomView(customView, callback);
+			fullScreenView.requestFocus();
+		} else if (customView != null) {
+			customView = null;
+			exitFullScreen();
+			if (webChromeClient != null)
+				webChromeClient.onHideCustomView();
+		}
+	}
+
+	/* AwContents.exitFullScreen(): the page back into the WebView */
+	private void exitFullScreen() {
+		if (fullScreenView == null)
+			return;
+		long webkit = fullScreenView.widget;
+		fullScreenView.widget = native_exitFullscreen(webkit, widget);
+		widget = webkit;
+		fullScreenView = null;
+	}
+
+	/* AwContents.requestExitFullscreen() = WebContents.exitFullscreen(): the page leaves fullscreen, WebKit reports
+	 * it with leave-fullscreen */
+	void requestExitFullscreen() {
+		if (!destroyed && fullScreenView != null)
+			native_evaluateJavascript(webkitWidget(), "document.fullscreenElement&&document.exitFullscreen()", null);
+	}
+
+
 
 	public void removeAllViews() {}
 
@@ -1648,6 +1738,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		if (destroyed)
 			return;
 		destroyed = true;
+		customView = null;
+		exitFullScreen();
 		javascriptInterfaces.clear();
 		widget = native_destroy(widget);
 	}
@@ -1684,7 +1776,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		data = data.replace("file:///android_asset/", "android-asset:///assets/");
 		// relative URLs in the document are resolved against the base URL, so it needs the same treatment
 		baseUrl = baseUrl.replace("file:///android_asset/", "android-asset:///assets/");
-		native_loadDataWithBaseURL(widget, baseUrl, data.getBytes(java.nio.charset.StandardCharsets.UTF_8), mimeType, historyUrl, entryUrl);
+		native_loadDataWithBaseURL(webkitWidget(), baseUrl, data.getBytes(java.nio.charset.StandardCharsets.UTF_8), mimeType, historyUrl, entryUrl);
 	}
 
 	/* Chromium's LoadUrlParams.buildDataUri() */
@@ -1702,19 +1794,19 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 
 	// a data: URL of loadData(): an ordinary URL load for WebKit, as for Chromium (LoadURLType.DATA)
 	private void loadDataUrl(String dataUrl) {
-		native_loadUrl(widget, dataUrl);
+		native_loadUrl(webkitWidget(), dataUrl);
 	}
 
 	public void loadUrl(String url) {
 		if (isDestroyed())
 			return;
 		if (url.startsWith("javascript:")) {
-			native_evaluateJavascript(widget, url.substring("javascript:".length()), null);
+			native_evaluateJavascript(webkitWidget(), url.substring("javascript:".length()), null);
 			return;
 		}
 		// webkit doesn't allow overwriting the file:// uri scheme. So we replace it with the android-asset:// scheme
 		url = url.replace("file:///android_asset/", "android-asset:///assets/");
-		native_loadUrl(widget, url);
+		native_loadUrl(webkitWidget(), url);
 	}
 
 	/* AOSP WebView.postUrl(): a network URL is loaded with a POST of postData, any other URL with loadUrl().
@@ -1742,7 +1834,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 				.append("\" value=\"").append(attributeEscape(equals < 0 ? "" : formDecode(field.substring(equals + 1)))).append("\">");
 		}
 		form.append("</form>");
-		native_postUrl(widget, url, form.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), formId);
+		native_postUrl(webkitWidget(), url, form.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8), formId);
 	}
 
 	private static String attributeEscape(String s) {
@@ -1779,14 +1871,14 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 			headers[i++] = header.getKey();
 			headers[i++] = header.getValue();
 		}
-		native_loadUrlWithHeaders(widget, url, headers);
+		native_loadUrlWithHeaders(webkitWidget(), url, headers);
 	}
 
 	/* Chromium (AwContents.getUrl()): the visible URL, for a page of loadDataWithBaseURL() its history URL */
 	public String getUrl() {
 		if (isDestroyed())
 			return null;
-		String historyUrl = native_getDataHistoryUrl(widget);
+		String historyUrl = native_getDataHistoryUrl(webkitWidget());
 		return historyUrl != null ? historyUrl : url;
 	}
 
@@ -1794,7 +1886,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public String getOriginalUrl() {
 		if (isDestroyed())
 			return null;
-		String originalUrl = native_getOriginalUrl(widget);
+		String originalUrl = native_getOriginalUrl(webkitWidget());
 		return originalUrl != null ? internalToAppUrl(originalUrl) : null;
 	}
 
@@ -1802,14 +1894,14 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public String getTitle() {
 		if (isDestroyed())
 			return null;
-		return native_getTitle(widget);
+		return native_getTitle(webkitWidget());
 	}
 
 	/* AOSP WebView.getCertificate(): the SSL certificate of the main top-level page, null if there is none */
 	public android.net.http.SslCertificate getCertificate() {
 		if (isDestroyed())
 			return null;
-		byte[] der = native_getCertificate(widget);
+		byte[] der = native_getCertificate(webkitWidget());
 		if (der == null)
 			return null;
 		try {
@@ -1840,26 +1932,26 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public boolean canGoBackOrForward(int steps) {
 		if (isDestroyed())
 			return false;
-		return native_canGoBackOrForward(widget, steps);
+		return native_canGoBackOrForward(webkitWidget(), steps);
 	}
 
 	/* AOSP WebView.goBackOrForward(): nothing if the entry is not there */
 	public void goBackOrForward(int steps) {
 		if (isDestroyed())
 			return;
-		native_goBackOrForward(widget, steps);
+		native_goBackOrForward(webkitWidget(), steps);
 	}
 
 	public void stopLoading() {
 		if (isDestroyed())
 			return;
-		native_stopLoading(widget);
+		native_stopLoading(webkitWidget());
 	}
 
 	public void reload() {
 		if (isDestroyed())
 			return;
-		native_reload(widget);
+		native_reload(webkitWidget());
 	}
 
 	// to be used by native code
@@ -1906,7 +1998,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public void evaluateJavascript(String script, ValueCallback<String> resultCallback) {
 		if (isDestroyed())
 			return;
-		native_evaluateJavascript(widget, script, resultCallback);
+		native_evaluateJavascript(webkitWidget(), script, resultCallback);
 	}
 
 	public static void setWebContentsDebuggingEnabled(boolean enabled) {
@@ -1946,7 +2038,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public void clearHistory() {
 		if (isDestroyed())
 			return;
-		native_clearHistory(widget);
+		native_clearHistory(webkitWidget());
 	}
 
 	public void clearSslPreferences() {}
@@ -1956,7 +2048,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public void clearCache(boolean includeDiskFiles) {
 		if (isDestroyed())
 			return;
-		native_clearCache(widget, includeDiskFiles);
+		native_clearCache(webkitWidget(), includeDiskFiles);
 	}
 
 	/* AOSP WebView.getFactory() = WebViewFactory.getProvider(): fails once disableWebView() was called, otherwise the
@@ -2008,6 +2100,8 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private native String native_getDataHistoryUrl(long widget);
 	private native String[] native_getHistory(long widget, int[] currentIndex);
 	private native void native_loadUrl(long widget, String url);
+	private native long native_enterFullscreen(long widget, long fullScreenWidget);
+	private native long native_exitFullscreen(long widget, long placeholder);
 	private static native void native_finishFileChooser(long request, String[] paths);
 	private static native void native_finishPermission(long request, boolean allow);
 	static native void native_releaseRequest(long request);

@@ -28,6 +28,14 @@ static jobject webview_jobject(JNIEnv *env, WrapperWidget *wrapper)
 	return (*env)->NewLocalRef(env, wrapper->jobj);
 }
 
+/* the wrapper of the WebView a WebKitWebView belongs to: its parent, or while the page is shown in fullscreen
+ * (native_enterFullscreen()) the WebView's wrapper it was taken from */
+static GtkWidget *web_view_wrapper(GtkWidget *web_view)
+{
+	GtkWidget *wrapper = g_object_get_data(G_OBJECT(web_view), "atl-fullscreen-from");
+	return wrapper ? wrapper : gtk_widget_get_parent(web_view);
+}
+
 static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
 {
 	const gchar *path = webkit_uri_scheme_request_get_path(request);
@@ -49,7 +57,7 @@ static void asset_uri_scheme_request_cb(WebKitURISchemeRequest *request, gpointe
 		return;
 	}
 	path += 1; // remove the leading '/'
-	GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(webkit_uri_scheme_request_get_web_view(request)));
+	GtkWidget *parent = web_view_wrapper(GTK_WIDGET(webkit_uri_scheme_request_get_web_view(request)));
 	if (!WRAPPER_IS_WIDGET(parent)) { // the WebView was destroyed
 		GError *error = g_error_new(G_IO_ERROR, G_IO_ERROR_CANCELLED, "WebView destroyed");
 		webkit_uri_scheme_request_finish_error(request, error);
@@ -105,7 +113,7 @@ static void java_bridge_reply(WebKitURISchemeRequest *request, const char *answe
 static void java_bridge_request_cb(WebKitURISchemeRequest *request, gpointer user_data)
 {
 	WebKitWebView *web_view = webkit_uri_scheme_request_get_web_view(request);
-	GtkWidget *parent = web_view ? gtk_widget_get_parent(GTK_WIDGET(web_view)) : NULL;
+	GtkWidget *parent = web_view ? web_view_wrapper(GTK_WIDGET(web_view)) : NULL;
 	JNIEnv *env = get_jni_env();
 	jobject this = WRAPPER_IS_WIDGET(parent) ? webview_jobject(env, WRAPPER_WIDGET(parent)) : NULL;
 	GInputStream *body = webkit_uri_scheme_request_get_http_body(request);
@@ -458,7 +466,7 @@ static void data_load_start(WebKitWebView *web_view, struct data_load *load)
 
 static void web_view_load_changed(WebKitWebView *web_view, WebKitLoadEvent load_event, gpointer user_data)
 {
-	WrapperWidget *wrapper = WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(web_view)));
+	WrapperWidget *wrapper = WRAPPER_WIDGET(web_view_wrapper(GTK_WIDGET(web_view)));
 	// the app's load started without a policy decision (e.g. loadData*()): later navigations are the page's
 	if (load_event == WEBKIT_LOAD_STARTED)
 		app_load_take(web_view);
@@ -664,7 +672,7 @@ static void evaluate_js_cb(GObject *source, GAsyncResult *result, gpointer user_
 		JNIEnv *env = get_jni_env();
 		// the WebView was destroyed meanwhile: like on Android, the callback is dropped
 		jobject this = webview_jobject(env, data->wrapper);
-		if (this && gtk_widget_get_parent(GTK_WIDGET(source)) == GTK_WIDGET(data->wrapper)) {
+		if (this && web_view_wrapper(GTK_WIDGET(source)) == GTK_WIDGET(data->wrapper)) {
 			J__WebView__internalJsResult(env, this, data->callback, _JSTRING(json ? json : "null"));
 			if ((*env)->ExceptionCheck(env)) {
 				(*env)->ExceptionDescribe(env);
@@ -1105,6 +1113,86 @@ JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1isAudioMuted(JNIE
 	return WEBKIT_IS_WEB_VIEW(webview) && webkit_web_view_get_is_muted(WEBKIT_WEB_VIEW(webview));
 }
 
+/* ---- fullscreen (Chromium: AwWebContentsDelegateAdapter.enterFullscreen()/exitFullscreen(), AwContents'
+ * FullScreenState): the page leaves the WebView for a FullScreenView that the app shows with onShowCustomView().
+ * WebKit's request to make the window fullscreen is declined (TRUE): on Android the app decides about the window. */
+static gboolean enter_fullscreen_cb(WebKitWebView *web_view, WrapperWidget *wrapper)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = webview_jobject(env, wrapper);
+	if (this) {
+		J__WebView__internalFullscreen(env, this, JNI_TRUE);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		(*env)->DeleteLocalRef(env, this);
+	}
+	return TRUE;
+}
+
+static gboolean leave_fullscreen_cb(WebKitWebView *web_view, WrapperWidget *wrapper)
+{
+	JNIEnv *env = get_jni_env();
+	jobject this = webview_jobject(env, wrapper);
+	if (this) {
+		J__WebView__internalFullscreen(env, this, JNI_FALSE);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
+		(*env)->DeleteLocalRef(env, this);
+	}
+	return TRUE;
+}
+
+/* the WebKitWebView moves from the WebView's wrapper into the full screen view's (whose placeholder goes); the
+ * WebView keeps a placeholder, which is returned */
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1enterFullscreen(JNIEnv *env, jobject this, jlong widget_ptr, jlong fullscreen_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	GtkWidget *fullscreen_placeholder = _PTR(fullscreen_ptr);
+	GtkWidget *wrapper = gtk_widget_get_parent(webview);
+	GtkWidget *fullscreen_wrapper = gtk_widget_get_parent(fullscreen_placeholder);
+	GtkWidget *placeholder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	g_object_ref(webview);
+	gtk_widget_unparent(webview);
+	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), placeholder);
+	gtk_widget_unparent(fullscreen_placeholder);
+	wrapper_widget_set_child(WRAPPER_WIDGET(fullscreen_wrapper), webview);
+	g_object_unref(webview);
+	g_object_set_data(G_OBJECT(webview), "atl-fullscreen-from", wrapper);
+	return _INTPTR(placeholder);
+}
+
+/* back into the WebView's wrapper; the full screen view gets a placeholder, which is returned */
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1exitFullscreen(JNIEnv *env, jobject this, jlong widget_ptr, jlong placeholder_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	GtkWidget *placeholder = _PTR(placeholder_ptr);
+	GtkWidget *wrapper = gtk_widget_get_parent(placeholder);
+	GtkWidget *fullscreen_wrapper = gtk_widget_get_parent(webview);
+	GtkWidget *fullscreen_placeholder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	g_object_set_data(G_OBJECT(webview), "atl-fullscreen-from", NULL);
+	g_object_ref(webview);
+	gtk_widget_unparent(webview);
+	wrapper_widget_set_child(WRAPPER_WIDGET(fullscreen_wrapper), fullscreen_placeholder);
+	gtk_widget_unparent(placeholder);
+	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), webview);
+	g_object_unref(webview);
+	return _INTPTR(fullscreen_placeholder);
+}
+
+/* the View of AtlFullScreenView: a wrapper with a placeholder until it holds the page */
+JNIEXPORT jlong JNICALL Java_android_webkit_AtlFullScreenView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
+{
+	GtkWidget *wrapper = g_object_ref_sink(wrapper_widget_new());
+	GtkWidget *placeholder = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), placeholder);
+	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
+	return _INTPTR(placeholder);
+}
+
 JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	/*
@@ -1270,6 +1358,8 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 	g_signal_connect(webview, "run-file-chooser", G_CALLBACK(run_file_chooser_cb), wrapper);
 	g_signal_connect(webview, "permission-request", G_CALLBACK(permission_request_cb), wrapper);
 	g_signal_connect(webview, "user-message-received", G_CALLBACK(user_message_received_cb), wrapper);
+	g_signal_connect(webview, "enter-fullscreen", G_CALLBACK(enter_fullscreen_cb), wrapper);
+	g_signal_connect(webview, "leave-fullscreen", G_CALLBACK(leave_fullscreen_cb), wrapper);
 	WebKitFindController *find_controller = webkit_web_view_get_find_controller(WEBKIT_WEB_VIEW(webview));
 	g_signal_connect(find_controller, "found-text", G_CALLBACK(found_text_cb), wrapper);
 	g_signal_connect(find_controller, "failed-to-find-text", G_CALLBACK(failed_to_find_text_cb), wrapper);
@@ -1829,7 +1919,7 @@ JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1evaluateJavascript(JN
 
 	WebKitWebView *webview = _PTR(widget_ptr);
 	struct evaluate_js_data *data = g_new(struct evaluate_js_data, 1);
-	data->wrapper = g_object_ref(WRAPPER_WIDGET(gtk_widget_get_parent(GTK_WIDGET(webview))));
+	data->wrapper = g_object_ref(WRAPPER_WIDGET(web_view_wrapper(GTK_WIDGET(webview))));
 	data->callback = callback ? (*env)->NewGlobalRef(env, callback) : NULL;
 	webkit_web_view_evaluate_javascript(webview, _CSTRING(script), -1, NULL, NULL, NULL, evaluate_js_cb, data);
 }
