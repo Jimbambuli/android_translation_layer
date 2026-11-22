@@ -35,13 +35,20 @@ JNIEXPORT jboolean JNICALL Java_android_widget_CompoundButton_isChecked(JNIEnv *
 }
 
 /* the listener is looked up in the view, as the native side holds no reference to it (also for
- * CheckBox and RadioButton) */
+ * CheckBox and RadioButton). As AOSP CompoundButton.setChecked(): the drawable state (state_checked)
+ * is refreshed before the listener is called; the checked state lives in the GTK widget, so this is
+ * done when it changed there. */
 void compound_button_checked_changed(WrapperWidget *wrapper, gboolean checked)
 {
 	JNIEnv *env = get_jni_env();
 	jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
 	if (!view) // garbage collected
 		return;
+	J__View__refreshDrawableState(env, view);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	jobject listener = _GET_OBJ_FIELD(view, "mOnCheckedChangeListener", "Landroid/widget/CompoundButton$OnCheckedChangeListener;");
 	if (listener) {
 		J__CompoundButton__OnCheckedChangeListener__onCheckedChanged(env, listener, view, checked);
