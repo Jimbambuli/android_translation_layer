@@ -528,10 +528,15 @@ public final class ContextImpl extends Context {
 		/* like AOSP (ActivityStarter), the launch modes singleTask and singleInstance reuse the activity's instance
 		 * in the back stack as FLAG_ACTIVITY_CLEAR_TOP does: the ones above it finish and it gets onNewIntent() */
 		int launchMode = ActivityInfo.LAUNCH_MULTIPLE;
+		String activityClass = className; // an <activity-alias> runs its target activity (ActivityInfo.targetActivity)
 		for (PackageParser.Activity activity : this.atl_loaded_app.pkg.activities) {
-			if (activity.className.equals(className))
+			if (activity.className.equals(className)) {
 				launchMode = activity.info.launchMode;
+				if (activity.info.targetActivity != null)
+					activityClass = activity.info.targetActivity;
+			}
 		}
+		final String activityClass_ = activityClass;
 		/* FLAG_ACTIVITY_NEW_TASK with FLAG_ACTIVITY_CLEAR_TASK: the app's one task is cleared, the activity starts
 		 * anew as its root; the ones that were there finish after the start and what it started itself
 		 * (Activity.nativeClearTaskMark()) */
@@ -547,7 +552,7 @@ public final class ContextImpl extends Context {
 						Activity.nativeClearTaskMark();
 					if (reuse) {
 						boolean found = Activity.nativeResumeActivity(
-						    ContextImpl.this.atl_loaded_app.loadClass(className_).asSubclass(Activity.class),
+						    ContextImpl.this.atl_loaded_app.loadClass(activityClass_).asSubclass(Activity.class),
 						    intent_);
 						if (found)
 							return;
