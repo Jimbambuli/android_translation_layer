@@ -54,6 +54,12 @@ public class ATLMediaContentProvider extends ContentProvider {
 
 	private static final String TAG = "ATLMediaProvider";
 
+	/* ContentProvider.onCreate(): nothing to set up, the provider is ready */
+	@Override
+	public boolean onCreate() {
+		return true;
+	}
+
 	/* the user's folders (native_user_dirs()) and their directory in the shared storage */
 	private static final String[] USER_DIR_NAMES = {"Pictures", "Music", "Movies", "Download"};
 	/* Environment.STANDARD_DIRECTORIES */

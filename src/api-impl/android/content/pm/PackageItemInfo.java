@@ -82,9 +82,21 @@ public class PackageItemInfo {
 	 */
 	public Bundle metaData;
 
+	/**
+	 * If different of UserHandle.USER_NULL, The icon of this item will represent that user.
+	 * @hide
+	 */
+	public int showUserIcon;
+
+	/**
+	 * Whether the package is currently in an archived state.
+	 */
+	public boolean isArchived;
+
 	public PackageItemInfo() {
 		metaData = new Bundle();
 		packageName = "android";
+		showUserIcon = android.os.UserHandle.USER_NULL;
 	}
 
 	public PackageItemInfo(PackageItemInfo orig) {
@@ -100,6 +112,8 @@ public class PackageItemInfo {
 		logo = orig.logo;
 		banner = orig.banner;
 		metaData = orig.metaData;
+		showUserIcon = orig.showUserIcon;
+		isArchived = orig.isArchived;
 	}
 
 	/**
@@ -271,8 +285,7 @@ public class PackageItemInfo {
 		return null;
 	}
 
-	/* AOSP PackageItemInfo.writeToParcel()/PackageItemInfo(Parcel); ATL has no showUserIcon/isArchived fields,
-	 * so those two are not written */
+	/* AOSP PackageItemInfo.writeToParcel()/PackageItemInfo(Parcel) */
 	public void writeToParcel(Parcel dest, int parcelableFlags) {
 		dest.writeString8(name);
 		dest.writeString8(packageName);
@@ -282,6 +295,8 @@ public class PackageItemInfo {
 		dest.writeInt(logo);
 		dest.writeBundle(metaData);
 		dest.writeInt(banner);
+		dest.writeInt(showUserIcon);
+		dest.writeBoolean(isArchived);
 	}
 
 	protected PackageItemInfo(Parcel source) {
@@ -293,6 +308,8 @@ public class PackageItemInfo {
 		logo = source.readInt();
 		metaData = source.readBundle();
 		banner = source.readInt();
+		showUserIcon = source.readInt();
+		isArchived = source.readBoolean();
 	}
 
 	public static class DisplayNameComparator
