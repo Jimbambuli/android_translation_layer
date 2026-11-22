@@ -15,9 +15,14 @@
  */
 
 /* frameworks/base/native/android/sharedmem.cpp (android-14) on the host ashmem of libcutils, which
- * keeps the region in an unlinked file; ASharedMemory_dupFromJava() is left out (no android.os.SharedMemory) */
+ * keeps the region in an unlinked file; ASharedMemory_dupFromJava() takes the fd of ATL's android.os.SharedMemory */
 
+#include <fcntl.h>
 #include <stddef.h>
+
+#include <jni.h>
+
+#include "ndk_jni.h"
 
 /* libcutils (art_standalone), cutils/ashmem.h */
 int ashmem_create_region(const char *name, size_t size);
@@ -44,4 +49,17 @@ size_t ASharedMemory_getSize(int fd)
 int ASharedMemory_setProt(int fd, int prot)
 {
 	return ashmem_set_prot_region(fd, prot);
+}
+
+int ASharedMemory_dupFromJava(JNIEnv *env, jobject javaSharedMemory)
+{
+	if (!env || !javaSharedMemory)
+		return -1;
+	jclass shared_memory = ndk_jni_class(env, "android/os/SharedMemory");
+	if (!(*env)->IsInstanceOf(env, javaSharedMemory, shared_memory))
+		return -1;
+	int fd = (*env)->CallIntMethod(env, javaSharedMemory, (*env)->GetMethodID(env, shared_memory, "getFd", "()I"));
+	if (fd != -1)
+		fd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+	return fd;
 }

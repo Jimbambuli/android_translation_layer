@@ -544,6 +544,32 @@ int32_t ANativeWindow_setFrameRate(ANativeWindow *window, float frameRate, int8_
 	return 0; // success
 }
 
+/* AOSP ANativeWindow.cpp: -EINVAL without a window, otherwise as setFrameRate() (there is no display mode to change) */
+int32_t ANativeWindow_setFrameRateWithChangeStrategy(ANativeWindow *window, float frameRate, int8_t compatibility, int8_t changeFrameRateStrategy)
+{
+	if (!window)
+		return -EINVAL;
+	return ANativeWindow_setFrameRate(window, frameRate, compatibility);
+}
+
+/* AOSP: NATIVE_WINDOW_ALLOCATE_BUFFERS only allocates ahead of time; ATL's buffers are allocated on dequeue */
+void ANativeWindow_tryAllocateBuffers(ANativeWindow *window)
+{
+}
+
+/* AOSP: Surface_readFromParcel/Surface_writeToParcel of libgui, which ATL does not have (no libbinder_ndk,
+ * so no AParcel either): the answer when they cannot be loaded */
+#define STATUS_FAILED_TRANSACTION (INT32_MIN + 2)
+int32_t ANativeWindow_readFromParcel(const void *parcel, ANativeWindow **outWindow)
+{
+	return STATUS_FAILED_TRANSACTION;
+}
+
+int32_t ANativeWindow_writeToParcel(ANativeWindow *window, void *parcel)
+{
+	return STATUS_FAILED_TRANSACTION;
+}
+
 /**
  * Set a transform that will be applied to future buffers posted to the window.
  *
@@ -1057,6 +1083,21 @@ VkResult bionic_vkGetAndroidHardwareBufferPropertiesANDROID(VkDevice device, con
                                                             VkAndroidHardwareBufferPropertiesANDROID *pProperties)
 {
 	return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+}
+
+/* AOSP libvulkan exports this command of VK_EXT_image_compression_control / VK_EXT_host_image_copy
+ * (api_gen.cpp: a trampoline into the device's dispatch table); the host's loader does not, so it is looked up
+ * on the device, under the names it was promoted to (VK_KHR_maintenance5, Vulkan 1.4) as well */
+void bionic_vkGetImageSubresourceLayout2EXT(VkDevice device, VkImage image, const VkImageSubresource2KHR *pSubresource, VkSubresourceLayout2KHR *pLayout)
+{
+	static const char *const names[] = {"vkGetImageSubresourceLayout2EXT", "vkGetImageSubresourceLayout2KHR", "vkGetImageSubresourceLayout2"};
+	for (size_t i = 0; i < G_N_ELEMENTS(names); i++) {
+		PFN_vkGetImageSubresourceLayout2KHR func = (PFN_vkGetImageSubresourceLayout2KHR)vkGetDeviceProcAddr(device, names[i]);
+		if (func) {
+			func(device, image, pSubresource, pLayout);
+			return;
+		}
+	}
 }
 
 VkResult bionic_vkGetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID *pInfo,
