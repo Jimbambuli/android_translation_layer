@@ -482,11 +482,20 @@ struct cpu_frame {
 static gboolean present_cpu_frame(void *data)
 {
 	struct cpu_frame *f = data;
-	surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(f->widget), f->texture, FALSE);
-	g_object_unref(f->texture);
+	surface_view_widget_set_texture(SURFACE_VIEW_WIDGET(f->widget), f->texture, FALSE); // takes the texture's reference
 	g_object_unref(f->widget);
 	free(f);
 	return G_SOURCE_REMOVE;
+}
+
+/* the frame of a window of a SurfaceView widget of this process goes to that widget, on the main thread; takes the
+ * reference on texture */
+void ANativeWindow_localPresentTexture(struct ANativeWindow *native_window, GdkTexture *texture)
+{
+	struct cpu_frame *f = malloc(sizeof(*f));
+	f->widget = g_object_ref(native_window->surface_view_widget);
+	f->texture = texture;
+	g_idle_add(present_cpu_frame, f);
 }
 
 /* AOSP: the drawn buffer goes to the window's consumer; here as a texture to the SurfaceView widget (on the main
@@ -525,10 +534,7 @@ int32_t ANativeWindow_unlockAndPost(ANativeWindow *window)
 		ANativeWindow_remotePresentTexture(window, texture, FALSE);
 		g_object_unref(texture);
 	} else {
-		struct cpu_frame *f = malloc(sizeof(*f));
-		f->widget = g_object_ref(window->surface_view_widget);
-		f->texture = texture;
-		g_idle_add(present_cpu_frame, f);
+		ANativeWindow_localPresentTexture(window, texture);
 	}
 	return 0;
 }
@@ -780,7 +786,9 @@ static GHashTable *vk_surface_native_windows;
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
 	VkResult ret;
-	if (pCreateInfo->window->remote_fd >= 0)
+	/* the host's WSI needs a Wayland or X11 surface of its own, which a window has only with ATL_DIRECT_EGL; any other
+	 * window gets the swapchain of vulkan_swapchain.c, as AOSP's loader builds it on every ANativeWindow */
+	if (pCreateInfo->window->remote_fd >= 0 || (!pCreateInfo->window->wayland_surface && !pCreateInfo->window->x11_display))
 		return atl_vk_create_remote_surface(instance, pCreateInfo->window, pSurface);
 	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
 
