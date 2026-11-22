@@ -587,6 +587,8 @@ public final class Manifest {
 		 third party applications.
 		 */
 		public static final String INTERACT_ACROSS_USERS = "android.permission.INTERACT_ACROSS_USERS";
+		/* ATL: AOSP @hide/@SystemApi permission, needed by WifiInfo.@RequiresPermission */
+		public static final String NETWORK_SETTINGS = "android.permission.NETWORK_SETTINGS";
 		/**
 		 @hide Fuller form of {@link android.Manifest.permission#INTERACT_ACROSS_USERS}
 		 that removes restrictions on where broadcasts can be sent and allows other

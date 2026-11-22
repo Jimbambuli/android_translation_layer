@@ -82,6 +82,18 @@ public class TelephonyManager {
 	public static final String EXTRA_STATE_RINGING = "RINGING";
 	public static final String EXTRA_STATE_OFFHOOK = "OFFHOOK";
 
+	/* AOSP TelephonyManager(Context): the context of the caller (its target SDK decides the compat changes) */
+	private final android.content.Context mContext;
+
+	/** @hide */
+	public TelephonyManager(android.content.Context context) {
+		mContext = context;
+	}
+
+	private TelephonyManager() {
+		this(null);
+	}
+
 	public static TelephonyManager getDefault() {
 		return new TelephonyManager();
 	}
@@ -90,7 +102,7 @@ public class TelephonyManager {
 	private int mSubId = SubscriptionManager.DEFAULT_SUBSCRIPTION_ID;
 
 	public TelephonyManager createForSubscriptionId(int subId) {
-		TelephonyManager tm = new TelephonyManager();
+		TelephonyManager tm = new TelephonyManager(mContext);
 		tm.mSubId = subId;
 		return tm;
 	}
@@ -148,10 +160,23 @@ public class TelephonyManager {
 		public void onError(int errorCode, Throwable detail) {}
 	}
 
-	/* AOSP: with telephony null, ISE for apps targeting after R (NULL_TELEPHONY_THROW_NO_CB), silent return
-	 * before. ATL does not keep the caller's target SDK here, so the modern behaviour is used. */
+	/* AOSP: with telephony null (getITelephony()), IllegalStateException for a caller targeting after R
+	 * (NULL_TELEPHONY_THROW_NO_CB, @EnabledAfter R), a silent return before. The caller is the context the manager
+	 * belongs to: in ATL another package's code (microG, targetSdk 29) runs in the app's process with its own context */
+	private boolean nullTelephonyThrowNoCb() {
+		android.content.pm.ApplicationInfo info = mContext != null ? mContext.getApplicationInfo() : null;
+		return info == null || info.targetSdkVersion > android.os.Build.VERSION_CODES.R;
+	}
+
 	public void requestCellInfoUpdate(java.util.concurrent.Executor executor, CellInfoCallback callback) {
-		throw new IllegalStateException("Telephony is null");
+		if (nullTelephonyThrowNoCb())
+			throw new IllegalStateException("Telephony is null");
+	}
+
+	/* @SystemApi variant, the same check */
+	public void requestCellInfoUpdate(android.os.WorkSource workSource, java.util.concurrent.Executor executor, CellInfoCallback callback) {
+		if (nullTelephonyThrowNoCb())
+			throw new IllegalStateException("Telephony is null");
 	}
 
 	public String getMmsUserAgent() {

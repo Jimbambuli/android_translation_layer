@@ -1657,7 +1657,11 @@ public class PackageManager {
 		if (packageName.equals("atl") || packageName.equals("android")) {
 			PackageInfo info = new PackageInfo();
 			info.packageName = packageName;
-			info.signatures = new Signature[] {new Signature(new byte[0])};
+			/* signed with ATL's platform certificate, like "android" with a device's platform key */
+			if ((flags & GET_SIGNATURES) != 0)
+				info.signatures = android.atl.ATLSigHelper.getPlatformSignatures();
+			if ((flags & GET_SIGNING_CERTIFICATES) != 0)
+				info.signingInfo = new SigningInfo(android.atl.ATLSigHelper.getPlatformSignatures());
 			return info;
 		}
 		PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
@@ -2302,7 +2306,7 @@ public class PackageManager {
 			case "android.permission.ACCESS_COARSE_LOCATION":
 			// the desktop gives the position whether the window is shown or not
 			case "android.permission.ACCESS_BACKGROUND_LOCATION":
-				if (ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName)
+				if (requestedPermissions(pkgName).contains(permName)
 				    && android.location.LocationManager.available())
 					return PERMISSION_GRANTED;
 				else
@@ -2313,15 +2317,24 @@ public class PackageManager {
 				else
 					return PERMISSION_DENIED;
 			default:
-				return isNormalPermissionRequested(permName) ? PERMISSION_GRANTED : PERMISSION_DENIED;
+				return isNormalPermissionRequested(permName, pkgName) ? PERMISSION_GRANTED : PERMISSION_DENIED;
 		}
+	}
+
+	/* AOSP checks the permissions of the package asked about (its own uid): a package loaded into this process, such
+	 * as microG's Play Services, has those of its own manifest; any other name (also the framework's) those of the app */
+	private static java.util.List<String> requestedPermissions(String pkgName) {
+		ATLLoadedApp app = pkgName != null ? android.atl.ATLLoadedAppManager.peekAppFromPackageName(pkgName) : null;
+		if (app == null || app == ATLLoadedApp.getSystemApplication())
+			app = ATLLoadedApp.getPrimaryApplication();
+		return app.pkg.requestedPermissions;
 	}
 
 	/* AOSP: the system grants a permission of protection level normal at install time to the app that requests it
 	 * in its manifest; any other name is denied. The level comes from the manifest that declares the permission
 	 * (the app's own, framework-res' or Play Services'). */
-	private boolean isNormalPermissionRequested(String permName) {
-		if (!ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName))
+	private boolean isNormalPermissionRequested(String permName, String pkgName) {
+		if (!requestedPermissions(pkgName).contains(permName))
 			return false;
 		try {
 			return getPermissionInfo(permName, 0).getProtection() == PermissionInfo.PROTECTION_NORMAL;
@@ -2645,7 +2658,7 @@ public class PackageManager {
 		 * offers no app to a device without them (android.hardware.touchscreen is implied by most apps) */
 		String[] names = {FEATURE_TOUCHSCREEN, "android.hardware.touchscreen.multitouch.distinct", FEATURE_FAKETOUCH, FEATURE_SCREEN_PORTRAIT,
 		                  FEATURE_SCREEN_LANDSCAPE, FEATURE_AUDIO_OUTPUT, FEATURE_MICROPHONE, FEATURE_LOCATION,
-		                  FEATURE_LOCATION_NETWORK, FEATURE_AUTOMOTIVE,
+		                  FEATURE_LOCATION_NETWORK, FEATURE_WIFI, FEATURE_AUTOMOTIVE,
 		                  FEATURE_LEANBACK, FEATURE_TELEVISION, FEATURE_WATCH, FEATURE_PICTURE_IN_PICTURE};
 		List<FeatureInfo> features = new ArrayList<>();
 		for (String name : names) {
@@ -2688,6 +2701,11 @@ public class PackageManager {
 			 * android.hardware.location from ACCESS_COARSE_LOCATION */
 			case FEATURE_LOCATION:
 			case FEATURE_LOCATION_NETWORK:
+				return true;
+			/* WifiManager over the desktop's NetworkManager. Without a Wi-Fi device (or without NetworkManager, in a
+			 * Flatpak without --system-talk-name=org.freedesktop.NetworkManager) ATL is a device whose Wi-Fi is
+			 * switched off, not one without Wi-Fi: apps written for phones take Wi-Fi for granted */
+			case FEATURE_WIFI:
 				return true;
 			case FEATURE_AUTOMOTIVE:
 				return System.getenv("ATL_IS_AUTOMOTIVE") != null;

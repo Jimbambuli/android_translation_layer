@@ -1,6 +1,14 @@
 package android.net;
 
 public final class NetworkCapabilities implements android.os.Parcelable {
+	/* ATL: AOSP NetworkCapabilities redaction constants (@hide), values as in modules_Connectivity */
+	public static final long REDACT_NONE = 0;
+	public static final long REDACT_FOR_ACCESS_FINE_LOCATION = 1 << 0;
+	public static final long REDACT_FOR_LOCAL_MAC_ADDRESS = 1 << 1;
+	public static final long REDACT_FOR_NETWORK_SETTINGS = 1 << 2;
+	public static final long REDACT_FOR_THREAD_NETWORK_PRIVILEGED = 1 << 3;
+	public static final long REDACT_ALL = -1L;
+
 	public static final int NET_CAPABILITY_MMS = 0;
 	public static final int NET_CAPABILITY_SUPL = 1;
 	public static final int NET_CAPABILITY_DUN = 2;

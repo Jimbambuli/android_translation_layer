@@ -291,6 +291,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/widgets/android_widget_Spinner.c',
                                                                   	'src/api-impl-jni/widgets/android_widget_TextView.c',
                                                                   	'src/api-impl-jni/widgets/android_widget_TimePicker.c',
+                                                                  	'src/api-impl-jni/wifi/com_android_server_wifi_NetworkManagerWifi.c',
                                                                   	mpris,
                                                                   	portal_openuri,
                                                                   	portal_email,

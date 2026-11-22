@@ -964,6 +964,15 @@ public abstract class Context {
 		}
 	}
 
+	/* a sticky broadcast of the system (AOSP: sendStickyBroadcastAsUser of a service): kept for receivers
+	 * registered later; initialOnly keeps it without sending (the state the system had before the app started) */
+	public static void sendStickyBroadcastToReceivers(Intent intent, boolean initialOnly) {
+		if (intent.getAction() != null)
+			stickyIntents.put(intent.getAction(), new Intent(intent));
+		if (!initialOnly)
+			sendBroadcastToReceivers(intent);
+	}
+
 	public void sendBroadcast(Intent intent, String receiverPermission) {
 		sendBroadcast(intent);
 	}

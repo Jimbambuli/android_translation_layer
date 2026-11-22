@@ -159,7 +159,7 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<TelephonyManager>() {
             @Override
             public TelephonyManager createService(ContextImpl ctx) {
-                return new TelephonyManager();
+                return new TelephonyManager(ctx);
             }});
 
         registerService(Context.AUDIO_SERVICE, AudioManager.class,
@@ -286,7 +286,11 @@ public final class SystemServiceRegistry {
                 new CachedServiceFetcher<WifiManager>() {
             @Override
             public WifiManager createService(ContextImpl ctx) {
-                return new WifiManager();
+                // WifiFrameworkInitializer: no WifiManager on a device without Wi-Fi
+                if (!ctx.getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_WIFI)) {
+                    return null;
+                }
+                return new WifiManager(ctx);
             }});
 
         registerService(Context.BLUETOOTH_SERVICE, BluetoothManager.class,
