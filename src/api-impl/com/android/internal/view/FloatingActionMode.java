@@ -159,7 +159,7 @@ public final class FloatingActionMode extends ActionMode {
         mOriginatingView.getLocationOnScreen(mViewPositionOnScreen);
         mOriginatingView.getRootView().getLocationOnScreen(mRootViewPositionOnScreen);
         mOriginatingView.getGlobalVisibleRect(mViewRectOnScreen);
-        mViewRectOnScreen.offset(mRootViewPositionOnScreen[0], mRootViewPositionOnScreen[1]);
+        // ATL: getGlobalVisibleRect() is on the screen already (the toplevel's surface), not in the window
 
         if (forceRepositionToolbar
                 || !Arrays.equals(mViewPositionOnScreen, mPreviousViewPositionOnScreen)
