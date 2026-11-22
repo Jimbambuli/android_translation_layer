@@ -25,6 +25,13 @@ popover#PopupWindow > contents {
 	padding: 0;
 }
 
+/* PopupWindow with a transparent background drawable: no window background, only the content draws */
+popover#PopupWindow.atl-transparent-background > contents {
+	background: none;
+	border: none;
+	box-shadow: none;
+}
+
 /* the dim behind a dialog (FLAG_DIM_BEHIND): black behind the faded content of the app's window */
 window.ATL-dim-behind {
 	background-color: black;

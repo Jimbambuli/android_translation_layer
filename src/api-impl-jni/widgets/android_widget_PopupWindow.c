@@ -86,6 +86,14 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setContentView(JN
 	apply_content_size(GTK_WIDGET(_PTR(popover_ptr)));
 }
 
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTransparentBackground(JNIEnv *env, jobject this, jlong popover_ptr, jboolean transparent)
+{
+	if (transparent)
+		gtk_widget_add_css_class(GTK_WIDGET(_PTR(popover_ptr)), "atl-transparent-background");
+	else
+		gtk_widget_remove_css_class(GTK_WIDGET(_PTR(popover_ptr)), "atl-transparent-background");
+}
+
 /* android.view.Gravity */
 #define GRAVITY_CENTER_HORIZONTAL 0x01
 #define GRAVITY_RIGHT 0x05
@@ -229,7 +237,10 @@ void atl_popover_set_colors(GtkPopover *popover, int background, int foreground)
 		/* menu items are highlighted like Android's colorControlHighlight, the text color at 12 % */
 		char *css = g_strdup_printf(
 		    "popover.%1$s > contents { background-color: rgba(%2$d,%3$d,%4$d,%5$.3f); color: rgba(%6$d,%7$d,%8$d,%9$.3f); }\n"
-		    "popover.%1$s modelbutton:hover, popover.%1$s modelbutton:selected { background-color: rgba(%6$d,%7$d,%8$d,0.12); }\n",
+		    "popover.%1$s modelbutton:hover, popover.%1$s modelbutton:selected { background-color: rgba(%6$d,%7$d,%8$d,0.12); }\n"
+		    /* a window without background (see default-stylesheet.css): a provider added later wins over the
+		     * stylesheet for the same priority, so the rule is repeated here */
+		    "popover.%1$s.atl-transparent-background > contents { background: none; border: none; box-shadow: none; }\n",
 		    css_class, CSS_RGBA(background), CSS_RGBA(foreground));
 		gtk_css_provider_load_from_string(css_provider, css);
 		g_free(css);

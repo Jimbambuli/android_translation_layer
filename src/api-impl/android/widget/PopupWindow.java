@@ -5,6 +5,7 @@ import android.atl.annotation.Export;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
+import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
@@ -172,10 +173,17 @@ public class PopupWindow {
 			exit_transition = getTransition(context, a.getResourceId(com.android.internal.R.styleable.PopupWindow_popupExitTransition, 0));
 		else
 			exit_transition = enter_transition == null ? null : enter_transition.clone();
+		/* the GTK frame in these colors stands in for the style's popupBackground; a style without one (the
+		 * text selection handles' Widget.TextSelectHandle) has no window background on AOSP */
+		mStyleBackground = a.getDrawable(com.android.internal.R.styleable.PopupWindow_popupBackground) != null;
 		a.recycle();
 		int[] colors = themeColors(context);
 		native_setColors(popover, colors[0], colors[1]);
+		native_setTransparentBackground(popover, !mStyleBackground);
 	}
+
+	/* whether the window has the background of its style (only the constructors with a Context read one) */
+	private boolean mStyleBackground;
 
 	/* background and text color of Material popups: colorBackgroundFloating and textColorPrimary */
 	static int[] themeColors(Context context) {
@@ -250,10 +258,14 @@ public class PopupWindow {
 	 * the padding of the background (a nine-patch, an InsetDrawable) is not applied to the content view
 	 * itself, where ListPopupWindow would count it a second time */
 	private void updateBackgroundView() {
-		if (contentView == null) {
-			native_setContentView(popover, 0);
+		/* the popover lets go of the view it shows now, so that it can go into a new FrameLayout: GTK keeps a
+		 * widget with a parent where it is (PopupWindow(View) followed by setBackgroundDrawable()) */
+		native_setContentView(popover, 0);
+		/* AOSP draws the background drawable as the window's background; the frame of the GTK theme stands in
+		 * for it, so without a background or with a transparent one only the content shows */
+		native_setTransparentBackground(popover, background != null ? background.getOpacity() == PixelFormat.TRANSPARENT : !mStyleBackground);
+		if (contentView == null)
 			return;
-		}
 		if (contentView.getParent() instanceof ViewGroup)
 			((ViewGroup)contentView.getParent()).removeView(contentView);
 		View backgroundView = contentView;
@@ -267,6 +279,8 @@ public class PopupWindow {
 			wrapper.setBackgroundDrawable(background);
 			backgroundView = wrapper;
 		}
+		mShownView = backgroundView;
+		applyWrapContent();
 		native_setContentView(popover, backgroundView.widget);
 	}
 
@@ -674,19 +688,44 @@ public class PopupWindow {
 		mClippingEnabled = enabled;
 	}
 
-	/* TODO: handle LayoutParams.WRAP_CONTENT and LayoutParams.MATCH_PARENT */
+	/* TODO: handle LayoutParams.MATCH_PARENT */
 	public void setWidth(int width) {
+		if (width == ViewGroup.LayoutParams.WRAP_CONTENT) {
+			mWrapWidth = true;
+			applyWrapContent();
+		}
 		if (width < 0)
 			return;
-
+		mWrapWidth = false;
 		native_setWidth(popover, width);
 	}
 
 	public void setHeight(int height) {
+		if (height == ViewGroup.LayoutParams.WRAP_CONTENT) {
+			mWrapHeight = true;
+			applyWrapContent();
+		}
 		if (height < 0)
 			return;
-
+		mWrapHeight = false;
 		native_setHeight(popover, height);
+	}
+
+	private boolean mWrapWidth, mWrapHeight;
+	private View mShownView;
+	private ViewGroup.LayoutParams mWrapParams;
+
+	/* AOSP gives the popup's decor view window LayoutParams of mWidth x mHeight, so a WRAP_CONTENT popup is as
+	 * big as its content measures. ATL's popover shows the view directly; a view without LayoutParams would be
+	 * MATCH_PARENT there and never measured, so it gets those of the window */
+	private void applyWrapContent() {
+		if (mShownView == null || (!mWrapWidth && !mWrapHeight))
+			return;
+		ViewGroup.LayoutParams params = mShownView.getLayoutParams();
+		if (params == null || params == mWrapParams)
+			mShownView.setLayoutParams(mWrapParams = new ViewGroup.LayoutParams(
+			    mWrapWidth ? ViewGroup.LayoutParams.WRAP_CONTENT : ViewGroup.LayoutParams.MATCH_PARENT,
+			    mWrapHeight ? ViewGroup.LayoutParams.WRAP_CONTENT : ViewGroup.LayoutParams.MATCH_PARENT));
 	}
 
 	public int getWidth() {
@@ -772,6 +811,7 @@ public class PopupWindow {
 	protected native boolean native_isAboveAnchor(long widget);
 	protected native void native_setColors(long widget, int background, int foreground);
 	protected native void native_setContentView(long widget, long contentView);
+	private native void native_setTransparentBackground(long widget, boolean transparent);
 	protected native void native_showAsDropDown(long widget, long anchor, int anchorWidth, int anchorHeight, int xoff, int yoff, int gravity, boolean overlapAnchor);
 	protected native void native_showAtLocation(long widget, long parent, int gravity, int x, int y);
 	protected native boolean native_isShowing(long widget);
