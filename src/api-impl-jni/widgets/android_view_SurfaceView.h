@@ -44,3 +44,20 @@ struct atl_surface_msg {
 	uint32_t crop; /* PRESENT: the scaling mode SCALE_TO_FIT_WITH_CROPPING of MediaCodec (the frame covers the widget) */
 	uint64_t modifier;
 };
+
+/* the planes of a frame of a hardware decoder (MediaCodec), on its GdkTexture as "atl-dmabuf" (g_object_set_data):
+ * SurfaceTexture.updateTexImage() samples them through an EGLImage, as Android's external texture samples the
+ * decoder's buffer */
+#define ATL_DMABUF_MAX_PLANES 2
+struct atl_dmabuf {
+	uint32_t fourcc; /* DRM_FORMAT_NV12 or DRM_FORMAT_P010 */
+	uint64_t modifier;
+	int32_t width;
+	int32_t height;
+	uint32_t n_planes;
+	int fd[ATL_DMABUF_MAX_PLANES];
+	uint32_t offset[ATL_DMABUF_MAX_PLANES];
+	uint32_t stride[ATL_DMABUF_MAX_PLANES];
+	uint32_t matrix; /* the YUV matrix: 601, 709 or 2020 */
+	uint32_t full_range;
+};

@@ -204,6 +204,7 @@ static const struct {
 	uint32_t layers[AV_DRM_MAX_PLANES];
 } drm_format_map[] = {
 	{DRM_FORMAT_NV12, 2, {DRM_FORMAT_R8, DRM_FORMAT_GR88}},
+	{DRM_FORMAT_P010, 2, {DRM_FORMAT_R16, DRM_FORMAT_GR1616}}, // 10 bit (HEVC Main10, VP9 Profile2, AV1 Main10)
 };
 
 static uint32_t get_drm_frame_format(const AVDRMFrameDescriptor *drm_frame_desc)
@@ -353,6 +354,28 @@ static GdkTexture *import_drm_frame_desc_as_texture(const AVDRMFrameDescriptor *
 	gdk_dmabuf_texture_builder_set_fourcc(builder, drm_format);
 	GError *error = NULL;
 	GdkTexture *texture = gdk_dmabuf_texture_builder_build(builder, handle_dmabuftexture_destroy, drm_frame, &error);
+	/* the planes for SurfaceTexture.updateTexImage() and a Surface of another process (struct atl_dmabuf); the file
+	 * descriptors belong to drm_frame, which lives as long as the texture */
+	if (texture && k <= ATL_DMABUF_MAX_PLANES && (drm_format == DRM_FORMAT_NV12 || drm_format == DRM_FORMAT_P010)) {
+		struct atl_dmabuf *dmabuf = g_new0(struct atl_dmabuf, 1);
+		dmabuf->fourcc = drm_format;
+		dmabuf->width = width;
+		dmabuf->height = height;
+		for (int i = 0; i < drm_frame_desc->nb_layers; i++) {
+			for (int j = 0; j < drm_frame_desc->layers[i].nb_planes; j++) {
+				const AVDRMPlaneDescriptor *plane = &drm_frame_desc->layers[i].planes[j];
+				const AVDRMObjectDescriptor *object = &drm_frame_desc->objects[plane->object_index];
+				dmabuf->modifier = object->format_modifier;
+				dmabuf->fd[dmabuf->n_planes] = object->fd;
+				dmabuf->offset[dmabuf->n_planes] = plane->offset;
+				dmabuf->stride[dmabuf->n_planes] = plane->pitch;
+				dmabuf->n_planes++;
+			}
+		}
+		dmabuf->matrix = drm_frame->colorspace == AVCOL_SPC_BT709 ? 709 : (drm_frame->colorspace == AVCOL_SPC_BT2020_NCL || drm_frame->colorspace == AVCOL_SPC_BT2020_CL) ? 2020 : 601;
+		dmabuf->full_range = drm_frame->color_range == AVCOL_RANGE_JPEG;
+		g_object_set_data_full(G_OBJECT(texture), "atl-dmabuf", dmabuf, g_free);
+	}
 	if (error) {
 		fprintf(stderr, "Failed to build texture: %s\n", error->message);
 		exit(1);
@@ -571,6 +594,9 @@ static gboolean render_frame(void *data)
 			fprintf(stderr, "Failed to map frame: %s\n", av_err2str(ret));
 			exit(1);
 		}
+		/* the YUV matrix and range for a consumer that samples the planes (struct atl_dmabuf) */
+		drm_frame->colorspace = frame->colorspace;
+		drm_frame->color_range = frame->color_range;
 		av_frame_free(&frame);
 	} else {
 		drm_frame = frame;
@@ -617,9 +643,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 			return;
 		}
 
-		/* a SurfaceTexture's consumer may read the pixels (updateTexImage()), and a frame to be turned is turned
-		 * in memory: a hardware frame is copied to memory first */
-		if (frame->hw_frames_ctx && (ctx->video.surface_texture || ctx->video.rotation)) {
+		/* a frame to be turned is turned in memory: a hardware frame is copied to memory first; a SurfaceTexture
+		 * gets the hardware frame itself (as a dmabuf, like AOSP's BufferQueue gets the decoder's buffer) */
+		if (frame->hw_frames_ctx && ctx->video.rotation) {
 			AVFrame *sw_frame = av_frame_alloc();
 			if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0 || av_frame_copy_props(sw_frame, frame) < 0) {
 				fprintf(stderr, "skipping %dx%d frame: can't copy it from the hardware\n", frame->width, frame->height);
@@ -689,8 +715,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		struct render_frame_data *data = malloc(sizeof(struct render_frame_data));
 		data->frame = frame;
 		data->release_time_ns = presentationTimeNs;
+		data->timestamp_ns = timestamp_ns;
 		data->surface_view_widget = ctx->video.surface_view_widget;
-		data->surface_texture = NULL;
+		data->surface_texture = ctx->video.surface_texture ? (*env)->NewGlobalRef(env, ctx->video.surface_texture) : NULL;
 		data->crop = ctx->video.crop;
 		data->remote = ctx->video.remote;
 		if (data->remote)
