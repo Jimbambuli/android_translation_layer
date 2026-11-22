@@ -7,21 +7,41 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_hardware_SensorManager_SENSOR_DELAY_FASTEST
+#define android_hardware_SensorManager_SENSOR_DELAY_FASTEST 0L
+#undef android_hardware_SensorManager_SENSOR_DELAY_GAME
+#define android_hardware_SensorManager_SENSOR_DELAY_GAME 1L
+#undef android_hardware_SensorManager_SENSOR_DELAY_UI
+#define android_hardware_SensorManager_SENSOR_DELAY_UI 2L
+#undef android_hardware_SensorManager_SENSOR_DELAY_NORMAL
+#define android_hardware_SensorManager_SENSOR_DELAY_NORMAL 3L
+#undef android_hardware_SensorManager_PROXY_LIGHT
+#define android_hardware_SensorManager_PROXY_LIGHT 1L
+#undef android_hardware_SensorManager_PROXY_PROXIMITY
+#define android_hardware_SensorManager_PROXY_PROXIMITY 2L
 /*
  * Class:     android_hardware_SensorManager
- * Method:    register_accelerometer_listener_native
- * Signature: (Landroid/hardware/SensorEventListener;Landroid/hardware/Sensor;I)J
+ * Method:    nativeProxySensors
+ * Signature: ()I
  */
-JNIEXPORT jlong JNICALL Java_android_hardware_SensorManager_register_1accelerometer_1listener_1native
-  (JNIEnv *, jobject, jobject, jobject, jint);
+JNIEXPORT jint JNICALL Java_android_hardware_SensorManager_nativeProxySensors
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_hardware_SensorManager
- * Method:    unregister_accelerometer_listener_native
- * Signature: (J)V
+ * Method:    nativeProxyClaim
+ * Signature: (IZ)Z
  */
-JNIEXPORT void JNICALL Java_android_hardware_SensorManager_unregister_1accelerometer_1listener_1native
-  (JNIEnv *, jobject, jlong);
+JNIEXPORT jboolean JNICALL Java_android_hardware_SensorManager_nativeProxyClaim
+  (JNIEnv *, jclass, jint, jboolean);
+
+/*
+ * Class:     android_hardware_SensorManager
+ * Method:    nativeProxyValue
+ * Signature: (I)F
+ */
+JNIEXPORT jfloat JNICALL Java_android_hardware_SensorManager_nativeProxyValue
+  (JNIEnv *, jclass, jint);
 
 #ifdef __cplusplus
 }

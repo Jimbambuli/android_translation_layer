@@ -331,9 +331,38 @@ public final class Sensor {
 	private int mMinDelay;
 	private int mFifoReservedEventCount;
 	private int mFifoMaxEventCount;
+	private int mMaxDelay;
+	private int mFlags;
+
+	/* AOSP Sensor.SENSOR_FLAG_WAKE_UP_SENSOR */
+	private static final int SENSOR_FLAG_WAKE_UP_SENSOR = 1;
 
 	Sensor(int type) {
 		mType = type;
+	}
+
+	/* a sensor of SensorManager's sensor list (AOSP: Sensor(InputSensorInfo) from the sensors HAL) */
+	Sensor(String name, String vendor, int handle, int type, float maxRange, float resolution, int minDelay, int maxDelay, boolean wakeUp) {
+		mName = name;
+		mVendor = vendor;
+		mVersion = 1;
+		mHandle = handle;
+		mType = type;
+		mMaxRange = maxRange;
+		mResolution = resolution;
+		mMinDelay = minDelay;
+		mMaxDelay = maxDelay;
+		mFlags = wakeUp ? SENSOR_FLAG_WAKE_UP_SENSOR : 0;
+	}
+
+	/* AOSP Sensor.getMaxDelay() */
+	public int getMaxDelay() {
+		return mMaxDelay;
+	}
+
+	/* AOSP Sensor.isWakeUpSensor() */
+	public boolean isWakeUpSensor() {
+		return (mFlags & SENSOR_FLAG_WAKE_UP_SENSOR) != 0;
 	}
 
 	/**
@@ -430,7 +459,9 @@ public final class Sensor {
 	}
 
 	/* AOSP Sensor.TYPE_* missing above */
+	static final int TYPE_TILT_DETECTOR = 22;
 	static final int TYPE_GLANCE_GESTURE = 24;
+	static final int TYPE_WRIST_TILT_GESTURE = 26;
 	public static final int TYPE_HEART_RATE = 21;
 	static final int TYPE_PICK_UP_GESTURE = 25;
 	static final int TYPE_WAKE_GESTURE = 23;
