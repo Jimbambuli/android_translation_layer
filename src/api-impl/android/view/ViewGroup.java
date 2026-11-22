@@ -228,6 +228,46 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			if (onHierarchyChangeListener != null)
 				onHierarchyChangeListener.onChildViewAdded(this, child);
 		}
+		// If a propagated value exists, pass it to the child.
+		if (!Float.isNaN(getRequestedFrameRate()) && mPropagatedFrameRate) {
+			child.overrideFrameRate(getRequestedFrameRate(), getForcedOverrideFrameRateFlag());
+		}
+	}
+
+	/* AOSP FLAG_PROPAGATED_FRAME_RATE */
+	private boolean mPropagatedFrameRate;
+
+	@Override
+	public void setRequestedFrameRate(float frameRate) {
+		if (getForcedOverrideFrameRateFlag()) {
+			return;
+		}
+		super.setRequestedFrameRate(frameRate);
+		setSelfRequestedFrameRateFlag(!Float.isNaN(getRequestedFrameRate()));
+		mPropagatedFrameRate = false;
+	}
+
+	public void propagateRequestedFrameRate(float frameRate, boolean forceOverride) {
+		// Skip setting the frame rate if it's currently in forced override mode.
+		if (getForcedOverrideFrameRateFlag()) {
+			return;
+		}
+		// frame rate could be set previously with setRequestedFrameRate or propagateRequestedFrameRate
+		setSelfRequestedFrameRateFlag(false);
+		overrideFrameRate(frameRate, forceOverride);
+		setSelfRequestedFrameRateFlag(true);
+	}
+
+	@Override
+	void overrideFrameRate(float frameRate, boolean forceOverride) {
+		// if it's in forceOverride mode or has no self requested frame rate, it will override the frame rate.
+		if (forceOverride || !getSelfRequestedFrameRateFlag()) {
+			super.overrideFrameRate(frameRate, forceOverride);
+			mPropagatedFrameRate = true;
+			for (int i = 0; i < getChildCount(); i++) {
+				getChildAt(i).overrideFrameRate(frameRate, forceOverride);
+			}
+		}
 	}
 
 	private View touchTarget;

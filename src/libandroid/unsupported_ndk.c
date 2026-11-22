@@ -1,13 +1,14 @@
 /*
  * NDK functions of features ATL does not have, answering like an Android device without them:
  * no DRM scheme (libmediandk NdkMediaDrm/NdkMediaCrypto), no gralloc buffers (AHardwareBuffer),
- * no image readers (NdkImageReader), no sync fences (libsync). Firefox's libxul links all of them
- * and checks the results.
+ * no image readers (NdkImageReader), no sync fences (libsync), no SurfaceFlinger (ASurfaceControl,
+ * AChoreographer). Firefox's libxul and YouTube's libgoogle3 link them and check the results.
  */
 
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -53,6 +54,13 @@ int AHardwareBuffer_lock(void *buffer, uint64_t usage, int32_t fence, const void
 int AHardwareBuffer_unlock(void *buffer, int32_t *fence) { return BAD_VALUE; }
 int AHardwareBuffer_sendHandleToUnixSocket(const void *buffer, int socketFd) { return BAD_VALUE; }
 int AHardwareBuffer_recvHandleFromUnixSocket(int socketFd, void **outBuffer) { return INVALID_OPERATION; }
+/* AOSP AHardwareBuffer.cpp: isSupported() asks the allocator; a trial allocation fails here */
+int AHardwareBuffer_isSupported(const void *desc) { return 0; }
+void AHardwareBuffer_acquire(void *buffer) {}
+int AHardwareBuffer_lockPlanes(void *buffer, uint64_t usage, int32_t fence, const void *rect, void *outPlanes) { return BAD_VALUE; }
+/* hardware_buffer_jni.cpp: an android.hardware.HardwareBuffer in ATL never holds a native buffer */
+void *AHardwareBuffer_fromHardwareBuffer(JNIEnv *env, jobject hardwareBufferObj) { return NULL; }
+jobject AHardwareBuffer_toHardwareBuffer(JNIEnv *env, void *hardwareBuffer) { return NULL; }
 
 /* NdkImageReader / NdkImage */
 media_status_t AImageReader_newWithUsage(int32_t width, int32_t height, int32_t format, uint64_t usage, int32_t maxImages, void **reader)
@@ -65,9 +73,40 @@ void AImageReader_delete(void *reader) {}
 media_status_t AImageReader_getWindow(void *reader, void **window) { return AMEDIA_ERROR_INVALID_PARAMETER; }
 media_status_t AImageReader_setImageListener(void *reader, void *listener) { return AMEDIA_ERROR_INVALID_PARAMETER; }
 media_status_t AImageReader_acquireNextImageAsync(void *reader, void **image, int *acquireFenceFd) { return AMEDIA_ERROR_INVALID_PARAMETER; }
+media_status_t AImageReader_acquireNextImage(void *reader, void **image) { return AImageReader_acquireNextImageAsync(reader, image, NULL); }
+media_status_t AImageReader_acquireLatestImageAsync(void *reader, void **image, int *acquireFenceFd) { return AMEDIA_ERROR_INVALID_PARAMETER; }
+media_status_t AImageReader_acquireLatestImage(void *reader, void **image) { return AImageReader_acquireLatestImageAsync(reader, image, NULL); }
 void AImage_delete(void *image) {}
 void AImage_deleteAsync(void *image, int releaseFenceFd) {}
 media_status_t AImage_getHardwareBuffer(const void *image, void **buffer) { return AMEDIA_ERROR_INVALID_PARAMETER; }
+media_status_t AImage_getCropRect(const void *image, void *rect) { return AMEDIA_ERROR_INVALID_PARAMETER; }
+media_status_t AImage_getTimestamp(const void *image, int64_t *timestampNs) { return AMEDIA_ERROR_INVALID_PARAMETER; }
+
+/* surface_control.cpp: createFromWindow() returns NULL when there is no composer client
+ * (SurfaceComposerClient::initCheck()). So no ASurfaceControl exists, and a transaction has nothing to
+ * apply and never completes. */
+void *ASurfaceControl_createFromWindow(void *window, const char *debug_name) { return NULL; }
+void ASurfaceControl_release(void *aSurfaceControl) {}
+struct ASurfaceTransaction {
+	char unused;
+};
+void *ASurfaceTransaction_create(void) { return calloc(1, sizeof(struct ASurfaceTransaction)); }
+void ASurfaceTransaction_delete(void *aSurfaceTransaction) { free(aSurfaceTransaction); }
+void ASurfaceTransaction_apply(void *aSurfaceTransaction) {}
+void ASurfaceTransaction_setOnComplete(void *aSurfaceTransaction, void *context, void (*func)(void *context, void *stats)) {}
+void ASurfaceTransaction_reparent(void *aSurfaceTransaction, void *aSurfaceControl, void *newParentASurfaceControl) {}
+void ASurfaceTransaction_setBuffer(void *aSurfaceTransaction, void *aSurfaceControl, void *buffer, int acquire_fence_fd) {}
+void ASurfaceTransaction_setBufferDataSpace(void *aSurfaceTransaction, void *aSurfaceControl, int32_t aDataSpace) {}
+void ASurfaceTransaction_setGeometry(void *aSurfaceTransaction, void *aSurfaceControl, const void *source, const void *destination, int32_t transform) {}
+int ASurfaceTransactionStats_getPreviousReleaseFenceFd(void *aSurfaceTransactionStats, void *aSurfaceControl) { return -1; }
+
+/* AChoreographer.cpp: getInstance() is Choreographer::getForThread(), which returns NULL when it cannot
+ * connect to SurfaceFlinger's display events ("Failed to initialize") */
+void *AChoreographer_getInstance(void) { return NULL; }
+void AChoreographer_postFrameCallback(void *choreographer, void (*callback)(long frameTimeNanos, void *data), void *data) {}
+void AChoreographer_postFrameCallbackDelayed(void *choreographer, void (*callback)(long frameTimeNanos, void *data), void *data, long delayMillis) {}
+void AChoreographer_postFrameCallback64(void *choreographer, void (*callback)(int64_t frameTimeNanos, void *data), void *data) {}
+void AChoreographer_postFrameCallbackDelayed64(void *choreographer, void (*callback)(int64_t frameTimeNanos, void *data), void *data, uint32_t delayMillis) {}
 
 /* native_window_jni: only windows of android.view.Surface have one */
 jobject ANativeWindow_toSurface(JNIEnv *env, void *window) { return NULL; }

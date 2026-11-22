@@ -67,15 +67,34 @@ public class Network implements android.os.Parcelable {
 		return Integer.toString(netId);
 	}
 
-	public long getNetworkHandle() {
-		return 1L;
+	/* AOSP Network.java: the NDK handle is the netId for the resolver above the magic value that
+	 * libandroid's net.c checks */
+	private static final long HANDLE_MAGIC = 0xcafed00dL;
+	private static final int HANDLE_MAGIC_SIZE = 32;
+	private static final int USE_LOCAL_NAMESERVERS_FLAG = 0x80000000;
+
+	/** @hide */
+	public int getNetIdForResolv() {
+		return mPrivateDnsBypass ? (USE_LOCAL_NAMESERVERS_FLAG | netId) : netId;
 	}
 
-	/* AOSP refuses handle 0 (NETID_UNSET); ATL has one network, so any other handle is that network */
+	public long getNetworkHandle() {
+		if (netId == 0) {
+			return 0L;
+		}
+		return (((long)getNetIdForResolv()) << HANDLE_MAGIC_SIZE) | HANDLE_MAGIC;
+	}
+
 	public static Network fromNetworkHandle(long networkHandle) {
-		if (networkHandle == 0)
+		if (networkHandle == 0) {
 			throw new IllegalArgumentException("Network.fromNetworkHandle refusing to instantiate NETID_UNSET Network.");
-		return new Network();
+		}
+		if ((networkHandle & ((1L << HANDLE_MAGIC_SIZE) - 1)) != HANDLE_MAGIC) {
+			throw new IllegalArgumentException("Value passed to fromNetworkHandle() is not a network handle.");
+		}
+		final int netIdForResolv = (int)(networkHandle >>> HANDLE_MAGIC_SIZE);
+		return new Network((netIdForResolv & ~USE_LOCAL_NAMESERVERS_FLAG),
+		                   ((netIdForResolv & USE_LOCAL_NAMESERVERS_FLAG) != 0));
 	}
 
 	/* AOSP Network.java binds name lookups and sockets to this network's netId. ATL has one network
