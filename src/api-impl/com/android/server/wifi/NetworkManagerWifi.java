@@ -11,8 +11,8 @@ import java.util.List;
 /*
  * ATL's Wi-Fi hardware: the desktop's NetworkManager on the system bus (org.freedesktop.NetworkManager, in a Flatpak
  * it needs --system-talk-name for it). It takes the place of AOSP's wificond/WifiScanner below ScanRequestProxy and of
- * ClientModeImpl's WifiInfo. Without NetworkManager or without a Wi-Fi device ATL is a device without Wi-Fi
- * (no FEATURE_WIFI, no WifiManager).
+ * ClientModeImpl's WifiInfo. Without NetworkManager or without a Wi-Fi device ATL has Wi-Fi that is switched off
+ * (WIFI_STATE_DISABLED, no scan results).
  *
  * NetworkManager gives what wpa_supplicant reports, a little reduced: the signal only as quality in percent
  * (nm_wifi_utils_level_to_quality(): -100..-40 dBm linearly to 0..100 %, converted back here), the security as flags
@@ -77,19 +77,25 @@ public final class NetworkManagerWifi {
 
 	/** the device's values (DEVICE_*), all 0 when it went away */
 	public static int[] getDevice() {
-		int[] values = nativeGetDevice();
+		int[] values = isPresent() ? nativeGetDevice() : null;
 		return values != null && values.length == DEVICE_COUNT ? values : new int[DEVICE_COUNT];
+	}
+
+	/** switch the radio (NetworkManager's WirelessEnabled); the change comes back through stateChanged() */
+	public static void setWirelessEnabled(boolean enabled) {
+		nativeSetWirelessEnabled(enabled);
 	}
 
 	/** ask NetworkManager to scan; the answer comes through scanDone() */
 	public static void requestScan() {
-		nativeRequestScan();
+		if (isPresent())
+			nativeRequestScan();
 	}
 
 	/** the access points NetworkManager has seen in its recent scans, as AOSP's scan results */
 	public static List<ScanResult> getScanResults() {
 		List<ScanResult> results = new ArrayList<>();
-		Object[] records = nativeGetAccessPoints();
+		Object[] records = isPresent() ? nativeGetAccessPoints() : null;
 		if (records == null)
 			return results;
 		for (Object record : records) {
@@ -309,6 +315,7 @@ public final class NetworkManagerWifi {
 	private static native Object[] nativeGetAccessPoints();
 	private static native Object[] nativeGetActiveAccessPoint();
 	private static native void nativeRequestScan();
+	private static native void nativeSetWirelessEnabled(boolean enabled);
 
 	/* NetworkManager finished a scan (LastScan changed: success) or refused the request (failure) */
 	@Export

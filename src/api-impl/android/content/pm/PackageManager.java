@@ -2702,10 +2702,11 @@ public class PackageManager {
 			case FEATURE_LOCATION:
 			case FEATURE_LOCATION_NETWORK:
 				return true;
-			/* WifiManager over the desktop's NetworkManager: a device without Wi-Fi when it has no Wi-Fi device
-			 * or cannot be reached (in a Flatpak without --system-talk-name=org.freedesktop.NetworkManager) */
+			/* WifiManager over the desktop's NetworkManager. Without a Wi-Fi device (or without NetworkManager, in a
+			 * Flatpak without --system-talk-name=org.freedesktop.NetworkManager) ATL is a device whose Wi-Fi is
+			 * switched off, not one without Wi-Fi: apps written for phones take Wi-Fi for granted */
 			case FEATURE_WIFI:
-				return com.android.server.wifi.NetworkManagerWifi.isPresent();
+				return true;
 			case FEATURE_AUTOMOTIVE:
 				return System.getenv("ATL_IS_AUTOMOTIVE") != null;
 			case FEATURE_LEANBACK:

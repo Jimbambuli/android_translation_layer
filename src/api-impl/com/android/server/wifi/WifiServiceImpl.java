@@ -117,6 +117,23 @@ public final class WifiServiceImpl {
 		return mScanThrottleEnabled;
 	}
 
+	/* WifiServiceImpl.setWifiEnabled(): CHANGE_WIFI_STATE, refused (false) for apps targeting Q or later, otherwise
+	 * the radio is switched (NetworkManager's WirelessEnabled, polkit decides) and the answer is true. Without a
+	 * Wi-Fi device nothing can be switched and the state stays WIFI_STATE_DISABLED. The confirmation dialog for
+	 * third-party apps (config_showConfirmationDialogForThirdPartyAppsEnablingWifi) is not shown (its default in
+	 * AOSP not checked). */
+	public boolean setWifiEnabled(Context context, boolean enable) {
+		enforceChangePermission(context);
+		if (context.getApplicationInfo().targetSdkVersion >= Build.VERSION_CODES.Q) {
+			Log.i(TAG, "setWifiEnabled not allowed for uid=" + android.os.Process.myUid());
+			return false;
+		}
+		Log.i(TAG, "setWifiEnabled package=" + context.getOpPackageName() + " enable=" + enable);
+		if (NetworkManagerWifi.isPresent())
+			NetworkManagerWifi.setWirelessEnabled(enable);
+		return true;
+	}
+
 	/* ---- scans (WifiServiceImpl.startScan, ScanRequestProxy.startScan) ---- */
 
 	public boolean startScan(Context context) {

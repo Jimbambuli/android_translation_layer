@@ -131,6 +131,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_android_server_wifi_NetworkManagerWifi_n
 JNIEXPORT void JNICALL Java_com_android_server_wifi_NetworkManagerWifi_nativeRequestScan
   (JNIEnv *, jclass);
 
+/*
+ * Class:     com_android_server_wifi_NetworkManagerWifi
+ * Method:    nativeSetWirelessEnabled
+ * Signature: (Z)V
+ */
+JNIEXPORT void JNICALL Java_com_android_server_wifi_NetworkManagerWifi_nativeSetWirelessEnabled
+  (JNIEnv *, jclass, jboolean);
+
 #ifdef __cplusplus
 }
 #endif

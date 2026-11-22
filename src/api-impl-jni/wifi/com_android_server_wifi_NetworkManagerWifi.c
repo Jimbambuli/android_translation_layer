@@ -10,8 +10,9 @@
  * NetworkManagerWifi: the desktop's Wi-Fi through NetworkManager on the system bus (in a Flatpak it needs
  * --system-talk-name=org.freedesktop.NetworkManager). Java reads with synchronous calls from its own threads; the
  * scan request and the PropertiesChanged signals (LastScan: a scan finished; radio, device state, connection) live in
- * the main context and come back through the @Export methods. Only reads and RequestScan, which polkit allows as
- * org.freedesktop.NetworkManager.wifi.scan.
+ * the main context and come back through the @Export methods. Besides reading only RequestScan (polkit
+ * org.freedesktop.NetworkManager.wifi.scan) and WirelessEnabled for setWifiEnabled() of old apps
+ * (org.freedesktop.NetworkManager.enable-disable-wifi).
  */
 
 #define NM_NAME "org.freedesktop.NetworkManager"
@@ -268,4 +269,18 @@ JNIEXPORT void JNICALL Java_com_android_server_wifi_NetworkManagerWifi_nativeReq
 {
 	if (device_path)
 		g_idle_add(request_scan_idle, NULL);
+}
+
+static gboolean set_wireless_idle(gpointer data)
+{
+	g_dbus_connection_call(bus, NM_NAME, NM_PATH, "org.freedesktop.DBus.Properties", "Set",
+	                       g_variant_new("(ssv)", NM_NAME, "WirelessEnabled", g_variant_new_boolean(GPOINTER_TO_INT(data))),
+	                       NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL, NULL);
+	return G_SOURCE_REMOVE;
+}
+
+JNIEXPORT void JNICALL Java_com_android_server_wifi_NetworkManagerWifi_nativeSetWirelessEnabled(JNIEnv *env, jclass, jboolean enabled)
+{
+	if (bus)
+		g_idle_add(set_wireless_idle, GINT_TO_POINTER(enabled ? 1 : 0));
 }

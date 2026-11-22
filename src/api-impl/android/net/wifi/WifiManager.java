@@ -392,9 +392,9 @@ public class WifiManager {
 		return getWifiState() == WIFI_STATE_ENABLED;
 	}
 
-	/* no Wi-Fi control from inside the sandbox: AOSP returns false when the request is not carried out */
+	@Deprecated
 	public boolean setWifiEnabled(boolean enabled) {
-		return false;
+		return mService.setWifiEnabled(mContext, enabled);
 	}
 
 	/* AOSP startScan() -> startScan(null) */
@@ -475,7 +475,7 @@ public class WifiManager {
 		return rssiA - rssiB;
 	}
 
-	/* no Wi-Fi control from inside the sandbox (see setWifiEnabled): the request is not carried out */
+	/* no Wi-Fi network control from inside the sandbox: the request is not carried out */
 	@Deprecated
 	public boolean enableNetwork(int netId, boolean attemptConnect) {
 		return false;
