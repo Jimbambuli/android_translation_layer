@@ -47,7 +47,6 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	public static final int RENDERER_PRIORITY_IMPORTANT = 2;
 
 	private WebViewClient webViewClient;
-	private String url;
 	private WebChromeClient webChromeClient;
 	private boolean destroyed;
 	// the page's scroll offset in View pixels as last reported or set, AwScrollOffsetManager's mNativeScroll*
@@ -788,7 +787,6 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	@Export
 	void internalLoadChanged(int loadState, String url) {
 		url = internalToAppUrl(url);
-		this.url = url;
 		if (loadState == /*WEBKIT_LOAD_STARTED*/ 0) {
 			if (webViewClient != null)
 				webViewClient.onPageStarted(this, url, null);
@@ -1389,8 +1387,15 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		native_loadUrlWithHeaders(widget, url, headers);
 	}
 
+	/* AOSP WebView.getUrl() with Chromium as the provider (AwContents.getUrl()): the visible URL, which for a load the
+	 * app started is the requested one at once (NavigationControllerImpl::GetVisibleEntry() shows the pending entry),
+	 * null when empty or destroyed. WebKit's active URI (webkit_web_view_get_uri()) is the requested URI from
+	 * webkit_web_view_load_uri() on, before WEBKIT_LOAD_STARTED reaches internalLoadChanged() */
 	public String getUrl() {
-		return url;
+		if (isDestroyed())
+			return null;
+		String url = native_getUrl(widget);
+		return url != null && !url.trim().isEmpty() ? internalToAppUrl(url) : null;
 	}
 
 	/* AOSP WebView.getOriginalUrl(): the URL asked for the current page, before redirects */
@@ -1597,6 +1602,7 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 	private native void native_goBackOrForward(long widget, int steps);
 	private native void native_clearHistory(long widget);
 	private native String native_getTitle(long widget);
+	private native String native_getUrl(long widget);
 	private native String native_getOriginalUrl(long widget);
 	private native byte[] native_getCertificate(long widget);
 	private native boolean native_capturePicture(long widget, android.graphics.Bitmap bitmap);

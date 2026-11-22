@@ -985,6 +985,16 @@ JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getTitle(JNIEnv *e
 	return _JSTRING(uri ? uri : "");
 }
 
+// the active URI: the requested one as soon as a load is started, NULL before the first load
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getUrl(JNIEnv *env, jobject this, jlong widget_ptr)
+{
+	GtkWidget *webview = _PTR(widget_ptr);
+	if (!WEBKIT_IS_WEB_VIEW(webview))
+		return NULL;
+	const char *uri = webkit_web_view_get_uri(WEBKIT_WEB_VIEW(webview));
+	return uri ? _JSTRING(uri) : NULL;
+}
+
 // the URL first asked for the current entry, before redirects
 JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getOriginalUrl(JNIEnv *env, jobject this, jlong widget_ptr)
 {

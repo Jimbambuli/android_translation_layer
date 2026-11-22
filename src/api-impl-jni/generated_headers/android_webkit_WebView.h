@@ -533,6 +533,14 @@ JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getTitle
 
 /*
  * Class:     android_webkit_WebView
+ * Method:    native_getUrl
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_webkit_WebView_native_1getUrl
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
  * Method:    native_getOriginalUrl
  * Signature: (J)Ljava/lang/String;
  */
