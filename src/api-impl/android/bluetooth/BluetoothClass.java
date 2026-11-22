@@ -16,8 +16,11 @@
 
 package android.bluetooth;
 
+import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresNoPermission;
 import android.annotation.SystemApi;
+import android.compat.annotation.UnsupportedAppUsage;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -57,7 +60,7 @@ public final class BluetoothClass implements Parcelable {
     private final int mClass;
 
     /** @hide */
-    
+    @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public BluetoothClass(int classInt) {
         mClass = classInt;
     }
@@ -85,7 +88,7 @@ public final class BluetoothClass implements Parcelable {
         return 0;
     }
 
-    public static final @android.annotation.NonNull Parcelable.Creator<BluetoothClass> CREATOR =
+    public static final @NonNull Parcelable.Creator<BluetoothClass> CREATOR =
             new Parcelable.Creator<BluetoothClass>() {
                 public BluetoothClass createFromParcel(Parcel in) {
                     return new BluetoothClass(in.readInt());
@@ -133,6 +136,7 @@ public final class BluetoothClass implements Parcelable {
      * @param service valid service class
      * @return true if the service class is supported
      */
+    @RequiresNoPermission
     public boolean hasService(int service) {
         return ((mClass & Service.BITMASK & service) != 0);
     }
@@ -253,6 +257,7 @@ public final class BluetoothClass implements Parcelable {
      *
      * @return major device class component
      */
+    @RequiresNoPermission
     public int getMajorDeviceClass() {
         return (mClass & Device.Major.BITMASK);
     }
@@ -265,6 +270,7 @@ public final class BluetoothClass implements Parcelable {
      *
      * @return device class component
      */
+    @RequiresNoPermission
     public int getDeviceClass() {
         return (mClass & Device.BITMASK);
     }
@@ -279,6 +285,7 @@ public final class BluetoothClass implements Parcelable {
      *     CoD">https://www.bluetooth.com/specifications/assigned-numbers/baseband</a>
      * @hide
      */
+    @RequiresNoPermission
     public int getClassOfDevice() {
         return mClass;
     }
@@ -309,6 +316,7 @@ public final class BluetoothClass implements Parcelable {
      * @param profile the profile to be checked
      * @return whether this device supports specified profile
      */
+    @RequiresNoPermission
     public boolean doesClassMatch(int profile) {
         if (profile == PROFILE_A2DP) {
             if (hasService(Service.RENDER)) {

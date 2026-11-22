@@ -18,6 +18,7 @@ package android.bluetooth;
 
 import android.annotation.NonNull;
 
+
 /** This abstract class is used to implement {@link BluetoothGatt} callbacks. */
 public abstract class BluetoothGattCallback {
 
@@ -256,24 +257,13 @@ public abstract class BluetoothGattCallback {
     /**
      * Callback indicating LE connection's subrate parameters have changed.
      *
-     * @param gatt GATT client involved
-     * @param subrateFactor for the LE connection.
-     * @param latency Worker latency for the connection in number of connection events. Valid range
-     *     is from 0 to 499
-     * @param contNum Valid range is from 0 to 499.
-     * @param timeout Supervision timeout for this connection, in 10ms unit. Valid range is from 10
-     *     (0.1s) to 3200 (32s)
-     * @param status {@link BluetoothGatt#GATT_SUCCESS} if LE connection subrating has been changed
-     *     successfully.
-     * @hide
+     * @param gatt The remote device involved
+     * @param subrateMode for this LE connection.
+     * @param status {@link BluetoothGatt#GATT_SUCCESS} if the connection subrating has been updated
+     *     successfully
      */
-    public void onSubrateChange(BluetoothGatt gatt, int subrateMode, int status) {}
-
     public void onSubrateChange(
-            BluetoothGatt gatt,
-            int subrateFactor,
-            int latency,
-            int contNum,
-            int timeout,
-            int status) {}
+            @NonNull BluetoothGatt gatt,
+            @BluetoothGatt.OnSubrateChangeModeValues int subrateMode,
+            @BluetoothGatt.OnSubrateChangeStatusValues int status) {}
 }

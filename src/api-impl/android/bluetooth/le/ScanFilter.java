@@ -16,6 +16,7 @@
 
 package android.bluetooth.le;
 
+import static android.Manifest.permission.BLUETOOTH_PRIVILEGED;
 
 import static java.util.Objects.requireNonNull;
 
@@ -23,8 +24,10 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
 import android.annotation.RequiresPermission;
+import android.annotation.SystemApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothDevice.AddressType;
 import android.bluetooth.BluetoothStatusCodes;
 import android.bluetooth.le.ScanRecord.AdvertisingDataType;
 import android.os.Parcel;
@@ -52,12 +55,15 @@ import java.util.UUID;
  * @see BluetoothLeScanner
  */
 public final class ScanFilter implements Parcelable {
+    // ATL: android.Manifest.permission has no BLUETOOTH_SCAN, so keep the name here.
+    private static final String BLUETOOTH_SCAN = "android.permission.BLUETOOTH_SCAN";
+
 
     @Nullable private final String mDeviceName;
 
     @Nullable private final String mDeviceAddress;
 
-    private final int mAddressType;
+    private final @AddressType int mAddressType;
 
     @Nullable private final byte[] mIrk;
 
@@ -97,7 +103,7 @@ public final class ScanFilter implements Parcelable {
             int manufacturerId,
             byte[] manufacturerData,
             byte[] manufacturerDataMask,
-            int addressType,
+            @AddressType int addressType,
             @Nullable byte[] irk,
             @AdvertisingDataType int advertisingDataType,
             @Nullable byte[] advertisingData,
@@ -221,6 +227,7 @@ public final class ScanFilter implements Parcelable {
                 }
 
                 @Override
+                @RequiresPermission(allOf = {BLUETOOTH_SCAN, BLUETOOTH_PRIVILEGED})
                 public ScanFilter createFromParcel(Parcel in) {
                     Builder builder = new Builder();
                     if (in.readInt() == 1) {
@@ -355,12 +362,14 @@ public final class ScanFilter implements Parcelable {
     }
 
     /** @hide */
+    @SystemApi
     @RequiresNoPermission
-    public int getAddressType() {
+    public @AddressType int getAddressType() {
         return mAddressType;
     }
 
     /** @hide */
+    @SystemApi
     @RequiresNoPermission
     public @Nullable byte[] getIrk() {
         return mIrk;
@@ -402,6 +411,7 @@ public final class ScanFilter implements Parcelable {
      *
      * @hide
      */
+    @SystemApi
     @RequiresNoPermission
     public @Nullable TransportBlockFilter getTransportBlockFilter() {
         return mTransportBlockFilter;
@@ -713,11 +723,11 @@ public final class ScanFilter implements Parcelable {
     public static final class Builder {
 
         /** @hide */
-        public static final int LEN_IRK_OCTETS = 16;
+        @SystemApi public static final int LEN_IRK_OCTETS = 16;
 
         private String mDeviceName;
         private String mDeviceAddress;
-        private int mAddressType = BluetoothDevice.ADDRESS_TYPE_PUBLIC;
+        private @AddressType int mAddressType = BluetoothDevice.ADDRESS_TYPE_PUBLIC;
         private byte[] mIrk;
 
         private ParcelUuid mServiceUuid;
@@ -752,7 +762,7 @@ public final class ScanFilter implements Parcelable {
          *
          * <p>The address passed to this API must be in big endian byte order. It needs to be in the
          * format of "01:02:03:AB:CD:EF". The device address can be validated using {@link
-         * BluetoothAdapter#checkBluetoothAddress}. The is defaulted to {@link
+         * BluetoothAdapter#checkBluetoothAddress}. The @AddressType is defaulted to {@link
          * BluetoothDevice#ADDRESS_TYPE_PUBLIC}.
          *
          * @param deviceAddress the remote device Bluetooth address for the filter
@@ -783,9 +793,10 @@ public final class ScanFilter implements Parcelable {
          * @throws NullPointerException if {@code deviceAddress} is null
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setDeviceAddress(
-                @NonNull String deviceAddress, int addressType) {
+                @NonNull String deviceAddress, @AddressType int addressType) {
             return setDeviceAddressInternal(deviceAddress, addressType, null);
         }
 
@@ -824,9 +835,10 @@ public final class ScanFilter implements Parcelable {
          * @throws NullPointerException if {@code deviceAddress} or {@code irk} is null
          * @hide
          */
+        @SystemApi
         @RequiresNoPermission
         public @NonNull Builder setDeviceAddress(
-                @NonNull String deviceAddress, int addressType, @NonNull byte[] irk) {
+                @NonNull String deviceAddress, @AddressType int addressType, @NonNull byte[] irk) {
             requireNonNull(irk);
             if (irk.length != LEN_IRK_OCTETS) {
                 throw new IllegalArgumentException("'irk' is invalid length!");
@@ -851,7 +863,7 @@ public final class ScanFilter implements Parcelable {
          * @throws NullPointerException if {@code deviceAddress} is null
          */
         private @NonNull Builder setDeviceAddressInternal(
-                @NonNull String deviceAddress, int addressType, @Nullable byte[] irk) {
+                @NonNull String deviceAddress, @AddressType int addressType, @Nullable byte[] irk) {
 
             // Make sure our deviceAddress is valid!
             requireNonNull(deviceAddress);
@@ -1063,6 +1075,8 @@ public final class ScanFilter implements Parcelable {
          * @return this builder
          * @hide
          */
+        @SystemApi
+        @RequiresPermission(allOf = {BLUETOOTH_SCAN, BLUETOOTH_PRIVILEGED})
         public @NonNull Builder setTransportBlockFilter(
                 @NonNull TransportBlockFilter transportBlockFilter) {
             BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
