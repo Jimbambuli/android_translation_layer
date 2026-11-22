@@ -65,6 +65,7 @@ public abstract class Service extends ContextWrapper implements android.content.
 		if (foreground && notification_id != id)
 			notificationManager.cancel(notification_id);
 		this.notification_id = id;
+		notification.flags |= Notification.FLAG_FOREGROUND_SERVICE; // AOSP ActiveServices.setServiceForegroundInnerLocked()
 		notificationManager.notify(id, notification);
 		setForeground(true);
 	}

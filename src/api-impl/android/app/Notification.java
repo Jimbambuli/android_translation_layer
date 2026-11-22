@@ -12,9 +12,13 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
 import android.widget.RemoteViews;
+import android.util.Log;
+import android.view.Gravity;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public class Notification implements Parcelable {
 
@@ -286,6 +290,51 @@ public class Notification implements Parcelable {
 	public static final int FLAG_LOCAL_ONLY = 0x00000100;
 	public static final int FLAG_GROUP_SUMMARY = 0x00000200;
 	public static final int FLAG_BUBBLE = 0x00001000;
+	public static final int FLAG_PROMOTED_ONGOING = 0x00040000;
+
+	/* AOSP Notification constants */
+	public static final String CATEGORY_ALARM = "alarm";
+	public static final String CATEGORY_CALL = "call";
+	public static final String CATEGORY_EMAIL = "email";
+	public static final String CATEGORY_ERROR = "err";
+	public static final String CATEGORY_EVENT = "event";
+	public static final String CATEGORY_LOCATION_SHARING = "location_sharing";
+	public static final String CATEGORY_MESSAGE = "msg";
+	public static final String CATEGORY_MISSED_CALL = "missed_call";
+	public static final String CATEGORY_NAVIGATION = "navigation";
+	public static final String CATEGORY_PROGRESS = "progress";
+	public static final String CATEGORY_PROMO = "promo";
+	public static final String CATEGORY_RECOMMENDATION = "recommendation";
+	public static final String CATEGORY_REMINDER = "reminder";
+	public static final String CATEGORY_SERVICE = "service";
+	public static final String CATEGORY_SOCIAL = "social";
+	public static final String CATEGORY_STATUS = "status";
+	public static final String CATEGORY_STOPWATCH = "stopwatch";
+	public static final String CATEGORY_SYSTEM = "sys";
+	public static final String CATEGORY_VOICEMAIL = "voicemail";
+	public static final String CATEGORY_WORKOUT = "workout";
+	public static final String EXTRA_AUDIO_CONTENTS_URI = "android.audioContents";
+	public static final String EXTRA_CHANNEL_GROUP_ID = "android.intent.extra.CHANNEL_GROUP_ID";
+	public static final String EXTRA_CHANNEL_ID = "android.intent.extra.CHANNEL_ID";
+	public static final String EXTRA_CHRONOMETER_COUNT_DOWN = "android.chronometerCountDown";
+	public static final String EXTRA_LARGE_ICON = "android.largeIcon";
+	public static final String EXTRA_NOTIFICATION_ID = "android.intent.extra.NOTIFICATION_ID";
+	public static final String EXTRA_NOTIFICATION_TAG = "android.intent.extra.NOTIFICATION_TAG";
+	public static final String EXTRA_REMOTE_INPUT_DRAFT = "android.remoteInputDraft";
+	public static final String EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing";
+	public static final String EXTRA_SMALL_ICON = "android.icon";
+	/** @hide */
+	public static final String EXTRA_CONTAINS_SUMMARIZATION = "android.app.extra.contains_summarization";
+	/** @hide */
+	public static final String EXTRA_APP_SUMMARIZATION = "android.app.extra.app_summarization";
+	public static final int FOREGROUND_SERVICE_DEFAULT = 0;
+	public static final int FOREGROUND_SERVICE_IMMEDIATE = 1;
+	public static final int FOREGROUND_SERVICE_DEFERRED = 2;
+	public static final String INTENT_CATEGORY_NOTIFICATION_PREFERENCES = "android.intent.category.NOTIFICATION_PREFERENCES";
+	@Deprecated
+	public static final int STREAM_DEFAULT = -1;
+	@Deprecated
+	public RemoteViews tickerView;
 
 	public static final int VISIBILITY_PUBLIC = 1;
 	public static final int VISIBILITY_PRIVATE = 0;
@@ -384,6 +433,87 @@ public class Notification implements Parcelable {
 	public int getBadgeIconType() { return mBadgeIcon; }
 
 	public long getTimeoutAfter() { return mTimeout; }
+
+	public int describeContents() {
+		return 0;
+	}
+
+	/** @hide AOSP: promoted ongoing is granted by the system (FLAG_PROMOTED_ONGOING), which ATL never does */
+	public boolean isPromotedOngoing() {
+		return (flags & FLAG_PROMOTED_ONGOING) != 0;
+	}
+
+	public android.util.Pair<RemoteInput, Action> findRemoteInputActionPair(boolean requiresFreeform) {
+		if (isPromotedOngoing()) {
+			return null;
+		}
+		if (actions == null) {
+			return null;
+		}
+		for (Notification.Action action : actions) {
+			if (action.getRemoteInputs() == null) {
+				continue;
+			}
+			RemoteInput resultRemoteInput = null;
+			for (RemoteInput remoteInput : action.getRemoteInputs()) {
+				if (remoteInput.getAllowFreeFormInput() || !requiresFreeform) {
+					resultRemoteInput = remoteInput;
+				}
+			}
+			if (resultRemoteInput != null) {
+				return android.util.Pair.create(resultRemoteInput, action);
+			}
+		}
+		return null;
+	}
+
+	public List<Notification.Action> getContextualActions() {
+		if (actions == null || isPromotedOngoing()) return java.util.Collections.emptyList();
+		List<Notification.Action> contextualActions = new ArrayList<>();
+		for (Notification.Action action : actions) {
+			if (action.isContextual()) {
+				contextualActions.add(action);
+			}
+		}
+		return contextualActions;
+	}
+
+	public String getShortCriticalText() {
+		return extras.getString(EXTRA_SHORT_CRITICAL_TEXT);
+	}
+
+	public boolean isRequestPromotedOngoing() {
+		return extras.getBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, false);
+	}
+
+	public boolean hasSummarizedContent() {
+		return extras != null && extras.getBoolean(EXTRA_CONTAINS_SUMMARIZATION);
+	}
+
+	public CharSequence getSummarizedContent() {
+		return extras != null ? extras.getCharSequence(EXTRA_APP_SUMMARIZATION) : null;
+	}
+
+	/* AOSP hasImage(): an image message of a MessagingStyle, a large icon or a background image */
+	public boolean hasImage() {
+		if (style instanceof MessagingStyle && extras != null) {
+			final Parcelable[] messages = extras.getParcelableArray(EXTRA_MESSAGES);
+			if (messages != null && messages.length > 0) {
+				for (MessagingStyle.Message m : MessagingStyle.Message.getMessagesFromBundleArray(messages)) {
+					if (m.getDataUri() != null
+					    && m.getDataMimeType() != null
+					    && m.getDataMimeType().startsWith("image/")) {
+						return true;
+					}
+				}
+			}
+		} else if (mLargeIcon != null || largeIcon != null) {
+			return true;
+		} else if (extras.containsKey(EXTRA_BACKGROUND_IMAGE_URI)) {
+			return true;
+		}
+		return false;
+	}
 
 	public String getShortcutId() { return mShortcutId; }
 
@@ -711,6 +841,37 @@ public class Notification implements Parcelable {
 			if (style instanceof MediaStyle) {
 				notification.ongoing = true;
 			}
+			return this;
+		}
+
+		public Style getStyle() {
+			return notification.style;
+		}
+
+		public Builder extend(Extender extender) {
+			extender.extend(this);
+			return this;
+		}
+
+		public Builder setChronometerCountDown(boolean countDown) {
+			mExtras.putBoolean(EXTRA_CHRONOMETER_COUNT_DOWN, countDown);
+			return this;
+		}
+
+		public Builder setHasSummarizedContent(boolean hasSummarizedContent) {
+			mExtras.putBoolean(EXTRA_CONTAINS_SUMMARIZATION, hasSummarizedContent);
+			return this;
+		}
+
+		/* AOSP: with the nm_summarization flag on, as in Android 16 */
+		public Builder setSummarizedContent(CharSequence summarizedContent) {
+			mExtras.putCharSequence(EXTRA_APP_SUMMARIZATION, summarizedContent);
+			setHasSummarizedContent(!TextUtils.isEmpty(summarizedContent));
+			return this;
+		}
+
+		public Builder setRequestPromotedOngoing(boolean requestPromotedOngoing) {
+			getExtras().putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, requestPromotedOngoing);
 			return this;
 		}
 
@@ -1225,6 +1386,142 @@ public class Notification implements Parcelable {
 		public String toString() {
 			return "Action [" + icon + ", " + title + ", " + actionIntent + "]";
 		}
+
+		/* AOSP Notification.Action.WearableExtender */
+		public static final class WearableExtender implements Extender {
+			private static final String EXTRA_WEARABLE_EXTENSIONS = "android.wearable.EXTENSIONS";
+
+			private static final String KEY_FLAGS = "flags";
+			private static final String KEY_IN_PROGRESS_LABEL = "inProgressLabel";
+			private static final String KEY_CONFIRM_LABEL = "confirmLabel";
+			private static final String KEY_CANCEL_LABEL = "cancelLabel";
+
+			private static final int FLAG_AVAILABLE_OFFLINE = 0x1;
+			private static final int FLAG_HINT_LAUNCHES_ACTIVITY = 1 << 1;
+			private static final int FLAG_HINT_DISPLAY_INLINE = 1 << 2;
+
+			private static final int DEFAULT_FLAGS = FLAG_AVAILABLE_OFFLINE;
+
+			private int mFlags = DEFAULT_FLAGS;
+
+			private CharSequence mInProgressLabel;
+			private CharSequence mConfirmLabel;
+			private CharSequence mCancelLabel;
+
+			public WearableExtender() {
+			}
+
+			public WearableExtender(Action action) {
+				Bundle wearableBundle = action.getExtras().getBundle(EXTRA_WEARABLE_EXTENSIONS);
+				if (wearableBundle != null) {
+					mFlags = wearableBundle.getInt(KEY_FLAGS, DEFAULT_FLAGS);
+					mInProgressLabel = wearableBundle.getCharSequence(KEY_IN_PROGRESS_LABEL);
+					mConfirmLabel = wearableBundle.getCharSequence(KEY_CONFIRM_LABEL);
+					mCancelLabel = wearableBundle.getCharSequence(KEY_CANCEL_LABEL);
+				}
+			}
+
+			@Override
+			public Action.Builder extend(Action.Builder builder) {
+				Bundle wearableBundle = new Bundle();
+
+				if (mFlags != DEFAULT_FLAGS) {
+					wearableBundle.putInt(KEY_FLAGS, mFlags);
+				}
+				if (mInProgressLabel != null) {
+					wearableBundle.putCharSequence(KEY_IN_PROGRESS_LABEL, mInProgressLabel);
+				}
+				if (mConfirmLabel != null) {
+					wearableBundle.putCharSequence(KEY_CONFIRM_LABEL, mConfirmLabel);
+				}
+				if (mCancelLabel != null) {
+					wearableBundle.putCharSequence(KEY_CANCEL_LABEL, mCancelLabel);
+				}
+
+				builder.getExtras().putBundle(EXTRA_WEARABLE_EXTENSIONS, wearableBundle);
+				return builder;
+			}
+
+			@Override
+			public WearableExtender clone() {
+				WearableExtender that = new WearableExtender();
+				that.mFlags = this.mFlags;
+				that.mInProgressLabel = this.mInProgressLabel;
+				that.mConfirmLabel = this.mConfirmLabel;
+				that.mCancelLabel = this.mCancelLabel;
+				return that;
+			}
+
+			public WearableExtender setAvailableOffline(boolean availableOffline) {
+				setFlag(FLAG_AVAILABLE_OFFLINE, availableOffline);
+				return this;
+			}
+
+			public boolean isAvailableOffline() {
+				return (mFlags & FLAG_AVAILABLE_OFFLINE) != 0;
+			}
+
+			private void setFlag(int mask, boolean value) {
+				if (value) {
+					mFlags |= mask;
+				} else {
+					mFlags &= ~mask;
+				}
+			}
+
+			@Deprecated
+			public WearableExtender setInProgressLabel(CharSequence label) {
+				mInProgressLabel = label;
+				return this;
+			}
+
+			@Deprecated
+			public CharSequence getInProgressLabel() {
+				return mInProgressLabel;
+			}
+
+			@Deprecated
+			public WearableExtender setConfirmLabel(CharSequence label) {
+				mConfirmLabel = label;
+				return this;
+			}
+
+			@Deprecated
+			public CharSequence getConfirmLabel() {
+				return mConfirmLabel;
+			}
+
+			@Deprecated
+			public WearableExtender setCancelLabel(CharSequence label) {
+				mCancelLabel = label;
+				return this;
+			}
+
+			@Deprecated
+			public CharSequence getCancelLabel() {
+				return mCancelLabel;
+			}
+
+			public WearableExtender setHintLaunchesActivity(
+					boolean hintLaunchesActivity) {
+				setFlag(FLAG_HINT_LAUNCHES_ACTIVITY, hintLaunchesActivity);
+				return this;
+			}
+
+			public boolean getHintLaunchesActivity() {
+				return (mFlags & FLAG_HINT_LAUNCHES_ACTIVITY) != 0;
+			}
+
+			public WearableExtender setHintDisplayActionInline(
+					boolean hintDisplayInline) {
+				setFlag(FLAG_HINT_DISPLAY_INLINE, hintDisplayInline);
+				return this;
+			}
+
+			public boolean getHintDisplayActionInline() {
+				return (mFlags & FLAG_HINT_DISPLAY_INLINE) != 0;
+			}
+		}
 	}
 
 	/* AOSP Notification.Style: what the styles put into the extras of the notification; the desktop notification
@@ -1234,6 +1531,13 @@ public class Notification implements Parcelable {
 		CharSequence mSummaryText = null;
 		boolean mSummaryTextPresent = false;
 		protected Builder mBuilder;
+
+		/* AOSP getStandardView(): the standard template of the builder in this layout; ATL fills no templates, the
+		 * RemoteViews of the layout stay as inflated */
+		@Deprecated
+		protected RemoteViews getStandardView(int layoutId) {
+			return new RemoteViews(mBuilder.mContext.getPackageName(), layoutId);
+		}
 
 		protected void internalSetBigContentTitle(CharSequence title) {
 			mBigContentTitle = title;
@@ -1608,7 +1912,7 @@ public class Notification implements Parcelable {
 					bundle.putInt(KEY_TYPE, TYPE_FIXED_INT);
 				} else if (value instanceof FixedFloat) {
 					bundle.putInt(KEY_TYPE, TYPE_FIXED_FLOAT);
-				} else if (value instanceof FixedText) {
+				} else if (value instanceof FixedString || value instanceof FixedText) {
 					bundle.putInt(KEY_TYPE, TYPE_FIXED_STRING);
 				} else {
 					throw new AssertionError("Impossible MetricValue subclass: " + value);
@@ -2004,7 +2308,62 @@ public class Notification implements Parcelable {
 			}
 		}
 
-		/* AOSP Notification.Metric.FixedString (the API 36.1 name is FixedText) */
+		/* AOSP Notification.Metric.FixedString */
+		public static final class FixedString extends MetricValue {
+
+			private static final String KEY_VALUE = "value";
+			private static final String KEY_UNIT = "unit";
+
+			private final String mValue;
+			private final String mUnit;
+
+			public FixedString(CharSequence value) {
+				this(value, null);
+			}
+
+			public FixedString(CharSequence value, CharSequence unit) {
+				mValue = safeCharSequenceToString(java.util.Objects.requireNonNull(value));
+				mUnit = safeCharSequenceToString(unit);
+			}
+
+			@Override
+			protected void toBundle(Bundle bundle) {
+				bundle.putString(KEY_VALUE, mValue);
+				bundle.putString(KEY_UNIT, mUnit);
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (!(obj instanceof FixedString)) return false;
+				FixedString that = (FixedString) obj;
+				if (this == that) return true;
+				return java.util.Objects.equals(this.mValue, that.mValue)
+						&& java.util.Objects.equals(this.mUnit, that.mUnit);
+			}
+
+			@Override
+			public int hashCode() {
+				return java.util.Objects.hash(mValue, mUnit);
+			}
+
+			@Override
+			public String toString() {
+				return getClass().getSimpleName() + "{"
+						+ "mValue=" + mValue
+						+ ", mUnit=" + mUnit
+						+ "}";
+			}
+
+			public CharSequence getValue() {
+				return mValue;
+			}
+
+			public CharSequence getUnit() {
+				return mUnit;
+			}
+		}
+
+		/* the API 36.1 name of FixedString */
 		public static final class FixedText extends MetricValue {
 			private static final String KEY_VALUE = "value";
 			private static final String KEY_UNIT = "unit";
@@ -2723,6 +3082,52 @@ public class Notification implements Parcelable {
 				}
 				return bundles;
 			}
+
+			public static List<Message> getMessagesFromBundleArray(Parcelable[] bundles) {
+				if (bundles == null) {
+					return new ArrayList<>();
+				}
+				List<Message> messages = new ArrayList<>(bundles.length);
+				for (int i = 0; i < bundles.length; i++) {
+					if (bundles[i] instanceof Bundle) {
+						Message message = getMessageFromBundle((Bundle)bundles[i]);
+						if (message != null) {
+							messages.add(message);
+						}
+					}
+				}
+				return messages;
+			}
+
+			/** @hide */
+			public static Message getMessageFromBundle(Bundle bundle) {
+				try {
+					if (!bundle.containsKey(KEY_TEXT) || !bundle.containsKey(KEY_TIMESTAMP)) {
+						return null;
+					} else {
+						Person senderPerson = bundle.getParcelable(KEY_SENDER_PERSON, Person.class);
+						if (senderPerson == null) {
+							CharSequence senderName = bundle.getCharSequence(KEY_SENDER);
+							if (senderName != null) {
+								senderPerson = new Person.Builder().setName(senderName).build();
+							}
+						}
+						Message message = new Message(bundle.getCharSequence(KEY_TEXT),
+						                              bundle.getLong(KEY_TIMESTAMP),
+						                              senderPerson);
+						if (bundle.containsKey(KEY_DATA_MIME_TYPE) && bundle.containsKey(KEY_DATA_URI)) {
+							message.setData(bundle.getString(KEY_DATA_MIME_TYPE),
+							                bundle.getParcelable(KEY_DATA_URI, Uri.class));
+						}
+						if (bundle.containsKey(KEY_EXTRAS_BUNDLE)) {
+							message.getExtras().putAll(bundle.getBundle(KEY_EXTRAS_BUNDLE));
+						}
+						return message;
+					}
+				} catch (ClassCastException e) {
+					return null;
+				}
+			}
 		}
 	}
 
@@ -2937,6 +3342,10 @@ public class Notification implements Parcelable {
 			}
 		};
 
+		public int describeContents() {
+			return 0;
+		}
+
 		@Override
 		public void writeToParcel(Parcel out, int flags) {
 			out.writeInt(mPendingIntent != null ? 1 : 0);
@@ -3050,6 +3459,824 @@ public class Notification implements Parcelable {
 					mFlags &= ~mask;
 				return this;
 			}
+		}
+	}
+
+	/* AOSP Notification.Extender and the extenders: they keep their settings in the extras of the notification */
+	private static final String TAG = "Notification";
+
+	/* AOSP change WEARABLE_EXTENDER_BACKGROUND_BLOCKED (CompatChanges.isChangeEnabled()): enabled from target SDK 35 */
+	static final long WEARABLE_EXTENDER_BACKGROUND_BLOCKED = 270551184L;
+
+	/* AOSP getParcelableArrayFromBundle(): the array of the bundle as an array of itemClass, put back typed */
+	@SuppressWarnings("unchecked")
+	private static <T extends Parcelable> T[] getParcelableArrayFromBundle(Bundle bundle, String key, Class<T> itemClass) {
+		final Parcelable[] array = bundle.getParcelableArray(key, Parcelable.class);
+		final Class<?> arrayClass = java.lang.reflect.Array.newInstance(itemClass, 0).getClass();
+		if (arrayClass.isInstance(array) || array == null) {
+			return (T[])array;
+		}
+		final T[] typedArray = (T[])java.lang.reflect.Array.newInstance(itemClass, array.length);
+		for (int i = 0; i < array.length; i++) {
+			typedArray[i] = (T)array[i];
+		}
+		bundle.putParcelableArray(key, typedArray);
+		return typedArray;
+	}
+
+	private static boolean wearableBackgroundBlocked() {
+		return android.atl.ATLLoadedApp.getPrimaryApplication().getApplication().getApplicationInfo().targetSdkVersion >= 35;
+	}
+	public interface Extender {
+		public Builder extend(Builder builder);
+	}
+
+	public static final class WearableExtender implements Extender {
+		public static final int UNSET_ACTION_INDEX = -1;
+
+		@Deprecated
+		public static final int SIZE_DEFAULT = 0;
+
+		@Deprecated
+		public static final int SIZE_XSMALL = 1;
+
+		@Deprecated
+		public static final int SIZE_SMALL = 2;
+
+		@Deprecated
+		public static final int SIZE_MEDIUM = 3;
+
+		@Deprecated
+		public static final int SIZE_LARGE = 4;
+
+		@Deprecated
+		public static final int SIZE_FULL_SCREEN = 5;
+
+		@Deprecated
+		public static final int SCREEN_TIMEOUT_SHORT = 0;
+
+		@Deprecated
+		public static final int SCREEN_TIMEOUT_LONG = -1;
+
+		private static final String EXTRA_WEARABLE_EXTENSIONS = "android.wearable.EXTENSIONS";
+
+		private static final String KEY_ACTIONS = "actions";
+		private static final String KEY_FLAGS = "flags";
+		static final String KEY_DISPLAY_INTENT = "displayIntent";
+		private static final String KEY_PAGES = "pages";
+		static final String KEY_BACKGROUND = "background";
+		private static final String KEY_CONTENT_ICON = "contentIcon";
+		private static final String KEY_CONTENT_ICON_GRAVITY = "contentIconGravity";
+		private static final String KEY_CONTENT_ACTION_INDEX = "contentActionIndex";
+		private static final String KEY_CUSTOM_SIZE_PRESET = "customSizePreset";
+		private static final String KEY_CUSTOM_CONTENT_HEIGHT = "customContentHeight";
+		private static final String KEY_GRAVITY = "gravity";
+		private static final String KEY_HINT_SCREEN_TIMEOUT = "hintScreenTimeout";
+		private static final String KEY_DISMISSAL_ID = "dismissalId";
+		private static final String KEY_BRIDGE_TAG = "bridgeTag";
+
+		private static final int FLAG_CONTENT_INTENT_AVAILABLE_OFFLINE = 0x1;
+		private static final int FLAG_HINT_HIDE_ICON = 1 << 1;
+		private static final int FLAG_HINT_SHOW_BACKGROUND_ONLY = 1 << 2;
+		private static final int FLAG_START_SCROLL_BOTTOM = 1 << 3;
+		private static final int FLAG_HINT_AVOID_BACKGROUND_CLIPPING = 1 << 4;
+		private static final int FLAG_BIG_PICTURE_AMBIENT = 1 << 5;
+		private static final int FLAG_HINT_CONTENT_INTENT_LAUNCHES_ACTIVITY = 1 << 6;
+
+		private static final int DEFAULT_FLAGS = FLAG_CONTENT_INTENT_AVAILABLE_OFFLINE;
+
+		private static final int DEFAULT_CONTENT_ICON_GRAVITY = Gravity.END;
+		private static final int DEFAULT_GRAVITY = Gravity.BOTTOM;
+
+		private ArrayList<Action> mActions = new ArrayList<Action>();
+		private int mFlags = DEFAULT_FLAGS;
+		private PendingIntent mDisplayIntent;
+		private ArrayList<Notification> mPages = new ArrayList<Notification>();
+		private Bitmap mBackground;
+		private int mContentIcon;
+		private int mContentIconGravity = DEFAULT_CONTENT_ICON_GRAVITY;
+		private int mContentActionIndex = UNSET_ACTION_INDEX;
+		private int mCustomSizePreset = SIZE_DEFAULT;
+		private int mCustomContentHeight;
+		private int mGravity = DEFAULT_GRAVITY;
+		private int mHintScreenTimeout;
+		private String mDismissalId;
+		private String mBridgeTag;
+
+		public WearableExtender() {
+		}
+
+		public WearableExtender(Notification notif) {
+			Bundle wearableBundle = notif.extras.getBundle(EXTRA_WEARABLE_EXTENSIONS);
+			if (wearableBundle != null) {
+				List<Action> actions = wearableBundle.getParcelableArrayList(KEY_ACTIONS, android.app.Notification.Action.class);
+				if (actions != null) {
+					mActions.addAll(actions);
+				}
+
+				mFlags = wearableBundle.getInt(KEY_FLAGS, DEFAULT_FLAGS);
+				mDisplayIntent = wearableBundle.getParcelable(
+						KEY_DISPLAY_INTENT, PendingIntent.class);
+
+				Notification[] pages = getParcelableArrayFromBundle(
+						wearableBundle, KEY_PAGES, Notification.class);
+				if (pages != null) {
+					Collections.addAll(mPages, pages);
+				}
+
+				mBackground = wearableBundle.getParcelable(KEY_BACKGROUND, Bitmap.class);
+				mContentIcon = wearableBundle.getInt(KEY_CONTENT_ICON);
+				mContentIconGravity = wearableBundle.getInt(KEY_CONTENT_ICON_GRAVITY,
+						DEFAULT_CONTENT_ICON_GRAVITY);
+				mContentActionIndex = wearableBundle.getInt(KEY_CONTENT_ACTION_INDEX,
+						UNSET_ACTION_INDEX);
+				mCustomSizePreset = wearableBundle.getInt(KEY_CUSTOM_SIZE_PRESET,
+						SIZE_DEFAULT);
+				mCustomContentHeight = wearableBundle.getInt(KEY_CUSTOM_CONTENT_HEIGHT);
+				mGravity = wearableBundle.getInt(KEY_GRAVITY, DEFAULT_GRAVITY);
+				mHintScreenTimeout = wearableBundle.getInt(KEY_HINT_SCREEN_TIMEOUT);
+				mDismissalId = wearableBundle.getString(KEY_DISMISSAL_ID);
+				mBridgeTag = wearableBundle.getString(KEY_BRIDGE_TAG);
+			}
+		}
+
+		@Override
+		public Notification.Builder extend(Notification.Builder builder) {
+			Bundle wearableBundle = new Bundle();
+
+			if (!mActions.isEmpty()) {
+				wearableBundle.putParcelableArrayList(KEY_ACTIONS, mActions);
+			}
+			if (mFlags != DEFAULT_FLAGS) {
+				wearableBundle.putInt(KEY_FLAGS, mFlags);
+			}
+			if (mDisplayIntent != null) {
+				wearableBundle.putParcelable(KEY_DISPLAY_INTENT, mDisplayIntent);
+			}
+			if (!mPages.isEmpty()) {
+				wearableBundle.putParcelableArray(KEY_PAGES, mPages.toArray(
+						new Notification[mPages.size()]));
+			}
+
+			if (mBackground != null) {
+				if (wearableBackgroundBlocked()) {
+					Log.d(TAG, "Use of background in WearableExtenders has been deprecated and "
+							+ "will not be populated anymore.");
+				} else {
+					wearableBundle.putParcelable(KEY_BACKGROUND, mBackground);
+				}
+			}
+
+			if (mContentIcon != 0) {
+				wearableBundle.putInt(KEY_CONTENT_ICON, mContentIcon);
+			}
+			if (mContentIconGravity != DEFAULT_CONTENT_ICON_GRAVITY) {
+				wearableBundle.putInt(KEY_CONTENT_ICON_GRAVITY, mContentIconGravity);
+			}
+			if (mContentActionIndex != UNSET_ACTION_INDEX) {
+				wearableBundle.putInt(KEY_CONTENT_ACTION_INDEX,
+						mContentActionIndex);
+			}
+			if (mCustomSizePreset != SIZE_DEFAULT) {
+				wearableBundle.putInt(KEY_CUSTOM_SIZE_PRESET, mCustomSizePreset);
+			}
+			if (mCustomContentHeight != 0) {
+				wearableBundle.putInt(KEY_CUSTOM_CONTENT_HEIGHT, mCustomContentHeight);
+			}
+			if (mGravity != DEFAULT_GRAVITY) {
+				wearableBundle.putInt(KEY_GRAVITY, mGravity);
+			}
+			if (mHintScreenTimeout != 0) {
+				wearableBundle.putInt(KEY_HINT_SCREEN_TIMEOUT, mHintScreenTimeout);
+			}
+			if (mDismissalId != null) {
+				wearableBundle.putString(KEY_DISMISSAL_ID, mDismissalId);
+			}
+			if (mBridgeTag != null) {
+				wearableBundle.putString(KEY_BRIDGE_TAG, mBridgeTag);
+			}
+
+			builder.getExtras().putBundle(EXTRA_WEARABLE_EXTENSIONS, wearableBundle);
+			return builder;
+		}
+
+		@Override
+		public WearableExtender clone() {
+			WearableExtender that = new WearableExtender();
+			that.mActions = new ArrayList<Action>(this.mActions);
+			that.mFlags = this.mFlags;
+			that.mDisplayIntent = this.mDisplayIntent;
+			that.mPages = new ArrayList<Notification>(this.mPages);
+			that.mBackground = this.mBackground;
+			that.mContentIcon = this.mContentIcon;
+			that.mContentIconGravity = this.mContentIconGravity;
+			that.mContentActionIndex = this.mContentActionIndex;
+			that.mCustomSizePreset = this.mCustomSizePreset;
+			that.mCustomContentHeight = this.mCustomContentHeight;
+			that.mGravity = this.mGravity;
+			that.mHintScreenTimeout = this.mHintScreenTimeout;
+			that.mDismissalId = this.mDismissalId;
+			that.mBridgeTag = this.mBridgeTag;
+			return that;
+		}
+
+		public WearableExtender addAction(Action action) {
+			mActions.add(action);
+			return this;
+		}
+
+		public WearableExtender addActions(List<Action> actions) {
+			mActions.addAll(actions);
+			return this;
+		}
+
+		public WearableExtender clearActions() {
+			mActions.clear();
+			return this;
+		}
+
+		public List<Action> getActions() {
+			return mActions;
+		}
+
+		@Deprecated
+		public WearableExtender setDisplayIntent(PendingIntent intent) {
+			mDisplayIntent = intent;
+			return this;
+		}
+
+		@Deprecated
+		public PendingIntent getDisplayIntent() {
+			return mDisplayIntent;
+		}
+
+		@Deprecated
+		public WearableExtender addPage(Notification page) {
+			mPages.add(page);
+			return this;
+		}
+
+		@Deprecated
+		public WearableExtender addPages(List<Notification> pages) {
+			mPages.addAll(pages);
+			return this;
+		}
+
+		@Deprecated
+		public WearableExtender clearPages() {
+			mPages.clear();
+			return this;
+		}
+
+		@Deprecated
+		public List<Notification> getPages() {
+			return mPages;
+		}
+
+		@Deprecated
+		public WearableExtender setBackground(Bitmap background) {
+			if (wearableBackgroundBlocked()) {
+				Log.d(TAG, "Use of background in WearableExtenders has been deprecated and "
+						+ "will not be populated anymore.");
+			} else {
+				mBackground = background;
+			}
+			return this;
+		}
+
+		@Deprecated
+		public Bitmap getBackground() {
+			Log.w(TAG, "Use of background in WearableExtender has been removed, returning null.");
+			return mBackground;
+		}
+
+		@Deprecated
+		public WearableExtender setContentIcon(int icon) {
+			mContentIcon = icon;
+			return this;
+		}
+
+		@Deprecated
+		public int getContentIcon() {
+			return mContentIcon;
+		}
+
+		@Deprecated
+		public WearableExtender setContentIconGravity(int contentIconGravity) {
+			mContentIconGravity = contentIconGravity;
+			return this;
+		}
+
+		@Deprecated
+		public int getContentIconGravity() {
+			return mContentIconGravity;
+		}
+
+		public WearableExtender setContentAction(int actionIndex) {
+			mContentActionIndex = actionIndex;
+			return this;
+		}
+
+		public int getContentAction() {
+			return mContentActionIndex;
+		}
+
+		@Deprecated
+		public WearableExtender setGravity(int gravity) {
+			mGravity = gravity;
+			return this;
+		}
+
+		@Deprecated
+		public int getGravity() {
+			return mGravity;
+		}
+
+		@Deprecated
+		public WearableExtender setCustomSizePreset(int sizePreset) {
+			mCustomSizePreset = sizePreset;
+			return this;
+		}
+
+		@Deprecated
+		public int getCustomSizePreset() {
+			return mCustomSizePreset;
+		}
+
+		@Deprecated
+		public WearableExtender setCustomContentHeight(int height) {
+			mCustomContentHeight = height;
+			return this;
+		}
+
+		@Deprecated
+		public int getCustomContentHeight() {
+			return mCustomContentHeight;
+		}
+
+		public WearableExtender setStartScrollBottom(boolean startScrollBottom) {
+			setFlag(FLAG_START_SCROLL_BOTTOM, startScrollBottom);
+			return this;
+		}
+
+		public boolean getStartScrollBottom() {
+			return (mFlags & FLAG_START_SCROLL_BOTTOM) != 0;
+		}
+
+		public WearableExtender setContentIntentAvailableOffline(
+				boolean contentIntentAvailableOffline) {
+			setFlag(FLAG_CONTENT_INTENT_AVAILABLE_OFFLINE, contentIntentAvailableOffline);
+			return this;
+		}
+
+		public boolean getContentIntentAvailableOffline() {
+			return (mFlags & FLAG_CONTENT_INTENT_AVAILABLE_OFFLINE) != 0;
+		}
+
+		@Deprecated
+		public WearableExtender setHintHideIcon(boolean hintHideIcon) {
+			setFlag(FLAG_HINT_HIDE_ICON, hintHideIcon);
+			return this;
+		}
+
+		@Deprecated
+		public boolean getHintHideIcon() {
+			return (mFlags & FLAG_HINT_HIDE_ICON) != 0;
+		}
+
+		@Deprecated
+		public WearableExtender setHintShowBackgroundOnly(boolean hintShowBackgroundOnly) {
+			setFlag(FLAG_HINT_SHOW_BACKGROUND_ONLY, hintShowBackgroundOnly);
+			return this;
+		}
+
+		@Deprecated
+		public boolean getHintShowBackgroundOnly() {
+			return (mFlags & FLAG_HINT_SHOW_BACKGROUND_ONLY) != 0;
+		}
+
+		@Deprecated
+		public WearableExtender setHintAvoidBackgroundClipping(
+				boolean hintAvoidBackgroundClipping) {
+			setFlag(FLAG_HINT_AVOID_BACKGROUND_CLIPPING, hintAvoidBackgroundClipping);
+			return this;
+		}
+
+		@Deprecated
+		public boolean getHintAvoidBackgroundClipping() {
+			return (mFlags & FLAG_HINT_AVOID_BACKGROUND_CLIPPING) != 0;
+		}
+
+		@Deprecated
+		public WearableExtender setHintScreenTimeout(int timeout) {
+			mHintScreenTimeout = timeout;
+			return this;
+		}
+
+		@Deprecated
+		public int getHintScreenTimeout() {
+			return mHintScreenTimeout;
+		}
+
+		@Deprecated
+		public WearableExtender setHintAmbientBigPicture(boolean hintAmbientBigPicture) {
+			setFlag(FLAG_BIG_PICTURE_AMBIENT, hintAmbientBigPicture);
+			return this;
+		}
+
+		@Deprecated
+		public boolean getHintAmbientBigPicture() {
+			return (mFlags & FLAG_BIG_PICTURE_AMBIENT) != 0;
+		}
+
+		public WearableExtender setHintContentIntentLaunchesActivity(
+				boolean hintContentIntentLaunchesActivity) {
+			setFlag(FLAG_HINT_CONTENT_INTENT_LAUNCHES_ACTIVITY, hintContentIntentLaunchesActivity);
+			return this;
+		}
+
+		public boolean getHintContentIntentLaunchesActivity() {
+			return (mFlags & FLAG_HINT_CONTENT_INTENT_LAUNCHES_ACTIVITY) != 0;
+		}
+
+		public WearableExtender setDismissalId(String dismissalId) {
+			mDismissalId = dismissalId;
+			return this;
+		}
+
+		public String getDismissalId() {
+			return mDismissalId;
+		}
+
+		public WearableExtender setBridgeTag(String bridgeTag) {
+			mBridgeTag = bridgeTag;
+			return this;
+		}
+
+		public String getBridgeTag() {
+			return mBridgeTag;
+		}
+
+		private void setFlag(int mask, boolean value) {
+			if (value) {
+				mFlags |= mask;
+			} else {
+				mFlags &= ~mask;
+			}
+		}
+	}
+
+	public static final class CarExtender implements Extender {
+		private static final String TAG = "CarExtender";
+
+		private static final String EXTRA_CAR_EXTENDER = "android.car.EXTENSIONS";
+		private static final String EXTRA_LARGE_ICON = "large_icon";
+		private static final String EXTRA_CONVERSATION = "car_conversation";
+		private static final String EXTRA_COLOR = "app_color";
+
+		private Bitmap mLargeIcon;
+		private UnreadConversation mUnreadConversation;
+		private int mColor = Notification.COLOR_DEFAULT;
+
+		public CarExtender() {
+		}
+
+		public CarExtender(Notification notif) {
+			Bundle carBundle = notif.extras == null ?
+					null : notif.extras.getBundle(EXTRA_CAR_EXTENDER);
+			if (carBundle != null) {
+				mLargeIcon = carBundle.getParcelable(EXTRA_LARGE_ICON, Bitmap.class);
+				mColor = carBundle.getInt(EXTRA_COLOR, Notification.COLOR_DEFAULT);
+
+				Bundle b = carBundle.getBundle(EXTRA_CONVERSATION);
+				mUnreadConversation = UnreadConversation.getUnreadConversationFromBundle(b);
+			}
+		}
+
+		@Override
+		public Notification.Builder extend(Notification.Builder builder) {
+			Bundle carExtensions = new Bundle();
+
+			if (mLargeIcon != null) {
+				carExtensions.putParcelable(EXTRA_LARGE_ICON, mLargeIcon);
+			}
+			if (mColor != Notification.COLOR_DEFAULT) {
+				carExtensions.putInt(EXTRA_COLOR, mColor);
+			}
+
+			if (mUnreadConversation != null) {
+				Bundle b = mUnreadConversation.getBundleForUnreadConversation();
+				carExtensions.putBundle(EXTRA_CONVERSATION, b);
+			}
+
+			builder.getExtras().putBundle(EXTRA_CAR_EXTENDER, carExtensions);
+			return builder;
+		}
+
+		public CarExtender setColor(int color) {
+			mColor = color;
+			return this;
+		}
+
+		public int getColor() {
+			return mColor;
+		}
+
+		public CarExtender setLargeIcon(Bitmap largeIcon) {
+			mLargeIcon = largeIcon;
+			return this;
+		}
+
+		public Bitmap getLargeIcon() {
+			return mLargeIcon;
+		}
+
+		public CarExtender setUnreadConversation(UnreadConversation unreadConversation) {
+			mUnreadConversation = unreadConversation;
+			return this;
+		}
+
+		public UnreadConversation getUnreadConversation() {
+			return mUnreadConversation;
+		}
+
+		public static class UnreadConversation {
+			private static final String KEY_AUTHOR = "author";
+			private static final String KEY_TEXT = "text";
+			private static final String KEY_MESSAGES = "messages";
+			static final String KEY_REMOTE_INPUT = "remote_input";
+			static final String KEY_ON_REPLY = "on_reply";
+			static final String KEY_ON_READ = "on_read";
+			private static final String KEY_PARTICIPANTS = "participants";
+			private static final String KEY_TIMESTAMP = "timestamp";
+
+			private final String[] mMessages;
+			private final RemoteInput mRemoteInput;
+			private final PendingIntent mReplyPendingIntent;
+			private final PendingIntent mReadPendingIntent;
+			private final String[] mParticipants;
+			private final long mLatestTimestamp;
+
+			UnreadConversation(String[] messages, RemoteInput remoteInput,
+					PendingIntent replyPendingIntent, PendingIntent readPendingIntent,
+					String[] participants, long latestTimestamp) {
+				mMessages = messages;
+				mRemoteInput = remoteInput;
+				mReadPendingIntent = readPendingIntent;
+				mReplyPendingIntent = replyPendingIntent;
+				mParticipants = participants;
+				mLatestTimestamp = latestTimestamp;
+			}
+
+			public String[] getMessages() {
+				return mMessages;
+			}
+
+			public RemoteInput getRemoteInput() {
+				return mRemoteInput;
+			}
+
+			public PendingIntent getReplyPendingIntent() {
+				return mReplyPendingIntent;
+			}
+
+			public PendingIntent getReadPendingIntent() {
+				return mReadPendingIntent;
+			}
+
+			public String[] getParticipants() {
+				return mParticipants;
+			}
+
+			public String getParticipant() {
+				return mParticipants.length > 0 ? mParticipants[0] : null;
+			}
+
+			public long getLatestTimestamp() {
+				return mLatestTimestamp;
+			}
+
+			Bundle getBundleForUnreadConversation() {
+				Bundle b = new Bundle();
+				String author = null;
+				if (mParticipants != null && mParticipants.length > 1) {
+					author = mParticipants[0];
+				}
+				Parcelable[] messages = new Parcelable[mMessages.length];
+				for (int i = 0; i < messages.length; i++) {
+					Bundle m = new Bundle();
+					m.putString(KEY_TEXT, mMessages[i]);
+					m.putString(KEY_AUTHOR, author);
+					messages[i] = m;
+				}
+				b.putParcelableArray(KEY_MESSAGES, messages);
+				if (mRemoteInput != null) {
+					b.putParcelable(KEY_REMOTE_INPUT, mRemoteInput);
+				}
+				b.putParcelable(KEY_ON_REPLY, mReplyPendingIntent);
+				b.putParcelable(KEY_ON_READ, mReadPendingIntent);
+				b.putStringArray(KEY_PARTICIPANTS, mParticipants);
+				b.putLong(KEY_TIMESTAMP, mLatestTimestamp);
+				return b;
+			}
+
+			static UnreadConversation getUnreadConversationFromBundle(Bundle b) {
+				if (b == null) {
+					return null;
+				}
+				Parcelable[] parcelableMessages = b.getParcelableArray(KEY_MESSAGES,
+						Parcelable.class);
+				String[] messages = null;
+				if (parcelableMessages != null) {
+					String[] tmp = new String[parcelableMessages.length];
+					boolean success = true;
+					for (int i = 0; i < tmp.length; i++) {
+						if (!(parcelableMessages[i] instanceof Bundle)) {
+							success = false;
+							break;
+						}
+						tmp[i] = ((Bundle) parcelableMessages[i]).getString(KEY_TEXT);
+						if (tmp[i] == null) {
+							success = false;
+							break;
+						}
+					}
+					if (success) {
+						messages = tmp;
+					} else {
+						return null;
+					}
+				}
+
+				PendingIntent onRead = b.getParcelable(KEY_ON_READ, PendingIntent.class);
+				PendingIntent onReply = b.getParcelable(KEY_ON_REPLY, PendingIntent.class);
+
+				RemoteInput remoteInput = b.getParcelable(KEY_REMOTE_INPUT, RemoteInput.class);
+
+				String[] participants = b.getStringArray(KEY_PARTICIPANTS);
+				if (participants == null || participants.length != 1) {
+					return null;
+				}
+
+				return new UnreadConversation(messages,
+						remoteInput,
+						onReply,
+						onRead,
+						participants, b.getLong(KEY_TIMESTAMP));
+			}
+		};
+
+		public static class Builder {
+			private final List<String> mMessages = new ArrayList<String>();
+			private final String mParticipant;
+			private RemoteInput mRemoteInput;
+			private PendingIntent mReadPendingIntent;
+			private PendingIntent mReplyPendingIntent;
+			private long mLatestTimestamp;
+
+			public Builder(String name) {
+				mParticipant = name;
+			}
+
+			public Builder addMessage(String message) {
+				mMessages.add(message);
+				return this;
+			}
+
+			public Builder setReplyAction(
+					PendingIntent pendingIntent, RemoteInput remoteInput) {
+				mRemoteInput = remoteInput;
+				mReplyPendingIntent = pendingIntent;
+
+				return this;
+			}
+
+			public Builder setReadPendingIntent(PendingIntent pendingIntent) {
+				mReadPendingIntent = pendingIntent;
+				return this;
+			}
+
+			public Builder setLatestTimestamp(long timestamp) {
+				mLatestTimestamp = timestamp;
+				return this;
+			}
+
+			public UnreadConversation build() {
+				String[] messages = mMessages.toArray(new String[mMessages.size()]);
+				String[] participants = { mParticipant };
+				return new UnreadConversation(messages, mRemoteInput, mReplyPendingIntent,
+						mReadPendingIntent, participants, mLatestTimestamp);
+			}
+		}
+	}
+
+	public static final class TvExtender implements Extender {
+		private static final String TAG = "TvExtender";
+
+		private static final String EXTRA_TV_EXTENDER = "android.tv.EXTENSIONS";
+		private static final String EXTRA_FLAGS = "flags";
+		static final String EXTRA_CONTENT_INTENT = "content_intent";
+		static final String EXTRA_DELETE_INTENT = "delete_intent";
+		private static final String EXTRA_CHANNEL_ID = "channel_id";
+		private static final String EXTRA_SUPPRESS_SHOW_OVER_APPS = "suppressShowOverApps";
+
+		private static final int FLAG_AVAILABLE_ON_TV = 0x1;
+
+		private int mFlags;
+		private String mChannelId;
+		private PendingIntent mContentIntent;
+		private PendingIntent mDeleteIntent;
+		private boolean mSuppressShowOverApps;
+
+		public TvExtender() {
+			mFlags = FLAG_AVAILABLE_ON_TV;
+		}
+
+		public TvExtender(Notification notif) {
+			Bundle bundle = notif.extras == null ?
+				null : notif.extras.getBundle(EXTRA_TV_EXTENDER);
+			if (bundle != null) {
+				mFlags = bundle.getInt(EXTRA_FLAGS);
+				mChannelId = bundle.getString(EXTRA_CHANNEL_ID);
+				mSuppressShowOverApps = bundle.getBoolean(EXTRA_SUPPRESS_SHOW_OVER_APPS);
+				mContentIntent = bundle.getParcelable(EXTRA_CONTENT_INTENT, PendingIntent.class);
+				mDeleteIntent = bundle.getParcelable(EXTRA_DELETE_INTENT, PendingIntent.class);
+			}
+		}
+
+		@Override
+
+		public Notification.Builder extend(Notification.Builder builder) {
+			Bundle bundle = new Bundle();
+
+			bundle.putInt(EXTRA_FLAGS, mFlags);
+			bundle.putString(EXTRA_CHANNEL_ID, mChannelId);
+			bundle.putBoolean(EXTRA_SUPPRESS_SHOW_OVER_APPS, mSuppressShowOverApps);
+			if (mContentIntent != null) {
+				bundle.putParcelable(EXTRA_CONTENT_INTENT, mContentIntent);
+			}
+
+			if (mDeleteIntent != null) {
+				bundle.putParcelable(EXTRA_DELETE_INTENT, mDeleteIntent);
+			}
+
+			builder.getExtras().putBundle(EXTRA_TV_EXTENDER, bundle);
+			return builder;
+		}
+
+		public boolean isAvailableOnTv() {
+			return (mFlags & FLAG_AVAILABLE_ON_TV) != 0;
+		}
+
+		public TvExtender setChannel(String channelId) {
+			mChannelId = channelId;
+			return this;
+		}
+
+		public TvExtender setChannelId(String channelId) {
+			mChannelId = channelId;
+			return this;
+		}
+
+		@Deprecated
+
+		public String getChannel() {
+			return mChannelId;
+		}
+
+		public String getChannelId() {
+			return mChannelId;
+		}
+
+		public TvExtender setContentIntent(PendingIntent intent) {
+			mContentIntent = intent;
+			return this;
+		}
+
+		public PendingIntent getContentIntent() {
+			return mContentIntent;
+		}
+
+		public TvExtender setDeleteIntent(PendingIntent intent) {
+			mDeleteIntent = intent;
+			return this;
+		}
+
+		public PendingIntent getDeleteIntent() {
+			return mDeleteIntent;
+		}
+
+		public TvExtender setSuppressShowOverApps(boolean suppress) {
+			mSuppressShowOverApps = suppress;
+			return this;
+		}
+
+		public boolean getSuppressShowOverApps() {
+			return mSuppressShowOverApps;
+		}
+
+		public boolean isSuppressShowOverApps() {
+			return mSuppressShowOverApps;
 		}
 	}
 }

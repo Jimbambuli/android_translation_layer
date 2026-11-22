@@ -56,6 +56,9 @@ public final class NotificationChannel implements android.os.Parcelable {
 	private String mName;
 	private String mDesc;
 	private int mImportance = DEFAULT_IMPORTANCE;
+	/* AOSP: the importance the app created the channel with (PreferencesHelper.createNotificationChannel()) */
+	private int mOriginalImportance = DEFAULT_IMPORTANCE;
+	private boolean mDemoted = false;
 	private boolean mBypassDnd;
 	private int mLockscreenVisibility = DEFAULT_VISIBILITY;
 	private Uri mSound = Settings.System.DEFAULT_NOTIFICATION_URI;
@@ -484,10 +487,10 @@ public final class NotificationChannel implements android.os.Parcelable {
 		dest.writeInt(mLightColor);
 		dest.writeBoolean(mBlockableSystem);
 		dest.writeInt(mAllowBubbles);
-		dest.writeInt(DEFAULT_IMPORTANCE /* mOriginalImportance */);
+		dest.writeInt(mOriginalImportance);
 		dest.writeString(mParentId);
 		dest.writeString(mConversationId);
-		dest.writeBoolean(false /* mDemoted */);
+		dest.writeBoolean(mDemoted);
 		dest.writeBoolean(mImportantConvo);
 		dest.writeLong(-1 /* mDeletedTime: DEFAULT_DELETION_TIME_MS */);
 		dest.writeBoolean(false /* mImportanceLockedDefaultApp */);
@@ -535,10 +538,10 @@ public final class NotificationChannel implements android.os.Parcelable {
 		mLightColor = in.readInt();
 		mBlockableSystem = in.readBoolean();
 		mAllowBubbles = in.readInt();
-		in.readInt(); // mOriginalImportance
+		mOriginalImportance = in.readInt();
 		mParentId = getTrimmedString(in.readString());
 		mConversationId = getTrimmedString(in.readString());
-		in.readBoolean(); // mDemoted
+		mDemoted = in.readBoolean();
 		mImportantConvo = in.readBoolean();
 		in.readLong(); // mDeletedTime
 		in.readBoolean(); // mImportanceLockedDefaultApp
@@ -557,4 +560,47 @@ public final class NotificationChannel implements android.os.Parcelable {
 			return new NotificationChannel[size];
 		}
 	};
+
+	public static final String EDIT_SOUND = "sound";
+	public static final String EDIT_VIBRATION = "vibration";
+	public static final String EDIT_IMPORTANCE = "importance";
+	public static final String EDIT_LOCKED_DEVICE = "locked";
+	public static final String EDIT_ZEN = "zen";
+	public static final String EDIT_CONVERSATION = "conversation";
+	public static final String EDIT_LAUNCHER = "launcher";
+
+	public int getOriginalImportance() {
+		return mOriginalImportance;
+	}
+
+	/** @hide */
+	public void setOriginalImportance(int importance) {
+		mOriginalImportance = importance;
+	}
+
+	/** @hide */
+	public void setDemoted(boolean demoted) {
+		mDemoted = demoted;
+	}
+
+	public boolean isDemoted() {
+		return mDemoted;
+	}
+
+	/* AOSP: (mUserLockedFields & USER_LOCKED_IMPORTANCE) != 0; ATL has no settings where the user changes it */
+	public boolean hasUserSetImportance() {
+		return false;
+	}
+
+	/** @hide AOSP copy(): the same settings in a new object (here through the parcel, which carries them all) */
+	public NotificationChannel copy() {
+		android.os.Parcel parcel = android.os.Parcel.obtain();
+		try {
+			writeToParcel(parcel, 0);
+			parcel.setDataPosition(0);
+			return CREATOR.createFromParcel(parcel);
+		} finally {
+			parcel.recycle();
+		}
+	}
 }

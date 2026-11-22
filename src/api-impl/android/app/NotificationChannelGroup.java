@@ -63,6 +63,14 @@ public final class NotificationChannelGroup implements android.os.Parcelable {
 	}
 
 	/* the group as the service hands it out: name, description and the given channels */
+	/* AOSP clone(): a copy with copies of the channels (ATL keeps no user locked fields) */
+	public NotificationChannelGroup clone() {
+		List<NotificationChannel> channels = new ArrayList<>();
+		for (NotificationChannel c : mChannels)
+			channels.add(c.copy());
+		return copyWith(channels);
+	}
+
 	NotificationChannelGroup copyWith(List<NotificationChannel> channels) {
 		NotificationChannelGroup g = new NotificationChannelGroup(mId, mName);
 		g.mDescription = mDescription;
