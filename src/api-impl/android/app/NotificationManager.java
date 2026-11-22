@@ -20,6 +20,32 @@ public class NotificationManager {
 	public static final int IMPORTANCE_HIGH = 4;
 	public static final int IMPORTANCE_MAX = 5;
 
+	public static final String ACTION_APP_BLOCK_STATE_CHANGED = "android.app.action.APP_BLOCK_STATE_CHANGED";
+	public static final String ACTION_AUTOMATIC_ZEN_RULE = "android.app.action.AUTOMATIC_ZEN_RULE";
+	public static final String ACTION_AUTOMATIC_ZEN_RULE_STATUS_CHANGED = "android.app.action.AUTOMATIC_ZEN_RULE_STATUS_CHANGED";
+	public static final String ACTION_CONSOLIDATED_NOTIFICATION_POLICY_CHANGED = "android.app.action.CONSOLIDATED_NOTIFICATION_POLICY_CHANGED";
+	public static final String ACTION_INTERRUPTION_FILTER_CHANGED = "android.app.action.INTERRUPTION_FILTER_CHANGED";
+	public static final String ACTION_NOTIFICATION_CHANNEL_BLOCK_STATE_CHANGED = "android.app.action.NOTIFICATION_CHANNEL_BLOCK_STATE_CHANGED";
+	public static final String ACTION_NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED = "android.app.action.NOTIFICATION_CHANNEL_GROUP_BLOCK_STATE_CHANGED";
+	public static final String ACTION_NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED = "android.app.action.NOTIFICATION_POLICY_ACCESS_GRANTED_CHANGED";
+	public static final String ACTION_NOTIFICATION_POLICY_CHANGED = "android.app.action.NOTIFICATION_POLICY_CHANGED";
+	public static final int AUTOMATIC_RULE_STATUS_UNKNOWN = -1;
+	public static final int AUTOMATIC_RULE_STATUS_ENABLED = 1;
+	public static final int AUTOMATIC_RULE_STATUS_DISABLED = 2;
+	public static final int AUTOMATIC_RULE_STATUS_REMOVED = 3;
+	public static final int AUTOMATIC_RULE_STATUS_ACTIVATED = 4;
+	public static final int AUTOMATIC_RULE_STATUS_DEACTIVATED = 5;
+	@Deprecated
+	public static final String EXTRA_AUTOMATIC_RULE_ID = "android.app.extra.AUTOMATIC_RULE_ID";
+	public static final String EXTRA_AUTOMATIC_ZEN_RULE_ID = "android.app.extra.AUTOMATIC_ZEN_RULE_ID";
+	public static final String EXTRA_AUTOMATIC_ZEN_RULE_STATUS = "android.app.extra.AUTOMATIC_ZEN_RULE_STATUS";
+	public static final String EXTRA_BLOCKED_STATE = "android.app.extra.BLOCKED_STATE";
+	public static final String EXTRA_NOTIFICATION_CHANNEL_GROUP_ID = "android.app.extra.NOTIFICATION_CHANNEL_GROUP_ID";
+	public static final String EXTRA_NOTIFICATION_CHANNEL_ID = "android.app.extra.NOTIFICATION_CHANNEL_ID";
+	public static final String EXTRA_NOTIFICATION_POLICY = "android.app.extra.NOTIFICATION_POLICY";
+	public static final String META_DATA_AUTOMATIC_RULE_TYPE = "android.service.zen.automatic.ruleType";
+	public static final String META_DATA_RULE_INSTANCE_LIMIT = "android.service.zen.automatic.ruleInstanceLimit";
+
 	/* GNotificationPriority */
 	private static final int G_NORMAL = 0, G_LOW = 1, G_HIGH = 2, G_URGENT = 3;
 
@@ -248,6 +274,7 @@ public class NotificationManager {
 		synchronized (channels) {
 			NotificationChannel existing = channels.get(channel.getId());
 			if (existing == null) {
+				channel.setOriginalImportance(channel.getImportance());
 				channels.put(channel.getId(), channel);
 				return;
 			}
@@ -257,6 +284,8 @@ public class NotificationManager {
 				existing.setGroup(channel.getGroup());
 			if (channel.getImportance() < existing.getImportance())
 				existing.setImportance(channel.getImportance());
+			if (existing.getOriginalImportance() == IMPORTANCE_UNSPECIFIED)
+				existing.setOriginalImportance(channel.getImportance());
 		}
 	}
 
@@ -500,6 +529,113 @@ public class NotificationManager {
 				return new Policy[size];
 			}
 		};
+
+		/** @hide */
+		public static final int[] ALL_PRIORITY_CATEGORIES = {
+			PRIORITY_CATEGORY_ALARMS,
+			PRIORITY_CATEGORY_MEDIA,
+			PRIORITY_CATEGORY_SYSTEM,
+			PRIORITY_CATEGORY_REMINDERS,
+			PRIORITY_CATEGORY_EVENTS,
+			PRIORITY_CATEGORY_MESSAGES,
+			PRIORITY_CATEGORY_CALLS,
+			PRIORITY_CATEGORY_REPEAT_CALLERS,
+			PRIORITY_CATEGORY_CONVERSATIONS,
+		};
+
+		private static final int[] ALL_SUPPRESSED_EFFECTS = {
+			SUPPRESSED_EFFECT_SCREEN_OFF,
+			SUPPRESSED_EFFECT_SCREEN_ON,
+			SUPPRESSED_EFFECT_FULL_SCREEN_INTENT,
+			SUPPRESSED_EFFECT_LIGHTS,
+			SUPPRESSED_EFFECT_PEEK,
+			SUPPRESSED_EFFECT_STATUS_BAR,
+			SUPPRESSED_EFFECT_BADGE,
+			SUPPRESSED_EFFECT_AMBIENT,
+			SUPPRESSED_EFFECT_NOTIFICATION_LIST
+		};
+
+		public static String suppressedEffectsToString(int effects) {
+			if (effects <= 0) return "";
+			final StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < ALL_SUPPRESSED_EFFECTS.length; i++) {
+				final int effect = ALL_SUPPRESSED_EFFECTS[i];
+				if ((effects & effect) != 0) {
+					if (sb.length() > 0) sb.append(',');
+					sb.append(effectToString(effect));
+				}
+				effects &= ~effect;
+			}
+			if (effects != 0) {
+				if (sb.length() > 0) sb.append(',');
+				sb.append("UNKNOWN_").append(effects);
+			}
+			return sb.toString();
+		}
+		public static String priorityCategoriesToString(int priorityCategories) {
+			if (priorityCategories == 0) return "";
+			final StringBuilder sb = new StringBuilder();
+			for (int i = 0; i < ALL_PRIORITY_CATEGORIES.length; i++) {
+				final int priorityCategory = ALL_PRIORITY_CATEGORIES[i];
+				if ((priorityCategories & priorityCategory) != 0) {
+					if (sb.length() > 0) sb.append(',');
+					sb.append(priorityCategoryToString(priorityCategory));
+				}
+				priorityCategories &= ~priorityCategory;
+			}
+			if (priorityCategories != 0) {
+				if (sb.length() > 0) sb.append(',');
+				sb.append("PRIORITY_CATEGORY_UNKNOWN_").append(priorityCategories);
+			}
+			return sb.toString();
+		}
+		public static String prioritySendersToString(int prioritySenders) {
+			switch (prioritySenders) {
+				case PRIORITY_SENDERS_ANY: return "PRIORITY_SENDERS_ANY";
+				case PRIORITY_SENDERS_CONTACTS: return "PRIORITY_SENDERS_CONTACTS";
+				case PRIORITY_SENDERS_STARRED: return "PRIORITY_SENDERS_STARRED";
+				default: return "PRIORITY_SENDERS_UNKNOWN_" + prioritySenders;
+			}
+		}
+		private static String effectToString(int effect) {
+			switch (effect) {
+				case SUPPRESSED_EFFECT_FULL_SCREEN_INTENT:
+					return "SUPPRESSED_EFFECT_FULL_SCREEN_INTENT";
+				case SUPPRESSED_EFFECT_LIGHTS:
+					return "SUPPRESSED_EFFECT_LIGHTS";
+				case SUPPRESSED_EFFECT_PEEK:
+					return "SUPPRESSED_EFFECT_PEEK";
+				case SUPPRESSED_EFFECT_STATUS_BAR:
+					return "SUPPRESSED_EFFECT_STATUS_BAR";
+				case SUPPRESSED_EFFECT_BADGE:
+					return "SUPPRESSED_EFFECT_BADGE";
+				case SUPPRESSED_EFFECT_AMBIENT:
+					return "SUPPRESSED_EFFECT_AMBIENT";
+				case SUPPRESSED_EFFECT_NOTIFICATION_LIST:
+					return "SUPPRESSED_EFFECT_NOTIFICATION_LIST";
+				case SUPPRESSED_EFFECT_SCREEN_OFF:
+					return "SUPPRESSED_EFFECT_SCREEN_OFF";
+				case SUPPRESSED_EFFECT_SCREEN_ON:
+					return "SUPPRESSED_EFFECT_SCREEN_ON";
+				case SUPPRESSED_EFFECTS_UNSET:
+					return "SUPPRESSED_EFFECTS_UNSET";
+				default: return "UNKNOWN_" + effect;
+			}
+		}
+		private static String priorityCategoryToString(int priorityCategory) {
+			switch (priorityCategory) {
+				case PRIORITY_CATEGORY_REMINDERS: return "PRIORITY_CATEGORY_REMINDERS";
+				case PRIORITY_CATEGORY_EVENTS: return "PRIORITY_CATEGORY_EVENTS";
+				case PRIORITY_CATEGORY_MESSAGES: return "PRIORITY_CATEGORY_MESSAGES";
+				case PRIORITY_CATEGORY_CALLS: return "PRIORITY_CATEGORY_CALLS";
+				case PRIORITY_CATEGORY_REPEAT_CALLERS: return "PRIORITY_CATEGORY_REPEAT_CALLERS";
+				case PRIORITY_CATEGORY_ALARMS: return "PRIORITY_CATEGORY_ALARMS";
+				case PRIORITY_CATEGORY_MEDIA: return "PRIORITY_CATEGORY_MEDIA";
+				case PRIORITY_CATEGORY_SYSTEM: return "PRIORITY_CATEGORY_SYSTEM";
+				case PRIORITY_CATEGORY_CONVERSATIONS: return "PRIORITY_CATEGORY_CONVERSATIONS";
+				default: return "PRIORITY_CATEGORY_UNKNOWN_" + priorityCategory;
+			}
+		}
 
 		/* AOSP Policy.allowPriorityChannels() (API 35); hasPriorityChannels() is @hide */
 		public boolean hasPriorityChannels() {
