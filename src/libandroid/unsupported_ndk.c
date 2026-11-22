@@ -1,7 +1,7 @@
 /*
  * NDK functions of features ATL does not have, answering like an Android device without them:
- * no DRM scheme (libmediandk NdkMediaCrypto), no gralloc buffers (AHardwareBuffer), no sync fences
- * (libsync), no SurfaceFlinger (ASurfaceControl). Firefox's libxul and YouTube's
+ * no DRM scheme (libmediandk NdkMediaCrypto), no gralloc buffers (AHardwareBuffer), no SurfaceFlinger
+ * (ASurfaceControl). Firefox's libxul and YouTube's
  * libgoogle3 link them and check the results.
  */
 
@@ -56,10 +56,3 @@ void ASurfaceTransaction_setBuffer(void *aSurfaceTransaction, void *aSurfaceCont
 void ASurfaceTransaction_setBufferDataSpace(void *aSurfaceTransaction, void *aSurfaceControl, int32_t aDataSpace) {}
 void ASurfaceTransaction_setGeometry(void *aSurfaceTransaction, void *aSurfaceControl, const void *source, const void *destination, int32_t transform) {}
 int ASurfaceTransactionStats_getPreviousReleaseFenceFd(void *aSurfaceTransactionStats, void *aSurfaceControl) { return -1; }
-
-/* libsync */
-int sync_merge(const char *name, int fd1, int fd2)
-{
-	errno = EINVAL;
-	return -1;
-}

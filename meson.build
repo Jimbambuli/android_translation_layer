@@ -167,6 +167,7 @@ libandroid_so = shared_library('android', [
                                           	'src/libandroid/sensor.c',
                                           	'src/libandroid/sharedmem.c',
                                           	'src/libandroid/surface_texture.c',
+                                          	'src/libandroid/sync.c',
                                           	'src/libandroid/system_fonts.c',
                                           	'src/libandroid/trace.c',
                                           	'src/libandroid/unsupported_ndk.c',
