@@ -1657,7 +1657,11 @@ public class PackageManager {
 		if (packageName.equals("atl") || packageName.equals("android")) {
 			PackageInfo info = new PackageInfo();
 			info.packageName = packageName;
-			info.signatures = new Signature[] {new Signature(new byte[0])};
+			/* signed with ATL's platform certificate, like "android" with a device's platform key */
+			if ((flags & GET_SIGNATURES) != 0)
+				info.signatures = android.atl.ATLSigHelper.getPlatformSignatures();
+			if ((flags & GET_SIGNING_CERTIFICATES) != 0)
+				info.signingInfo = new SigningInfo(android.atl.ATLSigHelper.getPlatformSignatures());
 			return info;
 		}
 		PackageParser.Package pkg = ATLLoadedAppManager.getPackageFromPackageName(packageName);
