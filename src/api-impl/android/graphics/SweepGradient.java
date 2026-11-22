@@ -16,6 +16,7 @@
 
 package android.graphics;
 
+/* ATL keeps the gradient in Java like LinearGradient; there is no native shader (Shader.init() takes none) */
 public class SweepGradient extends Shader {
 
 	private static final int TYPE_COLORS_AND_POSITIONS = 1;
@@ -62,7 +63,6 @@ public class SweepGradient extends Shader {
 		mCy = cy;
 		mColors = colors;
 		mPositions = positions;
-		init(nativeCreate1(cx, cy, colors, positions));
 	}
 
 	/**
@@ -98,7 +98,6 @@ public class SweepGradient extends Shader {
 		mCy = cy;
 		mColor0 = color0;
 		mColor1 = color1;
-		init(nativeCreate2(cx, cy, color0, color1));
 	}
 
 	/**
@@ -123,6 +122,4 @@ public class SweepGradient extends Shader {
 		return copy;
 	}
 
-	private static native long nativeCreate1(float x, float y, int colors[], float positions[]);
-	private static native long nativeCreate2(float x, float y, int color0, int color1);
 }
