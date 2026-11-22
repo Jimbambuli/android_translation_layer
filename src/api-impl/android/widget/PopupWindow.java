@@ -609,6 +609,27 @@ public class PopupWindow {
 		applyTouchModal();
 	}
 
+	public boolean isTouchModal() {
+		return mTouchModal;
+	}
+
+	/* AOSP mIgnoreCheekPress and mLayoutInScreen only become window flags (FLAG_IGNORE_CHEEK_PRESSES,
+	 * FLAG_LAYOUT_IN_SCREEN) of the window AOSP would add; ATL's popover does not use them */
+	private boolean mIgnoreCheekPress = false;
+	private boolean mLayoutInScreen;
+
+	public void setIgnoreCheekPress() {
+		mIgnoreCheekPress = true;
+	}
+
+	public boolean isLaidOutInScreen() {
+		return mLayoutInScreen;
+	}
+
+	public void setIsLaidOutInScreen(boolean enabled) {
+		mLayoutInScreen = enabled;
+	}
+
 	public float getElevation() {
 		return mElevation;
 	}
