@@ -78,7 +78,11 @@ public class SensorManager {
 							listener.onSensorChanged(new SensorEvent(new float[] {location.getBearing()}, sensor));
 						}
 					};
-					new LocationManager().requestLocationUpdates(null, 0, 0, locationListener);
+					try { // the bearing of the fused position; without a location permission no events
+						new LocationManager(android.atl.ATLLoadedApp.getPrimaryApplication().getApplication())
+						    .requestLocationUpdates(LocationManager.FUSED_PROVIDER, 0, 0, locationListener);
+					} catch (SecurityException e) {
+					}
 					source = locationListener;
 					break;
 				case Sensor.TYPE_ACCELEROMETER:
@@ -121,7 +125,7 @@ public class SensorManager {
 				return;
 			for (Object source : sensor == null ? sensors.values() : Arrays.asList(sensors.get(sensor.getType()))) {
 				if (source instanceof LocationListener)
-					new LocationManager().removeUpdates((LocationListener)source);
+					new LocationManager(android.atl.ATLLoadedApp.getPrimaryApplication().getApplication()).removeUpdates((LocationListener)source);
 				else if (source instanceof Long)
 					unregister_accelerometer_listener_native((Long)source);
 			}

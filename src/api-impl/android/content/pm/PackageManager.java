@@ -2295,13 +2295,15 @@ public class PackageManager {
 			case "android.permission.READ_PHONE_STATE":
 			case "android.permission.POST_NOTIFICATIONS":
 				return PERMISSION_GRANTED;
-			// only tell the app that it can access location if it *actually* can
-			// (until we find apps that refuse to launch without being lied to anyway)
+			// runtime permissions: AOSP grants only what the manifest requests; ATL has no dialog of its own, the
+			// desktop asks (location portal in a Flatpak, GeoClue's agent outside). After a «no» there, or without
+			// a location service, the app has no location permission.
 			case "android.permission.ACCESS_FINE_LOCATION":
 			case "android.permission.ACCESS_COARSE_LOCATION":
-			// the portal gives the position whether the window is shown or not
+			// the desktop gives the position whether the window is shown or not
 			case "android.permission.ACCESS_BACKGROUND_LOCATION":
-				if (android.location.LocationManager.available()) // in a Flatpak the location portal asks the user
+				if (ATLLoadedApp.getPrimaryApplication().pkg.requestedPermissions.contains(permName)
+				    && android.location.LocationManager.available())
 					return PERMISSION_GRANTED;
 				else
 					return PERMISSION_DENIED;
@@ -2682,8 +2684,8 @@ public class PackageManager {
 			case FEATURE_AUDIO_OUTPUT:
 			case FEATURE_MICROPHONE:
 				return true;
-			/* LocationManager (desktop portal; off unless ATL_UGLY_ENABLE_LOCATION, like a device with location
-			 * turned off); Google Play implies android.hardware.location from ACCESS_COARSE_LOCATION */
+			/* LocationManager (the desktop's position as network provider, no GNSS hardware); Google Play implies
+			 * android.hardware.location from ACCESS_COARSE_LOCATION */
 			case FEATURE_LOCATION:
 			case FEATURE_LOCATION_NETWORK:
 				return true;

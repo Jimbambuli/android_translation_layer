@@ -43,10 +43,6 @@ The following environment variables are recognized by the main executable:
 
 ---
 
-`ATL_UGLY_ENABLE_LOCATION=` - if set, apps will be able to get location data using the relevant android APIs. (TODO: use bubblewrap)  
-
----
-
 `ATL_UGLY_ENABLE_MICROPHONE=` - if set, apps will be able record microphone audio using the relevant android APIs. (TODO: use bubblewrap)
 
 ---

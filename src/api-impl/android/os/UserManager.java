@@ -18,6 +18,11 @@ public class UserManager {
 	public static final String DISALLOW_OUTGOING_CALLS = "no_outgoing_calls";
 	public static final String DISALLOW_SMS = "no_sms";
 
+	/* AOSP UserManager.get(Context) */
+	public static UserManager get(android.content.Context context) {
+		return (UserManager) context.getSystemService(android.content.Context.USER_SERVICE);
+	}
+
 	public static final int QUIET_MODE_DISABLE_ONLY_IF_CREDENTIAL_NOT_REQUIRED = 0x1;
 
 	/* AOSP UserManager: extras of the ACTION_CREATE_USER intent */
