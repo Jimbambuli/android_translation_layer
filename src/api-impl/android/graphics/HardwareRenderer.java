@@ -43,6 +43,46 @@ public class HardwareRenderer {
 		mSurface = null;
 	}
 
+	private boolean mOpaque = true;
+	private boolean mStopped;
+	private static boolean sDrawingEnabled = true;
+
+	/* AOSP stop()/start() -> nSetStopped(): a stopped renderer draws no frames (syncAndDraw() reports
+	 * SYNC_CONTEXT_IS_STOPPED) */
+	public void stop() {
+		mStopped = true;
+	}
+
+	public void start() {
+		mStopped = false;
+	}
+
+	/* AOSP setOpaque()/isOpaque(); ATL's buffers keep their alpha either way */
+	public void setOpaque(boolean opaque) {
+		mOpaque = opaque;
+	}
+
+	public boolean isOpaque() {
+		return mOpaque;
+	}
+
+	/* AOSP setDrawingEnabled()/isDrawingEnabled() -> nSetDrawingEnabled(): with drawing off no frame is drawn */
+	public static void setDrawingEnabled(boolean drawingEnabled) {
+		sDrawingEnabled = drawingEnabled;
+	}
+
+	public static boolean isDrawingEnabled() {
+		return sDrawingEnabled;
+	}
+
+	/* AOSP setName() (a name for the debug output), notifyFramePending() (a hint for the scheduling),
+	 * clearContent() (frees the GPU resources): nothing to do here */
+	public void setName(String name) {}
+
+	public void notifyFramePending() {}
+
+	public void clearContent() {}
+
 	private final FrameRenderRequest mRenderRequest = new FrameRenderRequest();
 
 	/* AOSP HardwareRenderer.createRenderRequest(): the one request of the renderer, reset */
@@ -86,8 +126,12 @@ public class HardwareRenderer {
 		public int syncAndDraw() {
 			int result = SYNC_OK;
 			android.view.Surface surface = mSurface;
-			if (surface == null || !surface.isValid()) {
+			if (mStopped) {
+				result = SYNC_CONTEXT_IS_STOPPED | SYNC_FRAME_DROPPED;
+			} else if (surface == null || !surface.isValid()) {
 				result = SYNC_LOST_SURFACE_REWARD_IF_FOUND | SYNC_FRAME_DROPPED;
+			} else if (!sDrawingEnabled) {
+				result = SYNC_FRAME_DROPPED;
 			} else {
 				Canvas canvas = surface.lockHardwareCanvas();
 				try {
