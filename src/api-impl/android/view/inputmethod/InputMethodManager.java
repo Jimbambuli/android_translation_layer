@@ -9,7 +9,15 @@ import java.util.List;
 
 public class InputMethodManager {
 
-	private static long im_context = nativeInit();
+	/* the GtkIMContext, made on first use: the class may be loaded on any thread (Chromium's thread pool did), GTK
+	 * objects are made on the main thread, which the View-bound calls below run on (doc/threading.md) */
+	private static long im_context;
+
+	private static long imContext() {
+		if (im_context == 0)
+			im_context = nativeInit();
+		return im_context;
+	}
 
 	/* the on-screen keyboard of the shell is shown (sm.puri.OSK0 of Phosh's keyboards, see nativeInit()) */
 	private static boolean sOskVisible;
@@ -43,7 +51,7 @@ public class InputMethodManager {
 
 	public boolean hideSoftInputFromWindow(IBinder windowToken, int flags, ResultReceiver resultReceiver) {
 		boolean wasShown = activeView != null;
-		nativeHideSoftInput(im_context);
+		nativeHideSoftInput(imContext());
 		activeView = null;
 		if (resultReceiver != null)
 			resultReceiver.send(wasShown ? RESULT_HIDDEN : RESULT_UNCHANGED_HIDDEN, null);
@@ -56,7 +64,7 @@ public class InputMethodManager {
 
 	public boolean showSoftInput(View view, int flags, ResultReceiver resultReceiver) {
 		boolean alreadyShown = view == activeView;
-		boolean shown = alreadyShown ? nativeShowSoftInput(im_context, view.widget, null, 0) : startInput(view);
+		boolean shown = alreadyShown ? nativeShowSoftInput(imContext(), view.widget, null, 0) : startInput(view);
 		if (resultReceiver != null)
 			resultReceiver.send(shown ? (alreadyShown ? RESULT_UNCHANGED_SHOWN : RESULT_SHOWN) : RESULT_UNCHANGED_HIDDEN, null);
 		return shown;
@@ -177,7 +185,7 @@ public class InputMethodManager {
 				activeConnection.closeConnection();
 			activeView = view;
 			activeConnection = ic;
-			return nativeShowSoftInput(im_context, view.widget, ic, outAttrs.inputType);
+			return nativeShowSoftInput(imContext(), view.widget, ic, outAttrs.inputType);
 		}
 		return false;
 	}
