@@ -499,12 +499,13 @@ static void watch(const char *gtk_dir)
 }
 
 /* GTK also takes the icon theme from the settings portal (org.gnome.desktop.interface), maybe one that is not in
- * the sandbox (KDE: breeze): keep an installed one */
+ * the sandbox (KDE: breeze): keep an installed one. Adwaita is GTK's own fallback; setting it again when it is not
+ * installed either would notify this handler again, without end. */
 static void icon_theme_changed(GtkSettings *settings, GParamSpec *pspec, gpointer user_data)
 {
 	char *name = NULL;
 	g_object_get(settings, "gtk-icon-theme-name", &name, NULL);
-	if (!name || !icon_theme_installed(name))
+	if (!name || (strcmp(name, "Adwaita") && !icon_theme_installed(name)))
 		g_object_set(settings, "gtk-icon-theme-name", "Adwaita", NULL);
 	g_free(name);
 }

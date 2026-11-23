@@ -306,5 +306,8 @@ JNIEXPORT void JNICALL Java_com_android_server_input_EventHub_nativeCancelVibrat
 /* the directory of AOSP's /system/usr (keylayout, keychars, idc) in ATL's installation */
 JNIEXPORT jstring JNICALL Java_com_android_server_input_EventHub_nativeGetSystemUsrDir(JNIEnv *env, jclass class)
 {
-	return (*env)->NewStringUTF(env, INSTALL_DATADIR "/atl/system/usr/");
+	char *dir = atl_install_path(ATL_DATADIR "/atl/system/usr/");
+	jstring ret = (*env)->NewStringUTF(env, dir);
+	g_free(dir);
+	return ret;
 }

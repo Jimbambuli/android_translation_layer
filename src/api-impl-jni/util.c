@@ -1,3 +1,6 @@
+// for dladdr
+#define _GNU_SOURCE
+
 #include <libintl.h>
 #include <locale.h>
 #include <math.h>
@@ -987,4 +990,15 @@ char *atl_framework_string(JNIEnv *env, jobject context, const char *name)
 	(*env)->DeleteLocalRef(env, text);
 	(*env)->DeleteLocalRef(env, r_string);
 	return result;
+}
+
+char *atl_install_path(const char *rel)
+{
+	Dl_info info;
+	if (g_path_is_absolute(rel) || !dladdr(atl_install_path, &info) || !info.dli_fname)
+		return g_strdup(rel);
+	char *dir = g_path_get_dirname(info.dli_fname);
+	char *path = g_build_filename(dir, rel, NULL);
+	g_free(dir);
+	return path;
 }

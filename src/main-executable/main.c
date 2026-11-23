@@ -60,9 +60,13 @@
 static const char *native_bridge(void)
 {
 	static int available = -1;
-	if (available < 0)
-		available = ATL_NATIVE_BRIDGE[0] && ATL_NATIVE_BRIDGE_ABI[0] && !access(ATL_NATIVE_BRIDGE, R_OK);
-	return available ? ATL_NATIVE_BRIDGE : NULL;
+	static char *path;
+	if (available < 0) {
+		/* relative to ATL's installation when the bridge is installed with it (see atl_install_path()) */
+		path = atl_install_path(ATL_NATIVE_BRIDGE);
+		available = ATL_NATIVE_BRIDGE[0] && ATL_NATIVE_BRIDGE_ABI[0] && !access(path, R_OK);
+	}
+	return available ? path : NULL;
 }
 
 /* What Berberis (Digitalis) needs to know about this host, set before ART loads it; settings already in the
@@ -344,7 +348,7 @@ JNIEnv *create_vm(char *api_impl_jar, char *apk_classpath, char *framework_res_a
 
 	/* the device has the bridge: ro.dalvik.vm.native.bridge and an ABI list with the bridged ABI after the host's */
 	if (native_bridge()) {
-		options[option_counter++].optionString = g_strdup_printf("-Dro.dalvik.vm.native.bridge=%s", ATL_NATIVE_BRIDGE);
+		options[option_counter++].optionString = g_strdup_printf("-Dro.dalvik.vm.native.bridge=%s", native_bridge());
 		options[option_counter++].optionString = "-Dro.product.cpu.abilist=" NATIVE_ARCH "," ATL_NATIVE_BRIDGE_ABI;
 	}
 	/* like AndroidRuntime::startVm with ro.dalvik.vm.native.bridge set, ART loads the bridge and leaves its
@@ -622,15 +626,15 @@ static void update_animator_duration_scale(GtkSettings *settings)
  * family "Roboto Condensed", the family name of the condensed Roboto fonts; the rule below makes
  * it Roboto at width 75 (the Condensed instances of the variable font). */
 #define ROBOTO_FONT "Roboto-Regular.ttf"
-static const char *roboto_font_paths[] = {
-	INSTALL_DATADIR "/atl/fonts/" ROBOTO_FONT,
-	/* Relative path when running from ./android_translation_layer/builddir */
-	"../res/fonts/" ROBOTO_FONT,
-	NULL,
-};
-
 static void add_android_fonts(void)
 {
+	char *installed = atl_install_path(ATL_DATADIR "/atl/fonts/" ROBOTO_FONT);
+	const char *roboto_font_paths[] = {
+		installed,
+		/* Relative path when running from ./android_translation_layer/builddir */
+		"../res/fonts/" ROBOTO_FONT,
+		NULL,
+	};
 	FcConfig *config = FcConfigGetCurrent();
 	for (const char **path = roboto_font_paths; *path; path++) {
 		if (FcConfigAppFontAddFile(config, (const FcChar8 *)*path))
@@ -638,6 +642,7 @@ static void add_android_fonts(void)
 		if (!path[1])
 			fprintf(stderr, "add_android_fonts: %s not found, Roboto is used only if it is installed\n", ROBOTO_FONT);
 	}
+	g_free(installed);
 	FcConfigParseAndLoadFromMemory(config, (const FcChar8 *)
 	    "<?xml version=\"1.0\"?><!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\"><fontconfig>"
 	    "<match target=\"pattern\"><test name=\"family\"><string>Roboto Condensed</string></test>"
