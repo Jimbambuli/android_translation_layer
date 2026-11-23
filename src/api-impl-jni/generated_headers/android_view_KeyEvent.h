@@ -777,6 +777,8 @@ extern "C" {
 #define android_view_KeyEvent_FLAG_START_TRACKING 1073741824L
 #undef android_view_KeyEvent_FLAG_TAINTED
 #define android_view_KeyEvent_FLAG_TAINTED -2147483648L
+#undef android_view_KeyEvent_FLAG_IS_ACCESSIBILITY_EVENT
+#define android_view_KeyEvent_FLAG_IS_ACCESSIBILITY_EVENT 2048L
 #undef android_view_KeyEvent_DEBUG
 #define android_view_KeyEvent_DEBUG 0L
 #undef android_view_KeyEvent_MAX_RECYCLED

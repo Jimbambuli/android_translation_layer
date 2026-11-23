@@ -25,6 +25,10 @@ extern "C" {
 #define android_text_Layout_ATTR_STRIKETHROUGH 7L
 #undef android_text_Layout_ATTR_HYPHENS
 #define android_text_Layout_ATTR_HYPHENS 8L
+#undef android_text_Layout_DIR_LEFT_TO_RIGHT
+#define android_text_Layout_DIR_LEFT_TO_RIGHT 1L
+#undef android_text_Layout_DIR_RIGHT_TO_LEFT
+#define android_text_Layout_DIR_RIGHT_TO_LEFT -1L
 /*
  * Class:     android_text_Layout
  * Method:    native_constructor
@@ -56,6 +60,14 @@ JNIEXPORT void JNICALL Java_android_text_Layout_native_1add_1placeholder
  */
 JNIEXPORT jboolean JNICALL Java_android_text_Layout_native_1get_1placeholder
   (JNIEnv *, jclass, jlong, jint, jfloatArray);
+
+/*
+ * Class:     android_text_Layout
+ * Method:    native_get_line_metrics
+ * Signature: (JI[I)V
+ */
+JNIEXPORT void JNICALL Java_android_text_Layout_native_1get_1line_1metrics
+  (JNIEnv *, jclass, jlong, jint, jintArray);
 
 /*
  * Class:     android_text_Layout
@@ -192,14 +204,6 @@ JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1ascent
  */
 JNIEXPORT jint JNICALL Java_android_text_Layout_native_1get_1line_1descent
   (JNIEnv *, jobject, jlong, jint);
-
-/*
- * Class:     android_text_Layout
- * Method:    native_get_line_metrics
- * Signature: (JI[I)V
- */
-JNIEXPORT void JNICALL Java_android_text_Layout_native_1get_1line_1metrics
-  (JNIEnv *, jclass, jlong, jint, jintArray);
 
 /*
  * Class:     android_text_Layout

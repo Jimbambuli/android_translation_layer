@@ -151,6 +151,8 @@ extern "C" {
 #define android_widget_TextView_PFLAG2_DRAG_HOVERED 2L
 #undef android_widget_TextView_DRAG_MASK
 #define android_widget_TextView_DRAG_MASK 3L
+#undef android_widget_TextView_LAYOUT_DIRECTION_UNDEFINED
+#define android_widget_TextView_LAYOUT_DIRECTION_UNDEFINED -1L
 #undef android_widget_TextView_LAYOUT_DIRECTION_LTR
 #define android_widget_TextView_LAYOUT_DIRECTION_LTR 0L
 #undef android_widget_TextView_LAYOUT_DIRECTION_RTL
@@ -243,20 +245,64 @@ extern "C" {
 #define android_widget_TextView_PFLAG_PRESSED 16384L
 #undef android_widget_TextView_PFLAG_ACTIVATED
 #define android_widget_TextView_PFLAG_ACTIVATED 1073741824L
+#undef android_widget_TextView_PFLAG_HOVERED
+#define android_widget_TextView_PFLAG_HOVERED 268435456L
 #undef android_widget_TextView_PFLAG3_IS_LAID_OUT
 #define android_widget_TextView_PFLAG3_IS_LAID_OUT 4L
+#undef android_widget_TextView_PFLAG3_APPLYING_INSETS
+#define android_widget_TextView_PFLAG3_APPLYING_INSETS 32L
+#undef android_widget_TextView_PFLAG3_FITTING_SYSTEM_WINDOWS
+#define android_widget_TextView_PFLAG3_FITTING_SYSTEM_WINDOWS 64L
+#undef android_widget_TextView_PFLAG3_CLUSTER
+#define android_widget_TextView_PFLAG3_CLUSTER 32768L
 #undef android_widget_TextView_UNDEFINED_PADDING
 #define android_widget_TextView_UNDEFINED_PADDING -2147483648L
 #undef android_widget_TextView_PFLAG_PREPRESSED
 #define android_widget_TextView_PFLAG_PREPRESSED 33554432L
+#undef android_widget_TextView_PUBLIC_STATUS_BAR_VISIBILITY_MASK
+#define android_widget_TextView_PUBLIC_STATUS_BAR_VISIBILITY_MASK 16375L
+#undef android_widget_TextView_SYSTEM_UI_CLEARABLE_FLAGS
+#define android_widget_TextView_SYSTEM_UI_CLEARABLE_FLAGS 7L
 #undef android_widget_TextView_PFLAG_SAVE_STATE_CALLED
 #define android_widget_TextView_PFLAG_SAVE_STATE_CALLED 131072L
+#undef android_widget_TextView_SCROLL_CAPTURE_HINT_AUTO
+#define android_widget_TextView_SCROLL_CAPTURE_HINT_AUTO 0L
+#undef android_widget_TextView_SCROLL_CAPTURE_HINT_EXCLUDE
+#define android_widget_TextView_SCROLL_CAPTURE_HINT_EXCLUDE 1L
+#undef android_widget_TextView_SCROLL_CAPTURE_HINT_INCLUDE
+#define android_widget_TextView_SCROLL_CAPTURE_HINT_INCLUDE 2L
+#undef android_widget_TextView_SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS
+#define android_widget_TextView_SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS 4L
 #undef android_widget_TextView_LAYER_TYPE_NONE
 #define android_widget_TextView_LAYER_TYPE_NONE 0L
 #undef android_widget_TextView_LAYER_TYPE_SOFTWARE
 #define android_widget_TextView_LAYER_TYPE_SOFTWARE 1L
 #undef android_widget_TextView_LAYER_TYPE_HARDWARE
 #define android_widget_TextView_LAYER_TYPE_HARDWARE 2L
+#undef android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED
+#define android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED 0L
+#undef android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY
+#define android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY 1L
+#undef android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR
+#define android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR 2L
+#undef android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS
+#define android_widget_TextView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS 3L
+#undef android_widget_TextView_POINTER_CAPTURE_MODE_UNCAPTURED
+#define android_widget_TextView_POINTER_CAPTURE_MODE_UNCAPTURED 0L
+#undef android_widget_TextView_POINTER_CAPTURE_MODE_ABSOLUTE
+#define android_widget_TextView_POINTER_CAPTURE_MODE_ABSOLUTE 1L
+#undef android_widget_TextView_POINTER_CAPTURE_MODE_RELATIVE
+#define android_widget_TextView_POINTER_CAPTURE_MODE_RELATIVE 2L
+#undef android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_AUTO
+#define android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_AUTO 0L
+#undef android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_YES
+#define android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_YES 1L
+#undef android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_NO
+#define android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_NO 2L
+#undef android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS
+#define android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS 4L
+#undef android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+#define android_widget_TextView_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS 8L
 #undef android_widget_TextView_IMPORTANT_FOR_ACCESSIBILITY_AUTO
 #define android_widget_TextView_IMPORTANT_FOR_ACCESSIBILITY_AUTO 0L
 #undef android_widget_TextView_IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -301,6 +347,16 @@ extern "C" {
 #define android_widget_TextView_CONTENT_SENSITIVITY_SENSITIVE 1L
 #undef android_widget_TextView_CONTENT_SENSITIVITY_NOT_SENSITIVE
 #define android_widget_TextView_CONTENT_SENSITIVITY_NOT_SENSITIVE 2L
+#undef android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+#define android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_DEFAULT NaNf
+#undef android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE
+#define android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE -1.0f
+#undef android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_LOW
+#define android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_LOW -2.0f
+#undef android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_NORMAL
+#define android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_NORMAL -3.0f
+#undef android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_HIGH
+#define android_widget_TextView_REQUESTED_FRAME_RATE_CATEGORY_HIGH -4.0f
 #undef android_widget_TextView_AUTOFILL_TYPE_NONE
 #define android_widget_TextView_AUTOFILL_TYPE_NONE 0L
 #undef android_widget_TextView_AUTOFILL_TYPE_TEXT
@@ -389,19 +445,19 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setText
 
 /*
  * Class:     android_widget_TextView
- * Method:    native_setPaintFlags
- * Signature: (I)V
- */
-JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setPaintFlags
-  (JNIEnv *, jobject, jint);
-
-/*
- * Class:     android_widget_TextView
  * Method:    native_setTextSize
  * Signature: (F)V
  */
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTextSize
   (JNIEnv *, jobject, jfloat);
+
+/*
+ * Class:     android_widget_TextView
+ * Method:    native_setPaintFlags
+ * Signature: (I)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setPaintFlags
+  (JNIEnv *, jobject, jint);
 
 /*
  * Class:     android_widget_TextView
@@ -418,6 +474,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTextColor
  */
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLines
   (JNIEnv *, jobject, jint, jint);
+
+/*
+ * Class:     android_widget_TextView
+ * Method:    native_setWrap
+ * Signature: (Z)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setWrap
+  (JNIEnv *, jobject, jboolean);
 
 /*
  * Class:     android_widget_TextView
@@ -454,10 +518,18 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setTypeface
 /*
  * Class:     android_widget_TextView
  * Method:    native_setCompoundDrawables
- * Signature: (JJJJJ)V
+ * Signature: (JLandroid/graphics/drawable/Drawable;Landroid/graphics/drawable/Drawable;Landroid/graphics/drawable/Drawable;Landroid/graphics/drawable/Drawable;)V
  */
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables
-  (JNIEnv *, jobject, jlong, jlong, jlong, jlong, jlong);
+  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jobject);
+
+/*
+ * Class:     android_widget_TextView
+ * Method:    native_setSelectable
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setSelectable
+  (JNIEnv *, jobject, jlong, jboolean);
 
 /*
  * Class:     android_widget_TextView
@@ -466,6 +538,14 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setCompoundDrawables
  */
 JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setFontPadding
   (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_widget_TextView
+ * Method:    native_setLetterSpacing
+ * Signature: (JF)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLetterSpacing
+  (JNIEnv *, jobject, jlong, jfloat);
 
 #ifdef __cplusplus
 }

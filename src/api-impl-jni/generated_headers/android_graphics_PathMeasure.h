@@ -7,6 +7,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_graphics_PathMeasure_POSITION_MATRIX_FLAG
+#define android_graphics_PathMeasure_POSITION_MATRIX_FLAG 1L
+#undef android_graphics_PathMeasure_TANGENT_MATRIX_FLAG
+#define android_graphics_PathMeasure_TANGENT_MATRIX_FLAG 2L
 /*
  * Class:     android_graphics_PathMeasure
  * Method:    native_split

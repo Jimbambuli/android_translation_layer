@@ -7,29 +7,75 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_media_SoundPool_CMD_PAUSE
+#define android_media_SoundPool_CMD_PAUSE 0L
+#undef android_media_SoundPool_CMD_RESUME
+#define android_media_SoundPool_CMD_RESUME 1L
+#undef android_media_SoundPool_CMD_STOP
+#define android_media_SoundPool_CMD_STOP 2L
+#undef android_media_SoundPool_CMD_VOLUME
+#define android_media_SoundPool_CMD_VOLUME 3L
+#undef android_media_SoundPool_CMD_PRIORITY
+#define android_media_SoundPool_CMD_PRIORITY 4L
+#undef android_media_SoundPool_CMD_LOOP
+#define android_media_SoundPool_CMD_LOOP 5L
+#undef android_media_SoundPool_CMD_RATE
+#define android_media_SoundPool_CMD_RATE 6L
 /*
  * Class:     android_media_SoundPool
- * Method:    native_constructor
- * Signature: ()J
+ * Method:    native_setup
+ * Signature: (I)J
  */
-JNIEXPORT jlong JNICALL Java_android_media_SoundPool_native_1constructor
-  (JNIEnv *, jclass);
+JNIEXPORT jlong JNICALL Java_android_media_SoundPool_native_1setup
+  (JNIEnv *, jclass, jint);
 
 /*
  * Class:     android_media_SoundPool
- * Method:    nativeLoad
- * Signature: (JLjava/lang/String;)I
+ * Method:    native_decode
+ * Signature: (JIIJJ)I
  */
-JNIEXPORT jint JNICALL Java_android_media_SoundPool_nativeLoad
-  (JNIEnv *, jclass, jlong, jstring);
+JNIEXPORT jint JNICALL Java_android_media_SoundPool_native_1decode
+  (JNIEnv *, jclass, jlong, jint, jint, jlong, jlong);
 
 /*
  * Class:     android_media_SoundPool
- * Method:    nativePlay
- * Signature: (JI)I
+ * Method:    native_unload
+ * Signature: (JI)Z
  */
-JNIEXPORT jint JNICALL Java_android_media_SoundPool_nativePlay
+JNIEXPORT jboolean JNICALL Java_android_media_SoundPool_native_1unload
   (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_media_SoundPool
+ * Method:    native_play
+ * Signature: (JIFFIIF)I
+ */
+JNIEXPORT jint JNICALL Java_android_media_SoundPool_native_1play
+  (JNIEnv *, jclass, jlong, jint, jfloat, jfloat, jint, jint, jfloat);
+
+/*
+ * Class:     android_media_SoundPool
+ * Method:    native_command
+ * Signature: (JIIIFF)V
+ */
+JNIEXPORT void JNICALL Java_android_media_SoundPool_native_1command
+  (JNIEnv *, jclass, jlong, jint, jint, jint, jfloat, jfloat);
+
+/*
+ * Class:     android_media_SoundPool
+ * Method:    native_autoPause
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_media_SoundPool_native_1autoPause
+  (JNIEnv *, jclass, jlong, jboolean);
+
+/*
+ * Class:     android_media_SoundPool
+ * Method:    native_release
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_SoundPool_native_1release
+  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

@@ -7,37 +7,55 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_media_MediaPlayer_MEDIA_ERROR_UNKNOWN
+#define android_media_MediaPlayer_MEDIA_ERROR_UNKNOWN 1L
+#undef android_media_MediaPlayer_MEDIA_ERROR_SERVER_DIED
+#define android_media_MediaPlayer_MEDIA_ERROR_SERVER_DIED 100L
+#undef android_media_MediaPlayer_MEDIA_ERROR_IO
+#define android_media_MediaPlayer_MEDIA_ERROR_IO -1004L
+#undef android_media_MediaPlayer_MEDIA_ERROR_MALFORMED
+#define android_media_MediaPlayer_MEDIA_ERROR_MALFORMED -1007L
+#undef android_media_MediaPlayer_MEDIA_ERROR_UNSUPPORTED
+#define android_media_MediaPlayer_MEDIA_ERROR_UNSUPPORTED -1010L
+#undef android_media_MediaPlayer_MEDIA_ERROR_TIMED_OUT
+#define android_media_MediaPlayer_MEDIA_ERROR_TIMED_OUT -110L
+#undef android_media_MediaPlayer_STEP_END
+#define android_media_MediaPlayer_STEP_END -1L
+#undef android_media_MediaPlayer_VIDEO_END
+#define android_media_MediaPlayer_VIDEO_END -1L
+#undef android_media_MediaPlayer_VIDEO_MAX_LATE_MS
+#define android_media_MediaPlayer_VIDEO_MAX_LATE_MS 40L
+#undef android_media_MediaPlayer_MEDIA_INFO_STARTED_AS_NEXT
+#define android_media_MediaPlayer_MEDIA_INFO_STARTED_AS_NEXT 2L
+#undef android_media_MediaPlayer_MEDIA_INFO_VIDEO_RENDERING_START
+#define android_media_MediaPlayer_MEDIA_INFO_VIDEO_RENDERING_START 3L
+#undef android_media_MediaPlayer_SPEED_MIN
+#define android_media_MediaPlayer_SPEED_MIN 0.01f
+#undef android_media_MediaPlayer_SPEED_MAX
+#define android_media_MediaPlayer_SPEED_MAX 20.0f
+#undef android_media_MediaPlayer_PITCH_MIN
+#define android_media_MediaPlayer_PITCH_MIN 0.25f
+#undef android_media_MediaPlayer_PITCH_MAX
+#define android_media_MediaPlayer_PITCH_MAX 4.0f
+#undef android_media_MediaPlayer_VIDEO_SCALING_MODE_SCALE_TO_FIT
+#define android_media_MediaPlayer_VIDEO_SCALING_MODE_SCALE_TO_FIT 1L
+#undef android_media_MediaPlayer_VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+#define android_media_MediaPlayer_VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING 2L
+#undef android_media_MediaPlayer_PREPARE_DRM_STATUS_SUCCESS
+#define android_media_MediaPlayer_PREPARE_DRM_STATUS_SUCCESS 0L
+#undef android_media_MediaPlayer_PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR
+#define android_media_MediaPlayer_PREPARE_DRM_STATUS_PROVISIONING_NETWORK_ERROR 1L
+#undef android_media_MediaPlayer_PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR
+#define android_media_MediaPlayer_PREPARE_DRM_STATUS_PROVISIONING_SERVER_ERROR 2L
+#undef android_media_MediaPlayer_PREPARE_DRM_STATUS_PREPARATION_ERROR
+#define android_media_MediaPlayer_PREPARE_DRM_STATUS_PREPARATION_ERROR 3L
 /*
  * Class:     android_media_MediaPlayer
- * Method:    native_prepare
- * Signature: (J)V
+ * Method:    native_open
+ * Signature: (Ljava/lang/String;IJJLandroid/media/MediaDataSource;)J
  */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1prepare
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_media_MediaPlayer
- * Method:    native_setDataSource
- * Signature: (Ljava/lang/String;)J
- */
-JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1setDataSource
-  (JNIEnv *, jobject, jstring);
-
-/*
- * Class:     android_media_MediaPlayer
- * Method:    native_setOnCompletionListener
- * Signature: (JLandroid/media/MediaPlayer/OnCompletionListener;)V
- */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setOnCompletionListener
-  (JNIEnv *, jclass, jlong, jobject);
-
-/*
- * Class:     android_media_MediaPlayer
- * Method:    native_start
- * Signature: (J)V
- */
-JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1start
-  (JNIEnv *, jclass, jlong);
+JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1open
+  (JNIEnv *, jclass, jstring, jint, jlong, jlong, jobject);
 
 /*
  * Class:     android_media_MediaPlayer
@@ -49,10 +67,98 @@ JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getDuration
 
 /*
  * Class:     android_media_MediaPlayer
- * Method:    native_getCurrentPosition
+ * Method:    native_step
+ * Signature: (JFFZ)I
+ */
+JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1step
+  (JNIEnv *, jclass, jlong, jfloat, jfloat, jboolean);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_pause
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1pause
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_drain
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1drain
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_setPlaybackRate
+ * Signature: (JFF)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1setPlaybackRate
+  (JNIEnv *, jclass, jlong, jfloat, jfloat);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_seek
+ * Signature: (JIZ)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1seek
+  (JNIEnv *, jclass, jlong, jint, jboolean);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_clock
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1clock
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_getVideoSize
  * Signature: (J)I
  */
-JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getCurrentPosition
+JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1getVideoSize
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_videoDecode
+ * Signature: (J)I
+ */
+JNIEXPORT jint JNICALL Java_android_media_MediaPlayer_native_1videoDecode
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_videoSeek
+ * Signature: (JI)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1videoSeek
+  (JNIEnv *, jclass, jlong, jint);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_videoTexture
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_media_MediaPlayer_native_1videoTexture
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_showTexture
+ * Signature: (JJZ)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1showTexture
+  (JNIEnv *, jclass, jlong, jlong, jboolean);
+
+/*
+ * Class:     android_media_MediaPlayer
+ * Method:    native_release
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_media_MediaPlayer_native_1release
   (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus

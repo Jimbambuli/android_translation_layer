@@ -25,27 +25,65 @@ extern "C" {
 #define android_media_AudioTrack_STATE_UNINITIALIZED 0L
 #undef android_media_AudioTrack_STATE_INITIALIZED
 #define android_media_AudioTrack_STATE_INITIALIZED 1L
+#undef android_media_AudioTrack_STATE_NO_STATIC_DATA
+#define android_media_AudioTrack_STATE_NO_STATIC_DATA 2L
+#undef android_media_AudioTrack_MODE_STATIC
+#define android_media_AudioTrack_MODE_STATIC 0L
+#undef android_media_AudioTrack_MODE_STREAM
+#define android_media_AudioTrack_MODE_STREAM 1L
+#undef android_media_AudioTrack_ENCAPSULATION_MODE_NONE
+#define android_media_AudioTrack_ENCAPSULATION_MODE_NONE 0L
+#undef android_media_AudioTrack_ENCAPSULATION_MODE_ELEMENTARY_STREAM
+#define android_media_AudioTrack_ENCAPSULATION_MODE_ELEMENTARY_STREAM 1L
+#undef android_media_AudioTrack_ENCAPSULATION_MODE_HANDLE
+#define android_media_AudioTrack_ENCAPSULATION_MODE_HANDLE 2L
+#undef android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_NONE
+#define android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_NONE 0L
+#undef android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_FRAMEWORK_TUNER
+#define android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_FRAMEWORK_TUNER 1L
+#undef android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_DVB_AD_DESCRIPTOR
+#define android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_DVB_AD_DESCRIPTOR 2L
+#undef android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_SUPPLEMENTARY_AUDIO_PLACEMENT
+#define android_media_AudioTrack_ENCAPSULATION_METADATA_TYPE_SUPPLEMENTARY_AUDIO_PLACEMENT 3L
+#undef android_media_AudioTrack_SUPPLEMENTARY_AUDIO_PLACEMENT_NORMAL
+#define android_media_AudioTrack_SUPPLEMENTARY_AUDIO_PLACEMENT_NORMAL 0L
+#undef android_media_AudioTrack_SUPPLEMENTARY_AUDIO_PLACEMENT_LEFT
+#define android_media_AudioTrack_SUPPLEMENTARY_AUDIO_PLACEMENT_LEFT 1L
+#undef android_media_AudioTrack_SUPPLEMENTARY_AUDIO_PLACEMENT_RIGHT
+#define android_media_AudioTrack_SUPPLEMENTARY_AUDIO_PLACEMENT_RIGHT 2L
+#undef android_media_AudioTrack_DUAL_MONO_MODE_OFF
+#define android_media_AudioTrack_DUAL_MONO_MODE_OFF 0L
+#undef android_media_AudioTrack_DUAL_MONO_MODE_LR
+#define android_media_AudioTrack_DUAL_MONO_MODE_LR 1L
+#undef android_media_AudioTrack_DUAL_MONO_MODE_LL
+#define android_media_AudioTrack_DUAL_MONO_MODE_LL 2L
+#undef android_media_AudioTrack_DUAL_MONO_MODE_RR
+#define android_media_AudioTrack_DUAL_MONO_MODE_RR 3L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_NONE
+#define android_media_AudioTrack_PERFORMANCE_MODE_NONE 0L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY
+#define android_media_AudioTrack_PERFORMANCE_MODE_LOW_LATENCY 1L
+#undef android_media_AudioTrack_PERFORMANCE_MODE_POWER_SAVING
+#define android_media_AudioTrack_PERFORMANCE_MODE_POWER_SAVING 2L
 #undef android_media_AudioTrack_PLAYSTATE_STOPPED
 #define android_media_AudioTrack_PLAYSTATE_STOPPED 1L
 #undef android_media_AudioTrack_PLAYSTATE_PAUSED
 #define android_media_AudioTrack_PLAYSTATE_PAUSED 2L
 #undef android_media_AudioTrack_PLAYSTATE_PLAYING
 #define android_media_AudioTrack_PLAYSTATE_PLAYING 3L
+#undef android_media_AudioTrack_SUPPORTED_OUT_CHANNELS
+#define android_media_AudioTrack_SUPPORTED_OUT_CHANNELS 268435452L
+#undef android_media_AudioTrack_OUT_CHANNEL_COUNT_MAX
+#define android_media_AudioTrack_OUT_CHANNEL_COUNT_MAX 12L
+#undef android_media_AudioTrack_FCC_24
+#define android_media_AudioTrack_FCC_24 24L
 /*
  * Class:     android_media_AudioTrack
  * Method:    native_constructor
- * Signature: (IIIIII)V
+ * Signature: (IIIIIII)V
  */
 JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor
-  (JNIEnv *, jobject, jint, jint, jint, jint, jint, jint);
-
-/*
- * Class:     android_media_AudioTrack
- * Method:    getMinBufferSize
- * Signature: (III)I
- */
-JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize
-  (JNIEnv *, jclass, jint, jint, jint);
+  (JNIEnv *, jobject, jint, jint, jint, jint, jint, jint, jint);
 
 /*
  * Class:     android_media_AudioTrack
@@ -102,6 +140,14 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3BIIFZ
  */
 JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIFZ
   (JNIEnv *, jobject, jshortArray, jint, jint, jfloat, jboolean);
+
+/*
+ * Class:     android_media_AudioTrack
+ * Method:    native_write
+ * Signature: ([FIIFZ)I
+ */
+JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3FIIFZ
+  (JNIEnv *, jobject, jfloatArray, jint, jint, jfloat, jboolean);
 
 /*
  * Class:     android_media_AudioTrack

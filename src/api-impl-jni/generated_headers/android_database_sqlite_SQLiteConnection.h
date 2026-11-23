@@ -19,6 +19,46 @@ JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeOpen
 
 /*
  * Class:     android_database_sqlite_SQLiteConnection
+ * Method:    nativeRegisterCustomScalarFunction
+ * Signature: (JLjava/lang/String;Ljava/util/function/UnaryOperator;)V
+ */
+JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterCustomScalarFunction
+  (JNIEnv *, jclass, jlong, jstring, jobject);
+
+/*
+ * Class:     android_database_sqlite_SQLiteConnection
+ * Method:    nativeRegisterCustomAggregateFunction
+ * Signature: (JLjava/lang/String;Ljava/util/function/BinaryOperator;)V
+ */
+JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterCustomAggregateFunction
+  (JNIEnv *, jclass, jlong, jstring, jobject);
+
+/*
+ * Class:     android_database_sqlite_SQLiteConnection
+ * Method:    nativeLastInsertRowId
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeLastInsertRowId
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_database_sqlite_SQLiteConnection
+ * Method:    nativeChanges
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeChanges
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_database_sqlite_SQLiteConnection
+ * Method:    nativeTotalChanges
+ * Signature: (J)J
+ */
+JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeTotalChanges
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_database_sqlite_SQLiteConnection
  * Method:    nativeClose
  * Signature: (J)V
  */
@@ -224,46 +264,6 @@ JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeReset
  */
 JNIEXPORT jboolean JNICALL Java_android_database_sqlite_SQLiteConnection_nativeHasCodec
   (JNIEnv *, jclass);
-
-/*
- * Class:     android_database_sqlite_SQLiteConnection
- * Method:    nativeRegisterCustomScalarFunction
- * Signature: (JLjava/lang/String;Ljava/util/function/UnaryOperator;)V
- */
-JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterCustomScalarFunction
-  (JNIEnv *, jclass, jlong, jstring, jobject);
-
-/*
- * Class:     android_database_sqlite_SQLiteConnection
- * Method:    nativeRegisterCustomAggregateFunction
- * Signature: (JLjava/lang/String;Ljava/util/function/BinaryOperator;)V
- */
-JNIEXPORT void JNICALL Java_android_database_sqlite_SQLiteConnection_nativeRegisterCustomAggregateFunction
-  (JNIEnv *, jclass, jlong, jstring, jobject);
-
-/*
- * Class:     android_database_sqlite_SQLiteConnection
- * Method:    nativeLastInsertRowId
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeLastInsertRowId
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_database_sqlite_SQLiteConnection
- * Method:    nativeChanges
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeChanges
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     android_database_sqlite_SQLiteConnection
- * Method:    nativeTotalChanges
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_android_database_sqlite_SQLiteConnection_nativeTotalChanges
-  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

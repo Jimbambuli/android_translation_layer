@@ -7,6 +7,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_graphics_Typeface_RESOLVE_BY_FONT_TABLE
+#define android_graphics_Typeface_RESOLVE_BY_FONT_TABLE -1L
 #undef android_graphics_Typeface_NORMAL
 #define android_graphics_Typeface_NORMAL 0L
 #undef android_graphics_Typeface_BOLD

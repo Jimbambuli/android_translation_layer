@@ -15,6 +15,42 @@ extern "C" {
 #define android_net_ConnectivityManager_TYPE_ETHERNET 9L
 #undef android_net_ConnectivityManager_TYPE_VPN
 #define android_net_ConnectivityManager_TYPE_VPN 17L
+#undef android_net_ConnectivityManager_TYPE_BLUETOOTH
+#define android_net_ConnectivityManager_TYPE_BLUETOOTH 7L
+#undef android_net_ConnectivityManager_TYPE_DUMMY
+#define android_net_ConnectivityManager_TYPE_DUMMY 8L
+#undef android_net_ConnectivityManager_TYPE_MOBILE_DUN
+#define android_net_ConnectivityManager_TYPE_MOBILE_DUN 4L
+#undef android_net_ConnectivityManager_TYPE_MOBILE_HIPRI
+#define android_net_ConnectivityManager_TYPE_MOBILE_HIPRI 5L
+#undef android_net_ConnectivityManager_TYPE_MOBILE_MMS
+#define android_net_ConnectivityManager_TYPE_MOBILE_MMS 2L
+#undef android_net_ConnectivityManager_TYPE_MOBILE_SUPL
+#define android_net_ConnectivityManager_TYPE_MOBILE_SUPL 3L
+#undef android_net_ConnectivityManager_TYPE_WIMAX
+#define android_net_ConnectivityManager_TYPE_WIMAX 6L
+#undef android_net_ConnectivityManager_TYPE_NONE
+#define android_net_ConnectivityManager_TYPE_NONE -1L
+#undef android_net_ConnectivityManager_TYPE_TEST
+#define android_net_ConnectivityManager_TYPE_TEST 18L
+#undef android_net_ConnectivityManager_MAX_NETWORK_TYPE
+#define android_net_ConnectivityManager_MAX_NETWORK_TYPE 18L
+#undef android_net_ConnectivityManager_MIN_NETWORK_TYPE
+#define android_net_ConnectivityManager_MIN_NETWORK_TYPE 0L
+#undef android_net_ConnectivityManager_MULTIPATH_PREFERENCE_HANDOVER
+#define android_net_ConnectivityManager_MULTIPATH_PREFERENCE_HANDOVER 1L
+#undef android_net_ConnectivityManager_MULTIPATH_PREFERENCE_RELIABILITY
+#define android_net_ConnectivityManager_MULTIPATH_PREFERENCE_RELIABILITY 2L
+#undef android_net_ConnectivityManager_MULTIPATH_PREFERENCE_PERFORMANCE
+#define android_net_ConnectivityManager_MULTIPATH_PREFERENCE_PERFORMANCE 4L
+#undef android_net_ConnectivityManager_MULTIPATH_PREFERENCE_UNMETERED
+#define android_net_ConnectivityManager_MULTIPATH_PREFERENCE_UNMETERED 7L
+#undef android_net_ConnectivityManager_RESTRICT_BACKGROUND_STATUS_DISABLED
+#define android_net_ConnectivityManager_RESTRICT_BACKGROUND_STATUS_DISABLED 1L
+#undef android_net_ConnectivityManager_RESTRICT_BACKGROUND_STATUS_WHITELISTED
+#define android_net_ConnectivityManager_RESTRICT_BACKGROUND_STATUS_WHITELISTED 2L
+#undef android_net_ConnectivityManager_RESTRICT_BACKGROUND_STATUS_ENABLED
+#define android_net_ConnectivityManager_RESTRICT_BACKGROUND_STATUS_ENABLED 3L
 /*
  * Class:     android_net_ConnectivityManager
  * Method:    isActiveNetworkMetered
@@ -29,6 +65,14 @@ JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_isActiveNetworkM
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_nativeGetNetworkAvailable
+  (JNIEnv *, jclass);
+
+/*
+ * Class:     android_net_ConnectivityManager
+ * Method:    nativeGetNetworkAvailableCached
+ * Signature: ()Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_net_ConnectivityManager_nativeGetNetworkAvailableCached
   (JNIEnv *, jclass);
 
 /*

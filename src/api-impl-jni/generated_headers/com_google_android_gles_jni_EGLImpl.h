@@ -65,6 +65,22 @@ JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGet
 
 /*
  * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglGetCurrentDisplay
+ * Signature: ()J
+ */
+JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentDisplay
+  (JNIEnv *, jobject);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
+ * Method:    native_eglSwapInterval
+ * Signature: (JI)Z
+ */
+JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglSwapInterval
+  (JNIEnv *, jobject, jlong, jint);
+
+/*
+ * Class:     com_google_android_gles_jni_EGLImpl
  * Method:    native_eglGetCurrentSurface
  * Signature: (I)J
  */
@@ -150,22 +166,6 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
  */
 JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglCreatePbufferSurface
   (JNIEnv *, jobject, jlong, jlong, jintArray);
-
-/*
- * Class:     com_google_android_gles_jni_EGLImpl
- * Method:    native_eglGetCurrentDisplay
- * Signature: ()J
- */
-JNIEXPORT jlong JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetCurrentDisplay
-  (JNIEnv *, jobject);
-
-/*
- * Class:     com_google_android_gles_jni_EGLImpl
- * Method:    native_eglSwapInterval
- * Signature: (JI)Z
- */
-JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglSwapInterval
-  (JNIEnv *, jobject, jlong, jint);
 
 #ifdef __cplusplus
 }

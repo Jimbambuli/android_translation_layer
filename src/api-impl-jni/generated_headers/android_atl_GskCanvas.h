@@ -57,6 +57,14 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawPath
 
 /*
  * Class:     android_atl_GskCanvas
+ * Method:    native_fillBitmapShader
+ * Signature: (JJFFFFIIJ)V
+ */
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1fillBitmapShader
+  (JNIEnv *, jobject, jlong, jlong, jfloat, jfloat, jfloat, jfloat, jint, jint, jlong);
+
+/*
+ * Class:     android_atl_GskCanvas
  * Method:    native_drawLinearGradient
  * Signature: (JFFFFFFFF[I[FZJ)V
  */
@@ -118,6 +126,14 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLines
  */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawText
   (JNIEnv *, jobject, jlong, jstring, jfloat, jfloat, jlong);
+
+/*
+ * Class:     android_atl_GskCanvas
+ * Method:    native_drawGlyphs
+ * Signature: (J[II[FIILjava/lang/String;IIJ)V
+ */
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawGlyphs
+  (JNIEnv *, jobject, jlong, jintArray, jint, jfloatArray, jint, jint, jstring, jint, jint, jlong);
 
 /*
  * Class:     android_atl_GskCanvas

@@ -115,6 +115,14 @@ extern "C" {
 #define android_os_Process_PROC_OUT_LONG 8192L
 #undef android_os_Process_PROC_OUT_FLOAT
 #define android_os_Process_PROC_OUT_FLOAT 16384L
+#undef android_os_Process_FIRST_SDK_SANDBOX_UID
+#define android_os_Process_FIRST_SDK_SANDBOX_UID 20000L
+#undef android_os_Process_LAST_SDK_SANDBOX_UID
+#define android_os_Process_LAST_SDK_SANDBOX_UID 29999L
+#undef android_os_Process_FIRST_APP_ZYGOTE_ISOLATED_UID
+#define android_os_Process_FIRST_APP_ZYGOTE_ISOLATED_UID 90000L
+#undef android_os_Process_LAST_APP_ZYGOTE_ISOLATED_UID
+#define android_os_Process_LAST_APP_ZYGOTE_ISOLATED_UID 98999L
 /*
  * Class:     android_os_Process
  * Method:    getElapsedCpuTime

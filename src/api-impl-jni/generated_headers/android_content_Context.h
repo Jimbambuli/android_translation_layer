@@ -11,6 +11,10 @@ extern "C" {
 #define android_content_Context_MODE_PRIVATE 0L
 #undef android_content_Context_MODE_APPEND
 #define android_content_Context_MODE_APPEND 32768L
+#undef android_content_Context_DEVICE_ID_DEFAULT
+#define android_content_Context_DEVICE_ID_DEFAULT 0L
+#undef android_content_Context_DEVICE_ID_INVALID
+#define android_content_Context_DEVICE_ID_INVALID -1L
 #undef android_content_Context_CONTEXT_INCLUDE_CODE
 #define android_content_Context_CONTEXT_INCLUDE_CODE 1L
 #undef android_content_Context_CONTEXT_IGNORE_SECURITY

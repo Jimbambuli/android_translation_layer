@@ -13,6 +13,16 @@ extern "C" {
 #define android_media_AudioRecord_RECORDSTATE_RECORDING 3L
 #undef android_media_AudioRecord_ERROR_BAD_VALUE
 #define android_media_AudioRecord_ERROR_BAD_VALUE -2L
+#undef android_media_AudioRecord_ERROR_INVALID_OPERATION
+#define android_media_AudioRecord_ERROR_INVALID_OPERATION -3L
+#undef android_media_AudioRecord_READ_BLOCKING
+#define android_media_AudioRecord_READ_BLOCKING 0L
+#undef android_media_AudioRecord_READ_NON_BLOCKING
+#define android_media_AudioRecord_READ_NON_BLOCKING 1L
+#undef android_media_AudioRecord_SUCCESS
+#define android_media_AudioRecord_SUCCESS 0L
+#undef android_media_AudioRecord_ERROR
+#define android_media_AudioRecord_ERROR -1L
 /*
  * Class:     android_media_AudioRecord
  * Method:    native_constructor

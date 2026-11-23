@@ -151,6 +151,8 @@ extern "C" {
 #define android_webkit_WebView_PFLAG2_DRAG_HOVERED 2L
 #undef android_webkit_WebView_DRAG_MASK
 #define android_webkit_WebView_DRAG_MASK 3L
+#undef android_webkit_WebView_LAYOUT_DIRECTION_UNDEFINED
+#define android_webkit_WebView_LAYOUT_DIRECTION_UNDEFINED -1L
 #undef android_webkit_WebView_LAYOUT_DIRECTION_LTR
 #define android_webkit_WebView_LAYOUT_DIRECTION_LTR 0L
 #undef android_webkit_WebView_LAYOUT_DIRECTION_RTL
@@ -243,12 +245,24 @@ extern "C" {
 #define android_webkit_WebView_PFLAG_PRESSED 16384L
 #undef android_webkit_WebView_PFLAG_ACTIVATED
 #define android_webkit_WebView_PFLAG_ACTIVATED 1073741824L
+#undef android_webkit_WebView_PFLAG_HOVERED
+#define android_webkit_WebView_PFLAG_HOVERED 268435456L
 #undef android_webkit_WebView_PFLAG3_IS_LAID_OUT
 #define android_webkit_WebView_PFLAG3_IS_LAID_OUT 4L
+#undef android_webkit_WebView_PFLAG3_APPLYING_INSETS
+#define android_webkit_WebView_PFLAG3_APPLYING_INSETS 32L
+#undef android_webkit_WebView_PFLAG3_FITTING_SYSTEM_WINDOWS
+#define android_webkit_WebView_PFLAG3_FITTING_SYSTEM_WINDOWS 64L
+#undef android_webkit_WebView_PFLAG3_CLUSTER
+#define android_webkit_WebView_PFLAG3_CLUSTER 32768L
 #undef android_webkit_WebView_UNDEFINED_PADDING
 #define android_webkit_WebView_UNDEFINED_PADDING -2147483648L
 #undef android_webkit_WebView_PFLAG_PREPRESSED
 #define android_webkit_WebView_PFLAG_PREPRESSED 33554432L
+#undef android_webkit_WebView_PUBLIC_STATUS_BAR_VISIBILITY_MASK
+#define android_webkit_WebView_PUBLIC_STATUS_BAR_VISIBILITY_MASK 16375L
+#undef android_webkit_WebView_SYSTEM_UI_CLEARABLE_FLAGS
+#define android_webkit_WebView_SYSTEM_UI_CLEARABLE_FLAGS 7L
 #undef android_webkit_WebView_PFLAG_SAVE_STATE_CALLED
 #define android_webkit_WebView_PFLAG_SAVE_STATE_CALLED 131072L
 #undef android_webkit_WebView_SCROLL_CAPTURE_HINT_AUTO
@@ -265,6 +279,30 @@ extern "C" {
 #define android_webkit_WebView_LAYER_TYPE_SOFTWARE 1L
 #undef android_webkit_WebView_LAYER_TYPE_HARDWARE
 #define android_webkit_WebView_LAYER_TYPE_HARDWARE 2L
+#undef android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED
+#define android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED 0L
+#undef android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY
+#define android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY 1L
+#undef android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR
+#define android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR 2L
+#undef android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS
+#define android_webkit_WebView_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS 3L
+#undef android_webkit_WebView_POINTER_CAPTURE_MODE_UNCAPTURED
+#define android_webkit_WebView_POINTER_CAPTURE_MODE_UNCAPTURED 0L
+#undef android_webkit_WebView_POINTER_CAPTURE_MODE_ABSOLUTE
+#define android_webkit_WebView_POINTER_CAPTURE_MODE_ABSOLUTE 1L
+#undef android_webkit_WebView_POINTER_CAPTURE_MODE_RELATIVE
+#define android_webkit_WebView_POINTER_CAPTURE_MODE_RELATIVE 2L
+#undef android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_AUTO
+#define android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_AUTO 0L
+#undef android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_YES
+#define android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_YES 1L
+#undef android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_NO
+#define android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_NO 2L
+#undef android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS
+#define android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS 4L
+#undef android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+#define android_webkit_WebView_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS 8L
 #undef android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_AUTO
 #define android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_AUTO 0L
 #undef android_webkit_WebView_IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -309,6 +347,16 @@ extern "C" {
 #define android_webkit_WebView_CONTENT_SENSITIVITY_SENSITIVE 1L
 #undef android_webkit_WebView_CONTENT_SENSITIVITY_NOT_SENSITIVE
 #define android_webkit_WebView_CONTENT_SENSITIVITY_NOT_SENSITIVE 2L
+#undef android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+#define android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_DEFAULT NaNf
+#undef android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE
+#define android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE -1.0f
+#undef android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_LOW
+#define android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_LOW -2.0f
+#undef android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_NORMAL
+#define android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_NORMAL -3.0f
+#undef android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_HIGH
+#define android_webkit_WebView_REQUESTED_FRAME_RATE_CATEGORY_HIGH -4.0f
 #undef android_webkit_WebView_AUTOFILL_TYPE_NONE
 #define android_webkit_WebView_AUTOFILL_TYPE_NONE 0L
 #undef android_webkit_WebView_AUTOFILL_TYPE_TEXT
@@ -351,6 +399,14 @@ extern "C" {
 #define android_webkit_WebView_FLAG_MASK_FOCUSABILITY 393216L
 #undef android_webkit_WebView_FOCUS_BEFORE_DESCENDANTS
 #define android_webkit_WebView_FOCUS_BEFORE_DESCENDANTS 131072L
+#undef android_webkit_WebView_PERSISTENT_NO_CACHE
+#define android_webkit_WebView_PERSISTENT_NO_CACHE 0L
+#undef android_webkit_WebView_PERSISTENT_ANIMATION_CACHE
+#define android_webkit_WebView_PERSISTENT_ANIMATION_CACHE 1L
+#undef android_webkit_WebView_PERSISTENT_SCROLLING_CACHE
+#define android_webkit_WebView_PERSISTENT_SCROLLING_CACHE 2L
+#undef android_webkit_WebView_PERSISTENT_ALL_CACHES
+#define android_webkit_WebView_PERSISTENT_ALL_CACHES 3L
 #undef android_webkit_WebView_FOCUS_AFTER_DESCENDANTS
 #define android_webkit_WebView_FOCUS_AFTER_DESCENDANTS 262144L
 #undef android_webkit_WebView_FOCUS_BLOCK_DESCENDANTS
@@ -371,6 +427,22 @@ extern "C" {
 #define android_webkit_WebView_LAYOUT_MODE_UNDEFINED -1L
 #undef android_webkit_WebView_LAYOUT_MODE_DEFAULT
 #define android_webkit_WebView_LAYOUT_MODE_DEFAULT 0L
+#undef android_webkit_WebView_RENDERER_PRIORITY_WAIVED
+#define android_webkit_WebView_RENDERER_PRIORITY_WAIVED 0L
+#undef android_webkit_WebView_RENDERER_PRIORITY_BOUND
+#define android_webkit_WebView_RENDERER_PRIORITY_BOUND 1L
+#undef android_webkit_WebView_RENDERER_PRIORITY_IMPORTANT
+#define android_webkit_WebView_RENDERER_PRIORITY_IMPORTANT 2L
+#undef android_webkit_WebView_PAGE_SCROLL_OVERLAP
+#define android_webkit_WebView_PAGE_SCROLL_OVERLAP 24L
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setPreferredLanguage
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setPreferredLanguage
+  (JNIEnv *, jclass, jstring);
+
 /*
  * Class:     android_webkit_WebView
  * Method:    native_setBooleanSetting
@@ -426,6 +498,102 @@ JNIEXPORT jobjectArray JNICALL Java_android_webkit_WebView_native_1getHistory
  */
 JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1loadUrl
   (JNIEnv *, jobject, jlong, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_enterFullscreen
+ * Signature: (JJ)J
+ */
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1enterFullscreen
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_exitFullscreen
+ * Signature: (JJ)J
+ */
+JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1exitFullscreen
+  (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_finishFileChooser
+ * Signature: (J[Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishFileChooser
+  (JNIEnv *, jclass, jlong, jobjectArray);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_finishPermission
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1finishPermission
+  (JNIEnv *, jclass, jlong, jboolean);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_releaseRequest
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1releaseRequest
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_postToFrame
+ * Signature: (JJJLjava/lang/String;Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1postToFrame
+  (JNIEnv *, jobject, jlong, jlong, jlong, jstring, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setAudioMuted
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setAudioMuted
+  (JNIEnv *, jobject, jlong, jboolean);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_isAudioMuted
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1isAudioMuted
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setDataDirectory
+ * Signature: (Ljava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setDataDirectory
+  (JNIEnv *, jclass, jstring);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_setGeolocationProvider
+ * Signature: (Ljava/lang/Object;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1setGeolocationProvider
+  (JNIEnv *, jclass, jobject);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_geolocationUpdate
+ * Signature: (JJDDDDDDD)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1geolocationUpdate
+  (JNIEnv *, jclass, jlong, jlong, jdouble, jdouble, jdouble, jdouble, jdouble, jdouble, jdouble);
+
+/*
+ * Class:     android_webkit_WebView
+ * Method:    native_geolocationFailed
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_webkit_WebView_native_1geolocationFailed
+  (JNIEnv *, jclass, jlong, jstring);
 
 /*
  * Class:     android_webkit_WebView

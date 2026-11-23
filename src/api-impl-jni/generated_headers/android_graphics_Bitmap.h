@@ -67,6 +67,14 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1ref_1texture
 
 /*
  * Class:     android_graphics_Bitmap
+ * Method:    native_is_opaque
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_Bitmap_native_1is_1opaque
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_graphics_Bitmap
  * Method:    native_get_pixels
  * Signature: (J[IIIIIII)V
  */

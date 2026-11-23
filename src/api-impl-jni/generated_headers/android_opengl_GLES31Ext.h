@@ -7,12 +7,412 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_opengl_GLES31Ext_GL_BLEND_ADVANCED_COHERENT_KHR
+#define android_opengl_GLES31Ext_GL_BLEND_ADVANCED_COHERENT_KHR 37509L
+#undef android_opengl_GLES31Ext_GL_MULTIPLY_KHR
+#define android_opengl_GLES31Ext_GL_MULTIPLY_KHR 37524L
+#undef android_opengl_GLES31Ext_GL_SCREEN_KHR
+#define android_opengl_GLES31Ext_GL_SCREEN_KHR 37525L
+#undef android_opengl_GLES31Ext_GL_OVERLAY_KHR
+#define android_opengl_GLES31Ext_GL_OVERLAY_KHR 37526L
+#undef android_opengl_GLES31Ext_GL_DARKEN_KHR
+#define android_opengl_GLES31Ext_GL_DARKEN_KHR 37527L
+#undef android_opengl_GLES31Ext_GL_LIGHTEN_KHR
+#define android_opengl_GLES31Ext_GL_LIGHTEN_KHR 37528L
+#undef android_opengl_GLES31Ext_GL_COLORDODGE_KHR
+#define android_opengl_GLES31Ext_GL_COLORDODGE_KHR 37529L
+#undef android_opengl_GLES31Ext_GL_COLORBURN_KHR
+#define android_opengl_GLES31Ext_GL_COLORBURN_KHR 37530L
+#undef android_opengl_GLES31Ext_GL_HARDLIGHT_KHR
+#define android_opengl_GLES31Ext_GL_HARDLIGHT_KHR 37531L
+#undef android_opengl_GLES31Ext_GL_SOFTLIGHT_KHR
+#define android_opengl_GLES31Ext_GL_SOFTLIGHT_KHR 37532L
+#undef android_opengl_GLES31Ext_GL_DIFFERENCE_KHR
+#define android_opengl_GLES31Ext_GL_DIFFERENCE_KHR 37534L
+#undef android_opengl_GLES31Ext_GL_EXCLUSION_KHR
+#define android_opengl_GLES31Ext_GL_EXCLUSION_KHR 37536L
+#undef android_opengl_GLES31Ext_GL_HSL_HUE_KHR
+#define android_opengl_GLES31Ext_GL_HSL_HUE_KHR 37549L
+#undef android_opengl_GLES31Ext_GL_HSL_SATURATION_KHR
+#define android_opengl_GLES31Ext_GL_HSL_SATURATION_KHR 37550L
+#undef android_opengl_GLES31Ext_GL_HSL_COLOR_KHR
+#define android_opengl_GLES31Ext_GL_HSL_COLOR_KHR 37551L
+#undef android_opengl_GLES31Ext_GL_HSL_LUMINOSITY_KHR
+#define android_opengl_GLES31Ext_GL_HSL_LUMINOSITY_KHR 37552L
+#undef android_opengl_GLES31Ext_GL_DEBUG_OUTPUT_SYNCHRONOUS_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_OUTPUT_SYNCHRONOUS_KHR 33346L
+#undef android_opengl_GLES31Ext_GL_DEBUG_NEXT_LOGGED_MESSAGE_LENGTH_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_NEXT_LOGGED_MESSAGE_LENGTH_KHR 33347L
+#undef android_opengl_GLES31Ext_GL_DEBUG_CALLBACK_FUNCTION_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_CALLBACK_FUNCTION_KHR 33348L
+#undef android_opengl_GLES31Ext_GL_DEBUG_CALLBACK_USER_PARAM_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_CALLBACK_USER_PARAM_KHR 33349L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SOURCE_API_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SOURCE_API_KHR 33350L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SOURCE_WINDOW_SYSTEM_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SOURCE_WINDOW_SYSTEM_KHR 33351L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SOURCE_SHADER_COMPILER_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SOURCE_SHADER_COMPILER_KHR 33352L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SOURCE_THIRD_PARTY_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SOURCE_THIRD_PARTY_KHR 33353L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SOURCE_APPLICATION_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SOURCE_APPLICATION_KHR 33354L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SOURCE_OTHER_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SOURCE_OTHER_KHR 33355L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_ERROR_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_ERROR_KHR 33356L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_KHR 33357L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_KHR 33358L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_PORTABILITY_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_PORTABILITY_KHR 33359L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_PERFORMANCE_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_PERFORMANCE_KHR 33360L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_OTHER_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_OTHER_KHR 33361L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_MARKER_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_MARKER_KHR 33384L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_PUSH_GROUP_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_PUSH_GROUP_KHR 33385L
+#undef android_opengl_GLES31Ext_GL_DEBUG_TYPE_POP_GROUP_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_TYPE_POP_GROUP_KHR 33386L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_NOTIFICATION_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_NOTIFICATION_KHR 33387L
+#undef android_opengl_GLES31Ext_GL_MAX_DEBUG_GROUP_STACK_DEPTH_KHR
+#define android_opengl_GLES31Ext_GL_MAX_DEBUG_GROUP_STACK_DEPTH_KHR 33388L
+#undef android_opengl_GLES31Ext_GL_DEBUG_GROUP_STACK_DEPTH_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_GROUP_STACK_DEPTH_KHR 33389L
+#undef android_opengl_GLES31Ext_GL_BUFFER_KHR
+#define android_opengl_GLES31Ext_GL_BUFFER_KHR 33504L
+#undef android_opengl_GLES31Ext_GL_SHADER_KHR
+#define android_opengl_GLES31Ext_GL_SHADER_KHR 33505L
+#undef android_opengl_GLES31Ext_GL_PROGRAM_KHR
+#define android_opengl_GLES31Ext_GL_PROGRAM_KHR 33506L
+#undef android_opengl_GLES31Ext_GL_VERTEX_ARRAY_KHR
+#define android_opengl_GLES31Ext_GL_VERTEX_ARRAY_KHR 32884L
+#undef android_opengl_GLES31Ext_GL_QUERY_KHR
+#define android_opengl_GLES31Ext_GL_QUERY_KHR 33507L
+#undef android_opengl_GLES31Ext_GL_SAMPLER_KHR
+#define android_opengl_GLES31Ext_GL_SAMPLER_KHR 33510L
+#undef android_opengl_GLES31Ext_GL_MAX_LABEL_LENGTH_KHR
+#define android_opengl_GLES31Ext_GL_MAX_LABEL_LENGTH_KHR 33512L
+#undef android_opengl_GLES31Ext_GL_MAX_DEBUG_MESSAGE_LENGTH_KHR
+#define android_opengl_GLES31Ext_GL_MAX_DEBUG_MESSAGE_LENGTH_KHR 37187L
+#undef android_opengl_GLES31Ext_GL_MAX_DEBUG_LOGGED_MESSAGES_KHR
+#define android_opengl_GLES31Ext_GL_MAX_DEBUG_LOGGED_MESSAGES_KHR 37188L
+#undef android_opengl_GLES31Ext_GL_DEBUG_LOGGED_MESSAGES_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_LOGGED_MESSAGES_KHR 37189L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_HIGH_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_HIGH_KHR 37190L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_MEDIUM_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_MEDIUM_KHR 37191L
+#undef android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_LOW_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_SEVERITY_LOW_KHR 37192L
+#undef android_opengl_GLES31Ext_GL_DEBUG_OUTPUT_KHR
+#define android_opengl_GLES31Ext_GL_DEBUG_OUTPUT_KHR 37600L
+#undef android_opengl_GLES31Ext_GL_CONTEXT_FLAG_DEBUG_BIT_KHR
+#define android_opengl_GLES31Ext_GL_CONTEXT_FLAG_DEBUG_BIT_KHR 2L
+#undef android_opengl_GLES31Ext_GL_STACK_OVERFLOW_KHR
+#define android_opengl_GLES31Ext_GL_STACK_OVERFLOW_KHR 1283L
+#undef android_opengl_GLES31Ext_GL_STACK_UNDERFLOW_KHR
+#define android_opengl_GLES31Ext_GL_STACK_UNDERFLOW_KHR 1284L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_4x4_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_4x4_KHR 37808L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_5x4_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_5x4_KHR 37809L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_5x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_5x5_KHR 37810L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_6x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_6x5_KHR 37811L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_6x6_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_6x6_KHR 37812L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_8x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_8x5_KHR 37813L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_8x6_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_8x6_KHR 37814L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_8x8_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_8x8_KHR 37815L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x5_KHR 37816L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x6_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x6_KHR 37817L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x8_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x8_KHR 37818L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x10_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_10x10_KHR 37819L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_12x10_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_12x10_KHR 37820L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_12x12_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_RGBA_ASTC_12x12_KHR 37821L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR 37840L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR 37841L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR 37842L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR 37843L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR 37844L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR 37845L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR 37846L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR 37847L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR 37848L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR 37849L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR 37850L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR 37851L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR 37852L
+#undef android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR
+#define android_opengl_GLES31Ext_GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR 37853L
+#undef android_opengl_GLES31Ext_GL_SAMPLE_SHADING_OES
+#define android_opengl_GLES31Ext_GL_SAMPLE_SHADING_OES 35894L
+#undef android_opengl_GLES31Ext_GL_MIN_SAMPLE_SHADING_VALUE_OES
+#define android_opengl_GLES31Ext_GL_MIN_SAMPLE_SHADING_VALUE_OES 35895L
+#undef android_opengl_GLES31Ext_GL_MIN_FRAGMENT_INTERPOLATION_OFFSET_OES
+#define android_opengl_GLES31Ext_GL_MIN_FRAGMENT_INTERPOLATION_OFFSET_OES 36443L
+#undef android_opengl_GLES31Ext_GL_MAX_FRAGMENT_INTERPOLATION_OFFSET_OES
+#define android_opengl_GLES31Ext_GL_MAX_FRAGMENT_INTERPOLATION_OFFSET_OES 36444L
+#undef android_opengl_GLES31Ext_GL_FRAGMENT_INTERPOLATION_OFFSET_BITS_OES
+#define android_opengl_GLES31Ext_GL_FRAGMENT_INTERPOLATION_OFFSET_BITS_OES 36445L
+#undef android_opengl_GLES31Ext_GL_STENCIL_INDEX_OES
+#define android_opengl_GLES31Ext_GL_STENCIL_INDEX_OES 6401L
+#undef android_opengl_GLES31Ext_GL_STENCIL_INDEX8_OES
+#define android_opengl_GLES31Ext_GL_STENCIL_INDEX8_OES 36168L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_2D_MULTISAMPLE_ARRAY_OES
+#define android_opengl_GLES31Ext_GL_TEXTURE_2D_MULTISAMPLE_ARRAY_OES 37122L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY_OES
+#define android_opengl_GLES31Ext_GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY_OES 37125L
+#undef android_opengl_GLES31Ext_GL_SAMPLER_2D_MULTISAMPLE_ARRAY_OES
+#define android_opengl_GLES31Ext_GL_SAMPLER_2D_MULTISAMPLE_ARRAY_OES 37131L
+#undef android_opengl_GLES31Ext_GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES
+#define android_opengl_GLES31Ext_GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES 37132L
+#undef android_opengl_GLES31Ext_GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES
+#define android_opengl_GLES31Ext_GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY_OES 37133L
+#undef android_opengl_GLES31Ext_GL_GEOMETRY_SHADER_EXT
+#define android_opengl_GLES31Ext_GL_GEOMETRY_SHADER_EXT 36313L
+#undef android_opengl_GLES31Ext_GL_GEOMETRY_SHADER_BIT_EXT
+#define android_opengl_GLES31Ext_GL_GEOMETRY_SHADER_BIT_EXT 4L
+#undef android_opengl_GLES31Ext_GL_GEOMETRY_LINKED_VERTICES_OUT_EXT
+#define android_opengl_GLES31Ext_GL_GEOMETRY_LINKED_VERTICES_OUT_EXT 35094L
+#undef android_opengl_GLES31Ext_GL_GEOMETRY_LINKED_INPUT_TYPE_EXT
+#define android_opengl_GLES31Ext_GL_GEOMETRY_LINKED_INPUT_TYPE_EXT 35095L
+#undef android_opengl_GLES31Ext_GL_GEOMETRY_LINKED_OUTPUT_TYPE_EXT
+#define android_opengl_GLES31Ext_GL_GEOMETRY_LINKED_OUTPUT_TYPE_EXT 35096L
+#undef android_opengl_GLES31Ext_GL_GEOMETRY_SHADER_INVOCATIONS_EXT
+#define android_opengl_GLES31Ext_GL_GEOMETRY_SHADER_INVOCATIONS_EXT 34943L
+#undef android_opengl_GLES31Ext_GL_LAYER_PROVOKING_VERTEX_EXT
+#define android_opengl_GLES31Ext_GL_LAYER_PROVOKING_VERTEX_EXT 33374L
+#undef android_opengl_GLES31Ext_GL_LINES_ADJACENCY_EXT
+#define android_opengl_GLES31Ext_GL_LINES_ADJACENCY_EXT 10L
+#undef android_opengl_GLES31Ext_GL_LINE_STRIP_ADJACENCY_EXT
+#define android_opengl_GLES31Ext_GL_LINE_STRIP_ADJACENCY_EXT 11L
+#undef android_opengl_GLES31Ext_GL_TRIANGLES_ADJACENCY_EXT
+#define android_opengl_GLES31Ext_GL_TRIANGLES_ADJACENCY_EXT 12L
+#undef android_opengl_GLES31Ext_GL_TRIANGLE_STRIP_ADJACENCY_EXT
+#define android_opengl_GLES31Ext_GL_TRIANGLE_STRIP_ADJACENCY_EXT 13L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_UNIFORM_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_UNIFORM_COMPONENTS_EXT 36319L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_UNIFORM_BLOCKS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_UNIFORM_BLOCKS_EXT 35372L
+#undef android_opengl_GLES31Ext_GL_MAX_COMBINED_GEOMETRY_UNIFORM_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_COMBINED_GEOMETRY_UNIFORM_COMPONENTS_EXT 35378L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_INPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_INPUT_COMPONENTS_EXT 37155L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_OUTPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_OUTPUT_COMPONENTS_EXT 37156L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_OUTPUT_VERTICES_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_OUTPUT_VERTICES_EXT 36320L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS_EXT 36321L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_SHADER_INVOCATIONS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_SHADER_INVOCATIONS_EXT 36442L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS_EXT 35881L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_ATOMIC_COUNTER_BUFFERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_ATOMIC_COUNTER_BUFFERS_EXT 37583L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_ATOMIC_COUNTERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_ATOMIC_COUNTERS_EXT 37589L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_IMAGE_UNIFORMS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_IMAGE_UNIFORMS_EXT 37069L
+#undef android_opengl_GLES31Ext_GL_MAX_GEOMETRY_SHADER_STORAGE_BLOCKS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_GEOMETRY_SHADER_STORAGE_BLOCKS_EXT 37079L
+#undef android_opengl_GLES31Ext_GL_FIRST_VERTEX_CONVENTION_EXT
+#define android_opengl_GLES31Ext_GL_FIRST_VERTEX_CONVENTION_EXT 36429L
+#undef android_opengl_GLES31Ext_GL_LAST_VERTEX_CONVENTION_EXT
+#define android_opengl_GLES31Ext_GL_LAST_VERTEX_CONVENTION_EXT 36430L
+#undef android_opengl_GLES31Ext_GL_UNDEFINED_VERTEX_EXT
+#define android_opengl_GLES31Ext_GL_UNDEFINED_VERTEX_EXT 33376L
+#undef android_opengl_GLES31Ext_GL_PRIMITIVES_GENERATED_EXT
+#define android_opengl_GLES31Ext_GL_PRIMITIVES_GENERATED_EXT 35975L
+#undef android_opengl_GLES31Ext_GL_FRAMEBUFFER_DEFAULT_LAYERS_EXT
+#define android_opengl_GLES31Ext_GL_FRAMEBUFFER_DEFAULT_LAYERS_EXT 37650L
+#undef android_opengl_GLES31Ext_GL_MAX_FRAMEBUFFER_LAYERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_FRAMEBUFFER_LAYERS_EXT 37655L
+#undef android_opengl_GLES31Ext_GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_EXT
+#define android_opengl_GLES31Ext_GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_EXT 36264L
+#undef android_opengl_GLES31Ext_GL_FRAMEBUFFER_ATTACHMENT_LAYERED_EXT
+#define android_opengl_GLES31Ext_GL_FRAMEBUFFER_ATTACHMENT_LAYERED_EXT 36263L
+#undef android_opengl_GLES31Ext_GL_REFERENCED_BY_GEOMETRY_SHADER_EXT
+#define android_opengl_GLES31Ext_GL_REFERENCED_BY_GEOMETRY_SHADER_EXT 37641L
+#undef android_opengl_GLES31Ext_GL_PRIMITIVE_BOUNDING_BOX_EXT
+#define android_opengl_GLES31Ext_GL_PRIMITIVE_BOUNDING_BOX_EXT 37566L
+#undef android_opengl_GLES31Ext_GL_PATCHES_EXT
+#define android_opengl_GLES31Ext_GL_PATCHES_EXT 14L
+#undef android_opengl_GLES31Ext_GL_PATCH_VERTICES_EXT
+#define android_opengl_GLES31Ext_GL_PATCH_VERTICES_EXT 36466L
+#undef android_opengl_GLES31Ext_GL_TESS_CONTROL_OUTPUT_VERTICES_EXT
+#define android_opengl_GLES31Ext_GL_TESS_CONTROL_OUTPUT_VERTICES_EXT 36469L
+#undef android_opengl_GLES31Ext_GL_TESS_GEN_MODE_EXT
+#define android_opengl_GLES31Ext_GL_TESS_GEN_MODE_EXT 36470L
+#undef android_opengl_GLES31Ext_GL_TESS_GEN_SPACING_EXT
+#define android_opengl_GLES31Ext_GL_TESS_GEN_SPACING_EXT 36471L
+#undef android_opengl_GLES31Ext_GL_TESS_GEN_VERTEX_ORDER_EXT
+#define android_opengl_GLES31Ext_GL_TESS_GEN_VERTEX_ORDER_EXT 36472L
+#undef android_opengl_GLES31Ext_GL_TESS_GEN_POINT_MODE_EXT
+#define android_opengl_GLES31Ext_GL_TESS_GEN_POINT_MODE_EXT 36473L
+#undef android_opengl_GLES31Ext_GL_ISOLINES_EXT
+#define android_opengl_GLES31Ext_GL_ISOLINES_EXT 36474L
+#undef android_opengl_GLES31Ext_GL_QUADS_EXT
+#define android_opengl_GLES31Ext_GL_QUADS_EXT 7L
+#undef android_opengl_GLES31Ext_GL_FRACTIONAL_ODD_EXT
+#define android_opengl_GLES31Ext_GL_FRACTIONAL_ODD_EXT 36475L
+#undef android_opengl_GLES31Ext_GL_FRACTIONAL_EVEN_EXT
+#define android_opengl_GLES31Ext_GL_FRACTIONAL_EVEN_EXT 36476L
+#undef android_opengl_GLES31Ext_GL_MAX_PATCH_VERTICES_EXT
+#define android_opengl_GLES31Ext_GL_MAX_PATCH_VERTICES_EXT 36477L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_GEN_LEVEL_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_GEN_LEVEL_EXT 36478L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_UNIFORM_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_UNIFORM_COMPONENTS_EXT 36479L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_UNIFORM_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_UNIFORM_COMPONENTS_EXT 36480L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_TEXTURE_IMAGE_UNITS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_TEXTURE_IMAGE_UNITS_EXT 36481L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_TEXTURE_IMAGE_UNITS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_TEXTURE_IMAGE_UNITS_EXT 36482L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_OUTPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_OUTPUT_COMPONENTS_EXT 36483L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_PATCH_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_PATCH_COMPONENTS_EXT 36484L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_TOTAL_OUTPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_TOTAL_OUTPUT_COMPONENTS_EXT 36485L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_OUTPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_OUTPUT_COMPONENTS_EXT 36486L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_UNIFORM_BLOCKS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_UNIFORM_BLOCKS_EXT 36489L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_UNIFORM_BLOCKS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_UNIFORM_BLOCKS_EXT 36490L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_INPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_INPUT_COMPONENTS_EXT 34924L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_INPUT_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_INPUT_COMPONENTS_EXT 34925L
+#undef android_opengl_GLES31Ext_GL_MAX_COMBINED_TESS_CONTROL_UNIFORM_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_COMBINED_TESS_CONTROL_UNIFORM_COMPONENTS_EXT 36382L
+#undef android_opengl_GLES31Ext_GL_MAX_COMBINED_TESS_EVALUATION_UNIFORM_COMPONENTS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_COMBINED_TESS_EVALUATION_UNIFORM_COMPONENTS_EXT 36383L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_ATOMIC_COUNTER_BUFFERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_ATOMIC_COUNTER_BUFFERS_EXT 37581L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_ATOMIC_COUNTER_BUFFERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_ATOMIC_COUNTER_BUFFERS_EXT 37582L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_ATOMIC_COUNTERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_ATOMIC_COUNTERS_EXT 37587L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_ATOMIC_COUNTERS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_ATOMIC_COUNTERS_EXT 37588L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_IMAGE_UNIFORMS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_IMAGE_UNIFORMS_EXT 37067L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_IMAGE_UNIFORMS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_IMAGE_UNIFORMS_EXT 37068L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_SHADER_STORAGE_BLOCKS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_CONTROL_SHADER_STORAGE_BLOCKS_EXT 37080L
+#undef android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_SHADER_STORAGE_BLOCKS_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TESS_EVALUATION_SHADER_STORAGE_BLOCKS_EXT 37081L
+#undef android_opengl_GLES31Ext_GL_PRIMITIVE_RESTART_FOR_PATCHES_SUPPORTED
+#define android_opengl_GLES31Ext_GL_PRIMITIVE_RESTART_FOR_PATCHES_SUPPORTED 33313L
+#undef android_opengl_GLES31Ext_GL_IS_PER_PATCH_EXT
+#define android_opengl_GLES31Ext_GL_IS_PER_PATCH_EXT 37607L
+#undef android_opengl_GLES31Ext_GL_REFERENCED_BY_TESS_CONTROL_SHADER_EXT
+#define android_opengl_GLES31Ext_GL_REFERENCED_BY_TESS_CONTROL_SHADER_EXT 37639L
+#undef android_opengl_GLES31Ext_GL_REFERENCED_BY_TESS_EVALUATION_SHADER_EXT
+#define android_opengl_GLES31Ext_GL_REFERENCED_BY_TESS_EVALUATION_SHADER_EXT 37640L
+#undef android_opengl_GLES31Ext_GL_TESS_CONTROL_SHADER_EXT
+#define android_opengl_GLES31Ext_GL_TESS_CONTROL_SHADER_EXT 36488L
+#undef android_opengl_GLES31Ext_GL_TESS_EVALUATION_SHADER_EXT
+#define android_opengl_GLES31Ext_GL_TESS_EVALUATION_SHADER_EXT 36487L
+#undef android_opengl_GLES31Ext_GL_TESS_CONTROL_SHADER_BIT_EXT
+#define android_opengl_GLES31Ext_GL_TESS_CONTROL_SHADER_BIT_EXT 8L
+#undef android_opengl_GLES31Ext_GL_TESS_EVALUATION_SHADER_BIT_EXT
+#define android_opengl_GLES31Ext_GL_TESS_EVALUATION_SHADER_BIT_EXT 16L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BORDER_COLOR_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BORDER_COLOR_EXT 4100L
+#undef android_opengl_GLES31Ext_GL_CLAMP_TO_BORDER_EXT
+#define android_opengl_GLES31Ext_GL_CLAMP_TO_BORDER_EXT 33069L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_EXT 35882L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_BINDING_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_BINDING_EXT 35882L
+#undef android_opengl_GLES31Ext_GL_MAX_TEXTURE_BUFFER_SIZE_EXT
+#define android_opengl_GLES31Ext_GL_MAX_TEXTURE_BUFFER_SIZE_EXT 35883L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BINDING_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BINDING_BUFFER_EXT 35884L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_DATA_STORE_BINDING_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_DATA_STORE_BINDING_EXT 35885L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_OFFSET_ALIGNMENT_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_OFFSET_ALIGNMENT_EXT 37279L
+#undef android_opengl_GLES31Ext_GL_SAMPLER_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_SAMPLER_BUFFER_EXT 36290L
+#undef android_opengl_GLES31Ext_GL_INT_SAMPLER_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_INT_SAMPLER_BUFFER_EXT 36304L
+#undef android_opengl_GLES31Ext_GL_UNSIGNED_INT_SAMPLER_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_UNSIGNED_INT_SAMPLER_BUFFER_EXT 36312L
+#undef android_opengl_GLES31Ext_GL_IMAGE_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_IMAGE_BUFFER_EXT 36945L
+#undef android_opengl_GLES31Ext_GL_INT_IMAGE_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_INT_IMAGE_BUFFER_EXT 36956L
+#undef android_opengl_GLES31Ext_GL_UNSIGNED_INT_IMAGE_BUFFER_EXT
+#define android_opengl_GLES31Ext_GL_UNSIGNED_INT_IMAGE_BUFFER_EXT 36967L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_OFFSET_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_OFFSET_EXT 37277L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_SIZE_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BUFFER_SIZE_EXT 37278L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_CUBE_MAP_ARRAY_EXT 36873L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_BINDING_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_BINDING_CUBE_MAP_ARRAY_EXT 36874L
+#undef android_opengl_GLES31Ext_GL_SAMPLER_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_SAMPLER_CUBE_MAP_ARRAY_EXT 36876L
+#undef android_opengl_GLES31Ext_GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW_EXT
+#define android_opengl_GLES31Ext_GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW_EXT 36877L
+#undef android_opengl_GLES31Ext_GL_INT_SAMPLER_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_INT_SAMPLER_CUBE_MAP_ARRAY_EXT 36878L
+#undef android_opengl_GLES31Ext_GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY_EXT 36879L
+#undef android_opengl_GLES31Ext_GL_IMAGE_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_IMAGE_CUBE_MAP_ARRAY_EXT 36948L
+#undef android_opengl_GLES31Ext_GL_INT_IMAGE_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_INT_IMAGE_CUBE_MAP_ARRAY_EXT 36959L
+#undef android_opengl_GLES31Ext_GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY_EXT
+#define android_opengl_GLES31Ext_GL_UNSIGNED_INT_IMAGE_CUBE_MAP_ARRAY_EXT 36970L
+#undef android_opengl_GLES31Ext_GL_TEXTURE_SRGB_DECODE_EXT
+#define android_opengl_GLES31Ext_GL_TEXTURE_SRGB_DECODE_EXT 35400L
+#undef android_opengl_GLES31Ext_GL_DECODE_EXT
+#define android_opengl_GLES31Ext_GL_DECODE_EXT 35401L
+#undef android_opengl_GLES31Ext_GL_SKIP_DECODE_EXT
+#define android_opengl_GLES31Ext_GL_SKIP_DECODE_EXT 35402L
 /*
  * Class:     android_opengl_GLES31Ext
  * Method:    glBlendBarrierKHR
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendBarrierKHR__
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendBarrierKHR
   (JNIEnv *, jclass);
 
 /*
@@ -33,6 +433,22 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDebugMessageControlKHR__I
 
 /*
  * Class:     android_opengl_GLES31Ext
+ * Method:    glDebugMessageInsertKHR
+ * Signature: (IIIILjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDebugMessageInsertKHR
+  (JNIEnv *, jclass, jint, jint, jint, jint, jstring);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glDebugMessageCallbackKHR
+ * Signature: (Landroid/opengl/GLES31Ext/DebugProcKHR;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDebugMessageCallbackKHR
+  (JNIEnv *, jclass, jobject);
+
+/*
+ * Class:     android_opengl_GLES31Ext
  * Method:    glGetDebugMessageLogKHR
  * Signature: (II[II[II[II[II[II[BI)I
  */
@@ -41,10 +457,34 @@ JNIEXPORT jint JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__II
 
 /*
  * Class:     android_opengl_GLES31Ext
+ * Method:    glGetDebugMessageLogKHR
+ * Signature: (ILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/ByteBuffer;)I
+ */
+JNIEXPORT jint JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__ILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_ByteBuffer_2
+  (JNIEnv *, jclass, jint, jobject, jobject, jobject, jobject, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glGetDebugMessageLogKHR
+ * Signature: (I[II[II[II[II)[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__I_3II_3II_3II_3II
+  (JNIEnv *, jclass, jint, jintArray, jint, jintArray, jint, jintArray, jint, jintArray, jint);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glGetDebugMessageLogKHR
+ * Signature: (ILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;)[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__ILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2
+  (JNIEnv *, jclass, jint, jobject, jobject, jobject, jobject);
+
+/*
+ * Class:     android_opengl_GLES31Ext
  * Method:    glPushDebugGroupKHR
  * Signature: (IIILjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPushDebugGroupKHR__IIILjava_lang_String_2
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPushDebugGroupKHR
   (JNIEnv *, jclass, jint, jint, jint, jstring);
 
 /*
@@ -52,7 +492,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPushDebugGroupKHR__IIILja
  * Method:    glPopDebugGroupKHR
  * Signature: ()V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPopDebugGroupKHR__
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPopDebugGroupKHR
   (JNIEnv *, jclass);
 
 /*
@@ -60,15 +500,47 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPopDebugGroupKHR__
  * Method:    glObjectLabelKHR
  * Signature: (IIILjava/lang/String;)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glObjectLabelKHR__IIILjava_lang_String_2
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glObjectLabelKHR
   (JNIEnv *, jclass, jint, jint, jint, jstring);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glGetObjectLabelKHR
+ * Signature: (II)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES31Ext_glGetObjectLabelKHR
+  (JNIEnv *, jclass, jint, jint);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glObjectPtrLabelKHR
+ * Signature: (JLjava/lang/String;)V
+ */
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glObjectPtrLabelKHR
+  (JNIEnv *, jclass, jlong, jstring);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glGetObjectPtrLabelKHR
+ * Signature: (J)Ljava/lang/String;
+ */
+JNIEXPORT jstring JNICALL Java_android_opengl_GLES31Ext_glGetObjectPtrLabelKHR
+  (JNIEnv *, jclass, jlong);
+
+/*
+ * Class:     android_opengl_GLES31Ext
+ * Method:    glGetDebugMessageCallbackKHR
+ * Signature: ()Landroid/opengl/GLES31Ext/DebugProcKHR;
+ */
+JNIEXPORT jobject JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageCallbackKHR
+  (JNIEnv *, jclass);
 
 /*
  * Class:     android_opengl_GLES31Ext
  * Method:    glMinSampleShadingOES
  * Signature: (F)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glMinSampleShadingOES__F
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glMinSampleShadingOES
   (JNIEnv *, jclass, jfloat);
 
 /*
@@ -76,7 +548,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glMinSampleShadingOES__F
  * Method:    glTexStorage3DMultisampleOES
  * Signature: (IIIIIIZ)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexStorage3DMultisampleOES__IIIIIIZ
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexStorage3DMultisampleOES
   (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jboolean);
 
 /*
@@ -84,7 +556,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexStorage3DMultisampleOE
  * Method:    glCopyImageSubDataEXT
  * Signature: (IIIIIIIIIIIIIII)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glCopyImageSubDataEXT__IIIIIIIIIIIIIII
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glCopyImageSubDataEXT
   (JNIEnv *, jclass, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint, jint);
 
 /*
@@ -92,7 +564,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glCopyImageSubDataEXT__IIII
  * Method:    glEnableiEXT
  * Signature: (II)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glEnableiEXT__II
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glEnableiEXT
   (JNIEnv *, jclass, jint, jint);
 
 /*
@@ -100,7 +572,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glEnableiEXT__II
  * Method:    glDisableiEXT
  * Signature: (II)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDisableiEXT__II
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDisableiEXT
   (JNIEnv *, jclass, jint, jint);
 
 /*
@@ -108,7 +580,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDisableiEXT__II
  * Method:    glBlendEquationiEXT
  * Signature: (II)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendEquationiEXT__II
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendEquationiEXT
   (JNIEnv *, jclass, jint, jint);
 
 /*
@@ -116,7 +588,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendEquationiEXT__II
  * Method:    glBlendEquationSeparateiEXT
  * Signature: (III)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendEquationSeparateiEXT__III
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendEquationSeparateiEXT
   (JNIEnv *, jclass, jint, jint, jint);
 
 /*
@@ -124,7 +596,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendEquationSeparateiEXT
  * Method:    glBlendFunciEXT
  * Signature: (III)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendFunciEXT__III
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendFunciEXT
   (JNIEnv *, jclass, jint, jint, jint);
 
 /*
@@ -132,7 +604,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendFunciEXT__III
  * Method:    glBlendFuncSeparateiEXT
  * Signature: (IIIII)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendFuncSeparateiEXT__IIIII
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendFuncSeparateiEXT
   (JNIEnv *, jclass, jint, jint, jint, jint, jint);
 
 /*
@@ -140,7 +612,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glBlendFuncSeparateiEXT__II
  * Method:    glColorMaskiEXT
  * Signature: (IZZZZ)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glColorMaskiEXT__IZZZZ
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glColorMaskiEXT
   (JNIEnv *, jclass, jint, jboolean, jboolean, jboolean, jboolean);
 
 /*
@@ -148,7 +620,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glColorMaskiEXT__IZZZZ
  * Method:    glIsEnablediEXT
  * Signature: (II)Z
  */
-JNIEXPORT jboolean JNICALL Java_android_opengl_GLES31Ext_glIsEnablediEXT__II
+JNIEXPORT jboolean JNICALL Java_android_opengl_GLES31Ext_glIsEnablediEXT
   (JNIEnv *, jclass, jint, jint);
 
 /*
@@ -156,7 +628,7 @@ JNIEXPORT jboolean JNICALL Java_android_opengl_GLES31Ext_glIsEnablediEXT__II
  * Method:    glFramebufferTextureEXT
  * Signature: (IIII)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glFramebufferTextureEXT__IIII
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glFramebufferTextureEXT
   (JNIEnv *, jclass, jint, jint, jint, jint);
 
 /*
@@ -164,7 +636,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glFramebufferTextureEXT__II
  * Method:    glPrimitiveBoundingBoxEXT
  * Signature: (FFFFFFFF)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPrimitiveBoundingBoxEXT__FFFFFFFF
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPrimitiveBoundingBoxEXT
   (JNIEnv *, jclass, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat);
 
 /*
@@ -172,7 +644,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPrimitiveBoundingBoxEXT__
  * Method:    glPatchParameteriEXT
  * Signature: (II)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPatchParameteriEXT__II
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glPatchParameteriEXT
   (JNIEnv *, jclass, jint, jint);
 
 /*
@@ -308,7 +780,7 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glGetSamplerParameterIuivEX
  * Method:    glTexBufferEXT
  * Signature: (III)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexBufferEXT__III
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexBufferEXT
   (JNIEnv *, jclass, jint, jint, jint);
 
 /*
@@ -316,80 +788,8 @@ JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexBufferEXT__III
  * Method:    glTexBufferRangeEXT
  * Signature: (IIIII)V
  */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexBufferRangeEXT__IIIII
+JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glTexBufferRangeEXT
   (JNIEnv *, jclass, jint, jint, jint, jint, jint);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glDebugMessageInsertKHR
- * Signature: (IIIILjava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDebugMessageInsertKHR__IIIILjava_lang_String_2
-  (JNIEnv *, jclass, jint, jint, jint, jint, jstring);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glGetDebugMessageCallbackKHR
- * Signature: ()Landroid/opengl/GLES31Ext$DebugProcKHR;
- */
-JNIEXPORT jobject JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageCallbackKHR__
-  (JNIEnv *, jclass);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glDebugMessageCallbackKHR
- * Signature: (Landroid/opengl/GLES31Ext$DebugProcKHR;)V
- */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glDebugMessageCallbackKHR__Landroid_opengl_GLES31Ext_00024DebugProcKHR_2
-  (JNIEnv *, jclass, jobject);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glGetDebugMessageLogKHR
- * Signature: (ILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/ByteBuffer;)I
- */
-JNIEXPORT jint JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__ILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_ByteBuffer_2
-  (JNIEnv *, jclass, jint, jobject, jobject, jobject, jobject, jobject, jobject);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glGetDebugMessageLogKHR
- * Signature: (I[II[II[II[II)[Ljava/lang/String;
- */
-JNIEXPORT jobjectArray JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__I_3II_3II_3II_3II
-  (JNIEnv *, jclass, jint, jintArray, jint, jintArray, jint, jintArray, jint, jintArray, jint);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glGetDebugMessageLogKHR
- * Signature: (ILjava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;Ljava/nio/IntBuffer;)[Ljava/lang/String;
- */
-JNIEXPORT jobjectArray JNICALL Java_android_opengl_GLES31Ext_glGetDebugMessageLogKHR__ILjava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2Ljava_nio_IntBuffer_2
-  (JNIEnv *, jclass, jint, jobject, jobject, jobject, jobject);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glGetObjectLabelKHR
- * Signature: (II)Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL Java_android_opengl_GLES31Ext_glGetObjectLabelKHR__II
-  (JNIEnv *, jclass, jint, jint);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glObjectPtrLabelKHR
- * Signature: (JLjava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_android_opengl_GLES31Ext_glObjectPtrLabelKHR__JLjava_lang_String_2
-  (JNIEnv *, jclass, jlong, jstring);
-
-/*
- * Class:     android_opengl_GLES31Ext
- * Method:    glGetObjectPtrLabelKHR
- * Signature: (J)Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL Java_android_opengl_GLES31Ext_glGetObjectPtrLabelKHR__J
-  (JNIEnv *, jclass, jlong);
 
 #ifdef __cplusplus
 }

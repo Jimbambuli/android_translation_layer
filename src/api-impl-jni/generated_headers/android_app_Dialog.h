@@ -13,6 +13,8 @@ extern "C" {
 #define android_app_Dialog_CANCEL 68L
 #undef android_app_Dialog_SHOW
 #define android_app_Dialog_SHOW 69L
+#undef android_app_Dialog_OUTSIDE
+#define android_app_Dialog_OUTSIDE -10000.0f
 /*
  * Class:     android_app_Dialog
  * Method:    nativeInit

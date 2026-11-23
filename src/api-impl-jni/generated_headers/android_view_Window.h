@@ -11,8 +11,42 @@ extern "C" {
 #define android_view_Window_FEATURE_OPTIONS_PANEL 0L
 #undef android_view_Window_FEATURE_NO_TITLE
 #define android_view_Window_FEATURE_NO_TITLE 1L
+#undef android_view_Window_FEATURE_PROGRESS
+#define android_view_Window_FEATURE_PROGRESS 2L
+#undef android_view_Window_FEATURE_LEFT_ICON
+#define android_view_Window_FEATURE_LEFT_ICON 3L
+#undef android_view_Window_FEATURE_RIGHT_ICON
+#define android_view_Window_FEATURE_RIGHT_ICON 4L
+#undef android_view_Window_FEATURE_INDETERMINATE_PROGRESS
+#define android_view_Window_FEATURE_INDETERMINATE_PROGRESS 5L
 #undef android_view_Window_FEATURE_CONTEXT_MENU
 #define android_view_Window_FEATURE_CONTEXT_MENU 6L
+#undef android_view_Window_FEATURE_CUSTOM_TITLE
+#define android_view_Window_FEATURE_CUSTOM_TITLE 7L
+#undef android_view_Window_FEATURE_ACTION_BAR
+#define android_view_Window_FEATURE_ACTION_BAR 8L
+#undef android_view_Window_FEATURE_ACTION_BAR_OVERLAY
+#define android_view_Window_FEATURE_ACTION_BAR_OVERLAY 9L
+#undef android_view_Window_FEATURE_ACTION_MODE_OVERLAY
+#define android_view_Window_FEATURE_ACTION_MODE_OVERLAY 10L
+#undef android_view_Window_FEATURE_SWIPE_TO_DISMISS
+#define android_view_Window_FEATURE_SWIPE_TO_DISMISS 11L
+#undef android_view_Window_FEATURE_CONTENT_TRANSITIONS
+#define android_view_Window_FEATURE_CONTENT_TRANSITIONS 12L
+#undef android_view_Window_FEATURE_ACTIVITY_TRANSITIONS
+#define android_view_Window_FEATURE_ACTIVITY_TRANSITIONS 13L
+#undef android_view_Window_FEATURE_MAX
+#define android_view_Window_FEATURE_MAX 13L
+#undef android_view_Window_DEFAULT_FEATURES
+#define android_view_Window_DEFAULT_FEATURES 65L
+#undef android_view_Window_CUSTOM_TITLE_COMPATIBLE_FEATURES
+#define android_view_Window_CUSTOM_TITLE_COMPATIBLE_FEATURES 13505L
+#undef android_view_Window_FLAG_RESOURCE_SET_ICON
+#define android_view_Window_FLAG_RESOURCE_SET_ICON 1L
+#undef android_view_Window_FLAG_RESOURCE_SET_LOGO
+#define android_view_Window_FLAG_RESOURCE_SET_LOGO 2L
+#undef android_view_Window_FLAG_RESOURCE_SET_ICON_FALLBACK
+#define android_view_Window_FLAG_RESOURCE_SET_ICON_FALLBACK 4L
 /*
  * Class:     android_view_Window
  * Method:    set_title

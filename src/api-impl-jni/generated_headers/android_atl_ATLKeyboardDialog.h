@@ -13,6 +13,8 @@ extern "C" {
 #define android_atl_ATLKeyboardDialog_CANCEL 68L
 #undef android_atl_ATLKeyboardDialog_SHOW
 #define android_atl_ATLKeyboardDialog_SHOW 69L
+#undef android_atl_ATLKeyboardDialog_OUTSIDE
+#define android_atl_ATLKeyboardDialog_OUTSIDE -10000.0f
 /*
  * Class:     android_atl_ATLKeyboardDialog
  * Method:    nativeInit

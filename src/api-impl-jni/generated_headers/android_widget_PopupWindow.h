@@ -7,10 +7,24 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_widget_PopupWindow_INPUT_METHOD_FROM_FOCUSABLE
+#define android_widget_PopupWindow_INPUT_METHOD_FROM_FOCUSABLE 0L
+#undef android_widget_PopupWindow_INPUT_METHOD_NEEDED
+#define android_widget_PopupWindow_INPUT_METHOD_NEEDED 1L
+#undef android_widget_PopupWindow_INPUT_METHOD_NOT_NEEDED
+#define android_widget_PopupWindow_INPUT_METHOD_NOT_NEEDED 2L
 #undef android_widget_PopupWindow_ANIMATION_STYLE_DEFAULT
 #define android_widget_PopupWindow_ANIMATION_STYLE_DEFAULT -1L
 #undef android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY
 #define android_widget_PopupWindow_DEFAULT_ANCHORED_GRAVITY 8388659L
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_moveTo
+ * Signature: (JIII)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1moveTo
+  (JNIEnv *, jobject, jlong, jint, jint, jint);
+
 /*
  * Class:     android_widget_PopupWindow
  * Method:    native_constructor
@@ -18,6 +32,14 @@ extern "C" {
  */
 JNIEXPORT jlong JNICALL Java_android_widget_PopupWindow_native_1constructor
   (JNIEnv *, jobject);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_isAboveAnchor
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_widget_PopupWindow_native_1isAboveAnchor
+  (JNIEnv *, jobject, jlong);
 
 /*
  * Class:     android_widget_PopupWindow
@@ -34,6 +56,14 @@ JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setColors
  */
 JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setContentView
   (JNIEnv *, jobject, jlong, jlong);
+
+/*
+ * Class:     android_widget_PopupWindow
+ * Method:    native_setTransparentBackground
+ * Signature: (JZ)V
+ */
+JNIEXPORT void JNICALL Java_android_widget_PopupWindow_native_1setTransparentBackground
+  (JNIEnv *, jobject, jlong, jboolean);
 
 /*
  * Class:     android_widget_PopupWindow

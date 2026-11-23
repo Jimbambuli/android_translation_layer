@@ -7,6 +7,24 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef android_atl_GVariantBuilderParcel_EX_SECURITY
+#define android_atl_GVariantBuilderParcel_EX_SECURITY -1L
+#undef android_atl_GVariantBuilderParcel_EX_BAD_PARCELABLE
+#define android_atl_GVariantBuilderParcel_EX_BAD_PARCELABLE -2L
+#undef android_atl_GVariantBuilderParcel_EX_ILLEGAL_ARGUMENT
+#define android_atl_GVariantBuilderParcel_EX_ILLEGAL_ARGUMENT -3L
+#undef android_atl_GVariantBuilderParcel_EX_NULL_POINTER
+#define android_atl_GVariantBuilderParcel_EX_NULL_POINTER -4L
+#undef android_atl_GVariantBuilderParcel_EX_ILLEGAL_STATE
+#define android_atl_GVariantBuilderParcel_EX_ILLEGAL_STATE -5L
+#undef android_atl_GVariantBuilderParcel_EX_NETWORK_MAIN_THREAD
+#define android_atl_GVariantBuilderParcel_EX_NETWORK_MAIN_THREAD -6L
+#undef android_atl_GVariantBuilderParcel_EX_UNSUPPORTED_OPERATION
+#define android_atl_GVariantBuilderParcel_EX_UNSUPPORTED_OPERATION -7L
+#undef android_atl_GVariantBuilderParcel_EX_SERVICE_SPECIFIC
+#define android_atl_GVariantBuilderParcel_EX_SERVICE_SPECIFIC -8L
+#undef android_atl_GVariantBuilderParcel_EX_PARCELABLE
+#define android_atl_GVariantBuilderParcel_EX_PARCELABLE -9L
 /*
  * Class:     android_atl_GVariantBuilderParcel
  * Method:    native_writeByte

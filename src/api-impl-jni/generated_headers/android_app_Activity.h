@@ -11,6 +11,10 @@ extern "C" {
 #define android_app_Activity_MODE_PRIVATE 0L
 #undef android_app_Activity_MODE_APPEND
 #define android_app_Activity_MODE_APPEND 32768L
+#undef android_app_Activity_DEVICE_ID_DEFAULT
+#define android_app_Activity_DEVICE_ID_DEFAULT 0L
+#undef android_app_Activity_DEVICE_ID_INVALID
+#define android_app_Activity_DEVICE_ID_INVALID -1L
 #undef android_app_Activity_CONTEXT_INCLUDE_CODE
 #define android_app_Activity_CONTEXT_INCLUDE_CODE 1L
 #undef android_app_Activity_CONTEXT_IGNORE_SECURITY
@@ -224,6 +228,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeUpdatePictureInPicture
  */
 JNIEXPORT void JNICALL Java_android_app_Activity_nativeMoveTaskToBack
   (JNIEnv *, jclass);
+
 /*
  * Class:     android_app_Activity
  * Method:    nativeBackInvoked

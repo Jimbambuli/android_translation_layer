@@ -67,6 +67,12 @@ extern "C" {
 #define android_view_MotionEvent_ACTION_POINTER_ID_SHIFT 8L
 #undef android_view_MotionEvent_FLAG_WINDOW_IS_OBSCURED
 #define android_view_MotionEvent_FLAG_WINDOW_IS_OBSCURED 1L
+#undef android_view_MotionEvent_FLAG_WINDOW_IS_PARTIALLY_OBSCURED
+#define android_view_MotionEvent_FLAG_WINDOW_IS_PARTIALLY_OBSCURED 2L
+#undef android_view_MotionEvent_FLAG_IS_ACCESSIBILITY_EVENT
+#define android_view_MotionEvent_FLAG_IS_ACCESSIBILITY_EVENT 2048L
+#undef android_view_MotionEvent_FLAG_CANCELED
+#define android_view_MotionEvent_FLAG_CANCELED 32L
 #undef android_view_MotionEvent_FLAG_TAINTED
 #define android_view_MotionEvent_FLAG_TAINTED -2147483648L
 #undef android_view_MotionEvent_EDGE_TOP

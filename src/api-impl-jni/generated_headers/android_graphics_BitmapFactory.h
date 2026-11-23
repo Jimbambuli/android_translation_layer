@@ -49,6 +49,14 @@ JNIEXPORT jobject JNICALL Java_android_graphics_BitmapFactory_nativeDecodeByteAr
 JNIEXPORT jboolean JNICALL Java_android_graphics_BitmapFactory_nativeIsSeekable
   (JNIEnv *, jclass, jobject);
 
+/*
+ * Class:     android_graphics_BitmapFactory
+ * Method:    nativeIsAlpha8
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_graphics_BitmapFactory_nativeIsAlpha8
+  (JNIEnv *, jclass, jlong);
+
 #ifdef __cplusplus
 }
 #endif

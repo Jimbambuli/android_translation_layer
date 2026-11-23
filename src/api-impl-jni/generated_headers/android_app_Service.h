@@ -11,6 +11,10 @@ extern "C" {
 #define android_app_Service_MODE_PRIVATE 0L
 #undef android_app_Service_MODE_APPEND
 #define android_app_Service_MODE_APPEND 32768L
+#undef android_app_Service_DEVICE_ID_DEFAULT
+#define android_app_Service_DEVICE_ID_DEFAULT 0L
+#undef android_app_Service_DEVICE_ID_INVALID
+#define android_app_Service_DEVICE_ID_INVALID -1L
 #undef android_app_Service_CONTEXT_INCLUDE_CODE
 #define android_app_Service_CONTEXT_INCLUDE_CODE 1L
 #undef android_app_Service_CONTEXT_IGNORE_SECURITY
@@ -25,6 +29,20 @@ extern "C" {
 #define android_app_Service_MODE_ENABLE_WRITE_AHEAD_LOGGING 8L
 #undef android_app_Service_MODE_NO_LOCALIZED_COLLATORS
 #define android_app_Service_MODE_NO_LOCALIZED_COLLATORS 16L
+#undef android_app_Service_START_CONTINUATION_MASK
+#define android_app_Service_START_CONTINUATION_MASK 15L
+#undef android_app_Service_START_STICKY_COMPATIBILITY
+#define android_app_Service_START_STICKY_COMPATIBILITY 0L
+#undef android_app_Service_START_STICKY
+#define android_app_Service_START_STICKY 1L
+#undef android_app_Service_START_NOT_STICKY
+#define android_app_Service_START_NOT_STICKY 2L
+#undef android_app_Service_START_REDELIVER_INTENT
+#define android_app_Service_START_REDELIVER_INTENT 3L
+#undef android_app_Service_START_FLAG_REDELIVERY
+#define android_app_Service_START_FLAG_REDELIVERY 1L
+#undef android_app_Service_START_FLAG_RETRY
+#define android_app_Service_START_FLAG_RETRY 2L
 #undef android_app_Service_STOP_FOREGROUND_LEGACY
 #define android_app_Service_STOP_FOREGROUND_LEGACY 0L
 #undef android_app_Service_STOP_FOREGROUND_REMOVE

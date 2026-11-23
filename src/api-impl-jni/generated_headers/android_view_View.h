@@ -151,6 +151,8 @@ extern "C" {
 #define android_view_View_PFLAG2_DRAG_HOVERED 2L
 #undef android_view_View_DRAG_MASK
 #define android_view_View_DRAG_MASK 3L
+#undef android_view_View_LAYOUT_DIRECTION_UNDEFINED
+#define android_view_View_LAYOUT_DIRECTION_UNDEFINED -1L
 #undef android_view_View_LAYOUT_DIRECTION_LTR
 #define android_view_View_LAYOUT_DIRECTION_LTR 0L
 #undef android_view_View_LAYOUT_DIRECTION_RTL
@@ -243,20 +245,64 @@ extern "C" {
 #define android_view_View_PFLAG_PRESSED 16384L
 #undef android_view_View_PFLAG_ACTIVATED
 #define android_view_View_PFLAG_ACTIVATED 1073741824L
+#undef android_view_View_PFLAG_HOVERED
+#define android_view_View_PFLAG_HOVERED 268435456L
 #undef android_view_View_PFLAG3_IS_LAID_OUT
 #define android_view_View_PFLAG3_IS_LAID_OUT 4L
+#undef android_view_View_PFLAG3_APPLYING_INSETS
+#define android_view_View_PFLAG3_APPLYING_INSETS 32L
+#undef android_view_View_PFLAG3_FITTING_SYSTEM_WINDOWS
+#define android_view_View_PFLAG3_FITTING_SYSTEM_WINDOWS 64L
+#undef android_view_View_PFLAG3_CLUSTER
+#define android_view_View_PFLAG3_CLUSTER 32768L
 #undef android_view_View_UNDEFINED_PADDING
 #define android_view_View_UNDEFINED_PADDING -2147483648L
 #undef android_view_View_PFLAG_PREPRESSED
 #define android_view_View_PFLAG_PREPRESSED 33554432L
+#undef android_view_View_PUBLIC_STATUS_BAR_VISIBILITY_MASK
+#define android_view_View_PUBLIC_STATUS_BAR_VISIBILITY_MASK 16375L
+#undef android_view_View_SYSTEM_UI_CLEARABLE_FLAGS
+#define android_view_View_SYSTEM_UI_CLEARABLE_FLAGS 7L
 #undef android_view_View_PFLAG_SAVE_STATE_CALLED
 #define android_view_View_PFLAG_SAVE_STATE_CALLED 131072L
+#undef android_view_View_SCROLL_CAPTURE_HINT_AUTO
+#define android_view_View_SCROLL_CAPTURE_HINT_AUTO 0L
+#undef android_view_View_SCROLL_CAPTURE_HINT_EXCLUDE
+#define android_view_View_SCROLL_CAPTURE_HINT_EXCLUDE 1L
+#undef android_view_View_SCROLL_CAPTURE_HINT_INCLUDE
+#define android_view_View_SCROLL_CAPTURE_HINT_INCLUDE 2L
+#undef android_view_View_SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS
+#define android_view_View_SCROLL_CAPTURE_HINT_EXCLUDE_DESCENDANTS 4L
 #undef android_view_View_LAYER_TYPE_NONE
 #define android_view_View_LAYER_TYPE_NONE 0L
 #undef android_view_View_LAYER_TYPE_SOFTWARE
 #define android_view_View_LAYER_TYPE_SOFTWARE 1L
 #undef android_view_View_LAYER_TYPE_HARDWARE
 #define android_view_View_LAYER_TYPE_HARDWARE 2L
+#undef android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED
+#define android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED 0L
+#undef android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY
+#define android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_SCROLL_ONLY 1L
+#undef android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR
+#define android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR 2L
+#undef android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS
+#define android_view_View_RECTANGLE_ON_SCREEN_REQUEST_SOURCE_INPUT_FOCUS 3L
+#undef android_view_View_POINTER_CAPTURE_MODE_UNCAPTURED
+#define android_view_View_POINTER_CAPTURE_MODE_UNCAPTURED 0L
+#undef android_view_View_POINTER_CAPTURE_MODE_ABSOLUTE
+#define android_view_View_POINTER_CAPTURE_MODE_ABSOLUTE 1L
+#undef android_view_View_POINTER_CAPTURE_MODE_RELATIVE
+#define android_view_View_POINTER_CAPTURE_MODE_RELATIVE 2L
+#undef android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_AUTO
+#define android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_AUTO 0L
+#undef android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_YES
+#define android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_YES 1L
+#undef android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_NO
+#define android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_NO 2L
+#undef android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS
+#define android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_YES_EXCLUDE_DESCENDANTS 4L
+#undef android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
+#define android_view_View_IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS 8L
 #undef android_view_View_IMPORTANT_FOR_ACCESSIBILITY_AUTO
 #define android_view_View_IMPORTANT_FOR_ACCESSIBILITY_AUTO 0L
 #undef android_view_View_IMPORTANT_FOR_ACCESSIBILITY_YES
@@ -301,6 +347,16 @@ extern "C" {
 #define android_view_View_CONTENT_SENSITIVITY_SENSITIVE 1L
 #undef android_view_View_CONTENT_SENSITIVITY_NOT_SENSITIVE
 #define android_view_View_CONTENT_SENSITIVITY_NOT_SENSITIVE 2L
+#undef android_view_View_REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+#define android_view_View_REQUESTED_FRAME_RATE_CATEGORY_DEFAULT NaNf
+#undef android_view_View_REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE
+#define android_view_View_REQUESTED_FRAME_RATE_CATEGORY_NO_PREFERENCE -1.0f
+#undef android_view_View_REQUESTED_FRAME_RATE_CATEGORY_LOW
+#define android_view_View_REQUESTED_FRAME_RATE_CATEGORY_LOW -2.0f
+#undef android_view_View_REQUESTED_FRAME_RATE_CATEGORY_NORMAL
+#define android_view_View_REQUESTED_FRAME_RATE_CATEGORY_NORMAL -3.0f
+#undef android_view_View_REQUESTED_FRAME_RATE_CATEGORY_HIGH
+#define android_view_View_REQUESTED_FRAME_RATE_CATEGORY_HIGH -4.0f
 #undef android_view_View_AUTOFILL_TYPE_NONE
 #define android_view_View_AUTOFILL_TYPE_NONE 0L
 #undef android_view_View_AUTOFILL_TYPE_TEXT
@@ -613,6 +669,14 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1getMatrix
 
 /*
  * Class:     android_view_View
+ * Method:    nativeClearFocus
+ * Signature: (J)V
+ */
+JNIEXPORT void JNICALL Java_android_view_View_nativeClearFocus
+  (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_view_View
  * Method:    native_setAnimating
  * Signature: (JZ)V
  */
@@ -626,6 +690,14 @@ JNIEXPORT void JNICALL Java_android_view_View_native_1setAnimating
  */
 JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsAttachedToWindow
   (JNIEnv *, jobject, jlong);
+
+/*
+ * Class:     android_view_View
+ * Method:    nativeIsInTouchMode
+ * Signature: (J)Z
+ */
+JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsInTouchMode
+  (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     android_view_View
