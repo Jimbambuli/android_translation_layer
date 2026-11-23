@@ -393,7 +393,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		Slog.i(TAG, "- onStart - yay!");
 		window.setTitle(title);
 		if (!mMultiWindowKnown) {
-			mIsInMultiWindowMode = isInMultiWindowMode();
+			mIsInMultiWindowMode = native_isInMultiWindowMode();
 			mMultiWindowKnown = true;
 		}
 
@@ -1407,7 +1407,7 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		/* ActivityThread.handleMultiWindowModeChanged(): ATL's multi-window mode is a window that is not
 		 * maximized (isInMultiWindowMode()); a change comes with a change of the size */
 		if (mMultiWindowKnown) {
-			boolean multiWindow = isInMultiWindowMode();
+			boolean multiWindow = native_isInMultiWindowMode();
 			if (multiWindow != mIsInMultiWindowMode) {
 				mIsInMultiWindowMode = multiWindow;
 				onMultiWindowModeChanged(multiWindow, new Configuration(newConfig));
@@ -1710,7 +1710,15 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	}
 
 	public void onCreateContextMenu(android.view.ContextMenu menu, View v, android.view.ContextMenu.ContextMenuInfo menuInfo) {}
-	public native boolean isInMultiWindowMode();
+	/* AOSP returns mIsInMultiWindowMode, which any thread may read (Shattered Pixel Dungeon: GLThread); here the main
+	 * thread keeps it from GTK's window (native_isInMultiWindowMode()), asked directly only before it is known */
+	public boolean isInMultiWindowMode() {
+		if (!mMultiWindowKnown && Looper.getMainLooper().isCurrentThread())
+			return native_isInMultiWindowMode();
+		return mIsInMultiWindowMode;
+	}
+
+	private native boolean native_isInMultiWindowMode();
 
 	/* AOSP Activity, picture-in-picture. The part of ActivityTaskManagerService (ATMS: the pinned task, which
 	 * is a small window of its own here, its menu with the actions) is native, see android_app_Activity.c */
@@ -2986,8 +2994,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	 * activities that another activity of the app started have one, the first one comes from the desktop */
 	String mLaunchedFromPackage;
 	/* AOSP: Activity.mIsInMultiWindowMode, kept to tell onMultiWindowModeChanged() when it changes */
-	private boolean mIsInMultiWindowMode;
-	private boolean mMultiWindowKnown;
+	private volatile boolean mIsInMultiWindowMode;
+	private volatile boolean mMultiWindowKnown;
 
 	/** @hide AOSP Activity.getLaunchedFromUid(): the uid of the one that started the activity, which here is the app itself (or the launcher it was started from, which has no uid of its own to give) */
 	public int getLaunchedFromUid() {

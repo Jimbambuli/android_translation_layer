@@ -199,10 +199,10 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativePickImages
 
 /*
  * Class:     android_app_Activity
- * Method:    isInMultiWindowMode
+ * Method:    native_isInMultiWindowMode
  * Signature: ()Z
  */
-JNIEXPORT jboolean JNICALL Java_android_app_Activity_isInMultiWindowMode
+JNIEXPORT jboolean JNICALL Java_android_app_Activity_native_1isInMultiWindowMode
   (JNIEnv *, jobject);
 
 /*

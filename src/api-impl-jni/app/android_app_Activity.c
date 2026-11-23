@@ -2029,7 +2029,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativePickImages(JNIEnv *env, j
 	g_object_unref(dialog);
 }
 
-JNIEXPORT jboolean JNICALL Java_android_app_Activity_isInMultiWindowMode(JNIEnv *env, jobject this)
+JNIEXPORT jboolean JNICALL Java_android_app_Activity_native_1isInMultiWindowMode(JNIEnv *env, jobject this)
 {
 	return !gtk_window_is_maximized(window);
 }
