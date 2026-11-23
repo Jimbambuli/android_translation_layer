@@ -698,6 +698,8 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 		backupAgentName = orig.backupAgentName;
 		storageUuid = orig.storageUuid;
 		splitNames = orig.splitNames;
+		splitSourceDirs = orig.splitSourceDirs;
+		splitPublicSourceDirs = orig.splitPublicSourceDirs;
 		seInfo = orig.seInfo;
 		seInfoUser = orig.seInfoUser;
 		deviceProtectedDataDir = orig.deviceProtectedDataDir;

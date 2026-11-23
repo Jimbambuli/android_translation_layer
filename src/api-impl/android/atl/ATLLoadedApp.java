@@ -8,6 +8,7 @@ import android.app.Service;
 import android.atl.annotation.Export;
 import android.content.*;
 import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.pm.ServiceInfo;
@@ -164,6 +165,7 @@ public final class ATLLoadedApp {
 
 	@NonNull
 	public static ATLLoadedApp loadFromPath(String mainApk, String nativePath, String classLoaderPath) throws IOException {
+		final String[] apkPaths = classLoaderPath.split(File.pathSeparator);
 		if (ATLToggles.ATL_GHAX) {
 			// Always load ghax.jar as the first element to override application library classes
 			classLoaderPath = ATLPaths.ghax_jar.getPath() + File.pathSeparator + classLoaderPath;
@@ -190,7 +192,42 @@ public final class ATLLoadedApp {
 			ATLSigHelper.addGMSSignatures(pkg);
 		}
 		pkg.applicationInfo.sourceDir = mainApk;
+		setSplits(pkg.applicationInfo, mainApk, apkPaths);
 		return new ATLLoadedApp(track(resources, null), classLoader, pkg);
+	}
+
+	/* Like ApkLiteParseUtils.composePackageLiteFromApks() and PackageImpl.toAppInfoWithoutState(): the split APKs
+	 * that were installed along with the base APK, by their manifest's split name, sorted by that name */
+	private static void setSplits(ApplicationInfo appInfo, String mainApk, String[] apkPaths) {
+		java.util.TreeMap<String, String> splits = new java.util.TreeMap<>();
+		for (String path : apkPaths) {
+			if (path.equals(mainApk))
+				continue;
+			AssetManager splitAssets = new AssetManager(path);
+			android.content.res.XmlResourceParser parser = null;
+			try {
+				parser = splitAssets.openXmlResourceParser(1, "AndroidManifest.xml");
+				int type;
+				while ((type = parser.next()) != org.xmlpull.v1.XmlPullParser.START_TAG && type != org.xmlpull.v1.XmlPullParser.END_DOCUMENT)
+					;
+				String splitName = parser.getAttributeValue(null, "split");
+				if (splitName == null || splitName.isEmpty())
+					Slog.w(TAG, path + " is not a split APK (no split name)");
+				else
+					splits.put(splitName, path);
+			} catch (IOException | XmlPullParserException e) {
+				Slog.w(TAG, "Unable to read the manifest of " + path, e);
+			} finally {
+				if (parser != null)
+					parser.close();
+				splitAssets.close();
+			}
+		}
+		if (splits.isEmpty())
+			return;
+		appInfo.splitNames = splits.keySet().toArray(new String[0]);
+		appInfo.splitSourceDirs = splits.values().toArray(new String[0]);
+		appInfo.splitPublicSourceDirs = appInfo.splitSourceDirs;
 	}
 
 	public Resources createDefaultResources() {

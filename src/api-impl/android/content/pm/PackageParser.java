@@ -301,6 +301,8 @@ public class PackageParser {
 		}
 		PackageInfo pi = new PackageInfo();
 		pi.packageName = p.packageName;
+		// like PackageInfoCommonUtils.generate(): AndroidPackage.getSplitNames() is an empty array without splits
+		pi.splitNames = p.applicationInfo.splitNames != null ? p.applicationInfo.splitNames : new String[0];
 		pi.versionCode = p.mVersionCode;
 		pi.versionName = p.mVersionName;
 		pi.sharedUserId = p.mSharedUserId;
