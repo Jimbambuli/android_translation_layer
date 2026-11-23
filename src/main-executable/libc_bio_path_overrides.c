@@ -7,6 +7,8 @@
 #include <fontconfig/fontconfig.h>
 #include <glib.h>
 
+#include "../api-impl-jni/util.h"
+
 /* helpers */
 static bool starts_with(const char *string, const char *substring)
 {
@@ -75,14 +77,20 @@ static char *get_font_path(char *filename)
 	return NULL;
 }
 
-static char *fonts_overrides[] = {
-	"/etc/fonts.xml",
-	/* INSTALL_DATADIR will be something like /usr/local/share */
-	INSTALL_DATADIR "/atl/system/etc/fonts.xml",
-	/* Relative path when running from ./android_translation_layer/builddir */
-	"../res/fonts.xml",
-	NULL,
-};
+static char **fonts_overrides(void)
+{
+	static char **overrides;
+	if (g_once_init_enter(&overrides)) {
+		char **list = g_new0(char *, 4);
+		list[0] = "/etc/fonts.xml";
+		/* ATL_DATADIR is relative to ATL's installation, see atl_install_path() */
+		list[1] = atl_install_path(ATL_DATADIR "/atl/system/etc/fonts.xml");
+		/* Relative path when running from ./android_translation_layer/builddir */
+		list[2] = "../res/fonts.xml";
+		g_once_init_leave(&overrides, list);
+	}
+	return overrides;
+}
 
 extern char *get_app_data_dir(void);
 
@@ -93,7 +101,7 @@ bool apply_path_overrides(char **path)
 	/* TODO: read the overrides from a config file */
 	/* TODO: compare with canonicalized path */
 	if (!strcmp(*path, "/system/etc/fonts.xml")) {
-		for (char **override = fonts_overrides; *override; override++) {
+		for (char **override = fonts_overrides(); *override; override++) {
 			if (file_exists(*override)) {
 				*path = *override;
 				break;

@@ -215,6 +215,15 @@ wayland_protos_dep = dependency('wayland-protocols', version: '>=1.12')
 subdir('protocol')
 
 webext_dir = get_option('libdir') / 'android_translation_layer/webext'
+# ATL finds its data, its WebView extension and a native bridge installed with it relative to the directory of
+# libtranslation_layer_main.so (atl_install_path()), so that the installation can be moved as a whole (AppImage)
+natives_dir = get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives'
+datadir_rel = fs.relative_to(get_option('prefix') / get_option('datadir'), natives_dir)
+webext_rel = fs.relative_to(get_option('prefix') / webext_dir, natives_dir)
+native_bridge = get_option('native_bridge')
+if native_bridge.startswith(get_option('prefix') + '/')
+	native_bridge = fs.relative_to(native_bridge, natives_dir)
+endif
 libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/android_app_NativeActivity.c',
                                                                   	'src/api-impl-jni/android_atl_ATLViewDump.c',
@@ -369,8 +378,8 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   ],
                                                                   c_args: [
                                                                   	'-D_LARGEFILE64_SOURCE',
-                                                                  	'-DATL_WEBEXT_DIR="' + get_option('prefix') / webext_dir + '"',
-                                                                  	'-DINSTALL_DATADIR="' + join_paths(get_option('prefix'), get_option('datadir')) + '"',
+                                                                  	'-DATL_WEBEXT_DIR="' + webext_rel + '"',
+                                                                  	'-DATL_DATADIR="' + datadir_rel + '"',
                                                                   ])
 
 # the web process extension of WebView (shouldInterceptRequest), loaded by WebKit's web process
@@ -411,8 +420,8 @@ executable('android-translation-layer', [
                                         install_rpath: get_option('prefix') / get_option('libdir') / 'art' + ':' +
                                                        get_option('prefix') / get_option('libdir') / 'java/dex/android_translation_layer/natives',
                                         c_args: [
-						'-DINSTALL_DATADIR="'+join_paths(get_option('prefix'), get_option('datadir'))+'"',
-						'-DATL_NATIVE_BRIDGE="' + get_option('native_bridge') + '"',
+						'-DATL_DATADIR="' + datadir_rel + '"',
+						'-DATL_NATIVE_BRIDGE="' + native_bridge + '"',
 						'-DATL_NATIVE_BRIDGE_ABI="' + get_option('native_bridge_abi') + '"',
 						librsvg_dep.found() ? '-DHAVE_LIBRSVG' : '-UHAVE_LIBRSVG'
                                         ])

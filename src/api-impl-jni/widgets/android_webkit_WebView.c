@@ -445,7 +445,9 @@ static void intercept_setup(WebKitWebContext *web_context)
 	g_signal_connect(service, "run", G_CALLBACK(intercept_connection_cb), NULL);
 	g_socket_service_start(service);
 	webkit_web_context_add_path_to_sandbox(web_context, dir, FALSE);
-	webkit_web_context_set_web_process_extensions_directory(web_context, ATL_WEBEXT_DIR);
+	char *webext_dir = atl_install_path(ATL_WEBEXT_DIR);
+	webkit_web_context_set_web_process_extensions_directory(web_context, webext_dir);
+	g_free(webext_dir);
 	webkit_web_context_set_web_process_extensions_initialization_user_data(web_context, g_variant_new_string(intercept_socket_path));
 	webkit_web_context_register_uri_scheme(web_context, INTERCEPT_SCHEME, intercept_request_cb, NULL, NULL);
 	webkit_security_manager_register_uri_scheme_as_cors_enabled(webkit_web_context_get_security_manager(web_context), INTERCEPT_SCHEME);

@@ -80,6 +80,11 @@ void atl_window_android_touch_targets(GtkWindow *window);
 /* another window took the press that this one has seen: the rest of the gesture is not for this window */
 void atl_window_press_taken(GtkWidget *widget, GdkEvent *event);
 
+/* a file of ATL's installation, REL relative to the directory of libtranslation_layer_main.so (meson.build makes the
+ * relative paths from the install directories), so that an installation moved as a whole finds its files; an absolute
+ * REL is returned unchanged. Free with g_free(). */
+char *atl_install_path(const char *rel);
+
 #define INTENT_G_VARIANT_TYPE_STRING "(sssa{sv}s)" // (action, className, data, extras, sender_dbus_name)
 GVariant *intent_serialize(JNIEnv *env, jobject intent);
 jobject intent_deserialize(JNIEnv *env, GVariant *variant);
