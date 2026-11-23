@@ -10,34 +10,38 @@ import java.nio.Buffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /*
- * Bitmap is implemented as GdkTexture or GtkSnapshot. It can only be one of the two at a time.
- * The methods getTexture() and getSnapshot() automatically convert between the two as needed.
- * Android lets any thread read and write a bitmap's pixels (e.g. several threads setPixels() into disjoint rows);
- * a GtkSnapshot must not be used by two threads at once and a conversion frees the other handle, so each native
- * pixel access holds the bitmap's lock together with the handle it uses.
+ * The pixels of a Bitmap are a GdkTexture (a decoded image that nothing has changed) or a cairo image surface
+ * (getSurface(): created on the first pixel access or drawing, from the texture if there is one). Android lets any
+ * thread read and write a bitmap's pixels and draw into it (Canvas(Bitmap)); cairo works on the surface in any
+ * thread, so no GTK object is used for that. Each native pixel access holds the bitmap's lock (Android leaves the
+ * order of accesses to the app; the lock keeps the memory consistent). GTK draws the bitmap with getTexture(): a
+ * GdkTexture copied from the surface, kept until the pixels change (generation id).
  */
 public final class Bitmap implements Parcelable {
 
 	public static final int DENSITY_NONE = 0;
 
 	public enum Config {
-		RGB_565(2, -1, /*ANDROID_BITMAP_FORMAT_RGB_565*/ 4),
-		ARGB_8888(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /**ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1),
-		ARGB_4444(2, -1, /*ANDROID_BITMAP_FORMAT_RGBA_4444*/ 7),
-		ALPHA_8(1, /*GDK_MEMORY_A8*/ 24, /*ANDROID_BITMAP_FORMAT_A_8*/ 8),
-		RGBA_F16(8, /*GDK_MEMORY_R16G16B16A16_FLOAT*/ 14, /*ANDROID_BITMAP_FORMAT_RGBA_F16*/ 9),
-		HARDWARE(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /*ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1),
+		/* the cairo format of the surface: RGB_565 is opaque (RGB24), ALPHA_8 is A8, all others ARGB32 */
+		RGB_565(2, -1, /*ANDROID_BITMAP_FORMAT_RGB_565*/ 4, /*CAIRO_FORMAT_RGB24*/ 1),
+		ARGB_8888(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /**ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1, /*CAIRO_FORMAT_ARGB32*/ 0),
+		ARGB_4444(2, -1, /*ANDROID_BITMAP_FORMAT_RGBA_4444*/ 7, 0),
+		ALPHA_8(1, /*GDK_MEMORY_A8*/ 24, /*ANDROID_BITMAP_FORMAT_A_8*/ 8, /*CAIRO_FORMAT_A8*/ 2),
+		RGBA_F16(8, /*GDK_MEMORY_R16G16B16A16_FLOAT*/ 14, /*ANDROID_BITMAP_FORMAT_RGBA_F16*/ 9, 0),
+		HARDWARE(4, /*GDK_MEMORY_R8G8B8A8*/ 5, /*ANDROID_BITMAP_FORMAT_RGBA_8888*/ 1, 0),
 		/* AOSP Bitmap.Config.RGBA_1010102 (API 33): 4 bytes per pixel; GDK has no matching memory format */
-		RGBA_1010102(4, -1, /*ANDROID_BITMAP_FORMAT_RGBA_1010102*/ 10);
+		RGBA_1010102(4, -1, /*ANDROID_BITMAP_FORMAT_RGBA_1010102*/ 10, 0);
 
 		private int bytes_per_pixel;
 		private int gdk_memory_format;
 		int android_memory_format; // used by native function AndroidBitmap_getInfo()
+		private int cairo_format;
 
-		private Config(int bytes_per_pixel, int gdk_memory_format, int android_memory_format) {
+		private Config(int bytes_per_pixel, int gdk_memory_format, int android_memory_format, int cairo_format) {
 			this.bytes_per_pixel = bytes_per_pixel;
 			this.gdk_memory_format = gdk_memory_format;
 			this.android_memory_format = android_memory_format;
+			this.cairo_format = cairo_format;
 		}
 	}
 
@@ -94,7 +98,8 @@ public final class Bitmap implements Parcelable {
 	private int height;
 	private int stride;
 	private long texture;
-	private long snapshot;
+	private long surface;
+	private int textureGeneration; // the generation id of the pixels the texture shows (if there is a surface)
 	private Config config = Config.ARGB_8888;
 	private boolean hasAlpha = true;
 	long bytes = 0; // used by native function AndroidBitmap_lockPixels()
@@ -124,6 +129,7 @@ public final class Bitmap implements Parcelable {
 	Bitmap(long texture, Config config) {
 		this(native_get_width(texture), native_get_height(texture), config);
 		this.texture = texture;
+		this.textureGeneration = generationId;
 	}
 
 	private Bitmap(int width, int height, Config config) {
@@ -273,10 +279,15 @@ public final class Bitmap implements Parcelable {
 		return bitmap;
 	}
 
+	/* AOSP: an immutable bitmap with the pixels of src */
 	public static Bitmap createBitmap(Bitmap src) {
+		Bitmap bitmap = new Bitmap(src.width, src.height, src.config);
 		synchronized (src) {
-			return new Bitmap(native_ref_texture(src.getTexture()));
+			bitmap.surface = native_copy_surface(src.getSurface(), src.config.cairo_format);
 		}
+		bitmap.hasAlpha = src.hasAlpha;
+		bitmap.mutable = false;
+		return bitmap;
 	}
 
 	public static Bitmap createScaledBitmap(Bitmap src, int dstWidth, int dstHeight, boolean filter) {
@@ -325,37 +336,42 @@ public final class Bitmap implements Parcelable {
 		return ColorSpace.get(ColorSpace.Named.SRGB);
 	}
 
+	/** @hide the GdkTexture GTK draws the bitmap with: the decoded image, or a copy of the surface's pixels */
 	@Export
 	public synchronized long getTexture() {
-		if (texture == 0) {
-			texture = native_create_texture(snapshot, width, height, stride, config.gdk_memory_format);
-			snapshot = 0;
+		if (surface == 0 && texture != 0)
+			return texture;
+		long surface = getSurface();
+		if (texture == 0 || textureGeneration != generationId) {
+			native_recycle(texture, 0);
+			texture = native_texture_from_surface(surface);
+			textureGeneration = generationId;
 		}
 		return texture;
 	}
 
-	/** @hide the GTK snapshot to draw into (Surface.lockHardwareCanvas() on an ImageReader's buffer) */
-	public synchronized long getSnapshot() {
-		notifyPixelsChanged();
-		if (snapshot == 0) {
-			snapshot = native_create_snapshot(texture);
-			texture = 0;
-		}
-		return snapshot;
+	/** @hide the cairo image surface with the pixels, to read them or draw the bitmap; the caller holds the lock */
+	@Export
+	public synchronized long getSurface() {
+		if (surface == 0)
+			surface = native_create_surface(texture, width, height, config.cairo_format);
+		return surface;
 	}
 
+	/** @hide the surface to change the pixels of (draw into, set pixels); the caller holds the lock */
+	@Export
+	public synchronized long getSurfaceForWrite() {
+		notifyPixelsChanged();
+		return getSurface();
+	}
+
+	/* AOSP: every pixel set to the color (SkBitmap::eraseColor(), no blending) */
 	public void eraseColor(int color) {
-		if (color == Color.TRANSPARENT) {
-			synchronized (this) {
-				native_recycle(texture, snapshot);
-				snapshot = native_erase_color(color, width, height);
-				texture = 0;
-			}
-			notifyPixelsChanged();
-		} else {
-			Paint paint = new Paint();
-			paint.setColor(color);
-			new Canvas(this).drawRect(0, 0, width, height, paint);
+		checkRecycled("Can't erase a recycled bitmap");
+		if (!isMutable())
+			throw new IllegalStateException("cannot erase immutable bitmaps");
+		synchronized (this) {
+			native_erase_color(getSurfaceForWrite(), color);
 		}
 	}
 
@@ -367,9 +383,9 @@ public final class Bitmap implements Parcelable {
 	@Export
 	public void recycle() {
 		synchronized (this) {
-			native_recycle(texture, snapshot);
+			native_recycle(texture, surface);
 			texture = 0;
-			snapshot = 0;
+			surface = 0;
 		}
 		recycled = true;
 		notifyPixelsChanged();
@@ -381,9 +397,10 @@ public final class Bitmap implements Parcelable {
 
 	// used by BitmapFactory to satify Options.inBitmap if set
 	void transferFrom(Bitmap src) {
-		native_recycle(this.texture, this.snapshot);
+		boolean textureValid = src.textureGeneration == src.generationId;
+		native_recycle(this.texture, this.surface);
 		this.texture = src.texture;
-		this.snapshot = src.snapshot;
+		this.surface = src.surface;
 		this.width = src.width;
 		this.height = src.height;
 		this.stride = src.stride;
@@ -392,9 +409,10 @@ public final class Bitmap implements Parcelable {
 		this.mutable = src.mutable;
 		this.recycled = false;
 		src.texture = 0;
-		src.snapshot = 0;
+		src.surface = 0;
 		src.recycled = true;
 		notifyPixelsChanged();
+		textureGeneration = textureValid ? generationId : 0;
 	}
 
 	public int getGenerationId() {
@@ -525,7 +543,7 @@ public final class Bitmap implements Parcelable {
 			bitmap.setPixels(colors, 0, width, 0, 0, width, height);
 		} else {
 			synchronized (this) {
-				bitmap.texture = native_ref_texture(getTexture());
+				bitmap.surface = native_copy_surface(getSurface(), config.cairo_format);
 			}
 			bitmap.hasAlpha = hasAlpha;
 		}
@@ -549,7 +567,7 @@ public final class Bitmap implements Parcelable {
 			return; // nothing to do
 		checkPixelsAccess(x, y, width, height, offset, stride, pixels);
 		synchronized (this) {
-			native_get_pixels(getTexture(), pixels, offset, stride, x, y, width, height);
+			native_get_pixels(getSurface(), pixels, offset, stride, x, y, width, height);
 		}
 	}
 
@@ -618,7 +636,7 @@ public final class Bitmap implements Parcelable {
 		checkPixelAccess(x, y);
 		int[] pixels = new int[1];
 		synchronized (this) {
-			native_get_pixels(getTexture(), pixels, 0, 1, x, y, 1, 1);
+			native_get_pixels(getSurface(), pixels, 0, 1, x, y, 1, 1);
 		}
 		return pixels[0];
 	}
@@ -633,7 +651,7 @@ public final class Bitmap implements Parcelable {
 			System.exit(1);
 		}
 		synchronized (this) {
-			native_copy_to_buffer(getTexture(), buffer, rawMemoryFormat(), getRowBytes());
+			native_copy_to_buffer(getSurface(), buffer, rawMemoryFormat(), getRowBytes());
 		}
 		buffer.position(buffer.position() + getByteCount());
 	}
@@ -802,7 +820,7 @@ public final class Bitmap implements Parcelable {
 		/* AOSP's nativeCompress() writes to the stream and returns false when that fails */
 		byte[] data;
 		synchronized (this) {
-			data = native_compress(getTexture(), format.nativeInt, quality);
+			data = native_compress_surface(getSurface(), format.nativeInt, quality);
 		}
 		if (data == null)
 			return false;
@@ -815,17 +833,17 @@ public final class Bitmap implements Parcelable {
 	}
 
 	public synchronized void setPixels(int[] pixels, int offset, int stride, int x, int y, int width, int height) {
-		native_set_pixels(getSnapshot(), pixels, offset, stride, x, y, width, height);
+		native_set_pixels(getSurfaceForWrite(), pixels, offset, stride, x, y, width, height);
 	}
 
 	public synchronized void setPixel(int x, int y, int color) {
 		int[] pixels = new int[] {color};
-		native_set_pixels(getSnapshot(), pixels, 0, 1, x, y, 1, 1);
+		native_set_pixels(getSurfaceForWrite(), pixels, 0, 1, x, y, 1, 1);
 	}
 
 	/* AOSP Bitmap.reconfigure() with the size check of the native Bitmap::reconfigure() (android_graphics_Bitmap.cpp).
 	 * AOSP keeps the pixel memory and reinterprets its bytes (contents undefined per the API); the
-	 * GdkTexture here cannot change its size or format, so the bitmap gets fresh transparent pixels */
+	 * surface here cannot change its size or format, so the bitmap gets fresh transparent pixels */
 	public void reconfigure(int width, int height, Bitmap.Config config) {
 		if (recycled)
 			throw new IllegalStateException("Can't call reconfigure() on a recycled bitmap");
@@ -838,9 +856,9 @@ public final class Bitmap implements Parcelable {
 		if (height * stride > allocation)
 			throw new IllegalArgumentException("Bitmap not large enough to support new configuration");
 		synchronized (this) {
-			native_recycle(texture, snapshot);
+			native_recycle(texture, surface);
 			texture = 0;
-			snapshot = 0;
+			surface = 0;
 		}
 		this.allocationByteCount = allocation;
 		this.width = width;
@@ -916,16 +934,17 @@ public final class Bitmap implements Parcelable {
 		}
 	}
 
-	private static native long native_create_snapshot(long texture);
-	private static native long native_create_texture(long snapshot, int width, int height, int stride, int format);
+	private static native long native_create_surface(long texture, int width, int height, int cairo_format);
+	private static native long native_texture_from_surface(long surface);
+	private static native long native_copy_surface(long surface, int cairo_format);
 	private static native int native_get_width(long texture);
 	private static native int native_get_height(long texture);
-	private static native long native_erase_color(int color, int width, int height);
-	private static native void native_recycle(long texture, long snapshot);
-	private static native long native_ref_texture(long texture);
+	private static native void native_erase_color(long surface, int color);
+	private static native void native_recycle(long texture, long surface);
 	static native boolean native_is_opaque(long texture);
-	private static native void native_get_pixels(long texture, int[] pixels, int offset, int stride, int x, int y, int width, int height);
-	private static native void native_copy_to_buffer(long texture, Buffer buffer, int memory_format, int stride);
+	private static native void native_get_pixels(long surface, int[] pixels, int offset, int stride, int x, int y, int width, int height);
+	private static native void native_copy_to_buffer(long surface, Buffer buffer, int memory_format, int stride);
 	private static native byte[] native_compress(long texture, int format, int quality);
-	private static native void native_set_pixels(long snapshot, int[] pixels, int offset, int stride, int x, int y, int width, int height);
+	private static native byte[] native_compress_surface(long surface, int format, int quality);
+	private static native void native_set_pixels(long surface, int[] pixels, int offset, int stride, int x, int y, int width, int height);
 }

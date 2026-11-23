@@ -1746,7 +1746,7 @@ JNIEXPORT jbyteArray JNICALL Java_android_webkit_WebView_native_1getCertificate(
 }
 
 /* capturePicture(): the page's visible part as WebKit last drew it (the widget's render node) is drawn into the
- * Bitmap (its snapshot, see Bitmap.getSnapshot()); false when there is no such drawing */
+ * Bitmap's surface (Bitmap.getSurfaceForWrite()) with cairo; false when there is no such drawing */
 JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1capturePicture(JNIEnv *env, jobject this, jlong widget_ptr, jobject bitmap)
 {
 	GtkWidget *webview = _PTR(widget_ptr);
@@ -1764,8 +1764,11 @@ JNIEXPORT jboolean JNICALL Java_android_webkit_WebView_native_1capturePicture(JN
 	if (!node)
 		return JNI_FALSE;
 	jclass bitmap_class = (*env)->GetObjectClass(env, bitmap);
-	GtkSnapshot *target = _PTR((*env)->CallLongMethod(env, bitmap, (*env)->GetMethodID(env, bitmap_class, "getSnapshot", "()J")));
-	gtk_snapshot_append_node(target, node);
+	(*env)->MonitorEnter(env, bitmap);
+	cairo_t *cr = cairo_create(_PTR((*env)->CallLongMethod(env, bitmap, (*env)->GetMethodID(env, bitmap_class, "getSurfaceForWrite", "()J"))));
+	gsk_render_node_draw(node, cr);
+	cairo_destroy(cr);
+	(*env)->MonitorExit(env, bitmap);
 	gsk_render_node_unref(node);
 	return JNI_TRUE;
 }

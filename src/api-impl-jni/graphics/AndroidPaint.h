@@ -26,6 +26,7 @@ struct AndroidPaint {
 	bool fake_bold : 1; /* Paint.FAKE_BOLD_TEXT_FLAG */
 	bool hinting : 1; /* Paint.setHinting(), HINTING_ON by default */
 	bool font_hinted : 1; /* android_paint_pango_context(): the font of hinted_font hints itself */
+	bool hairline : 1; /* Paint.setStrokeWidth(0): one device pixel wide (gsk_stroke has width 1) */
 	PangoFontDescription *hinted_font; /* the font description font_hinted was found for, NULL: none yet */
 };
 
@@ -37,6 +38,9 @@ void android_paint_append_layout(GtkSnapshot *snapshot, PangoLayout *layout, str
 void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGlyphString *glyphs, const graphene_point_t *origin, struct AndroidPaint *paint);
 void android_paint_add_layout_outline(GskPathBuilder *builder, PangoLayout *layout, float x, float y);
 void android_paint_add_glyphs_outline(GskPathBuilder *builder, PangoFont *font, PangoGlyphString *glyphs, float x, float y);
+/* the same with cairo (CairoCanvas): the layout's top left corner at the origin, the glyphs' origin at x, y */
+void android_paint_draw_layout_cairo(cairo_t *cr, PangoLayout *layout, struct AndroidPaint *paint);
+void android_paint_draw_glyphs_cairo(cairo_t *cr, PangoFont *font, PangoGlyphString *glyphs, float x, float y, struct AndroidPaint *paint);
 
 /* android_graphics_Path.c: adds the outline of the stroke of src (width 0: only the dashes of src) to dst, and src
  * itself for add_fill (Paint.getFillPath) */

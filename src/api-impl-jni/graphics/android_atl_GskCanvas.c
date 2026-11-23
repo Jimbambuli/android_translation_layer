@@ -241,8 +241,10 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawRect(JNIEnv *env, 
 		gtk_snapshot_pop(snapshot);
 }
 
-JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLinearGradient(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat x0, jfloat y0, jfloat x1, jfloat y1, jintArray colors_arr, jfloatArray positions_arr, jboolean repeat, jlong paint_ptr)
+JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLinearGradient(JNIEnv *env, jclass this_class, jlong snapshot_ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jfloat x0, jfloat y0, jfloat x1, jfloat y1, jintArray colors_arr, jfloatArray positions_arr, jint tile_mode, jlong paint_ptr)
 {
+	/* TileMode.MIRROR is not supported by GSK and falls back to CLAMP */
+	bool repeat = tile_mode == TILE_REPEAT;
 	GdkSnapshot *snapshot = (GdkSnapshot *)_PTR(snapshot_ptr);
 	struct AndroidPaint *paint = _PTR(paint_ptr);
 	graphene_rect_t bounds = GRAPHENE_RECT_INIT(left, top, right - left, bottom - top);

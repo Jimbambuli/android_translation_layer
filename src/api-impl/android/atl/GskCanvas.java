@@ -19,7 +19,7 @@ public class GskCanvas extends DisplayListCanvas {
 	/* the save levels that saveLayer() opened as an isolated GSK layer, and how many are open */
 	private BitSet layer_levels = new BitSet();
 	private int layers = 0;
-	private boolean compositing = false;
+	protected boolean compositing = false;
 	/* the snapshot is drawn into a bitmap (android.graphics.Canvas): it starts transparent, like a layer */
 	public boolean offscreen = false;
 	/* AOSP RecordingCanvas: the size of what is recorded (the view or render node), set before drawing */
@@ -108,12 +108,13 @@ public class GskCanvas extends DisplayListCanvas {
 		return count;
 	}
 
-	private interface Drawing {
+	protected interface Drawing {
 		void draw(Paint paint);
 	}
 
-	/* GskPorterDuff of the paint's Porter-Duff mode, -1 for SRC_OVER, no mode or a separable blend mode */
-	private static int porterDuffOf(Paint paint) {
+	/* the composite operation of the paint's mode for native_pushComposite(), -1 if the mode is drawn without one:
+	 * here the GskPorterDuff of a Porter-Duff mode, -1 for SRC_OVER, no mode or a separable blend mode */
+	protected int compositeOp(Paint paint) {
 		BlendMode mode = paint != null ? paint.getBlendMode() : null;
 		if (mode == null)
 			return -1;
@@ -138,9 +139,9 @@ public class GskCanvas extends DisplayListCanvas {
 	 * the coverage, drawn opaque, child = the drawing. Only inside saveLayer() or a bitmap; elsewhere the GSK
 	 * background is the whole window, not the surface of the view, and the drawing stays SRC_OVER as before.
 	 * The separable blend modes (MULTIPLY, SCREEN, ...) stay SRC_OVER as well. */
-	private boolean drawComposited(Paint paint, Drawing coverage, Drawing drawing) {
+	protected boolean drawComposited(Paint paint, Drawing coverage, Drawing drawing) {
 		int op;
-		if (compositing || (layers == 0 && !offscreen) || (op = porterDuffOf(paint)) < 0 || !native_pushComposite(snapshot, op))
+		if (compositing || (layers == 0 && !offscreen) || (op = compositeOp(paint)) < 0 || !native_pushComposite(snapshot, op))
 			return false;
 		Paint coverage_paint = new Paint(paint);
 		coverage_paint.setShader(null);
@@ -244,12 +245,12 @@ public class GskCanvas extends DisplayListCanvas {
 			throw new RuntimeException("Canvas: trying to use a non-premultiplied bitmap " + bitmap);
 		if (drawComposited(paint, p -> native_drawRect(snapshot, dst.left, dst.top, dst.right, dst.bottom, p.paint), p -> drawBitmap(bitmap, src, dst, p)))
 			return;
-		/* under the bitmap's lock: another thread's setPixels() would free the texture (see Bitmap) */
+		/* under the bitmap's lock: another thread may change its pixels meanwhile (see Bitmap) */
 		synchronized (bitmap) {
 			if (src == null)
-				native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
+				native_drawBitmap(snapshot, imageOf(bitmap), dst.left, dst.top, dst.width(), dst.height(), paint != null ? paint.paint : default_paint.paint);
 			else
-				native_drawBitmap(snapshot, bitmap.getTexture(), dst.left, dst.top, dst.width(), dst.height(), src.left, src.top, src.width(), src.height(), paint != null ? paint.paint : default_paint.paint);
+				native_drawBitmap(snapshot, imageOf(bitmap), dst.left, dst.top, dst.width(), dst.height(), src.left, src.top, src.width(), src.height(), paint != null ? paint.paint : default_paint.paint);
 		}
 	}
 
@@ -278,7 +279,7 @@ public class GskCanvas extends DisplayListCanvas {
 				concat(local);
 			}
 			synchronized (shader.bitmap) {
-				native_fillBitmapShader(snapshot, shader.bitmap.getTexture(), area.left, area.top, area.right, area.bottom,
+				native_fillBitmapShader(snapshot, imageOf(shader.bitmap), area.left, area.top, area.right, area.bottom,
 				                        tileModeInt(shader.tileX), tileModeInt(shader.tileY), paint.paint);
 			}
 			restore();
@@ -300,12 +301,22 @@ public class GskCanvas extends DisplayListCanvas {
 			save();
 			concat(local);
 		}
-		// TileMode.MIRROR is not supported by GSK and falls back to CLAMP
 		native_drawLinearGradient(snapshot, area.left, area.top, area.right, area.bottom, gradient.x0, gradient.y0, gradient.x1, gradient.y1,
-		                          gradient.colors, gradient.positions, gradient.tileMode == Shader.TileMode.REPEAT, paint.paint);
+		                          gradient.colors, gradient.positions, tileModeInt(gradient.tileMode), paint.paint);
 		if (has_local)
 			restore();
 		return true;
+	}
+
+	/* the image the native drawing draws a bitmap from: here its GdkTexture */
+	protected long imageOf(Bitmap bitmap) {
+		return bitmap.getTexture();
+	}
+
+	/* whether the native drawing applies the paint's blend mode itself (else a mode that is not composited is
+	 * left out of drawRect()) */
+	protected boolean drawsBlendMode() {
+		return false;
 	}
 
 	/* AOSP Shader.TileMode.nativeInt */
@@ -348,7 +359,7 @@ public class GskCanvas extends DisplayListCanvas {
 		if (drawComposited(paint, p -> drawRect(left, top, right, bottom, p), p -> drawRect(left, top, right, bottom, p)))
 			return;
 		/* without a layer (or GTK < 4.22) a Porter-Duff mode is left out, see drawComposited() */
-		if (!compositing && paint != null && paint.getXfermode() != null && paint.getBlendMode() != BlendMode.SRC_OVER)
+		if (!compositing && !drawsBlendMode() && paint != null && paint.getXfermode() != null && paint.getBlendMode() != BlendMode.SRC_OVER)
 			return;
 		if (fillWithShader(left, top, right, bottom, paint))
 			return;
@@ -503,7 +514,7 @@ public class GskCanvas extends DisplayListCanvas {
 	protected native void native_drawRect(long snapshot, float left, float top, float right, float bottom, long paint);
 	protected native void native_drawPath(long snapshot, long path, int fill_rule, boolean inverse, long paint);
 	protected native void native_fillBitmapShader(long snapshot, long texture, float left, float top, float right, float bottom, int tile_x, int tile_y, long paint);
-	protected native void native_drawLinearGradient(long snapshot, float left, float top, float right, float bottom, float x0, float y0, float x1, float y1, int[] colors, float[] positions, boolean repeat, long paint);
+	protected native void native_drawLinearGradient(long snapshot, float left, float top, float right, float bottom, float x0, float y0, float x1, float y1, int[] colors, float[] positions, int tile_mode, long paint);
 	protected native void native_translate(long snapshot, float dx, float dy);
 	protected native void native_rotate(long snapshot, float degrees);
 	protected native void native_save(long snapshot);

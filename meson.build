@@ -278,6 +278,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/egl/android_opengl_EGLExt.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
                                                                   	'src/api-impl-jni/graphics/NinePatchPaintable.c',
+                                                                  	'src/api-impl-jni/graphics/android_atl_CairoCanvas.c',
                                                                   	'src/api-impl-jni/graphics/android_atl_GskCanvas.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_Bitmap.c',
                                                                   	'src/api-impl-jni/graphics/android_graphics_BitmapFactory.c',
