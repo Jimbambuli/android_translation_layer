@@ -938,6 +938,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	/* -- misc -- */
 
 	window = gtk_application_window_new(app);
+	atl_display_info_init(window);
 	if (titlebar_kind() == TITLEBAR_SYSTEM_NAVIGATION) {
 		GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 		GtkWidget *pages = activity_pages_new();

@@ -63,6 +63,22 @@ void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
 void atl_unref_on_main_thread(gpointer object);
 PangoContext *atl_pango_context(void);
+
+/* What render and worker threads need of GTK's display (doc/threading.md): taken on the main thread once the window
+ * exists (atl_display_info_init()), unchanged afterwards, so any thread may read it without a GTK call. */
+struct wl_display;
+struct wl_compositor;
+struct atl_display_info {
+	gboolean is_wayland;
+	gboolean is_x11;
+	struct wl_display *wl_display;
+	struct wl_compositor *wl_compositor;
+	void *x11_display;
+	double pango_resolution; /* of the window's PangoContext, for the PangoContexts of other threads */
+	cairo_font_options_t *pango_font_options;
+};
+extern struct atl_display_info atl_display_info;
+void atl_display_info_init(GtkWidget *window);
 PangoContext *atl_pango_context_hinted(void);
 gboolean atl_pango_layout_placeholder(PangoLayout *layout, guint index, float place[4]);
 gboolean atl_compute_point_in_window(GtkWidget *widget, const graphene_point_t *point_in, graphene_point_t *point_out);

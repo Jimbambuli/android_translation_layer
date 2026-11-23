@@ -21,17 +21,44 @@
 #include "../api-impl-jni/defines.h"
 #include "../api-impl-jni/widgets/android_view_SurfaceView.h"
 
+#include "../api-impl-jni/util.h"
 #include "hardware_buffer.h"
 #include "native_window.h"
 
-extern GtkWindow *window; // TODO: how do we get rid of this? the app won't pass anything useful to eglGetDisplay
+/* The tables below are used by every app thread with a GL context (EGL: any thread), so they go under one lock. */
+static GMutex tables_lock;
+
+static gpointer table_lookup(GHashTable **table, gconstpointer key)
+{
+	g_mutex_lock(&tables_lock);
+	gpointer value = *table ? g_hash_table_lookup(*table, key) : NULL;
+	g_mutex_unlock(&tables_lock);
+	return value;
+}
+
+static void table_insert(GHashTable **table, gpointer key, gpointer value)
+{
+	g_mutex_lock(&tables_lock);
+	if (!*table)
+		*table = g_hash_table_new(NULL, NULL);
+	g_hash_table_insert(*table, key, value);
+	g_mutex_unlock(&tables_lock);
+}
+
+static void table_remove(GHashTable **table, gconstpointer key)
+{
+	g_mutex_lock(&tables_lock);
+	if (*table)
+		g_hash_table_remove(*table, key);
+	g_mutex_unlock(&tables_lock);
+}
 
 static GHashTable *egl_surface_hashtable;
 
 /* the ANativeWindow of an EGL window surface ATL made, or NULL (also before the first one: no table yet) */
 static struct ANativeWindow *surface_native_window(EGLSurface surface)
 {
-	return egl_surface_hashtable ? g_hash_table_lookup(egl_surface_hashtable, surface) : NULL;
+	return table_lookup(&egl_surface_hashtable, surface);
 }
 
 // temporary for debugging
@@ -181,17 +208,11 @@ EGLDisplay bionic_eglGetDisplay(EGLNativeDisplayType native_display)
 	 * We obviously want to make the app use the correct display, which may happen to be a different one
 	 * than the "default" display (especially on Wayland)
 	 */
-	GdkDisplay *display = gtk_root_get_display(GTK_ROOT(window));
-
-	if (GDK_IS_WAYLAND_DISPLAY(display)) {
-		struct wl_display *wl_display = gdk_wayland_display_get_wl_display(display);
-		return eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND_KHR, wl_display, NULL);
-	} else if (GDK_IS_X11_DISPLAY(display)) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-		Display *x11_display = gdk_x11_display_get_xdisplay(display);
-#pragma GCC diagnostic pop
-		return eglGetPlatformDisplay(EGL_PLATFORM_X11_KHR, x11_display, NULL);
+	/* any thread: GTK's display as taken on the main thread (atl_display_info) */
+	if (atl_display_info.is_wayland) {
+		return eglGetPlatformDisplay(EGL_PLATFORM_WAYLAND_KHR, atl_display_info.wl_display, NULL);
+	} else if (atl_display_info.is_x11) {
+		return eglGetPlatformDisplay(EGL_PLATFORM_X11_KHR, atl_display_info.x11_display, NULL);
 	} else {
 		return NULL;
 	}
@@ -210,9 +231,7 @@ EGLBoolean bionic_eglTerminate(EGLDisplay display)
 
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
-	GdkDisplay *gdk_display = gtk_root_get_display(GTK_ROOT(window));
-
-	if (GDK_IS_X11_DISPLAY(gdk_display)) {
+	if (atl_display_info.is_x11) {
 		/* X11 supports pbuffers just fine */
 		return eglChooseConfig(display, attrib_list, configs, config_size, num_config);
 	} else {
@@ -247,16 +266,22 @@ EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLCo
 /* the pbuffers that are wl_egl_window surfaces of an unmapped wl_surface (Wayland has none) */
 static GHashTable *wayland_pbuffers = NULL;
 
+/* The wl_surfaces of the pbuffers are made in the app's GL threads. GDK's main thread dispatches the default queue of
+ * the wl_display, so they go to a queue of their own (nobody dispatches it: an unmapped surface gets no events). */
+static struct wl_event_queue *pbuffer_queue;
+
 EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, EGLint const *attrib_list)
 {
-	GdkDisplay *gdk_display = gtk_root_get_display(GTK_ROOT(window));
-
-	if (GDK_IS_X11_DISPLAY(gdk_display)) {
+	if (atl_display_info.is_x11) {
 		/* X11 supports pbuffers just fine */
 		return eglCreatePbufferSurface(display, config, attrib_list);
 	} else {
-		struct wl_compositor *wl_compositor = gdk_wayland_display_get_wl_compositor(gdk_display);
+		if (g_once_init_enter_pointer(&pbuffer_queue))
+			g_once_init_leave_pointer(&pbuffer_queue, wl_display_create_queue(atl_display_info.wl_display));
+		struct wl_compositor *wl_compositor = wl_proxy_create_wrapper(atl_display_info.wl_compositor);
+		wl_proxy_set_queue((struct wl_proxy *)wl_compositor, pbuffer_queue);
 		struct wl_surface *wayland_surface = wl_compositor_create_surface(wl_compositor);
+		wl_proxy_wrapper_destroy(wl_compositor);
 		EGLint width = 0;
 		EGLint height = 0;
 		EGLint *new_attrib_list = NULL;
@@ -281,11 +306,8 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 		}
 		struct wl_egl_window *egl_window = wl_egl_window_create(wayland_surface, width, height);
 		EGLSurface surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType)egl_window, new_attrib_list);
-		if (surface) {
-			if (!wayland_pbuffers)
-				wayland_pbuffers = g_hash_table_new(NULL, NULL);
-			g_hash_table_add(wayland_pbuffers, surface);
-		}
+		if (surface)
+			table_insert(&wayland_pbuffers, surface, surface);
 		return surface;
 	}
 }
@@ -441,9 +463,6 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 	if (!native_window)
 		return NULL;
 
-	if (!egl_surface_hashtable)
-		egl_surface_hashtable = g_hash_table_new(NULL, NULL);
-
 	ANativeWindow_acquire(native_window);
 
 	PrintConfigAttributes(display, config);
@@ -489,9 +508,9 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 
 	printf("EGL::: ret: %p\n", surface);
 
-	g_hash_table_insert(egl_surface_hashtable, surface, native_window);
-
-	if (!surface)
+	if (surface)
+		table_insert(&egl_surface_hashtable, surface, native_window);
+	else
 		ANativeWindow_release(native_window);
 
 	return surface;
@@ -499,8 +518,7 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 
 EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 {
-	if (wayland_pbuffers)
-		g_hash_table_remove(wayland_pbuffers, surface);
+	table_remove(&wayland_pbuffers, surface);
 	struct ANativeWindow *native_window = surface_native_window(surface);
 
 	if (!native_window)
@@ -523,10 +541,11 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 			if (atl_surface->buffers[i].gl_texture)
 				glDeleteTextures(1, &atl_surface->buffers[i].gl_texture);
 		}
-		g_object_unref(atl_surface);
+		/* dispose deletes GTK's textures in a GdkGLContext of the widget: main thread only */
+		atl_unref_on_main_thread(atl_surface);
 	}
 	if (ret) {
-		g_hash_table_remove(egl_surface_hashtable, surface);
+		table_remove(&egl_surface_hashtable, surface);
 		ANativeWindow_release(native_window);
 	}
 
@@ -741,12 +760,8 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 	if (!native_window) {
 		return eglMakeCurrent(display, draw, read, context);
 	}
-	if (!draw_surface_hashtable)
-		draw_surface_hashtable = g_hash_table_new(NULL, NULL);
-	g_hash_table_insert(draw_surface_hashtable, context, draw);
-	if (!read_surface_hashtable)
-		read_surface_hashtable = g_hash_table_new(NULL, NULL);
-	g_hash_table_insert(read_surface_hashtable, context, read);
+	table_insert(&draw_surface_hashtable, context, draw);
+	table_insert(&read_surface_hashtable, context, read);
 	EGLBoolean ret = eglMakeCurrent(display, NULL, NULL, context);
 	ATLSurface *atl_surface = draw;
 	if (!atl_surface->unused_buffers) {
@@ -840,7 +855,7 @@ EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 {
 	/* EGL: on a pbuffer eglSwapBuffers has no effect. The window surface standing in for it would wait
 	 * forever for a frame callback of its never shown wl_surface (OsmAnd's GLThread drew one frame) */
-	if (wayland_pbuffers && g_hash_table_contains(wayland_pbuffers, surface))
+	if (table_lookup(&wayland_pbuffers, surface))
 		return EGL_TRUE;
 	if (getenv("ATL_DIRECT_EGL"))
 		return eglSwapBuffers(display, surface);
@@ -897,9 +912,9 @@ EGLSurface bionic_eglGetCurrentSurface(EGLint readdraw)
 		return eglGetCurrentSurface(readdraw);
 	EGLContext current_context = eglGetCurrentContext();
 	if (readdraw == EGL_READ)
-		return g_hash_table_lookup(read_surface_hashtable, current_context);
+		return table_lookup(&read_surface_hashtable, current_context);
 	else if (readdraw == EGL_DRAW)
-		return g_hash_table_lookup(draw_surface_hashtable, current_context);
+		return table_lookup(&draw_surface_hashtable, current_context);
 
 	return NULL;
 }
@@ -908,6 +923,6 @@ void bionic_glBindFramebuffer(GLenum target, GLuint framebuffer)
 {
 	if (getenv("ATL_DIRECT_EGL") || framebuffer != 0)
 		return glBindFramebuffer(target, framebuffer);
-	ATLSurface *atl_surface = g_hash_table_lookup(draw_surface_hashtable, eglGetCurrentContext());
+	ATLSurface *atl_surface = table_lookup(&draw_surface_hashtable, eglGetCurrentContext());
 	return glBindFramebuffer(target, atl_surface && atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
 }

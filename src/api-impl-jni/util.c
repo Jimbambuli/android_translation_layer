@@ -12,6 +12,14 @@
 
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
+#ifdef GDK_WINDOWING_WAYLAND
+#include <gdk/wayland/gdkwayland.h>
+#endif
+#ifdef GDK_WINDOWING_X11
+/* from gdk/x11/gdkx.h, which would bring Xlib's names into this file */
+GType gdk_x11_display_get_type(void);
+void *gdk_x11_display_get_xdisplay(GdkDisplay *display);
+#endif
 
 #include "src/api-impl-jni/defines.h"
 #include "util.h"
@@ -273,19 +281,47 @@ extern GThread *main_thread_id;
 
 static GPrivate thread_pango_context = G_PRIVATE_INIT(g_object_unref);
 
+struct atl_display_info atl_display_info;
+
+void atl_display_info_init(GtkWidget *window)
+{
+	GdkDisplay *display = gtk_widget_get_display(window);
+	PangoContext *context = gtk_widget_get_pango_context(window);
+	atl_display_info.pango_resolution = pango_cairo_context_get_resolution(context);
+	const cairo_font_options_t *options = pango_cairo_context_get_font_options(context);
+	atl_display_info.pango_font_options = options ? cairo_font_options_copy(options) : NULL;
+#ifdef GDK_WINDOWING_WAYLAND
+	if (GDK_IS_WAYLAND_DISPLAY(display)) {
+		atl_display_info.is_wayland = TRUE;
+		atl_display_info.wl_display = gdk_wayland_display_get_wl_display(display);
+		atl_display_info.wl_compositor = gdk_wayland_display_get_wl_compositor(display);
+	}
+#endif
+#ifdef GDK_WINDOWING_X11
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+	if (G_TYPE_CHECK_INSTANCE_TYPE(display, gdk_x11_display_get_type())) {
+		atl_display_info.is_x11 = TRUE;
+		atl_display_info.x11_display = gdk_x11_display_get_xdisplay(display);
+	}
+#pragma GCC diagnostic pop
+#endif
+}
+
 /* The PangoContext for text in the current thread. Pango font maps are not thread-safe: only the main thread uses
  * the window's context; other threads (apps drawing text into a Bitmap from worker threads) get a context of their
- * own on the thread's own default font map, with the resolution and font options of the window's context. */
+ * own on the thread's own default font map, with the resolution and font options of the window's context, as taken
+ * on the main thread (atl_display_info) */
 PangoContext *atl_pango_context(void)
 {
 	if (!main_thread_id || g_thread_self() == main_thread_id)
 		return gtk_widget_get_pango_context(window);
 	PangoContext *context = g_private_get(&thread_pango_context);
 	if (!context) {
-		PangoContext *window_context = gtk_widget_get_pango_context(window);
 		context = pango_font_map_create_context(pango_cairo_font_map_get_default());
-		pango_cairo_context_set_resolution(context, pango_cairo_context_get_resolution(window_context));
-		pango_cairo_context_set_font_options(context, pango_cairo_context_get_font_options(window_context));
+		if (atl_display_info.pango_resolution)
+			pango_cairo_context_set_resolution(context, atl_display_info.pango_resolution);
+		pango_cairo_context_set_font_options(context, atl_display_info.pango_font_options);
 		g_private_set(&thread_pango_context, context);
 	}
 	return context;
