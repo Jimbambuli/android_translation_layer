@@ -211,6 +211,10 @@ public class InputMethodManager {
 
 	public void updateSelection(View view, int selStart, int selEnd, int candidatesStart, int candidatesEnd) {}
 
+	/* AOSP tells the IME session about the click; without an IME session (ATL has none) it returns */
+	@Deprecated
+	public void viewClicked(View view) {}
+
 	public InputMethodSubtype getCurrentInputMethodSubtype() {
 		return new InputMethodSubtype();
 	}
