@@ -273,19 +273,36 @@ extern GThread *main_thread_id;
 
 static GPrivate thread_pango_context = G_PRIVATE_INIT(g_object_unref);
 
+/* the resolution and font options of the window's context, taken on the main thread for the other threads */
+G_LOCK_DEFINE_STATIC(window_text_settings);
+static double window_resolution = -1;
+static cairo_font_options_t *window_font_options;
+
 /* The PangoContext for text in the current thread. Pango font maps are not thread-safe: only the main thread uses
  * the window's context; other threads (apps drawing text into a Bitmap from worker threads) get a context of their
- * own on the thread's own default font map, with the resolution and font options of the window's context. */
+ * own on the thread's own default font map, with the resolution and font options of the window's context (as the
+ * main thread last saw them: GTK's widget must not be asked from another thread). */
 PangoContext *atl_pango_context(void)
 {
-	if (!main_thread_id || g_thread_self() == main_thread_id)
-		return gtk_widget_get_pango_context(window);
+	if (!main_thread_id || g_thread_self() == main_thread_id) {
+		PangoContext *context = gtk_widget_get_pango_context(window);
+		if (window_resolution < 0) {
+			const cairo_font_options_t *options = pango_cairo_context_get_font_options(context);
+			G_LOCK(window_text_settings);
+			window_resolution = pango_cairo_context_get_resolution(context);
+			window_font_options = options ? cairo_font_options_copy(options) : NULL;
+			G_UNLOCK(window_text_settings);
+		}
+		return context;
+	}
 	PangoContext *context = g_private_get(&thread_pango_context);
 	if (!context) {
-		PangoContext *window_context = gtk_widget_get_pango_context(window);
 		context = pango_font_map_create_context(pango_cairo_font_map_get_default());
-		pango_cairo_context_set_resolution(context, pango_cairo_context_get_resolution(window_context));
-		pango_cairo_context_set_font_options(context, pango_cairo_context_get_font_options(window_context));
+		G_LOCK(window_text_settings);
+		if (window_resolution >= 0)
+			pango_cairo_context_set_resolution(context, window_resolution);
+		pango_cairo_context_set_font_options(context, window_font_options);
+		G_UNLOCK(window_text_settings);
 		g_private_set(&thread_pango_context, context);
 	}
 	return context;

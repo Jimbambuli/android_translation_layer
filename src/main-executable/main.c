@@ -938,6 +938,7 @@ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *h
 	/* -- misc -- */
 
 	window = gtk_application_window_new(app);
+	atl_pango_context(); /* takes the window's text settings for the other threads */
 	if (titlebar_kind() == TITLEBAR_SYSTEM_NAVIGATION) {
 		GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 		GtkWidget *pages = activity_pages_new();
