@@ -26,6 +26,7 @@
 #include <libgen.h>
 #include <locale.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -1458,6 +1459,15 @@ int main(int argc, char **argv)
 	int status;
 
 	pregrow_stack();
+
+	/* like Runtime::BlockSignals() in Android's zygote, before any thread exists: the runtime is only started later
+	 * (in open()), when GLib's threads are already running, and a SIGQUIT delivered to one of them would end the
+	 * process instead of reaching ART's signal catcher (thread dump, "kill -3"); SIGUSR1 (GC) likewise */
+	sigset_t runtime_signals;
+	sigemptyset(&runtime_signals);
+	sigaddset(&runtime_signals, SIGQUIT);
+	sigaddset(&runtime_signals, SIGUSR1);
+	pthread_sigmask(SIG_BLOCK, &runtime_signals, NULL);
 
 	/* this has to be done in the main executable, so might as well do it here */
 	init__r_debug();
