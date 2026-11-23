@@ -102,6 +102,8 @@ static uint8_t classify(const char *n)
 	for (int i = 0; any_prefix[i]; i++)
 		if (starts(n, any_prefix[i]))
 			return CAT_ANY;
+	if (starts(n, "gsk_") && strstr(n, "_node_")) /* render nodes: constructors and getters of immutable objects */
+		return CAT_ANY;
 	if (!strcmp(n, "gtk_snapshot_free_to_node") || !strcmp(n, "gtk_snapshot_free_to_paintable") ||
 	    !strcmp(n, "gsk_path_builder_free_to_path") || !strcmp(n, "gsk_path_builder_unref"))
 		return CAT_BUILDER_FREE;
@@ -218,6 +220,11 @@ static size_t java_stack(char *b, size_t n)
 
 static void report(int kind, uint32_t idx, void *caller, const char *fmt, ...)
 {
+	/* a library calling its own exported function through the PLT (libwayland: wl_proxy_marshal_flags() ->
+	 * wl_proxy_marshal_array_flags()) is that library's business; its outside caller was checked already */
+	Dl_info caller_info, real_info;
+	if (dladdr(caller, &caller_info) && dladdr(atomic_load(&real[idx]), &real_info) && caller_info.dli_fbase == real_info.dli_fbase)
+		return;
 	uintptr_t key = ((uintptr_t)caller << 5) ^ ((uintptr_t)idx << 3) ^ (uintptr_t)kind ^ 1;
 	uintptr_t h = (key * 0x9E3779B97F4A7C15ull) >> 52;
 	for (int i = 0; i < SITES; i++) {
