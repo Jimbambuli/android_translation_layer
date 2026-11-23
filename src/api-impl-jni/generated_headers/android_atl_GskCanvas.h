@@ -66,10 +66,10 @@ JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1fillBitmapShader
 /*
  * Class:     android_atl_GskCanvas
  * Method:    native_drawLinearGradient
- * Signature: (JFFFFFFFF[I[FZJ)V
+ * Signature: (JFFFFFFFF[I[FIJ)V
  */
 JNIEXPORT void JNICALL Java_android_atl_GskCanvas_native_1drawLinearGradient
-  (JNIEnv *, jobject, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jintArray, jfloatArray, jboolean, jlong);
+  (JNIEnv *, jobject, jlong, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jfloat, jintArray, jfloatArray, jint, jlong);
 
 /*
  * Class:     android_atl_GskCanvas

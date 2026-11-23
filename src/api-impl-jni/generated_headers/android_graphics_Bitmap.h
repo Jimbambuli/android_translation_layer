@@ -11,19 +11,27 @@ extern "C" {
 #define android_graphics_Bitmap_DENSITY_NONE 0L
 /*
  * Class:     android_graphics_Bitmap
- * Method:    native_create_snapshot
+ * Method:    native_create_surface
+ * Signature: (JIII)J
+ */
+JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1surface
+  (JNIEnv *, jclass, jlong, jint, jint, jint);
+
+/*
+ * Class:     android_graphics_Bitmap
+ * Method:    native_texture_from_surface
  * Signature: (J)J
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1snapshot
+JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1texture_1from_1surface
   (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     android_graphics_Bitmap
- * Method:    native_create_texture
- * Signature: (JIIII)J
+ * Method:    native_copy_surface
+ * Signature: (JI)J
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1create_1texture
-  (JNIEnv *, jclass, jlong, jint, jint, jint, jint);
+JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1copy_1surface
+  (JNIEnv *, jclass, jlong, jint);
 
 /*
  * Class:     android_graphics_Bitmap
@@ -44,10 +52,10 @@ JNIEXPORT jint JNICALL Java_android_graphics_Bitmap_native_1get_1height
 /*
  * Class:     android_graphics_Bitmap
  * Method:    native_erase_color
- * Signature: (III)J
+ * Signature: (JI)V
  */
-JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1erase_1color
-  (JNIEnv *, jclass, jint, jint, jint);
+JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1erase_1color
+  (JNIEnv *, jclass, jlong, jint);
 
 /*
  * Class:     android_graphics_Bitmap
@@ -56,14 +64,6 @@ JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1erase_1color
  */
 JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1recycle
   (JNIEnv *, jclass, jlong, jlong);
-
-/*
- * Class:     android_graphics_Bitmap
- * Method:    native_ref_texture
- * Signature: (J)J
- */
-JNIEXPORT jlong JNICALL Java_android_graphics_Bitmap_native_1ref_1texture
-  (JNIEnv *, jclass, jlong);
 
 /*
  * Class:     android_graphics_Bitmap
@@ -95,6 +95,14 @@ JNIEXPORT void JNICALL Java_android_graphics_Bitmap_native_1copy_1to_1buffer
  * Signature: (JII)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1compress
+  (JNIEnv *, jclass, jlong, jint, jint);
+
+/*
+ * Class:     android_graphics_Bitmap
+ * Method:    native_compress_surface
+ * Signature: (JII)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_android_graphics_Bitmap_native_1compress_1surface
   (JNIEnv *, jclass, jlong, jint, jint);
 
 /*
