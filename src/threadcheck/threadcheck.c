@@ -62,6 +62,8 @@ static __thread int shadow_depth;
 
 static void *(*p_wl_proxy_get_queue)(void *);
 static void *(*p_wl_proxy_get_display)(void *);
+static const char *(*p_wl_proxy_get_class)(void *);
+static void *gdk_wl_display; /* the wl_display whose default queue libgtk dispatches */
 
 static int starts(const char *s, const char *p) { return !strncmp(s, p, strlen(p)); }
 static int ends(const char *s, const char *p) { size_t a = strlen(s), b = strlen(p); return a >= b && !strcmp(s + a - b, p); }
@@ -169,8 +171,9 @@ static void map_del(struct map *m, struct entry *e)
 #define SITES 4096
 static struct { _Atomic(uintptr_t) key; _Atomic uint32_t count; uint32_t idx; uint8_t kind; void *caller; } sites[SITES];
 static const char *const kind_names[] = {"off-main", "builder-concurrent", "foreign-owned", "wl-default-queue",
-	"egl-context-two-threads", "egl-swap-foreign-surface", "wl-egl-window-foreign-thread", "wl-egl-window-outlived"};
-enum { K_OFF_MAIN, K_BUILDER, K_OWNED, K_WL_QUEUE, K_EGL_CTX, K_EGL_SWAP, K_WLEGL_THREAD, K_WLEGL_LIFE };
+	"egl-context-two-threads", "egl-swap-foreign-surface", "wl-egl-window-foreign-thread", "wl-egl-window-outlived",
+	"wl-output-on-gdk-connection"};
+enum { K_OFF_MAIN, K_BUILDER, K_OWNED, K_WL_QUEUE, K_EGL_CTX, K_EGL_SWAP, K_WLEGL_THREAD, K_WLEGL_LIFE, K_WL_GDK };
 
 static pid_t gettid_(void) { return gettid(); }
 
@@ -374,6 +377,8 @@ __attribute__((visibility("hidden"))) void *tc_enter(uint64_t idx, uint64_t *reg
 		case CAT_WL_DISPATCH_Q: {
 			if (categories[idx] == CAT_WL_DISPATCH_Q && regs[1] && regs[1] != (uint64_t)p_wl_proxy_get_queue(a0))
 				break; /* a queue of its own */
+			if (!gdk_wl_display && caller >= gtk_lo && caller < gtk_hi)
+				gdk_wl_display = a0;
 			pid_t d = display_dispatcher(a0, tid);
 			if (d != tid)
 				report(K_WL_QUEUE, idx, caller, "display=%p default queue dispatched by tid %d", a0, d);
@@ -383,6 +388,12 @@ __attribute__((visibility("hidden"))) void *tc_enter(uint64_t idx, uint64_t *reg
 		case CAT_WL_LISTENER:
 			if (categories[idx] == CAT_WL_CREATE && !regs[2])
 				break; /* no new object */
+			/* a global bound by someone else on GDK's connection: the compositor then tells GDK's objects about it
+			 * (wl_surface.enter with a wl_output GDK does not know, WebView start, 2fcc0c359) */
+			if (categories[idx] == CAT_WL_CREATE && a0 && gdk_wl_display && !(caller >= gtk_lo && caller < gtk_hi) &&
+			    p_wl_proxy_get_display(a0) == gdk_wl_display && !strcmp(p_wl_proxy_get_class(a0), "wl_registry") &&
+			    !strcmp(*(const char *const *)regs[2], "wl_output")) /* struct wl_interface starts with the name */
+				report(K_WL_GDK, idx, caller, "wl_output bound on registry=%p of GDK's wl_display", a0);
 			if (a0 && default_queue(a0)) {
 				pid_t d = display_dispatcher(p_wl_proxy_get_display(a0), tid);
 				if (d != tid)
@@ -548,6 +559,7 @@ __attribute__((constructor)) static void init(void)
 		categories[i] = classify(tc_names[i]);
 	p_wl_proxy_get_queue = dlsym(RTLD_NEXT, "wl_proxy_get_queue");
 	p_wl_proxy_get_display = dlsym(RTLD_NEXT, "wl_proxy_get_display");
+	p_wl_proxy_get_class = dlsym(RTLD_NEXT, "wl_proxy_get_class");
 	dl_iterate_phdr(find_gtk, NULL);
 	pthread_atfork(NULL, NULL, child_after_fork);
 	atexit(summary);
