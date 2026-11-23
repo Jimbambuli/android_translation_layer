@@ -274,12 +274,13 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemote(JNIEn
 		return -1;
 	struct remote_consumer *consumer = g_new0(struct remote_consumer, 1);
 	g_atomic_ref_count_init(&consumer->ref);
-	consumer->widget = SURFACE_VIEW_WIDGET(g_object_ref(gtk_widget_get_first_child(GTK_WIDGET(_PTR(surface_view)))));
+	consumer->widget = g_object_ref(surface_view_widget_of(_PTR(surface_view)));
 	consumer->fd = fds[0];
 	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
 		consumer->buffers[i].fd = consumer->buffers[i].fd1 = -1;
-	/* the producer may be waiting for its size inside a call the main thread waits for: read here, not there */
-	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, gtk_widget_get_width(GTK_WIDGET(consumer->widget)), gtk_widget_get_height(GTK_WIDGET(consumer->widget)));
+	/* the producer may be waiting for its size inside a call the main thread waits for: read here, not there (the
+	 * size the main thread keeps for other threads, no GTK call on this binder thread) */
+	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, g_atomic_int_get(&consumer->widget->width), g_atomic_int_get(&consumer->widget->height));
 	g_main_context_invoke(NULL, G_SOURCE_FUNC(start), consumer);
 	return fds[1];
 }

@@ -122,6 +122,21 @@ void ANativeWindow_acquire(struct ANativeWindow *native_window)
 	g_atomic_int_inc(&native_window->refcount); // MediaCodec's frames hold one on the main thread
 }
 
+/* the subsurface and the resize handler of ATL_DIRECT_EGL (direct_egl_window()), on the main thread */
+static gboolean release_direct_egl_window(gpointer data)
+{
+	struct ANativeWindow *native_window = data;
+	g_clear_signal_handler(&native_window->resize_handler, native_window->surface_view_widget);
+	if (native_window->wayland_display) {
+		wl_egl_window_destroy((struct wl_egl_window *)native_window->egl_window);
+		wl_surface_destroy(native_window->wayland_surface);
+	} else if (native_window->x11_display) {
+		XDestroyWindow(native_window->x11_display, native_window->egl_window);
+	}
+	free(native_window);
+	return G_SOURCE_REMOVE;
+}
+
 void ANativeWindow_release(struct ANativeWindow *native_window)
 {
 	if (!g_atomic_int_dec_and_test(&native_window->refcount))
@@ -149,14 +164,9 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 		}
 		g_mutex_clear(&native_window->remote_lock);
 		free(native_window);
+	} else if (native_window->resize_handler) {
+		g_idle_add(release_direct_egl_window, native_window); /* ATL_DIRECT_EGL: GTK's signal, on the main thread */
 	} else {
-		g_clear_signal_handler(&native_window->resize_handler, native_window->surface_view_widget);
-		if (native_window->wayland_display) {
-			wl_egl_window_destroy((struct wl_egl_window *)native_window->egl_window);
-			wl_surface_destroy(native_window->wayland_surface);
-		} else if (native_window->x11_display) {
-			XDestroyWindow(native_window->x11_display, native_window->egl_window);
-		}
 		free(native_window);
 	}
 }
@@ -167,7 +177,7 @@ int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window)
 		ANativeWindow_remoteRead(native_window, 0);
 		return native_window->width;
 	}
-	return gtk_widget_get_width(native_window->surface_view_widget);
+	return g_atomic_int_get(&SURFACE_VIEW_WIDGET(native_window->surface_view_widget)->width);
 }
 
 int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
@@ -176,7 +186,7 @@ int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
 		ANativeWindow_remoteRead(native_window, 0);
 		return native_window->height;
 	}
-	return gtk_widget_get_height(native_window->surface_view_widget);
+	return g_atomic_int_get(&SURFACE_VIEW_WIDGET(native_window->surface_view_widget)->height);
 }
 
 /* the window of a Surface of another process: messages from the widget showing it (android_view_SurfaceView.h),
@@ -637,49 +647,71 @@ static void on_resize(GtkWidget *self, gint width, gint height, ANativeWindow *n
 }
 
 extern GThread *main_thread_id;
-ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
+
+/* runs func(data) on the main thread and waits for its result (ATL_DIRECT_EGL only: the main thread must not be
+ * waiting for the calling thread) */
+struct main_call {
+	gboolean (*func)(void *data);
+	void *data;
+	gboolean result;
+	gboolean done;
+	GMutex lock;
+	GCond cond;
+};
+
+static gboolean main_call_run(gpointer data)
 {
-	int width;
-	int height;
+	struct main_call *call = data;
+	gboolean result = call->func(call->data);
+	g_mutex_lock(&call->lock);
+	call->result = result;
+	call->done = TRUE;
+	g_cond_signal(&call->cond);
+	g_mutex_unlock(&call->lock);
+	return G_SOURCE_REMOVE;
+}
 
-	int ret;
+static gboolean run_on_main_thread(gboolean (*func)(void *data), void *data)
+{
+	if (g_thread_self() == main_thread_id)
+		return func(data);
+	struct main_call call = {.func = func, .data = data};
+	g_mutex_init(&call.lock);
+	g_cond_init(&call.cond);
+	g_idle_add_full(G_PRIORITY_HIGH, main_call_run, &call, NULL);
+	g_mutex_lock(&call.lock);
+	while (!call.done)
+		g_cond_wait(&call.cond, &call.lock);
+	g_mutex_unlock(&call.lock);
+	g_mutex_clear(&call.lock);
+	g_cond_clear(&call.cond);
+	return call.result;
+}
 
+static gboolean direct_egl_window(void *data)
+{
+	struct ANativeWindow *native_window = data;
+	GtkWidget *surface_view_widget = native_window->surface_view_widget;
+	int width = native_window->width;
+	int height = native_window->height;
 	graphene_point_t pos;
 	double off_x;
 	double off_y;
-
+	int ret;
 	static struct wl_subcompositor *wl_subcompositor = NULL;
 	static struct wl_registry_listener wl_registry_listener = {
 		.global = wl_registry_global_handler,
 		.global_remove = wl_registry_global_remove_handler
 	};
-
-	/* no SurfaceView widget of this process: a Surface of another process or of a SurfaceTexture, whose buffers go
-	 * over a socket to the consumer (Surface.atl_connect()); a released Surface has neither (AOSP: no native object,
-	 * NULL). Waiting below for a widget to get mapped would spin forever on a NULL widget. */
-	if (!_GET_LONG_FIELD(surface, "widget"))
-		return remote_window_fromSurface(env, surface);
-
-	/* AOSP android_view_Surface_getNativeWindow(): a Surface without a native surface (released, or of a
-	 * SurfaceView that is not in a window) gives NULL; here that is a Surface without a widget or a SurfaceView
-	 * widget outside a toplevel window */
-	GtkWidget *wrapper = _PTR(_GET_LONG_FIELD(surface, "widget"));
-	GtkWidget *surface_view_widget = wrapper ? gtk_widget_get_first_child(wrapper) : NULL;
-	GtkNative *native = surface_view_widget ? gtk_widget_get_native(surface_view_widget) : NULL;
+	GtkNative *native = gtk_widget_get_native(surface_view_widget);
 	if (!native)
-		return NULL;
+		return FALSE;
 	GtkWidget *window = GTK_WIDGET(native);
-	while ((width = gtk_widget_get_width(surface_view_widget)) == 0) {
-		// FIXME: UGLY: this loop waits until the SurfaceView widget gets mapped
-		if (g_thread_self() == main_thread_id)
-			g_main_context_iteration(g_main_context_default(), false);
-	}
-	height = gtk_widget_get_height(surface_view_widget);
 
 	// get position of the SurfaceView widget wrt the toplevel window
 	ret = gtk_widget_compute_point(surface_view_widget, window, &GRAPHENE_POINT_INIT(0, 0), &pos);
 	if (!ret) // the widget left the window while waiting for its size
-		return NULL;
+		return FALSE;
 	// compensate for offset between the widget coordinates and the surface coordinates
 	gtk_native_get_surface_transform(GTK_NATIVE(window), &off_x, &off_y);
 	pos.x += off_x;
@@ -689,19 +721,9 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	printf("XXXXX: SurfaceView widget: x: %lf, y: %lf\n", pos.x, pos.y);
 	printf("XXXXX: native offset: x: %lf, y: %lf\n", off_x, off_y);
 
-	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
-	native_window->refcount = 1; // probably, 0 doesn't work
-	native_window->remote_fd = -1;
-	native_window->surface_view_widget = surface_view_widget;
-	native_window->surface = (*env)->NewGlobalRef(env, surface);
-	native_window->width = width;
-	native_window->height = height;
-
 	GdkDisplay *display = gtk_root_get_display(GTK_ROOT(window));
 
-	if (!getenv("ATL_DIRECT_EGL")) {
-		// nothing to do
-	} else if (GDK_IS_WAYLAND_DISPLAY(display)) {
+	if (GDK_IS_WAYLAND_DISPLAY(display)) {
 		struct wl_display *wl_display = gdk_wayland_display_get_wl_display(display);
 		struct wl_compositor *wl_compositor = gdk_wayland_display_get_wl_compositor(display);
 
@@ -788,9 +810,54 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 #pragma GCC diagnostic pop
 	}
 
-	if (getenv("ATL_DIRECT_EGL") && native_window->resize_handler == 0)
+	if (native_window->resize_handler == 0)
 		native_window->resize_handler = g_signal_connect(surface_view_widget, "resize", G_CALLBACK(on_resize), native_window);
+	return TRUE;
+}
 
+ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
+{
+	int width;
+	int height;
+
+	/* no SurfaceView widget of this process: a Surface of another process or of a SurfaceTexture, whose buffers go
+	 * over a socket to the consumer (Surface.atl_connect()); a released Surface has neither (AOSP: no native object,
+	 * NULL). Waiting below for a widget to get mapped would spin forever on a NULL widget. */
+	if (!_GET_LONG_FIELD(surface, "widget"))
+		return remote_window_fromSurface(env, surface);
+
+	/* AOSP android_view_Surface_getNativeWindow(): a Surface without a native surface (released, or of a
+	 * SurfaceView that is not in a window) gives NULL; here that is a Surface without a widget or a SurfaceView
+	 * widget outside a toplevel window. Apps call this in their render threads (GLSurfaceView's GLThread through
+	 * eglCreateWindowSurface), so the widget's state comes from what the main thread keeps for them
+	 * (SurfaceViewWidget.width/height/realized), not from GTK (doc/threading.md). */
+	SurfaceViewWidget *surface_view_widget = surface_view_widget_of(_PTR(_GET_LONG_FIELD(surface, "widget")));
+	if (!surface_view_widget || !g_atomic_int_get(&surface_view_widget->realized))
+		return NULL;
+	while ((width = g_atomic_int_get(&surface_view_widget->width)) == 0) {
+		// FIXME: UGLY: this loop waits until the SurfaceView widget gets its size
+		if (g_thread_self() == main_thread_id)
+			g_main_context_iteration(g_main_context_default(), false);
+		else
+			g_usleep(1000);
+		if (!g_atomic_int_get(&surface_view_widget->realized)) // the widget left the window while waiting for its size
+			return NULL;
+	}
+	height = g_atomic_int_get(&surface_view_widget->height);
+
+	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
+	native_window->refcount = 1; // probably, 0 doesn't work
+	native_window->remote_fd = -1;
+	native_window->surface_view_widget = GTK_WIDGET(surface_view_widget);
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
+	native_window->width = width;
+	native_window->height = height;
+
+	/* ATL_DIRECT_EGL: a subsurface of GTK's toplevel, made on the main thread */
+	if (getenv("ATL_DIRECT_EGL") && !run_on_main_thread(direct_egl_window, native_window)) {
+		ANativeWindow_release(native_window);
+		return NULL;
+	}
 	return native_window;
 }
 
@@ -807,7 +874,8 @@ ANativeWindow *ANativeWindow_fromSurfaceTexture(JNIEnv *env, jobject surfaceText
 
 // FIXME 1.5: this most likely belongs elsewhere
 
-static GHashTable *vk_surface_native_windows;
+static GHashTable *vk_surface_native_windows; /* under vk_surface_lock: Vulkan may be used in any thread */
+static GMutex vk_surface_lock;
 
 VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSurfaceCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSurfaceKHR *pSurface)
 {
@@ -816,9 +884,7 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 	 * window gets the swapchain of vulkan_swapchain.c, as AOSP's loader builds it on every ANativeWindow */
 	if (pCreateInfo->window->remote_fd >= 0 || (!pCreateInfo->window->wayland_surface && !pCreateInfo->window->x11_display))
 		return atl_vk_create_remote_surface(instance, pCreateInfo->window, pSurface);
-	GdkDisplay *display = gtk_widget_get_display(pCreateInfo->window->surface_view_widget);
-
-	if (GDK_IS_WAYLAND_DISPLAY(display)) {
+	if (pCreateInfo->window->wayland_surface) {
 		VkWaylandSurfaceCreateInfoKHR wayland_create_info = {
 			.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
 			.display = pCreateInfo->window->wayland_display,
@@ -826,7 +892,7 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 		};
 
 		ret = vkCreateWaylandSurfaceKHR(instance, &wayland_create_info, pAllocator, pSurface);
-	} else if (GDK_IS_X11_DISPLAY(display)) {
+	} else {
 		VkXlibSurfaceCreateInfoKHR x11_create_info = {
 			.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR,
 			.dpy = pCreateInfo->window->x11_display,
@@ -834,14 +900,13 @@ VkResult bionic_vkCreateAndroidSurfaceKHR(VkInstance instance, const VkAndroidSu
 		};
 
 		ret = vkCreateXlibSurfaceKHR(instance, &x11_create_info, pAllocator, pSurface);
-	} else {
-		fprintf(stderr, "bionic_vkCreateAndroidSurfaceKHR: the GDK backend is neither Wayland nor X11, no SurfaceView for you");
-		ret = VK_ERROR_UNKNOWN;
 	}
 	if (ret == VK_SUCCESS) {
+		g_mutex_lock(&vk_surface_lock);
 		if (!vk_surface_native_windows)
 			vk_surface_native_windows = g_hash_table_new(NULL, NULL);
 		g_hash_table_insert(vk_surface_native_windows, *pSurface, pCreateInfo->window);
+		g_mutex_unlock(&vk_surface_lock);
 	}
 	return ret;
 }
@@ -850,8 +915,10 @@ void bionic_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const
 {
 	if (atl_vk_destroy_remote_surface(surface))
 		return;
+	g_mutex_lock(&vk_surface_lock);
 	if (vk_surface_native_windows)
 		g_hash_table_remove(vk_surface_native_windows, surface);
+	g_mutex_unlock(&vk_surface_lock);
 	vkDestroySurfaceKHR(instance, surface, pAllocator);
 }
 
@@ -875,8 +942,10 @@ VkResult bionic_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physi
 	if (atl_vk_remote_surface_capabilities(surface, pSurfaceCapabilities))
 		return VK_SUCCESS;
 	VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, pSurfaceCapabilities);
-	if (res == VK_SUCCESS && pSurfaceCapabilities && vk_surface_native_windows) {
-		struct ANativeWindow *native_window = g_hash_table_lookup(vk_surface_native_windows, surface);
+	if (res == VK_SUCCESS && pSurfaceCapabilities) {
+		g_mutex_lock(&vk_surface_lock);
+		struct ANativeWindow *native_window = vk_surface_native_windows ? g_hash_table_lookup(vk_surface_native_windows, surface) : NULL;
+		g_mutex_unlock(&vk_surface_lock);
 		if (native_window) {
 			pSurfaceCapabilities->currentExtent.width = ANativeWindow_getWidth(native_window);
 			pSurfaceCapabilities->currentExtent.height = ANativeWindow_getHeight(native_window);

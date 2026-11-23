@@ -27,7 +27,7 @@ void surface_target_set(JNIEnv *env, struct surface_target *target, jobject surf
 	GtkWidget *wrapper = _PTR(_GET_LONG_FIELD(surface, "widget"));
 	jobject surface_texture = _GET_OBJ_FIELD(surface, "surfaceTexture", "Landroid/graphics/SurfaceTexture;");
 	if (wrapper)
-		target->surface_view_widget = SURFACE_VIEW_WIDGET(gtk_widget_get_first_child(wrapper));
+		target->surface_view_widget = surface_view_widget_of(wrapper);
 	else if (surface_texture)
 		target->surface_texture = (*env)->NewGlobalRef(env, surface_texture);
 }

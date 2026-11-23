@@ -10,6 +10,11 @@ struct _SurfaceViewWidget {
 	gboolean crop; /* the scaling mode SCALE_CROP: the texture covers the widget, keeping its aspect ratio */
 	void (*frame_callback)(SurfaceViewWidget *surface_view_widget);
 	gpointer frame_callback_data;
+	/* for the app's render threads (ANativeWindow, MediaCodec, camera), which must not ask GTK: the allocated size
+	 * and whether the widget is realized (in a window), kept with g_atomic_int_* on the main thread */
+	gint width;
+	gint height;
+	gint realized;
 };
 
 struct _SurfaceViewWidgetClass {
@@ -17,6 +22,8 @@ struct _SurfaceViewWidgetClass {
 };
 
 void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, GdkTexture *texture, gboolean needs_flip);
+/* the SurfaceViewWidget of a SurfaceView's widget (Surface.widget), in any thread */
+SurfaceViewWidget *surface_view_widget_of(GtkWidget *view_widget);
 
 /* The buffers of an EGL window on a Surface that came from another process of the app (Surface.Endpoint): that
  * process draws them (libandroid/egl.c, producer), this one shows them in the SurfaceView's widget

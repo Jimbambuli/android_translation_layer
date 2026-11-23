@@ -27,6 +27,8 @@ static guint signals[LAST_SIGNAL] = {
 
 static void surface_view_widget_size_allocate(GtkWidget *widget, int width, int height, int baseline)
 {
+	g_atomic_int_set(&SURFACE_VIEW_WIDGET(widget)->width, width);
+	g_atomic_int_set(&SURFACE_VIEW_WIDGET(widget)->height, height);
 	g_signal_emit(widget, signals[RESIZE], 0, width, height);
 	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
 		gtk_widget_size_allocate(child, &(GtkAllocation){.x = 0, .y = 0, .width = width, .height = height}, baseline);
@@ -105,6 +107,11 @@ static void surface_view_widget_class_init(SurfaceViewWidgetClass *class)
 	g_signal_set_va_marshaller(signals[RESIZE],
 	                           G_TYPE_FROM_CLASS(class),
 	                           g_cclosure_user_marshal_VOID__INT_INTv);
+}
+
+SurfaceViewWidget *surface_view_widget_of(GtkWidget *view_widget)
+{
+	return g_object_get_data(G_OBJECT(view_widget), "atl-surface-view-widget");
 }
 
 GtkWidget *surface_view_widget_new(void)
@@ -187,12 +194,16 @@ static void on_resize(GtkWidget *self, gint width, gint height, struct jni_callb
 
 static void on_realize(GtkWidget *self, struct jni_callback_data *d)
 {
+	g_atomic_int_set(&SURFACE_VIEW_WIDGET(self)->realized, TRUE);
 	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, G_SOURCE_FUNC(update_surface), g_object_ref(self), g_object_unref);
 }
 
 /* a new realize creates the surface again, as before */
 static void on_unrealize(GtkWidget *self, struct jni_callback_data *d)
 {
+	g_atomic_int_set(&SURFACE_VIEW_WIDGET(self)->realized, FALSE);
+	g_atomic_int_set(&SURFACE_VIEW_WIDGET(self)->width, 0);
+	g_atomic_int_set(&SURFACE_VIEW_WIDGET(self)->height, 0);
 	d->created = FALSE;
 	d->width = d->height = 0;
 }
@@ -203,6 +214,7 @@ JNIEXPORT jlong JNICALL Java_android_view_SurfaceView_native_1constructor(JNIEnv
 	GtkWidget *dummy = surface_view_widget_new();
 	gtk_widget_set_name(dummy, "dummy widget for SurfaceView");
 	GtkWidget *graphics_offload = gtk_graphics_offload_new(dummy);
+	g_object_set_data(G_OBJECT(graphics_offload), "atl-surface-view-widget", dummy);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), graphics_offload);
 	wrapper_widget_set_jobject(WRAPPER_WIDGET(wrapper), env, this);
 	gtk_widget_set_hexpand(wrapper, true);

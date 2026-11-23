@@ -295,7 +295,7 @@ static void set_output_surface(JNIEnv *env, struct ATL_codec_context *ctx, jobje
 	GtkWidget *wrapper = _PTR(_GET_LONG_FIELD(surface, "widget"));
 	jobject surface_texture = _GET_OBJ_FIELD(surface, "surfaceTexture", "Landroid/graphics/SurfaceTexture;");
 	if (wrapper)
-		ctx->video.surface_view_widget = SURFACE_VIEW_WIDGET(gtk_widget_get_first_child(wrapper));
+		ctx->video.surface_view_widget = surface_view_widget_of(wrapper);
 	else if (surface_texture)
 		ctx->video.surface_texture = (*env)->NewGlobalRef(env, surface_texture);
 }
