@@ -173,14 +173,9 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1configure_1audio(JN
 
 	ctx->audio.sample_rate = sample_rate;
 	codec_ctx->sample_rate = sample_rate;
-	if (nb_channels == 1)
-		codec_ctx->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_MONO;
-	else if (nb_channels == 2)
-		codec_ctx->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO;
-	else {
-		printf("MediaCodec: Unsupported number of channels %d\n", nb_channels);
-		exit(0);
-	}
+	/* AOSP's audio decoders take multichannel streams too (C2SoftAacDec up to 8 channels): FFmpeg's default layout of
+	 * the count, whose order (FL FR FC LFE BL BR ...) is that of Android's channel masks */
+	av_channel_layout_default(&codec_ctx->ch_layout, nb_channels);
 
 	if (extradata) {
 		codec_ctx->extradata_size = get_nio_buffer_size(env, extradata);
@@ -563,8 +558,10 @@ JNIEXPORT jint JNICALL Java_android_media_MediaCodec_native_1dequeueOutputBuffer
 			}
 			swr_init(ctx->audio.swr);
 		}
+		/* at most what the output buffer holds (a 5.1 AC-3 frame is 18 KiB of PCM16); swr keeps the rest */
+		int room = get_nio_buffer_size(env, buffer) / (2 * codec_ctx->ch_layout.nb_channels);
 		uint8_t *raw_buffer = get_nio_buffer(env, buffer, &array_ref, &array);
-		int outSamples = swr_convert(ctx->audio.swr, &raw_buffer, frame->nb_samples, (uint8_t const **)(frame->data), frame->nb_samples);
+		int outSamples = swr_convert(ctx->audio.swr, &raw_buffer, MIN(frame->nb_samples, room), (uint8_t const **)(frame->data), frame->nb_samples);
 		release_nio_buffer(env, array_ref, array);
 		_SET_INT_FIELD(buffer_info, "offset", 0);
 		_SET_INT_FIELD(buffer_info, "size", outSamples * 2 * codec_ctx->ch_layout.nb_channels);

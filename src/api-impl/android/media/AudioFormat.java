@@ -214,6 +214,116 @@ public class AudioFormat implements android.os.Parcelable {
 		return channelCount;
 	}
 
+	/* AOSP AudioFormat.SAMPLE_RATE_HZ_MIN/MAX: AudioSystem's, SAMPLE_RATE_HZ_MIN/MAX of system/audio.h */
+	public static final int SAMPLE_RATE_HZ_MIN = 4000;
+	public static final int SAMPLE_RATE_HZ_MAX = 192000;
+
+	/** @hide AOSP AudioFormat.isPublicEncoding() */
+	public static boolean isPublicEncoding(int audioFormat) {
+		switch (audioFormat) {
+			case ENCODING_PCM_16BIT:
+			case ENCODING_PCM_8BIT:
+			case ENCODING_PCM_FLOAT:
+			case ENCODING_AC3:
+			case ENCODING_E_AC3:
+			case ENCODING_DTS:
+			case ENCODING_DTS_HD:
+			case ENCODING_MP3:
+			case ENCODING_AAC_LC:
+			case ENCODING_AAC_HE_V1:
+			case ENCODING_AAC_HE_V2:
+			case ENCODING_IEC61937:
+			case ENCODING_DOLBY_TRUEHD:
+			case ENCODING_AAC_ELD:
+			case ENCODING_AAC_XHE:
+			case ENCODING_AC4:
+			case ENCODING_AC4_L4:
+			case ENCODING_E_AC3_JOC:
+			case ENCODING_DOLBY_MAT:
+			case ENCODING_OPUS:
+			case ENCODING_PCM_24BIT_PACKED:
+			case ENCODING_PCM_32BIT:
+			case ENCODING_MPEGH_BL_L3:
+			case ENCODING_MPEGH_BL_L4:
+			case ENCODING_MPEGH_LC_L3:
+			case ENCODING_MPEGH_LC_L4:
+			case ENCODING_DTS_UHD_P1:
+			case ENCODING_DRA:
+			case ENCODING_DTS_HD_MA:
+			case ENCODING_DTS_UHD_P2:
+			case ENCODING_DSD:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_AAC:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_FLAC:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_OPUS:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM:
+			case ENCODING_IAMF_BASE_PROFILE_AAC:
+			case ENCODING_IAMF_BASE_PROFILE_FLAC:
+			case ENCODING_IAMF_BASE_PROFILE_OPUS:
+			case ENCODING_IAMF_BASE_PROFILE_PCM:
+			case ENCODING_IAMF_SIMPLE_PROFILE_AAC:
+			case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
+			case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
+			case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	/** @hide AOSP AudioFormat.isEncodingLinearFrames() */
+	public static boolean isEncodingLinearFrames(int audioFormat) {
+		switch (audioFormat) {
+			case ENCODING_PCM_16BIT:
+			case ENCODING_PCM_8BIT:
+			case ENCODING_PCM_FLOAT:
+			case ENCODING_IEC61937: // same size as stereo PCM
+			case ENCODING_PCM_24BIT_PACKED:
+			case ENCODING_PCM_32BIT:
+			case ENCODING_DEFAULT:
+				return true;
+			case ENCODING_AC3:
+			case ENCODING_E_AC3:
+			case ENCODING_DTS:
+			case ENCODING_DTS_HD:
+			case ENCODING_MP3:
+			case ENCODING_AAC_LC:
+			case ENCODING_AAC_HE_V1:
+			case ENCODING_AAC_HE_V2:
+			case ENCODING_DOLBY_TRUEHD:
+			case ENCODING_AAC_ELD:
+			case ENCODING_AAC_XHE:
+			case ENCODING_AC4:
+			case ENCODING_AC4_L4:
+			case ENCODING_E_AC3_JOC:
+			case ENCODING_DOLBY_MAT:
+			case ENCODING_OPUS:
+			case ENCODING_MPEGH_BL_L3:
+			case ENCODING_MPEGH_BL_L4:
+			case ENCODING_MPEGH_LC_L3:
+			case ENCODING_MPEGH_LC_L4:
+			case ENCODING_DTS_UHD_P1:
+			case ENCODING_DRA:
+			case ENCODING_DTS_HD_MA:
+			case ENCODING_DTS_UHD_P2:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_AAC:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_FLAC:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_OPUS:
+			case ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM:
+			case ENCODING_IAMF_BASE_PROFILE_AAC:
+			case ENCODING_IAMF_BASE_PROFILE_FLAC:
+			case ENCODING_IAMF_BASE_PROFILE_OPUS:
+			case ENCODING_IAMF_BASE_PROFILE_PCM:
+			case ENCODING_IAMF_SIMPLE_PROFILE_AAC:
+			case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
+			case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
+			case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+				return false;
+			case ENCODING_INVALID:
+			default:
+				throw new IllegalArgumentException("Bad audio format " + audioFormat);
+		}
+	}
+
 	/** @hide */
 	public static int channelCountFromInChannelMask(int mask) {
 		return Integer.bitCount(mask);

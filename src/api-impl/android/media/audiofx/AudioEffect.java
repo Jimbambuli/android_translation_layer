@@ -4,9 +4,11 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.UUID;
 
-/* AOSP media/java/android/media/audiofx/AudioEffect.java. ATL has no effect engines: queryEffects() lists
- * none, so isEffectTypeAvailable() is false and the effect constructors fail the way AOSP's do when
- * native_setup() finds no effect of the requested type (ERROR_BAD_VALUE -> IllegalArgumentException
+/* AOSP media/java/android/media/audiofx/AudioEffect.java. ATL's one effect engine is AOSP's Dynamics Processing
+ * (libdynproc, in AOSP's default audio_effects.xml): queryEffects() lists it, an AudioEffect of its type keeps the
+ * parameters as the engine's command interface does and AudioTrack applies the enabled effect of its session
+ * (input gain and limiter, see android_media_AudioTrack.c). For every other type the constructor fails the way AOSP's
+ * does when native_setup() finds no effect of the requested type (ERROR_BAD_VALUE -> IllegalArgumentException
  * "Effect type: ... not supported."). */
 public class AudioEffect {
 	public static final UUID EFFECT_TYPE_ENV_REVERB = UUID.fromString("c2e5d5f0-94bd-4763-9cac-4e234d06839e");
@@ -21,6 +23,11 @@ public class AudioEffect {
 	public static final UUID EFFECT_TYPE_DYNAMICS_PROCESSING = UUID.fromString("7261676f-6d75-7369-6364-28e2fd3ac39e");
 	public static final UUID EFFECT_TYPE_HAPTIC_GENERATOR = UUID.fromString("1411e6d6-aecd-4021-a1cf-a6aceb0d71e5");
 	public static final UUID EFFECT_TYPE_NULL = UUID.fromString("ec7178ec-e5e1-4432-a3f4-4657e6795210");
+
+	public static final String EFFECT_INSERT = "Insert";
+	public static final String EFFECT_AUXILIARY = "Auxiliary";
+	public static final String EFFECT_PRE_PROCESSING = "Pre Processing";
+	public static final String EFFECT_POST_PROCESSING = "Post Processing";
 
 	public static final int SUCCESS = 0;
 	public static final int ERROR = -1;
@@ -83,13 +90,72 @@ public class AudioEffect {
 	AudioEffect() {
 	}
 
-	/* AOSP AudioEffect(UUID, UUID, int, int): native_setup() finds no engine for the type */
+	/* AOSP EffectDynamicsProcessing.cpp gDPDescriptor */
+	private static final UUID DYNAMICS_PROCESSING_UUID = UUID.fromString("e0e6539b-1781-7261-676f-6d7573696340");
+
+	private static Descriptor dynamicsProcessingDescriptor() {
+		return new Descriptor(EFFECT_TYPE_DYNAMICS_PROCESSING.toString(), DYNAMICS_PROCESSING_UUID.toString(), EFFECT_INSERT,
+		                      "Dynamics Processing", "The Android Open Source Project");
+	}
+
+	/* the engine's parameters (EFFECT_CMD_SET_PARAM/GET_PARAM), by the bytes of the parameter */
+	private final java.util.Map<java.nio.ByteBuffer, byte[]> mParameters = new java.util.HashMap<>();
+	private boolean mInitialized;
+	private boolean mEnabled;
+	private int mId;
+	private int mSession;
+	private static int sNextId = 1;
+	/* the effects of each audio session (AudioFlinger's EffectChain), for AudioTrack */
+	private static final java.util.Map<Integer, java.util.List<AudioEffect>> sSessions = new java.util.HashMap<>();
+
+	/* AOSP AudioEffect(UUID, UUID, int, int): native_setup() finds the engine by type (EFFECT_TYPE_NULL: any) or by
+	 * uuid; only Dynamics Processing has one */
 	public AudioEffect(UUID type, UUID uuid, int priority, int audioSession) {
-		throw new IllegalArgumentException("Effect type: " + type + " not supported.");
+		Descriptor d = dynamicsProcessingDescriptor();
+		boolean typeOk = type.equals(EFFECT_TYPE_NULL) || type.equals(d.type);
+		boolean uuidOk = uuid.equals(EFFECT_TYPE_NULL) || uuid.equals(d.uuid);
+		if (!typeOk || !uuidOk || (type.equals(EFFECT_TYPE_NULL) && uuid.equals(EFFECT_TYPE_NULL)))
+			throw new IllegalArgumentException("Effect type: " + type + " not supported.");
+		mDescriptor = d;
+		mSession = audioSession;
+		mInitialized = true;
+		synchronized (sSessions) {
+			mId = sNextId++;
+			sSessions.computeIfAbsent(audioSession, k -> new java.util.ArrayList<>()).add(this);
+		}
+	}
+
+	/* the enabled effects of a session (the output mix, session 0, applies to all tracks), for AudioTrack */
+	/** @hide */
+	public static java.util.List<AudioEffect> enabledEffects(int audioSession) {
+		java.util.List<AudioEffect> list = new java.util.ArrayList<>();
+		synchronized (sSessions) {
+			for (int session : new int[] {audioSession, 0}) {
+				java.util.List<AudioEffect> effects = sSessions.get(session);
+				if (effects != null)
+					for (AudioEffect e : effects)
+						if (e.mEnabled)
+							list.add(e);
+				if (audioSession == 0)
+					break;
+			}
+		}
+		return list;
+	}
+
+	/* a parameter of the engine as set (null if never set), for AudioTrack */
+	/** @hide */
+	public synchronized byte[] parameter(byte[] param) {
+		return mParameters.get(java.nio.ByteBuffer.wrap(param));
+	}
+
+	/** @hide */
+	public UUID typeOf() {
+		return mDescriptor.type;
 	}
 
 	public static Descriptor[] queryEffects() {
-		return new Descriptor[0];
+		return new Descriptor[] {dynamicsProcessingDescriptor()};
 	}
 
 	/* AOSP isEffectTypeAvailable(): looks the type up in queryEffects() */
@@ -104,18 +170,38 @@ public class AudioEffect {
 		return false;
 	}
 
-	public boolean getEnabled() { return false; }
+	public boolean getEnabled() throws IllegalStateException {
+		checkState("getEnabled()");
+		return mEnabled;
+	}
 
-	public int setEnabled(boolean enable) { return SUCCESS; }
+	public int setEnabled(boolean enable) throws IllegalStateException {
+		checkState("setEnabled()");
+		mEnabled = enable;
+		return SUCCESS;
+	}
 
-	/* AOSP releases the native effect engine; ATL has none */
-	public void release() {}
+	/* AOSP release(): the engine goes, the effect is STATE_UNINITIALIZED */
+	public void release() {
+		synchronized (sSessions) {
+			java.util.List<AudioEffect> effects = sSessions.get(mSession);
+			if (effects != null) {
+				effects.remove(this);
+				if (effects.isEmpty())
+					sSessions.remove(mSession);
+			}
+		}
+		mInitialized = false;
+		mEnabled = false;
+	}
 
 	private Descriptor mDescriptor;
 
-	/* AOSP finalize(): native_finalize() releases the native effect engine; ATL has none */
+	/* AOSP finalize(): native_finalize() releases the native effect engine */
 	@Override
-	protected void finalize() {}
+	protected void finalize() {
+		release();
+	}
 
 	/* AOSP getDescriptor(): checkState() then mDescriptor */
 	public Descriptor getDescriptor() throws IllegalStateException {
@@ -123,15 +209,20 @@ public class AudioEffect {
 		return mDescriptor;
 	}
 
-	/* AOSP AudioEffect.checkState(): no ATL effect has an engine, so none is ever STATE_INITIALIZED */
+	/* AOSP AudioEffect.checkState() */
 	public void checkState(String methodName) throws IllegalStateException {
-		throw (new IllegalStateException(methodName + " called on uninitialized AudioEffect."));
+		if (!mInitialized)
+			throw (new IllegalStateException(methodName + " called on uninitialized AudioEffect."));
 	}
 
-	/* AOSP setParameter()/getParameter()/getId()/hasControl(): checkState() before the native call */
+	/* AOSP setParameter()/getParameter()/getId()/hasControl(): checkState() before the native call; the engine keeps
+	 * a parameter's value as it was set and answers a get with it */
 	public int setParameter(byte[] param, byte[] value) throws IllegalStateException {
 		checkState("setParameter()");
-		return ERROR_NO_INIT;
+		synchronized (this) {
+			mParameters.put(java.nio.ByteBuffer.wrap(param.clone()), value.clone());
+		}
+		return SUCCESS;
 	}
 
 	public int setParameter(int param, int value) throws IllegalStateException {
@@ -151,9 +242,21 @@ public class AudioEffect {
 		return setParameter(p, value);
 	}
 
+	/* AOSP: the size of the value (the engine's reply), here the value as set; DP_PARAM_GET_CHANNEL_COUNT (0x10) is the
+	 * channel count of the effect's configuration, the stereo output mix */
 	public int getParameter(byte[] param, byte[] value) throws IllegalStateException {
 		checkState("getParameter()");
-		return ERROR_NO_INIT;
+		byte[] stored;
+		synchronized (this) {
+			stored = mParameters.get(java.nio.ByteBuffer.wrap(param));
+		}
+		if (stored == null && param.length == 4 && byteArrayToInt(param) == 0x10)
+			stored = intToByteArray(2);
+		if (stored == null)
+			return ERROR_BAD_VALUE;
+		int n = Math.min(stored.length, value.length);
+		System.arraycopy(stored, 0, value, 0, n);
+		return n;
 	}
 
 	public int getParameter(int param, byte[] value) throws IllegalStateException {
@@ -326,12 +429,13 @@ public class AudioEffect {
 
 	public int getId() throws IllegalStateException {
 		checkState("getId()");
-		return 0;
+		return mId;
 	}
 
+	/* the one client of the effect has control, as AOSP grants it to the first */
 	public boolean hasControl() throws IllegalStateException {
 		checkState("hasControl()");
-		return false;
+		return true;
 	}
 
 	/* AOSP listeners: stored; ATL has no engine that would post the events (NativeEventHandler) */

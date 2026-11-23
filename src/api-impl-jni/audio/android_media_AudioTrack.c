@@ -2,6 +2,8 @@
 
 #include <alsa/asoundlib.h>
 #include <errno.h>
+#include <math.h>
+#include <string.h>
 #include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,7 +16,29 @@
 
 #include "../generated_headers/android_media_AudioTrack.h"
 
-JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv *env, jobject this, jint streamType, jint rate, jint channel_config, jint audioFormat, jint buffer_size, jint mode)
+/* AOSP audio_bytes_per_sample() of the linear PCM encodings ATL's output takes (android.media.AudioFormat values), else 0 */
+static int bytes_per_sample(int encoding)
+{
+	switch (encoding) {
+		case 3: // ENCODING_PCM_8BIT
+			return 1;
+		case 2: // ENCODING_PCM_16BIT
+			return 2;
+		case 21: // ENCODING_PCM_24BIT_PACKED
+			return 3;
+		case 4:  // ENCODING_PCM_FLOAT
+		case 22: // ENCODING_PCM_32BIT
+			return 4;
+		default:
+			return 0;
+	}
+}
+
+/* AOSP: a track plays on the mixer output, which mixes it into the output's format; ATL's output is an ALSA stream of
+ * PCM16, mono for a mono track and else stereo, the channel mask of AOSP's primary output. A compressed encoding (AC-3,
+ * E-AC-3, DTS, IEC61937...) needs a direct or offloaded output, which ATL does not have: AudioPolicyManager finds no
+ * output for it, AudioTrack::set() fails and the track stays STATE_UNINITIALIZED, like on a device without HDMI. */
+JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv *env, jobject this, jint streamType, jint rate, jint channel_mask, jint channel_count, jint encoding, jint buffer_size, jint mode)
 {
 
 	snd_pcm_t *pcm_handle;
@@ -27,6 +51,11 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 
 	int ret;
 
+	if (!bytes_per_sample(encoding) || channel_count <= 0) {
+		printf("AudioTrack: no output for encoding %d with %d channels\n", encoding, channel_count);
+		return; // the track stays uninitialized (pcm_handle field stays NULL)
+	}
+
 	/* Open the PCM device in playback mode */
 	ret = snd_pcm_open(&pcm_handle, PCM_DEVICE, SND_PCM_STREAM_PLAYBACK, 0);
 	if (ret < 0) {
@@ -35,10 +64,10 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 	}
 
 	snd_pcm_hw_params_alloca(&params);
-	helper_hw_params_init(pcm_handle, params, rate, channel_config, SND_PCM_FORMAT_S16_LE, &channels);
+	helper_hw_params_init(pcm_handle, params, rate, channel_count == 1 ? 4 /* CHANNEL_OUT_MONO */ : 12 /* CHANNEL_OUT_STEREO */, SND_PCM_FORMAT_S16_LE, &channels);
 
 	/*--↓*/
-	snd_pcm_uframes_t buffer_size_as_uframes_t = buffer_size / channels / 2; // 2 means PCM16
+	snd_pcm_uframes_t buffer_size_as_uframes_t = buffer_size / (channel_count * bytes_per_sample(encoding)); // the track's frames
 	snd_pcm_hw_params_set_buffer_size_near(pcm_handle, params, &buffer_size_as_uframes_t);
 	/*--↑*/
 
@@ -101,44 +130,6 @@ JNIEXPORT void JNICALL Java_android_media_AudioTrack_native_1constructor(JNIEnv 
 	_SET_INT_FIELD(this, "period_time", period_time);
 	/* AOSP ClientProxy::interrupt(): pause() and stop() wake a write() that waits for room */
 	_SET_INT_FIELD(this, "interrupt_fd", eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
-}
-
-JNIEXPORT jint JNICALL Java_android_media_AudioTrack_getMinBufferSize(JNIEnv *env, jclass this_class, jint sampleRateInHz, jint channelConfig, jint audioFormat)
-{
-	snd_pcm_t *pcm_handle;
-	snd_pcm_hw_params_t *params;
-	snd_pcm_uframes_t frames;
-	int ret;
-	unsigned int num_channels;
-
-	ret = snd_pcm_open(&pcm_handle, PCM_DEVICE, SND_PCM_STREAM_PLAYBACK, 0);
-	if (ret < 0) {
-		printf("Error calling snd_pcm_open: %s\n", snd_strerror(ret));
-		return -1; // AudioTrack.ERROR: no usable PCM device, let the caller handle it
-	}
-
-	snd_pcm_hw_params_alloca(&params);
-	helper_hw_params_init(pcm_handle, params, sampleRateInHz, channelConfig, SND_PCM_FORMAT_S16_LE, &num_channels); // FIXME: a switch?
-
-	ret = snd_pcm_hw_params(pcm_handle, params);
-	if (ret < 0)
-		printf("Error calling snd_pcm_hw_params: %s\n", snd_strerror(ret));
-
-	ret = snd_pcm_hw_params_get_period_size(params, &frames, 0);
-	if (ret < 0)
-		printf("Error calling snd_pcm_hw_params_get_period_size: %s\n", snd_strerror(ret));
-
-	// TODO: snd_pcm_hw_params_free(params) causes segfault, is it not supposed to be called?
-	snd_pcm_close(pcm_handle);
-
-	_SET_STATIC_INT_FIELD(this_class, "frames", frames);
-	if ((*env)->ExceptionCheck(env)) {
-		(*env)->ExceptionDescribe(env);
-		(*env)->ExceptionClear(env);
-	}
-
-	printf("\n\nJava_android_media_AudioTrack_getMinBufferSize is returning: %ld\n\n\n", frames * num_channels * 2);
-	return frames * num_channels * 2; // FIXME: 2 bytes = 16 bits (s16)
 }
 
 struct jni_callback_data {
@@ -248,6 +239,203 @@ static gboolean wait_for_room(snd_pcm_t *pcm_handle, int interrupt_fd)
 	return TRUE;
 }
 
+/* AOSP audio_utils ChannelMix fillChannelMatrix() for AUDIO_CHANNEL_OUT_STEREO: the weights of a channel (one bit of a
+ * position mask, android.media.AudioFormat values) in the left and the right output */
+static void stereo_weights(int channel, int mask, float *left, float *right)
+{
+	const float COEF_25 = 0.2508909536f;
+	const float COEF_35 = 0.3543928915f;
+	const float COEF_36 = 0.3552343859f;
+	const float COEF_61 = 0.6057043428f;
+	const float MINUS_3_DB_IN_FLOAT = M_SQRT1_2;
+	*left = *right = 0.f;
+	switch (channel) {
+		case 0x4:       // FRONT_LEFT
+		case 0x4000:    // TOP_FRONT_LEFT
+		case 0x400000:  // BOTTOM_FRONT_LEFT
+			*left = 1.f;
+			break;
+		case 0x800:     // SIDE_LEFT
+		case 0x40:      // BACK_LEFT
+		case 0x20000:   // TOP_BACK_LEFT
+		case 0x4000000: // FRONT_WIDE_LEFT
+			*left = MINUS_3_DB_IN_FLOAT;
+			break;
+		case 0x8:       // FRONT_RIGHT
+		case 0x10000:   // TOP_FRONT_RIGHT
+		case 0x1000000: // BOTTOM_FRONT_RIGHT
+			*right = 1.f;
+			break;
+		case 0x1000:    // SIDE_RIGHT
+		case 0x80:      // BACK_RIGHT
+		case 0x80000:   // TOP_BACK_RIGHT
+		case 0x8000000: // FRONT_WIDE_RIGHT
+			*right = MINUS_3_DB_IN_FLOAT;
+			break;
+		case 0x10:      // FRONT_CENTER
+		case 0x8000:    // TOP_FRONT_CENTER
+		case 0x800000:  // BOTTOM_FRONT_CENTER
+			*left = *right = MINUS_3_DB_IN_FLOAT;
+			break;
+		case 0x100000:  // TOP_SIDE_LEFT
+			*left = COEF_61;
+			break;
+		case 0x200000:  // TOP_SIDE_RIGHT
+			*right = COEF_61;
+			break;
+		case 0x100:     // FRONT_LEFT_OF_CENTER
+			*left = COEF_61;
+			*right = COEF_25;
+			break;
+		case 0x200:     // FRONT_RIGHT_OF_CENTER
+			*left = COEF_25;
+			*right = COEF_61;
+			break;
+		case 0x2000:    // TOP_CENTER
+			*left = *right = COEF_36;
+			break;
+		case 0x40000:   // TOP_BACK_CENTER
+			*left = *right = COEF_35;
+			break;
+		case 0x2000000: // LOW_FREQUENCY_2
+			*right = MINUS_3_DB_IN_FLOAT;
+			break;
+		case 0x20:      // LOW_FREQUENCY
+			if (mask & 0x2000000) {
+				*left = MINUS_3_DB_IN_FLOAT;
+				break;
+			}
+			/* fall through */
+		case 0x400:     // BACK_CENTER
+			*left = *right = 0.5f;
+			break;
+	}
+}
+
+/* sample i of the track's data as float (AOSP memcpy_to_float_from_*) */
+static float sample_to_float(const void *data, int encoding, int i)
+{
+	switch (encoding) {
+		case 3: // ENCODING_PCM_8BIT
+			return (((const uint8_t *)data)[i] - 128) / 128.f;
+		case 21: { // ENCODING_PCM_24BIT_PACKED
+			const uint8_t *p = (const uint8_t *)data + i * 3;
+			return (int32_t)((uint32_t)p[0] << 8 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 24) / 2147483648.f;
+		}
+		case 22: // ENCODING_PCM_32BIT
+			return ((const int32_t *)data)[i] / 2147483648.f;
+		case 4: // ENCODING_PCM_FLOAT
+			return ((const float *)data)[i];
+		default: // ENCODING_PCM_16BIT
+			return ((const int16_t *)data)[i] / 32768.f;
+	}
+}
+
+static float db_to_linear(float db)
+{
+	return powf(10.f, db / 20.f);
+}
+
+/* AOSP libdynproc (EffectDynamicsProcessing.cpp, DPFrequency.cpp) on the output mix, with the parameters from
+ * AudioTrack.updateEffect(): the input gain of each channel, then the limiter: an envelope of the level per block
+ * (attack and release as theta = exp(-1 / (time * blocks per second))), above the threshold a gain of
+ * (1 / ratio - 1) * (envelope - threshold) dB, the smallest of the linked channels (link group 0), and the post gain.
+ * The block hop is half the power of two the preferred frame duration gives (DP_configureVariant()). The level is the
+ * RMS of the block's samples where DPFrequency takes the energy of its FFT bins; the equalizers and the multi-band
+ * compressor are not computed (their defaults, 0 dB gains and ratio 1, leave the signal as it is). */
+static void dynamics_processing(float *buf, int channels, int frames, int rate, const float *fx, float *envelope)
+{
+	int block = fx[0] * rate / 1000.f;
+	if (block < 8)
+		block = 8;
+	else if (block & (block - 1))
+		block = 1 << (32 - __builtin_clz(block));
+	int hop = block / 2;
+	float blocks_per_second = (float)rate / hop;
+	for (int c = 0; c < channels; c++) {
+		float gain = db_to_linear(fx[1 + c * 7]);
+		for (int f = 0; f < frames; f++)
+			buf[f * channels + c] *= gain;
+	}
+	for (int start = 0; start < frames; start += hop) {
+		int n = MIN(hop, frames - start);
+		float factor = 1.f;
+		gboolean limiting = FALSE;
+		for (int c = 0; c < channels; c++) {
+			const float *l = fx + 1 + c * 7;
+			if (l[1] == 0.f)
+				continue;
+			limiting = TRUE;
+			float energy = 0.f;
+			for (int f = start; f < start + n; f++)
+				energy += buf[f * channels + c] * buf[f * channels + c];
+			energy = sqrtf(energy / n);
+			float theta = expf(-1.f / ((energy > envelope[c] ? l[2] : l[3]) / 1000.f * blocks_per_second));
+			envelope[c] = (1.f - theta) * energy + theta * envelope[c];
+			float env_db = 20.f * log10f(fmaxf(envelope[c], 1e-10f));
+			float factor_db = env_db > l[5] ? (1.f / l[4] - 1.f) * (env_db - l[5]) : 0.f;
+			factor = fminf(factor, db_to_linear(factor_db));
+		}
+		if (!limiting)
+			continue;
+		for (int c = 0; c < channels; c++) {
+			const float *l = fx + 1 + c * 7;
+			if (l[1] == 0.f)
+				continue;
+			float g = factor * db_to_linear(l[6]);
+			for (int f = start; f < start + n; f++)
+				buf[f * channels + c] *= g;
+		}
+	}
+}
+
+/* AOSP AudioMixer: the track's samples in float, a multichannel track downmixed to the stereo output by the matrix of
+ * ChannelMix (clamped to +3 dB like ChannelMix's clamp()), the volume applied, the effect of the session (fx, else
+ * NULL), then PCM16 of the output (clamp16_from_float). A mono or stereo track keeps its channels (the ALSA stream has
+ * as many). */
+static void mix_to_output(jshort *out, int out_channels, const void *data, int encoding, int track_channels, int mask, int frames, float volume,
+                          const float *fx, float *envelope, int rate)
+{
+	float *mixed = malloc(frames * out_channels * sizeof(float));
+	if (!mixed) {
+		memset(out, 0, frames * out_channels * sizeof(jshort));
+		return;
+	}
+	float weights[32][2];
+	gboolean downmix = track_channels != out_channels;
+	if (downmix) {
+		int index = 0;
+		for (unsigned tmp = mask; tmp != 0 && index < 32; ++index) {
+			unsigned lowest = tmp & -tmp;
+			stereo_weights(lowest, mask, &weights[index][0], &weights[index][1]);
+			tmp ^= lowest;
+		}
+		for (; index < 32; index++)
+			weights[index][0] = weights[index][1] = 0.f;
+	}
+	for (int f = 0; f < frames; f++) {
+		for (int c = 0; c < out_channels; c++) {
+			float v;
+			if (downmix) {
+				v = 0.f;
+				for (int t = 0; t < track_channels && t < 32; t++)
+					v += sample_to_float(data, encoding, f * track_channels + t) * weights[t][c];
+				v = fminf(fmaxf(v, -M_SQRT2), M_SQRT2);
+			} else {
+				v = sample_to_float(data, encoding, f * track_channels + c);
+			}
+			mixed[f * out_channels + c] = v * volume;
+		}
+	}
+	if (fx)
+		dynamics_processing(mixed, out_channels, frames, rate, fx, envelope);
+	for (int i = 0; i < frames * out_channels; i++) {
+		float v = mixed[i];
+		out[i] = v >= 1.f ? 32767 : v <= -1.f ? -32768 : (jshort)lrintf(v * 32768.f);
+	}
+	free(mixed);
+}
+
 /* blocking: AOSP WRITE_BLOCKING on a playing track; otherwise what fits now, 0 when the buffer is full */
 static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const void *buffer, int frames_to_write, float volume, jboolean blocking)
 {
@@ -269,15 +457,27 @@ static int write_frames(JNIEnv *env, jobject this, snd_pcm_t *pcm_handle, const 
 		if (frames_to_write > room)
 			frames_to_write = room;
 	}
-	/* the volume goes into a copy: the app's data stays as it is (after a short write it comes again) */
+	/* the conversion goes into a copy: the app's data stays as it is (after a short write it comes again) */
 	jshort *scaled = NULL;
-	if (volume != 1.f) {
-		int samples = frames_to_write * _GET_INT_FIELD(this, "channels");
-		scaled = malloc(samples * sizeof(jshort));
+	int encoding = _GET_INT_FIELD(this, "encoding");
+	int track_channels = _GET_INT_FIELD(this, "channelCount");
+	int out_channels = _GET_INT_FIELD(this, "channels");
+	jfloatArray effect = _GET_OBJ_FIELD(this, "effect", "[F");
+	if (volume != 1.f || encoding != 2 /* ENCODING_PCM_16BIT */ || track_channels != out_channels || effect) {
+		scaled = malloc(frames_to_write * out_channels * sizeof(jshort));
 		if (!scaled)
 			return 0;
-		for (int i = 0; i < samples; i++)
-			scaled[i] = ((const jshort *)buffer)[i] * volume;
+		float fx[15], envelope[2] = {0.f, 0.f};
+		jfloatArray state = _GET_OBJ_FIELD(this, "effectState", "[F");
+		if (effect) {
+			(*env)->GetFloatArrayRegion(env, effect, 0, 15, fx);
+			if (state)
+				(*env)->GetFloatArrayRegion(env, state, 0, 2, envelope);
+		}
+		mix_to_output(scaled, out_channels, buffer, encoding, track_channels, _GET_INT_FIELD(this, "channelMask"), frames_to_write, volume,
+		              effect ? fx : NULL, envelope, _GET_INT_FIELD(this, "sampleRateInHz"));
+		if (effect && state)
+			(*env)->SetFloatArrayRegion(env, state, 0, 2, envelope);
 		buffer = scaled;
 	}
 	/* AOSP AudioTrack::write(): a blocking write waits for room until all is queued, but pause(), stop() or
@@ -335,6 +535,17 @@ JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3SIIFZ(JNIE
 	jshort *buffer = (*env)->GetShortArrayElements(env, audio_data, NULL);
 	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_shorts, frames_to_write, volume, blocking);
 	(*env)->ReleaseShortArrayElements(env, audio_data, buffer, 0);
+
+	return frames_written;
+}
+
+JNIEXPORT jint JNICALL Java_android_media_AudioTrack_native_1write___3FIIFZ(JNIEnv *env, jobject this, jfloatArray audio_data, jint offset_in_floats, jint frames_to_write, jfloat volume, jboolean blocking)
+{
+	snd_pcm_t *pcm_handle = _PTR(_GET_LONG_FIELD(this, "pcm_handle"));
+
+	jfloat *buffer = (*env)->GetFloatArrayElements(env, audio_data, NULL);
+	snd_pcm_sframes_t frames_written = write_frames(env, this, pcm_handle, buffer + offset_in_floats, frames_to_write, volume, blocking);
+	(*env)->ReleaseFloatArrayElements(env, audio_data, buffer, JNI_ABORT);
 
 	return frames_written;
 }
