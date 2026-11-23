@@ -394,6 +394,20 @@ resources = gnome.compile_resources('com.gitlab.android_translation_layer.androi
 # librsvg draws the window buttons of the desktop (KDE) for ATL's title bar, see system_theme.c
 librsvg_dep = dependency('librsvg-2.0', version: '>=2.46', required: false)
 
+# libatl_threadcheck.so: debug checker for the threading contract (doc/threading.md), preloaded with ATL_THREADCHECK=1
+threadcheck_c_args = []
+if host_machine.cpu_family() == 'x86_64' and get_option('debug')
+	gtk4_libdir = dependency('gtk4').get_variable(pkgconfig: 'libdir')
+	threadcheck_tramp = custom_target('threadcheck_trampolines',
+	                                  output: ['tc_trampolines.S', 'tc_names.h'],
+	                                  input: 'src/threadcheck/gen_trampolines.py',
+	                                  command: [find_program('python3'), '@INPUT@', '@OUTPUT0@', '@OUTPUT1@', gtk4_libdir / 'libgtk-4.so'])
+	shared_library('atl_threadcheck', ['src/threadcheck/threadcheck.c', 'src/threadcheck/entry_x86_64.S', threadcheck_tramp],
+	               dependencies: [dependency('jni').partial_dependency(compile_args: true, includes: true), dependency('dl'), dependency('threads')],
+	               install: true)
+	threadcheck_c_args = ['-DATL_THREADCHECK_LIB="' + get_option('prefix') / get_option('libdir') / 'libatl_threadcheck.so"']
+endif
+
 executable('android-translation-layer', [
                                         	'src/main-executable/main.c',
                                         	'src/main-executable/actions.c',
@@ -424,7 +438,7 @@ executable('android-translation-layer', [
 						'-DATL_NATIVE_BRIDGE="' + native_bridge + '"',
 						'-DATL_NATIVE_BRIDGE_ABI="' + get_option('native_bridge_abi') + '"',
 						librsvg_dep.found() ? '-DHAVE_LIBRSVG' : '-UHAVE_LIBRSVG'
-                                        ])
+                                        ] + threadcheck_c_args)
 
 # PackageManager's ABI choice (src/main-executable/apk_abi.c) on APKs made by the test
 apk_abi_test = executable('apk_abi_test', ['tests/apk_abi_test.c', 'src/main-executable/apk_abi.c'])

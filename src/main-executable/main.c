@@ -1452,11 +1452,29 @@ static void set_argv0_to_process_name(int argc, char **argv, const char *name)
 	pthread_setname_np(pthread_self(), len < 15 ? name : name + len - 15);
 }
 
+#ifdef ATL_THREADCHECK_LIB
+/* ATL_THREADCHECK: start again with the threading checker preloaded (doc/threading.md); only a preloaded library
+ * comes before libgtk-4 in the symbol lookup */
+static void preload_threadcheck(char **argv)
+{
+	const char *preload = getenv("LD_PRELOAD");
+	if (!getenv("ATL_THREADCHECK") || (preload && strstr(preload, ATL_THREADCHECK_LIB)))
+		return;
+	char *value = preload && *preload ? g_strconcat(ATL_THREADCHECK_LIB, ":", preload, NULL) : g_strdup(ATL_THREADCHECK_LIB);
+	setenv("LD_PRELOAD", value, 1);
+	execv("/proc/self/exe", argv);
+	fprintf(stderr, "ATL_THREADCHECK: execv failed: %s\n", strerror(errno));
+}
+#endif
+
 int main(int argc, char **argv)
 {
 	GtkApplication *app;
 	int status;
 
+#ifdef ATL_THREADCHECK_LIB
+	preload_threadcheck(argv);
+#endif
 	pregrow_stack();
 
 	/* this has to be done in the main executable, so might as well do it here */
