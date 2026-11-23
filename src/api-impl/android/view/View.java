@@ -2325,8 +2325,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public native Window native_get_window(long widget);
+
+	/* the window the view is attached to: GTK's widget tree on the main thread; other threads (AOSP allows e.g.
+	 * getRootWindowInsets() there, Unity calls it on UnityMain) get what the main thread noted at attach/detach,
+	 * as AOSP reads mAttachInfo (doc/threading.md) */
+	private volatile Window attachedWindow;
+
+	private Window getAttachedWindow() {
+		return Looper.getMainLooper().isCurrentThread() ? native_get_window(widget) : attachedWindow;
+	}
 	public ViewTreeObserver getViewTreeObserver() {
-		Window window = native_get_window(widget);
+		Window window = getAttachedWindow();
 		if (window != null) {
 			if (window.view_tree_observer == null)
 				window.view_tree_observer = new ViewTreeObserver(window);
@@ -4230,7 +4239,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/* like AOSP, the whole window gets the insets dispatched again (on the next main loop iteration) */
 	public void requestApplyInsets() {
-		Window window = native_get_window(widget);
+		Window window = getAttachedWindow();
 		if (window != null)
 			window.requestApplyInsets();
 	}
@@ -4601,6 +4610,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (attachedToWindow)
 			return;
 		attachedToWindow = true;
+		attachedWindow = native_get_window(widget);
 		mWindowAttachCount++;
 		// We will need to evaluate the drawable state at least once.
 		mPrivateFlags |= PFLAG_DRAWABLE_STATE_DIRTY;
@@ -4657,6 +4667,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			}
 		}
 		attachedToWindow = false;
+		attachedWindow = null;
 	}
 
 	protected void onAttachedToWindow() {
@@ -4726,7 +4737,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/* AOSP keeps the state in the AttachInfo of the window's ViewRootImpl, ATL in the Window */
 	public KeyEvent.DispatcherState getKeyDispatcherState() {
-		Window window = native_get_window(widget);
+		Window window = getAttachedWindow();
 		return window != null ? window.mKeyDispatchState : null;
 	}
 
@@ -5609,7 +5620,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public WindowInsets getRootWindowInsets() {
-		Window window = native_get_window(widget);
+		Window window = getAttachedWindow();
 		return window != null ? window.getWindowInsets() : null;
 	}
 
@@ -5992,7 +6003,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public WindowInsetsController getWindowInsetsController() {
 		/* like AOSP: the controller of the window the view is attached to; before that the one of the
 		 * nearest ancestor (the DecorView of a window answers with the window's controller) */
-		Window window = native_get_window(widget);
+		Window window = getAttachedWindow();
 		if (window != null)
 			return window.getInsetsController();
 		ViewParent parent = getParent();
