@@ -24,9 +24,10 @@ public class Paint {
 	private Shader shader;
 	private Align align = Align.CENTER;
 	private ColorFilter color_filter;
-	/* Kept for the getters only: GSK always draws antialiased and filtered, Pango hints text
-	 * itself. ATL always antialiases, so that flag is set by default, like in AOSP since API 30. */
-	private int flags = ANTI_ALIAS_FLAG;
+	/* AOSP Paint(): ANTI_ALIAS_FLAG (since API 30) and HIDDEN_DEFAULT_PAINT_FLAGS. GSK always draws antialiased
+	 * and filtered; the canvas of a bitmap (CairoCanvas) follows ANTI_ALIAS_FLAG and FILTER_BITMAP_FLAG like hwui */
+	private int flags = ANTI_ALIAS_FLAG | HIDDEN_DEFAULT_PAINT_FLAGS;
+	static final int HIDDEN_DEFAULT_PAINT_FLAGS = DEV_KERN_TEXT_FLAG | EMBEDDED_BITMAP_TEXT_FLAG | FILTER_BITMAP_FLAG;
 	private float text_scale_x = 1;
 	private float stroke_miter = 4;
 	private int hinting = HINTING_ON;
@@ -49,7 +50,7 @@ public class Paint {
 
 	public Paint(int flags) {
 		this();
-		setFlags(flags);
+		setFlags(flags | HIDDEN_DEFAULT_PAINT_FLAGS);
 	}
 
 	public Paint(Paint paint) {
@@ -1218,6 +1219,7 @@ public class Paint {
 		shadow_layer_color = 0;
 		text_skew_x = 0;
 		hinting = HINTING_ON;
+		flags = ANTI_ALIAS_FLAG | HIDDEN_DEFAULT_PAINT_FLAGS; // AOSP reset()
 		native_set_text_flags(paint, flags);
 	}
 
