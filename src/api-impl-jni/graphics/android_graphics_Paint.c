@@ -121,6 +121,7 @@ JNIEXPORT void JNICALL Java_android_graphics_Paint_native_1set_1stroke_1width(JN
 	 * meanwile width of 1 should care about scaling;
 	 * The problem is, 0 is not a valid value for gsk_stroke_set_line_width,
 	 * so at least change it to 1 for now */
+	paint->hairline = width == 0;
 	if (width == 0)
 		width = 1;
 	gsk_stroke_set_line_width(paint->gsk_stroke, width);
@@ -607,6 +608,85 @@ void android_paint_append_glyphs(GtkSnapshot *snapshot, PangoFont *font, PangoGl
 		transform_skew(snapshot, paint);
 	append_text(snapshot, paint, NULL, font, glyphs);
 	gtk_snapshot_restore(snapshot);
+}
+
+/* append_text() with cairo: the text at the origin (the layout's top left corner, the baseline origin of a line or
+ * of glyphs) in the paint's color, filled and/or with the outlines stroked, fill and stroke composed once */
+static void draw_text_cairo(cairo_t *cr, struct AndroidPaint *paint, PangoLayout *layout, PangoLayoutLine *line, PangoFont *font, PangoGlyphString *glyphs)
+{
+	GskStroke *stroke = text_outline_stroke(paint);
+	GdkRGBA color = paint->color;
+	bool group = paint->is_fill && stroke;
+	if (group) {
+		cairo_push_group(cr);
+		cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+		color.alpha = 1.f;
+	}
+	cairo_set_source_rgba(cr, color.red, color.green, color.blue, color.alpha);
+	if (paint->is_fill) {
+		cairo_move_to(cr, 0, 0);
+		if (line)
+			pango_cairo_show_layout_line(cr, line);
+		else if (layout)
+			pango_cairo_show_layout(cr, layout);
+		else
+			pango_cairo_show_glyph_string(cr, font, glyphs);
+	}
+	if (stroke) {
+		cairo_new_path(cr);
+		cairo_move_to(cr, 0, 0);
+		if (line)
+			pango_cairo_layout_line_path(cr, line);
+		else if (layout)
+			pango_cairo_layout_path(cr, layout);
+		else
+			pango_cairo_glyph_string_path(cr, font, glyphs);
+		gsk_stroke_to_cairo(stroke, cr);
+		cairo_stroke(cr);
+		gsk_stroke_free(stroke);
+	}
+	if (group) {
+		cairo_pop_group_to_source(cr);
+		cairo_paint_with_alpha(cr, paint->color.alpha);
+	}
+}
+
+/* Paint.setTextSkewX(): x' = x + skewX * y about the baseline origin */
+static void skew_cairo(cairo_t *cr, struct AndroidPaint *paint)
+{
+	cairo_matrix_t skew;
+	cairo_matrix_init(&skew, 1, 0, paint->text_skew_x, 1, 0, 0);
+	cairo_transform(cr, &skew);
+}
+
+void android_paint_draw_layout_cairo(cairo_t *cr, PangoLayout *layout, struct AndroidPaint *paint)
+{
+	if (paint->text_skew_x == 0.f) {
+		draw_text_cairo(cr, paint, layout, NULL, NULL, NULL);
+		return;
+	}
+	/* each line skewed about its own baseline */
+	PangoLayoutIter *iter = pango_layout_get_iter(layout);
+	do {
+		PangoRectangle logical;
+		pango_layout_iter_get_line_extents(iter, NULL, &logical);
+		cairo_save(cr);
+		cairo_translate(cr, (float)logical.x / PANGO_SCALE, (float)pango_layout_iter_get_baseline(iter) / PANGO_SCALE);
+		skew_cairo(cr, paint);
+		draw_text_cairo(cr, paint, NULL, pango_layout_iter_get_line_readonly(iter), NULL, NULL);
+		cairo_restore(cr);
+	} while (pango_layout_iter_next_line(iter));
+	pango_layout_iter_free(iter);
+}
+
+void android_paint_draw_glyphs_cairo(cairo_t *cr, PangoFont *font, PangoGlyphString *glyphs, float x, float y, struct AndroidPaint *paint)
+{
+	cairo_save(cr);
+	cairo_translate(cr, x, y);
+	if (paint->text_skew_x != 0.f)
+		skew_cairo(cr, paint);
+	draw_text_cairo(cr, paint, NULL, NULL, font, glyphs);
+	cairo_restore(cr);
 }
 
 /* ---- text shaping for the measuring methods, TextRunShaper and getTextPath ----

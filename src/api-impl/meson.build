@@ -381,6 +381,7 @@ srcs = [
 	'android/atl/crypto/OpenSSLMessageDigest.java',
 	'android/atl/crypto/OpenSSLProvider.java',
 	'android/atl/crypto/OpenSSLRandom.java',
+	'android/atl/CairoCanvas.java',
 	'android/atl/GskCanvas.java',
 	'android/atl/GVariantBuilderParcel.java',
 	'android/atl/GVariantIterParcel.java',

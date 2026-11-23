@@ -16,6 +16,7 @@ public class Canvas {
 
 	private Bitmap bitmap;
 	private GskCanvas gsk_canvas;
+	private long surface; // the surface of the bitmap that gsk_canvas draws into
 	private int density = Bitmap.DENSITY_NONE;
 
 	public Canvas() {
@@ -27,9 +28,19 @@ public class Canvas {
 
 	public Canvas(Bitmap bmp) {
 		this.bitmap = bmp;
-		gsk_canvas = new GskCanvas(bmp.getSnapshot());
-		gsk_canvas.offscreen = true;
+		bind();
 		density = bmp.getDensity();
+	}
+
+	/* Draws into the bitmap's surface with cairo (in any thread, like Skia's software canvas); called with the
+	 * bitmap's lock held before each operation, it marks the pixels changed. The surface only changes when the
+	 * bitmap is reconfigured or recycled; the canvas then starts afresh on the new one, as AOSP's setBitmap(). */
+	private void bind() {
+		long surface = bitmap.getSurfaceForWrite();
+		if (surface != this.surface) {
+			gsk_canvas = new android.atl.CairoCanvas(surface);
+			this.surface = surface;
+		}
 	}
 
 	public int getDensity() {
@@ -47,20 +58,20 @@ public class Canvas {
 
 	public int save() {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			return gsk_canvas.save();
 		}
 	}
 	public void restore() {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.restore();
 		}
 	}
 
 	public int getSaveCount() {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			return gsk_canvas.getSaveCount();
 		}
 	}
@@ -101,17 +112,7 @@ public class Canvas {
 	 */
 	public void drawRect(float left, float top, float right, float bottom, Paint paint) {
 		synchronized (bitmap) {
-			/* without GSK composite nodes (GTK < 4.22) CLEAR erases the whole bitmap */
-			if (!GskCanvas.canComposite() && paint != null && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
-				int oldSaveCount = gsk_canvas.getSaveCount();
-				gsk_canvas.restoreToCount(1);
-				bitmap.eraseColor(0);
-				gsk_canvas.snapshot = bitmap.getSnapshot();
-				while (gsk_canvas.getSaveCount() < oldSaveCount)
-					gsk_canvas.save();
-				return;
-			}
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawRect(left, top, right, bottom, paint);
 		}
 	}
@@ -124,7 +125,7 @@ public class Canvas {
 	 */
 	public void rotate(float degrees) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.rotate(degrees);
 		}
 	}
@@ -153,7 +154,7 @@ public class Canvas {
 	 */
 	public void drawText(String text, float x, float y, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawText(text, x, y, paint);
 		}
 	}
@@ -249,7 +250,7 @@ public class Canvas {
 	public void drawGlyphs(int[] glyphIds, int glyphIdOffset, float[] positions, int positionOffset, int glyphCount, android.graphics.fonts.Font font, Paint paint) {
 		checkGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, paint);
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawGlyphs(glyphIds, glyphIdOffset, positions, positionOffset, glyphCount, font, paint);
 		}
 	}
@@ -378,7 +379,7 @@ public class Canvas {
 	 */
 	public /*native*/ void scale(float sx, float sy) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.scale(sx, sy);
 		}
 	}
@@ -470,8 +471,8 @@ public class Canvas {
 	 * @param paint  May be null. The paint used to draw the bitmap
 	 */
 	public void drawBitmap(Bitmap bitmap, Rect src, Rect dst, Paint paint) {
-		synchronized (bitmap) {
-			gsk_canvas.snapshot = this.bitmap.getSnapshot();
+		synchronized (this.bitmap) {
+			bind();
 			gsk_canvas.drawBitmap(bitmap, src, dst, paint);
 		}
 	}
@@ -571,7 +572,7 @@ public class Canvas {
 	 */
 	public void drawLine(float startX, float startY, float stopX, float stopY, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawLine(startX, startY, stopX, stopY, paint);
 		}
 	}
@@ -582,7 +583,7 @@ public class Canvas {
 
 	public void drawLines(float[] points, int offset, int count, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawLines(points, offset, count, paint);
 		}
 	}
@@ -592,12 +593,13 @@ public class Canvas {
 			throw new IllegalStateException("Bitmap must be mutable");
 		}
 		this.bitmap = bitmap;
-		gsk_canvas.snapshot = bitmap == null ? 0 : bitmap.getSnapshot();
+		if (bitmap != null)
+			bind();
 	}
 
 	public void drawPath(Path path, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawPath(path, paint);
 		}
 	}
@@ -612,17 +614,8 @@ public class Canvas {
 	public void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, Paint paint) {
 		synchronized (bitmap) {
 			/* a shader fills the rounded rectangle (GskCanvas.drawRoundRect()), as in hwui */
-			if (!GskCanvas.canComposite() && paint.getXfermode() instanceof PorterDuffXfermode && ((PorterDuffXfermode)paint.getXfermode()).porterDuffMode == PorterDuff.Mode.CLEAR.nativeInt) {
-				int oldSaveCount = gsk_canvas.getSaveCount();
-				gsk_canvas.restoreToCount(1);
-				bitmap.eraseColor(0);
-				gsk_canvas.snapshot = bitmap.getSnapshot();
-				while (gsk_canvas.getSaveCount() < oldSaveCount)
-					gsk_canvas.save();
-			} else {
-				gsk_canvas.snapshot = bitmap.getSnapshot();
-				gsk_canvas.drawRoundRect(left, top, right, bottom, rx, ry, paint);
-			}
+			bind();
+			gsk_canvas.drawRoundRect(left, top, right, bottom, rx, ry, paint);
 		}
 	}
 
@@ -632,7 +625,7 @@ public class Canvas {
 
 	public void getMatrix(Matrix matrix) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.getMatrix(matrix);
 		}
 	}
@@ -645,21 +638,21 @@ public class Canvas {
 
 	public void translate(float dx, float dy) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.translate(dx, dy);
 		}
 	}
 
 	public void drawCircle(float cx, float cy, float radius, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawCircle(cx, cy, radius, paint);
 		}
 	}
 
 	public void drawOval(float left, float top, float right, float bottom, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.drawOval(left, top, right, bottom, paint);
 		}
 	}
@@ -672,7 +665,7 @@ public class Canvas {
 
 	public void concat(Matrix matrix) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			gsk_canvas.concat(matrix);
 		}
 	}
@@ -726,7 +719,7 @@ public class Canvas {
 	/* AOSP: a layer of its own (GskCanvas.saveLayer()), also when drawing into a bitmap */
 	public int saveLayer(RectF bounds, Paint paint, int flags) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			return gsk_canvas.saveLayer(bounds, paint, flags);
 		}
 	}
@@ -737,7 +730,7 @@ public class Canvas {
 
 	public int saveLayer(float left, float top, float right, float bottom, Paint paint) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			return gsk_canvas.saveLayer(left, top, right, bottom, paint);
 		}
 	}
@@ -785,7 +778,7 @@ public class Canvas {
 
 	public boolean clipRect(float left, float top, float right, float bottom) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			return gsk_canvas.clipRect(left, top, right, bottom);
 		}
 	}
@@ -800,7 +793,7 @@ public class Canvas {
 
 	public boolean clipPath(Path path) {
 		synchronized (bitmap) {
-			gsk_canvas.snapshot = bitmap.getSnapshot();
+			bind();
 			return gsk_canvas.clipPath(path);
 		}
 	}

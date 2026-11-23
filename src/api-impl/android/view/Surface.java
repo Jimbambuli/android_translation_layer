@@ -198,12 +198,11 @@ public class Surface implements android.os.Parcelable {
 	}
 
 	/* AOSP draws with HWUI (HwuiContext: a RenderNode's recording canvas, which can draw render nodes). On an
-	 * ImageReader's buffer that is a GTK snapshot of the buffer's bitmap, like the canvas of a view. */
+	 * ImageReader's buffer that is a cairo canvas on the buffer's bitmap, which draws render nodes too. */
 	public android.graphics.Canvas lockHardwareCanvas() {
 		if (atl_imageReader != null && isValid()) {
 			lockReaderBuffer();
-			android.atl.GskCanvas canvas = new android.atl.GskCanvas(lockedBitmap.getSnapshot());
-			canvas.offscreen = true;
+			android.atl.CairoCanvas canvas = new android.atl.CairoCanvas(lockedBitmap.getSurfaceForWrite());
 			canvas.width = lockedBitmap.getWidth();
 			canvas.height = lockedBitmap.getHeight();
 			return canvas;

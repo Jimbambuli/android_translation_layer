@@ -1,3 +1,4 @@
+#include <cairo.h>
 #include <gdk/gdk.h>
 #include <jni.h>
 #include <stdbool.h>
@@ -90,77 +91,84 @@ int AndroidBitmap_getInfo(JNIEnv *env, jobject bitmap, struct AndroidBitmapInfo 
 	return ANDROID_BITMAP_RESULT_SUCCESS;
 }
 
+/* the GDK memory format with the layout of the bitmap's cairo surface (Bitmap.getSurface()) */
+static GdkMemoryFormat surface_memory_format(cairo_surface_t *surface)
+{
+	switch (cairo_image_surface_get_format(surface)) {
+		case CAIRO_FORMAT_A8:
+			return GDK_MEMORY_A8;
+		case CAIRO_FORMAT_RGB24:
+			return G_BYTE_ORDER == G_LITTLE_ENDIAN ? GDK_MEMORY_B8G8R8X8 : GDK_MEMORY_X8R8G8B8;
+		default:
+			return G_BYTE_ORDER == G_LITTLE_ENDIAN ? GDK_MEMORY_B8G8R8A8_PREMULTIPLIED : GDK_MEMORY_A8R8G8B8_PREMULTIPLIED;
+	}
+}
+
+/* converts between the surface and memory in the given layout (GDK converts the formats; the GdkMemoryTexture only
+ * wraps the source memory and is thread-safe) */
+static void convert(const void *src, GdkMemoryFormat src_format, size_t src_stride, void *dst, GdkMemoryFormat dst_format, size_t dst_stride, int32_t width, int32_t height)
+{
+	GBytes *bytes = g_bytes_new_static(src, src_stride * height);
+	GdkTexture *texture = gdk_memory_texture_new(width, height, src_format, bytes, src_stride);
+	g_bytes_unref(bytes);
+	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
+	gdk_texture_downloader_set_format(downloader, dst_format);
+	gdk_texture_downloader_download_into(downloader, dst, dst_stride);
+	gdk_texture_downloader_free(downloader);
+	g_object_unref(texture);
+}
+
+/* AOSP hands out the bitmap's own pixel memory. ATL's pixels are a cairo surface in cairo's layout (BGRA on little
+ * endian), so the caller gets a copy in the Android layout, which unlockPixels() writes back into the surface. Both
+ * copies are made under the bitmap's lock. */
 int AndroidBitmap_lockPixels(JNIEnv *env, jobject bitmap, void **pixels)
 {
-	printf("AndroidBitmap_lockPixels\n");
-	GdkTexture *texture = _PTR(J__Bitmap__getTexture(env, bitmap));
+	(*env)->MonitorEnter(env, bitmap);
+	cairo_surface_t *surface = _PTR(J__Bitmap__getSurface(env, bitmap));
+	int32_t width = cairo_image_surface_get_width(surface), height = cairo_image_surface_get_height(surface);
 	int stride = _GET_INT_FIELD(bitmap, "stride");
-	int format = _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "gdk_memory_format");
-	if (format != -1)
-		format = raw_format(env, bitmap, format);
+	jobject config = _GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;");
+	int format = _GET_INT_FIELD(config, "gdk_memory_format");
+	uint8_t *data = g_malloc0((size_t)stride * height);
+	cairo_surface_flush(surface);
 	if (format == -1) {
-		int32_t width = gdk_texture_get_width(texture), height = gdk_texture_get_height(texture);
 		uint8_t *rgba = g_malloc((size_t)width * height * 4);
-		GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
-		gdk_texture_downloader_set_format(downloader, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED);
-		gdk_texture_downloader_download_into(downloader, rgba, (gsize)width * 4);
-		gdk_texture_downloader_free(downloader);
-		uint8_t *data = g_malloc0((size_t)stride * height);
-		to_16bit(rgba, data, width, height, stride, _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "android_memory_format"));
+		convert(cairo_image_surface_get_data(surface), surface_memory_format(surface), cairo_image_surface_get_stride(surface), rgba, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, (size_t)width * 4, width, height);
+		to_16bit(rgba, data, width, height, stride, _GET_INT_FIELD(config, "android_memory_format"));
 		g_free(rgba);
-		GBytes *bytes = g_bytes_new_take(data, (size_t)stride * height);
-		_SET_LONG_FIELD(bitmap, "bytes", _INTPTR(bytes));
-		*pixels = data;
-		return ANDROID_BITMAP_RESULT_SUCCESS;
+	} else {
+		convert(cairo_image_surface_get_data(surface), surface_memory_format(surface), cairo_image_surface_get_stride(surface), data, raw_format(env, bitmap, format), stride, width, height);
 	}
-	GdkTextureDownloader *downloader = gdk_texture_downloader_new(texture);
-	gdk_texture_downloader_set_format(downloader, format);
-	GBytes *bytes = NULL;
-	if (GDK_IS_MEMORY_TEXTURE(texture)) { // try to get the bytes non-copying
-		gsize texture_stride;
-		bytes = gdk_texture_downloader_download_bytes(downloader, &texture_stride);
-		if (texture_stride != stride) { // texture was not created by us, fall back to copy
-			g_bytes_unref(bytes);
-			bytes = NULL;
-		}
-	}
-	if (bytes == NULL) {
-		guchar *data = g_malloc(stride * gdk_texture_get_height(texture));
-		gdk_texture_downloader_download_into(downloader, data, stride);
-		bytes = g_bytes_new_take(data, stride * gdk_texture_get_height(texture));
-	}
-	gdk_texture_downloader_free(downloader);
-	_SET_LONG_FIELD(bitmap, "bytes", _INTPTR(bytes));
-	*pixels = (void *)g_bytes_get_data(bytes, NULL);
+	(*env)->MonitorExit(env, bitmap);
+	_SET_LONG_FIELD(bitmap, "bytes", _INTPTR(g_bytes_new_take(data, (size_t)stride * height)));
+	*pixels = data;
 	return ANDROID_BITMAP_RESULT_SUCCESS;
 }
 
 int AndroidBitmap_unlockPixels(JNIEnv *env, jobject bitmap)
 {
-	printf("AndroidBitmap_unlockPixels\n");
 	GBytes *bytes = _PTR(_GET_LONG_FIELD(bitmap, "bytes"));
 	if (!bytes) {
 		printf("AndroidBitmap_unlockPixels: no bytes! Was AndroidBitmap_lockPixels called?\n");
 		exit(1);
 	}
-	int width = _GET_INT_FIELD(bitmap, "width");
-	int height = _GET_INT_FIELD(bitmap, "height");
 	int stride = _GET_INT_FIELD(bitmap, "stride");
-	int format = _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "gdk_memory_format");
-	if (format != -1)
-		format = raw_format(env, bitmap, format);
-	GdkTexture *texture;
+	jobject config = _GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;");
+	int format = _GET_INT_FIELD(config, "gdk_memory_format");
+	(*env)->MonitorEnter(env, bitmap);
+	cairo_surface_t *surface = _PTR(J__Bitmap__getSurfaceForWrite(env, bitmap));
+	int32_t width = cairo_image_surface_get_width(surface), height = cairo_image_surface_get_height(surface);
+	cairo_surface_flush(surface);
 	if (format == -1) {
-		GBytes *rgba = from_16bit(g_bytes_get_data(bytes, NULL), width, height, stride, _GET_INT_FIELD(_GET_OBJ_FIELD(bitmap, "config", "Landroid/graphics/Bitmap$Config;"), "android_memory_format"));
-		texture = gdk_memory_texture_new(width, height, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, rgba, (gsize)width * 4);
+		GBytes *rgba = from_16bit(g_bytes_get_data(bytes, NULL), width, height, stride, _GET_INT_FIELD(config, "android_memory_format"));
+		convert(g_bytes_get_data(rgba, NULL), GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, (size_t)width * 4, cairo_image_surface_get_data(surface), surface_memory_format(surface), cairo_image_surface_get_stride(surface), width, height);
 		g_bytes_unref(rgba);
 	} else {
-		texture = gdk_memory_texture_new(width, height, format, bytes, stride);
+		convert(g_bytes_get_data(bytes, NULL), raw_format(env, bitmap, format), stride, cairo_image_surface_get_data(surface), surface_memory_format(surface), cairo_image_surface_get_stride(surface), width, height);
 	}
+	cairo_surface_mark_dirty(surface);
+	(*env)->MonitorExit(env, bitmap);
 	g_bytes_unref(bytes);
-	J__Bitmap__recycle(env, bitmap);
-	_SET_BOOL_FIELD(bitmap, "recycled", false); // recycle() only drops the old texture here, the bitmap stays usable
-	_SET_LONG_FIELD(bitmap, "texture", _INTPTR(texture));
 	_SET_LONG_FIELD(bitmap, "bytes", 0);
 	return ANDROID_BITMAP_RESULT_SUCCESS;
 }
