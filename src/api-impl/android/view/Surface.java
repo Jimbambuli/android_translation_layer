@@ -177,6 +177,10 @@ public class Surface implements android.os.Parcelable {
 			throw new IllegalStateException("Surface has no native object.");
 		if (atl_endpoint != null)
 			throw new UnsupportedOperationException("software drawing into a surface of another process is not implemented");
+		if (atl_imageReader != null) {
+			lockReaderBuffer();
+			return new android.graphics.Canvas(lockedBitmap);
+		}
 		if (widget == 0) { // a SurfaceTexture's: a buffer of its default size
 			lockedBitmap = android.graphics.Bitmap.createBitmap(surfaceTexture.getDefaultBufferWidth(), surfaceTexture.getDefaultBufferHeight(), android.graphics.Bitmap.Config.ARGB_8888);
 			return new android.graphics.Canvas(lockedBitmap);
@@ -184,7 +188,26 @@ public class Surface implements android.os.Parcelable {
 		return new android.atl.GskCanvas(SurfaceView.native_createSnapshot());
 	}
 
+	/* the Surface of an ImageReader: a buffer of the reader's size, which unlockCanvasAndPost() queues as an image;
+	 * only the 4-byte RGBA formats can be drawn into here */
+	private void lockReaderBuffer() {
+		int format = atl_imageReader.getImageFormat();
+		if (format != android.graphics.PixelFormat.RGBA_8888 && format != android.graphics.PixelFormat.RGBX_8888)
+			throw new UnsupportedOperationException("drawing into an ImageReader of format " + format + " is not implemented");
+		lockedBitmap = android.graphics.Bitmap.createBitmap(atl_imageReader.getWidth(), atl_imageReader.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+	}
+
+	/* AOSP draws with HWUI (HwuiContext: a RenderNode's recording canvas, which can draw render nodes). On an
+	 * ImageReader's buffer that is a GTK snapshot of the buffer's bitmap, like the canvas of a view. */
 	public android.graphics.Canvas lockHardwareCanvas() {
+		if (atl_imageReader != null && isValid()) {
+			lockReaderBuffer();
+			android.atl.GskCanvas canvas = new android.atl.GskCanvas(lockedBitmap.getSnapshot());
+			canvas.offscreen = true;
+			canvas.width = lockedBitmap.getWidth();
+			canvas.height = lockedBitmap.getHeight();
+			return canvas;
+		}
 		return lockCanvas(null);
 	}
 
@@ -194,7 +217,15 @@ public class Surface implements android.os.Parcelable {
 		if (widget == 0 && lockedBitmap != null) {
 			if (!isValid())
 				throw new IllegalStateException("Surface has no native object.");
-			surfaceTexture.queueBitmap(lockedBitmap, System.nanoTime());
+			if (atl_imageReader != null) { // one plane of RGBA bytes, as a reader of these formats has
+				java.nio.ByteBuffer pixels = java.nio.ByteBuffer.allocateDirect(lockedBitmap.getByteCount());
+				lockedBitmap.copyPixelsToBuffer(pixels);
+				pixels.rewind();
+				atl_imageReader.queueImage(System.nanoTime(), new java.nio.ByteBuffer[] {pixels}, new int[] {lockedBitmap.getRowBytes()}, new int[] {4});
+				lockedBitmap.recycle();
+			} else {
+				surfaceTexture.queueBitmap(lockedBitmap, System.nanoTime());
+			}
 			lockedBitmap = null;
 			return;
 		}

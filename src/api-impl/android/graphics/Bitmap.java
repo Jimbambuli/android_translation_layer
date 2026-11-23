@@ -334,7 +334,8 @@ public final class Bitmap implements Parcelable {
 		return texture;
 	}
 
-	synchronized long getSnapshot() {
+	/** @hide the GTK snapshot to draw into (Surface.lockHardwareCanvas() on an ImageReader's buffer) */
+	public synchronized long getSnapshot() {
 		notifyPixelsChanged();
 		if (snapshot == 0) {
 			snapshot = native_create_snapshot(texture);
