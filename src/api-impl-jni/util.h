@@ -46,6 +46,7 @@ int __android_log_buf_write(int bufID, int prio, const char *tag, const char *te
 
 /* defined in util.c */
 int android_log_printf(android_LogPriority prio, const char *tag, const char *fmt, ...);
+gboolean atl_log_below_info_wanted(void);
 
 void *get_nio_buffer(JNIEnv *env, jobject buffer, jarray *array_ref, jbyte **array);
 void release_nio_buffer(JNIEnv *env, jarray array_ref, jbyte *array);

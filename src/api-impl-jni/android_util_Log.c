@@ -40,6 +40,11 @@ JNIEXPORT jint JNICALL Java_android_util_Log_println_1native(JNIEnv *env, jobjec
 		return -1;
 	}
 
+	/* dropped by liblog anyway (util.c): skip the conversions, return what liblog returns for a dropped line
+	 * (the lengths of priority, tag and message with their NULs) */
+	if (priority < ANDROID_LOG_INFO && !atl_log_below_info_wanted())
+		return 3 + (tagObj ? (*env)->GetStringUTFLength(env, tagObj) : 0) + (*env)->GetStringUTFLength(env, msgObj);
+
 	if (tagObj != NULL)
 		tag = (*env)->GetStringUTFChars(env, tagObj, NULL);
 	msg = (*env)->GetStringUTFChars(env, msgObj, NULL);

@@ -329,7 +329,7 @@ public class Drawable {
 
 	/* Copyright (C) 2006 The Android Open Source Project */
 	PorterDuffColorFilter updateTintFilter(PorterDuffColorFilter tintFilter, ColorStateList tint, PorterDuff.Mode tintMode) {
-		System.out.println("updateTintFilter(" + tintFilter + ", " + tint + ", " + tintMode + ")");
+		android.util.Log.d("Drawable", "updateTintFilter(" + tintFilter + ", " + tint + ", " + tintMode + ")");
 		if (tint == null || tintMode == null) {
 			return null;
 		}

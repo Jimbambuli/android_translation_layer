@@ -123,7 +123,7 @@ public class NotificationManager {
 			return;
 		}
 
-		System.out.println("notify(" + tag + ", " + id + ", " + notification + ") called");
+		android.util.Log.d("NotificationManager", "notify(" + tag + ", " + id + ", " + notification + ") called");
 		int priority = desktopPriority(notification);
 		if (priority < 0)
 			return;

@@ -104,8 +104,24 @@ static int fallback_verbose_log(int prio, const char *tag, const char *fmt, va_l
 	return ret;
 }
 
+/* liblog (fake_log_device) drops verbose and debug lines unless ANDROID_LOG_TAGS asks for them (the global
+ * minimum is info), but only after the caller has built them. Without ANDROID_LOG_TAGS (read once) they are
+ * dropped here, before formatting; with it (apk-starter's debug sets it) liblog filters as before. */
+gboolean atl_log_below_info_wanted(void)
+{
+	static int wanted = -1;
+	int w = __atomic_load_n(&wanted, __ATOMIC_RELAXED);
+	if (w < 0) {
+		w = getenv("ANDROID_LOG_TAGS") != NULL;
+		__atomic_store_n(&wanted, w, __ATOMIC_RELAXED);
+	}
+	return w;
+}
+
 static int android_log_vprintf(int prio, const char *tag, const char *fmt, va_list ap)
 {
+	if (prio < ANDROID_LOG_INFO && !atl_log_below_info_wanted())
+		return 0;
 
 	static __android_log_vprint_type *_android_log_vprintf = NULL;
 	if (!_android_log_vprintf) {

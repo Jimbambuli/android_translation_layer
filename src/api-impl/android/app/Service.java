@@ -41,7 +41,7 @@ public abstract class Service extends ContextWrapper implements android.content.
 	/* AOSP Service.onStartCommand(): the old onStart() of apps that have not moved on gets the start; the service is
 	 * sticky, as a service of an app of the target SDK of today (START_STICKY_COMPATIBILITY is for apps before ECLAIR) */
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		System.out.println("Service.onStartCommand(" + intent + ", " + flags + ", " + startId + ") called");
+		android.util.Log.d("Service", "Service.onStartCommand(" + intent + ", " + flags + ", " + startId + ") called");
 		onStart(intent, startId);
 		return START_STICKY;
 	}
@@ -58,7 +58,7 @@ public abstract class Service extends ContextWrapper implements android.content.
 	/* AOSP Service.startForeground(): ActiveServices.setServiceForegroundInnerLocked() posts the notification
 	 * (ServiceRecord.postNotification()); a new id replaces the notification of the old one */
 	public final void startForeground(int id, Notification notification) {
-		System.out.println("startForeground(" + id + ", " + notification + ") called");
+		android.util.Log.d("Service", "startForeground(" + id + ", " + notification + ") called");
 		if (notification == null)
 			throw new IllegalArgumentException("null notification");
 		NotificationManager notificationManager = new NotificationManager();
@@ -81,7 +81,7 @@ public abstract class Service extends ContextWrapper implements android.content.
 
 	/* AOSP Service.stopForeground(int): the notification stays unless STOP_FOREGROUND_REMOVE */
 	public final void stopForeground(int notificationBehavior) {
-		System.out.println("stopForeground(" + notificationBehavior + ") called");
+		android.util.Log.d("Service", "stopForeground(" + notificationBehavior + ") called");
 		if ((notificationBehavior & STOP_FOREGROUND_REMOVE) != 0)
 			new NotificationManager().cancel(notification_id);
 		if ((notificationBehavior & (STOP_FOREGROUND_REMOVE | STOP_FOREGROUND_DETACH)) != 0)
