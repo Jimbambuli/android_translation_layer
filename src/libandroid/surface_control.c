@@ -1,14 +1,16 @@
 /*
  * ASurfaceControl / ASurfaceTransaction (AOSP frameworks/base/native/android/surface_control.cpp) on ATL.
  *
- * There is no SurfaceFlinger: the surfaces of a window form a tree here, and applying a transaction shows a buffer
- * of it in the window. Supported is the window of a Surface of another process (Surface.Endpoint, the GPU process
- * of Chromium drawing into the browser's SurfaceView): its widget shows AHardwareBuffers (dma-bufs) as they are,
- * over the same socket messages as MediaCodec's frames (android_view_SurfaceView.h).
+ * There is no SurfaceFlinger: the surfaces of a window form a tree here, and applying a transaction shows the
+ * buffers of it in the window. Supported is the window of a Surface of another process (Surface.Endpoint, the GPU
+ * process of Chromium drawing into the browser's SurfaceView): its widget shows AHardwareBuffers (dma-bufs) as they
+ * are, over the same socket as MediaCodec's frames (android_view_SurfaceView.h).
  *
- * Composition: the widget shows one buffer. Of the visible surfaces with a buffer, that is the one with the
- * largest destination (lowest z-order among equal ones), normally the primary plane; the others (overlays) are not
- * shown. Geometry other than this choice, transforms, colors and HDR metadata have no effect.
+ * Composition as SurfaceFlinger's (FrontEnd/RequestedLayerState.cpp, LayerSnapshotBuilder.cpp): each visible
+ * surface with a buffer is a layer of the frame (ATL_SURFACE_MSG_LAYER), drawn in z-order (children by z, those
+ * below 0 under their parent), with the buffer crop and transform, scaled to the destination frame or else placed
+ * with position and scale, cut to its crop and to the bounds of its parents, with the alpha of it and its parents.
+ * The widget draws them (GTK). Colors (setColor), the opaque hint and HDR metadata have no effect.
  *
  * Callbacks run on a thread of the window, like AOSP's binder thread: OnCommit right after apply, OnComplete once
  * the buffers the transaction replaced are released by the widget (so their release fence is -1, signalled), and
@@ -64,9 +66,9 @@ struct slot {
 struct display {
 	int refcount;
 	struct ANativeWindow *window;
-	struct slot slots[ATL_SURFACE_MAX_BUFFERS];
+	struct slot slots[ATL_SURFACE_MAX_SLOTS];
 	uint64_t seq;
-	int shown;         /* slot shown last, -1 */
+	bool dirty;        /* a surface of the tree changed: apply() shows a new frame */
 	bool stop;         /* the root surface is gone: the thread ends */
 	bool warned;
 	GThread *thread;
@@ -77,9 +79,16 @@ struct ASurfaceControl {
 	int refcount;
 	struct ASurfaceControl *parent; /* a reference; NULL for a root or a detached surface */
 	struct display *display;        /* only on a root */
+	uint64_t id; /* creation order, for siblings of the same z */
 	bool visible;
 	int32_t z;
-	ARect destination; /* in the parent; empty: the buffer's size */
+	ARect destination; /* in the parent; empty: position and scale place the buffer */
+	ARect crop;        /* in the surface; empty: none */
+	ARect buffer_crop; /* the part of the buffer shown; empty: all */
+	int32_t x, y;
+	float scale_x, scale_y;
+	int32_t transform; /* of the buffer, ANativeWindowTransform */
+	float alpha;
 	struct AHardwareBuffer *buffer;
 	OnBufferRelease release_cb;
 	void *release_ctx;
@@ -96,6 +105,12 @@ enum {
 	CHANGE_Z = 1 << 2,
 	CHANGE_DESTINATION = 1 << 3,
 	CHANGE_PARENT = 1 << 4,
+	CHANGE_CROP = 1 << 5,
+	CHANGE_BUFFER_CROP = 1 << 6,
+	CHANGE_POSITION = 1 << 7,
+	CHANGE_SCALE = 1 << 8,
+	CHANGE_TRANSFORM = 1 << 9,
+	CHANGE_ALPHA = 1 << 10,
 };
 
 struct change {
@@ -108,6 +123,12 @@ struct change {
 	bool visible;
 	int32_t z;
 	ARect destination;
+	ARect crop;
+	ARect buffer_crop;
+	int32_t x, y;
+	float scale_x, scale_y;
+	int32_t transform;
+	float alpha;
 	struct ASurfaceControl *parent; /* a reference */
 };
 
@@ -161,9 +182,13 @@ static int64_t now_ns(void)
 
 static struct ASurfaceControl *sc_new(struct ASurfaceControl *parent)
 {
+	static uint64_t ids;
 	struct ASurfaceControl *sc = calloc(1, sizeof(*sc));
 	sc->refcount = 1;
+	sc->id = ++ids;
 	sc->visible = true; /* layers are shown unless hidden (eHidden is not set by createSurface()) */
+	sc->scale_x = sc->scale_y = 1;
+	sc->alpha = 1;
 	sc->shown_slot = -1;
 	if (parent) {
 		parent->refcount++;
@@ -195,24 +220,13 @@ static struct ASurfaceControl *sc_root(struct ASurfaceControl *sc)
 	return sc;
 }
 
-/* shown: it and all its parents are visible, and it hangs below a window */
-static bool sc_shown(struct ASurfaceControl *sc)
-{
-	for (; sc; sc = sc->parent)
-		if (!sc->visible)
-			return false;
-		else if (sc->display)
-			return true;
-	return false;
-}
-
 /* ---- displays ---- */
 
 static void display_unref(struct display *display)
 {
 	if (--display->refcount > 0)
 		return;
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++)
 		AHardwareBuffer_release(display->slots[i].buffer);
 	ANativeWindow_release(display->window);
 	free(display);
@@ -285,14 +299,16 @@ static void display_run_pending(struct display *display, bool all)
 	}
 }
 
-/* ANativeWindow_remoteRead(), with the window's remote_lock: the widget let go of a buffer */
+/* ANativeWindow_remoteRead(), with the window's remote_lock: the widget let go of a buffer (a RELEASE for an
+ * older LAYER of it crossed a newer one: the buffer is still shown) */
 static void display_message(void *data, const struct atl_surface_msg *msg)
 {
 	struct display *display = data;
-	if (msg->type != ATL_SURFACE_MSG_RELEASE || msg->index >= ATL_SURFACE_MAX_BUFFERS)
+	if (msg->type != ATL_SURFACE_MSG_RELEASE || msg->index >= ATL_SURFACE_MAX_SLOTS)
 		return;
 	g_mutex_lock(&lock);
-	display->slots[msg->index].busy = false;
+	if (msg->serial == (uint32_t)display->slots[msg->index].presented)
+		display->slots[msg->index].busy = false;
 	g_mutex_unlock(&lock);
 }
 
@@ -328,7 +344,6 @@ struct ASurfaceControl *ASurfaceControl_createFromWindow(struct ANativeWindow *w
 	struct display *display = calloc(1, sizeof(*display));
 	display->refcount = 2; /* the root surface and the thread */
 	display->window = window;
-	display->shown = -1;
 	ANativeWindow_acquire(window);
 	struct ASurfaceControl *sc = sc_new(NULL);
 	sc->display = display;
@@ -506,6 +521,8 @@ void ASurfaceTransaction_setBufferWithRelease(struct ASurfaceTransaction *aSurfa
 		abort();                                                         \
 	}
 
+/* AOSP: the source is the buffer crop (top and left not negative, an invalid one is none), the destination frame
+ * places it, and the transform */
 void ASurfaceTransaction_setGeometry(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, const ARect *source,
                                      const ARect *destination, int32_t transform)
 {
@@ -513,34 +530,55 @@ void ASurfaceTransaction_setGeometry(struct ASurfaceTransaction *aSurfaceTransac
 	CHECK_VALID_RECT(*source);
 	CHECK_VALID_RECT(*destination);
 	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->buffer_crop = *source;
+	c->buffer_crop.left = MAX(c->buffer_crop.left, 0);
+	c->buffer_crop.top = MAX(c->buffer_crop.top, 0);
 	c->destination = *destination;
-	c->mask |= CHANGE_DESTINATION;
+	c->transform = transform;
+	c->mask |= CHANGE_BUFFER_CROP | CHANGE_DESTINATION | CHANGE_TRANSFORM;
 }
 
-/* these only register the surface: crop, position, scale and transform only matter for the choice above
- * through setGeometry()'s destination */
 void ASurfaceTransaction_setCrop(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, const ARect *crop)
 {
 	CHECK_SURFACE();
 	CHECK_VALID_RECT(*crop);
-	change_of(aSurfaceTransaction, aSurfaceControl);
+	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->crop = *crop;
+	c->mask |= CHANGE_CROP;
 }
 void ASurfaceTransaction_setPosition(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, int32_t x, int32_t y)
 {
 	CHECK_SURFACE();
-	change_of(aSurfaceTransaction, aSurfaceControl);
+	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->x = x;
+	c->y = y;
+	c->mask |= CHANGE_POSITION;
 }
 void ASurfaceTransaction_setBufferTransform(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, int32_t transform)
 {
 	CHECK_SURFACE();
-	change_of(aSurfaceTransaction, aSurfaceControl);
+	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->transform = transform;
+	c->mask |= CHANGE_TRANSFORM;
 }
 void ASurfaceTransaction_setScale(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, float xScale, float yScale)
 {
 	CHECK_SURFACE();
 	if (xScale < 0 || yScale < 0)
 		fatal("invalid scale");
-	change_of(aSurfaceTransaction, aSurfaceControl);
+	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->scale_x = xScale;
+	c->scale_y = yScale;
+	c->mask |= CHANGE_SCALE;
+}
+void ASurfaceTransaction_setBufferAlpha(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, float alpha)
+{
+	CHECK_SURFACE();
+	if (alpha < 0 || alpha > 1)
+		fatal("invalid alpha");
+	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->alpha = alpha;
+	c->mask |= CHANGE_ALPHA;
 }
 
 #define REGISTER_ONLY(name, ...)                                                                                                   \
@@ -551,7 +589,6 @@ void ASurfaceTransaction_setScale(struct ASurfaceTransaction *aSurfaceTransactio
 	}
 REGISTER_ONLY(ASurfaceTransaction_setBufferTransparency, int8_t transparency)
 REGISTER_ONLY(ASurfaceTransaction_setDamageRegion, const void *rects, uint32_t count)
-REGISTER_ONLY(ASurfaceTransaction_setBufferAlpha, float alpha)
 REGISTER_ONLY(ASurfaceTransaction_setBufferDataSpace, int32_t aDataSpace)
 REGISTER_ONLY(ASurfaceTransaction_setHdrMetadata_smpte2086, void *metadata)
 REGISTER_ONLY(ASurfaceTransaction_setHdrMetadata_cta861_3, void *metadata)
@@ -590,32 +627,6 @@ void ASurfaceTransaction_setOnCommit(struct ASurfaceTransaction *aSurfaceTransac
 	add_callback(&aSurfaceTransaction->commit, &aSurfaceTransaction->n_commit, func, context);
 }
 
-/* with lock held: the surface of display's tree to show, NULL if none */
-static struct ASurfaceControl *choose(struct display *display, struct ASurfaceControl **all, size_t n_all)
-{
-	struct ASurfaceControl *best = NULL;
-	int64_t best_area = -1;
-	int count = 0;
-	for (size_t i = 0; i < n_all; i++) {
-		struct ASurfaceControl *sc = all[i];
-		if (!sc->buffer || sc_root(sc)->display != display || !sc_shown(sc))
-			continue;
-		count++;
-		const ARect *d = &sc->destination;
-		int64_t area = (d->right > d->left && d->bottom > d->top) ? (int64_t)(d->right - d->left) * (d->bottom - d->top)
-		                                                           : (int64_t)sc->buffer->desc.width * sc->buffer->desc.height;
-		if (area > best_area || (area == best_area && sc->z < best->z)) {
-			best = sc;
-			best_area = area;
-		}
-	}
-	if (count > 1 && !display->warned) {
-		display->warned = true;
-		fprintf(stderr, "ASurfaceControl: %d surfaces with buffers, only the largest is shown\n", count);
-	}
-	return best;
-}
-
 /* all surfaces with a buffer: the ones the displays know through the transactions (kept in a list) */
 static struct ASurfaceControl **known;
 static size_t n_known;
@@ -643,40 +654,203 @@ static void forget_unused(void)
 	}
 }
 
-/* with lock held: shows sc's buffer in display; FALSE if no slot is free */
-static bool present(struct display *display, struct ASurfaceControl *sc)
+/* ---- composition ---- */
+
+/* where a surface is in the window: its transform to window coordinates (positive scales and a translation), the
+ * part of the window it may cover (its bounds, LayerSnapshot.geomLayerBounds) and its alpha */
+struct geometry {
+	float sx, sy, tx, ty;
+	float bounds[4]; /* left, top, right, bottom */
+	float alpha;
+};
+
+static void map_rect(const struct geometry *g, float l, float t, float r, float b, float out[4])
 {
-	struct AHardwareBuffer *buffer = sc->buffer;
-	int slot = -1;
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS && slot < 0; i++)
-		if (!display->slots[i].busy && display->slots[i].buffer == buffer)
-			slot = i;
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS && slot < 0; i++)
-		if (!display->slots[i].busy && !display->slots[i].buffer)
-			slot = i;
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS && slot < 0; i++)
-		if (!display->slots[i].busy)
-			slot = i;
-	if (slot < 0)
-		return false;
-	struct slot *s = &display->slots[slot];
-	if (s->buffer != buffer) {
-		AHardwareBuffer_release(s->buffer);
-		AHardwareBuffer_acquire(buffer);
-		s->buffer = buffer;
-		struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_BUFFER, .index = slot, .width = buffer->desc.width, .height = buffer->desc.height,
-		                              .stride = buffer->strides[0], .offset = buffer->offsets[0], .fourcc = buffer->drm_format,
-		                              .modifier = buffer->modifier, .top_first = 1};
-		ANativeWindow_remoteSend(display->window, &msg, buffer->fd);
+	out[0] = g->sx * l + g->tx;
+	out[1] = g->sy * t + g->ty;
+	out[2] = g->sx * r + g->tx;
+	out[3] = g->sy * b + g->ty;
+}
+
+static void intersect(float a[4], const float b[4])
+{
+	a[0] = MAX(a[0], b[0]);
+	a[1] = MAX(a[1], b[1]);
+	a[2] = MIN(a[2], b[2]);
+	a[3] = MIN(a[3], b[3]);
+}
+
+static bool rect_empty(const ARect *r)
+{
+	return r->right <= r->left || r->bottom <= r->top;
+}
+
+/* the buffer's size after its transform (RequestedLayerState::getBufferSize()) */
+static void buffer_size(struct ASurfaceControl *sc, float *w, float *h)
+{
+	*w = sc->buffer->desc.width;
+	*h = sc->buffer->desc.height;
+	if (sc->transform & ATL_SURFACE_TRANSFORM_ROT_90) {
+		float t = *w;
+		*w = *h;
+		*h = t;
 	}
-	s->busy = true;
-	s->presented = ++display->seq;
-	display->shown = slot;
-	sc->shown_on = display;
-	sc->shown_slot = slot;
-	sc->shown_seq = s->presented;
-	ANativeWindow_remoteSend(display->window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_PRESENT, .index = slot}, -1);
+}
+
+/* with lock held: FALSE if it or a parent is hidden. The local transform is RequestedLayerState::getTransform(): the
+ * destination frame scales the buffer to it, without one position and scale apply; the bounds are the parent's cut
+ * to the crop and to the buffer (LayerSnapshotBuilder::updateLayerBounds()) */
+static bool sc_geometry(struct ASurfaceControl *sc, struct geometry *g)
+{
+	if (sc->parent) {
+		if (!sc_geometry(sc->parent, g))
+			return false;
+	} else {
+		*g = (struct geometry){.sx = 1, .sy = 1, .bounds = {-1e9f, -1e9f, 1e9f, 1e9f}, .alpha = 1};
+	}
+	if (!sc->visible)
+		return false;
+	float bw = 0, bh = 0;
+	if (sc->buffer)
+		buffer_size(sc, &bw, &bh);
+	float lsx = sc->scale_x, lsy = sc->scale_y, ltx = sc->x, lty = sc->y;
+	if (!rect_empty(&sc->destination)) {
+		ltx = MAX(sc->destination.left, 0);
+		lty = MAX(sc->destination.top, 0);
+		lsx = sc->buffer && bw > 0 ? (sc->destination.right - sc->destination.left) / bw : 1;
+		lsy = sc->buffer && bh > 0 ? (sc->destination.bottom - sc->destination.top) / bh : 1;
+	}
+	g->tx += g->sx * ltx;
+	g->ty += g->sy * lty;
+	g->sx *= lsx;
+	g->sy *= lsy;
+	float r[4];
+	if (!rect_empty(&sc->crop)) {
+		map_rect(g, sc->crop.left, sc->crop.top, sc->crop.right, sc->crop.bottom, r);
+		intersect(g->bounds, r);
+	}
+	if (sc->buffer) {
+		map_rect(g, 0, 0, bw, bh, r);
+		intersect(g->bounds, r);
+	}
+	g->alpha *= sc->alpha;
 	return true;
+}
+
+/* the order SurfaceFlinger draws a and b in (<0: a first): siblings by z, then by creation; a child with z below 0
+ * under its parent, the others above */
+static int compare_order(struct ASurfaceControl *a, struct ASurfaceControl *b)
+{
+	struct ASurfaceControl *pa[64], *pb[64];
+	int na = 0, nb = 0;
+	for (struct ASurfaceControl *s = a; s && na < 64; s = s->parent)
+		pa[na++] = s;
+	for (struct ASurfaceControl *s = b; s && nb < 64; s = s->parent)
+		pb[nb++] = s;
+	/* from the root down to where the paths part */
+	int i = na - 1, k = nb - 1;
+	while (i >= 0 && k >= 0 && pa[i] == pb[k]) {
+		i--;
+		k--;
+	}
+	if (i < 0 && k < 0)
+		return 0;
+	if (i < 0) /* a is a parent of b */
+		return pb[k]->z < 0 ? 1 : -1;
+	if (k < 0)
+		return pa[i]->z < 0 ? -1 : 1;
+	if (pa[i]->z != pb[k]->z)
+		return pa[i]->z < pb[k]->z ? -1 : 1;
+	return pa[i]->id < pb[k]->id ? -1 : 1;
+}
+
+/* with lock held: a slot of display for sc's buffer in this frame (used: the slots of the frame so far), -1 if none;
+ * a buffer still shown from the last frame keeps its slot */
+static int slot_for(struct display *display, struct ASurfaceControl *sc, const bool *used)
+{
+	if (sc->shown_on == display && sc->shown_slot >= 0 && display->slots[sc->shown_slot].buffer == sc->buffer && !used[sc->shown_slot])
+		return sc->shown_slot;
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++)
+		if (!display->slots[i].busy && !used[i] && display->slots[i].buffer == sc->buffer)
+			return i;
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++)
+		if (!display->slots[i].busy && !used[i] && !display->slots[i].buffer)
+			return i;
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++)
+		if (!display->slots[i].busy && !used[i])
+			return i;
+	return -1;
+}
+
+/* with lock held: the frame of display's tree, its layers bottom first */
+static void show_frame(struct display *display, struct ASurfaceControl **all, size_t n_all)
+{
+	struct ASurfaceControl **layers = calloc(n_all ? n_all : 1, sizeof(*layers));
+	struct geometry *geometries = calloc(n_all ? n_all : 1, sizeof(*geometries));
+	size_t n = 0;
+	for (size_t i = 0; i < n_all; i++) {
+		struct ASurfaceControl *sc = all[i];
+		struct geometry g;
+		if (!sc->buffer || sc_root(sc)->display != display || !sc_geometry(sc, &g))
+			continue;
+		/* insertion sort by order */
+		size_t k = n++;
+		while (k > 0 && compare_order(layers[k - 1], sc) > 0) {
+			layers[k] = layers[k - 1];
+			geometries[k] = geometries[k - 1];
+			k--;
+		}
+		layers[k] = sc;
+		geometries[k] = g;
+	}
+	bool used[ATL_SURFACE_MAX_SLOTS] = {0};
+	for (size_t i = 0; i < n; i++) {
+		struct ASurfaceControl *sc = layers[i];
+		struct AHardwareBuffer *buffer = sc->buffer;
+		int slot = slot_for(display, sc, used);
+		if (slot < 0) {
+			if (!display->warned)
+				fprintf(stderr, "ASurfaceControl: no free buffer slot in the window, layer dropped\n");
+			display->warned = true;
+			continue;
+		}
+		struct slot *s = &display->slots[slot];
+		if (s->buffer != buffer) {
+			AHardwareBuffer_release(s->buffer);
+			AHardwareBuffer_acquire(buffer);
+			s->buffer = buffer;
+			struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_BUFFER, .index = slot, .width = buffer->desc.width, .height = buffer->desc.height,
+			                              .stride = buffer->strides[0], .offset = buffer->offsets[0], .fourcc = buffer->drm_format,
+			                              .modifier = buffer->modifier, .top_first = 1};
+			ANativeWindow_remoteSend(display->window, &msg, buffer->fd);
+		}
+		used[slot] = true;
+		s->busy = true;
+		s->presented = ++display->seq;
+		sc->shown_on = display;
+		sc->shown_slot = slot;
+		sc->shown_seq = s->presented;
+		/* the buffer crop (RequestedLayerState::getBufferCrop()): within the buffer, all of it if none */
+		struct geometry *g = &geometries[i];
+		float src[4] = {0, 0, buffer->desc.width, buffer->desc.height};
+		if (!rect_empty(&sc->buffer_crop))
+			intersect(src, (float[4]){sc->buffer_crop.left, sc->buffer_crop.top, sc->buffer_crop.right, sc->buffer_crop.bottom});
+		float bw, bh, dst[4];
+		buffer_size(sc, &bw, &bh);
+		map_rect(g, 0, 0, bw, bh, dst);
+		struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_LAYER, .index = slot, .serial = (uint32_t)s->presented,
+		                              .layer = {.src = {src[0], src[1], src[2] - src[0], src[3] - src[1]},
+		                                        .dst = {dst[0], dst[1], dst[2] - dst[0], dst[3] - dst[1]},
+		                                        .clip = {g->bounds[0], g->bounds[1], MAX(0, g->bounds[2] - g->bounds[0]), MAX(0, g->bounds[3] - g->bounds[1])},
+		                                        .transform = sc->transform & (ATL_SURFACE_TRANSFORM_FLIP_H | ATL_SURFACE_TRANSFORM_FLIP_V | ATL_SURFACE_TRANSFORM_ROT_90),
+		                                        .alpha = g->alpha}};
+		ANativeWindow_remoteSend(display->window, &msg, -1);
+	}
+	/* the size the window has for the producer (no ANativeWindow_getWidth(): it takes the window's remote_lock,
+	 * which the display thread holds while it waits for this lock) */
+	ANativeWindow_remoteSend(display->window, &(struct atl_surface_msg){.type = ATL_SURFACE_MSG_COMMIT, .width = display->window->width, .height = display->window->height}, -1);
+	free(layers);
+	free(geometries);
 }
 
 /* a wait for the buffer sc shows now (empty if it is not shown) */
@@ -721,11 +895,15 @@ void ASurfaceTransaction_apply(struct ASurfaceTransaction *t)
 	for (size_t i = 0; i < t->n_changes; i++) {
 		struct change *c = &t->changes[i];
 		struct ASurfaceControl *sc = c->sc;
+		if (sc_root(sc)->display)
+			sc_root(sc)->display->dirty = true;
 		if (c->mask & CHANGE_PARENT) {
 			if (c->parent)
 				c->parent->refcount++;
 			sc_unref(sc->parent);
 			sc->parent = c->parent;
+			if (sc_root(sc)->display)
+				sc_root(sc)->display->dirty = true;
 		}
 		if (c->mask & CHANGE_VISIBILITY)
 			sc->visible = c->visible;
@@ -733,6 +911,22 @@ void ASurfaceTransaction_apply(struct ASurfaceTransaction *t)
 			sc->z = c->z;
 		if (c->mask & CHANGE_DESTINATION)
 			sc->destination = c->destination;
+		if (c->mask & CHANGE_CROP)
+			sc->crop = c->crop;
+		if (c->mask & CHANGE_BUFFER_CROP)
+			sc->buffer_crop = c->buffer_crop;
+		if (c->mask & CHANGE_POSITION) {
+			sc->x = c->x;
+			sc->y = c->y;
+		}
+		if (c->mask & CHANGE_SCALE) {
+			sc->scale_x = c->scale_x;
+			sc->scale_y = c->scale_y;
+		}
+		if (c->mask & CHANGE_TRANSFORM)
+			sc->transform = c->transform;
+		if (c->mask & CHANGE_ALPHA)
+			sc->alpha = c->alpha;
 		if (c->mask & CHANGE_BUFFER) {
 			/* the old buffer is released once the widget lets go of it */
 			struct pending *p = wait_for_shown(sc);
@@ -759,22 +953,13 @@ void ASurfaceTransaction_apply(struct ASurfaceTransaction *t)
 		if (!display)
 			display = sc_root(sc)->display;
 	}
-	/* what each window shows now */
-	struct display *displays[8];
-	int n_displays = 0;
+	/* what each window whose tree changed shows now */
 	for (size_t i = 0; i < n_known; i++) {
 		struct display *d = sc_root(known[i])->display;
-		bool seen = !d;
-		for (int k = 0; k < n_displays && !seen; k++)
-			seen = displays[k] == d;
-		if (!seen && n_displays < 8)
-			displays[n_displays++] = d;
-	}
-	for (int k = 0; k < n_displays; k++) {
-		struct display *d = displays[k];
-		struct ASurfaceControl *sc = choose(d, known, n_known);
-		if (sc && !(sc->shown_on == d && sc->shown_slot >= 0 && d->shown == sc->shown_slot) && !present(d, sc))
-			fprintf(stderr, "ASurfaceControl: no free buffer slot in the window, frame dropped\n");
+		if (d && d->dirty) {
+			d->dirty = false;
+			show_frame(d, known, n_known);
+		}
 	}
 	forget_unused();
 

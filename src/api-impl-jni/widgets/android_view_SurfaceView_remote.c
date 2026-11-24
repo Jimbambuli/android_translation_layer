@@ -25,6 +25,8 @@ struct remote_buffer {
 	struct atl_surface_msg desc;
 	void *map; /* memory buffers */
 	size_t size;
+	GdkTexture *texture; /* the texture the layers of the frames show of it (ATL_SURFACE_MSG_LAYER), while it exists */
+	uint32_t serial; /* of the last LAYER (or PRESENT) of it, for its RELEASE */
 };
 
 struct remote_consumer {
@@ -34,12 +36,15 @@ struct remote_consumer {
 	int fd; /* -1 once the producer is gone */
 	gulong resize_handler;
 	GdkTexture *shown;
-	struct remote_buffer buffers[ATL_SURFACE_MAX_BUFFERS];
+	gboolean shows_layers;
+	GArray *frame; /* the layers since the last COMMIT */
+	struct remote_buffer buffers[ATL_SURFACE_MAX_SLOTS];
 };
 
 struct texture_data {
 	struct remote_consumer *consumer;
 	uint32_t index;
+	GdkTexture *texture;
 };
 
 /* the consumers of SurfaceTextures, for setDefaultBufferSize() */
@@ -50,7 +55,9 @@ static void consumer_unref(struct remote_consumer *consumer)
 {
 	if (!g_atomic_ref_count_dec(&consumer->ref))
 		return;
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++) {
+	if (consumer->frame)
+		g_array_unref(consumer->frame);
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++) {
 		if (consumer->buffers[i].map)
 			munmap(consumer->buffers[i].map, consumer->buffers[i].size);
 		if (consumer->buffers[i].fd >= 0)
@@ -71,7 +78,8 @@ static void consumer_unref(struct remote_consumer *consumer)
 
 static void consumer_send(struct remote_consumer *consumer, enum atl_surface_msg_type type, uint32_t index, int width, int height)
 {
-	struct atl_surface_msg msg = {.type = type, .index = index, .width = width, .height = height};
+	struct atl_surface_msg msg = {.type = type, .index = index, .width = width, .height = height,
+	                              .serial = type == ATL_SURFACE_MSG_RELEASE ? consumer->buffers[index].serial : 0};
 	if (consumer->fd >= 0)
 		send(consumer->fd, &msg, sizeof(msg), MSG_NOSIGNAL | MSG_DONTWAIT);
 }
@@ -80,6 +88,8 @@ static void consumer_send(struct remote_consumer *consumer, enum atl_surface_msg
 static void texture_released(void *data)
 {
 	struct texture_data *d = data;
+	if (d->texture && d->consumer->buffers[d->index].texture == d->texture)
+		d->consumer->buffers[d->index].texture = NULL;
 	consumer_send(d->consumer, ATL_SURFACE_MSG_RELEASE, d->index, 0, 0);
 	consumer_unref(d->consumer);
 	g_free(d);
@@ -96,10 +106,11 @@ static void on_resize(GtkWidget *widget, int width, int height, struct remote_co
 	consumer_send(consumer, ATL_SURFACE_MSG_SIZE, 0, width, height);
 }
 
-static void present(struct remote_consumer *consumer, uint32_t index)
+/* a texture of buffer index; its release tells the producer (NULL if it can't be made, then that is told already) */
+static GdkTexture *make_texture(struct remote_consumer *consumer, uint32_t index)
 {
 	struct remote_buffer *buffer = &consumer->buffers[index];
-	struct texture_data *d = g_new(struct texture_data, 1);
+	struct texture_data *d = g_new0(struct texture_data, 1);
 	GdkTexture *texture = NULL;
 	GError *error = NULL;
 
@@ -139,13 +150,23 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 			fprintf(stderr, "SurfaceView: a dmabuf of another process can't be shown: %s\n", error->message);
 			g_error_free(error);
 			texture_released(d);
-			return;
+			return NULL;
 		}
 	} else {
 		GBytes *bytes = g_bytes_new_with_free_func(buffer->map, buffer->size, texture_released, d);
 		texture = gdk_memory_texture_new(buffer->desc.width, buffer->desc.height, GDK_MEMORY_R8G8B8A8_PREMULTIPLIED, bytes, buffer->desc.stride);
 		g_bytes_unref(bytes);
 	}
+	d->texture = texture;
+	return texture;
+}
+
+static void present(struct remote_consumer *consumer, uint32_t index)
+{
+	struct remote_buffer *buffer = &consumer->buffers[index];
+	GdkTexture *texture = make_texture(consumer, index);
+	if (!texture)
+		return;
 	if (consumer->surface_texture) {
 		/* SurfaceTexture.queueBuffer() takes the texture over; AOSP's queueBuffer() stamps a frame without a
 		 * timestamp of its own with the monotonic clock; GL rows start at the bottom (transform FLIP_V) */
@@ -164,6 +185,70 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 	surface_view_widget_set_texture(consumer->widget, texture, !buffer->desc.top_first); // GL rows: bottom first
 }
 
+static void layer_clear(struct surface_view_layer *layer)
+{
+	g_object_unref(layer->texture);
+}
+
+/* LAYER: buffer index joins the next frame; a buffer still shown keeps its texture (GTK keeps what it imported) */
+static void add_layer(struct remote_consumer *consumer, const struct atl_surface_msg *msg)
+{
+	struct remote_buffer *buffer = &consumer->buffers[msg->index];
+	buffer->serial = msg->serial;
+	GdkTexture *texture = buffer->texture ? g_object_ref(buffer->texture) : NULL;
+	if (!texture) {
+		if (buffer->fd < 0 || !(buffer->map || buffer->desc.fourcc)) {
+			consumer_send(consumer, ATL_SURFACE_MSG_RELEASE, msg->index, 0, 0);
+			return;
+		}
+		texture = buffer->texture = make_texture(consumer, msg->index);
+		if (!texture)
+			return;
+	}
+	if (!consumer->frame) {
+		consumer->frame = g_array_new(FALSE, FALSE, sizeof(struct surface_view_layer));
+		g_array_set_clear_func(consumer->frame, (GDestroyNotify)layer_clear);
+	}
+	g_array_append_val(consumer->frame, ((struct surface_view_layer){.texture = texture, .geometry = msg->layer}));
+}
+
+/* a layer that shows all of its buffer as it is over the whole window */
+static gboolean layer_is_window(const struct surface_view_layer *layer, int width, int height)
+{
+	const struct atl_surface_layer *g = &layer->geometry;
+	return !g->transform && g->alpha >= 1 && g->src[0] == 0 && g->src[1] == 0 && g->src[2] == gdk_texture_get_width(layer->texture) &&
+	       g->src[3] == gdk_texture_get_height(layer->texture) && g->dst[0] == 0 && g->dst[1] == 0 && g->dst[2] == width && g->dst[3] == height &&
+	       g->clip[0] <= 0 && g->clip[1] <= 0 && g->clip[0] + g->clip[2] >= width && g->clip[1] + g->clip[3] >= height;
+}
+
+/* COMMIT: the layers since the last COMMIT are the frame; a frame of one layer filling the window is shown as a plain
+ * texture (GtkGraphicsOffload can hand it to the compositor) */
+static void commit(struct remote_consumer *consumer, int width, int height)
+{
+	GArray *frame = consumer->frame;
+	consumer->frame = NULL;
+	if (!consumer->widget) { /* a SurfaceTexture shows no layers */
+		if (frame)
+			g_array_unref(frame);
+		return;
+	}
+	consumer->widget->crop = FALSE;
+	if (frame && frame->len == 1 && layer_is_window(&g_array_index(frame, struct surface_view_layer, 0), width, height)) {
+		GdkTexture *texture = g_object_ref(g_array_index(frame, struct surface_view_layer, 0).texture);
+		g_array_unref(frame);
+		surface_view_widget_set_layers(consumer->widget, NULL, 0, 0);
+		consumer->shown = texture;
+		surface_view_widget_set_texture(consumer->widget, texture, FALSE);
+	} else {
+		surface_view_widget_set_layers(consumer->widget, frame, width, height);
+		consumer->shown = NULL;
+		surface_view_widget_set_texture(consumer->widget, NULL, FALSE);
+	}
+	consumer->shows_layers = TRUE;
+	consumer->widget->frame_callback_data = consumer;
+	consumer->widget->frame_callback = frame_callback;
+}
+
 static void add_buffer(struct remote_consumer *consumer, const struct atl_surface_msg *msg, int fd, int fd1)
 {
 	struct remote_buffer *buffer = &consumer->buffers[msg->index];
@@ -179,6 +264,7 @@ static void add_buffer(struct remote_consumer *consumer, const struct atl_surfac
 	buffer->desc = *msg;
 	buffer->map = NULL;
 	buffer->size = 0;
+	buffer->texture = NULL;
 	if (!msg->fourcc) {
 		buffer->size = (size_t)msg->stride * msg->height;
 		buffer->map = mmap(NULL, buffer->size, PROT_READ, MAP_SHARED, fd, 0);
@@ -201,6 +287,8 @@ static void disconnect(struct remote_consumer *consumer, gboolean keep_frame)
 		}
 		if (!keep_frame && consumer->shown && widget->texture == consumer->shown)
 			surface_view_widget_set_texture(widget, NULL, FALSE);
+		if (!keep_frame && consumer->shows_layers)
+			surface_view_widget_set_layers(widget, NULL, 0, 0);
 	}
 	consumer->shown = NULL;
 	close(consumer->fd);
@@ -225,7 +313,7 @@ static gboolean on_message(int fd, GIOCondition condition, struct remote_consume
 			if (cmsg->cmsg_len >= CMSG_LEN(2 * sizeof(int)))
 				memcpy(&buffer_fd1, CMSG_DATA(cmsg) + sizeof(int), sizeof(int));
 		}
-	if (len != sizeof(msg) || msg.index >= ATL_SURFACE_MAX_BUFFERS || msg.type == ATL_SURFACE_MSG_DISCONNECT) {
+	if (len != sizeof(msg) || msg.index >= ATL_SURFACE_MAX_SLOTS || msg.type == ATL_SURFACE_MSG_DISCONNECT) {
 		if (buffer_fd >= 0)
 			close(buffer_fd);
 		if (buffer_fd1 >= 0)
@@ -248,10 +336,15 @@ static gboolean on_message(int fd, GIOCondition condition, struct remote_consume
 		if (consumer->buffers[msg.index].fd >= 0 && (consumer->buffers[msg.index].map || consumer->buffers[msg.index].desc.fourcc)) {
 			if (consumer->widget)
 				consumer->widget->crop = msg.crop;
+			consumer->buffers[msg.index].serial = msg.serial;
 			present(consumer, msg.index);
 		}
 		else
 			consumer_send(consumer, ATL_SURFACE_MSG_RELEASE, msg.index, 0, 0);
+	} else if (msg.type == ATL_SURFACE_MSG_LAYER) {
+		add_layer(consumer, &msg);
+	} else if (msg.type == ATL_SURFACE_MSG_COMMIT) {
+		commit(consumer, msg.width, msg.height);
 	}
 	return G_SOURCE_CONTINUE;
 }
@@ -276,7 +369,7 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemote(JNIEn
 	g_atomic_ref_count_init(&consumer->ref);
 	consumer->widget = g_object_ref(surface_view_widget_of(_PTR(surface_view)));
 	consumer->fd = fds[0];
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++)
 		consumer->buffers[i].fd = consumer->buffers[i].fd1 = -1;
 	/* the producer may be waiting for its size inside a call the main thread waits for: read here, not there (the
 	 * size the main thread keeps for other threads, no GTK call on this binder thread) */
@@ -297,7 +390,7 @@ JNIEXPORT jint JNICALL Java_android_view_SurfaceView_native_1connectRemoteTextur
 	g_atomic_ref_count_init(&consumer->ref);
 	consumer->surface_texture = (*env)->NewGlobalRef(env, surface_texture);
 	consumer->fd = fds[0];
-	for (int i = 0; i < ATL_SURFACE_MAX_BUFFERS; i++)
+	for (int i = 0; i < ATL_SURFACE_MAX_SLOTS; i++)
 		consumer->buffers[i].fd = consumer->buffers[i].fd1 = -1;
 	int width = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferWidth", "()I"));
 	int height = (*env)->CallIntMethod(env, surface_texture, _METHOD(_CLASS(surface_texture), "getDefaultBufferHeight", "()I"));

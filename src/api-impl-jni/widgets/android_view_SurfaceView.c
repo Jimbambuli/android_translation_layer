@@ -35,12 +35,59 @@ static void surface_view_widget_size_allocate(GtkWidget *widget, int width, int 
 	}
 }
 
+/* a layer of an ASurfaceControl tree (AOSP: the layer SurfaceFlinger composes): the part src of the buffer, flipped and
+ * rotated by the transform, fills dst, cut to clip, with alpha; the frame's window coordinates scaled to the widget */
+static void snapshot_layer(GdkSnapshot *snapshot, const struct surface_view_layer *layer, float scale_x, float scale_y)
+{
+	const struct atl_surface_layer *g = &layer->geometry;
+	if (g->src[2] <= 0 || g->src[3] <= 0 || g->dst[2] <= 0 || g->dst[3] <= 0)
+		return;
+	gtk_snapshot_push_clip(snapshot, &GRAPHENE_RECT_INIT(g->clip[0] * scale_x, g->clip[1] * scale_y, g->clip[2] * scale_x, g->clip[3] * scale_y));
+	if (g->alpha < 1)
+		gtk_snapshot_push_opacity(snapshot, g->alpha);
+	gtk_snapshot_save(snapshot);
+	/* dst as the unit square */
+	gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(g->dst[0] * scale_x, g->dst[1] * scale_y));
+	gtk_snapshot_scale(snapshot, g->dst[2] * scale_x, g->dst[3] * scale_y);
+	/* the buffer's transform in it: points go through the flips first, then the rotation (ANativeWindowTransform) */
+	if (g->transform & ATL_SURFACE_TRANSFORM_ROT_90) {
+		gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(1, 0));
+		gtk_snapshot_rotate(snapshot, 90);
+	}
+	if (g->transform & ATL_SURFACE_TRANSFORM_FLIP_H) {
+		gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(1, 0));
+		gtk_snapshot_scale(snapshot, -1, 1);
+	}
+	if (g->transform & ATL_SURFACE_TRANSFORM_FLIP_V) {
+		gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(0, 1));
+		gtk_snapshot_scale(snapshot, 1, -1);
+	}
+	/* the unit square as src of the buffer */
+	gtk_snapshot_scale(snapshot, 1 / g->src[2], 1 / g->src[3]);
+	gtk_snapshot_translate(snapshot, &GRAPHENE_POINT_INIT(-g->src[0], -g->src[1]));
+	gtk_snapshot_push_clip(snapshot, &GRAPHENE_RECT_INIT(g->src[0], g->src[1], g->src[2], g->src[3]));
+	gtk_snapshot_append_texture(snapshot, layer->texture, &GRAPHENE_RECT_INIT(0, 0, gdk_texture_get_width(layer->texture), gdk_texture_get_height(layer->texture)));
+	gtk_snapshot_pop(snapshot);
+	gtk_snapshot_restore(snapshot);
+	if (g->alpha < 1)
+		gtk_snapshot_pop(snapshot);
+	gtk_snapshot_pop(snapshot);
+}
+
 static void surface_view_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 {
 	SurfaceViewWidget *surface_view_widget = SURFACE_VIEW_WIDGET(widget);
+	if (surface_view_widget->layers && surface_view_widget->frame_width > 0 && surface_view_widget->frame_height > 0) {
+		float scale_x = (float)gtk_widget_get_width(widget) / surface_view_widget->frame_width;
+		float scale_y = (float)gtk_widget_get_height(widget) / surface_view_widget->frame_height;
+		gtk_snapshot_push_clip(snapshot, &GRAPHENE_RECT_INIT(0, 0, gtk_widget_get_width(widget), gtk_widget_get_height(widget)));
+		for (guint i = 0; i < surface_view_widget->layers->len; i++)
+			snapshot_layer(snapshot, &g_array_index(surface_view_widget->layers, struct surface_view_layer, i), scale_x, scale_y);
+		gtk_snapshot_pop(snapshot);
+	}
 #if (GTK_MAJOR_VERSION >= 4 && GTK_MINOR_VERSION >= 22)
 	/* with direct EGL, only punch a hole when nothing (e.g. MediaCodec) gave us a texture to draw */
-	if (getenv("ATL_DIRECT_EGL") && !surface_view_widget->texture) {
+	if (getenv("ATL_DIRECT_EGL") && !surface_view_widget->texture && !surface_view_widget->layers) {
 		graphene_rect_t bounds = GRAPHENE_RECT_INIT(0, 0, gtk_widget_get_width(widget), gtk_widget_get_height(widget));
 		/* the exact color doesn't really matter with GSK_PORTER_DUFF_CLEAR */
 		GskRenderNode *hole = gsk_color_node_new(&(GdkRGBA){0, 0, 0, 0}, &bounds);
@@ -84,6 +131,7 @@ static void surface_view_widget_dispose(GObject *object)
 		g_object_unref(surface_view_widget->texture);
 		surface_view_widget->texture = NULL;
 	}
+	g_clear_pointer(&surface_view_widget->layers, g_array_unref);
 	G_OBJECT_CLASS(surface_view_widget_parent_class)->dispose(object);
 }
 
@@ -117,6 +165,15 @@ SurfaceViewWidget *surface_view_widget_of(GtkWidget *view_widget)
 GtkWidget *surface_view_widget_new(void)
 {
 	return g_object_new(surface_view_widget_get_type(), NULL);
+}
+
+void surface_view_widget_set_layers(SurfaceViewWidget *surface_view_widget, GArray *layers, int frame_width, int frame_height)
+{
+	g_clear_pointer(&surface_view_widget->layers, g_array_unref);
+	surface_view_widget->layers = layers;
+	surface_view_widget->frame_width = frame_width;
+	surface_view_widget->frame_height = frame_height;
+	gtk_widget_queue_draw(GTK_WIDGET(surface_view_widget));
 }
 
 void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, GdkTexture *texture, gboolean needs_flip)

@@ -1,6 +1,19 @@
 #include <gtk/gtk.h>
 #include <stdint.h>
 
+/* how a buffer of an ASurfaceControl tree is shown (ATL_SURFACE_MSG_LAYER) */
+struct atl_surface_layer {
+	float src[4]; /* the part of the buffer shown: x, y, width, height in buffer pixels */
+	float dst[4]; /* where it is shown (after the transform) in the window */
+	float clip[4]; /* the part of the window it may cover */
+	uint32_t transform; /* ANativeWindowTransform of the buffer: flips, then a rotation by 90 degrees */
+	float alpha;
+};
+/* ANativeWindowTransform */
+#define ATL_SURFACE_TRANSFORM_FLIP_H 0x01
+#define ATL_SURFACE_TRANSFORM_FLIP_V 0x02
+#define ATL_SURFACE_TRANSFORM_ROT_90 0x04
+
 G_DECLARE_FINAL_TYPE(SurfaceViewWidget, surface_view_widget, SURFACE_VIEW, WIDGET, GtkWidget)
 
 struct _SurfaceViewWidget {
@@ -15,6 +28,16 @@ struct _SurfaceViewWidget {
 	gint width;
 	gint height;
 	gint realized;
+	/* the layers of an ASurfaceControl tree (struct surface_view_layer) in the window size frame_width x frame_height,
+	 * instead of texture */
+	GArray *layers;
+	int frame_width;
+	int frame_height;
+};
+
+struct surface_view_layer {
+	GdkTexture *texture;
+	struct atl_surface_layer geometry;
 };
 
 struct _SurfaceViewWidgetClass {
@@ -22,6 +45,8 @@ struct _SurfaceViewWidgetClass {
 };
 
 void surface_view_widget_set_texture(SurfaceViewWidget *surface_view_widget, GdkTexture *texture, gboolean needs_flip);
+/* takes over layers (an array of struct surface_view_layer whose clear function unrefs the texture, NULL for none) */
+void surface_view_widget_set_layers(SurfaceViewWidget *surface_view_widget, GArray *layers, int frame_width, int frame_height);
 /* the SurfaceViewWidget of a SurfaceView's widget (Surface.widget), in any thread */
 SurfaceViewWidget *surface_view_widget_of(GtkWidget *view_widget);
 
@@ -35,9 +60,14 @@ enum atl_surface_msg_type {
 	ATL_SURFACE_MSG_RELEASE, /* consumer: buffer `index` may be drawn into again */
 	ATL_SURFACE_MSG_FRAME, /* consumer: the widget drew a frame (the producer's vsync) */
 	ATL_SURFACE_MSG_SIZE, /* consumer: the widget's size */
+	/* the surfaces of an ASurfaceControl tree (libandroid/surface_control.c): a frame is the LAYER messages since the
+	 * last COMMIT, drawn in their order */
+	ATL_SURFACE_MSG_LAYER, /* producer: buffer `index` is shown with the geometry of `layer`, `serial` comes back in its RELEASE */
+	ATL_SURFACE_MSG_COMMIT, /* producer: show the layers sent since the last COMMIT; width and height are the window's size */
 };
 
 #define ATL_SURFACE_MAX_BUFFERS 4
+#define ATL_SURFACE_MAX_SLOTS 16 /* buffer indexes the consumer takes (ASurfaceControl shows several buffers at once) */
 
 struct atl_surface_msg {
 	uint32_t type;
@@ -57,6 +87,9 @@ struct atl_surface_msg {
 	uint32_t offset1;
 	uint32_t matrix;
 	uint32_t full_range;
+	/* LAYER: the RELEASE of buffer `index` carries the serial of the last LAYER that showed it */
+	uint32_t serial;
+	struct atl_surface_layer layer;
 };
 
 /* the planes of a frame of a hardware decoder (MediaCodec), on its GdkTexture as "atl-dmabuf" (g_object_set_data):
