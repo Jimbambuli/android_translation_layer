@@ -27,6 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <drm/drm_fourcc.h>
 #include <jni.h>
 
 #include "../api-impl-jni/widgets/android_view_SurfaceView.h"
@@ -89,6 +90,7 @@ struct ASurfaceControl {
 	float scale_x, scale_y;
 	int32_t transform; /* of the buffer, ANativeWindowTransform */
 	float alpha;
+	int32_t dataspace; /* of the buffer, ADataSpace */
 	struct AHardwareBuffer *buffer;
 	OnBufferRelease release_cb;
 	void *release_ctx;
@@ -111,6 +113,7 @@ enum {
 	CHANGE_SCALE = 1 << 8,
 	CHANGE_TRANSFORM = 1 << 9,
 	CHANGE_ALPHA = 1 << 10,
+	CHANGE_DATASPACE = 1 << 11,
 };
 
 struct change {
@@ -129,6 +132,7 @@ struct change {
 	float scale_x, scale_y;
 	int32_t transform;
 	float alpha;
+	int32_t dataspace;
 	struct ASurfaceControl *parent; /* a reference */
 };
 
@@ -571,6 +575,15 @@ void ASurfaceTransaction_setScale(struct ASurfaceTransaction *aSurfaceTransactio
 	c->scale_y = yScale;
 	c->mask |= CHANGE_SCALE;
 }
+/* the data space of the buffer: for a YUV buffer its matrix and range (HDR is not shown as such) */
+void ASurfaceTransaction_setBufferDataSpace(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, int32_t aDataSpace)
+{
+	CHECK_SURFACE();
+	struct change *c = change_of(aSurfaceTransaction, aSurfaceControl);
+	c->dataspace = aDataSpace;
+	c->mask |= CHANGE_DATASPACE;
+}
+
 void ASurfaceTransaction_setBufferAlpha(struct ASurfaceTransaction *aSurfaceTransaction, struct ASurfaceControl *aSurfaceControl, float alpha)
 {
 	CHECK_SURFACE();
@@ -589,7 +602,6 @@ void ASurfaceTransaction_setBufferAlpha(struct ASurfaceTransaction *aSurfaceTran
 	}
 REGISTER_ONLY(ASurfaceTransaction_setBufferTransparency, int8_t transparency)
 REGISTER_ONLY(ASurfaceTransaction_setDamageRegion, const void *rects, uint32_t count)
-REGISTER_ONLY(ASurfaceTransaction_setBufferDataSpace, int32_t aDataSpace)
 REGISTER_ONLY(ASurfaceTransaction_setHdrMetadata_smpte2086, void *metadata)
 REGISTER_ONLY(ASurfaceTransaction_setHdrMetadata_cta861_3, void *metadata)
 REGISTER_ONLY(ASurfaceTransaction_setExtendedRangeBrightness, float currentBufferRatio, float desiredRatio)
@@ -822,7 +834,19 @@ static void show_frame(struct display *display, struct ASurfaceControl **all, si
 			struct atl_surface_msg msg = {.type = ATL_SURFACE_MSG_BUFFER, .index = slot, .width = buffer->desc.width, .height = buffer->desc.height,
 			                              .stride = buffer->strides[0], .offset = buffer->offsets[0], .fourcc = buffer->drm_format,
 			                              .modifier = buffer->modifier, .top_first = 1};
-			ANativeWindow_remoteSend(display->window, &msg, buffer->fd);
+			if (buffer->drm_format == DRM_FORMAT_NV12 || buffer->drm_format == DRM_FORMAT_P010) {
+				/* a video frame (MediaCodec through an ImageReader): both planes and the YUV matrix and range
+				 * of the data space (ADataSpace STANDARD_*, RANGE_FULL; BT.709 limited without one) */
+				int standard = (sc->dataspace >> 16) & 63;
+				msg.n_planes = 2;
+				msg.stride1 = buffer->strides[1];
+				msg.offset1 = buffer->offsets[1];
+				msg.matrix = standard >= 2 && standard <= 5 ? 601 : standard == 6 || standard == 7 ? 2020 : 709;
+				msg.full_range = ((sc->dataspace >> 27) & 7) == 1;
+				ANativeWindow_remoteSendFds(display->window, &msg, (int[]){buffer->fd, buffer->fd}, 2);
+			} else {
+				ANativeWindow_remoteSend(display->window, &msg, buffer->fd);
+			}
 		}
 		used[slot] = true;
 		s->busy = true;
@@ -927,6 +951,8 @@ void ASurfaceTransaction_apply(struct ASurfaceTransaction *t)
 			sc->transform = c->transform;
 		if (c->mask & CHANGE_ALPHA)
 			sc->alpha = c->alpha;
+		if (c->mask & CHANGE_DATASPACE)
+			sc->dataspace = c->dataspace;
 		if (c->mask & CHANGE_BUFFER) {
 			/* the old buffer is released once the widget lets go of it */
 			struct pending *p = wait_for_shown(sc);
