@@ -370,6 +370,11 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
 	GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(event_controller));
 	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
 	GtkPropagationPhase phase = gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(event_controller));
+	/* The window's root view gave the event to the window (Window.Callback, AOSP DecorView) and all its
+	 * views in the capture phase. On AOSP the window gets each event once: an event no view took must
+	 * not come back in the bubble phase (Activity.onTouchEvent() would hear a tap twice, a double tap). */
+	if (wrapper->touch_root && phase == GTK_PHASE_BUBBLE)
+		return false;
 	guint32 timestamp = gdk_event_get_time(event);
 	/* A mouse is a mouse on Android too (SOURCE_MOUSE, TOOL_TYPE_MOUSE, getButtonState()): apps and web
 	 * content treat it differently from a finger, e.g. a drag selects text instead of turning the page.
