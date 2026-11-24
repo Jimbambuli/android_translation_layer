@@ -89,11 +89,24 @@ struct AHardwareBuffer {
 	int lock_count;
 	uint64_t lock_usage;
 	struct native_handle *native_handle;
+	void (*destroy)(void *data); /* ahb_from_dmabuf(): frees what keeps the memory (a decoder's frame) */
+	void *destroy_data;
 };
 
 /* the AHardwareBuffer behind a pointer an app passes (Vulkan), NULL if it is none */
 struct AHardwareBuffer *ahb_from_pointer(const void *pointer);
 /* the AHardwareBuffer of an EGLClientBuffer (its ANativeWindowBuffer), NULL if it is none */
 struct AHardwareBuffer *ahb_from_client_buffer(const void *client_buffer);
+
+/* a dma-buf of another allocator (a hardware decoder's frame, MediaCodec into an ImageReader) as an AHardwareBuffer of
+ * the given format: the planes are in the one fd (taken over); destroy(data) runs when the producer gets the buffer back or with the
+ * last reference */
+struct AHardwareBuffer *ahb_from_dmabuf(const AHardwareBuffer_Desc *desc, uint32_t drm_format, uint64_t modifier, int fd,
+                                        int plane_count, const uint32_t *offsets, const uint32_t *strides,
+                                        void (*destroy)(void *data), void *data);
+
+/* the producer takes its memory back (AOSP: the consumer released the buffer to the BufferQueue, which the producer
+ * may fill again): destroy() of ahb_from_dmabuf() runs now, the buffer stays valid for whoever holds it */
+void ahb_return_to_producer(struct AHardwareBuffer *buffer);
 
 #endif

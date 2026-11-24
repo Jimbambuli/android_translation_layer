@@ -154,9 +154,10 @@ public class MediaCodec {
 			if (surface != null && !format.containsKey("color-format"))
 				format.setInteger("color-format", 0x7F000789);
 			/* the frames the app holds come on top of the decoder's own; AOSP lets a Surface's consumer hold
-			 * mRenderingDepth (3) more */
+			 * mRenderingDepth (3) more, an ImageReader its maxImages */
+			int consumerFrames = surface != null && surface.atl_imageReader != null ? surface.atl_imageReader.getMaxImages() : 3;
 			native_configure_video(native_codec, format.getByteBuffer("csd-0"), format.getByteBuffer("csd-1"), surface,
-			                       format.getInteger("rotation-degrees", 0), outputBuffers.length + 3);
+			                       format.getInteger("rotation-degrees", 0), outputBuffers.length + consumerFrames);
 		} else {
 			System.out.println("configure: format " + format + " not implemented");
 			Thread.dumpStack();

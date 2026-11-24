@@ -24,10 +24,12 @@
 #include <libswscale/swscale.h>
 
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "../defines.h"
 #include "../util.h"
 #include "../generated_headers/android_media_MediaCodec.h"
+#include "../../libandroid/hardware_buffer.h"
 #include "../../libandroid/native_window.h"
 #include "../widgets/android_view_SurfaceView.h"
 #include "jni.h"
@@ -49,6 +51,7 @@ struct ATL_codec_context {
 			int rotation;            // degrees clockwise (the format's rotation-degrees), the frames are turned
 			gboolean crop;           // VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
 			struct ANativeWindow *remote; // the window of a Surface of another process of the app
+			jobject image_reader; // global ref: the ImageReader of an ImageReader's Surface
 			size_t extradata_size;
 			uint8_t *extradata;
 		} video;
@@ -283,11 +286,19 @@ static void set_output_surface(JNIEnv *env, struct ATL_codec_context *ctx, jobje
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
 	if (ctx->video.remote)
 		ANativeWindow_release(ctx->video.remote);
+	if (ctx->video.image_reader)
+		(*env)->DeleteGlobalRef(env, ctx->video.image_reader);
 	ctx->video.surface_texture = NULL;
 	ctx->video.surface_view_widget = NULL;
 	ctx->video.remote = NULL;
+	ctx->video.image_reader = NULL;
 	if (!surface)
 		return;
+	jobject image_reader = _GET_OBJ_FIELD(surface, "atl_imageReader", "Landroid/media/ImageReader;");
+	if (!_GET_LONG_FIELD(surface, "widget") && image_reader) {
+		ctx->video.image_reader = (*env)->NewGlobalRef(env, image_reader);
+		return;
+	}
 	if (!_GET_LONG_FIELD(surface, "widget") && _GET_OBJ_FIELD(surface, "atl_endpoint", "Landroid/os/IBinder;")) {
 		ctx->video.remote = ANativeWindow_fromSurface(env, surface);
 		return;
@@ -578,6 +589,111 @@ JNIEXPORT jint JNICALL Java_android_media_MediaCodec_native_1dequeueOutputBuffer
 	return 0;
 }
 
+int AHardwareBuffer_allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **outBuffer);
+int AHardwareBuffer_lockPlanes(struct AHardwareBuffer *buffer, uint64_t usage, int32_t fence, const ARect *rect, AHardwareBuffer_Planes *outPlanes);
+int AHardwareBuffer_unlock(struct AHardwareBuffer *buffer, int32_t *fence);
+void AHardwareBuffer_release(struct AHardwareBuffer *buffer);
+
+#define AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM 1
+#define AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420 0x23
+#define AHARDWAREBUFFER_FORMAT_YCbCr_P010 0x36
+#define AHARDWAREBUFFER_USAGE_CPU_READ_MASK 0xf
+#define AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN 0x30
+
+static void free_drm_frame(void *data)
+{
+	AVFrame *drm_frame = data;
+	av_frame_free(&drm_frame);
+}
+
+/* the decoder's frame itself as the buffer (AOSP: the codec's gralloc buffer goes to the consumer): its dma-buf, NV12
+ * or P010 with both planes in one object; the mapped frame keeps the decoder's surface until the reader lets go of the
+ * buffer (ahb_return_to_producer()) */
+static struct AHardwareBuffer *hw_frame_buffer(AVFrame *frame, uint64_t usage)
+{
+	AVFrame *drm_frame = av_frame_alloc();
+	drm_frame->format = AV_PIX_FMT_DRM_PRIME;
+	if (av_hwframe_map(drm_frame, frame, AV_HWFRAME_MAP_READ) < 0) {
+		av_frame_free(&drm_frame);
+		return NULL;
+	}
+	const AVDRMFrameDescriptor *desc = (void *)drm_frame->data[0];
+	uint32_t drm_format = get_drm_frame_format(desc);
+	uint32_t offsets[2], strides[2];
+	int n = 0;
+	for (int i = 0; i < desc->nb_layers; i++) {
+		for (int j = 0; j < desc->layers[i].nb_planes && n < 2; j++, n++) {
+			offsets[n] = desc->layers[i].planes[j].offset;
+			strides[n] = desc->layers[i].planes[j].pitch;
+		}
+	}
+	if (desc->nb_objects != 1 || n != 2 || (drm_format != DRM_FORMAT_NV12 && drm_format != DRM_FORMAT_P010)) {
+		av_frame_free(&drm_frame);
+		return NULL;
+	}
+	AHardwareBuffer_Desc ahb_desc = {.width = frame->width, .height = frame->height, .layers = 1, .usage = usage,
+	                                 .format = drm_format == DRM_FORMAT_NV12 ? AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420 : AHARDWAREBUFFER_FORMAT_YCbCr_P010};
+	struct AHardwareBuffer *buffer = ahb_from_dmabuf(&ahb_desc, drm_format, desc->objects[0].format_modifier, dup(desc->objects[0].fd),
+	                                                 n, offsets, strides, free_drm_frame, drm_frame);
+	if (!buffer)
+		av_frame_free(&drm_frame);
+	return buffer;
+}
+
+/* a frame in memory converted into a new buffer: RGBA for an RGBA reader, else NV12 (AOSP's flexible YUV) */
+static struct AHardwareBuffer *sw_frame_buffer(struct ATL_codec_context *ctx, AVFrame *frame, uint64_t usage, int32_t reader_format)
+{
+	bool rgba = reader_format == AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM;
+	AHardwareBuffer_Desc desc = {.width = frame->width, .height = frame->height, .layers = 1, .usage = usage | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
+	                             .format = rgba ? AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM : AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420};
+	struct AHardwareBuffer *buffer;
+	AHardwareBuffer_Planes planes;
+	if (AHardwareBuffer_allocate(&desc, &buffer))
+		return NULL;
+	if (AHardwareBuffer_lockPlanes(buffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1, NULL, &planes)) {
+		AHardwareBuffer_release(buffer);
+		return NULL;
+	}
+	struct SwsContext *sws = sws_cached(&ctx->video.sws, frame, frame->width, frame->height, rgba ? AV_PIX_FMT_RGBA : AV_PIX_FMT_NV12, 0);
+	uint8_t *dst[2] = {planes.planes[0].data, rgba ? NULL : planes.planes[1].data};
+	int dst_stride[2] = {planes.planes[0].rowStride, rgba ? 0 : planes.planes[1].rowStride};
+	sws_scale(sws, (const uint8_t *const *)frame->data, frame->linesize, 0, frame->height, dst, dst_stride);
+	AHardwareBuffer_unlock(buffer, NULL);
+	return buffer;
+}
+
+/* AOSP: the frame's buffer is queued to the ImageReader (BufferQueue) with its timestamp; the reader drops it when it
+ * is full. A reader that reads on the CPU gets a copy in linear memory (the decoder's surfaces may be tiled). */
+static void queue_to_image_reader(JNIEnv *env, struct ATL_codec_context *ctx, AVFrame *frame, jlong timestamp_ns)
+{
+	jobject reader = ctx->video.image_reader;
+	jlong usage = (*env)->CallLongMethod(env, reader, _METHOD(_CLASS(reader), "getUsage", "()J"));
+	jint format = (*env)->CallIntMethod(env, reader, _METHOD(_CLASS(reader), "getHardwareBufferFormat", "()I"));
+	struct AHardwareBuffer *buffer = NULL;
+	if (frame->hw_frames_ctx && !(usage & AHARDWAREBUFFER_USAGE_CPU_READ_MASK) && format != AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM)
+		buffer = hw_frame_buffer(frame, usage);
+	if (!buffer && frame->hw_frames_ctx) {
+		AVFrame *sw_frame = av_frame_alloc();
+		if (av_hwframe_transfer_data(sw_frame, frame, 0) < 0 || av_frame_copy_props(sw_frame, frame) < 0) {
+			fprintf(stderr, "skipping %dx%d frame: can't copy it from the hardware\n", frame->width, frame->height);
+			av_frame_free(&sw_frame);
+			av_frame_free(&frame);
+			return;
+		}
+		av_frame_free(&frame);
+		frame = sw_frame;
+	}
+	if (!buffer)
+		buffer = sw_frame_buffer(ctx, frame, usage, format);
+	int width = frame->width, height = frame->height;
+	av_frame_free(&frame);
+	if (!buffer) {
+		fprintf(stderr, "skipping %dx%d frame: no buffer for the ImageReader\n", width, height);
+		return;
+	}
+	(*env)->CallBooleanMethod(env, reader, _METHOD(_CLASS(reader), "queueHardwareBuffer", "(JJII)Z"), timestamp_ns, _INTPTR(buffer), width, height);
+}
+
 // callback to perform wayland stuff on main thread
 static gboolean render_frame(void *data)
 {
@@ -640,9 +756,13 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1releaseOutputBuffer
 		if (!frame)
 			return;
 
-		if (!render || (!ctx->video.surface_view_widget && !ctx->video.surface_texture && !ctx->video.remote)) {
+		if (!render || (!ctx->video.surface_view_widget && !ctx->video.surface_texture && !ctx->video.remote && !ctx->video.image_reader)) {
 			fprintf(stderr, "skipping %dx%d frame!\n", frame->width, frame->height);
 			av_frame_free(&frame);
+			return;
+		}
+		if (ctx->video.image_reader) {
+			queue_to_image_reader(env, ctx, frame, presentationTimeNs ? presentationTimeNs : frame->pts * 1000);
 			return;
 		}
 
@@ -744,6 +864,8 @@ JNIEXPORT void JNICALL Java_android_media_MediaCodec_native_1release(JNIEnv *env
 		(*env)->DeleteGlobalRef(env, ctx->video.surface_texture);
 	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.remote)
 		ANativeWindow_release(ctx->video.remote);
+	if (ctx->codec->codec_type == AVMEDIA_TYPE_VIDEO && ctx->video.image_reader)
+		(*env)->DeleteGlobalRef(env, ctx->video.image_reader);
 
 	avcodec_free_context(&ctx->codec);
 	free(ctx);

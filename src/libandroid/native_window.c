@@ -20,6 +20,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 
 #include <EGL/egl.h>
@@ -144,6 +145,8 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 	if (native_window->surface) {
 		JNIEnv *env = ndk_jni_env();
 		(*env)->DeleteGlobalRef(env, native_window->surface);
+		if (native_window->image_reader)
+			(*env)->DeleteGlobalRef(env, native_window->image_reader);
 	}
 	g_free(native_window->cpu.bits);
 	if (native_window->remote_fd >= 0) {
@@ -335,6 +338,21 @@ void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*
 	native_window->remote_handler = handler;
 	native_window->remote_data = data;
 	g_mutex_unlock(&native_window->remote_lock);
+}
+
+/* the Surface of an ImageReader (Surface.atl_imageReader): the producer (MediaCodec, the camera, the CPU) queues its
+ * images into the reader; the window's size is the reader's, as AOSP's consumer default buffer size */
+static ANativeWindow *image_reader_window(JNIEnv *env, jobject surface, jobject image_reader)
+{
+	jclass class = (*env)->GetObjectClass(env, image_reader);
+	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
+	native_window->refcount = 1;
+	native_window->remote_fd = -1;
+	native_window->width = (*env)->CallIntMethod(env, image_reader, (*env)->GetMethodID(env, class, "getWidth", "()I"));
+	native_window->height = (*env)->CallIntMethod(env, image_reader, (*env)->GetMethodID(env, class, "getHeight", "()I"));
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
+	native_window->image_reader = (*env)->NewGlobalRef(env, image_reader);
+	return native_window;
 }
 
 /* a Surface of another process (Surface.atl_endpoint): its window draws into buffers that the process showing
@@ -537,6 +555,22 @@ int32_t ANativeWindow_unlockAndPost(ANativeWindow *window)
 		/* Android's RGBA_8888 buffers are premultiplied */
 		format = window->cpu.locked_format == WINDOW_FORMAT_RGBX_8888 ? GDK_MEMORY_R8G8B8X8 : GDK_MEMORY_R8G8B8A8_PREMULTIPLIED;
 		stride = (size_t)width * 4;
+	}
+	if (window->image_reader) {
+		/* the reader's one plane of rows (ImageReader.queueImage()), as Surface.unlockCanvasAndPost() queues */
+		JNIEnv *env = ndk_jni_env();
+		jclass byte_buffer = (*env)->FindClass(env, "java/nio/ByteBuffer");
+		jobject plane = (*env)->CallStaticObjectMethod(env, byte_buffer, (*env)->GetStaticMethodID(env, byte_buffer, "allocateDirect", "(I)Ljava/nio/ByteBuffer;"), (jint)g_bytes_get_size(bytes));
+		memcpy((*env)->GetDirectBufferAddress(env, plane), g_bytes_get_data(bytes, NULL), g_bytes_get_size(bytes));
+		g_bytes_unref(bytes);
+		jobjectArray planes = (*env)->NewObjectArray(env, 1, byte_buffer, plane);
+		jintArray row_strides = (*env)->NewIntArray(env, 1);
+		jintArray pixel_strides = (*env)->NewIntArray(env, 1);
+		(*env)->SetIntArrayRegion(env, row_strides, 0, 1, (jint[]){stride});
+		(*env)->SetIntArrayRegion(env, pixel_strides, 0, 1, (jint[]){stride / width});
+		(*env)->CallBooleanMethod(env, window->image_reader, (*env)->GetMethodID(env, (*env)->GetObjectClass(env, window->image_reader), "queueImage", "(J[Ljava/nio/ByteBuffer;[I[I)Z"),
+		                          (jlong)g_get_monotonic_time() * 1000, planes, row_strides, pixel_strides);
+		return 0;
 	}
 	GdkTexture *texture = gdk_memory_texture_new(width, height, format, bytes, stride);
 	g_bytes_unref(bytes);
@@ -823,8 +857,12 @@ ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface)
 	/* no SurfaceView widget of this process: a Surface of another process or of a SurfaceTexture, whose buffers go
 	 * over a socket to the consumer (Surface.atl_connect()); a released Surface has neither (AOSP: no native object,
 	 * NULL). Waiting below for a widget to get mapped would spin forever on a NULL widget. */
-	if (!_GET_LONG_FIELD(surface, "widget"))
+	if (!_GET_LONG_FIELD(surface, "widget")) {
+		jobject image_reader = _GET_OBJ_FIELD(surface, "atl_imageReader", "Landroid/media/ImageReader;");
+		if (image_reader)
+			return image_reader_window(env, surface, image_reader);
 		return remote_window_fromSurface(env, surface);
+	}
 
 	/* AOSP android_view_Surface_getNativeWindow(): a Surface without a native surface (released, or of a
 	 * SurfaceView that is not in a window) gives NULL; here that is a Surface without a widget or a SurfaceView

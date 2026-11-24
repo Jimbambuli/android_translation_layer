@@ -300,6 +300,7 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
                                                                   	'src/api-impl-jni/bluetooth/com_android_bluetooth_bluez_BluezBus.c',
                                                                   	'src/api-impl-jni/telephony/com_android_internal_telephony_ModemManagerPhone.c',
                                                                   	'src/api-impl-jni/hardware/android_hardware_camera2_impl_ExternalCameraDevice.c',
+                                                                  	'src/api-impl-jni/media/android_media_ImageReader.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaCodec.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaExtractor.c',
                                                                   	'src/api-impl-jni/media/android_media_MediaRecorder.c',

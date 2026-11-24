@@ -12,10 +12,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 
 /* AOSP frameworks/base/core/java/android/media/ImageReader.java: the argument checks, the formats and the state. In place
- * of the BufferQueue, the reader's Surface (Surface.atl_imageReader) takes the images a producer queues: so far the
- * camera (camera2.impl.CameraDeviceImpl), with YUV_420_888 (three planes, I420), JPEG (one plane) and PRIVATE (no
- * planes) images. As a BufferQueue whose consumer holds all buffers, a full reader (maxImages acquired or queued)
- * takes no more images; the producer drops them. */
+ * of the BufferQueue, the reader's Surface (Surface.atl_imageReader) takes the images a producer queues: the camera
+ * (camera2.impl.CameraDeviceImpl), with YUV_420_888 (three planes, I420), JPEG (one plane) and PRIVATE (no planes)
+ * images, Surface.lockCanvas() (RGBA), and MediaCodec, whose frames are AHardwareBuffers (queueHardwareBuffer()).
+ * As a BufferQueue whose consumer holds all buffers, a full reader (maxImages acquired or queued) takes no more
+ * images; the producer drops them. The NDK's AImageReader (libandroid image_reader.c) is this reader. */
 public class ImageReader implements AutoCloseable {
 	private final int mWidth;
 	private final int mHeight;
@@ -256,6 +257,28 @@ public class ImageReader implements AutoCloseable {
 				return false;
 			mQueuedImages.add(new SurfaceImage(timestampNs, buffers, rowStrides, pixelStrides));
 		}
+		notifyImageAvailable();
+		return true;
+	}
+
+	/** @hide the producer side for a hardware buffer (an AHardwareBuffer, of which the reader takes over one
+	 * reference) of a producer such as MediaCodec, its size being the buffer's (AOSP: the consumer's default size
+	 * only applies to a producer that sets none); false, and the buffer released, while the reader is full or
+	 * closed */
+	public boolean queueHardwareBuffer(long timestampNs, long buffer, int width, int height) {
+		synchronized (mCloseLock) {
+			if (!mIsReaderValid || mAcquiredImages.size() + mQueuedImages.size() >= mMaxImages) {
+				nativeReleaseBuffer(buffer);
+				return false;
+			}
+			mQueuedImages.add(new SurfaceImage(timestampNs, buffer, width, height));
+		}
+		notifyImageAvailable();
+		return true;
+	}
+
+	/* AOSP ListenerHandler: onImageAvailable() on the listener's executor */
+	private void notifyImageAvailable() {
 		OnImageAvailableListener listener;
 		Executor executor;
 		synchronized (mListenerLock) {
@@ -271,19 +294,125 @@ public class ImageReader implements AutoCloseable {
 				listener.onImageAvailable(ImageReader.this);
 			});
 		}
-		return true;
 	}
+
+	/* AOSP BufferRemovedListener of the NDK (AImageReader_setBufferRemovedListener()): a buffer leaves the reader;
+	 * the callback runs on the reader's callback thread, as AOSP's handler message holds the buffer until then */
+	private long mNativeRemovedCallback;
+	private long mNativeRemovedContext;
+	private long mNativeReader;
+	private java.util.concurrent.ExecutorService mNativeExecutor;
+
+	/** @hide AImageReader: the thread of its callbacks (AOSP: the ALooper of the reader) */
+	public Executor atl_nativeExecutor(long nativeReader) {
+		synchronized (mListenerLock) {
+			mNativeReader = nativeReader;
+			if (mNativeExecutor == null)
+				mNativeExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
+			return mNativeExecutor;
+		}
+	}
+
+	/** @hide AImageReader_setImageListener(): the callback on the reader's callback thread, none for 0 */
+	public void atl_setImageListener(long callback, long context) {
+		if (callback == 0) {
+			setOnImageAvailableListener(null, null);
+			return;
+		}
+		long reader;
+		synchronized (mListenerLock) {
+			reader = mNativeReader;
+		}
+		setOnImageAvailableListenerWithExecutor(r -> nativeImageAvailable(callback, context, reader), atl_nativeExecutor(reader));
+	}
+
+	/** @hide AImageReader_setBufferRemovedListener() */
+	public void atl_setBufferRemovedListener(long callback, long context) {
+		synchronized (mListenerLock) {
+			mNativeRemovedCallback = callback;
+			mNativeRemovedContext = context;
+		}
+	}
+
+	private void releaseBuffer(long buffer) {
+		long callback, context, reader;
+		Executor executor;
+		synchronized (mListenerLock) {
+			callback = mNativeRemovedCallback;
+			context = mNativeRemovedContext;
+			reader = mNativeReader;
+			executor = mNativeExecutor;
+		}
+		if (callback == 0 || executor == null) {
+			nativeReleaseBuffer(buffer);
+			return;
+		}
+		try {
+			executor.execute(() -> {
+				nativeBufferRemoved(callback, context, reader, buffer);
+				nativeReleaseBuffer(buffer);
+			});
+		} catch (java.util.concurrent.RejectedExecutionException e) {
+			nativeReleaseBuffer(buffer);
+		}
+	}
+
+	/** @hide AImageReader: the result of AOSP's acquireNextSurfaceImage() (ACQUIRE_*) and the image */
+	public int atl_acquireNextImage(Image[] out) {
+		SurfaceImage[] si = new SurfaceImage[1];
+		int status = acquireNextSurfaceImage(si);
+		out[0] = si[0];
+		return status;
+	}
+
+	private static native void nativeReleaseBuffer(long buffer);
+	private static native void nativeImageAvailable(long callback, long context, long reader);
+	private static native void nativeBufferRemoved(long callback, long context, long reader, long buffer);
+	private static native int nativeLockPlanes(long buffer, java.nio.ByteBuffer[] buffers, int[] rowStrides, int[] pixelStrides);
+	private static native void nativeUnlock(long buffer);
 
 	/* AOSP ImageReader.SurfaceImage: an image of this reader */
 	private class SurfaceImage extends Image {
 		private final long mTimestamp;
-		private final SurfacePlane[] mPlanes;
+		private SurfacePlane[] mPlanes;
+		private final long mBuffer; /* the AHardwareBuffer of a hardware producer, else 0 */
+		private final int mBufferWidth;
+		private final int mBufferHeight;
+		private boolean mLocked;
 
 		SurfaceImage(long timestampNs, java.nio.ByteBuffer[] buffers, int[] rowStrides, int[] pixelStrides) {
 			mTimestamp = timestampNs;
 			mPlanes = new SurfacePlane[buffers.length];
 			for (int i = 0; i < buffers.length; i++)
 				mPlanes[i] = new SurfacePlane(buffers[i], rowStrides[i], pixelStrides[i]);
+			mBuffer = 0;
+			mBufferWidth = mWidth;
+			mBufferHeight = mHeight;
+		}
+
+		SurfaceImage(long timestampNs, long buffer, int width, int height) {
+			mTimestamp = timestampNs;
+			mBuffer = buffer;
+			mBufferWidth = width;
+			mBufferHeight = height;
+		}
+
+		/* AOSP nativeCreatePlanes(): a PRIVATE image has none; the buffer is locked for the CPU, which fails
+		 * without CPU read usage (UnsupportedOperationException as AOSP's Image_createSurfacePlanes()) */
+		private SurfacePlane[] createPlanes() {
+			if (mFormat == ImageFormat.PRIVATE)
+				return new SurfacePlane[0];
+			java.nio.ByteBuffer[] buffers = new java.nio.ByteBuffer[3];
+			int[] rowStrides = new int[3];
+			int[] pixelStrides = new int[3];
+			int n = (mUsage & HardwareBuffer.USAGE_CPU_READ_OFTEN) != 0 ? nativeLockPlanes(mBuffer, buffers, rowStrides, pixelStrides) : -1;
+			if (n < 0)
+				throw new UnsupportedOperationException("Failed to lock the image buffer for CPU reading");
+			mLocked = true;
+			SurfacePlane[] planes = new SurfacePlane[n];
+			for (int i = 0; i < n; i++)
+				planes[i] = new SurfacePlane(buffers[i], rowStrides[i], pixelStrides[i]);
+			return planes;
 		}
 
 		@Override
@@ -295,13 +424,13 @@ public class ImageReader implements AutoCloseable {
 		@Override
 		public int getWidth() {
 			throwISEIfImageIsInvalid();
-			return mWidth;
+			return mBufferWidth;
 		}
 
 		@Override
 		public int getHeight() {
 			throwISEIfImageIsInvalid();
-			return mHeight;
+			return mBufferHeight;
 		}
 
 		@Override
@@ -313,7 +442,14 @@ public class ImageReader implements AutoCloseable {
 		@Override
 		public Plane[] getPlanes() {
 			throwISEIfImageIsInvalid();
+			if (mPlanes == null)
+				mPlanes = createPlanes();
 			return mPlanes.clone();
+		}
+
+		/* AImage_getHardwareBuffer() */
+		private long atl_getHardwareBuffer() {
+			return mIsImageValid ? mBuffer : 0;
 		}
 
 		/* AOSP SurfaceImage.close() -> ImageReader.releaseImage() */
@@ -325,6 +461,17 @@ public class ImageReader implements AutoCloseable {
 				mIsImageValid = false;
 				mAcquiredImages.remove(this);
 			}
+			freeBuffer();
+		}
+
+		/* the buffer goes back (AOSP: releaseBuffer() to the BufferQueue) */
+		void freeBuffer() {
+			if (mBuffer == 0)
+				return;
+			if (mLocked)
+				nativeUnlock(mBuffer);
+			mLocked = false;
+			releaseBuffer(mBuffer);
 		}
 
 		private class SurfacePlane extends Image.Plane {
@@ -392,7 +539,13 @@ public class ImageReader implements AutoCloseable {
 				image.close();
 			}
 			mAcquiredImages.clear();
+			for (SurfaceImage image : mQueuedImages)
+				image.freeBuffer();
 			mQueuedImages.clear();
+		}
+		synchronized (mListenerLock) {
+			if (mNativeExecutor != null)
+				mNativeExecutor.shutdown();
 		}
 	}
 

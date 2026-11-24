@@ -390,6 +390,41 @@ static int allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **o
 	return NO_ERROR;
 }
 
+struct AHardwareBuffer *ahb_from_dmabuf(const AHardwareBuffer_Desc *desc, uint32_t drm_format, uint64_t modifier, int fd,
+                                        int plane_count, const uint32_t *offsets, const uint32_t *strides,
+                                        void (*destroy)(void *data), void *data)
+{
+	const struct format_info *fi = format_info(desc->format);
+	if (!fi || plane_count < 1 || plane_count > AHB_MAX_PLANES)
+		return NULL;
+	struct AHardwareBuffer *buffer = buffer_new(desc);
+	buffer->drm_format = drm_format;
+	buffer->modifier = modifier;
+	buffer->fd = fd;
+	buffer->dmabuf = true;
+	buffer->plane_count = plane_count;
+	for (int i = 0; i < plane_count; i++) {
+		buffer->offsets[i] = offsets[i];
+		buffer->strides[i] = strides[i];
+	}
+	buffer->desc.stride = strides[0] / fi->bpp;
+	buffer->size = lseek(fd, 0, SEEK_END);
+	buffer->destroy = destroy;
+	buffer->destroy_data = data;
+	fill_anwb(buffer);
+	return buffer;
+}
+
+void ahb_return_to_producer(struct AHardwareBuffer *buffer)
+{
+	pthread_mutex_lock(&buffer->lock);
+	void (*destroy)(void *) = buffer->destroy;
+	buffer->destroy = NULL;
+	pthread_mutex_unlock(&buffer->lock);
+	if (destroy)
+		destroy(buffer->destroy_data);
+}
+
 struct AHardwareBuffer *ahb_from_pointer(const void *pointer)
 {
 	struct AHardwareBuffer *buffer = (struct AHardwareBuffer *)pointer;
@@ -441,6 +476,8 @@ void AHardwareBuffer_release(struct AHardwareBuffer *buffer)
 	if (buffer->fd >= 0)
 		close(buffer->fd);
 	free(buffer->native_handle);
+	if (buffer->destroy)
+		buffer->destroy(buffer->destroy_data);
 	buffer->magic = 0;
 	free(buffer);
 }

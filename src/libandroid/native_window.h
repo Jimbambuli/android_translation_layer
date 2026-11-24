@@ -16,6 +16,7 @@ struct ANativeWindow {
 	gulong resize_handler;
 	int refcount;
 	jobject surface; /* the android.view.Surface of this window (a global reference) */
+	jobject image_reader; /* the android.media.ImageReader whose Surface this is (a global reference), else NULL */
 	struct { /* ANativeWindow_setBuffersGeometry() and the buffer of ANativeWindow_lock() */
 		int width;
 		int height;
