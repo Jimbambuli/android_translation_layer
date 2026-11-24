@@ -47,7 +47,13 @@ public class GskCanvas extends DisplayListCanvas {
 	/* ATL_SNAPSHOT_CHECK set: finishRecording() reports each draw that left saves or clips open */
 	private static final boolean check_balance = System.getenv("ATL_SNAPSHOT_CHECK") != null;
 
-	/* called when the view, drawable or render node that draws with this canvas has drawn */
+	/* AOSP RenderNode.endRecording(): SkiaRecordingCanvas::finishRecording() restores the canvas to save count 1,
+	 * and hwui draws each display list in a save of its own, so what a view's draw left saved or clipped (also when
+	 * an exception ended it) ends with its display list. Here the view draws into the GTK snapshot of its widget,
+	 * which its parent and the window share: what it left open is closed when it has drawn. Otherwise the snapshot
+	 * stays unbalanced and GTK keeps only the innermost node of the frame (gtk_snapshot_free_to_node(): "Too many
+	 * gtk_snapshot_push() calls"), without the window's offset. Called when the view, drawable or render node
+	 * that draws with this canvas has drawn. */
 	@Export
 	public void finishRecording(Object owner) {
 		int saves = getSaveCount() - 1;
@@ -56,6 +62,12 @@ public class GskCanvas extends DisplayListCanvas {
 			return;
 		if (check_balance)
 			android.util.Log.w("GskCanvas", "ATL_SNAPSHOT_CHECK: " + (owner != null ? owner.getClass().getName() : "?") + " left " + saves + " saves and " + clips + " clips of the base level open");
+		while (getSaveCount() > 1)
+			restore();
+		if (clips > 0) {
+			native_pop(snapshot, clips);
+			push_history[1] = 0;
+		}
 	}
 
 	@Override
