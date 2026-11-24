@@ -473,11 +473,12 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 		ATLSurface *atl_surface = g_object_new(atl_surface_get_type(), NULL);
 		atl_surface->width = native_window->width;
 		atl_surface->height = native_window->height;
-		if (native_window->remote_fd >= 0) {
+		/* no buffer has a file descriptor yet; fit_back_buffer() closes it for every surface */
+		for (int i = 0; i < NUM_BUFFERS; i++)
+			atl_surface->buffers[i].fd = -1;
+		if (native_window->remote_fd >= 0)
 			atl_surface->remote = native_window;
-			for (int i = 0; i < NUM_BUFFERS; i++)
-				atl_surface->buffers[i].fd = -1;
-		} else
+		else
 			atl_surface->surface_view_widget = SURFACE_VIEW_WIDGET(g_object_ref(native_window->surface_view_widget));
 		EGLint alpha_size = 0;
 		EGLint depth_size = 0;
