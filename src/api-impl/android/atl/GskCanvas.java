@@ -44,6 +44,20 @@ public class GskCanvas extends DisplayListCanvas {
 		setDensity(android.util.DisplayMetrics.DENSITY_DEVICE);
 	}
 
+	/* ATL_SNAPSHOT_CHECK set: finishRecording() reports each draw that left saves or clips open */
+	private static final boolean check_balance = System.getenv("ATL_SNAPSHOT_CHECK") != null;
+
+	/* called when the view, drawable or render node that draws with this canvas has drawn */
+	@Export
+	public void finishRecording(Object owner) {
+		int saves = getSaveCount() - 1;
+		int clips = (push_history != null && push_history.length > 1) ? push_history[1] : 0;
+		if (saves == 0 && clips == 0)
+			return;
+		if (check_balance)
+			android.util.Log.w("GskCanvas", "ATL_SNAPSHOT_CHECK: " + (owner != null ? owner.getClass().getName() : "?") + " left " + saves + " saves and " + clips + " clips of the base level open");
+	}
+
 	@Override
 	public int getWidth() {
 		return width;

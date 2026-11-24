@@ -417,6 +417,7 @@ public class RenderNode {
 	}
 
 	public void end(DisplayListCanvas canvas) {
+		((GskCanvas)canvas).finishRecording(this);
 		nativeUnref(render_node);
 		render_node = nativeCreateNode(((GskCanvas)canvas).snapshot);
 		/* the canvas started without a stretch (AOSP: View clears it before recording) */

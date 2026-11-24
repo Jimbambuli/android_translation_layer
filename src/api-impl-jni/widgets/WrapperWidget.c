@@ -467,6 +467,11 @@ static void wrapper_widget_snapshot(GtkWidget *widget, GdkSnapshot *snapshot)
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
 		}
+		J__GskCanvas__finishRecording(env, wrapper->canvas, wrapper->jobj);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		}
 		float stretch_x = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_x");
 		float stretch_y = _GET_FLOAT_FIELD(wrapper->canvas, "stretch_y");
 		if (!wrapper->defers_render_nodes && _GET_BOOL_FIELD(wrapper->canvas, "drew_render_node")) {

@@ -401,6 +401,11 @@ static void atl_compound_drawable_snapshot(GtkWidget *widget, GtkSnapshot *snaps
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
+	J__GskCanvas__finishRecording(env, canvas, self->drawable);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	gtk_snapshot_restore(snapshot);
 	(*env)->PopLocalFrame(env, NULL);
 }

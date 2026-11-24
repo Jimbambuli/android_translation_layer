@@ -36,6 +36,11 @@ static void java_paintable_snapshot(GdkPaintable *gdk_paintable, GdkSnapshot *sn
 		(*env)->ExceptionDescribe(env);
 		(*env)->ExceptionClear(env);
 	}
+	J__GskCanvas__finishRecording(env, canvas, drawable);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
 	(*env)->DeleteLocalRef(env, canvas);
 	(*env)->DeleteLocalRef(env, drawable);
 }
