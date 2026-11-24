@@ -2639,8 +2639,8 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		return getWindow().getMediaController();
 	}
 
-	/* the remaining Window.Callback methods; touches reach the views through GTK, so there is
-	 * nothing to dispatch here, and there is no action bar to start an action mode in */
+	/* the remaining Window.Callback methods; the decor view hands touches here first (AOSP DecorView),
+	 * and there is no action bar to start an action mode in */
 
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {

@@ -759,26 +759,35 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 		return getWindow().getOnBackInvokedDispatcher();
 	}
 
-	// input reaches the views through GTK, so there is nothing to dispatch here
-
 	@Override
 	public boolean dispatchKeyShortcutEvent(KeyEvent event) {
 		return false;
 	}
 
+	/* AOSP Dialog.dispatchTouchEvent(), dispatchTrackballEvent(), dispatchGenericMotionEvent(): the decor view
+	 * hands the event here first (Window.DecorView), the views get it through the window */
 	@Override
 	public boolean dispatchTouchEvent(MotionEvent event) {
+		if (window.superDispatchTouchEvent(event)) {
+			return true;
+		}
 		return onTouchEvent(event);
 	}
 
 	@Override
 	public boolean dispatchTrackballEvent(MotionEvent event) {
-		return false;
+		if (window.superDispatchTrackballEvent(event)) {
+			return true;
+		}
+		return onTrackballEvent(event);
 	}
 
 	@Override
 	public boolean dispatchGenericMotionEvent(MotionEvent event) {
-		return false;
+		if (window.superDispatchGenericMotionEvent(event)) {
+			return true;
+		}
+		return onGenericMotionEvent(event);
 	}
 
 	@Override

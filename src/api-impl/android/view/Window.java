@@ -124,7 +124,7 @@ public class Window {
 	public Window(Context context, Window.Callback callback) {
 		this.callback = callback;
 		this.context = context;
-		decorView = new FrameLayout(context) {
+		decorView = new DecorView(context) {
 			@Override
 			public OnBackInvokedDispatcher findOnBackInvokedDispatcher() {
 				return onBackInvokedDispatcher;
@@ -903,15 +903,55 @@ public class Window {
 	/* AOSP PhoneWindow.superDispatchTouchEvent(), superDispatchTrackballEvent(), superDispatchGenericMotionEvent():
 	 * the decor view dispatches the event to the views */
 	public boolean superDispatchTouchEvent(MotionEvent event) {
-		return getDecorView().dispatchTouchEvent(event);
+		return ((DecorView)getDecorView()).superDispatchTouchEvent(event);
 	}
 
 	public boolean superDispatchTrackballEvent(MotionEvent event) {
-		return getDecorView().dispatchTrackballEvent(event);
+		return ((DecorView)getDecorView()).superDispatchTrackballEvent(event);
 	}
 
 	public boolean superDispatchGenericMotionEvent(MotionEvent event) {
-		return getDecorView().dispatchGenericMotionEvent(event);
+		return ((DecorView)getDecorView()).superDispatchGenericMotionEvent(event);
+	}
+
+	/* AOSP DecorView.dispatchTouchEvent(), dispatchTrackballEvent(), dispatchGenericMotionEvent(): the window's
+	 * Window.Callback (the Activity or Dialog) gets the event first and hands it to the views through
+	 * superDispatch*(), so Activity.onTouchEvent() hears the touches no view handled. ATL's window has no
+	 * features (mFeatureId) and does not track isDestroyed(). */
+	private class DecorView extends FrameLayout {
+		DecorView(Context context) {
+			super(context);
+		}
+
+		@Override
+		public boolean dispatchTouchEvent(MotionEvent ev) {
+			final Callback cb = getCallback();
+			return cb != null ? cb.dispatchTouchEvent(ev) : super.dispatchTouchEvent(ev);
+		}
+
+		@Override
+		public boolean dispatchTrackballEvent(MotionEvent ev) {
+			final Callback cb = getCallback();
+			return cb != null ? cb.dispatchTrackballEvent(ev) : super.dispatchTrackballEvent(ev);
+		}
+
+		@Override
+		public boolean dispatchGenericMotionEvent(MotionEvent ev) {
+			final Callback cb = getCallback();
+			return cb != null ? cb.dispatchGenericMotionEvent(ev) : super.dispatchGenericMotionEvent(ev);
+		}
+
+		boolean superDispatchTouchEvent(MotionEvent event) {
+			return super.dispatchTouchEvent(event);
+		}
+
+		boolean superDispatchTrackballEvent(MotionEvent event) {
+			return super.dispatchTrackballEvent(event);
+		}
+
+		boolean superDispatchGenericMotionEvent(MotionEvent event) {
+			return super.dispatchGenericMotionEvent(event);
+		}
 	}
 
 	/* AOSP Window.getCurrentFocus(): the view of the window that has the focus */
