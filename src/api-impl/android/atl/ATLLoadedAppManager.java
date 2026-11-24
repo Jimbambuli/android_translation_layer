@@ -29,6 +29,9 @@ public final class ATLLoadedAppManager {
 
 	private ATLLoadedAppManager() {}
 
+	/* adds a dir with bionic-linked libraries of a package loaded into the process to the linker's path */
+	private static native void native_addLibrarySearchPath(String dir);
+
 	@Nullable
 	public static PackageParser.Package getPackageFromPackageName(String packageName) {
 		ATLLoadedApp app = ATLLoadedApp.getPrimaryApplication();
@@ -135,6 +138,10 @@ public final class ATLLoadedAppManager {
 				app = ATLLoadedApp.loadFromPath(apk_path, lib_path, apk_path);
 				setInstalledPaths(app.pkg);
 				app.pkg.applicationInfo.nativeLibraryDir = lib_path;
+				/* like the linker namespace AOSP creates for the class loader (LoadedApk), so that
+				 * System.loadLibrary() from the package's code can load its libraries */
+				if (lib_path != null)
+					native_addLibrarySearchPath(lib_path);
 				Slog.i(TAG, "loadApplication(\"" + packageName + "\")");
 				loaded_packages.put(packageName, app.pkg);
 				loaded_apps.put(packageName, app);
