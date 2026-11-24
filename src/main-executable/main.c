@@ -780,9 +780,11 @@ static JNIEnv *start_runtime(char *apk_classpath, char *apk_name, struct jni_cal
 	// Apps which extract libraries on their own can place them anywhere in app_data_dir. Therefore, we add app_data_dir/** to the
 	// BIONIC_LD_LIBRARY_PATH. While app_data_dir/lib is already matched by the wildcard, it needs to be specified again to allow loading
 	// libraries by libname from app_data_dir/lib
+	/* AOSP permits an app to load libraries from all of /data (LoadedApk.createOrUpdateClassLoaderLocked), its cache
+	 * dir included; ATL keeps the cache dirs in /tmp/atl_cache (Context.getCacheDir()), so that is permitted too */
 	char *ld_path = getenv("BIONIC_LD_LIBRARY_PATH");
 	ld_path = (ld_path ? ld_path : "");
-	ld_path = g_strdup_printf("%s:%s**:%s", app_lib_dir, app_data_dir, ld_path);
+	ld_path = g_strdup_printf("%s:%s**:/tmp/atl_cache/**:%s", app_lib_dir, app_data_dir, ld_path);
 	/* the bridge's own directory, like /system/lib64 on a device, holds the host libraries it loads */
 	if (native_bridge()) {
 		char *bridge_dir = g_path_get_dirname(native_bridge());
