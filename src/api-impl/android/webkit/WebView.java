@@ -1775,7 +1775,26 @@ public class WebView extends android.widget.AbsoluteLayout implements ViewGroup.
 		data = data.replace("file:///android_asset/", "android-asset:///assets/");
 		// relative URLs in the document are resolved against the base URL, so it needs the same treatment
 		baseUrl = baseUrl.replace("file:///android_asset/", "android-asset:///assets/");
+		/* Chromium shows the data under any base URL. WebKit refuses a document whose URL is an about: URL other than
+		 * about:blank and about:srcdoc ("The URL can't be shown") and leaves the page empty, so its scripts never run
+		 * (Google UMP passes "about:blank/"). Such a page gets about:blank, which resolves no relative URL either. */
+		if (baseUrl.regionMatches(true, 0, "about:", 0, 6) && !isShownAboutUrl(baseUrl.substring(6)))
+			baseUrl = "about:blank";
 		native_loadDataWithBaseURL(webkitWidget(), baseUrl, data.getBytes(java.nio.charset.StandardCharsets.UTF_8), mimeType, historyUrl, entryUrl);
+	}
+
+	/* WebKit's URL::isAboutBlank()/isAboutSrcDoc(): the path after "about:" (before query and fragment) is exactly
+	 * "blank" or "srcdoc" */
+	private static boolean isShownAboutUrl(String rest) {
+		int end = rest.length();
+		for (int i = 0; i < rest.length(); i++) {
+			if (rest.charAt(i) == '?' || rest.charAt(i) == '#') {
+				end = i;
+				break;
+			}
+		}
+		String path = rest.substring(0, end);
+		return path.equals("blank") || path.equals("srcdoc");
 	}
 
 	/* Chromium's LoadUrlParams.buildDataUri() */
