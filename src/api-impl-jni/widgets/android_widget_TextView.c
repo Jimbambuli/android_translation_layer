@@ -10,6 +10,9 @@
 
 static GtkLabel *box_get_label(JNIEnv *env, GtkWidget *box)
 {
+	/* an EditText's widget is a GtkText: its last child is GTK's placeholder (the hint), not a label of the text */
+	if (GTK_IS_TEXT(box))
+		return NULL;
 	GtkWidget *label = gtk_widget_get_last_child(GTK_WIDGET(box));
 	if (label && !GTK_IS_LABEL(label))
 		label = gtk_widget_get_prev_sibling(label);
@@ -257,7 +260,13 @@ JNIEXPORT void JNICALL Java_android_widget_TextView_native_1setLetterSpacing(JNI
  * alignment within the given height */
 JNIEXPORT jint JNICALL Java_android_widget_TextView_native_1getBaseline(JNIEnv *env, jobject this, jlong widget_ptr, jint width, jint height)
 {
-	GtkLabel *label = box_get_label(env, _PTR(widget_ptr));
+	GtkWidget *widget = _PTR(widget_ptr);
+	if (GTK_IS_TEXT(widget)) { /* an EditText: GtkText centers its line vertically */
+		int natural, baseline;
+		gtk_widget_measure(widget, GTK_ORIENTATION_VERTICAL, -1, NULL, &natural, NULL, &baseline);
+		return baseline < 0 ? -1 : baseline + MAX(height - natural, 0) / 2;
+	}
+	GtkLabel *label = box_get_label(env, widget);
 	if (!label)
 		return -1;
 	int natural, baseline, minimum_width;
