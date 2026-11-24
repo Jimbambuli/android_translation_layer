@@ -105,8 +105,9 @@ static int fallback_verbose_log(int prio, const char *tag, const char *fmt, va_l
 }
 
 /* liblog (fake_log_device) drops verbose and debug lines unless ANDROID_LOG_TAGS asks for them (the global
- * minimum is info), but only after the caller has built them. Without ANDROID_LOG_TAGS (read once) they are
- * dropped here, before formatting; with it (apk-starter's debug sets it) liblog filters as before. */
+ * minimum is info), after a __android_log_is_loggable check per line (Log.println_native converts both strings
+ * before that). Without ANDROID_LOG_TAGS (read once) they are dropped here; with it (apk-starter's debug sets
+ * it) liblog filters as before. */
 gboolean atl_log_below_info_wanted(void)
 {
 	static int wanted = -1;

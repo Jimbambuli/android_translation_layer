@@ -1,4 +1,5 @@
 #include <dlfcn.h>
+#include <errno.h>
 #include <stdio.h>
 
 #include "defines.h"
@@ -40,10 +41,10 @@ JNIEXPORT jint JNICALL Java_android_util_Log_println_1native(JNIEnv *env, jobjec
 		return -1;
 	}
 
-	/* dropped by liblog anyway (util.c): skip the conversions, return what liblog returns for a dropped line
-	 * (the lengths of priority, tag and message with their NULs) */
+	/* dropped by liblog anyway (util.c): skip the conversions, return what __android_log_buf_write returns for a
+	 * line it drops (-EPERM, AOSP liblog logger_write.cpp) */
 	if (priority < ANDROID_LOG_INFO && !atl_log_below_info_wanted())
-		return 3 + (tagObj ? (*env)->GetStringUTFLength(env, tagObj) : 0) + (*env)->GetStringUTFLength(env, msgObj);
+		return -EPERM;
 
 	if (tagObj != NULL)
 		tag = (*env)->GetStringUTFChars(env, tagObj, NULL);
