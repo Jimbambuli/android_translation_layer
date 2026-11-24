@@ -477,6 +477,8 @@ static cairo_status_t cairo_write_func_gstring(void *closure, const unsigned cha
 
 // this is exported by the shim bionic linker
 void dl_parse_library_path(const char *path, char *delim);
+/* the library path given to the shim bionic linker, see android_atl_ATLLoadedAppManager.c */
+char *bionic_ld_library_path;
 
 #define REL_DEX_INSTALL_PATH              "../java/dex"
 
@@ -795,7 +797,7 @@ static JNIEnv *start_runtime(char *apk_classpath, char *apk_name, struct jni_cal
 	}
 	// calling directly into the shim bionic linker to whitelist the app's lib dir as containing bionic-linked libraries
 	dl_parse_library_path(ld_path, ":");
-	g_free(ld_path);
+	bionic_ld_library_path = ld_path; // kept: a package loaded later adds its lib dir to it (ATLLoadedAppManager)
 
 	JNIEnv *env = create_vm(api_impl_jar, apk_classpath, framework_res_apk, test_runner_jar, api_impl_natives_dir, app_lib_dir, d->sdk_int, d->extra_jvm_options, zygote);
 
