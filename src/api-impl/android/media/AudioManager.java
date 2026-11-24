@@ -112,7 +112,6 @@ public class AudioManager {
 	private native boolean nativeIsStreamMute();
 
 	public AudioManager() {
-		BluetoothRoutes.start();
 	}
 
 	/* AOSP: AudioSystem.getDeviceConnectionState(DEVICE_OUT_BLUETOOTH_A2DP) is AVAILABLE, i.e. an A2DP sink is
@@ -196,6 +195,7 @@ public class AudioManager {
 	static final java.util.Set<Object> sFocusHolders = java.util.Collections.synchronizedSet(new java.util.HashSet<Object>());
 
 	public int requestAudioFocus(OnAudioFocusChangeListener listener, int streamType, int durationHint) {
+		BluetoothRoutes.start();
 		sFocusHolders.add(listener != null ? listener : this);
 		return /*AUDIOFOCUS_REQUEST_GRANTED*/ 1;
 	}
@@ -209,6 +209,7 @@ public class AudioManager {
 		if (focusRequest == null) {
 			throw new NullPointerException("Illegal null AudioFocusRequest");
 		}
+		BluetoothRoutes.start();
 		sFocusHolders.add(focusRequest);
 		return AUDIOFOCUS_REQUEST_GRANTED;
 	}

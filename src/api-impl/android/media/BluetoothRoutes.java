@@ -21,7 +21,10 @@ public final class BluetoothRoutes implements AdapterService.AudioDeviceListener
 
 	private BluetoothRoutes() {}
 
-	/* from AudioManager's constructor: AOSP's AudioService always watches the devices */
+	/* AOSP's AudioService always watches the devices, but what an app sees of that needs no watch before it holds
+	 * audio focus (ACTION_AUDIO_BECOMING_NOISY) or registers an AudioDeviceCallback; the device lists ask BlueZ
+	 * when read. Not from AudioManager's constructor: AOSP's does not wait for Bluetooth, and connecting to the
+	 * system bus waits for the main loop (BluezBus), ~55 ms in VLC's start on a worker thread. */
 	static synchronized void start() {
 		if (instance != null || !AdapterService.isAvailable())
 			return;
