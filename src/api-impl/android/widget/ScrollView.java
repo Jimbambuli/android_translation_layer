@@ -68,10 +68,25 @@ public class ScrollView extends FrameLayout {
 	}
 
 	/* the children's positions in Java do not follow the GTK scrolling: as with the touches
-	 * (onInterceptTouchEvent()), the wheel goes on along GTK's path to the children and the ScrollView */
+	 * (onInterceptTouchEvent()), the wheel goes on along GTK's path to the children and the ScrollView.
+	 * Without a scroll range (a child no taller than the view) nothing scrolls and the children stay where Java
+	 * has them: as on AOSP (onGenericMotionEvent() does not consume ACTION_SCROLL then), the children get the
+	 * event and an unhandled one goes back to the parent in Java (Chromium's CompositorViewHolder). */
 	@Override
 	protected boolean dispatchGenericPointerEvent(MotionEvent event) {
+		if (getScrollRange() == 0)
+			return super.dispatchGenericPointerEvent(event);
 		return native_gtkEventPropagation();
+	}
+
+	/* AOSP getScrollRange() */
+	private int getScrollRange() {
+		int scrollRange = 0;
+		if (getChildCount() > 0) {
+			View child = getChildAt(0);
+			scrollRange = Math.max(0, child.getHeight() - (getHeight() - getPaddingBottom() - getPaddingTop()));
+		}
+		return scrollRange;
 	}
 
 	@Override
