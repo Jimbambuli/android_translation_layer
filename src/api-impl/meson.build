@@ -357,6 +357,7 @@ srcs = [
 	'android/atl/ATLLoadedApp.java',
 	'android/atl/ATLLoadedAppManager.java',
 	'android/atl/ATLMediaContentProvider.java',
+	'android/atl/ATLOtherAppBinder.java',
 	'android/atl/ATLPaths.java',
 	'android/atl/ATLProcess.java',
 	'android/atl/ATLProvider.java',

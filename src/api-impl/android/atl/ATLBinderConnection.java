@@ -89,6 +89,11 @@ public final class ATLBinderConnection {
 		pool.allowCoreThreadTimeOut(true);
 	}
 
+	/* a transaction for this process's binder threads (ATLOtherAppBinder) */
+	static void executeOnBinderThread(Runnable r) {
+		pool.execute(r);
+	}
+
 	private static final class BinderThreadFactory implements ThreadFactory {
 		private final String name;
 

@@ -299,7 +299,7 @@ public final class ContextImpl extends Context {
 		String processName = otherServiceProcess(targetApp, intent);
 		if (processName != null)
 			return ATLProcess.bindService(intent, serviceConnection, processName, null);
-		if (targetApp.startOrBindService(intent, serviceConnection, flags) == null)
+		if (targetApp.startOrBindService(intent, serviceConnection, flags, atl_loaded_app) == null)
 			return false;
 		synchronized (bound_services) {
 			bound_services.put(serviceConnection, targetApp);

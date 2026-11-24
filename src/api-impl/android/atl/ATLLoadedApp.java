@@ -56,6 +56,8 @@ public final class ATLLoadedApp {
 	/* connections bound without BIND_AUTO_CREATE to a service that is not running (ActiveServices keeps
 	 * their bindings and connects them once the service is brought up by someone else) */
 	private final HashMap<String, HashMap<ServiceConnection, Integer>> pending_bindings = new HashMap<>();
+	/* the app that bound each connection (startOrBindService), for the binder it gets */
+	private final WeakHashMap<ServiceConnection, ATLLoadedApp> connection_clients = new WeakHashMap<>();
 	private Application application;
 	private Resources.Theme default_theme;
 	/* the AssetManagers for the override configurations, see createResources() */
@@ -428,11 +430,29 @@ public final class ATLLoadedApp {
 		return null;
 	}
 
+	private ATLLoadedApp clientOf(ServiceConnection connection) {
+		synchronized (running_services) {
+			ATLLoadedApp client = connection_clients.get(connection);
+			return client != null ? client : this;
+		}
+	}
+
+	private android.os.IBinder forClient(android.os.IBinder binder, ATLLoadedApp client) {
+		return client != this ? ATLOtherAppBinder.of(binder) : binder;
+	}
+
 	public ComponentName startOrBindService(final Intent intent, final ServiceConnection serviceConnection) {
 		return startOrBindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
 	}
 
 	public ComponentName startOrBindService(final Intent intent, final ServiceConnection serviceConnection, final int flags) {
+		return startOrBindService(intent, serviceConnection, flags, this);
+	}
+
+	/* client: the app that binds. A service of another app runs in that app's process on Android; its binder reaches
+	 * the client as ATLOtherAppBinder, so that oneway calls do not run on the client's thread */
+	public ComponentName startOrBindService(final Intent intent, final ServiceConnection serviceConnection, final int flags,
+	                                        final ATLLoadedApp client) {
 		ComponentName component = intent.getComponent();
 		if (component == null) {
 			int priority = Integer.MIN_VALUE;
@@ -454,6 +474,11 @@ public final class ATLLoadedApp {
 		}
 		final ComponentName name = component;
 		final String className = component.getClassName();
+		if (serviceConnection != null) {
+			synchronized (running_services) {
+				connection_clients.put(serviceConnection, client);
+			}
+		}
 
 		new Handler(Looper.getMainLooper()).post(new Runnable() {
 			@Override
@@ -501,7 +526,7 @@ public final class ATLLoadedApp {
 						android.os.IBinder binder = r.service.onBind(r.bindIntent);
 						for (ServiceConnection connection : pending.keySet()) {
 							if (binder != null)
-								connection.onServiceConnected(bindIntent.getComponent(), binder);
+								connection.onServiceConnected(bindIntent.getComponent(), forClient(binder, clientOf(connection)));
 							else
 								connection.onNullBinding(bindIntent.getComponent());
 						}
@@ -517,7 +542,7 @@ public final class ATLLoadedApp {
 						// onServiceConnected with a null binder (which crashes callers that dereference it).
 						android.os.IBinder binder = r.service.onBind(intent);
 						if (binder != null) {
-							serviceConnection.onServiceConnected(name, binder);
+							serviceConnection.onServiceConnected(name, forClient(binder, client));
 						} else {
 							serviceConnection.onNullBinding(name);
 						}
