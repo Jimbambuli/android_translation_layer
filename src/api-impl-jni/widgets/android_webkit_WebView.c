@@ -990,13 +990,27 @@ static void web_view_css_changed(GtkWidget *webview, GtkCssStyleChange *change)
  * the font resolution, gtk-xft-dpi / 96 (refreshInternalScaling() in WebKitWebViewBase.cpp, which leaves
  * out changes of up to 2 %), so a desktop text scaling such as 144 dpi with a 150 % monitor would scale
  * web content twice. Undo that zoom; this follows WebKit when gtk-xft-dpi changes, whichever handler runs
- * first. Without gtk-xft-dpi WebKit takes the monitor's physical resolution, which GTK does not tell. */
+ * first. An unset gtk-xft-dpi is 96 dpi, see font_dpi_for_web_kit(). */
 static void undo_font_dpi_zoom(GtkSettings *settings, GParamSpec *pspec, WebKitWebView *webview)
 {
 	int xft_dpi;
 	g_object_get(settings, "gtk-xft-dpi", &xft_dpi, NULL);
 	double page_scale = xft_dpi > 0 ? xft_dpi / (96 * 1024.0) : 1;
 	webkit_web_view_set_zoom_level(webview, fabs(page_scale - 1) > 0.02 ? 1 / page_scale : 1);
+}
+
+/* While gtk-xft-dpi is unset (-1), GTK draws text at 96 dpi (gtkcssinitialvalue.c), but WebKitGTK zooms pages by
+ * the physical resolution of the primary monitor instead (WebCore::fontDPI(), ScreenManagerGtk.cpp), and only
+ * WebViews created after it has looked at the screens: a monitor without a physical size (-1 mm, a headless
+ * compositor's) gave a later WebView devicePixelRatio 311 and a 1x2 CSS px viewport. Give WebKit the 96 dpi GTK
+ * uses, before the first WebKitWebView. */
+static void font_dpi_for_web_kit(void)
+{
+	GtkSettings *settings = gtk_settings_get_default();
+	int xft_dpi;
+	g_object_get(settings, "gtk-xft-dpi", &xft_dpi, NULL);
+	if (xft_dpi <= 0)
+		g_object_set(settings, "gtk-xft-dpi", 96 * 1024, NULL);
 }
 
 /* ---- WebChromeClient requests (Chromium: AwWebContentsDelegate / AwContentsClientBridge) ---- */
@@ -1407,6 +1421,7 @@ JNIEXPORT jlong JNICALL Java_android_webkit_WebView_native_1constructor(JNIEnv *
 		return Java_android_view_View_native_1constructor(env, this, context, attrs);
 
 	if (!webkit_css_changed) {
+		font_dpi_for_web_kit();
 		GtkWidgetClass *web_view_class = g_type_class_ref(WEBKIT_TYPE_WEB_VIEW);
 		webkit_css_changed = web_view_class->css_changed;
 		web_view_class->css_changed = web_view_css_changed;
