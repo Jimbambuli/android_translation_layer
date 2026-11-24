@@ -35,6 +35,9 @@ public class SurfaceTexture {
 	private Bitmap queued;
 	private long queuedTimestamp;
 	private Bitmap latched;
+	/* the frame's rows start at the bottom (drawn by GL): AOSP's buffer transform NATIVE_WINDOW_TRANSFORM_FLIP_V */
+	private boolean queuedFlipV;
+	private boolean latchedFlipV;
 
 	public SurfaceTexture(int texName) {
 		this.texName = texName;
@@ -83,12 +86,21 @@ public class SurfaceTexture {
 	/** @hide ATL: the producer side (AOSP's BufferQueueProducer::queueBuffer()): a frame as a GdkTexture,
 	 * which the SurfaceTexture takes over; an older frame not latched yet is dropped */
 	public void queueBuffer(long texture, long timestampNs) {
+		queueBuffer(texture, timestampNs, false);
+	}
+
+	/** @hide the same for a frame whose rows start at the bottom (GL), which is shown flipped vertically */
+	public void queueBuffer(long texture, long timestampNs, boolean flipV) {
 		if (texture != 0)
-			queueBitmap(new Bitmap(texture), timestampNs);
+			queueBitmap(new Bitmap(texture), timestampNs, flipV);
 	}
 
 	/** @hide the frame drawn into a Surface(SurfaceTexture) with lockCanvas() */
 	public void queueBitmap(Bitmap frame, long timestampNs) {
+		queueBitmap(frame, timestampNs, false);
+	}
+
+	private void queueBitmap(Bitmap frame, long timestampNs, boolean flipV) {
 		synchronized (this) {
 			if (released) {
 				frame.recycle();
@@ -98,6 +110,7 @@ public class SurfaceTexture {
 				queued.recycle();
 			queued = frame;
 			queuedTimestamp = timestampNs;
+			queuedFlipV = flipV;
 		}
 		Handler h = handler;
 		OnFrameAvailableListener l = listener;
@@ -116,6 +129,7 @@ public class SurfaceTexture {
 			if (latched != null)
 				latched.recycle();
 			latched = queued;
+			latchedFlipV = queuedFlipV;
 			queued = null;
 			timestamp = queuedTimestamp;
 			return true;
@@ -125,6 +139,11 @@ public class SurfaceTexture {
 	/** @hide the frame latched last, or null */
 	public synchronized Bitmap getLatchedFrame() {
 		return latched;
+	}
+
+	/** @hide the frame latched last is to be shown flipped vertically (see queueBuffer()) */
+	public synchronized boolean isLatchedFrameFlippedV() {
+		return latchedFlipV;
 	}
 
 	/* AOSP SurfaceTexture.updateTexImage() (GLConsumer::updateTexImage()) */
@@ -185,15 +204,21 @@ public class SurfaceTexture {
 		}
 	}
 
-	/* AOSP GLConsumer: identity before the first frame; then the buffers here are uncropped and their first row is
-	 * the top of the image, as AOSP's, so the matrix flips the texture coordinates vertically */
+	/* AOSP GLConsumer::computeTransformMatrix(): identity before the first frame; then the buffers here are
+	 * uncropped, the matrix is the buffer's transform followed by a vertical flip (the first row of a buffer is the
+	 * top of the image, GL's texture coordinates start at the bottom). A frame drawn by GL has FLIP_V as transform,
+	 * the two flips cancel out */
 	public void getTransformMatrix(float[] mtx) {
 		if (mtx.length != 16)
 			throw new IllegalArgumentException();
+		boolean flip;
+		synchronized (this) {
+			flip = glHasFrame && !latchedFlipV;
+		}
 		java.util.Arrays.fill(mtx, 0);
 		mtx[0] = mtx[10] = mtx[15] = 1;
-		mtx[5] = glHasFrame ? -1 : 1;
-		mtx[13] = glHasFrame ? 1 : 0;
+		mtx[5] = flip ? -1 : 1;
+		mtx[13] = flip ? 1 : 0;
 	}
 
 	/* the presentation time of the latched frame in nanoseconds (no frame: 0) */

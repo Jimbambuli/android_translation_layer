@@ -116,6 +116,9 @@ public class TextureView extends View {
 		canvas.save();
 		if (mTransform != null)
 			canvas.concat(mTransform);
+		/* AOSP: the layer is drawn through the SurfaceTexture's transform matrix, which undoes a frame's FLIP_V */
+		if (mSurface.isLatchedFrameFlippedV())
+			canvas.scale(1, -1, 0, height / 2f);
 		canvas.drawBitmap(frame, null, new Rect(0, 0, width, height), null);
 		canvas.restore();
 	}

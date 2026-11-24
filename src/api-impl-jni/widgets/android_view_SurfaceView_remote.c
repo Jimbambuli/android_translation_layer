@@ -148,10 +148,10 @@ static void present(struct remote_consumer *consumer, uint32_t index)
 	}
 	if (consumer->surface_texture) {
 		/* SurfaceTexture.queueBuffer() takes the texture over; AOSP's queueBuffer() stamps a frame without a
-		 * timestamp of its own with the monotonic clock */
+		 * timestamp of its own with the monotonic clock; GL rows start at the bottom (transform FLIP_V) */
 		JNIEnv *env = get_jni_env();
-		jmethodID queue_buffer = _METHOD(_CLASS(consumer->surface_texture), "queueBuffer", "(JJ)V");
-		(*env)->CallVoidMethod(env, consumer->surface_texture, queue_buffer, _INTPTR(texture), (jlong)g_get_monotonic_time() * 1000);
+		jmethodID queue_buffer = _METHOD(_CLASS(consumer->surface_texture), "queueBuffer", "(JJZ)V");
+		(*env)->CallVoidMethod(env, consumer->surface_texture, queue_buffer, _INTPTR(texture), (jlong)g_get_monotonic_time() * 1000, (jboolean)!buffer->desc.top_first);
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
