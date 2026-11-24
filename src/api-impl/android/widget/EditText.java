@@ -82,8 +82,10 @@ public class EditText extends TextView {
 		return getText();
 	}
 
+	/* AOSP EditText.setText(CharSequence, BufferType): the text always goes into the editable buffer (here the
+	 * GtkText); TextView.setText(CharSequence) and its other variants end up here */
 	@Override
-	public void setText(CharSequence text) {
+	public void setText(CharSequence text, BufferType type) {
 		text = applyFilters(text);
 		if (text == null)
 			text = "";
