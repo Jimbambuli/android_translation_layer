@@ -1690,6 +1690,8 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		ev.metaState = 0;
 		ev.deviceId = 1;
 		ev.axes = null;
+		ev.scroll_dx = 0;
+		ev.scroll_dy = 0;
 		return ev;
 	}
 
@@ -1960,6 +1962,9 @@ public final class MotionEvent extends InputEvent implements Parcelable {
 		ev.coords = other.coords.clone();
 		ev.eventTime = other.eventTime;
 		ev.deviceId = other.deviceId;
+		/* AOSP copies all axes of the pointers, the scroll axes too */
+		ev.scroll_dx = other.scroll_dx;
+		ev.scroll_dy = other.scroll_dy;
 		if (other.axes != null) {
 			ev.axes = new PointerCoords[other.axes.length];
 			for (int i = 0; i < other.axes.length; i++)
