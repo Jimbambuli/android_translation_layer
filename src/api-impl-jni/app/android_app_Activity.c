@@ -283,12 +283,42 @@ static void activity_stop(JNIEnv *env, jobject activity, bool save_state)
  * it left, which must not have saved its state yet */
 static jobject pinned_activity;
 
-static gboolean stop_when_idle(gpointer activity)
+/* ActivityRecord.occludesParent(): a floating or translucent window (ActivityInfo.isTranslucentOrFloating(),
+ * e.g. a dialog-themed activity) lets the activity behind it be seen */
+static gboolean activity_occludes(JNIEnv *env, jobject activity)
 {
-	JNIEnv *env = get_jni_env();
+	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
+	gboolean occludes = !window_jobj || !(_GET_BOOL_FIELD(window_jobj, "isFloating") || _GET_BOOL_FIELD(window_jobj, "isTranslucent"));
+	(*env)->DeleteLocalRef(env, window_jobj);
+	return occludes;
+}
+
+static void stop_if_paused(JNIEnv *env, jobject activity)
+{
 	/* unless it came back meanwhile, or went into picture-in-picture: that one stays paused and visible */
 	if (_GET_BOOL_FIELD(activity, "paused") && !(pinned_activity && (*env)->IsSameObject(env, activity, pinned_activity)))
 		activity_stop(env, activity, true);
+}
+
+/* like AOSP's visibility update (TaskFragment.updateActivityVisibilities()): from the top of the back stack down,
+ * activities are visible up to and including the first one that occludes what is behind it; those below are
+ * stopped, the visible ones that are not on top stay paused (an activity under a dialog-themed one gets onPause
+ * only). An activity that left the back stack (finished) is stopped as before. */
+static gboolean stop_when_idle(gpointer activity)
+{
+	JNIEnv *env = get_jni_env();
+	gboolean in_backlog = FALSE;
+	gboolean visible = TRUE;
+	for (GList *l = activity_backlog; l != NULL; l = l->next) {
+		if ((*env)->IsSameObject(env, l->data, activity))
+			in_backlog = TRUE;
+		if (!visible)
+			stop_if_paused(env, l->data);
+		else if (activity_occludes(env, l->data))
+			visible = FALSE;
+	}
+	if (!in_backlog)
+		stop_if_paused(env, activity);
 	_UNREF(activity);
 	return G_SOURCE_REMOVE;
 }
