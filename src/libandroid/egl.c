@@ -229,38 +229,56 @@ EGLBoolean bionic_eglTerminate(EGLDisplay display)
 	return eglTerminate(display);
 }
 
+/* EGL_ANDROID_recordable is mandatory and EGL_ANDROID_framebuffer_target present on every Android device (AOSP
+ * frameworks/native/opengl/libs/EGL/egl_platform_entries.cpp), but desktop Mesa enables them only on its Android platform
+ * and fails eglChooseConfig with EGL_BAD_ATTRIBUTE for them. ATL draws every window surface through its own buffers
+ * (bionic_eglCreateWindowSurface), the same way for every config, so every config qualifies. */
+static bool is_android_config_attrib(EGLint attribute)
+{
+	return attribute == EGL_RECORDABLE_ANDROID || attribute == EGL_FRAMEBUFFER_TARGET_ANDROID;
+}
+
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config)
 {
-	if (atl_display_info.is_x11) {
-		/* X11 supports pbuffers just fine */
+	if (!attrib_list)
 		return eglChooseConfig(display, attrib_list, configs, config_size, num_config);
-	} else {
-		bool has_pbuffer_bit = false;
-		int attrib_list_size = 0;
-		for (EGLint *attr = attrib_list; *attr != EGL_NONE; attr += 2) {
-			if (*attr == EGL_SURFACE_TYPE && (*(attr + 1) & EGL_PBUFFER_BIT) && *(attr + 1) != EGL_DONT_CARE) {
-				has_pbuffer_bit = true;
-			}
-			attrib_list_size += 2;
+	int attrib_list_size = 0;
+	while (attrib_list[attrib_list_size] != EGL_NONE)
+		attrib_list_size += 2;
+	/* copy the list in case it's mapped read-only */
+	EGLint *new_attrib_list = malloc(sizeof(EGLint) * (attrib_list_size + 1));
+	int n = 0;
+	bool none_match = false;
+	for (int i = 0; i < attrib_list_size; i += 2) {
+		EGLint attribute = attrib_list[i], value = attrib_list[i + 1];
+		if (is_android_config_attrib(attribute)) {
+			/* exact match against EGL_TRUE: only EGL_FALSE excludes */
+			none_match |= value == EGL_FALSE;
+			continue;
 		}
-		attrib_list_size += 1; // for EGL_NONE
-		if (has_pbuffer_bit) {
-			/* copy the list in case it's mapped read-only */
-			EGLint *new_attrib_list = malloc(sizeof(EGLint) * attrib_list_size);
-			memcpy(new_attrib_list, attrib_list, sizeof(EGLint) * attrib_list_size);
-			for (EGLint *attr = new_attrib_list; *attr != EGL_NONE; attr += 2) {
-				if (*attr == EGL_SURFACE_TYPE && *(attr + 1) != EGL_DONT_CARE) {
-					*(attr + 1) &= ~EGL_PBUFFER_BIT;
-					*(attr + 1) |= EGL_WINDOW_BIT;
-				}
-			}
-			EGLBoolean ret = eglChooseConfig(display, new_attrib_list, configs, config_size, num_config);
-			free(new_attrib_list);
-			return ret;
-		} else {
-			return eglChooseConfig(display, attrib_list, configs, config_size, num_config);
-		}
+		/* Wayland has no pbuffers (bionic_eglCreatePbufferSurface makes them from window surfaces), X11 has */
+		if (!atl_display_info.is_x11 && attribute == EGL_SURFACE_TYPE && value != EGL_DONT_CARE && (value & EGL_PBUFFER_BIT))
+			value = (value & ~EGL_PBUFFER_BIT) | EGL_WINDOW_BIT;
+		new_attrib_list[n++] = attribute;
+		new_attrib_list[n++] = value;
 	}
+	new_attrib_list[n] = EGL_NONE;
+	EGLBoolean ret = eglChooseConfig(display, new_attrib_list, configs, config_size, num_config);
+	free(new_attrib_list);
+	if (ret && none_match)
+		*num_config = 0;
+	return ret;
+}
+
+EGLBoolean bionic_eglGetConfigAttrib(EGLDisplay display, EGLConfig config, EGLint attribute, EGLint *value)
+{
+	if (!is_android_config_attrib(attribute))
+		return eglGetConfigAttrib(display, config, attribute, value);
+	EGLint config_id;
+	if (!eglGetConfigAttrib(display, config, EGL_CONFIG_ID, &config_id)) /* sets the error for a bad display or config */
+		return EGL_FALSE;
+	*value = EGL_TRUE;
+	return EGL_TRUE;
 }
 
 /* the pbuffers that are wl_egl_window surfaces of an unmapped wl_surface (Wayland has none) */

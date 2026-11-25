@@ -132,7 +132,7 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglGetConfigAttrib(JNIEnv *env, jobject this, jlong display, jlong config, jint attribute, jintArray _value)
 {
 	EGLint *value = get_int_array_crit(env, _value);
-	bool ret = eglGetConfigAttrib(_PTR(display), _PTR(config), attribute, &value[0]);
+	bool ret = bionic_eglGetConfigAttrib(_PTR(display), _PTR(config), attribute, &value[0]);
 	release_int_array_crit(env, _value, value);
 	return ret;
 }
