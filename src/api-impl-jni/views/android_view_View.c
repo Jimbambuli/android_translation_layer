@@ -1693,7 +1693,7 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_nativeIsInTouchMode(JNIEnv *en
 	return !GTK_IS_WINDOW(root) || !gtk_window_get_focus_visible(GTK_WINDOW(root));
 }
 
-JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame(JNIEnv *env, jobject this, jobject rect)
+JNIEXPORT void JNICALL Java_android_view_View_native_1getWindowVisibleDisplayFrame(JNIEnv *env, jobject this, jobject rect)
 {
 	int width;
 	int height;

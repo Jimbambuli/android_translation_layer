@@ -733,10 +733,10 @@ JNIEXPORT jboolean JNICALL Java_android_view_View_native_1getGlobalVisibleRect
 
 /*
  * Class:     android_view_View
- * Method:    getWindowVisibleDisplayFrame
+ * Method:    native_getWindowVisibleDisplayFrame
  * Signature: (Landroid/graphics/Rect;)V
  */
-JNIEXPORT void JNICALL Java_android_view_View_getWindowVisibleDisplayFrame
+JNIEXPORT void JNICALL Java_android_view_View_native_1getWindowVisibleDisplayFrame
   (JNIEnv *, jobject, jobject);
 
 /*

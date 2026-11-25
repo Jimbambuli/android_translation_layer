@@ -31,6 +31,7 @@ import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.BlendMode;
 import android.graphics.PorterDuff;
+import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
@@ -5057,7 +5058,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return (mPrivateFlags & PFLAG_PRESSED) == PFLAG_PRESSED;
 	}
 
-	public native void getWindowVisibleDisplayFrame(Rect rect);
+	public void getWindowVisibleDisplayFrame(Rect rect) {
+		if (gtkReady()) {
+			native_getWindowVisibleDisplayFrame(rect);
+			return;
+		}
+		/* AOSP View.getWindowVisibleDisplayFrame() without mAttachInfo (GTK's window is the main thread's) */
+		final WindowMetrics metrics = getContext().getSystemService(WindowManager.class).getMaximumWindowMetrics();
+		final Insets insets = metrics.getWindowInsets().getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+		rect.set(metrics.getBounds());
+		rect.inset(insets);
+	}
+	private native void native_getWindowVisibleDisplayFrame(Rect rect);
 
 	public void setRotation(float rotation) {
 		if (this.rotation == rotation)
