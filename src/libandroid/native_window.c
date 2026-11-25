@@ -176,6 +176,10 @@ void ANativeWindow_release(struct ANativeWindow *native_window)
 
 int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window)
 {
+	/* AOSP Surface::query(NATIVE_WINDOW_WIDTH): the size set with ANativeWindow_setBuffersGeometry(), else the
+	 * consumer's default buffer size (an ImageReader's size) */
+	if (native_window->image_reader)
+		return native_window->cpu.width ?: native_window->width;
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteRead(native_window, 0);
 		return native_window->width;
@@ -185,6 +189,8 @@ int32_t ANativeWindow_getWidth(struct ANativeWindow *native_window)
 
 int32_t ANativeWindow_getHeight(struct ANativeWindow *native_window)
 {
+	if (native_window->image_reader)
+		return native_window->cpu.height ?: native_window->height;
 	if (native_window->remote_fd >= 0) {
 		ANativeWindow_remoteRead(native_window, 0);
 		return native_window->height;
@@ -344,15 +350,31 @@ void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*
  * images into the reader; the window's size is the reader's, as AOSP's consumer default buffer size */
 static ANativeWindow *image_reader_window(JNIEnv *env, jobject surface, jobject image_reader)
 {
-	jclass class = (*env)->GetObjectClass(env, image_reader);
 	struct ANativeWindow *native_window = calloc(1, sizeof(struct ANativeWindow));
 	native_window->refcount = 1;
 	native_window->remote_fd = -1;
+	native_window->surface = (*env)->NewGlobalRef(env, surface);
+	ANativeWindow_setImageReader(native_window, env, image_reader);
+	return native_window;
+}
+
+/* the consumer of a window made before it had one (AMediaCodec_createPersistentInputSurface(), then
+ * AMediaCodec_setInputSurface()) */
+void ANativeWindow_setImageReader(struct ANativeWindow *native_window, JNIEnv *env, jobject image_reader)
+{
+	if (!image_reader || native_window->image_reader)
+		return;
+	jclass class = (*env)->GetObjectClass(env, image_reader);
 	native_window->width = (*env)->CallIntMethod(env, image_reader, (*env)->GetMethodID(env, class, "getWidth", "()I"));
 	native_window->height = (*env)->CallIntMethod(env, image_reader, (*env)->GetMethodID(env, class, "getHeight", "()I"));
-	native_window->surface = (*env)->NewGlobalRef(env, surface);
+	native_window->image_reader_usage = (*env)->CallLongMethod(env, image_reader, (*env)->GetMethodID(env, class, "getUsage", "()J"));
 	native_window->image_reader = (*env)->NewGlobalRef(env, image_reader);
-	return native_window;
+}
+
+/* the window of a Surface an encoder consumes (an input surface), with or without its ImageReader yet */
+ANativeWindow *ANativeWindow_fromConsumerSurface(JNIEnv *env, jobject surface)
+{
+	return image_reader_window(env, surface, _GET_OBJ_FIELD(surface, "atl_imageReader", "Landroid/media/ImageReader;"));
 }
 
 /* a Surface of another process (Surface.atl_endpoint): its window draws into buffers that the process showing

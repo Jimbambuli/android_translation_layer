@@ -849,8 +849,23 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 
 	/* CallbackProcessor::onFrameAvailable(): a frame while preview callbacks are on; a one-shot callback turns
 	 * them off (the FrameListener runs on the stream's thread) */
+	/* the input surface of a MediaRecorder with this camera (AOSP Camera2Client::startRecording(): a recording
+	 * stream into the encoder's surface) */
+	private volatile android.media.ImageReader mRecordingReader;
+
+	void setRecordingReader(android.media.ImageReader reader) {
+		mRecordingReader = reader;
+		/* Camera2Client::startRecordingL(): a stopped preview is started (apps such as Open Camera stop it before
+		 * Camera.unlock() and leave the camera to the recorder) */
+		if (reader != null)
+			startPreview();
+	}
+
 	@Override
 	public void onFrame(long timestampNs) {
+		android.media.ImageReader recording = mRecordingReader;
+		if (recording != null)
+			mHal.queueYuvImage(recording, timestampNs);
 		boolean capture;
 		int pictureWidth, pictureHeight, quality;
 		synchronized (mLock) {

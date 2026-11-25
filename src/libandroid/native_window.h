@@ -17,6 +17,7 @@ struct ANativeWindow {
 	int refcount;
 	jobject surface; /* the android.view.Surface of this window (a global reference) */
 	jobject image_reader; /* the android.media.ImageReader whose Surface this is (a global reference), else NULL */
+	uint64_t image_reader_usage; /* its ImageReader.getUsage() (EGL can't ask: the JNI of EGL14 holds arrays critical) */
 	struct { /* ANativeWindow_setBuffersGeometry() and the buffer of ANativeWindow_lock() */
 		int width;
 		int height;
@@ -57,6 +58,8 @@ void ANativeWindow_localPresentTexture(struct ANativeWindow *native_window, GdkT
 void ANativeWindow_remoteSetHandler(struct ANativeWindow *native_window, void (*handler)(void *data, const struct atl_surface_msg *msg), void *data);
 
 struct ANativeWindow *ANativeWindow_fromSurface(JNIEnv *env, jobject surface);
+struct ANativeWindow *ANativeWindow_fromConsumerSurface(JNIEnv *env, jobject surface);
+void ANativeWindow_setImageReader(struct ANativeWindow *native_window, JNIEnv *env, jobject image_reader);
 
 #ifdef VULKAN_CORE_H_
 /* vulkan_swapchain.c: Vulkan on a window with remote_fd or without a Wayland/X11 surface of its own */
@@ -70,6 +73,8 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface);
 EGLDisplay bionic_eglGetDisplay(NativeDisplayType native_display);
 EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface read, EGLContext context);
 EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface);
+EGLBoolean bionic_eglQuerySurface(EGLDisplay display, EGLSurface surface, EGLint attribute, EGLint *value);
+EGLBoolean bionic_eglPresentationTimeANDROID(EGLDisplay dpy, EGLSurface surface, int64_t time);
 EGLBoolean bionic_eglChooseConfig(EGLDisplay display, EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
 EGLBoolean bionic_eglGetConfigAttrib(EGLDisplay display, EGLConfig config, EGLint attribute, EGLint *value);
 EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, EGLint const *attrib_list);

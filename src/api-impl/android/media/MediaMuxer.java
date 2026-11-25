@@ -10,8 +10,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.ByteBuffer;
 
-/* AOSP frameworks/base/media/java/android/media/MediaMuxer.java: the argument checks and the states. ATL has no muxer
- * that writes the container (libstagefright), so creating one fails with an IOException, like a muxer AOSP cannot create. */
+/* AOSP frameworks/base/media/java/android/media/MediaMuxer.java: the argument checks and the states; the container is
+ * written by FFmpeg (android_media_MediaMuxer.c) instead of libstagefright. */
 public final class MediaMuxer {
     public static final class OutputFormat {
         private OutputFormat() {}
@@ -32,20 +32,15 @@ public final class MediaMuxer {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface Format {}
-    /* AOSP nativeSetup() creates libstagefright's MediaMuxer on the descriptor; ATL has no muxer, so AOSP's failure of a
-     * muxer that cannot be created: an IOException */
-    private static long nativeSetup(@NonNull FileDescriptor fd, int format) throws IllegalArgumentException, IOException {
-        throw new IOException("Failed to instantiate the muxer: ATL has no media muxer");
-    }
-    private static void nativeRelease(long nativeObject) {}
-    private static void nativeStart(long nativeObject) {}
-    private static void nativeStop(long nativeObject) {}
-    private static int nativeAddTrack(long nativeObject, String[] keys, Object[] values) {
-        throw new IllegalStateException("Muxer has been released!"); // no native muxer exists, see nativeSetup()
-    }
-    private static void nativeSetOrientationHint(long nativeObject, int degrees) {}
-    private static void nativeSetLocation(long nativeObject, int latitude, int longitude) {}
-    private static void nativeWriteSampleData(long nativeObject, int trackIndex, @NonNull ByteBuffer byteBuf, int offset, int size, long presentationTimeUs, int flags) {}
+    /* AOSP's natives (android_media_MediaMuxer.cpp) on FFmpeg's muxers (android_media_MediaMuxer.c) */
+    private static native long nativeSetup(@NonNull FileDescriptor fd, int format) throws IllegalArgumentException, IOException;
+    private static native void nativeRelease(long nativeObject);
+    private static native void nativeStart(long nativeObject);
+    private static native void nativeStop(long nativeObject);
+    private static native int nativeAddTrack(long nativeObject, String[] keys, Object[] values);
+    private static native void nativeSetOrientationHint(long nativeObject, int degrees);
+    private static native void nativeSetLocation(long nativeObject, int latitude, int longitude);
+    private static native void nativeWriteSampleData(long nativeObject, int trackIndex, @NonNull ByteBuffer byteBuf, int offset, int size, long presentationTimeUs, int flags);
     private static final int MUXER_STATE_UNINITIALIZED  = -1;
     private static final int MUXER_STATE_INITIALIZED    = 0;
     private static final int MUXER_STATE_STARTED        = 1;
@@ -172,7 +167,15 @@ public final class MediaMuxer {
         int trackIndex = -1;
         int mapSize = format.getKeys().size();
         if (mapSize > 0) {
-            trackIndex = nativeAddTrack(mNativeObject, null, null);
+            String[] keys = new String[mapSize];
+            Object[] values = new Object[mapSize];
+            int i = 0;
+            for (java.util.Map.Entry<String, Object> entry : format.getMap().entrySet()) {
+                keys[i] = entry.getKey();
+                values[i] = entry.getValue();
+                i++;
+            }
+            trackIndex = nativeAddTrack(mNativeObject, keys, values);
         } else {
             throw new IllegalArgumentException("format must not be empty.");
         }

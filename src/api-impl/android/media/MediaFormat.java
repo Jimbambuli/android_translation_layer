@@ -193,6 +193,11 @@ public class MediaFormat {
 
 	private Map<String, Object> map = new HashMap<>();
 
+	/* AOSP: package private, the keys and values (MediaMuxer.addTrack() hands them to the native muxer) */
+	/* package private */ Map<String, Object> getMap() {
+		return map;
+	}
+
 	public static final MediaFormat createAudioFormat(String mime, int sampleRate, int channelCount) {
 		MediaFormat format = new MediaFormat();
 		format.setString(KEY_MIME, mime);

@@ -1,15 +1,18 @@
-/* MediaRecorder for sound: the microphone through ALSA (in the Flatpak PulseAudio behind it), encoded and
-   muxed with FFmpeg into the file the app gives. Video (camera) is not recorded yet. */
+/* MediaRecorder: the microphone through ALSA (in the Flatpak PulseAudio behind it) and the frames of the video
+   source (MediaRecorder.java: an input surface, the camera's recording frames), encoded and muxed with FFmpeg into
+   the file the app gives. */
 #include <alsa/asoundlib.h>
 #include <glib.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/display.h>
 #include <unistd.h>
 
 #include "../defines.h"
 #include "../audio/audio.h"
 
 #include "../generated_headers/android_media_MediaRecorder.h"
+#include "video_encoder.h"
 
 struct recorder {
 	snd_pcm_t *pcm;
@@ -25,6 +28,13 @@ struct recorder {
 	gint running;
 	gint paused;
 	gint max_amplitude;
+	/* the video track: timestamps from start() on, without the time paused (AOSP: a pause leaves no gap) */
+	struct atl_venc *venc;
+	AVStream *video_st;
+	GMutex write_lock; /* both tracks' packets into the muxer */
+	int64_t start_us;
+	int64_t pause_us; /* when the pause began, else 0 */
+	int64_t paused_us; /* all pauses so far */
 };
 
 static const char *muxer_name(int output_format)
@@ -108,11 +118,27 @@ static int64_t fd_seek(void *opaque, int64_t offset, int whence)
 static void write_packets(struct recorder *r)
 {
 	AVPacket *pkt = av_packet_alloc();
+	g_mutex_lock(&r->write_lock);
 	while (avcodec_receive_packet(r->enc, pkt) == 0) {
 		av_packet_rescale_ts(pkt, r->enc->time_base, r->st->time_base);
 		pkt->stream_index = r->st->index;
 		av_interleaved_write_frame(r->oc, pkt);
 	}
+	g_mutex_unlock(&r->write_lock);
+	av_packet_free(&pkt);
+}
+
+static void write_video_packets(struct recorder *r)
+{
+	AVCodecContext *ctx = atl_venc_context(r->venc);
+	AVPacket *pkt = av_packet_alloc();
+	g_mutex_lock(&r->write_lock);
+	while (atl_venc_receive(r->venc, pkt) == 0) {
+		av_packet_rescale_ts(pkt, ctx->time_base, r->video_st->time_base);
+		pkt->stream_index = r->video_st->index;
+		av_interleaved_write_frame(r->oc, pkt);
+	}
+	g_mutex_unlock(&r->write_lock);
 	av_packet_free(&pkt);
 }
 
@@ -176,6 +202,8 @@ static gpointer record_thread(gpointer data)
 
 static void recorder_free(struct recorder *r)
 {
+	atl_venc_free(r->venc);
+	g_mutex_clear(&r->write_lock);
 	if (r->pcm)
 		snd_pcm_close(r->pcm);
 	if (r->oc && r->oc->pb) {
@@ -196,15 +224,54 @@ static void recorder_free(struct recorder *r)
 	g_free(r);
 }
 
-JNIEXPORT jlong JNICALL Java_android_media_MediaRecorder_nativePrepare(JNIEnv *env, jclass clazz, jstring path_jstr, jint fd, jint output_format, jint audio_encoder, jint sample_rate, jint channels, jint bit_rate)
+/* the video track: the type's encoder (VA-API first) with the size, rate and bit rate of the recorder */
+static bool add_video(struct recorder *r, const char *mime, int width, int height, int frame_rate, int bit_rate, int orientation)
 {
-	const AVCodec *codec = find_encoder(audio_encoder);
-	if (!codec) {
+	const char *name = atl_venc_find(mime, true) ?: atl_venc_find(mime, false);
+	if (!name) {
+		printf("MediaRecorder: no encoder for %s\n", mime);
+		return false;
+	}
+	r->venc = atl_venc_open(name, width, height, frame_rate, bit_rate, 1 /* VBR */, 1, r->oc->oformat->flags & AVFMT_GLOBALHEADER);
+	if (!r->venc) {
+		printf("MediaRecorder: can't open %s for %dx%d\n", name, width, height);
+		return false;
+	}
+	r->video_st = avformat_new_stream(r->oc, NULL);
+	r->video_st->time_base = atl_venc_context(r->venc)->time_base;
+	avcodec_parameters_from_context(r->video_st->codecpar, atl_venc_context(r->venc));
+	if (orientation) {
+		AVPacketSideData *sd = av_packet_side_data_new(&r->video_st->codecpar->coded_side_data, &r->video_st->codecpar->nb_coded_side_data,
+		                                               AV_PKT_DATA_DISPLAYMATRIX, sizeof(int32_t) * 9, 0);
+		if (sd)
+			av_display_rotation_set((int32_t *)sd->data, -orientation);
+	}
+	return true;
+}
+
+JNIEXPORT jlong JNICALL Java_android_media_MediaRecorder_nativePrepare(JNIEnv *env, jclass clazz, jstring path_jstr, jint fd, jint output_format, jboolean audio, jint audio_encoder, jint sample_rate, jint channels, jint bit_rate,
+                                                                       jstring video_mime, jint width, jint height, jint frame_rate, jint video_bit_rate, jint orientation)
+{
+	const AVCodec *codec = audio ? find_encoder(audio_encoder) : NULL;
+	if (audio && !codec) {
 		printf("MediaRecorder: no encoder for AudioEncoder %d\n", audio_encoder);
 		return 0;
 	}
 	struct recorder *r = g_new0(struct recorder, 1);
+	g_mutex_init(&r->write_lock);
 	r->fd = -1;
+	int ret;
+	if (avformat_alloc_output_context2(&r->oc, NULL, muxer_name(output_format), NULL) < 0)
+		goto fail;
+	if (video_mime) {
+		const char *mime = (*env)->GetStringUTFChars(env, video_mime, NULL);
+		bool ok = add_video(r, mime, width, height, frame_rate, video_bit_rate, orientation);
+		(*env)->ReleaseStringUTFChars(env, video_mime, mime);
+		if (!ok)
+			goto fail;
+	}
+	if (!audio)
+		goto output;
 	r->enc = avcodec_alloc_context3(codec);
 	/* the requested rate when the encoder takes it, else 48 kHz or the encoder's first */
 	int rate = sample_rate > 0 ? sample_rate : 8000;
@@ -221,7 +288,7 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaRecorder_nativePrepare(JNIEnv *e
 			rate = has48 ? 48000 : rates[0];
 	}
 	unsigned int alsa_channels;
-	int ret = snd_pcm_open(&r->pcm, PCM_DEVICE, SND_PCM_STREAM_CAPTURE, 0);
+	ret = snd_pcm_open(&r->pcm, PCM_DEVICE, SND_PCM_STREAM_CAPTURE, 0);
 	if (ret < 0) {
 		printf("MediaRecorder: no microphone: %s\n", snd_strerror(ret));
 		r->pcm = NULL;
@@ -254,8 +321,6 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaRecorder_nativePrepare(JNIEnv *e
 	r->enc->time_base = (AVRational){1, got_rate};
 	r->enc->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL; /* FFmpeg's own Opus encoder */
 
-	if (avformat_alloc_output_context2(&r->oc, NULL, muxer_name(output_format), NULL) < 0)
-		goto fail;
 	if (r->oc->oformat->flags & AVFMT_GLOBALHEADER)
 		r->enc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 	if (avcodec_open2(r->enc, codec, NULL) < 0)
@@ -264,6 +329,17 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaRecorder_nativePrepare(JNIEnv *e
 	r->st->time_base = r->enc->time_base;
 	avcodec_parameters_from_context(r->st->codecpar, r->enc);
 
+	r->frame = av_frame_alloc();
+	r->frame->format = fmt;
+	r->frame->sample_rate = got_rate;
+	av_channel_layout_copy(&r->frame->ch_layout, &r->enc->ch_layout);
+	r->frame_size = r->enc->frame_size ?: 1024;
+	r->frame->nb_samples = r->frame_size;
+	if (av_frame_get_buffer(r->frame, 0) < 0)
+		goto fail;
+	r->pcm_buf = g_new(int16_t, r->frame_size * alsa_channels);
+
+output:
 	if (path_jstr) {
 		const char *path = (*env)->GetStringUTFChars(env, path_jstr, NULL);
 		ret = avio_open(&r->oc->pb, path, AVIO_FLAG_WRITE);
@@ -278,16 +354,6 @@ JNIEXPORT jlong JNICALL Java_android_media_MediaRecorder_nativePrepare(JNIEnv *e
 	}
 	if (avformat_write_header(r->oc, NULL) < 0)
 		goto fail;
-
-	r->frame = av_frame_alloc();
-	r->frame->format = fmt;
-	r->frame->sample_rate = got_rate;
-	av_channel_layout_copy(&r->frame->ch_layout, &r->enc->ch_layout);
-	r->frame_size = r->enc->frame_size ?: 1024;
-	r->frame->nb_samples = r->frame_size;
-	if (av_frame_get_buffer(r->frame, 0) < 0)
-		goto fail;
-	r->pcm_buf = g_new(int16_t, r->frame_size * alsa_channels);
 	return _INTPTR(r);
 
 fail:
@@ -299,13 +365,62 @@ fail:
 JNIEXPORT void JNICALL Java_android_media_MediaRecorder_nativeStart(JNIEnv *env, jclass clazz, jlong ptr)
 {
 	struct recorder *r = _PTR(ptr);
+	r->start_us = g_get_monotonic_time();
 	g_atomic_int_set(&r->running, 1);
-	r->thread = g_thread_new("MediaRecorder", record_thread, r);
+	if (r->pcm)
+		r->thread = g_thread_new("MediaRecorder", record_thread, r);
+}
+
+/* a frame of the video source (CLOCK_MONOTONIC timestamp, as the camera's and the swap's of EGL): frames from before
+ * start() or while paused are left out */
+JNIEXPORT jint JNICALL Java_android_media_MediaRecorder_nativeWriteVideo(JNIEnv *env, jclass clazz, jlong ptr, jlong buffer, jobjectArray buffers, jintArray row_strides, jintArray pixel_strides, jint width, jint height, jlong timestamp_ns)
+{
+	struct recorder *r = _PTR(ptr);
+	if (!r->venc || g_atomic_int_get(&r->paused))
+		return 0;
+	int64_t pts = timestamp_ns / 1000 - r->start_us - r->paused_us;
+	if (pts < 0)
+		return 0;
+	if (!atl_venc_frames(r->venc))
+		fprintf(stderr, "MediaRecorder: first video frame %dx%d\n", width, height);
+	int ret;
+	if (buffer) {
+		ret = atl_venc_send_buffer(r->venc, _PTR(buffer), pts);
+	} else {
+		int n = MIN((*env)->GetArrayLength(env, buffers), 4);
+		uint8_t *data[4] = {0};
+		int linesize[4] = {0};
+		int pixel_stride[4] = {0};
+		(*env)->GetIntArrayRegion(env, row_strides, 0, n, linesize);
+		(*env)->GetIntArrayRegion(env, pixel_strides, 0, n, pixel_stride);
+		for (int i = 0; i < n; i++) {
+			jobject plane = (*env)->GetObjectArrayElement(env, buffers, i);
+			data[i] = (*env)->GetDirectBufferAddress(env, plane);
+			(*env)->DeleteLocalRef(env, plane);
+		}
+		enum AVPixelFormat format = atl_venc_planes_format(n, data, pixel_stride);
+		if (format == AV_PIX_FMT_NV12 || format == AV_PIX_FMT_NV21) {
+			if (format == AV_PIX_FMT_NV21 && n == 3)
+				data[1] = data[2];
+			data[2] = NULL;
+			linesize[2] = 0;
+		}
+		ret = format == AV_PIX_FMT_NONE ? AVERROR(EINVAL) : atl_venc_send(r->venc, format, data, linesize, width, height, pts);
+	}
+	if (ret >= 0)
+		write_video_packets(r);
+	return ret;
 }
 
 JNIEXPORT void JNICALL Java_android_media_MediaRecorder_nativePause(JNIEnv *env, jclass clazz, jlong ptr, jboolean paused)
 {
 	struct recorder *r = _PTR(ptr);
+	if (paused && !r->pause_us)
+		r->pause_us = g_get_monotonic_time();
+	else if (!paused && r->pause_us) {
+		r->paused_us += g_get_monotonic_time() - r->pause_us;
+		r->pause_us = 0;
+	}
 	g_atomic_int_set(&r->paused, paused);
 }
 
@@ -315,8 +430,9 @@ JNIEXPORT jint JNICALL Java_android_media_MediaRecorder_nativeGetMaxAmplitude(JN
 	return g_atomic_int_exchange(&r->max_amplitude, 0);
 }
 
-/* stops a started recording and completes the file; also frees a recorder that was only prepared */
-JNIEXPORT void JNICALL Java_android_media_MediaRecorder_nativeStop(JNIEnv *env, jclass clazz, jlong ptr)
+/* stops a started recording and completes the file; also frees a recorder that was only prepared. AOSP: false (stop()
+ * throws RuntimeException) when the video track got no frame; the file is not completed then */
+JNIEXPORT jboolean JNICALL Java_android_media_MediaRecorder_nativeStop(JNIEnv *env, jclass clazz, jlong ptr)
 {
 	struct recorder *r = _PTR(ptr);
 	if (r->thread) {
@@ -325,6 +441,14 @@ JNIEXPORT void JNICALL Java_android_media_MediaRecorder_nativeStop(JNIEnv *env, 
 		if (avcodec_send_frame(r->enc, NULL) == 0)
 			write_packets(r);
 	}
-	av_write_trailer(r->oc);
+	bool ok = !r->venc || atl_venc_frames(r->venc) > 0;
+	if (r->venc && r->start_us && atl_venc_send(r->venc, AV_PIX_FMT_NONE, NULL, NULL, 0, 0, 0) == 0)
+		write_video_packets(r);
+	if (ok)
+		av_write_trailer(r->oc);
+	else
+		fprintf(stderr, "MediaRecorder: no video frame recorded\n");
+	ok = ok || !r->start_us;
 	recorder_free(r);
+	return ok;
 }

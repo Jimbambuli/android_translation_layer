@@ -614,6 +614,23 @@ public final class ExternalCameraDevice {
 			nativeClose(handle);
 	}
 
+	/** @hide during onFrame(): the frame as a YUV_420_888 image (I420 planes) of the reader's size, queued to the
+	 * reader (an ImageReader target, an encoder's input surface); false if the reader takes no image now */
+	public boolean queueYuvImage(android.media.ImageReader reader, long timestampNs) {
+		int w = reader.getWidth(), h = reader.getHeight();
+		int ySize = w * h, cSize = (w / 2) * (h / 2);
+		byte[] i420 = new byte[ySize + 2 * cSize];
+		if (!copyFrame(i420, android.graphics.ImageFormat.YUV_420_888, w, h))
+			return false;
+		java.nio.ByteBuffer[] planes = {
+			java.nio.ByteBuffer.allocateDirect(ySize).put(i420, 0, ySize),
+			java.nio.ByteBuffer.allocateDirect(cSize).put(i420, ySize, cSize),
+			java.nio.ByteBuffer.allocateDirect(cSize).put(i420, ySize + cSize, cSize)};
+		for (java.nio.ByteBuffer plane : planes)
+			plane.rewind();
+		return reader.queueImage(timestampNs, planes, new int[] {w, w / 2, w / 2}, new int[] {1, 1, 1});
+	}
+
 	/** during FrameListener.onFrame(): the frame scaled to width x height as ImageFormat.NV21 or YV12 (the layouts
 	 * of Camera's preview callbacks) or YUV_420_888 (I420, packed) in dst; false if it does not fit */
 	public boolean copyFrame(byte[] dst, int imageFormat, int width, int height) {

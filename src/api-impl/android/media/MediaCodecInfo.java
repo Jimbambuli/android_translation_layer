@@ -11,11 +11,19 @@ public class MediaCodecInfo {
 	private final CodecProfileLevel[] profileLevels;
 	private final int maxWidth;
 	private final int maxHeight;
+	private final boolean encoder;
 
 	/* a codec of MediaCodecList: FFmpeg's decoder, a hardware (VA-API) or software codec, its profiles and levels
 	 * and its largest frame */
 	MediaCodecInfo(String name, String mime, String decoder, boolean hardware, CodecProfileLevel[] profileLevels,
 	               int maxWidth, int maxHeight) {
+		this(name, mime, decoder, hardware, profileLevels, maxWidth, maxHeight, false);
+	}
+
+	/* an encoder of MediaCodecList: FFmpeg's encoder (getDecoder() names it) */
+	MediaCodecInfo(String name, String mime, String decoder, boolean hardware, CodecProfileLevel[] profileLevels,
+	               int maxWidth, int maxHeight, boolean encoder) {
+		this.encoder = encoder;
 		this.name = name;
 		this.mime = mime;
 		this.decoder = decoder;
@@ -25,7 +33,7 @@ public class MediaCodecInfo {
 		this.maxHeight = maxHeight;
 	}
 
-	/** @hide FFmpeg's decoder of the codec */
+	/** @hide FFmpeg's decoder (encoder) of the codec */
 	public String getDecoder() {
 		return decoder;
 	}
@@ -41,7 +49,7 @@ public class MediaCodecInfo {
 	}
 
 	public boolean isEncoder() {
-		return false;
+		return encoder;
 	}
 
 	/* API 29: no codec is listed under a second name */
@@ -78,6 +86,13 @@ public class MediaCodecInfo {
 		for (int i = 0; i < profileLevels.length; i++)
 			caps.profileLevels[i] = new CodecProfileLevel(profileLevels[i].profile, profileLevels[i].level);
 		caps.videoCaps = new VideoCapabilities(maxWidth, maxHeight);
+		/* AOSP's video encoders (C2SoftAvcEnc and the vendors'): input from a Surface or a YUV 4:2:0 ByteBuffer,
+		 * with variable and constant bit rate */
+		if (encoder && type.startsWith("video/")) {
+			caps.colorFormats = new int[] {CodecCapabilities.COLOR_FormatYUV420Flexible, CodecCapabilities.COLOR_FormatSurface,
+			                               CodecCapabilities.COLOR_FormatYUV420Planar, CodecCapabilities.COLOR_FormatYUV420SemiPlanar};
+			caps.encoderCaps = new EncoderCapabilities((1 << EncoderCapabilities.BITRATE_MODE_VBR) | (1 << EncoderCapabilities.BITRATE_MODE_CBR));
+		}
 		return caps;
 	}
 
@@ -184,9 +199,11 @@ public class MediaCodecInfo {
 			return new AudioCapabilities();
 		}
 
-		/* AOSP: mEncoderCaps, null for a decoder; all ATL codecs are decoders */
+		private EncoderCapabilities encoderCaps;
+
+		/* AOSP: mEncoderCaps, null for a decoder */
 		public EncoderCapabilities getEncoderCapabilities() {
-			return null;
+			return encoderCaps;
 		}
 
 		public VideoCapabilities getVideoCapabilities() {
@@ -586,19 +603,21 @@ public class MediaCodecInfo {
 		public static final int AACObjectXHE = 42;
 	}
 
-	/* AOSP MediaCodecInfo.EncoderCapabilities; never handed out, as ATL has no encoders */
+	/* AOSP MediaCodecInfo.EncoderCapabilities of a video encoder: the bit rate modes it supports */
 	public static final class EncoderCapabilities {
 		public static final int BITRATE_MODE_CQ = 0;
 		public static final int BITRATE_MODE_VBR = 1;
 		public static final int BITRATE_MODE_CBR = 2;
 		public static final int BITRATE_MODE_CBR_FD = 3;
 
-		/* AOSP defaults of an EncoderCapabilities without published limits (unreachable in ATL) */
+		/* AOSP defaults of an EncoderCapabilities without published quality and complexity limits */
 		private final android.util.Range<Integer> mQualityRange = new android.util.Range<Integer>(0, 0);
 		private final android.util.Range<Integer> mComplexityRange = new android.util.Range<Integer>(0, 0);
 		private int mBitControl = 0;
 
-		private EncoderCapabilities() {}
+		private EncoderCapabilities(int bitControl) {
+			mBitControl = bitControl;
+		}
 
 		public android.util.Range<Integer> getQualityRange() {
 			return mQualityRange;

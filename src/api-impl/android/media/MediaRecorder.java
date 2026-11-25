@@ -1,6 +1,7 @@
 package android.media;
 
 import android.content.Context;
+import android.view.Surface;
 import java.io.File;
 import java.io.FileDescriptor;
 import java.io.IOException;
@@ -98,18 +99,30 @@ public class MediaRecorder {
 	private long recorder;
 	private boolean started;
 
-	private static native long nativePrepare(String path, int fd, int outputFormat, int audioEncoder, int samplingRate, int channels, int bitRate);
+	/* AOSP StagefrightRecorder's defaults for a video track */
+	private int videoEncoder;
+	private int videoWidth = 176, videoHeight = 144, videoFrameRate = 30, videoBitRate = 192000;
+	private int orientationHint;
+	private android.hardware.Camera camera;
+	private Surface inputSurface; // a PersistentSurface of setInputSurface()
+	private ImageReader videoInput; // the consumer of the video source's frames
+	private java.util.concurrent.ExecutorService videoThread;
+
+	private static native long nativePrepare(String path, int fd, int outputFormat, boolean audio, int audioEncoder, int samplingRate, int channels, int bitRate,
+	                                         String videoMime, int width, int height, int frameRate, int videoBitRate, int orientation);
+	private static native int nativeWriteVideo(long recorder, long hardwareBuffer, java.nio.ByteBuffer[] planes, int[] rowStrides, int[] pixelStrides, int width, int height, long timestampNs);
 	private static native void nativeStart(long recorder);
 	private static native void nativePause(long recorder, boolean paused);
 	private static native int nativeGetMaxAmplitude(long recorder);
-	private static native void nativeStop(long recorder);
+	private static native boolean nativeStop(long recorder);
 
 	public void setAudioSource(int audioSource) {
 		this.audioSource = audioSource;
 	}
 
+	/* AOSP StagefrightRecorder::setVideoSource(): DEFAULT is the camera */
 	public void setVideoSource(int videoSource) {
-		this.videoSource = videoSource;
+		this.videoSource = videoSource == VideoSource.DEFAULT ? VideoSource.CAMERA : videoSource;
 	}
 
 	public void setOutputFormat(int outputFormat) {
@@ -120,10 +133,35 @@ public class MediaRecorder {
 		this.audioEncoder = audioEncoder;
 	}
 
-	public void setVideoEncoder(int videoEncoder) {}
+	public void setVideoEncoder(int videoEncoder) {
+		this.videoEncoder = videoEncoder;
+	}
 
-	/* AOSP MediaRecorder.setVideoEncodingProfileLevel(): the checks, then setParameter() for the video encoder,
-	 * which ATL does not have (prepare() with a video source fails), as the other video setters */
+	/* MediaRecorder.VideoEncoder as the encoder's type; DEFAULT as AOSP's setDefaultVideoEncoderIfNecessary(): VP8 for
+	 * WebM, else the codec of the camera's QUALITY_LOW profile, which is H.264 in ATL's profiles */
+	private String videoMime(int encoder) {
+		if (encoder == VideoEncoder.DEFAULT && outputFormat == OutputFormat.WEBM)
+			return MediaFormat.MIMETYPE_VIDEO_VP8;
+		switch (encoder) {
+			case VideoEncoder.H263:
+				return MediaFormat.MIMETYPE_VIDEO_H263;
+			case VideoEncoder.MPEG_4_SP:
+				return MediaFormat.MIMETYPE_VIDEO_MPEG4;
+			case VideoEncoder.VP8:
+				return MediaFormat.MIMETYPE_VIDEO_VP8;
+			case VideoEncoder.HEVC:
+				return MediaFormat.MIMETYPE_VIDEO_HEVC;
+			case 6: /* VP9 */
+				return MediaFormat.MIMETYPE_VIDEO_VP9;
+			case 8: /* AV1 */
+				return MediaFormat.MIMETYPE_VIDEO_AV1;
+			default:
+				return MediaFormat.MIMETYPE_VIDEO_AVC;
+		}
+	}
+
+	/* AOSP MediaRecorder.setVideoEncodingProfileLevel(): the checks, then setParameter() for the video encoder; ATL's
+	 * encoders take their default profile */
 	public void setVideoEncodingProfileLevel(int profile, int level) {
 		if (profile < 0) {
 			throw new IllegalArgumentException("Video encoding profile is not positive");
@@ -134,18 +172,43 @@ public class MediaRecorder {
 	}
 
 	/* AOSP MediaRecorder.setCamera() (deprecated): hands the camera to the native recorder, used for a CAMERA video
-	 * source at prepare(); ATL records no video */
-	public void setCamera(android.hardware.Camera c) {}
-
-	/* AOSP MediaRecorder.getSurface(): IllegalStateException unless prepared with VIDEO_SOURCE_SURFACE; ATL's
-	 * prepare() rejects every video source, so there is never such a surface */
-	public android.view.Surface getSurface() {
-		throw new IllegalStateException("failed to get surface");
+	 * source; its preview frames are recorded */
+	public void setCamera(android.hardware.Camera c) {
+		camera = c;
 	}
-	public void setVideoSize(int width, int height) {}
-	public void setVideoFrameRate(int rate) {}
-	public void setVideoEncodingBitRate(int bitRate) {}
-	public void setOrientationHint(int degrees) {}
+
+	/* AOSP MediaRecorder.getSurface(): the input surface of a recorder prepared with VIDEO_SOURCE_SURFACE, else
+	 * IllegalStateException */
+	public Surface getSurface() {
+		if (videoInput == null || videoSource != VideoSource.SURFACE)
+			throw new IllegalStateException("failed to get surface");
+		return videoInput.getSurface();
+	}
+
+	public void setVideoSize(int width, int height) {
+		if (width <= 0 || height <= 0)
+			throw new IllegalArgumentException("Video size must be positive");
+		videoWidth = width;
+		videoHeight = height;
+	}
+
+	public void setVideoFrameRate(int rate) {
+		if (rate > 0)
+			videoFrameRate = rate;
+	}
+
+	public void setVideoEncodingBitRate(int bitRate) {
+		if (bitRate <= 0)
+			throw new IllegalArgumentException("Video encoding bit rate is not positive");
+		videoBitRate = bitRate;
+	}
+
+	/* AOSP: 0, 90, 180 or 270, written as the video's rotation in the container */
+	public void setOrientationHint(int degrees) {
+		if (degrees != 0 && degrees != 90 && degrees != 180 && degrees != 270)
+			throw new IllegalArgumentException("Unsupported angle: " + degrees);
+		orientationHint = degrees;
+	}
 	public void setLocation(float latitude, float longitude) {}
 	public void setMaxDuration(int maxDurationMs) {}
 	public void setMaxFileSize(long maxFilesizeBytes) {}
@@ -187,15 +250,61 @@ public class MediaRecorder {
 	public void prepare() throws IOException {
 		if (path == null && fd == null)
 			throw new IllegalStateException("No valid output file");
-		if (audioSource < 0)
-			throw new IllegalStateException("No audio source");
-		if (videoSource >= 0)
-			throw new IOException("ATL records no video yet");
-		if (!AudioRecord.microphoneAvailable())
+		if (audioSource < 0 && videoSource < 0)
+			throw new IllegalStateException("No audio or video source");
+		if (audioSource >= 0 && !AudioRecord.microphoneAvailable())
 			throw new IOException("no microphone (outside a Flatpak only with ATL_UGLY_ENABLE_MICROPHONE)");
-		recorder = nativePrepare(path, fd != null ? fd.getInt$() : -1, outputFormat, audioEncoder, samplingRate, channels, bitRate);
+		recorder = nativePrepare(path, fd != null ? fd.getInt$() : -1, outputFormat, audioSource >= 0, audioEncoder, samplingRate, channels, bitRate,
+		                         videoSource >= 0 ? videoMime(videoEncoder) : null, videoWidth, videoHeight, videoFrameRate, videoBitRate, orientationHint);
 		if (recorder == 0)
 			throw new IOException("prepare failed (microphone, encoder or file)");
+		/* the frames of the video source come to an encoder's input surface: the app's (SURFACE) or the camera's
+		 * recording stream (CAMERA, AOSP CameraSource) */
+		if (videoSource >= 0)
+			videoInput = ImageReader.atl_newEncoderInput(inputSurface, videoWidth, videoHeight);
+	}
+
+	/* the frames of the input surface into the recording, on a thread of the recorder (AOSP: the encoder's
+	 * GraphicBufferSource) */
+	private void writeVideo(ImageReader reader) {
+		Image image;
+		while ((image = reader.acquireNextImageNoThrowISE()) != null) {
+			long buffer = ImageReader.atl_hardwareBuffer(image);
+			Image.Plane[] planes = buffer == 0 ? ImageReader.atl_queuedPlanes(image) : null;
+			int n = planes != null ? planes.length : 0;
+			java.nio.ByteBuffer[] data = new java.nio.ByteBuffer[n];
+			int[] rowStrides = new int[n], pixelStrides = new int[n];
+			for (int i = 0; i < n; i++) {
+				data[i] = planes[i].getBuffer();
+				rowStrides[i] = planes[i].getRowStride();
+				pixelStrides[i] = planes[i].getPixelStride();
+			}
+			synchronized (this) {
+				if (recorder != 0 && started)
+					nativeWriteVideo(recorder, buffer, data, rowStrides, pixelStrides, image.getWidth(), image.getHeight(), image.getTimestamp());
+			}
+			image.close();
+		}
+	}
+
+	private void stopVideo() {
+		if (camera != null && videoSource == VideoSource.CAMERA)
+			camera.atl_setRecordingReader(null);
+		if (videoThread != null) {
+			videoInput.setOnImageAvailableListener(null, null);
+			videoThread.shutdown();
+			try {
+				videoThread.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
+			} catch (InterruptedException e) {
+			}
+			videoThread = null;
+		}
+	}
+
+	private void closeVideoInput() {
+		if (videoInput != null && inputSurface == null)
+			videoInput.close();
+		videoInput = null;
 	}
 
 	public void start() {
@@ -203,6 +312,16 @@ public class MediaRecorder {
 			throw new IllegalStateException();
 		nativeStart(recorder);
 		started = true;
+		if (videoInput != null) {
+			videoThread = java.util.concurrent.Executors.newSingleThreadExecutor();
+			ImageReader reader = videoInput;
+			videoInput.setOnImageAvailableListenerWithExecutor(r -> writeVideo(reader), videoThread);
+			if (videoSource == VideoSource.CAMERA) {
+				if (camera == null)
+					throw new IllegalStateException("no camera for VIDEO_SOURCE_CAMERA (setCamera())");
+				camera.atl_setRecordingReader(videoInput);
+			}
+		}
 	}
 
 	public void pause() {
@@ -224,18 +343,38 @@ public class MediaRecorder {
 	public void stop() {
 		if (!started)
 			throw new IllegalStateException();
-		nativeStop(recorder);
-		recorder = 0;
-		started = false;
+		stopVideo();
+		boolean ok;
+		synchronized (this) {
+			ok = nativeStop(recorder);
+			recorder = 0;
+			started = false;
+		}
+		closeVideoInput();
+		/* AOSP: "a RuntimeException is intentionally thrown to the application, if no valid audio/video data has been
+		 * received when stop() is called" */
+		if (!ok)
+			throw new RuntimeException("stop failed.");
 	}
 
 	public void reset() {
-		if (recorder != 0)
-			nativeStop(recorder);
-		recorder = 0;
-		started = false;
+		stopVideo();
+		synchronized (this) {
+			if (recorder != 0)
+				nativeStop(recorder);
+			recorder = 0;
+			started = false;
+		}
+		closeVideoInput();
 		audioSource = videoSource = -1;
 		outputFormat = audioEncoder = samplingRate = bitRate = 0;
+		videoEncoder = orientationHint = 0;
+		videoWidth = 176;
+		videoHeight = 144;
+		videoFrameRate = 30;
+		videoBitRate = 192000;
+		camera = null;
+		inputSurface = null;
 		channels = 1;
 		path = null;
 		fd = null;
@@ -308,8 +447,13 @@ public class MediaRecorder {
     public void removeOnRoutingChangedListener(android.media.AudioRouting.OnRoutingChangedListener arg0) {  }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void setAudioProfile(android.media.EncoderProfiles.AudioProfile arg0) {  }
-    /* AOSP 16 API; no backing hardware/service in ATL */
-    public void setInputSurface(android.view.Surface arg0) {  }
+    /* AOSP setInputSurface(): a PersistentSurface (MediaCodec.createPersistentInputSurface()) as the input of
+     * VIDEO_SOURCE_SURFACE, before prepare() */
+    public void setInputSurface(Surface surface) {
+        if (!(surface instanceof MediaCodec.PersistentSurface))
+            throw new IllegalArgumentException("not a PersistentSurface");
+        inputSurface = surface;
+    }
     /* AOSP 16 API; no backing hardware/service in ATL */
     public void setLogSessionId(android.media.metrics.LogSessionId arg0) {  }
     /* AOSP 16 API; no backing hardware/service in ATL */

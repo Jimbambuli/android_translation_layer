@@ -61,6 +61,18 @@ public class MediaCodec {
 
 	private final MediaCodecInfo info;
 
+	/* a video encoder (MediaCodecInfo.isEncoder()): FFmpeg's encoder of video_encoder.c, opened by configure();
+	 * native_codec is ENCODER for it, as the decoder's natives never see it */
+	private static final long ENCODER = -1;
+	private final boolean encoder;
+	private long native_encoder;
+	private MediaFormat outputFormat;
+	private int encoderColorFormat, encoderStride, encoderSliceHeight;
+	private byte[] codecConfig; // the codec-specific data, given out as first output buffer (BUFFER_FLAG_CODEC_CONFIG)
+	private ImageReader inputReader; // the consumer of the input surface
+	private boolean inputSurfaceEos, inputEosSent;
+	private Image pendingImage; // taken from the input surface, not yet taken by the encoder (EAGAIN)
+
 	/* AOSP native_setup(): a name MediaCodecList does not list fails with NAME_NOT_FOUND, an IllegalArgumentException;
 	 * other failures are IOExceptions */
 	private MediaCodec(String codecName) throws IOException {
@@ -68,7 +80,8 @@ public class MediaCodec {
 		info = MediaCodecList.getInfoByName(codecName);
 		if (info == null)
 			throw new IllegalArgumentException("Failed to initialize " + codecName + ", error 0xfffffffe (NAME_NOT_FOUND)");
-		native_codec = native_constructor(info.getDecoder(), info.isHardwareAccelerated());
+		encoder = info.isEncoder();
+		native_codec = encoder ? ENCODER : native_constructor(info.getDecoder(), info.isHardwareAccelerated());
 		if (native_codec == 0) {
 			throw new IOException("Unable to create MediaCodec: " + codecName);
 		}
@@ -103,6 +116,10 @@ public class MediaCodec {
 		this.mediaFormat = format;
 		mHasSurface = surface != null;
 		String mime = info.getSupportedTypes()[0];
+		if (encoder) {
+			configureEncoder(format, mime);
+			return;
+		}
 
 		int maxInputSize = 262144;
 		if (format.containsKey("max-input-size")) {
@@ -165,9 +182,145 @@ public class MediaCodec {
 		}
 	}
 
+	private static int number(MediaFormat format, String key, int defaultValue) {
+		Number n = format.getNumber(key);
+		return n != null ? n.intValue() : defaultValue;
+	}
+
+	/* AOSP CCodec::configure() of a video encoder: size, frame rate, bit rate (mode), key frame interval and the
+	 * input's color format (COLOR_FormatSurface: createInputSurface()/setInputSurface()); the output format has the
+	 * codec-specific data (AVC: csd-0 SPS, csd-1 PPS; HEVC: csd-0 VPS+SPS+PPS), which also comes as the first output
+	 * buffer with BUFFER_FLAG_CODEC_CONFIG */
+	private void configureEncoder(MediaFormat format, String mime) {
+		int width = number(format, MediaFormat.KEY_WIDTH, 0), height = number(format, MediaFormat.KEY_HEIGHT, 0);
+		if (width <= 0 || height <= 0)
+			throw new IllegalArgumentException("encoder needs " + MediaFormat.KEY_WIDTH + " and " + MediaFormat.KEY_HEIGHT);
+		Number interval = format.getNumber(MediaFormat.KEY_I_FRAME_INTERVAL);
+		if (native_encoder != 0)
+			native_encoderFree(native_encoder);
+		native_encoder = native_encoderOpen(info.getDecoder(), width, height, number(format, MediaFormat.KEY_FRAME_RATE, 30),
+		                                    number(format, MediaFormat.KEY_BIT_RATE, 0), number(format, MediaFormat.KEY_BITRATE_MODE, 1),
+		                                    interval != null ? interval.floatValue() : 1);
+		if (native_encoder == 0)
+			throw new CodecException(0x80000000, "configure: " + codecName + " can't encode " + width + "x" + height);
+		encoderColorFormat = number(format, MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+		encoderStride = number(format, MediaFormat.KEY_STRIDE, width);
+		encoderSliceHeight = number(format, MediaFormat.KEY_SLICE_HEIGHT, height);
+		boolean surfaceInput = encoderColorFormat == MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface;
+		inputBuffers = new ByteBuffer[surfaceInput ? 0 : 4];
+		inputBufferTimestamps = new long[inputBuffers.length];
+		freeInputBuffers = new ArrayDeque<>(inputBuffers.length);
+		queuedInputBuffers = new ArrayDeque<>(inputBuffers.length);
+		for (int i = 0; i < inputBuffers.length; i++) {
+			inputBuffers[i] = ByteBuffer.allocateDirect(Math.max(encoderStride, width) * Math.max(encoderSliceHeight, height) * 3 / 2);
+			freeInputBuffers.add(i);
+		}
+		outputBuffers = new ByteBuffer[8];
+		freeOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		readyOutputBuffers = new ArrayDeque<>(outputBuffers.length);
+		outputInfos = new BufferInfo[outputBuffers.length];
+		for (int i = 0; i < outputBuffers.length; i++) {
+			outputBuffers[i] = ByteBuffer.allocateDirect(Math.max(width * height * 3 / 2, 1 << 20));
+			outputInfos[i] = new BufferInfo();
+			freeOutputBuffers.add(i);
+		}
+		outputEos = false;
+		outputFormatSet = false;
+		inputSurfaceEos = inputEosSent = false;
+		outputFormat = new MediaFormat();
+		outputFormat.setString(MediaFormat.KEY_MIME, mime);
+		outputFormat.setInteger(MediaFormat.KEY_WIDTH, width);
+		outputFormat.setInteger(MediaFormat.KEY_HEIGHT, height);
+		if (format.containsKey(MediaFormat.KEY_BIT_RATE))
+			outputFormat.setInteger(MediaFormat.KEY_BIT_RATE, number(format, MediaFormat.KEY_BIT_RATE, 0));
+		if (format.containsKey(MediaFormat.KEY_FRAME_RATE))
+			outputFormat.setInteger(MediaFormat.KEY_FRAME_RATE, number(format, MediaFormat.KEY_FRAME_RATE, 0));
+		codecConfig = native_encoderExtradata(native_encoder);
+		if (codecConfig != null) {
+			if (mime.equals(MediaFormat.MIMETYPE_VIDEO_AVC)) {
+				/* AOSP: csd-0 the SPS, csd-1 the PPS, each with its start code */
+				int pps = ppsStart(codecConfig);
+				outputFormat.setByteBuffer("csd-0", ByteBuffer.wrap(java.util.Arrays.copyOfRange(codecConfig, 0, pps)));
+				if (pps < codecConfig.length)
+					outputFormat.setByteBuffer("csd-1", ByteBuffer.wrap(java.util.Arrays.copyOfRange(codecConfig, pps, codecConfig.length)));
+			} else {
+				outputFormat.setByteBuffer("csd-0", ByteBuffer.wrap(codecConfig.clone()));
+			}
+		}
+	}
+
+	/* the offset of the first NAL unit after the SPS (Annex B start codes) */
+	private static int ppsStart(byte[] annexB) {
+		for (int i = 4; i + 3 < annexB.length; i++)
+			if (annexB[i] == 0 && annexB[i + 1] == 0 && annexB[i + 2] == 1 && (annexB[i + 3] & 0x1f) != 7)
+				return (i > 0 && annexB[i - 1] == 0) ? i - 1 : i;
+		return annexB.length;
+	}
+
+	/* one step of an encoder: an image of the input surface (or a queued ByteBuffer) into the encoder, a packet into a
+	 * free output slot */
+	private boolean encodeStep() {
+		boolean progress = false;
+		if (inputReader != null) {
+			/* AOSP GraphicBufferSource: a frame stays queued until the encoder takes it */
+			Image image = pendingImage != null ? pendingImage : inputReader.acquireNextImageNoThrowISE();
+			pendingImage = null;
+			if (image != null) {
+				long buffer = ImageReader.atl_hardwareBuffer(image);
+				Image.Plane[] planes = buffer == 0 ? ImageReader.atl_queuedPlanes(image) : null;
+				int n = planes != null ? planes.length : 0;
+				ByteBuffer[] data = new ByteBuffer[n];
+				int[] rowStrides = new int[n], pixelStrides = new int[n];
+				for (int i = 0; i < n; i++) {
+					data[i] = planes[i].getBuffer();
+					rowStrides[i] = planes[i].getRowStride();
+					pixelStrides[i] = planes[i].getPixelStride();
+				}
+				if (native_encoderSendImage(native_encoder, buffer, data, rowStrides, pixelStrides, image.getWidth(), image.getHeight(), image.getTimestamp() / 1000) == AVERROR_EAGAIN) {
+					pendingImage = image;
+				} else {
+					image.close();
+					progress = true;
+				}
+			} else if (inputSurfaceEos && !inputEosSent) {
+				inputEosSent = native_encoderSendBuffer(native_encoder, null, 0, 0, 0, 0, 0, 0) != AVERROR_EAGAIN;
+				progress = inputEosSent;
+			}
+		} else {
+			int queued = queuedInputBuffers.size();
+			tryProcessInputBuffer();
+			progress = queuedInputBuffers.size() != queued;
+		}
+		Integer index = freeOutputBuffers.peek();
+		if (index != null && !outputEos) {
+			ByteBuffer out = outputBuffers[index];
+			out.clear();
+			boolean filled = false;
+			if (codecConfig != null) {
+				out.put(codecConfig).flip();
+				outputInfos[index].set(0, codecConfig.length, 0, BUFFER_FLAG_CODEC_CONFIG);
+				codecConfig = null;
+				filled = true;
+			} else if (native_encoderReceive(native_encoder, out, outputInfos[index]) == 0) {
+				out.limit(outputInfos[index].size);
+				filled = true;
+			}
+			if (filled) {
+				freeOutputBuffers.remove();
+				readyOutputBuffers.add(index);
+				outputEos = (outputInfos[index].flags & BUFFER_FLAG_END_OF_STREAM) != 0;
+				progress = true;
+			}
+		}
+		return progress;
+	}
+
 	public void start() {
 		System.out.println("MediaCodec.start(): codecName=" + codecName);
-		native_start(native_codec);
+		if (encoder && native_encoder == 0)
+			throw new IllegalStateException("start() before configure()");
+		if (!encoder)
+			native_start(native_codec);
 		startDecoding();
 		if (callback != null && !pumping) {
 			pumping = true;
@@ -365,10 +518,16 @@ public class MediaCodec {
 	private synchronized boolean decodeStep() {
 		if (!decoding || native_codec == 0)
 			return false;
-		int queued = queuedInputBuffers.size();
-		tryProcessInputBuffer();
-		boolean progress = queuedInputBuffers.size() != queued;
-		Integer index = freeOutputBuffers.peek();
+		boolean progress = false;
+		Integer index = null;
+		if (encoder) {
+			progress = encodeStep();
+		} else {
+			int queued = queuedInputBuffers.size();
+			tryProcessInputBuffer();
+			progress = queuedInputBuffers.size() != queued;
+			index = freeOutputBuffers.peek();
+		}
 		if (index != null && !outputEos) {
 			outputBuffers[index].clear();
 			if (native_dequeueOutputBuffer(native_codec, outputBuffers[index], outputInfos[index]) == 0) {
@@ -416,7 +575,8 @@ public class MediaCodec {
 	public synchronized void releaseOutputBuffer(int index, boolean render) {
 		checkHeldOutput(index);
 		notifyAll();
-		native_releaseOutputBuffer(native_codec, outputBuffers[index], render, 0);
+		if (!encoder)
+			native_releaseOutputBuffer(native_codec, outputBuffers[index], render, 0);
 		freeOutputBuffers.add(index);
 	}
 
@@ -424,7 +584,8 @@ public class MediaCodec {
 	public synchronized void releaseOutputBuffer(int index, long releaseTimeNs) {
 		checkHeldOutput(index);
 		notifyAll();
-		native_releaseOutputBuffer(native_codec, outputBuffers[index], true, releaseTimeNs);
+		if (!encoder)
+			native_releaseOutputBuffer(native_codec, outputBuffers[index], true, releaseTimeNs);
 		freeOutputBuffers.add(index);
 	}
 
@@ -436,7 +597,7 @@ public class MediaCodec {
 	}
 
 	public MediaFormat getOutputFormat() {
-		return mediaFormat;
+		return encoder ? outputFormat : mediaFormat;
 	}
 
 	/* AOSP MediaCodec.getOutputFormat(int): the format of a dequeued output buffer (IllegalStateException for an
@@ -453,7 +614,8 @@ public class MediaCodec {
 		pumping = false;
 		/* AOSP: a flush returns all buffers to the codec; the frames in them are dropped */
 		releaseAllOutput();
-		native_flush(native_codec);
+		if (!encoder)
+			native_flush(native_codec);
 		freeInputBuffers.clear();
 		for (int i = 0; i < inputBuffers.length; i++)
 			freeInputBuffers.add(i);
@@ -469,7 +631,7 @@ public class MediaCodec {
 		if (outputBuffers == null)
 			return;
 		for (int i = 0; i < outputBuffers.length; i++) {
-			if (!freeOutputBuffers.contains(i))
+			if (!encoder && !freeOutputBuffers.contains(i))
 				native_releaseOutputBuffer(native_codec, outputBuffers[i], false, 0);
 		}
 		readyOutputBuffers.clear();
@@ -481,7 +643,11 @@ public class MediaCodec {
 		Integer index = queuedInputBuffers.peek();
 		if (index != null) {
 			int ret;
-			if (index == -1) { // end of stream
+			if (encoder) {
+				ByteBuffer buffer = index == -1 ? null : inputBuffers[index];
+				ret = native_encoderSendBuffer(native_encoder, buffer, buffer != null ? buffer.position() : 0, buffer != null ? buffer.remaining() : 0,
+				                               encoderColorFormat, encoderStride, encoderSliceHeight, index == -1 ? 0 : inputBufferTimestamps[index]);
+			} else if (index == -1) { // end of stream
 				ret = native_queueInputBuffer(native_codec, null, 0);
 			} else {
 				ret = native_queueInputBuffer(native_codec, inputBuffers[index], inputBufferTimestamps[index]);
@@ -539,7 +705,7 @@ public class MediaCodec {
 	public void setVideoScalingMode(int mode) {
 		if (mode != MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT && mode != MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
 			throw new IllegalArgumentException();
-		if (native_codec != 0)
+		if (native_codec != 0 && !encoder)
 			native_setVideoScalingMode(native_codec, mode == MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
 	}
 
@@ -556,8 +722,18 @@ public class MediaCodec {
 		synchronized (this) {
 			if (native_codec != 0) {
 				releaseAllOutput();
-				native_release(native_codec);
+				if (!encoder)
+					native_release(native_codec);
 			}
+			if (native_encoder != 0)
+				native_encoderFree(native_encoder);
+			native_encoder = 0;
+			if (pendingImage != null)
+				pendingImage.close();
+			pendingImage = null;
+			if (inputReader != null && !(inputReader.getSurface() instanceof PersistentSurface))
+				inputReader.close();
+			inputReader = null;
 			native_codec = 0;
 			notifyAll();
 		}
@@ -578,20 +754,28 @@ public class MediaCodec {
 		outputBuffers = null;
 		mediaFormat = null;
 		outputFormatSet = false;
-		native_codec = native_constructor(info.getDecoder(), info.isHardwareAccelerated());
+		outputFormat = null;
+		native_codec = encoder ? ENCODER : native_constructor(info.getDecoder(), info.isHardwareAccelerated());
 		if (native_codec == 0)
 			throw new CodecException(0x80000000, "reset: failed to create " + codecName);
 	}
 
-	/* AOSP createPersistentInputSurface(): null when MediaCodec::CreatePersistentInputSurface() fails, as
-	 * it does without an encoder (ATL has only decoders) */
-	public static Surface createPersistentInputSurface() {
-		return null;
+	/* AOSP MediaCodec.PersistentSurface: an input surface that outlives the encoders it is given to with
+	 * setInputSurface() (ATL: the Surface whose ImageReader the encoder consumes) */
+	static class PersistentSurface extends Surface {
+		PersistentSurface() {}
 	}
 
-	/* AOSP setInputSurface(): only a PersistentSurface is accepted, and ATL never creates one */
+	public static Surface createPersistentInputSurface() {
+		return new PersistentSurface();
+	}
+
+	/* AOSP setInputSurface(): after configure() and before start(), only a PersistentSurface; the encoder
+	 * consumes what is queued to it from now on */
 	public void setInputSurface(Surface surface) {
-		throw new IllegalArgumentException("not a PersistentSurface");
+		if (!(surface instanceof PersistentSurface))
+			throw new IllegalArgumentException("not a PersistentSurface");
+		inputReader = ImageReader.atl_newEncoderInput(surface, outputFormat.getInteger(MediaFormat.KEY_WIDTH), outputFormat.getInteger(MediaFormat.KEY_HEIGHT));
 	}
 
 	/* AOSP MediaCodec.setOutputSurface(): the video codec renders into another surface from now on (a player
@@ -600,7 +784,7 @@ public class MediaCodec {
 	public void setOutputSurface(Surface surface) {
 		if (surface == null)
 			throw new IllegalArgumentException("surface must not be null");
-		if (native_codec != 0)
+		if (native_codec != 0 && !encoder)
 			native_setOutputSurface(native_codec, surface);
 	}
 
@@ -615,18 +799,31 @@ public class MediaCodec {
 		throw new IllegalStateException("codec does not support detaching output surface");
 	}
 
-	public void setParameters(Bundle parameters) {}
-
-	/* AOSP createInputSurface()/signalEndOfInputStream() are native and only valid on a video encoder;
-	 * ATL provides decoders only (createEncoderByType() fails). The call is answered as an invalid
-	 * operation, which media/jni/android_media_MediaCodec.cpp (throwExceptionAsNecessary) throws as
-	 * IllegalStateException. */
-	public final Surface createInputSurface() {
-		throw new IllegalStateException("createInputSurface: not an encoder");
+	/* AOSP setParameters(): an encoder makes the next frame a key frame on PARAMETER_KEY_REQUEST_SYNC_FRAME; the
+	 * other parameters (a new bit rate, suspending) are not applied by ATL's encoders */
+	public synchronized void setParameters(Bundle parameters) {
+		if (encoder && native_encoder != 0 && parameters != null && parameters.containsKey(PARAMETER_KEY_REQUEST_SYNC_FRAME))
+			native_encoderRequestSyncFrame(native_encoder);
 	}
 
-	public final void signalEndOfInputStream() {
-		throw new IllegalStateException("signalEndOfInputStream: not an encoder");
+	/* AOSP createInputSurface(): after configure() and before start(), only for a video encoder configured with
+	 * COLOR_FormatSurface; otherwise INVALID_OPERATION, which throwExceptionAsNecessary() throws as
+	 * IllegalStateException. The frames queued to the Surface (EGL, the camera, a decoder, lockCanvas()) are encoded with
+	 * their timestamps. */
+	public final Surface createInputSurface() {
+		if (!encoder || native_encoder == 0 || encoderColorFormat != MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+			throw new IllegalStateException("createInputSurface: not an encoder configured for surface input");
+		inputReader = ImageReader.atl_newEncoderInput(null, outputFormat.getInteger(MediaFormat.KEY_WIDTH), outputFormat.getInteger(MediaFormat.KEY_HEIGHT));
+		return inputReader.getSurface();
+	}
+
+	/* AOSP: the end of the input surface's stream: once the frames queued so far are encoded, the last output buffer
+	 * has BUFFER_FLAG_END_OF_STREAM */
+	public final synchronized void signalEndOfInputStream() {
+		if (inputReader == null)
+			throw new IllegalStateException("signalEndOfInputStream: no input surface");
+		inputSurfaceEos = true;
+		notifyAll();
 	}
 
 	/* API 31. The FFmpeg codecs have no vendor parameters, so there is nothing to subscribe to. */
@@ -656,8 +853,7 @@ public class MediaCodec {
 
 	/* AOSP createDecoderByType()/createEncoderByType(): new MediaCodec(type, true, encoder) instantiates the
 	 * first codec of the list for the type; if there is none, MediaCodec::CreateByType() reports
-	 * NAME_NOT_FOUND and android_media_MediaCodec_native_setup() throws IllegalArgumentException. ATL's
-	 * list has only decoders, so no encoder is ever found. */
+	 * NAME_NOT_FOUND and android_media_MediaCodec_native_setup() throws IllegalArgumentException. */
 	public static MediaCodec createDecoderByType(String type) throws IOException {
 		if (type == null)
 			throw new NullPointerException();
@@ -672,6 +868,11 @@ public class MediaCodec {
 	public static MediaCodec createEncoderByType(String type) throws IOException {
 		if (type == null)
 			throw new NullPointerException();
+		for (int i = 0; i < MediaCodecList.getCodecCount(); i++) {
+			MediaCodecInfo info = MediaCodecList.getCodecInfoAt(i);
+			if (info.isEncoder() && type.equalsIgnoreCase(info.getSupportedTypes()[0]))
+				return new MediaCodec(info.getName());
+		}
 		throw new IllegalArgumentException("Failed to initialize " + type + ", error 0xfffffffe (NAME_NOT_FOUND)");
 	}
 
@@ -686,6 +887,14 @@ public class MediaCodec {
 	}
 
 	private native long native_constructor(String decoder, boolean hardware);
+	static native String[] native_encoders();
+	private static native long native_encoderOpen(String name, int width, int height, int frameRate, int bitRate, int bitrateMode, float iFrameInterval);
+	private static native byte[] native_encoderExtradata(long encoder);
+	private static native int native_encoderSendBuffer(long encoder, ByteBuffer buffer, int offset, int size, int colorFormat, int stride, int sliceHeight, long presentationTimeUs);
+	private static native int native_encoderSendImage(long encoder, long hardwareBuffer, ByteBuffer[] planes, int[] rowStrides, int[] pixelStrides, int width, int height, long presentationTimeUs);
+	private static native int native_encoderReceive(long encoder, ByteBuffer buffer, BufferInfo info);
+	private static native void native_encoderRequestSyncFrame(long encoder);
+	private static native void native_encoderFree(long encoder);
 	static native int[] native_hardwareProfiles();
 	private native void native_setOutputSurface(long codec, Surface surface);
 	private native void native_configure_audio(long codec, ByteBuffer extradata, int sampleRate, int channelCount);
