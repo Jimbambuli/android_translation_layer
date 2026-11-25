@@ -709,26 +709,17 @@ public class PopupWindow {
 		mClippingEnabled = enabled;
 	}
 
-	/* TODO: handle LayoutParams.MATCH_PARENT */
+	/** AOSP setWidth(): a size, MATCH_PARENT (the width of the app's window) or WRAP_CONTENT */
 	public void setWidth(int width) {
-		if (width == ViewGroup.LayoutParams.WRAP_CONTENT) {
-			mWrapWidth = true;
-			applyWrapContent();
-		}
-		if (width < 0)
-			return;
-		mWrapWidth = false;
+		mWrapWidth = width == ViewGroup.LayoutParams.WRAP_CONTENT;
+		applyWrapContent();
 		native_setWidth(popover, width);
 	}
 
+	/** AOSP setHeight(): a size, MATCH_PARENT (the height of the app's window) or WRAP_CONTENT */
 	public void setHeight(int height) {
-		if (height == ViewGroup.LayoutParams.WRAP_CONTENT) {
-			mWrapHeight = true;
-			applyWrapContent();
-		}
-		if (height < 0)
-			return;
-		mWrapHeight = false;
+		mWrapHeight = height == ViewGroup.LayoutParams.WRAP_CONTENT;
+		applyWrapContent();
 		native_setHeight(popover, height);
 	}
 
