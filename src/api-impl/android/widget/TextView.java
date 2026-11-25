@@ -1795,6 +1795,12 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			return;
 		}
 		int width = getMeasuredWidth();
+		/* the label's natural width leaves out the letter spacing after the last letter, like AOSP's text width
+		 * (minikin's adjustAdvanceLetterSpacingEdge()); Pango's line breaking counts it, so the label would
+		 * ellipsize or wrap its text at that width */
+		float letterSpacing = getPaint().getLetterSpacing() * getTextSize();
+		if (letterSpacing > 0)
+			width += (int)Math.ceil(letterSpacing);
 		if (mMaxWidthMode == EMS) {
 			width = Math.min(width, mMaxWidth * getLineHeight());
 		} else {
