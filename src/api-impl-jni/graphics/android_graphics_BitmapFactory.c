@@ -73,7 +73,11 @@ static GInputStream *java_input_stream_new(JNIEnv *env, jobject is, jbyteArray s
 /* Like AOSP's decoder (which hands the "npTc" chunk to the Bitmap, frameworks/base/libs/hwui/jni/
  * BitmapFactory.cpp), find the 9-patch chunk of a PNG. It comes before the image data, so the scan
  * stops at IDAT. The bytes can come from untrusted sources: every length is checked against the
- * data, and the chunk is limited to 1 MB. Returns a byte[] without the CRC, or NULL. */
+ * data, and the chunk is limited to 1 MB. Returns a byte[] without the CRC, or NULL.
+ * Like AOSP's NinePatchPeeker::readChunk() the chunk must have its serialized size, and the byte[] holds it
+ * deserialized (wasDeserialized set, the offsets of the arrays filled in) and in device byte order
+ * (Res_png_9patch::fileToDevice()): Bitmap.getNinePatchChunk() gives apps that form, e.g. Chrome's
+ * ResourceManager reads padding and divs from it. */
 static jbyteArray find_ninepatch_chunk(JNIEnv *env, GBytes *bytes)
 {
 	gsize size;
@@ -94,9 +98,28 @@ static jbyteArray find_ninepatch_chunk(JNIEnv *env, GBytes *bytes)
 		if (!memcmp(type, "npTc", 4)) {
 			if (length > 1024 * 1024)
 				return NULL;
+			if (length < sizeof(struct Res_png_9patch))
+				return NULL;
+			const struct Res_png_9patch *file = (const struct Res_png_9patch *)(data + pos + 8);
+			guint32 serialized = sizeof(struct Res_png_9patch) + 4 * ((guint32)file->numXDivs + file->numYDivs + file->numColors);
+			if (length != serialized)
+				return NULL;
+			struct Res_png_9patch *patch = g_memdup2(file, length);
+			patch->wasDeserialized = 1; // Res_png_9patch::deserialize()
+			patch->xDivsOffset = sizeof(struct Res_png_9patch);
+			patch->yDivsOffset = patch->xDivsOffset + patch->numXDivs * sizeof(int32_t);
+			patch->colorsOffset = patch->yDivsOffset + patch->numYDivs * sizeof(int32_t);
+			uint32_t *values = (uint32_t *)(patch + 1); // fileToDevice(): xDivs, yDivs and colors follow each other
+			for (guint32 i = 0; i < (guint32)patch->numXDivs + patch->numYDivs + patch->numColors; i++)
+				values[i] = ntohl(values[i]);
+			patch->paddingLeft = ntohl(patch->paddingLeft);
+			patch->paddingRight = ntohl(patch->paddingRight);
+			patch->paddingTop = ntohl(patch->paddingTop);
+			patch->paddingBottom = ntohl(patch->paddingBottom);
 			jbyteArray chunk = (*env)->NewByteArray(env, length);
 			if (chunk)
-				(*env)->SetByteArrayRegion(env, chunk, 0, length, (const jbyte *)(data + pos + 8));
+				(*env)->SetByteArrayRegion(env, chunk, 0, length, (const jbyte *)patch);
+			g_free(patch);
 			return chunk;
 		}
 		pos += 12 + (gsize)length;
@@ -104,8 +127,8 @@ static jbyteArray find_ninepatch_chunk(JNIEnv *env, GBytes *bytes)
 	return NULL;
 }
 
-/* AOSP NinePatchPeeker::getPadding(): the padding of the 9-patch chunk (paddingLeft/Right/Top/Bottom, stored big-endian
- * in the PNG, see Res_png_9patch::fileToDevice) goes to the Rect, -1 for every side without a chunk. The chunk is not
+/* AOSP NinePatchPeeker::getPadding(): the padding of the 9-patch chunk (paddingLeft/Right/Top/Bottom, already in
+ * device byte order, see find_ninepatch_chunk()) goes to the Rect, -1 for every side without a chunk. The chunk is not
  * scaled here, the NinePatchDrawable scales the padding to the density it is shown at. */
 static void set_padding(JNIEnv *env, jobject rect, jbyteArray chunk)
 {
@@ -115,10 +138,10 @@ static void set_padding(JNIEnv *env, jobject rect, jbyteArray chunk)
 	if (chunk && (*env)->GetArrayLength(env, chunk) >= (jsize)sizeof(raw)) {
 		(*env)->GetByteArrayRegion(env, chunk, 0, sizeof(raw), raw);
 		const struct Res_png_9patch *patch = (const struct Res_png_9patch *)raw;
-		values[0] = ntohl(patch->paddingLeft);
-		values[1] = ntohl(patch->paddingTop);
-		values[2] = ntohl(patch->paddingRight);
-		values[3] = ntohl(patch->paddingBottom);
+		values[0] = patch->paddingLeft;
+		values[1] = patch->paddingTop;
+		values[2] = patch->paddingRight;
+		values[3] = patch->paddingBottom;
 	}
 	jclass rect_class = (*env)->GetObjectClass(env, rect);
 	(*env)->SetIntField(env, rect, (*env)->GetFieldID(env, rect_class, "left", "I"), values[0]);
