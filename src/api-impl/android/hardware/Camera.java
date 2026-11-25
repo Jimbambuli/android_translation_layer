@@ -305,6 +305,12 @@ public class Camera {
 		release();
 	}
 
+	/** @hide MediaRecorder with VIDEO_SOURCE_CAMERA: the preview frames also go to the recorder's input surface
+	 * (AOSP: CameraSource -> Camera::startRecording()); null stops that */
+	public void atl_setRecordingReader(android.media.ImageReader reader) {
+		client().setRecordingReader(reader);
+	}
+
 	/* Camera2Client::lock()/unlock(): ATL's single process always holds the lock */
 	public final void unlock() {
 		client();

@@ -628,20 +628,14 @@ public class CameraDeviceImpl extends CameraDevice implements ExternalCameraDevi
 	/* the frame for an ImageReader output, on the stream's thread: false if the reader takes no image now */
 	private boolean queueImage(android.media.ImageReader reader, CaptureRequest request, long timestampNs) {
 		int w = reader.getWidth(), h = reader.getHeight();
-		switch (reader.getImageFormat()) {
-			case android.graphics.ImageFormat.YUV_420_888: {
-				int ySize = w * h, cSize = (w / 2) * (h / 2);
-				byte[] i420 = new byte[ySize + 2 * cSize];
-				if (!mHal.copyFrame(i420, android.graphics.ImageFormat.YUV_420_888, w, h))
-					return false;
-				java.nio.ByteBuffer[] planes = {
-					java.nio.ByteBuffer.allocateDirect(ySize).put(i420, 0, ySize),
-					java.nio.ByteBuffer.allocateDirect(cSize).put(i420, ySize, cSize),
-					java.nio.ByteBuffer.allocateDirect(cSize).put(i420, ySize + cSize, cSize)};
-				for (java.nio.ByteBuffer plane : planes)
-					plane.rewind();
-				return reader.queueImage(timestampNs, planes, new int[] {w, w / 2, w / 2}, new int[] {1, 1, 1});
-			}
+		int format = reader.getImageFormat();
+		/* an encoder's input surface (MediaRecorder.getSurface(), MediaCodec.createInputSurface()) takes the camera's
+		 * YUV frames (AOSP: the camera's buffers with video encoder usage) */
+		if (format == android.graphics.ImageFormat.PRIVATE && (reader.getUsage() & android.hardware.HardwareBuffer.USAGE_VIDEO_ENCODE) != 0)
+			format = android.graphics.ImageFormat.YUV_420_888;
+		switch (format) {
+			case android.graphics.ImageFormat.YUV_420_888:
+				return mHal.queueYuvImage(reader, timestampNs);
 			case android.graphics.ImageFormat.JPEG: {
 				Byte quality = request.get(CaptureRequest.JPEG_QUALITY);
 				byte[] jpeg = mHal.encodeJpeg(w, h, quality != null ? quality & 0xff : 90);
