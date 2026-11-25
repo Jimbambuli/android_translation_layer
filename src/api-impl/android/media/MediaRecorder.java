@@ -114,14 +114,15 @@ public class MediaRecorder {
 	private static native void nativeStart(long recorder);
 	private static native void nativePause(long recorder, boolean paused);
 	private static native int nativeGetMaxAmplitude(long recorder);
-	private static native void nativeStop(long recorder);
+	private static native boolean nativeStop(long recorder);
 
 	public void setAudioSource(int audioSource) {
 		this.audioSource = audioSource;
 	}
 
+	/* AOSP StagefrightRecorder::setVideoSource(): DEFAULT is the camera */
 	public void setVideoSource(int videoSource) {
-		this.videoSource = videoSource;
+		this.videoSource = videoSource == VideoSource.DEFAULT ? VideoSource.CAMERA : videoSource;
 	}
 
 	public void setOutputFormat(int outputFormat) {
@@ -136,8 +137,11 @@ public class MediaRecorder {
 		this.videoEncoder = videoEncoder;
 	}
 
-	/* MediaRecorder.VideoEncoder as the encoder's type; DEFAULT is H.264 here (ATL's encoders have no H.263 by VA-API) */
-	private static String videoMime(int encoder) {
+	/* MediaRecorder.VideoEncoder as the encoder's type; DEFAULT as AOSP's setDefaultVideoEncoderIfNecessary(): VP8 for
+	 * WebM, else the codec of the camera's QUALITY_LOW profile, which is H.264 in ATL's profiles */
+	private String videoMime(int encoder) {
+		if (encoder == VideoEncoder.DEFAULT && outputFormat == OutputFormat.WEBM)
+			return MediaFormat.MIMETYPE_VIDEO_VP8;
 		switch (encoder) {
 			case VideoEncoder.H263:
 				return MediaFormat.MIMETYPE_VIDEO_H263;
@@ -340,12 +344,17 @@ public class MediaRecorder {
 		if (!started)
 			throw new IllegalStateException();
 		stopVideo();
+		boolean ok;
 		synchronized (this) {
-			nativeStop(recorder);
+			ok = nativeStop(recorder);
 			recorder = 0;
 			started = false;
 		}
 		closeVideoInput();
+		/* AOSP: "a RuntimeException is intentionally thrown to the application, if no valid audio/video data has been
+		 * received when stop() is called" */
+		if (!ok)
+			throw new RuntimeException("stop failed.");
 	}
 
 	public void reset() {

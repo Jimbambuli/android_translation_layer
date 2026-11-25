@@ -133,7 +133,7 @@ static void write_video_packets(struct recorder *r)
 	AVCodecContext *ctx = atl_venc_context(r->venc);
 	AVPacket *pkt = av_packet_alloc();
 	g_mutex_lock(&r->write_lock);
-	while (avcodec_receive_packet(ctx, pkt) == 0) {
+	while (atl_venc_receive(r->venc, pkt) == 0) {
 		av_packet_rescale_ts(pkt, ctx->time_base, r->video_st->time_base);
 		pkt->stream_index = r->video_st->index;
 		av_interleaved_write_frame(r->oc, pkt);
@@ -381,6 +381,8 @@ JNIEXPORT jint JNICALL Java_android_media_MediaRecorder_nativeWriteVideo(JNIEnv 
 	int64_t pts = timestamp_ns / 1000 - r->start_us - r->paused_us;
 	if (pts < 0)
 		return 0;
+	if (!atl_venc_frames(r->venc))
+		fprintf(stderr, "MediaRecorder: first video frame %dx%d\n", width, height);
 	int ret;
 	if (buffer) {
 		ret = atl_venc_send_buffer(r->venc, _PTR(buffer), pts);
@@ -428,8 +430,9 @@ JNIEXPORT jint JNICALL Java_android_media_MediaRecorder_nativeGetMaxAmplitude(JN
 	return g_atomic_int_exchange(&r->max_amplitude, 0);
 }
 
-/* stops a started recording and completes the file; also frees a recorder that was only prepared */
-JNIEXPORT void JNICALL Java_android_media_MediaRecorder_nativeStop(JNIEnv *env, jclass clazz, jlong ptr)
+/* stops a started recording and completes the file; also frees a recorder that was only prepared. AOSP: false (stop()
+ * throws RuntimeException) when the video track got no frame; the file is not completed then */
+JNIEXPORT jboolean JNICALL Java_android_media_MediaRecorder_nativeStop(JNIEnv *env, jclass clazz, jlong ptr)
 {
 	struct recorder *r = _PTR(ptr);
 	if (r->thread) {
@@ -438,8 +441,14 @@ JNIEXPORT void JNICALL Java_android_media_MediaRecorder_nativeStop(JNIEnv *env, 
 		if (avcodec_send_frame(r->enc, NULL) == 0)
 			write_packets(r);
 	}
+	bool ok = !r->venc || atl_venc_frames(r->venc) > 0;
 	if (r->venc && r->start_us && atl_venc_send(r->venc, AV_PIX_FMT_NONE, NULL, NULL, 0, 0, 0) == 0)
 		write_video_packets(r);
-	av_write_trailer(r->oc);
+	if (ok)
+		av_write_trailer(r->oc);
+	else
+		fprintf(stderr, "MediaRecorder: no video frame recorded\n");
+	ok = ok || !r->start_us;
 	recorder_free(r);
+	return ok;
 }

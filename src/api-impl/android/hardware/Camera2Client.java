@@ -855,6 +855,10 @@ final class Camera2Client implements ExternalCameraDevice.FrameListener {
 
 	void setRecordingReader(android.media.ImageReader reader) {
 		mRecordingReader = reader;
+		/* Camera2Client::startRecordingL(): a stopped preview is started (apps such as Open Camera stop it before
+		 * Camera.unlock() and leave the camera to the recorder) */
+		if (reader != null)
+			startPreview();
 	}
 
 	@Override

@@ -21,6 +21,9 @@ AVCodecContext *atl_venc_context(struct atl_venc *venc);
 int atl_venc_send(struct atl_venc *venc, enum AVPixelFormat format, uint8_t *const data[4], const int linesize[4], int width, int height, int64_t pts_us);
 /* an AHardwareBuffer that the CPU can read (an ImageReader image of a GPU or decoder producer) */
 int atl_venc_send_buffer(struct atl_venc *venc, struct AHardwareBuffer *buffer, int64_t pts_us);
+/* avcodec_receive_packet(), AVERROR_EOF once drained without a frame */
+int atl_venc_receive(struct atl_venc *venc, AVPacket *pkt);
+int64_t atl_venc_frames(struct atl_venc *venc);
 /* the layout of an Image's planes (ImageReader.queueImage(): camera, Surface.lockCanvas()); AV_PIX_FMT_NONE if unknown */
 enum AVPixelFormat atl_venc_planes_format(int n_planes, uint8_t *const data[], const int pixel_stride[]);
 void atl_venc_request_sync_frame(struct atl_venc *venc);

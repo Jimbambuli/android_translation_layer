@@ -29,6 +29,8 @@ struct atl_venc {
 	struct SwsContext *sws;
 	bool request_sync;
 	int64_t last_pts;
+	int64_t frames; /* sent to the encoder */
+	bool empty_eof; /* drained without a frame: FFmpeg's encoders are not given that (VA-API's crashes) */
 };
 
 /* per type the hardware (VA-API) encoders, then the software ones */
@@ -173,6 +175,10 @@ void atl_venc_free(struct atl_venc *venc)
 int atl_venc_send(struct atl_venc *venc, enum AVPixelFormat format, uint8_t *const data[4], const int linesize[4], int width, int height, int64_t pts_us)
 {
 	AVCodecContext *ctx = venc->ctx;
+	if (!data && !venc->frames) {
+		venc->empty_eof = true;
+		return 0;
+	}
 	if (!data)
 		return avcodec_send_frame(ctx, NULL);
 	if (pts_us <= venc->last_pts)
@@ -204,8 +210,20 @@ int atl_venc_send(struct atl_venc *venc, enum AVPixelFormat format, uint8_t *con
 	}
 	if (ret >= 0)
 		ret = avcodec_send_frame(ctx, frame);
+	if (ret >= 0)
+		venc->frames++;
 	av_frame_free(&frame);
 	return ret;
+}
+
+int atl_venc_receive(struct atl_venc *venc, AVPacket *pkt)
+{
+	return venc->empty_eof ? AVERROR_EOF : avcodec_receive_packet(venc->ctx, pkt);
+}
+
+int64_t atl_venc_frames(struct atl_venc *venc)
+{
+	return venc->frames;
 }
 
 enum AVPixelFormat atl_venc_planes_format(int n_planes, uint8_t *const data[], const int pixel_stride[])
@@ -365,9 +383,8 @@ JNIEXPORT jint JNICALL Java_android_media_MediaCodec_native_1encoderSendImage(JN
  * empty buffer with BUFFER_FLAG_END_OF_STREAM */
 JNIEXPORT jint JNICALL Java_android_media_MediaCodec_native_1encoderReceive(JNIEnv *env, jclass clazz, jlong ptr, jobject buffer, jobject info)
 {
-	AVCodecContext *ctx = atl_venc_context(_PTR(ptr));
 	AVPacket *pkt = av_packet_alloc();
-	int ret = avcodec_receive_packet(ctx, pkt);
+	int ret = atl_venc_receive(_PTR(ptr), pkt);
 	int size = 0, flags = 0;
 	int64_t pts = 0;
 	if (ret == AVERROR_EOF) {
