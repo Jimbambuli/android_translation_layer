@@ -732,7 +732,11 @@ public final class ATLLoadedApp {
 		}
 	}
 
+	/* the window of the process: there is one, and the activities of every package that runs here (Play
+	 * Services, e.g. microG's ConsentSignInActivity started from its service) are pages of it. A window of 0
+	 * made such an activity's finish() do nothing (Activity.finish() closes the page through the window). */
 	public long getNativeWindow() {
-		return this.application == null ? 0 : this.application.native_window;
+		Application primary = getPrimaryApplication().application;
+		return primary == null ? 0 : primary.native_window;
 	}
 }
