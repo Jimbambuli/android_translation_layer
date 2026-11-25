@@ -873,6 +873,22 @@ public class Window {
 			decorView.addView(root, 0, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 			mContentParent = decorView.findViewById(android.R.id.content);
 			installDecorContentParent();
+		} else if (floating && callback instanceof android.app.Activity
+		           && (mFeatures & ((1 << FEATURE_NO_TITLE) | (1 << FEATURE_LEFT_ICON) | (1 << FEATURE_RIGHT_ICON) | (1 << FEATURE_CUSTOM_TITLE))) == 0
+		           && ((mFeatures & ((1 << FEATURE_PROGRESS) | (1 << FEATURE_INDETERMINATE_PROGRESS))) == 0 || (mFeatures & (1 << FEATURE_ACTION_BAR)) != 0)) {
+			/* AOSP PhoneWindow.generateLayout(): a floating window with a title gets the theme's dialogTitleDecorLayout,
+			 * and the title view shows the window's title (installDecor()). Only for activities: an android.app.Dialog
+			 * is a desktop window of its own in ATL, with the title in the desktop's caption (Dialog.setTitle()). */
+			final TypedValue tv = new TypedValue();
+			if (context.getTheme().resolveAttribute(com.android.internal.R.attr.dialogTitleDecorLayout, tv, true) && tv.resourceId != 0) {
+				decorView.setId(View.NO_ID);
+				final View root = LayoutInflater.from(context).inflate(tv.resourceId, null);
+				decorView.addView(root, 0, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+				mContentParent = decorView.findViewById(android.R.id.content);
+				mTitleView = decorView.findViewById(com.android.internal.R.id.title);
+				if (mTitleView != null)
+					mTitleView.setText(mTitle);
+			}
 		}
 		a.recycle();
 	}
@@ -1483,7 +1499,9 @@ public class Window {
 	 * caption of a desktop window in AOSP (WindowDecorTaskResourceLoader: pm.getApplicationLabel()) */
 	public void setTitle(CharSequence title) {
 		/* AOSP PhoneWindow.setTitle(): the decor layout's action bar shows it too */
-		if (mDecorContentParent != null)
+		if (mTitleView != null)
+			mTitleView.setText(title);
+		else if (mDecorContentParent != null)
 			mDecorContentParent.setWindowTitle(title);
 		mTitle = title;
 		if (title == null)
@@ -1814,6 +1832,8 @@ public class Window {
 	/* AOSP PhoneWindow.mContentParent: the view the content goes into, the decor view itself unless the window
 	 * has the decor layout of the action bar */
 	private ViewGroup mContentParent;
+	/* AOSP PhoneWindow.mTitleView: the title of a floating activity's decor layout (dialogTitleDecorLayout) */
+	private android.widget.TextView mTitleView;
 	private com.android.internal.widget.DecorContentParent mDecorContentParent;
 	private CharSequence mTitle;
 	private int mUiOptions;
