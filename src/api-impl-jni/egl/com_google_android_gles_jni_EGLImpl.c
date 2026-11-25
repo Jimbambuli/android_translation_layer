@@ -197,7 +197,7 @@ JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1egl
 JNIEXPORT jboolean JNICALL Java_com_google_android_gles_1jni_EGLImpl_native_1eglQuerySurface(JNIEnv *env, jobject this, jlong display, jlong surface, jint attribute, jintArray value)
 {
 	EGLint v = 0;
-	EGLBoolean ret = eglQuerySurface(_PTR(display), _PTR(surface), attribute, &v);
+	EGLBoolean ret = bionic_eglQuerySurface(_PTR(display), _PTR(surface), attribute, &v);
 	jint value_out = v;
 	(*env)->SetIntArrayRegion(env, value, 0, 1, &value_out);
 	return ret;

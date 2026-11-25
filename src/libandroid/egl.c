@@ -24,6 +24,11 @@
 #include "../api-impl-jni/util.h"
 #include "hardware_buffer.h"
 #include "native_window.h"
+#include "ndk_jni.h"
+
+void AHardwareBuffer_acquire(struct AHardwareBuffer *buffer);
+void AHardwareBuffer_release(struct AHardwareBuffer *buffer);
+int AHardwareBuffer_allocate(const AHardwareBuffer_Desc *desc, struct AHardwareBuffer **out);
 
 /* The tables below are used by every app thread with a GL context (EGL: any thread), so they go under one lock. */
 static GMutex tables_lock;
@@ -119,9 +124,14 @@ static void PrintConfigAttributes(EGLDisplay display, EGLConfig config)
 	printf("-------------------------------------------------------------------------------\n");
 }
 
-// this is an extension that only android implements, we can hopefully get away with just stubbing it
+static bool set_presentation_time(EGLSurface surface, int64_t time);
+
+/* EGL_ANDROID_presentation_time (eglPresentationTimeANDROIDImpl() -> native_window_set_buffers_timestamp()): the
+ * timestamp of the next buffer queued by eglSwapBuffers(); only a consumer of the buffers (an ImageReader, an
+ * encoder's input surface) sees it, a window on screen shows its frames when they come */
 EGLBoolean bionic_eglPresentationTimeANDROID(EGLDisplay dpy, EGLSurface surface, EGLnsecsANDROID time)
 {
+	set_presentation_time(surface, time);
 	return EGL_TRUE;
 }
 
@@ -331,6 +341,7 @@ EGLSurface bionic_eglCreatePbufferSurface(EGLDisplay display, EGLConfig config, 
 }
 
 #define NUM_BUFFERS 3
+#define CONSUMER_SLOTS 4
 
 struct _ATLSurface {
 	GObject parent;
@@ -361,11 +372,37 @@ struct _ATLSurface {
 	/* the window of a Surface of another process (ANativeWindow.remote_fd): the buffers go there instead of to a
 	 * widget of this process */
 	struct ANativeWindow *remote;
+	/* the window of an ImageReader's Surface (ANativeWindow.image_reader, also an encoder's input surface): the
+	 * buffers are AHardwareBuffers that eglSwapBuffers() queues to the reader */
+	struct ANativeWindow *consumer;
+	uint32_t consumer_format; /* AHARDWAREBUFFER_FORMAT_* of the config, as AOSP's getNativePixelFormat() */
+	uint64_t consumer_usage;
+	int64_t presentation_time; /* eglPresentationTimeANDROID() for the next buffer, else -1 */
+	/* the app draws into buffers[0]; eglSwapBuffers() copies it into the buffer of a slot and queues that */
+	struct consumer_slot {
+		struct AHardwareBuffer *ahb;
+		uint32_t gl_texture;
+		uint32_t gl_framebuffer;
+		int width;
+		int height;
+	} slots[CONSUMER_SLOTS];
+	int next_slot;
 };
 G_DECLARE_FINAL_TYPE(ATLSurface, atl_surface, ATL, SURFACE, GObject);
 static void atl_surface_dispose(GObject *object)
 {
 	ATLSurface *atl_surface = ATL_SURFACE(object);
+	if (atl_surface->consumer) {
+		for (int i = 0; i < CONSUMER_SLOTS; i++)
+			AHardwareBuffer_release(atl_surface->slots[i].ahb);
+		if (atl_surface->unused_buffers)
+			g_async_queue_unref(atl_surface->unused_buffers);
+		if (atl_surface->vsync)
+			g_async_queue_unref(atl_surface->vsync);
+		return;
+	}
+	if (!atl_surface->remote && !atl_surface->surface_view_widget) /* refused by eglCreateWindowSurface() */
+		return;
 	if (atl_surface->remote) {
 		for (int i = 0; i < NUM_BUFFERS; i++) {
 			if (atl_surface->buffers[i].map)
@@ -494,16 +531,29 @@ EGLSurface bionic_eglCreateWindowSurface(EGLDisplay display, EGLConfig config, s
 		/* no buffer has a file descriptor yet; fit_back_buffer() closes it for every surface */
 		for (int i = 0; i < NUM_BUFFERS; i++)
 			atl_surface->buffers[i].fd = -1;
-		if (native_window->remote_fd >= 0)
-			atl_surface->remote = native_window;
-		else
-			atl_surface->surface_view_widget = SURFACE_VIEW_WIDGET(g_object_ref(native_window->surface_view_widget));
 		EGLint alpha_size = 0;
 		EGLint depth_size = 0;
 		EGLint stencil_size = 0;
 		eglGetConfigAttrib(display, config, EGL_ALPHA_SIZE, &alpha_size);
 		eglGetConfigAttrib(display, config, EGL_DEPTH_SIZE, &depth_size);
 		eglGetConfigAttrib(display, config, EGL_STENCIL_SIZE, &stencil_size);
+		if (native_window->remote_fd >= 0) {
+			atl_surface->remote = native_window;
+		} else if (native_window->image_reader) {
+			/* AOSP eglCreateWindowSurfaceTmpl(): the buffers get the config's format (RGBA_8888, or RGBX_8888
+			 * without alpha) and the consumer's usage; the GPU renders into them */
+			atl_surface->consumer = native_window;
+			atl_surface->consumer_format = alpha_size > 0 ? 1 /* AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM */ : 2 /* R8G8B8X8 */;
+			atl_surface->consumer_usage = native_window->image_reader_usage | 0x200 /* AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER */ | 0x100 /* GPU_SAMPLED_IMAGE */;
+			atl_surface->presentation_time = -1;
+		} else if (native_window->surface_view_widget) {
+			atl_surface->surface_view_widget = SURFACE_VIEW_WIDGET(g_object_ref(native_window->surface_view_widget));
+		} else {
+			/* AOSP: EGL_BAD_NATIVE_WINDOW for a window nobody consumes (NATIVE_WINDOW_IS_VALID) */
+			g_object_unref(atl_surface);
+			ANativeWindow_release(native_window);
+			return EGL_NO_SURFACE;
+		}
 		if (alpha_size > 0) {
 			atl_surface->framebuffer_format = GL_RGBA;
 		} else {
@@ -559,6 +609,12 @@ EGLBoolean bionic_eglDestroySurface(EGLDisplay display, EGLSurface surface)
 				glDeleteFramebuffers(1, &atl_surface->buffers[i].gl_framebuffer);
 			if (atl_surface->buffers[i].gl_texture)
 				glDeleteTextures(1, &atl_surface->buffers[i].gl_texture);
+		}
+		for (int i = 0; i < CONSUMER_SLOTS; i++) {
+			if (atl_surface->slots[i].gl_framebuffer)
+				glDeleteFramebuffers(1, &atl_surface->slots[i].gl_framebuffer);
+			if (atl_surface->slots[i].gl_texture)
+				glDeleteTextures(1, &atl_surface->slots[i].gl_texture);
 		}
 		/* dispose deletes GTK's textures in a GdkGLContext of the widget: main thread only */
 		atl_unref_on_main_thread(atl_surface);
@@ -771,6 +827,99 @@ static void fit_back_buffer(ATLSurface *atl_surface, struct ANativeWindow *nativ
 	glBindTexture(GL_TEXTURE_2D, previous_texture);
 }
 
+/* -- the window of a consumer of buffers: an ImageReader's Surface (also an encoder's input surface) -- */
+
+static bool set_presentation_time(EGLSurface surface, int64_t time)
+{
+	if (getenv("ATL_DIRECT_EGL") || !surface_native_window(surface))
+		return false;
+	ATLSurface *atl_surface = surface;
+	if (atl_surface->consumer)
+		atl_surface->presentation_time = time;
+	return true;
+}
+
+/* AOSP Surface::dequeueBuffer(): a buffer of the window's size that the consumer does not hold (no reference
+ * besides the surface's own); a slot whose buffer the consumer still holds gets a new one, the old one stays with
+ * the consumer until it lets go */
+static struct consumer_slot *consumer_dequeue(ATLSurface *atl_surface, int width, int height)
+{
+	static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES;
+	struct consumer_slot *slot = &atl_surface->slots[atl_surface->next_slot];
+	atl_surface->next_slot = (atl_surface->next_slot + 1) % CONSUMER_SLOTS;
+	if (slot->ahb && slot->ahb->refcount == 1 && slot->width == width && slot->height == height)
+		return slot;
+	if (slot->gl_framebuffer)
+		glDeleteFramebuffers(1, &slot->gl_framebuffer);
+	if (slot->gl_texture)
+		glDeleteTextures(1, &slot->gl_texture);
+	slot->gl_framebuffer = slot->gl_texture = 0;
+	AHardwareBuffer_release(slot->ahb);
+	slot->ahb = NULL;
+	AHardwareBuffer_Desc desc = {.width = width, .height = height, .layers = 1, .format = atl_surface->consumer_format, .usage = atl_surface->consumer_usage};
+	if (AHardwareBuffer_allocate(&desc, &slot->ahb) != 0) {
+		fprintf(stderr, "eglSwapBuffers: no %dx%d buffer for the consumer\n", width, height);
+		slot->ahb = NULL;
+		return NULL;
+	}
+	EGLImage image = bionic_eglCreateImage(eglGetCurrentDisplay(), EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, (EGLClientBuffer)&slot->ahb->anwb, NULL);
+	if (image == EGL_NO_IMAGE) {
+		fprintf(stderr, "eglSwapBuffers: the consumer's buffer can't be rendered to (EGL error 0x%x)\n", eglGetError());
+		AHardwareBuffer_release(slot->ahb);
+		slot->ahb = NULL;
+		return NULL;
+	}
+	if (!glEGLImageTargetTexture2DOES)
+		glEGLImageTargetTexture2DOES = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+	GLint previous_texture;
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous_texture);
+	glGenTextures(1, &slot->gl_texture);
+	glBindTexture(GL_TEXTURE_2D, slot->gl_texture);
+	glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, image);
+	glBindTexture(GL_TEXTURE_2D, previous_texture);
+	eglDestroyImage(eglGetCurrentDisplay(), image); /* the texture keeps the buffer */
+	glGenFramebuffers(1, &slot->gl_framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, slot->gl_framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, slot->gl_texture, 0);
+	slot->width = width;
+	slot->height = height;
+	return slot;
+}
+
+/* eglSwapBuffers() on a consumer's window: the frame goes into a buffer of the consumer, top row first as in
+ * Android's window buffers (GL's origin is the bottom), and is queued with its timestamp (AOSP: the one of
+ * eglPresentationTimeANDROID(), else the time of the swap, CLOCK_MONOTONIC). The consumer reads it on the CPU or in
+ * another context, so the copy is finished first (no fence goes with the buffer). */
+static EGLBoolean consumer_swap_buffers(ATLSurface *atl_surface)
+{
+	static void (*glBlitFramebuffer_)(GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLenum);
+	struct atl_surface_buffer *buffer = atl_surface->back_buffer;
+	struct consumer_slot *slot = buffer ? consumer_dequeue(atl_surface, buffer->width, buffer->height) : NULL;
+	int64_t timestamp = atl_surface->presentation_time >= 0 ? atl_surface->presentation_time : g_get_monotonic_time() * 1000;
+	atl_surface->presentation_time = -1;
+	if (slot) {
+		if (!glBlitFramebuffer_)
+			glBlitFramebuffer_ = (void *)eglGetProcAddress("glBlitFramebuffer");
+		GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+		glDisable(GL_SCISSOR_TEST);
+		glBindFramebuffer(0x8CA8 /* GL_READ_FRAMEBUFFER */, buffer->gl_framebuffer);
+		glBindFramebuffer(0x8CA9 /* GL_DRAW_FRAMEBUFFER */, slot->gl_framebuffer);
+		glBlitFramebuffer_(0, 0, buffer->width, buffer->height, 0, buffer->height, buffer->width, 0, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		if (scissor)
+			glEnable(GL_SCISSOR_TEST);
+		glFinish();
+		AHardwareBuffer_acquire(slot->ahb); /* the reader takes over this reference */
+		JNIEnv *env = ndk_jni_env();
+		jobject reader = atl_surface->consumer->image_reader;
+		(*env)->CallBooleanMethod(env, reader, (*env)->GetMethodID(env, (*env)->GetObjectClass(env, reader), "queueHardwareBuffer", "(JJII)Z"),
+		                          (jlong)timestamp, _INTPTR(slot->ahb), (jint)slot->width, (jint)slot->height);
+		ndk_jni_threw(env, "eglSwapBuffers");
+	}
+	fit_back_buffer(atl_surface, atl_surface->consumer);
+	glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer ? atl_surface->back_buffer->gl_framebuffer : 0);
+	return EGL_TRUE;
+}
+
 EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface read, EGLContext context)
 {
 	if (getenv("ATL_DIRECT_EGL"))
@@ -798,12 +947,16 @@ EGLBoolean bionic_eglMakeCurrent(EGLDisplay display, EGLSurface draw, EGLSurface
 			glBindRenderbuffer(GL_RENDERBUFFER, previous_renderbuffer);
 		}
 
-		for (int i = 0; i < NUM_BUFFERS; i++) {
+		/* a consumer's window draws into one buffer, which eglSwapBuffers() copies into the consumer's buffers */
+		for (int i = 0; i < (atl_surface->consumer ? 1 : NUM_BUFFERS); i++) {
 			atl_surface->buffers[i].surface = atl_surface;
 			make_buffer(atl_surface, &atl_surface->buffers[i]);
 			if (atl_surface->remote)
 				remote_buffer_share(atl_surface, i);
-			g_async_queue_push(atl_surface->unused_buffers, &atl_surface->buffers[i]);
+			if (atl_surface->consumer)
+				atl_surface->back_buffer = &atl_surface->buffers[i];
+			else
+				g_async_queue_push(atl_surface->unused_buffers, &atl_surface->buffers[i]);
 		}
 		glBindTexture(GL_TEXTURE_2D, previousTexture);
 		if (atl_surface->remote)
@@ -886,6 +1039,8 @@ EGLBoolean bionic_eglSwapBuffers(EGLDisplay display, EGLSurface surface)
 
 	if (atl_surface->remote)
 		return remote_swap_buffers(atl_surface);
+	if (atl_surface->consumer)
+		return consumer_swap_buffers(atl_surface);
 
 	glFlush();
 	if (atl_surface->back_buffer) {

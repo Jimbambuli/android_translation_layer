@@ -2,16 +2,17 @@
 #include <EGL/eglext.h>
 
 #include "../defines.h"
+#include "../../libandroid/native_window.h"
 
 #include "../generated_headers/android_opengl_EGLExt.h"
 
 /* AOSP EGLExt.eglPresentationTimeANDROID() (android_opengl_EGLExt.cpp) calls the EGL_ANDROID_presentation_time
- * extension. Mesa does not have it; ATL's EGL layer for native apps (libandroid/egl.c,
- * bionic_eglPresentationTimeANDROID()) accepts the call and ignores the time, which is only a hint, and so does
- * this. */
+ * extension, which ATL's EGL layer answers (libandroid/egl.c: the timestamp of the next buffer of a consumer's window) */
 JNIEXPORT jboolean JNICALL Java_android_opengl_EGLExt_eglPresentationTimeANDROID(JNIEnv *env, jclass class, jobject dpy, jobject sur, jlong time)
 {
-	return EGL_TRUE;
+	EGLDisplay dpy_native = _PTR((*env)->CallLongMethod(env, dpy, _METHOD(_CLASS(dpy), "getNativeHandle", "()J")));
+	EGLSurface sur_native = _PTR((*env)->CallLongMethod(env, sur, _METHOD(_CLASS(sur), "getNativeHandle", "()J")));
+	return bionic_eglPresentationTimeANDROID(dpy_native, sur_native, time);
 }
 
 /* AOSP android_eglDupNativeFenceFDANDROID(): the EGL_ANDROID_native_fence_sync call of the desktop EGL. Apps see
