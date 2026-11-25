@@ -132,7 +132,8 @@ public class CheckedTextView extends TextView implements Checkable {
 			else
 				right = mCheckMarkDrawable;
 		}
-		native_setCompoundDrawables(widget, left, d[1], right, d[3]);
+		Drawable l = left, r = right;
+		gtk(() -> native_setCompoundDrawables(widget, l, d[1], r, d[3]));
 	}
 
 	@Override

@@ -131,7 +131,7 @@ static void on_selected_changed(GtkDropDown *dropdown, GParamSpec *pspec, jobjec
 	J__AdapterView__OnItemSelectedListener__onItemSelected(env, listener, model->jobject, NULL, index, (long)0);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_Spinner_setOnItemSelectedListener(JNIEnv *env, jobject this, jobject listener)
+JNIEXPORT void JNICALL Java_android_widget_Spinner_native_1setOnItemSelectedListener(JNIEnv *env, jobject this, jobject listener)
 {
 	GtkDropDown *dropdown = GTK_DROP_DOWN(_PTR(_GET_LONG_FIELD(this, "widget")));
 	g_signal_connect(dropdown, "notify::selected", G_CALLBACK(on_selected_changed), _REF(listener));

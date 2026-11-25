@@ -7,6 +7,7 @@ import android.content.res.ColorStateList;
 import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.InputFilter;
+import android.text.Selection;
 import android.text.SpannableStringBuilder;
 import android.text.SpannedString;
 import android.text.TextWatcher;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 public class EditText extends TextView {
 	public EditText(Context context) {
 		super(context);
-		nativeSetOnLongClickListener(widget);
+		gtk(() -> nativeSetOnLongClickListener(widget));
 	}
 
 	public EditText(Context context, AttributeSet attrs) {
@@ -39,7 +40,7 @@ public class EditText extends TextView {
 	public EditText(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		super(context, attrs, defStyle, defStyleRes);
 		/* the long press of the GtkText reaches performLongClick(), which selects a word like AOSP's Editor */
-		nativeSetOnLongClickListener(widget);
+		gtk(() -> nativeSetOnLongClickListener(widget));
 	}
 
 	@Override
@@ -74,8 +75,15 @@ public class EditText extends TextView {
 
 	public Editable getText() {
 		if (mEditable == null)
-			mEditable = getEditableFactory().newEditable(native_getText(widget));
+			mEditable = getEditableFactory().newEditable(nativeText());
 		return mEditable;
+	}
+
+	/* the GtkText's text; off the main thread the Editable's, which the GtkText gets when it is made there */
+	private String nativeText() {
+		if (gtkReady())
+			return native_getText(widget);
+		return mEditable != null ? mEditable.toString() : "";
 	}
 
 	public Editable getEditableText() {
@@ -90,9 +98,12 @@ public class EditText extends TextView {
 		if (text == null)
 			text = "";
 		mEditable = getEditableFactory().newEditable(text);
-		programmatic_text = true;
-		native_setText(widget, mEditable.toString());
-		programmatic_text = false;
+		String gtkText = mEditable.toString();
+		gtk(() -> {
+			programmatic_text = true;
+			native_setText(widget, gtkText);
+			programmatic_text = false;
+		});
 	}
 
 	/* the typed change into the Editable: only the changed part is replaced, so spans elsewhere stay */
@@ -116,7 +127,7 @@ public class EditText extends TextView {
 	@Override
 	public void setFilters(InputFilter[] filters) {
 		super.setFilters(filters);
-		native_setFiltered(widget, filters.length > 0);
+		gtk(() -> native_setFiltered(widget, filters.length > 0));
 	}
 	private native void native_setFiltered(long widget, boolean filtered);
 
@@ -140,7 +151,7 @@ public class EditText extends TextView {
 	}
 	@Override
 	protected void applyNativeTextSize(float size) {
-		native_setTextSize(widget, size);
+		gtk(() -> native_setTextSize(widget, size));
 		applyHintColor();
 	}
 	private native void native_setTextSize(long widget, float size);
@@ -159,7 +170,7 @@ public class EditText extends TextView {
 		if (listeners == null)
 			listeners = new ArrayList<TextWatcher>();
 		listeners.add(watcher);
-		native_addTextChangedListener(widget, watcher);
+		gtk(() -> native_addTextChangedListener(widget, watcher));
 	}
 
 	/* the text is being set by the app, not typed (InputTrace) */
@@ -300,7 +311,7 @@ public class EditText extends TextView {
 	@Override
 	void setTransformationMethodInternal(TransformationMethod method) {
 		super.setTransformationMethodInternal(method);
-		native_setPassword(widget, method instanceof PasswordTransformationMethod);
+		gtk(() -> native_setPassword(widget, method instanceof PasswordTransformationMethod));
 	}
 	private native void native_setPassword(long widget, boolean password);
 
@@ -311,7 +322,8 @@ public class EditText extends TextView {
 
 	@Override
 	public void setHint(CharSequence s) {
-		native_setHint(widget, s == null ? "" : s.toString());
+		mHint = s == null ? "" : s.toString();
+		gtk(() -> native_setHint(widget, mHint));
 		applyHintColor();
 	}
 
@@ -324,14 +336,15 @@ public class EditText extends TextView {
 	private void applyHintColor() {
 		ColorStateList colors = getHintTextColors();
 		if (colors != null)
-			native_setHintColor(widget, colors.getColorForState(getDrawableState(), colors.getDefaultColor()));
+			gtk(() -> native_setHintColor(widget, colors.getColorForState(getDrawableState(), colors.getDefaultColor())));
 	}
 	private native void native_setHintColor(long widget, int color);
 
 	@Override
 	public CharSequence getHint() {
-		return native_getHint(widget);
+		return gtkReady() ? native_getHint(widget) : mHint;
 	}
+	private CharSequence mHint; // for getHint() off the main thread; no initializer, TextView's constructor sets it
 
 	/* ---- selection: the GtkText's. GTK counts characters, Android UTF-16 units. ---- */
 
@@ -344,12 +357,16 @@ public class EditText extends TextView {
 
 	@Override
 	public int getSelectionStart() {
+		if (!gtkReady()) // AOSP TextView.getSelectionStart() on the Editable
+			return Selection.getSelectionStart(getText());
 		String s = native_getText(widget);
 		return toUtf16(s, native_getSelectionBounds(widget)[0]);
 	}
 
 	@Override
 	public int getSelectionEnd() {
+		if (!gtkReady())
+			return Selection.getSelectionEnd(getText());
 		String s = native_getText(widget);
 		return toUtf16(s, native_getSelectionBounds(widget)[1]);
 	}
@@ -357,12 +374,15 @@ public class EditText extends TextView {
 	/* AOSP EditText.setSelection(): Selection.setSelection() on the text, which throws if the range is not in it */
 	@Override
 	public void setSelection(int start, int stop) {
-		String s = native_getText(widget);
+		String s = nativeText();
 		int length = s.length();
 		if (start < 0 || stop < 0 || start > length || stop > length) {
 			throw new IndexOutOfBoundsException("setSpan (" + start + " ... " + stop + ") ends beyond length " + length);
 		}
-		native_setSelectionBounds(widget, s.codePointCount(0, start), s.codePointCount(0, stop));
+		int gtkStart = s.codePointCount(0, start), gtkStop = s.codePointCount(0, stop);
+		if (!gtkReady()) // for getSelectionStart()/End() there, as AOSP: the selection of the Editable
+			Selection.setSelection(getText(), start, stop);
+		gtk(() -> native_setSelectionBounds(widget, gtkStart, gtkStop));
 	}
 
 	@Override
@@ -375,7 +395,7 @@ public class EditText extends TextView {
 	}
 
 	public void selectAll() {
-		setSelection(0, native_getText(widget).length());
+		setSelection(0, nativeText().length());
 	}
 
 	/* the cursor moved with a text change that sendTextChanged() has not passed on yet */
@@ -406,8 +426,10 @@ public class EditText extends TextView {
 	 * reported to the TextWatchers as typing is), not a new text */
 	@Override
 	void replaceText_internal(int min, int max, CharSequence newText) {
-		String s = native_getText(widget);
-		native_replaceText(widget, s.codePointCount(0, min), s.codePointCount(0, max), newText.toString());
+		String s = nativeText();
+		int gtkStart = s.codePointCount(0, min), gtkEnd = s.codePointCount(0, max);
+		String gtkText = newText.toString();
+		gtk(() -> native_replaceText(widget, gtkStart, gtkEnd, gtkText));
 	}
 	private native void native_replaceText(long widget, int start, int end, String text);
 

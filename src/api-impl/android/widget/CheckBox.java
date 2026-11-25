@@ -27,10 +27,10 @@ public class CheckBox extends CompoundButton {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 
 	@Override
-	public native void setChecked(boolean checked);
+	protected native void native_setChecked(boolean checked);
 
 	@Override
-	public native boolean isChecked();
+	protected native boolean native_isChecked();
 
 	// following methods are overridden to prevent calling incompatible methods from superclasses
 	@Override

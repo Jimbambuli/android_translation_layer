@@ -96,7 +96,7 @@ public class Spinner extends AbsSpinner implements android.content.DialogInterfa
 		super.setAdapter(adapter);
 		if (adapter != null)
 			adapter.registerDataSetObserver(observer);
-		native_setAdapter(this.widget, adapter);
+		gtk(() -> native_setAdapter(widget, adapter));
 	}
 
 	public SpinnerAdapter getAdapter() {
@@ -104,17 +104,20 @@ public class Spinner extends AbsSpinner implements android.content.DialogInterfa
 	}
 
 	@Override
-	public native void setOnItemSelectedListener(AdapterView.OnItemSelectedListener listener);
+	public void setOnItemSelectedListener(AdapterView.OnItemSelectedListener listener) {
+		gtk(() -> native_setOnItemSelectedListener(listener));
+	}
+	private native void native_setOnItemSelectedListener(AdapterView.OnItemSelectedListener listener);
 
 	private class Observer extends DataSetObserver {
 
 		@Override
 		public void onChanged() {
-			Spinner.this.native_setAdapter(widget, getAdapter());
+			gtk(() -> native_setAdapter(widget, getAdapter()));
 		}
 		@Override
 		public void onInvalidated() {
-			Spinner.this.native_setAdapter(widget, getAdapter());
+			gtk(() -> native_setAdapter(widget, getAdapter()));
 		}
 	}
 

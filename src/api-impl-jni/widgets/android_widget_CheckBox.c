@@ -19,12 +19,12 @@ JNIEXPORT jlong JNICALL Java_android_widget_CheckBox_native_1constructor(JNIEnv 
 	return _INTPTR(button);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_CheckBox_setChecked(JNIEnv *env, jobject this, jboolean checked)
+JNIEXPORT void JNICALL Java_android_widget_CheckBox_native_1setChecked(JNIEnv *env, jobject this, jboolean checked)
 {
 	gtk_check_button_set_active(GTK_CHECK_BUTTON(_PTR(_GET_LONG_FIELD(this, "widget"))), checked);
 }
 
-JNIEXPORT jboolean JNICALL Java_android_widget_CheckBox_isChecked(JNIEnv *env, jobject this)
+JNIEXPORT jboolean JNICALL Java_android_widget_CheckBox_native_1isChecked(JNIEnv *env, jobject this)
 {
 	return gtk_check_button_get_active(GTK_CHECK_BUTTON(_PTR(_GET_LONG_FIELD(this, "widget"))));
 }

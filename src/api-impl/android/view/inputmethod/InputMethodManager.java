@@ -64,7 +64,7 @@ public class InputMethodManager {
 
 	public boolean showSoftInput(View view, int flags, ResultReceiver resultReceiver) {
 		boolean alreadyShown = view == activeView;
-		boolean shown = alreadyShown ? nativeShowSoftInput(imContext(), view.widget, null, 0) : startInput(view);
+		boolean shown = alreadyShown ? nativeShowSoftInput(imContext(), view.gtkWidget(), null, 0) : startInput(view);
 		if (resultReceiver != null)
 			resultReceiver.send(shown ? (alreadyShown ? RESULT_UNCHANGED_SHOWN : RESULT_SHOWN) : RESULT_UNCHANGED_HIDDEN, null);
 		return shown;
@@ -185,7 +185,7 @@ public class InputMethodManager {
 				activeConnection.closeConnection();
 			activeView = view;
 			activeConnection = ic;
-			return nativeShowSoftInput(imContext(), view.widget, ic, outAttrs.inputType);
+			return nativeShowSoftInput(imContext(), view.gtkWidget(), ic, outAttrs.inputType);
 		}
 		return false;
 	}

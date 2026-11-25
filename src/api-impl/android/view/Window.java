@@ -260,11 +260,11 @@ public class Window {
 			}
 		};
 		// DecorView grabs all touch events and propagates them in Java
-		decorView.native_registerTouchEventPropagation(decorView.widget);
+		decorView.native_registerTouchEventPropagation(decorView.gtkWidget());
 		decorView.setId(android.R.id.content);
 		mContentParent = decorView;
 		// files dragged from the desktop come as drag events (handleDragEvent())
-		native_set_drop_target(decorView.widget);
+		native_set_drop_target(decorView.gtkWidget());
 	}
 
 	/* AOSP ViewRootImpl.handleDragEvent() for files dragged from the desktop onto the window (a GtkDropTarget on

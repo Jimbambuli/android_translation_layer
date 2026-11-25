@@ -215,11 +215,15 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				break;
 			}
 		}
-		native_addView(widget, child.widget, sortedIndex, params);
-		/* a native container (ScrollView) places the child in GTK: now that GTK knows the parent, the
-		 * gravity and margins of the layout params apply to it there */
-		if (!native_hasAndroidLayout(widget))
-			child.applyLayoutParams(params);
+		final int gtkIndex = sortedIndex;
+		final LayoutParams gtkParams = params;
+		gtk(() -> {
+			native_addView(widget, child.gtkWidget(), gtkIndex, gtkParams);
+			/* a native container (ScrollView) places the child in GTK: now that GTK knows the parent, the
+			 * gravity and margins of the layout params apply to it there */
+			if (!native_hasAndroidLayout(widget))
+				child.applyLayoutParams(gtkParams);
+		});
 		requestLayout();
 		if (child.isDuplicateParentStateEnabled())
 			child.refreshDrawableState();
@@ -672,7 +676,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			child.parent = null;
 		}
 		children.remove(index);
-		native_removeView(widget, child.widget);
+		gtk(() -> native_removeView(widget, child.gtkWidget()));
 	}
 
 	/* AOSP ViewGroup.removeView() ... removeAllViewsInLayout(); without what ATL has no counterpart for (the
@@ -803,7 +807,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				childHasTransientStateChanged(view, true);
 			}
 		}
-		view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha() * view.getTransitionAlpha(), view.isEnabled());
+		view.gtk(() -> view.native_setVisibility(view.widget, view.getVisibility(), view.getAlpha() * view.getTransitionAlpha(), view.isEnabled()));
 	}
 
 	protected void removeDetachedView(View child, boolean animate) {
@@ -811,7 +815,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 			return;
 		child.dispatchDetachedFromWindow();
 		child.parent = null;
-		native_removeView(widget, child.widget);
+		gtk(() -> native_removeView(widget, child.gtkWidget()));
 		dispatchViewRemoved(child);
 	}
 
@@ -909,7 +913,8 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				break;
 			}
 		}
-		native_addView(widget, child.widget, sortedIndex, null);
+		final int gtkIndex = sortedIndex;
+		gtk(() -> native_addView(widget, child.gtkWidget(), gtkIndex, null));
 		requestLayout();
 		invalidate();
 	}
@@ -1418,7 +1423,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		}
 		mGroupFlags &= ~FLAG_MASK_FOCUSABILITY;
 		mGroupFlags |= (focusability & FLAG_MASK_FOCUSABILITY);
-		native_setBlockDescendantsFocus(widget, focusability == FOCUS_BLOCK_DESCENDANTS);
+		gtk(() -> native_setBlockDescendantsFocus(widget, focusability == FOCUS_BLOCK_DESCENDANTS));
 	}
 	private native void native_setBlockDescendantsFocus(long widget, boolean block);
 
@@ -1645,7 +1650,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 				public void run() {
 					pendingHideDetachedChildren = false;
 					for (View child : detachedChildren)
-						child.native_setVisibility(child.widget, GONE, 0, false);
+						child.gtk(() -> child.native_setVisibility(child.widget, GONE, 0, false));
 				}
 			});
 		}
@@ -1665,7 +1670,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 		if (this.clipChildren == clipChildren)
 			return;
 		this.clipChildren = clipChildren;
-		native_setClipChildren(widget, clipChildren);
+		gtk(() -> native_setClipChildren(widget, clipChildren));
 	}
 	private native void native_setClipChildren(long widget, boolean clipChildren);
 
@@ -1701,7 +1706,7 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	}
 
 	public boolean drawChild(Canvas canvas, View child, long drawingTime) {
-		if (canvas instanceof GskCanvas)
+		if (canvas instanceof GskCanvas && child.widget != 0) // a child built on another thread gets its widget when added
 			native_drawChild(widget, child.widget, ((GskCanvas)canvas).snapshot);
 		return false;
 	}
@@ -1750,11 +1755,23 @@ public class ViewGroup extends View implements ViewParent, ViewManager {
 	private native void native_offsetRect(long from_widget, long to_widget, Rect rect);
 
 	public final void offsetDescendantRectToMyCoords(View descendant, Rect rect) {
-		native_offsetRect(descendant.widget, widget, rect);
+		if (gtkReady())
+			native_offsetRect(descendant.gtkWidget(), widget, rect);
+		else
+			offsetRectBetween(descendant, rect, 1);
 	}
 
 	public final void offsetRectIntoDescendantCoords(View descendant, Rect rect) {
-		native_offsetRect(widget, descendant.widget, rect);
+		if (gtkReady())
+			native_offsetRect(widget, descendant.gtkWidget(), rect);
+		else
+			offsetRectBetween(descendant, rect, -1);
+	}
+
+	/* AOSP offsetRectBetweenParentAndChild() without transforms, for views off the main thread (no GTK there) */
+	private void offsetRectBetween(View descendant, Rect rect, int sign) {
+		for (View v = descendant; v != this && v != null; v = v.getParent() instanceof View ? (View)v.getParent() : null)
+			rect.offset(sign * (v.getLeft() - v.getScrollX()), sign * (v.getTop() - v.getScrollY()));
 	}
 
 	public static class LayoutParams {

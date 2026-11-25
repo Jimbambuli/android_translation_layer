@@ -24,12 +24,12 @@ JNIEXPORT jlong JNICALL Java_android_widget_CompoundButton_native_1constructor(J
 	return _INTPTR(box);
 }
 
-JNIEXPORT void JNICALL Java_android_widget_CompoundButton_setChecked(JNIEnv *env, jobject this, jboolean checked)
+JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setChecked(JNIEnv *env, jobject this, jboolean checked)
 {
 	gtk_switch_set_active(GTK_SWITCH(gtk_widget_get_last_child(_PTR(_GET_LONG_FIELD(this, "widget")))), checked);
 }
 
-JNIEXPORT jboolean JNICALL Java_android_widget_CompoundButton_isChecked(JNIEnv *env, jobject this)
+JNIEXPORT jboolean JNICALL Java_android_widget_CompoundButton_native_1isChecked(JNIEnv *env, jobject this)
 {
 	return gtk_switch_get_active(GTK_SWITCH(gtk_widget_get_last_child(_PTR(_GET_LONG_FIELD(this, "widget")))));
 }
@@ -44,6 +44,7 @@ void compound_button_checked_changed(WrapperWidget *wrapper, gboolean checked)
 	jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
 	if (!view) // garbage collected
 		return;
+	_SET_BOOL_FIELD(view, "mChecked", checked); // CompoundButton.isChecked() off the main thread
 	J__View__refreshDrawableState(env, view);
 	if ((*env)->ExceptionCheck(env)) {
 		(*env)->ExceptionDescribe(env);

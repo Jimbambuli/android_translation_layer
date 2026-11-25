@@ -25,6 +25,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
 
 public class PopupWindow {
 	/* AOSP PopupWindow: the modes of setInputMethodMode() */
@@ -107,7 +108,7 @@ public class PopupWindow {
 		if (contentView != null)
 			contentView.clearAnimation();
 		fading_out = false;
-		native_resetFade(popover);
+		gtk(() -> native_resetFade(popover));
 	}
 
 	private void playFade(final Fade fadeTransition, final boolean appear, final Runnable done) {
@@ -117,12 +118,12 @@ public class PopupWindow {
 			fade.setStartDelay(fadeTransition.getStartDelay());
 		if (fadeTransition.getInterpolator() != null)
 			fade.setInterpolator(fadeTransition.getInterpolator());
-		native_setOpacity(popover, appear ? 0 : 1);
+		gtk(() -> native_setOpacity(popover, appear ? 0 : 1));
 		fade.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
 			@Override
 			public void onAnimationUpdate(ValueAnimator animation) {
 				float f = (Float)animation.getAnimatedValue();
-						native_setOpacity(popover, appear ? f : 1 - f);
+						gtk(() -> native_setOpacity(popover, appear ? f : 1 - f));
 			}
 		});
 		fade.addListener(new android.animation.AnimatorListenerAdapter() {
@@ -157,11 +158,11 @@ public class PopupWindow {
 
 	private void finishDismiss() {
 		resetFade();
-		native_dismiss(popover);
+		gtk(() -> native_dismiss(popover));
 	}
 
 	public PopupWindow(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-		popover = native_constructor();
+		gtkReady();
 		TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.PopupWindow, defStyleAttr, defStyleRes);
 		overlap_anchor = a.getBoolean(com.android.internal.R.styleable.PopupWindow_overlapAnchor, false);
 		if (a.hasValueOrEmpty(com.android.internal.R.styleable.PopupWindow_popupAnimationStyle)) {
@@ -178,8 +179,8 @@ public class PopupWindow {
 		mStyleBackground = a.getDrawable(com.android.internal.R.styleable.PopupWindow_popupBackground) != null;
 		a.recycle();
 		int[] colors = themeColors(context);
-		native_setColors(popover, colors[0], colors[1]);
-		native_setTransparentBackground(popover, !mStyleBackground);
+		gtk(() -> native_setColors(popover, colors[0], colors[1]));
+		gtk(() -> native_setTransparentBackground(popover, !mStyleBackground));
 	}
 
 	/* whether the window has the background of its style (only the constructors with a Context read one) */
@@ -205,11 +206,11 @@ public class PopupWindow {
 	}
 
 	public PopupWindow() {
-		popover = native_constructor();
+		gtkReady();
 	}
 
 	public PopupWindow(View contentView, int width, int height, boolean focusable) {
-		popover = native_constructor();
+		gtkReady();
 		setContentView(contentView);
 		setWidth(width);
 		setHeight(height);
@@ -236,7 +237,49 @@ public class PopupWindow {
 
 	private View contentView;
 	private Drawable background;
-	private long popover; // native pointer to GtkPopover
+	private long popover; // native pointer to GtkPopover; 0 until made on the main thread (see gtk())
+
+	/* AOSP lets a PopupWindow be made and set up on any thread (an AutoCompleteTextView built on a worker thread
+	 * makes its ListPopupWindow there); the GtkPopover belongs to the main thread. As for views (View.gtk()), it
+	 * is made there, and native calls from other threads wait in popoverOps and run there in order. */
+	private ArrayList<Runnable> popoverOps;
+	private final Object popoverLock = new Object();
+	private static Handler sMainHandler;
+
+	private boolean gtkReady() {
+		if (!View.onMainThread())
+			return false;
+		ArrayList<Runnable> ops;
+		synchronized (popoverLock) {
+			ops = popoverOps;
+			popoverOps = null;
+		}
+		if (popover == 0)
+			popover = native_constructor();
+		if (ops != null)
+			for (Runnable op : ops)
+				op.run();
+		return true;
+	}
+
+	private void gtk(Runnable op) {
+		if (gtkReady()) {
+			op.run();
+			return;
+		}
+		boolean post;
+		synchronized (popoverLock) {
+			post = popoverOps == null;
+			if (post)
+				popoverOps = new ArrayList<>();
+			popoverOps.add(op);
+		}
+		if (post) {
+			if (sMainHandler == null)
+				sMainHandler = new Handler(Looper.getMainLooper());
+			sMainHandler.post(this::gtkReady);
+		}
+	}
 	private int anchored_gravity = DEFAULT_ANCHORED_GRAVITY;
 	private boolean overlap_anchor;
 
@@ -260,10 +303,10 @@ public class PopupWindow {
 	private void updateBackgroundView() {
 		/* the popover lets go of the view it shows now, so that it can go into a new FrameLayout: GTK keeps a
 		 * widget with a parent where it is (PopupWindow(View) followed by setBackgroundDrawable()) */
-		native_setContentView(popover, 0);
+		gtk(() -> native_setContentView(popover, 0));
 		/* AOSP draws the background drawable as the window's background; the frame of the GTK theme stands in
 		 * for it, so without a background or with a transparent one only the content shows */
-		native_setTransparentBackground(popover, background != null ? background.getOpacity() == PixelFormat.TRANSPARENT : !mStyleBackground);
+		gtk(() -> native_setTransparentBackground(popover, background != null ? background.getOpacity() == PixelFormat.TRANSPARENT : !mStyleBackground));
 		if (contentView == null)
 			return;
 		if (contentView.getParent() instanceof ViewGroup)
@@ -281,7 +324,8 @@ public class PopupWindow {
 		}
 		mShownView = backgroundView;
 		applyWrapContent();
-		native_setContentView(popover, backgroundView.widget);
+		View shown = backgroundView;
+		gtk(() -> native_setContentView(popover, shown.gtkWidget()));
 	}
 
 	public void setInputMethodMode(int mode) {
@@ -294,11 +338,11 @@ public class PopupWindow {
 
 	/** AOSP isAboveAnchor(): whether the last showAsDropDown()/update() placed the popup above its anchor */
 	public boolean isAboveAnchor() {
-		return native_isAboveAnchor(popover);
+		return gtkReady() && native_isAboveAnchor(popover);
 	}
 
 	public boolean isShowing() {
-		return native_isShowing(popover);
+		return gtkReady() && native_isShowing(popover);
 	}
 
 	private boolean focusable;
@@ -306,7 +350,7 @@ public class PopupWindow {
 	/* like AOSP, takes effect when the popup is shown (or updated) next */
 	public void setFocusable(boolean focusable) {
 		this.focusable = focusable;
-		native_setFocusable(popover, focusable);
+		gtk(() -> native_setFocusable(popover, focusable));
 		applyTouchModal();
 	}
 
@@ -384,7 +428,7 @@ public class PopupWindow {
 	private boolean mTouchModal = true;
 
 	private void applyTouchModal() {
-		native_setTouchModal(popover, focusable ? mTouchModal || mOutsideTouchable : mOutsideTouchable);
+		gtk(() -> native_setTouchModal(popover, focusable ? mTouchModal || mOutsideTouchable : mOutsideTouchable));
 	}
 
 	/* the state AOSP's PopupWindow keeps for the window it would add; ATL's popover does not use it */
@@ -418,8 +462,8 @@ public class PopupWindow {
 		anchored_gravity = gravity;
 		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
 		android.atl.ATLViewDump.addRoot(this);
-		native_showAsDropDown(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff,
-		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor);
+		gtk(() -> native_showAsDropDown(popover, anchor.gtkWidget(), anchor.getWidth(), anchor.getHeight(), xoff, yoff,
+		                      Gravity.getAbsoluteGravity(gravity, anchor.getLayoutDirection()), overlap_anchor));
 		startEnterAnimation();
 		takeWindowFocus(anchor);
 	}
@@ -489,7 +533,7 @@ public class PopupWindow {
 			return;
 		if (focusTakenFrom == null) {
 			focusTakenFrom = anchor.getRootView();
-			native_setOnDismissListener(popover); // to give the focus back on every dismissal
+			gtk(() -> native_setOnDismissListener(popover)); // to give the focus back on every dismissal
 			focusTakenFrom.dispatchRootWindowFocusChanged(false);
 		}
 		contentView.dispatchRootWindowFocusChanged(true);
@@ -517,7 +561,8 @@ public class PopupWindow {
 	}
 
 	public void setTouchable(boolean touchable) {
-		native_setTouchable(popover, touchable);
+		mTouchable = touchable;
+		gtk(() -> native_setTouchable(popover, touchable));
 	}
 
 	public void showAsDropDown(View anchor) {
@@ -542,7 +587,7 @@ public class PopupWindow {
 		android.atl.ATLViewDump.removeRoot(this); // debugging aid (atl-doctor)
 		android.atl.ATLViewDump.addRoot(this);
 		mLocationGravity = Gravity.getAbsoluteGravity(gravity, parent.getLayoutDirection());
-		native_showAtLocation(popover, parent.widget, mLocationGravity, x, y);
+		gtk(() -> native_showAtLocation(popover, parent.gtkWidget(), mLocationGravity, x, y));
 		startEnterAnimation();
 		takeWindowFocus(parent);
 	}
@@ -554,14 +599,14 @@ public class PopupWindow {
 		resetFade();
 		Fade exitFade = ValueAnimator.getDurationScale() == 0 ? null : findFade(exit_transition, Visibility.MODE_OUT);
 		Animation animation = ValueAnimator.getDurationScale() == 0 ? null : styleAnimation(false);
-		if ((exitFade == null && animation == null) || !native_isMapped(popover)) {
-			native_dismiss(popover);
+		if ((exitFade == null && animation == null) || !(gtkReady() && native_isMapped(popover))) {
+			gtk(() -> native_dismiss(popover));
 			return;
 		}
 		/* as on AOSP, the dismiss listener is called at once, the popup is no longer showing and takes no
 		 * input; it is popped down when the animations end */
 		fading_out = true;
-		native_startFadeOut(popover);
+		gtk(() -> native_startFadeOut(popover));
 		final int[] running = {0};
 		final Runnable onEnd = new Runnable() {
 			@Override
@@ -639,8 +684,8 @@ public class PopupWindow {
 	}
 
 	public void update(View anchor, int xoff, int yoff, int width, int height) {
-		native_update(popover, anchor.widget, anchor.getWidth(), anchor.getHeight(), xoff, yoff, width, height,
-		              Gravity.getAbsoluteGravity(anchored_gravity, anchor.getLayoutDirection()), overlap_anchor);
+		gtk(() -> native_update(popover, anchor.gtkWidget(), anchor.getWidth(), anchor.getHeight(), xoff, yoff, width, height,
+		              Gravity.getAbsoluteGravity(anchored_gravity, anchor.getLayoutDirection()), overlap_anchor));
 	}
 
 	public void setWindowLayoutType(int layoutType) {
@@ -713,17 +758,21 @@ public class PopupWindow {
 	public void setWidth(int width) {
 		mWrapWidth = width == ViewGroup.LayoutParams.WRAP_CONTENT;
 		applyWrapContent();
-		native_setWidth(popover, width);
+		mWidth = width;
+		gtk(() -> native_setWidth(popover, width));
 	}
 
 	/** AOSP setHeight(): a size, MATCH_PARENT (the height of the app's window) or WRAP_CONTENT */
 	public void setHeight(int height) {
 		mWrapHeight = height == ViewGroup.LayoutParams.WRAP_CONTENT;
 		applyWrapContent();
-		native_setHeight(popover, height);
+		mHeight = height;
+		gtk(() -> native_setHeight(popover, height));
 	}
 
 	private boolean mWrapWidth, mWrapHeight;
+	private int mWidth, mHeight; // for getWidth()/getHeight() off the main thread
+	private boolean mTouchable = true; // for isTouchable() off the main thread
 	private View mShownView;
 	private ViewGroup.LayoutParams mWrapParams;
 
@@ -741,11 +790,11 @@ public class PopupWindow {
 	}
 
 	public int getWidth() {
-		return native_getWidth(popover);
+		return gtkReady() ? native_getWidth(popover) : mWidth;
 	}
 
 	public int getHeight() {
-		return native_getHeight(popover);
+		return gtkReady() ? native_getHeight(popover) : mHeight;
 	}
 
 	/* AOSP computeGravity(): the gravity of the last showAtLocation(), START | TOP before any (here made absolute
@@ -761,7 +810,7 @@ public class PopupWindow {
 			setHeight(height);
 		if (!isShowing() || !hasContentView())
 			return;
-		native_moveTo(popover, mLocationGravity, x, y);
+		gtk(() -> native_moveTo(popover, mLocationGravity, x, y));
 	}
 	private native void native_moveTo(long popover, int gravity, int x, int y);
 
@@ -800,7 +849,7 @@ public class PopupWindow {
 	public void setWindowLayoutMode(int widthSpec, int heightSpec) {}
 
 	public boolean isTouchable() {
-		return native_isTouchable(popover);
+		return gtkReady() ? native_isTouchable(popover) : mTouchable;
 	}
 
 	public void setOverlapAnchor(boolean overlap) {
@@ -844,7 +893,7 @@ public class PopupWindow {
 	/* like AOSP, a new listener replaces the old one */
 	public void setOnDismissListener(OnDismissListener listener) {
 		on_dismiss_listener = listener;
-		native_setOnDismissListener(popover);
+		gtk(() -> native_setOnDismissListener(popover));
 	}
 
 	/* AOSP's PopupWindow.PopupDecorView.dispatchKeyEvent(): Back and Escape dismiss the popup. ATL

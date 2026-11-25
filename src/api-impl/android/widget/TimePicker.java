@@ -35,7 +35,10 @@ public class TimePicker extends FrameLayout {
 	 * by: measure the GTK widget as View.onMeasure() does for a native view, or the picker gets size 0 */
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+		if (gtkReady())
+			native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+		else // GTK measures on the main thread only
+			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 	}
 
 	public Integer getCurrentHour() {
@@ -46,12 +49,15 @@ public class TimePicker extends FrameLayout {
 		return getMinute();
 	}
 
+	/* the time set last, for the getters off the main thread (the spin buttons start at 0) */
+	private int mHour, mMinute;
+
 	public int getHour() {
-		return nativeGetSpinBtnValue(hour_spin_widget);
+		return gtkReady() ? nativeGetSpinBtnValue(hour_spin_widget) : mHour;
 	}
 
 	public int getMinute() {
-		return nativeGetSpinBtnValue(minute_spin_widget);
+		return gtkReady() ? nativeGetSpinBtnValue(minute_spin_widget) : mMinute;
 	}
 
 	/* AOSP setIs24HourView()/is24HourView(); the GTK spin buttons always show 0-23, as getHour() returns */
@@ -84,15 +90,17 @@ public class TimePicker extends FrameLayout {
 	}
 
 	public void setHour(int hour) {
-		nativeSetSpinBtnValue(hour_spin_widget, hour);
+		mHour = hour;
+		gtk(() -> nativeSetSpinBtnValue(hour_spin_widget, hour));
 	}
 
 	public void setMinute(int minute) {
-		nativeSetSpinBtnValue(minute_spin_widget, minute);
+		mMinute = minute;
+		gtk(() -> nativeSetSpinBtnValue(minute_spin_widget, minute));
 	}
 
 	public void setOnTimeChangedListener(OnTimeChangedListener onTimeChangedListener) {
-		nativeSetOnTimeChangedListener(btn_widget);
+		gtk(() -> nativeSetOnTimeChangedListener(btn_widget));
 		on_time_changed_listener = onTimeChangedListener;
 	}
 

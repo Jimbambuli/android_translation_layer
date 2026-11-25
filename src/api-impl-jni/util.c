@@ -325,6 +325,27 @@ void atl_display_info_init(GtkWidget *window)
 #endif
 }
 
+static gboolean invalidate_idle(gpointer paintable)
+{
+	gdk_paintable_invalidate_contents(paintable);
+	gdk_paintable_invalidate_size(paintable);
+	g_object_unref(paintable);
+	return G_SOURCE_REMOVE;
+}
+
+/* gdk_paintable_invalidate_contents()/_size(): the widgets showing the paintable handle the signals, so a drawable
+ * changed on another thread (Android allows that for one that is not drawn) signals from the main loop */
+void atl_paintable_invalidate(GdkPaintable *paintable, gboolean size)
+{
+	if (!main_thread_id || g_thread_self() == main_thread_id) {
+		gdk_paintable_invalidate_contents(paintable);
+		if (size)
+			gdk_paintable_invalidate_size(paintable);
+	} else {
+		g_idle_add(invalidate_idle, g_object_ref(paintable));
+	}
+}
+
 /* The PangoContext for text in the current thread. Pango font maps are not thread-safe: only the main thread uses
  * the window's context; other threads (apps drawing text into a Bitmap from worker threads) get a context of their
  * own on the thread's own default font map, with the resolution and font options of the window's context, as taken

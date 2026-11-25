@@ -34,7 +34,7 @@ public class SurfaceView extends View {
 		super(context, attrs, defStyleAttr, defStyleRes);
 		setWillNotDraw(true);
 
-		mSurface.widget = this.widget;
+		gtk(() -> mSurface.widget = widget); // the SurfaceViewWidget is made on the main thread
 		mSurface.atl_format = mRequestedFormat;
 	}
 

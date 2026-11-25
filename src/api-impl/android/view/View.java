@@ -1036,7 +1036,83 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	ViewTreeObserver floating_observer = null;
 
-	public long widget; // pointer
+	public long widget; // pointer; 0 while a view built on another thread waits for its widget (see gtkReady())
+
+	/* AOSP lets a view be built and set up on any thread until it is attached (AsyncLayoutInflater, RecyclerView
+	 * prefetch); only ViewRootImpl.checkThread() ties an attached view to its thread. GTK widgets belong to the
+	 * main thread (doc/threading.md). So a view built on another thread gets its widget on the main thread, when
+	 * that first needs it (addView() to a parent there at the latest), and the native calls made on other threads
+	 * wait in gtkOps until then and run there in order. Views built on the main thread are unchanged. */
+	private ArrayList<Runnable> gtkOps; // non-null while calls wait for the main thread
+	private static final Object gtkOpsLock = new Object();
+	private static Thread sMainThread;
+	private static Handler sMainHandler;
+
+	public static boolean onMainThread() {
+		Thread main = sMainThread;
+		if (main == null) {
+			Looper looper = Looper.getMainLooper();
+			if (looper == null)
+				return true;
+			main = sMainThread = looper.getThread();
+		}
+		return Thread.currentThread() == main;
+	}
+
+	/* true on the main thread, where the widget exists and the waiting calls have run; false on other threads */
+	protected final boolean gtkReady() {
+		if (!onMainThread())
+			return false;
+		if (gtkOps != null)
+			runGtkOps();
+		return true;
+	}
+
+	/* a parent's GTK layout of its children; nothing to do before the widget exists */
+	final void queueAllocate() {
+		if (gtkReady())
+			native_queueAllocate(widget);
+	}
+
+	/* the widget, for main-thread code outside the view (parent, window, popup) */
+	public final long gtkWidget() {
+		gtkReady();
+		return widget;
+	}
+
+	/* a native call that changes the widget: now on the main thread, else when the main thread gets to it */
+	protected final void gtk(Runnable op) {
+		if (gtkReady()) {
+			op.run();
+			return;
+		}
+		boolean post;
+		synchronized (gtkOpsLock) {
+			post = gtkOps == null; // a widget made on the main thread: nobody else will run the call
+			if (post)
+				gtkOps = new ArrayList<>();
+			gtkOps.add(op);
+		}
+		if (post) {
+			if (sMainHandler == null)
+				sMainHandler = new Handler(Looper.getMainLooper());
+			sMainHandler.post(this::gtkReady);
+		}
+	}
+
+	private void runGtkOps() {
+		ArrayList<Runnable> ops;
+		synchronized (gtkOpsLock) {
+			ops = gtkOps;
+			gtkOps = null;
+		}
+		if (ops == null)
+			return;
+		if (widget == 0)
+			widget = native_constructor(context, null); // the AttributeSet is gone, the Java constructor read it
+		for (Runnable op : ops)
+			op.run();
+	}
 
 	private int oldWidthMeasureSpec = -1;
 	private int oldHeightMeasureSpec = -1;
@@ -1243,7 +1319,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public View(Context context, AttributeSet attrs, int defStyle, int defStyleRes) {
 		this.context = context;
 
-		widget = native_constructor(context, attrs);
+		if (onMainThread())
+			widget = native_constructor(context, attrs);
+		else
+			gtkOps = new ArrayList<>();
 
 		if (!sCompatibilityDone && context != null) {
 			final int targetSdkVersion = context.getApplicationInfo().targetSdkVersion;
@@ -1303,7 +1382,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			visibility = VISIBILITY_FLAGS[a.getInt(com.android.internal.R.styleable.View_visibility, 0)];
 			/* the flag, not the overridable isEnabled(): AOSP's constructor calls no View method here, and a
 			 * subclass's isEnabled() would run before its fields are set (YouTube's InlineTimeBarWrapper) */
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, (mViewFlags & ENABLED_MASK) == ENABLED);
+			gtk(() -> native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, (mViewFlags & ENABLED_MASK) == ENABLED));
 		}
 		if (a.hasValue(com.android.internal.R.styleable.View_alpha))
 			setAlpha(a.getFloat(com.android.internal.R.styleable.View_alpha, 1f));
@@ -1370,7 +1449,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			paddingBottom = bottomPadding;
 		resolvePaddingValues();
 
-		native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+		gtk(() -> native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom));
 
 		if (a.hasValue(com.android.internal.R.styleable.View_layoutDirection)) {
 			/* the attribute's values are ltr, rtl, inherit and locale, in the order of the constants */
@@ -1605,7 +1684,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private void setDefaultFocusHighlight(Drawable highlight) {
 		mDefaultFocusHighlight = highlight;
 		if (highlight != null) {
-			native_drawThroughJava(widget);
+			gtk(() -> native_drawThroughJava(widget));
 			if (highlight.isStateful()) {
 				highlight.setState(getDrawableState());
 			}
@@ -1693,7 +1772,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			bottomMargin = ((ViewGroup.MarginLayoutParams)params).bottomMargin;
 		}
 
-		native_setLayoutParams(widget, params.width, params.height, gravity, params.weight, leftMargin, topMargin, rightMargin, bottomMargin);
+		int width = params.width, height = params.height, g = gravity, l = leftMargin, t = topMargin, r = rightMargin, b = bottomMargin;
+		float weight = params.weight;
+		gtk(() -> native_setLayoutParams(widget, width, height, g, weight, l, t, r, b));
 
 		layout_params = params;
 	}
@@ -2036,7 +2117,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setOnTouchListener(OnTouchListener l) {
-		nativeSetOnTouchListener(widget);
+		gtk(() -> nativeSetOnTouchListener(widget));
 		on_touch_listener = l;
 	}
 
@@ -2045,7 +2126,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setOnClickListener(OnClickListener l) {
 		if (!isClickable())
 			setClickable(true);
-		nativeSetOnClickListener(widget);
+		gtk(() -> nativeSetOnClickListener(widget));
 		getListenerInfo().mOnClickListener = l;
 	}
 	protected native void nativeSetOnClickListener(long widget);
@@ -2131,7 +2212,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * and the key reaches its wrapper widget (nativeSetOnKeyListener() makes sure it listens) */
 	public void setOnKeyListener(OnKeyListener l) {
 		getListenerInfo().mOnKeyListener = l;
-		nativeSetOnKeyListener(widget);
+		gtk(() -> nativeSetOnKeyListener(widget));
 	}
 	private native void nativeSetOnKeyListener(long widget);
 
@@ -2147,7 +2228,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		setFlags(focusable, FOCUSABLE_MASK);
 		/* ATL: what GTK's widget can focus follows an explicit setFocusable(), not FOCUSABLE_AUTO or touch mode */
 		if ((focusable & FOCUSABLE_AUTO) == 0) {
-			native_setNativeFocusable(widget, (focusable & FOCUSABLE) != 0);
+			gtk(() -> native_setNativeFocusable(widget, (focusable & FOCUSABLE) != 0));
 		}
 	}
 
@@ -2207,7 +2288,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			if ((mViewFlags & ENABLED_MASK) != ENABLED) {
 				if (isFocused()) clearFocus();
 			}
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, (mViewFlags & ENABLED_MASK) == ENABLED);
+			gtk(() -> native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, (mViewFlags & ENABLED_MASK) == ENABLED));
 		}
 	}
 	/**
@@ -2230,7 +2311,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		if (isFocused())
 			return true;
 		if (isEnabled() && isFocusable() && visibility == VISIBLE) {
-			return nativeRequestFocus(widget, direction);
+			return gtkReady() && nativeRequestFocus(widget, direction); // AOSP: no focus without a window
 		}
 		return false;
 	}
@@ -2247,7 +2328,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		   and the caption bar; LAYOUT_FULLSCREEN only lays the content out behind the status bar
 		   (adjustLayoutParamsForCompatibility()), which ATL's window does not have (e.g. CoordinatorLayout
 		   sets it for fitsSystemWindows) */
-		nativeSetFullscreen(widget, (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0);
+		gtk(() -> nativeSetFullscreen(widget, (visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) != 0));
 		system_ui_visibility = visibility;
 		final View root = getRootView();
 		final int clearable = visibility & SYSTEM_UI_CLEARABLE_FLAGS;
@@ -2268,6 +2349,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	@Export
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		if (haveCustomMeasure) // calling native_measure here would create infinite loop
+			setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
+		else if (!gtkReady()) // GTK measures on the main thread only
 			setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));
 		else {
 			native_measure(widget, widthMeasureSpec, heightMeasureSpec);
@@ -2332,7 +2415,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private volatile Window attachedWindow;
 
 	private Window getAttachedWindow() {
-		return Looper.getMainLooper().isCurrentThread() ? native_get_window(widget) : attachedWindow;
+		return gtkReady() ? native_get_window(widget) : attachedWindow;
 	}
 	public ViewTreeObserver getViewTreeObserver() {
 		Window window = getAttachedWindow();
@@ -2383,7 +2466,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * invalidates the dirty rectangle */
 	private void invalidateInternal() {
 		propagateInvalidation();
-		nativeInvalidate(widget);
+		if (gtkReady())
+			gtk(() -> nativeInvalidate(widget));
 	}
 	private static native void nativeInvalidate(long widget);
 
@@ -2397,7 +2481,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected native void native_setBackgroundColor(long widget, int color);
 	public void setBackgroundColor(int color) {
 		background = new ColorDrawable(color);
-		native_setBackgroundColor(widget, color);
+		gtk(() -> native_setBackgroundColor(widget, color));
 	}
 
 	native void native_setVisibility(long widget, int visibility, float alpha, boolean sensitive);
@@ -2421,7 +2505,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			((ViewGroup)parent).requestLayout();
 		}
 		this.visibility = visibility;
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+		gtk(() -> native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled()));
 		/* a view that goes while it animates: the animation runs on as on AOSP (see GoneAnimationTicker) */
 		if (visibility == GONE && currentAnimation != null && animationMore)
 			getHandler().post(new GoneAnimationTicker(currentAnimation));
@@ -2442,7 +2526,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		paddingTop = top;
 		paddingRight = right;
 		paddingBottom = bottom;
-		native_setPadding(widget, left, top, right, bottom);
+		gtk(() -> native_setPadding(widget, left, top, right, bottom));
 		if (paddingChanged) {
 			requestLayout();
 		}
@@ -2792,7 +2876,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return isFocusable() && ((mViewFlags & FOCUSABLE_AUTO) == 0 || isClickable());
 	}
 	private void updateKeyboardFocusable() {
-		native_setKeyboardFocusable(widget, isFocusableResolved());
+		gtk(() -> native_setKeyboardFocusable(widget, isFocusableResolved()));
 	}
 	private native void native_setKeyboardFocusable(long widget, boolean focusable);
 	private native void native_setNativeFocusable(long widget, boolean focusable);
@@ -2866,7 +2950,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setOnLongClickListener(OnLongClickListener listener) {
 		if (!isLongClickable())
 			setLongClickable(true);
-		nativeSetOnLongClickListener(widget);
+		gtk(() -> nativeSetOnLongClickListener(widget));
 		on_long_click_listener = listener;
 	}
 	protected native void nativeSetOnLongClickListener(long widget);
@@ -2879,7 +2963,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * installed once a view has a hover listener (or overrides one of the hover methods) */
 	public void setOnHoverListener(OnHoverListener l) {
 		getListenerInfo().mOnHoverListener = l;
-		nativeSetOnHoverListener(widget);
+		gtk(() -> nativeSetOnHoverListener(widget));
 	}
 
 	protected native void nativeSetOnHoverListener(long widget);
@@ -3010,7 +3094,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		int oldH = bottom - top;
 		this.layouted = true;
 		setFrame(l, t, r, b);
-		if (this.in_layout)                   // check re-entrancy
+		if (!gtkReady())                      // a view off the main thread is not shown: only the Java frame
+			;
+		else if (this.in_layout)              // check re-entrancy
 			native_queueAllocate(widget); // GTK is not re-entrant-safe. Queue allocation
 		else {
 			/* AOSP lays out a view that was measured since its last layout (onLayout()) even if its bounds
@@ -3024,7 +3110,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		/* GTK lays out native widgets (TextView, Button, ...) without layoutInternal(): let them
 		 * know their size and layout like AOSP's layout() does (MaterialButton places its icon in
 		 * onLayout()). Native containers (ScrollView) are left alone, GTK places their children */
-		if (!(this instanceof ViewGroup) && !native_hasAndroidLayout(widget)) {
+		if (!(this instanceof ViewGroup) && !(gtkReady() && native_hasAndroidLayout(widget))) {
 			if (sizeChanged)
 				onSizeChanged(r - l, b - t, oldW, oldH);
 			onLayout(changed, l, t, r, b);
@@ -3191,7 +3277,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			backgroundDrawable.setLayoutDirection(getLayoutDirection());
 		}
 		if (backgroundDrawable instanceof ColorDrawable) {
-			native_setBackgroundColor(widget, ((ColorDrawable)backgroundDrawable).getColor());
+			gtk(() -> native_setBackgroundColor(widget, ((ColorDrawable)backgroundDrawable).getColor()));
 			if (needsOutline())
 				invalidateOutline();
 			return;
@@ -3226,12 +3312,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 				paddingRight = userPaddingRightInitial;
 				paddingTop = bgPadding.top;
 				paddingBottom = bgPadding.bottom;
-				native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+				gtk(() -> native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom));
 				if (bgPaddingChanged)
 					requestLayout();
 			}
 		}
-		native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0);
+		gtk(() -> native_setBackgroundDrawable(widget, backgroundDrawable != null ? backgroundDrawable.paintable : 0));
 		if (needsOutline())
 			invalidateOutline();
 	}
@@ -3294,6 +3380,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			view.mPrivateFlags |= PFLAG_FORCE_LAYOUT;
 			rootRequest = true;
 		}
+		if (!gtkReady())
+			return;
 		if (rootRequest && sRootMeasureDepth == 0)
 			native_requestLayout(widget);
 		else
@@ -3440,7 +3528,8 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	@SuppressWarnings("deprecation")
 	protected void finalize() throws Throwable {
 		try {
-			native_destructor(widget);
+			if (widget != 0)
+				native_destructor(widget);
 		} finally {
 			super.finalize();
 		}
@@ -3467,7 +3556,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		return (mViewFlags & ENABLED_MASK) == ENABLED;
 	}
 	/* the GTK focus is in this view's widgets (ViewGroup refines this to AOSP's invariant) */
-	public boolean hasFocus() { return nativeHasFocus(widget); }
+	public boolean hasFocus() { return gtkReady() && nativeHasFocus(widget); }
 	private static native boolean nativeHasFocus(long widget);
 	public boolean isLayoutRequested() { return (mPrivateFlags & PFLAG_FORCE_LAYOUT) == PFLAG_FORCE_LAYOUT; }
 	public int getBaseline() { return -1; }
@@ -3496,7 +3585,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 	private static native boolean nativeIsFocused(long widget);
 	public boolean isFocused() {
-		return nativeIsFocused(widget);
+		return gtkReady() && nativeIsFocused(widget);
 	}
 
 	/**
@@ -3507,9 +3596,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			currentAnimation.detach();
 		}
 		currentAnimation = null;
-		native_setAnimating(widget, false);
+		gtk(() -> native_setAnimating(widget, false));
 		if (visibility == INVISIBLE)
-			native_setVisibility(widget, visibility, alpha * transitionAlpha, isEnabled());
+			gtk(() -> native_setVisibility(widget, visibility, alpha * transitionAlpha, isEnabled()));
 		invalidate();
 	}
 
@@ -3531,13 +3620,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setTranslationX(float translationX) {
 		this.translationX = translationX;
 		if (parent instanceof View)
-			((View)parent).native_queueAllocate(((View)parent).widget);
+			((View)parent).queueAllocate();
 	}
 
 	public void setTranslationY(float translationY) {
 		this.translationY = translationY;
 		if (parent instanceof View)
-			((View)parent).native_queueAllocate(((View)parent).widget);
+			((View)parent).queueAllocate();
 	}
 
 	public void setX(float x) {
@@ -3549,7 +3638,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public void setAlpha(float alpha) {
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+		gtk(() -> native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled()));
 		this.alpha = alpha;
 	}
 
@@ -3657,7 +3746,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		boolean had = hasTransform;
 		hasTransform = scaleX != 1 || scaleY != 1 || rotation != 0 || rotationX != 0 || rotationY != 0;
 		if ((had || hasTransform) && parent instanceof View)
-			((View)parent).native_queueAllocate(((View)parent).widget);
+			((View)parent).queueAllocate();
 	}
 
 	protected static final int[] EMPTY_STATE_SET = new int[0];
@@ -3728,7 +3817,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void clearFocus() {
 		if (!isFocused())
 			return;
-		nativeClearFocus(widget);
+		gtk(() -> nativeClearFocus(widget));
 		if (!isInTouchMode()) {
 			getRootView().requestFocus();
 		}
@@ -4170,7 +4259,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		int right = paddingRight;
 		resolvePaddingValues();
 		if (left != paddingLeft || right != paddingRight) {
-			native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom);
+			gtk(() -> native_setPadding(widget, paddingLeft, paddingTop, paddingRight, paddingBottom));
 			requestLayout();
 		}
 	}
@@ -4227,14 +4316,14 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		paddingTop = top;
 		paddingRight = userPaddingRightInitial;
 		paddingBottom = bottom;
-		native_setPadding(widget, paddingLeft, top, paddingRight, bottom);
+		gtk(() -> native_setPadding(widget, paddingLeft, top, paddingRight, bottom));
 		if (paddingChanged)
 			requestLayout();
 	}
 
 	private native boolean nativeIsAttachedToWindow(long widget);
 	public boolean isAttachedToWindow() {
-		return nativeIsAttachedToWindow(widget);
+		return gtkReady() ? nativeIsAttachedToWindow(widget) : attachedToWindow;
 	}
 
 	/* like AOSP, the whole window gets the insets dispatched again (on the next main loop iteration) */
@@ -4400,7 +4489,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 		mForegroundInfo.mDrawable = foreground;
 		if (foreground != null) {
-			native_drawThroughJava(widget);
+			gtk(() -> native_drawThroughJava(widget));
 			applyForegroundTint();
 			foreground = mForegroundInfo.mDrawable;
 			foreground.setLayoutDirection(getLayoutDirection());
@@ -4579,7 +4668,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	 * the keyboard leaves; for a view that is not attached AOSP asks the window manager, which says yes as long as
 	 * nothing has left it */
 	public boolean isInTouchMode() {
-		return !isAttachedToWindow() || widget == 0 || nativeIsInTouchMode(widget);
+		return !isAttachedToWindow() || !gtkReady() || nativeIsInTouchMode(widget);
 	}
 
 
@@ -4591,7 +4680,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	private static native void native_keep_screen_on(long widget, boolean keepScreenOn);
 	public void setKeepScreenOn(boolean screenOn) {
 		if (isAttachedToWindow() && keepScreenOn != screenOn)
-			native_keep_screen_on(widget, screenOn);
+			gtk(() -> native_keep_screen_on(widget, screenOn));
 		keepScreenOn = screenOn;
 	}
 
@@ -4674,7 +4763,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		mPrivateFlags3 &= ~PFLAG3_IS_LAID_OUT;
 
 		if (keepScreenOn)
-			native_keep_screen_on(widget, true);
+			gtk(() -> native_keep_screen_on(widget, true));
 		if (floating_observer != null) {
 			getViewTreeObserver().merge(floating_observer);
 			floating_observer = null;
@@ -4683,7 +4772,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	protected void onDetachedFromWindow() {
 		if (keepScreenOn)
-			native_keep_screen_on(widget, false);
+			gtk(() -> native_keep_screen_on(widget, false));
 	}
 
 	public static final int LAYER_TYPE_NONE = 0;
@@ -4814,17 +4903,18 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			outline_provider.getOutline(this, outline);
 		}
 		if (clipToOutline && outline != null && !outline.isEmpty()) {
-			Rect rect = outline.mRect;
+			Rect rect = new Rect(outline.mRect);
+			float clipRadius = Math.max(outline.mRadius, 0);
 			long path = outline.mMode == Outline.MODE_PATH ? outline.mPath.getGskPath() : 0;
-			native_setOutlineClip(widget, true, rect.left, rect.top, rect.right, rect.bottom, Math.max(outline.mRadius, 0), path);
+			gtk(() -> native_setOutlineClip(widget, true, rect.left, rect.top, rect.right, rect.bottom, clipRadius, path));
 			has_outline_clip = true;
 		} else if (has_outline_clip) {
-			native_setOutlineClip(widget, false, 0, 0, 0, 0, 0, 0);
+			gtk(() -> native_setOutlineClip(widget, false, 0, 0, 0, 0, 0, 0));
 			has_outline_clip = false;
 		}
 		if (z <= 0 || outline == null || outline.isEmpty() || outline.getAlpha() <= 0) {
 			if (has_shadow)
-				native_setShadow(widget, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+				gtk(() -> native_setShadow(widget, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
 			has_shadow = false;
 			return;
 		}
@@ -4846,8 +4936,10 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 		final int ambientShadowAlpha = (int)(255 * a.getFloat(com.android.internal.R.styleable.Lighting_ambientShadowAlpha, 0) + 0.5f);
 		final int spotShadowAlpha = (int)(255 * a.getFloat(com.android.internal.R.styleable.Lighting_spotShadowAlpha, 0) + 0.5f);
 		a.recycle();
-		native_setShadow(widget, rect.left, rect.top, rect.right, rect.bottom, radius, z, outline.getAlpha(),
-				 ambientShadowAlpha / 255.f, spotShadowAlpha / 255.f, lightY, lightZ, lightRadius);
+		final float shadowRadius = radius;
+		final float shadowAlpha = outline.getAlpha();
+		gtk(() -> native_setShadow(widget, rect.left, rect.top, rect.right, rect.bottom, shadowRadius, z, shadowAlpha,
+				 ambientShadowAlpha / 255.f, spotShadowAlpha / 255.f, lightY, lightZ, lightRadius));
 		has_shadow = true;
 	}
 	private native void native_setShadow(long widget, int left, int top, int right, int bottom, float radius, float z, float alpha,
@@ -4896,7 +4988,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	protected native boolean native_getGlobalVisibleRect(long widget, Rect visibleRect);
 
 	public boolean getGlobalVisibleRect(Rect visibleRect) {
-		return native_getGlobalVisibleRect(widget, visibleRect);
+		return gtkReady() && native_getGlobalVisibleRect(widget, visibleRect);
 	}
 
 	public boolean onCheckIsTextEditor() { return false; }
@@ -4928,19 +5020,19 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			invalidate();
 		}
 		String[] classesToRemove = {"ATL-text-align-left", "ATL-text-align-center", "ATL-text-align-right"};
-		native_removeClasses(widget, classesToRemove);
+		gtk(() -> native_removeClasses(widget, classesToRemove));
 
 		switch (textAlignment) {
 			case TEXT_ALIGNMENT_CENTER:
-				native_addClass(widget, "ATL-text-align-center");
+				gtk(() -> native_addClass(widget, "ATL-text-align-center"));
 				break;
 			case TEXT_ALIGNMENT_TEXT_START:
 			case TEXT_ALIGNMENT_VIEW_START:
-				native_addClass(widget, "ATL-text-align-left");
+				gtk(() -> native_addClass(widget, "ATL-text-align-left"));
 				break;
 			case TEXT_ALIGNMENT_TEXT_END:
 			case TEXT_ALIGNMENT_VIEW_END:
-				native_addClass(widget, "ATL-text-align-right");
+				gtk(() -> native_addClass(widget, "ATL-text-align-right"));
 				break;
 		}
 	}
@@ -5320,7 +5412,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	/* the wrapper widget calls draw() only for views that draw something themselves: an overlay is drawn by it */
 	void overlayChanged() {
-		native_drawThroughJava(widget);
+		gtk(() -> native_drawThroughJava(widget));
 	}
 
 	/* AOSP View.getTextAlignment(): the resolved text alignment */
@@ -5437,7 +5529,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 
 	public void setTooltipText(CharSequence tooltip) {
 		tooltipText = (tooltip == null || tooltip.length() == 0) ? null : tooltip;
-		native_setTooltipText(widget, tooltipText == null ? null : tooltipText.toString());
+		gtk(() -> native_setTooltipText(widget, tooltipText == null ? null : tooltipText.toString()));
 	}
 
 	public CharSequence getTooltipText() {
@@ -5466,9 +5558,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			return;
 		this.clipBounds = clipBounds != null ? new Rect(clipBounds) : null;
 		if (clipBounds != null)
-			native_setClipBounds(widget, true, clipBounds.left, clipBounds.top, clipBounds.right, clipBounds.bottom);
+			gtk(() -> native_setClipBounds(widget, true, clipBounds.left, clipBounds.top, clipBounds.right, clipBounds.bottom));
 		else
-			native_setClipBounds(widget, false, 0, 0, 0, 0);
+			gtk(() -> native_setClipBounds(widget, false, 0, 0, 0, 0));
 	}
 	private native void native_setClipBounds(long widget, boolean enabled, int left, int top, int right, int bottom);
 
@@ -5649,13 +5741,13 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* API 29; transitions fade with this, on top of the view's own alpha */
 	public void setTransitionAlpha(float alpha) {
 		transitionAlpha = alpha;
-		native_setVisibility(widget, getDrawnVisibility(), this.alpha * transitionAlpha, isEnabled());
+		gtk(() -> native_setVisibility(widget, getDrawnVisibility(), this.alpha * transitionAlpha, isEnabled()));
 	}
 
 	/* API 29; sets the visibility without the side effects of setVisibility() */
 	public void setTransitionVisibility(int visibility) {
 		this.visibility = visibility;
-		native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+		gtk(() -> native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled()));
 	}
 
 	/* API 29 */
@@ -5715,9 +5807,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 			animation.reset();
 			animationMore = true;
 		}
-		native_setAnimating(widget, animation != null);
+		gtk(() -> native_setAnimating(widget, animation != null));
 		if (visibility == INVISIBLE)
-			native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled());
+			gtk(() -> native_setVisibility(widget, getDrawnVisibility(), alpha * transitionAlpha, isEnabled()));
 		if (visibility == GONE && animation != null)
 			getHandler().post(new GoneAnimationTicker(animation));
 	}
@@ -5802,7 +5894,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	}
 
 	public boolean getGlobalVisibleRect(Rect visibleRect, Point globalOffset) {
-		boolean result = native_getGlobalVisibleRect(widget, visibleRect);
+		boolean result = gtkReady() && native_getGlobalVisibleRect(widget, visibleRect);
 		globalOffset.set(visibleRect.left, visibleRect.top);
 		return result;
 	}
@@ -6120,7 +6212,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	/* a hoverable view needs the hover events to be hovered: its GTK motion controller delivers them */
 	private void updateHoverable() {
 		if (widget != 0 && isHoverable())
-			nativeSetOnHoverListener(widget);
+			gtk(() -> nativeSetOnHoverListener(widget));
 	}
 
 	/* AOSP View.startActionMode(): the parents are asked (startActionModeForChild) */
@@ -6264,7 +6356,7 @@ public class View implements Drawable.Callback, KeyEvent.Callback {
 	public void setAnimationMatrix(Matrix matrix) {
 		animationMatrix = (matrix != null) ? new Matrix(matrix) : null;
 		if (parent instanceof View)
-			((View)parent).native_queueAllocate(((View)parent).widget);
+			((View)parent).queueAllocate();
 	}
 
 	public Matrix getAnimationMatrix() {

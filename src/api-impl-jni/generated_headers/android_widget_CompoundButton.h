@@ -445,18 +445,18 @@ JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setText
 
 /*
  * Class:     android_widget_CompoundButton
- * Method:    setChecked
+ * Method:    native_setChecked
  * Signature: (Z)V
  */
-JNIEXPORT void JNICALL Java_android_widget_CompoundButton_setChecked
+JNIEXPORT void JNICALL Java_android_widget_CompoundButton_native_1setChecked
   (JNIEnv *, jobject, jboolean);
 
 /*
  * Class:     android_widget_CompoundButton
- * Method:    isChecked
+ * Method:    native_isChecked
  * Signature: ()Z
  */
-JNIEXPORT jboolean JNICALL Java_android_widget_CompoundButton_isChecked
+JNIEXPORT jboolean JNICALL Java_android_widget_CompoundButton_native_1isChecked
   (JNIEnv *, jobject);
 
 #ifdef __cplusplus

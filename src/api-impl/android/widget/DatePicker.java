@@ -41,7 +41,10 @@ public class DatePicker extends FrameLayout {
 	 * by: measure the GTK widget as View.onMeasure() does for a native view, or the picker gets size 0 */
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+		if (gtkReady())
+			native_measure(widget, widthMeasureSpec, heightMeasureSpec);
+		else // GTK measures on the main thread only
+			super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 	}
 
 	private Calendar currentDate() {
@@ -112,7 +115,7 @@ public class DatePicker extends FrameLayout {
 	}
 
 	public void setOnDateChangedListener(OnDateChangedListener onDateChangedListener) {
-		nativeSetOnDateChangedListener(widget);
+		gtk(() -> nativeSetOnDateChangedListener(widget));
 		on_date_changed_listener = onDateChangedListener;
 	}
 
@@ -123,20 +126,29 @@ public class DatePicker extends FrameLayout {
 		}
 	}
 
+	/* the date set last, for the getters off the main thread (the GtkCalendar starts at today) */
+	private Calendar mDate;
+
+	private Calendar javaDate() {
+		return mDate != null ? mDate : Calendar.getInstance();
+	}
+
 	public int getYear() {
-		return nativeGetYear(widget);
+		return gtkReady() ? nativeGetYear(widget) : javaDate().get(Calendar.YEAR);
 	}
 
 	public int getMonth() {
-		return nativeGetMonth(widget);
+		return gtkReady() ? nativeGetMonth(widget) : javaDate().get(Calendar.MONTH);
 	}
 
 	public int getDayOfMonth() {
-		return nativeGetDay(widget);
+		return gtkReady() ? nativeGetDay(widget) : javaDate().get(Calendar.DAY_OF_MONTH);
 	}
 
 	public void updateDate(int year, int month, int dayOfMonth) {
-		nativeUpdateDate(widget, year, month, dayOfMonth);
+		mDate = Calendar.getInstance();
+		mDate.set(year, month, dayOfMonth);
+		gtk(() -> nativeUpdateDate(widget, year, month, dayOfMonth));
 	}
 
 	@Override

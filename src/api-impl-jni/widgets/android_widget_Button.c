@@ -78,7 +78,7 @@ JNIEXPORT void JNICALL Java_android_widget_Button_nativeSetOnClickListener(JNIEn
 	g_signal_connect(button, "clicked", G_CALLBACK(clicked_cb), NULL);
 }
 
-JNIEXPORT jobject JNICALL Java_android_widget_Button_getText(JNIEnv *env, jobject this)
+JNIEXPORT jobject JNICALL Java_android_widget_Button_native_1getText(JNIEnv *env, jobject this)
 {
 	GtkButton *button = GTK_BUTTON(_PTR(_GET_LONG_FIELD(this, "widget")));
 	return (*env)->NewStringUTF(env, gtk_label_get_text(box_get_label(env, gtk_button_get_child(button))));

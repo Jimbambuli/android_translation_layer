@@ -170,7 +170,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		/* as on AOSP, a focusable window that is not FLAG_NOT_TOUCH_MODAL takes all touches, also
 		 * those outside of it (Compose's popups dismiss themselves on these) */
 		boolean touchModal = (windowParams.flags & (WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)) == 0;
-		native_addView(view.widget, view, windowParams.type, touchModal, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
+		native_addView(view.gtkWidget(), view, windowParams.type, touchModal, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, params.width, params.height);
 	}
 
 	/* the gravity by which x and y place the window; ATL's LayoutParams have -1 for none set */
@@ -216,7 +216,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		view.getWindowVisibleDisplayFrame(displayFrame);
 		view.internalSetDefaultMeasureSpec(View.MeasureSpec.AT_MOST | displayFrame.width(), View.MeasureSpec.AT_MOST | displayFrame.height());
 		WindowManager.LayoutParams windowParams = (WindowManager.LayoutParams)view.getLayoutParams();
-		native_updateViewLayout(view.widget, absoluteGravity(view, windowParams), windowParams.x, windowParams.y, windowParams.width, windowParams.height);
+		native_updateViewLayout(view.gtkWidget(), absoluteGravity(view, windowParams), windowParams.x, windowParams.y, windowParams.width, windowParams.height);
 	}
 
 	@Override
@@ -224,7 +224,7 @@ public class WindowManagerImpl implements WindowManager, ViewManager {
 		android.atl.ATLViewDump.removeRoot(view); // debugging aid (atl-doctor)
 		WindowManagerGlobal.getInstance().viewRemoved(view);
 		view.dispatchDetachedFromWindow();
-		native_removeView(view.widget);
+		native_removeView(view.gtkWidget());
 		view.parent = null;
 	}
 

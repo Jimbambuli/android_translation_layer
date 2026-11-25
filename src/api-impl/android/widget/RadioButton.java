@@ -25,10 +25,10 @@ public class RadioButton extends CompoundButton {
 	protected native long native_constructor(Context context, AttributeSet attrs);
 
 	@Override
-	public native void setChecked(boolean checked);
+	protected native void native_setChecked(boolean checked);
 
 	@Override
-	public native boolean isChecked();
+	protected native boolean native_isChecked();
 
 	@Override
 	public native void native_setText(long widget, String text);

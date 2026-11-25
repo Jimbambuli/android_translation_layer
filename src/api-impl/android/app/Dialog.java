@@ -99,7 +99,7 @@ public class Dialog implements Window.Callback, DialogInterface, KeyEvent.Callba
 			}
 		}
 		window = new Window(this.context, this);
-		nativePtr = nativeInit(window.getDecorView().widget);
+		nativePtr = nativeInit(window.getDecorView().gtkWidget());
 
 		window.set_native_window(nativePtr);
 

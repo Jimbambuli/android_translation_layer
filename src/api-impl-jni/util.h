@@ -63,6 +63,7 @@ void atl_safe_gtk_widget_set_visible(GtkWidget *widget, gboolean visible);
 void atl_safe_gtk_widget_queue_allocate(GtkWidget *widget);
 void atl_safe_gtk_widget_queue_resize(GtkWidget *widget);
 void atl_unref_on_main_thread(gpointer object);
+void atl_paintable_invalidate(GdkPaintable *paintable, gboolean size);
 PangoContext *atl_pango_context(void);
 
 /* What render and worker threads need of GTK's display (doc/threading.md): taken on the main thread once the window

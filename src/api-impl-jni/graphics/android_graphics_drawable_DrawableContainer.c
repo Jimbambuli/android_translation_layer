@@ -1,6 +1,7 @@
 #include <gdk/gdk.h>
 
 #include "../defines.h"
+#include "../util.h"
 #include "../generated_headers/android_graphics_drawable_DrawableContainer.h"
 
 struct _ContainerPaintable {
@@ -71,6 +72,5 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_DrawableContainer_native_1
 {
 	ContainerPaintable *container = CONTAINER_PAINTABLE(_PTR(ptr));
 	container->child = GDK_PAINTABLE(_PTR(child_ptr));
-	gdk_paintable_invalidate_contents(GDK_PAINTABLE(container));
-	gdk_paintable_invalidate_size(GDK_PAINTABLE(container));
+	atl_paintable_invalidate(GDK_PAINTABLE(container), TRUE);
 }

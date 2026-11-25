@@ -481,10 +481,10 @@ JNIEXPORT void JNICALL Java_android_widget_Spinner_native_1setBackgroundColor
 
 /*
  * Class:     android_widget_Spinner
- * Method:    setOnItemSelectedListener
+ * Method:    native_setOnItemSelectedListener
  * Signature: (Landroid/widget/AdapterView/OnItemSelectedListener;)V
  */
-JNIEXPORT void JNICALL Java_android_widget_Spinner_setOnItemSelectedListener
+JNIEXPORT void JNICALL Java_android_widget_Spinner_native_1setOnItemSelectedListener
   (JNIEnv *, jobject, jobject);
 
 #ifdef __cplusplus

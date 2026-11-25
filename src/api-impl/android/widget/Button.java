@@ -33,9 +33,9 @@ public class Button extends TextView {
 
 		/* AOSP's Button draws only its background drawable and nothing without one (background="@null"): the
 		 * GtkButton never draws a frame, shadow or focus ring of its own, nor its own background */
-		native_addClass(widget, "ATL-no-border");
+		gtk(() -> native_addClass(widget, "ATL-no-border"));
 		if (getBackground() == null)
-			native_setBackgroundDrawable(widget, 0);
+			gtk(() -> native_setBackgroundDrawable(widget, 0));
 	}
 
 	@Override
@@ -52,19 +52,24 @@ public class Button extends TextView {
 	@Override
 	public void setText(CharSequence text) {
 		/* AOSP TextView.setText(): a null text is the empty text (icon-only buttons set null) */
-		if (text == null)
-			text = "";
-		native_setText(widget, text.toString());
+		String label = text == null ? "" : text.toString();
+		this.label = label;
+		gtk(() -> native_setText(widget, label));
 	}
 
+	private String label; // for getText() off the main thread; no initializer, TextView's constructor sets the text
+
 	@Override
-	public native CharSequence getText();
+	public CharSequence getText() {
+		return gtkReady() ? native_getText() : label == null ? "" : label;
+	}
+	private native CharSequence native_getText();
 
 	/* the label of the GtkButton takes the size as an absolute Pango size in pixels; without it GTK's default font
 	 * (in points) follows gtk-xft-dpi, which Android's sp do not */
 	@Override
 	protected void applyNativeTextSize(float size) {
-		native_setTextSize(widget, size);
+		gtk(() -> native_setTextSize(widget, size));
 	}
 
 	private native void native_setTextSize(long widget, float size);

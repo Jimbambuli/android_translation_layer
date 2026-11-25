@@ -2,6 +2,7 @@
 #include <gdk/gdk.h>
 
 #include "../defines.h"
+#include "../util.h"
 #include "NinePatchPaintable.h"
 
 #include "../generated_headers/android_graphics_drawable_NinePatchDrawable.h"
@@ -80,7 +81,7 @@ JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSe
 	NinePatchPaintable *paintable = NINEPATCH_PAINTABLE(_PTR(paintable_ptr));
 	paintable->tint = color;
 	paintable->tint_multiply = multiply;
-	gdk_paintable_invalidate_contents(GDK_PAINTABLE(paintable));
+	atl_paintable_invalidate(GDK_PAINTABLE(paintable), FALSE);
 }
 
 JNIEXPORT void JNICALL Java_android_graphics_drawable_NinePatchDrawable_nativeSetScale(JNIEnv *env, jobject this, jlong paintable_ptr, jfloat scale)

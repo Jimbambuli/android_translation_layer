@@ -421,18 +421,18 @@ JNIEXPORT jlong JNICALL Java_android_widget_CheckBox_native_1constructor
 
 /*
  * Class:     android_widget_CheckBox
- * Method:    setChecked
+ * Method:    native_setChecked
  * Signature: (Z)V
  */
-JNIEXPORT void JNICALL Java_android_widget_CheckBox_setChecked
+JNIEXPORT void JNICALL Java_android_widget_CheckBox_native_1setChecked
   (JNIEnv *, jobject, jboolean);
 
 /*
  * Class:     android_widget_CheckBox
- * Method:    isChecked
+ * Method:    native_isChecked
  * Signature: ()Z
  */
-JNIEXPORT jboolean JNICALL Java_android_widget_CheckBox_isChecked
+JNIEXPORT jboolean JNICALL Java_android_widget_CheckBox_native_1isChecked
   (JNIEnv *, jobject);
 
 /*

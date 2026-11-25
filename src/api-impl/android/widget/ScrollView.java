@@ -47,14 +47,14 @@ public class ScrollView extends FrameLayout {
 			// Nothing to do.
 			return;
 		}
-		native_scrollTo(widget, dx, dy, true);
+		gtk(() -> native_scrollTo(widget, dx, dy, true));
 	}
 
 	/** AOSP smoothScrollTo() = smoothScrollBy(x - scrollX, y - scrollY), with the position taken from GTK */
 	public final void smoothScrollTo(int x, int y) {
 		if (getChildCount() == 0)
 			return;
-		native_scrollTo(widget, x, y, false);
+		gtk(() -> native_scrollTo(widget, x, y, false));
 	}
 
 	@Override

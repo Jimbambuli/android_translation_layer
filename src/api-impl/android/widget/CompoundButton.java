@@ -45,7 +45,9 @@ public abstract class CompoundButton extends Button implements Checkable {
 		/* AndroidX SwitchCompat/MaterialSwitch and ATL's own Switch draw thumb and track in onDraw() like AOSP's Switch;
 		 * the GtkSwitch would be drawn under them, so it stays as state holder only. The same without a button
 		 * drawable (ToggleButton), where AOSP's onDraw() draws none. */
-		mDrawsItself = (overridesOnDraw(getClass()) || button_drawable == null) && native_hideSwitch(widget);
+		mDrawsItself = (overridesOnDraw(getClass()) || button_drawable == null) && !(this instanceof CheckBox || this instanceof RadioButton);
+		if (mDrawsItself)
+			gtk(() -> native_hideSwitch(widget));
 	}
 
 	private boolean mDrawsItself;
@@ -61,7 +63,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 		return false;
 	}
 
-	/* hides the GtkSwitch; false for the other native widgets (CheckBox, RadioButton) */
+	/* hides the GtkSwitch (CheckBox and RadioButton have none) */
 	private native boolean native_hideSwitch(long widget);
 
 	/* AOSP's TextView makes room for the compound paddings, through which SwitchCompat reserves the
@@ -98,7 +100,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 		int activated = a.getColor(2, 0xff009688);
 		int thumb = a.getColor(3, 0xfff1f1f1);
 		a.recycle();
-		native_setSwitchColors(widget, thumb, activated, withAlpha(foreground, alpha), withAlpha(activated, alpha));
+		gtk(() -> native_setSwitchColors(widget, thumb, activated, withAlpha(foreground, alpha), withAlpha(activated, alpha)));
 	}
 
 	private static int withAlpha(int color, float alpha) {
@@ -125,11 +127,22 @@ public abstract class CompoundButton extends Button implements Checkable {
 		mOnCheckedChangeListener = listener;
 	}
 
-	@Override
-	public native void setChecked(boolean checked);
+	/* the state of the native widget; kept here too for isChecked() off the main thread */
+	private boolean mChecked;
 
 	@Override
-	public native boolean isChecked();
+	public void setChecked(boolean checked) {
+		mChecked = checked;
+		gtk(() -> native_setChecked(checked));
+	}
+
+	@Override
+	public boolean isChecked() {
+		return gtkReady() ? native_isChecked() : mChecked;
+	}
+
+	protected native void native_setChecked(boolean checked);
+	protected native boolean native_isChecked();
 
 	@Override
 	/* Copyright (C) 2007 The Android Open Source Project */
@@ -171,7 +184,7 @@ public abstract class CompoundButton extends Button implements Checkable {
 	@Override
 	public void setText(CharSequence text) {
 		mText = text == null ? "" : text;
-		native_setText(widget, mText.toString());
+		gtk(() -> native_setText(widget, mText.toString()));
 	}
 
 	@Override

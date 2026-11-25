@@ -363,7 +363,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		if (mTransformed instanceof Spanned)
 			setPangoMarkup((Spanned)mTransformed);
 		else
-			native_setText(mTransformed.toString());
+			gtk(() -> native_setText(mTransformed.toString()));
 	}
 
 	/* --- ParagraphStyle spans ---
@@ -391,7 +391,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		}
 		mParagraphText = show;
 		if (show) {
-			native_setText("");
+			gtk(() -> native_setText(""));
 			replacementSpans.clear();
 			if (mReplacementOverlay != null)
 				getOverlay().remove(mReplacementOverlay);
@@ -399,7 +399,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			if (mParagraphOverlay == null)
 				mParagraphOverlay = new ParagraphLayoutDrawable();
 			getOverlay().add(mParagraphOverlay);
-			nativeSetOnTouchListener(widget); // the touches for onTouchEvent(), also inside a GTK scroll view
+			gtk(() -> nativeSetOnTouchListener(widget)); // the touches for onTouchEvent(), also inside a GTK scroll view
 			invalidate();
 		} else if (mParagraphOverlay != null) {
 			getOverlay().remove(mParagraphOverlay);
@@ -513,7 +513,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		int[] places = new int[replacementPlaces.size() * 4];
 		for (int i = 0; i < replacementPlaces.size(); i++)
 			System.arraycopy(replacementPlaces.get(i), 0, places, i * 4, 4);
-		native_setMarkup(markup, places);
+		gtk(() -> native_setMarkup(markup, places));
 		if (!replacementSpans.isEmpty()) {
 			if (mReplacementOverlay == null)
 				mReplacementOverlay = new ReplacementSpansDrawable();
@@ -786,7 +786,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	/* the GtkLabel takes the size as an absolute Pango size in pixels; Button, CheckBox, CompoundButton and
 	 * RadioButton (native widgets with their own text size) ignore it, EditText sets it on its GtkText */
 	protected void applyNativeTextSize(float size) {
-		native_setTextSize(size);
+		gtk(() -> native_setTextSize(size));
 	}
 	private native void native_setTextSize(float size);
 	private native void native_setPaintFlags(int flags);
@@ -808,7 +808,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		final int color = colors.getColorForState(getDrawableState(), 0);
 		final boolean changed = color != mCurTextColor;
 		mCurTextColor = color;
-		native_setTextColor(color);
+		gtk(() -> native_setTextColor(color));
 		if (changed)
 			invalidate();
 	}
@@ -839,7 +839,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setTypeface(Typeface tf) {
 		typeface = tf;
 		paint.setTypeface(tf);
-		native_setTypeface(widget, tf);
+		gtk(() -> native_setTypeface(widget, tf));
 	}
 	/* AOSP keeps the spacing for its layouts and getLineHeight(); the GtkLabel does not space its lines by it */
 	private float mSpacingMult = 1.0f;
@@ -1300,7 +1300,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		else if (mEllipsize == TextUtils.TruncateAt.MIDDLE)
 			mode = 2; // PANGO_ELLIPSIZE_MIDDLE
 		boolean limited = mMaxMode == LINES && mMaximum > 0 && mMaximum != Integer.MAX_VALUE;
-		native_setLines(limited ? mMaximum : -1, limited ? mode : 0);
+		int lines = limited ? mMaximum : -1, ellipsize = limited ? mode : 0;
+		gtk(() -> native_setLines(lines, ellipsize));
 	}
 	private native void native_setLines(int lines, int ellipsize_mode);
 	private native void native_setWrap(boolean wrap);
@@ -1362,7 +1363,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			yalign = 0.5f;
 		else if (vertical == Gravity.BOTTOM)
 			yalign = 1.f;
-		native_setAlignment(xalign, yalign);
+		float x = xalign, y = yalign;
+		gtk(() -> native_setAlignment(x, y));
 	}
 
 	@Override
@@ -1380,6 +1382,8 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			Layout layout = paragraphLayout();
 			return getExtendedPaddingTop() + paragraphVerticalOffset(layout) + layout.getLineBaseline(0);
 		}
+		if (!gtkReady())
+			return super.getBaseline();
 		int baseline = native_getBaseline(widget, getMeasuredWidth() - getPaddingLeft() - getPaddingRight(),
 		                                  getMeasuredHeight() - getPaddingTop() - getPaddingBottom());
 		return baseline < 0 ? super.getBaseline() : getPaddingTop() + baseline;
@@ -1402,10 +1406,10 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setAllCaps(boolean allCaps) {
 		mAllCaps = allCaps;
 		String[] classesToRemove = {"ATL-text-uppercase"};
-		native_removeClasses(widget, classesToRemove);
+		gtk(() -> native_removeClasses(widget, classesToRemove));
 
 		if (allCaps) {
-			native_addClass(widget, "ATL-text-uppercase");
+			gtk(() -> native_addClass(widget, "ATL-text-uppercase"));
 		}
 	}
 
@@ -1472,7 +1476,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		setFocusable(FOCUSABLE_AUTO);
 		setClickable(selectable);
 		setLongClickable(selectable);
-		native_setSelectable(widget, selectable);
+		gtk(() -> native_setSelectable(widget, selectable));
 		setMovementMethod(selectable ? android.text.method.ArrowKeyMovementMethod.getInstance() : null);
 		setText(getText(), selectable ? BufferType.SPANNABLE : BufferType.NORMAL);
 	}
@@ -1785,7 +1789,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			measureParagraphs(widthMeasureSpec, heightMeasureSpec);
 			return;
 		}
-		native_setFontPadding(widget, include_padding);
+		gtk(() -> native_setFontPadding(widget, include_padding));
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 		/* AOSP TextView.onMeasure(): unless the width is exact, it is limited by maxWidth/maxEms and minWidth/minEms
 		 * (setWidth(), android:width ...); the height then follows from the text in that width */
@@ -1940,7 +1944,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	}
 
 	private void applyNativeLetterSpacing() {
-		native_setLetterSpacing(widget, getPaint().getLetterSpacing() * getTextSize());
+		gtk(() -> native_setLetterSpacing(widget, getPaint().getLetterSpacing() * getTextSize()));
 	}
 	private native void native_setLetterSpacing(long widget, float spacing);
 
@@ -2186,7 +2190,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 		if (!any && !nativeHasDrawables)
 			return; // the constructor sets "no drawables": nothing to tell the native side
 		nativeHasDrawables = any;
-		native_setCompoundDrawables(widget, d[Drawables.LEFT], d[Drawables.TOP], d[Drawables.RIGHT], d[Drawables.BOTTOM]);
+		gtk(() -> native_setCompoundDrawables(widget, d[Drawables.LEFT], d[Drawables.TOP], d[Drawables.RIGHT], d[Drawables.BOTTOM]));
 	}
 
 	/* resolveDrawables() and the reset on a direction change are View's, as in AOSP */
@@ -2736,7 +2740,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			dr.mDrawablePadding = pad;
 		}
 
-		native_setCompoundDrawablePadding(widget, pad);
+		gtk(() -> native_setCompoundDrawablePadding(widget, pad));
 		invalidate();
 		requestLayout();
 	}
@@ -3014,7 +3018,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 			mHorizontallyScrolling = whether;
 			/* AOSP lays out a horizontally scrolling text (singleLine) in one line as wide as the text: the label
 			 * does not wrap, so that it measures that width */
-			native_setWrap(!whether);
+			gtk(() -> native_setWrap(!whether));
 
 			requestLayout();
 			invalidate();
@@ -3630,7 +3634,7 @@ public class TextView extends View implements android.view.ViewTreeObserver.OnPr
 	public void setPaintFlags(int flags) {
 		if (getPaint().getFlags() != flags) {
 			getPaint().setFlags(flags);
-			native_setPaintFlags(flags);
+			gtk(() -> native_setPaintFlags(flags));
 			requestLayout();
 			invalidate();
 		}
