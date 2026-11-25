@@ -2,6 +2,7 @@ package android.atl;
 
 import android.annotation.NonNull;
 import android.app.Activity;
+import android.app.AppComponentFactory;
 import android.app.Application;
 import android.app.ContextImpl;
 import android.app.Service;
@@ -12,6 +13,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageParser;
 import android.content.pm.ServiceInfo;
+import android.content.pm.split.SplitDependencyLoader;
 import android.graphics.Compatibility;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
@@ -48,6 +50,10 @@ public final class ATLLoadedApp {
 	public final Resources default_resources;
 	public final ClassLoader class_loader;
 	public final PackageParser.Package pkg;
+	/* LoadedApk.mAppComponentFactory: the app's android:appComponentFactory, it instantiates the components */
+	public final AppComponentFactory app_component_factory;
+	/* LoadedApk.mSplitLoader: the class loaders of an app that requests isolated split loading */
+	private final SplitDependencyLoaderImpl split_loader;
 	/* the package manager of this package's contexts when it is not the primary app (ContextImpl.getPackageManager) */
 	private PackageManager package_manager;
 	public final int effective_sdk_compat;
@@ -110,13 +116,100 @@ public final class ATLLoadedApp {
 	ATLLoadedApp(Resources resources, ClassLoader classLoader,
 	             PackageParser.Package pkg) {
 		this.default_resources = resources;
-		this.class_loader = classLoader;
 		this.pkg = pkg;
+		/* like LoadedApk.createOrUpdateClassLoaderLocked() */
+		this.app_component_factory = createAppFactory(pkg.applicationInfo, classLoader);
+		this.class_loader = app_component_factory.instantiateClassLoader(classLoader, new ApplicationInfo(pkg.applicationInfo));
+		ApplicationInfo aInfo = pkg.applicationInfo;
+		this.split_loader = aInfo.requestsIsolatedSplitLoading() && aInfo.splitNames != null && aInfo.splitNames.length > 0
+		    ? new SplitDependencyLoaderImpl(aInfo.splitDependencies) : null;
 		this.effective_sdk_compat = Math.min(pkg.applicationInfo.targetSdkVersion, Build.VERSION.SDK_INT);
 		/* AOSP sets it in ActivityThread.handleBindApplication(); AnimatedVectorDrawable reads it */
 		Compatibility.setTargetSdkVersion(pkg.applicationInfo.targetSdkVersion);
 		this.init_lock = new Object();
 		this.running_services = new HashMap<>();
+	}
+
+	/* LoadedApk.createAppFactory() */
+	private static AppComponentFactory createAppFactory(ApplicationInfo appInfo, ClassLoader cl) {
+		if (appInfo.appComponentFactory != null && cl != null) {
+			try {
+				return (AppComponentFactory)cl.loadClass(appInfo.appComponentFactory).newInstance();
+			} catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+				Slog.e(TAG, "Unable to instantiate appComponentFactory", e);
+			}
+		}
+		return AppComponentFactory.DEFAULT;
+	}
+
+	/*
+	 * LoadedApk.SplitDependencyLoaderImpl: all indices received by the super class should be shifted by 1 when
+	 * accessing splitNames, etc. The super class assumes the base APK is index 0. ATL's resources hold every APK of
+	 * the app, so only the class loaders are kept here.
+	 */
+	private class SplitDependencyLoaderImpl extends SplitDependencyLoader<PackageManager.NameNotFoundException> {
+		private final ClassLoader[] cached_class_loaders;
+
+		SplitDependencyLoaderImpl(android.util.SparseArray<int[]> dependencies) {
+			super(dependencies);
+			cached_class_loaders = new ClassLoader[pkg.applicationInfo.splitNames.length + 1];
+		}
+
+		@Override
+		protected boolean isSplitCached(int splitIdx) {
+			synchronized (this) {
+				return cached_class_loaders[splitIdx] != null;
+			}
+		}
+
+		@Override
+		protected void constructSplit(int splitIdx, int[] configSplitIndices, int parentSplitIdx) {
+			synchronized (this) {
+				if (splitIdx == 0) {
+					cached_class_loaders[0] = class_loader;
+					return;
+				}
+				/* ApplicationLoaders.getClassLoader(): a PathClassLoader without a library search path */
+				cached_class_loaders[splitIdx] = new PathClassLoader(pkg.applicationInfo.splitSourceDirs[splitIdx - 1],
+				                                                     cached_class_loaders[parentSplitIdx]);
+			}
+		}
+
+		ClassLoader getClassLoaderForSplit(String splitName) throws PackageManager.NameNotFoundException {
+			int idx = 0;
+			if (splitName != null) {
+				idx = Arrays.binarySearch(pkg.applicationInfo.splitNames, splitName);
+				if (idx < 0) {
+					throw new PackageManager.NameNotFoundException(
+					    "Split name '" + splitName + "' is not installed");
+				}
+				idx += 1;
+			}
+			loadDependenciesForSplit(idx);
+			synchronized (this) {
+				return cached_class_loaders[idx];
+			}
+		}
+	}
+
+	/* ContextImpl.createActivityContext(): the class loader of an activity's context, the one of the activity's split
+	 * for isolated splits */
+	public ClassLoader getActivityClassLoader(ActivityInfo info) {
+		if (info == null || !pkg.applicationInfo.requestsIsolatedSplitLoading())
+			return class_loader;
+		try {
+			return getSplitClassLoader(info.splitName);
+		} catch (PackageManager.NameNotFoundException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	/* LoadedApk.getSplitClassLoader() */
+	public ClassLoader getSplitClassLoader(String splitName) throws PackageManager.NameNotFoundException {
+		if (split_loader == null) {
+			return class_loader;
+		}
+		return split_loader.getClassLoaderForSplit(splitName);
 	}
 
 	@NonNull
@@ -168,13 +261,17 @@ public final class ATLLoadedApp {
 	@NonNull
 	public static ATLLoadedApp loadFromPath(String mainApk, String nativePath, String classLoaderPath) throws IOException {
 		final String[] apkPaths = classLoaderPath.split(File.pathSeparator);
+		String ghaxPath = "";
 		if (ATLToggles.ATL_GHAX) {
 			// Always load ghax.jar as the first element to override application library classes
-			classLoaderPath = ATLPaths.ghax_jar.getPath() + File.pathSeparator + classLoaderPath;
+			ghaxPath = ATLPaths.ghax_jar.getPath() + File.pathSeparator;
 		}
+		AssetManager assetManager = new AssetManager(ghaxPath + classLoaderPath + ":" + System.getProperty("java.class.path"));
+		/* like LoadedApk.makePaths(): do not load all available splits if the app requested isolated split loading,
+		 * they get their own class loaders (getSplitClassLoader()) */
+		String codePath = requestsIsolatedSplits(assetManager) ? mainApk : classLoaderPath;
 		BaseDexClassLoader classLoader = new PathClassLoader(
-		    classLoaderPath, nativePath, ATLLoadedApp.class.getClassLoader());
-		AssetManager assetManager = new AssetManager(classLoaderPath + ":" + System.getProperty("java.class.path"));
+		    ghaxPath + codePath, nativePath, ATLLoadedApp.class.getClassLoader());
 		PackageParser packageParser = new PackageParser(mainApk);
 		Resources resources = new Resources(classLoader, assetManager, new DisplayMetrics(), Context.sys_config);
 		String[] outError = new String[1];
@@ -195,13 +292,56 @@ public final class ATLLoadedApp {
 		}
 		pkg.applicationInfo.sourceDir = mainApk;
 		setSplits(pkg.applicationInfo, mainApk, apkPaths);
+		parseSplitApks(packageParser, pkg, mainApk, classLoader, outError);
 		return new ATLLoadedApp(track(resources, null), classLoader, pkg);
 	}
 
+	/* like PackageParser.parseClusterPackage(): the manifest of each split, with the assets of the split, the base and
+	 * the framework (cookie 1 is the split) */
+	private static void parseSplitApks(PackageParser packageParser, PackageParser.Package pkg, String mainApk,
+	                                   ClassLoader classLoader, String[] outError) throws IOException {
+		String[] splitPaths = pkg.applicationInfo.splitSourceDirs;
+		if (pkg.applicationInfo.splitNames == null)
+			return;
+		for (int i = 0; i < splitPaths.length; i++) {
+			AssetManager splitAssets = new AssetManager(splitPaths[i] + ":" + mainApk + ":" + System.getProperty("java.class.path"));
+			android.content.res.XmlResourceParser parser = null;
+			try {
+				parser = splitAssets.openXmlResourceParser(1, "AndroidManifest.xml");
+				Resources res = new Resources(classLoader, splitAssets, new DisplayMetrics(), Context.sys_config);
+				if (packageParser.parseSplitApk(pkg, res, parser, 0, i, outError) == null)
+					throw new IOException(splitPaths[i] + " (at " + parser.getPositionDescription() + "): " + outError[0]);
+			} catch (XmlPullParserException e) {
+				throw new IOException("Failed to read manifest from " + splitPaths[i], e);
+			} finally {
+				if (parser != null)
+					parser.close();
+			}
+		}
+	}
+
+	/* ApkLiteParseUtils.parseApkLite(): the base APK's android:isolatedSplits (cookie 1 is the base APK) */
+	private static boolean requestsIsolatedSplits(AssetManager assets) throws IOException {
+		android.content.res.XmlResourceParser parser = assets.openXmlResourceParser(1, "AndroidManifest.xml");
+		try {
+			int type;
+			while ((type = parser.next()) != org.xmlpull.v1.XmlPullParser.START_TAG && type != org.xmlpull.v1.XmlPullParser.END_DOCUMENT)
+				;
+			return parser.getAttributeBooleanValue(ANDROID_RES_NAMESPACE, "isolatedSplits", false);
+		} catch (XmlPullParserException e) {
+			throw new IOException(e);
+		} finally {
+			parser.close();
+		}
+	}
+
+	private static final String ANDROID_RES_NAMESPACE = "http://schemas.android.com/apk/res/android";
+
 	/* Like ApkLiteParseUtils.composePackageLiteFromApks() and PackageImpl.toAppInfoWithoutState(): the split APKs
 	 * that were installed along with the base APK, by their manifest's split name, sorted by that name */
-	private static void setSplits(ApplicationInfo appInfo, String mainApk, String[] apkPaths) {
-		java.util.TreeMap<String, String> splits = new java.util.TreeMap<>();
+	private static void setSplits(ApplicationInfo appInfo, String mainApk, String[] apkPaths) throws IOException {
+		/* per split name: path, android:isFeatureSplit, <uses-split android:name>, configForSplit (ApkLite) */
+		java.util.TreeMap<String, Object[]> splits = new java.util.TreeMap<>();
 		for (String path : apkPaths) {
 			if (path.equals(mainApk))
 				continue;
@@ -213,10 +353,21 @@ public final class ATLLoadedApp {
 				while ((type = parser.next()) != org.xmlpull.v1.XmlPullParser.START_TAG && type != org.xmlpull.v1.XmlPullParser.END_DOCUMENT)
 					;
 				String splitName = parser.getAttributeValue(null, "split");
+				boolean isFeatureSplit = parser.getAttributeBooleanValue(ANDROID_RES_NAMESPACE, "isFeatureSplit", false);
+				String configForSplit = parser.getAttributeValue(null, "configForSplit");
+				String usesSplitName = null;
+				/* ApkLiteParseUtils.parseApkLite(): the first <uses-split> directly under <manifest> */
+				final int searchDepth = parser.getDepth() + 1;
+				while ((type = parser.next()) != org.xmlpull.v1.XmlPullParser.END_DOCUMENT && (type != org.xmlpull.v1.XmlPullParser.END_TAG || parser.getDepth() >= searchDepth)) {
+					if (type != org.xmlpull.v1.XmlPullParser.START_TAG || parser.getDepth() != searchDepth)
+						continue;
+					if ("uses-split".equals(parser.getName()) && usesSplitName == null)
+						usesSplitName = parser.getAttributeValue(ANDROID_RES_NAMESPACE, "name");
+				}
 				if (splitName == null || splitName.isEmpty())
 					Slog.w(TAG, path + " is not a split APK (no split name)");
 				else
-					splits.put(splitName, path);
+					splits.put(splitName, new Object[] {path, isFeatureSplit, usesSplitName, configForSplit});
 			} catch (IOException | XmlPullParserException e) {
 				Slog.w(TAG, "Unable to read the manifest of " + path, e);
 			} finally {
@@ -227,9 +378,31 @@ public final class ATLLoadedApp {
 		}
 		if (splits.isEmpty())
 			return;
+		final int size = splits.size();
 		appInfo.splitNames = splits.keySet().toArray(new String[0]);
-		appInfo.splitSourceDirs = splits.values().toArray(new String[0]);
+		appInfo.splitSourceDirs = new String[size];
+		boolean[] isFeatureSplits = new boolean[size];
+		String[] usesSplitNames = new String[size];
+		String[] configForSplits = new String[size];
+		int i = 0;
+		for (Object[] split : splits.values()) {
+			appInfo.splitSourceDirs[i] = (String)split[0];
+			isFeatureSplits[i] = (Boolean)split[1];
+			usesSplitNames[i] = (String)split[2];
+			configForSplits[i] = (String)split[3];
+			i++;
+		}
 		appInfo.splitPublicSourceDirs = appInfo.splitSourceDirs;
+		/* ParsingPackageUtils.parseClusterPackage(): the dependencies of isolated splits, a package with invalid
+		 * ones does not install (INSTALL_PARSE_FAILED_BAD_MANIFEST) */
+		if (appInfo.requestsIsolatedSplitLoading()) {
+			try {
+				appInfo.splitDependencies = SplitDependencyLoader.createDependenciesFromPackage(
+				    appInfo.splitNames, isFeatureSplits, usesSplitNames, configForSplits);
+			} catch (SplitDependencyLoader.IllegalDependencyException e) {
+				throw new IOException(e.getMessage(), e);
+			}
+		}
 	}
 
 	public Resources createDefaultResources() {
@@ -289,15 +462,9 @@ public final class ATLLoadedApp {
 		synchronized (this.init_lock) {
 			if (application != null)
 				return application;
-			if (applicationClassName != null) {
-				Class<? extends Application> cls =
-				    this.loadClass(pkg.applicationInfo.className)
-					.asSubclass(Application.class);
-				Constructor<? extends Application> constructor = cls.getConstructor();
-				application = constructor.newInstance();
-			} else {
-				application = new Application();
-			}
+			/* LoadedApk.makeApplicationInner(): the app's AppComponentFactory instantiates it */
+			application = app_component_factory.instantiateApplication(class_loader,
+			    applicationClassName != null ? applicationClassName : "android.app.Application");
 			application.atl_attach_base_context(new ContextImpl(
 			    this.createDefaultResources(), this, pkg.applicationInfo.theme));
 			// HACK: Set WhatsApp's custom logging mechanism to verbose for easier debugging.
@@ -343,9 +510,10 @@ public final class ATLLoadedApp {
 
 		theme_res = Resources.selectDefaultTheme(theme_res, this.effective_sdk_compat);
 
-		Class<? extends Activity> cls = this.loadClass(activityClass).asSubclass(Activity.class);
-		Constructor<? extends Activity> constructor = cls.getConstructor();
-		Activity activity = constructor.newInstance();
+		/* ActivityThread.performLaunchActivity(): Instrumentation.newActivity() with the class loader of the activity
+		 * context (ContextImpl.createActivityContext(): the one of the activity's split for isolated splits) */
+		ClassLoader cl = getActivityClassLoader(info);
+		Activity activity = app_component_factory.instantiateActivity(cl, activityClass, intent);
 		activity.component = new ComponentName(pkg.packageName, className);
 		intent.setComponent(activity.component);
 		activity.intent = intent;
@@ -354,7 +522,7 @@ public final class ATLLoadedApp {
 		// theme, the activity theme is applied after attachBaseContext(). An activity may replace
 		// its resources there (AppCompat does so for night mode), and the theme has to be resolved
 		// against those resources, not against the ones of the base context.
-		activity.atl_attach_base_context(ContextImpl.createActivityContext(r, this, Resources.selectDefaultTheme(0, this.effective_sdk_compat)));
+		activity.atl_attach_base_context(ContextImpl.createActivityContext(r, this, Resources.selectDefaultTheme(0, this.effective_sdk_compat), cl));
 		// like Activity.attach(), with the activity as the Window.Callback: the window takes the
 		// manifest's soft input mode, the color mode and the post-processing preference (ATL reads
 		// neither android:colorMode nor android:preferMinimalPostProcessing, so these are the defaults)
@@ -496,17 +664,24 @@ public final class ATLLoadedApp {
 					}
 					HashMap<ServiceConnection, Integer> pending = null;
 					if (r == null) {
-						Class<? extends Service> cls = ATLLoadedApp.this.loadClass(className).asSubclass(Service.class);
-						Service service = cls.getConstructor().newInstance();
-						service.attachBaseContext(new ContextImpl(
-						    ATLLoadedApp.this.createDefaultResources(), ATLLoadedApp.this,
-						    pkg.applicationInfo.theme));
-						service.onCreate();
 						int serviceFlags = 0;
+						String splitName = null;
 						for (PackageParser.Service s : pkg.services) {
-							if (className.equals(s.className))
+							if (className.equals(s.className)) {
 								serviceFlags = s.info.flags;
+								splitName = s.info.splitName;
+							}
 						}
+						/* ActivityThread.handleCreateService(): the split's class loader and context */
+						final ClassLoader cl = splitName != null ? getSplitClassLoader(splitName) : class_loader;
+						Service service = app_component_factory.instantiateService(cl, className, intent);
+						Context context = new ContextImpl(
+						    ATLLoadedApp.this.createDefaultResources(), ATLLoadedApp.this,
+						    pkg.applicationInfo.theme);
+						if (splitName != null)
+							context = context.createContextForSplit(splitName);
+						service.attachBaseContext(context);
+						service.onCreate();
 						r = new ServiceRecord(service, serviceFlags);
 						synchronized (running_services) {
 							running_services.put(className, r);
@@ -554,7 +729,7 @@ public final class ATLLoadedApp {
 						}
 						r.service.onStartCommand(intent, 0, startId);
 					}
-				} catch (ReflectiveOperationException e) {
+				} catch (ReflectiveOperationException | PackageManager.NameNotFoundException e) {
 					Slog.e(TAG, "startService: failed to start service " + className, e);
 				}
 			}
@@ -722,12 +897,17 @@ public final class ATLLoadedApp {
 
 	private void deliverBroadcast(PackageParser.Activity receiver, Context context, Intent intent, int resultCode) {
 		try {
-			Class<? extends BroadcastReceiver> cls = this.loadClass(receiver.className).asSubclass(BroadcastReceiver.class);
-			BroadcastReceiver receiverInstance = cls.newInstance();
+			/* ActivityThread.handleReceiver(): with the class loader of the application's base context, or of its
+			 * split's context */
+			Context receiverContext = getApplication().getBaseContext();
+			if (receiver.info.splitName != null)
+				receiverContext = receiverContext.createContextForSplit(receiver.info.splitName);
+			ClassLoader cl = receiverContext.getClassLoader();
+			BroadcastReceiver receiverInstance = app_component_factory.instantiateReceiver(cl, receiver.className, intent);
 			receiverInstance.setResultCode(resultCode);
 			// a receiver of another package runs with that package's context, as in its own process
 			receiverInstance.onReceive(pkg.packageName.equals(context.getPackageName()) ? context : getApplication(), intent);
-		} catch (ReflectiveOperationException e) {
+		} catch (ReflectiveOperationException | PackageManager.NameNotFoundException e) {
 			Slog.e(TAG, "startService: failed to receive broadcast " + receiver.className, e);
 		}
 	}

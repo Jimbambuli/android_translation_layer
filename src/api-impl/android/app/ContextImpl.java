@@ -73,6 +73,10 @@ public final class ContextImpl extends Context {
 	final int[] mServiceInitializationStateArray = new int[mServiceCache.length];
 
 	private final int atl_flags;
+	/* AOSP ContextImpl.mClassLoader: set for a split's context (createContextForSplit()) and kept by the contexts
+	 * created from this one; apps replace it by reflection (Chromium's BundleUtils.replaceClassLoader()) */
+	@UnsupportedAppUsage
+	private ClassLoader mClassLoader;
 	/* like AOSP's mContextType: activity contexts (and their configuration contexts) are UI contexts */
 	private boolean mIsUiContext;
 
@@ -98,9 +102,10 @@ public final class ContextImpl extends Context {
 	}
 
 	/* like AOSP's ContextImpl.createActivityContext(): the base context of an activity, a UI context */
-	public static ContextImpl createActivityContext(Resources resources, ATLLoadedApp loadedApp, int themeResource) {
+	public static ContextImpl createActivityContext(Resources resources, ATLLoadedApp loadedApp, int themeResource, ClassLoader classLoader) {
 		ContextImpl context = new ContextImpl(resources, loadedApp, themeResource);
 		context.mIsUiContext = true;
+		context.mClassLoader = classLoader;
 		return context;
 	}
 
@@ -210,10 +215,27 @@ public final class ContextImpl extends Context {
 
 	@Override
 	public ClassLoader getClassLoader() {
+		if (mClassLoader != null) {
+			return mClassLoader;
+		}
 		if ((this.atl_flags & ATL_FLAG_NO_CODE) != 0) {
 			return null;
 		}
 		return this.atl_loaded_app.class_loader;
+	}
+
+	/* AOSP ContextImpl.createContextForSplit(): a context with the split's class loader; ATL's resources already
+	 * hold every split of the app, so the split's context keeps them */
+	@Override
+	public Context createContextForSplit(String splitName) throws android.content.pm.PackageManager.NameNotFoundException {
+		if (!this.atl_loaded_app.pkg.applicationInfo.requestsIsolatedSplitLoading()) {
+			// All Splits are always loaded.
+			return this;
+		}
+		final ClassLoader classLoader = this.atl_loaded_app.getSplitClassLoader(splitName);
+		ContextImpl context = new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
+		context.mClassLoader = classLoader;
+		return context;
 	}
 
 	public ComponentName startService(Intent intent) {
@@ -545,14 +567,17 @@ public final class ContextImpl extends Context {
 		 * in the back stack as FLAG_ACTIVITY_CLEAR_TOP does: the ones above it finish and it gets onNewIntent() */
 		int launchMode = ActivityInfo.LAUNCH_MULTIPLE;
 		String activityClass = className; // an <activity-alias> runs its target activity (ActivityInfo.targetActivity)
+		ActivityInfo activityInfo = null;
 		for (PackageParser.Activity activity : this.atl_loaded_app.pkg.activities) {
 			if (activity.className.equals(className)) {
+				activityInfo = activity.info;
 				launchMode = activity.info.launchMode;
 				if (activity.info.targetActivity != null)
 					activityClass = activity.info.targetActivity;
 			}
 		}
 		final String activityClass_ = activityClass;
+		final ClassLoader activityClassLoader = this.atl_loaded_app.getActivityClassLoader(activityInfo);
 		/* FLAG_ACTIVITY_NEW_TASK with FLAG_ACTIVITY_CLEAR_TASK: the app's one task is cleared, the activity starts
 		 * anew as its root; the ones that were there finish after the start and what it started itself
 		 * (Activity.nativeClearTaskMark()) */
@@ -568,7 +593,7 @@ public final class ContextImpl extends Context {
 						Activity.nativeClearTaskMark();
 					if (reuse) {
 						boolean found = Activity.nativeResumeActivity(
-						    ContextImpl.this.atl_loaded_app.loadClass(activityClass_).asSubclass(Activity.class),
+						    Class.forName(activityClass_, false, activityClassLoader).asSubclass(Activity.class),
 						    intent_);
 						if (found)
 							return;
@@ -636,6 +661,7 @@ public final class ContextImpl extends Context {
 		}
 		ContextImpl context = this.atl_loaded_app.createContext(null, overrideConfiguration, getTheme());
 		context.mIsUiContext = mIsUiContext;
+		context.mClassLoader = mClassLoader;
 		return context;
 	}
 
@@ -648,7 +674,9 @@ public final class ContextImpl extends Context {
 
 	@Override
 	public Context createDisplayContext(Display display) {
-		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
+		ContextImpl context = new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
+		context.mClassLoader = mClassLoader;
+		return context;
 	}
 
 	/* AOSP: a WindowContext, a UI context for windows of the given type (toasts, overlays); ATL has one display */
@@ -661,6 +689,7 @@ public final class ContextImpl extends Context {
 	public Context createWindowContext(Display display, int type, Bundle options) {
 		ContextImpl context = new ContextImpl(getResources(), this.atl_loaded_app, getTheme(), this.atl_flags);
 		context.mIsUiContext = true;
+		context.mClassLoader = mClassLoader;
 		return context;
 	}
 
@@ -676,15 +705,19 @@ public final class ContextImpl extends Context {
 
 	@Override
 	public Context createDeviceProtectedStorageContext() {
-		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(),
-		                       this.atl_flags | ATL_FLAG_PROTECTED_STORAGE);
+		ContextImpl context = new ContextImpl(getResources(), this.atl_loaded_app, getTheme(),
+		                                      this.atl_flags | ATL_FLAG_PROTECTED_STORAGE);
+		context.mClassLoader = mClassLoader;
+		return context;
 	}
 
 	/* AOSP ContextImpl.createCredentialProtectedStorageContext(): the device-protected flag is cleared */
 	@Override
 	public Context createCredentialProtectedStorageContext() {
-		return new ContextImpl(getResources(), this.atl_loaded_app, getTheme(),
-		                       this.atl_flags & ~ATL_FLAG_PROTECTED_STORAGE);
+		ContextImpl context = new ContextImpl(getResources(), this.atl_loaded_app, getTheme(),
+		                                      this.atl_flags & ~ATL_FLAG_PROTECTED_STORAGE);
+		context.mClassLoader = mClassLoader;
+		return context;
 	}
 
 	@Override

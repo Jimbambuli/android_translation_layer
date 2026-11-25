@@ -1,6 +1,7 @@
 package android.atl;
 
 import android.content.ContentProvider;
+import android.content.Context;
 import android.content.pm.PackageParser;
 import android.util.Slog;
 import java.util.Objects;
@@ -36,10 +37,14 @@ public final class ATLProvider {
 		ContentProvider contentProvider = null;
 		Slog.i(TAG, "Loading content provider " + this.provider.info.authority + "(" + this.provider.className + ")");
 		try {
-			contentProvider = this.atlLoadedApp.loadClass(this.provider.className)
-			                      .asSubclass(ContentProvider.class)
-			                      .newInstance();
-			contentProvider.attachInfo(this.atlLoadedApp.getApplication(), this.provider.info);
+			/* ActivityThread.installProvider(): the app's AppComponentFactory, with the class loader of the app's context
+			 * or of its split's context */
+			Context c = this.atlLoadedApp.getApplication();
+			if (this.provider.info.splitName != null)
+				c = c.createContextForSplit(this.provider.info.splitName);
+			contentProvider = this.atlLoadedApp.app_component_factory.instantiateProvider(
+			    c.getClassLoader(), this.provider.className);
+			contentProvider.attachInfo(c, this.provider.info);
 			contentProvider.onCreate();
 			this.contentProvider = contentProvider;
 		} catch (Throwable t) {

@@ -1015,6 +1015,9 @@ public class PackageParser {
 		pkg.installLocation = sa.getInteger(
 		    com.android.internal.R.styleable.AndroidManifest_installLocation,
 		    PARSE_DEFAULT_INSTALL_LOCATION);
+		/* like AOSP PackageParser.parseBaseApk(): android:isolatedSplits */
+		if (sa.getBoolean(com.android.internal.R.styleable.AndroidManifest_isolatedSplits, false))
+			pkg.applicationInfo.privateFlags |= ApplicationInfo.PRIVATE_FLAG_ISOLATED_SPLIT_LOADING;
 
 		sa.recycle();
 
@@ -1967,6 +1970,7 @@ public class PackageParser {
 		boolean hardwareAccelerated = sa.getBoolean(
 		    com.android.internal.R.styleable.AndroidManifestApplication_hardwareAccelerated,
 		    owner.applicationInfo.targetSdkVersion >= Build.VERSION_CODES.ICE_CREAM_SANDWICH);
+		owner.baseHardwareAccelerated = hardwareAccelerated;
 
 		if (sa.getBoolean(
 			com.android.internal.R.styleable.AndroidManifestApplication_hasCode,
@@ -2225,6 +2229,196 @@ public class PackageParser {
 					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
 					return false;
 				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Parse the manifest of a <em>split APK</em> (AOSP PackageParser.parseSplitApk()): its components join the
+	 * package, with the split's name unless they name one. The split's names are pkg.applicationInfo.splitNames.
+	 * <p>
+	 * Note that split APKs have many more restrictions on what they're capable
+	 * of doing, so many valid features of a base APK have been carefully
+	 * omitted here.
+	 */
+	public Package parseSplitApk(Package pkg, Resources res, XmlResourceParser parser, int flags,
+	                             int splitIndex, String[] outError) throws XmlPullParserException, IOException {
+		AttributeSet attrs = parser;
+
+		// We parsed manifest tag earlier; just skip past it
+		int type;
+		while ((type = parser.next()) != XmlPullParser.START_TAG && type != XmlPullParser.END_DOCUMENT)
+			;
+
+		boolean foundApp = false;
+
+		int outerDepth = parser.getDepth();
+		while ((type = parser.next()) != XmlPullParser.END_DOCUMENT && (type != XmlPullParser.END_TAG || parser.getDepth() > outerDepth)) {
+			if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
+				continue;
+			}
+
+			String tagName = parser.getName();
+			if (tagName.equals("application")) {
+				if (foundApp) {
+					Slog.w(TAG, "<manifest> has more than one <application>");
+					XmlUtils.skipCurrentTag(parser);
+					continue;
+				}
+
+				foundApp = true;
+				if (!parseSplitApplication(pkg, res, parser, attrs, flags, splitIndex, outError)) {
+					return null;
+				}
+
+			} else {
+				Slog.w(TAG, "Unknown element under <manifest>: " + parser.getName() + " at " + mArchiveSourcePath + " " + parser.getPositionDescription());
+				XmlUtils.skipCurrentTag(parser);
+				continue;
+			}
+		}
+
+		return pkg;
+	}
+
+	/* AOSP PackageParser.parseSplitApplication(); ATL keeps no split flags (hasCode) and no split class loader
+	 * names, and parses no <uses-static-library> */
+	private boolean parseSplitApplication(Package owner, Resources res, XmlResourceParser parser, AttributeSet attrs,
+	                                      int flags, int splitIndex, String[] outError)
+	    throws XmlPullParserException, IOException {
+		final int innerDepth = parser.getDepth();
+		int type;
+		while ((type = parser.next()) != XmlPullParser.END_DOCUMENT && (type != XmlPullParser.END_TAG || parser.getDepth() > innerDepth)) {
+			if (type == XmlPullParser.END_TAG || type == XmlPullParser.TEXT) {
+				continue;
+			}
+
+			ComponentInfo parsedComponent = null;
+
+			String tagName = parser.getName();
+			if (tagName.equals("activity")) {
+				Activity a = parseActivity(owner, res, parser, attrs, flags, outError, false,
+				                           owner.baseHardwareAccelerated);
+				if (a == null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+
+				owner.activities.add(a);
+				parsedComponent = a.info;
+
+			} else if (tagName.equals("receiver")) {
+				Activity a = parseActivity(owner, res, parser, attrs, flags, outError, true, false);
+				if (a == null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+
+				owner.receivers.add(a);
+				parsedComponent = a.info;
+
+			} else if (tagName.equals("service")) {
+				Service s = parseService(owner, res, parser, attrs, flags, outError);
+				if (s == null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+
+				owner.services.add(s);
+				parsedComponent = s.info;
+
+			} else if (tagName.equals("provider")) {
+				Provider p = parseProvider(owner, res, parser, attrs, flags, outError);
+				if (p == null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+
+				owner.providers.add(p);
+				parsedComponent = p.info;
+
+			} else if (tagName.equals("activity-alias")) {
+				Activity a = parseActivityAlias(owner, res, parser, attrs, flags, outError);
+				if (a == null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+
+				owner.activities.add(a);
+				parsedComponent = a.info;
+
+			} else if (parser.getName().equals("meta-data")) {
+				// note: application meta-data is stored off to the side, so it can
+				// remain null in the primary copy (we like to avoid extra copies because
+				// it can be large)
+				if ((owner.mAppMetaData = parseMetaData(res, parser, attrs, owner.mAppMetaData,
+				                                        outError))
+				    == null) {
+					mParseError = PackageManager.INSTALL_PARSE_FAILED_MANIFEST_MALFORMED;
+					return false;
+				}
+
+			} else if (tagName.equals("uses-library")) {
+				TypedArray sa = res.obtainAttributes(attrs,
+				                                     com.android.internal.R.styleable.AndroidManifestUsesLibrary);
+
+				// Note: don't allow this value to be a reference to a resource
+				// that may change.
+				String lname = sa.getNonResourceString(
+				    com.android.internal.R.styleable.AndroidManifestUsesLibrary_name);
+				boolean req = sa.getBoolean(
+				    com.android.internal.R.styleable.AndroidManifestUsesLibrary_required,
+				    true);
+
+				sa.recycle();
+
+				if (lname != null) {
+					lname = lname.intern();
+					if (req) {
+						// Upgrade to treat as stronger constraint
+						if (owner.usesLibraries == null) {
+							owner.usesLibraries = new ArrayList<String>();
+						}
+						if (!owner.usesLibraries.contains(lname)) {
+							owner.usesLibraries.add(lname);
+						}
+						if (owner.usesOptionalLibraries != null) {
+							owner.usesOptionalLibraries.remove(lname);
+						}
+					} else {
+						// Ignore if someone already defined as required
+						if (owner.usesLibraries == null || !owner.usesLibraries.contains(lname)) {
+							if (owner.usesOptionalLibraries == null) {
+								owner.usesOptionalLibraries = new ArrayList<String>();
+							}
+							if (!owner.usesOptionalLibraries.contains(lname)) {
+								owner.usesOptionalLibraries.add(lname);
+							}
+						}
+					}
+				}
+
+				XmlUtils.skipCurrentTag(parser);
+
+			} else if (tagName.equals("uses-package")) {
+				// Dependencies for app installers; we don't currently try to
+				// enforce this.
+				XmlUtils.skipCurrentTag(parser);
+
+			} else {
+				Slog.w(TAG, "Unknown element under <application>: " + tagName + " at " + mArchiveSourcePath + " " + parser.getPositionDescription());
+				XmlUtils.skipCurrentTag(parser);
+				continue;
+			}
+
+			if (parsedComponent != null && parsedComponent.splitName == null) {
+				// If the loaded component did not specify a split, inherit the split name
+				// based on the split it is defined in.
+				// This is used to later load the correct split when starting this
+				// component.
+				parsedComponent.splitName = owner.applicationInfo.splitNames[splitIndex];
 			}
 		}
 
@@ -3397,6 +3591,9 @@ public class PackageParser {
 	public final static class Package {
 
 		public String packageName;
+
+		/* AOSP: the base APK's android:hardwareAccelerated, the default of the activities in split APKs */
+		public boolean baseHardwareAccelerated;
 
 		// For now we only support one application per package.
 		public final ApplicationInfo applicationInfo = new ApplicationInfo();

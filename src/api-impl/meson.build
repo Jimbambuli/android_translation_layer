@@ -470,6 +470,7 @@ srcs = [
 	'android/content/pm/ShortcutInfo.java',
 	'android/content/pm/ShortcutManager.java',
 	'android/content/pm/Signature.java',
+	'android/content/pm/split/SplitDependencyLoader.java',
 	'android/content/pm/SigningInfo.java',
 	'android/content/pm/ApkSigningBlock.java',
 	'android/content/pm/ModuleInfo.java',

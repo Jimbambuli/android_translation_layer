@@ -1511,11 +1511,8 @@ public abstract class Context {
 		System.out.println("revokeUriPermission(" + toPackage + ", " + uri + ", " + modeFlags + ") called");
 	}
 
-	/* AOSP ContextImpl.createContextForSplit(): an app that does not request isolated split loading has all its
-	 * splits loaded, so the context itself serves (ATL installs no isolated splits) */
-	public Context createContextForSplit(String splitName) throws android.content.pm.PackageManager.NameNotFoundException {
-		return this;
-	}
+	/* AOSP: abstract, ContextImpl implements it */
+	public abstract Context createContextForSplit(String splitName) throws android.content.pm.PackageManager.NameNotFoundException;
 
 	public String getAttributionTag() {
 		return null;

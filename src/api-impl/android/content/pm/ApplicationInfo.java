@@ -378,6 +378,14 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 	public static final int PRIVATE_FLAG_PRIVILEGED = 1 << 3;
 
 	/**
+	 * Value for {@link #privateFlags}: When set, the application will only have its splits loaded
+	 * if they are required to load a component. Splits can be loaded on demand using the
+	 * {@link Context#createContextForSplit(String)} API.
+	 * @hide
+	 */
+	public static final int PRIVATE_FLAG_ISOLATED_SPLIT_LOADING = 1 << 15;
+
+	/**
 	 * Private/hidden flags. See {@code PRIVATE_FLAG_...} constants.
 	 * @hide
 	 */
@@ -570,6 +578,15 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 		return (privateFlags & ApplicationInfo.PRIVATE_FLAG_IS_RESOURCE_OVERLAY) != 0;
 	}
 
+	/**
+	 * Returns true if the app has declared in its manifest that it wants its split APKs to be
+	 * loaded into isolated Contexts, with their own ClassLoaders and Resources objects.
+	 * @hide
+	 */
+	public boolean requestsIsolatedSplitLoading() {
+		return (privateFlags & ApplicationInfo.PRIVATE_FLAG_ISOLATED_SPLIT_LOADING) != 0;
+	}
+
 	public boolean hasRtlSupport() {
 		return (flags & FLAG_SUPPORTS_RTL) == FLAG_SUPPORTS_RTL;
 	}
@@ -601,6 +618,13 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 	 * leaves for a package without them (null, 0, CATEGORY_UNDEFINED) */
 	public java.util.UUID storageUuid;
 	public String[] splitNames;
+	/**
+	 * The split dependencies of the app (AOSP SplitDependencyLoader.createDependenciesFromPackage()): index 0 is the
+	 * base, split i is index i + 1; the first element is the parent, the others are its configuration splits.
+	 * May be null if no splits are installed, or if no dependencies exist between them.
+	 * @hide
+	 */
+	public android.util.SparseArray<int[]> splitDependencies;
 	public String seInfo;
 	public String seInfoUser;
 	public int compileSdkVersion;
@@ -698,6 +722,7 @@ public class ApplicationInfo extends PackageItemInfo implements android.os.Parce
 		backupAgentName = orig.backupAgentName;
 		storageUuid = orig.storageUuid;
 		splitNames = orig.splitNames;
+		splitDependencies = orig.splitDependencies;
 		splitSourceDirs = orig.splitSourceDirs;
 		splitPublicSourceDirs = orig.splitPublicSourceDirs;
 		seInfo = orig.seInfo;
