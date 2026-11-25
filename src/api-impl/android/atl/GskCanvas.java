@@ -44,8 +44,11 @@ public class GskCanvas extends DisplayListCanvas {
 		setDensity(android.util.DisplayMetrics.DENSITY_DEVICE);
 	}
 
-	/* ATL_SNAPSHOT_CHECK set: finishRecording() reports each draw that left saves or clips open */
+	/* ATL_SNAPSHOT_CHECK set: finishRecording() reports the first draw of each class that left saves or clips open.
+	 * Once is enough: apps leave them open on every draw (e.g. Material CollapsingTextHelper.draw() returns between
+	 * save() and restoreToCount() without text), and AOSP closes them silently */
 	private static final boolean check_balance = System.getenv("ATL_SNAPSHOT_CHECK") != null;
+	private static final java.util.Set<String> check_reported = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
 	/* AOSP RenderNode.endRecording(): SkiaRecordingCanvas::finishRecording() restores the canvas to save count 1,
 	 * and hwui draws each display list in a save of its own, so what a view's draw left saved or clipped (also when
@@ -60,8 +63,11 @@ public class GskCanvas extends DisplayListCanvas {
 		int clips = (push_history != null && push_history.length > 1) ? push_history[1] : 0;
 		if (saves == 0 && clips == 0)
 			return;
-		if (check_balance)
-			android.util.Log.w("GskCanvas", "ATL_SNAPSHOT_CHECK: " + (owner != null ? owner.getClass().getName() : "?") + " left " + saves + " saves and " + clips + " clips of the base level open");
+		if (check_balance) {
+			String name = owner != null ? owner.getClass().getName() : "?";
+			if (check_reported.add(name))
+				android.util.Log.w("GskCanvas", "ATL_SNAPSHOT_CHECK: " + name + " left " + saves + " saves and " + clips + " clips of the base level open (reported once per class)");
+		}
 		while (getSaveCount() > 1)
 			restore();
 		if (clips > 0) {
