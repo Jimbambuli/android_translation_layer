@@ -235,6 +235,29 @@ public class ImageReader implements AutoCloseable {
 		}
 	}
 
+	/** @hide the consumer of an encoder's input surface (MediaCodec.createInputSurface(), MediaRecorder.getSurface()):
+	 * images of any producer's format and size, read on the CPU (AOSP: the encoder's GraphicBufferSource takes the
+	 * buffers its producer queues). surface: the Surface to consume (a PersistentSurface), else a new one */
+	static ImageReader atl_newEncoderInput(Surface surface, int width, int height) {
+		ImageReader reader = new ImageReader(width, height, ImageFormat.PRIVATE, 4, HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_VIDEO_ENCODE);
+		if (surface != null) {
+			reader.mSurface = surface;
+			surface.atl_imageReader = reader;
+		}
+		return reader;
+	}
+
+	/** @hide an image's AHardwareBuffer, 0 for an image of ByteBuffers */
+	static long atl_hardwareBuffer(Image image) {
+		return ((SurfaceImage)image).mBuffer;
+	}
+
+	/** @hide the ByteBuffers an image was queued with (ImageReader.queueImage()), null for a hardware buffer */
+	static Image.Plane[] atl_queuedPlanes(Image image) {
+		SurfaceImage si = (SurfaceImage)image;
+		return si.mBuffer != 0 ? null : si.mPlanes;
+	}
+
 	/** @hide */
 	public Image acquireNextImageNoThrowISE() {
 		SurfaceImage[] si = new SurfaceImage[1];

@@ -445,29 +445,60 @@ media_status_t AMediaCodec_setOutputSurface(AMediaCodec *mc, struct ANativeWindo
 	return ret;
 }
 
-/* AOSP: MediaCodec::createInputSurface() is INVALID_OPERATION for a codec that is not a video encoder, and ATL has
- * decoders only */
+/* AOSP NdkMediaCodec: the Surface of MediaCodec.createInputSurface() as an ANativeWindow; INVALID_OPERATION (here
+ * the IllegalStateException) for a codec that is not a video encoder configured for surface input */
 media_status_t AMediaCodec_createInputSurface(AMediaCodec *mc, struct ANativeWindow **surface)
 {
 	if (!surface || !mc)
 		return AMEDIA_ERROR_INVALID_PARAMETER;
 	*surface = NULL;
-	return AMEDIA_ERROR_UNKNOWN;
+	JNIEnv *env = env_init();
+	jobject java_surface = (*env)->CallObjectMethod(env, mc->codec, (*env)->GetMethodID(env, m.class, "createInputSurface", "()Landroid/view/Surface;"));
+	if (ndk_jni_threw(env, "AMediaCodec_createInputSurface") || !java_surface)
+		return AMEDIA_ERROR_INVALID_OPERATION;
+	*surface = ANativeWindow_fromConsumerSurface(env, java_surface);
+	(*env)->DeleteLocalRef(env, java_surface);
+	return AMEDIA_OK;
 }
 
-/* AOSP: AMEDIA_ERROR_UNKNOWN when MediaCodec::CreatePersistentInputSurface() fails, as without an encoder */
+/* AOSP: a PersistentSurface (MediaCodec.createPersistentInputSurface()) as an ANativeWindow */
 media_status_t AMediaCodec_createPersistentInputSurface(struct ANativeWindow **surface)
 {
 	if (!surface)
 		return AMEDIA_ERROR_INVALID_PARAMETER;
 	*surface = NULL;
-	return AMEDIA_ERROR_UNKNOWN;
+	JNIEnv *env = env_init();
+	jobject java_surface = (*env)->CallStaticObjectMethod(env, m.class, (*env)->GetStaticMethodID(env, m.class, "createPersistentInputSurface", "()Landroid/view/Surface;"));
+	if (ndk_jni_threw(env, "AMediaCodec_createPersistentInputSurface") || !java_surface)
+		return AMEDIA_ERROR_UNKNOWN;
+	*surface = ANativeWindow_fromConsumerSurface(env, java_surface);
+	(*env)->DeleteLocalRef(env, java_surface);
+	return AMEDIA_OK;
 }
 
-/* AOSP: only a persistent surface (from AMediaCodec_createPersistentInputSurface()) is accepted */
+/* AOSP: only a persistent surface (from AMediaCodec_createPersistentInputSurface()) is accepted; the window gets the
+ * encoder as its consumer */
 media_status_t AMediaCodec_setInputSurface(AMediaCodec *mc, struct ANativeWindow *surface)
 {
-	return AMEDIA_ERROR_INVALID_PARAMETER;
+	if (!mc || !surface || !surface->surface)
+		return AMEDIA_ERROR_INVALID_PARAMETER;
+	JNIEnv *env = env_init();
+	(*env)->CallVoidMethod(env, mc->codec, (*env)->GetMethodID(env, m.class, "setInputSurface", "(Landroid/view/Surface;)V"), surface->surface);
+	if (ndk_jni_threw(env, "AMediaCodec_setInputSurface"))
+		return AMEDIA_ERROR_INVALID_PARAMETER;
+	jobject reader = (*env)->GetObjectField(env, surface->surface, (*env)->GetFieldID(env, ndk_jni_class(env, "android/view/Surface"), "atl_imageReader", "Landroid/media/ImageReader;"));
+	ANativeWindow_setImageReader(surface, env, reader);
+	(*env)->DeleteLocalRef(env, reader);
+	return AMEDIA_OK;
+}
+
+/* AOSP: the window of the persistent surface goes */
+media_status_t AMediaCodec_releasePersistentInputSurface(struct ANativeWindow *surface)
+{
+	if (!surface)
+		return AMEDIA_ERROR_INVALID_PARAMETER;
+	ANativeWindow_release(surface);
+	return AMEDIA_OK;
 }
 
 /* AOSP hands the parameters to the native codec. ATL's MediaCodec.setParameters() applies none (its FFmpeg
@@ -489,7 +520,9 @@ media_status_t AMediaCodec_signalEndOfInputStream(AMediaCodec *mc)
 {
 	if (!mc)
 		return AMEDIA_ERROR_INVALID_PARAMETER;
-	return AMEDIA_ERROR_INVALID_OPERATION;
+	JNIEnv *env = env_init();
+	(*env)->CallVoidMethod(env, mc->codec, (*env)->GetMethodID(env, m.class, "signalEndOfInputStream", "()V"));
+	return ndk_jni_threw(env, "AMediaCodec_signalEndOfInputStream") ? AMEDIA_ERROR_INVALID_OPERATION : AMEDIA_OK;
 }
 
 typedef enum {

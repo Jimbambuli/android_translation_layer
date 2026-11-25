@@ -55,6 +55,18 @@ public class MediaCodecList {
 		for (String[] codec : SOFTWARE_CODECS)
 			list.add(new MediaCodecInfo(codec[0], codec[1], codec[2], false, softwareProfileLevels(codec[1]),
 			                            MediaCodecInfo.VideoCapabilities.MAX_SIZE, MediaCodecInfo.VideoCapabilities.MAX_SIZE));
+		/* the video encoders: FFmpeg's (VA-API ones as hardware codecs, "c2.vaapi.<type>.encoder"), the first that works
+		 * per type; a software encoder is named after FFmpeg's encoder like the software decoders */
+		String[] encoders = MediaCodec.native_encoders();
+		for (int i = 0; i + 2 < encoders.length; i += 3) {
+			boolean hw = encoders[i + 2].equals("hardware");
+			String name = encoders[i];
+			for (String[] decoder : HARDWARE_CODECS)
+				if (hw && decoder[1].equals(encoders[i + 1]))
+					name = decoder[0].replace(".decoder", ".encoder");
+			list.add(new MediaCodecInfo(name, encoders[i + 1], encoders[i], hw, new MediaCodecInfo.CodecProfileLevel[0],
+			                            MediaCodecInfo.VideoCapabilities.MAX_SIZE, MediaCodecInfo.VideoCapabilities.MAX_SIZE, true));
+		}
 		codecs = list.toArray(new MediaCodecInfo[0]);
 		return codecs;
 	}
@@ -140,7 +152,7 @@ public class MediaCodecList {
 	}
 
 	/* AOSP findEncoderForFormat()/findCodecForFormat(): the first codec of the requested kind whose
-	 * capabilities support the format; ATL lists only decoders, so no encoder is ever found */
+	 * capabilities support the format */
 	public final String findDecoderForFormat(MediaFormat format) {
 		return findCodecForFormat(false, format);
 	}
