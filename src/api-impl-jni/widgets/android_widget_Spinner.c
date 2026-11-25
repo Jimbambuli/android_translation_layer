@@ -80,7 +80,6 @@ static GtkWidget *find_list_view(GtkWidget *widget)
 JNIEXPORT jlong JNICALL Java_android_widget_Spinner_native_1constructor(JNIEnv *env, jobject this, jobject context, jobject attrs)
 {
 	WrapperWidget *wrapper = g_object_ref_sink(WRAPPER_WIDGET(wrapper_widget_new()));
-	wrapper_widget_set_jobject(wrapper, env, this);
 	GtkListItemFactory *factory = gtk_signal_list_item_factory_new();
 	g_signal_connect(factory, "bind", G_CALLBACK(bind_listitem_cb), wrapper);
 	RangeListModel *model = g_object_new(range_list_model_get_type(), NULL);
@@ -89,6 +88,7 @@ JNIEXPORT jlong JNICALL Java_android_widget_Spinner_native_1constructor(JNIEnv *
 	model->list_view = dropdown;
 	model->jobject = _WEAK_REF(this);
 	wrapper_widget_set_child(WRAPPER_WIDGET(wrapper), dropdown);
+	wrapper_widget_set_jobject(wrapper, env, this); // after the child, like every view: it may queue the child's allocation
 	gtk_widget_set_name(dropdown, "Spinner");
 	/* a row is as high as its view wants (AOSP's ListPopupWindow measures the drop-down views): with the
 	 * default GTK_SCROLL_MINIMUM the list gives each row its minimum height, which is 0 for a view */
@@ -137,16 +137,30 @@ JNIEXPORT void JNICALL Java_android_widget_Spinner_setOnItemSelectedListener(JNI
 	g_signal_connect(dropdown, "notify::selected", G_CALLBACK(on_selected_changed), _REF(listener));
 }
 
+/* the view's background is drawn by its WrapperWidget (the View natives work on the GtkDropDown, whose parent is
+ * the wrapper); the GtkToggleButton inside the GtkDropDown would paint GTK's button background over it */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+static void clear_button_background(GtkWidget *dropdown)
+{
+	GtkWidget *button = gtk_widget_get_first_child(dropdown);
+	if (g_object_get_data(G_OBJECT(button), "background_style_provider"))
+		return;
+	GtkCssProvider *css_provider = gtk_css_provider_new();
+	gtk_css_provider_load_from_string(css_provider, "* { background-image: none; background-color: #00000000; }");
+	gtk_style_context_add_provider(gtk_widget_get_style_context(button), GTK_STYLE_PROVIDER(css_provider), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+	g_object_set_data_full(G_OBJECT(button), "background_style_provider", css_provider, g_object_unref);
+}
+#pragma GCC diagnostic pop
+
 JNIEXPORT void JNICALL Java_android_widget_Spinner_native_1setBackgroundDrawable(JNIEnv *env, jobject this, jlong widget_ptr, jlong paintable_ptr)
 {
-	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
-	// background must be set to the GtkToggleButton which is the first child of the GtkDropDown
-	Java_android_view_View_native_1setBackgroundDrawable(env, this, _INTPTR(gtk_widget_get_first_child(widget)), paintable_ptr);
+	Java_android_view_View_native_1setBackgroundDrawable(env, this, widget_ptr, paintable_ptr);
+	clear_button_background(GTK_WIDGET(_PTR(widget_ptr)));
 }
 
 JNIEXPORT void JNICALL Java_android_widget_Spinner_native_1setBackgroundColor(JNIEnv *env, jobject this, jlong widget_ptr, jint color)
 {
-	GtkWidget *widget = GTK_WIDGET(_PTR(widget_ptr));
-	// background must be set to the GtkToggleButton which is the first child of the GtkDropDown
-	Java_android_view_View_native_1setBackgroundColor(env, this, _INTPTR(gtk_widget_get_first_child(widget)), color);
+	Java_android_view_View_native_1setBackgroundColor(env, this, widget_ptr, color);
+	clear_button_background(GTK_WIDGET(_PTR(widget_ptr)));
 }
