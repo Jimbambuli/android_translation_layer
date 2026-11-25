@@ -55,7 +55,7 @@ public class MediaCodec {
 	private Thread decodeThread;
 	private boolean decoding;
 	/* AOSP MediaCodec::setState() cancels a pending dequeue on every change of state (flush, stop, release) */
-	private int stateGeneration;
+	private volatile int stateGeneration;
 	private Queue<Integer> queuedInputBuffers;
 	private Queue<Integer> freeInputBuffers;
 
@@ -324,6 +324,7 @@ public class MediaCodec {
 		startDecoding();
 		if (callback != null && !pumping) {
 			pumping = true;
+			pump = new Pump(stateGeneration);
 			callbackHandler.post(pump);
 		}
 	}
@@ -376,7 +377,7 @@ public class MediaCodec {
 	private void stopPumping() {
 		synchronized (mListenerLock) {
 			pumping = false;
-			if (callbackHandler != null)
+			if (callbackHandler != null && pump != null)
 				callbackHandler.removeCallbacks(pump);
 		}
 	}
@@ -394,17 +395,29 @@ public class MediaCodec {
 		callbackHandler = handler;
 	}
 
-	private final Runnable pump = new Runnable() {
+	/* AOSP MediaCodec.cpp: a flushed asynchronous codec offers no buffers until start() (kWhatStart in FLUSHED state
+	 * calls onInputBufferAvailable()), so its callbacks reach the handler only after start(). Each start() has a pump
+	 * of its own, which ends with the next flush(), stop() or reset(); a pump of before the flush that is still queued
+	 * on the handler offers nothing (Chrome drops the buffers offered before the message it posts ahead of start()). */
+	private volatile Pump pump;
+
+	private final class Pump implements Runnable {
+		private final int generation;
+
+		Pump(int generation) {
+			this.generation = generation;
+		}
+
 		@Override
 		public void run() {
 			if (!pumping)
 				return;
 			int index;
-			while (pumping && (index = dequeueInputBuffer(0)) >= 0)
+			while (pumping && (index = pumpBuffer(generation, null)) >= 0)
 				callback.onInputBufferAvailable(MediaCodec.this, index);
 			while (pumping) {
 				BufferInfo info = new BufferInfo();
-				index = dequeueOutputBuffer(info, 0);
+				index = pumpBuffer(generation, info);
 				if (index == /*INFO_OUTPUT_FORMAT_CHANGED*/ -2)
 					callback.onOutputFormatChanged(MediaCodec.this, getOutputFormat());
 				else if (index >= 0)
@@ -416,11 +429,18 @@ public class MediaCodec {
 			 * that nothing is posted to a handler whose thread is gone once the codec is stopped.
 			 * ExoPlayer quits the callback thread before it releases the codec, hence the check of the queue. */
 			synchronized (mListenerLock) {
-				if (pumping && !callbackHandler.getLooper().getQueue().isQuitting())
+				if (pumping && generation == stateGeneration && !callbackHandler.getLooper().getQueue().isQuitting())
 					callbackHandler.postDelayed(this, 5);
 			}
 		}
-	};
+	}
+
+	/* a free input buffer (info null) or a decoded output buffer for the pump of this generation, -1 for an older one */
+	private synchronized int pumpBuffer(int generation, BufferInfo info) {
+		if (generation != stateGeneration || native_codec == 0)
+			return /*INFO_TRY_AGAIN_LATER*/ -1;
+		return info == null ? tryDequeueInputBuffer() : tryDequeueOutputBuffer(info);
+	}
 
 	public ByteBuffer[] getInputBuffers() {
 		return inputBuffers;
