@@ -422,16 +422,21 @@ public class Window {
 	 * unless the app has set them (dim behind a floating window, the window animations). */
 	public void applyThemeAttributes() {
 		TypedArray a = context.obtainStyledAttributes(com.android.internal.R.styleable.Window);
-		boolean floating = a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false);
+		applyDimBehind(a, a.getBoolean(com.android.internal.R.styleable.Window_windowIsFloating, false));
+		if (params.windowAnimations == 0)
+			params.windowAnimations = a.getResourceId(com.android.internal.R.styleable.Window_windowAnimationStyle, 0);
+		a.recycle();
+	}
+
+	/* PhoneWindow.generateLayout(): all dialogs (backgroundDimEnabled, by default a floating window) have the
+	 * window behind them dimmed */
+	private void applyDimBehind(TypedArray a, boolean floating) {
 		if (a.getBoolean(com.android.internal.R.styleable.Window_backgroundDimEnabled, floating)) {
 			if ((forcedWindowFlags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) == 0)
 				params.flags |= WindowManager.LayoutParams.FLAG_DIM_BEHIND;
 			if (!haveDimAmount)
 				params.dimAmount = a.getFloat(com.android.internal.R.styleable.Window_backgroundDimAmount, 0.5f);
 		}
-		if (params.windowAnimations == 0)
-			params.windowAnimations = a.getResourceId(com.android.internal.R.styleable.Window_windowAnimationStyle, 0);
-		a.recycle();
 	}
 
 	/* --- action modes, AOSP DecorView.startActionMode() and what it calls ---
@@ -760,6 +765,59 @@ public class Window {
 		return isFloating;
 	}
 
+	/* the dim of the windows behind this one (FLAG_DIM_BEHIND, dimAmount), 0 for none; see doc/activity-windows.md */
+	@Export
+	public float getDimBehind() {
+		return (params.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0 ? params.dimAmount : 0;
+	}
+
+	/* The frame of a floating activity's window in the app's window of width x height: ViewRootImpl.measureHierarchy()
+	 * measures the decor view with the window's size (WRAP_CONTENT for a floating window, generateLayout()), trying
+	 * config_prefDialogWidth first, and WindowLayout.computeFrames() places it with Gravity.apply() (in the middle
+	 * for gravity 0). frame = {x, y, width, height}; see doc/activity-windows.md */
+	@Export
+	public void layoutFloating(int width, int height, int[] frame) {
+		final int heightMeasureSpec = rootMeasureSpec(height, params.height);
+		boolean goodMeasure = false;
+		if (params.width == WindowManager.LayoutParams.WRAP_CONTENT) {
+			final TypedValue tv = new TypedValue();
+			context.getResources().getValue(com.android.internal.R.dimen.config_prefDialogWidth, tv, true);
+			int baseSize = tv.type == TypedValue.TYPE_DIMENSION ? (int)tv.getDimension(context.getResources().getDisplayMetrics()) : 0;
+			if (baseSize != 0 && width > baseSize) {
+				decorView.measure(rootMeasureSpec(baseSize, params.width), heightMeasureSpec);
+				if ((decorView.getMeasuredWidthAndState() & View.MEASURED_STATE_TOO_SMALL) == 0) {
+					goodMeasure = true;
+				} else {
+					baseSize = (baseSize + width) / 2;
+					decorView.measure(rootMeasureSpec(baseSize, params.width), heightMeasureSpec);
+					goodMeasure = (decorView.getMeasuredWidthAndState() & View.MEASURED_STATE_TOO_SMALL) == 0;
+				}
+			}
+		}
+		if (!goodMeasure)
+			decorView.measure(rootMeasureSpec(width, params.width), heightMeasureSpec);
+		final int w = Math.min(decorView.getMeasuredWidth(), width);
+		final int h = Math.min(decorView.getMeasuredHeight(), height);
+		final Rect container = new Rect(0, 0, width, height);
+		final Rect out = new Rect();
+		final int gravity = params.gravity == -1 ? 0 : params.gravity; // -1: none set (AOSP's default is 0)
+		Gravity.apply(gravity, w, h, container, (int)(params.x + params.horizontalMargin * width), (int)(params.y + params.verticalMargin * height), out);
+		Gravity.applyDisplay(gravity, container, out); // FLAG_LAYOUT_NO_LIMITS is not set: inside the app's window
+		frame[0] = out.left;
+		frame[1] = out.top;
+		frame[2] = out.width();
+		frame[3] = out.height();
+	}
+
+	/* ViewRootImpl.getRootMeasureSpec() */
+	private static int rootMeasureSpec(int windowSize, int measurement) {
+		if (measurement == ViewGroup.LayoutParams.MATCH_PARENT)
+			return View.MeasureSpec.makeMeasureSpec(windowSize, View.MeasureSpec.EXACTLY);
+		if (measurement == ViewGroup.LayoutParams.WRAP_CONTENT)
+			return View.MeasureSpec.makeMeasureSpec(windowSize, View.MeasureSpec.AT_MOST);
+		return View.MeasureSpec.makeMeasureSpec(measurement, View.MeasureSpec.EXACTLY);
+	}
+
 	/* like PhoneWindow.installDecor()/generateLayout(), once, when the decor view is first asked
 	 * for: the window flags from the theme, each set with setFlags(), so the Window.Callback hears
 	 * of every one; the attributes ATL implements are applied elsewhere (applyThemeAttributes()) */
@@ -794,6 +852,7 @@ public class Window {
 			setThemeFlag(a, com.android.internal.R.styleable.Window_windowDrawsSystemBarBackgrounds, false, WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
 		if (a.getBoolean(com.android.internal.R.styleable.Window_windowCloseOnTouchOutside, false))
 			setCloseOnTouchOutsideIfNotSet(true);
+		applyDimBehind(a, floating);
 		if (!hasSoftInputMode)
 			params.softInputMode = a.getInt(com.android.internal.R.styleable.Window_windowSoftInputMode, params.softInputMode);
 		a.getValue(com.android.internal.R.styleable.Window_windowMinWidthMajor, mMinWidthMajor);

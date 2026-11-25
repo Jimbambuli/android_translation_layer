@@ -31,42 +31,37 @@ static gboolean starter_below(void)
 static jobject transition_from = NULL;
 static gboolean transition_opening = FALSE;
 
-/* The window's child is a GtkOverlay: the activities are the pages of its GtkStack, and the window
- * that an activity change animates out is shown by a snapshot (AtlWindowGhost) in one of the two
- * layers around the stack - below it for an opening change (the new window slides in over the old
- * one), above it for a closing one (the old window slides away over the revealed one). The stack
- * itself switches pages at once. */
-static GtkWidget *pages_stack;
+/* The window's child is a GtkOverlay around the windows of the activities (AtlPages, see doc/activity-windows.md):
+ * the window that an activity change animates out is shown by a snapshot (AtlWindowGhost) in one of the two
+ * layers around them - below for an opening change (the new window slides in over the old one), above for a
+ * closing one (the old window slides away over the revealed one). */
+static GtkWidget *pages;
 static GtkWidget *pages_below;
 static GtkWidget *pages_above;
-static GtkWidget *pages_backdrop; /* what shows through a translucent activity, below everything */
+
+static gboolean on_touch_outside(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data);
+static GType atl_pages_get_type(void);
 
 GtkWidget *activity_pages_new(void)
 {
 	GtkWidget *overlay = gtk_overlay_new();
-	pages_backdrop = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	pages_below = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-	pages_stack = gtk_stack_new();
+	pages = g_object_new(atl_pages_get_type(), NULL);
 	pages_above = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-	gtk_stack_set_transition_type(GTK_STACK(pages_stack), GTK_STACK_TRANSITION_TYPE_NONE);
 	gtk_widget_set_can_target(pages_above, FALSE);
-	gtk_widget_set_can_target(pages_backdrop, FALSE);
-	gtk_overlay_set_child(GTK_OVERLAY(overlay), pages_backdrop);
-	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_below);
-	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_stack);
-	gtk_overlay_set_measure_overlay(GTK_OVERLAY(overlay), pages_stack, TRUE);
+	gtk_overlay_set_child(GTK_OVERLAY(overlay), pages_below);
+	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages);
+	gtk_overlay_set_measure_overlay(GTK_OVERLAY(overlay), pages, TRUE);
 	gtk_overlay_add_overlay(GTK_OVERLAY(overlay), pages_above);
+	GtkEventController *controller = gtk_event_controller_legacy_new();
+	g_signal_connect(controller, "event", G_CALLBACK(on_touch_outside), NULL);
+	gtk_widget_add_controller(pages, controller);
 	return overlay;
 }
 
 GtkWidget *activity_pages_stack(void)
 {
-	return pages_stack;
-}
-
-static GtkStack *get_stack(void)
-{
-	return GTK_STACK(pages_stack);
+	return pages;
 }
 
 /* ---- AtlWindowGhost: the snapshot of a window that an activity change animates out ---- */
@@ -152,46 +147,189 @@ static gboolean ghost_tick(GtkWidget *widget, GdkFrameClock *clock, gpointer use
 	return more ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
 }
 
-/* shows a snapshot of the page that is about to be left, for the time the window animations need */
-static void ghost_start(GtkWidget *page, gboolean below)
+/* shows a snapshot of what is about to be left (a page, or all of AtlPages), for the time the window animations need */
+static void ghost_start(GtkWidget *what, gboolean below)
 {
 	AtlWindowGhost *ghost = g_object_new(ATL_TYPE_WINDOW_GHOST, NULL);
 	GtkSnapshot *snapshot = gtk_snapshot_new();
-	gtk_widget_snapshot_child(gtk_widget_get_parent(page), page, snapshot); /* as GtkStack does for its transitions */
+	gtk_widget_snapshot_child(gtk_widget_get_parent(what), what, snapshot);
 	ghost->image = gtk_snapshot_free_to_node(snapshot);
 	gtk_box_append(GTK_BOX(below ? pages_below : pages_above), GTK_WIDGET(ghost));
 	gtk_widget_add_tick_callback(GTK_WIDGET(ghost), ghost_tick, NULL, NULL);
 }
 
-/* A translucent activity (windowIsTranslucent) lets the activities behind it show through, as AOSP keeps
- * drawing them. Here only one page of the stack is drawn, so the page gets, when it is first shown, an
- * image of what was visible then: the page it covers, over that page's own backdrop if it is translucent
- * as well. Whenever a page is shown, its backdrop (if any) goes below the stack. */
-static void backdrop_show(GtkWidget *page, GtkWidget *old_page, gboolean translucent)
+/* ---- AtlPages: the windows of the activities of the task, like AOSP's window stack (doc/activity-windows.md) ----
+ * The children are the pages (decor views) of the activities in back stack order, bottom first, and the popovers of
+ * WindowManagerImpl, which are windows of their own. pages_update() decides which pages are visible; those are drawn
+ * live, bottom to top, the one dim layer right below the topmost visible page with FLAG_DIM_BEHIND. A page that is not
+ * floating fills the window, a floating one gets the frame of Window.layoutFloating(). Only the top page takes input
+ * and focus; presses next to a floating top page go to it as well (on_touch_outside()). */
+
+typedef struct {
+	jobject window; /* android.view.Window of the page's activity (global reference) */
+	gboolean floating; /* windowIsFloating */
+} PageInfo;
+
+static void page_info_free(gpointer data)
 {
-	GtkWidget *child;
-	while ((child = gtk_widget_get_first_child(pages_backdrop)))
-		gtk_box_remove(GTK_BOX(pages_backdrop), child);
-	g_object_set_data(G_OBJECT(page), "atl-translucent", GINT_TO_POINTER(translucent));
-	if (!translucent)
-		return;
-	GskRenderNode *image = g_object_get_data(G_OBJECT(page), "atl-backdrop");
-	if (!image && old_page && old_page != page) {
-		GtkSnapshot *snapshot = gtk_snapshot_new();
-		GskRenderNode *below = g_object_get_data(G_OBJECT(old_page), "atl-translucent") ? g_object_get_data(G_OBJECT(old_page), "atl-backdrop") : NULL;
-		if (below)
-			gtk_snapshot_append_node(snapshot, below);
-		gtk_widget_snapshot_child(gtk_widget_get_parent(old_page), old_page, snapshot);
-		image = gtk_snapshot_free_to_node(snapshot);
-		if (!image)
-			return;
-		g_object_set_data_full(G_OBJECT(page), "atl-backdrop", image, (GDestroyNotify)gsk_render_node_unref);
+	PageInfo *info = data;
+	(*get_jni_env())->DeleteGlobalRef(get_jni_env(), info->window);
+	g_free(info);
+}
+
+/* NULL for a child that is not a page (a popover) */
+static PageInfo *page_info(GtkWidget *child)
+{
+	return g_object_get_data(G_OBJECT(child), "atl-page");
+}
+
+#define ATL_TYPE_PAGES (atl_pages_get_type())
+G_DECLARE_FINAL_TYPE(AtlPages, atl_pages, ATL, PAGES, GtkWidget)
+
+struct _AtlPages {
+	GtkWidget parent_instance;
+	GtkWidget *top; /* the visible page on top: input and focus */
+	/* the dim layer (Dimmer): drawn right below dim_page, or over all pages while it fades out after dim_page was
+	 * removed (NULL); dim is the amount shown, fading from dim_from to dim_to */
+	GtkWidget *dim_page;
+	float dim, dim_from, dim_to;
+	gint64 dim_start, dim_duration; /* us */
+	guint dim_tick;
+};
+
+G_DEFINE_FINAL_TYPE(AtlPages, atl_pages, GTK_TYPE_WIDGET)
+
+/* like GtkStack (homogeneous): as large as the largest page that is not floating */
+static void atl_pages_measure(GtkWidget *widget, GtkOrientation orientation, int for_size, int *minimum, int *natural, int *minimum_baseline, int *natural_baseline)
+{
+	*minimum = *natural = 0;
+	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+		PageInfo *info = page_info(child);
+		if (!info || info->floating || !gtk_widget_get_visible(child))
+			continue;
+		int child_minimum, child_natural;
+		gtk_widget_measure(child, orientation, for_size, &child_minimum, &child_natural, NULL, NULL);
+		*minimum = MAX(*minimum, child_minimum);
+		*natural = MAX(*natural, child_natural);
 	}
-	if (!image)
+}
+
+static void atl_pages_size_allocate(GtkWidget *widget, int width, int height, int baseline)
+{
+	JNIEnv *env = get_jni_env();
+	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+		PageInfo *info = page_info(child);
+		if (!info || !gtk_widget_get_child_visible(child))
+			continue;
+		if (!info->floating) {
+			gtk_widget_allocate(child, width, height, -1, NULL);
+			continue;
+		}
+		int minimum;
+		gtk_widget_measure(child, GTK_ORIENTATION_HORIZONTAL, -1, &minimum, NULL, NULL, NULL); /* GTK's order; the size is the window's */
+		jintArray frame_array = (*env)->NewIntArray(env, 4);
+		J__Window__layoutFloating(env, info->window, width, height, frame_array);
+		jint frame[4] = {0, 0, width, height};
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+		} else {
+			(*env)->GetIntArrayRegion(env, frame_array, 0, 4, frame);
+		}
+		(*env)->DeleteLocalRef(env, frame_array);
+		gtk_widget_allocate(child, frame[2], frame[3], -1, gsk_transform_translate(NULL, &GRAPHENE_POINT_INIT(frame[0], frame[1])));
+	}
+}
+
+static void atl_pages_snapshot(GtkWidget *widget, GtkSnapshot *snapshot)
+{
+	AtlPages *self = ATL_PAGES(widget);
+	graphene_rect_t bounds = GRAPHENE_RECT_INIT(0, 0, gtk_widget_get_width(widget), gtk_widget_get_height(widget));
+	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+		if (!page_info(child) || !gtk_widget_get_child_visible(child))
+			continue;
+		if (child == self->dim_page && self->dim > 0)
+			gtk_snapshot_append_color(snapshot, &(GdkRGBA){0, 0, 0, self->dim}, &bounds);
+		gtk_widget_snapshot_child(widget, child, snapshot);
+	}
+	if (!self->dim_page && self->dim > 0)
+		gtk_snapshot_append_color(snapshot, &(GdkRGBA){0, 0, 0, self->dim}, &bounds);
+}
+
+static void atl_pages_dispose(GObject *object)
+{
+	AtlPages *self = ATL_PAGES(object);
+	GtkWidget *child;
+	if (self->dim_tick)
+		gtk_widget_remove_tick_callback(GTK_WIDGET(self), self->dim_tick);
+	self->dim_tick = 0;
+	while ((child = gtk_widget_get_first_child(GTK_WIDGET(self))))
+		gtk_widget_unparent(child);
+	G_OBJECT_CLASS(atl_pages_parent_class)->dispose(object);
+}
+
+static void atl_pages_class_init(AtlPagesClass *class)
+{
+	G_OBJECT_CLASS(class)->dispose = atl_pages_dispose;
+	GTK_WIDGET_CLASS(class)->measure = atl_pages_measure;
+	GTK_WIDGET_CLASS(class)->size_allocate = atl_pages_size_allocate;
+	GTK_WIDGET_CLASS(class)->snapshot = atl_pages_snapshot;
+}
+
+static void atl_pages_init(AtlPages *self)
+{
+	gtk_widget_set_overflow(GTK_WIDGET(self), GTK_OVERFLOW_HIDDEN);
+}
+
+static gboolean dim_tick(GtkWidget *widget, GdkFrameClock *clock, gpointer user_data)
+{
+	AtlPages *self = ATL_PAGES(widget);
+	gint64 now = gdk_frame_clock_get_frame_time(clock);
+	if (!self->dim_start)
+		self->dim_start = now;
+	double t = self->dim_duration > 0 ? (double)(now - self->dim_start) / self->dim_duration : 1;
+	self->dim = t >= 1 ? self->dim_to : self->dim_from + (self->dim_to - self->dim_from) * t;
+	gtk_widget_queue_draw(widget);
+	if (t < 1)
+		return G_SOURCE_CONTINUE;
+	self->dim_tick = 0;
+	return G_SOURCE_REMOVE;
+}
+
+/* Dimmer: the dim layer goes to page with amount (or away, page NULL); a change of the amount fades in 200 ms
+ * (times the animator duration scale), as AOSP's default dim animation. A dim whose page was covered by an opaque
+ * one goes at once (it is below that page). */
+static void pages_dim(AtlPages *self, GtkWidget *page, float amount)
+{
+	GtkWidget *old = self->dim_page;
+	gboolean old_gone = old && gtk_widget_get_parent(old) != GTK_WIDGET(self);
+	if (page)
+		self->dim_page = page;
+	else if (old_gone)
+		self->dim_page = NULL;
+	else if (old && !gtk_widget_get_child_visible(old))
+		self->dim = 0;
+	if (self->dim_tick)
+		gtk_widget_remove_tick_callback(GTK_WIDGET(self), self->dim_tick);
+	self->dim_tick = 0;
+	if (self->dim == amount) {
+		gtk_widget_queue_draw(GTK_WIDGET(self));
 		return;
-	AtlWindowGhost *ghost = g_object_new(ATL_TYPE_WINDOW_GHOST, NULL);
-	ghost->image = gsk_render_node_ref(image);
-	gtk_box_append(GTK_BOX(pages_backdrop), GTK_WIDGET(ghost));
+	}
+	JNIEnv *env = get_jni_env();
+	jclass animator = (*env)->FindClass(env, "android/animation/ValueAnimator");
+	float scale = (*env)->CallStaticFloatMethod(env, animator, (*env)->GetStaticMethodID(env, animator, "getDurationScale", "()F"));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+		scale = 1;
+	}
+	(*env)->DeleteLocalRef(env, animator);
+	self->dim_from = self->dim;
+	self->dim_to = amount;
+	self->dim_start = 0;
+	self->dim_duration = 200 * 1000 * scale;
+	self->dim_tick = gtk_widget_add_tick_callback(GTK_WIDGET(self), dim_tick, NULL, NULL);
 }
 
 static GtkWidget *get_decor_view(JNIEnv *env, jobject activity)
@@ -328,6 +466,8 @@ static void stop_later(JNIEnv *env, jobject activity)
 	g_idle_add(stop_when_idle, _REF(activity));
 }
 
+static void pages_update(JNIEnv *env, GtkWidget *shown);
+
 static void activity_close(JNIEnv *env, jobject activity)
 {
 	// in case some exception was left unhandled in native code, print it here so we don't confuse it with an exception thrown by onDestroy
@@ -345,9 +485,10 @@ static void activity_close(JNIEnv *env, jobject activity)
 	}
 
 	GtkWidget *decor_view = get_decor_view(env, activity);
-	GtkStack *stack = get_stack();
-	if (gtk_widget_get_parent(decor_view) == GTK_WIDGET(stack))
-		gtk_stack_remove(stack, decor_view);
+	if (pages && gtk_widget_get_parent(decor_view) == pages) {
+		gtk_widget_unparent(decor_view);
+		pages_update(env, NULL);
+	}
 
 	/* -- run the activity's onDestroy -- */
 	J__Activity__performDestroy(env, activity);
@@ -379,24 +520,101 @@ static void grab_focus_in_place(GtkWidget *widget)
 	g_slist_free(viewports);
 }
 
+/* WindowManager.addView() of the activity's window: its page goes into AtlPages, hidden until pages_update() shows it.
+ * Like Activity.makeVisible(), the decor view is asked for (installDecor(): windowIsFloating, windowIsTranslucent). */
+static void pages_add(JNIEnv *env, jobject activity, GtkWidget *page)
+{
+	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
+	jobject decor = (*env)->CallObjectMethod(env, window_jobj, _METHOD(_CLASS(window_jobj), "getDecorView", "()Landroid/view/View;"));
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	PageInfo *info = g_new0(PageInfo, 1);
+	info->window = (*env)->NewGlobalRef(env, window_jobj);
+	info->floating = _GET_BOOL_FIELD(window_jobj, "isFloating");
+	g_object_set_data_full(G_OBJECT(page), "atl-page", info, page_info_free);
+	(*env)->DeleteLocalRef(env, decor);
+	(*env)->DeleteLocalRef(env, window_jobj);
+	gtk_widget_set_child_visible(page, FALSE);
+	gtk_widget_insert_before(page, pages, NULL);
+}
+
+/* Like TaskFragment.updateActivityVisibilities() for the windows: from the top of the back stack down, the pages
+ * of the activities up to and including the first one that occludes what is behind it (activity_occludes(), the
+ * same rule as for stopping, stop_when_idle()) are visible; those below are hidden. A visible activity whose page
+ * is not in AtlPages yet gets it now (Activity.makeVisible(): e.g. one that started a translucent activity from
+ * onCreate()), except the top of the back stack, whose page comes when it is shown after onResume() (shown).
+ * The pages keep the order of the back stack; the top visible page gets input and focus; the dim layer goes
+ * right below the topmost visible page with FLAG_DIM_BEHIND (Dimmer). */
+static void pages_update(JNIEnv *env, GtkWidget *shown)
+{
+	if (!pages)
+		return;
+	AtlPages *self = ATL_PAGES(pages);
+	GList *visible = NULL; /* top first */
+	for (GList *l = activity_backlog; l; l = l->next) {
+		GtkWidget *page = get_decor_view(env, l->data);
+		if (gtk_widget_get_parent(page) != pages) {
+			if (l == activity_backlog && page != shown)
+				continue;
+			pages_add(env, l->data, page);
+		}
+		visible = g_list_append(visible, page);
+		if (activity_occludes(env, l->data))
+			break;
+	}
+	GtkWidget *prev = NULL;
+	for (GList *l = g_list_last(activity_backlog); l; l = l->prev) {
+		GtkWidget *page = get_decor_view(env, l->data);
+		if (gtk_widget_get_parent(page) != pages)
+			continue;
+		if ((prev ? gtk_widget_get_next_sibling(prev) : gtk_widget_get_first_child(pages)) != page)
+			gtk_widget_insert_after(page, pages, prev);
+		prev = page;
+	}
+	self->top = visible ? visible->data : NULL;
+	for (GtkWidget *child = gtk_widget_get_first_child(pages); child; child = gtk_widget_get_next_sibling(child)) {
+		if (!page_info(child))
+			continue;
+		gtk_widget_set_child_visible(child, g_list_find(visible, child) != NULL);
+		gtk_widget_set_can_target(child, child == self->top);
+		gtk_widget_set_can_focus(child, child == self->top);
+	}
+	GtkWidget *dim_page = NULL;
+	float dim = 0;
+	for (GList *l = visible; l && !dim_page; l = l->next) {
+		dim = J__Window__getDimBehind(env, page_info(l->data)->window);
+		if ((*env)->ExceptionCheck(env)) {
+			(*env)->ExceptionDescribe(env);
+			(*env)->ExceptionClear(env);
+			dim = 0;
+		}
+		if (dim > 0)
+			dim_page = l->data;
+	}
+	pages_dim(self, dim_page, dim);
+	g_list_free(visible);
+}
+
+GtkWidget *activity_pages_top(void)
+{
+	return pages ? ATL_PAGES(pages)->top : NULL;
+}
+
 /* On Android every activity has a window of its own, which keeps its focused view while another
  * activity is in front; a window that gets the focus back assigns no new focus and does not scroll.
- * Here all activities are pages of one GtkStack, which would move the focus to the widget focused
- * in the page before, or else to the first focusable one, and the viewports of the scroll views
+ * Here all activities are pages of AtlPages, in one GtkWindow: GTK would move the focus to the widget
+ * focused in the page before, or else to the first focusable one, and the viewports of the scroll views
  * would then scroll to it (e.g. back to the top of a page that the user had scrolled down). So
  * remember the focus of the page that is left, and only give it back, in place, when the page is
- * shown again; a page shown for the first time gets the first focusable widget, as from GtkStack. */
-static void stack_show_page(GtkStack *stack, GtkWidget *page)
+ * shown again; a page shown for the first time gets the first focusable widget. */
+static void pages_show(JNIEnv *env, GtkWidget *page)
 {
-	GtkRoot *root = gtk_widget_get_root(GTK_WIDGET(stack));
-	GtkWidget *old_page = gtk_stack_get_visible_child(stack);
+	GtkRoot *root = gtk_widget_get_root(pages);
+	GtkWidget *old_page = ATL_PAGES(pages)->top;
 	GtkWidget *focus = root ? gtk_root_get_focus(root) : NULL;
 	gboolean had_focus = old_page && focus && gtk_widget_is_ancestor(focus, old_page);
-
-	/* like WindowManager.addView() in ActivityThread.handleResumeActivity(): a new activity's window is added
-	 * only now, so its views are attached to the window (onAttachedToWindow()) after onResume() */
-	if (gtk_widget_get_parent(page) != GTK_WIDGET(stack))
-		gtk_stack_add_child(stack, page);
 
 	if (old_page && old_page != page) {
 		GWeakRef *ref = g_new(GWeakRef, 1);
@@ -406,7 +624,9 @@ static void stack_show_page(GtkStack *stack, GtkWidget *page)
 			gtk_root_set_focus(root, NULL);
 	}
 
-	gtk_stack_set_visible_child(stack, page);
+	/* like WindowManager.addView() in ActivityThread.handleResumeActivity(): a new activity's window is added
+	 * only now, so its views are attached to the window (onAttachedToWindow()) after onResume() */
+	pages_update(env, page);
 
 	if (!had_focus || old_page == page)
 		return;
@@ -430,7 +650,7 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	/* an activity of another process that it started is still on top of it (in that process's window): it is
 	 * shown, but stays paused until that one finishes (Activity.startInOtherProcess()) */
 	if (_GET_INT_FIELD(activity, "coveringOtherProcesses") > 0) {
-		stack_show_page(get_stack(), get_decor_view(env, activity));
+		pages_show(env, get_decor_view(env, activity));
 		return;
 	}
 
@@ -470,25 +690,24 @@ static void activity_focus(JNIEnv *env, jobject activity)
 	if (!activity_backlog || !(*env)->IsSameObject(env, activity_backlog->data, activity))
 		return;
 	GtkWidget *decor_view = get_decor_view(env, activity);
-	GtkStack *stack = get_stack();
-	GtkWidget *old_page = gtk_stack_get_visible_child(stack);
+	GtkWidget *old_page = ATL_PAGES(pages)->top;
 	if (old_page && old_page != decor_view && transition_from) {
-		jint duration = J__Activity__startWindowTransition(env, activity, transition_from, transition_opening,
-		                                                   gtk_widget_get_width(GTK_WIDGET(stack)), gtk_widget_get_height(GTK_WIDGET(stack)));
+		/* the activity that opens or closes is translucent or floating: what is below it stays visible and
+		 * does not animate, only that window does (see Activity.startWindowTransition()) */
+		gboolean translucent = !activity_occludes(env, transition_opening ? activity : transition_from);
+		jint duration = J__Activity__startWindowTransition(env, activity, transition_from, transition_opening, translucent,
+		                                                   gtk_widget_get_width(pages), gtk_widget_get_height(pages));
 		if ((*env)->ExceptionCheck(env)) {
 			(*env)->ExceptionDescribe(env);
 			(*env)->ExceptionClear(env);
 			duration = 0;
 		}
-		if (duration > 0)
-			ghost_start(old_page, transition_opening);
+		/* opening: all that was visible goes below the new window; closing: the closed window over the revealed ones */
+		if (duration > 0 && !(transition_opening && translucent))
+			ghost_start(transition_opening ? pages : old_page, transition_opening);
 	}
 	transition_from = NULL;
-	jobject window_jobj = _GET_OBJ_FIELD(activity, "window", "Landroid/view/Window;");
-	gboolean translucent = window_jobj && _GET_BOOL_FIELD(window_jobj, "isTranslucent");
-	(*env)->DeleteLocalRef(env, window_jobj);
-	backdrop_show(decor_view, old_page, translucent);
-	stack_show_page(stack, decor_view);
+	pages_show(env, decor_view);
 
 	J__Activity__onTopResumedActivityChanged(env, activity, true);
 	if ((*env)->ExceptionCheck(env)) {
@@ -814,6 +1033,50 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeBackInvoked(JNIEnv *env, 
 #define META_ALT_ON           (1 << 1)
 #define META_CTRL_ON          (1 << 12)
 #define META_META_ON          (1 << 16)
+
+#define SOURCE_MOUSE 0x2002
+#define SOURCE_TOUCHSCREEN 0x1002
+
+/* A floating window is touch-modal (no FLAG_NOT_TOUCH_MODAL): on AOSP it gets the touches outside of it as well,
+ * with coordinates outside of its frame, which the windows behind it never see. Its decor view hands them to the
+ * activity (Activity.dispatchTouchEvent()), whose onTouchEvent() finishes it if it closes on a touch outside
+ * (Window.shouldCloseOnTouch(); windowCloseOnTouchOutside of the dialog themes). Here these are the presses and
+ * releases on AtlPages next to the floating top page (the pages below take no input). */
+static gboolean on_touch_outside(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer user_data)
+{
+	GdkEventType type = gdk_event_get_event_type(event);
+	int action;
+	if (type == GDK_BUTTON_PRESS || type == GDK_TOUCH_BEGIN)
+		action = ACTION_DOWN;
+	else if (type == GDK_BUTTON_RELEASE || type == GDK_TOUCH_END)
+		action = ACTION_UP;
+	else
+		return FALSE;
+	GtkWidget *page = activity_pages_top();
+	if (!page || !page_info(page)->floating || !WRAPPER_IS_WIDGET(page))
+		return FALSE;
+	GtkNative *native = gtk_widget_get_native(page);
+	double x, y, nx, ny;
+	if (!native || !gdk_event_get_position(event, &x, &y))
+		return FALSE;
+	gtk_native_get_surface_transform(native, &nx, &ny);
+	graphene_point_t point;
+	if (!gtk_widget_compute_point(GTK_WIDGET(native), page, &GRAPHENE_POINT_INIT(x - nx, y - ny), &point))
+		return FALSE;
+	if (point.x >= 0 && point.y >= 0 && point.x < gtk_widget_get_width(page) && point.y < gtk_widget_get_height(page))
+		return FALSE;
+	JNIEnv *env = get_jni_env();
+	jobject decor = WRAPPER_WIDGET(page)->jobj;
+	jobject motion_event = J_new__MotionEvent__single(env, type == GDK_TOUCH_BEGIN || type == GDK_TOUCH_END ? SOURCE_TOUCHSCREEN : SOURCE_MOUSE,
+	                                                  action, (jlong)gdk_event_get_time(event), point.x, point.y, x - nx, y - ny);
+	(*env)->CallBooleanMethod(env, decor, _METHOD(_CLASS(decor), "dispatchTouchEvent", "(Landroid/view/MotionEvent;)Z"), motion_event);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionDescribe(env);
+		(*env)->ExceptionClear(env);
+	}
+	(*env)->DeleteLocalRef(env, motion_event);
+	return TRUE;
+}
 
 static gboolean dispatch_window_key(JNIEnv *env, int action, int code, int repeat, int meta, int scancode, int flags, int unicode, jlong down_time)
 {
@@ -1279,7 +1542,7 @@ static void pinned_task_expand(void)
 		return;
 	GtkWidget *page;
 	jobject activity = pinned_task_take(&page);
-	gtk_stack_add_child(get_stack(), page);
+	pages_add(env, activity, page);
 	g_object_unref(page);
 	pinned_task_changed(env, activity, 0, 0);
 	activity_backlog = g_list_prepend(activity_backlog, activity);
@@ -1524,7 +1787,8 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeEnterPictureInPicture
 	activity_backlog = g_list_delete_link(activity_backlog, l);
 	GtkWidget *page = get_decor_view(env, this);
 	g_object_ref(page);
-	gtk_stack_remove(get_stack(), page);
+	gtk_widget_unparent(page);
+	pages_update(env, NULL);
 	pinned_task_default_size(aspect_ratio, &pinned_width, &pinned_height);
 	pinned_window_new(env, page);
 	g_object_unref(page);
@@ -1608,7 +1872,7 @@ void activity_start(JNIEnv *env, jobject activity_object)
 	}
 
 	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
-	/* the decor view is added to the stack when the activity is shown (stack_show_page()) */
+	/* the decor view is added to AtlPages when the activity is shown (pages_show()) */
 	activity_update_current(env);
 	transition_from = NULL;
 }
@@ -1727,6 +1991,7 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeRecreate(JNIEnv *env, job
 	}
 	_UNREF(old_activity);
 	activity_update_current(env);
+	pages_update(env, NULL); // one that is visible below the top gets its new window (Activity.makeVisible())
 }
 
 static gboolean task_clearing_has(JNIEnv *env, jobject activity);

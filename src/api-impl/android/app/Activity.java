@@ -1557,14 +1557,17 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 	 * leaving one is no longer part of the stack and is shown by a snapshot, which the native code
 	 * draws with the transformation sampled here. Returns how long the snapshot is needed, in ms
 	 * (0: none). An opening change keeps the old window below the new one until the animation of the
-	 * new window ends, a closing one animates the old window out.
+	 * new window ends, a closing one animates the old window out. When the activity that opens or
+	 * closes is translucent or floating (translucent), the window below it stays visible: only that
+	 * window animates, with the translucent variant of the default animation (AOSP
+	 * TransitionAnimation.loadAnimationAttr(), updateToTranslucentAnimIfNeeded()).
 	 */
 	private static Animation leavingAnimation;
 	private static long leavingDuration;
 	private static final Transformation leavingTransformation = new Transformation();
 
 	@Export
-	private static int startWindowTransition(Activity entering, Activity leaving, boolean opening, int width, int height) {
+	private static int startWindowTransition(Activity entering, Activity leaving, boolean opening, boolean translucent, int width, int height) {
 		boolean set = pendingTransitionSet;
 		pendingTransitionSet = false;
 		leavingAnimation = null;
@@ -1576,10 +1579,18 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 			enter = loadWindowAnimation(entering, pendingEnterAnim, width, height);
 			exit = loadWindowAnimation(leaving, pendingExitAnim, width, height);
 		} else {
-			enter = loadWindowAnimation(entering, windowAnimationAttr(entering, opening ? com.android.internal.R.styleable.WindowAnimation_activityOpenEnterAnimation
-			                                                                           : com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation), width, height);
-			exit = loadWindowAnimation(leaving, windowAnimationAttr(leaving, opening ? com.android.internal.R.styleable.WindowAnimation_activityOpenExitAnimation
-			                                                                         : com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation), width, height);
+			int enterId = windowAnimationAttr(entering, opening ? com.android.internal.R.styleable.WindowAnimation_activityOpenEnterAnimation
+			                                                    : com.android.internal.R.styleable.WindowAnimation_activityCloseEnterAnimation);
+			int exitId = windowAnimationAttr(leaving, opening ? com.android.internal.R.styleable.WindowAnimation_activityOpenExitAnimation
+			                                                  : com.android.internal.R.styleable.WindowAnimation_activityCloseExitAnimation);
+			enter = loadWindowAnimation(entering, translucent && opening ? translucentAnimation(enterId) : enterId, width, height);
+			exit = loadWindowAnimation(leaving, translucent && !opening ? translucentAnimation(exitId) : exitId, width, height);
+		}
+		if (translucent) {
+			if (opening)
+				exit = null;
+			else
+				enter = null;
 		}
 		if (enter != null)
 			entering.getWindow().getDecorView().startAnimation(enter);
@@ -1614,6 +1625,14 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, Ke
 		a = activity.getTheme().obtainStyledAttributes(style, com.android.internal.R.styleable.WindowAnimation);
 		int id = a.getResourceId(attr, 0);
 		a.recycle();
+		return id;
+	}
+
+	private static int translucentAnimation(int id) {
+		if (id == com.android.internal.R.anim.activity_open_enter)
+			return com.android.internal.R.anim.activity_translucent_open_enter;
+		if (id == com.android.internal.R.anim.activity_close_exit)
+			return com.android.internal.R.anim.activity_translucent_close_exit;
 		return id;
 	}
 

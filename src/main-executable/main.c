@@ -183,9 +183,8 @@ gboolean app_exit(GtkWindow *self, JNIEnv *env) // TODO: do more cleanup?
 		return TRUE;
 	start_exit_watchdog();
 	activity_close_all();
-	/* popups (PopupWindow, WindowManager windows) are popovers in the GtkStack next to the
-	 * activities' pages; GtkStack's dispose removes only pages and loops forever on any other
-	 * child, so they go first, as AOSP removes the remaining windows of a closed app */
+	/* popups (PopupWindow, WindowManager windows) are popovers in AtlPages next to the
+	 * activities' pages; they go first, as AOSP removes the remaining windows of a closed app */
 	GtkWidget *stack = activity_pages_stack();
 	GtkWidget *child = stack ? gtk_widget_get_first_child(stack) : NULL;
 	while (child) {

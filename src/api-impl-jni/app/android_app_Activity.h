@@ -12,7 +12,9 @@ void activity_window_present(void);
 void activity_app_quit(void);
 /* the window's child: the pages of the activities and the layers for their window animations */
 GtkWidget *activity_pages_new(void);
+/* AtlPages, the activities' windows (see doc/activity-windows.md), and its visible page on top (input and focus) */
 GtkWidget *activity_pages_stack(void);
+GtkWidget *activity_pages_top(void);
 void current_activity_back_pressed(void);
 /* the keys that reach the app's window go to the shown activity (Window.dispatchKeyEventFromNative()) */
 void activity_window_add_key_controller(GtkWindow *window);

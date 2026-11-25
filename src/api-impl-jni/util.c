@@ -500,7 +500,7 @@ static void on_move_focus(GtkWidget *widget, GtkDirectionType direction, gpointe
 	GtkWidget *root = gtk_window_get_child(window);
 	GtkWidget *stack = activity_pages_stack();
 	if (stack && gtk_widget_get_root(stack) == GTK_ROOT(window))
-		root = gtk_stack_get_visible_child(GTK_STACK(stack));
+		root = activity_pages_top();
 	if (root && WRAPPER_IS_WIDGET(root) && WRAPPER_WIDGET(root)->jobj) {
 		JNIEnv *env = get_jni_env();
 		J__Window__moveFocusOnTab(env, WRAPPER_WIDGET(root)->jobj, direction == GTK_DIR_TAB_FORWARD);
